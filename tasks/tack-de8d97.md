@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: codex-trust-restore
 created: 2026-09-28T10:51:24Z
-updated: 2026-09-29T10:23:20Z
+updated: 2026-09-29T10:42:56Z
 started: 2026-09-29T09:14:43Z
 depends: []
 tags: [rules]
@@ -34,3 +34,4 @@ From the local-layer review: with trust out of the index, a merge, rebase, check
 - 2026-09-29T10:17:14Z (codex-trust-restore): Plan review round 1: rollout live check gated on git diff --quiet; restore refuses a headerless file without a final newline and checks the filter output is unchanged; README qualifies fresh clone
 - 2026-09-29T10:23:20Z (codex-trust-restore): resumed
   provenance: {"harness_session":"claude-code:669361e4-a89f-455b-a473-2b02963d95ac","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-29T10:42:56Z (codex-trust-restore): Tasks 1-4 landed (982283a..5764f5d); final review fix 70e6c85 (multi-line string placement); deferred minors filed as tack-46ba6c
