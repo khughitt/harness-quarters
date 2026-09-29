@@ -38,9 +38,11 @@ of the three ideas are built on it.
   (ops 30, prism 27, beliefs 17, familiar 15, obs 14, niri-material 14, …;
   tack 3, of which tack-bc49ed is the one sizable tree). None of them has a
   recorded reviewer, so the reverse direction has no baseline to replay.
-- Positive signal, not cross-family: tack-b2291c (feedback from lit) — an
-  independent parser review caught loader acceptance differences that passing
-  fixtures missed. Its reviewer family is unknown.
+- Same-family baseline: tack-b2291c (feedback from lit) — in lit-a7b4ec, a
+  Codex session's fresh-context reviewer subagent (`review_safe_yaml`,
+  gpt-6-sol, `fork_turns: none`) caught YAML acceptance changes that a
+  371-test gate passed. A fresh reviewer from the same family already finds
+  real problems; tack-fc26cf measures what a second family adds on top.
 - Unknown: the mindful source thoughts (48e70c65…, 34328bb6…) are not found by
   the current `mindful` CLI; the task bodies carry their content.
 
