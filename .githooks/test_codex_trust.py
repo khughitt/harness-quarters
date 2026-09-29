@@ -157,6 +157,20 @@ def test_a_file_with_no_header_and_no_final_newline_is_refused(repo):
     assert live(repo).read_text() == 'personality = "p"'
 
 
+def test_restore_skips_a_header_like_line_inside_a_string(repo):
+    text = 'developer_instructions = """\nUse these sections:\n[notes]\nend\n"""\n\n' + BASE
+    live(repo).write_text(text)
+    saved(repo).write_text(A)
+
+    result = trust(repo, "restore")
+
+    assert result.returncode == 0, result.stderr
+    restored = tomllib.loads(live(repo).read_text())
+    assert restored["developer_instructions"] == tomllib.loads(text)["developer_instructions"]
+    assert list(restored["projects"]) == ["/work/a"]
+    assert clean(repo, live(repo).read_text()) == clean(repo, text)
+
+
 def test_restore_twice_inserts_nothing_the_second_time(repo):
     saved(repo).write_text(A)
 

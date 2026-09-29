@@ -136,23 +136,31 @@ def write(path, text):
         raise
 
 
-def insert(live, tables):
-    """live with tables before its first table header, or at its end when it has none.
+def placements(live, tables):
+    """live with tables before each header-like line in turn, then at its end.
 
-    The filter drops everything from a trust header to the next header, so the inserted
-    tables and the blank line that ends them leave its output unchanged. Text appended
-    after the last table would not: the blank line before it is kept. A file with no
-    header and no final newline is refused: the newline a table needs before it would
-    change what git stages.
+    The filter drops everything from a trust header to the next header, so tables
+    inserted before a header, with the blank line that ends them, leave its output
+    unchanged. Text appended after the last table would not: the blank line before it is
+    kept. A header-like line can sit inside a multi-line string, so restore takes the
+    first placement that keeps every value. A file with no header and no final newline
+    is refused: the newline a table needs before it would change what git stages.
     """
     offset = 0
     for line in live.splitlines(keepends=True):
         if TOML_HEADER.match(line):
-            return live[:offset] + tables + "\n" + live[offset:]
+            yield live[:offset] + tables + "\n" + live[offset:]
         offset += len(line)
     if live and not live.endswith("\n"):
         fail(f"{LIVE_NAME} has no table header and no final newline; add the newline")
-    return live + tables
+    yield live + tables
+
+
+def loads(text):
+    try:
+        return tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
+        return None
 
 
 def capture():
@@ -169,12 +177,15 @@ def restore():
     missing = [table for path, table in read_saved().items() if path not in present]
     if not missing:
         return False
-    result = insert(live, render(missing))
-    parse(result, f"{LIVE_NAME} with the restored tables")
-    if CLEAN_TOML(result) != CLEAN_TOML(live):
-        fail(f"restoring would change what git stages from {LIVE_NAME}; nothing written")
-    write(LIVE.resolve(), result)
-    return True
+    tables = render(missing)
+    want = parse(live, LIVE_NAME)
+    want.setdefault("projects", {}).update(parse(tables, SAVED_NAME)["projects"])
+    for result in placements(live, tables):
+        if loads(result) == want and CLEAN_TOML(result) == CLEAN_TOML(live):
+            write(LIVE.resolve(), result)
+            return True
+    fail(f"found no place in {LIVE_NAME} for the saved tables that keeps its values and "
+         "what git stages; nothing written")
 
 
 def restage():

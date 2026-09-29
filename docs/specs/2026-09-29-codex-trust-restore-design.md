@@ -96,8 +96,11 @@ checkout it lives in (like `harness-state-refresh`, which it serves) and on
   means that a line appended at the end of the file by hand does not join a trust
   table, whose lines the filter would drop. A file with no table header gets the
   tables at its end. If it also lacks a final newline, restore refuses: the newline
-  a table needs before it would change the filter's output. As a last guard, `restore`
-  compares the filter's output before and after, and writes nothing if they differ.
+  a table needs before it would change the filter's output. A header-like line can sit
+  inside a multi-line string, so `restore` tries the headers in order and takes the
+  first placement whose parsed values equal the live file's plus the restored tables
+  and whose filter output equals the live file's. If none does, it writes nothing and
+  exits non-zero.
 - `sync` is `capture` then `restore`, under one lock.
 - `hook <name>` is `restore` as the git hooks run it (§3.3). It then restages the file
   when its filtered diff is empty and no other git process holds the index, as
