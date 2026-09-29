@@ -1,0 +1,12 @@
+name = "tack"
+purpose = "Agent harness configuration: global instructions, skills, rules"
+abstract = """
+The global instructions every Claude Code and Codex session loads, the skills and tools
+those sessions call, and each harness's settings and hooks. Per-project profiles here
+carry what differs between personal, work, and external checkouts.
+"""
+authority = []
+subsystems = []
+
+[agents]
+scope = "global"

@@ -1,0 +1,267 @@
+{
+  "env": {
+    "CLAUDE_CODE_SHELL": "/bin/bash",
+    "TASKS_FORMAT": "json"
+  },
+  "includeCoAuthoredBy": false,
+  "permissions": {
+    "allow": [
+      "Bash(fd)",
+      "Bash(find)",
+      "Bash(git log:*)",
+      "Bash(jq)",
+      "Bash(just)",
+      "Bash(ls)",
+      "Bash(mkdir)",
+      "Bash(npm run format)",
+      "Bash(npm run lint)",
+      "Bash(npm run lint_fix)",
+      "Bash(npm run test:*)",
+      "Bash(npm run type-check)",
+      "Bash(ps)",
+      "Bash(rg)",
+      "Bash(uv run pytest)",
+      "Bash(uv run ruff)",
+      "Read(~/.zshrc)",
+      "Glob",
+      "Grep",
+      "LS",
+      "Read",
+      "Edit",
+      "MultiEdit",
+      "WebFetch",
+      "WebSearch",
+      "Write"
+    ],
+    "defaultMode": "auto",
+    "_denyRemovedNote": "permissions.deny (Bash(curl:*), Read(./.env), Read(./.env.*), Read(./secrets/**)) removed 2026-09-03: Claude Code 2.1.259 widened Read() deny-rule matching so any `cd DIR && grep -r`/`cp -r` compound now triggers a mandatory ask whenever ANY Read() deny rule exists, even when the target doesn't match the rule, and even under bypassPermissions/--dangerously-skip-permissions. Made routine cd+recursive-grep commands prompt constantly. Reported upstream (SendFeedback draft); re-add these rules once fixed."
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/familiar/bin/familiar hook SessionStart"
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/ops/hooks/claude-sessionstart"
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/ops/hooks/claude-provenance"
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/ops/hooks/claude-profile"
+          }
+        ]
+      }
+    ],
+    "PostModelSwitch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/ops/hooks/claude-provenance"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/familiar/bin/familiar hook UserPromptSubmit"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/familiar/bin/familiar hook PreToolUse"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/ops/hooks/claude-pretooluse"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/familiar/bin/familiar hook Notification:idle_prompt"
+          }
+        ]
+      },
+      {
+        "matcher": "permission_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/familiar/bin/familiar hook Notification:permission_prompt"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/familiar/bin/familiar hook Stop"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/ops/hooks/claim-guard --harness claude-code"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.local/bin/harness-state-refresh"
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/familiar/bin/familiar hook StopFailure"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/familiar/bin/familiar hook SessionEnd"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/ops/hooks/claude-posttooluse"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/ops/hooks/claude-posttooluse"
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "~/d/familiar/bin/familiar statusline",
+    "refreshInterval": 2
+  },
+  "enabledPlugins": {
+    "typescript-lsp@claude-plugins-official": true,
+    "context7@claude-plugins-official": false,
+    "pyright-lsp@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": true,
+    "github@claude-plugins-official": false,
+    "code-simplifier@claude-plugins-official": false,
+    "frontend-design@claude-plugins-official": false,
+    "code-review@claude-plugins-official": false,
+    "mgrep@Mixedbread-Grep": false,
+    "security-guidance@claude-plugins-official": false,
+    "claude-md-management@claude-plugins-official": false,
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "typesafe@typesafe-ai": true
+  },
+  "extraKnownMarketplaces": {
+    "superpowers-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "obra/superpowers-marketplace"
+      },
+      "autoUpdate": true
+    },
+    "Mixedbread-Grep": {
+      "source": {
+        "source": "git",
+        "url": "https://github.com/mixedbread-ai/mgrep.git"
+      }
+    },
+    "ponytail": {
+      "source": {
+        "source": "github",
+        "repo": "DietrichGebert/ponytail"
+      }
+    },
+    "typesafe-ai": {
+      "source": {
+        "source": "github",
+        "repo": "typesafe-ai/skills"
+      }
+    }
+  },
+  "alwaysThinkingEnabled": true,
+  "effortLevel": "high",
+  "tui": "fullscreen",
+  "voice": {
+    "enabled": true,
+    "mode": "hold"
+  },
+  "skipDangerousModePermissionPrompt": true,
+  "theme": "custom:noctalia",
+  "editorMode": "normal",
+  "inputNeededNotifEnabled": false,
+  "agentPushNotifEnabled": true,
+  "voiceEnabled": true
+}

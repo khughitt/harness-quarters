@@ -1,0 +1,29 @@
+---
+id: tack-3a1a60
+title: The three profile fragments
+status: done
+priority: "2"
+size: xs
+complexity: low
+process: direct
+owner: project-profiles
+created: 2026-09-19T17:15:42Z
+updated: 2026-09-19T17:44:10Z
+started: 2026-09-19T17:43:26Z
+completed: 2026-09-19T17:44:10Z
+depends: []
+parent: tack-45ac4c
+tags: [rules, hooks]
+agent: "claude-code/claude-opus-5[1m]"
+plan: docs/plans/2026-09-19-project-profiles.md
+step: "Task 1: The three profile fragments"
+---
+
+## Notes
+
+- 2026-09-19T17:43:26Z (project-profiles): started
+  provenance: {"harness_session":"codex:01a0bac3-023c-7461-b3fc-393e3ebe1a27","harness_session_source":"CODEX_SESSION_ID"}
+- 2026-09-19T17:44:10Z (project-profiles): done
+  provenance: {"harness_session":"codex:01a0bac3-023c-7461-b3fc-393e3ebe1a27","harness_session_source":"CODEX_SESSION_ID"}
+- 2026-09-19T17:44:10Z (project-profiles): Added personal, work, and external profile instruction fragments
+  provenance: {"harness_session":"codex:01a0bac3-023c-7461-b3fc-393e3ebe1a27","harness_session_source":"CODEX_SESSION_ID"}

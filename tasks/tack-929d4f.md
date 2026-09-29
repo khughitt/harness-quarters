@@ -1,0 +1,34 @@
+---
+id: tack-929d4f
+title: Find who reads ~/.agents/skills and whether Codex lists a flat layout once
+status: done
+priority: "2"
+size: s
+complexity: mid
+process: direct
+owner: main
+created: 2026-09-27T11:21:07Z
+updated: 2026-09-27T12:10:30Z
+started: 2026-09-27T12:07:28Z
+completed: 2026-09-27T12:10:30Z
+depends: []
+parent: tack-e2ed51
+tags: [skills]
+agent: claude-code/claude-opus-5-5
+---
+
+Question: Which harnesses read ~/.agents/skills (ai/agents/skills), does any still need the superpowers submodule there now that Codex has the superpowers plugin, and does Codex list each skill once, at a path agents resolve, when every skill sits directly under agents/skills?
+Where to start: agents/skills/README.md; codex/config.toml and codex/config.work.toml; codex/rules/default.rules:107 (stale superpowers/6.3.0 allow rule); the Codex skill-roots table in any recent rollout's developer message; the brief docs/notes/2026-09-27-path-mistakes-brief.md (Codex section).
+Bound: Read harness configs in this repository and run one probe Codex session against a temporary flat copy under the scratchpad (a scratch CODEX_HOME or skills root), not the live ~/.agents/skills; no layout change committed.
+Expected result: The list of readers, the probe's skill catalog, and a recommended layout (flatten, drop the submodule for Codex, or leave), as a note here and in the brief.
+Ideas it wakes: On completion, run tasks note on ai-ae8196 with the finding, in the same commit as this result.
+
+## Notes
+
+- 2026-09-27T12:07:28Z (main): started
+  provenance: {"harness_session":"claude-code:46017b38-f086-4c7d-9fb8-333582689636","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-27T12:10:30Z (main): finding: ~/.agents/skills is read by Codex, Crush and OpenCode; flat entries render as r0/<name>/SKILL.md; skills.config disables one skill by SKILL.md path (probe via codex debug prompt-input), not by directory; superpowers copies drifted (submodule 6.3.0, Claude 6.4.1, Codex 6.4.2); vendored agent-skills' ../../references links are broken. Recommendation: flatten, superpowers from the submodule alone, Codex remote plugin off — filed as ai-cea269.
+- 2026-09-27T12:10:30Z (main): done
+  provenance: {"harness_session":"claude-code:46017b38-f086-4c7d-9fb8-333582689636","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-27T12:10:30Z (main): Readers, probe and layout recommendation recorded in docs/notes/2026-09-27-path-mistakes-brief.md; implementation filed as ai-cea269
+  provenance: {"harness_session":"claude-code:46017b38-f086-4c7d-9fb8-333582689636","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

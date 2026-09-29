@@ -1,0 +1,4 @@
+.worktrees
+claude/plans/*
+!claude/plans/.gitkeep
+local/

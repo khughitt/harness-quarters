@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "~/d/ops/hooks/claude-profile" }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "~/.local/bin/harness-state-refresh" }] }
+    ]
+  }
+}

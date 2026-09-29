@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+"""Converge this host's home links into the checkout from links.toml.
+
+Report mode prints one line per entry and writes nothing; --check exits 1 on any
+drift; --apply writes, and only when no entry is refused. A link counts as ok when it
+resolves to its target by any spelling; a dangling or foreign link is repointed; a real
+file or directory at a link path is refused, never overwritten. Required links go on
+every host (their parent directory is created); a harness group applies only where its
+home is a real directory. Run from the main checkout: links must never resolve into a
+worktree. A target is checked only when its entry applies (a required link, or a group
+whose home is a real directory); a missing one is an error, never created. Design:
+docs/specs/2026-09-27-rename-to-tack-design.md, docs/specs/2026-09-28-local-layer-design.md.
+"""
+import argparse
+import os
+import subprocess
+import sys
+import tomllib
+from dataclasses import dataclass
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+
+
+class ManifestError(Exception):
+    pass
+
+
+class ApplyRefused(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class Entry:
+    link: Path
+    target: Path
+    home: Path | None      # None for a required link
+
+
+def git(*args):
+    result = subprocess.run(["git", "-C", str(HERE), *args], text=True, capture_output=True)
+    if result.returncode != 0:
+        sys.exit(f"tack-link: git {' '.join(args)}: {result.stderr.strip()}")
+    return result.stdout.strip()
+
+
+def checkout_root():
+    git_dir = Path(git("rev-parse", "--absolute-git-dir"))
+    common = Path(git("rev-parse", "--path-format=absolute", "--git-common-dir"))
+    if git_dir.resolve() != common.resolve():
+        print("tack-link: run from the main checkout, not a worktree", file=sys.stderr)
+        sys.exit(2)
+    return Path(git("rev-parse", "--show-toplevel"))
+
+
+def expand(path):
+    return Path(os.path.expanduser(path))
+
+
+def load(root):
+    data = tomllib.loads((root / "links.toml").read_text())
+    entries = [Entry(expand(link), root / rel, None) for link, rel in data.get("required", {}).items()]
+    homes = []
+    for name, table in data.get("harness", {}).items():
+        home = expand(table["home"])
+        homes.append(home)
+        entries += [Entry(home / link, root / rel, home) for link, rel in table["links"].items()]
+    links = [entry.link for entry in entries]
+    for managed in links:
+        for path in [*links, *homes]:
+            if path != managed and managed in path.parents:
+                raise ManifestError(f"{path} lies under the managed link {managed}")
+    for home in homes:
+        if home in links:
+            raise ManifestError(f"harness home {home} is a managed link")
+    return entries, homes
+
+
+def is_real_dir(path):
+    return path.is_dir() and not path.is_symlink()
+
+
+def active(entry):
+    return entry.home is None or is_real_dir(entry.home)
+
+
+def check_targets(root, entries):
+    """Every target this host will link to exists. A skipped group's targets are not
+    checked: a public clone has no local/, and a host without a work home needs none."""
+    for entry in entries:
+        if not active(entry) or entry.target.exists():
+            continue
+        message = f"{entry.link}: target {entry.target} does not exist"
+        if (root / "local") in entry.target.parents:
+            message += ("; local/ is untracked: copy it from another host's `local/`, "
+                        "or run `just setup` for the directories it creates")
+        raise ManifestError(message)
+
+
+def state(entry):
+    if entry.link.is_symlink():
+        if entry.link.exists() and entry.link.resolve() == entry.target.resolve():
+            return "ok", ""
+        return "repoint", f"was {os.readlink(entry.link)}"
+    if entry.link.exists():
+        kind = "directory" if entry.link.is_dir() else "file"
+        return "refuse", f"a real {kind} is there"
+    return "create", ""
+
+
+def show(path):
+    home = Path.home()
+    return f"~/{path.relative_to(home)}" if home in path.parents else str(path)
+
+
+def plan(entries, homes):
+    rows, skipped = [], set()
+    for entry in entries:
+        if not active(entry):
+            if entry.home not in skipped:
+                skipped.add(entry.home)
+                rows.append(("skipped", entry.home, f"{show(entry.home)} absent", None))
+            continue
+        name, detail = state(entry)
+        rows.append((name, entry.link, detail, entry))
+    return rows
+
+
+def apply(rows):
+    for name, _, _, entry in rows:
+        if name not in ("create", "repoint"):
+            continue
+        entry.link.parent.mkdir(parents=True, exist_ok=True)
+        staging = entry.link.with_name(f".{entry.link.name}.tack-link")
+        if staging.is_symlink():
+            staging.unlink()
+        staging.symlink_to(entry.target)
+        # Re-check immediately before the swap: plan() ran earlier, and a real file or
+        # directory may have appeared at this link path since. Never replace one.
+        if entry.link.exists() and not entry.link.is_symlink():
+            kind = "directory" if entry.link.is_dir() else "file"
+            staging.unlink()
+            raise ApplyRefused(f"{show(entry.link)}: a real {kind} is there")
+        os.replace(staging, entry.link)
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(prog="tack-link", description=__doc__.splitlines()[0])
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--check", action="store_true", help="exit 1 on any drift")
+    mode.add_argument("--apply", action="store_true", help="converge the links")
+    args = parser.parse_args(argv)
+    root = checkout_root()
+    try:
+        entries, homes = load(root)
+        check_targets(root, entries)
+    except (ManifestError, KeyError, tomllib.TOMLDecodeError) as error:
+        print(f"tack-link: links.toml: {error}", file=sys.stderr)
+        return 2
+    rows = plan(entries, homes)
+    for name, path, detail, _ in rows:
+        print(f"{name}\t{show(path)}\t{detail}".rstrip("\t"))
+    refused = any(row[0] == "refuse" for row in rows)
+    if args.check:
+        return 1 if any(row[0] in ("create", "repoint", "refuse") for row in rows) else 0
+    if args.apply and not refused:
+        try:
+            apply(rows)
+        except ApplyRefused as error:
+            print(f"tack-link: {error}", file=sys.stderr)
+            return 1
+    return 1 if refused else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

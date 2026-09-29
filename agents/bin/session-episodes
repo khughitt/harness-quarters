@@ -1,0 +1,1317 @@
+#!/usr/bin/env python3
+"""Prepare pre-flow episodes from the Claude Code and Codex session stores.
+
+session-episodes extract  [--since DAYS] [--project PREFIX] [--window-minutes N]
+                          [--labels PATH] [--anchors PATH] --out PATH
+session-episodes show     <id>        --episodes PATH
+session-episodes confirm  <id> yes|no --episodes PATH [--anchors PATH]
+session-episodes label    <id> yes|no --episodes PATH [--labels PATH]
+
+The contract is docs/specs/2026-09-19-session-logs-design.md in the ai checkout.
+Read-only over the stores and every tasks/ directory; standard library only.
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import hashlib
+import json
+import os
+import re
+import shlex
+import subprocess
+import sys
+import tomllib
+from dataclasses import dataclass, field, replace
+from pathlib import Path
+
+CLAUDE_HARNESS = "claude-code"
+CODEX_HARNESS = "codex"
+WAIT_TOOLS = {"AskUserQuestion", "EnterPlanMode", "ExitPlanMode"}
+CODEX_WAIT_TOOL = "request_user_input"
+CODEX_INJECTED = ("# AGENTS.md", "<environment_context>", "<INSTRUCTIONS>", "<skills_instruct",
+                  "<turn_aborted>", "<permissions", "<user_shell", "<collaboration_mode")
+INTERACTIVE = {CLAUDE_HARNESS: ("cli",), CODEX_HARNESS: ("codex-tui", "codex_exec")}
+INTERRUPT_MARK = "[Request interrupted by user"
+# a Claude Code user turn that starts with a paste: the wrapper tags are the harness's, the
+# text inside and after them is the person's
+PASTED_OPEN = "<pasted_content"
+_PASTED_TAG = re.compile(r"^</?pasted_content\b[^>\n]*>[ \t]*\n?", re.M)
+
+
+# --- model ---------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class Event:
+    kind: str
+    at_ms: int
+    line: int
+    uuid: str | None = None
+    text: str = ""
+    call_id: str | None = None
+    tool: str | None = None
+    commands: tuple[str, ...] = ()
+    unsupported: bool = False
+    raw: str = ""
+    text_only: bool = False
+    pending: tuple[str, ...] = ()
+    interrupted: bool = False
+    turn_id: str | None = None
+
+
+@dataclass
+class Session:
+    harness: str
+    path: Path
+    session_id: str | None
+    cwd: str | None
+    entrypoint: str | None
+    subagent: bool
+    events: list[Event]
+    malformed: int
+    skipped: str | None = None  # a prefilter reason from scan_stores: the body was never parsed
+
+
+def at_ms(text: str) -> int:
+    t = dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+    return int(t.timestamp() * 1000)
+
+
+def _text_blocks(content) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "\n".join(b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text")
+    return ""
+
+
+def _lines(path: Path):
+    with open(path, encoding="utf-8", errors="replace") as handle:
+        for number, line in enumerate(handle, 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                yield number, json.loads(line)
+            except json.JSONDecodeError:
+                yield number, None
+
+
+# --- Claude Code ---------------------------------------------------------------
+
+def claude_header(path: Path) -> Session:
+    """The file's identity without its events: the same first main-line values read_claude
+    keeps, and subagent exactly when no main-line record exists. Stops at the first record
+    that settles all of them, so a main-line file costs a line or two."""
+    s = Session(CLAUDE_HARNESS, path, None, None, None, True, [], 0)
+    for _, r in _lines(path):
+        if r is None or "timestamp" not in r or r.get("isSidechain"):
+            continue
+        s.subagent = False
+        s.session_id = s.session_id or r.get("sessionId")
+        s.cwd = s.cwd or r.get("cwd")
+        s.entrypoint = s.entrypoint or r.get("entrypoint")
+        if s.session_id and s.cwd and s.entrypoint:
+            break
+    return s
+
+
+def read_claude(path: Path) -> Session:
+    s = Session(CLAUDE_HARNESS, path, None, None, None, True, [], 0)
+    for line, r in _lines(path):
+        if r is None:
+            s.malformed += 1
+            continue
+        if "timestamp" not in r or r.get("isSidechain"):
+            continue
+        s.subagent = False
+        t = at_ms(r["timestamp"])
+        s.session_id = s.session_id or r.get("sessionId")
+        s.cwd = s.cwd or r.get("cwd")
+        s.entrypoint = s.entrypoint or r.get("entrypoint")
+        kind = r.get("type")
+        content = (r.get("message") or {}).get("content")
+        if kind == "user":
+            if r.get("isMeta") or r.get("isCompactSummary"):
+                continue
+            results = [b for b in content if isinstance(b, dict) and b.get("type") == "tool_result"] if isinstance(content, list) else []
+            for b in results:
+                body = b.get("content")
+                body = body if isinstance(body, str) else _text_blocks(body)
+                s.events.append(Event("tool_result", t, line, r.get("uuid"), body, call_id=b.get("tool_use_id"),
+                                      interrupted=body.lstrip().startswith(INTERRUPT_MARK)))
+            body = _text_blocks(content).strip()
+            if body.startswith(INTERRUPT_MARK):
+                s.events.append(Event("interrupt", t, line, r.get("uuid"), body))
+            elif body and (body.startswith(PASTED_OPEN) or not body.startswith("<")):
+                s.events.append(Event("human", t, line, r.get("uuid"), _PASTED_TAG.sub("", body).strip() or body))
+        elif kind == "assistant":
+            blocks = content if isinstance(content, list) else []
+            uses = [b for b in blocks if isinstance(b, dict) and b.get("type") == "tool_use"]
+            body = _text_blocks(content)
+            s.events.append(Event("assistant", t, line, r.get("uuid"), body,
+                                  text_only=bool(body.strip()) and not uses,
+                                  pending=tuple(b.get("id") for b in uses)))
+            for b in uses:
+                inp = b.get("input") or {}
+                commands = (str(inp.get("command", "")),) if b.get("name") == "Bash" else ()
+                s.events.append(Event("tool_call", t, line, r.get("uuid"), call_id=b.get("id"),
+                                      tool=b.get("name"), commands=commands))
+    return s
+
+
+# --- Codex ---------------------------------------------------------------------
+
+def _codex_output_text(output) -> str:
+    if isinstance(output, list):
+        return "".join(b.get("text", "") for b in output if isinstance(b, dict))
+    if isinstance(output, str):
+        try:
+            parsed = json.loads(output)
+        except json.JSONDecodeError:
+            return output
+        if isinstance(parsed, dict) and isinstance(parsed.get("output"), str):
+            return parsed["output"]
+        return output
+    return ""
+
+
+def _codex_function_commands(name: str, arguments) -> tuple[str, ...]:
+    if name not in ("shell", "exec_command"):
+        return ()
+    try:
+        args = json.loads(arguments) if isinstance(arguments, str) else (arguments or {})
+    except json.JSONDecodeError:
+        return ()
+    if not isinstance(args, dict):
+        return ()
+    command = args.get("command")
+    if isinstance(command, list) and command:
+        if len(command) >= 3 and command[0] in ("bash", "sh", "zsh") and command[1] in ("-lc", "-c"):
+            return (str(command[2]),)
+        return (" ".join(str(c) for c in command),)
+    if isinstance(command, str):
+        return (command,)
+    if isinstance(args.get("cmd"), str):
+        return (args["cmd"],)
+    return ()
+
+
+def _codex_meta(s: Session, payload: dict) -> None:
+    s.session_id = payload.get("id")
+    s.cwd = payload.get("cwd")
+    s.entrypoint = payload.get("originator")
+    s.subagent = payload.get("thread_source") not in (None, "user")
+
+
+def codex_header(path: Path) -> Session | None:
+    """The rollout's identity from its first line when that line is its session_meta;
+    None otherwise, and the caller reads the whole file."""
+    for _, r in _lines(path):
+        if r is None or r.get("type") != "session_meta":
+            return None
+        s = Session(CODEX_HARNESS, path, None, None, None, False, [], 0)
+        _codex_meta(s, r.get("payload") or {})
+        return s
+    return None
+
+
+def read_codex(path: Path) -> Session:
+    s = Session(CODEX_HARNESS, path, None, None, None, False, [], 0)
+    meta_seen = False
+    for line, r in _lines(path):
+        if r is None:
+            s.malformed += 1
+            continue
+        p = r.get("payload") or {}
+        kind = r.get("type")
+        if kind == "session_meta":
+            # the rollout's own meta is its first record; a thread forked from another copies
+            # the parent's session_meta in with the parent's history, and that one is history
+            if not meta_seen:
+                _codex_meta(s, p)
+                meta_seen = True
+            continue
+        if "timestamp" not in r:
+            continue
+        t = at_ms(r["timestamp"])
+        pt = p.get("type")
+        if kind == "event_msg":
+            if pt == "task_started":
+                s.events.append(Event("turn_start", t, line, turn_id=p.get("turn_id")))
+            elif pt == "task_complete":
+                s.events.append(Event("turn_end", t, line, turn_id=p.get("turn_id")))
+            elif pt == "turn_aborted":
+                s.events.append(Event("turn_aborted", t, line, turn_id=p.get("turn_id")))
+            continue
+        if kind != "response_item":
+            continue
+        if pt == "message":
+            body = "\n".join(c.get("text", "") for c in (p.get("content") or [])
+                             if isinstance(c, dict) and c.get("type") in ("input_text", "output_text")).strip()
+            if p.get("role") == "user":
+                if body and not body.startswith(CODEX_INJECTED) and not body.startswith("<"):
+                    s.events.append(Event("human", t, line, text=body))
+            elif p.get("role") == "assistant":
+                s.events.append(Event("assistant", t, line, text=body, text_only=True))
+        elif pt == "function_call":
+            s.events.append(Event("tool_call", t, line, call_id=p.get("call_id"), tool=p.get("name"),
+                                  commands=_codex_function_commands(p.get("name"), p.get("arguments"))))
+        elif pt == "custom_tool_call":
+            source = str(p.get("input") or "")
+            commands, unsupported = commands_of_custom_input(source)
+            s.events.append(Event("tool_call", t, line, call_id=p.get("call_id"), tool=p.get("name"),
+                                  commands=commands, unsupported=unsupported, raw=source))
+        elif pt in ("function_call_output", "custom_tool_call_output"):
+            s.events.append(Event("tool_result", t, line, call_id=p.get("call_id"),
+                                  text=_codex_output_text(p.get("output"))))
+    return s
+
+
+# --- commands and attribution --------------------------------------------------
+
+# the literal must be the whole property value: a `+`, a `?`, or anything but `,`/`}` after
+# the closing quote means the command is assembled at run time and only partly visible
+_CMD_LITERAL = re.compile(
+    r'''(?:"cmd"|(?<![\w"'])cmd)\s*:\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|`((?:[^`\\]|\\.)*)`)(?=\s*[,}])''', re.S)
+START_RE = re.compile(r"\btasks\s+(?:-C\s+\S+\s+)?(?:--\S+\s+)*start\b(?:\s+--\S+)*\s+([a-z0-9]+-[0-9a-f]{6})\b")
+TASK_ID_RE = re.compile(r"^[a-z0-9]+-[0-9a-f]{6}$")
+ID_PRINTING = ("start", "note", "edit", "park", "done", "drop", "dep", "shelve", "unshelve")
+TASKS_ID_CMD = re.compile(
+    r"\btasks\s+(?:-C\s+\S+\s+)?(?:--\S+\s+)*(" + "|".join(ID_PRINTING) + r")\b(?:\s+--\S+)*\s+([a-z0-9]+-[0-9a-f]{6})\b")
+_HEREDOC = re.compile(r"(?P<open>[^\n]*<<-?\s*(['\"]?)(?P<tag>[A-Za-z_][A-Za-z0-9_]*)\2[^\n]*)\n(?P<body>.*?)\n[ \t]*(?P=tag)[ \t]*(?:\n|$)", re.S)
+_SHELLS = ("bash", "sh", "zsh", "dash", "ssh", "sudo", "env", "nohup", "eval", "source", ".")
+_QUOTED = re.compile(r'"(?:[^"\\]|\\.)*"|\'[^\']*\'')
+# a shell word at the start of a segment, then its first quoted argument on that segment
+_SHELL_STRING = re.compile(r"(?:^|[;&|\n]\s*)(" + "|".join(re.escape(w) for w in ("bash", "sh", "zsh", "dash", "ssh", "sudo", "env", "nohup", "eval"))
+                           + r")\b[^;&|\n\"']*?(?:\"((?:[^\"\\]|\\.)*)\"|'([^']*)')")
+_ERROR_LINE = re.compile(r"^error:", re.M)
+_JS_ESCAPES = {"n": "\n", "t": "\t", "r": "\r", "\\": "\\", "`": "`", "$": "$", "'": "'", '"': '"', "0": "\0", "b": "\b", "f": "\f", "v": "\v"}
+_STDERR_ONLY = (("2", ">&", "1"), ("2", ">", "/dev/null"))
+
+
+def _decode_js(body: str) -> str | None:
+    """A single- or template-quoted JS literal body: the plain escapes are decoded, anything
+    else (\\u, \\x, a line continuation, an interpolation) makes the literal unsupported."""
+    if "${" in body:
+        return None
+    out, i = [], 0
+    while i < len(body):
+        c = body[i]
+        if c != "\\":
+            out.append(c)
+            i += 1
+            continue
+        if i + 1 >= len(body) or body[i + 1] not in _JS_ESCAPES:
+            return None
+        out.append(_JS_ESCAPES[body[i + 1]])
+        i += 2
+    return "".join(out)
+
+
+def _decode(double: str | None, single: str | None, template: str | None) -> str | None:
+    if double is not None:
+        return json.loads('"' + double + '"')
+    if single is not None:
+        return _decode_js(single)
+    if template is not None:
+        return _decode_js(template)
+    return None
+
+
+# a JS object literal made only of scalar properties, e.g. {"cmd":"…","workdir":"…","yield_time_ms":10000}
+_SCALAR = r'(?:"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'|`[^`$]*`|-?\d+(?:\.\d+)?|true|false|null)'
+_OBJECT = r"\{\s*(?:(?:\"[A-Za-z_]\w*\"|[A-Za-z_]\w*)\s*:\s*" + _SCALAR + r"\s*,?\s*)*\}"
+_WRAPPER_FORMS = tuple(re.compile(pattern.replace("OBJ", "(" + _OBJECT + ")"), re.S) for pattern in (
+    r"^const\s+(\w+)\s*=\s*await\s+tools\.exec_command\(\s*OBJ\s*\)\s*;\s*text\(\s*\1\.output\s*\)\s*;?$",
+    r"^const\s+(\w+)\s*=\s*await\s+tools\.exec_command\(\s*OBJ\s*\)\s*;\s*text\(\s*\1\s*\)\s*;?$",
+    r"^text\(\s*await\s+tools\.exec_command\(\s*OBJ\s*\)\s*\)\s*;?$",
+    r"^text\(\s*\(\s*await\s+tools\.exec_command\(\s*OBJ\s*\)\s*\)\.output\s*\)\s*;?$",
+))
+
+
+def single_wrapper_command(source: str) -> str | None:
+    """The command of a Codex custom tool call whose *entire* JavaScript is one observed
+    single-call form around an object literal of scalars. Extracting a `cmd` literal from
+    any other wrapper says nothing about whether that command ran, so only this shape may
+    have its output attributed. The four forms cover 550 of the 555 single-exec wrappers
+    with a start in September's rollouts."""
+    text = source.strip()
+    for form in _WRAPPER_FORMS:
+        m = form.match(text)
+        if m is None:
+            continue
+        obj = m.group(m.lastindex)
+        commands, _ = commands_of_custom_input(obj)
+        if len(commands) == 1 and _CMD_LITERAL.search(obj) and len(_CMD_LITERAL.findall(obj)) == 1:
+            return commands[0]
+        return None
+    return None
+
+
+def attributable_commands(event) -> tuple[str, ...] | None:
+    """What `attribute` may read for a tool call: a plain shell call's commands, or the one
+    command of a Codex wrapper in a supported single-call form. None otherwise."""
+    if event.raw:
+        command = single_wrapper_command(event.raw)
+        return (command,) if command is not None else None
+    return event.commands
+
+
+def commands_of_custom_input(source: str) -> tuple[tuple[str, ...], bool]:
+    """Static shell strings handed to a `cmd` key inside a Codex custom tool call. This is
+    the discovery reading — it finds candidates; it never proves a command ran."""
+    commands = []
+    for m in _CMD_LITERAL.finditer(source):
+        try:
+            decoded = _decode(*m.groups())
+        except json.JSONDecodeError:
+            decoded = None
+        if decoded is not None:
+            commands.append(decoded)
+    unsupported = "tasks start" in source and not any("tasks start" in c for c in commands)
+    return tuple(commands), unsupported
+
+
+# --- reading a command -----------------------------------------------------------
+#
+# Two readings, for two purposes. For *finding* candidates the tool reads loosely: heredoc
+# bodies lifted out, quoted strings blanked, a regex over what is left, plus the executable
+# text (shell heredocs, -c strings, "$(…)") kept as nested candidates. For *confirming* a
+# transition from its own output the tool reads strictly: the command must be one literal
+# `tasks` invocation and nothing else (§4.2). Everything between those two is review.
+
+@dataclass(frozen=True)
+class Invocation:
+    subcommand: str
+    task_id: str
+    pretty: bool
+
+
+def _lift_heredocs(command: str) -> tuple[str, list[str], int]:
+    """(command without heredoc bodies, bodies handed to a shell, number of heredocs)."""
+    nested, count = [], 0
+
+    def lift(m):
+        nonlocal count
+        count += 1
+        opener = m.group("open")
+        words = opener.strip().split()
+        if words and words[0] in _SHELLS:
+            nested.append(m.group("body"))
+        return re.sub(r"<<(-?)\s*(['\"])(\w+)\2", r"<<\1\3", opener) + "\n"
+
+    return _HEREDOC.sub(lift, command), nested, count
+
+
+def _loose(command: str) -> str:
+    """The shell text a candidate regex may read: no heredoc bodies, no string contents —
+    except a quoted string that is exactly one task id, which is an argument, not prose."""
+    text, _, _ = _lift_heredocs(command)
+    return _QUOTED.sub(lambda m: m.group(0)[1:-1] if TASK_ID_RE.match(m.group(0)[1:-1]) else '""', text)
+
+
+def nested_text(command: str) -> list[str]:
+    """Executable text hidden from the loose reading: shell heredoc bodies, the string
+    argument of a shell (`bash -c '…'`, `ssh host "…"`), a double-quoted `$(…)`."""
+    text, nested, _ = _lift_heredocs(command)
+    out = list(nested)
+    for m in _SHELL_STRING.finditer(text):
+        out.append(m.group(2) if m.group(2) is not None else m.group(3))
+    out.extend(m.group(1) for m in re.finditer(r'"([^"]*\$\([^"]*)"', text))
+    return out
+
+
+def start_candidates(command: str) -> list[str]:
+    """The strict reading when it succeeds, else the loose one."""
+    strict = single_invocation(command)
+    if strict is not None:
+        return [strict.task_id] if strict.subcommand == "start" else []
+    return list(dict.fromkeys(m.group(1) for m in START_RE.finditer(_loose(command))))
+
+
+def nested_start_candidates(command: str) -> list[str]:
+    seen = set(start_candidates(command))
+    out = []
+    for text in nested_text(command):
+        for m in START_RE.finditer(text):
+            if m.group(1) not in seen:
+                out.append(m.group(1))
+                seen.add(m.group(1))
+    return out
+
+
+def transitions_in(command: str) -> list[tuple[str, str]]:
+    strict = single_invocation(command)
+    if strict is not None:
+        return [(strict.subcommand, strict.task_id)] if strict.subcommand in ("park", "done", "drop") else []
+    return [(m.group(1), m.group(2)) for m in TASKS_ID_CMD.finditer(_loose(command)) if m.group(1) in ("park", "done", "drop")]
+
+
+def single_invocation(command: str) -> Invocation | None:
+    """The one command shape whose output the tool attributes: optionally `cd <path> &&`,
+    then exactly one `tasks [-C path] SUBCOMMAND args…` with optional `--pretty` and an
+    optional trailing `2>&1` or `2>/dev/null`. Arguments are plain words or quoted strings
+    without `$` or backticks. Anything else is None."""
+    if "\n" in command or "<<" in command:
+        return None
+    lexer = shlex.shlex(command, posix=True, punctuation_chars="();<>|&")
+    lexer.whitespace_split = True
+    lexer.commenters = ""
+    try:
+        tokens = list(lexer)
+    except ValueError:
+        return None
+    if any("$" in t or "`" in t for t in tokens):
+        return None  # no expansion anywhere: not in a path, a -C argument, a message, or a redirection target
+    if len(tokens) >= 3 and tokens[0] == "cd" and tokens[2] == "&&":
+        tokens = tokens[3:]
+    for tail in _STDERR_ONLY:
+        if tuple(tokens[-3:]) == tail:
+            tokens = tokens[:-3]
+            break
+    if not tokens or tokens[0] != "tasks":
+        return None
+    i = 1
+    if i < len(tokens) and tokens[i] == "-C":
+        i += 2
+    pretty = False
+    while i < len(tokens) and tokens[i] == "--pretty":
+        pretty, i = True, i + 1
+    if i >= len(tokens):
+        return None
+    subcommand, args = tokens[i], tokens[i + 1:]
+    if any(re.fullmatch(r"[();<>|&]+", t) for t in tokens):
+        return None
+    pretty = pretty or "--pretty" in args
+    task_id = next((a for a in args if TASK_ID_RE.match(a)), None)
+    if task_id is None:
+        return None
+    return Invocation(subcommand, task_id, pretty)
+
+
+def has_error_line(result_text: str) -> bool:
+    return bool(_ERROR_LINE.search(result_text))
+
+
+def _id_objects(result_text: str):
+    for line in result_text.splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict) and isinstance(obj.get("id"), str) and "warnings" in obj:
+            yield obj["id"]
+
+
+def id_lines(result_text: str, task_id: str, pretty: bool = False) -> int:
+    count = sum(1 for i in _id_objects(result_text) if i == task_id)
+    if pretty:
+        count += sum(1 for line in result_text.splitlines() if line.strip() == task_id)
+    return count
+
+
+def ids_in_result(result_text: str) -> list[str]:
+    return list(dict.fromkeys(_id_objects(result_text)))
+
+
+def attribute(commands: tuple[str, ...], result_text: str, task_id: str, subcommand: str = "start") -> str:
+    """Does this call's output prove that its `tasks <subcommand> <task_id>` ran? (§4.2)
+    confirmed | outside-grammar | no-id-line | error-output"""
+    if has_error_line(result_text):
+        return "error-output"
+    if len(commands) != 1:
+        return "outside-grammar"  # several literals share one output
+    invocation = single_invocation(commands[0])
+    if invocation is None:
+        return "outside-grammar"
+    if invocation.subcommand != subcommand or invocation.task_id != task_id:
+        return "outside-grammar"
+    return "confirmed" if id_lines(result_text, task_id, invocation.pretty) >= 1 else "no-id-line"
+
+
+# --- task records --------------------------------------------------------------
+
+NOTE_RE = re.compile(r"^- (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z) \(([^)]*)\): (.*)$")
+PROVENANCE_RE = re.compile(r"^\s+provenance: (\{.*\})\s*$")
+
+
+@dataclass(frozen=True)
+class Note:
+    at_ms: int
+    text: str
+    harness_session: str | None
+    path: Path
+    line: int
+
+
+@dataclass
+class TaskRecord:
+    task_id: str
+    status: str | None
+    started_ms: int | None
+    completed: list[tuple[int, Path]]
+    notes: list[Note]
+    copies: list[Path]
+    unreadable: list[Path]
+
+
+def registry(env: dict) -> dict[str, Path]:
+    if env.get("XDG_CONFIG_HOME"):
+        config = Path(env["XDG_CONFIG_HOME"])
+    elif env.get("HOME"):
+        config = Path(env["HOME"]) / ".config"
+    else:
+        return {}
+    path = config / "tasks" / "projects.toml"
+    if not path.is_file():
+        return {}
+    projects = tomllib.loads(path.read_text()).get("projects", {})
+    return {prefix: Path(root).expanduser().resolve() for prefix, root in projects.items()}
+
+
+def task_copies(root: Path) -> tuple[list[Path], list[Path]]:
+    """Every tasks/ directory holding this project's records: the root and each worktree."""
+    listed = subprocess.run(["git", "-C", str(root), "worktree", "list", "--porcelain"],
+                            capture_output=True, text=True)
+    if listed.returncode != 0:
+        raise SystemExit(f"session-episodes: git worktree list failed under {root}: {listed.stderr.strip()}")
+    listing = listed.stdout
+    paths = [Path(line[len("worktree "):]) for line in listing.splitlines() if line.startswith("worktree ")]
+    if root.resolve() not in [p.resolve() if p.exists() else p for p in paths]:
+        paths.insert(0, root)
+    readable, unreadable = [], []
+    for p in paths:
+        tasks_dir = p / "tasks"
+        (readable if tasks_dir.is_dir() else unreadable).append(tasks_dir if tasks_dir.is_dir() else p)
+    return readable, unreadable
+
+
+def note_kind(text: str) -> str | None:
+    if text in ("started", "resumed"):
+        return "start"
+    if text.startswith("parked (waiting on "):
+        return "park"
+    if text in ("done", "dropped") or text.startswith("completed; next due"):
+        return "close"
+    return None
+
+
+def _parse_task_file(path: Path) -> tuple[dict, list[Note]]:
+    text = path.read_text(encoding="utf-8", errors="replace")
+    head, _, body = text[4:].partition("\n---\n") if text.startswith("---\n") else ("", "", text)
+    fields = {}
+    for line in head.splitlines():
+        key, sep, value = line.partition(":")
+        if sep:
+            fields[key.strip()] = value.strip().strip('"')
+    notes: list[Note] = []
+    first_body_line = head.count("\n") + 4  # opening fence, the head lines, closing fence, then the body
+    for offset, line in enumerate(body.splitlines(), first_body_line):
+        m = NOTE_RE.match(line)
+        if m:
+            notes.append(Note(at_ms(m.group(1)), m.group(3).strip(), None, path, offset))
+            continue
+        pm = PROVENANCE_RE.match(line)
+        if pm and notes:
+            try:
+                session = json.loads(pm.group(1)).get("harness_session")
+            except json.JSONDecodeError:
+                session = None
+            notes[-1] = replace(notes[-1], harness_session=session)
+    return fields, notes
+
+
+def read_task(root: Path, task_id: str, copies: tuple[list[Path], list[Path]] | None = None) -> TaskRecord | None:
+    """The task's record across every copy; `copies` is a cached task_copies(root)."""
+    readable, unreadable = copies if copies is not None else task_copies(root)
+    record = None
+    seen: dict[tuple[int, str], Note] = {}
+    copies = []
+    for tasks_dir in readable:
+        path = tasks_dir / f"{task_id}.md"
+        if not path.is_file():
+            continue
+        fields, notes = _parse_task_file(path)
+        copies.append(path)
+        if record is None:
+            record = TaskRecord(task_id, fields.get("status"), None, [], [], [], unreadable)
+        if fields.get("started"):
+            stamp = at_ms(fields["started"])
+            record.started_ms = stamp if record.started_ms is None else min(record.started_ms, stamp)
+        if fields.get("completed"):
+            record.completed.append((at_ms(fields["completed"]), path))
+        for n in notes:
+            seen.setdefault((n.at_ms, n.text), n)
+    if record is None:
+        return None
+    record.notes = sorted(seen.values(), key=lambda n: (n.at_ms, n.text))
+    record.completed.sort()
+    record.copies = copies
+    return record
+
+
+# --- turns and continuation ----------------------------------------------------
+
+@dataclass(frozen=True)
+class Turn:
+    ended_at: int
+    outcome: str
+    end_index: int
+
+
+def _claude_turn(session: Session, anchor_index: int) -> Turn:
+    events = session.events
+    results: set[str] = set()
+    last_assistant = None
+    last_index = anchor_index
+    outcome = None
+    for i in range(anchor_index + 1, len(events)):
+        e = events[i]
+        if e.kind in ("human", "interrupt"):
+            if e.kind == "interrupt":
+                outcome, last_index = "interrupted", i
+            break
+        last_index = i
+        if e.kind == "tool_result":
+            results.add(e.call_id)
+            if e.interrupted:
+                outcome = "interrupted"
+        elif e.kind == "assistant":
+            last_assistant = e
+    for i in range(anchor_index, -1, -1):  # the anchor's own assistant record precedes it
+        if events[i].kind == "assistant":
+            last_assistant = last_assistant or events[i]
+            break
+    ended_at = last_assistant.at_ms if last_assistant else events[anchor_index].at_ms
+    if outcome is None:
+        tail = events[last_index]
+        if tail.kind == "assistant" and tail.text_only:
+            outcome = "completed"
+        elif last_assistant is not None and any(p not in results for p in last_assistant.pending):
+            pending_tools = {e.tool for e in events if e.kind == "tool_call" and e.call_id in last_assistant.pending and e.call_id not in results}
+            outcome = "wait" if pending_tools and pending_tools <= WAIT_TOOLS else "unknown"
+        else:
+            outcome = "unknown"
+    return Turn(ended_at, outcome, last_index)
+
+
+def _codex_turn(session: Session, anchor_index: int) -> Turn:
+    events = session.events
+    answered: set[str] = set()
+    last_call = None
+    last_index = anchor_index
+    for i in range(anchor_index + 1, len(events)):
+        e = events[i]
+        if e.kind == "turn_start":
+            break
+        last_index = i
+        if e.kind == "turn_end":
+            return Turn(e.at_ms, "completed", i)
+        if e.kind == "turn_aborted":
+            return Turn(events[i - 1].at_ms if i else e.at_ms, "interrupted", i)
+        if e.kind == "tool_call":
+            last_call = e
+        elif e.kind == "tool_result":
+            answered.add(e.call_id)
+    ended_at = events[last_index].at_ms
+    if last_call is not None and last_call.tool == CODEX_WAIT_TOOL and last_call.call_id not in answered:
+        return Turn(ended_at, "wait", last_index)
+    return Turn(ended_at, "unknown", last_index)
+
+
+def turn_after(session: Session, anchor_index: int) -> Turn:
+    return _claude_turn(session, anchor_index) if session.harness == CLAUDE_HARNESS else _codex_turn(session, anchor_index)
+
+
+def next_human_after(session: Session, end_index: int) -> Event | None:
+    for e in session.events[end_index + 1:]:
+        if e.kind == "human":
+            return e
+    return None
+
+
+def digest(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
+
+
+def identity(event: Event) -> tuple:
+    if event.uuid:
+        return ("uuid", event.uuid, event.kind, event.call_id)
+    return (event.kind, event.at_ms, event.call_id, digest(event.text))
+
+
+def _boundary(session: Session, anchor_index: int) -> int:
+    turn = turn_after(session, anchor_index)
+    nxt = next_human_after(session, turn.end_index)
+    return session.events.index(nxt) if nxt else len(session.events) - 1
+
+
+def continuation(candidates: list[tuple[Session, int]]) -> tuple[Session, int] | None:
+    """The file whose main line runs longest past the anchor, provided every file agrees
+    with it record-for-record up to its own boundary."""
+    seqs = []
+    for session, anchor_index in candidates:
+        stop = _boundary(session, anchor_index)
+        seqs.append(([identity(e) for e in session.events[anchor_index:stop + 1]], session, anchor_index))
+    # longest boundary sequence first; among equals, the file with more records after the anchor
+    seqs.sort(key=lambda s: (len(s[0]), len(s[1].events) - s[2]), reverse=True)
+    longest = seqs[0][0]
+    for ids, _, _ in seqs[1:]:
+        if longest[:len(ids)] != ids:
+            return None
+    return seqs[0][1], seqs[0][2]
+
+
+# --- episodes ------------------------------------------------------------------
+
+STATUS_PATTERNS = tuple(re.compile(p) for p in (
+    r"still (running|executing|going|working)",
+    r"is (it|that|this|the task) (still )?(running|done|finished|complete)",
+    r"(did|has) (it|that) (finish|complete|stop)",
+    r"\bstatus\b",
+    r"\bprogress\b",
+    r"where (are we|is it|did .* (stop|leave off))",
+    r"what('s| is) (left|next|happening)",
+    r"(are|is) (you|anything) (still )?(working|running)",
+))
+TOLERANCE_MS = 120_000
+
+
+def heuristic_label(text: str) -> bool:
+    low = text.lower()
+    return any(p.search(low) for p in STATUS_PATTERNS)
+
+
+def episode_id(harness: str, call_id: str, task_id: str) -> str:
+    return hashlib.sha256(f"{harness}\n{call_id}\n{task_id}".encode("utf-8")).hexdigest()[:12]
+
+
+def source_ref(session: Session, event: Event) -> str:
+    return f"{session.harness}:{session.session_id}:{session.path}#L{event.line}"
+
+
+def task_ref(prefix: str, note: Note) -> str:
+    return f"tasks:{prefix}:{note.path}#L{note.line}"
+
+
+def session_key(session: Session) -> str:
+    return f"{session.harness}:{session.session_id}"
+
+
+@dataclass
+class Inputs:
+    sessions: list[Session]
+    roots: dict[str, Path]
+    labels: dict[str, dict]
+    anchors: dict[str, dict]
+    now_ms: int
+    window_ms: int
+    since_ms: int | None = None
+    project: str | None = None
+
+
+@dataclass
+class _Anchor:
+    task_id: str
+    call_id: str
+    holders: list[tuple[Session, int]] = field(default_factory=list)
+    nested: bool = False  # the start text sits only in executable heredoc/-c text: review only
+
+
+def _result_for(session: Session, index: int) -> Event | None:
+    call_id = session.events[index].call_id
+    for e in session.events[index + 1:]:
+        if e.kind == "tool_result" and e.call_id == call_id:
+            return e
+    return None
+
+
+def _new_summary(inputs: Inputs) -> dict:
+    return {"files": {}, "excluded": {"subagent": 0, "non-interactive": 0},
+            "skipped": {"subagent_meta": 0, "before_since": 0, "no_lifecycle_text": 0}, "anchors_seen": 0, "anchors_multi_file": 0, "anchors_collapsed": 0,
+            "unconfirmed": {"outside-grammar": 0, "no-id-line": 0, "error-output": 0, "nested": 0, "unsupported-wrapper": 0},
+            "unsupported_unknown_task": 0, "unregistered": 0,
+            "turns": {"completed": 0, "wait": 0, "interrupted": 0, "unknown": 0, "ambiguous": 0},
+            "episodes": 0, "label_sources": {"heuristic": 0, "reviewed": 0}, "stale_labels": 0,
+            "stale_confirmations": 0, "retired": 0, "note_missing": 0, "origin_unknown": 0, "window_ms": inputs.window_ms,
+            "since_ms": inputs.since_ms, "roots": {}, "malformed_lines": 0}
+
+
+def _collect_anchors(inputs: Inputs, summary: dict) -> tuple[dict[tuple, _Anchor], dict[tuple, dict]]:
+    """Every tasks-start candidate keyed by (harness, call_id, task_id), and per-session
+    confirmed transitions keyed the same way for §4.4."""
+    anchors: dict[tuple, _Anchor] = {}
+    transitions: dict[tuple, dict] = {}
+    for s in inputs.sessions:
+        summary["files"][s.harness] = summary["files"].get(s.harness, 0) + 1
+        summary["malformed_lines"] += s.malformed
+        excluded = "subagent" if s.subagent else "non-interactive" if s.entrypoint not in INTERACTIVE[s.harness] else None
+        if excluded:
+            summary["excluded"][excluded] += 1
+        if s.skipped:
+            summary["skipped"][s.skipped] += 1
+        if excluded or s.skipped:
+            continue
+        for i, e in enumerate(s.events):
+            if e.kind != "tool_call":
+                continue
+            if e.unsupported and not any(start_candidates(c) for c in e.commands):
+                result = _result_for(s, i)
+                named = ids_in_result(result.text) if result is not None else []
+                if not named:
+                    summary["unsupported_unknown_task"] += 1
+                for task_id in named:
+                    anchors.setdefault((s.harness, e.call_id, task_id), _Anchor(task_id, e.call_id)).holders.append((s, i))
+            for c in e.commands:
+                for task_id in start_candidates(c):
+                    anchors.setdefault((s.harness, e.call_id, task_id), _Anchor(task_id, e.call_id)).holders.append((s, i))
+                for task_id in nested_start_candidates(c):
+                    anchors.setdefault((s.harness, e.call_id, task_id), _Anchor(task_id, e.call_id, nested=True)).holders.append((s, i))
+                for sub, task_id in transitions_in(c):
+                    result = _result_for(s, i)
+                    readable = attributable_commands(e)
+                    if result is not None and readable is not None and attribute(readable, result.text, task_id, sub) == "confirmed":
+                        # a fork copies the call under the same id; keep one per (call_id, times)
+                        transitions.setdefault((task_id, sub), {}).setdefault(
+                            (e.at_ms, result.at_ms, e.call_id), (s, e, result))
+    return anchors, transitions
+
+
+def _confirm(anchor: _Anchor, record: TaskRecord | None, inputs: Inputs, summary: dict,
+             holder: tuple[Session, int]) -> tuple[str | None, str | None, str | None]:
+    """(anchor_source, reason, stamped_session): how this start is corroborated (§4.2).
+    Order: the call's own output; this session's lifecycle note; a reviewed confirmation.
+    Any error line blocks the automatic routes, and the started: stamp alone is only a hint."""
+    session, index = holder
+    call = session.events[index]
+    result = _result_for(session, index)
+    text = result.text if result is not None else ""
+    if anchor.nested:
+        reason = "nested"
+    elif call.unsupported and not any(anchor.task_id in start_candidates(c) for c in call.commands):
+        reason = "unsupported-wrapper"
+    elif result is not None:
+        readable = attributable_commands(call)  # a wrapper outside the single-call forms is unreadable
+        verdict = attribute(readable, text, anchor.task_id) if readable is not None else "outside-grammar"
+        if verdict == "confirmed":
+            return "result", None, None
+        reason = verdict
+    else:
+        reason = "no-id-line"
+    if record is not None and not has_error_line(text) and not anchor.nested:
+        candidates = {session_key(s) for s, _ in anchor.holders}
+        for n in record.notes:
+            if note_kind(n.text) == "start" and n.harness_session in candidates and abs(n.at_ms - call.at_ms) <= TOLERANCE_MS:
+                return "note", None, n.harness_session
+    eid = episode_id(session.harness, anchor.call_id, anchor.task_id)
+    review = inputs.anchors.get(eid)
+    if review is not None:
+        evidence = digest("\n".join(call.commands) + call.raw + "\n" + text)
+        if review.get("evidence_digest") != evidence:
+            summary["stale_confirmations"] += 1
+        elif review.get("confirmed"):
+            return "reviewed", None, None
+        else:
+            return None, "retired", None
+    return None, reason, None
+
+
+def _stamp_delta_s(record: TaskRecord | None, call_at: int) -> int | None:
+    if record is None or record.started_ms is None or abs(record.started_ms - call_at) > TOLERANCE_MS:
+        return None
+    return (record.started_ms - call_at) // 1000
+
+
+@dataclass(frozen=True)
+class Transition:
+    at_ms: int
+    source: str                      # note | transcript | stamp
+    refs: tuple[str, ...]
+    interval: tuple[int, int] | None  # (call_at, result_at) when only the transcript places it
+
+
+def _transitions_of(kind: str, task_id: str, record: TaskRecord | None, transitions: dict,
+                    started_at: int) -> list[Transition]:
+    """Every park (kind='park') or close (kind='close') candidate at or after started_at, from
+    notes, confirmed transcript calls, and — for closes — completion stamps (§4.4)."""
+    found: list[Transition] = []
+    prefix = task_id.rsplit("-", 1)[0]
+    notes = [n for n in (record.notes if record else []) if note_kind(n.text) == kind and n.at_ms >= started_at]
+    for n in notes:
+        found.append(Transition(n.at_ms, "note", (task_ref(prefix, n),), None))
+    subs = ("park",) if kind == "park" else ("done", "drop")
+    calls = []
+    for sub in subs:
+        for (call_at, result_at, _), (s, call, result) in sorted(
+                transitions.get((task_id, sub), {}).items(), key=lambda kv: (kv[0][0], kv[0][1], str(kv[0][2]))):
+            if result_at >= started_at:
+                calls.append((call_at, result_at, s, call, result))
+    # a note is written by exactly one call: give each note to the narrowest interval holding
+    # it, so a wide uncertain call cannot borrow the note of a later, tighter one
+    claimed: dict[int, Note] = {}
+    for n in notes:
+        holders = [i for i, (call_at, result_at, *_) in enumerate(calls)
+                   if i not in claimed and call_at - TOLERANCE_MS <= n.at_ms <= result_at + TOLERANCE_MS]
+        if holders:
+            claimed[min(holders, key=lambda i: calls[i][1] - calls[i][0])] = n
+    for i, (call_at, result_at, s, call, result) in enumerate(calls):
+        if i in claimed:
+            continue  # already listed above by its note; the call's ref is not repeated
+        found.append(Transition(result_at, "transcript", (source_ref(s, call), source_ref(s, result)),
+                                (call_at, result_at)))
+    if kind == "close" and record is not None:
+        for stamp_ms, path in record.completed:
+            if stamp_ms >= started_at:
+                found.append(Transition(stamp_ms, "stamp", (f"tasks:{prefix}:{path}#completed",), None))
+    return sorted(found, key=lambda t: (t.at_ms, t.source))
+
+
+def _straddles(found: list[Transition], cutoff: int) -> bool:
+    """Could a transcript-only transition have happened on the other side of the cutoff?
+    Irrelevant once some transition is definitely inside the window."""
+    if any(t.interval is None and t.at_ms <= cutoff for t in found):
+        return False
+    return any(t.interval is not None and t.interval[0] <= cutoff < t.interval[1] for t in found)
+
+
+def build_episodes(inputs: Inputs) -> tuple[list[dict], list[dict], dict]:
+    summary = _new_summary(inputs)
+    anchors, transitions = _collect_anchors(inputs, summary)
+    records: dict[str, TaskRecord | None] = {}
+    copies: dict[str, tuple[list[Path], list[Path]]] = {}
+    transcript_only: set[tuple[str, ...]] = set()
+    episodes, candidates = [], []
+    collapsed: set[tuple] = set()
+    for key, anchor in sorted(anchors.items(), key=lambda kv: (str(kv[1].holders[0][0].path), kv[1].holders[0][1], kv[0][2])):
+        harness, call_id, task_id = key
+        summary["anchors_seen"] += 1
+        if len({s.path for s, _ in anchor.holders}) > 1:
+            summary["anchors_multi_file"] += 1
+        prefix = task_id.rsplit("-", 1)[0]
+        if prefix not in inputs.roots or (inputs.project and prefix != inputs.project):
+            summary["unregistered"] += prefix not in inputs.roots
+            continue
+        if prefix not in copies:
+            copies[prefix] = task_copies(inputs.roots[prefix])
+        if task_id not in records:
+            records[task_id] = read_task(inputs.roots[prefix], task_id, copies[prefix])
+        record = records[task_id]
+        chosen = continuation(anchor.holders)
+        if chosen is None:
+            summary["turns"]["ambiguous"] += 1
+            continue
+        session, index = chosen
+        source, reason, stamped = _confirm(anchor, record, inputs, summary, chosen)
+        call = session.events[index]
+        holder_keys = {session_key(s) for s, _ in anchor.holders}
+        if stamped is None and record is not None:  # origin is a fact about the notes, whatever confirmed the start
+            stamped = next((n.harness_session for n in record.notes if note_kind(n.text) == "start"
+                            and n.harness_session in holder_keys and abs(n.at_ms - call.at_ms) <= TOLERANCE_MS), None)
+        if inputs.since_ms is not None and call.at_ms < inputs.since_ms:
+            continue
+        eid = episode_id(harness, call_id, task_id)
+        if source is None:
+            if reason == "retired":
+                summary["retired"] += 1
+            elif reason in summary["unconfirmed"]:
+                summary["unconfirmed"][reason] += 1
+                candidates.append({"id": eid, "task_id": task_id, "reason": reason,
+                                   "sessions": sorted({session_key(s) for s, _ in anchor.holders}),
+                                   "call_at": call.at_ms, "stamp_delta_s": _stamp_delta_s(record, call.at_ms),
+                                   "source_refs": [source_ref(session, call)] +
+                                                  [source_ref(s, s.events[i]) for s, i in anchor.holders if s is not session]})
+            continue
+        turn = turn_after(session, index)
+        collapse_key = (session.path, task_id, turn.end_index)
+        if collapse_key in collapsed:
+            summary["anchors_collapsed"] += 1
+            continue
+        collapsed.add(collapse_key)
+        summary["turns"][turn.outcome] += 1
+        if turn.outcome != "completed":
+            continue
+        refs = [source_ref(session, session.events[index]), source_ref(session, session.events[turn.end_index])]
+        cutoff = turn.ended_at + inputs.window_ms
+        parks = _transitions_of("park", task_id, record, transitions, call.at_ms)
+        closes = _transitions_of("close", task_id, record, transitions, call.at_ms)
+        transcript_only.update(t.refs for t in parks + closes if t.source == "transcript")
+        first_park = parks[0] if parks else None
+        first_close = closes[0] if closes else None
+        parked_at = first_park.at_ms if first_park else None
+        closed_at = first_close.at_ms if first_close else None
+        closure_source = first_close.source if first_close else None
+        for t in (first_park, first_close):
+            if t is not None:
+                refs.extend(t.refs)
+        # a definite park OR close inside the window settles the question; otherwise any
+        # transcript-only transition whose interval crosses the cutoff leaves it open
+        definite_inside = any(t.interval is None and t.at_ms <= cutoff for t in parks + closes)
+        uncertain = not definite_inside and (_straddles(parks, cutoff) or _straddles(closes, cutoff))
+        nxt = next_human_after(session, turn.end_index)
+        status, label_source = None, None
+        if nxt is not None:
+            refs.append(source_ref(session, nxt))
+            review = inputs.labels.get(eid)
+            if review is not None and review.get("message_digest") == digest(nxt.text):
+                status, label_source = bool(review["status_question"]), "reviewed"
+            else:
+                if review is not None:
+                    summary["stale_labels"] += 1
+                status, label_source = heuristic_label(nxt.text), "heuristic"
+            summary["label_sources"][label_source] += 1
+        for s, i in anchor.holders:
+            if s is not session:
+                refs.append(source_ref(s, s.events[i]))
+        sessions_holding = {session_key(s) for s, _ in anchor.holders}
+        if len(sessions_holding) == 1:
+            key_out = next(iter(sessions_holding))
+        elif stamped:
+            key_out = stamped
+        else:
+            key_out = None
+            summary["origin_unknown"] += 1
+        if record is None or key_out is None:
+            join_class = "unknown"
+        elif stamped or any(note_kind(n.text) == "start" and n.harness_session == key_out for n in record.notes):
+            join_class = "stamped"
+        else:
+            join_class = "inferred"
+        window = (record is not None and not record.unreadable and inputs.now_ms >= cutoff
+                  and join_class != "unknown" and not uncertain)
+        episodes.append({"id": eid, "task_id": task_id, "session_key": key_out, "started_at": call.at_ms,
+                         "ended_at": turn.ended_at, "parked_at": parked_at, "closed_at": closed_at,
+                         "next_human_at": nxt.at_ms if nxt else None, "status_question": status,
+                         "label_source": label_source, "anchor_source": source, "closure_source": closure_source,
+                         "window_complete": window, "join_class": join_class, "source_refs": refs})
+    summary["episodes"] = len(episodes)
+    summary["note_missing"] = len(transcript_only)
+    return episodes, candidates, summary
+
+
+# --- files and CLI -------------------------------------------------------------
+
+# Raw text that every file with an anchor, a fork copy of one, or a confirmable transition
+# must contain: the START_RE / TASKS_ID_CMD shape up to the verb, over the JSON line as
+# written. Decoded whitespace may be a literal, a JSON or JS escape at any depth (a Codex
+# shell call is JSON inside JSON), or a non-ASCII space; a quoted -C or --flag argument may
+# hold spaces the loose reading blanks. No leading \b and none after `start`, because the
+# unsupported-wrapper route is the plain substring `tasks start`. A superset: a match means
+# parse, not anchor.
+_RAW_SEP = rb"(?:[\s\x1c-\x1f\x80-\xff]|\\+[nrtfv]|\\+u[0-9a-fA-F]{4})+"
+_RAW_WORD = rb"(?:[^\s\"']|\"[^\"]*\"|'[^']*')+"
+LIFECYCLE_TEXT = re.compile(rb"tasks" + _RAW_SEP + rb"(?:-C" + _RAW_SEP + _RAW_WORD + _RAW_SEP + rb")?"
+                            + rb"(?:--" + _RAW_WORD + _RAW_SEP + rb")*(?:start|park\b|done\b|drop\b)")
+
+
+def _prefilter(header: Session, since_ms: int | None) -> str | None:
+    """Why a file need not be parsed, cheapest test first, or None. Each reason is exact:
+    a Codex rollout whose own session_meta says subagent is excluded whatever follows; every
+    record in a file is older than its mtime, so nothing in one older than --since can be
+    an anchor or a transition after one; and a file without the lifecycle text holds no
+    anchor, no fork copy of one, and no confirmable transition."""
+    if header.harness == CODEX_HARNESS and header.subagent:
+        return "subagent_meta"
+    if since_ms is not None and header.path.stat().st_mtime_ns // 1_000_000 < since_ms:
+        return "before_since"
+    if LIFECYCLE_TEXT.search(header.path.read_bytes()) is None:
+        return "no_lifecycle_text"
+    return None
+
+
+def scan_stores(claude_root: Path, codex_root: Path, since_ms: int | None = None) -> list[Session]:
+    """Every file in both stores as a Session: parsed, or a header carrying its skip reason.
+    Skipped files still count in the summary's files and excluded, since the header settles
+    subagent and entrypoint the way the full read does."""
+    sessions = []
+    if claude_root.is_dir():
+        for path in sorted(claude_root.glob("*/*.jsonl")):
+            header = claude_header(path)
+            header.skipped = _prefilter(header, since_ms)
+            sessions.append(header if header.skipped else read_claude(path))
+    if codex_root.is_dir():
+        for path in sorted(codex_root.rglob("*.jsonl")):
+            header = codex_header(path)
+            if header is not None:
+                header.skipped = _prefilter(header, since_ms)
+            sessions.append(header if header is not None and header.skipped else read_codex(path))
+    return sessions
+
+
+def sidecar(episodes_path: Path, kind: str) -> Path:
+    return episodes_path.with_name(f"{episodes_path.stem}.{kind}.jsonl")
+
+
+def read_jsonl_map(path: Path) -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    if not path.is_file():
+        return out
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            obj = None
+        if not isinstance(obj, dict) or "id" not in obj:
+            raise SystemExit(f"session-episodes: {path}:{number}: not a JSON object with an id")
+        out[obj["id"]] = obj
+    return out
+
+
+def write_jsonl(path: Path, rows: list[dict]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(json.dumps(r, sort_keys=True) + "\n" for r in rows), encoding="utf-8")
+
+
+def _roots(env: dict) -> tuple[Path, Path]:
+    home = Path(env.get("HOME", "~")).expanduser()
+    return (Path(env.get("SESSION_LOGS_CLAUDE") or home / ".claude" / "projects"),
+            Path(env.get("SESSION_LOGS_CODEX") or home / ".codex" / "sessions"))
+
+
+def cmd_extract(args, env: dict) -> int:
+    out = Path(args.out)
+    labels_path = Path(args.labels) if args.labels else sidecar(out, "labels")
+    anchors_path = Path(args.anchors) if args.anchors else sidecar(out, "anchors")
+    roots = registry(env)
+    for prefix, root in roots.items():
+        if args.project and prefix != args.project:
+            continue
+        if not (root / "tasks").is_dir():
+            raise SystemExit(f"session-episodes: registered project {prefix} has no tasks/ under {root}")
+    claude_root, codex_root = _roots(env)
+    now = int(dt.datetime.now(dt.timezone.utc).timestamp() * 1000)
+    since = now - args.since * 86_400_000 if args.since is not None else None
+    inputs = Inputs(scan_stores(claude_root, codex_root, since), roots, read_jsonl_map(labels_path), read_jsonl_map(anchors_path),
+                    now, args.window_minutes * 60_000, since, args.project)
+    episodes, candidates, summary = build_episodes(inputs)
+    summary["roots"] = {"claude": str(claude_root), "codex": str(codex_root)}
+    summary["missing_roots"] = [str(r) for r in (claude_root, codex_root) if not r.is_dir()]
+    write_jsonl(out, episodes)
+    write_jsonl(sidecar(out, "candidates"), candidates)
+    print(json.dumps(summary, sort_keys=True), file=sys.stderr)
+    return 0
+
+
+def _lookup(episodes_path: Path, wanted: str) -> tuple[str, dict]:
+    for kind, path in (("episode", episodes_path), ("candidate", sidecar(episodes_path, "candidates"))):
+        row = read_jsonl_map(path).get(wanted)
+        if row is not None:
+            return kind, row
+    raise SystemExit(f"session-episodes: unknown id {wanted} in {episodes_path} and its candidates")
+
+
+def _parse_ref(ref: str) -> tuple[str, Path, int]:
+    head, _, line = ref.rpartition("#L")
+    harness, _, rest = head.partition(":")
+    _, _, path = rest.partition(":")
+    return harness, Path(path), int(line)
+
+
+def _session_for(ref: str, cache: dict) -> Session:
+    harness, path, _ = _parse_ref(ref)
+    if path not in cache:
+        cache[path] = read_claude(path) if harness == CLAUDE_HARNESS else read_codex(path)
+    return cache[path]
+
+
+def _evidence(row: dict, kind: str, cache: dict) -> tuple[str, str, str, str]:
+    """(anchor commands, result text, last assistant text, next human text) for show/confirm/label."""
+    session = _session_for(row["source_refs"][0], cache)
+    line = _parse_ref(row["source_refs"][0])[2]
+    # the episode id hashes the call id, so the call on this line whose id reproduces it is the one
+    index = next((i for i, e in enumerate(session.events) if e.kind == "tool_call" and e.line == line
+                  and episode_id(session.harness, e.call_id, row["task_id"]) == row["id"]), None)
+    if index is None:
+        raise SystemExit(f"session-episodes: {row['source_refs'][0]} no longer holds the call behind {row['id']}; re-run extract")
+    call = session.events[index]
+    result = _result_for(session, index)
+    turn = turn_after(session, index)
+    last_assistant = next((e for e in reversed(session.events[index:turn.end_index + 1]) if e.kind == "assistant"), None)
+    nxt = next_human_after(session, turn.end_index) if kind == "episode" else None
+    return ("\n".join(call.commands) + call.raw, result.text if result else "",
+            last_assistant.text if last_assistant else "", nxt.text if nxt else "")
+
+
+def cmd_show(args, env: dict) -> int:
+    kind, row = _lookup(Path(args.episodes), args.id)
+    commands, result, assistant, human = _evidence(row, kind, {})
+    print(f"id: {row['id']}\nkind: {kind}\ntask_id: {row['task_id']}")
+    for ref in row["source_refs"]:
+        print(f"== {ref}")
+    for label, body in (("anchor commands", commands), ("result", result), ("last assistant", assistant), ("next human turn", human)):
+        print(f"-- {label}\n{body}")
+    return 0
+
+
+
+def cmd_confirm(args, env: dict) -> int:
+    episodes_path = Path(args.episodes)
+    kind, row = _lookup(episodes_path, args.id)
+    commands, result, _, _ = _evidence(row, kind, {})
+    anchors_path = Path(args.anchors) if args.anchors else sidecar(episodes_path, "anchors")
+    read_jsonl_map(anchors_path)  # validates the file before appending
+    anchors_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(anchors_path, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps({"id": row["id"], "confirmed": args.verdict == "yes",
+                                 "evidence_digest": digest(commands + "\n" + result),
+                                 "confirmed_at": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")},
+                                sort_keys=True) + "\n")
+    return 0
+
+
+def cmd_label(args, env: dict) -> int:
+    episodes_path = Path(args.episodes)
+    kind, row = _lookup(episodes_path, args.id)
+    if kind != "episode":
+        raise SystemExit(f"session-episodes: {args.id} is a candidate; confirm it first")
+    _, _, _, human = _evidence(row, kind, {})
+    labels_path = Path(args.labels) if args.labels else sidecar(episodes_path, "labels")
+    read_jsonl_map(labels_path)
+    labels_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(labels_path, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps({"id": row["id"], "status_question": args.verdict == "yes",
+                                 "message_digest": digest(human),
+                                 "labelled_at": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")},
+                                sort_keys=True) + "\n")
+    return 0
+
+
+def main(argv: list[str], env: dict) -> int:
+    parser = argparse.ArgumentParser(prog="session-episodes", description=__doc__.split("\n\n")[0])
+    sub = parser.add_subparsers(dest="command", required=True)
+    ex = sub.add_parser("extract")
+    ex.add_argument("--since", type=int, metavar="DAYS")
+    ex.add_argument("--project", metavar="PREFIX")
+    ex.add_argument("--window-minutes", type=int, default=10)
+    ex.add_argument("--labels")
+    ex.add_argument("--anchors")
+    ex.add_argument("--out", required=True)
+    ex.set_defaults(run=cmd_extract)
+    for name, run, verdict, extra in (("show", cmd_show, False, None), ("confirm", cmd_confirm, True, "--anchors"),
+                                      ("label", cmd_label, True, "--labels")):
+        p = sub.add_parser(name)
+        p.add_argument("id")
+        if verdict:
+            p.add_argument("verdict", choices=("yes", "no"))
+        p.add_argument("--episodes", required=True)
+        if extra:
+            p.add_argument(extra)
+        p.set_defaults(run=run)
+    try:
+        args = parser.parse_args(argv)
+        return args.run(args, env)
+    except SystemExit as error:
+        if isinstance(error.code, str):
+            print(error.code, file=sys.stderr)
+            return 2
+        return int(error.code or 0)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:], dict(os.environ)))

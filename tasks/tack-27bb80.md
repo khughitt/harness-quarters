@@ -1,0 +1,42 @@
+---
+id: tack-27bb80
+title: Run the agents' shell tool under bash to end zsh '=' and glob failures
+status: done
+priority: "2"
+size: s
+complexity: mid
+process: direct
+owner: main
+created: 2026-09-26T20:51:42Z
+updated: 2026-09-27T10:49:07Z
+started: 2026-09-27T10:20:03Z
+completed: 2026-09-27T10:23:00Z
+depends: []
+tags: [rules, obs]
+source: "obs:docs/reports/2026-09-26-tool-failure-modes.md"
+model: claude-opus-5-5
+agent: claude-code/claude-opus-5-5
+---
+
+Why: the Bash tool runs zsh. There an unquoted `=` word, such as an `echo ===` separator, is expanded as a command lookup. It fails with `(eval):1: ==== not found` and aborts the rest of the batch. obs measured this over 2026-08-05..09-26 (docs/reports/2026-09-26-tool-failure-modes.md §1 in the obs checkout): 822 of 3,414 Claude Code Bash errors (24%), and 89% of calls containing such a word fail. Unmatched globs (an unquoted `--include=*.py`) add 145 more (4%). `pkill -f` matches its own shell and fails 82% of the time (47 errors). Codex has 209 zsh glob or syntax failures. The `=` failure was reproduced twice while scoping on 2026-09-27.
+
+Approach:
+1. Claude Code: add `"CLAUDE_CODE_SHELL": "/bin/bash"` to the `env` block of claude/settings.json, and to the work variant if there is one. Claude Code 2.1.283 honours the variable when the path contains bash or zsh and is executable; it logs "Using shell override". bash leaves `===` literal and passes unmatched globs through, so both failure modes go away. Environment parity: the process inherits its environment from the zsh that launched it, so ~/.zshenv exports carry over. Only the aliases and functions from .zshrc drop out of the snapshot. Check that `tasks`, `just`, `ops-profile` and `host-load` still resolve under `bash -ic`; they did at scoping.
+2. Codex: find out whether its shell tool can run under bash. The binary has a `zsh_path` option and otherwise follows the user's shell. If bash is possible, set it in codex/config.toml and codex/config.work.toml. If not, record that in a note.
+3. Add a short shell rule to AGENTS.md covering only what the shell switch leaves: no `pkill -f` on a pattern that the command's own line contains (use `pgrep` first, or `pkill -f '[p]attern'`). If Codex stays on zsh, the rule also says to quote globs and `=` words. Two or three lines at most.
+
+Done when: in a fresh Claude Code session, `echo ===; ls --include=*.nothing . >/dev/null; echo ok` prints its output with no `(eval)` error. The Codex outcome is recorded, and the rule lands if it is needed. Later check: once obs-18b8eb labels the modes, the zsh `=` and unmatched-glob modes are near zero in sessions after the change.
+
+Where to look: the `env` block of claude/settings.json, codex/config.toml, AGENTS.md and its mirrors, and the obs report above.
+
+## Notes
+
+- 2026-09-27T10:11:21Z (main): scope: scoped; set todo p2/s/mid/direct, body rewritten with the CLAUDE_CODE_SHELL=/bin/bash approach, the Codex check and a pkill rule
+- 2026-09-27T10:20:03Z (main): started
+  provenance: {"harness_session":"claude-code:c82c3022-0ecc-44d8-a0dc-7e7b3f114b5e","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-27T10:23:00Z (feat/bash-shell): Codex 0.157.1 ignores SHELL=/bin/bash and runs /bin/zsh -lc (the passwd login shell); no config key picks its shell (only zsh_path). Codex stays on zsh, so AGENTS.md gains a Shell section with the quoting rule; pkill -f self-kill reproduced (exit 144) and the [p]attern form verified.
+- 2026-09-27T10:23:00Z (feat/bash-shell): done
+  provenance: {"harness_session":"claude-code:c82c3022-0ecc-44d8-a0dc-7e7b3f114b5e","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-27T10:23:00Z (feat/bash-shell): CLAUDE_CODE_SHELL=/bin/bash in claude/settings.json and settings.work.json (headless session verified: bash 5.3, echo === and unmatched glob pass); Codex cannot be switched, so AGENTS.md has a Shell section for zsh quoting and pkill -f
+  provenance: {"harness_session":"claude-code:c82c3022-0ecc-44d8-a0dc-7e7b3f114b5e","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-27T10:49:07Z (main): Codex shell override requested upstream: openai/codex#48678 (Unix counterpart to the Windows-only #16579)

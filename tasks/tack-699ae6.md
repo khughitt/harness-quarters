@@ -1,0 +1,29 @@
+---
+id: tack-699ae6
+title: Restore personal-project defaults for design and plan documents
+status: done
+priority: "2"
+size: xs
+complexity: low
+process: direct
+owner: docs/project-doc-policy
+created: 2026-09-19T16:01:39Z
+updated: 2026-09-19T16:03:59Z
+started: 2026-09-19T16:02:12Z
+completed: 2026-09-19T16:03:59Z
+depends: []
+tags: [rules]
+agent: codex
+---
+
+User requested a short correction to the global Design & Plan Docs policy: personal projects commit specs/plans by default; work/external projects exclude unless explicitly requested. Trace f6e3f0e (ai-889237), c15f2709 (ai-341dcc), and 734e9b2d (ai-4a90a7). Shorten both policy entries, retain the narrowly applicable excluded-doc preservation safeguard, and capture project-profile/composition design separately. The ops Claude staging hook still implements the old docs/superpowers default; record that integration constraint in the follow-up. Direct documentation edit; no profile machinery in this change.
+
+## Notes
+
+- 2026-09-19T16:02:12Z (docs/project-doc-policy): started
+  provenance: {"harness_session":"codex:01a0ba30-0fe6-77d3-926b-db90dde3f92b","harness_session_source":"CODEX_SESSION_ID"}
+- 2026-09-19T16:03:59Z (docs/project-doc-policy): History verified: f6e3f0e / ai-889237 introduced the universal no-commit default despite motivation limited to work/external PRs; c15f2709 / ai-341dcc shortened it; 734e9b2d / ai-4a90a7 combined status guidance originally present at init. No separate personal-project justification found. Design & Plan Docs reduced from 170 to 59 words: personal docs committed by default, work/external exceptions scoped, preserve excluded docs before worktree removal, verify/update status. Follow-up ai-45ac4c covers arbitrary composable profiles, related fragment work ai-ec379d, and the still-active ops docs/superpowers hook plus exclusion migration. Independent review: no findings; tasks check and diff check pass.
+- 2026-09-19T16:03:59Z (docs/project-doc-policy): done
+  provenance: {"harness_session":"codex:01a0ba30-0fe6-77d3-926b-db90dde3f92b","harness_session_source":"CODEX_SESSION_ID"}
+- 2026-09-19T16:03:59Z (docs/project-doc-policy): Restored personal-project doc tracking defaults and shortened global status guidance; captured composable project profiles in ai-45ac4c.
+  provenance: {"harness_session":"codex:01a0ba30-0fe6-77d3-926b-db90dde3f92b","harness_session_source":"CODEX_SESSION_ID"}

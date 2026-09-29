@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+"""Git clean filter: keep model and effort switches out of the tracked harness configs.
+
+The harness homes symlink to `claude/settings*.json` and `codex/config*.toml`, so
+`/model` and `/effort` in a session write straight into the checkout. Those keys are
+session state, not configuration: this filter drops them from what git stages and
+leaves the working tree — the live file — untouched. Codex also writes bookkeeping
+(the screen-reader probe flag, model-announcement counters, marketplace fetch stamps),
+dropped the same way. Project trust (`[projects.*]`) is host state and is
+dropped too. Everything else the harness writes (plugin toggles, marketplace sources,
+hook trust hashes) stays tracked. Wired by
+`.gitattributes` and `git config filter.harness-state.clean`; the smudge side is
+identity, so a checkout simply carries no default model until the next pick.
+"""
+import json
+import re
+import sys
+
+JSON_KEYS = ("model", "modelSettings")
+# (table, key) pairs; the table is a full-match pattern over the header's name, "" for
+# the top level before any header.
+TOML_KEYS = (
+    (re.compile(r""), "model"),
+    (re.compile(r""), "model_reasoning_effort"),
+    (re.compile(r"tui"), "screen_reader_detection_done"),
+    (re.compile(r'marketplaces\.(?:"[^"]*"|[^."]+)'), "last_updated"),
+    (re.compile(r'marketplaces\.(?:"[^"]*"|[^."]+)'), "last_revision"),
+)
+# Tables dropped whole, header and blank lines up to the next header included. Codex
+# appends a [projects."<path>"] table each time a directory is trusted: that is host
+# state naming every checkout, kept in the live file and out of the index.
+TOML_TABLES = (re.compile(r"tui\.model_availability_nux"), re.compile(r"projects\..+"))
+TOML_HEADER = re.compile(r"^\s*\[\[?\s*(.*?)\s*\]\]?\s*(#.*)?$")
+TOML_KEY = re.compile(r'^\s*("[^"]*"|[A-Za-z0-9_-]+)\s*=')
+
+
+def clean_json(text):
+    data = json.loads(text)
+    for key in JSON_KEYS:
+        data.pop(key, None)
+    return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+
+
+def clean_toml(text):
+    out = []
+    table = ""
+    for line in text.splitlines(keepends=True):
+        header = TOML_HEADER.match(line)
+        if header:
+            table = header.group(1)
+        if any(pattern.fullmatch(table) for pattern in TOML_TABLES):
+            continue
+        key = None if header else TOML_KEY.match(line)
+        if key and any(pattern.fullmatch(table) and key.group(1) == name
+                       for pattern, name in TOML_KEYS):
+            continue
+        out.append(line)
+    return "".join(out)
+
+
+def main(argv):
+    if len(argv) != 2:
+        sys.exit("harness-state-clean: usage: harness-state-clean <path>  (stdin -> stdout)")
+    path = argv[1]
+    text = sys.stdin.read()
+    if path.endswith(".json"):
+        sys.stdout.write(clean_json(text))
+    elif path.endswith(".toml"):
+        sys.stdout.write(clean_toml(text))
+    else:
+        sys.exit(f"harness-state-clean: {path} is not a harness config; check .gitattributes")
+
+
+if __name__ == "__main__":
+    main(sys.argv)

@@ -1,0 +1,504 @@
+#!/usr/bin/env python3
+"""Derive a task's flow state from its record and the covered tree.
+
+flow-state <id> [--json] [--no-git]    state of one task
+flow-state fingerprint [--index|--head] covered-tree hash of the current repo
+
+The machine is docs/specs/2026-09-15-flow-state-machine-design.md; the gate
+grammar is agents/flow/gate-notes.md, with its corpus beside it.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+
+STATES = ("captured", "scoped", "designed", "planned", "implementing", "verified", "closed", "outside")
+GATE_STATES = ("scoped", "designed", "planned", "implementing", "verified")
+EXCLUDED = ("tasks", "docs/specs", "docs/plans")
+
+GATE_RE = re.compile(r"^gate:\s*([A-Za-z]+)\s*(.*)$", re.S)
+TREE_RE = re.compile(r"(?<![A-Za-z0-9])tree:([0-9a-f]{40})")
+TREE_TOKEN_RE = re.compile(r"(?<![A-Za-z0-9])tree:([0-9A-Za-z]*)")
+FINDING_RE = re.compile(r"^(important|minor)\s+(addressed|deferred)(?:\s+(.*))?$", re.S)
+LABEL_RE = re.compile(r"^(human|none|[A-Za-z0-9._-]+/[A-Za-z0-9._\[\]-]+)$")
+SESSION_RE = re.compile(r"^[a-z][a-z0-9-]*:\S+$")
+VERDICT_FIELDS = ("checks", "review", "reviewer")
+TODO_LIKE = ("todo", "blocked")
+
+
+@dataclass(frozen=True)
+class Finding:
+    severity: str
+    disposition: str
+    text: str
+
+
+@dataclass(frozen=True)
+class Verdict:
+    checks: str
+    findings: tuple
+    reviewer: str
+    session: str | None
+
+
+@dataclass(frozen=True)
+class ParsedNote:
+    kind: str
+    state: str | None = None
+    detail: str = ""
+    tree: str | None = None
+    verdict: Verdict | None = None
+    why: str | None = None
+
+
+@dataclass(frozen=True)
+class Gate:
+    state: str
+    detail: str
+    at: str
+    index: int = -1
+    verdict: Verdict | None = None
+
+
+@dataclass(frozen=True)
+class Derivation:
+    state: str
+    inconsistent: str | None = None
+    note: str | None = None
+    verified_tree: str | None = None
+    verdict: str | None = None
+    malformed: tuple = ()
+
+
+class Malformed(Exception):
+    pass
+
+
+def _parse_findings(value: str) -> tuple:
+    value = value.strip()
+    if value == "none":
+        return ()
+    out = []
+    for part in value.split(","):
+        part = part.strip()
+        m = FINDING_RE.match(part)
+        if not m:
+            raise Malformed(f"finding without severity and disposition: {part or '<none>'}")
+        severity, disposition, text = m.group(1), m.group(2), (m.group(3) or "").strip()
+        if not text:
+            raise Malformed("empty finding text")
+        if severity == "important" and disposition == "deferred":
+            raise Malformed("important finding deferred")
+        out.append(Finding(severity, disposition, text))
+    return tuple(out)
+
+
+def _parse_verdict(detail: str) -> Verdict:
+    body = TREE_TOKEN_RE.sub("", detail, count=1).strip().lstrip("—-").strip()
+    fields: dict[str, str] = {}
+    for part in body.split(";"):
+        name, sep, value = part.strip().partition(":")
+        name = name.strip()
+        if not sep or name not in VERDICT_FIELDS:
+            raise Malformed(f"unknown field {name or part.strip() or '<none>'}")
+        if name in fields:
+            raise Malformed(f"duplicate field {name}")
+        fields[name] = value.strip()
+    for name in VERDICT_FIELDS:
+        if not fields.get(name):
+            raise Malformed(f"missing field {name}")
+    words = fields["reviewer"].split()
+    session = None
+    if len(words) == 2 and words[1].startswith("session:"):
+        session = words[1][len("session:"):]
+        if not SESSION_RE.match(session):
+            raise Malformed("session id")
+    elif len(words) != 1:
+        raise Malformed("reviewer field")
+    if not LABEL_RE.match(words[0]):
+        raise Malformed("reviewer field")
+    return Verdict(fields["checks"], _parse_findings(fields["review"]), words[0], session)
+
+
+def parse_note(text: str) -> ParsedNote:
+    t = text.strip()
+    if not t.startswith("gate:"):
+        return ParsedNote("not-a-gate")
+    m = GATE_RE.match(t)
+    state = m.group(1) if m else ""
+    if state not in GATE_STATES:
+        return ParsedNote("malformed", None, why=f"unknown state {state or '<none>'}")
+    detail = m.group(2).strip()
+    tree = None
+    token = TREE_TOKEN_RE.search(detail)
+    if token:
+        if not re.fullmatch(r"[0-9a-f]{40}", token.group(1)):
+            return ParsedNote("malformed", state, detail, why="tree hash not 40 hex")
+        tree = token.group(1)
+    verdict = None
+    if state == "verified" and "review:" in detail:
+        try:
+            verdict = _parse_verdict(detail)
+        except Malformed as e:
+            return ParsedNote("malformed", state, detail, tree, why=str(e))
+    return ParsedNote("gate", state, detail, tree, verdict)
+
+
+# --- gate parsing -----------------------------------------------------------
+
+def gates(record: dict) -> list[Gate]:
+    out = []
+    for i, n in enumerate(record.get("notes") or []):
+        p = parse_note(n["text"])
+        if p.kind == "gate":
+            out.append(Gate(p.state, p.detail, n["at"], i, p.verdict))
+    return out
+
+
+def malformed(record: dict) -> list[tuple[int, str | None, str]]:
+    out = []
+    for i, n in enumerate(record.get("notes") or []):
+        p = parse_note(n["text"])
+        if p.kind == "malformed":
+            out.append((i, p.state, p.why))
+    return out
+
+
+def retro_after(record: dict, gate: Gate) -> bool:
+    """A retro: note positioned after the gate's note (by index, never by clock or text)."""
+    notes = record.get("notes") or []
+    return any(n["text"].strip().startswith("retro:") for n in notes[gate.index + 1:])
+
+
+def verified_tree_of(gate: Gate) -> str | None:
+    m = TREE_RE.search(gate.detail)
+    return m.group(1) if m else None
+
+
+BACK_EDGE_RE = re.compile(r"^[—-]+\s*(invalidated|reopened):")
+
+
+def is_back_edge(gate: Gate) -> bool:
+    """A recorded back edge: the marker leads the detail and matches the state (spec 4.2)."""
+    m = BACK_EDGE_RE.match(gate.detail)
+    return bool(m) and (gate.state, m.group(1)) in (("scoped", "invalidated"), ("implementing", "reopened"))
+
+
+def reduce_history(record: dict) -> tuple[list[Gate], list[dict]]:
+    """Fold the notes in order (spec 4.2): a well-formed gate appends and supersedes every
+    earlier malformed note; a malformed note naming a known state cancels the tail gates
+    naming that state, stopping at a back edge; an unknown state cancels nothing."""
+    eff: list[Gate] = []
+    bad: list[dict] = []
+    for i, n in enumerate(record.get("notes") or []):
+        p = parse_note(n["text"])
+        if p.kind == "gate":
+            eff.append(Gate(p.state, p.detail, n["at"], i, p.verdict))
+            for b in bad:
+                b["superseded"] = True
+        elif p.kind == "malformed":
+            if p.state is not None:
+                while eff and eff[-1].state == p.state and not is_back_edge(eff[-1]):
+                    eff.pop()
+            bad.append({"note": i, "state": p.state, "why": p.why, "superseded": False})
+    return eff, bad
+
+
+def _with_malformed(d: Derivation, bad: list[dict]) -> Derivation:
+    if not bad:
+        return d
+    problems = [f"malformed gate at note {b['note']}: {b['why']}" for b in bad if not b["superseded"]]
+    joined = "; ".join(([d.inconsistent] if d.inconsistent else []) + problems) or None
+    return Derivation(d.state, joined, d.note, d.verified_tree, d.verdict, tuple(bad))
+
+
+def _no_effective_gate(record: dict, d: Derivation) -> Derivation:
+    """Only malformed gate notes: not `outside` (the flow touched it); captured, or closed when done."""
+    if d.state != "outside" or d.note is not None:
+        return d
+    return Derivation("closed" if record["status"] == "done" else "captured", "no well-formed gate")
+
+
+def _verdict_summary(gate: Gate) -> str:
+    v = gate.verdict
+    if v is None:
+        return "no verdict"
+    ia = sum(1 for f in v.findings if f.severity == "important" and f.disposition == "addressed")
+    ma = sum(1 for f in v.findings if f.severity == "minor" and f.disposition == "addressed")
+    md = sum(1 for f in v.findings if f.severity == "minor" and f.disposition == "deferred")
+    return f"findings: {ia}/{ma}/{md}, {v.reviewer}"
+
+
+def _with_verdict(d: Derivation, last: Gate) -> Derivation:
+    if d.state != "verified" or last.state != "verified":
+        return d
+    return Derivation(d.state, d.inconsistent, d.note, d.verified_tree, _verdict_summary(last), d.malformed)
+
+
+# --- leaf derivation --------------------------------------------------------
+
+def _closed(record: dict, last: Gate) -> Derivation:
+    if last.state != "verified":
+        return Derivation("closed", f"done with last gate {last.state}")
+    tree = verified_tree_of(last)
+    if tree is None:
+        return Derivation("closed", "verified gate without tree:<hash>")
+    if not retro_after(record, last):
+        return Derivation("closed", "done without a retro: note after the verified gate", verified_tree=tree)
+    return Derivation("closed", verified_tree=tree)
+
+
+def _derive_leaf(record: dict, gs: list[Gate]) -> Derivation:
+    status = record["status"]
+    if status in ("dropped", "shelved"):
+        return Derivation("outside", note=status)
+    if not gs:
+        return Derivation("captured" if status == "idea" else "outside")
+    last = gs[-1]
+    if status == "idea":
+        return Derivation(last.state, "status idea with gate notes")
+    if status == "done":
+        return _closed(record, last)
+    claimed = status in TODO_LIKE or status == "doing"
+    if last.state == "scoped":
+        if not record.get("process"):
+            return Derivation("scoped", "process unset")
+        return Derivation("scoped") if claimed else Derivation("scoped", f"status {status}")
+    if last.state == "designed":
+        if not record.get("spec"):
+            return Derivation("designed", "no spec link")
+        return Derivation("designed") if claimed else Derivation("designed", f"status {status}")
+    if last.state == "planned":
+        return Derivation("planned", "planned gate without step children")
+    if last.state == "implementing":
+        return Derivation("implementing") if status == "doing" else Derivation("implementing", f"status {status}")
+    tree = verified_tree_of(last)
+    if tree is None:
+        return Derivation("verified", "verified gate without tree:<hash>")
+    return Derivation("verified", verified_tree=tree) if status == "doing" else Derivation("verified", f"status {status}", verified_tree=tree)
+
+
+# --- parent derivation ------------------------------------------------------
+
+def _child_left_scoped(child: dict) -> bool:
+    """Over the child's effective history (spec 4.2), so a cancelled gate does not count."""
+    return any(g.state != "scoped" for g in reduce_history(child)[0])
+
+
+def _derive_parent(record: dict, children: list[dict], gs: list[Gate]) -> Derivation:
+    status = record["status"]
+    if status in ("dropped", "shelved"):
+        return Derivation("outside", note=status)
+    if not gs:
+        return Derivation("captured" if status == "idea" else "outside")
+    last = gs[-1]
+    if last.state in ("scoped", "designed"):
+        return _derive_leaf(record, gs)
+    claimed = status in TODO_LIKE or status == "doing"
+    ungated = [c["id"] for c in children if not reduce_history(c)[0]]
+    if last.state == "planned":
+        state = "implementing" if any(_child_left_scoped(c) for c in children) else "planned"
+        if not record.get("plan"):
+            return Derivation(state, "no plan link")
+        if ungated:
+            return Derivation(state, f"child {', '.join(ungated)} has no gate notes")
+        if status == "done":
+            return Derivation("closed", "done with last gate planned")
+        return Derivation(state) if claimed else Derivation(state, f"status {status}")
+    if last.state == "implementing":
+        if not is_back_edge(last):
+            return Derivation("implementing", "parent implementing gate is not a reopen")
+        if status == "done":
+            return Derivation("closed", "done with last gate implementing")
+        return Derivation("implementing") if claimed else Derivation("implementing", f"status {status}")
+    # verified
+    tree = verified_tree_of(last)
+    if tree is None:
+        return Derivation("verified", "verified gate without tree:<hash>")
+    problems = []
+    for c in children:
+        cd = derive_leaf(c)
+        if cd.state == "outside" and cd.note == "dropped":
+            continue
+        if cd.state == "outside" and cd.note == "shelved":
+            problems.append(f"child {c['id']} is shelved")
+        elif cd.state != "closed":
+            problems.append(f"child {c['id']} is {cd.state}")
+        elif cd.inconsistent:
+            problems.append(f"child {c['id']} closed (inconsistent: {cd.inconsistent})")
+    if problems:
+        state = "closed" if status == "done" else "verified"
+        return Derivation(state, "; ".join(problems), verified_tree=tree)
+    if status == "done":
+        return _closed(record, last)
+    return Derivation("verified", verified_tree=tree) if claimed else Derivation("verified", f"status {status}", verified_tree=tree)
+
+
+def derive_leaf(record: dict) -> Derivation:
+    gs, bad = reduce_history(record)
+    d = _derive_leaf(record, gs)
+    d = _with_verdict(d, gs[-1]) if gs else (_no_effective_gate(record, d) if bad else d)
+    return _with_malformed(d, bad)
+
+
+def derive_parent(record: dict, children: list[dict]) -> Derivation:
+    gs, bad = reduce_history(record)
+    d = _derive_parent(record, children, gs)
+    d = _with_verdict(d, gs[-1]) if gs else (_no_effective_gate(record, d) if bad else d)
+    return _with_malformed(d, bad)
+
+
+def derive(show: dict, child_records: list[dict]) -> Derivation:
+    if show.get("children"):
+        return derive_parent(show["task"], child_records)
+    return derive_leaf(show["task"])
+
+
+# --- covered tree -----------------------------------------------------------
+
+class DirtySubmodule(Exception):
+    def __init__(self, paths: list[str]):
+        super().__init__("dirty submodule: " + ", ".join(paths))
+        self.paths = paths
+
+
+def git(repo: Path, *args: str, env: dict | None = None) -> str:
+    return subprocess.run(["git", *args], cwd=repo, check=True, text=True,
+                          capture_output=True, env=env).stdout.strip()
+
+
+def dirty_submodules(repo: Path) -> list[str]:
+    out = git(repo, "status", "--porcelain=2", "--ignore-submodules=none")
+    dirty = []
+    for line in out.splitlines():
+        parts = line.split(" ")
+        if parts[0] not in ("1", "2"):
+            continue
+        sub = parts[2]  # "N..." for a file, "S<c><m><u>" for a submodule
+        if sub.startswith("S") and ("M" in sub[2:] or "U" in sub[2:]):
+            dirty.append(parts[-1] if parts[0] == "1" else parts[-1].split("\t")[0])
+    return dirty
+
+
+def fingerprint(repo: Path, mode: str = "worktree") -> str:
+    if mode not in ("worktree", "index", "head"):
+        raise ValueError(mode)
+    if mode != "head":
+        dirty = dirty_submodules(repo)
+        if dirty:
+            raise DirtySubmodule(dirty)
+    git_dir = Path(git(repo, "rev-parse", "--git-dir"))
+    if not git_dir.is_absolute():
+        git_dir = repo / git_dir
+    with tempfile.TemporaryDirectory() as tmp:
+        index = Path(tmp) / "index"
+        env = {**os.environ, "GIT_INDEX_FILE": str(index)}
+        if mode == "head":
+            git(repo, "read-tree", "HEAD", env=env)
+        else:
+            shutil.copy(git_dir / "index", index)
+            if mode == "worktree":
+                git(repo, "add", "-A", env=env)
+        git(repo, "rm", "-r", "-q", "-f", "--cached", "--ignore-unmatch", "--", *EXCLUDED, env=env)
+        return git(repo, "write-tree", env=env)
+
+
+def apply_worktree(d: Derivation, covered: str | None) -> Derivation:
+    if d.state != "verified" or covered is None or d.verified_tree == covered:
+        return d
+    return Derivation("implementing", d.inconsistent,
+                      f"verified at tree:{d.verified_tree}, covered content changed", d.verified_tree,
+                      None, d.malformed)
+
+
+# --- CLI --------------------------------------------------------------------
+
+def tasks_show(task_id: str) -> dict:
+    exe = os.environ.get("FLOW_STATE_TASKS", "tasks")
+    r = subprocess.run([exe, "show", task_id], text=True, capture_output=True)
+    if r.returncode != 0:
+        detail = r.stdout.strip() or r.stderr.strip()
+        raise SystemExit(f"flow-state: tasks show {task_id} failed: {detail}")
+    return json.loads(r.stdout)
+
+
+def repo_root(cwd: Path) -> Path | None:
+    r = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=cwd, text=True, capture_output=True)
+    return Path(r.stdout.strip()) if r.returncode == 0 else None
+
+
+def state_of(task_id: str, use_git: bool) -> dict:
+    show = tasks_show(task_id)
+    children = [tasks_show(c["id"])["task"] for c in show.get("children") or []]
+    d = derive(show, children)
+    covered = None
+    root = repo_root(Path.cwd()) if use_git else None
+    if root is not None and d.state == "verified":
+        try:
+            covered = fingerprint(root)
+        except DirtySubmodule as e:
+            raise SystemExit(f"flow-state: {e}")
+        d = apply_worktree(d, covered)
+    return {"id": task_id, "state": d.state, "inconsistent": d.inconsistent,
+            "note": d.note, "verified_tree": d.verified_tree, "covered_tree": covered,
+            "verdict": d.verdict, "malformed": list(d.malformed)}
+
+
+def render(result: dict) -> str:
+    extras = [x for x in (
+        result["note"],
+        result.get("verdict"),
+        f"inconsistent: {result['inconsistent']}" if result["inconsistent"] else None,
+    ) if x]
+    return result["state"] + (f" ({'; '.join(extras)})" if extras else "")
+
+
+def main(argv: list[str]) -> int:
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__.strip())
+        return 0
+    if argv[0] == "fingerprint":
+        rest = argv[1:]
+        if not rest:
+            mode = "worktree"
+        elif len(rest) == 1 and rest[0] in ("--index", "--head"):
+            mode = "index" if rest[0] == "--index" else "head"
+        else:
+            print("flow-state: usage: flow-state fingerprint [--index|--head]", file=sys.stderr)
+            return 2
+        root = repo_root(Path.cwd())
+        if root is None:
+            print("flow-state: not inside a git repository", file=sys.stderr)
+            return 1
+        try:
+            print(fingerprint(root, mode))
+        except DirtySubmodule as e:
+            print(f"flow-state: {e}", file=sys.stderr)
+            return 1
+        return 0
+    ids = [a for a in argv if not a.startswith("--")]
+    if not ids:
+        print(__doc__.strip(), file=sys.stderr)
+        return 2
+    task_id = ids[0]
+    as_json = "--json" in argv
+    use_git = "--no-git" not in argv
+    try:
+        result = state_of(task_id, use_git)
+    except SystemExit as e:
+        print(e, file=sys.stderr)
+        return 1
+    print(json.dumps(result) if as_json else render(result))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -1,0 +1,268 @@
+#!/usr/bin/env python3
+"""Judge one controller-wake probe transcript: did the harness start a new controller
+turn, without human input, because a child it was running finished?
+
+wake-judge <claude-code|codex> <transcript.jsonl> <nonce> <prompt-file>
+
+Prints PASS, or FAIL: <why>; exits 0 on PASS and 1 on FAIL. It fails closed. Every
+input record must classify as the one human prompt (byte-equal to <prompt-file>, stripped),
+known harness context, a tool result, or a completion notification in a known form; any
+other input record, or a record type it does not know, is a FAIL. A completion counts
+only if the controller's turn had ended first (its last record before the notification
+is text with no tool call, and is exactly WAITING), the notification names a child launched
+in that turn by a launching tool call (its id, or an id its own result returned), the nonce
+appears nowhere before it, and a controller message after it reports the nonce.
+
+Known forms grow only from a real transcript and a test built from it (ai
+docs/plans/2026-09-24-turn-boundary-gate.md Task 10). No Codex completion form is known
+yet, so a Codex run cannot pass until one is added that way.
+"""
+import json
+import re
+import sys
+
+CLAUDE_NOTIFICATION_PREFIX = "<task-notification>"
+CLAUDE_CONTEXT_PREFIXES = ("<system-reminder>",)
+# Claude Code record types that carry no model input.
+CLAUDE_NON_INPUT_TYPES = frozenset({"summary", "file-history-snapshot", "system",
+                                    # Session metadata seen in the Claude Code 2.1.282 wake probe, 2026-09-24.
+                                    "ai-title", "atis-latch", "mode", "permission-mode", "last-prompt"})
+# Attachment subtypes seen carrying harness context, never human input (same probe). Any
+# other subtype fails: an attachment can carry queued or edited user content.
+CLAUDE_CONTEXT_ATTACHMENTS = frozenset({
+    "agent_listing_delta", "credential_org", "date", "deferred_tools_delta", "deferred_tools_record",
+    "environment", "hook_additional_context", "hook_success", "instructions", "mcp_instructions_delta",
+    "model", "prompt_snapshot", "session_context", "skill_listing", "total_tokens_reminder",
+})
+CODEX_CONTEXT_PREFIXES = ("<environment_context>", "# AGENTS.md", "<INSTRUCTIONS>", "<user_instructions>")
+CODEX_NOTIFICATION_PREFIXES = ()
+CODEX_RECORD_TYPES = frozenset({"session_meta", "turn_context", "event_msg", "response_item"})
+CODEX_TOOL_CALLS = frozenset({"function_call", "custom_tool_call", "local_shell_call"})
+CODEX_TOOL_OUTPUTS = frozenset({"function_call_output", "custom_tool_call_output"})
+# Subtypes known to carry no model input. Anything not listed, and not handled above, is
+# unclassified and fails the run.
+CODEX_NON_INPUT_EVENTS = frozenset({
+    "agent_message", "agent_reasoning", "agent_reasoning_section_break", "token_count",
+    "exec_command_begin", "exec_command_end", "exec_command_output_delta",
+    "patch_apply_begin", "patch_apply_end", "mcp_tool_call_begin", "mcp_tool_call_end",
+    "web_search_begin", "web_search_end", "turn_diff", "plan_update",
+})
+CODEX_NON_INPUT_ITEMS = frozenset({"reasoning"})
+# An id a launching tool result hands back ("agentId: a1b2c3", "task_id=…").
+ID_IN_RESULT = re.compile(r"(?i)\b(?:agent|task|shell|process|background)[ _-]?id\s*[:=]\s*[\"']?([A-Za-z0-9_-]{4,})")
+# Tool calls that launch a child a notification may name; nothing else counts.
+CLAUDE_LAUNCH_TOOLS = frozenset({"Agent", "Task"})
+CODEX_LAUNCH_TOOLS = frozenset({"spawn_agent"})
+
+
+class Fail(Exception):
+    """The transcript does not establish a wake; the message says why."""
+
+
+def _blocks(content):
+    return [{"type": "text", "text": content}] if isinstance(content, str) else list(content or [])
+
+
+def _text(content):
+    parts = []
+    for block in _blocks(content):
+        if block.get("type") == "text":
+            parts.append(block.get("text", ""))
+        elif block.get("type") == "tool_result":
+            inner = block.get("content")
+            parts.append(inner if isinstance(inner, str) else _text(inner))
+    return "".join(parts)
+
+
+def _launch_ids(tool_ids, result_texts):
+    ids = {i for i in tool_ids if isinstance(i, str) and i}
+    for text in result_texts:
+        ids.update(ID_IN_RESULT.findall(text))
+    return ids
+
+
+def _claude_launch(block):
+    name = block.get("name")
+    return name in CLAUDE_LAUNCH_TOOLS or (name == "Bash" and (block.get("input") or {}).get("run_in_background") is True)
+
+
+def _claude_kind(record, prompt):
+    kind = record.get("type")
+    if kind in CLAUDE_NON_INPUT_TYPES or (kind in ("user", "assistant") and record.get("isSidechain")):
+        return None
+    if kind == "attachment":
+        sub = (record.get("attachment") or {}).get("type")
+        if sub in CLAUDE_CONTEXT_ATTACHMENTS:
+            return None
+        raise Fail(f"unclassified attachment {sub!r}")
+    if kind == "queue-operation":
+        # Queue bookkeeping: what is dequeued arrives as its own user record. Only an empty
+        # entry or a queued notification is harmless; queued human text is not a wake.
+        content = record.get("content")
+        if content is None or (isinstance(content, str) and content.lstrip().startswith(CLAUDE_NOTIFICATION_PREFIX)):
+            return None
+        raise Fail(f"queued input that is not a notification: {str(content)[:60]!r}")
+    if kind not in ("user", "assistant"):
+        raise Fail(f"unclassified record type {kind!r}")
+    message = record.get("message")
+    if not isinstance(message, dict) or "content" not in message:
+        raise Fail(f"{kind} record without message content")
+    content = message["content"]
+    if kind == "assistant":
+        return "assistant-tool" if any(b.get("type") == "tool_use" for b in _blocks(content)) else "assistant"
+    if record.get("isMeta"):
+        return "context"
+    blocks = _blocks(content)
+    if blocks and all(b.get("type") == "tool_result" for b in blocks):
+        return "tool-result"
+    text = _text(content).strip()
+    if text == prompt:
+        return "human"
+    if text.startswith(CLAUDE_NOTIFICATION_PREFIX):
+        return "notification"
+    if text.startswith(CLAUDE_CONTEXT_PREFIXES):
+        return "context"
+    raise Fail(f"unclassified input: {text[:60]!r}")
+
+
+def judge_claude(records, nonce, prompt):
+    seq = [(k, r) for r in records if (k := _claude_kind(r, prompt)) is not None]
+    kinds = [k for k, _ in seq]
+    if kinds.count("human") != 1:
+        raise Fail(f"{kinds.count('human')} human prompts; expected exactly one")
+    first_human = kinds.index("human")
+    if any(k.startswith("assistant") for k in kinds[:first_human]):
+        raise Fail("the controller spoke before the prompt")
+    if "notification" not in kinds:
+        raise Fail("no completion notification")
+    n = kinds.index("notification")
+    before = [i for i in range(n) if kinds[i] != "context"]
+    if not before or kinds[before[-1]] != "assistant":
+        raise Fail("the controller's turn had not ended before the notification (last record is not a text-only reply)")
+    # Claude Code writes one record per content block, so the final reply is the last record.
+    if _text(seq[before[-1]][1]["message"]["content"]).strip() != "WAITING":
+        raise Fail("the controller's turn did not end with a reply of exactly WAITING")
+    if any(nonce in json.dumps(r) for _, r in seq[:n]):
+        raise Fail("the nonce appeared before the notification")
+    launches = {b["id"] for k, r in seq[:n] if k == "assistant-tool"
+                for b in _blocks(r["message"]["content"])
+                if b.get("type") == "tool_use" and _claude_launch(b)}
+    if not launches:
+        raise Fail("no child was launched before the notification")
+    results = [_text([b]) for k, r in seq[:n] if k == "tool-result"
+               for b in _blocks(r["message"]["content"]) if b.get("tool_use_id") in launches]
+    notification = _text(seq[n][1]["message"]["content"])
+    if not any(i in notification for i in _launch_ids(launches, results)):
+        raise Fail("the notification does not name a child launched in the first turn")
+    if not any(k.startswith("assistant") and nonce in _text(r["message"]["content"]) for k, r in seq[n + 1:]):
+        raise Fail("no controller reply after the notification reports the nonce")
+
+
+def _codex_text(payload):
+    return "".join(c.get("text", "") for c in payload.get("content", []) if isinstance(c, dict))
+
+
+def _codex_input(text, prompt):
+    text = text.strip()
+    if text == prompt:
+        return "human"
+    if CODEX_NOTIFICATION_PREFIXES and text.startswith(CODEX_NOTIFICATION_PREFIXES):
+        return "notification"
+    if text.startswith(CODEX_CONTEXT_PREFIXES):
+        return "context"
+    raise Fail(f"unclassified input: {text[:60]!r}")
+
+
+def _codex_kind(record, prompt):
+    kind, payload = record.get("type"), record.get("payload") or {}
+    if kind not in CODEX_RECORD_TYPES:
+        raise Fail(f"unclassified record type {kind!r}")
+    sub = payload.get("type")
+    if kind == "event_msg":
+        if sub == "user_message":
+            _codex_input(payload.get("message") or "", prompt)  # must classify; counted from response_item
+            return None
+        if sub in ("task_started", "task_complete"):
+            return {"task_started": "start", "task_complete": "complete"}[sub]
+        if sub in CODEX_NON_INPUT_EVENTS:
+            return None
+        raise Fail(f"unclassified event subtype {sub!r}")
+    if kind != "response_item":
+        return None
+    if sub == "message":
+        role = payload.get("role")
+        if role == "assistant":
+            return "assistant"
+        if role == "developer":
+            return "context"
+        if role == "user":
+            return _codex_input(_codex_text(payload), prompt)
+        raise Fail(f"unclassified message role {role!r}")
+    if sub in CODEX_TOOL_CALLS:
+        return "tool-call"
+    if sub in CODEX_TOOL_OUTPUTS:
+        return "tool-output"
+    if sub in CODEX_NON_INPUT_ITEMS:
+        return None
+    raise Fail(f"unclassified response item {sub!r}")
+
+
+def judge_codex(records, nonce, prompt):
+    seq = [(k, r["payload"]) for r in records if (k := _codex_kind(r, prompt)) is not None]
+    kinds = [k for k, _ in seq]
+    if kinds.count("human") != 1:
+        raise Fail(f"{kinds.count('human')} human prompts; expected exactly one")
+    if "complete" not in kinds:
+        raise Fail("the first turn never completed")
+    c = kinds.index("complete")
+    last = [i for i in range(c) if kinds[i] in ("assistant", "tool-call")]
+    if not last or kinds[last[-1]] != "assistant" or _codex_text(seq[last[-1]][1]).strip() != "WAITING":
+        raise Fail("the first turn did not end with a reply of exactly WAITING")
+    if "notification" not in kinds[c:]:
+        raise Fail("no completion notification")
+    n = kinds.index("notification", c)
+    if any(nonce in json.dumps(p) for _, p in seq[:n]):
+        raise Fail("the nonce appeared before the notification")
+    launches = {p.get("call_id") for k, p in seq[:c] if k == "tool-call" and p.get("name") in CODEX_LAUNCH_TOOLS} - {None}
+    if not launches:
+        raise Fail("no child was launched in the first turn")
+    outputs = [json.dumps(p.get("output")) for k, p in seq[:c] if k == "tool-output" and p.get("call_id") in launches]
+    if not any(i in _codex_text(seq[n][1]) for i in _launch_ids(launches, outputs)):
+        raise Fail("the notification does not name a child launched in the first turn")
+    starts = [i for i in range(c + 1, len(kinds)) if kinds[i] == "start"]
+    if not starts:
+        raise Fail("no new turn started after the first completed")
+    after = max(n, starts[0])
+    if not any(k == "assistant" and nonce in _codex_text(p) for k, p in seq[after + 1:]):
+        raise Fail("no controller reply in the new turn reports the nonce")
+
+
+def judge(harness, records, nonce, prompt):
+    try:
+        (judge_claude if harness == "claude-code" else judge_codex)(records, nonce, prompt.strip())
+    except Fail as failure:
+        return f"FAIL: {failure}"
+    except (AttributeError, KeyError, TypeError, ValueError) as error:
+        return f"FAIL: malformed record ({error!r})"
+    return "PASS"
+
+
+def main(argv):
+    if len(argv) != 4 or argv[0] not in ("claude-code", "codex"):
+        print(__doc__.splitlines()[3], file=sys.stderr)
+        return 2
+    harness, path, nonce, prompt_file = argv
+    try:
+        with open(path) as handle:
+            records = [json.loads(line) for line in handle if line.strip()]
+    except json.JSONDecodeError as error:
+        print(f"FAIL: unreadable transcript line: {error}")
+        return 1
+    with open(prompt_file) as handle:
+        verdict = judge(harness, records, nonce, handle.read())
+    print(verdict)
+    return 0 if verdict == "PASS" else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

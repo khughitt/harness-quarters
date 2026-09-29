@@ -1,0 +1,9 @@
+[Unit]
+Description=SSH agent for Codex work GitHub access
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/ssh-agent -D -a %t/codex-ssh-agent.sock
+
+[Install]
+WantedBy=default.target

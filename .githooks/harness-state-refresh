@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+"""Stop hook: clear git's size-only "modified" mark on the tracked harness configs.
+
+A model or effort switch rewrites `claude/settings*.json` or `codex/config*.toml`
+through the homes' symlinks. The harness-state clean filter keeps those keys out of the
+index, but git calls a file modified when its size differs from the index entry without
+running the filter, so `git status` shows `M` on a file whose filtered diff is empty.
+Staging such a file writes the blob already in the index and refreshes its stat; a file
+with a real change is left alone.
+
+Claude Code runs this from Stop because `/effort` fires no hook (PostModelSwitch covers
+`/model` only; ConfigChange does not fire on the harness's own writes; probed with Claude
+Code 2.1.283); Codex has no event nearer its picker than Stop. The hook fires in every
+project, so it works on the checkout it lives in, not the cwd. The mark is cosmetic and
+must never block a turn: when another git process holds the index lock it skips, and the
+next Stop retries. Any other git failure exits non-zero, which both harnesses report
+without blocking. The hooks call it through `~/.local/bin/harness-state-refresh`, a link
+`links.toml` manages, so the command never names the checkout.
+"""
+import subprocess
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent
+PATTERNS = ("claude/settings*.json", "codex/config*.toml")
+
+
+def git(*args):
+    return subprocess.run(["git", "-C", str(REPO), *args], text=True, capture_output=True)
+
+
+def checked(*args):
+    result = git(*args)
+    if result.returncode != 0:
+        sys.exit(f"harness-state-refresh: git {' '.join(args)}: {result.stderr.strip()}")
+    return result.stdout
+
+
+def filtered_equal(path):
+    result = git("diff", "--quiet", "--", path)
+    if result.returncode not in (0, 1):
+        sys.exit(f"harness-state-refresh: git diff {path}: {result.stderr.strip()}")
+    return result.returncode == 0
+
+
+def main():
+    sys.stdin.read()
+    lock = Path(checked("rev-parse", "--path-format=absolute", "--git-path", "index.lock").strip())
+    if lock.exists():
+        return
+    marked = checked("diff-files", "--name-only", "--", *PATTERNS).split()
+    stale = [path for path in marked if filtered_equal(path)]
+    if stale:
+        checked("add", "--", *stale)
+
+
+if __name__ == "__main__":
+    main()

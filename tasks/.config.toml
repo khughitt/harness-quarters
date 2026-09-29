@@ -1,0 +1,13 @@
+prefix = "tack"
+
+[feedback]
+scope = "Global agent instructions (AGENTS.md and its mirrors), harness settings, and the flow and session-logs skills with their agents/bin tools."
+
+[tags]
+flow = "Agent workflow experiments: distilled superpowers, explicit state machine, agent pairing."
+hooks = "Harness hooks: what runs at session start, before and after tools, and at stop."
+obs = "Observability of agent sessions: logs, stores, retention."
+question = "An open question to investigate or answer."
+quick-add = "Captured or routed through quick add."
+rules = "The instruction files: AGENTS.md and what mirrors it."
+skills = "Skill definitions and the tooling around them."

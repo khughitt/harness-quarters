@@ -1,0 +1,27 @@
+---
+id: tack-c6086b
+title: Pre-commit guard for the generated projects block
+status: done
+priority: "2"
+size: xs
+complexity: low
+process: direct
+owner: flow
+created: 2026-09-13T18:48:19Z
+updated: 2026-09-15T11:11:27Z
+started: 2026-09-15T11:04:26Z
+completed: 2026-09-15T11:11:27Z
+depends: []
+tags: [skills]
+model: "claude-opus-5[1m]"
+---
+
+Why: ns and rad were hand-written into the generated projects block in AGENTS.md and committed; ai has no hooks or justfile, so the drift surfaced only at ops pre-push (ops 082431c fixed it by adding the identity tables). Done: .githooks/pre-commit that runs 'python3 <ops root>/bin/ops-projects check' (resolve ops through the tasks registry, fail loudly if unregistered), core.hooksPath documented in README, and a note by the block marker that edits go to ops identity.toml. Where: ai .githooks/, README.md; ops bin/ops-projects for the check contract.
+
+## Notes
+
+- 2026-09-15T11:04:26Z (flow): gate: scoped — adopted
+- 2026-09-15T11:04:26Z (flow): gate: implementing .worktrees/flow
+- 2026-09-15T11:11:20Z (flow): gate: verified tree:fc3be77627a27a4b09e8538c8989fcbb9c605d05 — uv run --with pytest pytest .githooks/test_pre_commit.py -q: 10 passed, pristine; live probe: hook passes the real AGENTS.md and refuses a hand-edited block against the real ops render; fresh-context review (sonnet): 1 important (staged deletion traceback) fixed in ce96cf0 with the 2 minors (untested failure paths), scoped re-review all addressed
+- 2026-09-15T11:11:20Z (flow): retro: judging the staged content instead of calling ops-projects check was the one real decision, and having the reviewer verify it against ops-projects' own target() settled it; the reviewer's deletion probe found what the tests missed — ask reviewers to try the file-lifecycle cases (delete, rename) on any hook.
+- 2026-09-15T11:11:27Z (flow): pre-commit hook compares the staged AGENTS.md projects block against ops-projects render, resolving ops through the tasks registry and failing loudly when unregistered; README documents core.hooksPath; the marker already carried the identity.toml note

@@ -1,0 +1,29 @@
+---
+id: tack-9fa058
+title: "The `session-logs` skill, its links, and the real-data acceptance run"
+status: done
+priority: "2"
+size: s
+complexity: mid
+process: direct
+owner: session-logs
+created: 2026-09-19T11:53:09Z
+updated: 2026-09-19T16:16:28Z
+started: 2026-09-19T15:47:42Z
+completed: 2026-09-19T16:16:28Z
+depends: [tack-9a6954]
+parent: tack-bc49ed
+tags: [obs, skills]
+agent: claude-code/claude-opus-5
+plan: docs/plans/2026-09-19-session-logs.md
+step: "Task 7: The `session-logs` skill, its links, and the real-data acceptance run"
+---
+
+## Notes
+
+- 2026-09-19T15:47:42Z (session-logs): started
+  provenance: {"harness_session":"claude-code:d53829b2-d997-4129-ac8e-c296d6399be2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-19T16:16:28Z (session-logs): done
+  provenance: {"harness_session":"claude-code:d53829b2-d997-4129-ac8e-c296d6399be2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-19T16:16:28Z (session-logs): session-logs skill, README bullet, ~/.claude/skills/session-logs link, acceptance run recorded on ai-bc49ed
+  provenance: {"harness_session":"claude-code:d53829b2-d997-4129-ac8e-c296d6399be2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

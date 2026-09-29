@@ -1,0 +1,26 @@
+---
+id: tack-4a90a7
+title: Fold the three doc-status bullets into one
+status: done
+priority: "2"
+size: xs
+complexity: low
+process: direct
+owner: prune-agents
+created: 2026-09-16T15:51:27Z
+updated: 2026-09-16T21:49:03Z
+started: 2026-09-16T21:48:53Z
+completed: 2026-09-16T21:49:03Z
+depends: []
+parent: tack-9ec1eb
+tags: [rules]
+source: "mindful:thought:8e45d49e001c4e5eb9b00f159dc60e87"
+model: "claude-opus-5[1m]"
+agent: "claude-code/claude-opus-5[1m]"
+---
+
+Why: rows A14–A16 (80 words) are three sentences about one thing — a design doc's status is a claim to verify, correct at merge, and propagate — with no recorded incident since init; tasks check now enforces the plan-heading half. Done: one bullet of ~30 words keeping all three verbs (verify against the tree before relying on a status or checkbox; correct it in the change that lands the work; grep the user-facing docs for the same claim). Where: AGENTS.md Design & Plan Docs. Check: word count; the three verbs present.
+
+## Notes
+
+- 2026-09-16T21:49:03Z (prune-agents): Three doc-status bullets folded into one: 83 -> 64 words, all three verbs kept (verify against the tree, correct in the landing change, grep user-facing docs) plus the 'unchecked steps are not evidence' clause, which is the one with behavioural force.

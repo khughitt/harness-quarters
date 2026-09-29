@@ -1,0 +1,48 @@
+# Every link from a home directory into this checkout. `just link` reports what it would
+# change; `just link --apply` converges this host. Required links go on every host;
+# a harness group applies only where that harness's home is a real directory.
+# Targets under local/ are untracked (Dropbox carries them between hosts); `just setup`
+# creates the directories a public clone needs.
+
+[required]
+"~/.agents" = "agents"
+"~/.config/AGENTS.md" = "AGENTS.md"
+"~/.local/bin/harness-state-refresh" = ".githooks/harness-state-refresh"
+
+[harness.claude]
+home = "~/.claude"
+[harness.claude.links]
+"CLAUDE.md" = "AGENTS.md"
+"settings.json" = "claude/settings.json"
+"agents" = "claude/agents"
+"commands" = "claude/commands"
+"plans" = "claude/plans"
+"skills/flow" = "agents/skills/flow"
+"skills/session-logs" = "agents/skills/session-logs"
+
+[harness.claude-work]
+home = "~/.claude-work"
+[harness.claude-work.links]
+"CLAUDE.md" = "AGENTS.md"
+"settings.json" = "local/claude/settings.work.json"
+"statusline-command.sh" = "claude/statusline-command.sh"
+
+[harness.codex]
+home = "~/.codex"
+[harness.codex.links]
+"AGENTS.md" = "AGENTS.md"
+"config.toml" = "codex/config.toml"
+"hooks.json" = "codex/hooks.json"
+"rules" = "local/codex/rules"
+
+[harness.codex-work]
+home = "~/.codex-work"
+[harness.codex-work.links]
+"AGENTS.md" = "AGENTS.md"
+"config.toml" = "local/codex/config.work.toml"
+"hooks.json" = "codex/hooks.work.json"
+
+[harness.opencode]
+home = "~/.config/opencode.local"
+[harness.opencode.links]
+"AGENTS.md" = "AGENTS.md"

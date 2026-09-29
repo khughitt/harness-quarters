@@ -1,0 +1,132 @@
+# default_permissions = ":workspace"
+default_permissions = "workspace-local"
+approval_policy = "never"
+approvals_reviewer = "user"
+
+personality = "pragmatic"
+web_search = "live"
+
+# codex-specific instructions
+# codex-specific instructions: none; the profile fragments carry the per-project rules.
+developer_instructions = ""
+
+[permissions.workspace-local]
+extends = ":workspace"
+description = "Normal development with package-manager and Git metadata access."
+
+[permissions.workspace-local.workspace_roots]
+"/mnt/ssd/Dropbox/atoms" = true
+"/mnt/ssd/Dropbox/autonomy" = true
+"/mnt/ssd/Dropbox/beliefs" = true
+"/mnt/ssd/Dropbox/nodes" = true
+"/mnt/ssd/Dropbox/science" = true
+
+[permissions.workspace-local.filesystem.":workspace_roots"]
+".git" = "write"
+
+[permissions.workspace-local.filesystem]
+"/mnt/ssd3/work/" = "write"
+"/mnt/ssd/.dropbox-work/" = "write"
+"/mnt/ssd2/uv-cache/" = "write"
+"/run/user/1000/agent-browser" = "write"
+"~/.agent-browser" = "write"
+"~/.cache/puppeteer" = "write"
+"~/.codex/plugins/cache/openai-curated-remote/superpowers" = "read"
+"~/.codex/superpowers" = "read"
+"~/.local/state/tasks/claims" = "write"
+"~/.npm" = "write"
+"~/d/nodes/ts" = "read"
+
+[permissions.workspace-local.network]
+enabled = true
+mode = "limited"
+
+[permissions.workspace-local.network.domains]
+"api.figshare.com" = "allow"
+"api.github.com" = "allow"
+"developers.openai.com" = "allow"
+"files.pythonhosted.org" = "allow"
+"github.com" = "allow"
+"pubmed.ncbi.nlm.nih.gov" = "allow"
+"pypi.org" = "allow"
+"raw.githubusercontent.com" = "allow"
+"registry.npmjs.org" = "allow"
+"npmjs.com" = "allow"
+
+[shell_environment_policy]
+set = { TASKS_FORMAT = "json", TASKS_AGENT = "codex" }
+
+[features]
+shell_snapshot = true
+js_repl = true
+multi_agent = true
+
+[tui]
+status_line = ["model-with-reasoning", "context-remaining", "current-dir", "project-name", "git-branch"]
+status_line_use_colors = true
+theme = "noctalia"
+
+[mcp_servers.ohai]
+command = "node"
+args = ["/home/keith/d/software/ohai/bin/ohai-mcp"]
+
+[mcp_servers.ohai.env]
+OHAI_DEFAULT_IMAGE = "openai"
+
+[mcp_servers.ohai.tools.ohai]
+approval_mode = "approve"
+
+[mcp_servers.ohai.tools.ohai_status]
+approval_mode = "approve"
+
+[hooks.state]
+
+[hooks.state."/home/keith/.codex/hooks.json:pre_tool_use:0:0"]
+trusted_hash = "sha256:7f6b225e37eb145ccd5f8b31553620c7926f57f90ef07691baab1dfca585ba92"
+
+[hooks.state."/home/keith/.codex/hooks.json:permission_request:0:0"]
+trusted_hash = "sha256:bccb7c64c06f097999fa16814c17bbb5568bc692ed1d9a12013b31a2610d886f"
+
+[hooks.state."/home/keith/.codex/hooks.json:session_start:0:0"]
+trusted_hash = "sha256:bae5f37a1b0fadd52f685a55ee38c2b2a136f96584c546d20d7cf531f3e4c926"
+
+[hooks.state."/home/keith/.codex/hooks.json:user_prompt_submit:0:0"]
+trusted_hash = "sha256:a6555e48b5638508aff7df9affa5b84abac398e5a15f1f15a624d256080b856c"
+
+[hooks.state."/home/keith/.codex/hooks.json:stop:0:0"]
+trusted_hash = "sha256:b88c003a21c220fac0ced66adb28ee2e011db2c31be5d441ef4627ea44593e26"
+
+[hooks.state."ponytail@ponytail:hooks/claude-codex-hooks.json:session_start:0:0"]
+trusted_hash = "sha256:5f81d38f47448a1581c08ec877e044d9e04dd6f814dce3f2671f7a8edadd719b"
+
+[hooks.state."ponytail@ponytail:hooks/claude-codex-hooks.json:user_prompt_submit:0:0"]
+trusted_hash = "sha256:6a6f42bc3b58d6262db38bfd74d7f340fcca2b09cdb134aad365063f0bfefca4"
+
+[hooks.state."ponytail@ponytail:hooks/claude-codex-hooks.json:subagent_start:0:0"]
+trusted_hash = "sha256:1423b56c1322f96c8f74c51c1e7ae9a047b904c1fa43ee9165d462fd7a6e70ef"
+
+[hooks.state."/mnt/ssd/Dropbox/mindful/v6/.codex/hooks.json:post_tool_use:0:0"]
+trusted_hash = "sha256:f217fbcf8ebe41da3413e01f17f17afcb1cae89c2b995feccd9ebbc4b2297fb6"
+
+[hooks.state."/mnt/ssd/Dropbox/mindful/v6/.codex/hooks.json:stop:0:0"]
+trusted_hash = "sha256:6eb46df3fb741be24b7d49bd375f6a1b24257fa297b6f0f886c1e34a32ef4dfb"
+
+[hooks.state."/home/keith/.codex/hooks.json:session_start:1:0"]
+trusted_hash = "sha256:e7998d355e4004214533301360a7ac9779953e5df677f8e43823ddd61dfdb4d4"
+
+[hooks.state."/home/keith/.codex/hooks.json:stop:1:0"]
+trusted_hash = "sha256:19c30d87a87c005ad66dce25343b7f71289c03ed6a659ba8cdb03adbfb4a51fe"
+
+[hooks.state."/home/keith/.codex/hooks.json:stop:2:0"]
+trusted_hash = "sha256:1af4d7b0db7828de49e3ee977c46c56581f393ab882e179db44eb24716951c3a"
+
+[marketplaces.ponytail]
+source_type = "git"
+source = "https://github.com/DietrichGebert/ponytail.git"
+
+[plugins."ponytail@ponytail"]
+enabled = true
+
+[notice]
+hide_rate_limit_model_nudge = true
+

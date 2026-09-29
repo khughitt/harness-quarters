@@ -1,0 +1,31 @@
+---
+id: tack-dc5380
+title: "flow-state: parent derivation and dispatch"
+status: done
+priority: "2"
+size: xs
+complexity: mid
+process: direct
+owner: flow
+created: 2026-09-15T10:03:24Z
+updated: 2026-09-15T10:47:27Z
+started: 2026-09-15T10:42:17Z
+completed: 2026-09-15T10:47:27Z
+depends: [tack-f186ce]
+parent: tack-f5da3a
+tags: [flow]
+model: "claude-opus-5[1m]"
+agent: claude-code/claude-opus-5
+plan: docs/plans/2026-09-15-flow-state-machine.md
+step: "Task 2: Parent derivation and dispatch"
+---
+
+Outcome: derive_parent and derive per spec §3.3 — planned until a child leaves scoped, implementing through all children closed, reopened parents, verified requires every child closed. Approach: plan Task 2. Verification: pytest.
+
+## Notes
+
+- 2026-09-15T10:03:53Z (flow): gate: scoped — step of ai-f5da3a plan
+- 2026-09-15T10:42:17Z (flow): gate: implementing .worktrees/flow
+- 2026-09-15T10:47:27Z (flow): gate: verified tree:07bf069d9be4b851cc768b618a9c525ae66f1e4d — pytest agents/bin/test_flow_state.py: 40 passed, pristine; fresh-context review (sonnet) spec ✅ approved, 1 minor deferred (planned branch reports the first inconsistency only when plan link and ungated children both fail)
+- 2026-09-15T10:47:27Z (flow): retro: the reviewer's manual trace of the three hardest assertions was worth more than the byte-diff; keep asking reviewers to trace, not just compare.
+- 2026-09-15T10:47:27Z (flow): derive_parent and derive: parent state from children, reopen, validly-closed check; 14 tests
