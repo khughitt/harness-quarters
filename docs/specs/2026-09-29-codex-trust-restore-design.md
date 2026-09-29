@@ -94,7 +94,10 @@ checkout it lives in (like `harness-state-refresh`, which it serves) and on
   at the end instead adds a blank line the filter keeps. The file then differs from
   `HEAD` for real, and a rebase refuses to start (probed). Inserting at the top also
   means that a line appended at the end of the file by hand does not join a trust
-  table, whose lines the filter would drop.
+  table, whose lines the filter would drop. A file with no table header gets the
+  tables at its end. If it also lacks a final newline, restore refuses: the newline
+  a table needs before it would change the filter's output. As a last guard, `restore`
+  compares the filter's output before and after, and writes nothing if they differ.
 - `sync` is `capture` then `restore`, under one lock.
 - `hook <name>` is `restore` as the git hooks run it (§3.3). It then restages the file
   when its filtered diff is empty and no other git process holds the index, as

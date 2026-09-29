@@ -30,7 +30,7 @@
 
 ## Review Focus
 
-1. **A restore that changes what git stages.** A blank line the filter keeps (text appended after the last table) makes the file really modified. The Stop hook then never stages it, and a rebase refuses to start. Pinned by `test_restore_leaves_what_git_stages_unchanged` (Task 1).
+1. **A restore that changes what git stages.** A blank line the filter keeps (text appended after the last table) makes the file really modified. The Stop hook then never stages it, and a rebase refuses to start. `restore` checks the invariant itself with the filter's `clean_toml` and writes nothing when it would break. Pinned by `test_restore_leaves_what_git_stages_unchanged` and `test_a_file_with_no_header_and_no_final_newline_is_refused` (Task 1).
 2. **A rebase that replays a config commit after a restore.** The rebase's in-memory index drops a restage made mid-rebase, and the replay stops with "local changes would be overwritten". Pinned by `test_a_rebase_that_replays_a_config_commit_keeps_trust` and `test_a_rebase_stopped_on_a_conflict_continues_after_the_stop_hook` (Task 3).
 3. **A turn end that changes nothing.** It must not rewrite the saved copy or the live file. Pinned by `test_a_sync_that_changes_nothing_writes_nothing` (Task 1).
 4. **Turn ends of concurrent sessions.** Racing restores would insert a table twice, and Codex refuses a duplicate table. Pinned by `test_concurrent_syncs_leave_one_copy_of_each_table` (Task 1).
@@ -46,7 +46,7 @@
 - Create: `.githooks/test_codex_trust.py`
 
 **Interfaces:**
-- Consumes: `harness-state-clean`'s module globals `TOML_HEADER` (header regex; `group(1)` is the table name) and the new `PROJECT_TRUST` (full-match pattern over a table name), read with `runpy.run_path`.
+- Consumes: `harness-state-clean`'s module globals `TOML_HEADER` (header regex; `group(1)` is the table name), the new `PROJECT_TRUST` (full-match pattern over a table name) and `clean_toml(text) -> str` (the filter's TOML path), read with `runpy.run_path`.
 - Produces: the CLI `codex-trust capture | restore | sync`, run by path from any cwd, acting on the checkout it lives in. Exit 0 on success. On failure, exit non-zero with `codex-trust: <message>` on stderr. Python functions that Task 3 extends: `restore() -> bool` (True when it wrote), `locked()` (context manager: checks `local/codex/` and the live file, then holds the flock), `git(*args) -> str`, `git_path(name) -> Path`, `linked_worktree() -> bool`, `fail(message)`, `USAGE`, `main(argv)`.
 
 - [ ] **Step 1: Name the filter's trust pattern.** In `.githooks/harness-state-clean`, replace
@@ -210,6 +210,27 @@ def test_restore_leaves_what_git_stages_unchanged(repo):
 
     assert projects(live(repo)) == ["/work/a", "/work/b"]
     assert clean(repo, live(repo).read_text()) == clean(repo, before)
+
+
+def test_restore_appends_to_a_file_with_no_header(repo):
+    live(repo).write_text('personality = "p"\n')
+    saved(repo).write_text(A)
+
+    assert trust(repo, "restore").returncode == 0
+
+    assert live(repo).read_text() == 'personality = "p"\n' + A
+    assert clean(repo, live(repo).read_text()) == clean(repo, 'personality = "p"\n')
+
+
+def test_a_file_with_no_header_and_no_final_newline_is_refused(repo):
+    live(repo).write_text('personality = "p"')
+    saved(repo).write_text(A)
+
+    result = trust(repo, "restore")
+
+    assert result.returncode != 0
+    assert "no final newline" in result.stderr
+    assert live(repo).read_text() == 'personality = "p"'
 
 
 def test_restore_twice_inserts_nothing_the_second_time(repo):
@@ -380,6 +401,7 @@ USAGE = "usage: codex-trust capture | restore | sync"
 FILTER = runpy.run_path(str(HERE / "harness-state-clean"))
 TOML_HEADER = FILTER["TOML_HEADER"]
 PROJECT_TRUST = FILTER["PROJECT_TRUST"]
+CLEAN_TOML = FILTER["clean_toml"]
 
 
 def fail(message):
@@ -471,14 +493,18 @@ def insert(live, tables):
 
     The filter drops everything from a trust header to the next header, so the inserted
     tables and the blank line that ends them leave its output unchanged. Text appended
-    after the last table would not: the blank line before it is kept.
+    after the last table would not: the blank line before it is kept. A file with no
+    header and no final newline is refused: the newline a table needs before it would
+    change what git stages.
     """
     offset = 0
     for line in live.splitlines(keepends=True):
         if TOML_HEADER.match(line):
             return live[:offset] + tables + "\n" + live[offset:]
         offset += len(line)
-    return live + ("\n" if live and not live.endswith("\n") else "") + tables
+    if live and not live.endswith("\n"):
+        fail(f"{LIVE_NAME} has no table header and no final newline; add the newline")
+    return live + tables
 
 
 def capture():
@@ -497,6 +523,8 @@ def restore():
         return False
     result = insert(live, render(missing))
     parse(result, f"{LIVE_NAME} with the restored tables")
+    if CLEAN_TOML(result) != CLEAN_TOML(live):
+        fail(f"restoring would change what git stages from {LIVE_NAME}; nothing written")
     write(LIVE.resolve(), result)
     return True
 
@@ -1056,7 +1084,7 @@ live file lacks before its first table header. The `post-checkout`, `post-merge`
 `post-rewrite` hooks insert them right after a switch, a checkout of the file, a merge
 or a rebase, in the main checkout only. Where no hook runs (`git stash`,
 `git reset --hard`, a merge stopped on a conflict, a rebase that only fast-forwards, a
-fresh clone), the list is back at the next turn end. A Codex session started before
+fresh clone that has a saved copy), the list is back at the next turn end. A Codex session started before
 then asks again. While the main checkout is on a branch older than these hooks, nothing
 restores the list until the checkout switches back. A table Codex added since the last
 turn end is not saved yet. Nothing prunes the saved copy: to forget a directory, delete
@@ -1124,7 +1152,13 @@ python3 -c 'import tomllib; print(len(tomllib.load(open("local/codex/trust.toml"
 
 Expected: `diff` prints nothing. The count equals `grep -c '^\[projects\.' codex/config.toml`.
 
-- [ ] **Step 3: Live check.** Drop the list the way a checkout does, and watch the hook put it back:
+- [ ] **Step 3: Live check.** First confirm that the live file carries no real change. The checkout below discards one, and the saved copy protects only trust tables:
+
+```bash
+git diff --quiet -- codex/config.toml
+```
+
+If this exits non-zero, stop: show the user `git diff -- codex/config.toml` and leave the live check to them. Otherwise, drop the list the way a checkout does, and watch the hook put it back:
 
 ```bash
 touch codex/config.toml
