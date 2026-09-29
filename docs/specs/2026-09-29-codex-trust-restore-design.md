@@ -17,20 +17,38 @@ overwrite the file and which of them run a hook:
 
 | Command | Hook that runs |
 |---|---|
-| `git switch` / `git checkout <branch>` | `post-checkout` |
+| `git switch` / `git checkout <branch>` | `post-checkout`, read from the tree just checked out |
+| the same, to a branch whose tree lacks the hook | none |
 | `git checkout -- <path>`, `git restore <path>` | `post-checkout` (flag 0) |
 | `git merge` (fast-forward included), `git pull` | `post-merge` |
+| a merge that stops on a conflict in any file | none, and the `git commit` that concludes it runs none either |
 | `git rebase`, `git pull --rebase` | `post-checkout`, `post-rewrite` |
 | `git stash`, `git stash pop`, `git reset --hard` | none |
 | a fresh clone | none (hooks are not configured until `just setup`) |
+
+Git looks a hook up after the command has written the tree, in `core.hooksPath`
+(`.githooks`, tracked). A switch to a branch that predates a hook removes the hook
+before git looks for it. A switch back to a branch that has it runs it. A merge that
+stops on a conflict has already written every cleanly merged file, `codex/config.toml`
+included, and leaves no `index.lock` behind.
 
 ## 2. Goals and non-goals
 
 Goals:
 
-- The trust list survives every row of the table without a manual step. Where a git
-  hook runs, the list is back before the command returns. Where none runs, it is back
-  by the end of the next turn in either harness.
+- The trust list survives every row of the table without a manual step, on this
+  schedule:
+  - Where a hook runs, the list is back before the command returns.
+  - Where none runs (stash, reset, a conflicted merge, a fresh clone), it is back at
+    the end of the next turn in either harness. A Codex session started in the gap
+    asks for trust again.
+  - While the main checkout is on a branch that predates this change, nothing restores
+    the list. Both hooks resolve into the checked-out tree, the Stop hook through its
+    `~/.local/bin` link included. The `post-checkout` of the switch back restores it.
+    The main checkout normally stays on `main`, since work happens in worktrees.
+- A trust table is protected once a turn end has captured it. Until then, a drop loses
+  it. Codex adds a table when a session starts, so the window closes at that session's
+  first turn end.
 - The saved copy lives in `local/`, untracked, and Dropbox carries it between hosts
   along with the rest of `local/`.
 - The README's manual save and restore goes away.
@@ -92,8 +110,12 @@ calls `codex-trust sync` before its existing staging step, so a restored file is
 restaged in the same run. The `index.lock` check guards both steps: while another git
 command holds the index, the hook skips both, and the next Stop retries. This is the
 only capture point. Codex adds a trust table at the start of a session, and that
-session's first turn end saves it. This is also the restore that covers the rows with
-no hook: stash, reset, and a fresh clone that has a sidecar.
+session's first turn end saves it. A table added since the last turn end is not yet
+saved, and a drop in that window loses it (§2). This is also the restore that covers
+the rows with no hook: stash, reset, a fresh clone that has a sidecar, and a merge
+stopped on a conflict. That merge holds no `index.lock`, so the hook runs while it is
+still open. It restores the working file and restages it: git has already staged the
+cleanly merged config at stage 0, so the resolution is unaffected.
 
 **Restore after a git command.** New `post-checkout`, `post-merge` and `post-rewrite`
 hooks in `.githooks/` run `codex-trust restore`. Each is a two-line shell wrapper that
@@ -102,6 +124,12 @@ worktree's git dir equals the common git dir. A linked worktree's `codex/config.
 is not live, and restoring into it would only make the worktree dirty. The hooks
 restore but never capture. When they run, the file has already been overwritten, and
 the Stop hook has already saved what it held.
+
+A hook location that survives branch switches was considered and rejected. It would
+be a `core.hooksPath` outside the tracked tree, filled by `just setup` with copies,
+or links into the tree, which a switch empties just the same. Copies drift from the
+tracked scripts, and the Stop hook's link resolves into the tree either way. The
+exposure is a main checkout parked on an old branch, and §2 names it.
 
 Why the clean filter is not the capture point, as the task suggested: git runs the
 filter for its own reasons (status, diff, add, and the index refresh after a merge),
@@ -144,6 +172,11 @@ from only one of the two comes back from the other at the next `sync`, by design
   branch switch, `git checkout -- codex/config.toml` and a rebase that each replace the
   file leave the trust tables in place. The same commands in a linked worktree leave
   its file untouched.
+- A switch to a branch whose tree lacks the hooks leaves the tables dropped. The
+  switch back restores them.
+- A merge that stops on a conflict in another file leaves the tables dropped.
+  `harness-state-refresh` run during the open merge restores them, and concluding the
+  merge commits a config blob without trust tables.
 - `harness-state-refresh` after a `git stash` / `stash pop` round trip restores the
   tables and leaves `git status` clean.
 - Two `sync` processes started together leave exactly one copy of each table.
@@ -152,9 +185,15 @@ from only one of the two comes back from the other at the next `sync`, by design
 
 Merging the branch changes no `codex/config.toml` blob, so the merge itself drops
 nothing. The hooks take effect when the merge lands, because `core.hooksPath` and the
-`~/.local/bin` link point into the main checkout. The first turn end afterwards
-captures the live list into `local/codex/trust.toml`. Check it by comparing the
-`[projects.*]` headers in the two files. Then `git checkout -- codex/config.toml` in
-the main checkout is a live check that the list comes back. That checkout also drops
+`~/.local/bin` link point into the main checkout. The sidecar does not exist yet, so
+until the first capture a drop would lose the list with nothing to restore. Right
+after the merge, before any other git command in the main checkout:
+
+1. Run `.githooks/codex-trust capture` by hand.
+2. Check that the `[projects.*]` headers in `local/codex/trust.toml` match those in
+   `codex/config.toml`, and that the sidecar parses.
+
+Only then run the destructive live check: `git checkout -- codex/config.toml` in the
+main checkout, which must bring the list back. That checkout also drops
 the model pick and Codex's bookkeeping, as any checkout of the file does (README), so
 run it between sessions.
