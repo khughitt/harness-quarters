@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: codex-trust-restore
 created: 2026-09-28T10:51:24Z
-updated: 2026-09-29T13:02:46Z
+updated: 2026-09-29T13:04:24Z
 started: 2026-09-29T09:14:43Z
 depends: []
 tags: [rules]
@@ -38,4 +38,6 @@ From the local-layer review: with trust out of the index, a merge, rebase, check
 - 2026-09-29T10:42:56Z (codex-trust-restore): parked (waiting on user, approval): User approves merging codex-trust-restore into main; then the agent merges in the main checkout and runs plan Task 5 (tack-5ac94e): capture, compare headers, gated live check, close
   provenance: {"harness_session":"claude-code:669361e4-a89f-455b-a473-2b02963d95ac","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-29T13:02:46Z (codex-trust-restore): resumed
+  provenance: {"harness_session":"claude-code:669361e4-a89f-455b-a473-2b02963d95ac","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-29T13:04:24Z (main): parked (waiting on user, decision): User closes the Codex sessions in mindful/v6 and natural-systems (or says to go ahead with them open); then the agent runs plan Task 5 Step 3 (gated git checkout -- codex/config.toml live check) and Step 4 (close, tt-report, remove the worktree)
   provenance: {"harness_session":"claude-code:669361e4-a89f-455b-a473-2b02963d95ac","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
