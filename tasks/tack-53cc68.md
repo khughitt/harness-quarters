@@ -1,11 +1,11 @@
 ---
 id: tack-53cc68
 title: Removal experiments for rules with no recorded failure
-status: idea
-priority: "2"
+status: shelved
+priority: 2
 created: 2026-09-16T15:51:27Z
-updated: 2026-09-22T00:31:56Z
-depends: [ops-8fdaf6, ops-acd029]
+updated: 2026-09-29T20:54:33Z
+depends: [ops-8fdaf6, ops-acd029, tack-7d9375]
 parent: tack-9ec1eb
 tags: [rules, obs]
 source: "mindful:thought:8e45d49e001c4e5eb9b00f159dc60e87"
@@ -17,3 +17,5 @@ Stage (b) of the pruning idea. The audit lists rules with no incident behind the
 ## Notes
 
 - 2026-09-22T00:31:56Z (main): Dependency on ai-9dfba9 removed 2026-09-21: that idea is shelved because the measure it would define now lives in obs — charter §7 (verified gate before closure as the outcome; the stall proxy) and obs-a6c7d4 (cost per stage). A removal experiment measures against those; the A/B runner ai-9dfba9 still defers is what repeated controlled runs would need.
+- 2026-09-29T20:54:33Z (main): scope: shelved; the vehicle for a removal experiment is now tack-7d9375 (randomized flow/skill variant arms) measured by obs-00809f's review rounds and defects after close, so added a dependency on tack-7d9375; ops-8fdaf6 stays as the skill A/B umbrella. Shelving satisfies the parent tack-9ec1eb's Done (b).
+- 2026-09-29T20:54:33Z (main): shelved: tack-7d9375 can assign a flow or skill variant as an arm and obs-00809f's outcome measures pass their validation; then run one rule removal as that arm

@@ -1,10 +1,10 @@
 ---
 id: tack-ec379d
 title: Generate SKILL.md from a template and skill atoms with provenance metadata
-status: idea
-priority: "2"
+status: shelved
+priority: 2
 created: 2026-09-12T16:34:53Z
-updated: 2026-09-12T18:52:12Z
+updated: 2026-09-29T20:54:33Z
 depends: []
 tags: [quick-add, skills]
 source: "mindful:thought:d3bf47e9ec8c4932b86b363fbba790f8"
@@ -23,3 +23,5 @@ Source: mindful:thought:d3bf47e9ec8c4932b86b363fbba790f8
 ## Notes
 
 - 2026-09-12T18:52:12Z (main): Granularity resolved to one recursive fragment primitive; informativeness score deferred (see body).
+- 2026-09-29T20:54:33Z (main): scope: shelved; the design in the body stands, but its payoff (attributing an eval effect to a fragment, per-model variants as filters) needs the eval chain obs-00809f → tack-026612 → tack-7d9375 that does not exist yet. tack authors only flow and session-logs of the skills it ships (tasks, scope, curate live in tasks; quick-add in ops; the rest are vendored), and tools/ops-docs already regenerates AGENTS.md's identity regions, so there is no shared text to keep in sync today.
+- 2026-09-29T20:54:33Z (main): shelved: an eval built on tack-026612 or tack-7d9375 needs to attribute an effect to part of a skill, or the same instruction text must be kept in sync across two or more skills or AGENTS.md
