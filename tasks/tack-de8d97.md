@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: codex-trust-restore
 created: 2026-09-28T10:51:24Z
-updated: 2026-09-29T10:07:55Z
+updated: 2026-09-29T10:08:00Z
 started: 2026-09-29T09:14:43Z
 depends: []
 tags: [rules]
@@ -28,4 +28,6 @@ From the local-layer review: with trust out of the index, a merge, rebase, check
   provenance: {"harness_session":"claude-code:669361e4-a89f-455b-a473-2b02963d95ac","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-29T09:49:10Z (codex-trust-restore): Spec review round 1: hook-less branch switch, conflicted merge (no post-merge) and pre-first-capture window added to the spec; switch and merge cases reproduced on git 2.55.0
 - 2026-09-29T09:54:36Z (codex-trust-restore): resumed
+  provenance: {"harness_session":"claude-code:669361e4-a89f-455b-a473-2b02963d95ac","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-29T10:08:00Z (codex-trust-restore): parked (waiting on user, review): User reviews docs/plans/2026-09-29-codex-trust-restore.md (and the planning amendments to the spec) in .worktrees/codex-trust-restore and picks subagent-driven or native; then the agent executes Task 1 (tack-197b79)
   provenance: {"harness_session":"claude-code:669361e4-a89f-455b-a473-2b02963d95ac","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
