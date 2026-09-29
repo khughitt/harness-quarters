@@ -1,15 +1,16 @@
 ---
 id: tack-de8d97
 title: Restore Codex project trust automatically after a checkout drops it
-status: doing
+status: done
 priority: 3
 size: s
 complexity: mid
 process: planned
-owner: codex-trust-restore
+owner: main
 created: 2026-09-28T10:51:24Z
-updated: 2026-09-29T13:04:24Z
+updated: 2026-09-29T14:11:34Z
 started: 2026-09-29T09:14:43Z
+completed: 2026-09-29T14:11:34Z
 depends: []
 tags: [rules]
 agent: claude-code/claude-opus-5-5
@@ -40,4 +41,10 @@ From the local-layer review: with trust out of the index, a merge, rebase, check
 - 2026-09-29T13:02:46Z (codex-trust-restore): resumed
   provenance: {"harness_session":"claude-code:669361e4-a89f-455b-a473-2b02963d95ac","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-29T13:04:24Z (main): parked (waiting on user, decision): User closes the Codex sessions in mindful/v6 and natural-systems (or says to go ahead with them open); then the agent runs plan Task 5 Step 3 (gated git checkout -- codex/config.toml live check) and Step 4 (close, tt-report, remove the worktree)
+  provenance: {"harness_session":"claude-code:669361e4-a89f-455b-a473-2b02963d95ac","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-29T14:11:01Z (main): resumed
+  provenance: {"harness_session":"claude-code:669361e4-a89f-455b-a473-2b02963d95ac","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-29T14:11:34Z (main): done
+  provenance: {"harness_session":"claude-code:669361e4-a89f-455b-a473-2b02963d95ac","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-29T14:11:34Z (main): codex-trust saves Codex project trust in local/codex/trust.toml and restores it from the Stop hook and the post-checkout, post-merge and post-rewrite hooks; rolled out and live-checked
   provenance: {"harness_session":"claude-code:669361e4-a89f-455b-a473-2b02963d95ac","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
