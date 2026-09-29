@@ -67,11 +67,12 @@ names the field the reader wants, not the whole schema.
 
 **Human or injected.** Claude: `isMeta`, `isCompactSummary`, `isSidechain`,
 `tool_result`-only user records, and text beginning `<` (system reminders, hook
-context) are not the human — except a turn beginning `<pasted_content id="…">`,
-which is the person pasting (about 5% of recent human turns); its wrapper tags
-are stripped and the text inside and after them is the turn. Codex: user messages beginning with `# AGENTS.md`,
+context) are not the human. Codex: user messages beginning with `# AGENTS.md`,
 `<environment_context>`, `<INSTRUCTIONS>`, `<skills_instruct`, `<turn_aborted>`,
 `<permissions`, `<user_shell`, `<collaboration_mode`, or any `<`, are injected.
+In both harnesses the exception is a turn beginning `<pasted_content id="…">`,
+which is the person pasting (about 5% of recent human turns); its wrapper tags
+are stripped and the text inside and after them is the turn.
 This is the same list the obs adapters and `obs-index` use; the skill says so
 and names both so a divergence is found, not discovered.
 

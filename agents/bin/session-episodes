@@ -34,7 +34,7 @@ CODEX_INJECTED = ("# AGENTS.md", "<environment_context>", "<INSTRUCTIONS>", "<sk
                   "<turn_aborted>", "<permissions", "<user_shell", "<collaboration_mode")
 INTERACTIVE = {CLAUDE_HARNESS: ("cli",), CODEX_HARNESS: ("codex-tui", "codex_exec")}
 INTERRUPT_MARK = "[Request interrupted by user"
-# a Claude Code user turn that starts with a paste: the wrapper tags are the harness's, the
+# a Claude Code or Codex user turn that starts with a paste: the wrapper tags are the harness's, the
 # text inside and after them is the person's
 PASTED_OPEN = "<pasted_content"
 _PASTED_TAG = re.compile(r"^</?pasted_content\b[^>\n]*>[ \t]*\n?", re.M)
@@ -251,8 +251,8 @@ def read_codex(path: Path) -> Session:
             body = "\n".join(c.get("text", "") for c in (p.get("content") or [])
                              if isinstance(c, dict) and c.get("type") in ("input_text", "output_text")).strip()
             if p.get("role") == "user":
-                if body and not body.startswith(CODEX_INJECTED) and not body.startswith("<"):
-                    s.events.append(Event("human", t, line, text=body))
+                if body and not body.startswith(CODEX_INJECTED) and (body.startswith(PASTED_OPEN) or not body.startswith("<")):
+                    s.events.append(Event("human", t, line, text=_PASTED_TAG.sub("", body).strip() or body))
             elif p.get("role") == "assistant":
                 s.events.append(Event("assistant", t, line, text=body, text_only=True))
         elif pt == "function_call":

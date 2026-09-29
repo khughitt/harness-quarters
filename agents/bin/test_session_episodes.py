@@ -1237,6 +1237,19 @@ def test_pasted_content_turn_is_human_without_its_wrapper_tags(tmp_path):
     assert s.events[1].text == "only a paste"
 
 
+def test_codex_pasted_content_turn_is_human_without_its_wrapper_tags(tmp_path):
+    s = se.read_codex(codex_file(tmp_path, [
+        x_meta(),
+        x_user(PASTE, 0),
+        x_user('<pasted_content id="1">\nonly a paste\n</pasted_content id="1">', 1),
+        x_user("<environment_context>x</environment_context>", 2),
+        x_user("<other>x</other>", 3),
+    ]))
+    assert [e.kind for e in s.events] == ["human", "human"]
+    assert s.events[0].text == "Review findings:\n- fix the parser\n\nIs it still running?"
+    assert s.events[1].text == "only a paste"
+
+
 def test_pasted_next_human_turn_is_the_episodes_next_turn(tmp_path):
     roots = project(tmp_path)
     claude_file(tmp_path, [

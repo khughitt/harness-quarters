@@ -53,13 +53,13 @@ bracketed by `task_started` … `task_complete`; `turn_aborted` ends one early.
 Not the human, in Claude Code: `isMeta`, `isCompactSummary`, `isSidechain`,
 a user record holding only `tool_result` blocks, and text beginning `<`
 (system reminders, hook context, `<task-notification>`,
-`<local-command-stdout>`). The one `<` that *is* the human: a turn beginning
-`<pasted_content id="…">` — the person pasted something and may have typed
-after the closing `</pasted_content id="…">`; the wrapper tags are the
-harness's, the rest is theirs. Not the human, in Codex: user messages
+`<local-command-stdout>`). Not the human, in Codex: user messages
 beginning `# AGENTS.md`, `<environment_context>`, `<INSTRUCTIONS>`,
 `<skills_instruct`, `<turn_aborted>`, `<permissions`, `<user_shell`,
-`<collaboration_mode`, or any `<`. The same list lives in obs's
+`<collaboration_mode`, or any `<`. In both harnesses the one `<` that *is* the
+human: a turn beginning `<pasted_content id="…">` — the person pasted
+something and may have typed after the closing `</pasted_content id="…">`; the
+wrapper tags are the harness's, the rest is theirs. The same list lives in obs's
 `claude_adapter.py` / `codex_adapter.py` and in `session-episodes`; change all
 three together.
 
