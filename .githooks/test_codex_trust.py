@@ -8,7 +8,8 @@ from pathlib import Path
 import pytest
 
 HOOKS = Path(__file__).parent
-HOOK_FILES = ("harness-state-clean", "codex-trust", "harness-state-refresh")
+HOOK_FILES = ("harness-state-clean", "codex-trust", "harness-state-refresh",
+              "post-checkout", "post-merge", "post-rewrite")
 CONFIG = "codex/config.toml"
 BASE = "[features]\nhooks = true\n"
 TUI = "[tui]\nx = 1\n"
@@ -378,3 +379,138 @@ def test_a_failed_sync_still_clears_the_marks_and_fails_the_hook(repo):
     assert result.returncode != 0
     assert "codex-trust:" in result.stderr
     assert git(repo, "diff-files", "--quiet", "--", CONFIG, check=False).returncode == 0
+
+
+def side_with_config(repo, text=TUI + "\n" + BASE):
+    git(repo, "switch", "-q", "-c", "side")
+    commit_config(repo, text, "side")
+    git(repo, "switch", "-q", "main")
+
+
+def test_a_merge_that_replaces_the_config_keeps_trust(repo):
+    side_with_config(repo)
+    trusted(repo, A)
+
+    git(repo, "merge", "-q", "side")
+
+    assert live(repo).read_text() == A + "\n" + TUI + "\n" + BASE
+    assert status(repo) == ""
+
+
+def test_a_branch_switch_keeps_trust_both_ways(repo):
+    side_with_config(repo)
+    trusted(repo, A)
+
+    git(repo, "switch", "-q", "side")
+    assert live(repo).read_text() == A + "\n" + TUI + "\n" + BASE
+    git(repo, "switch", "-q", "main")
+
+    assert live(repo).read_text() == A + "\n" + BASE
+    assert status(repo) == ""
+
+
+@pytest.mark.parametrize("command", [("checkout", "--"), ("restore",)])
+def test_a_checkout_of_the_file_keeps_trust(repo, command):
+    trusted(repo, A)
+    live(repo).write_text(TUI + "\n" + live(repo).read_text())
+
+    git(repo, *command, CONFIG)
+
+    assert live(repo).read_text() == A + "\n" + BASE
+    assert status(repo) == ""
+
+
+def test_a_rebase_that_replays_a_config_commit_keeps_trust(repo):
+    git(repo, "switch", "-q", "-c", "side")
+    (repo / "u").write_text("side\n")
+    git(repo, "add", "u")
+    git(repo, "commit", "-q", "-m", "side")
+    git(repo, "switch", "-q", "main")
+    commit_config(repo, TUI + "\n" + BASE, "main config")
+    trusted(repo, A)
+
+    result = git(repo, "rebase", "side", check=False)
+
+    assert result.returncode == 0, result.stderr
+    assert live(repo).read_text() == A + "\n" + TUI + "\n" + BASE
+    assert "projects" not in git(repo, "show", "HEAD:" + CONFIG).stdout
+    assert status(repo) == ""
+
+
+def test_a_rebase_stopped_on_a_conflict_continues_after_the_stop_hook(repo):
+    (repo / "u").write_text("base\n")
+    git(repo, "add", "u")
+    git(repo, "commit", "-q", "-m", "u")
+    git(repo, "switch", "-q", "-c", "side")
+    (repo / "u").write_text("side\n")
+    git(repo, "add", "u")
+    git(repo, "commit", "-q", "-m", "side")
+    git(repo, "switch", "-q", "main")
+    (repo / "u").write_text("main\n")
+    git(repo, "add", "u")
+    git(repo, "commit", "-q", "-m", "main")
+    commit_config(repo, TUI + "\n" + BASE, "main config")
+    trusted(repo, A)
+    assert git(repo, "rebase", "side", check=False).returncode != 0
+    assert projects(live(repo)) == []
+
+    assert refresh(repo).returncode == 0
+    assert projects(live(repo)) == ["/work/a"]
+    (repo / "u").write_text("both\n")
+    git(repo, "add", "u")
+    result = git(repo, "-c", "core.editor=true", "rebase", "--continue", check=False)
+
+    assert result.returncode == 0, result.stderr
+    assert live(repo).read_text() == A + "\n" + TUI + "\n" + BASE
+    assert status(repo) == ""
+
+
+def test_a_rebase_that_only_fast_forwards_leaves_trust_to_the_stop_hook(repo):
+    side_with_config(repo)
+    trusted(repo, A)
+
+    git(repo, "rebase", "-q", "side")
+    assert projects(live(repo)) == []
+    assert refresh(repo).returncode == 0
+
+    assert live(repo).read_text() == A + "\n" + TUI + "\n" + BASE
+    assert status(repo) == ""
+
+
+def test_a_linked_worktree_is_left_alone(repo, tmp_path):
+    side_with_config(repo)
+    trusted(repo, A)
+    other = tmp_path / "other"
+    git(repo, "worktree", "add", "-q", str(other), "side")
+    other_config = other / CONFIG
+    other_config.write_text("[notice]\nx = 1\n\n" + other_config.read_text())
+
+    result = git(other, "checkout", "-q", "--", CONFIG)
+
+    assert result.stderr == ""
+    assert other_config.read_text() == TUI + "\n" + BASE
+    assert git(other, "status", "--porcelain").stdout == ""
+    assert projects(live(repo)) == ["/work/a"]
+
+
+def test_a_switch_to_a_branch_without_the_hooks_waits_for_the_switch_back(repo):
+    git(repo, "switch", "-q", "-c", "old")
+    git(repo, "rm", "-q", ".githooks/post-checkout", ".githooks/post-merge",
+        ".githooks/post-rewrite")
+    commit_config(repo, TUI + "\n" + BASE, "old")
+    git(repo, "switch", "-q", "main")
+    trusted(repo, A)
+
+    git(repo, "switch", "-q", "old")
+    assert projects(live(repo)) == []
+    git(repo, "switch", "-q", "main")
+
+    assert live(repo).read_text() == A + "\n" + BASE
+    assert status(repo) == ""
+
+
+def test_an_unknown_git_hook_prints_the_usage(repo):
+    result = trust(repo, "hook", "pre-push")
+
+    assert result.returncode != 0
+    assert "usage: codex-trust" in result.stderr

@@ -6,16 +6,19 @@ the index, so a git command that writes a new blob of codex/config.toml over the
 file drops them. This tool saves them in local/codex/trust.toml, untracked and carried
 between hosts by Dropbox, and puts back the ones a checkout dropped:
 
-    capture   merge the live file's trust tables into the saved copy
-    restore   insert each saved table whose project the live file lacks
-    sync      capture, then restore
+    capture       merge the live file's trust tables into the saved copy
+    restore       insert each saved table whose project the live file lacks
+    sync          capture, then restore
+    hook <name>   restore from a git hook, then restage the file
 
 capture never removes a saved table: a dropped list must not shrink the saved one, and
 nothing prunes it. To forget a directory, delete its table from both files. restore
 inserts before the live file's first table header, which leaves the filter's output,
-and so what git stages, unchanged. The Stop hook harness-state-refresh runs sync. The
-tool works on the checkout it lives in and refuses a linked worktree, whose
-codex/config.toml is not live. docs/specs/2026-09-29-codex-trust-restore-design.md.
+and so what git stages, unchanged. The Stop hook harness-state-refresh runs sync; the
+post-checkout, post-merge and post-rewrite hooks run hook, which skips a linked worktree
+silently and, from post-checkout, a rebase in progress. The tool works on the checkout
+it lives in and refuses a linked worktree, whose codex/config.toml is not live. Design:
+docs/specs/2026-09-29-codex-trust-restore-design.md.
 """
 import contextlib
 import fcntl
@@ -34,7 +37,13 @@ SAVED_NAME = "local/codex/trust.toml"
 LIVE = REPO / LIVE_NAME
 SAVED = REPO / SAVED_NAME
 LOCK = SAVED.with_name("trust.toml.lock")
-USAGE = "usage: codex-trust capture | restore | sync"
+GIT_HOOKS = ("post-checkout", "post-merge", "post-rewrite")
+USAGE = "usage: codex-trust capture | restore | sync | hook post-checkout|post-merge|post-rewrite"
+# A rebase runs post-checkout after checking out the new base, then replays commits
+# from its in-memory index, which drops a restage made there; the file keeps its new
+# size, and the replay of a commit that touches it stops with "local changes would be
+# overwritten". post-rewrite restores when the rebase ends.
+REBASE_STATE = ("rebase-merge", "rebase-apply")
 # The filter decides what a checkout drops; reading its patterns keeps the saved tables
 # exactly the dropped ones.
 FILTER = runpy.run_path(str(HERE / "harness-state-clean"))
@@ -168,6 +177,27 @@ def restore():
     return True
 
 
+def restage():
+    """Stage the restored file when its filtered diff is empty, as harness-state-refresh does.
+
+    The insert changes the file's size, and git calls a file of another size modified
+    without running the filter; a rebase refuses to start on that mark. While another
+    git process holds the index, the next turn end's refresh stages it instead.
+    """
+    if git_path("index.lock").exists():
+        return
+    diff = subprocess.run(["git", "-C", str(REPO), "diff", "--quiet", "--", LIVE_NAME],
+                          text=True, capture_output=True)
+    if diff.returncode not in (0, 1):
+        fail(f"git diff {LIVE_NAME}: {diff.stderr.strip()}")
+    if diff.returncode == 0:
+        git("add", "--", LIVE_NAME)
+
+
+def rebasing():
+    return any(git_path(state).exists() for state in REBASE_STATE)
+
+
 @contextlib.contextmanager
 def locked():
     """Hold the host's lock: two restores racing would each insert a table, and Codex
@@ -183,10 +213,20 @@ def locked():
 
 def main(argv):
     args = argv[1:]
-    if not (len(args) == 1 and args[0] in ("capture", "restore", "sync")):
+    if not (len(args) == 1 and args[0] in ("capture", "restore", "sync")
+            or len(args) == 2 and args[0] == "hook" and args[1] in GIT_HOOKS):
         fail(USAGE)
     if linked_worktree():
+        if args[0] == "hook":
+            return
         fail(f"{REPO} is a linked worktree; its {LIVE_NAME} is not live")
+    if args[0] == "hook":
+        if args[1] == "post-checkout" and rebasing():
+            return
+        with locked():
+            if restore():
+                restage()
+        return
     with locked():
         if args[0] in ("capture", "sync"):
             capture()

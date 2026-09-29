@@ -1,0 +1,3 @@
+#!/bin/sh
+# Put back the Codex project trust this checkout dropped (.githooks/codex-trust).
+exec "$(dirname "$0")/codex-trust" hook post-checkout
