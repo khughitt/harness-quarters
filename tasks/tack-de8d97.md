@@ -1,13 +1,15 @@
 ---
 id: tack-de8d97
 title: Restore Codex project trust automatically after a checkout drops it
-status: todo
+status: doing
 priority: 3
 size: s
 complexity: mid
 process: planned
+owner: main
 created: 2026-09-28T10:51:24Z
-updated: 2026-09-29T09:04:41Z
+updated: 2026-09-29T09:14:43Z
+started: 2026-09-29T09:14:43Z
 depends: []
 tags: [rules]
 agent: claude-code/claude-opus-5-5
@@ -18,3 +20,5 @@ From the local-layer review: with trust out of the index, a merge, rebase, check
 ## Notes
 
 - 2026-09-29T09:04:41Z (main): Moved off tack-5b608f when it closed: a follow-up to the local layer, not needed for publication.
+- 2026-09-29T09:14:43Z (main): started
+  provenance: {"harness_session":"claude-code:669361e4-a89f-455b-a473-2b02963d95ac","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
