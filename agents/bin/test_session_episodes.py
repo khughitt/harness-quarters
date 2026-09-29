@@ -977,6 +977,13 @@ def test_labels_heuristic_reviewed_and_stale(tmp_path):
     ("Where are we?", True), ("did it finish?", True), ("Are you still working on it?", True),
     ("What's left?", True), ("Any progress?", True),
     ("Great, now add tests for the parser.", False), ("Looks good.", False),
+    # from the labelled baseline: misses the first list lacked
+    ("Did it get stuck?", True), ("Is `mind6` currently executing? Or do you need me to do anything?", True),
+    ("How are things progressing?", True), ("What is the current status of the run?", True),
+    # from the labelled baseline: false positives of the bare words
+    ("Run git status and commit.", False), ("The progress bar is broken.", False),
+    ("systemctl --user status work-link.service", False), ("What's next?", False),
+    ("**P1** the status field is never cleared; progress is lost on restart.", False),
 ])
 def test_heuristic_patterns(text, expected):
     assert se.heuristic_label(text) is expected

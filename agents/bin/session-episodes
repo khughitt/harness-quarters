@@ -769,14 +769,21 @@ def continuation(candidates: list[tuple[Session, int]]) -> tuple[Session, int] |
 
 # --- episodes ------------------------------------------------------------------
 
+# Starting list, corrected by review against the labelled baseline (2026-09-21: 115 labelled
+# next turns, 20 status questions): the bare words "status" and "progress" matched pasted
+# review findings and `systemctl status`, and "what's next" follows a completion report,
+# so they are anchored or dropped; "stuck", "progressing" and "currently executing" were
+# missed.
 STATUS_PATTERNS = tuple(re.compile(p) for p in (
     r"still (running|executing|going|working)",
     r"is (it|that|this|the task) (still )?(running|done|finished|complete)",
-    r"(did|has) (it|that) (finish|complete|stop)",
-    r"\bstatus\b",
-    r"\bprogress\b",
+    r"(did|has) (it|that) (finish|complete|stop|get stuck)",
+    r"\b(what('s| is) the|any|task|current) (status|progress)\b",
+    r"\b(status|progress) (of|on|update|check)\b",
+    r"\b(progressing|stuck)\b",
+    r"currently (running|executing|working)",
     r"where (are we|is it|did .* (stop|leave off))",
-    r"what('s| is) (left|next|happening)",
+    r"what('s| is) (left|happening)",
     r"(are|is) (you|anything) (still )?(working|running)",
 ))
 TOLERANCE_MS = 120_000
