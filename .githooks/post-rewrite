@@ -1,0 +1,5 @@
+#!/bin/sh
+# Put back the Codex project trust this rebase dropped (.githooks/codex-trust). Git
+# feeds the rewritten commits on stdin; drain them so it never writes to a closed pipe.
+cat >/dev/null
+exec "$(dirname "$0")/codex-trust" hook post-rewrite

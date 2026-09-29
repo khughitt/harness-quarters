@@ -22,13 +22,18 @@ def write_settings(repo, **extra):
 
 @pytest.fixture
 def repo(tmp_path):
-    """A checkout shaped like this one: the filter, the refresh, and a filtered settings file."""
+    """A checkout shaped like this one: the filter, the refresh, codex-trust, and filtered configs."""
     repo = tmp_path / "ai"
     (repo / ".githooks").mkdir(parents=True)
     (repo / "claude").mkdir()
-    for name in ("harness-state-clean", "harness-state-refresh"):
+    (repo / "codex").mkdir()
+    (repo / "local" / "codex").mkdir(parents=True)
+    for name in ("harness-state-clean", "harness-state-refresh", "codex-trust"):
         shutil.copy2(HOOKS / name, repo / ".githooks" / name)
-    (repo / ".gitattributes").write_text("claude/settings*.json filter=harness-state\n")
+    (repo / ".gitattributes").write_text("claude/settings*.json filter=harness-state\n"
+                                         "codex/config*.toml filter=harness-state\n")
+    (repo / ".gitignore").write_text("local/\n")
+    (repo / "codex" / "config.toml").write_text("[features]\nhooks = true\n")
     git(tmp_path, "init", "-q", str(repo))
     git(repo, "config", "filter.harness-state.clean", ".githooks/harness-state-clean %f")
     git(repo, "config", "user.email", "t@example.invalid")

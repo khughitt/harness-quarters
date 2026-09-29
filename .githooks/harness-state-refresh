@@ -16,6 +16,11 @@ must never block a turn: when another git process holds the index lock it skips,
 next Stop retries. Any other git failure exits non-zero, which both harnesses report
 without blocking. The hooks call it through `~/.local/bin/harness-state-refresh`, a link
 `links.toml` manages, so the command never names the checkout.
+
+It first runs `codex-trust sync`, which saves Codex's project trust into
+local/codex/trust.toml and puts back the tables a checkout dropped. The staging below
+then clears the mark that restore's insert leaves. A failed sync still lets the marks
+clear, then fails the hook with the sync's message.
 """
 import subprocess
 import sys
@@ -23,6 +28,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 PATTERNS = ("claude/settings*.json", "codex/config*.toml")
+TRUST = Path(__file__).resolve().with_name("codex-trust")
 
 
 def git(*args):
@@ -48,10 +54,13 @@ def main():
     lock = Path(checked("rev-parse", "--path-format=absolute", "--git-path", "index.lock").strip())
     if lock.exists():
         return
+    trust = subprocess.run([str(TRUST), "sync"], text=True, capture_output=True)
     marked = checked("diff-files", "--name-only", "--", *PATTERNS).split()
     stale = [path for path in marked if filtered_equal(path)]
     if stale:
         checked("add", "--", *stale)
+    if trust.returncode != 0:
+        sys.exit(trust.stderr.strip())
 
 
 if __name__ == "__main__":

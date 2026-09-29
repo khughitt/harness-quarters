@@ -6,11 +6,12 @@ The harness homes symlink to `claude/settings*.json` and `codex/config*.toml`, s
 session state, not configuration: this filter drops them from what git stages and
 leaves the working tree — the live file — untouched. Codex also writes bookkeeping
 (the screen-reader probe flag, model-announcement counters, marketplace fetch stamps),
-dropped the same way. Project trust (`[projects.*]`) is host state and is
-dropped too. Everything else the harness writes (plugin toggles, marketplace sources,
-hook trust hashes) stays tracked. Wired by
-`.gitattributes` and `git config filter.harness-state.clean`; the smudge side is
-identity, so a checkout simply carries no default model until the next pick.
+dropped the same way. Project trust (`[projects.*]`) is host state and is dropped
+too; `codex-trust` saves it in local/ and puts it back after a checkout drops it.
+Everything else the harness writes (plugin toggles, marketplace sources, hook trust
+hashes) stays tracked. Wired by `.gitattributes` and `git config
+filter.harness-state.clean`; the smudge side is identity, so a checkout simply carries
+no default model until the next pick.
 """
 import json
 import re
@@ -26,10 +27,12 @@ TOML_KEYS = (
     (re.compile(r'marketplaces\.(?:"[^"]*"|[^."]+)'), "last_updated"),
     (re.compile(r'marketplaces\.(?:"[^"]*"|[^."]+)'), "last_revision"),
 )
-# Tables dropped whole, header and blank lines up to the next header included. Codex
-# appends a [projects."<path>"] table each time a directory is trusted: that is host
-# state naming every checkout, kept in the live file and out of the index.
-TOML_TABLES = (re.compile(r"tui\.model_availability_nux"), re.compile(r"projects\..+"))
+# Codex appends a [projects."<path>"] table each time a directory is trusted: that is
+# host state naming every checkout, kept in the live file and out of the index.
+# codex-trust saves what this pattern drops and puts it back after a checkout.
+PROJECT_TRUST = re.compile(r"projects\..+")
+# Tables dropped whole, header and blank lines up to the next header included.
+TOML_TABLES = (re.compile(r"tui\.model_availability_nux"), PROJECT_TRUST)
 TOML_HEADER = re.compile(r"^\s*\[\[?\s*(.*?)\s*\]\]?\s*(#.*)?$")
 TOML_KEY = re.compile(r'^\s*("[^"]*"|[A-Za-z0-9_-]+)\s*=')
 

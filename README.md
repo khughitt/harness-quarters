@@ -27,20 +27,24 @@ the index: `/model` and `/effort` write them into the live files (the homes
 symlink here), and they are session state, not configuration. The working tree
 keeps the harness's last pick; a checkout of the file drops it, and the harness
 runs on its default model until the next pick. Codex's project trust, the
-`[projects."<path>"]` tables it appends to `codex/config*.toml`, is host state and
-stays out of the index the same way. Anything that writes a new blob of
-`codex/config.toml` into the main checkout drops the whole live list: a fresh clone,
-`git checkout --`, or a merge, rebase or branch switch that changes the file. Because
-the checkout is shared through Dropbox, every host loses it at once, and Codex asks
-again in every checkout. Before merging a branch that changes `codex/config.toml`,
-save the tables, then put them back after the merge:
+`[projects."<path>"]` tables it adds to `codex/config*.toml`, is host state and stays
+out of the index the same way. So any git command that writes a new blob of
+`codex/config.toml` over the live file drops the whole list, on every host at once,
+since the checkout is shared through Dropbox. `.githooks/codex-trust` puts it back. At
+every turn end the Stop hook below saves the live tables into
+`local/codex/trust.toml`, never removing one, and inserts the ones the live file lacks
+before its first table header. The `post-checkout`, `post-merge` and `post-rewrite`
+hooks insert them right after a switch, a checkout of the file, a merge or a rebase,
+in the main checkout only. Where no hook runs (`git stash`, `git reset --hard`, a
+merge stopped on a conflict, a rebase that only fast-forwards, a fresh clone that has
+a saved copy), the list is back at the next turn end. A Codex session started before
+then asks again. While the main checkout is on a branch older than these hooks,
+nothing restores the list until the checkout switches back. A table Codex added since
+the last turn end is not saved yet. Nothing prunes the saved copy: to forget a
+directory, delete its table from both `local/codex/trust.toml` and `codex/config.toml`
+before the next turn end.
 
-    awk '/^\[/{keep = /^\[projects\./} keep' codex/config.toml > local/codex/trust.toml
-    git merge <branch>
-    cat local/codex/trust.toml >> codex/config.toml
-
-Dropbox's file history is the fallback when a merge already dropped them. After the
-local-layer rollout, other worktrees and branches made before it show
+After the local-layer rollout, other worktrees and branches made before it show
 `codex/config*.toml` as modified, because their blobs still carry trust tables, and a
 rebase there can stop on them. `git checkout -- codex/config.toml` in a worktree is
 safe, since worktree copies are not live. It drops Codex's bookkeeping the

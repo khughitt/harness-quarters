@@ -1,0 +1,249 @@
+#!/usr/bin/env python3
+"""Keep Codex project trust across git commands that overwrite codex/config.toml.
+
+The harness-state clean filter keeps Codex's [projects."<path>"] trust tables out of
+the index, so a git command that writes a new blob of codex/config.toml over the live
+file drops them. This tool saves them in local/codex/trust.toml, untracked and carried
+between hosts by Dropbox, and puts back the ones a checkout dropped:
+
+    capture       merge the live file's trust tables into the saved copy
+    restore       insert each saved table whose project the live file lacks
+    sync          capture, then restore
+    hook <name>   restore from a git hook, then restage the file
+
+capture never removes a saved table: a dropped list must not shrink the saved one, and
+nothing prunes it. To forget a directory, delete its table from both files. restore
+inserts before the live file's first table header, which leaves the filter's output,
+and so what git stages, unchanged. The Stop hook harness-state-refresh runs sync; the
+post-checkout, post-merge and post-rewrite hooks run hook, which skips a linked worktree
+silently and, from post-checkout, a rebase in progress. The tool works on the checkout
+it lives in and refuses a linked worktree, whose codex/config.toml is not live. Design:
+docs/specs/2026-09-29-codex-trust-restore-design.md.
+"""
+import contextlib
+import fcntl
+import os
+import runpy
+import subprocess
+import sys
+import tempfile
+import tomllib
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+REPO = HERE.parent
+LIVE_NAME = "codex/config.toml"
+SAVED_NAME = "local/codex/trust.toml"
+LIVE = REPO / LIVE_NAME
+SAVED = REPO / SAVED_NAME
+LOCK = SAVED.with_name("trust.toml.lock")
+GIT_HOOKS = ("post-checkout", "post-merge", "post-rewrite")
+USAGE = "usage: codex-trust capture | restore | sync | hook post-checkout|post-merge|post-rewrite"
+# A rebase runs post-checkout after checking out the new base, then replays commits
+# from its in-memory index, which drops a restage made there; the file keeps its new
+# size, and the replay of a commit that touches it stops with "local changes would be
+# overwritten". post-rewrite restores when the rebase ends.
+REBASE_STATE = ("rebase-merge", "rebase-apply")
+# The filter decides what a checkout drops; reading its patterns keeps the saved tables
+# exactly the dropped ones.
+FILTER = runpy.run_path(str(HERE / "harness-state-clean"))
+TOML_HEADER = FILTER["TOML_HEADER"]
+PROJECT_TRUST = FILTER["PROJECT_TRUST"]
+CLEAN_TOML = FILTER["clean_toml"]
+
+
+def fail(message):
+    sys.exit(f"codex-trust: {message}")
+
+
+def git(*args):
+    result = subprocess.run(["git", "-C", str(REPO), *args], text=True, capture_output=True)
+    if result.returncode != 0:
+        fail(f"git {' '.join(args)}: {result.stderr.strip()}")
+    return result.stdout.strip()
+
+
+def git_path(name):
+    return Path(git("rev-parse", "--path-format=absolute", "--git-path", name))
+
+
+def linked_worktree():
+    return (git("rev-parse", "--path-format=absolute", "--git-dir")
+            != git("rev-parse", "--path-format=absolute", "--git-common-dir"))
+
+
+def parse(text, name):
+    try:
+        return tomllib.loads(text)
+    except tomllib.TOMLDecodeError as error:
+        fail(f"{name} is not valid TOML: {error}")
+
+
+def trust_tables(text, name):
+    """The [projects."<path>"] tables in text, as {path: table text} in file order.
+
+    A table runs from its header to the next header, trailing blank lines dropped. Trust
+    written any other way (an inline table, dotted keys) is refused: the filter would
+    not drop it, and restore could not put it back.
+    """
+    blocks = []
+    for line in text.splitlines(keepends=True):
+        header = TOML_HEADER.match(line)
+        if header:
+            blocks.append([line] if PROJECT_TRUST.fullmatch(header.group(1)) else None)
+        elif blocks and blocks[-1] is not None:
+            blocks[-1].append(line)
+    tables = {}
+    for block in (block for block in blocks if block is not None):
+        table = "".join(block).rstrip("\n") + "\n"
+        paths = list(parse(table, name).get("projects", {}))
+        if len(paths) != 1:
+            fail(f"{name}: {block[0].strip()} does not name one project")
+        if paths[0] in tables:
+            fail(f"{name}: project {paths[0]!r} has more than one table")
+        tables[paths[0]] = table
+    if set(parse(text, name).get("projects", {})) != set(tables):
+        fail(f'{name} declares project trust outside [projects."<path>"] tables')
+    return tables
+
+
+def render(tables):
+    """Table texts separated by one blank line."""
+    return "\n".join(tables)
+
+
+def read_saved():
+    if not SAVED.exists():
+        return {}
+    text = SAVED.read_text()
+    other = set(parse(text, SAVED_NAME)) - {"projects"}
+    if other:
+        fail(f"{SAVED_NAME} holds more than project trust: {', '.join(sorted(other))}")
+    return trust_tables(text, SAVED_NAME)
+
+
+def write(path, text):
+    """Replace path by one rename, keeping its mode: the live config is private (0600)."""
+    mode = path.stat().st_mode & 0o7777 if path.exists() else 0o600
+    fd, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
+    try:
+        with os.fdopen(fd, "w") as out:
+            out.write(text)
+        os.chmod(temporary, mode)
+        os.replace(temporary, path)
+    except BaseException:
+        Path(temporary).unlink(missing_ok=True)
+        raise
+
+
+def placements(live, tables):
+    """live with tables before each header-like line in turn, then at its end.
+
+    The filter drops everything from a trust header to the next header, so tables
+    inserted before a header, with the blank line that ends them, leave its output
+    unchanged. Text appended after the last table would not: the blank line before it is
+    kept. A header-like line can sit inside a multi-line string, so restore takes the
+    first placement that keeps every value. A file with no header and no final newline
+    is refused: the newline a table needs before it would change what git stages.
+    """
+    offset = 0
+    for line in live.splitlines(keepends=True):
+        if TOML_HEADER.match(line):
+            yield live[:offset] + tables + "\n" + live[offset:]
+        offset += len(line)
+    if live and not live.endswith("\n"):
+        fail(f"{LIVE_NAME} has no table header and no final newline; add the newline")
+    yield live + tables
+
+
+def loads(text):
+    try:
+        return tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
+        return None
+
+
+def capture():
+    merged = read_saved() | trust_tables(LIVE.read_text(), LIVE_NAME)
+    text = render(merged.values())
+    if text != (SAVED.read_text() if SAVED.exists() else ""):
+        write(SAVED, text)
+
+
+def restore():
+    """Insert the saved tables the live file lacks; True when it wrote."""
+    live = LIVE.read_text()
+    present = trust_tables(live, LIVE_NAME)
+    missing = [table for path, table in read_saved().items() if path not in present]
+    if not missing:
+        return False
+    tables = render(missing)
+    want = parse(live, LIVE_NAME)
+    want.setdefault("projects", {}).update(parse(tables, SAVED_NAME)["projects"])
+    for result in placements(live, tables):
+        if loads(result) == want and CLEAN_TOML(result) == CLEAN_TOML(live):
+            write(LIVE.resolve(), result)
+            return True
+    fail(f"found no place in {LIVE_NAME} for the saved tables that keeps its values and "
+         "what git stages; nothing written")
+
+
+def restage():
+    """Stage the restored file when its filtered diff is empty, as harness-state-refresh does.
+
+    The insert changes the file's size, and git calls a file of another size modified
+    without running the filter; a rebase refuses to start on that mark. While another
+    git process holds the index, the next turn end's refresh stages it instead.
+    """
+    if git_path("index.lock").exists():
+        return
+    diff = subprocess.run(["git", "-C", str(REPO), "diff", "--quiet", "--", LIVE_NAME],
+                          text=True, capture_output=True)
+    if diff.returncode not in (0, 1):
+        fail(f"git diff {LIVE_NAME}: {diff.stderr.strip()}")
+    if diff.returncode == 0:
+        git("add", "--", LIVE_NAME)
+
+
+def rebasing():
+    return any(git_path(state).exists() for state in REBASE_STATE)
+
+
+@contextlib.contextmanager
+def locked():
+    """Hold the host's lock: two restores racing would each insert a table, and Codex
+    refuses a file with a duplicate table."""
+    if not SAVED.parent.is_dir():
+        fail("local/codex/ is missing; run `just setup`")
+    if not LIVE.is_file():
+        fail(f"{LIVE_NAME} is missing")
+    with open(LOCK, "a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        yield
+
+
+def main(argv):
+    args = argv[1:]
+    if not (len(args) == 1 and args[0] in ("capture", "restore", "sync")
+            or len(args) == 2 and args[0] == "hook" and args[1] in GIT_HOOKS):
+        fail(USAGE)
+    if linked_worktree():
+        if args[0] == "hook":
+            return
+        fail(f"{REPO} is a linked worktree; its {LIVE_NAME} is not live")
+    if args[0] == "hook":
+        if args[1] == "post-checkout" and rebasing():
+            return
+        with locked():
+            if restore():
+                restage()
+        return
+    with locked():
+        if args[0] in ("capture", "sync"):
+            capture()
+        if args[0] in ("restore", "sync"):
+            restore()
+
+
+if __name__ == "__main__":
+    main(sys.argv)
