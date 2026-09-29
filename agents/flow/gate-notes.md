@@ -79,3 +79,15 @@ A `verified` detail without `review:` is free text and carries no verdict.
 | `important finding deferred` | `review: important deferred rename` |
 | `reviewer field` | `reviewer: codex/gpt-5.6 extra words` |
 | `session id` | `session:garbage`, `session:codex:` |
+
+## Outcome notes
+
+Two other note shapes are not gates (`not-a-gate`, corpus cases above): obs's
+outcome measures read them (obs `docs/specs/2026-09-28-outcome-measures-design.md`
+§4). The `verified` gate's `review:` field is a disposition record and never a round.
+
+    review: <spec|plan|impl> round <n> — verdict: <revise|accept>; findings: <label> <count>, … | none; reviewer: <harness/model | human>
+    concerns: <task-id> <defect|change|extension> — <one line>
+
+`test_outcome_notes_match_their_grammar` in `agents/bin/test_flow_state.py` checks
+every corpus text that begins with either word against these shapes.

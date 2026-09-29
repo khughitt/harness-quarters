@@ -56,6 +56,10 @@ in `tack`).
    `--project <prefix>`, `--json`); it is what the curation pass reads. A lesson
    about the tooling rather than the task is also feedback (the Feedback section
    of the global instructions): file it and put the returned id in the retro.
+   A review that arrives on the spec, plan, or implementation is also a `review:`
+   round and a follow-up to closed work carries `concerns:` (the Task notes
+   section of the global instructions); the `verified` gate's `review:` field
+   records dispositions and is not a round.
 
 ## States
 

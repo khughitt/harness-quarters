@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -695,3 +696,17 @@ def test_cli_accepts_flags_before_id(fake_tasks, tmp_path):
     before = run_cli(exe, "--json", "--no-git", "ai-000001", cwd=tmp_path)
     after = run_cli(exe, "ai-000001", "--json", "--no-git", cwd=tmp_path)
     assert before.returncode == 0 and before.stdout == after.stdout
+
+
+REVIEW_NOTE = re.compile(
+    r"review: (spec|plan|impl) round [1-9]\d* — verdict: (revise|accept); "
+    r"findings: (none|\S+ \d+(, \S+ \d+)*); reviewer: (human|[a-z][a-z0-9-]*/\S+)")
+CONCERNS_NOTE = re.compile(r"concerns: [a-z][a-z0-9]*-[0-9a-f]+ (defect|change|extension) — \S.*")
+
+
+def test_outcome_notes_match_their_grammar():
+    texts = [c["text"] for c in corpus_cases() if c["text"].startswith(("review:", "concerns:"))]
+    assert len(texts) >= 4
+    for text in texts:
+        pattern = REVIEW_NOTE if text.startswith("review:") else CONCERNS_NOTE
+        assert pattern.fullmatch(text), text

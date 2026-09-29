@@ -1,18 +1,20 @@
 ---
 id: tack-19f5f7
 title: "Instruct agents to record review: and concerns: notes for outcome measures"
-status: doing
+status: done
 priority: 2
 size: s
 complexity: low
 process: direct
 owner: main
 created: 2026-09-28T11:23:34Z
-updated: 2026-09-29T20:14:04Z
+updated: 2026-09-29T20:15:27Z
 started: 2026-09-29T20:14:04Z
+completed: 2026-09-29T20:15:27Z
 depends: []
 tags: [rules]
 source: obs-00809f
+model: claude-sonnet-5-5
 agent: claude-code/claude-opus-5-5
 ---
 
@@ -24,4 +26,8 @@ Pieces: two short rules in the global AGENTS.md (and its mirrors), a cross-refer
 ## Notes
 
 - 2026-09-29T20:14:04Z (main): started
+  provenance: {"harness_session":"claude-code:0db1579c-fd74-4ccd-9baa-5c0562180ad5","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-29T20:15:27Z (feat/outcome-notes): done
+  provenance: {"harness_session":"claude-code:0db1579c-fd74-4ccd-9baa-5c0562180ad5","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-29T20:15:27Z (feat/outcome-notes): AGENTS.md carries the review: and concerns: note rules (CLAUDE.md and Codex AGENTS.md link to it); the flow skill cross-references them; the corpus holds four examples that a test checks against the spec grammar
   provenance: {"harness_session":"claude-code:0db1579c-fd74-4ccd-9baa-5c0562180ad5","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
