@@ -26,10 +26,12 @@ TOML_KEYS = (
     (re.compile(r'marketplaces\.(?:"[^"]*"|[^."]+)'), "last_updated"),
     (re.compile(r'marketplaces\.(?:"[^"]*"|[^."]+)'), "last_revision"),
 )
-# Tables dropped whole, header and blank lines up to the next header included. Codex
-# appends a [projects."<path>"] table each time a directory is trusted: that is host
-# state naming every checkout, kept in the live file and out of the index.
-TOML_TABLES = (re.compile(r"tui\.model_availability_nux"), re.compile(r"projects\..+"))
+# Codex appends a [projects."<path>"] table each time a directory is trusted: that is
+# host state naming every checkout, kept in the live file and out of the index.
+# codex-trust saves what this pattern drops and puts it back after a checkout.
+PROJECT_TRUST = re.compile(r"projects\..+")
+# Tables dropped whole, header and blank lines up to the next header included.
+TOML_TABLES = (re.compile(r"tui\.model_availability_nux"), PROJECT_TRUST)
 TOML_HEADER = re.compile(r"^\s*\[\[?\s*(.*?)\s*\]\]?\s*(#.*)?$")
 TOML_KEY = re.compile(r'^\s*("[^"]*"|[A-Za-z0-9_-]+)\s*=')
 
