@@ -6,6 +6,11 @@ those sessions call, and each harness's settings and hooks. Per-project profiles
 carry what differs between personal, work, and external checkouts.
 <!-- ops:identity end -->
 
+This is one person's working configuration for coding agents, published as a reference
+rather than as a package. It is wired to its owner's other projects and hosts, so a
+clone does not run as-is. It is more useful to read than to install: the instruction
+file, the skills, and the hooks and tests that keep them honest.
+
 ## Setup
 
 Once per clone:
@@ -68,6 +73,28 @@ registered. Its tests: `uv run --with pytest pytest .githooks/test_pre_commit.py
 The same hook runs `tools/ops-docs check`, vendored from ops: the identity regions at
 the top of this file and of `AGENTS.md` are generated from `identity.toml`, and
 `just docs` regenerates them.
+
+## Usage
+
+Things you can take from here without the rest:
+
+- `AGENTS.md`: the global instructions. Claude Code reads it as `~/.claude/CLAUDE.md`,
+  and Codex as `~/.codex/AGENTS.md`. The "Projects" block near the end lists the owner's
+  own projects, and the rules refer to their tools (`tasks`, `ops-profile`,
+  `host-load`), so read them as an example rather than adopting them wholesale.
+- `agents/skills/`: skills in the Agent Skills format. `flow` and `session-logs` are
+  written here. The superpowers skills link into the `agents/vendor/superpowers`
+  submodule (`git submodule update --init`). The addyosmani/agent-skills ones are
+  vendored under their MIT license (`agents/skills/references/`). `curate`, `scope`
+  and `tasks` link into a sibling checkout of [tasks](https://github.com/khughitt/tasks)
+  and dangle without one; `quick-add` links into a private checkout.
+- `.githooks/harness-state-clean`: a git clean filter that keeps `/model` and `/effort`
+  picks, Codex bookkeeping and Codex project trust out of committed harness configs.
+  It is useful on its own for anyone who versions `~/.claude` or `~/.codex`.
+- `tools/tack-link` with `links.toml`: declares every link from a harness home into a
+  checkout. It reports drift and never overwrites a real file.
+
+MIT licensed; see `LICENSE`.
 
 ## Layout
 
