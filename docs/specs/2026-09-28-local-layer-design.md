@@ -121,7 +121,8 @@ The consequences match those of the existing filtered keys, and the README state
 them the same way:
 
 - A checkout of the file (a fresh clone, `git checkout -- codex/config.toml`) drops
-  the trust list, and Codex asks again per directory.
+  the trust list, and Codex asks again per directory. Since `tack-de8d97`,
+  `.githooks/codex-trust` restores it (`docs/specs/2026-09-29-codex-trust-restore-design.md`).
 - Git's size-only "modified" mark after Codex adds a trust entry is cleared by the
   existing Stop hook (`harness-state-refresh`). Its patterns already cover
   `codex/config*.toml`.

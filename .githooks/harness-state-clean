@@ -6,11 +6,12 @@ The harness homes symlink to `claude/settings*.json` and `codex/config*.toml`, s
 session state, not configuration: this filter drops them from what git stages and
 leaves the working tree — the live file — untouched. Codex also writes bookkeeping
 (the screen-reader probe flag, model-announcement counters, marketplace fetch stamps),
-dropped the same way. Project trust (`[projects.*]`) is host state and is
-dropped too. Everything else the harness writes (plugin toggles, marketplace sources,
-hook trust hashes) stays tracked. Wired by
-`.gitattributes` and `git config filter.harness-state.clean`; the smudge side is
-identity, so a checkout simply carries no default model until the next pick.
+dropped the same way. Project trust (`[projects.*]`) is host state and is dropped
+too; `codex-trust` saves it in local/ and puts it back after a checkout drops it.
+Everything else the harness writes (plugin toggles, marketplace sources, hook trust
+hashes) stays tracked. Wired by `.gitattributes` and `git config
+filter.harness-state.clean`; the smudge side is identity, so a checkout simply carries
+no default model until the next pick.
 """
 import json
 import re
