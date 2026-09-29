@@ -1,15 +1,16 @@
 ---
 id: tack-90bf74
 title: Replace khughitt/tack history with a squashed fresh root and archive the old history privately
-status: doing
+status: done
 priority: 2
 size: xs
 complexity: low
 process: direct
 owner: main
 created: 2026-09-28T09:27:27Z
-updated: 2026-09-29T09:00:41Z
+updated: 2026-09-29T09:02:09Z
 started: 2026-09-29T09:00:41Z
+completed: 2026-09-29T09:02:09Z
 depends: [tack-4cd688, tack-b0197e]
 parent: tack-5b608f
 tags: []
@@ -21,4 +22,8 @@ From tack-8062ad: the root commit carries account and org ids in claude/claude.j
 ## Notes
 
 - 2026-09-29T09:00:41Z (main): started
+  provenance: {"harness_session":"claude-code:344dc247-3419-4443-85b2-8c2de56a3ee4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-29T09:02:09Z (main): done
+  provenance: {"harness_session":"claude-code:344dc247-3419-4443-85b2-8c2de56a3ee4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-09-29T09:02:09Z (main): Full history (393 commits, main 805d129) archived as private khughitt/tack-history by renaming the old repo; fresh private khughitt/tack holds root c28e2da of the remediated tree. gitleaks and the work-term and identifier greps are clean over the new history. Commit ids cited in older task notes resolve in tack-history.
   provenance: {"harness_session":"claude-code:344dc247-3419-4443-85b2-8c2de56a3ee4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
