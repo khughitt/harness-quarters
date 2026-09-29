@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 HOOKS = Path(__file__).parent
-HOOK_FILES = ("harness-state-clean", "codex-trust")
+HOOK_FILES = ("harness-state-clean", "codex-trust", "harness-state-refresh")
 CONFIG = "codex/config.toml"
 BASE = "[features]\nhooks = true\n"
 TUI = "[tui]\nx = 1\n"
@@ -272,3 +272,109 @@ def test_concurrent_syncs_leave_one_copy_of_each_table(repo):
     assert text.count('[projects."/work/a"]') == 1
     assert text.count('[projects."/work/b"]') == 1
     assert projects(live(repo)) == ["/work/a", "/work/b"]
+
+
+def trusted(repo, *tables):
+    """Codex trusted tables and its turn ended: they are live, saved, and git's mark is clear.
+
+    The tables go before the first header, where the filter's output stays equal to HEAD.
+    """
+    live(repo).write_text("".join(table + "\n" for table in tables) + live(repo).read_text())
+    assert trust(repo, "capture").returncode == 0
+    git(repo, "add", "--", CONFIG)
+
+
+def commit_config(repo, text, message):
+    live(repo).write_text(text)
+    git(repo, "add", "--", CONFIG)
+    git(repo, "commit", "-q", "-m", message)
+
+
+def status(repo):
+    return git(repo, "status", "--porcelain").stdout
+
+
+def refresh(repo):
+    """Run the Stop hook as a harness does: from another directory, payload on stdin."""
+    return subprocess.run([str(repo / ".githooks" / "harness-state-refresh")], cwd=repo.parent,
+                          input='{"hook_event_name":"Stop"}', text=True, capture_output=True)
+
+
+def test_the_stop_hook_saves_new_trust(repo):
+    live(repo).write_text(A + "\n" + BASE)
+
+    result = refresh(repo)
+
+    assert result.returncode == 0, result.stderr
+    assert saved(repo).read_text() == A
+    assert status(repo) == ""
+
+
+def test_the_stop_hook_restores_trust_after_a_hard_reset(repo):
+    trusted(repo, A)
+    live(repo).write_text(TUI + "\n" + live(repo).read_text())
+    git(repo, "reset", "-q", "--hard")
+    assert projects(live(repo)) == []
+
+    result = refresh(repo)
+
+    assert result.returncode == 0, result.stderr
+    assert projects(live(repo)) == ["/work/a"]
+    assert status(repo) == ""
+
+
+def test_the_stop_hook_restores_trust_after_a_stash_round_trip(repo):
+    trusted(repo, A)
+    live(repo).write_text(TUI + "\n" + live(repo).read_text())
+    git(repo, "stash", "-q")
+    git(repo, "stash", "pop", "-q")
+    assert projects(live(repo)) == []
+
+    result = refresh(repo)
+
+    assert result.returncode == 0, result.stderr
+    assert projects(live(repo)) == ["/work/a"]
+    diff = git(repo, "diff", "--", CONFIG).stdout
+    assert "+[tui]" in diff
+    assert "projects" not in diff
+
+
+def test_the_stop_hook_restores_trust_during_a_merge_stopped_on_a_conflict(repo):
+    (repo / "u").write_text("base\n")
+    git(repo, "add", "u")
+    git(repo, "commit", "-q", "-m", "u")
+    git(repo, "switch", "-q", "-c", "side")
+    (repo / "u").write_text("side\n")
+    git(repo, "add", "u")
+    commit_config(repo, TUI + "\n" + BASE, "side")
+    git(repo, "switch", "-q", "main")
+    (repo / "u").write_text("main\n")
+    git(repo, "add", "u")
+    git(repo, "commit", "-q", "-m", "main")
+    trusted(repo, A)
+
+    assert git(repo, "merge", "-q", "side", check=False).returncode == 1
+    assert projects(live(repo)) == []
+
+    result = refresh(repo)
+
+    assert result.returncode == 0, result.stderr
+    assert projects(live(repo)) == ["/work/a"]
+    (repo / "u").write_text("both\n")
+    git(repo, "add", "u")
+    git(repo, "commit", "-q", "--no-edit")
+    committed = git(repo, "show", "HEAD:" + CONFIG).stdout
+    assert "[tui]" in committed
+    assert "projects" not in committed
+    assert status(repo) == ""
+
+
+def test_a_failed_sync_still_clears_the_marks_and_fails_the_hook(repo):
+    saved(repo).write_text("[projects\n")
+    live(repo).write_text('model = "gpt-6"\n' + BASE)
+
+    result = refresh(repo)
+
+    assert result.returncode != 0
+    assert "codex-trust:" in result.stderr
+    assert git(repo, "diff-files", "--quiet", "--", CONFIG, check=False).returncode == 0
