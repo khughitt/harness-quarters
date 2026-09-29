@@ -6,9 +6,9 @@ priority: 3
 size: s
 complexity: mid
 process: planned
-owner: main
+owner: codex-trust-restore
 created: 2026-09-28T10:51:24Z
-updated: 2026-09-29T09:49:10Z
+updated: 2026-09-29T09:54:36Z
 started: 2026-09-29T09:14:43Z
 depends: []
 tags: [rules]
@@ -26,3 +26,5 @@ From the local-layer review: with trust out of the index, a merge, rebase, check
 - 2026-09-29T09:17:36Z (codex-trust-restore): parked (waiting on user, review): User reviews docs/specs/2026-09-29-codex-trust-restore-design.md in .worktrees/codex-trust-restore; on approval, agent writes the plan with writing-plans
   provenance: {"harness_session":"claude-code:669361e4-a89f-455b-a473-2b02963d95ac","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-09-29T09:49:10Z (codex-trust-restore): Spec review round 1: hook-less branch switch, conflicted merge (no post-merge) and pre-first-capture window added to the spec; switch and merge cases reproduced on git 2.55.0
+- 2026-09-29T09:54:36Z (codex-trust-restore): resumed
+  provenance: {"harness_session":"claude-code:669361e4-a89f-455b-a473-2b02963d95ac","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
