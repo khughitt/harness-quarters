@@ -1,6 +1,7 @@
 # Codex trust restore: keep project trust across checkouts that drop it
 
-Status: draft for review. Task: `tack-de8d97`. Follows the local layer
+Status: approved 2026-09-29; amended while planning (§3.2, §3.3: insertion point,
+restaging, rebases). Task: `tack-de8d97`. Follows the local layer
 (`docs/specs/2026-09-28-local-layer-design.md` §3.2).
 
 ## 1. Problem
@@ -20,9 +21,10 @@ overwrite the file and which of them run a hook:
 | `git switch` / `git checkout <branch>` | `post-checkout`, read from the tree just checked out |
 | the same, to a branch whose tree lacks the hook | none |
 | `git checkout -- <path>`, `git restore <path>` | `post-checkout` (flag 0) |
-| `git merge` (fast-forward included), `git pull` | `post-merge` |
+| `git merge` (fast-forward included), `git pull`, a `git pull --rebase` that fast-forwards | `post-merge` |
 | a merge that stops on a conflict in any file | none, and the `git commit` that concludes it runs none either |
-| `git rebase`, `git pull --rebase` | `post-checkout`, `post-rewrite` |
+| `git rebase`, `git pull --rebase` that replay commits | `post-checkout` while the rebase is in progress, `post-rewrite` at its end |
+| a `git rebase` that only fast-forwards | `post-checkout` while the rebase is in progress |
 | `git stash`, `git stash pop`, `git reset --hard` | none |
 | a fresh clone | none (hooks are not configured until `just setup`) |
 
@@ -39,8 +41,9 @@ Goals:
 - The trust list survives every row of the table without a manual step, on this
   schedule:
   - Where a hook runs, the list is back before the command returns.
-  - Where none runs (stash, reset, a conflicted merge, a fresh clone), it is back at
-    the end of the next turn in either harness. A Codex session started in the gap
+  - Where none runs (stash, reset, a conflicted merge, a fresh clone), and after a
+    rebase that only fast-forwards (§3.3), it is back at the end of the next turn in
+    either harness. A Codex session started in the gap
     asks for trust again.
   - While the main checkout is on a branch that predates this change, nothing restores
     the list. Both hooks resolve into the checked-out tree, the Stop hook through its
@@ -66,9 +69,9 @@ Non-goals:
 
 ### 3.1 The sidecar
 
-`local/codex/trust.toml` holds `[projects."<path>"]` tables only, each as the exact
-text Codex wrote (header, keys, and the blank lines up to the next header). It is valid
-TOML on its own. The README already names this path for the manual save, so a
+`local/codex/trust.toml` holds `[projects."<path>"]` tables only, each as the text
+Codex wrote from its header up to the next header, with trailing blank lines dropped.
+One blank line separates the tables. It is valid TOML on its own. The README already names this path for the manual save, so a
 hand-made copy from before this change is picked up as it is.
 
 ### 3.2 One tool, two operations
@@ -82,10 +85,22 @@ checkout it lives in (like `harness-state-refresh`, which it serves) and on
   file lacks stays in the sidecar. That is the point: a dropped list must never shrink
   the saved one. When the live value wins, a directory Codex marks untrusted is saved
   as untrusted.
-- `restore` appends to the live file each sidecar table whose project path the live
+- `restore` inserts into the live file each sidecar table whose project path the live
   file lacks. It leaves the tables the live file has alone. It is idempotent: a second
-  run appends nothing.
+  run inserts nothing. The tables go before the live file's first table header, each
+  followed by a blank line. The filter keeps a blank line that comes before a trust
+  header but drops everything from the header to the next one. So text inserted there
+  leaves the filter's output, and what git stages, byte-for-byte unchanged. Appending
+  at the end instead adds a blank line the filter keeps. The file then differs from
+  `HEAD` for real, and a rebase refuses to start (probed). Inserting at the top also
+  means that a line appended at the end of the file by hand does not join a trust
+  table, whose lines the filter would drop.
 - `sync` is `capture` then `restore`, under one lock.
+- `hook <name>` is `restore` as the git hooks run it (§3.3). It then restages the file
+  when its filtered diff is empty and no other git process holds the index, as
+  `harness-state-refresh` does. The insert changes the file's size. Git calls a file
+  of another size modified without running the filter, and a rebase refuses to start
+  on that mark (probed).
 
 Tables are matched by project path, parsed with `tomllib`, not by header text.
 Otherwise `[projects."/a"]` and `[ projects."/a" ]` would count as two tables.
@@ -118,12 +133,21 @@ still open. It restores the working file and restages it: git has already staged
 cleanly merged config at stage 0, so the resolution is unaffected.
 
 **Restore after a git command.** New `post-checkout`, `post-merge` and `post-rewrite`
-hooks in `.githooks/` run `codex-trust restore`. Each is a two-line shell wrapper that
-ignores its arguments and stdin. They act only in the main checkout, where the
-worktree's git dir equals the common git dir. A linked worktree's `codex/config.toml`
-is not live, and restoring into it would only make the worktree dirty. The hooks
-restore but never capture. When they run, the file has already been overwritten, and
-the Stop hook has already saved what it held.
+hooks in `.githooks/` run `codex-trust hook <name>`. Each is a short shell wrapper
+that drains its stdin and ignores its arguments. They act only in the main checkout,
+where the worktree's git dir equals the common git dir. A linked worktree's
+`codex/config.toml` is not live, and restoring into it would only make the worktree
+dirty. The hooks restore but never capture. When they run, the file has already been
+overwritten, and the Stop hook has already saved what it held.
+
+`post-checkout` does nothing while a rebase is in progress (`rebase-merge` or
+`rebase-apply` exists under the git dir). A rebase runs it after checking out the new
+base and then replays commits from its in-memory index, which drops the hook's
+restaging. The file keeps its new size, and the replay of a commit that touches it
+stops with "local changes would be overwritten" (probed). `post-rewrite` restores when
+the rebase ends. A rebase that only fast-forwards runs no `post-rewrite`, so the next
+turn end restores after it. A rebase stopped on a conflict holds no index lock: the
+Stop hook restores and restages on disk, and `git rebase --continue` reads that index.
 
 A hook location that survives branch switches was considered and rejected. It would
 be a `core.hooksPath` outside the tracked tree, filled by `just setup` with copies,
@@ -151,8 +175,9 @@ from only one of the two comes back from the other at the next `sync`, by design
 ### 3.5 Docs
 
 - README: replace the manual save and restore paragraph with the automatic behaviour,
-  the forget procedure, and one line on the no-hook rows (the list returns at the next
-  turn end).
+  the forget procedure, and the cases no hook covers. The list returns at the next turn
+  end, except while the main checkout is on a branch that predates this change, where
+  it returns only when the checkout switches back (§2).
 - The `harness-state-clean` docstring and the local-layer spec §3.2 say that trust
   dropped from the working file is restored from `local/codex/trust.toml`.
 
@@ -164,8 +189,9 @@ from only one of the two comes back from the other at the next `sync`, by design
 - `capture` into a missing sidecar writes the live tables. Capture from a live file
   with fewer tables keeps the sidecar's extra tables. A live table's text replaces the
   saved one (untrusted wins).
-- `restore` appends only the missing tables, twice in a row appends nothing, and the
-  result parses. A malformed sidecar exits non-zero, and the live file is byte-for-byte
+- `restore` inserts only the missing tables, twice in a row inserts nothing, and the
+  result parses. The filter's output of the restored file equals its output of the
+  file before the restore. A malformed sidecar exits non-zero, and the live file is byte-for-byte
   unchanged.
 - The live path is a symlink into the checkout: after `restore`, it is still a symlink.
 - End to end in a temporary repository with `just setup`'s configuration: a merge, a
@@ -174,6 +200,10 @@ from only one of the two comes back from the other at the next `sync`, by design
   its file untouched.
 - A switch to a branch whose tree lacks the hooks leaves the tables dropped. The
   switch back restores them.
+- A rebase that replays a commit changing the config succeeds and ends with the
+  tables in place. So does one stopped on a conflict, restored by
+  `harness-state-refresh`, then continued. A rebase that only fast-forwards leaves
+  them dropped until `harness-state-refresh` runs.
 - A merge that stops on a conflict in another file leaves the tables dropped.
   `harness-state-refresh` run during the open merge restores them, and concluding the
   merge commits a config blob without trust tables.
