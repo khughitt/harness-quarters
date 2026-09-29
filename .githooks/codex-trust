@@ -9,14 +9,19 @@ between hosts by Dropbox, and puts back the ones a checkout dropped:
     capture       merge the live file's trust tables into the saved copy
     restore       insert each saved table whose project the live file lacks
     sync          capture, then restore
+    forget <path> delete a project's table from both files
     hook <name>   restore from a git hook, then restage the file
 
 capture never removes a saved table: a dropped list must not shrink the saved one, and
-nothing prunes it. To forget a directory, delete its table from both files. restore
+nothing prunes it; forget is the one way a table leaves. The saved copy is machine-owned:
+capture writes it whole from the tables, so a comment added by hand is lost. restore
 inserts before the live file's first table header, which leaves the filter's output,
 and so what git stages, unchanged. The Stop hook harness-state-refresh runs sync; the
 post-checkout, post-merge and post-rewrite hooks run hook, which skips a linked worktree
-silently and, from post-checkout, a rebase in progress. The tool works on the checkout
+silently and, from post-checkout, a rebase in progress. A hook reports a failure on stderr
+and exits 0: git ends a checkout with the hook's status, and a switch that worked must not
+exit 1. The next turn end retries. restore also takes group and other access off the live
+file: a checkout writes it with the umask's mode, and Codex's config is private. The tool works on the checkout
 it lives in and refuses a linked worktree, whose codex/config.toml is not live. Design:
 docs/specs/2026-09-29-codex-trust-restore-design.md.
 """
@@ -38,7 +43,8 @@ LIVE = REPO / LIVE_NAME
 SAVED = REPO / SAVED_NAME
 LOCK = SAVED.with_name("trust.toml.lock")
 GIT_HOOKS = ("post-checkout", "post-merge", "post-rewrite")
-USAGE = "usage: codex-trust capture | restore | sync | hook post-checkout|post-merge|post-rewrite"
+USAGE = ("usage: codex-trust capture | restore | sync | forget <project path> | "
+         "hook post-checkout|post-merge|post-rewrite")
 # A rebase runs post-checkout after checking out the new base, then replays commits
 # from its in-memory index, which drops a restage made there; the file keeps its new
 # size, and the replay of a commit that touches it stops with "local changes would be
@@ -170,8 +176,17 @@ def capture():
         write(SAVED, text)
 
 
+def keep_private():
+    """Take group and other access off the live file, which git rewrites with the umask's mode."""
+    target = LIVE.resolve()
+    mode = target.stat().st_mode & 0o7777
+    if mode & 0o077:
+        os.chmod(target, mode & ~0o077)
+
+
 def restore():
     """Insert the saved tables the live file lacks; True when it wrote."""
+    keep_private()
     live = LIVE.read_text()
     present = trust_tables(live, LIVE_NAME)
     missing = [table for path, table in read_saved().items() if path not in present]
@@ -186,6 +201,38 @@ def restore():
             return True
     fail(f"found no place in {LIVE_NAME} for the saved tables that keeps its values and "
          "what git stages; nothing written")
+
+
+def without_table(text, project):
+    """text without the [projects."<project>"] table, its header through the next header."""
+    kept, skipping = [], False
+    for line in text.splitlines(keepends=True):
+        header = TOML_HEADER.match(line)
+        if header:
+            skipping = (PROJECT_TRUST.fullmatch(header.group(1)) is not None
+                        and project in parse(line, LIVE_NAME).get("projects", {}))
+        if not skipping:
+            kept.append(line)
+    return "".join(kept)
+
+
+def forget(project):
+    """Delete a project's table from the saved copy and the live file, under one lock."""
+    tables = read_saved()
+    live = LIVE.read_text()
+    in_live = project in trust_tables(live, LIVE_NAME)
+    if project not in tables and not in_live:
+        fail(f"no trust for {project!r} in {SAVED_NAME} or {LIVE_NAME}")
+    if in_live:
+        result = without_table(live, project)
+        if CLEAN_TOML(result) != CLEAN_TOML(live) or project in trust_tables(result, LIVE_NAME):
+            fail(f"could not remove {project!r} from {LIVE_NAME} without changing what git "
+                 "stages; nothing written")
+        write(LIVE.resolve(), result)
+    if project in tables:
+        del tables[project]
+        write(SAVED, render(tables.values()))
+    restage()
 
 
 def restage():
@@ -225,7 +272,8 @@ def locked():
 def main(argv):
     args = argv[1:]
     if not (len(args) == 1 and args[0] in ("capture", "restore", "sync")
-            or len(args) == 2 and args[0] == "hook" and args[1] in GIT_HOOKS):
+            or len(args) == 2 and args[0] in ("forget", "hook")
+            and (args[0] == "forget" or args[1] in GIT_HOOKS)):
         fail(USAGE)
     if linked_worktree():
         if args[0] == "hook":
@@ -234,11 +282,18 @@ def main(argv):
     if args[0] == "hook":
         if args[1] == "post-checkout" and rebasing():
             return
-        with locked():
-            if restore():
-                restage()
+        try:
+            with locked():
+                if restore():
+                    restage()
+        except SystemExit as error:
+            print(f"{error}\ncodex-trust: trust not restored; the next turn end retries",
+                  file=sys.stderr)
         return
     with locked():
+        if args[0] == "forget":
+            forget(args[1])
+            return
         if args[0] in ("capture", "sync"):
             capture()
         if args[0] in ("restore", "sync"):

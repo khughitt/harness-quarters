@@ -89,3 +89,13 @@ def test_a_held_index_lock_skips_without_failing(repo, tmp_path):
     assert lock.read_text() == ""
     lock.unlink()
     assert marked(repo)
+
+
+def test_a_sync_that_dies_without_a_message_still_fails_with_one(repo, tmp_path):
+    trust = repo / ".githooks" / "codex-trust"
+    trust.write_text("#!/bin/sh\nexit 3\n")
+
+    result = refresh(repo, cwd=tmp_path)
+
+    assert result.returncode != 0
+    assert "codex-trust sync exited 3" in result.stderr

@@ -26,6 +26,7 @@ overwrite the file and which of them run a hook:
 | `git rebase`, `git pull --rebase` that replay commits | `post-checkout` while the rebase is in progress, `post-rewrite` at its end |
 | a `git rebase` that only fast-forwards | `post-checkout` while the rebase is in progress |
 | `git stash`, `git stash pop`, `git reset --hard` | none |
+| `git cherry-pick`, `git revert`, `git rebase --abort`, `git merge --abort` | none (probed, git 2.55.0, 2026-09-29) |
 | a fresh clone | none (hooks are not configured until `just setup`) |
 
 Git looks a hook up after the command has written the tree, in `core.hooksPath`
@@ -102,6 +103,9 @@ checkout it lives in (like `harness-state-refresh`, which it serves) and on
   and whose filter output equals the live file's. If none does, it writes nothing and
   exits non-zero.
 - `sync` is `capture` then `restore`, under one lock.
+- `forget <path>` deletes the project's table from the sidecar and the live file under
+  one lock, refuses a project neither holds, and writes nothing unless the live file's
+  filter output stays unchanged. It is the one way a table leaves (§3.4).
 - `hook <name>` is `restore` as the git hooks run it (§3.3). It then restages the file
   when its filtered diff is empty and no other git process holds the index, as
   `harness-state-refresh` does. The insert changes the file's size. Git calls a file
@@ -155,6 +159,11 @@ the rebase ends. A rebase that only fast-forwards runs no `post-rewrite`, so the
 turn end restores after it. A rebase stopped on a conflict holds no index lock: the
 Stop hook restores and restages on disk, and `git rebase --continue` reads that index.
 
+A hook that fails reports the message on stderr and exits 0: git ends a checkout with
+the hook's status, and a switch that worked must not exit 1. Nothing is silent; the
+next turn end retries. `restore` also takes group and other access off the live file,
+since a checkout rewrites it with the umask's mode and Codex's config is private.
+
 A hook location that survives branch switches was considered and rejected. It would
 be a `core.hooksPath` outside the tracked tree, filled by `just setup` with copies,
 or links into the tree, which a switch empties just the same. Copies drift from the
@@ -174,8 +183,8 @@ directory) costs one inert entry in Codex's list. A wrongly pruned one costs a t
 prompt on every host. And no host can judge staleness: the file is shared by hosts
 whose directory trees differ, so "this path does not exist here" is not evidence.
 
-To forget a directory, delete its table from both `local/codex/trust.toml` and
-`codex/config.toml` before the next turn end. The README says so. A table deleted
+To forget a directory, run `codex-trust forget <path>`. The sidecar is machine-owned:
+`capture` writes it whole from the tables, so a comment added by hand is lost. The README says so. A table deleted
 from only one of the two comes back from the other at the next `sync`, by design.
 
 ### 3.5 Docs

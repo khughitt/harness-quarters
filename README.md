@@ -35,14 +35,18 @@ every turn end the Stop hook below saves the live tables into
 `local/codex/trust.toml`, never removing one, and inserts the ones the live file lacks
 before its first table header. The `post-checkout`, `post-merge` and `post-rewrite`
 hooks insert them right after a switch, a checkout of the file, a merge or a rebase,
-in the main checkout only. Where no hook runs (`git stash`, `git reset --hard`, a
-merge stopped on a conflict, a rebase that only fast-forwards, a fresh clone that has
-a saved copy), the list is back at the next turn end. A Codex session started before
+in the main checkout only. A hook that fails reports on stderr and exits 0, so a
+switch that worked does not exit 1; the next turn end retries. Where no hook runs
+(`git stash`, `git reset --hard`, `git cherry-pick`, `git revert`, `git rebase --abort`,
+`git merge --abort`, a merge stopped on a conflict, a rebase that only fast-forwards, a
+fresh clone that has a saved copy), the list is back at the next turn end. A Codex session started before
 then asks again. While the main checkout is on a branch older than these hooks,
 nothing restores the list until the checkout switches back. A table Codex added since
-the last turn end is not saved yet. Nothing prunes the saved copy: to forget a
-directory, delete its table from both `local/codex/trust.toml` and `codex/config.toml`
-before the next turn end.
+the last turn end is not saved yet. `local/codex/trust.toml` is machine-owned: capture rewrites it whole, so a comment
+added by hand is lost. Restoring also takes group and other access off the live
+`codex/config.toml`, which a checkout rewrites with the umask's mode. Nothing prunes the
+saved copy: to forget a directory, run `.githooks/codex-trust forget <path>`, which
+deletes its table from both files.
 
 After the local-layer rollout, other worktrees and branches made before it show
 `codex/config*.toml` as modified, because their blobs still carry trust tables, and a

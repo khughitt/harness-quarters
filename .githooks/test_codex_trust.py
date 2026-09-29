@@ -491,18 +491,40 @@ def test_a_rebase_that_only_fast_forwards_leaves_trust_to_the_stop_hook(repo):
     assert status(repo) == ""
 
 
-def test_a_linked_worktree_is_left_alone(repo, tmp_path):
+def replay(other):
+    """A rebase of a branch with its own commit onto one that changed the config."""
+    git(other, "switch", "-q", "-c", "mine")
+    (other / "u").write_text("mine\n")
+    git(other, "add", "u")
+    git(other, "commit", "-q", "-m", "mine")
+    git(other, "rebase", "-q", "ahead")
+
+
+LINKED_COMMANDS = {
+    "checkout --": lambda other: git(other, "checkout", "-q", "--", CONFIG),
+    "switch": lambda other: git(other, "switch", "-q", "ahead"),
+    "merge": lambda other: git(other, "merge", "-q", "ahead"),
+    "rebase": replay,
+}
+
+
+@pytest.mark.parametrize("command", LINKED_COMMANDS)
+def test_a_linked_worktree_is_left_alone(repo, tmp_path, command):
     side_with_config(repo)
+    git(repo, "switch", "-q", "-c", "ahead", "side")
+    commit_config(repo, TUI + "\n[notice]\nx = 1\n\n" + BASE, "ahead")
+    git(repo, "switch", "-q", "main")
     trusted(repo, A)
     other = tmp_path / "other"
     git(repo, "worktree", "add", "-q", str(other), "side")
     other_config = other / CONFIG
-    other_config.write_text("[notice]\nx = 1\n\n" + other_config.read_text())
+    if command == "checkout --":
+        other_config.write_text("[notice]\nx = 1\n\n" + other_config.read_text())
 
-    result = git(other, "checkout", "-q", "--", CONFIG)
+    result = LINKED_COMMANDS[command](other)
 
-    assert result.stderr == ""
-    assert other_config.read_text() == TUI + "\n" + BASE
+    assert result is None or result.stderr == ""
+    assert "projects" not in other_config.read_text()
     assert git(other, "status", "--porcelain").stdout == ""
     assert projects(live(repo)) == ["/work/a"]
 
@@ -528,3 +550,80 @@ def test_an_unknown_git_hook_prints_the_usage(repo):
 
     assert result.returncode != 0
     assert "usage: codex-trust" in result.stderr
+
+
+def test_a_failing_hook_reports_and_lets_the_git_command_succeed(repo):
+    side_with_config(repo)
+    trusted(repo, A)
+    saved(repo).write_text("[projects\n")
+
+    result = git(repo, "switch", "-q", "side", check=False)
+
+    assert result.returncode == 0
+    assert "codex-trust:" in result.stderr
+    assert "the next turn end retries" in result.stderr
+    assert git(repo, "branch", "--show-current").stdout.strip() == "side"
+
+
+def test_a_failing_hook_run_by_hand_still_exits_nonzero_on_bad_usage(repo):
+    assert trust(repo, "hook", "post-merge").returncode == 0
+    assert trust(repo, "hook").returncode != 0
+
+
+def test_forget_deletes_the_table_from_both_files(repo):
+    trusted(repo, A, B)
+    before = clean(repo, live(repo).read_text())
+
+    result = trust(repo, "forget", "/work/a")
+
+    assert result.returncode == 0, result.stderr
+    assert projects(live(repo)) == ["/work/b"]
+    assert saved(repo).read_text() == B
+    assert clean(repo, live(repo).read_text()) == before
+    assert status(repo) == ""
+    assert trust(repo, "sync").returncode == 0
+    assert projects(live(repo)) == ["/work/b"]
+
+
+def test_forget_of_a_project_only_the_saved_copy_holds(repo):
+    saved(repo).write_text(A + "\n" + B)
+    live(repo).write_text(B + "\n" + BASE)
+
+    assert trust(repo, "forget", "/work/a").returncode == 0
+
+    assert saved(repo).read_text() == B
+    assert live(repo).read_text() == B + "\n" + BASE
+
+
+def test_forget_of_an_unknown_project_fails_and_writes_nothing(repo):
+    trusted(repo, A)
+    text = (live(repo).read_text(), saved(repo).read_text())
+
+    result = trust(repo, "forget", "/work/none")
+
+    assert result.returncode != 0
+    assert "/work/none" in result.stderr
+    assert (live(repo).read_text(), saved(repo).read_text()) == text
+
+
+def test_forget_needs_a_path(repo):
+    assert trust(repo, "forget").returncode != 0
+
+
+def test_restore_takes_group_and_other_access_off_the_live_file(repo):
+    live(repo).chmod(0o644)
+
+    assert trust(repo, "restore").returncode == 0
+
+    assert stat.S_IMODE(live(repo).stat().st_mode) == 0o600
+
+
+def test_a_checkout_of_the_file_leaves_the_live_file_private(repo):
+    trusted(repo, A)
+    live(repo).chmod(0o644)
+    live(repo).write_text(TUI + "\n" + live(repo).read_text())
+    live(repo).chmod(0o600)
+
+    git(repo, "checkout", "--", CONFIG)
+
+    assert stat.S_IMODE(live(repo).stat().st_mode) == 0o600
