@@ -95,10 +95,11 @@ database. Copying a deleted thread's rollout back into `sessions/` and resuming 
 recreated its `threads` row. An archive restored under the live `CODEX_HOME` therefore
 brings those threads back as live sessions.
 
-**Nobody resumes a Codex thread after a week.** Of 6782 threads, 6072 last changed within
-a day of starting, 69 within 1–7 days and 10 within 7–30 days. The 631 changed 30 or more
+**No observed Codex resume after 30 days.** Of 6782 threads, 6072 last changed within a
+day of starting, 69 within 1–7 days and 10 within 7–30 days. The 631 changed 30 or more
 days after starting are all bulk touches: 624 on 2026-09-14 and 7 on 2026-03-13. None is
-a resume.
+a resume. This is one host's sample, not a proof. Keeping files past 30 days for analysis
+only is the policy chosen below, not something the sample establishes.
 
 **Claude Code's `cleanupPeriodDays` covers more than transcripts** (code.claude.com docs,
 `claude-directory` "Cleaned up automatically" and `data-usage`). At every startup it
@@ -110,11 +111,17 @@ documented maximum. Raising the value keeps all of these for longer, but everyth
 besides `projects/` (2.3G) totals under 60M today; `file-history` is the largest at 54M.
 Desktop and Cowork transcripts follow a separate `desktopSessionCleanupPeriodDays`.
 
-**Raising it is not a guarantee.** anthropics/claude-code#41458, open since 2026-03-31,
-reports 490 sessions deleted despite `cleanupPeriodDays: 99999`. When settings fail to
-load, cleanup silently falls back to the 30-day default. An archive step has to capture a
-transcript before day 30 whatever the setting says. Restored files keep their old mtimes,
-so the next startup cleanup deletes any restored file older than the setting.
+**Cleanup pauses when the value is uncertain, in the installed version.**
+anthropics/claude-code#41458 (open since 2026-03-31, against an older version) reports 490
+sessions deleted despite `cleanupPeriodDays: 99999`, and lists suspected causes rather
+than a confirmed one. The installed 2.1.285 binary pauses instead of falling back:
+"Transcript retention cleanup is paused until the settings errors above are fixed
+(cleanupPeriodDays cannot be determined reliably)". It also skips cleanup when
+`--setting-sources` disables user settings and no enabled source sets the value. What
+remains is a configuration that loads cleanly without the key, such as a Claude home
+whose settings file does not set it: that home gets the 30-day default. Restored files
+keep their old mtimes, so the next startup cleanup deletes any restored file older than
+the setting.
 
 **obs can read an unpacked archive, but at a new path it counts everything twice.** obs
 keys `files` by absolute path. In a throwaway index of one Codex month (9 files) and one
@@ -127,44 +134,49 @@ variables at an archive also marks every live-root file missing until the next o
 run. Restoring the archive at its original path relinked cleanly: the missing marks
 cleared and nothing was duplicated, with or without `--full`. That original path is the
 live store, though (see the two restore hazards above). Re-parsing an archive safely needs
-obs to index an archive root as an alias of the root it came from: `obs-de84cb` (idea).
+obs to index an archive root as an alias of the root it came from: `obs-de84cb`.
 
-## Recommendation
+## Decision
 
-**A (archive, then prune), with N = 30**, applied the same way to both stores:
+Adopted 2026-09-30: **A (archive, then prune)**, after a review the user pasted
+(recorded on `tack-1327b8`) amended the first recommendation. The first version archived
+and pruned calendar months together, once a month. The review's changes:
 
-- A monthly job archives a calendar month once all of its files are more than 30 days
-  old and obs has indexed them. On the 1st it archives the month before last, as one
-  tarball per harness on `/mnt/backup`. It then prunes the originals: `codex delete
-  --force` per thread for Codex, so the sqlite stays in step, and file removal for
-  Claude.
-- `cleanupPeriodDays: 90` in `claude/settings.json`, so that with a monthly cadence
-  (files up to about 62 days old) Claude's own cleanup never runs first. #41458 means
-  this lowers the risk of Claude pruning first but does not remove it.
-- Past 30 days a session file is kept for obs re-parse only, not for resumability (the
-  resume counts above).
+- **Capture daily, prune monthly.** A daily incremental copy to `/mnt/backup` preserves
+  each transcript within a day, so nothing depends on Claude's cleanup setting holding.
+  Monthly compression and pruning stay. Calendar months organize the archive; they do
+  not decide what is safe to delete.
+- **Prune on 30 days of inactivity, not age since creation.** A file is eligible when it
+  has not changed for 30 days and has not changed since its capture. Running sessions
+  are never eligible.
+- **Prune only what verifiably survives.** A file is removed only when a readable
+  archive holds the exact version obs indexed. Coverage is both Claude homes
+  (`~/.claude` and `~/.claude-work`), including each session's `subagents/` and
+  `tool-results/`, and Codex's `sessions/` and `archived_sessions/`. Codex threads are
+  removed with `codex delete --force`, so its sqlite stays in step. If the backup disk is
+  unavailable or verification fails, the originals stay and the job reports the failure.
+- **Re-reading an archive is a rollout acceptance check.** `obs-de84cb` must show an
+  archive re-parsed into the existing index with no duplicate sessions and no live file
+  marked missing. Archiving can start before that lands. Restoring into a live harness
+  directory is never part of the normal workflow.
+- **`cleanupPeriodDays: 90` in both Claude configurations**, applied 2026-09-30:
+  `claude/settings.json` here and the local layer's `claude/settings.work.json`. This is
+  breathing room, not the guarantee; the daily capture is.
 
-Rejected: **C** saves one job but gives up re-parse for good, and the obs charter treats
+Rejected: **C** saves a job but gives up re-parse for good, and the obs charter treats
 re-parse input as worth keeping. **B** frees root space but leaves both stores
-unbounded, along with Claude's silent 30-day loss.
+unbounded.
 
-Two steps do not depend on N and can go first:
-
-- Raising `cleanupPeriodDays` now stops the daily loss of transcripts that obs has not
-  yet had a reason to re-parse.
-- Removing superseded Codex releases (`tack-079ad1`, about 7G) frees space.
-
-## Unanswered questions
-
-- Adopt A with N = 30 and `cleanupPeriodDays: 90`, or another policy? *The user.*
+Removing superseded Codex releases (`tack-079ad1`, about 7G) is independent of all this.
 
 ## Proposed decomposition
 
 | Task | What | Waiting |
 |---|---|---|
 | `tack-1327b8` | Research: what a Codex or Claude session file is still needed for past 30 days, and whether obs can index an archive (done 2026-09-30) | tack-401088 |
-| `obs-de84cb` | Index an unpacked archive under the paths it was first indexed at | A only |
+| `obs-de84cb` | Index an unpacked archive under the paths it was first indexed at; the rollout's re-read acceptance check | — |
+| `tack-401088` | Build the daily capture and the verified monthly prune | obs-de84cb for the re-read check only |
 | `tack-079ad1` | Remove superseded Codex standalone releases, keeping current and previous | — |
 
-Parent goal: `tack-1a3278`. `tack-401088` stays an idea until the user sets the policy,
-then becomes the implementation of the chosen alternative.
+Parent goal: `tack-1a3278`, which closes once the archive re-read acceptance check
+(`obs-de84cb`) passes.
