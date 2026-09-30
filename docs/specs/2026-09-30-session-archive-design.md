@@ -54,6 +54,8 @@ in no repository, and exists only on titan:
 
 ```toml
 archive_root = "<a directory on the backup disk>"
+obs_command = ["python3", "~/d/obs/obs.py"]   # obs is not on PATH; `--json index-state` is appended
+uninspectable_ok = []                          # optional; see §3.4, open files
 ```
 
 Every subcommand refuses, exiting 2 with a message that names the missing piece, when:
@@ -141,7 +143,10 @@ disappeared. Claude's own cleanup and `codex delete` shrink the live store, not 
 archive.
 
 Output is one JSON line per run with counts per source: `scanned`, `copied`,
-`repaired`, `diverged`, `unchanged`, `busy`, `failed`. Any `failed` count makes the exit code 1.
+`repaired`, `diverged`, `unchanged`, `busy`, `vanished`, `failed`. `vanished` counts a
+file its harness deleted between the walk and the copy, which is not a failure. A
+directory or entry capture cannot read is a failure: it is counted, named in the
+report, and fails the run, never skipped silently. Any `failed` count makes the exit code 1.
 
 Rejected alternative: monthly tarballs. The review permitted compression but did not
 require it. An uncompressed mirror is what `obs-de84cb` can alias to the original roots
@@ -158,7 +163,14 @@ For each pruning unit (§3.2), prune decides using these inputs:
 - a fresh sha256 of every live file, and of every archived copy read back from the
   archive disk;
 - obs's per-file index state, from `obs index-state --json` (`obs-0bc168`);
-- the set of files any process holds open, from `/proc/*/fd`.
+- the set of files any process holds open, from `/proc/*/fd`. The scope is every process
+  owned by this user, since transcript writers run as the user. A process that exits
+  mid-scan, or a descriptor that closes mid-scan, is skipped. A same-user process
+  whose descriptors cannot be read fails the inspection, and prune refuses to delete.
+  The exceptions are processes whose `comm` the config lists in `uninspectable_ok`: a
+  person names each one. On titan these are `(sd-pam)`, which is non-dumpable, and the
+  `systemd` user manager, whose descriptors can be listed but not followed. A failed
+  inspection is never read as "nothing is open".
 
 A unit is eligible only when every file in it satisfies all of the following:
 
@@ -257,14 +269,28 @@ itself excludes writers.
      may hold the only copy of bytes a resume appended after step 1. The rule's
      recapture path applies before the link goes. The report names the thread, because
      Codex's own rows may be half-deleted.
-3. **Re-verify** (after a successful delete). The inode is now frozen. The path and the
-   thread's row are gone, so resume cannot find it, and a writer that already had it
-   open would have held the lock and made the delete fail. Condition 2 is checked again
-   on the linked inode. If it changed, a resume ran in the seconds between steps 1 and
-   2: the bytes are recaptured under the release rule, and the unit is recorded as
-   `failed:changed` with the thread id. The bytes are safe, but Codex no longer lists
-   the thread. Restoring it goes into a scratch `CODEX_HOME`.
-4. **Remove** the link, under the release rule.
+3. **Freeze check** (after a successful delete). The protocol does not rely on how
+   long `codex delete` holds the writer lock. Instead it re-inspects open files, as the
+   Claude settle step does. The rollout's path is gone and the link is the only name
+   left, so if no process holds the inode open, nothing can write to it.
+
+   Codex writers keep their rollout open for as long as they run. This was observed on
+   titan on 2026-09-30:
+   - every process holding a thread writer lock had that thread's rollout open (12 of
+     12, including the app-server daemon);
+   - a live `codex exec` held both the lock and the rollout in 182 of 182 and 102 of
+     102 samples.
+
+   If a process holds the linked inode, the link stays in quarantine and the unit is
+   recorded as `failed:writer-live-quarantined`. A person looks once the writer exits,
+   and the leftover rule stops further prunes until then. If the inspection itself
+   fails, the outcome is `failed:uninspectable-quarantined`.
+4. **Re-verify.** Condition 2 is checked again on the frozen inode. If it changed, a
+   resume ran between steps 1 and 2: the bytes are recaptured under the release rule,
+   and the unit is recorded as `failed:changed` with the thread id. The bytes are safe,
+   but Codex no longer lists the thread. Restoring it goes into a scratch
+   `CODEX_HOME`.
+5. **Remove** the link, under the release rule.
 
 A `codex-work` unit (once enabled) runs the same steps with
 `CODEX_HOME=~/.codex-work`.
@@ -392,9 +418,10 @@ thread that was pruned wrongly is restored from the archive into a scratch
   latest version is only under `versions/`, stays live (`kept:diverged`). After
   `promote`, the same file becomes eligible, and the previous mirror copy is still
   present under `versions/`.
-- **Probes already run** (throwaway `CODEX_HOME`, 2026-09-30): resume refused and delete
-  refused while the writer lock is held, and `codex delete --force` on an
-  `archived_sessions/` thread removed both file and row. The plan turns these into
+- **Probes already run** (throwaway `CODEX_HOME`, 2026-09-30):
+  - resume and delete were refused while the writer lock was held;
+  - `codex delete --force` on an `archived_sessions/` thread removed both file and row;
+  - a live `codex exec` held its lock and its rollout open for as long as it ran. The plan turns these into
   `session-archive probe-codex`, which runs them in a throwaway `CODEX_HOME` and records
   the Codex version they passed on in the manifest. `prune --apply` refuses to delete
   Codex units when the installed `codex --version` differs from the last passing one,

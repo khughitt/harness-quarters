@@ -15,7 +15,9 @@
 - Standard library only. `just test` runs the tests as `uv run -q --with pytest pytest .githooks tools -q`, and nothing else may be installed.
 - Linux only: `renameat2` through `ctypes` and `/proc/*/fd` are required, not optional.
 - Exit codes: `0` ok; `1` a failed file, unit, obs call, read-back, probe or leftover quarantine; `2` the host gate (§3.1); `75` the archive lock is held (`EX_TEMPFAIL`).
-- Config: `~/.config/session-archive/config.toml` with the keys `archive_root` (string) and `obs_command` (a non-empty list of strings). Marker file: `<archive_root>/.session-archive-root`. `obs_command` is a plan-level addition to §3.1, because obs is not on `PATH`; Task 1 updates the spec.
+- Config: `~/.config/session-archive/config.toml` with the keys `archive_root` (string), `obs_command` (a non-empty list of strings), and the optional `uninspectable_ok` (a list of process `comm` names, default empty). Marker file: `<archive_root>/.session-archive-root`. See spec §3.1 and §3.4.
+- A failed inspection of open files never counts as "nothing is open". The scope is processes of this user. A process or descriptor that disappears mid-scan is skipped; any other failure raises `InspectionFailed`, unless the process's `comm` is in `uninspectable_ok`.
+- A failure to read a source directory or file is reported and fails the run. It is never skipped silently.
 - Sources are the constant table in §3.2: `claude`, `claude-work`, `codex` are pruned; `codex-archived` and `codex-work` are captured only.
 - Inactivity is 30 days. Capture runs daily at 04:00 and prune on the 1st at 05:00. The `codex delete` timeout is 120 seconds. `status` goes stale after 48 hours.
 - The obs contract is `<obs_command> --json index-state`. It prints one JSON object, `{"schema": <int>, "files": [{"path", "size", "mtime_ms", "byte_offset", "partial_tail", "indexed_schema", "missing_since_ms"}]}`, and exits 0 (recorded on `obs-0bc168`).
@@ -62,11 +64,10 @@
 
 **Files:**
 - Create: `tools/session-archive`, `tools/session_archive/__init__.py`, `tools/session_archive/config.py`, `tools/session_archive/cli.py`, `tools/session_archive/testing.py`, `tools/conftest.py`
-- Modify: `docs/specs/2026-09-30-session-archive-design.md` (§3.1 config example)
 - Test: `tools/test_session_archive_config.py`
 
 **Interfaces:**
-- Produces: `config.MARKER`, `config.EX_HOST = 2`, `config.EX_TEMPFAIL = 75`, `HostGateError`, `LockHeld`, `Source(name, kind, home, root, pruned)`, `sources(home: Path) -> tuple[Source, ...]`, `Config(archive_root: Path, obs_command: tuple[str, ...])`, `load_config(path) -> Config`, `check_sources(sources)`, `archive_lock(root)` context manager; `cli.main(argv) -> int`, `cli.COMMANDS: dict[str, handler]`, `cli.LOCKED`; `testing.write(path, data, age_days=None) -> Path`, `testing.age(path, days)`, `testing.write_config(home, archive, obs_command=("true",)) -> Path`, `testing.run_tool(*args, home) -> CompletedProcess`; fixtures `home`, `archive`.
+- Produces: `config.MARKER`, `config.EX_HOST = 2`, `config.EX_TEMPFAIL = 75`, `HostGateError`, `LockHeld`, `Source(name, kind, home, root, pruned)`, `sources(home: Path) -> tuple[Source, ...]`, `Config(archive_root: Path, obs_command: tuple[str, ...], uninspectable_ok: tuple[str, ...])`, `load_config(path) -> Config`, `check_sources(sources)`, `archive_lock(root)` context manager; `cli.main(argv) -> int`, `cli.COMMANDS: dict[str, handler]`, `cli.LOCKED`; `testing.write(path, data, age_days=None) -> Path`, `testing.age(path, days)`, `testing.write_config(home, archive, obs_command=("true",), uninspectable_ok=()) -> Path`, `testing.run_tool(*args, home) -> CompletedProcess`; fixtures `home`, `archive`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -133,6 +134,18 @@ def test_bad_obs_command_is_refused(tmp_path, archive, line):
         config.load_config(path)
 
 
+def test_uninspectable_ok_is_optional_and_typed(tmp_path, archive):
+    path = tmp_path / "config.toml"
+    base = f'archive_root = "{archive}"\nobs_command = ["obs"]\n'
+    path.write_text(base)
+    assert config.load_config(path).uninspectable_ok == ()
+    path.write_text(base + 'uninspectable_ok = ["(sd-pam)"]\n')
+    assert config.load_config(path).uninspectable_ok == ("(sd-pam)",)
+    path.write_text(base + 'uninspectable_ok = "(sd-pam)"\n')
+    with pytest.raises(config.HostGateError):
+        config.load_config(path)
+
+
 def test_held_lock_exits_75(home, archive):
     write_config(home, archive)
     fd = os.open(archive / ".lock", os.O_RDWR | os.O_CREAT)
@@ -172,11 +185,12 @@ def age(path: Path, days: float) -> None:
     os.utime(path, ns=(stamp, stamp))
 
 
-def write_config(home: Path, archive: Path, obs_command=("true",)) -> Path:
+def write_config(home: Path, archive: Path, obs_command=("true",), uninspectable_ok=()) -> Path:
     path = home / ".config" / "session-archive" / "config.toml"
     path.parent.mkdir(parents=True, exist_ok=True)
     command = ", ".join(f'"{part}"' for part in obs_command)
-    path.write_text(f'archive_root = "{archive}"\nobs_command = [{command}]\n')
+    allowed = ", ".join(f'"{name}"' for name in uninspectable_ok)
+    path.write_text(f'archive_root = "{archive}"\nobs_command = [{command}]\nuninspectable_ok = [{allowed}]\n')
     return path
 
 
@@ -294,6 +308,7 @@ def sources(home: Path) -> tuple[Source, ...]:
 class Config:
     archive_root: Path
     obs_command: tuple[str, ...]
+    uninspectable_ok: tuple[str, ...]   # comm names whose open files may go uninspected
 
 
 def load_config(path: Path) -> Config:
@@ -311,7 +326,10 @@ def load_config(path: Path) -> Config:
         raise HostGateError(f"archive_root {root} does not exist (is the backup disk mounted?)")
     if not (root / MARKER).is_file():
         raise HostGateError(f"archive_root {root} lacks the marker file {MARKER}")
-    return Config(root, tuple(os.path.expanduser(part) for part in command))
+    allowed = data.get("uninspectable_ok", [])
+    if not (isinstance(allowed, list) and all(isinstance(name, str) for name in allowed)):
+        raise HostGateError(f"{path}: uninspectable_ok must be a list of strings")
+    return Config(root, tuple(os.path.expanduser(part) for part in command), tuple(allowed))
 
 
 def check_sources(table) -> None:
@@ -385,26 +403,17 @@ def main(argv) -> int:
         return config.EX_TEMPFAIL
 ```
 
-In the spec, replace the §3.1 config example with:
-
-````markdown
-```toml
-archive_root = "<a directory on the backup disk>"
-obs_command = ["python3", "~/d/obs/obs.py"]   # obs is not on PATH; `--json index-state` is appended
-```
-````
-
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `uv run -q --with pytest pytest tools/test_session_archive_config.py -q`
-Expected: 9 passed.
+Expected: 10 passed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 chmod +x tools/session-archive
 just test
-git add tools/session-archive tools/session_archive tools/conftest.py tools/test_session_archive_config.py docs/specs/2026-09-30-session-archive-design.md
+git add tools/session-archive tools/session_archive tools/conftest.py tools/test_session_archive_config.py
 git commit -m "feat(session-archive): host gate, source table and archive lock"
 ```
 
@@ -1023,14 +1032,12 @@ git commit -m "feat(session-archive): capture one file with extension check and 
 ### Task 5: Capture run and the `capture` command
 
 **Files:**
-- Modify: `tools/session_archive/capture.py` (add `COUNTS`, `walk_files`, `capture_run`), `tools/session_archive/cli.py` (add `cmd_capture`), `docs/specs/2026-09-30-session-archive-design.md` (§3.3 output list gains `vanished`)
+- Modify: `tools/session_archive/capture.py` (add `COUNTS`, `walk_files`, `capture_run`), `tools/session_archive/cli.py` (add `cmd_capture`)
 - Test: `tools/test_session_archive_capture_run.py`
 
 **Interfaces:**
 - Consumes: `capture_file`, `config.Source`, `Manifest`, `Run`.
-- Produces: `COUNTS` (`scanned copied repaired diverged unchanged busy vanished failed`), `walk_files(top) -> Iterator[Path]` (sorted, regular files only, no symlinks), `capture_run(root, manifest, sources) -> tuple[dict, bool]`, `cli.cmd_capture`. The report is `{source: {count: n, ..., "errors": [..] when any}}`.
-
-`vanished` is a plan-level addition to §3.3's output list: a file deleted by its harness between the walk and the copy. It is not a failure, because its harness removed it on purpose.
+- Produces: `COUNTS` (`scanned copied repaired diverged unchanged busy vanished failed`); `walk_files(top, errors=None) -> Iterator[Path]` (sorted, regular files only, no symlinks). An unreadable directory or entry raises, or, when an `errors` list is given, is appended there as `(path, error)` and the walk continues. Also `capture_run(root, manifest, sources) -> tuple[dict, bool]` and `cli.cmd_capture`. The report is `{source: {count: n, ..., "errors": [..] when any}}`, or `{"error": ...}` when the run stops on an I/O error outside a single file.
 
 - [ ] **Step 1: Write the failing tests** in `tools/test_session_archive_capture_run.py`:
 
@@ -1106,6 +1113,21 @@ def test_unreadable_file_fails_the_run(home, archive, manifest):
     assert report["claude"]["failed"] == 1 and "p/a.jsonl" in report["claude"]["errors"][0]
 
 
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads unreadable directories")
+def test_unreadable_directory_fails_the_run(home, archive, manifest):
+    write(home / ".claude/projects/p/a.jsonl", b"a\n")
+    write(home / ".claude/projects/q/b.jsonl", b"b\n")
+    locked = home / ".claude/projects/p"
+    locked.chmod(0)
+    try:
+        report, ok = capture_run(archive, manifest, table(home))
+    finally:
+        locked.chmod(0o700)
+    assert not ok
+    assert report["claude"]["failed"] == 1 and report["claude"]["copied"] == 1
+    assert report["claude"]["errors"][0].startswith("p: unreadable:")
+
+
 def test_capture_command_records_the_run(home, archive):
     write(home / ".claude/projects/p/a.jsonl", b"a\n")
     write_config(home, archive)
@@ -1128,22 +1150,43 @@ Expected: `ImportError: cannot import name 'capture_run'`.
 COUNTS = ("scanned", "copied", "repaired", "diverged", "unchanged", "busy", "vanished", "failed")
 
 
-def walk_files(top: Path):
-    """Every regular file under top, sorted, never following or yielding symlinks."""
-    for dirpath, dirnames, filenames in os.walk(top):
-        dirnames.sort()
-        for name in sorted(filenames):
-            path = Path(dirpath) / name
-            if not path.is_symlink() and path.is_file():
-                yield path
+def walk_files(top: Path, errors: list | None = None):
+    """Every regular file under top, depth first in sorted order, never following or
+    yielding symlinks. A directory or entry that cannot be read raises; with `errors`
+    given, it is appended there as (path, error) and the walk goes on."""
+    stack = [Path(top)]
+    while stack:
+        directory = stack.pop()
+        try:
+            with os.scandir(directory) as scan:
+                entries = sorted(scan, key=lambda entry: entry.name)
+        except OSError as error:
+            if errors is None:
+                raise
+            errors.append((directory, error))
+            continue
+        subdirectories = []
+        for entry in entries:
+            try:
+                if entry.is_symlink():
+                    continue
+                if entry.is_dir(follow_symlinks=False):
+                    subdirectories.append(Path(entry.path))
+                elif entry.is_file(follow_symlinks=False):
+                    yield Path(entry.path)
+            except OSError as error:
+                if errors is None:
+                    raise
+                errors.append((Path(entry.path), error))
+        stack.extend(reversed(subdirectories))
 
 
 def capture_run(root: Path, manifest: Manifest, sources) -> tuple[dict, bool]:
     report = {}
     for source in sources:
         counts = dict.fromkeys(COUNTS, 0)
-        errors = []
-        for path in walk_files(source.root):
+        errors, unreadable = [], []
+        for path in walk_files(source.root, unreadable):
             relpath = path.relative_to(source.root).as_posix()
             counts["scanned"] += 1
             try:
@@ -1154,6 +1197,9 @@ def capture_run(root: Path, manifest: Manifest, sources) -> tuple[dict, bool]:
                 else:
                     counts["failed"] += 1
                     errors.append(f"{relpath}: {error}")
+        for path, error in unreadable:
+            counts["failed"] += 1
+            errors.append(f"{path.relative_to(source.root).as_posix()}: unreadable: {error}")
         report[source.name] = {**counts, "errors": errors} if errors else counts
     return report, all(entry["failed"] == 0 for entry in report.values())
 ```
@@ -1175,7 +1221,10 @@ def cmd_capture(cfg, table, args) -> int:
     manifest = Manifest.open(cfg.archive_root)
     try:
         started = utc_now()
-        report, ok = capture.capture_run(cfg.archive_root, manifest, table)
+        try:
+            report, ok = capture.capture_run(cfg.archive_root, manifest, table)
+        except OSError as error:
+            report, ok = {"error": f"{type(error).__name__}: {error}"}, False
         manifest.record_run(Run(uuid.uuid4().hex, "capture", "apply", started, utc_now(), ok, report))
     finally:
         manifest.close()
@@ -1186,18 +1235,16 @@ def cmd_capture(cfg, table, args) -> int:
 COMMANDS = {"capture": cmd_capture}
 ```
 
-In the spec §3.3, change the output sentence to list `scanned`, `copied`, `repaired`, `diverged`, `unchanged`, `busy`, `vanished`, `failed`, and add: "`vanished` counts a file its harness deleted between the walk and the copy; it is not a failure."
-
 - [ ] **Step 4: Run to verify pass**
 
 Run: `uv run -q --with pytest pytest tools/test_session_archive_capture_run.py -q`
-Expected: 6 passed.
+Expected: 7 passed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 just test
-git add tools/session_archive tools/test_session_archive_capture_run.py docs/specs/2026-09-30-session-archive-design.md
+git add tools/session_archive tools/test_session_archive_capture_run.py
 git commit -m "feat(session-archive): daily capture run and capture command"
 ```
 
@@ -1211,14 +1258,17 @@ git commit -m "feat(session-archive): daily capture run and capture command"
 
 **Interfaces:**
 - Consumes: `copy_hashed`, `hash_file`, `mirror_path`, `version_location`, `fsync_dir`, `Manifest`.
-- Produces: `PromoteError`, `promote(root, manifest, source, relpath) -> Version` (the new mirror row), `cli.cmd_promote`.
+- Produces: `PromoteError`, `promote(root, manifest, source, relpath) -> Version` (the new mirror row), `cli.cmd_promote`. The mirror path is never absent. The replacement is prepared first, the old mirror is kept under `versions/` by a hard link, and a single `os.replace` swaps it in, so an interrupted promote can be rerun.
 
 - [ ] **Step 1: Write the failing tests** in `tools/test_session_archive_promote.py`:
 
 ```python
 """promote makes a diverged file's latest version the mirror, deleting nothing (spec §3.3)."""
+import os
+
 import pytest
 
+from session_archive import capture
 from session_archive.capture import PromoteError, capture_file, mirror_path, promote
 from session_archive.manifest import MIRROR
 from session_archive.testing import run_tool, write, write_config
@@ -1256,6 +1306,41 @@ def test_promote_refuses_when_not_diverged(archive, manifest, tmp_path):
         promote(archive, manifest, "claude", "absent")
 
 
+def test_interrupted_copy_keeps_mirror_and_retry_works(archive, manifest, tmp_path, monkeypatch):
+    diverge(archive, manifest, tmp_path)
+
+    def disk_full(*args):
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(capture, "copy_hashed", disk_full)
+    with pytest.raises(OSError):
+        promote(archive, manifest, "claude", REL)
+    monkeypatch.undo()
+    assert mirror_path(archive, "claude", REL).read_bytes() == b"one\ntwo\n"
+    assert len(manifest.rows("claude", REL)) == 2
+    promote(archive, manifest, "claude", REL)
+    assert mirror_path(archive, "claude", REL).read_bytes() == b"rewritten\n"
+
+
+def test_interrupted_swap_keeps_old_version_and_retry_works(archive, manifest, tmp_path, monkeypatch):
+    diverge(archive, manifest, tmp_path)
+
+    def io_error(*args):
+        raise OSError(5, "Input/output error")
+
+    monkeypatch.setattr(capture.os, "replace", io_error)
+    with pytest.raises(OSError):
+        promote(archive, manifest, "claude", REL)
+    monkeypatch.undo()
+    mirrored = mirror_path(archive, "claude", REL)
+    assert mirrored.read_bytes() == b"one\ntwo\n"
+    assert not any(p.name.startswith(".capture-") for p in mirrored.parent.iterdir())
+    promote(archive, manifest, "claude", REL)
+    assert mirrored.read_bytes() == b"rewritten\n"
+    old = [v for v in manifest.rows("claude", REL) if v.location.startswith("versions/") and v.size == 8]
+    assert len(old) == 1 and (archive / old[0].location).read_bytes() == b"one\ntwo\n"
+
+
 def test_promote_command(home, archive, manifest):
     src = write(home / ".claude/projects" / REL, b"one\n")
     capture_file(archive, manifest, "claude", REL, src)
@@ -1280,26 +1365,37 @@ class PromoteError(Exception):
 
 
 def promote(root: Path, manifest: Manifest, source: str, relpath: str) -> Version:
-    """Make the newest captured version the mirror; the old mirror moves under versions/."""
+    """Make the newest captured version the mirror. The replacement is prepared first; the
+    old mirror is kept under versions/ by a hard link, so the mirror path never goes away;
+    one rename swaps the new version in. An interrupted promote can simply be rerun."""
     latest = manifest.latest(source, relpath)
     if latest is None:
         raise PromoteError(f"{source}/{relpath} has no archived version")
     if latest.location == MIRROR:
         raise PromoteError(f"{source}/{relpath} is not diverged")
     stored = root / latest.location
-    if hash_file(stored) != latest.sha256:
-        raise PromoteError(f"{stored} does not match its manifest sha256")
     dest = mirror_path(root, source, relpath)
-    mirror = manifest.mirror(source, relpath)
-    if mirror is not None:
-        old = version_location(source, relpath, mirror.captured_at)
-        (root / old).parent.mkdir(parents=True, exist_ok=True)
-        os.rename(dest, root / old)
-        fsync_dir((root / old).parent)
-        manifest.put(replace(mirror, location=old))
     copied = copy_hashed(stored, dest.parent, None)
-    os.utime(copied.tmp, ns=(latest.mtime_ns, latest.mtime_ns))
-    os.replace(copied.tmp, dest)
+    try:
+        if copied.sha256 != latest.sha256:
+            raise PromoteError(f"{stored} does not match its manifest sha256")
+        mirror = manifest.mirror(source, relpath)
+        if mirror is not None:
+            if hash_file(dest) != mirror.sha256:
+                raise PromoteError(f"{dest} is damaged; run capture to repair it first")
+            old = version_location(source, relpath, mirror.captured_at)
+            (root / old).parent.mkdir(parents=True, exist_ok=True)
+            if not (root / old).exists():
+                os.link(dest, root / old)
+                fsync_dir((root / old).parent)
+            elif hash_file(root / old) != mirror.sha256:
+                raise PromoteError(f"{root / old} exists with other content")
+            manifest.put(replace(mirror, location=old))
+        os.utime(copied.tmp, ns=(latest.mtime_ns, latest.mtime_ns))
+        os.replace(copied.tmp, dest)
+    except BaseException:
+        copied.tmp.unlink(missing_ok=True)
+        raise
     fsync_dir(dest.parent)
     promoted = replace(latest, location=MIRROR)
     manifest.put(promoted)
@@ -1328,7 +1424,7 @@ COMMANDS = {"capture": cmd_capture, "promote": cmd_promote}
 - [ ] **Step 4: Run to verify pass**
 
 Run: `uv run -q --with pytest pytest tools/test_session_archive_promote.py -q`
-Expected: 3 passed.
+Expected: 5 passed.
 
 - [ ] **Step 5: Commit**
 
@@ -1530,7 +1626,7 @@ git commit -m "feat(session-archive): pure prune eligibility over file facts"
 
 **Interfaces:**
 - Consumes: `decide.ObsFile`, `capture.walk_files`, `config.Source`.
-- Produces: `ObsUnavailable`, `load_obs_state(command, runner=subprocess.run) -> dict[str, ObsFile]` (keyed by `os.path.realpath`), `open_inodes(proc=Path("/proc")) -> set[tuple[int, int]]`, `tail_has_newline(path, offset) -> bool`, `SESSION_RE`, `ROLLOUT_RE`, `Unit(source, key, paths, files, thread_id=None)`, `claude_units(source) -> list[Unit]`, `codex_units(source) -> list[Unit]`; `testing.obs_for(*paths) -> dict`, `testing.SID`, `testing.TID`, `testing.claude_session(root, age_days=40, project="-p", sid=SID) -> Path` (the session's `.jsonl`), `testing.codex_rollout(root, age_days=40, tid=TID, data=...) -> Path`.
+- Produces: `ObsUnavailable`, `load_obs_state(command, runner=subprocess.run) -> dict[str, ObsFile]` (keyed by `os.path.realpath`), `InspectionFailed`, `open_inodes(allow=(), proc=Path("/proc"), uid=None) -> set[tuple[int, int]]` (this user's processes; raises `InspectionFailed` unless every uninspectable one's `comm` is in `allow`), `comm(pid_dir) -> str`, `tail_has_newline(path, offset) -> bool`, `SESSION_RE`, `ROLLOUT_RE`, `Unit(source, key, paths, files, thread_id=None)`, `claude_units(source) -> list[Unit]`, `codex_units(source) -> list[Unit]`; `testing.obs_for(*paths) -> dict`, `testing.SID`, `testing.TID`, `testing.claude_session(root, age_days=40, project="-p", sid=SID) -> Path` (the session's `.jsonl`), `testing.codex_rollout(root, age_days=40, tid=TID, data=...) -> Path`, `testing.uninspectable_comms() -> tuple[str, ...]`, `testing.lenient_open_inodes() -> set` (the real `/proc`, allowing what this host cannot inspect, for tests that need processes they start).
 
 - [ ] **Step 1: Write the failing tests.** Append to `testing.py`:
 
@@ -1560,6 +1656,22 @@ def claude_session(root: Path, age_days: float = 40, project: str = "-p", sid: s
 def codex_rollout(root: Path, age_days: float = 40, tid: str = TID,
                   data: bytes = b'{"type":"session_meta"}\n') -> Path:
     return write(root / "2026" / "01" / "01" / f"rollout-2026-01-01T00-00-00-{tid}.jsonl", data, age_days)
+
+
+def uninspectable_comms() -> tuple[str, ...]:
+    """comm names of this user's processes whose descriptors this host cannot read (on
+    titan: systemd and (sd-pam)); tests allow them so they can watch processes they start."""
+    from session_archive.inputs import InspectionFailed, open_inodes
+    try:
+        open_inodes()
+    except InspectionFailed as failure:
+        return tuple(sorted({name for _pid, name, _reason in failure.processes}))
+    return ()
+
+
+def lenient_open_inodes() -> set:
+    from session_archive.inputs import open_inodes
+    return open_inodes(allow=uninspectable_comms())
 ```
 
 `tools/test_session_archive_inputs.py`:
@@ -1573,9 +1685,9 @@ import subprocess
 import pytest
 
 from session_archive import config
-from session_archive.inputs import (ObsUnavailable, claude_units, codex_units, load_obs_state,
-                                    open_inodes, tail_has_newline)
-from session_archive.testing import SID, TID, claude_session, codex_rollout, write
+from session_archive.inputs import (InspectionFailed, ObsUnavailable, claude_units, codex_units,
+                                    load_obs_state, open_inodes, tail_has_newline)
+from session_archive.testing import SID, TID, claude_session, codex_rollout, lenient_open_inodes, write
 
 
 def source(home, name):
@@ -1610,11 +1722,51 @@ def test_obs_failures_raise(runner):
         load_obs_state(("obs",), runner)
 
 
-def test_open_inodes_sees_our_descriptor(tmp_path):
+def fake_proc(tmp_path, target):
+    """A /proc with one process of this user holding `target` open, plus a non-pid entry."""
+    proc = tmp_path / "proc"
+    (proc / "100" / "fd").mkdir(parents=True)
+    (proc / "100" / "comm").write_text("claude\n")
+    (proc / "100" / "fd" / "3").symlink_to(target)
+    (proc / "self").mkdir()
+    return proc
+
+
+def test_open_inodes_reads_this_users_processes(tmp_path):
+    target = write(tmp_path / "t", b"x")
+    info = os.stat(target)
+    assert open_inodes(proc=fake_proc(tmp_path, target)) == {(info.st_dev, info.st_ino)}
+
+
+def test_descriptor_closed_mid_scan_is_skipped(tmp_path):
+    target = write(tmp_path / "t", b"x")
+    proc = fake_proc(tmp_path, target)
+    target.unlink()
+    assert open_inodes(proc=proc) == set()
+
+
+def test_other_users_are_out_of_scope(tmp_path):
+    proc = fake_proc(tmp_path, write(tmp_path / "t", b"x"))
+    assert open_inodes(proc=proc, uid=os.getuid() + 1) == set()
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads unreadable directories")
+def test_uninspectable_process_refuses_unless_allowed(tmp_path):
+    proc = fake_proc(tmp_path, write(tmp_path / "t", b"x"))
+    (proc / "100" / "fd").chmod(0)
+    try:
+        with pytest.raises(InspectionFailed, match=r"100 \(claude\)"):
+            open_inodes(proc=proc)
+        assert open_inodes(allow=("claude",), proc=proc) == set()
+    finally:
+        (proc / "100" / "fd").chmod(0o700)
+
+
+def test_real_proc_sees_our_descriptor(tmp_path):
     path = write(tmp_path / "held", b"x")
     with open(path) as handle:
         info = os.fstat(handle.fileno())
-        assert (info.st_dev, info.st_ino) in open_inodes()
+        assert (info.st_dev, info.st_ino) in lenient_open_inodes()
 
 
 def test_tail_has_newline(tmp_path):
@@ -1699,20 +1851,54 @@ def load_obs_state(command, runner=subprocess.run) -> dict[str, ObsFile]:
         raise ObsUnavailable(f"obs index-state output does not match the contract: {error!r}") from error
 
 
-def open_inodes(proc: Path = Path("/proc")) -> set[tuple[int, int]]:
-    """(device, inode) of every file any readable process holds open."""
-    held = set()
-    for fd_dir in proc.glob("[0-9]*/fd"):
-        try:
-            entries = list(fd_dir.iterdir())
-        except OSError:
+class InspectionFailed(Exception):
+    """Processes of this user could not be inspected; prune must not read that as "nothing is
+    open" (spec §3.4). `processes` lists (pid, comm, reason), one entry per process."""
+
+    def __init__(self, processes: list[tuple[str, str, str]]):
+        self.processes = processes
+        super().__init__("cannot inspect open files of: "
+                         + "; ".join(f"{pid} ({name}): {reason}" for pid, name, reason in processes))
+
+
+def comm(pid_dir: Path) -> str:
+    try:
+        return (pid_dir / "comm").read_text().strip()
+    except OSError:
+        return "?"
+
+
+def open_inodes(allow: tuple[str, ...] = (), proc: Path = Path("/proc"), uid: int | None = None) -> set[tuple[int, int]]:
+    """(device, inode) of every file held open by a process of this user. A process or
+    descriptor that disappears mid-scan is skipped. Any other failure to read a process of
+    this user raises InspectionFailed, unless that process's comm is in `allow`."""
+    uid = os.getuid() if uid is None else uid
+    held, blocked = set(), []
+    for pid_dir in proc.iterdir():
+        if not pid_dir.name.isdigit():
             continue
+        failure = None
+        try:
+            if pid_dir.stat().st_uid != uid:
+                continue
+            entries = list((pid_dir / "fd").iterdir())
+        except (FileNotFoundError, ProcessLookupError):
+            continue
+        except OSError as error:
+            entries, failure = [], error.strerror
         for entry in entries:
             try:
                 info = os.stat(entry)
-            except OSError:
+            except (FileNotFoundError, ProcessLookupError):
+                continue
+            except OSError as error:
+                failure = failure or f"fd {entry.name}: {error.strerror}"
                 continue
             held.add((info.st_dev, info.st_ino))
+        if failure and comm(pid_dir) not in allow:
+            blocked.append((pid_dir.name, comm(pid_dir), failure))
+    if blocked:
+        raise InspectionFailed(blocked)
     return held
 
 
@@ -1761,7 +1947,7 @@ def codex_units(source: Source) -> list[Unit]:
 - [ ] **Step 4: Run to verify pass**
 
 Run: `uv run -q --with pytest pytest tools/test_session_archive_inputs.py -q`
-Expected: 8 passed.
+Expected: 12 passed.
 
 - [ ] **Step 5: Commit**
 
@@ -1972,7 +2158,7 @@ git commit -m "feat(session-archive): no-replace rename and the quarantine relea
 
 **Interfaces:**
 - Consumes: `capture.archived_file`, `capture_file`, `hash_file`, `mirror_path`, `stat_of`, `walk_files`; `decide.FileFacts`, `INACTIVE_NS`, `ObsFile`, `Stat`, `is_transcript`, `unit_reason`; `inputs.Unit`, `tail_has_newline`; `quarantine.*`; `manifest.MIRROR`, `Manifest`.
-- Produces: `ArchiveUnreadable`, `LeftoverQuarantine`, `Hooks(after_precheck, after_quarantine, before_delete)`, `Context(archive_root, manifest, obs, held, now_ns, run_id, codex_bin="codex", codex_timeout=120, hooks=Hooks())`, `evaluate(unit, ctx, held) -> str | None`, `preserver(ctx, source, relpath) -> Callable[[Path], bool]`, `delete_claude_unit(unit, ctx) -> str`. Outcomes: `pruned`, `kept:vanished`, `kept:open`, `kept:changed`, `failed:recreated`, `failed:recapture`, `failed:release`.
+- Produces: `ArchiveUnreadable`, `LeftoverQuarantine`, `Hooks(after_precheck, after_quarantine, before_delete)`, `Context(archive_root, manifest, obs, held, now_ns, run_id, codex_bin="codex", codex_timeout=120, hooks=Hooks())`, `evaluate(unit, ctx, held) -> str | None`, `preserver(ctx, source, relpath) -> Callable[[Path], bool]`, `delete_claude_unit(unit, ctx) -> str`. Outcomes: `pruned`, `kept:vanished`, `kept:open`, `kept:changed`, `failed:recreated`, `failed:recapture`, `failed:release`, `failed:uninspectable` (restored).
 
 - [ ] **Step 1: Write the failing tests** in `tools/test_session_archive_prune_claude.py`:
 
@@ -1985,10 +2171,10 @@ import pytest
 
 from session_archive import config, prune
 from session_archive.capture import capture_run, hash_file, mirror_path
-from session_archive.inputs import claude_units, open_inodes
+from session_archive.inputs import InspectionFailed, claude_units
 from session_archive.prune import Context, Hooks, delete_claude_unit, evaluate
 from session_archive.quarantine import QUARANTINE
-from session_archive.testing import SID, claude_session, obs_for
+from session_archive.testing import SID, claude_session, lenient_open_inodes, obs_for
 
 
 @pytest.fixture
@@ -1998,7 +2184,7 @@ def world(home, archive, manifest):
     capture_run(archive, manifest, [src])
     (unit,) = claude_units(src)
     transcripts = [jsonl, src.root / "-p" / SID / "subagents" / "agent-1.jsonl"]
-    ctx = Context(archive, manifest, obs_for(*transcripts), open_inodes, time.time_ns(), "run1")
+    ctx = Context(archive, manifest, obs_for(*transcripts), lenient_open_inodes, time.time_ns(), "run1")
     assert evaluate(unit, ctx, set()) is None
     return src, unit, jsonl, ctx
 
@@ -2034,6 +2220,18 @@ def test_open_at_settle_restores(world):
         for handle in handles:
             handle.close()
     assert jsonl.exists() and (src.root / "-p" / SID / "tool-results" / "r.txt").exists()
+
+
+def test_failed_inspection_restores(world):
+    src, unit, jsonl, ctx = world
+
+    def blind():
+        raise InspectionFailed([("1", "x", "Permission denied")])
+
+    ctx.held = blind
+    assert delete_claude_unit(unit, ctx) == "failed:uninspectable"
+    assert jsonl.exists() and (src.root / "-p" / SID / "tool-results" / "r.txt").exists()
+    assert not (src.home / QUARANTINE / "run1").exists()
 
 
 def recreate(jsonl):
@@ -2124,7 +2322,7 @@ from typing import Callable
 
 from .capture import archived_file, capture_file, hash_file, mirror_path, stat_of, walk_files
 from .decide import INACTIVE_NS, FileFacts, ObsFile, Stat, is_transcript, unit_reason
-from .inputs import Unit, tail_has_newline
+from .inputs import InspectionFailed, Unit, tail_has_newline
 from .manifest import MIRROR, Manifest
 from .quarantine import QUARANTINE, inodes, quarantine_dir, release, remove_empty_dirs, rename_noreplace
 
@@ -2245,7 +2443,11 @@ def delete_claude_unit(unit: Unit, ctx: Context) -> str:
             return _restore(moved, qdir, stop, "kept:vanished")
         moved.append((live, quarantined))
     ctx.hooks.after_quarantine(unit)
-    if inodes([q for _, q in moved]) & ctx.held():
+    try:
+        holders = ctx.held()
+    except InspectionFailed:
+        return _restore(moved, qdir, stop, "failed:uninspectable")
+    if inodes([q for _, q in moved]) & holders:
         return _restore(moved, qdir, stop, "kept:open")
     project = unit.key.split("/")[0]
     present = {f"{project}/{p.relative_to(qdir).as_posix()}": p for p in walk_files(qdir)}
@@ -2267,7 +2469,7 @@ def delete_claude_unit(unit: Unit, ctx: Context) -> str:
 - [ ] **Step 4: Run to verify pass**
 
 Run: `uv run -q --with pytest pytest tools/test_session_archive_prune_claude.py -q`
-Expected: 8 passed.
+Expected: 9 passed.
 
 - [ ] **Step 5: Commit**
 
@@ -2287,7 +2489,19 @@ git commit -m "feat(session-archive): Claude deletion protocol with no-replace r
 
 **Interfaces:**
 - Consumes: Task 10's `Context`, `evaluate`, `preserver`, `_mirror_sha`; `quarantine.release`, `remove_empty_dirs`.
-- Produces: `run_codex_delete(codex_bin, home, thread_id, timeout) -> bool`, `delete_codex_unit(unit, ctx) -> str`. Outcomes: `pruned`, `kept:busy`, `kept:vanished`, `kept:<reason>`, `failed:delete`, `failed:changed`, `failed:delete-quarantined`, `failed:changed-quarantined`, `failed:release`. The `stub_codex` fixture returns the stub's path. It honours `STUB_CODEX_MODE` (`ok`, `fail`, `unlink-fail`, `hang`, `ignore-lock`) and `STUB_CODEX_VERSION`, and logs argv plus `CODEX_HOME` to `$STUB_CODEX_LOG`.
+- Produces: `run_codex_delete(codex_bin, home, thread_id, timeout) -> bool`, `delete_codex_unit(unit, ctx) -> str`. Outcomes: `pruned`, `kept:busy`, `kept:vanished`, `kept:<reason>`, `failed:uninspectable`, `failed:delete`, `failed:changed`, `failed:delete-quarantined`, `failed:changed-quarantined`, `failed:writer-live-quarantined`, `failed:uninspectable-quarantined`, `failed:release`.
+- The `stub_codex` fixture returns the stub's path. The stub honours `STUB_CODEX_MODE`:
+  - `ok`;
+  - `fail`;
+  - `unlink-fail`;
+  - `hang`;
+  - `ignore-lock`;
+  - `writer-closes`: `exec` closes its rollout at once;
+  - `writer-during-delete`: `delete` leaves a detached writer holding the unlinked rollout, which appends after 0.5 s and exits after 2 s. This is the early-lock-release case.
+
+  It also honours `STUB_CODEX_VERSION` and `STUB_CODEX_WRITER_SECONDS` (how long `exec` holds its lock and rollout, default 1). It logs argv plus `CODEX_HOME` to `$STUB_CODEX_LOG`.
+
+The protocol's safety after `codex delete` rests on the freeze check (spec §3.4.3 step 3): no path, and no process holding the linked inode. It does not rest on how long `codex delete` holds the writer lock. The `writer-during-delete` test pins that: a delete that lets a writer in still loses nothing.
 
 - [ ] **Step 1: Write the failing tests.** Append `STUB_CODEX` to `testing.py`:
 
@@ -2297,7 +2511,9 @@ STUB_CODEX = r'''#!/usr/bin/env python3
 
 STUB_CODEX_MODE: ok (default), fail (exit 1, touch nothing), unlink-fail (unlink, then
 exit 1), hang (sleep past any timeout), ignore-lock (resume and delete ignore the writer
-lock). STUB_CODEX_LOG, when set, receives one JSON line per call."""
+lock), writer-closes (exec closes its rollout at once), writer-during-delete (delete leaves
+a detached writer appending to the unlinked rollout). STUB_CODEX_LOG, when set, receives
+one JSON line per call."""
 import fcntl, json, os, sqlite3, sys, time, uuid
 from pathlib import Path
 
@@ -2343,11 +2559,20 @@ elif args[:1] == ["exec"] and "resume" in args:
     sys.exit("Error: 401 Unauthorized")
 elif args[:1] == ["exec"]:
     tid = str(uuid.uuid4())
+    lock = home / "thread-writer-locks" / f"{tid}.lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock_fd = os.open(lock, os.O_RDWR | os.O_CREAT)
+    fcntl.flock(lock_fd, fcntl.LOCK_EX)          # a writer holds its lock while it runs
     day = home / "sessions" / "2026" / "01" / "01"
     day.mkdir(parents=True, exist_ok=True)
-    (day / f"rollout-2026-01-01T00-00-00-{tid}.jsonl").write_text('{"type":"session_meta"}\n')
+    rollout = open(day / f"rollout-2026-01-01T00-00-00-{tid}.jsonl", "a")
+    rollout.write('{"type":"session_meta"}\n')
+    rollout.flush()
+    if mode == "writer-closes":
+        rollout.close()
     with db() as conn:
         conn.execute("INSERT INTO threads VALUES (?)", (tid,))
+    time.sleep(float(os.environ.get("STUB_CODEX_WRITER_SECONDS", "1")))
     sys.exit("Error: 401 Unauthorized")
 elif args[:1] == ["archive"]:
     tid = args[1]
@@ -2361,6 +2586,21 @@ elif args[:2] == ["delete", "--force"]:
         time.sleep(60)
     if mode == "fail" or locked(tid):
         sys.exit("Error: failed to delete session")
+    if mode == "writer-during-delete":
+        handles = [open(path, "ab") for path in rollouts(tid)]
+        ready_r, ready_w = os.pipe()
+        if os.fork() == 0:
+            devnull = os.open(os.devnull, os.O_RDWR)
+            for stream in (0, 1, 2):
+                os.dup2(devnull, stream)
+            os.write(ready_w, b"1")
+            time.sleep(0.5)
+            for handle in handles:
+                handle.write(b'{"resumed":1}\n')
+                handle.flush()
+            time.sleep(1.5)
+            os._exit(0)
+        os.read(ready_r, 1)
     for path in rollouts(tid):
         path.unlink()
     with db() as conn:
@@ -2406,10 +2646,10 @@ import pytest
 
 from session_archive import config, prune
 from session_archive.capture import capture_run, hash_file, mirror_path
-from session_archive.inputs import codex_units, open_inodes
+from session_archive.inputs import codex_units
 from session_archive.prune import Context, Hooks, delete_codex_unit, evaluate
 from session_archive.quarantine import QUARANTINE
-from session_archive.testing import TID, codex_rollout, obs_for
+from session_archive.testing import TID, codex_rollout, lenient_open_inodes, obs_for
 
 
 @pytest.fixture
@@ -2418,7 +2658,7 @@ def world(home, archive, manifest, stub_codex):
     rollout = codex_rollout(src.root)
     capture_run(archive, manifest, [src])
     (unit,) = codex_units(src)
-    ctx = Context(archive, manifest, obs_for(rollout), open_inodes, time.time_ns(), "run1",
+    ctx = Context(archive, manifest, obs_for(rollout), lenient_open_inodes, time.time_ns(), "run1",
                   codex_bin=str(stub_codex))
     assert evaluate(unit, ctx, set()) is None
     return src, unit, rollout, ctx
@@ -2494,6 +2734,14 @@ def test_nonzero_exit_without_unlink_releases_link(world, monkeypatch):
     assert hash_file(rollout) == before and not link(src, rollout).exists()
 
 
+def test_writer_alive_after_delete_keeps_link(world, monkeypatch):
+    src, unit, rollout, ctx = world
+    monkeypatch.setenv("STUB_CODEX_MODE", "writer-during-delete")
+    assert delete_codex_unit(unit, ctx) == "failed:writer-live-quarantined"
+    time.sleep(2.5)                                  # the writer appends, then exits
+    assert link(src, rollout).read_bytes().endswith(b'{"resumed":1}\n')
+
+
 def test_timeout_is_a_failed_delete(world, monkeypatch):
     src, unit, rollout, ctx = world
     monkeypatch.setenv("STUB_CODEX_MODE", "hang")
@@ -2522,7 +2770,7 @@ def run_codex_delete(codex_bin: str, home: Path, thread_id: str, timeout: float)
 
 
 def delete_codex_unit(unit: Unit, ctx: Context) -> str:
-    """Spec §3.4.3: lock and link, delete, re-verify, release."""
+    """Spec §3.4.3: lock and link, delete, freeze check, re-verify, release."""
     rollout, relpath, home = unit.paths[0], unit.files[0], unit.source.home
     stop = home / QUARANTINE
     qdir = quarantine_dir(home, ctx.run_id)
@@ -2537,7 +2785,10 @@ def delete_codex_unit(unit: Unit, ctx: Context) -> str:
             return "kept:busy"
         if not os.path.lexists(rollout):
             return "kept:vanished"
-        reason = evaluate(unit, ctx, ctx.held())
+        try:
+            reason = evaluate(unit, ctx, ctx.held())
+        except InspectionFailed:
+            return "failed:uninspectable"
         if reason:
             return f"kept:{reason}"
         qdir.mkdir(parents=True, exist_ok=True)
@@ -2548,10 +2799,15 @@ def delete_codex_unit(unit: Unit, ctx: Context) -> str:
     deleted = run_codex_delete(ctx.codex_bin, home, unit.thread_id, ctx.codex_timeout)
     if not deleted or os.path.lexists(rollout):
         outcome = "failed:delete"
-    elif hash_file(link) != _mirror_sha(ctx, unit.source, relpath):
-        outcome = "failed:changed"
     else:
-        outcome = "pruned"
+        # Freeze check: no path is left, so only an open descriptor could still write.
+        try:
+            holders = ctx.held()
+        except InspectionFailed:
+            return "failed:uninspectable-quarantined"
+        if inodes([link]) & holders:
+            return "failed:writer-live-quarantined"
+        outcome = "failed:changed" if hash_file(link) != _mirror_sha(ctx, unit.source, relpath) else "pruned"
     if not release(link, rollout, preserver(ctx, unit.source, relpath)):
         return "failed:release" if outcome == "pruned" else f"{outcome}-quarantined"
     remove_empty_dirs(qdir, stop)
@@ -2561,7 +2817,7 @@ def delete_codex_unit(unit: Unit, ctx: Context) -> str:
 - [ ] **Step 4: Run to verify pass**
 
 Run: `uv run -q --with pytest pytest tools/test_session_archive_prune_codex.py -q`
-Expected: 7 passed.
+Expected: 8 passed.
 
 - [ ] **Step 5: Commit**
 
@@ -2581,32 +2837,49 @@ git commit -m "feat(session-archive): Codex deletion protocol behind the writer 
 - Test: `tools/test_session_archive_probe.py`
 
 **Interfaces:**
-- Consumes: `inputs.ROLLOUT_RE`; `Manifest.record_probe`.
-- Produces: `CodexUnavailable`, `codex_version(codex_bin) -> str`, `ProbeResult(version, checks)` with `.passed`, `probe_codex(codex_bin, workdir) -> ProbeResult`. The check keys are `thread_created`, `resume_refused_while_locked`, `delete_refused_while_locked`, `archive_moved`, `archived_delete_removed_file`, `archived_delete_removed_row`. Also `cli.CODEX` and `cli.cmd_probe_codex`.
+- Consumes: `inputs.ROLLOUT_RE`, `inputs.open_inodes`, `inputs.InspectionFailed`; `Manifest.record_probe`.
+- Produces: `CodexUnavailable`, `codex_version(codex_bin) -> str`, `ProbeResult(version, checks)` with `.passed`, `probe_codex(codex_bin, workdir, held) -> ProbeResult`, where `held` is the same open-inode callable prune uses. The check keys:
+  - `thread_created`;
+  - `writer_holds_lock` and `writer_holds_rollout_open`, both sampled while `exec` is alive; they are the evidence the freeze check rests on;
+  - `resume_refused_while_locked`;
+  - `delete_refused_while_locked`;
+  - `archive_moved`;
+  - `archived_delete_removed_file`;
+  - `archived_delete_removed_row`.
+
+  Also `cli.CODEX` and `cli.cmd_probe_codex`.
 
 - [ ] **Step 1: Write the failing tests** in `tools/test_session_archive_probe.py`:
 
 ```python
-"""probe-codex checks the lock and delete behaviour the protocol relies on (spec §5)."""
+"""probe-codex checks the Codex behaviour the protocol relies on (spec §3.4.3, §5)."""
 import json
 
 from session_archive.manifest import Manifest
 from session_archive.probe import codex_version, probe_codex
-from session_archive.testing import run_tool, write_config
+from session_archive.testing import lenient_open_inodes, run_tool, uninspectable_comms, write_config
 
 
 def test_probe_passes_against_conforming_codex(stub_codex, tmp_path):
-    result = probe_codex(str(stub_codex), tmp_path / "work")
+    result = probe_codex(str(stub_codex), tmp_path / "work", lenient_open_inodes)
     assert result.passed, result.checks
     assert result.version == "codex-cli 0.0.0-stub"
 
 
 def test_probe_fails_when_lock_is_ignored(stub_codex, tmp_path, monkeypatch):
     monkeypatch.setenv("STUB_CODEX_MODE", "ignore-lock")
-    result = probe_codex(str(stub_codex), tmp_path / "work")
+    result = probe_codex(str(stub_codex), tmp_path / "work", lenient_open_inodes)
     assert not result.passed
     assert result.checks["resume_refused_while_locked"] is False
     assert result.checks["delete_refused_while_locked"] is False
+
+
+def test_probe_fails_when_writer_does_not_hold_its_rollout(stub_codex, tmp_path, monkeypatch):
+    monkeypatch.setenv("STUB_CODEX_MODE", "writer-closes")
+    result = probe_codex(str(stub_codex), tmp_path / "work", lenient_open_inodes)
+    assert not result.passed
+    assert result.checks["writer_holds_lock"] is True
+    assert result.checks["writer_holds_rollout_open"] is False
 
 
 def test_codex_version(stub_codex, monkeypatch):
@@ -2615,7 +2888,7 @@ def test_codex_version(stub_codex, monkeypatch):
 
 
 def test_probe_command_records_passing_version(home, archive, stub_codex):
-    write_config(home, archive)
+    write_config(home, archive, uninspectable_ok=uninspectable_comms())
     result = run_tool("probe-codex", home=home)
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout)["passed"] is True
@@ -2638,6 +2911,7 @@ import fcntl
 import os
 import sqlite3
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -2680,7 +2954,31 @@ def _thread_rows(db: Path, thread_id: str) -> int | None:
         conn.close()
 
 
-def probe_codex(codex_bin: str, workdir: Path) -> ProbeResult:
+def _lock_held(path: Path) -> bool:
+    try:
+        fd = os.open(path, os.O_RDWR)
+    except FileNotFoundError:
+        return False
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return True
+    finally:
+        os.close(fd)
+    return False
+
+
+def _await_rollout(home: Path, writer: subprocess.Popen, timeout: float = 60) -> Path | None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        found = sorted((home / "sessions").rglob("rollout-*.jsonl")) if (home / "sessions").is_dir() else []
+        if found or writer.poll() is not None:
+            return found[0] if len(found) == 1 and ROLLOUT_RE.match(found[0].name) else None
+        time.sleep(0.05)
+    return None
+
+
+def probe_codex(codex_bin: str, workdir: Path, held) -> ProbeResult:
     home, cwd = workdir / "home", workdir / "cwd"
     home.mkdir(parents=True)
     cwd.mkdir()
@@ -2692,13 +2990,29 @@ def probe_codex(codex_bin: str, workdir: Path) -> ProbeResult:
                               capture_output=True, text=True, timeout=180)
 
     version = codex_version(codex_bin)
-    codex("exec", "--skip-git-repo-check", PROMPT)       # fails at auth, after creating the thread
-    rollouts = sorted((home / "sessions").rglob("rollout-*.jsonl"))
-    checks = {"thread_created": len(rollouts) == 1 and bool(ROLLOUT_RE.match(rollouts[0].name))}
-    if not checks["thread_created"]:
+    # exec fails at auth, but first creates the thread and writes it while it retries.
+    writer = subprocess.Popen([codex_bin, "exec", "--skip-git-repo-check", PROMPT], cwd=cwd, env=env,
+                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        rollout = _await_rollout(home, writer)
+        checks = {"thread_created": rollout is not None}
+        if rollout is not None:
+            thread_id = ROLLOUT_RE.match(rollout.name).group(1)
+            time.sleep(0.2)
+            info = os.stat(rollout)
+            lock_held = _lock_held(home / "thread-writer-locks" / f"{thread_id}.lock")
+            rollout_open = (info.st_dev, info.st_ino) in held()
+            alive = writer.poll() is None
+            checks["writer_holds_lock"] = alive and lock_held
+            checks["writer_holds_rollout_open"] = alive and rollout_open
+    finally:
+        try:
+            writer.wait(timeout=180)
+        except subprocess.TimeoutExpired:
+            writer.kill()
+            writer.wait()
+    if rollout is None:
         return ProbeResult(version, checks)
-    rollout = rollouts[0]
-    thread_id = ROLLOUT_RE.match(rollout.name).group(1)
     lock = home / "thread-writer-locks" / f"{thread_id}.lock"
     lock.parent.mkdir(exist_ok=True)
     fd = os.open(lock, os.O_RDWR | os.O_CREAT, 0o600)
@@ -2719,14 +3033,14 @@ def probe_codex(codex_bin: str, workdir: Path) -> ProbeResult:
     return ProbeResult(version, checks)
 ```
 
-In `cli.py`, add `import tempfile`, `from . import probe`, `CODEX = "codex"`, and:
+In `cli.py`, add `import tempfile`, `from . import inputs, probe`, `CODEX = "codex"`, and:
 
 ```python
 def cmd_probe_codex(cfg, table, args) -> int:
     try:
         with tempfile.TemporaryDirectory(prefix="session-archive-probe-") as workdir:
-            result = probe.probe_codex(CODEX, Path(workdir))
-    except probe.CodexUnavailable as error:
+            result = probe.probe_codex(CODEX, Path(workdir), lambda: inputs.open_inodes(allow=cfg.uninspectable_ok))
+    except (probe.CodexUnavailable, inputs.InspectionFailed) as error:
         print(f"session-archive: {error}", file=sys.stderr)
         return 1
     if result.passed:
@@ -2746,7 +3060,7 @@ COMMANDS = {"capture": cmd_capture, "promote": cmd_promote, "probe-codex": cmd_p
 - [ ] **Step 4: Run to verify pass**
 
 Run: `uv run -q --with pytest pytest tools/test_session_archive_probe.py -q`
-Expected: 4 passed.
+Expected: 5 passed.
 
 - [ ] **Step 5: Commit**
 
@@ -2765,27 +3079,30 @@ git commit -m "feat(session-archive): probe-codex records the Codex versions tha
 - Test: `tools/test_session_archive_prune_run.py`
 
 **Interfaces:**
-- Consumes: everything from Tasks 7–12; `inputs.claude_units`, `codex_units`, `load_obs_state`, `open_inodes`, `ObsUnavailable`; `quarantine.leftovers`; `probe.codex_version`, `CodexUnavailable`.
-- Produces: `repair_archive(unit, ctx) -> str` (`kept:archive-repaired` or `failed:archive-repair`), `prune_run(ctx, sources, apply, codex_probed) -> tuple[dict, bool]`. The report is `{source: {"totals": {outcome: n}, "units": [{"unit", "outcome"}]}}`, listing every unit except `kept:active` ones. When `--apply` meets an unprobed Codex version, the report also carries `codex_gate`. Also `cli.cmd_prune`.
+- Consumes: everything from Tasks 7–12; `inputs.claude_units`, `codex_units`, `load_obs_state`, `open_inodes`, `ObsUnavailable`, `InspectionFailed`; `quarantine.leftovers`; `probe.codex_version`, `CodexUnavailable`.
+- Produces: `repair_archive(unit, ctx) -> str` (`kept:archive-repaired` or `failed:archive-repair`), and `prune_run(ctx, sources, apply, codex_probed, report) -> bool`, which fills the caller's `report` as it goes, so an error still leaves what was done. The report is `{source: {"totals": {outcome: n}, "units": [{"unit", "outcome"}]}}`, listing every unit except `kept:active` ones, plus `errors` when phase two stopped.
+  - A live file prune cannot read is `failed:unreadable`.
+  - An unexpected `OSError` in phase two records `failed:io` for that unit, and `kept:stopped` for every unit after it.
+  - `cli.cmd_prune` records every expected failure as a failed run with the partial report: obs, inspection, read-back, leftovers, Codex, and any `OSError`. When `--apply` meets an unprobed Codex version, the report carries `codex_gate`.
 
 - [ ] **Step 1: Write the failing tests** in `tools/test_session_archive_prune_run.py`:
 
 ```python
 """The prune run: two phases, dry run, gates, leftovers, repair and divergence (spec §3.4)."""
 import json
+import os
 import sys
 import time
 
 import pytest
 
-from session_archive import config
+from session_archive import config, prune
 from session_archive.capture import capture_run, hash_file, mirror_path, promote
-from session_archive.inputs import open_inodes
 from session_archive.manifest import Manifest
 from session_archive.prune import Context, LeftoverQuarantine, prune_run
 from session_archive.quarantine import QUARANTINE
-from session_archive.testing import (SID, age, claude_session, codex_rollout, obs_for, run_tool,
-                                     write, write_config)
+from session_archive.testing import (SID, age, claude_session, codex_rollout, lenient_open_inodes, obs_for,
+                                     run_tool, uninspectable_comms, write, write_config)
 
 OTHER = "22222222-2222-4333-8444-555555555555"
 
@@ -2800,7 +3117,14 @@ def src(table, name):
 
 
 def ctx_for(archive, manifest, paths, codex_bin="codex"):
-    return Context(archive, manifest, obs_for(*paths), open_inodes, time.time_ns(), "run1", codex_bin=codex_bin)
+    return Context(archive, manifest, obs_for(*paths), lenient_open_inodes, time.time_ns(), "run1",
+                   codex_bin=codex_bin)
+
+
+def run_prune(ctx, table, apply, codex_probed=True):
+    report = {}
+    ok = prune_run(ctx, table, apply, codex_probed, report)
+    return report, ok
 
 
 def transcripts(root, sid=SID):
@@ -2811,7 +3135,7 @@ def test_dry_run_writes_nothing(table, archive, manifest):
     claude = src(table, "claude")
     jsonl = claude_session(claude.root)
     capture_run(archive, manifest, table)
-    report, ok = prune_run(ctx_for(archive, manifest, transcripts(claude.root)), table, False, True)
+    report, ok = run_prune(ctx_for(archive, manifest, transcripts(claude.root)), table, False)
     assert ok and report["claude"]["totals"] == {"eligible": 1}
     assert jsonl.exists() and not (claude.home / QUARANTINE).exists()
 
@@ -2822,7 +3146,7 @@ def test_apply_prunes_only_eligible(table, archive, manifest):
     claude_session(claude.root, age_days=1, sid=OTHER)
     capture_run(archive, manifest, table)
     paths = transcripts(claude.root) + transcripts(claude.root, OTHER)
-    report, ok = prune_run(ctx_for(archive, manifest, paths), table, True, True)
+    report, ok = run_prune(ctx_for(archive, manifest, paths), table, True)
     assert ok
     assert report["claude"]["totals"] == {"pruned": 1, "kept:active": 1}
     assert report["claude"]["units"] == [{"unit": f"-p/{SID}", "outcome": "pruned"}]
@@ -2832,14 +3156,14 @@ def test_apply_prunes_only_eligible(table, archive, manifest):
 def test_unindexed_is_kept_with_reason(table, archive, manifest):
     claude_session(src(table, "claude").root)
     capture_run(archive, manifest, table)
-    report, _ = prune_run(ctx_for(archive, manifest, []), table, True, True)
+    report, _ = run_prune(ctx_for(archive, manifest, []), table, True)
     assert report["claude"]["totals"] == {"kept:unindexed": 1}
 
 
 def test_leftover_quarantine_refuses(table, archive, manifest):
     write(src(table, "claude").home / QUARANTINE / "old" / "f", b"x")
     with pytest.raises(LeftoverQuarantine):
-        prune_run(ctx_for(archive, manifest, []), table, True, True)
+        run_prune(ctx_for(archive, manifest, []), table, True)
 
 
 def test_damaged_mirror_is_repaired_only_with_apply(table, archive, manifest):
@@ -2848,10 +3172,10 @@ def test_damaged_mirror_is_repaired_only_with_apply(table, archive, manifest):
     capture_run(archive, manifest, table)
     mirrored = mirror_path(archive, "claude", f"-p/{SID}.jsonl")
     mirrored.write_bytes(b"{")
-    report, _ = prune_run(ctx_for(archive, manifest, transcripts(claude.root)), table, False, True)
+    report, _ = run_prune(ctx_for(archive, manifest, transcripts(claude.root)), table, False)
     assert report["claude"]["totals"] == {"kept:archive-damaged": 1}
     assert mirrored.read_bytes() == b"{"
-    report, ok = prune_run(ctx_for(archive, manifest, transcripts(claude.root)), table, True, True)
+    report, ok = run_prune(ctx_for(archive, manifest, transcripts(claude.root)), table, True)
     assert ok and report["claude"]["totals"] == {"kept:archive-repaired": 1}
     assert hash_file(mirrored) == manifest.mirror("claude", f"-p/{SID}.jsonl").sha256
 
@@ -2863,11 +3187,11 @@ def test_diverged_file_stays_until_promoted(table, archive, manifest):
     jsonl.write_bytes(b'{"rewritten":1}\n')
     age(jsonl, 40)
     capture_run(archive, manifest, table)
-    report, _ = prune_run(ctx_for(archive, manifest, transcripts(claude.root)), table, True, True)
+    report, _ = run_prune(ctx_for(archive, manifest, transcripts(claude.root)), table, True)
     assert report["claude"]["totals"] == {"kept:diverged": 1} and jsonl.exists()
     old = manifest.mirror("claude", f"-p/{SID}.jsonl")
     promote(archive, manifest, "claude", f"-p/{SID}.jsonl")
-    report, ok = prune_run(ctx_for(archive, manifest, transcripts(claude.root)), table, True, True)
+    report, ok = run_prune(ctx_for(archive, manifest, transcripts(claude.root)), table, True)
     assert ok and report["claude"]["totals"] == {"pruned": 1}
     assert any(v.sha256 == old.sha256 and v.location.startswith("versions/")
                for v in manifest.rows("claude", f"-p/{SID}.jsonl"))
@@ -2877,7 +3201,7 @@ def test_unprobed_codex_is_kept_and_fails_the_run(table, archive, manifest, stub
     codex = src(table, "codex")
     rollout = codex_rollout(codex.root)
     capture_run(archive, manifest, table)
-    report, ok = prune_run(ctx_for(archive, manifest, [rollout], str(stub_codex)), table, True, False)
+    report, ok = run_prune(ctx_for(archive, manifest, [rollout], str(stub_codex)), table, True, codex_probed=False)
     assert not ok and report["codex"]["totals"] == {"kept:codex-unprobed": 1}
     assert rollout.exists()
 
@@ -2885,7 +3209,7 @@ def test_unprobed_codex_is_kept_and_fails_the_run(table, archive, manifest, stub
 def test_deferred_sources_are_not_pruned(table, archive, manifest):
     rollout = codex_rollout(src(table, "codex-archived").root)
     capture_run(archive, manifest, table)
-    report, _ = prune_run(ctx_for(archive, manifest, [rollout]), table, True, True)
+    report, _ = run_prune(ctx_for(archive, manifest, [rollout]), table, True)
     assert "codex-archived" not in report and rollout.exists()
 
 
@@ -2899,17 +3223,62 @@ def fake_obs(tmp_path, payload=None, exit_code=0):
 
 def test_prune_command_dry_run_and_obs_failure(home, archive, tmp_path, stub_codex):
     claude_session(home / ".claude" / "projects")
-    write_config(home, archive, fake_obs(tmp_path, {"schema": 1, "files": []}))
+    write_config(home, archive, fake_obs(tmp_path, {"schema": 1, "files": []}), uninspectable_comms())
     assert run_tool("capture", home=home).returncode == 0
     result = run_tool("prune", home=home)
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout)["claude"]["totals"] == {"kept:unindexed": 1}
-    write_config(home, archive, fake_obs(tmp_path, {}, exit_code=3))
+    write_config(home, archive, fake_obs(tmp_path, {}, exit_code=3), uninspectable_comms())
     result = run_tool("prune", "--apply", home=home)
     assert result.returncode == 1 and "obs index-state exited 3" in json.loads(result.stdout)["error"]
     opened = Manifest.open(archive)
     assert opened.last_run("prune").mode == "apply" and not opened.last_run("prune").ok
     opened.close()
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads unreadable files")
+def test_unreadable_transcript_fails_the_run(table, archive, manifest):
+    claude = src(table, "claude")
+    jsonl = claude_session(claude.root)
+    capture_run(archive, manifest, table)
+    jsonl.chmod(0)
+    try:
+        report, ok = run_prune(ctx_for(archive, manifest, transcripts(claude.root)), table, False)
+    finally:
+        jsonl.chmod(0o600)
+    assert not ok and report["claude"]["totals"] == {"failed:unreadable": 1}
+
+
+def test_io_error_stops_phase_two_and_keeps_the_report(table, archive, manifest, monkeypatch):
+    claude = src(table, "claude")
+    claude_session(claude.root)
+    claude_session(claude.root, sid=OTHER)
+    capture_run(archive, manifest, table)
+
+    def broken(unit, ctx):
+        raise OSError(5, "Input/output error")
+
+    monkeypatch.setattr(prune, "delete_claude_unit", broken)
+    report = {}
+    paths = transcripts(claude.root) + transcripts(claude.root, OTHER)
+    assert not prune_run(ctx_for(archive, manifest, paths), table, True, True, report)
+    assert report["claude"]["totals"] == {"failed:io": 1, "kept:stopped": 1}
+    assert "Input/output error" in report["errors"][0]
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads unreadable files")
+def test_filesystem_failure_is_recorded_and_status_turns_red(home, archive, tmp_path):
+    jsonl = claude_session(home / ".claude" / "projects")
+    write_config(home, archive, fake_obs(tmp_path, {"schema": 1, "files": []}), uninspectable_comms())
+    assert run_tool("capture", home=home).returncode == 0
+    assert run_tool("prune", home=home).returncode == 0
+    (home / ".claude" / "projects" / "-p").chmod(0)
+    try:
+        result = run_tool("prune", home=home)
+    finally:
+        (home / ".claude" / "projects" / "-p").chmod(0o700)
+    assert result.returncode == 1 and "PermissionError" in json.loads(result.stdout)["error"]
+    assert run_tool("status", home=home).returncode == 1
 ```
 
 - [ ] **Step 2: Run to verify failure**
@@ -2917,7 +3286,7 @@ def test_prune_command_dry_run_and_obs_failure(home, archive, tmp_path, stub_cod
 Run: `uv run -q --with pytest pytest tools/test_session_archive_prune_run.py -q`
 Expected: `ImportError: cannot import name 'prune_run'`.
 
-- [ ] **Step 3: Implement.** In `prune.py`, change the inputs import to `from .inputs import Unit, claude_units, codex_units, tail_has_newline` and the quarantine import to also import `leftovers`, then append:
+- [ ] **Step 3: Implement.** In `prune.py`, change the inputs import to `from .inputs import InspectionFailed, Unit, claude_units, codex_units, tail_has_newline` and the quarantine import to also import `leftovers`, then append:
 
 ```python
 def repair_archive(unit: Unit, ctx: Context) -> str:
@@ -2942,9 +3311,13 @@ def _precheck(unit: Unit, ctx: Context, held) -> str | None:
         return evaluate(unit, ctx, held)
     except FileNotFoundError:
         return "vanished"
+    except OSError:
+        return "unreadable"
 
 
 def _decide(unit: Unit, reason: str | None, ctx: Context, apply: bool, codex_probed: bool) -> str:
+    if reason == "unreadable":
+        return "failed:unreadable"
     if reason == "archive-damaged":
         return repair_archive(unit, ctx) if apply else "kept:archive-damaged"
     if reason:
@@ -2957,9 +3330,11 @@ def _decide(unit: Unit, reason: str | None, ctx: Context, apply: bool, codex_pro
     return delete_claude_unit(unit, ctx) if unit.source.kind == "claude" else delete_codex_unit(unit, ctx)
 
 
-def prune_run(ctx: Context, sources, apply: bool, codex_probed: bool) -> tuple[dict, bool]:
-    """Phase one pre-checks every unit, reading the archive back, before anything is deleted;
-    ArchiveUnreadable stops the run there. Phase two applies the protocols."""
+def prune_run(ctx: Context, sources, apply: bool, codex_probed: bool, report: dict) -> bool:
+    """Fill `report` as the run goes, so a caller that catches an error keeps what was done.
+    Phase one pre-checks every unit, reading the archive back, before anything is deleted:
+    ArchiveUnreadable, InspectionFailed and unit discovery errors stop the run there. Phase
+    two applies the protocols; an unexpected OSError stops it, and later units are kept."""
     left = leftovers([source.home for source in sources])
     if left:
         raise LeftoverQuarantine("quarantine not empty: " + ", ".join(str(path) for path in left))
@@ -2968,36 +3343,47 @@ def prune_run(ctx: Context, sources, apply: bool, codex_probed: bool) -> tuple[d
     plan = [(unit, _precheck(unit, ctx, held))
             for source in pruned
             for unit in (claude_units(source) if source.kind == "claude" else codex_units(source))]
-    report = {source.name: {"totals": {}, "units": []} for source in pruned}
-    ok = True
+    for source in pruned:
+        report[source.name] = {"totals": {}, "units": []}
+    ok, stopped = True, False
     for unit, reason in plan:
-        outcome = _decide(unit, reason, ctx, apply, codex_probed)
+        if stopped:
+            outcome = "kept:stopped"
+        else:
+            try:
+                outcome = _decide(unit, reason, ctx, apply, codex_probed)
+            except OSError as error:
+                outcome, stopped = "failed:io", True
+                report.setdefault("errors", []).append(f"{unit.source.name}/{unit.key}: {error}")
         if outcome.startswith("failed") or outcome == "kept:codex-unprobed":
             ok = False
         entry = report[unit.source.name]
         entry["totals"][outcome] = entry["totals"].get(outcome, 0) + 1
         if outcome != "kept:active":
             entry["units"].append({"unit": unit.key, "outcome": outcome})
-    return report, ok
+    return ok
 ```
 
-In `cli.py`, add `import time`, `from . import inputs, prune`, and:
+In `cli.py`, add `import time`, `from . import prune`, and:
 
 ```python
 def cmd_prune(cfg, table, args) -> int:
     manifest = Manifest.open(cfg.archive_root)
     run_id, started = uuid.uuid4().hex, utc_now()
+    report = {}
     try:
         try:
             codex_probed = (not args.apply) or manifest.probe_passed(probe.codex_version(CODEX))
             ctx = prune.Context(cfg.archive_root, manifest, inputs.load_obs_state(cfg.obs_command),
-                                inputs.open_inodes, time.time_ns(), run_id, codex_bin=CODEX)
-            report, ok = prune.prune_run(ctx, table, args.apply, codex_probed)
+                                lambda: inputs.open_inodes(allow=cfg.uninspectable_ok), time.time_ns(),
+                                run_id, codex_bin=CODEX)
+            ok = prune.prune_run(ctx, table, args.apply, codex_probed, report)
             if not codex_probed:
                 report["codex_gate"] = "the installed codex has not passed probe-codex; run `session-archive probe-codex`"
-        except (inputs.ObsUnavailable, prune.ArchiveUnreadable, prune.LeftoverQuarantine,
-                probe.CodexUnavailable) as error:
-            report, ok = {"error": str(error)}, False
+        except (inputs.ObsUnavailable, inputs.InspectionFailed, prune.ArchiveUnreadable,
+                prune.LeftoverQuarantine, probe.CodexUnavailable, OSError) as error:
+            report["error"] = f"{type(error).__name__}: {error}"
+            ok = False
         manifest.record_run(Run(run_id, "prune", "apply" if args.apply else "dry-run", started, utc_now(), ok, report))
     finally:
         manifest.close()
@@ -3012,7 +3398,7 @@ COMMANDS = {"capture": cmd_capture, "promote": cmd_promote, "probe-codex": cmd_p
 - [ ] **Step 4: Run to verify pass**
 
 Run: `uv run -q --with pytest pytest tools/test_session_archive_prune_run.py -q`
-Expected: 9 passed.
+Expected: 12 passed.
 
 - [ ] **Step 5: Commit**
 
@@ -3349,9 +3735,9 @@ Blocked until `obs-0bc168` (index state) lands, and, for Step 3, until `obs-de84
 - Test: `tools/test_session_archive_units.py` (the prune `ExecStart` expectation gains `--apply`)
 
 - [ ] **Step 1: Contract check.** Run `python3 ~/d/obs/obs.py --json index-state`. Confirm it matches the contract in Global Constraints, fed through `inputs.load_obs_state`. Any difference means fixing obs or amending the contract in both places before continuing.
-- [ ] **Step 2: Dry run.** Run `~/d/tack/tools/session-archive prune` and save the report. Review it with the user: totals per source, every `kept:` reason other than `active`, and the eligible units. This is a review gate: park with `--waiting-on user --reason review`.
+- [ ] **Step 2: Dry run.** Run `~/d/tack/tools/session-archive prune` and save the report. If it stops with `InspectionFailed`, it names the processes it could not inspect. On titan that is expected to be `(sd-pam)`, which is non-dumpable, and `systemd`, the user manager, whose descriptors can be listed but not followed. Whether to list a process in `uninspectable_ok` is the user's decision, never the agent's. Review it with the user: totals per source, every `kept:` reason other than `active`, and the eligible units. This is a review gate: park with `--waiting-on user --reason review`.
 - [ ] **Step 3: Gate.** Confirm `obs-de84cb` is done and its note records a re-read of this archive with no duplicate sessions and no live file marked missing. If it isn't done, stop here.
-- [ ] **Step 4: Probe and first apply.** Run `session-archive probe-codex` (expect exit 0), then `session-archive prune --apply` once by hand. Check three things:
+- [ ] **Step 4: Probe and first apply.** Run `~/d/tack/tools/session-archive probe-codex` (expect exit 0), then `~/d/tack/tools/session-archive prune --apply` once by hand. Check three things:
   - obs still lists the pruned files, as missing with their rows kept;
   - `codex resume --all` no longer lists the deleted threads;
   - `status` exits 0.
