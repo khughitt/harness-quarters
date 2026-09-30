@@ -1,6 +1,6 @@
 # Session archive: daily capture, verified prune
 
-Status: revised after review rounds 1–3 (codex); draft for review. Task: `tack-401088` (goal `tack-1a3278`: keep agent session
+Status: approved 2026-09-30 after review rounds 1–4 (codex, then the user). Task: `tack-401088` (goal `tack-1a3278`: keep agent session
 stores bounded without losing what obs can re-parse). Policy: the Decision section of
 `docs/notes/2026-09-29-session-store-retention-brief.md`, adopted 2026-09-30.
 
