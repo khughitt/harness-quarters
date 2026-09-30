@@ -1,13 +1,15 @@
 ---
 id: tack-e3cef2
 title: "Find when Codex multi-agent V2 evicts finished children at the thread limit, and set the local remedy"
-status: todo
+status: doing
 priority: 2
 size: s
 complexity: mid
 process: direct
+owner: main
 created: 2026-09-27T14:55:57Z
-updated: 2026-09-29T20:58:14Z
+updated: 2026-09-30T14:09:45Z
+started: 2026-09-30T14:09:45Z
 depends: []
 tags: [feedback, friction, "from:beliefs"]
 agent: codex
@@ -30,3 +32,5 @@ The Codex skill reference says finished agents are evicted when slots are needed
 ## Notes
 
 - 2026-09-29T20:58:14Z (main): scope: scoped; confirmed recurring (8 sessions, 5 projects, 0.154–0.158) against the vendored superpowers codex-tools.md Lifecycle claim; rewritten as a bounded eviction probe on 0.159 with a local remedy (config or AGENTS.md line) and a draft upstream issue for the user; todo P2 s/mid/direct
+- 2026-09-30T14:09:45Z (main): started
+  provenance: {"harness_session":"claude-code:2f6c453d-6dcd-4c66-8605-2a894929ca8c","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
