@@ -1,6 +1,6 @@
 # Session archive: daily capture, verified prune
 
-Status: revised after review round 1 (codex); draft for review. Task: `tack-401088` (goal `tack-1a3278`: keep agent session
+Status: revised after review rounds 1 and 2 (codex); draft for review. Task: `tack-401088` (goal `tack-1a3278`: keep agent session
 stores bounded without losing what obs can re-parse). Policy: the Decision section of
 `docs/notes/2026-09-29-session-store-retention-brief.md`, adopted 2026-09-30.
 
@@ -94,9 +94,11 @@ is a table change.
 
 ### 3.3 Capture (daily)
 
-The archive layout is `<archive_root>/<source name>/<path relative to the live root>`,
-together with a manifest, `<archive_root>/manifest.sqlite`. The manifest has one row
-per archived file: source, relative path, size, `mtime_ns`, sha256 and `captured_at`.
+The archive layout is `<archive_root>/<source name>/<path relative to the live root>`
+(the mirror), `<archive_root>/versions/` for versions that do not extend the mirrored
+copy (below), and a manifest, `<archive_root>/manifest.sqlite`. The manifest has one
+row per archived file version: source, relative path, where it is stored (`mirror`, or
+its path under `versions/`), size, `mtime_ns`, sha256 and `captured_at`.
 
 For each regular file under each source root:
 
@@ -107,18 +109,26 @@ For each regular file under each source root:
    size and mtime intact is caught by prune's read-back (§3.4), which recaptures
    from the live file.
 2. Otherwise copy it to a temporary name in its archive directory, hashing while
-   copying, and `fsync` the copy.
+   copying, and `fsync` the copy. When a mirrored copy of size N already exists, also
+   take the digest of the first N bytes during the same pass.
 3. Stat the source again. If its size or `mtime_ns` changed during the copy, drop the
    temporary file and count the file as `busy`; the next run captures it.
-4. Rename the copy into place, `fsync` the directory, and upsert the manifest row.
+4. **Extension check.** The new version replaces the mirrored copy only when it extends
+   it: its size is at least N and its first-N-bytes digest equals the mirrored copy's
+   manifest sha256. Otherwise the new version has been rewritten, truncated, or
+   recreated as a fragment. It goes to
+   `versions/<source name>/<relative path>@<captured_at>`, the mirror is left untouched,
+   and the file is counted as `diverged`.
+5. Rename the copy into place, `fsync` the directory, and write the manifest row.
 
-A newer version replaces the archived one: transcripts are append-only, so the latest
-version contains the earlier ones. The archive never deletes a file because its source
+A mirrored copy is only ever replaced by a version that contains it, and nothing else
+in the archive is ever replaced. Transcripts are append-only, so `diverged` is rare and
+always worth a look. `status` lists each diverged file. The archive never deletes a file because its source
 disappeared. Claude's own cleanup and `codex delete` shrink the live store, not the
 archive.
 
 Output is one JSON line per run with counts per source: `scanned`, `copied`,
-`repaired`, `unchanged`, `busy`, `failed`. Any `failed` count makes the exit code 1.
+`repaired`, `diverged`, `unchanged`, `busy`, `failed`. Any `failed` count makes the exit code 1.
 
 Rejected alternative: monthly tarballs. The review permitted compression but did not
 require it. An uncompressed mirror is what `obs-de84cb` can alias to the original roots
@@ -158,31 +168,57 @@ and the deletion. The deletion protocols below close that window: a unit is remo
 only after its content has been frozen, meaning no writer can reach it any more, and
 verified again.
 
-#### 3.4.1 Deleting a Claude unit
+#### 3.4.1 Quarantine rules
+
+Both protocols below move or link a unit into
+`<harness home>/session-archive-quarantine/<run id>/`, on the same filesystem as the
+live root. Two rules govern everything that leaves the quarantine:
+
+- **Restore never replaces.** Moving a unit back to its live path uses
+  `renameat2(RENAME_NOREPLACE)`, called through `ctypes` because Python's `os.rename`
+  replaces an existing target. This works for both files and directories, and titan is
+  Linux. If the target exists, because a writer recreated the path meanwhile, the call
+  fails with `EEXIST`. Both copies are kept, and the unit is recorded as
+  `failed:recreated`.
+- **Release only what is preserved.** A quarantined file or link is removed only when
+  one of these holds:
+  - (a) its inode is still reachable at its live path, so the quarantine entry is a
+    second name for bytes Codex or Claude still holds;
+  - (b) the archive holds its exact bytes, verified by reading the archived copy back
+    and comparing sha256.
+
+  When neither holds, prune recaptures the quarantined content (§3.3 decides between
+  the mirror and `versions/`), verifies it by read-back, and only then removes the
+  entry. If the recapture fails, the entry stays, and the leftover rule (§3.4.4) stops
+  the next run.
+
+#### 3.4.2 Deleting a Claude unit
 
 Claude Code has no writer lock, so prune takes the unit out of reach by path:
 
 1. **Quarantine.** Rename the unit's files (`<id>.jsonl` and the `<id>/` directory) into
-   `<harness home>/session-archive-quarantine/<run id>/`, on the same filesystem, so
-   each rename is atomic. From here on, nothing can open these inodes through the paths
-   a harness knows.
+   the quarantine. Each rename is atomic. From here on, nothing can open these inodes
+   through the paths a harness knows.
 2. **Settle.** Scan `/proc/*/fd` for any process holding one of the quarantined inodes,
-   matched by device and inode because the path has changed. If one does, rename the
-   unit back and record `kept:open`.
+   matched by device and inode because the path has changed. If one does, restore the
+   unit and record `kept:open`, or `failed:recreated` if the restore meets a recreated
+   path.
 3. **Re-verify.** Once step 2 finds no holder, the content is frozen. No process has a
    descriptor, and none can get one: the old path is gone and the quarantine path is
    unknown to the harness. A writer that closed before step 2 has finished writing, so
    the hash sees its bytes. Condition 2 is checked again on the quarantined files. If
-   the content changed after the pre-check, recapture it into the archive, rename the
-   unit back, and record `kept:changed`.
-4. **Recreation check.** If a writer appending by path recreated `<id>.jsonl` between
-   steps 1 and 2, the original path now holds a fragment. Prune does not merge the two.
-   It records `failed:recreated`, leaves the quarantined unit in place and reports both
-   paths. The quarantined version is already archived, and the next capture archives the
-   fragment. A person resolves it.
-5. **Remove** the quarantined unit.
+   the content changed after the pre-check, recapture it and verify the recapture,
+   then restore the unit and record `kept:changed`, or `failed:recreated` if the
+   restore meets a recreated path.
+4. **Recreation check.** If `<id>.jsonl` or `<id>/` exists at its original path again,
+   a writer appending by path recreated it after step 1, and it holds a fragment. Record
+   `failed:recreated` and keep the quarantined unit for a person to merge. The next
+   capture stores the fragment under `versions/`, because it does not extend the
+   mirrored copy (§3.3), and the full transcript in the mirror stays as it is.
+5. **Remove** the quarantined unit. The release rule holds through (b): step 3 verified
+   the archive against the quarantined bytes.
 
-#### 3.4.2 Deleting a Codex unit
+#### 3.4.3 Deleting a Codex unit
 
 A live Codex writer holds an exclusive `flock` on
 `<CODEX_HOME>/thread-writer-locks/<thread id>.lock` for the life of the session.
@@ -193,29 +229,37 @@ itself excludes writers.
 
 1. **Lock and link.** Take the thread's lock non-blocking; if it is held, record
    `kept:busy`. While holding it, re-run the pre-check for this unit and hard-link the
-   rollout into `<CODEX_HOME>/session-archive-quarantine/<run id>/`. The link keeps the
-   inode alive after Codex unlinks the path.
+   rollout into the quarantine. The link keeps the inode alive if Codex unlinks the
+   path.
 2. **Delete.** Release the lock and run `codex delete --force <thread id>`, where the
-   thread id is the UUID in the rollout's filename. A failure, or a rollout path still
-   present afterwards, is recorded as `failed:delete`, and the link is removed.
-3. **Re-verify.** After a successful delete the inode is frozen. The path and the
+   thread id is the UUID in the rollout's filename, with a 120-second timeout. The
+   delete has succeeded only when it exits 0 and the rollout path is gone. Anything else
+   (a nonzero exit, a timeout, a kill, or the path still present) is `failed:delete`,
+   and the link is handled by the release rule, never removed outright:
+   - If the rollout path still resolves to the linked inode, (a) holds: remove the link.
+   - Otherwise, the delete may have unlinked the rollout and then failed, and the link
+     may hold the only copy of bytes a resume appended after step 1. The rule's
+     recapture path applies before the link goes. The report names the thread, because
+     Codex's own rows may be half-deleted.
+3. **Re-verify** (after a successful delete). The inode is now frozen. The path and the
    thread's row are gone, so resume cannot find it, and a writer that already had it
    open would have held the lock and made the delete fail. Condition 2 is checked again
    on the linked inode. If it changed, a resume ran in the seconds between steps 1 and
-   2: recapture the linked content into the archive and record `failed:changed` with
-   the thread id. The bytes are safe, but Codex no longer lists the thread. Restoring it
-   goes into a scratch `CODEX_HOME`.
-4. **Remove** the link.
+   2: the bytes are recaptured under the release rule, and the unit is recorded as
+   `failed:changed` with the thread id. The bytes are safe, but Codex no longer lists
+   the thread. Restoring it goes into a scratch `CODEX_HOME`.
+4. **Remove** the link, under the release rule.
 
 A `codex-work` unit (once enabled) runs the same steps with
 `CODEX_HOME=~/.codex-work`.
 
-#### 3.4.3 Leftovers and reporting
+#### 3.4.4 Leftovers and reporting
 
 A prune run refuses to start (exit 1, naming the directory) while any
 `session-archive-quarantine/` it would use is non-empty. A leftover means an earlier run
-died mid-protocol or recorded `failed:recreated`, and a person looks before anything else
-is deleted.
+died mid-protocol, recorded `failed:recreated`, or could not release an entry under the
+release rule. A person looks before anything else is deleted. `status` also exits 1
+while a quarantine is non-empty.
 
 Prune runs without writing anything unless it is given `--apply`. The dry run prints the
 same JSON report, marking the units it would remove. Each ineligible unit gets the first
@@ -304,16 +348,28 @@ thread that was pruned wrongly is restored from the archive into a scratch
   is held; otherwise it unlinks the rollout, or fails. Cover the dry run writing
   nothing, `--apply` removing only eligible units, a `codex delete` failure recorded
   with the rollout kept, and an obs-state mismatch kept with its reason.
-- **Deletion window** (§3.4.1–3.4.2), through injected hooks between protocol steps:
+- **Deletion window** (§3.4.2–3.4.3), through injected hooks between protocol steps:
   - a Claude file appended after the pre-check and before quarantine (`kept:changed`,
-    and the archive holds the appended version);
-  - a Claude file held open across the settle scan (`kept:open`, renamed back);
+    and the mirror holds the appended version);
+  - a Claude file held open across the settle scan (`kept:open`, restored);
   - `<id>.jsonl` recreated at its original path after quarantine (`failed:recreated`,
     both kept);
+  - recreation combined with a holder at settle, and with a change at re-verify. In
+    both, the no-replace restore fails, the recreated fragment is byte-for-byte
+    unchanged, and the quarantined unit is still present (`failed:recreated`);
+  - a capture run immediately after `failed:recreated`: the fragment lands under
+    `versions/` (`diverged`), and the mirror copy keeps the full transcript's hash;
   - a Codex thread lock held at step 1 (`kept:busy`);
   - a Codex rollout appended between releasing the lock and the delete
     (`failed:changed`, and the archive holds the appended version);
+  - a Codex rollout appended, then unlinked by a stub delete that exits nonzero:
+    `failed:delete`, the appended bytes are recaptured before the link is removed, and
+    a stub run where the recapture fails leaves the link in quarantine;
+  - a stub delete that exits nonzero without unlinking: `failed:delete`, and the link
+    is removed under rule (a) with the rollout untouched;
   - a non-empty quarantine at start (the run refuses).
+- **Capture extension check:** an appended file replaces the mirror, while a truncated,
+  rewritten or recreated file goes to `versions/` and leaves the mirror unchanged.
 - **Probes already run** (throwaway `CODEX_HOME`, 2026-09-30): resume refused and delete
   refused while the writer lock is held, and `codex delete --force` on an
   `archived_sessions/` thread removed both file and row. The plan turns these into
