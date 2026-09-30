@@ -4,6 +4,7 @@ import json
 import sys
 import uuid
 from contextlib import nullcontext
+from dataclasses import asdict
 from pathlib import Path
 
 from . import capture, config
@@ -45,7 +46,20 @@ def cmd_capture(cfg, table, args) -> int:
     return 0 if ok else 1
 
 
-COMMANDS = {"capture": cmd_capture}
+def cmd_promote(cfg, table, args) -> int:
+    manifest = Manifest.open(cfg.archive_root)
+    try:
+        promoted = capture.promote(cfg.archive_root, manifest, args.source, args.relpath)
+    except capture.PromoteError as error:
+        print(f"session-archive: {error}", file=sys.stderr)
+        return 1
+    finally:
+        manifest.close()
+    print(json.dumps(asdict(promoted), sort_keys=True))
+    return 0
+
+
+COMMANDS = {"capture": cmd_capture, "promote": cmd_promote}
 
 
 def main(argv) -> int:

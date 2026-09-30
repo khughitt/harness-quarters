@@ -2,7 +2,7 @@
 import hashlib
 import os
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from .decide import Stat, capture_action, extends
@@ -225,3 +225,60 @@ def capture_run(root: Path, manifest: Manifest, sources) -> tuple[dict, bool]:
             errors.append(f"{path.relative_to(source.root).as_posix()}: unreadable: {error}")
         report[source.name] = {**counts, "errors": errors} if errors else counts
     return report, all(entry["failed"] == 0 for entry in report.values())
+
+
+class PromoteError(Exception):
+    pass
+
+
+def promote(root: Path, manifest: Manifest, source: str, relpath: str) -> Version:
+    """Prepare the latest version, preserve the mirror by hard link, then swap it in.
+    The mirror path never goes away; an interrupted promote can simply be rerun."""
+    latest = manifest.latest(source, relpath)
+    if latest is None:
+        raise PromoteError(f"{source}/{relpath} has no archived version")
+    if latest.location == MIRROR:
+        raise PromoteError(f"{source}/{relpath} is not diverged")
+    stored = root / latest.location
+    dest = mirror_path(root, source, relpath)
+    mirror = manifest.mirror(source, relpath)
+    if mirror is not None and mirror.sha256 != latest.sha256 and _installed(dest, latest):
+        return _finish_promote(root, manifest, source, relpath, latest, mirror, dest)
+    copied = copy_hashed(stored, dest.parent, None)
+    try:
+        if copied.sha256 != latest.sha256:
+            raise PromoteError(f"{stored} does not match its manifest sha256")
+        if mirror is not None:
+            if hash_file(dest) != mirror.sha256:
+                raise PromoteError(f"{dest} is damaged; run capture to repair it first")
+            old = version_location(source, relpath, mirror.captured_at)
+            mkdir_synced((root / old).parent)
+            if not (root / old).exists():
+                os.link(dest, root / old)
+            elif hash_file(root / old) != mirror.sha256:
+                raise PromoteError(f"{root / old} exists with other content")
+            fsync_dir((root / old).parent)
+            manifest.put(replace(mirror, location=old))
+        os.utime(copied.tmp, ns=(latest.mtime_ns, latest.mtime_ns))
+        os.replace(copied.tmp, dest)
+    finally:
+        copied.tmp.unlink(missing_ok=True)
+    return _finish_promote(root, manifest, source, relpath, latest, mirror, dest)
+
+
+def _installed(dest: Path, version: Version) -> bool:
+    return dest.is_file() and hash_file(dest) == version.sha256
+
+
+def _finish_promote(root: Path, manifest: Manifest, source: str, relpath: str, latest: Version,
+                    mirror: Version | None, dest: Path) -> Version:
+    """Check the preserved mirror and record a completed swap, including on retry."""
+    if mirror is not None and mirror.sha256 != latest.sha256:
+        old = version_location(source, relpath, mirror.captured_at)
+        if not (root / old).is_file() or hash_file(root / old) != mirror.sha256:
+            raise PromoteError(f"{dest} holds the new version but the old one is not preserved at {old}")
+        manifest.put(replace(mirror, location=old))
+    fsync_dir(dest.parent)
+    promoted = replace(latest, location=MIRROR)
+    manifest.put(promoted)
+    return promoted
