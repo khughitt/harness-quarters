@@ -4,6 +4,7 @@ imports by name."""
 import pytest
 
 from session_archive import config
+from session_archive.manifest import Manifest
 
 
 @pytest.fixture
@@ -21,3 +22,10 @@ def archive(tmp_path):
     root.mkdir()
     (root / config.MARKER).touch()
     return root
+
+
+@pytest.fixture
+def manifest(archive):
+    opened = Manifest.open(archive)
+    yield opened
+    opened.close()
