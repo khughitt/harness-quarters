@@ -61,6 +61,11 @@ shell_snapshot = true
 js_repl = true
 multi_agent = true
 
+# The default of 4 (root + 3 children) refuses a spawn once 3 children are
+# running; finished children are evicted, running ones never are.
+[agents]
+max_concurrent_threads_per_session = 8
+
 [tui]
 status_line = ["model-with-reasoning", "context-remaining", "current-dir", "project-name", "git-branch"]
 status_line_use_colors = true
