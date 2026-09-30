@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Callable
 from uuid import uuid4
 
-from .capture import open_nofollow, walk_files
+from .capture import open_nofollow
 
 QUARANTINE = "session-archive-quarantine"
 AT_FDCWD = -100
@@ -63,12 +63,33 @@ def _has_entries(root: Path) -> bool:
 
 
 def inodes(paths) -> set[tuple[int, int]]:
+    """Every entry's inode, including nested directories; never follow symlinks."""
     found = set()
     for path in paths:
-        for member in ([path, *walk_files(path)] if path.is_dir() else [path]):
-            info = os.stat(member, follow_symlinks=False)
-            found.add((info.st_dev, info.st_ino))
+        fd = open_nofollow(path, os.O_PATH)
+        try:
+            _collect_inodes(fd, found)
+        finally:
+            os.close(fd)
     return found
+
+
+def _collect_inodes(fd: int, found: set[tuple[int, int]]) -> None:
+    info = os.fstat(fd)
+    found.add((info.st_dev, info.st_ino))
+    if not stat.S_ISDIR(info.st_mode):
+        return
+    directory = os.open(".", os.O_RDONLY | os.O_DIRECTORY, dir_fd=fd)
+    try:
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                child = os.open(entry.name, os.O_PATH | os.O_NOFOLLOW, dir_fd=directory)
+                try:
+                    _collect_inodes(child, found)
+                finally:
+                    os.close(child)
+    finally:
+        os.close(directory)
 
 
 def release(entry: Path, live_path: Path, preserve: Callable[[Path], bool]) -> bool:

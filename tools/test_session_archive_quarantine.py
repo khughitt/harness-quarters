@@ -331,3 +331,19 @@ def test_release_restores_or_keeps_mismatched_claim(tmp_path, monkeypatch, same_
     assert sorted(path.read_bytes() for path in qdir.iterdir()) == sorted(expected)
     assert entry.read_bytes() == (b"recreated" if recreated else b"unrelated")
     assert leftovers([home]) == [home / QUARANTINE]
+
+
+def test_inodes_include_nested_directories_without_following_symlinks(tmp_path):
+    root = tmp_path / "unit"
+    nested = root / "tool-results" / "empty"
+    nested.mkdir(parents=True)
+    external = tmp_path / "outside"
+    external.mkdir()
+    link = root / "linked"
+    link.symlink_to(external, target_is_directory=True)
+    found = inodes([root])
+    for path in (root, nested.parent, nested, link):
+        info = path.lstat()
+        assert (info.st_dev, info.st_ino) in found
+    outside = external.stat()
+    assert (outside.st_dev, outside.st_ino) not in found

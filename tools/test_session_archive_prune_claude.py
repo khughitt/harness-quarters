@@ -271,3 +271,47 @@ def test_replaced_source_during_hash_is_rejected(world, monkeypatch):
     with pytest.raises(OSError):
         evaluate(unit, ctx, set())
     assert jsonl.read_bytes() == b'{"a":1}\n'
+
+
+def test_held_nested_directory_restores_before_openat_append(world):
+    src, unit, jsonl, ctx = world
+    handles = []
+
+    def hold_directory(u):
+        handles.append(os.open(quarantined(src, SID) / "tool-results", os.O_RDONLY | os.O_DIRECTORY))
+
+    def open_for_append(u):
+        handles.append(os.open("r.txt", os.O_WRONLY | os.O_APPEND, dir_fd=handles[0]))
+
+    ctx.hooks = Hooks(after_quarantine=hold_directory, before_delete=open_for_append)
+    try:
+        outcome = delete_claude_unit(unit, ctx)
+        # A held nested directory can still open original files even after their live names vanish.
+        writer = os.open("r.txt", os.O_WRONLY | os.O_APPEND, dir_fd=handles[0]) if len(handles) == 1 else handles[1]
+        if len(handles) == 1:
+            handles.append(writer)
+        os.write(writer, b" late")
+        assert outcome == "kept:open"
+        assert jsonl.exists()
+        assert (src.root / "-p" / SID / "tool-results" / "r.txt").read_bytes() == b"result late"
+    finally:
+        for fd in reversed(handles):
+            os.close(fd)
+
+
+def test_new_companion_directory_after_transcript_only_discovery_keeps_quarantine(world):
+    import shutil
+
+    src, _, jsonl, ctx = world
+    shutil.rmtree(src.root / "-p" / SID)
+    (unit,) = claude_units(src)
+
+    def recreate_directory(u):
+        companion = src.root / "-p" / SID
+        companion.mkdir()
+        (companion / "new.txt").write_bytes(b"new content")
+
+    ctx.hooks = Hooks(after_quarantine=recreate_directory)
+    assert delete_claude_unit(unit, ctx) == "failed:recreated"
+    assert quarantined(src).read_bytes() == b'{"a":1}\n'
+    assert (src.root / "-p" / SID / "new.txt").read_bytes() == b"new content"

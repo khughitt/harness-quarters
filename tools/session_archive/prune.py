@@ -193,7 +193,8 @@ def delete_claude_unit(unit: Unit, ctx: Context) -> str:
                 return "failed:recapture"
         return _restore(moved, qdir, stop, "kept:changed")
     ctx.hooks.before_delete(unit)
-    if any(os.path.lexists(live) for live, _ in moved):
+    session_dir = unit.source.root / unit.key
+    if any(os.path.lexists(path) for path in (session_dir, session_dir.with_suffix(".jsonl"))):
         return "failed:recreated"
     for rel, quarantined in sorted(present.items()):
         try:
