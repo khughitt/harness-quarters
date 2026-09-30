@@ -55,6 +55,15 @@ def fsync_dir(path: Path) -> None:
         os.close(fd)
 
 
+def mkdir_synced(path: Path) -> None:
+    """Create missing directories, syncing each new entry in its containing parent."""
+    if path.is_dir():
+        return
+    mkdir_synced(path.parent)
+    path.mkdir()
+    fsync_dir(path.parent)
+
+
 @dataclass(frozen=True)
 class Copied:
     tmp: Path
@@ -66,7 +75,7 @@ class Copied:
 def copy_hashed(src: Path, dest_dir: Path, prefix: int | None) -> Copied:
     """Copy src to an fsynced temporary file in dest_dir. One pass hashes the whole file and,
     when prefix is given, its first prefix bytes."""
-    dest_dir.mkdir(parents=True, exist_ok=True)
+    mkdir_synced(dest_dir)
     fd, name = tempfile.mkstemp(dir=dest_dir, prefix=".capture-")
     whole, head, seen = hashlib.sha256(), hashlib.sha256(), 0
     try:
@@ -113,7 +122,7 @@ def capture_file(root: Path, manifest: Manifest, source: str, relpath: str, path
         else:
             location = version_location(source, relpath, captured_at)
             dest = root / location
-            dest.parent.mkdir(parents=True, exist_ok=True)
+            mkdir_synced(dest.parent)
         os.utime(copied.tmp, ns=(live.mtime_ns, live.mtime_ns))
         if location == MIRROR:
             os.replace(copied.tmp, dest)

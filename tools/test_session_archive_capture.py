@@ -1,5 +1,6 @@
 """Capturing one file: mirror, extension check, versions/, busy and repair (spec §3.3)."""
 import os
+from pathlib import Path
 
 import pytest
 
@@ -135,3 +136,50 @@ def test_repeated_timestamp_never_replaces_archived_version(archive, manifest, l
     assert (archive / first.version.location).read_bytes() == b"fragment\n"
     assert manifest.rows("claude", "p/s.jsonl") == rows
     assert not any(p.name.startswith(".capture-") for p in (archive / "claude" / "p").iterdir())
+
+
+@pytest.mark.parametrize("diverged", [False, True], ids=["mirror", "versions"])
+@pytest.mark.parametrize("existing", [False, True], ids=["new-dirs", "existing-dirs"])
+def test_directory_entries_synced_before_manifest(archive, manifest, live, monkeypatch, diverged, existing):
+    rel = "p/deep/s.jsonl"
+    src = write(live / rel, b"one\n")
+    if diverged:
+        cap(archive, manifest, live, rel)
+        src.write_bytes(b"fragment\n")
+    base = archive / "versions" if diverged else archive
+    leaf = base / "claude/p/deep"
+    if existing:
+        leaf.mkdir(parents=True, exist_ok=True)
+    events = []
+    real_mkdir, real_sync, real_put = Path.mkdir, capture.fsync_dir, manifest.put
+
+    def mkdir(path, *args, **kwargs):
+        real_mkdir(path, *args, **kwargs)
+        events.append(("mkdir", path.relative_to(archive).as_posix()))
+
+    def sync(path):
+        real_sync(path)
+        events.append(("sync", path.relative_to(archive).as_posix()))
+
+    def put(version):
+        assert (archive / version.location if diverged else leaf / "s.jsonl").read_bytes() == src.read_bytes()
+        events.append(("put", None))
+        real_put(version)
+
+    monkeypatch.setattr(Path, "mkdir", mkdir)
+    monkeypatch.setattr(capture, "fsync_dir", sync)
+    monkeypatch.setattr(manifest, "put", put)
+    out = cap(archive, manifest, live, rel)
+    assert out.action == ("diverged" if diverged else "copied")
+    if existing:
+        directories, parents = [], []
+    elif diverged:
+        directories = ["versions", "versions/claude", "versions/claude/p", "versions/claude/p/deep"]
+        parents = [".", "versions", "versions/claude", "versions/claude/p"]
+    else:
+        directories = ["claude", "claude/p", "claude/p/deep"]
+        parents = [".", "claude", "claude/p"]
+    expected_leaf = "versions/claude/p/deep" if diverged else "claude/p/deep"
+    creation = [event for directory, parent in zip(directories, parents)
+                for event in [("mkdir", directory), ("sync", parent)]]
+    assert events == creation + [("sync", expected_leaf), ("put", None)]
