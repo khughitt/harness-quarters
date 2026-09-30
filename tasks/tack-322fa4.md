@@ -4,7 +4,7 @@ title: "A general model of tack's kinds (skills, hooks, flows) that an adaptive 
 status: shelved
 priority: 2
 created: 2026-09-30T14:12:36Z
-updated: 2026-09-30T14:28:37Z
+updated: 2026-09-30T14:48:03Z
 depends: []
 tags: [quick-add]
 source: "mindful:thought:a3b0b88f1902753a00a058225bd3a798"
@@ -18,3 +18,4 @@ Name the types of things tack represents: skills, hooks, flows/processes (formul
 - 2026-09-30T14:12:41Z (main): Related: ops-1a552c (model-adaptive hook messages)
 - 2026-09-30T14:28:37Z (main): shelved: tack-ec379d wakes (the eval chain obs-00809f -> tack-026612 exists), or a second adaptive dimension beyond hook text (ops-1a552c) is implemented, giving two concrete kinds to generalise from
 - 2026-09-30T14:28:37Z (main): scope: shelved; the skills half is tack-ec379d's fragment design (per-model variants as a filter over fragments), shelved on the same missing eval chain; hooks half is ops-1a552c, whose evidence points at repetition, not model tier; brief: ops:docs/notes/2026-09-30-adaptive-hook-messages-brief.md
+- 2026-09-30T14:48:03Z (main): Correction after review of the brief: claim-guard child detection (ops-ed76fe) had already removed most repeat blocks; ops-1a552c now targets unnecessary blocks, not model tier. The shelf and its wake condition stand.
