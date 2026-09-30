@@ -1548,6 +1548,11 @@ def test_each_condition(change, reason):
     assert file_reason(replace(PASSING, **change), NOW) == reason
 
 
+def test_diverged_latest_blocks_prune_even_when_live_matches_mirror():
+    facts = replace(PASSING, latest=version(location="versions/x", size=11, sha="b"))
+    assert file_reason(facts, NOW) == "diverged"
+
+
 def test_partial_tail_without_newline_passes():
     facts = replace(PASSING, obs=ObsFile(10, OLD // 1_000_000, 8, True, True, False))
     assert file_reason(facts, NOW) is None
@@ -1626,7 +1631,7 @@ def file_reason(f: FileFacts, now_ns: int) -> str | None:
     if now_ns - f.live.mtime_ns <= INACTIVE_NS:
         return "active"
     live_key = (f.live.size, f.live.mtime_ns)
-    if f.latest is not None and f.latest.location != MIRROR and (f.latest.size, f.latest.mtime_ns) == live_key:
+    if f.latest is not None and f.latest.location != MIRROR:
         return "diverged"
     if f.mirror is None or (f.mirror.size, f.mirror.mtime_ns) != live_key or f.live_sha256 != f.mirror.sha256:
         return "uncaptured"
@@ -1659,7 +1664,7 @@ def unit_reason(files: list[FileFacts], now_ns: int) -> str | None:
 - [ ] **Step 4: Run to verify pass**
 
 Run: `uv run -q --with pytest pytest tools/test_session_archive_eligibility.py -q`
-Expected: 23 passed.
+Expected: 24 passed.
 
 - [ ] **Step 5: Commit**
 

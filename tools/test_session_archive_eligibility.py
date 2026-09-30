@@ -44,6 +44,11 @@ def test_each_condition(change, reason):
     assert file_reason(replace(PASSING, **change), NOW) == reason
 
 
+def test_diverged_latest_blocks_prune_even_when_live_matches_mirror():
+    facts = replace(PASSING, latest=version(location="versions/x", size=11, sha="b"))
+    assert file_reason(facts, NOW) == "diverged"
+
+
 def test_partial_tail_without_newline_passes():
     facts = replace(PASSING, obs=ObsFile(10, OLD // 1_000_000, 8, True, True, False))
     assert file_reason(facts, NOW) is None

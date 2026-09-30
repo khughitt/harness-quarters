@@ -66,7 +66,7 @@ def file_reason(f: FileFacts, now_ns: int) -> str | None:
     if now_ns - f.live.mtime_ns <= INACTIVE_NS:
         return "active"
     live_key = (f.live.size, f.live.mtime_ns)
-    if f.latest is not None and f.latest.location != MIRROR and (f.latest.size, f.latest.mtime_ns) == live_key:
+    if f.latest is not None and f.latest.location != MIRROR:
         return "diverged"
     if f.mirror is None or (f.mirror.size, f.mirror.mtime_ns) != live_key or f.live_sha256 != f.mirror.sha256:
         return "uncaptured"
