@@ -137,3 +137,60 @@ def capture_file(root: Path, manifest: Manifest, source: str, relpath: str, path
         return Outcome("copied" if action == "copy" else "repaired", version)
     finally:
         copied.tmp.unlink(missing_ok=True)
+
+
+COUNTS = ("scanned", "copied", "repaired", "diverged", "unchanged", "busy", "vanished", "failed")
+
+
+def walk_files(top: Path, errors: list | None = None):
+    """Every regular file under top, depth first in sorted order, never following or
+    yielding symlinks. A directory or entry that cannot be read raises; with `errors`
+    given, it is appended there as (path, error) and the walk goes on."""
+    stack = [Path(top)]
+    while stack:
+        directory = stack.pop()
+        try:
+            with os.scandir(directory) as scan:
+                entries = sorted(scan, key=lambda entry: entry.name)
+        except OSError as error:
+            if errors is None:
+                raise
+            errors.append((directory, error))
+            continue
+        subdirectories = []
+        for entry in entries:
+            try:
+                if entry.is_symlink():
+                    continue
+                if entry.is_dir(follow_symlinks=False):
+                    subdirectories.append(Path(entry.path))
+                elif entry.is_file(follow_symlinks=False):
+                    yield Path(entry.path)
+            except OSError as error:
+                if errors is None:
+                    raise
+                errors.append((Path(entry.path), error))
+        stack.extend(reversed(subdirectories))
+
+
+def capture_run(root: Path, manifest: Manifest, sources) -> tuple[dict, bool]:
+    report = {}
+    for source in sources:
+        counts = dict.fromkeys(COUNTS, 0)
+        errors, unreadable = [], []
+        for path in walk_files(source.root, unreadable):
+            relpath = path.relative_to(source.root).as_posix()
+            counts["scanned"] += 1
+            try:
+                counts[capture_file(root, manifest, source.name, relpath, path).action] += 1
+            except OSError as error:
+                if not os.path.lexists(path):
+                    counts["vanished"] += 1
+                else:
+                    counts["failed"] += 1
+                    errors.append(f"{relpath}: {error}")
+        for path, error in unreadable:
+            counts["failed"] += 1
+            errors.append(f"{path.relative_to(source.root).as_posix()}: unreadable: {error}")
+        report[source.name] = {**counts, "errors": errors} if errors else counts
+    return report, all(entry["failed"] == 0 for entry in report.values())

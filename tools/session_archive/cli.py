@@ -1,10 +1,13 @@
 """session-archive command line (spec docs/specs/2026-09-30-session-archive-design.md)."""
 import argparse
+import json
 import sys
+import uuid
 from contextlib import nullcontext
 from pathlib import Path
 
-from . import config
+from . import capture, config
+from .manifest import Manifest, Run, utc_now
 
 LOCKED = frozenset({"capture", "prune", "promote", "probe-codex"})
 
@@ -27,8 +30,22 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-# command name -> handler(cfg, sources, args) -> exit code; later tasks add entries.
-COMMANDS = {}
+def cmd_capture(cfg, table, args) -> int:
+    manifest = Manifest.open(cfg.archive_root)
+    try:
+        started = utc_now()
+        try:
+            report, ok = capture.capture_run(cfg.archive_root, manifest, table)
+        except OSError as error:
+            report, ok = {"error": f"{type(error).__name__}: {error}"}, False
+        manifest.record_run(Run(uuid.uuid4().hex, "capture", "apply", started, utc_now(), ok, report))
+    finally:
+        manifest.close()
+    print(json.dumps(report, sort_keys=True))
+    return 0 if ok else 1
+
+
+COMMANDS = {"capture": cmd_capture}
 
 
 def main(argv) -> int:
