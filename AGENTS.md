@@ -115,6 +115,13 @@ this repository's own instructions, then the user in the session.
   runner directly: the recipe is how the run is recorded.
 - Before removing a worktree, run `tt-report` so its test timings are harvested.
 
+A project with an open task tagged `halt` takes that task first; `tasks prime` and
+the session-start message name it. To start other blocked work, use `tasks start
+<id> --force --reason "<why>"` so the override is recorded. Close a latency
+incident tagged `test-latency` only after `tt-latency verify <id> --after <remedy
+timestamp>` exits 0 for every host named in its breach notes, and include the
+verify output in the `tasks done` message.
+
 ## Shell
 
 - Claude Code's Bash tool runs bash (`CLAUDE_CODE_SHELL` in its settings); Codex's
