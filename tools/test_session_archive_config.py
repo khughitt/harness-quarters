@@ -110,3 +110,13 @@ def test_config_read_error_exits_2(home, archive, monkeypatch, capsys):
     assert str(path) in error
     assert "permission denied reading configuration" in error
     assert "Traceback" not in error
+
+
+def test_invalid_config_encoding_exits_2(home, archive):
+    path = write_config(home, archive)
+    path.write_bytes(b"\xff")
+    result = run_tool("capture", home=home)
+    assert result.returncode == 2
+    assert str(path) in result.stderr
+    assert "cannot read configuration" in result.stderr
+    assert "Traceback" not in result.stderr

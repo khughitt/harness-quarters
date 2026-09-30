@@ -52,7 +52,7 @@ def load_config(path: Path) -> Config:
         raise HostGateError(f"session-archive is not configured on this host ({path} is missing)")
     try:
         data = tomllib.loads(path.read_text())
-    except (OSError, tomllib.TOMLDecodeError) as error:
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
         raise HostGateError(f"{path}: cannot read configuration: {error}") from None
     for key in ("archive_root", "obs_command"):
         if key not in data:
