@@ -1,6 +1,6 @@
 # Session archive: daily capture, verified prune
 
-Status: revised after review rounds 1 and 2 (codex); draft for review. Task: `tack-401088` (goal `tack-1a3278`: keep agent session
+Status: revised after review rounds 1–3 (codex); draft for review. Task: `tack-401088` (goal `tack-1a3278`: keep agent session
 stores bounded without losing what obs can re-parse). Policy: the Decision section of
 `docs/notes/2026-09-29-session-store-retention-brief.md`, adopted 2026-09-30.
 
@@ -109,21 +109,34 @@ For each regular file under each source root:
    size and mtime intact is caught by prune's read-back (§3.4), which recaptures
    from the live file.
 2. Otherwise copy it to a temporary name in its archive directory, hashing while
-   copying, and `fsync` the copy. When a mirrored copy of size N already exists, also
-   take the digest of the first N bytes during the same pass.
+   copying, and `fsync` the copy. When the manifest has a mirror row for this file, let
+   N and D be that row's recorded size and sha256, and also take the digest of the
+   source's first N bytes during the same pass. N and D come from the manifest, never
+   from the mirrored file on disk, which may be damaged.
 3. Stat the source again. If its size or `mtime_ns` changed during the copy, drop the
    temporary file and count the file as `busy`; the next run captures it.
 4. **Extension check.** The new version replaces the mirrored copy only when it extends
-   it: its size is at least N and its first-N-bytes digest equals the mirrored copy's
-   manifest sha256. Otherwise the new version has been rewritten, truncated, or
-   recreated as a fragment. It goes to
+   the recorded mirror version: its size is at least N, and its first-N-bytes digest
+   equals D. The same test repairs a damaged mirror: a truncated or corrupted mirrored
+   file does not change N or D, so an intact live file passes and rewrites the mirror.
+   Otherwise the new version has been rewritten, truncated, or recreated as a
+   fragment. It goes to
    `versions/<source name>/<relative path>@<captured_at>`, the mirror is left untouched,
    and the file is counted as `diverged`.
 5. Rename the copy into place, `fsync` the directory, and write the manifest row.
 
-A mirrored copy is only ever replaced by a version that contains it, and nothing else
-in the archive is ever replaced. Transcripts are append-only, so `diverged` is rare and
-always worth a look. `status` lists each diverged file. The archive never deletes a file because its source
+A mirrored copy is only ever replaced by a version that contains the recorded mirror
+version, and nothing else in the archive is ever replaced. Transcripts are
+append-only, so `diverged` is rare and always worth a look. `status` lists each
+diverged file.
+
+**Reconciling a divergence.** A diverged file stays diverged until a person runs
+`session-archive promote <source> <relative path>`. This makes the file's latest
+captured version the mirror version. The old mirrored copy moves under `versions/`,
+the manifest's mirror row changes, and nothing is deleted. Promote is for a transcript
+that was truly rewritten. A recreated fragment (§3.4.2) is instead merged back into the
+live file by hand. The merged file then extends the mirror, and the next capture
+reconciles it on its own. The archive never deletes a file because its source
 disappeared. Claude's own cleanup and `codex delete` shrink the live store, not the
 archive.
 
@@ -150,9 +163,12 @@ For each pruning unit (§3.2), prune decides using these inputs:
 A unit is eligible only when every file in it satisfies all of the following:
 
 1. **Inactive:** its `mtime` is more than 30 days before the run.
-2. **Captured exactly:** a manifest row exists with the live size and `mtime_ns`. The
-   sha256 of the live file, of the archived copy as read back now, and of the manifest
-   row are equal.
+2. **Captured exactly, in the mirror:** the manifest's mirror row for this file has the
+   live size and `mtime_ns`. The sha256 of the live file, of the mirrored copy as read
+   back now, and of that row are equal. A file whose latest version sits only under
+   `versions/` fails this condition and is recorded as `kept:diverged`. obs re-reads
+   the mirror (`obs-de84cb`), so a version kept only under `versions/` would not come
+   back on a re-read. Re-reading versions can wait until something needs it.
 3. **Indexed exactly** (for files obs indexes, i.e. the ones `obs index-state` lists):
    obs's size and `mtime_ms` match the live file; `byte_offset` equals the size, or
    obs has `partial_tail` set and the bytes after `byte_offset` hold no newline (only
@@ -369,7 +385,13 @@ thread that was pruned wrongly is restored from the archive into a scratch
     is removed under rule (a) with the rollout untouched;
   - a non-empty quarantine at start (the run refuses).
 - **Capture extension check:** an appended file replaces the mirror, while a truncated,
-  rewritten or recreated file goes to `versions/` and leaves the mirror unchanged.
+  rewritten or recreated file goes to `versions/` and leaves the mirror unchanged. A
+  truncated or corrupted mirrored copy with an intact live file is repaired in the
+  mirror itself: the mirror hash is restored and nothing lands under `versions/`.
+- **Diverged files are not pruned:** a file aged past 30 days and indexed by obs, whose
+  latest version is only under `versions/`, stays live (`kept:diverged`). After
+  `promote`, the same file becomes eligible, and the previous mirror copy is still
+  present under `versions/`.
 - **Probes already run** (throwaway `CODEX_HOME`, 2026-09-30): resume refused and delete
   refused while the writer lock is held, and `codex delete --force` on an
   `archived_sessions/` thread removed both file and row. The plan turns these into
