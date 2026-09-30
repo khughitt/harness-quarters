@@ -98,9 +98,7 @@ def release(entry: Path, live_path: Path, preserve: Callable[[Path], bool]) -> b
     with ExitStack() as cleanup:
         parent = open_nofollow(entry.parent, os.O_RDONLY | os.O_DIRECTORY)
         cleanup.callback(os.close, parent)
-        entry_fd = os.open(entry.name, os.O_PATH | os.O_NOFOLLOW, dir_fd=parent)
-        cleanup.callback(os.close, entry_fd)
-        held = os.fstat(entry_fd)
+        held = os.lstat(entry.name, dir_fd=parent)
         try:
             fd = open_nofollow(live_path, os.O_PATH)
             try:
@@ -113,15 +111,19 @@ def release(entry: Path, live_path: Path, preserve: Callable[[Path], bool]) -> b
         if not same_live:
             if not preserve(entry):
                 return False
-            try:
-                fd = open_nofollow(entry, os.O_PATH)
-            except (FileNotFoundError, NotADirectoryError):
-                return False
-            try:
-                if not os.path.samestat(os.fstat(fd), held):
-                    return False
-            finally:
-                os.close(fd)
+        # Preserve may inspect open inodes. Pin the entry afterwards so our own O_PATH
+        # descriptor cannot masquerade as a writer during that inspection.
+        try:
+            entry_fd = (os.open(entry.name, os.O_PATH | os.O_NOFOLLOW, dir_fd=parent)
+                        if same_live else open_nofollow(entry, os.O_PATH))
+        except (FileNotFoundError, NotADirectoryError):
+            return False
+        cleanup.callback(os.close, entry_fd)
+        pinned = os.fstat(entry_fd)
+        if (not os.path.samestat(pinned, held)
+                or (not same_live and (pinned.st_size, pinned.st_mtime_ns)
+                    != (held.st_size, held.st_mtime_ns))):
+            return False
         private = f".release-{uuid4().hex}"
         try:
             _rename_at(parent, entry.name, parent, private)

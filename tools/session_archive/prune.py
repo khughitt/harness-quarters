@@ -1,9 +1,11 @@
 """Prune (spec §3.4): evaluate units against the manifest and obs, then delete eligible ones
 only through the quarantine protocols."""
 import errno
+import fcntl
 import hashlib
 import os
 import stat
+import subprocess
 from contextlib import ExitStack
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -204,3 +206,114 @@ def delete_claude_unit(unit: Unit, ctx: Context) -> str:
             return "failed:release"
     remove_empty_dirs(qdir, stop)
     return "failed:release" if os.path.lexists(qdir) else "pruned"
+
+
+def run_codex_delete(codex_bin: str, home: Path, thread_id: str, timeout: float) -> bool:
+    """True only for exit 0 within the timeout; the caller also checks the rollout is gone."""
+    try:
+        result = subprocess.run([codex_bin, "delete", "--force", thread_id],
+                                env={**os.environ, "CODEX_HOME": str(home)}, stdin=subprocess.DEVNULL,
+                                capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0
+
+
+def _same_inode(a: Path, b: Path) -> bool:
+    with ExitStack() as cleanup:
+        try:
+            first = open_nofollow(a, os.O_PATH)
+            cleanup.callback(os.close, first)
+            second = open_nofollow(b, os.O_PATH)
+            cleanup.callback(os.close, second)
+        except (FileNotFoundError, NotADirectoryError):
+            return False
+        return os.path.samestat(os.fstat(first), os.fstat(second))
+
+
+def delete_codex_unit(unit: Unit, ctx: Context) -> str:
+    """Spec §3.4.3: lock and link, delete, freeze check, re-verify, release. The freeze check
+    runs whenever the rollout's inode is no longer at its live path, whatever the exit status."""
+    rollout, relpath, home = unit.paths[0], unit.files[0], unit.source.home
+    stop = home / QUARANTINE
+    qdir = quarantine_dir(home, ctx.run_id)
+    link = qdir / rollout.name
+    lock_path = home / "thread-writer-locks" / f"{unit.thread_id}.lock"
+    try:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with ExitStack() as cleanup:
+            parent = open_nofollow(lock_path.parent, os.O_RDONLY | os.O_DIRECTORY)
+            cleanup.callback(os.close, parent)
+            fd = os.open(lock_path.name, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600,
+                         dir_fd=parent)
+            cleanup.callback(os.close, fd)
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return "kept:busy"
+            if not os.path.lexists(rollout):
+                return "kept:vanished"
+            reason = evaluate(unit, ctx, ctx.held())
+            if reason:
+                return f"kept:{reason}"
+            source = open_nofollow(rollout, os.O_RDONLY | os.O_NONBLOCK)
+            cleanup.callback(os.close, source)
+            if not stat.S_ISREG(os.fstat(source).st_mode):
+                return "failed:release"
+            qdir.mkdir(parents=True, exist_ok=True)
+            target = open_nofollow(qdir, os.O_RDONLY | os.O_DIRECTORY)
+            cleanup.callback(os.close, target)
+            # linkat follows this held descriptor, never a replaced rollout path or parent.
+            os.link(f"/proc/self/fd/{source}", link.name, dst_dir_fd=target, follow_symlinks=True)
+            if not _same_inode(link, rollout):
+                return "failed:release"
+    except InspectionFailed:
+        return "failed:uninspectable"
+    except OSError:
+        return "failed:release"
+    ctx.hooks.before_delete(unit)
+    try:
+        if not _same_inode(link, rollout):
+            return "failed:release"
+    except OSError:
+        return "failed:release"
+    deleted = run_codex_delete(ctx.codex_bin, home, unit.thread_id, ctx.codex_timeout)
+    succeeded = deleted and not os.path.lexists(rollout)
+
+    def freeze(entry):
+        try:
+            if inodes([entry]) & ctx.held():
+                return "failed:writer-live-quarantined"
+        except InspectionFailed:
+            return "failed:uninspectable-quarantined"
+        return None
+
+    refusal = None
+    preserve = preserver(ctx, unit.source, relpath)
+
+    def frozen_preserve(entry):
+        nonlocal refusal
+        # Release may reach rule (b) after a live path disappears between checks.
+        refusal = freeze(entry)
+        return refusal is None and preserve(entry)
+
+    try:
+        if not _same_inode(link, rollout):
+            refusal = freeze(link)
+            if refusal:
+                return refusal
+        if not succeeded:
+            outcome = "failed:delete"
+        else:
+            info, sha, _ = _read_file(link)
+            mirror = ctx.manifest.mirror(unit.source.name, relpath)
+            changed = (mirror is None or (info.st_size, info.st_mtime_ns) != (mirror.size, mirror.mtime_ns)
+                       or sha != mirror.sha256
+                       or sha != _read_back(mirror_path(ctx.archive_root, unit.source.name, relpath)))
+            outcome = "failed:changed" if changed else "pruned"
+        if not release(link, rollout, frozen_preserve):
+            return refusal or ("failed:release" if outcome == "pruned" else f"{outcome}-quarantined")
+        remove_empty_dirs(qdir, stop)
+        return "failed:release" if os.path.lexists(link) else outcome
+    except OSError:
+        return "failed:release"
