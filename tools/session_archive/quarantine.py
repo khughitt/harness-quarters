@@ -1,8 +1,10 @@
 """The quarantine rules of spec §3.4.1: restore never replaces, and an entry is released
 only when its bytes are preserved."""
 import ctypes
+import errno
 import os
 import stat
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Callable
 
@@ -67,37 +69,97 @@ def inodes(paths) -> set[tuple[int, int]]:
 def release(entry: Path, live_path: Path, preserve: Callable[[Path], bool]) -> bool:
     """Remove a quarantined file only when (a) its inode is still reachable at live_path or
     (b) preserve(entry) confirms the archive holds its exact bytes. False keeps it."""
-    held = os.stat(entry, follow_symlinks=False)
-    try:
-        fd = open_nofollow(live_path, os.O_PATH)
+    with ExitStack() as cleanup:
+        parent = open_nofollow(entry.parent, os.O_RDONLY | os.O_DIRECTORY)
+        cleanup.callback(os.close, parent)
+        entry_fd = os.open(entry.name, os.O_PATH | os.O_NOFOLLOW, dir_fd=parent)
+        cleanup.callback(os.close, entry_fd)
+        held = os.fstat(entry_fd)
         try:
-            live = os.fstat(fd)
-        finally:
-            os.close(fd)
-    except (FileNotFoundError, NotADirectoryError):
-        live = None
-    if live is not None and (live.st_dev, live.st_ino) == (held.st_dev, held.st_ino):
-        os.unlink(entry)
+            fd = open_nofollow(live_path, os.O_PATH)
+            try:
+                live = os.fstat(fd)
+            finally:
+                os.close(fd)
+        except (FileNotFoundError, NotADirectoryError):
+            live = None
+        same_live = live is not None and os.path.samestat(live, held)
+        if not same_live:
+            if not preserve(entry):
+                return False
+            try:
+                fd = open_nofollow(entry, os.O_PATH)
+            except (FileNotFoundError, NotADirectoryError):
+                return False
+            try:
+                if not os.path.samestat(os.fstat(fd), held):
+                    return False
+            finally:
+                os.close(fd)
+        try:
+            current = os.stat(entry.name, dir_fd=parent, follow_symlinks=False)
+        except FileNotFoundError:
+            return False
+        if not os.path.samestat(current, held):
+            return False
+        if not same_live and (current.st_size, current.st_mtime_ns) != (held.st_size, held.st_mtime_ns):
+            return False
+        os.unlink(entry.name, dir_fd=parent)
         return True
-    if preserve(entry):
-        os.unlink(entry)
-        return True
-    return False
 
 
 def remove_empty_dirs(top: Path, stop: Path) -> None:
     """Remove empty directories under and including top, then empty parents up to stop."""
-    top, stop = top.resolve(), stop.resolve()
-    top.relative_to(stop)
+    top, stop = Path(os.path.abspath(top)), Path(os.path.abspath(stop))
+    relative = top.relative_to(stop)
     if top == stop:
         return
-    if top.is_dir():
-        for dirpath, _dirnames, _filenames in os.walk(top, topdown=False):
+    if top.is_symlink():
+        raise ValueError("cleanup path is a symlink")
+    with ExitStack() as cleanup:
+        try:
+            fd = open_nofollow(stop, os.O_RDONLY | os.O_DIRECTORY)
+        except FileNotFoundError:
+            return
+        cleanup.callback(os.close, fd)
+        parents = []
+        for name in relative.parts:
+            parents.append((fd, name))
             try:
-                os.rmdir(dirpath)
-            except OSError:
-                pass
-    parent = top.parent
-    while parent != stop and parent.is_dir() and not any(parent.iterdir()):
-        parent.rmdir()
-        parent = parent.parent
+                fd = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+            except FileNotFoundError:
+                break
+            cleanup.callback(os.close, fd)
+        else:
+            _remove_empty_children(fd)
+        for parent, name in reversed(parents):
+            if not _rmdir(name, parent):
+                break
+
+
+def _remove_empty_children(fd: int) -> None:
+    with os.scandir(fd) as entries:
+        for entry in entries:
+            if not entry.is_dir(follow_symlinks=False):
+                continue
+            try:
+                child = os.open(entry.name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+            except FileNotFoundError:
+                continue
+            try:
+                _remove_empty_children(child)
+            finally:
+                os.close(child)
+            _rmdir(entry.name, fd)
+
+
+def _rmdir(name: str, parent: int) -> bool:
+    try:
+        os.rmdir(name, dir_fd=parent)
+    except FileNotFoundError:
+        return True
+    except OSError as error:
+        if error.errno in (errno.ENOTEMPTY, errno.EEXIST):
+            return False
+        raise
+    return True

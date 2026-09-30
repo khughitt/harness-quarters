@@ -1,11 +1,13 @@
 """No-replace restore and the release rule (spec §3.4.1)."""
 import os
+import errno
 
 import pytest
 
 from session_archive.quarantine import (QUARANTINE, inodes, leftovers, quarantine_dir, release,
                                         remove_empty_dirs, rename_noreplace)
 from session_archive.testing import write
+from session_archive import quarantine
 
 
 def test_rename_noreplace_moves(tmp_path):
@@ -139,3 +141,123 @@ def test_cleanup_refuses_paths_outside_stop(tmp_path, path_form):
     with pytest.raises(ValueError):
         remove_empty_dirs(top, stop)
     assert other.is_dir() and stop.is_dir()
+
+
+def test_release_rule_b_keeps_entry_when_preserver_swaps_parent(tmp_path):
+    entry = write(tmp_path / "quarantine" / "entry", b"held")
+    outside = write(tmp_path / "outside" / "entry", b"unrelated")
+    moved = tmp_path / "moved"
+
+    def preserve(path):
+        assert path.read_bytes() == b"held"
+        path.parent.rename(moved)
+        path.parent.symlink_to(outside.parent, target_is_directory=True)
+        return True
+
+    assert not release(entry, tmp_path / "missing", preserve)
+    assert outside.read_bytes() == b"unrelated"
+    assert (moved / "entry").read_bytes() == b"held"
+
+
+def test_release_rule_a_unlinks_only_held_parent(tmp_path, monkeypatch):
+    entry = write(tmp_path / "quarantine" / "entry", b"held")
+    live = tmp_path / "live"
+    os.link(entry, live)
+    outside = write(tmp_path / "outside" / "entry", b"unrelated")
+    moved = tmp_path / "moved"
+    real_fstat = os.fstat
+    swapped = False
+
+    def fstat(fd):
+        nonlocal swapped
+        info = real_fstat(fd)
+        if not swapped and os.path.samestat(info, live.stat()):
+            swapped = True
+            entry.parent.rename(moved)
+            entry.parent.symlink_to(outside.parent, target_is_directory=True)
+        return info
+
+    monkeypatch.setattr(quarantine.os, "fstat", fstat)
+    assert release(entry, live, lambda path: pytest.fail("preserve must not run"))
+    assert outside.read_bytes() == b"unrelated" and live.read_bytes() == b"held"
+    assert not (moved / "entry").exists()
+
+
+def test_release_does_not_unlink_replacement_entry(tmp_path):
+    entry = write(tmp_path / "entry", b"held")
+    replacement = write(tmp_path / "replacement", b"new bytes")
+
+    def preserve(path):
+        assert path.read_bytes() == b"held"
+        replacement.replace(path)
+        return True
+
+    assert not release(entry, tmp_path / "missing", preserve)
+    assert entry.read_bytes() == b"new bytes"
+
+
+def test_cleanup_does_not_follow_top_swapped_during_scan(tmp_path, monkeypatch):
+    stop = tmp_path / QUARANTINE
+    top = stop / "top"
+    (top / "inside").mkdir(parents=True)
+    outside = tmp_path / "outside"
+    (outside / "child").mkdir(parents=True)
+    original = top.stat()
+    moved = stop / "moved"
+    real_scan = os.scandir
+    swapped = False
+
+    def scan(path):
+        nonlocal swapped
+        info = os.fstat(path) if isinstance(path, int) else os.stat(path)
+        if not swapped and os.path.samestat(info, original):
+            swapped = True
+            top.rename(moved)
+            top.symlink_to(outside, target_is_directory=True)
+        return real_scan(path)
+
+    monkeypatch.setattr(quarantine.os, "scandir", scan)
+    error = None
+    try:
+        remove_empty_dirs(top, stop)
+    except OSError as caught:
+        error = caught
+    assert (outside / "child").is_dir()
+    assert isinstance(error, OSError)
+
+
+def test_cleanup_propagates_traversal_errors(tmp_path, monkeypatch):
+    stop = tmp_path / QUARANTINE
+    top = stop / "top"
+    (top / "child").mkdir(parents=True)
+    original = top.stat()
+    real_scan = os.scandir
+
+    def scan(path):
+        info = os.fstat(path) if isinstance(path, int) else os.stat(path)
+        if os.path.samestat(info, original):
+            raise PermissionError(errno.EACCES, "unreadable")
+        return real_scan(path)
+
+    monkeypatch.setattr(quarantine.os, "scandir", scan)
+    with pytest.raises(PermissionError):
+        remove_empty_dirs(top, stop)
+    assert (top / "child").is_dir()
+
+
+@pytest.mark.parametrize("error", [errno.EACCES, errno.EIO])
+def test_cleanup_propagates_removal_errors(tmp_path, monkeypatch, error):
+    stop = tmp_path / QUARANTINE
+    top = stop / "top"
+    top.mkdir(parents=True)
+    real_rmdir = os.rmdir
+
+    def rmdir(path, *, dir_fd=None):
+        if path in (top, str(top), top.name):
+            raise OSError(error, "cannot remove")
+        return real_rmdir(path, dir_fd=dir_fd)
+
+    monkeypatch.setattr(quarantine.os, "rmdir", rmdir)
+    with pytest.raises(OSError) as caught:
+        remove_empty_dirs(top, stop)
+    assert caught.value.errno == error and top.is_dir()
