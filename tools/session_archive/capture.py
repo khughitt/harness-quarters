@@ -11,6 +11,21 @@ from .manifest import MIRROR, Manifest, Version, utc_now
 CHUNK = 1 << 20
 
 
+def open_nofollow(path: Path, flags: int = os.O_RDONLY) -> int:
+    """Open a path relative to held directory descriptors, rejecting every symlink."""
+    path = Path(os.path.abspath(path))
+    directory = os.open(path.anchor, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for part in path.parts[1:-1]:
+            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                            dir_fd=directory)
+            os.close(directory)
+            directory = child
+        return os.open(path.name or path.anchor, flags | os.O_NOFOLLOW, dir_fd=directory)
+    finally:
+        os.close(directory)
+
+
 def stat_of(path: Path) -> Stat:
     info = os.stat(path, follow_symlinks=False)
     return Stat(info.st_size, info.st_mtime_ns)
@@ -72,15 +87,15 @@ class Copied:
     prefix_sha256: str | None   # digest of the first `prefix` bytes; None when shorter
 
 
-def copy_hashed(src: Path, dest_dir: Path, prefix: int | None) -> Copied:
-    """Copy src to an fsynced temporary file in dest_dir. One pass hashes the whole file and,
-    when prefix is given, its first prefix bytes."""
+def copy_hashed(src: Path | int, dest_dir: Path, prefix: int | None) -> Copied:
+    """Copy a path or held source descriptor to an fsynced temporary file. One pass hashes
+    the whole file and, when prefix is given, its first prefix bytes."""
     mkdir_synced(dest_dir)
     fd, name = tempfile.mkstemp(dir=dest_dir, prefix=".capture-")
     whole, head, seen = hashlib.sha256(), hashlib.sha256(), 0
     try:
         with os.fdopen(fd, "wb") as writer, os.fdopen(
-                os.open(src, os.O_RDONLY | os.O_NOFOLLOW), "rb") as reader:
+                os.dup(src) if isinstance(src, int) else open_nofollow(src), "rb") as reader:
             while chunk := reader.read(CHUNK):
                 if prefix is not None and seen < prefix:
                     head.update(chunk[: prefix - seen])
@@ -106,38 +121,43 @@ def capture_file(root: Path, manifest: Manifest, source: str, relpath: str, path
                  force: bool = False, now=utc_now) -> Outcome:
     """Capture `path` as `source`/`relpath`. `path` is normally the live file; prune passes a
     quarantined one. With force, an unchanged file is copied again (read-back repair)."""
-    live = stat_of(path)
-    latest = manifest.latest(source, relpath)
-    action = capture_action(live, latest, stored_stat(root, latest))
-    if action == "skip" and not force:
-        return Outcome("unchanged", latest)
-    mirror = manifest.mirror(source, relpath)
-    mirrored = mirror_path(root, source, relpath)
-    copied = copy_hashed(path, mirrored.parent, mirror.size if mirror else None)
-    try:
-        if stat_of(path) != live:
-            return Outcome("busy", None)
-        captured_at = now()
-        if extends(copied.size, copied.prefix_sha256, mirror):
-            location, dest = MIRROR, mirrored
-        else:
-            location = version_location(source, relpath, captured_at)
-            dest = root / location
-            mkdir_synced(dest.parent)
-        os.utime(copied.tmp, ns=(live.mtime_ns, live.mtime_ns))
-        if location == MIRROR:
-            os.replace(copied.tmp, dest)
-        else:
-            os.link(copied.tmp, dest)  # Publish atomically without replacing an archived version.
-            copied.tmp.unlink()
-        fsync_dir(dest.parent)
-        version = Version(source, relpath, location, copied.size, live.mtime_ns, copied.sha256, captured_at)
-        manifest.put(version)
-        if location != MIRROR:
-            return Outcome("diverged", version)
-        return Outcome("copied" if action == "copy" else "repaired", version)
-    finally:
-        copied.tmp.unlink(missing_ok=True)
+    with os.fdopen(open_nofollow(path), "rb") as reader:
+        info = os.fstat(reader.fileno())
+        live = Stat(info.st_size, info.st_mtime_ns)
+        latest = manifest.latest(source, relpath)
+        action = capture_action(live, latest, stored_stat(root, latest))
+        if action == "skip" and not force:
+            return Outcome("unchanged", latest)
+        mirror = manifest.mirror(source, relpath)
+        mirrored = mirror_path(root, source, relpath)
+        copied = copy_hashed(reader.fileno(), mirrored.parent, mirror.size if mirror else None)
+        try:
+            with os.fdopen(open_nofollow(path), "rb") as current:
+                current_info = os.fstat(current.fileno())
+            if (not os.path.samestat(info, current_info)
+                    or Stat(current_info.st_size, current_info.st_mtime_ns) != live):
+                return Outcome("busy", None)
+            captured_at = now()
+            if extends(copied.size, copied.prefix_sha256, mirror):
+                location, dest = MIRROR, mirrored
+            else:
+                location = version_location(source, relpath, captured_at)
+                dest = root / location
+                mkdir_synced(dest.parent)
+            os.utime(copied.tmp, ns=(live.mtime_ns, live.mtime_ns))
+            if location == MIRROR:
+                os.replace(copied.tmp, dest)
+            else:
+                os.link(copied.tmp, dest)  # Publish atomically without replacing an archived version.
+                copied.tmp.unlink()
+            fsync_dir(dest.parent)
+            version = Version(source, relpath, location, copied.size, live.mtime_ns, copied.sha256, captured_at)
+            manifest.put(version)
+            if location != MIRROR:
+                return Outcome("diverged", version)
+            return Outcome("copied" if action == "copy" else "repaired", version)
+        finally:
+            copied.tmp.unlink(missing_ok=True)
 
 
 COUNTS = ("scanned", "copied", "repaired", "diverged", "unchanged", "busy", "vanished", "failed")
@@ -152,7 +172,7 @@ def walk_files(top: Path, errors: list | None = None):
         directory = stack.pop()
         subdirectories, files = [], []
         try:
-            fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            fd = open_nofollow(directory, os.O_RDONLY | os.O_DIRECTORY)
             try:
                 with os.scandir(fd) as scan:
                     entries = sorted(scan, key=lambda entry: entry.name)

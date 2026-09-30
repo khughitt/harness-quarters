@@ -183,3 +183,54 @@ def test_directory_entries_synced_before_manifest(archive, manifest, live, monke
     creation = [event for directory, parent in zip(directories, parents)
                 for event in [("mkdir", directory), ("sync", parent)]]
     assert events == creation + [("sync", expected_leaf), ("put", None)]
+
+
+@pytest.mark.parametrize("linked", [False, True], ids=["replacement-file", "parent-link"])
+def test_source_path_replaced_during_copy_is_never_published(archive, manifest, live,
+                                                            tmp_path, monkeypatch, linked):
+    src = write(live / "p/s.jsonl", b"live")
+    outside = tmp_path / "outside"
+    write(outside / "s.jsonl", b"outside bytes")
+    real = capture.copy_hashed
+
+    def copy_then_replace(*args):
+        copied = real(*args)
+        if linked:
+            src.parent.rename(live / "original")
+            src.parent.symlink_to(outside, target_is_directory=True)
+        else:
+            src.rename(src.with_name("original.jsonl"))
+            src.write_bytes(b"live")
+            old = src.with_name("original.jsonl").stat()
+            os.utime(src, ns=(old.st_atime_ns, old.st_mtime_ns))
+        return copied
+
+    monkeypatch.setattr(capture, "copy_hashed", copy_then_replace)
+    if linked:
+        with pytest.raises(OSError):
+            cap(archive, manifest, live, "p/s.jsonl")
+    else:
+        assert cap(archive, manifest, live, "p/s.jsonl").action == "busy"
+    assert manifest.latest("claude", "p/s.jsonl") is None
+    assert not (archive / "claude/p/s.jsonl").exists()
+    assert not list(archive.rglob(".capture-*"))
+
+
+def test_copy_reads_held_file_when_parent_is_replaced(archive, manifest, live, tmp_path, monkeypatch):
+    src = write(live / "p/s.jsonl", b"live")
+    outside = tmp_path / "outside"
+    write(outside / "s.jsonl", b"outside bytes")
+    real = capture.copy_hashed
+
+    def replace_then_copy(*args):
+        src.parent.rename(live / "original")
+        src.parent.symlink_to(outside, target_is_directory=True)
+        copied = real(*args)
+        assert copied.tmp.read_bytes() == b"live"
+        return copied
+
+    monkeypatch.setattr(capture, "copy_hashed", replace_then_copy)
+    with pytest.raises(OSError):
+        cap(archive, manifest, live, "p/s.jsonl")
+    assert manifest.latest("claude", "p/s.jsonl") is None
+    assert not list(archive.rglob(".capture-*"))

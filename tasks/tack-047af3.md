@@ -1,15 +1,16 @@
 ---
 id: tack-047af3
 title: "Session archive: Capture run and the `capture` command"
-status: doing
+status: done
 priority: 2
 size: s
 complexity: low
 process: direct
 owner: session-retention-job
 created: 2026-09-30T16:53:58Z
-updated: 2026-09-30T21:20:51Z
+updated: 2026-09-30T21:42:00Z
 started: 2026-09-30T21:20:51Z
+completed: 2026-09-30T21:41:58Z
 depends: [tack-18a17b]
 parent: tack-401088
 tags: [obs]
@@ -21,3 +22,11 @@ step: "Task 5: Capture run and the `capture` command"
 ## Notes
 
 - 2026-09-30T21:20:51Z (session-retention-job): started
+- 2026-09-30T21:27:48Z (session-retention-job): review: impl round 1 — verdict: revise; findings: P1 2, P3 1; reviewer: codex/gpt-6.1-sol
+- 2026-09-30T21:35:19Z (session-retention-job): review: impl round 2 — verdict: revise; findings: P1 1; reviewer: codex/gpt-6.1-sol
+- 2026-09-30T21:41:58Z (session-retention-job): review: impl round 3 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
+- 2026-09-30T21:41:58Z (session-retention-job): retro: Reviewer repros exposed unsafe path resolution and silent permission handling; descriptor-relative no-follow reads closed the capture race.
+- 2026-09-30T21:41:58Z (session-retention-job): done
+  provenance: {"harness_session":"codex:01a0f381-ccbb-7391-b11a-a5ffa55c6bce","harness_session_source":"CODEX_SESSION_ID"}
+- 2026-09-30T21:41:58Z (session-retention-job): Daily capture walk and command landed with visible failures, vanished handling and no-follow source resolution; focused and full suites pass.
+  provenance: {"harness_session":"codex:01a0f381-ccbb-7391-b11a-a5ffa55c6bce","harness_session_source":"CODEX_SESSION_ID"}

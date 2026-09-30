@@ -243,3 +243,22 @@ def test_file_replaced_by_link_after_walk_never_archives_outside(home, archive, 
     assert not (archive / "claude/p/a.jsonl").exists()
     assert manifest.latest("claude", "p/a.jsonl") is None
     assert not list(archive.rglob(".capture-*"))
+
+
+def test_yielded_parent_replaced_by_link_never_archives_outside(home, archive, manifest,
+                                                             tmp_path, monkeypatch):
+    src = write(home / ".claude/projects/p/a.jsonl", b"live")
+    outside = tmp_path / "outside"
+    write(outside / "a.jsonl", b"outside bytes")
+    real = capture.capture_file
+
+    def replace_parent(*args, **kw):
+        src.parent.rename(src.parent.with_name("original"))
+        src.parent.symlink_to(outside, target_is_directory=True)
+        return real(*args, **kw)
+
+    monkeypatch.setattr(capture, "capture_file", replace_parent)
+    report, ok = capture_run(archive, manifest, table(home))
+    assert not ok and report["claude"]["failed"] >= 1
+    assert not (archive / "claude/p/a.jsonl").exists()
+    assert manifest.latest("claude", "p/a.jsonl") is None
