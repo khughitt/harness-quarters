@@ -1258,7 +1258,7 @@ git commit -m "feat(session-archive): daily capture run and capture command"
 
 **Interfaces:**
 - Consumes: `copy_hashed`, `hash_file`, `mirror_path`, `version_location`, `fsync_dir`, `Manifest`.
-- Produces: `PromoteError`, `promote(root, manifest, source, relpath) -> Version` (the new mirror row), `cli.cmd_promote`. The mirror path is never absent. The replacement is prepared first, the old mirror is kept under `versions/` by a hard link, and a single `os.replace` swaps it in, so an interrupted promote can be rerun.
+- Produces: `PromoteError`, `promote(root, manifest, source, relpath) -> Version` (the new mirror row), `cli.cmd_promote`. The mirror path is never absent. The replacement is prepared first, the old mirror is kept under `versions/` by a hard link, and a single `os.replace` swaps it in. A rerun after an interruption at any step finishes the transition. That includes an interruption after the swap: the rerun sees that the mirror file already holds the promoted version, checks the old one is preserved, and records it.
 
 - [ ] **Step 1: Write the failing tests** in `tools/test_session_archive_promote.py`:
 
@@ -1341,6 +1341,42 @@ def test_interrupted_swap_keeps_old_version_and_retry_works(archive, manifest, t
     assert len(old) == 1 and (archive / old[0].location).read_bytes() == b"one\ntwo\n"
 
 
+@pytest.mark.parametrize("step", ["fsync", "manifest"])
+def test_interruption_after_swap_is_finished_by_retry(archive, manifest, tmp_path, monkeypatch, step):
+    diverge(archive, manifest, tmp_path)
+    old = manifest.mirror("claude", REL)
+    new = manifest.latest("claude", REL)
+    mirror_dir = mirror_path(archive, "claude", REL).parent
+    if step == "fsync":
+        real_fsync = capture.fsync_dir
+
+        def fsync(path):
+            if path == mirror_dir:
+                raise OSError(5, "Input/output error")
+            real_fsync(path)
+
+        monkeypatch.setattr(capture, "fsync_dir", fsync)
+    else:
+        real_put = manifest.put
+
+        def put(version):
+            if version.location == "mirror" and version.sha256 == new.sha256:
+                raise OSError(28, "No space left on device")
+            real_put(version)
+
+        monkeypatch.setattr(manifest, "put", put)
+    with pytest.raises(OSError):
+        promote(archive, manifest, "claude", REL)
+    monkeypatch.undo()
+    assert mirror_path(archive, "claude", REL).read_bytes() == b"rewritten\n"
+    assert manifest.mirror("claude", REL).sha256 == old.sha256          # not yet recorded
+    promoted = promote(archive, manifest, "claude", REL)
+    assert promoted.sha256 == new.sha256 == manifest.mirror("claude", REL).sha256
+    kept = [v for v in manifest.rows("claude", REL) if v.sha256 == old.sha256]
+    assert len(kept) == 1 and (archive / kept[0].location).read_bytes() == b"one\ntwo\n"
+    assert manifest.diverged() == []
+
+
 def test_promote_command(home, archive, manifest):
     src = write(home / ".claude/projects" / REL, b"one\n")
     capture_file(archive, manifest, "claude", REL, src)
@@ -1375,11 +1411,13 @@ def promote(root: Path, manifest: Manifest, source: str, relpath: str) -> Versio
         raise PromoteError(f"{source}/{relpath} is not diverged")
     stored = root / latest.location
     dest = mirror_path(root, source, relpath)
+    mirror = manifest.mirror(source, relpath)
+    if mirror is not None and mirror.sha256 != latest.sha256 and _installed(dest, latest):
+        return _finish_promote(root, manifest, source, relpath, latest, mirror, dest)
     copied = copy_hashed(stored, dest.parent, None)
     try:
         if copied.sha256 != latest.sha256:
             raise PromoteError(f"{stored} does not match its manifest sha256")
-        mirror = manifest.mirror(source, relpath)
         if mirror is not None:
             if hash_file(dest) != mirror.sha256:
                 raise PromoteError(f"{dest} is damaged; run capture to repair it first")
@@ -1396,6 +1434,22 @@ def promote(root: Path, manifest: Manifest, source: str, relpath: str) -> Versio
     except BaseException:
         copied.tmp.unlink(missing_ok=True)
         raise
+    return _finish_promote(root, manifest, source, relpath, latest, mirror, dest)
+
+
+def _installed(dest: Path, version: Version) -> bool:
+    return dest.is_file() and hash_file(dest) == version.sha256
+
+
+def _finish_promote(root: Path, manifest: Manifest, source: str, relpath: str, latest: Version,
+                    mirror: Version | None, dest: Path) -> Version:
+    """Record a swap whose file is in place. A rerun after an interrupted promote comes
+    here directly: it checks that the old mirror is preserved, then records the new one."""
+    if mirror is not None and mirror.sha256 != latest.sha256:
+        old = version_location(source, relpath, mirror.captured_at)
+        if not (root / old).is_file() or hash_file(root / old) != mirror.sha256:
+            raise PromoteError(f"{dest} holds the new version but the old one is not preserved at {old}")
+        manifest.put(replace(mirror, location=old))
     fsync_dir(dest.parent)
     promoted = replace(latest, location=MIRROR)
     manifest.put(promoted)
@@ -1424,7 +1478,7 @@ COMMANDS = {"capture": cmd_capture, "promote": cmd_promote}
 - [ ] **Step 4: Run to verify pass**
 
 Run: `uv run -q --with pytest pytest tools/test_session_archive_promote.py -q`
-Expected: 5 passed.
+Expected: 7 passed.
 
 - [ ] **Step 5: Commit**
 
@@ -2498,10 +2552,11 @@ git commit -m "feat(session-archive): Claude deletion protocol with no-replace r
   - `ignore-lock`;
   - `writer-closes`: `exec` closes its rollout at once;
   - `writer-during-delete`: `delete` leaves a detached writer holding the unlinked rollout, which appends after 0.5 s and exits after 2 s. This is the early-lock-release case.
+  - `writer-unlink-fail`: the same, then `delete` exits 1.
 
   It also honours `STUB_CODEX_VERSION` and `STUB_CODEX_WRITER_SECONDS` (how long `exec` holds its lock and rollout, default 1). It logs argv plus `CODEX_HOME` to `$STUB_CODEX_LOG`.
 
-The protocol's safety after `codex delete` rests on the freeze check (spec §3.4.3 step 3): no path, and no process holding the linked inode. It does not rest on how long `codex delete` holds the writer lock. The `writer-during-delete` test pins that: a delete that lets a writer in still loses nothing.
+The protocol's safety after `codex delete` rests on the freeze check (spec §3.4.3 step 3): no path, and no process holding the linked inode. It does not rest on how long `codex delete` holds the writer lock. The check runs whenever the rollout's inode is no longer at its live path, whatever `codex delete` returned, and before any release under rule (b). The `writer-during-delete` and `writer-unlink-fail` tests pin that: a delete that lets a writer in loses nothing, whether it exits 0 or 1.
 
 - [ ] **Step 1: Write the failing tests.** Append `STUB_CODEX` to `testing.py`:
 
@@ -2512,8 +2567,8 @@ STUB_CODEX = r'''#!/usr/bin/env python3
 STUB_CODEX_MODE: ok (default), fail (exit 1, touch nothing), unlink-fail (unlink, then
 exit 1), hang (sleep past any timeout), ignore-lock (resume and delete ignore the writer
 lock), writer-closes (exec closes its rollout at once), writer-during-delete (delete leaves
-a detached writer appending to the unlinked rollout). STUB_CODEX_LOG, when set, receives
-one JSON line per call."""
+a detached writer appending to the unlinked rollout), writer-unlink-fail (the same, then
+exit 1). STUB_CODEX_LOG, when set, receives one JSON line per call."""
 import fcntl, json, os, sqlite3, sys, time, uuid
 from pathlib import Path
 
@@ -2586,7 +2641,7 @@ elif args[:2] == ["delete", "--force"]:
         time.sleep(60)
     if mode == "fail" or locked(tid):
         sys.exit("Error: failed to delete session")
-    if mode == "writer-during-delete":
+    if mode in ("writer-during-delete", "writer-unlink-fail"):
         handles = [open(path, "ab") for path in rollouts(tid)]
         ready_r, ready_w = os.pipe()
         if os.fork() == 0:
@@ -2605,7 +2660,7 @@ elif args[:2] == ["delete", "--force"]:
         path.unlink()
     with db() as conn:
         conn.execute("DELETE FROM threads WHERE id = ?", (tid,))
-    if mode == "unlink-fail":
+    if mode in ("unlink-fail", "writer-unlink-fail"):
         sys.exit("Error: failed to delete session")
     print(f"Deleted session {tid}.")
 else:
@@ -2742,6 +2797,14 @@ def test_writer_alive_after_delete_keeps_link(world, monkeypatch):
     assert link(src, rollout).read_bytes().endswith(b'{"resumed":1}\n')
 
 
+def test_writer_alive_after_unlink_then_failure_keeps_link(world, archive, monkeypatch):
+    src, unit, rollout, ctx = world
+    monkeypatch.setenv("STUB_CODEX_MODE", "writer-unlink-fail")
+    assert delete_codex_unit(unit, ctx) == "failed:writer-live-quarantined"
+    time.sleep(2.5)
+    assert link(src, rollout).read_bytes().endswith(b'{"resumed":1}\n')
+
+
 def test_timeout_is_a_failed_delete(world, monkeypatch):
     src, unit, rollout, ctx = world
     monkeypatch.setenv("STUB_CODEX_MODE", "hang")
@@ -2769,8 +2832,17 @@ def run_codex_delete(codex_bin: str, home: Path, thread_id: str, timeout: float)
     return result.returncode == 0
 
 
+def _same_inode(a: Path, b: Path) -> bool:
+    try:
+        first, second = os.stat(a), os.stat(b)
+    except FileNotFoundError:
+        return False
+    return (first.st_dev, first.st_ino) == (second.st_dev, second.st_ino)
+
+
 def delete_codex_unit(unit: Unit, ctx: Context) -> str:
-    """Spec §3.4.3: lock and link, delete, freeze check, re-verify, release."""
+    """Spec §3.4.3: lock and link, delete, freeze check, re-verify, release. The freeze check
+    runs whenever the rollout's inode is no longer at its live path, whatever the exit status."""
     rollout, relpath, home = unit.paths[0], unit.files[0], unit.source.home
     stop = home / QUARANTINE
     qdir = quarantine_dir(home, ctx.run_id)
@@ -2797,16 +2869,19 @@ def delete_codex_unit(unit: Unit, ctx: Context) -> str:
         os.close(fd)
     ctx.hooks.before_delete(unit)
     deleted = run_codex_delete(ctx.codex_bin, home, unit.thread_id, ctx.codex_timeout)
-    if not deleted or os.path.lexists(rollout):
-        outcome = "failed:delete"
-    else:
-        # Freeze check: no path is left, so only an open descriptor could still write.
+    succeeded = deleted and not os.path.lexists(rollout)
+    if not _same_inode(link, rollout):
+        # The link may be the last name of the rollout, whatever codex delete returned. Only
+        # an open descriptor could still write to it: freeze check before any release.
         try:
             holders = ctx.held()
         except InspectionFailed:
             return "failed:uninspectable-quarantined"
         if inodes([link]) & holders:
             return "failed:writer-live-quarantined"
+    if not succeeded:
+        outcome = "failed:delete"
+    else:
         outcome = "failed:changed" if hash_file(link) != _mirror_sha(ctx, unit.source, relpath) else "pruned"
     if not release(link, rollout, preserver(ctx, unit.source, relpath)):
         return "failed:release" if outcome == "pruned" else f"{outcome}-quarantined"
@@ -2817,7 +2892,7 @@ def delete_codex_unit(unit: Unit, ctx: Context) -> str:
 - [ ] **Step 4: Run to verify pass**
 
 Run: `uv run -q --with pytest pytest tools/test_session_archive_prune_codex.py -q`
-Expected: 8 passed.
+Expected: 9 passed.
 
 - [ ] **Step 5: Commit**
 

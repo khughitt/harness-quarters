@@ -266,9 +266,11 @@ itself excludes writers.
    and the link is handled by the release rule, never removed outright:
    - If the rollout path still resolves to the linked inode, (a) holds: remove the link.
    - Otherwise, the delete may have unlinked the rollout and then failed, and the link
-     may hold the only copy of bytes a resume appended after step 1. The rule's
-     recapture path applies before the link goes. The report names the thread, because
-     Codex's own rows may be half-deleted.
+     may hold the only copy of bytes a resume appended after step 1. The freeze check of
+     step 3 runs first: it runs whenever the linked inode is no longer at the live path,
+     whatever `codex delete` returned. Then the rule's recapture path applies before the
+     link goes. The report names the thread, because Codex's own rows may be
+     half-deleted.
 3. **Freeze check** (after a successful delete). The protocol does not rely on how
    long `codex delete` holds the writer lock. Instead it re-inspects open files, as the
    Claude settle step does. The rollout's path is gone and the link is the only name
