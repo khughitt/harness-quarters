@@ -71,20 +71,99 @@ Lean: A. Its archive half does not depend on N: until the policy is set, the onl
 step that frees space without deciding anything is removing superseded Codex releases
 (7G, about a fifth of the store).
 
+## Findings (`tack-1327b8`, 2026-09-30)
+
+Observed with Codex 0.159.2 and Claude Code 2.1.285. Every Codex test ran in a throwaway
+`CODEX_HOME` built from copies, with `rollout_path` rewritten into it and no `auth.json`,
+so a resume that got as far as the model stopped at a 401. Every obs test ran against a
+scratch copy with a throwaway `XDG_STATE_HOME`. Nothing live was moved or deleted.
+
+**Codex resume needs the rollout file, in both history modes.** `state_5.sqlite` has
+3381 `legacy` threads (2026-01-17 to 2026-08-09) and 3401 `paginated` ones (since
+2026-08-08). `thread_history_1.sqlite` is a projection of paginated rollouts: it tracks a
+byte offset into each file and holds no rows for legacy threads. With the rollout
+present, `codex exec resume <id>` loaded the thread and failed only at auth. With it
+removed, a legacy thread failed with `failed to resolve rollout path … file does not
+exist`, and a paginated thread with `no rollout found for thread id`. The sqlite rows do
+not stand in for the file.
+
+**Codex has its own delete, and re-adopts a returned rollout.** `codex delete --force
+<uuid>` removes the rollout, the `threads` row, and the thread's `thread_items`,
+`thread_turns` and projection-state rows together. Without `--force` it refuses with no
+TTY. A plain `rm` of the rollout would leave those rows behind in the 3G history
+database. Copying a deleted thread's rollout back into `sessions/` and resuming it by id
+recreated its `threads` row. An archive restored under the live `CODEX_HOME` therefore
+brings those threads back as live sessions.
+
+**Nobody resumes a Codex thread after a week.** Of 6782 threads, 6072 last changed within
+a day of starting, 69 within 1–7 days and 10 within 7–30 days. The 631 changed 30 or more
+days after starting are all bulk touches: 624 on 2026-09-14 and 7 on 2026-03-13. None is
+a resume.
+
+**Claude Code's `cleanupPeriodDays` covers more than transcripts** (code.claude.com docs,
+`claude-directory` "Cleaned up automatically" and `data-usage`). At every startup it
+deletes, by mtime, transcripts under `projects/` together with their `tool-results/` and
+`subagents/`, plus `file-history/`, `plans/`, `debug/`, `paste-cache/`, `image-cache/`,
+`uploads/`, `session-env/`, `tasks/`, `shell-snapshots/`, `backups/` and the legacy
+`todos/`, `statsig/` and `logs/`. The minimum is 1 (0 fails validation), and there is no
+documented maximum. Raising the value keeps all of these for longer, but everything
+besides `projects/` (2.3G) totals under 60M today; `file-history` is the largest at 54M.
+Desktop and Cowork transcripts follow a separate `desktopSessionCleanupPeriodDays`.
+
+**Raising it is not a guarantee.** anthropics/claude-code#41458, open since 2026-03-31,
+reports 490 sessions deleted despite `cleanupPeriodDays: 99999`. When settings fail to
+load, cleanup silently falls back to the 30-day default. An archive step has to capture a
+transcript before day 30 whatever the setting says. Restored files keep their old mtimes,
+so the next startup cleanup deletes any restored file older than the setting.
+
+**obs can read an unpacked archive, but at a new path it counts everything twice.** obs
+keys `files` by absolute path. In a throwaway index of one Codex month (9 files) and one
+small Claude project (12 files), a prune marked all 21 files `missing_since_ms` with
+their rows kept. Indexing the unpacked archive at a new path through
+`OBS_CODEX_SESSIONS` / `OBS_CLAUDE_PROJECTS` then added 21 new file rows and doubled
+sessions (12→24, 9→18) and turns (3066→6132). `supersede_sessions` did not fire, because
+it only supersedes a copy when the other copy has strictly more turns. Pointing the
+variables at an archive also marks every live-root file missing until the next ordinary
+run. Restoring the archive at its original path relinked cleanly: the missing marks
+cleared and nothing was duplicated, with or without `--full`. That original path is the
+live store, though (see the two restore hazards above). Re-parsing an archive safely needs
+obs to index an archive root as an alias of the root it came from: `obs-de84cb` (idea).
+
+## Recommendation
+
+**A (archive, then prune), with N = 30**, applied the same way to both stores:
+
+- A monthly job archives a calendar month once all of its files are more than 30 days
+  old and obs has indexed them. On the 1st it archives the month before last, as one
+  tarball per harness on `/mnt/backup`. It then prunes the originals: `codex delete
+  --force` per thread for Codex, so the sqlite stays in step, and file removal for
+  Claude.
+- `cleanupPeriodDays: 90` in `claude/settings.json`, so that with a monthly cadence
+  (files up to about 62 days old) Claude's own cleanup never runs first. #41458 means
+  this lowers the risk of Claude pruning first but does not remove it.
+- Past 30 days a session file is kept for obs re-parse only, not for resumability (the
+  resume counts above).
+
+Rejected: **C** saves one job but gives up re-parse for good, and the obs charter treats
+re-parse input as worth keeping. **B** frees root space but leaves both stores
+unbounded, along with Claude's silent 30-day loss.
+
+Two steps do not depend on N and can go first:
+
+- Raising `cleanupPeriodDays` now stops the daily loss of transcripts that obs has not
+  yet had a reason to re-parse.
+- Removing superseded Codex releases (`tack-079ad1`, about 7G) frees space.
+
 ## Unanswered questions
 
-- What is a session file for after N days: resumability, obs re-parse, or nothing? And
-  what is N? *The user, informed by `tack-1327b8`.*
-- Does `codex resume` or `thread_history_1.sqlite` need rollout files that are gone or
-  archived? Can obs index an unpacked archive through `OBS_CODEX_SESSIONS`? *`tack-1327b8`.*
-- Does raising `cleanupPeriodDays` change anything besides transcript lifetime (for
-  example, other state Claude Code prunes on the same clock)? *`tack-1327b8`.*
+- Adopt A with N = 30 and `cleanupPeriodDays: 90`, or another policy? *The user.*
 
 ## Proposed decomposition
 
 | Task | What | Waiting |
 |---|---|---|
-| `tack-1327b8` | Research: what a Codex or Claude session file is still needed for past 30 days, and whether obs can index an archive | tack-401088 |
+| `tack-1327b8` | Research: what a Codex or Claude session file is still needed for past 30 days, and whether obs can index an archive (done 2026-09-30) | tack-401088 |
+| `obs-de84cb` | Index an unpacked archive under the paths it was first indexed at | A only |
 | `tack-079ad1` | Remove superseded Codex standalone releases, keeping current and previous | — |
 
 Parent goal: `tack-1a3278`. `tack-401088` stays an idea until the user sets the policy,
