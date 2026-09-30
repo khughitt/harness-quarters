@@ -3,6 +3,7 @@ import json
 import errno
 import os
 import subprocess
+from contextlib import contextmanager
 
 import pytest
 
@@ -155,6 +156,32 @@ def test_obs_null_indexed_schema_is_stale():
     assert not state["/source/a.jsonl"].schema_current
 
 
+@pytest.mark.parametrize("field,value", [("size", 3), ("mtime_ms", 6), ("byte_offset", 1),
+                                       ("partial_tail", 1), ("indexed_schema", 8),
+                                       ("missing_since_ms", 5)])
+@pytest.mark.parametrize("alias", [False, True])
+def test_obs_rejects_conflicting_canonical_path_rows(tmp_path, field, value, alias):
+    real = write(tmp_path / "real" / "a.jsonl", b"x\n")
+    (tmp_path / "alias").symlink_to(real.parent, target_is_directory=True)
+    payload = obs_payload()
+    entry = payload["files"][0]
+    entry["path"] = str(real)
+    duplicate = {**entry, "path": str(tmp_path / "alias" / real.name) if alias else str(real), field: value}
+    payload["files"] = [duplicate, entry]
+    with pytest.raises(ObsUnavailable, match="conflicting"):
+        load_obs_state(("obs",), fake_runner(json.dumps(payload)))
+
+
+def test_obs_accepts_identical_canonical_path_rows(tmp_path):
+    real = write(tmp_path / "real" / "a.jsonl", b"x\n")
+    (tmp_path / "alias").symlink_to(real.parent, target_is_directory=True)
+    payload = obs_payload()
+    entry = payload["files"][0]
+    entry["path"] = str(real)
+    payload["files"].append({**entry, "path": str(tmp_path / "alias" / real.name)})
+    assert len(load_obs_state(("obs",), fake_runner(json.dumps(payload)))) == 1
+
+
 @pytest.mark.parametrize("error", [OSError("cannot execute"), subprocess.TimeoutExpired("obs", 900)])
 def test_obs_runner_errors_raise(error):
     def run(*args, **kw):
@@ -206,3 +233,29 @@ def test_claude_discovery_ignores_symlink_entries(home, tmp_path):
     (unit,) = claude_units(src)
     assert unit.paths == (project / SID,)
     assert unit.files == (f"-p/{SID}/tool-results/r.txt",)
+
+
+def test_claude_project_replaced_by_symlink_mid_scan_refuses(home, tmp_path, monkeypatch):
+    src = source(home, "claude")
+    project = src.root / "-p"
+    project.mkdir(parents=True)
+    outside = tmp_path / "outside"
+    transcript = write(outside / f"{SID}.jsonl", b"outside must stay untouched\n")
+    original = os.scandir
+    swapped = False
+
+    @contextmanager
+    def scan_and_replace(path):
+        nonlocal swapped
+        with original(path) as scan:
+            yield scan
+        if not swapped:
+            project.rename(tmp_path / "original-project")
+            project.symlink_to(outside, target_is_directory=True)
+            swapped = True
+
+    monkeypatch.setattr(os, "scandir", scan_and_replace)
+    with pytest.raises(OSError):
+        claude_units(src)
+    assert swapped and project.is_symlink()
+    assert transcript.read_bytes() == b"outside must stay untouched\n"

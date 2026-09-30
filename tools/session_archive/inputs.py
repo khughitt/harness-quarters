@@ -6,7 +6,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from .capture import walk_files
+from .capture import open_nofollow, walk_files
 from .config import Source
 from .decide import ObsFile
 
@@ -37,7 +37,7 @@ def load_obs_state(command, runner=subprocess.run) -> dict[str, ObsFile]:
         schema, files = data["schema"], data["files"]
         if not _nonnegative(schema) or not isinstance(files, list):
             raise ValueError("schema must be an integer and files must be a list")
-        state = {}
+        state, rows = {}, {}
         for entry in files:
             path = entry["path"]
             size, mtime, offset = entry["size"], entry["mtime_ms"], entry["byte_offset"]
@@ -50,8 +50,12 @@ def load_obs_state(command, runner=subprocess.run) -> dict[str, ObsFile]:
                 raise ValueError("partial_tail must be boolean or 0/1")
             if any(value is not None and not _nonnegative(value) for value in (indexed, missing)):
                 raise ValueError("indexed_schema and missing_since_ms must be null or nonnegative integers")
-            state[os.path.realpath(path)] = ObsFile(size, mtime, offset, bool(partial), indexed == schema,
-                                                  missing is not None)
+            realpath = os.path.realpath(path)
+            row = (size, mtime, offset, partial, indexed, missing)
+            if realpath in rows and rows[realpath] != row:
+                raise ValueError(f"conflicting index-state rows for {realpath}")
+            rows[realpath] = row
+            state[realpath] = ObsFile(size, mtime, offset, bool(partial), indexed == schema, missing is not None)
         return state
     except (ValueError, KeyError, TypeError, OSError) as error:
         raise ObsUnavailable(f"obs index-state output does not match the contract: {error!r}") from error
@@ -137,25 +141,35 @@ class Unit:
 def claude_units(source: Source) -> list[Unit]:
     """Group UUID transcripts and adjacent UUID directories. Ignore memory and symlinks."""
     units = []
-    with os.scandir(source.root) as scan:
-        projects = sorted(Path(p.path) for p in scan if p.is_dir(follow_symlinks=False))
-    for project in projects:
-        transcripts, directories = {}, {}
-        with os.scandir(project) as scan:
-            for entry in scan:
-                path = Path(entry.path)
-                if SESSION_RE.fullmatch(path.stem) and path.suffix == ".jsonl" and entry.is_file(follow_symlinks=False):
-                    transcripts[path.stem] = path
-                elif SESSION_RE.fullmatch(path.name) and entry.is_dir(follow_symlinks=False):
-                    directories[path.name] = path
-        for sid in sorted(transcripts.keys() | directories.keys()):
-            paths = tuple(mapping[sid] for mapping in (transcripts, directories) if sid in mapping)
-            files = []
-            if sid in transcripts:
-                files.append(transcripts[sid].relative_to(source.root).as_posix())
-            if sid in directories:
-                files.extend(member.relative_to(source.root).as_posix() for member in walk_files(directories[sid]))
-            units.append(Unit(source, f"{project.name}/{sid}", paths, tuple(files)))
+    root_fd = open_nofollow(source.root, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        with os.scandir(root_fd) as scan:
+            projects = sorted(p.name for p in scan if p.is_dir(follow_symlinks=False))
+        for name in projects:
+            project = source.root / name
+            transcripts, directories = {}, {}
+            project_fd = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=root_fd)
+            try:
+                with os.scandir(project_fd) as scan:
+                    for entry in scan:
+                        path = project / entry.name
+                        if (SESSION_RE.fullmatch(path.stem) and path.suffix == ".jsonl"
+                                and entry.is_file(follow_symlinks=False)):
+                            transcripts[path.stem] = path
+                        elif SESSION_RE.fullmatch(path.name) and entry.is_dir(follow_symlinks=False):
+                            directories[path.name] = path
+            finally:
+                os.close(project_fd)
+            for sid in sorted(transcripts.keys() | directories.keys()):
+                paths = tuple(mapping[sid] for mapping in (transcripts, directories) if sid in mapping)
+                files = []
+                if sid in transcripts:
+                    files.append(transcripts[sid].relative_to(source.root).as_posix())
+                if sid in directories:
+                    files.extend(member.relative_to(source.root).as_posix() for member in walk_files(directories[sid]))
+                units.append(Unit(source, f"{project.name}/{sid}", paths, tuple(files)))
+    finally:
+        os.close(root_fd)
     return units
 
 
