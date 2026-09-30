@@ -79,7 +79,8 @@ def copy_hashed(src: Path, dest_dir: Path, prefix: int | None) -> Copied:
     fd, name = tempfile.mkstemp(dir=dest_dir, prefix=".capture-")
     whole, head, seen = hashlib.sha256(), hashlib.sha256(), 0
     try:
-        with os.fdopen(fd, "wb") as writer, open(src, "rb") as reader:
+        with os.fdopen(fd, "wb") as writer, os.fdopen(
+                os.open(src, os.O_RDONLY | os.O_NOFOLLOW), "rb") as reader:
             while chunk := reader.read(CHUNK):
                 if prefix is not None and seen < prefix:
                     head.update(chunk[: prefix - seen])
@@ -149,27 +150,33 @@ def walk_files(top: Path, errors: list | None = None):
     stack = [Path(top)]
     while stack:
         directory = stack.pop()
+        subdirectories, files = [], []
         try:
-            with os.scandir(directory) as scan:
-                entries = sorted(scan, key=lambda entry: entry.name)
+            fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            try:
+                with os.scandir(fd) as scan:
+                    entries = sorted(scan, key=lambda entry: entry.name)
+                for entry in entries:
+                    path = directory / entry.name
+                    try:
+                        if entry.is_symlink():
+                            continue
+                        if entry.is_dir(follow_symlinks=False):
+                            subdirectories.append(path)
+                        elif entry.is_file(follow_symlinks=False):
+                            files.append(path)
+                    except OSError as error:
+                        if errors is None:
+                            raise
+                        errors.append((path, error))
+            finally:
+                os.close(fd)
         except OSError as error:
             if errors is None:
                 raise
             errors.append((directory, error))
             continue
-        subdirectories = []
-        for entry in entries:
-            try:
-                if entry.is_symlink():
-                    continue
-                if entry.is_dir(follow_symlinks=False):
-                    subdirectories.append(Path(entry.path))
-                elif entry.is_file(follow_symlinks=False):
-                    yield Path(entry.path)
-            except OSError as error:
-                if errors is None:
-                    raise
-                errors.append((Path(entry.path), error))
+        yield from files
         stack.extend(reversed(subdirectories))
 
 
@@ -184,11 +191,15 @@ def capture_run(root: Path, manifest: Manifest, sources) -> tuple[dict, bool]:
             try:
                 counts[capture_file(root, manifest, source.name, relpath, path).action] += 1
             except OSError as error:
-                if not os.path.lexists(path):
+                try:
+                    path.lstat()
+                except FileNotFoundError:
                     counts["vanished"] += 1
-                else:
-                    counts["failed"] += 1
-                    errors.append(f"{relpath}: {error}")
+                    continue
+                except OSError as stat_error:
+                    error = stat_error
+                counts["failed"] += 1
+                errors.append(f"{relpath}: {error}")
         for path, error in unreadable:
             counts["failed"] += 1
             errors.append(f"{path.relative_to(source.root).as_posix()}: unreadable: {error}")

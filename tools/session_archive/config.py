@@ -74,6 +74,9 @@ def load_config(path: Path) -> Config:
 
 
 def check_sources(table) -> None:
+    linked = [str(source.root) for source in table if source.root.is_symlink()]
+    if linked:
+        raise HostGateError("source root is a symlink: " + ", ".join(linked))
     missing = [str(source.root) for source in table if not source.root.is_dir()]
     if missing:
         raise HostGateError("source root missing: " + ", ".join(missing))

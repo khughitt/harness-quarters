@@ -155,3 +155,91 @@ def test_capture_command_records_run_level_io_error(home, archive, monkeypatch, 
         assert not run.ok and run.report == report
     finally:
         opened.close()
+
+
+def test_linked_source_root_fails_without_archiving_outside(home, archive, manifest, tmp_path):
+    root = home / ".claude/projects"
+    root.rmdir()
+    outside = tmp_path / "outside"
+    write(outside / "secret.jsonl", b"outside bytes")
+    root.symlink_to(outside, target_is_directory=True)
+    report, ok = capture_run(archive, manifest, table(home))
+    assert not ok and report["claude"]["failed"] == 1
+    assert report["claude"]["scanned"] == 0
+    assert not (archive / "claude/secret.jsonl").exists()
+    with pytest.raises(config.HostGateError):
+        config.check_sources(table(home))
+
+
+def test_queued_directory_replaced_with_link_never_archives_outside(home, archive, manifest,
+                                                                    tmp_path, monkeypatch):
+    root = home / ".claude/projects"
+    write(root / "first.jsonl", b"live")
+    queued = root / "queued"
+    queued.mkdir()
+    outside = tmp_path / "outside"
+    write(outside / "secret.jsonl", b"outside bytes")
+    real = capture.capture_file
+
+    def replace_directory(*args, **kw):
+        if args[4] == root / "first.jsonl":
+            queued.rmdir()
+            queued.symlink_to(outside, target_is_directory=True)
+        return real(*args, **kw)
+
+    monkeypatch.setattr(capture, "capture_file", replace_directory)
+    report, ok = capture_run(archive, manifest, table(home))
+    assert not ok and report["claude"]["failed"] == 1
+    assert report["claude"]["copied"] == 1
+    assert not (archive / "claude/queued/secret.jsonl").exists()
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root bypasses directory permissions")
+def test_parent_becoming_unsearchable_counts_failed_not_vanished(home, archive, manifest,
+                                                                 monkeypatch):
+    src = write(home / ".claude/projects/p/a.jsonl", b"live")
+    real = capture.capture_file
+
+    def lock_parent(*args, **kw):
+        src.parent.chmod(0)
+        return real(*args, **kw)
+
+    monkeypatch.setattr(capture, "capture_file", lock_parent)
+    try:
+        report, ok = capture_run(archive, manifest, table(home))
+    finally:
+        src.parent.chmod(0o700)
+    assert not ok and report["claude"]["failed"] == 1
+    assert report["claude"]["vanished"] == 0
+    assert "p/a.jsonl" in report["claude"]["errors"][0]
+    assert not (archive / "claude/p/a.jsonl").exists()
+
+
+def test_host_gate_rejects_linked_source_root(home, tmp_path):
+    root = home / ".claude/projects"
+    root.rmdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    root.symlink_to(outside, target_is_directory=True)
+    with pytest.raises(config.HostGateError):
+        config.check_sources(table(home))
+
+
+def test_file_replaced_by_link_after_walk_never_archives_outside(home, archive, manifest,
+                                                               tmp_path, monkeypatch):
+    src = write(home / ".claude/projects/p/a.jsonl", b"live")
+    outside = write(tmp_path / "secret.jsonl", b"outside bytes")
+    real = capture.capture_file
+
+    def replace_file(*args, **kw):
+        src.unlink()
+        src.symlink_to(outside)
+        return real(*args, **kw)
+
+    monkeypatch.setattr(capture, "capture_file", replace_file)
+    report, ok = capture_run(archive, manifest, table(home))
+    assert not ok and report["claude"]["failed"] == 1
+    assert report["claude"]["vanished"] == 0
+    assert not (archive / "claude/p/a.jsonl").exists()
+    assert manifest.latest("claude", "p/a.jsonl") is None
+    assert not list(archive.rglob(".capture-*"))
