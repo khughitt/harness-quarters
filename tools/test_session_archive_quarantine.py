@@ -261,3 +261,73 @@ def test_cleanup_propagates_removal_errors(tmp_path, monkeypatch, error):
     with pytest.raises(OSError) as caught:
         remove_empty_dirs(top, stop)
     assert caught.value.errno == error and top.is_dir()
+
+
+@pytest.mark.parametrize("same_live", [False, True])
+def test_release_keeps_basename_replaced_after_final_stat(tmp_path, monkeypatch, same_live):
+    home = tmp_path / "h"
+    qdir = quarantine_dir(home, "run1")
+    entry = write(qdir / "entry", b"held")
+    live = tmp_path / "live"
+    if same_live:
+        os.link(entry, live)
+    replacement = write(tmp_path / "replacement", b"unrelated")
+    held = entry.stat()
+    real_stat = os.stat
+    swapped = False
+
+    def stat(path, *, dir_fd=None, follow_symlinks=True):
+        nonlocal swapped
+        info = real_stat(path, dir_fd=dir_fd, follow_symlinks=follow_symlinks)
+        if dir_fd is not None and not swapped and os.path.samestat(info, held):
+            swapped = True
+            replacement.replace(entry)
+        return info
+
+    def preserve(path):
+        assert not same_live and path.read_bytes() == b"held"
+        return True
+
+    monkeypatch.setattr(quarantine.os, "stat", stat)
+    assert release(entry, live, preserve)
+    assert swapped and entry.read_bytes() == b"unrelated"
+    assert leftovers([home]) == [home / QUARANTINE]
+
+
+@pytest.mark.parametrize("same_live", [False, True])
+@pytest.mark.parametrize("recreated", [False, True])
+def test_release_restores_or_keeps_mismatched_claim(tmp_path, monkeypatch, same_live, recreated):
+    home = tmp_path / "h"
+    qdir = quarantine_dir(home, "run1")
+    entry = write(qdir / "entry", b"held")
+    live = tmp_path / "live"
+    if same_live:
+        os.link(entry, live)
+    replacement = write(tmp_path / "replacement", b"unrelated")
+    saved = tmp_path / "original"
+    real_rename = quarantine._libc.renameat2
+    swapped = False
+
+    def rename(src_fd, src, dst_fd, dst, flags):
+        nonlocal swapped
+        claiming = src_fd != quarantine.AT_FDCWD and os.fsdecode(src) == entry.name
+        if claiming and not swapped:
+            swapped = True
+            entry.rename(saved)
+            replacement.replace(entry)
+        result = real_rename(src_fd, src, dst_fd, dst, flags)
+        if claiming and recreated and result == 0:
+            write(entry, b"recreated")
+        return result
+
+    def preserve(path):
+        assert not same_live and path.read_bytes() == b"held"
+        return True
+
+    monkeypatch.setattr(quarantine._libc, "renameat2", rename)
+    assert not release(entry, live, preserve)
+    assert swapped and saved.read_bytes() == b"held"
+    expected = [b"recreated", b"unrelated"] if recreated else [b"unrelated"]
+    assert sorted(path.read_bytes() for path in qdir.iterdir()) == sorted(expected)
+    assert entry.read_bytes() == (b"recreated" if recreated else b"unrelated")
+    assert leftovers([home]) == [home / QUARANTINE]

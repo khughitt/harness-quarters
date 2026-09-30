@@ -7,6 +7,7 @@ import stat
 from contextlib import ExitStack
 from pathlib import Path
 from typing import Callable
+from uuid import uuid4
 
 from .capture import open_nofollow, walk_files
 
@@ -18,7 +19,11 @@ _libc = ctypes.CDLL(None, use_errno=True)
 
 def rename_noreplace(src: Path, dst: Path) -> None:
     """renameat2(RENAME_NOREPLACE): atomic, and fails with EEXIST instead of replacing dst."""
-    if _libc.renameat2(AT_FDCWD, os.fsencode(src), AT_FDCWD, os.fsencode(dst), RENAME_NOREPLACE) != 0:
+    _rename_at(AT_FDCWD, src, AT_FDCWD, dst)
+
+
+def _rename_at(src_fd: int, src, dst_fd: int, dst) -> None:
+    if _libc.renameat2(src_fd, os.fsencode(src), dst_fd, os.fsencode(dst), RENAME_NOREPLACE) != 0:
         err = ctypes.get_errno()
         raise OSError(err, os.strerror(err), str(dst))
 
@@ -96,15 +101,21 @@ def release(entry: Path, live_path: Path, preserve: Callable[[Path], bool]) -> b
                     return False
             finally:
                 os.close(fd)
+        private = f".release-{uuid4().hex}"
         try:
-            current = os.stat(entry.name, dir_fd=parent, follow_symlinks=False)
+            _rename_at(parent, entry.name, parent, private)
         except FileNotFoundError:
             return False
-        if not os.path.samestat(current, held):
+        current = os.stat(private, dir_fd=parent, follow_symlinks=False)
+        if (not os.path.samestat(current, held)
+                or (not same_live and (current.st_size, current.st_mtime_ns)
+                    != (held.st_size, held.st_mtime_ns))):
+            try:
+                _rename_at(parent, private, parent, entry.name)
+            except FileExistsError:
+                pass  # Keep the claimed entry in quarantine beside the recreated name.
             return False
-        if not same_live and (current.st_size, current.st_mtime_ns) != (held.st_size, held.st_mtime_ns):
-            return False
-        os.unlink(entry.name, dir_fd=parent)
+        os.unlink(private, dir_fd=parent)
         return True
 
 
