@@ -80,3 +80,33 @@ def test_held_lock_exits_75(home, archive):
         os.close(fd)
     assert result.returncode == 75
     assert "holds" in result.stderr
+
+
+@pytest.mark.parametrize("content, message", [
+    ('archive_root = [\n', "cannot read configuration"),
+    ('archive_root = 42\nobs_command = ["obs"]\n', "archive_root must be a string"),
+])
+def test_invalid_config_exits_2(home, archive, content, message):
+    path = write_config(home, archive)
+    path.write_text(content)
+    result = run_tool("capture", home=home)
+    assert result.returncode == 2
+    assert str(path) in result.stderr
+    assert message in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+def test_config_read_error_exits_2(home, archive, monkeypatch, capsys):
+    from session_archive import cli
+
+    path = write_config(home, archive)
+
+    def unreadable(self):
+        raise PermissionError("permission denied reading configuration")
+
+    monkeypatch.setattr(type(path), "read_text", unreadable)
+    assert cli.main(["capture"]) == 2
+    error = capsys.readouterr().err
+    assert str(path) in error
+    assert "permission denied reading configuration" in error
+    assert "Traceback" not in error

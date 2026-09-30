@@ -50,13 +50,18 @@ class Config:
 def load_config(path: Path) -> Config:
     if not path.is_file():
         raise HostGateError(f"session-archive is not configured on this host ({path} is missing)")
-    data = tomllib.loads(path.read_text())
+    try:
+        data = tomllib.loads(path.read_text())
+    except (OSError, tomllib.TOMLDecodeError) as error:
+        raise HostGateError(f"{path}: cannot read configuration: {error}") from None
     for key in ("archive_root", "obs_command"):
         if key not in data:
             raise HostGateError(f"{path}: missing key {key!r}")
     command = data["obs_command"]
     if not (isinstance(command, list) and command and all(isinstance(part, str) for part in command)):
         raise HostGateError(f"{path}: obs_command must be a non-empty list of strings")
+    if not isinstance(data["archive_root"], str):
+        raise HostGateError(f"{path}: archive_root must be a string")
     root = Path(os.path.expanduser(data["archive_root"]))
     if not root.is_dir():
         raise HostGateError(f"archive_root {root} does not exist (is the backup disk mounted?)")
