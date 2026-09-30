@@ -34,3 +34,46 @@ def write_config(home: Path, archive: Path, obs_command=("true",), uninspectable
 def run_tool(*args: str, home: Path) -> subprocess.CompletedProcess:
     return subprocess.run([sys.executable, str(TOOL), *args], env={**os.environ, "HOME": str(home)},
                           capture_output=True, text=True)
+
+
+SID = "11111111-2222-4333-8444-555555555555"
+TID = "019e0000-0000-7000-8000-000000000001"
+
+
+def obs_for(*paths: Path) -> dict:
+    """An obs index state in which each path is fully indexed at its current version."""
+    from session_archive.decide import ObsFile
+    state = {}
+    for path in paths:
+        info = os.stat(path)
+        state[os.path.realpath(path)] = ObsFile(info.st_size, info.st_mtime_ns // 1_000_000,
+                                                info.st_size, False, True, False)
+    return state
+
+
+def claude_session(root: Path, age_days: float = 40, project: str = "-p", sid: str = SID) -> Path:
+    """A session with a transcript, a subagent transcript and a tool result, all aged."""
+    write(root / project / sid / "subagents" / "agent-1.jsonl", b'{"sub":1}\n', age_days)
+    write(root / project / sid / "tool-results" / "r.txt", b"result", age_days)
+    return write(root / project / f"{sid}.jsonl", b'{"a":1}\n', age_days)
+
+
+def codex_rollout(root: Path, age_days: float = 40, tid: str = TID,
+                  data: bytes = b'{"type":"session_meta"}\n') -> Path:
+    return write(root / "2026" / "01" / "01" / f"rollout-2026-01-01T00-00-00-{tid}.jsonl", data, age_days)
+
+
+def uninspectable_comms() -> tuple[str, ...]:
+    """comm names of this user's processes whose descriptors this host cannot read (on
+    titan: systemd and (sd-pam)); tests allow them so they can watch processes they start."""
+    from session_archive.inputs import InspectionFailed, open_inodes
+    try:
+        open_inodes()
+    except InspectionFailed as failure:
+        return tuple(sorted({name for _pid, name, _reason in failure.processes}))
+    return ()
+
+
+def lenient_open_inodes() -> set:
+    from session_archive.inputs import open_inodes
+    return open_inodes(allow=uninspectable_comms())
