@@ -86,7 +86,8 @@ STUB_CODEX_MODE: ok (default), fail (exit 1, touch nothing), unlink-fail (unlink
 exit 1), hang (sleep past any timeout), ignore-lock (resume and delete ignore the writer
 lock), writer-closes (exec closes its rollout at once), writer-during-delete (delete leaves
 a detached writer appending to the unlinked rollout), writer-unlink-fail (the same, then
-exit 1). STUB_CODEX_LOG, when set, receives one JSON line per call."""
+exit 1), no-thread-row (never insert or delete a thread row). STUB_CODEX_LOG, when set,
+receives one JSON line per call."""
 import fcntl, json, os, sqlite3, sys, time, uuid
 from pathlib import Path
 
@@ -144,7 +145,8 @@ elif args[:1] == ["exec"]:
     if mode == "writer-closes":
         rollout.close()
     with db() as conn:
-        conn.execute("INSERT INTO threads VALUES (?)", (tid,))
+        if mode != "no-thread-row":
+            conn.execute("INSERT INTO threads VALUES (?)", (tid,))
     time.sleep(float(os.environ.get("STUB_CODEX_WRITER_SECONDS", "1")))
     sys.exit("Error: 401 Unauthorized")
 elif args[:1] == ["archive"]:
@@ -177,7 +179,8 @@ elif args[:2] == ["delete", "--force"]:
     for path in rollouts(tid):
         path.unlink()
     with db() as conn:
-        conn.execute("DELETE FROM threads WHERE id = ?", (tid,))
+        if mode != "no-thread-row":
+            conn.execute("DELETE FROM threads WHERE id = ?", (tid,))
     if mode in ("unlink-fail", "writer-unlink-fail"):
         sys.exit("Error: failed to delete session")
     print(f"Deleted session {tid}.")

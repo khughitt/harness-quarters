@@ -29,9 +29,10 @@ class ProbeResult:
         return bool(self.checks) and all(self.checks.values())
 
 
-def codex_version(codex_bin: str) -> str:
+def codex_version(codex_bin: str, *, env: dict[str, str] | None = None) -> str:
     try:
-        result = subprocess.run([codex_bin, "--version"], capture_output=True, text=True, timeout=60)
+        result = subprocess.run([codex_bin, "--version"], env=env,
+                                capture_output=True, text=True, timeout=60)
     except (OSError, subprocess.TimeoutExpired) as error:
         raise CodexUnavailable(f"{codex_bin} --version: {error}") from error
     if result.returncode != 0:
@@ -84,7 +85,7 @@ def probe_codex(codex_bin: str, workdir: Path, held) -> ProbeResult:
         return subprocess.run([codex_bin, *args], cwd=cwd, env=env, stdin=subprocess.DEVNULL,
                               capture_output=True, text=True, timeout=180)
 
-    version = codex_version(codex_bin)
+    version = codex_version(codex_bin, env=env)
     # exec creates and holds its thread while retrying before the auth failure.
     writer = subprocess.Popen([codex_bin, "exec", "--skip-git-repo-check", PROMPT], cwd=cwd, env=env,
                               stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -122,7 +123,9 @@ def probe_codex(codex_bin: str, workdir: Path, held) -> ProbeResult:
     codex("archive", thread_id)
     archived = list((home / "archived_sessions").rglob(f"*{thread_id}.jsonl"))
     checks["archive_moved"] = len(archived) == 1 and not rollout.exists()
+    rows_before_delete = _thread_rows(home / "state_5.sqlite", thread_id)
     deleted = codex("delete", "--force", thread_id)
     checks["archived_delete_removed_file"] = deleted.returncode == 0 and not any(home.rglob(f"*{thread_id}.jsonl"))
-    checks["archived_delete_removed_row"] = _thread_rows(home / "state_5.sqlite", thread_id) == 0
+    checks["archived_delete_removed_row"] = (
+        rows_before_delete == 1 and _thread_rows(home / "state_5.sqlite", thread_id) == 0)
     return ProbeResult(version, checks)

@@ -43,6 +43,25 @@ def test_codex_version(stub_codex, monkeypatch):
     assert codex_version(str(stub_codex)) == "codex-cli 9.9.9"
 
 
+def test_probe_isolates_every_codex_invocation(stub_codex, tmp_path, monkeypatch):
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "caller-home"))
+    work = tmp_path / "work"
+    result = probe_codex(str(stub_codex), work, lenient_open_inodes)
+    assert result.passed, result.checks
+    calls = [json.loads(line) for line in (tmp_path / "codex.log").read_text().splitlines()]
+    assert calls[0]["argv"] == ["--version"]
+    assert all(call["codex_home"] == str(work / "home") for call in calls)
+
+
+def test_probe_requires_row_before_archived_delete(stub_codex, tmp_path, monkeypatch):
+    monkeypatch.setenv("STUB_CODEX_MODE", "no-thread-row")
+    result = probe_codex(str(stub_codex), tmp_path / "work", lenient_open_inodes)
+    assert not result.passed
+    assert result.checks["archive_moved"] is True
+    assert result.checks["archived_delete_removed_file"] is True
+    assert result.checks["archived_delete_removed_row"] is False
+
+
 def test_probe_command_records_passing_version(home, archive, stub_codex):
     write_config(home, archive, uninspectable_ok=uninspectable_comms())
     result = run_tool("probe-codex", home=home)
