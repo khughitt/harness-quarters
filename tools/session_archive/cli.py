@@ -114,7 +114,7 @@ def cmd_status(cfg, table, args) -> int:
                                               datetime.now(timezone.utc))
         finally:
             manifest.close()
-    except sqlite3.Error as error:
+    except (sqlite3.Error, OSError, ValueError) as error:
         report, ok = {"ok": False, "error": f"{type(error).__name__}: {error}"}, False
     print(json.dumps(report, sort_keys=True))
     return 0 if ok else 1

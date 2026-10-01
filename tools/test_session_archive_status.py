@@ -119,3 +119,41 @@ def test_failed_prune_record_makes_status_unhealthy(home, archive, manifest):
     assert report["prune"]["run_id"] == recorded.run_id
     assert report["prune"]["mode"] == "dry-run" and report["prune"]["ok"] is False
     assert report["prune"]["report"]["error"].startswith("ObsUnavailable:")
+
+
+def test_status_reports_quarantine_io_failure(home, archive, manifest, monkeypatch, capsys):
+    from argparse import Namespace
+    from session_archive import cli, config, quarantine
+
+    root = home / ".claude" / QUARANTINE
+    write(root / "old" / "f", b"x")
+    open_nofollow = quarantine.open_nofollow
+
+    def unreadable(path, flags):
+        if path == root:
+            raise PermissionError("quarantine cannot be read")
+        return open_nofollow(path, flags)
+
+    monkeypatch.setattr(quarantine, "open_nofollow", unreadable)
+    cfg = config.Config(archive, ("unused-obs",), ())
+    assert cli.cmd_status(cfg, config.sources(home), Namespace()) == 1
+    output = capsys.readouterr()
+    assert json.loads(output.out) == {
+        "ok": False, "error": "PermissionError: quarantine cannot be read"}
+    assert not output.err
+
+
+@pytest.mark.parametrize("field, value, error_kind", [
+    ("report", "not json", "JSONDecodeError"),
+    ("finished_at", "not a timestamp", "ValueError"),
+])
+def test_status_reports_malformed_manifest(home, archive, manifest, field, value, error_kind):
+    write_config(home, archive)
+    run(manifest, "capture", timedelta(hours=1))
+    with manifest.conn:
+        manifest.conn.execute(f"UPDATE runs SET {field} = ? WHERE kind = 'capture'", (value,))
+    result = run_tool("status", home=home)
+    report = json.loads(result.stdout)
+    assert result.returncode == 1 and report["ok"] is False
+    assert report["error"].startswith(error_kind + ":")
+    assert not result.stderr
