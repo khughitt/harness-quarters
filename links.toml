@@ -8,6 +8,10 @@
 "~/.agents" = "agents"
 "~/.config/AGENTS.md" = "AGENTS.md"
 "~/.local/bin/harness-state-refresh" = ".githooks/harness-state-refresh"
+"~/.config/systemd/user/session-archive-capture.service" = "systemd/user/session-archive-capture.service"
+"~/.config/systemd/user/session-archive-capture.timer" = "systemd/user/session-archive-capture.timer"
+"~/.config/systemd/user/session-archive-prune.service" = "systemd/user/session-archive-prune.service"
+"~/.config/systemd/user/session-archive-prune.timer" = "systemd/user/session-archive-prune.timer"
 
 [harness.claude]
 home = "~/.claude"

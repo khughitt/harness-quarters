@@ -1,0 +1,10 @@
+[Unit]
+Description=Prune archived, inactive agent sessions (dry run until the rollout gate)
+Documentation=file://%h/d/tack/docs/specs/2026-09-30-session-archive-design.md
+
+[Service]
+Type=oneshot
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/python3 %h/d/tack/tools/session-archive prune
+Nice=10
+IOSchedulingClass=idle
