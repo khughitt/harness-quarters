@@ -77,11 +77,18 @@ def test_capture_freshness_boundary(manifest, tmp_path, ago, expected):
     assert status_report(manifest, [tmp_path], NOW)[1] is expected
 
 
-def test_failed_capture_does_not_refresh_last_success(manifest, tmp_path):
-    run(manifest, "capture", timedelta(hours=49))
+@pytest.mark.parametrize("success_age, expected", [
+    (timedelta(hours=49), False),
+    (timedelta(hours=3), True),
+])
+def test_latest_failed_capture_is_reported_without_refreshing_success(manifest, tmp_path,
+                                                                    success_age, expected):
+    run(manifest, "capture", success_age)
     run(manifest, "capture", timedelta(hours=1), ok=False)
     report, ok = status_report(manifest, [tmp_path], NOW)
-    assert not ok and report["capture"]["finished_at"] == stamp(timedelta(hours=49))
+    assert ok is expected
+    assert report["capture"]["finished_at"] == stamp(timedelta(hours=1))
+    assert report["capture"]["ok"] is False
 
 
 def test_status_command_is_healthy_and_preserves_manifest(home, archive):

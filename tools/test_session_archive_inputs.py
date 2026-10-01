@@ -92,6 +92,32 @@ def test_real_proc_sees_our_descriptor(tmp_path):
         assert (info.st_dev, info.st_ino) in lenient_open_inodes()
 
 
+@pytest.mark.parametrize("reference", ["cwd", "root"])
+def test_process_directory_references_are_held(tmp_path, reference):
+    target = tmp_path / "held-directory"
+    target.mkdir()
+    proc = fake_proc(tmp_path, tmp_path / "closed-file")
+    (proc / "100" / reference).symlink_to(target, target_is_directory=True)
+    info = target.stat()
+    assert open_inodes(proc=proc) == {(info.st_dev, info.st_ino)}
+
+
+@pytest.mark.parametrize("reference", ["cwd", "root"])
+def test_process_directory_inspection_failure_refuses_unless_allowed(tmp_path, monkeypatch, reference):
+    proc = fake_proc(tmp_path, tmp_path / "closed-file")
+    original = os.stat
+
+    def denied(path, *args, **kw):
+        if path == proc / "100" / reference:
+            raise PermissionError(errno.EACCES, "denied")
+        return original(path, *args, **kw)
+
+    monkeypatch.setattr(os, "stat", denied)
+    with pytest.raises(InspectionFailed, match=reference):
+        open_inodes(proc=proc)
+    assert open_inodes(allow=("claude",), proc=proc) == set()
+
+
 def test_tail_has_newline(tmp_path):
     path = write(tmp_path / "t", b"line\npartial")
     assert not tail_has_newline(path, 5)
@@ -199,7 +225,7 @@ def test_descriptor_inspection_error_refuses_unless_allowed(tmp_path, monkeypatc
             raise PermissionError(errno.EACCES, "denied")
         return original(path, *args, **kw)
     monkeypatch.setattr(os, "stat", denied)
-    with pytest.raises(InspectionFailed, match=r"100 \(claude\).*fd 3"):
+    with pytest.raises(InspectionFailed, match=r"100 \(claude\).*fd/3"):
         open_inodes(proc=proc)
     assert open_inodes(allow=("claude",), proc=proc) == set()
 

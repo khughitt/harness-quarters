@@ -1,5 +1,7 @@
 """Claude deletion protocol and its deletion-window cases (spec §3.4.2)."""
 import os
+import subprocess
+import sys
 import time
 
 import pytest
@@ -297,6 +299,51 @@ def test_held_nested_directory_restores_before_openat_append(world):
     finally:
         for fd in reversed(handles):
             os.close(fd)
+
+
+def test_child_cwd_restores_before_late_open_and_append(world):
+    src, unit, jsonl, ctx = world
+    subagents = src.root / "-p" / SID / "subagents"
+    script = r'''
+import os, sys
+print("ready", flush=True)
+sys.stdin.readline()
+with open("agent-1.jsonl", "ab") as writer:
+    print("opened", flush=True)
+    sys.stdin.readline()
+    writer.write(b'{"late":1}\n')
+    writer.flush()
+    print(os.fstat(writer.fileno()).st_nlink, flush=True)
+'''
+    child = subprocess.Popen([sys.executable, "-u", "-c", script], cwd=subagents,
+                             stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    opened = False
+
+    def open_after_settle(u):
+        nonlocal opened
+        child.stdin.write("open\n")
+        child.stdin.flush()
+        assert child.stdout.readline().strip() == "opened"
+        opened = True
+
+    ctx.hooks = Hooks(before_delete=open_after_settle)
+    try:
+        assert child.stdout.readline().strip() == "ready"
+        outcome = delete_claude_unit(unit, ctx)
+        if not opened:
+            open_after_settle(unit)
+        output, _ = child.communicate("append\n", timeout=5)
+        assert child.returncode == 0
+        assert outcome == "kept:open", f"{outcome}; late writer has {output.strip()} links"
+        assert int(output) > 0
+        assert jsonl.exists()
+        assert (subagents / "agent-1.jsonl").read_bytes() == b'{"sub":1}\n{"late":1}\n'
+    finally:
+        if child.poll() is None:
+            child.kill()
+        child.wait(timeout=5)
+        child.stdin.close()
+        child.stdout.close()
 
 
 def test_new_companion_directory_after_transcript_only_discovery_keeps_quarantine(world):

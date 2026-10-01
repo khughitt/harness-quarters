@@ -13,10 +13,11 @@ def _parse(stamp: str) -> datetime:
 
 
 def status_report(manifest: Manifest, homes, now: datetime) -> tuple[dict, bool]:
-    capture = manifest.last_run("capture", ok_only=True)
+    capture = manifest.last_run("capture")
+    successful_capture = manifest.last_run("capture", ok_only=True)
     prune = manifest.last_run("prune")
     quarantines = [str(path) for path in leftovers(homes)]
-    fresh = capture is not None and now - _parse(capture.finished_at) <= STALE
+    fresh = successful_capture is not None and now - _parse(successful_capture.finished_at) <= STALE
     ok = fresh and (prune is None or prune.ok) and not quarantines
     report = {
         "capture": asdict(capture) if capture else None,

@@ -79,7 +79,7 @@ def comm(pid_dir: Path) -> str:
 
 def open_inodes(allow: tuple[str, ...] = (), proc: Path = Path("/proc"),
                 uid: int | None = None) -> set[tuple[int, int]]:
-    """Inspect this user's descriptors. Skip disappearances; fail on other errors
+    """Inspect this user's descriptors, cwd and root. Skip disappearances; fail on other errors
     unless the process's readable comm is explicitly allowed."""
     uid = os.getuid() if uid is None else uid
     held, blocked = set(), []
@@ -105,13 +105,13 @@ def open_inodes(allow: tuple[str, ...] = (), proc: Path = Path("/proc"),
             failure = str(error)
         except OSError as error:
             failure = str(error)
-        for entry in entries:
+        for entry in [*entries, pid_dir / "cwd", pid_dir / "root"]:
             try:
                 info = os.stat(entry)
             except (FileNotFoundError, ProcessLookupError):
                 continue
             except OSError as error:
-                failure = failure or f"fd {entry.name}: {error}"
+                failure = failure or f"{entry.relative_to(pid_dir)}: {error}"
                 continue
             held.add((info.st_dev, info.st_ino))
         if failure:

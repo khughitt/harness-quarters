@@ -163,10 +163,11 @@ For each pruning unit (§3.2), prune decides using these inputs:
 - a fresh sha256 of every live file, and of every archived copy read back from the
   archive disk;
 - obs's per-file index state, from `obs index-state --json` (`obs-0bc168`);
-- the set of files any process holds open, from `/proc/*/fd`. The scope is every process
+- the set of files and directories any process holds through `/proc/*/fd`,
+  `/proc/*/cwd`, or `/proc/*/root`. The scope is every process
   owned by this user, since transcript writers run as the user. A process that exits
   mid-scan, or a descriptor that closes mid-scan, is skipped. A same-user process
-  whose descriptors cannot be read fails the inspection, and prune refuses to delete.
+  whose references cannot be read fails the inspection, and prune refuses to delete.
   The exceptions are processes whose `comm` the config lists in `uninspectable_ok`: a
   person names each one. On titan these are `(sd-pam)`, which is non-dumpable, and the
   `systemd` user manager, whose descriptors can be listed but not followed. A failed
@@ -227,13 +228,15 @@ Claude Code has no writer lock, so prune takes the unit out of reach by path:
 1. **Quarantine.** Rename the unit's files (`<id>.jsonl` and the `<id>/` directory) into
    the quarantine. Each rename is atomic. From here on, nothing can open these inodes
    through the paths a harness knows.
-2. **Settle.** Scan `/proc/*/fd` for any process holding one of the quarantined inodes,
-   matched by device and inode because the path has changed. If one does, restore the
+2. **Settle.** Scan `/proc/*/fd`, `/proc/*/cwd`, and `/proc/*/root` for any process
+   holding a quarantined file or descendant directory inode, matched by device and
+   inode because the path has changed. If one does, restore the
    unit and record `kept:open`, or `failed:recreated` if the restore meets a recreated
    path.
 3. **Re-verify.** Once step 2 finds no holder, the content is frozen. No process has a
-   descriptor, and none can get one: the old path is gone and the quarantine path is
-   unknown to the harness. A writer that closed before step 2 has finished writing, so
+   descriptor or directory reference into the unit, and none can get one: the old path
+   is gone and the quarantine path is unknown to the harness. A writer that closed
+   before step 2 has finished writing, so
    the hash sees its bytes. Condition 2 is checked again on the quarantined files. If
    the content changed after the pre-check, recapture it and verify the recapture,
    then restore the unit and record `kept:changed`, or `failed:recreated` if the
@@ -257,8 +260,9 @@ itself excludes writers.
 
 1. **Lock and link.** Take the thread's lock non-blocking; if it is held, record
    `kept:busy`. While holding it, re-run the pre-check for this unit and hard-link the
-   rollout into the quarantine. The link keeps the inode alive if Codex unlinks the
-   path.
+   rollout into the quarantine. Sync newly created ancestor directory entries and the
+   link's directory before releasing the lock. The durable link keeps the inode alive
+   if Codex unlinks the path.
 2. **Delete.** Release the lock and run `codex delete --force <thread id>`, where the
    thread id is the UUID in the rollout's filename, with a 120-second timeout. The
    delete has succeeded only when it exits 0 and the rollout path is gone. Anything else

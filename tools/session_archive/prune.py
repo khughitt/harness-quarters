@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from .capture import archived_file, capture_file, mirror_path, open_nofollow, stat_of, walk_files
+from .capture import archived_file, capture_file, mirror_path, mkdir_synced, open_nofollow, stat_of, walk_files
 from .decide import INACTIVE_NS, FileFacts, ObsFile, Stat, is_transcript, unit_reason
 from .inputs import InspectionFailed, Unit, claude_units, codex_units
 from .manifest import MIRROR, Manifest
@@ -260,13 +260,14 @@ def delete_codex_unit(unit: Unit, ctx: Context) -> str:
             cleanup.callback(os.close, source)
             if not stat.S_ISREG(os.fstat(source).st_mode):
                 return "failed:release"
-            qdir.mkdir(parents=True, exist_ok=True)
+            mkdir_synced(qdir)
             target = open_nofollow(qdir, os.O_RDONLY | os.O_DIRECTORY)
             cleanup.callback(os.close, target)
             # linkat follows this held descriptor, never a replaced rollout path or parent.
             os.link(f"/proc/self/fd/{source}", link.name, dst_dir_fd=target, follow_symlinks=True)
             if not _same_inode(link, rollout):
                 return "failed:release"
+            os.fsync(target)
     except InspectionFailed:
         return "failed:uninspectable"
     except OSError:

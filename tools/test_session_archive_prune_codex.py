@@ -3,6 +3,7 @@ import fcntl
 import json
 import os
 import time
+from pathlib import Path
 
 import pytest
 
@@ -42,6 +43,59 @@ def test_pruned_through_codex_delete(world, tmp_path, archive):
     calls = [json.loads(line) for line in (tmp_path / "codex.log").read_text().splitlines()]
     assert calls == [{"argv": ["delete", "--force", TID], "codex_home": str(src.home)}]
     assert mirror_path(archive, "codex", unit.files[0]).exists()
+
+
+def test_quarantine_is_durable_before_writer_lock_release_and_delete(world, monkeypatch):
+    src, unit, rollout, ctx = world
+    lock = src.home / "thread-writer-locks" / f"{TID}.lock"
+    qdir = link(src, rollout).parent
+    events = []
+    real_sync, real_close = os.fsync, os.close
+
+    def sync(fd):
+        path = Path(os.readlink(f"/proc/self/fd/{fd}"))
+        real_sync(fd)
+        events.append(("sync", path))
+        if path == qdir:
+            assert os.path.samefile(link(src, rollout), rollout)
+        if path in (src.home, qdir.parent, qdir):
+            with open(lock, "rb") as contender:
+                with pytest.raises(BlockingIOError):
+                    fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def close(fd):
+        if os.readlink(f"/proc/self/fd/{fd}") == str(lock):
+            events.append(("unlock", lock))
+        real_close(fd)
+
+    monkeypatch.setattr(os, "fsync", sync)
+    monkeypatch.setattr(os, "close", close)
+    ctx.hooks = Hooks(before_delete=lambda u: events.append(("delete", rollout)))
+    assert delete_codex_unit(unit, ctx) == "pruned"
+    first_unlock = events.index(("unlock", lock))
+    assert {path for event, path in events[:first_unlock] if event == "sync"} >= {
+        src.home, qdir.parent, qdir}
+    assert first_unlock < events.index(("delete", rollout))
+
+
+@pytest.mark.parametrize("directory", ["home", "quarantine", "run"])
+def test_quarantine_sync_failure_never_invokes_codex(world, tmp_path, monkeypatch, directory):
+    src, unit, rollout, ctx = world
+    qdir = link(src, rollout).parent
+    target = {"home": src.home, "quarantine": qdir.parent, "run": qdir}[directory]
+    real_sync = os.fsync
+
+    def refuse(fd):
+        if os.readlink(f"/proc/self/fd/{fd}") == str(target):
+            raise OSError("quarantine sync failed")
+        real_sync(fd)
+
+    monkeypatch.setattr(os, "fsync", refuse)
+    assert delete_codex_unit(unit, ctx) == "failed:release"
+    assert rollout.read_bytes() == b'{"type":"session_meta"}\n'
+    assert not (tmp_path / "codex.log").exists()
+    if directory == "run":
+        assert os.path.samefile(link(src, rollout), rollout)
 
 
 def test_held_writer_lock_is_busy(world):
