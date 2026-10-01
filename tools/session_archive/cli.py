@@ -2,15 +2,17 @@
 import argparse
 import json
 import sys
+import tempfile
 import uuid
 from contextlib import nullcontext
 from dataclasses import asdict
 from pathlib import Path
 
-from . import capture, config
+from . import capture, config, inputs, probe
 from .manifest import Manifest, Run, utc_now
 
 LOCKED = frozenset({"capture", "prune", "promote", "probe-codex"})
+CODEX = "codex"
 
 
 def config_path() -> Path:
@@ -59,7 +61,25 @@ def cmd_promote(cfg, table, args) -> int:
     return 0
 
 
-COMMANDS = {"capture": cmd_capture, "promote": cmd_promote}
+def cmd_probe_codex(cfg, table, args) -> int:
+    try:
+        with tempfile.TemporaryDirectory(prefix="session-archive-probe-") as workdir:
+            result = probe.probe_codex(CODEX, Path(workdir), lambda: inputs.open_inodes(allow=cfg.uninspectable_ok))
+    except (probe.CodexUnavailable, inputs.InspectionFailed) as error:
+        print(f"session-archive: {error}", file=sys.stderr)
+        return 1
+    if result.passed:
+        manifest = Manifest.open(cfg.archive_root)
+        try:
+            manifest.record_probe(result.version, utc_now())
+        finally:
+            manifest.close()
+    print(json.dumps({"version": result.version, "checks": result.checks, "passed": result.passed},
+                     sort_keys=True))
+    return 0 if result.passed else 1
+
+
+COMMANDS = {"capture": cmd_capture, "promote": cmd_promote, "probe-codex": cmd_probe_codex}
 
 
 def main(argv) -> int:
