@@ -1,6 +1,6 @@
 # Workflow evaluation from post-implementation outcomes
 
-Status: draft for review, revision 2 (answers review round 1, §10). Task: `tack-026612`.
+Status: draft for review, revision 3 (answers review rounds 1 and 2, §10). Task: `tack-026612`.
 Inputs: obs-00809f's outcome measures (obs `docs/specs/2026-09-28-outcome-measures-design.md`,
 revision 13, and its validation report `docs/reports/2026-09-29-outcome-measures-validation.md`);
 the case shape of `tack-99ea5d` (`agents/evals/cases/`); the intent of obs-abfcf9 (cases
@@ -62,7 +62,7 @@ subject:
   version: [blob:<SKILL.md git blob>, cohort <from>..<to>]
 inputs:
   - kind: query
-    ref: obs outcomes report --since <from> --until <to> --units
+    ref: obs outcomes report --since <from> --until <to> --cohort --units
     window: <from>..<to>
 expected:
   type: choice
@@ -74,7 +74,7 @@ observed:
   at: <subject version>
 judge:
   kind: check
-  command: obs outcomes report --since <from> --until <to> --units | agents/evals/bin/flow-outcome-verdict --from <from> --to <to>
+  command: obs outcomes report --since <from> --until <to> --cohort --units | agents/evals/bin/flow-outcome-verdict
   cwd: tack checkout
   pass: prints no-regression-detected
 source: [tack-026612, obs-00809f]
@@ -89,13 +89,31 @@ verdicts (§7).
 version ran, and obs's `skill_calls` has no version column. The subject is therefore a
 cohort: the tasks whose first start *and* first eligible close both fall inside the
 window during which one blob of `agents/skills/flow/SKILL.md` was the committed file.
-Requiring the start inside the window removes tasks that began under an earlier version;
-every flow load such a task made happened while this blob was committed. What it cannot
-remove is an uncommitted edit: the harness homes link the skill to the main checkout's
-working tree, so a session can load an edit that was never committed. The verdict is
-labelled a cohort verdict, never "flow at blob X ran and produced …". If obs later
-records the skill content each session loaded, version attribution per task replaces the
-cohort (out of scope here).
+Requiring the start inside the window removes tasks that began under an earlier
+version; it does not guarantee which content the task's sessions loaded. Three gaps stay
+open and are listed as limitations in every run:
+
+- **pre-start loads:** obs credits a skill invoked at or before the task's end
+  (`outcomes._factors_of`), so a load before the task's first start, possibly before
+  the window, counts toward `skill:flow`;
+- **held content:** a session that loaded the skill earlier keeps that content in its
+  context across later turns and resumptions, whatever was committed since;
+- **uncommitted edits:** the harness homes link the skill to the main checkout's
+  working tree, so a session can load an edit that was never committed.
+
+The verdict is labelled a cohort verdict, never "flow at blob X ran and produced …". If
+obs later records the skill content each session loaded, version attribution per task
+replaces the cohort (out of scope here).
+
+**Window boundaries.** obs's `--since` and `--until` take calendar dates, inclusive,
+anchored at midnight UTC, and blob transitions happen within a day. A cohort window is
+therefore the whole UTC days contained in the blob's interval: `from` is the first UTC
+day starting at or after the commit that introduced the blob, and `to` is the last UTC
+day ending at or before the commit that replaced it (today, for the current blob). A
+blob whose interval contains no whole day has no cohort of its own and is pooled. The
+days cut at each end are listed with the window. Rejected alternative: timestamp bounds,
+which would widen obs's shared `when` value for every command to recover at most two
+partial days per version.
 
 The blob hash survives the 2026-09-29 history cut: a pre-cut version is named by its
 blob from the private archive, and the same content yields the same hash in both
@@ -110,13 +128,16 @@ deterministic over that data, which does not make the data observed.
 
 ## 4. Verdict rule
 
-`agents/evals/bin/flow-outcome-verdict` reads the report's JSON on stdin, keeps the task
-rows (`--units`, §8) whose first start and first eligible close fall in `[from, to)`,
-and prints one choice, the reason, and the counts behind it. It reads the
-`factor = "skill:flow"`, `measure = "m4_defective"` comparisons only for obs's
-suppression decisions, and refuses (exit 2) when its own per-cell counts from the task
-rows disagree with the comparison rows' exact counts for the same window, since a
-disagreement means the two halves of the report describe different units.
+`agents/evals/bin/flow-outcome-verdict` reads the report's JSON on stdin and prints one
+choice, the reason, and the counts behind it. The cohort is applied once, in obs:
+`--cohort` restricts the task units to those whose first start and first eligible close
+both fall in the window *before* obs aggregates cells and decides suppression, so the
+`unassigned` and `low_retention` decisions are taken over the cohort, not over the plain
+close window. The `--units` rows are the same units. The tool reads the
+`factor = "skill:flow"`, `measure = "m4_defective"` comparisons for obs's suppression
+decisions and exact per-cell counts, recounts the cells from the task rows, and refuses
+(exit 2) on any disagreement, since that means the two halves of the report describe
+different units. It filters nothing itself.
 
 1. **insufficient: unvalidated** when the comparisons carry `suppressed_reason`
    `unvalidated:E2` (§2's gate).
@@ -187,8 +208,11 @@ cohort window rather than a commit; and an `insufficient` answer that carries a 
 ## 8. Pieces
 
 1. **obs: what the report must expose** (one obs task, filed from here):
-   - `--until` on `obs outcomes report`, the upper bound with the same anchors as
-     `--since`;
+   - `--until` on `obs outcomes report`: the shared `when` value, inclusive through
+     the end of that UTC day, on the same task anchor as `--since`;
+   - `--cohort`: task units enter only when their first start and first eligible close
+     both fall within `--since`..`--until`, applied before cell aggregation and
+     suppression, and to `--units`;
    - `m4_defective: "E2"` in `UNVALIDATED`, and the defect-link validation that clears
      it, as §2 states (the rejudge itself is obs's work under its E2 recommendation;
      this task only adds the gate);
@@ -196,7 +220,8 @@ cohort window rather than a commit; and an `insufficient` answer that carries a 
      today) and a new `sum` of the measure, so a binary measure's defective count is
      exact rather than recovered from a rounded mean; `total` stays as is and is not
      read as a denominator;
-   - `--units`: task-level rows for the windowed task units, each with task id, first
+   - `--units`: task-level rows for the windowed task units (the cohort's under
+     `--cohort`), each with task id, first
      start, first eligible close, stratum, credit state and values for each factor
      (harness, model, effort, `skill:*`), defect, change and extension counts with the
      evidence class of each link (recorded or inferred), reopens, and `output_tokens`.
@@ -206,9 +231,11 @@ cohort window rather than a commit; and an `insufficient` answer that carries a 
 2. **tack: `agents/evals/bin/flow-outcome-verdict`** with its tests over fixture reports
    in `agents/evals/fixtures/`, one per branch of §4 (unvalidated, too few, regression,
    no regression), plus the Simpson's-paradox case from review round 1 (flow better in
-   each of two strata, worse pooled: must not be `regression`), a count mismatch between
-   task rows and comparison rows (must exit 2), and a task started before the window
-   (must be excluded).
+   each of two strata, worse pooled: must not be `regression`), and a count mismatch
+   between task rows and comparison rows (must exit 2). The cohort's own boundary
+   cases (a task started the day before `--since`; a stratum that passes retention over
+   the close window and fails it over the cohort) are tests in the obs task, where the
+   filter lives.
 3. **tack: the case file** with the current blob, its window, and a first run. While
    the E2 gate holds, that run prints `insufficient: unvalidated`; it is the
    verification that the pipeline works end to end, not a finding about flow.
@@ -221,9 +248,9 @@ recording; any change to how flow is chosen.
 ## 9. Verification
 
 - The verdict tool's tests pass on every fixture in §8 piece 2.
-- The case runs end to end against the live obs index with `--until` and `--units`,
-  and its per-cell counts match the comparison rows for `skill:flow` over the same
-  window (the tool's own refusal check, exercised live).
+- The case runs end to end against the live obs index with `--until`, `--cohort` and
+  `--units`, and its per-cell counts match the comparison rows for `skill:flow` over
+  the same cohort (the tool's own refusal check, exercised live).
 - The case has the five existing cases' top-level keys, so obs-abfcf9's "the existing
   cases validate unchanged" bar extends to six.
 
@@ -237,3 +264,10 @@ recording; any change to how flow is chosen.
   uncommitted-edit gap named (§3); exact per-cell sums and task-level rows added to the
   obs piece (§8); conditions computed jointly over distinct tasks in the scored cohort
   (§5).
+- **Round 2** (codex, 2026-10-01): revise; P1 1, P2 2. Answered in revision 3: the
+  cohort filter moved into obs (`--cohort`), applied before cell aggregation and
+  suppression so obs's retention decisions and the tool's recount describe the same
+  units (§4, §8); the guarantee about which content a task loaded removed, with
+  pre-start loads, held content and uncommitted edits listed as limitations (§3);
+  cohort windows set to whole UTC days inside each blob interval, timestamp bounds
+  rejected (§3).
