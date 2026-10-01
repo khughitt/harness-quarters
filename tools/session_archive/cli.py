@@ -3,12 +3,13 @@ import argparse
 import json
 import sys
 import tempfile
+import time
 import uuid
 from contextlib import nullcontext
 from dataclasses import asdict
 from pathlib import Path
 
-from . import capture, config, inputs, probe
+from . import capture, config, inputs, probe, prune
 from .manifest import Manifest, Run, utc_now
 
 LOCKED = frozenset({"capture", "prune", "promote", "probe-codex"})
@@ -79,7 +80,32 @@ def cmd_probe_codex(cfg, table, args) -> int:
     return 0 if result.passed else 1
 
 
-COMMANDS = {"capture": cmd_capture, "promote": cmd_promote, "probe-codex": cmd_probe_codex}
+def cmd_prune(cfg, table, args) -> int:
+    manifest = Manifest.open(cfg.archive_root)
+    run_id, started = uuid.uuid4().hex, utc_now()
+    report = {}
+    try:
+        try:
+            codex_probed = (not args.apply) or manifest.probe_passed(probe.codex_version(CODEX))
+            if not codex_probed:
+                report["codex_gate"] = "the installed codex has not passed probe-codex; run `session-archive probe-codex`"
+            ctx = prune.Context(cfg.archive_root, manifest, inputs.load_obs_state(cfg.obs_command),
+                                lambda: inputs.open_inodes(allow=cfg.uninspectable_ok), time.time_ns(),
+                                run_id, codex_bin=CODEX)
+            ok = prune.prune_run(ctx, table, args.apply, codex_probed, report)
+        except (inputs.ObsUnavailable, inputs.InspectionFailed, prune.ArchiveUnreadable,
+                prune.LeftoverQuarantine, probe.CodexUnavailable, OSError) as error:
+            report["error"] = f"{type(error).__name__}: {error}"
+            ok = False
+        manifest.record_run(Run(run_id, "prune", "apply" if args.apply else "dry-run", started, utc_now(), ok, report))
+    finally:
+        manifest.close()
+    print(json.dumps(report, sort_keys=True))
+    return 0 if ok else 1
+
+
+COMMANDS = {"capture": cmd_capture, "promote": cmd_promote, "probe-codex": cmd_probe_codex,
+            "prune": cmd_prune}
 
 
 def main(argv) -> int:

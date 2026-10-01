@@ -13,9 +13,9 @@ from typing import Callable
 
 from .capture import archived_file, capture_file, mirror_path, open_nofollow, stat_of, walk_files
 from .decide import INACTIVE_NS, FileFacts, ObsFile, Stat, is_transcript, unit_reason
-from .inputs import InspectionFailed, Unit
-from .manifest import Manifest
-from .quarantine import QUARANTINE, _rename_at, inodes, quarantine_dir, release, remove_empty_dirs
+from .inputs import InspectionFailed, Unit, claude_units, codex_units
+from .manifest import MIRROR, Manifest
+from .quarantine import QUARANTINE, _rename_at, inodes, leftovers, quarantine_dir, release, remove_empty_dirs
 
 
 class ArchiveUnreadable(Exception):
@@ -328,3 +328,78 @@ def delete_codex_unit(unit: Unit, ctx: Context) -> str:
         return "failed:release" if os.path.lexists(link) else outcome
     except OSError:
         return "failed:release"
+
+
+def repair_archive(unit: Unit, ctx: Context) -> str:
+    """Recapture every file whose mirrored copy no longer reads back to its recorded hash."""
+    for relpath in unit.files:
+        mirror = ctx.manifest.mirror(unit.source.name, relpath)
+        mirrored = mirror_path(ctx.archive_root, unit.source.name, relpath)
+        if mirror is None or _read_back(mirrored) == mirror.sha256:
+            continue
+        try:
+            outcome = capture_file(ctx.archive_root, ctx.manifest, unit.source.name, relpath,
+                                   unit.source.root / relpath, force=True)
+        except OSError:
+            return "failed:archive-repair"
+        if outcome.version is None or outcome.version.location != MIRROR or _read_back(mirrored) != mirror.sha256:
+            return "failed:archive-repair"
+    return "kept:archive-repaired"
+
+
+def _precheck(unit: Unit, ctx: Context, held) -> str | None:
+    try:
+        return evaluate(unit, ctx, held)
+    except FileNotFoundError:
+        return "vanished"
+    except OSError:
+        return "unreadable"
+
+
+def _decide(unit: Unit, reason: str | None, ctx: Context, apply: bool, codex_probed: bool) -> str:
+    if reason == "unreadable":
+        return "failed:unreadable"
+    if reason == "archive-damaged":
+        return repair_archive(unit, ctx) if apply else "kept:archive-damaged"
+    if reason:
+        return f"kept:{reason}"
+    if not apply:
+        return "eligible"
+    if unit.source.kind == "codex" and not codex_probed:
+        return "kept:codex-unprobed"
+    ctx.hooks.after_precheck(unit)
+    return delete_claude_unit(unit, ctx) if unit.source.kind == "claude" else delete_codex_unit(unit, ctx)
+
+
+def prune_run(ctx: Context, sources, apply: bool, codex_probed: bool, report: dict) -> bool:
+    """Fill `report` as the run goes, so a caller that catches an error keeps what was done.
+    Phase one pre-checks every unit, reading the archive back, before anything is deleted:
+    ArchiveUnreadable, InspectionFailed and unit discovery errors stop the run there. Phase
+    two applies the protocols; an unexpected OSError stops it, and later units are kept."""
+    left = leftovers([source.home for source in sources])
+    if left:
+        raise LeftoverQuarantine("quarantine not empty: " + ", ".join(str(path) for path in left))
+    pruned = [source for source in sources if source.pruned]
+    held = ctx.held()
+    plan = [(unit, _precheck(unit, ctx, held))
+            for source in pruned
+            for unit in (claude_units(source) if source.kind == "claude" else codex_units(source))]
+    for source in pruned:
+        report[source.name] = {"totals": {}, "units": []}
+    ok, stopped = True, False
+    for unit, reason in plan:
+        if stopped:
+            outcome = "kept:stopped"
+        else:
+            try:
+                outcome = _decide(unit, reason, ctx, apply, codex_probed)
+            except OSError as error:
+                outcome, stopped = "failed:io", True
+                report.setdefault("errors", []).append(f"{unit.source.name}/{unit.key}: {error}")
+        if outcome.startswith("failed") or outcome == "kept:codex-unprobed":
+            ok = False
+        entry = report[unit.source.name]
+        entry["totals"][outcome] = entry["totals"].get(outcome, 0) + 1
+        if outcome != "kept:active":
+            entry["units"].append({"unit": unit.key, "outcome": outcome})
+    return ok
