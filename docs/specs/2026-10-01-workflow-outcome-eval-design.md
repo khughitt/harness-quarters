@@ -1,6 +1,6 @@
 # Workflow evaluation from post-implementation outcomes
 
-Status: draft for review, revision 3 (answers review rounds 1 and 2, §10). Task: `tack-026612`.
+Status: approved 2026-10-01 at revision 3 (review round 3, §10); revision 3.1 folds in that round's nonblocking P3. Task: `tack-026612`.
 Inputs: obs-00809f's outcome measures (obs `docs/specs/2026-09-28-outcome-measures-design.md`,
 revision 13, and its validation report `docs/reports/2026-09-29-outcome-measures-validation.md`);
 the case shape of `tack-99ea5d` (`agents/evals/cases/`); the intent of obs-abfcf9 (cases
@@ -139,8 +139,11 @@ decisions and exact per-cell counts, recounts the cells from the task rows, and 
 (exit 2) on any disagreement, since that means the two halves of the report describe
 different units. It filters nothing itself.
 
-1. **insufficient: unvalidated** when the comparisons carry `suppressed_reason`
-   `unvalidated:E2` (§2's gate).
+1. **insufficient: unvalidated** when the report's measure-level validation status
+   for M4 names `E2` (§2's gate). The tool reads that status, never a comparison row's
+   `suppressed_reason`: obs gives each row one reason, `unassigned` and `low_retention`
+   before `unvalidated`, so coverage can mask the gate, and an empty cohort has no rows
+   at all.
 2. A stratum (obs's key: project, size, complexity, process, artifact) **enters** when
    obs shows its comparison (not suppressed for `unassigned` or `low_retention`) and both
    arms have at least one scored task in the cohort. Strata that do not enter are counted
@@ -216,6 +219,9 @@ cohort window rather than a commit; and an `insufficient` answer that carries a 
    - `m4_defective: "E2"` in `UNVALIDATED`, and the defect-link validation that clears
      it, as §2 states (the rejudge itself is obs's work under its E2 recommendation;
      this task only adds the gate);
+   - each measure's validation status in the report's `measures` section, independent
+     of comparison rows, so it is present for an empty cohort and under coverage
+     suppression;
    - exact counts per comparison cell: `n` restricted to attributed, measured units (as
      today) and a new `sum` of the measure, so a binary measure's defective count is
      exact rather than recovered from a rounded mean; `total` stays as is and is not
@@ -232,7 +238,8 @@ cohort window rather than a commit; and an `insufficient` answer that carries a 
    in `agents/evals/fixtures/`, one per branch of §4 (unvalidated, too few, regression,
    no regression), plus the Simpson's-paradox case from review round 1 (flow better in
    each of two strata, worse pooled: must not be `regression`), and a count mismatch
-   between task rows and comparison rows (must exit 2). The cohort's own boundary
+   between task rows and comparison rows (must exit 2), and an empty cohort while the
+   gate holds (must be `insufficient: unvalidated`, not `too few`). The cohort's own boundary
    cases (a task started the day before `--since`; a stratum that passes retention over
    the close window and fails it over the cohort) are tests in the obs task, where the
    filter lives.
@@ -271,3 +278,6 @@ recording; any change to how flow is chosen.
   pre-start loads, held content and uncommitted edits listed as limitations (§3);
   cohort windows set to whole UTC days inside each blob interval, timestamp bounds
   rejected (§3).
+- **Round 3** (codex, 2026-10-01): accept; P3 1. Folded in as revision 3.1: M4's
+  validation status exposed at measure level and read from there, with an empty-cohort
+  fixture (§4, §8).
