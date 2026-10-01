@@ -120,6 +120,10 @@ MIT licensed; see `LICENSE`.
   a home links to that the repository must not publish. The `~/.claude-work`,
   `~/.codex-work` and `~/.codex/rules` links point into it
   (`docs/specs/2026-09-28-local-layer-design.md`).
+- `tools/session-archive` and `systemd/user/`: daily capture of agent transcripts to a
+  backup disk, and a monthly prune of what the archive and obs verifiably hold
+  (`docs/specs/2026-09-30-session-archive-design.md`). Linked on every host; the
+  timers are enabled only on a host with `~/.config/session-archive/config.toml`.
 - `docs/`: specs, plans, and notes.
 - `tools/ops-docs`: vendored from ops; change it there.
 

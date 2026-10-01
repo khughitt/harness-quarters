@@ -1,0 +1,12 @@
+#!/usr/bin/env python3
+"""session-archive: daily capture and verified prune of agent session stores.
+
+Design: docs/specs/2026-09-30-session-archive-design.md."""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from session_archive.cli import main  # noqa: E402
+
+sys.exit(main(sys.argv[1:]))
