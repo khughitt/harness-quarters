@@ -311,8 +311,19 @@ def delete_codex_unit(unit: Unit, ctx: Context) -> str:
                        or sha != mirror.sha256
                        or sha != _read_back(mirror_path(ctx.archive_root, unit.source.name, relpath)))
             outcome = "failed:changed" if changed else "pruned"
-        if not release(link, rollout, frozen_preserve):
-            return refusal or ("failed:release" if outcome == "pruned" else f"{outcome}-quarantined")
+        with ExitStack() as cleanup:
+            parent = open_nofollow(lock_path.parent, os.O_RDONLY | os.O_DIRECTORY)
+            cleanup.callback(os.close, parent)
+            fd = os.open(lock_path.name, os.O_RDWR | os.O_NOFOLLOW, dir_fd=parent)
+            cleanup.callback(os.close, fd)
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return "failed:writer-live-quarantined"
+            # Rule (a) must remain true through unlink: exclude a resumed writer for
+            # the entire release, including after its live-path snapshot.
+            if not release(link, rollout, frozen_preserve):
+                return refusal or ("failed:release" if outcome == "pruned" else f"{outcome}-quarantined")
         remove_empty_dirs(qdir, stop)
         return "failed:release" if os.path.lexists(link) else outcome
     except OSError:

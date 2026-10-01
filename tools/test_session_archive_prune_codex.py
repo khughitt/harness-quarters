@@ -291,3 +291,71 @@ def test_other_thread_quarantine_does_not_change_success(world):
     other.write_bytes(b"still quarantined")
     assert delete_codex_unit(unit, ctx) == "pruned"
     assert other.read_bytes() == b"still quarantined"
+
+
+def test_writer_cannot_unlink_live_rollout_inside_release(world, monkeypatch):
+    from session_archive import quarantine
+
+    src, unit, rollout, ctx = world
+    monkeypatch.setenv("STUB_CODEX_MODE", "fail")
+    real_rename = quarantine._rename_at
+    lock = src.home / "thread-writer-locks" / f"{TID}.lock"
+    lock.parent.mkdir(exist_ok=True)
+    writer_lock = os.open(lock, os.O_RDWR | os.O_CREAT, 0o600)
+    writers = []
+    blocked = False
+
+    def resume_before_claim(src_fd, name, dst_fd, target):
+        nonlocal blocked
+        if str(target).startswith(".release-"):
+            # A real Codex writer must get this lock before it can open the rollout.
+            try:
+                fcntl.flock(writer_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                blocked = True
+            else:
+                writers.append(open(rollout, "ab"))
+                rollout.unlink()
+        return real_rename(src_fd, name, dst_fd, target)
+
+    monkeypatch.setattr(quarantine, "_rename_at", resume_before_claim)
+    try:
+        assert delete_codex_unit(unit, ctx) == "failed:delete"
+        if writers:
+            writers[0].write(b'{"resumed":1}\n')
+            writers[0].flush()
+            assert os.fstat(writers[0].fileno()).st_nlink > 0, "the writer lost its last recoverable link"
+        assert blocked
+        assert rollout.read_bytes() == b'{"type":"session_meta"}\n'
+        assert not link(src, rollout).exists()
+        # The archive does not keep the writer lock after the protocol returns.
+        fcntl.flock(writer_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    finally:
+        for writer in writers:
+            writer.close()
+        os.close(writer_lock)
+
+
+def test_writer_resumed_after_failed_delete_keeps_quarantine(world, monkeypatch):
+    src, unit, rollout, ctx = world
+    monkeypatch.setenv("STUB_CODEX_MODE", "fail")
+    real_delete = prune.run_codex_delete
+    held = []
+
+    def delete_then_resume(*args):
+        result = real_delete(*args)
+        fd = os.open(src.home / "thread-writer-locks" / f"{TID}.lock", os.O_RDWR)
+        held.append(fd)
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        held.append(os.open(rollout, os.O_WRONLY | os.O_APPEND))
+        return result
+
+    monkeypatch.setattr(prune, "run_codex_delete", delete_then_resume)
+    try:
+        assert delete_codex_unit(unit, ctx) == "failed:writer-live-quarantined"
+        os.write(held[1], b'{"resumed":1}\n')
+        assert link(src, rollout).read_bytes().endswith(b'{"resumed":1}\n')
+        assert rollout.read_bytes().endswith(b'{"resumed":1}\n')
+    finally:
+        for fd in reversed(held):
+            os.close(fd)
