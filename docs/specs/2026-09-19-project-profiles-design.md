@@ -241,7 +241,11 @@ Provenance is carried per fact. Resolution output (`--json`):
 A repository-layer key override appears with its own source (`git config
 ops.designDocs`, or `AGENTS.md names docs/superpowers/specs`); the hook keeps
 reading those two opt-ins because they are the repository layer, and the
-resolver reports them so `explain` and the hook agree.
+resolver reports them so `explain` and the hook agree. The instruction-file
+opt-in is also read from `docs/AGENTS.md` and `docs/CLAUDE.md`, where the
+directory is named relative to `docs/` (`docs/AGENTS.md names
+superpowers/{plans,specs}`); a bare `superpowers/` does not count there either
+(ops-36646d).
 
 ## 5. Delivery: the session line and the fragment
 
@@ -345,7 +349,9 @@ Check 2 (draft PRs): runs `gh repo view` only when `pr_draft` is
 network call, naming the profile.
 
 Check 4 (design docs): the trigger stays what it is — a stage or commit that
-would carry a path under `docs/superpowers/` — and the decision becomes:
+would carry a path under `docs/superpowers/` — and the decision becomes the
+following. A deletion, or a move out of the directory, is not carrying a doc
+and always passes, so a shipped plan can be dropped (ops-bcb318).
 
 - `design_docs = commit` (profile or repository layer): allow.
 - `design_docs = exclude` and no repository-layer opt-in: refuse. The refusal
@@ -358,7 +364,10 @@ The refusal no longer states a universal default. The existing pointers at the
 checkout's convention (`docs/specs/` named in its instructions; docs already
 tracked under `docs/superpowers/`) stay, because they are still the most useful
 thing to say to an agent who reached for the wrong directory in a repository
-that has a right one.
+that has a right one. Where the tree already tracks docs under `docs/superpowers/` and its
+instructions name no other directory, the refusal drops the harness-convention
+claim and leads with `git config ops.designDocs commit`: the repository may be
+shared, and its instructions not ours to edit (ops-36646d).
 
 Resolver failure inside the hook (no ops checkout, a malformed
 `profiles.toml`, an undeclared registered project): there is no conservative
