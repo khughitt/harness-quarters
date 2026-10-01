@@ -260,8 +260,9 @@ itself excludes writers.
 
 1. **Lock and link.** Take the thread's lock non-blocking; if it is held, record
    `kept:busy`. While holding it, re-run the pre-check for this unit and hard-link the
-   rollout into the quarantine. Sync newly created ancestor directory entries and the
-   link's directory before releasing the lock. The durable link keeps the inode alive
+   rollout into the quarantine. Sync ancestor directory entries, including existing
+   entries left by a failed sync, and the link's directory before releasing the lock.
+   The durable link keeps the inode alive
    if Codex unlinks the path.
 2. **Delete.** Release the lock and run `codex delete --force <thread id>`, where the
    thread id is the UUID in the rollout's filename, with a 120-second timeout. The

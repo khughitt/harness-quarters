@@ -45,15 +45,22 @@ def test_pruned_through_codex_delete(world, tmp_path, archive):
     assert mirror_path(archive, "codex", unit.files[0]).exists()
 
 
-def test_quarantine_is_durable_before_writer_lock_release_and_delete(world, monkeypatch):
+@pytest.mark.parametrize("retry_after", [None, "home", "quarantine"])
+def test_quarantine_is_durable_before_writer_lock_release_and_delete(world, tmp_path,
+                                                                   monkeypatch, retry_after):
     src, unit, rollout, ctx = world
     lock = src.home / "thread-writer-locks" / f"{TID}.lock"
     qdir = link(src, rollout).parent
     events = []
     real_sync, real_close = os.fsync, os.close
+    failed_once = False
 
     def sync(fd):
+        nonlocal failed_once
         path = Path(os.readlink(f"/proc/self/fd/{fd}"))
+        if not failed_once and path == {"home": src.home, "quarantine": qdir.parent}.get(retry_after):
+            failed_once = True
+            raise OSError("first ancestor sync failed")
         real_sync(fd)
         events.append(("sync", path))
         if path == qdir:
@@ -71,6 +78,11 @@ def test_quarantine_is_durable_before_writer_lock_release_and_delete(world, monk
     monkeypatch.setattr(os, "fsync", sync)
     monkeypatch.setattr(os, "close", close)
     ctx.hooks = Hooks(before_delete=lambda u: events.append(("delete", rollout)))
+    if retry_after:
+        assert delete_codex_unit(unit, ctx) == "failed:release"
+        assert qdir.parent.is_dir() and rollout.exists()
+        assert not (tmp_path / "codex.log").exists()
+        events.clear()
     assert delete_codex_unit(unit, ctx) == "pruned"
     first_unlock = events.index(("unlock", lock))
     assert {path for event, path in events[:first_unlock] if event == "sync"} >= {

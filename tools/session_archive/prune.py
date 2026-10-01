@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from .capture import archived_file, capture_file, mirror_path, mkdir_synced, open_nofollow, stat_of, walk_files
+from .capture import archived_file, capture_file, fsync_dir, mirror_path, open_nofollow, stat_of, walk_files
 from .decide import INACTIVE_NS, FileFacts, ObsFile, Stat, is_transcript, unit_reason
 from .inputs import InspectionFailed, Unit, claude_units, codex_units
 from .manifest import MIRROR, Manifest
@@ -260,7 +260,10 @@ def delete_codex_unit(unit: Unit, ctx: Context) -> str:
             cleanup.callback(os.close, source)
             if not stat.S_ISREG(os.fstat(source).st_mode):
                 return "failed:release"
-            mkdir_synced(qdir)
+            qdir.mkdir(parents=True, exist_ok=True)
+            # Existing entries may survive a prior failed sync; persist them on every attempt.
+            fsync_dir(home)
+            fsync_dir(stop)
             target = open_nofollow(qdir, os.O_RDONLY | os.O_DIRECTORY)
             cleanup.callback(os.close, target)
             # linkat follows this held descriptor, never a replaced rollout path or parent.
