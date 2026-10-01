@@ -1,19 +1,19 @@
 # Workflow evaluation from post-implementation outcomes
 
-Status: draft for review. Task: `tack-026612`. Inputs: obs-00809f's outcome measures
-(obs `docs/specs/2026-09-28-outcome-measures-design.md`, revision 13, and its validation
-report `docs/reports/2026-09-29-outcome-measures-validation.md`); the case shape of
-`tack-99ea5d` (`agents/evals/cases/`); the intent of obs-abfcf9 (cases in projects,
-verdicts in obs). Consumers: `tack-7d9375` (randomized arms), `tack-fc26cf`
+Status: draft for review, revision 2 (answers review round 1, §10). Task: `tack-026612`.
+Inputs: obs-00809f's outcome measures (obs `docs/specs/2026-09-28-outcome-measures-design.md`,
+revision 13, and its validation report `docs/reports/2026-09-29-outcome-measures-validation.md`);
+the case shape of `tack-99ea5d` (`agents/evals/cases/`); the intent of obs-abfcf9 (cases
+in projects, verdicts in obs). Consumers: `tack-7d9375` (randomized arms), `tack-fc26cf`
 (cross-family review).
 
 ## 1. Purpose
 
 The five existing cases judge whether an agent did the right thing in a session. None
 judges a workflow by what its work led to. This spec defines one case that does: it
-rates the `flow` skill at a version by the defects filed against the tasks it carried
-to close, beside the same measure for comparable tasks closed without it, with cost
-shown alongside.
+looks for a regression in defects after close among tasks carried by the `flow` skill
+while one version of it was current, against comparable tasks closed without it, with
+cost shown alongside.
 
 One case, not a framework. It is the first case whose input is obs's derived tables
 rather than a session, and the place where the case shape and obs-abfcf9's verdict
@@ -27,15 +27,27 @@ validation report settles which:
 | Measure | State on 2026-10-01 | Used here |
 | --- | --- | --- |
 | M1–M3 review rounds and findings | E1 below target (precision 0.60); comparisons suppressed as `unvalidated:E1` until obs-c1b5ac | no |
-| M4 defects within 30 days of an eligible close | E2 backfill precision 0.80; recorded `concerns:` notes from 2026-09-29; first complete windows 2026-10-17 to 10-29; no exposure term until obs-db1316 | **scored** |
+| M4 defects within 30 days of an eligible close | inferred `defect` links: precision 2/3, Wilson [0.21, 0.94]; the report says M4 "cannot yet be read from inferred links alone"; recorded `concerns:` notes only from 2026-09-29; first complete windows 2026-10-17 to 10-29; no exposure term until obs-db1316 | **scored, once gated (below)** |
 | M5 change requests and extensions | same evidence as M4 | shown, not scored |
 | M6 reopens | same window; 2 of 5 reopens were real rework | shown, not scored |
 | M7 dispositions at verified gates | flow tasks only (7 of 18), so it cannot compare flow with no flow | no |
 | cost (`output_tokens`, whole task) | `cost` view, scope `own`, stage `*` | shown, not scored |
 
-M4 is therefore the only scored measure. Its owner is the task authorship (E0), whose
-attribution was 9 of 10 correct on hand-check. When obs-c1b5ac re-validates E1, M1–M3
-become a second case's input, not an edit to this one (§8).
+**The defect-evidence gate.** A complete 30-day window does not make M4 readable; valid
+defect links do. obs already gates M1–M3 this way: `UNVALIDATED` in
+`outcome_report.py` suppresses a measure's comparisons until its evidence passes
+validation. M4 joins that table as `m4_defective: "E2"` (piece 1, §8), and leaves it
+when obs records a defect-link validation meeting a target obs owns: the report's
+recommended `followup-rubric-v2` rejudge, hand-checked, with defect precision whose
+Wilson lower bound is at least 0.7. Recorded `concerns:` notes do not bypass the gate:
+their recall (an agent that files a fix without the note) is unmeasured, so a window
+built only from recorded notes is gated the same way until obs measures that recall.
+While the gate holds, every run of this case returns `insufficient` with reason
+`unvalidated:E2`, and the pipeline still runs end to end.
+
+M4's owner is the task authorship (E0), whose attribution was 9 of 10 correct on
+hand-check. When obs-c1b5ac re-validates E1, M1–M3 become a second case's input, not an
+edit to this one (§8).
 
 ## 3. The case
 
@@ -43,28 +55,28 @@ become a second case's input, not an edit to this one (§8).
 
 ```yaml
 id: flow-defects-after-close
-title: Tasks carried by the flow skill draw no more defects after close than comparable tasks without it
+title: No defect regression among tasks the flow skill carried while one version was current
 subject:
   kind: flow
   name: flow skill (agents/skills/flow/SKILL.md)
-  version: [blob:<SKILL.md git blob>, window <from>..<to>]
+  version: [blob:<SKILL.md git blob>, cohort <from>..<to>]
 inputs:
   - kind: query
-    ref: obs outcomes report --since <from> --until <to>
+    ref: obs outcomes report --since <from> --until <to> --units
     window: <from>..<to>
 expected:
   type: choice
-  claim: the M4 comparison of skill:flow true against false, read by the rule in §4
-  choices: [not-worse, worse, insufficient]
-  value: not-worse
+  claim: the stratified M4 comparison of skill:flow true against false, read by the rule in §4
+  choices: [no-regression-detected, regression, insufficient]
+  value: no-regression-detected
 observed:
   value: <choice>
   at: <subject version>
 judge:
   kind: check
-  command: obs outcomes report --since <from> --until <to> | agents/evals/bin/flow-outcome-verdict
+  command: obs outcomes report --since <from> --until <to> --units | agents/evals/bin/flow-outcome-verdict --from <from> --to <to>
   cwd: tack checkout
-  pass: prints not-worse
+  pass: prints no-regression-detected
 source: [tack-026612, obs-00809f]
 evidence: inferred
 ```
@@ -73,18 +85,24 @@ The body below the frontmatter carries what the frontmatter cannot: the conditio
 (§5), the caveat (§6), and each run's verdict with its counts until obs-abfcf9 stores
 verdicts (§7).
 
-**Subject version.** No task or note records which flow version ran, and obs's
-`skill_calls` has no version column. The version is the git blob hash of
-`agents/skills/flow/SKILL.md` (today `9d90fb0`), and the window is the span during which
-that blob was the committed file. A blob hash survives the 2026-09-29 history cut: a
-pre-cut version is named by its blob from the private archive, and the same content
-yields the same hash in both repositories. Versions whose window is shorter than the
-data needs are pooled into one subject entry listing every blob, never silently merged.
+**Subject: a cohort, not an execution record.** No task or note records which flow
+version ran, and obs's `skill_calls` has no version column. The subject is therefore a
+cohort: the tasks whose first start *and* first eligible close both fall inside the
+window during which one blob of `agents/skills/flow/SKILL.md` was the committed file.
+Requiring the start inside the window removes tasks that began under an earlier version;
+every flow load such a task made happened while this blob was committed. What it cannot
+remove is an uncommitted edit: the harness homes link the skill to the main checkout's
+working tree, so a session can load an edit that was never committed. The verdict is
+labelled a cohort verdict, never "flow at blob X ran and produced …". If obs later
+records the skill content each session loaded, version attribution per task replaces the
+cohort (out of scope here).
 
-**Window.** A task belongs to the version in force at its first eligible close, the
-anchor obs already uses for task units (outcome spec §8). M4 counts a task only once its
-30-day window is complete, so a version is first judgeable 30 days after its window
-opens.
+The blob hash survives the 2026-09-29 history cut: a pre-cut version is named by its
+blob from the private archive, and the same content yields the same hash in both
+repositories (today's is `9d90fb0`). The no-flow arm of the cohort is the tasks
+satisfying the same start-and-close condition that did not use the flow skill. Versions
+whose windows are too short to fill a cohort are pooled into one subject entry that
+lists every blob and the combined window, never silently merged.
 
 **`evidence: inferred`.** M4 rests on E0 authorship and, before 2026-09-29, on E2's
 model-judged links; obs labels every comparison view `inferred`. The check judge is
@@ -92,83 +110,130 @@ deterministic over that data, which does not make the data observed.
 
 ## 4. Verdict rule
 
-`agents/evals/bin/flow-outcome-verdict` reads the report's JSON on stdin and prints one
-choice and the counts behind it. It reads only rows with `factor = "skill:flow"` and
-`measure = "m4_defective"`:
+`agents/evals/bin/flow-outcome-verdict` reads the report's JSON on stdin, keeps the task
+rows (`--units`, §8) whose first start and first eligible close fall in `[from, to)`,
+and prints one choice, the reason, and the counts behind it. It reads the
+`factor = "skill:flow"`, `measure = "m4_defective"` comparisons only for obs's
+suppression decisions, and refuses (exit 2) when its own per-cell counts from the task
+rows disagree with the comparison rows' exact counts for the same window, since a
+disagreement means the two halves of the report describe different units.
 
-- **insufficient** when no such comparison is shown (every one suppressed by obs's own
-  rules: unassigned units over half a stratum, a value keeping under half its units
-  attributed) or when every shown stratum has a cell under 5, where obs gives counts
-  without rates.
-- Otherwise, over the shown strata with both cells at 5 or more, pool defective and
-  total per value (flow true, flow false), and compute each value's defect rate.
-  **worse** when the flow rate exceeds the no-flow rate and a one-sided Fisher exact
-  test on the pooled 2×2 table gives p < 0.1; **not-worse** otherwise.
+1. **insufficient: unvalidated** when the comparisons carry `suppressed_reason`
+   `unvalidated:E2` (§2's gate).
+2. A stratum (obs's key: project, size, complexity, process, artifact) **enters** when
+   obs shows its comparison (not suppressed for `unassigned` or `low_retention`) and both
+   arms have at least one scored task in the cohort. Strata that do not enter are counted
+   by reason in the output.
+3. **insufficient: too few** when either arm has fewer than 10 scored tasks across the
+   entering strata.
+4. Otherwise, a one-sided **exact conditional test** of a common odds ratio of 1 across
+   the entering strata: conditional on each stratum's margins, the flow arm's defective
+   count in that stratum is hypergeometric; the test statistic is their sum, its null
+   distribution the convolution of the per-stratum hypergeometrics, and p is the
+   probability of a sum at least the observed. Each stratum is compared only with
+   itself, so a flow arm better in every stratum can never be called a regression by a
+   difference in stratum mix. **regression** when p < 0.1; **no-regression-detected**
+   otherwise. The tool prints the Mantel–Haenszel common odds ratio beside p as the size
+   of the difference.
 
-The rule never invents a cell obs suppressed. It pools only within obs's strata, so
-size, complexity, project, process and artifact stay held fixed per cell. A one-sided
-test at 0.1 is loose on purpose: the question is a regression alarm on small counts,
-and a false alarm costs a look at the tasks, which the report lists. M5, M6 and cost are
-printed beside the verdict and never enter it.
+`no-regression-detected` means only what it says: this cohort gave no evidence of more
+defects with flow at the stated level. It is not evidence of equivalence, and the case
+never states one. A one-sided test at 0.1 is loose on purpose: the question is a
+regression alarm on small counts, and a false alarm costs a look at the tasks, which the
+output lists. The convolution is exact and small (counts are tens), written in the
+standard library, no statistics package. M5, M6 and cost are printed beside the verdict
+and never enter it.
 
 ## 5. Conditions kept visible
 
-Every run prints, and the case body records:
+Every run prints, over the **scored cohort** (the task rows that entered step 4, or
+would have, for an `insufficient`), counting distinct tasks:
 
-- task difficulty: the strata (size, complexity, process, project) that reached the
-  pooled table, and how many strata were suppressed or under 5;
-- workflow: flow true and false counts per stratum;
-- model and harness: obs's retained/total table for `harness` and `model` over the same
-  window, so a flow cell that is mostly one model is visible as such;
-- observation coverage: tasks with recorded `concerns:` notes, tasks covered only by E2
-  backfill, tasks with authorship `incomplete`, `mixed`, `several` or `unknown`, and
-  M4's missing exposure term (obs-db1316).
+- task difficulty: per entering stratum, the flow and no-flow counts and defective
+  counts; strata that did not enter, by reason;
+- model and harness, jointly with flow: a flow × harness × model table of task counts,
+  so a flow arm that is mostly one model is visible as such rather than inferred from
+  marginals;
+- observation coverage, per arm: tasks whose defect evidence is a recorded `concerns:`
+  note, an inferred E2 link, or no link; tasks excluded for authorship `incomplete`,
+  `mixed`, `several` or `unknown`; and M4's missing exposure term (obs-db1316);
+- cost: per arm, median and total `output_tokens` beside the verdict.
+
+The case body records the same tables at each run (§7).
 
 ## 6. What a verdict means
 
 The comparison is historical. Who chose flow, for which tasks, was not random: flow is
-picked for work its owner judged to need gates. A `not-worse` says the flow skill at
-that version was not associated with more defects among comparable tasks, and a
-`worse` says it was; neither establishes that the skill caused the difference.
-Randomized arms (`tack-7d9375`) are the stronger evidence and, when they exist, are a
-separate case over the arm assignment, not a reweighting of this one.
+picked for work its owner judged to need gates. A `regression` says flow tasks in this
+cohort drew more defects than comparable tasks without it, beyond what stratum-matched
+chance gives at p < 0.1; a `no-regression-detected` says the cohort did not show that.
+Neither establishes that the skill caused anything. Randomized arms (`tack-7d9375`) are
+the stronger evidence and, when they exist, are a separate case over the arm assignment,
+not a reweighting of this one.
 
 ## 7. Verdict storage until obs-abfcf9
 
 obs-abfcf9 will store verdicts in obs with a case id, subject version, evidence pointer,
-typed answer, judge identity and evidence class. Until it lands, each run appends one
-line to the case body's `## Verdicts` section:
+typed answer, judge identity and evidence class. Until it lands, each run appends to the
+case body's `## Verdicts` section one line,
 
-`<run date> <subject version> <window> <choice> — flow <d>/<n>, no flow <d>/<n>, strata <shown>/<total>, p <value>`
+`<run date> <blobs> cohort <from>..<to> <choice>[: <reason>] — flow <d>/<n>, no flow <d>/<n>, strata <entered>/<total>, p <value>, OR <value>`
 
-and `observed` holds the latest. This case adds two inputs to obs-abfcf9's design,
-recorded there as a note: an input of kind `query` (derived tables, not a session or
-fixture), and a subject version that is a blob plus a window rather than a commit.
+followed by §5's tables, and `observed` holds the latest choice. This case adds three
+inputs to obs-abfcf9's design, recorded there as a note: an input of kind `query`
+(derived tables, not a session or fixture); a subject version that is a blob set plus a
+cohort window rather than a commit; and an `insufficient` answer that carries a reason.
 
 ## 8. Pieces
 
-1. **obs: `--until` on `obs outcomes report`.** The report bounds its window only from
-   below (`--since`). A version's window needs both ends. An obs task, filed from here,
-   adds an upper bound with the same anchors as `--since`. Rejected alternative: per-task
-   version attribution as a new factor value (`skill:flow@<blob>`). It is the better
-   long-term shape for comparing many versions at once, but it needs a version column in
-   obs's skill index and buys nothing for one case.
-2. **tack: `agents/evals/bin/flow-outcome-verdict`** with its test, a fixture report in
-   `agents/evals/fixtures/` covering each branch of §4 (all suppressed, under 5, not
-   worse, worse).
-3. **tack: the case file** with the current blob, its window, and a first run. Before
-   2026-10-17 the first run is expected to print `insufficient`, and that run is the
+1. **obs: what the report must expose** (one obs task, filed from here):
+   - `--until` on `obs outcomes report`, the upper bound with the same anchors as
+     `--since`;
+   - `m4_defective: "E2"` in `UNVALIDATED`, and the defect-link validation that clears
+     it, as §2 states (the rejudge itself is obs's work under its E2 recommendation;
+     this task only adds the gate);
+   - exact counts per comparison cell: `n` restricted to attributed, measured units (as
+     today) and a new `sum` of the measure, so a binary measure's defective count is
+     exact rather than recovered from a rounded mean; `total` stays as is and is not
+     read as a denominator;
+   - `--units`: task-level rows for the windowed task units, each with task id, first
+     start, first eligible close, stratum, credit state and values for each factor
+     (harness, model, effort, `skill:*`), defect, change and extension counts with the
+     evidence class of each link (recorded or inferred), reopens, and `output_tokens`.
+   Rejected alternative: a per-task flow version as a factor value
+   (`skill:flow@<blob>`). It would replace the cohort with execution evidence, but it
+   needs the skill content each session loaded, which no harness records today.
+2. **tack: `agents/evals/bin/flow-outcome-verdict`** with its tests over fixture reports
+   in `agents/evals/fixtures/`, one per branch of §4 (unvalidated, too few, regression,
+   no regression), plus the Simpson's-paradox case from review round 1 (flow better in
+   each of two strata, worse pooled: must not be `regression`), a count mismatch between
+   task rows and comparison rows (must exit 2), and a task started before the window
+   (must be excluded).
+3. **tack: the case file** with the current blob, its window, and a first run. While
+   the E2 gate holds, that run prints `insufficient: unvalidated`; it is the
    verification that the pipeline works end to end, not a finding about flow.
-4. **obs-abfcf9: a note** carrying §7's two schema inputs.
+4. **obs-abfcf9: a note** carrying §7's three schema inputs.
 
-Out of scope: M1–M3 (a second case once obs-c1b5ac re-validates E1); a runner for
-cases (`just eval`, obs-abfcf9); any change to how flow is chosen.
+Out of scope: M1–M3 (a second case once obs-c1b5ac re-validates E1); the E2 rejudge
+(obs); a runner for cases (`just eval`, obs-abfcf9); per-session skill-content
+recording; any change to how flow is chosen.
 
 ## 9. Verification
 
-- The verdict tool's tests pass on the fixtures, one per branch of §4.
-- The case runs end to end against the live obs index through `--until`, and its
-  printed counts match `obs outcomes report`'s own human-readable comparison for
-  `skill:flow` over the same window.
-- The case validates against the five existing cases' shape (same top-level keys), so
-  obs-abfcf9's "the existing cases validate unchanged" bar extends to six.
+- The verdict tool's tests pass on every fixture in §8 piece 2.
+- The case runs end to end against the live obs index with `--until` and `--units`,
+  and its per-cell counts match the comparison rows for `skill:flow` over the same
+  window (the tool's own refusal check, exercised live).
+- The case has the five existing cases' top-level keys, so obs-abfcf9's "the existing
+  cases validate unchanged" bar extends to six.
+
+## 10. Review record
+
+- **Round 1** (codex, 2026-10-01): revise; P1 3, P2 3. Answered in revision 2:
+  defect evidence gated on validated defect links, not on window completeness (§2);
+  pooling replaced by an exact conditional test within obs's strata (§4); the passing
+  answer renamed `no-regression-detected` and stated as no evidence of regression, not
+  equivalence (§4, §6); the subject restated as a start-and-close cohort with the
+  uncommitted-edit gap named (§3); exact per-cell sums and task-level rows added to the
+  obs piece (§8); conditions computed jointly over distinct tasks in the scored cohort
+  (§5).
