@@ -58,6 +58,11 @@ class Manifest:
         conn.executescript(SCHEMA)
         return cls(conn)
 
+    @classmethod
+    def open_readonly(cls, archive_root: Path) -> "Manifest":
+        uri = (archive_root / FILENAME).resolve().as_uri() + "?mode=ro"
+        return cls(sqlite3.connect(uri, uri=True))
+
     def close(self) -> None:
         self.conn.close()
 

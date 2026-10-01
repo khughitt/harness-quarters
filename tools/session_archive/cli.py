@@ -1,15 +1,17 @@
 """session-archive command line (spec docs/specs/2026-09-30-session-archive-design.md)."""
 import argparse
 import json
+import sqlite3
 import sys
 import tempfile
 import time
 import uuid
 from contextlib import nullcontext
 from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
 
-from . import capture, config, inputs, probe, prune
+from . import capture, config, inputs, probe, prune, status
 from .manifest import Manifest, Run, utc_now
 
 LOCKED = frozenset({"capture", "prune", "promote", "probe-codex"})
@@ -104,8 +106,22 @@ def cmd_prune(cfg, table, args) -> int:
     return 0 if ok else 1
 
 
+def cmd_status(cfg, table, args) -> int:
+    try:
+        manifest = Manifest.open_readonly(cfg.archive_root)
+        try:
+            report, ok = status.status_report(manifest, [source.home for source in table],
+                                              datetime.now(timezone.utc))
+        finally:
+            manifest.close()
+    except sqlite3.Error as error:
+        report, ok = {"ok": False, "error": f"{type(error).__name__}: {error}"}, False
+    print(json.dumps(report, sort_keys=True))
+    return 0 if ok else 1
+
+
 COMMANDS = {"capture": cmd_capture, "promote": cmd_promote, "probe-codex": cmd_probe_codex,
-            "prune": cmd_prune}
+            "prune": cmd_prune, "status": cmd_status}
 
 
 def main(argv) -> int:
