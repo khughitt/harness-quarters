@@ -74,7 +74,7 @@ observed:
   at: <subject version>
 judge:
   kind: check
-  command: obs outcomes report --since <from> --until <to> --cohort --units | agents/evals/bin/flow-outcome-verdict
+  command: obs outcomes report --since <from> --until <to> --cohort --units | agents/bin/flow-outcome-verdict
   cwd: tack checkout
   pass: prints no-regression-detected
 source: [tack-026612, obs-00809f]
@@ -128,7 +128,7 @@ deterministic over that data, which does not make the data observed.
 
 ## 4. Verdict rule
 
-`agents/evals/bin/flow-outcome-verdict` reads the report's JSON on stdin and prints one
+`agents/bin/flow-outcome-verdict` reads the report's JSON on stdin and prints one
 choice, the reason, and the counts behind it. The cohort is applied once, in obs:
 `--cohort` restricts the task units to those whose first start and first eligible close
 both fall in the window *before* obs aggregates cells and decides suppression, so the
@@ -234,8 +234,8 @@ cohort window rather than a commit; and an `insufficient` answer that carries a 
    Rejected alternative: a per-task flow version as a factor value
    (`skill:flow@<blob>`). It would replace the cohort with execution evidence, but it
    needs the skill content each session loaded, which no harness records today.
-2. **tack: `agents/evals/bin/flow-outcome-verdict`** with its tests over fixture reports
-   in `agents/evals/fixtures/`, one per branch of §4 (unvalidated, too few, regression,
+2. **tack: `agents/bin/flow-outcome-verdict`** with its tests over fixture reports
+   built by the test module, one per branch of §4 (unvalidated, too few, regression,
    no regression), plus the Simpson's-paradox case from review round 1 (flow better in
    each of two strata, worse pooled: must not be `regression`), and a count mismatch
    between task rows and comparison rows (must exit 2), and an empty cohort while the
@@ -281,3 +281,6 @@ recording; any change to how flow is chosen.
 - **Round 3** (codex, 2026-10-01): accept; P3 1. Folded in as revision 3.1: M4's
   validation status exposed at measure level and read from there, with an empty-cohort
   fixture (§4, §8).
+- **Plan-time corrections** (2026-10-01, no change to the design): the verdict tool lives
+  in `agents/bin/` beside the other tools and their tests, not `agents/evals/bin/`; its
+  fixture reports are built by the test module rather than stored as JSON (§8 piece 2).
