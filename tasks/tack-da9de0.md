@@ -1,15 +1,16 @@
 ---
 id: tack-da9de0
 title: "Global instructions say to run long checks through the harness's own background mechanism, but Claude Code's background Bash was killed at its time limit after ~30 min with no stated limit"
-status: doing
+status: done
 priority: 2
 size: xs
 complexity: low
 process: direct
-owner: main
+owner: instr-four
 created: 2026-10-01T15:27:33Z
-updated: 2026-10-02T15:36:18Z
+updated: 2026-10-02T15:37:02Z
 started: 2026-10-02T15:36:18Z
+completed: 2026-10-02T15:37:02Z
 depends: []
 tags: [feedback, gap, "from:obs"]
 agent: claude-code/claude-opus-5-5
@@ -25,4 +26,10 @@ Where to look: AGENTS.md "Processes", the bullet beginning "Never end a turn wai
 
 - 2026-10-02T15:33:38Z (main): scope: scoped; todo P2 xs/low/direct; the limit is in the Bash tool contract (background default 30 min via timeout, max 2 h); add it beside the Codex wait limits in Processes, with slicing for longer runs
 - 2026-10-02T15:36:18Z (main): started
+  provenance: {"harness_session":"claude-code:e8e1b806-1b76-4ade-bab5-f0cdc5fe34ad","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-02T15:36:23Z (instr-four): resumed
+  provenance: {"harness_session":"claude-code:e8e1b806-1b76-4ade-bab5-f0cdc5fe34ad","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-02T15:37:02Z (instr-four): done
+  provenance: {"harness_session":"claude-code:e8e1b806-1b76-4ade-bab5-f0cdc5fe34ad","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-02T15:37:02Z (instr-four): Processes: Claude Code background Bash limit (30 min unset, 2 h max) beside the Codex waits, with slicing for longer runs
   provenance: {"harness_session":"claude-code:e8e1b806-1b76-4ade-bab5-f0cdc5fe34ad","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

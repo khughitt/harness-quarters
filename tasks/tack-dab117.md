@@ -1,15 +1,16 @@
 ---
 id: tack-dab117
 title: Agents write scratchpad files as bare 'scratchpad/<file>' paths that resolve nowhere
-status: doing
+status: done
 priority: 2
 size: xs
 complexity: low
 process: direct
-owner: main
+owner: instr-four
 created: 2026-09-27T12:19:35Z
-updated: 2026-10-02T15:36:18Z
+updated: 2026-10-02T15:37:02Z
 started: 2026-10-02T15:36:18Z
+completed: 2026-10-02T15:37:02Z
 depends: []
 tags: [rules]
 agent: claude-code/claude-opus-5-5
@@ -25,4 +26,10 @@ Where to look: AGENTS.md "Communication" and the worktree path bullet under "Git
 
 - 2026-10-02T15:29:12Z (main): scope: scoped; todo P2 xs/low/direct; one Communication-section line for paths shown to the user, distinct from the committed-text absolute-path rule; the session-logs sample made optional
 - 2026-10-02T15:36:18Z (main): started
+  provenance: {"harness_session":"claude-code:e8e1b806-1b76-4ade-bab5-f0cdc5fe34ad","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-02T15:36:23Z (instr-four): resumed
+  provenance: {"harness_session":"claude-code:e8e1b806-1b76-4ade-bab5-f0cdc5fe34ad","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-02T15:37:02Z (instr-four): done
+  provenance: {"harness_session":"claude-code:e8e1b806-1b76-4ade-bab5-f0cdc5fe34ad","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-02T15:37:02Z (instr-four): Communication: paths shown to the user resolve from the main checkout, never scratchpad-relative; distinct from the committed-text absolute-path rule
   provenance: {"harness_session":"claude-code:e8e1b806-1b76-4ade-bab5-f0cdc5fe34ad","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

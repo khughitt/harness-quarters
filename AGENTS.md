@@ -40,6 +40,11 @@ this repository's own instructions, then the user in the session.
 ## Communication
 
 - If the user suddenly switches the conversation to a different project, confirm that it was intentional.
+- A path you show the user is one they can open from where they stand, the main
+  checkout: relative to it when the file lives there, absolute otherwise. Never write
+  it relative to a directory only you know, such as the scratchpad (`scratchpad/x.md`
+  resolves nowhere for the user). The Git rule against machine-specific absolute paths
+  covers committed text, not what you tell the user.
 
 ## Decisions
 
@@ -67,6 +72,17 @@ this repository's own instructions, then the user in the session.
   the Task 6 review"), never a state ("waiting for next steps"). An unblocked task you
   hold is not parked between increments: continue until a blocker, a gate that needs a
   person, or the end of the session.
+- A skill's scripted question or stop (an integration menu, a "surface residual
+  findings" step) is a bounded decision under this rule unless it falls in the stop
+  list above; this rule outranks the skill's "exactly as written".
+- Integrating a finished, reviewed branch by local merge is a bounded decision only in
+  a repository the user owns (a `personal` profile checkout). In a work or external
+  checkout, never merge on your own: present the integration choice. A push, a PR, or
+  a merge that changes a live global surface (these global instructions, hooks,
+  services) stays an action outside the repository.
+- After a final whole-branch review, keep running corrective rounds (one fix dispatch
+  plus one scoped re-review each) while the re-review reproduces Critical or Important
+  findings, up to five rounds; then surface what remains. External actions stay gated.
 
 ## Processes
 
@@ -83,7 +99,11 @@ this repository's own instructions, then the user in the session.
 - Never end a turn waiting on work the harness does not track. Run a long check in the
   foreground with a timeout that covers it, or through the harness's own background
   mechanism; a job detached with `&` or `nohup` never wakes you, so no turn ends waiting
-  on a monitor of one. A controller with a running child ends its turn only where the
+  on a monitor of one. Claude Code's background Bash (`run_in_background`) is stopped
+  at its `timeout`, 30 min when unset and at most 2 h: set it to cover the run. A run
+  longer than 2 h is split into resumable slices (an incremental job run in bounded
+  passes, each under the limit, e.g. with `timeout --signal=INT`) or handed to a
+  tracked process the user agrees to. A controller with a running child ends its turn only where the
   harness is known to start its next turn when the child finishes (Claude Code: yes;
   Codex: no — probed 2026-09-24 and recorded in ops `hooks/claim-guard`'s
   `CHILD_WAKES`), and otherwise waits with the harness's bounded wait, at its longest
@@ -101,6 +121,12 @@ this repository's own instructions, then the user in the session.
   verdict, one case per check, and read the result. When a long run is refused or
   aborted partway, analyze the parts it completed before changing the environment and
   retrying. When asking for the machine, name the pilot and what it showed.
+- Work that takes the live desktop (opens windows on it, moves focus, switches
+  workspaces, captures the screen) is a host-use action, and approving a plan does not
+  grant it. Prefer a nested or headless compositor where the project has one; otherwise
+  ask at that moment, naming what will appear and for how long, or `tasks park --reason
+  quiet` the work. A retry or a later capture asks again rather than reusing an earlier
+  yes.
 
 ## Tests
 
