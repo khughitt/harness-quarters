@@ -1,6 +1,6 @@
 # Randomized flow trial
 
-Status: draft revision 2, for review (round 1 findings in §11). Task: `tack-7d9375`.
+Status: draft revision 3, for review (round 1 and 2 findings in §11). Task: `tack-7d9375`.
 Inputs: the outcome measures of obs-00809f; the report fields of obs-0491f1 (`--until`,
 `--cohort`, `--units`, the E2 gate); the case shape and the historical flow case of
 `tack-026612` (`docs/specs/2026-10-01-workflow-outcome-eval-design.md`, whose §6 names
@@ -95,12 +95,33 @@ started before `enroll` is not enrolled; its later children are not enrolled eit
 child started after `enroll` ends belongs to its unit and takes the unit's arm. An idea
 started for scoping enrolls at that start, and the arm holds through implementation.
 
-**Frozen membership.** The tree can change after enrollment. The first lookup on each
-task writes the note `arm: flow-trial-1 — unit <root id> — flow on|off`, and that
-recorded unit stands for the task from then on. A task that never had a lookup belongs
-to the unit computed from the tree when the census runs. Where a later reparenting
-makes the recorded and computed units disagree, the census lists the task and keeps the
-recorded unit.
+**The decision is frozen on the root.** The first lookup on any task in a unit
+decides the whole unit from the tree at that moment. It writes one note on the root,
+`trial: flow-trial-1 — enrolled — flow on|off` or `trial: flow-trial-1 — not enrolled:
+<reason>`. Every later lookup, `status` and the census read that note and never
+re-decide. A task moved under the root afterwards cannot disqualify the unit, and a
+task moved out cannot enroll it. A unit no session ever looked up has no decision note
+(its sessions broke the rule). The census then decides it from the tree as it stands,
+lists it under `decided late` with its count per arm, and gives it no special treatment
+in the analysis. That is the one place where the tree at census time decides
+enrollment.
+
+**Membership is frozen per task.** The first lookup on each task writes
+`arm: flow-trial-1 — unit <root id> — flow on|off` on it, and that recorded unit is the
+task's unit for the analysis from then on. A task that never had a lookup belongs to
+the unit computed from the tree when the census runs.
+
+**Moving a task between units.** On every lookup, `trial-arm` compares the task's
+recorded unit with the unit computed from the tree. When they differ, the task has been
+moved, and the destination unit sets how the remaining work runs, because flow's
+parent and child contract has to hold inside the tree as it now stands. The tool prints
+the destination unit's arm, with `moved from unit <root id>`. It writes
+`arm: flow-trial-1 — moved to unit <root id> — flow on|off` once, and the session
+follows that arm. The analysis keeps the task in its recorded unit, so a move never
+changes which units are enrolled or which arm a unit has. When the two arms differ, the
+recorded unit counts as non-compliant (§5), and moves are counted per arm in the
+output. When the destination unit is not enrolled, the task keeps its recorded unit's
+arm, since no conflicting contract exists.
 
 **`agents/bin/trial-arm <task-id>`** finds the active trials, resolves the unit from
 `tasks show`, and prints one line:
@@ -109,8 +130,9 @@ recorded unit.
 - `not enrolled: <reason>` (`no trial for <prefix>`, `unit <root id> first started
   <date>, outside enroll`, `not started`).
 
-On the first lookup for a task in an enrolled unit it writes the `arm:` note, and later
-lookups write nothing. It exits 0 for both outcomes, 1 when the task is missing, and 2
+On the first lookup in a unit it writes the root's `trial:` decision note. On the first
+lookup for a task in an enrolled unit it writes the task's `arm:` note. Later lookups
+write only the move note (above). It exits 0 for both outcomes, 1 when the task is missing, and 2
 when trial files overlap on a project or when a task's recorded arm disagrees with the
 function.
 
@@ -136,7 +158,7 @@ skill credit does not count either, because obs credits a flow load to every lat
 task in the same session. obs's `skill:flow` factor is printed beside the verdict as a
 cross-check and never decides compliance.
 
-**When compliance can be assessed.** A unit is assessable once its root has closed
+**When compliance can be assessed.** A unit is assessable once its root has first closed
 `done`. Before that point, an `on` unit can be treated without having reached a gate
 past `scoped` yet. A unit that is dropped, shelved or still open on `close_by` is
 unassessable and is counted separately by arm. An `on` unit complies when it was
@@ -155,11 +177,11 @@ of `close_by`.
 1. **The census**, from `agents/bin/trial-arm census flow-trial-1`. It is built from the
    task records of the trial's projects, not from obs, because obs's units hold only
    tasks with an eligible close. The census is JSON with one entry per enrolled unit:
-   root, arm, enrolled-at, and the unit's state on `close_by` (`done`, `dropped`,
-   `shelved`, `open`). Each unit carries its members: task, first start, close kind
-   and date, the gate states past `scoped`, and any override. The census also lists
-   membership conflicts (§4). State on `close_by` reads the lifecycle notes' timestamps,
-   so a close after `close_by` makes the unit `open`.
+   root, arm, enrolled-at, whether the decision was recorded or `decided late` (§4),
+   the root's first `done` close, and the unit's state on `close_by` (`done`, `dropped`,
+   `shelved`, `open`). Each unit carries its members: task, first start, first eligible
+   close, the gate states past `scoped`, any override, and any move with the
+   destination's arm. Dates come from the lifecycle notes' timestamps.
 2. **The obs report**: `obs --json outcomes report --since 2026-10-05 --until 2027-01-10
    --cohort --units`, run on or after `read_on`. Every task in it closed by `close_by`,
    and its 30-day window ended by `follow_up_to`, so every window is complete.
@@ -167,24 +189,43 @@ of `close_by`.
 ### Outcome
 
 The **primary outcome** is defined for every enrolled unit, with no unit excluded:
-**delivered clean**. The unit's root closed `done` by `close_by`, and none of its member
-tasks has a defect (`defects` ≥ 1 in obs's unit row) in its 30-day window. A unit that
-was dropped, shelved, still open on `close_by`, or delivered with a defect has not
-delivered clean. The question the primary outcome answers is whether flow changes the
-chance that a work item is delivered within six weeks of enrollment closing and holds
-up for 30 days after. Its limit is stated with every verdict: a unit that flow's gates
-stop on purpose counts against flow.
+**delivered clean**. Every date in it is anchored at a first close, because obs anchors
+each task's 30-day defect window at its first eligible close:
 
-**Missing defect data.** A member task closed `done` by `close_by` with no row in the
-obs report has an unknown defect state, and so does its unit. When unknown units are at
-most 5% of done units, the primary analysis counts them as clean, and a sensitivity line
-counts them as defective. Both lines are printed. Above 5% the verdict is
-`insufficient: missing defect data`.
+- **delivered:** the root's first `done` close is on or before `close_by`. A later
+  reopen does not undo delivery. Reopens are a secondary outcome.
+- **clean:** no member task has a defect (`defects` ≥ 1 in obs's unit row) in the
+  30 days after its own first eligible close.
+
+A unit whose root never closed `done` by `close_by` (dropped, shelved, or still open)
+has not delivered. A delivered unit with a member defect has not delivered clean. The
+question the primary outcome answers is whether flow changes the chance that a work
+item is first delivered within six weeks of enrollment closing and draws no defect in
+the 30 days after each piece's first close. Two limits are stated with every verdict:
+
+- A unit that flow's gates stop on purpose counts against flow.
+- Defects are watched only after first closes. Work that is reopened and closed again
+  has its later episode unobserved: a task done on October 10, reopened on December 15
+  and done again on January 5 counts a defect filed on January 20 as none, because the
+  window ended on November 9. Reopens per arm are printed so that difference is visible.
+
+**Defect state of a unit**, in this order:
+
+1. **defective:** any member's obs row has a defect. A known defect is never overridden
+   by missing data elsewhere in the unit.
+2. **unknown:** no member has a known defect, and a member whose first eligible close
+   is on or before `close_by` has no obs row.
+3. **clean:** otherwise.
+
+**Missing defect data.** When unknown units are at most 5% of delivered units, the
+primary analysis counts them as clean, and a sensitivity line counts them as defective.
+Both lines are printed. Above 5% the verdict is `insufficient: missing defect data`.
 
 **Secondary outcomes**, printed and never scored:
 
-- by arm over all enrolled units: delivered (done by `close_by`); delivered with a
-  defect; dropped; shelved; open;
+- by arm over all enrolled units: delivered (first done close by `close_by`);
+  delivered with a defect; dropped; shelved; open on `close_by`; reopened after
+  delivery;
 - among delivered units only, labeled as a comparison conditional on delivery and not a
   causal estimate: the defect rate, change requests, extensions and reopens;
 - the median `output_tokens` per delivered unit, summed over members;
@@ -231,8 +272,8 @@ on stdin and stops at the first step that applies:
 
 1. `insufficient: before read date` when the run date (`--as-of`, default today in UTC)
    is earlier than `read_on`. Nothing else is computed.
-2. Exit 2 when the inputs disagree: a census member's first start or first close
-   (to the UTC day) differs from its obs row, or a task appears twice in either input.
+2. Exit 2 when the inputs disagree: a census member's first start or first eligible
+   close (to the UTC day) differs from its obs row, or a task appears twice in either input.
    obs rows for tasks in no census unit are ignored: they belong to other projects or
    to units first started before `enroll`.
 3. `insufficient: unvalidated` while the report lists `m4` as `E2` (the historical
@@ -284,17 +325,24 @@ line in the body giving the reason. The verdict reads what enrolled, usually as
    - enrollment: inside the window; a unit with a pre-window start (not enrolled, and its
      later children not either); a child started after `enroll` ends (enrolled, with the
      unit's arm);
-   - notes: idempotent `arm:` writing; a reparented task keeping its recorded unit, with
-     the conflict listed by the census; a recorded arm that contradicts the function
-     (exits 2);
+   - the frozen decision: one `trial:` note per root; a task with an earlier start moved
+     under an enrolled root leaves it enrolled; a task moved out of a not-enrolled unit
+     does not enroll it; a unit with no lookups is `decided late`;
+   - membership: idempotent `arm:` writing; a task moved from an `on` unit under an
+     `off` planned parent prints `flow off … moved from unit …`, writes the move note
+     once, stays in its recorded unit for the census, and makes that unit
+     non-compliant; a move into a not-enrolled unit keeps the recorded arm; a recorded
+     arm that contradicts the function (exits 2);
    - compliance: `gate: scoped` alone is untreated; `gate: implementing` on any member is
      treated; a dropped unit is unassessable;
-   - census: state on `close_by` from lifecycle timestamps (a close the day after counts
-     as `open`).
+   - census: state on `close_by` and first `done` close from lifecycle timestamps (a
+     close the day after counts as `open`; done, reopened, done again keeps the first
+     date).
 2. **tack: `agents/bin/trial-verdict`**, with tests over fixture censuses and reports:
    one per step of §6's rule; a census unit with no obs rows that is `dropped`
    (`not delivered`, not missing); missing defect data at 5% and above it; a unit
-   with a defect in a child but not in its root (not clean); the sensitivity line.
+   with a defect in a child but not in its root (not clean); a unit with a known defect
+   and a member with no obs row (defective, not unknown); the sensitivity line.
 3. **tack: the trial file, the case file, and the AGENTS.md rule in tack.** The case
    file's first run is before `read_on` and prints `insufficient: before read date`.
    That checks the pipeline end to end.
@@ -328,7 +376,9 @@ with the arm. That is a separate design.
 - The case runs end to end against the live obs index once obs-0491f1 lands, and prints
   `insufficient: before read date`.
 
-## 11. Review round 1 (2026-10-02)
+## 11. Review rounds
+
+Round 1 (2026-10-02):
 
 | Finding | Resolution |
 | --- | --- |
@@ -337,3 +387,12 @@ with the arm. That is a separate design.
 | P1: the read date did not guarantee complete windows | Separate `close_by`, `follow_up_to` (`close_by` plus 30 days) and `read_on` (§3). Every counted close has a complete window. |
 | P2: the obs units could not supply open and dropped counts | A census of enrolled units from the task records is the verdict's second input, with a cross-check against obs (§6, piece 1). |
 | P2: skill credit and any gate note did not establish treatment | Treatment means a gate past `scoped` on the unit's own tasks. Compliance can be assessed once the root closes `done`. Skill credit is only a printed cross-check (§5). |
+
+Round 2 (2026-10-02). The reviewer recommended keeping tack and obs as the scope, and
+the scope is kept.
+
+| Finding | Resolution |
+| --- | --- |
+| P1: membership notes did not freeze enrollment or prevent conflicting arms | The first lookup decides the unit and records it on the root; nothing re-decides it. A moved task runs under its destination's arm, stays in its recorded unit for the analysis, and makes that unit non-compliant when the arms differ (§4). |
+| P1: missing data overrode a known defect | Defect state is decided in order: a known defect, then unknown, then clean. Imputation applies only without a known defect (§6). |
+| P2: delivery state on `close_by` was mixed with obs's first-close windows | Delivery and defects are both anchored at first closes. The later-episode gap is stated with every verdict, and reopens are printed per arm (§6). |
