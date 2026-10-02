@@ -1,10 +1,10 @@
 ---
 id: tack-af4ca5
 title: executing-plans task-done records runner configuration instead of the passing test summary when a composite check ends with Vitest finding no tests.
-status: idea
+status: shelved
 priority: 2
 created: 2026-10-02T12:37:32Z
-updated: 2026-10-02T14:30:58Z
+updated: 2026-10-02T14:39:12Z
 depends: []
 tags: [feedback, friction, "from:beliefs"]
 agent: codex
@@ -23,3 +23,5 @@ Local workaround until upstream changes: pass task-done the focused test command
 ## Notes
 
 - 2026-10-02T14:30:57Z (main): scope: question; body rewritten with cause (task-done:48 last-line heuristic), upstream #2342/PR #2348 (TAP-only fix), workaround, and one open question: post the Vitest/composite case upstream
+- 2026-10-02T14:39:11Z (main): Reported upstream as a comment on obra/superpowers#2342 (https://github.com/obra/superpowers/issues/2342#issuecomment-5954814790), reproduced on v6.4.1 with Vitest 5.0.3 --passWithNoTests
+- 2026-10-02T14:39:11Z (main): shelved: upstream changes task-done's last-line fallback (PR #2348 or a follow-up to the #2342 comment) in a release — then bump agents/vendor/superpowers and re-check a composite check ending in Vitest
