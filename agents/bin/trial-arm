@@ -1,0 +1,270 @@
+#!/usr/bin/env python3
+"""Randomized trial arms (docs/specs/2026-10-02-flow-trial-design.md).
+
+trial-arm <task-id>             the arm to follow after `tasks start`; writes the trial's notes once
+trial-arm status <trial-id>     enrolled units with treatment and compliance so far
+trial-arm census <trial-id>     the JSON census trial-verdict reads
+
+Trials are agents/evals/trials/*.md. Exits 0 with an answer, 1 when the task is missing,
+2 when trial files overlap on a project, a recorded note contradicts the function, or
+the tasks CLI fails.
+"""
+
+from __future__ import annotations
+
+import datetime as dt
+import hashlib
+import re
+from dataclasses import dataclass
+from pathlib import Path
+
+import yaml
+
+TRIALS = Path(__file__).resolve().parent.parent / "evals" / "trials"
+TREATED = ("designed", "planned", "implementing", "verified")
+FOLLOW_UP_DAYS = 30
+FIELDS = ("id", "factor", "arms", "projects", "enroll", "close_by", "follow_up_to", "read_on")
+GATE_RE = re.compile(r"^gate:\s*([A-Za-z]+)")
+DECISION_RE = re.compile(r"^trial: (?P<trial>\S+) — (?:enrolled — flow (?P<arm>on|off)|not enrolled: (?P<reason>.+))$")
+MEMBER_RE = re.compile(r"^arm: (?P<trial>\S+) — unit (?P<unit>\S+) — (?:flow (?P<arm>on|off)|not enrolled)$")
+MOVE_RE = re.compile(r"^arm: (?P<trial>\S+) — moved to unit (?P<unit>\S+) — flow (?P<arm>on|off)$")
+OVERRIDE_RE = re.compile(r"^arm: (?P<trial>\S+) — override: .+$")
+
+
+class TrialError(Exception):
+    """Trial files, recorded notes or the tasks CLI contradict the run (exit 2)."""
+
+
+class MissingTask(Exception):
+    """The task is not in its project's records (exit 1)."""
+
+
+@dataclass(frozen=True)
+class Trial:
+    id: str
+    factor: str
+    projects: tuple
+    enroll: tuple
+    close_by: dt.date
+    follow_up_to: dt.date
+    read_on: dt.date
+
+    def active_on(self, day):
+        return self.enroll[0] <= day <= self.close_by
+
+
+@dataclass(frozen=True)
+class Decision:
+    enrolled: bool
+    arm: str | None
+    reason: str | None
+    recorded: bool
+
+
+def _day(value, where):
+    if isinstance(value, dt.date):
+        return value
+    try:
+        return dt.date.fromisoformat(str(value))
+    except ValueError:
+        raise TrialError(f"{where} is {value!r}, not a YYYY-MM-DD date") from None
+
+
+def parse_trial(text, where):
+    parts = text.split("---\n")
+    if len(parts) < 3 or parts[0] != "":
+        raise TrialError(f"{where} has no frontmatter")
+    meta = yaml.safe_load(parts[1])
+    missing = [name for name in FIELDS if name not in meta]
+    if missing:
+        raise TrialError(f"{where} lacks {missing}")
+    if meta["factor"] != "flow" or list(meta["arms"]) != ["on", "off"]:
+        raise TrialError(f"{where}: only factor flow with arms [on, off] is supported")
+    start, sep, end = str(meta["enroll"]).partition("..")
+    if not sep:
+        raise TrialError(f"{where}: enroll is {meta['enroll']!r}, not <from>..<to>")
+    trial = Trial(id=str(meta["id"]), factor="flow", projects=tuple(meta["projects"]),
+                  enroll=(_day(start, f"{where} enroll"), _day(end, f"{where} enroll")),
+                  close_by=_day(meta["close_by"], f"{where} close_by"),
+                  follow_up_to=_day(meta["follow_up_to"], f"{where} follow_up_to"),
+                  read_on=_day(meta["read_on"], f"{where} read_on"))
+    if not trial.enroll[0] <= trial.enroll[1] < trial.close_by:
+        raise TrialError(f"{where}: enroll must end before close_by")
+    if trial.follow_up_to != trial.close_by + dt.timedelta(days=FOLLOW_UP_DAYS):
+        raise TrialError(f"{where}: follow_up_to must be close_by plus {FOLLOW_UP_DAYS} days")
+    if trial.read_on <= trial.follow_up_to:
+        raise TrialError(f"{where}: read_on must be after follow_up_to")
+    return trial
+
+
+def load_trials(directory=TRIALS):
+    trials = [parse_trial(path.read_text(), str(path.name)) for path in sorted(directory.glob("*.md"))]
+    ids = [trial.id for trial in trials]
+    if len(set(ids)) != len(ids):
+        raise TrialError(f"duplicate trial ids in {directory.name}: {sorted(ids)}")
+    for i, a in enumerate(trials):
+        for b in trials[i + 1:]:
+            shared = set(a.projects) & set(b.projects)
+            if shared and a.enroll[0] <= b.close_by and b.enroll[0] <= a.close_by:
+                raise TrialError(f"trials {a.id} and {b.id} overlap on {sorted(shared)}")
+    return trials
+
+
+def trial_for(trials, prefix, day):
+    found = [trial for trial in trials if prefix in trial.projects and trial.active_on(day)]
+    return found[0] if found else None
+
+
+def find_trial(trials, trial_id):
+    for trial in trials:
+        if trial.id == trial_id:
+            return trial
+    raise TrialError(f"no trial {trial_id}")
+
+
+def arm_of(trial_id, root):
+    return "on" if hashlib.sha256(f"{trial_id}:{root}".encode()).digest()[0] & 1 else "off"
+
+
+def _at(note):
+    return dt.datetime.fromisoformat(note["at"].replace("Z", "+00:00"))
+
+
+def _kind(text):
+    if text == "started":
+        return "start"
+    if text == "resumed":
+        return "resume"
+    if text in ("done", "dropped"):
+        return text
+    if text == "shelved" or text.startswith("shelved:"):
+        return "shelved"
+    return None
+
+
+def events(task):
+    return [(_at(note), kind) for note in task.get("notes", []) if (kind := _kind(note["text"]))]
+
+
+def first_start(task):
+    return next((at for at, kind in events(task) if kind == "start"), None)
+
+
+def first_done(task):
+    return next((at for at, kind in events(task) if kind == "done"), None)
+
+
+def state_on(task, day):
+    state = "open"
+    for at, kind in events(task):
+        if at.date() > day:
+            break
+        state = kind if kind in ("done", "dropped", "shelved") else "open"
+    return state
+
+
+def reopened(task, day):
+    done = first_done(task)
+    return done is not None and any(
+        kind in ("start", "resume") and at > done and at.date() <= day for at, kind in events(task))
+
+
+def _gate_states(task):
+    return [m.group(1) for note in task.get("notes", []) if (m := GATE_RE.match(note["text"]))]
+
+
+def _notes(task, until=None):
+    return [note for note in task.get("notes", []) if until is None or _at(note).date() <= until]
+
+
+def gates_past_scoped(task, until=None):
+    return [m.group(1) for note in _notes(task, until)
+            if (m := GATE_RE.match(note["text"])) and m.group(1) in TREATED]
+
+
+def gated(task):
+    return bool(_gate_states(task))
+
+
+def _matches(task, regex, trial_id, until=None):
+    return [m for note in _notes(task, until)
+            if (m := regex.match(note["text"])) and m["trial"] == trial_id]
+
+
+def member_of(task, trial_id):
+    found = _matches(task, MEMBER_RE, trial_id)
+    return (found[0]["unit"], found[0]["arm"]) if found else None
+
+
+def decision_of(task, trial_id):
+    found = {(m["arm"], m["reason"]) for m in _matches(task, DECISION_RE, trial_id)}
+    if len(found) > 1:
+        raise TrialError(f"task {task['id']} carries conflicting {trial_id} decision notes: {sorted(found, key=repr)}")
+    if not found:
+        return None
+    arm, reason = found.pop()
+    return Decision(arm is not None, arm, reason, True)
+
+
+def moves_of(task, trial_id, until=None):
+    return [(m["unit"], m["arm"]) for m in _matches(task, MOVE_RE, trial_id, until)]
+
+
+def overridden(task, trial_id, until=None):
+    return bool(_matches(task, OVERRIDE_RE, trial_id, until))
+
+
+def _prefix(task_id):
+    return task_id.partition("-")[0]
+
+
+class Tree:
+    """One trial's view of task records: parents within a project, units, members."""
+
+    def __init__(self, records, trial_id):
+        self.records = records
+        self.trial_id = trial_id
+
+    def task(self, task_id):
+        if task_id not in self.records:
+            raise MissingTask(task_id)
+        return self.records[task_id]
+
+    def parent(self, task_id):
+        parent = self.task(task_id).get("parent")
+        if parent in self.records and _prefix(parent) == _prefix(task_id):
+            return parent
+        return None
+
+    def computed_root(self, task_id):
+        unit = task_id
+        while (parent := self.parent(unit)) is not None and self.records[parent].get("process"):
+            unit = parent
+        return unit
+
+    def resolved_unit(self, task_id):
+        root = self.computed_root(task_id)
+        recorded = member_of(self.records[root], self.trial_id)
+        return recorded[0] if recorded else root
+
+    def unit_of(self, task_id):
+        recorded = member_of(self.task(task_id), self.trial_id)
+        return recorded[0] if recorded else self.resolved_unit(task_id)
+
+    def members(self, root):
+        return sorted(task_id for task_id in self.records if self.unit_of(task_id) == root)
+
+
+def decide(trial, tree, root):
+    """The unit's frozen decision when its root records one; otherwise a fresh one from
+    the tree, or None while no member has started."""
+    recorded = decision_of(tree.task(root), trial.id)
+    if recorded is not None:
+        return recorded
+    starts = [at for task_id in tree.members(root) if (at := first_start(tree.records[task_id]))]
+    if not starts:
+        return None
+    earliest = min(starts).date()
+    if trial.enroll[0] <= earliest <= trial.enroll[1]:
+        return Decision(True, arm_of(trial.id, root), None, False)
+    return Decision(False, None, f"unit {root} first started {earliest}, outside enroll", False)
