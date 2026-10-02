@@ -24,7 +24,7 @@ section numbers below refer to it.
 ## Global Constraints
 
 - Trial file: `agents/evals/trials/flow-trial-1.md` with `id: flow-trial-1`,
-  `factor: flow`, `arms: [on, off]`, `projects: [tack, obs]`,
+  `factor: flow`, `arms: ["on", "off"]`, `projects: [tack, obs]`,
   `enroll: 2026-10-05..2026-11-29`, `close_by: 2027-01-10`,
   `follow_up_to: 2027-02-09`, `read_on: 2027-02-16`, `source: [tack-7d9375]`.
 - Arm: `"on" if sha256("<trial id>:<unit root id>").digest()[0] & 1 else "off"`.
@@ -38,7 +38,8 @@ section numbers below refer to it.
   - `<trial>: flow on|off (unit <root>)`
   - `not enrolled: <reason>`, where the reason is `no trial for <prefix>`,
     `unit <root> first started <YYYY-MM-DD>, outside enroll`, or `not started`
-  - `<trial>: flow on|off (moved from unit <a> to unit <b>)`
+  - `<trial>: flow on|off (moved from unit <a> to unit <b>)`, where `<a>` is the task's
+    analysis unit and `<b>` its physical root (the top of its current parent chain)
 - Treated: a `gate:` note for a state in `designed`, `planned`, `implementing` or
   `verified` on any member. `gate: scoped` never counts.
 - Verdict choices: `flow-better`, `no-difference-detected`, `flow-worse`,
@@ -97,7 +98,8 @@ section numbers below refer to it.
   - `first_start(task) -> datetime | None`, `first_done(task) -> datetime | None`,
     `state_on(task, day: date) -> str` (`done|dropped|shelved|open`),
     `reopened(task, day: date) -> bool`, `gates_past_scoped(task) -> list[str]`,
-    `gated(task) -> bool`
+    `gated(task) -> bool`. `gates_past_scoped`, `overridden` and `moves_of` take an
+    optional `until: date`; with it, only notes on or before that UTC day count
   - `@dataclass(frozen=True) class Decision(enrolled: bool, arm: str | None, reason: str | None, recorded: bool)`
   - `member_of(task, trial_id) -> tuple[str, str | None] | None` (unit, arm or None
     for not enrolled); `decision_of(task, trial_id) -> Decision | None`;
@@ -131,7 +133,7 @@ loader.exec_module(ta)
 TRIAL_TEXT = """---
 id: flow-trial-1
 factor: flow
-arms: [on, off]
+arms: ["on", "off"]
 projects: [tack, obs]
 enroll: 2026-10-05..2026-11-29
 close_by: 2027-01-10
@@ -510,16 +512,21 @@ def _gate_states(task):
     return [m.group(1) for note in task.get("notes", []) if (m := GATE_RE.match(note["text"]))]
 
 
-def gates_past_scoped(task):
-    return [state for state in _gate_states(task) if state in TREATED]
+def _notes(task, until=None):
+    return [note for note in task.get("notes", []) if until is None or _at(note).date() <= until]
+
+
+def gates_past_scoped(task, until=None):
+    return [m.group(1) for note in _notes(task, until)
+            if (m := GATE_RE.match(note["text"])) and m.group(1) in TREATED]
 
 
 def gated(task):
     return bool(_gate_states(task))
 
 
-def _matches(task, regex, trial_id):
-    return [m for note in task.get("notes", [])
+def _matches(task, regex, trial_id, until=None):
+    return [m for note in _notes(task, until)
             if (m := regex.match(note["text"])) and m["trial"] == trial_id]
 
 
@@ -538,12 +545,12 @@ def decision_of(task, trial_id):
     return Decision(arm is not None, arm, reason, True)
 
 
-def moves_of(task, trial_id):
-    return [(m["unit"], m["arm"]) for m in _matches(task, MOVE_RE, trial_id)]
+def moves_of(task, trial_id, until=None):
+    return [(m["unit"], m["arm"]) for m in _matches(task, MOVE_RE, trial_id, until)]
 
 
-def overridden(task, trial_id):
-    return bool(_matches(task, OVERRIDE_RE, trial_id))
+def overridden(task, trial_id, until=None):
+    return bool(_matches(task, OVERRIDE_RE, trial_id, until))
 
 
 def _prefix(task_id):
@@ -627,10 +634,14 @@ git commit -m "feat(trial-arm): trial files, arm function, lifecycle and units"
   - `check(trial, tree) -> None`: raises `TrialError` when a recorded arm, decision or
     membership contradicts the function or the unit's decision
   - `@dataclass class Lookup(line: str, writes: list[tuple[str, str]])`
-  - `lookup(trial, tree, task_id) -> Lookup` (pure; the writes are `(task_id, note text)`)
+  - `lookup(trial, tree, task_id) -> Lookup` (pure; the writes are `(task_id, note text)`).
+    Two roots are kept apart: the **analysis unit** (`tree.unit_of`, frozen by notes) decides
+    enrollment and arm, and the **physical root** (`tree.computed_root`, the tree as it
+    stands) decides how the work runs when the two belong to different units.
   - `decision_text(trial, d)`, `member_text(trial, unit, d)`, `move_text(trial, unit, arm) -> str`
   - `class Tasks(exe: str | None = None)` with `records(prefix) -> dict[str, dict]` and
-    `note(task_id, text)`. The executable is `TRIAL_ARM_TASKS` when set, else `tasks`
+    `note(task_id, text)`. The executable is `TRIAL_ARM_TASKS` when set, else `tasks`.
+    Every call passes `--json`, so a `TASKS_FORMAT=pretty` environment cannot break it
   - `local_prefix(cwd=None) -> str | None`
   - `main(argv=None, tasks=None, trials_dir=TRIALS, today=None) -> int`
     (`status` and `census` are added in Task 3)
@@ -731,6 +742,40 @@ def test_a_move_under_a_not_enrolled_parent_follows_its_actual_workflow():
     assert ta.lookup(TRIAL, plain, task).line == f"{T}: flow off (moved from unit {on_root} to unit {outside})"
 
 
+def test_a_move_under_a_detached_parent_follows_the_parent_not_its_excluded_origin():
+    """The physical root decides execution: a parent detached from an excluded unit that
+    runs flow carries its children under flow, even though its analysis unit has no gates."""
+    a = pick("off")
+    origin = pick("on", skip=(a,))
+    parent, task = "tack-e00001", "tack-f00001"
+    t = tree(rec(a, process="planned", notes=[(IN, "started"), (IN, f"trial: {T} — enrolled — flow off")]),
+             rec(origin, process="planned", notes=[
+                 (BEFORE, "started"),
+                 (BEFORE, f"trial: {T} — not enrolled: unit {origin} first started 2026-10-01, outside enroll")]),
+             rec(parent, process="planned", notes=[
+                 (IN, "started"), (IN, f"arm: {T} — unit {origin} — not enrolled"),
+                 (IN, "gate: implementing .worktrees/p")]),
+             rec(task, parent=parent, notes=[(IN, "started"), (IN, f"arm: {T} — unit {a} — flow off")]))
+    result = ta.lookup(TRIAL, t, task)
+    assert result.line == f"{T}: flow on (moved from unit {a} to unit {parent})"
+    assert result.writes == [(task, f"arm: {T} — moved to unit {parent} — flow on")]
+    assert t.unit_of(task) == a
+
+
+def test_a_new_child_of_a_detached_flow_parent_is_not_enrolled_and_writes_no_move():
+    origin = pick("on")
+    parent, child = "tack-e00001", "tack-f00002"
+    t = tree(rec(origin, process="planned", notes=[
+                 (BEFORE, "started"),
+                 (BEFORE, f"trial: {T} — not enrolled: unit {origin} first started 2026-10-01, outside enroll")]),
+             rec(parent, process="planned", notes=[(IN, "started"), (IN, f"arm: {T} — unit {origin} — not enrolled"),
+                                                   (IN, "gate: implementing .worktrees/p")]),
+             rec(child, parent=parent, notes=[(LATER, "started")]))
+    result = ta.lookup(TRIAL, t, child)
+    assert result.line.startswith("not enrolled: unit")
+    assert result.writes == [(child, f"arm: {T} — unit {origin} — not enrolled")]
+
+
 def test_a_task_with_an_earlier_start_moved_under_an_enrolled_root_leaves_it_enrolled():
     root = pick("on")
     t = tree(rec(root, process="planned", notes=[(IN, "started"), (IN, f"trial: {T} — enrolled — flow on")]),
@@ -761,10 +806,12 @@ FAKE_TASKS = """#!/usr/bin/env python3
 import json, os, sys
 store = os.environ["FAKE_TASKS_STORE"]
 data = json.load(open(store))
-cmd, args = sys.argv[1], sys.argv[2:]
+cmd, args = sys.argv[1], [a for a in sys.argv[2:] if a != "--json"]
 with open(os.environ["FAKE_TASKS_LOG"], "a") as log:
     log.write(json.dumps(sys.argv[1:]) + "\\n")
-if cmd == "list":
+if os.environ.get("TASKS_FORMAT") == "pretty" and "--json" not in sys.argv:
+    print("---\\nid: pretty output, not JSON")
+elif cmd == "list":
     print(json.dumps({"tasks": [{"id": i} for i in data]}))
 elif cmd == "show":
     print(json.dumps({"task": data[args[0]]}))
@@ -832,12 +879,21 @@ def test_main_exit_codes(fake_tasks, tmp_path, capsys):
     assert ta.main(["tack-ffffff"], tasks=tasks, trials_dir=d, today=dt.date(2026, 10, 6)) == 2
 
 
+def test_the_client_forces_json_when_pretty_output_is_configured(fake_tasks, tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("TASKS_FORMAT", "pretty")
+    root = pick("on")
+    tasks = fake_tasks(rec(root, process="planned", notes=[(IN, "started")]))
+    assert ta.main([root], tasks=tasks, trials_dir=trials_dir(tmp_path), today=dt.date(2026, 10, 6)) == 0
+    assert capsys.readouterr().out.strip() == f"{T}: flow on (unit {root})"
+
+
 def test_records_reads_the_local_checkout_for_its_own_prefix(fake_tasks, tmp_path, monkeypatch):
     tasks = fake_tasks(rec("tack-000001"))
     monkeypatch.setattr(ta, "local_prefix", lambda cwd=None: "tack")
     tasks.records("tack")
     tasks.records("obs")
     calls = [json.loads(line) for line in fake_tasks.log.read_text().splitlines() if line.startswith('["list"')]
+    assert all("--json" in call for call in calls)
     assert "--project" not in calls[0]
     assert calls[1][calls[1].index("--project") + 1] == "obs"
 
@@ -908,33 +964,40 @@ def _answer(trial, unit, d):
 
 
 def lookup(trial, tree, task_id):
-    """What the session follows after `tasks start`, and the notes to write (§4)."""
+    """What the session follows after `tasks start`, and the notes to write (§4).
+
+    The analysis unit (frozen by the task's `arm:` note, else resolved from the tree)
+    decides enrollment and arm. The physical root (the top of the task's current parent
+    chain) decides execution when it belongs to another unit: that unit's arm when it is
+    enrolled, otherwise the root's actual workflow (flow when it carries any gate)."""
     task = tree.task(task_id)
     check(trial, tree)
     writes = []
-    current = tree.resolved_unit(task_id)
     member = member_of(task, trial.id)
-    if member is None or member[0] == current:
-        unit = current if member is None else member[0]
-        d = decide(trial, tree, unit)
-        if d is None:
-            return Lookup("not enrolled: not started", [])
-        if not d.recorded:
-            writes.append((unit, decision_text(trial, d)))
-        if member is None:
-            writes.append((task_id, member_text(trial, unit, d)))
+    unit = member[0] if member else tree.resolved_unit(task_id)
+    d = decide(trial, tree, unit)
+    if d is None:
+        return Lookup("not enrolled: not started", [])
+    if not d.recorded:
+        writes.append((unit, decision_text(trial, d)))
+    if member is None:
+        writes.append((task_id, member_text(trial, unit, d)))
+    root = tree.computed_root(task_id)
+    root_unit = tree.unit_of(root)
+    if root_unit == unit:
         return Lookup(_answer(trial, unit, d), writes)
-    recorded = member[0]
-    dest = decide(trial, tree, current)
-    if dest is not None and not dest.recorded:
-        writes.append((current, decision_text(trial, dest)))
-    if dest is not None and dest.enrolled:
-        arm = dest.arm
+    rd = decide(trial, tree, root_unit)
+    if rd is not None and not rd.recorded:
+        writes.append((root_unit, decision_text(trial, rd)))
+    if rd is not None and rd.enrolled:
+        arm = rd.arm
+    elif d.enrolled:
+        arm = "on" if gated(tree.task(root)) else "off"
     else:
-        arm = "on" if gated(tree.task(current)) else "off"
-    if (current, arm) not in moves_of(task, trial.id):
-        writes.append((task_id, move_text(trial, current, arm)))
-    return Lookup(f"{trial.id}: flow {arm} (moved from unit {recorded} to unit {current})", writes)
+        return Lookup(_answer(trial, unit, d), writes)
+    if (root, arm) not in moves_of(task, trial.id):
+        writes.append((task_id, move_text(trial, root, arm)))
+    return Lookup(f"{trial.id}: flow {arm} (moved from unit {unit} to unit {root})", writes)
 
 
 def local_prefix(cwd=None):
@@ -964,11 +1027,11 @@ class Tasks:
     def records(self, prefix):
         scope = [] if local_prefix() == prefix else ["--project", prefix]
         statuses = [arg for status in STATUSES for arg in ("--status", status)]
-        listed = json.loads(self._run("list", *scope, *statuses))["tasks"]
-        return {row["id"]: json.loads(self._run("show", row["id"]))["task"] for row in listed}
+        listed = json.loads(self._run("list", "--json", *scope, *statuses))["tasks"]
+        return {row["id"]: json.loads(self._run("show", "--json", row["id"]))["task"] for row in listed}
 
     def note(self, task_id, text):
-        self._run("note", task_id, text)
+        self._run("note", "--json", task_id, text)
 
 
 def main(argv=None, tasks=None, trials_dir=TRIALS, today=None):
@@ -1121,6 +1184,17 @@ def test_census_state_reads_close_by_and_keeps_the_first_done_date():
     assert unit["state"] == "open" and unit["reopened"] is True
 
 
+def test_evidence_after_the_cutoff_leaves_the_census_unchanged():
+    root = pick("on")
+    before = tree(enrolled(root, "on", (LATER, "done")))
+    after = tree(enrolled(root, "on", (LATER, "done"), ("2027-01-20T00:00:00Z", "gate: implementing late"),
+                          ("2027-01-21T00:00:00Z", f"arm: {T} — override: late"),
+                          ("2027-01-22T00:00:00Z", f"arm: {T} — moved to unit tack-ffffff — flow off")))
+    assert ta.census(TRIAL, after, TRIAL.close_by) == ta.census(TRIAL, before, TRIAL.close_by)
+    [unit] = ta.census(TRIAL, after, TRIAL.close_by)["units"]
+    assert (unit["treated"], unit["compliant"]) == (False, False)
+
+
 def test_compliance_and_status_lines_flag_a_halt():
     units = [{"root": f"tack-{i}", "arm": "on", "state": "done", "treated": i >= 4, "compliant": i >= 4}
              for i in range(16)] + \
@@ -1169,9 +1243,9 @@ def _unit(trial, tree, root, d, as_of):
     for task_id in tree.members(root):
         task = tree.records[task_id]
         members.append({"task": task_id, "first_start": _iso(first_start(task)),
-                        "first_done": _iso(first_done(task)), "gates": gates_past_scoped(task),
-                        "override": overridden(task, trial.id),
-                        "moves": [{"unit": unit, "arm": arm} for unit, arm in moves_of(task, trial.id)]})
+                        "first_done": _iso(first_done(task)), "gates": gates_past_scoped(task, as_of),
+                        "override": overridden(task, trial.id, as_of),
+                        "moves": [{"unit": unit, "arm": arm} for unit, arm in moves_of(task, trial.id, as_of)]})
     starts = [first_start(tree.records[m["task"]]) for m in members if m["first_start"]]
     done = first_done(root_task)
     treated = any(m["gates"] for m in members)
@@ -1280,8 +1354,11 @@ git commit -m "feat(trial-arm): census and status with unit compliance"
   `unvalidated.measures.m4`.
 - Produces: `fisher_two_sided(a, b, c, d) -> float`, `wilson(x, n, z) -> (lo, hi)`,
   `newcombe(x1, n1, x2, n2, z) -> (diff, lo, hi)`,
-  `judge(trial, census, report) -> list[str]`,
-  `main(argv=None, stdin=None, stdout=None) -> int`.
+  `read_inputs(trial, census, report) -> dict[str, dict]` (validates both inputs and
+  their agreement, returns the obs rows by task), `judge(trial, census, report) -> list[str]`,
+  `main(argv=None, stdin=None, stdout=None) -> int`. `--validate` checks the inputs and
+  prints one line naming only how many census units and matching obs rows were read, so
+  the live pipeline can be checked before `read_on` without showing any outcome.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1309,7 +1386,7 @@ ta = tv.ta
 TRIAL_TEXT = """---
 id: flow-trial-1
 factor: flow
-arms: [on, off]
+arms: ["on", "off"]
 projects: [tack, obs]
 enroll: 2026-10-05..2026-11-29
 close_by: 2027-01-10
@@ -1496,6 +1573,46 @@ def test_disagreeing_inputs_exit_2(tmp_path, damage):
     assert run(tmp_path, census, report)[0] == 2
 
 
+@pytest.mark.parametrize("damage", ["negative defects", "null gate", "bad gate", "no state", "compliant text",
+                                    "negative tokens", "no members", "bad timestamp"])
+def test_malformed_inputs_exit_2(tmp_path, damage):
+    census, report = build(arms(80, 100, 79, 100))
+    first = census["units"][0]
+    if damage == "negative defects":
+        report["units"][0]["defects"] = -1
+    elif damage == "null gate":
+        report["unvalidated"]["measures"]["m4"] = None
+    elif damage == "bad gate":
+        report["unvalidated"]["measures"]["m4"] = "E3"
+    elif damage == "no state":
+        del first["state"]
+    elif damage == "compliant text":
+        first["compliant"] = "yes"
+    elif damage == "negative tokens":
+        report["units"][0]["output_tokens"] = -5
+    elif damage == "no members":
+        first["members"] = []
+    else:
+        first["members"][0]["first_start"] = "yesterday"
+    assert run(tmp_path, census, report)[0] == 2
+
+
+def test_validate_reads_live_inputs_without_any_outcome(tmp_path):
+    census, report = build(arms(80, 100, 79, 100))
+    trial = tmp_path / "trial.md"
+    trial.write_text(TRIAL_TEXT)
+    path = tmp_path / "census.json"
+    path.write_text(json.dumps(census))
+    out = io.StringIO()
+    code = tv.main([str(trial), "--census", str(path), "--validate"],
+                   stdin=io.StringIO(json.dumps(report)), stdout=out)
+    assert (code, out.getvalue().splitlines()) == (0, ["inputs valid: 200 census units, 200 obs rows for their members"])
+    report["units"][0]["defects"] = -1
+    out = io.StringIO()
+    assert tv.main([str(trial), "--census", str(path), "--validate"],
+                   stdin=io.StringIO(json.dumps(report)), stdout=out) == 2
+
+
 def test_null_close_in_obs_row_is_refused(tmp_path, capsys):
     census, report = build(arms(80, 100, 79, 100))
     report["units"][0]["first_close_ms"] = None
@@ -1612,25 +1729,110 @@ def newcombe(x1, n1, x2, n2, z=Z90):
     return d, d - math.sqrt((p1 - l1) ** 2 + (u2 - p2) ** 2), d + math.sqrt((u1 - p1) ** 2 + (p2 - l2) ** 2)
 
 
+COUNTS = ("defects", "changes", "extensions", "reopens")
+STATES = ("done", "dropped", "shelved", "open")
+GATE_STATUSES = ("E2",)
+
+
+def _count(value, where):
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise InputError(f"{where} is {value!r}, not a count")
+    return value
+
+
+def _timestamp(value, where):
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise InputError(f"{where} is {value!r}, not a timestamp")
+    try:
+        dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        raise InputError(f"{where} is {value!r}, not a timestamp") from None
+    return value
+
+
 def _rows(report):
     rows = {}
     for row in _field(report, "units", list, "report"):
         task = _field(row, "task", str, "obs row")
         if task in rows:
             raise InputError(f"duplicate obs row for {task}")
-        for name in ("first_start_ms", "first_close_ms", "defects", "changes", "extensions", "reopens"):
-            _field(row, name, int, f"obs row {task}")
+        for name in ("first_start_ms", "first_close_ms", *COUNTS):
+            _count(_field(row, name, int, f"obs row {task}"), f"obs row {task}.{name}")
+        if "output_tokens" not in row:
+            raise InputError(f"obs row {task} lacks 'output_tokens'")
+        if row["output_tokens"] is not None:
+            _count(row["output_tokens"], f"obs row {task}.output_tokens")
         rows[task] = row
     return rows
 
 
-def _check(trial, census, rows):
-    if census.get("trial") != trial.id:
-        raise InputError(f"census is for {census.get('trial')!r}, not {trial.id}")
-    if census.get("as_of") != trial.close_by.isoformat():
-        raise InputError(f"census is as of {census.get('as_of')!r}, not close_by {trial.close_by}")
-    seen = set()
+def _gate_holds(report):
+    """A missing m4 key clears the gate; "E2" holds it; anything else is malformed."""
+    measures = _field(_field(report, "unvalidated", dict, "report"), "measures", dict, "report.unvalidated")
+    if "m4" not in measures:
+        return False
+    if measures["m4"] not in GATE_STATUSES:
+        raise InputError(f"invalid validation status for m4: {measures['m4']!r}")
+    return True
+
+
+def _census_shape(census):
+    _field(census, "trial", str, "census")
+    _field(census, "as_of", str, "census")
+    late = _field(census, "decided_late", dict, "census")
+    if set(late) != {"on", "off"}:
+        raise InputError(f"census.decided_late has keys {sorted(late)}, not on and off")
+    for arm in ("on", "off"):
+        _count(late[arm], f"census.decided_late.{arm}")
+    _field(census, "conflicts", list, "census")
     for u in _field(census, "units", list, "census"):
+        root = _field(u, "root", str, "census unit")
+        where = f"census unit {root}"
+        if _field(u, "arm", str, where) not in ("on", "off"):
+            raise InputError(f"{where}.arm is {u['arm']!r}")
+        if _field(u, "decision", str, where) not in ("recorded", "decided late"):
+            raise InputError(f"{where}.decision is {u['decision']!r}")
+        if _field(u, "state", str, where) not in STATES:
+            raise InputError(f"{where}.state is {u['state']!r}")
+        for name in ("enrolled_at", "first_done"):
+            if name not in u:
+                raise InputError(f"{where} lacks {name!r}")
+            _timestamp(u[name], f"{where}.{name}")
+        _field(u, "reopened", bool, where)
+        _field(u, "treated", bool, where)
+        if "compliant" not in u or not (u["compliant"] is None or isinstance(u["compliant"], bool)):
+            raise InputError(f"{where}.compliant is {u.get('compliant')!r}, not true, false or null")
+        stratum = _field(u, "stratum", dict, where)
+        for name in ("project", "size", "complexity", "process"):
+            if name not in stratum:
+                raise InputError(f"{where}.stratum lacks {name!r}")
+        members = _field(u, "members", list, where)
+        if not members:
+            raise InputError(f"{where} has no members")
+        for m in members:
+            task = _field(m, "task", str, f"{where} member")
+            for name in ("first_start", "first_done"):
+                if name not in m:
+                    raise InputError(f"{where} member {task} lacks {name!r}")
+                _timestamp(m[name], f"{where} member {task}.{name}")
+            _field(m, "gates", list, f"{where} member {task}")
+            _field(m, "override", bool, f"{where} member {task}")
+            _field(m, "moves", list, f"{where} member {task}")
+
+
+def read_inputs(trial, census, report):
+    """Validate both inputs and their agreement; return the obs rows by task."""
+    _census_shape(census)
+    rows = _rows(report)
+    _gate_holds(report)
+    if census["trial"] != trial.id:
+        raise InputError(f"census is for {census['trial']!r}, not {trial.id}")
+    if census["as_of"] != trial.close_by.isoformat():
+        raise InputError(f"census is as of {census['as_of']!r}, not close_by {trial.close_by}")
+    seen = set()
+    for u in census["units"]:
         if u["arm"] != ta.arm_of(trial.id, u["root"]):
             raise InputError(f"unit {u['root']} has arm {u['arm']}; the function gives {ta.arm_of(trial.id, u['root'])}")
         for m in u["members"]:
@@ -1643,6 +1845,7 @@ def _check(trial, census, rows):
             if (_day_ms(row["first_start_ms"]), _day_ms(row["first_close_ms"])) != \
                     (_day_iso(m["first_start"]), _day_iso(m["first_done"])):
                 raise InputError(f"task {m['task']}: census and obs disagree on its first start or first close")
+    return rows
 
 
 def _defect_state(trial, u, rows):
@@ -1660,9 +1863,8 @@ def _ratio(a, b):
 
 
 def judge(trial, census, report):
-    rows = _rows(report)
-    _check(trial, census, rows)
-    measures = _field(_field(report, "unvalidated", dict, "report"), "measures", dict, "report.unvalidated")
+    rows = read_inputs(trial, census, report)
+    gated = _gate_holds(report)
     by_arm = {"on": [], "off": []}
     for u in census["units"]:
         delivered = u["first_done"] is not None and _day_iso(u["first_done"]) <= trial.close_by
@@ -1689,7 +1891,7 @@ def judge(trial, census, report):
     p, interval = test("clean")
     delivered_total = on["delivered"] + off["delivered"]
     unknown_share = (on["unknown"] + off["unknown"]) / delivered_total if delivered_total else 0.0
-    if measures.get("m4") == "E2":
+    if gated:
         choice = "insufficient: unvalidated"
     elif unknown_share > MAX_UNKNOWN:
         choice = "insufficient: missing defect data"
@@ -1762,10 +1964,19 @@ def main(argv=None, stdin=None, stdout=None):
     parser.add_argument("trial")
     parser.add_argument("--census", required=True)
     parser.add_argument("--as-of", type=dt.date.fromisoformat)
+    parser.add_argument("--validate", action="store_true",
+                        help="check both inputs and print only what was read; compute no outcome")
     args = parser.parse_args(argv)
     stdin, out = stdin or sys.stdin, stdout or sys.stdout
     try:
         trial = ta.parse_trial(Path(args.trial).read_text(), args.trial)
+        if args.validate:
+            census = json.loads(Path(args.census).read_text())
+            rows = read_inputs(trial, census, json.load(stdin))
+            members = {m["task"] for u in census["units"] for m in u["members"]}
+            print(f"inputs valid: {len(census['units'])} census units, "
+                  f"{len(members & set(rows))} obs rows for their members", file=out)
+            return 0
         as_of = args.as_of or dt.datetime.now(dt.timezone.utc).date()
         if as_of < trial.read_on:
             print("insufficient: before read date", file=out)
@@ -1836,7 +2047,7 @@ Expected: FAIL (`ValueError: not enough values to unpack`), since no trial file 
 ---
 id: flow-trial-1
 factor: flow
-arms: [on, off]
+arms: ["on", "off"]
 projects: [tack, obs]
 enroll: 2026-10-05..2026-11-29
 close_by: 2027-01-10
@@ -1978,23 +2189,24 @@ agents/bin/trial-arm census flow-trial-1 > "$TMPDIR/census.json" \
 Expected: exit 0, first line `insufficient: before read date`. Any other exit is a
 pipeline defect: fix it before recording.
 
-- [ ] **Step 2: Run the verdict over the live report with a read date, to exercise the rule end to end**
+- [ ] **Step 2: Validate the live inputs without computing any outcome**
 
 ```bash
 obs --json outcomes report --since 2026-10-05 --until 2027-01-10 --cohort --units \
-  | agents/bin/trial-verdict agents/evals/trials/flow-trial-1.md --census "$TMPDIR/census.json" --as-of 2027-02-16
+  | agents/bin/trial-verdict agents/evals/trials/flow-trial-1.md --census "$TMPDIR/census.json" --validate
 ```
 
-Expected: exit 0. While M4 is gated, the choice is `insufficient: unvalidated`.
-Otherwise it is `insufficient: too few` this early. The `--as-of` run is a pipeline
-check only and is never recorded as a verdict: the trial's one read is the run on or
-after 2027-02-16.
+Expected: exit 0 and one line, `inputs valid: <n> census units, <m> obs rows for their
+members`. This checks that the live census and the obs report parse and agree, with
+no outcome, arm comparison or statistic printed. Never run the verdict with an
+`--as-of` at or after `read_on` before that date: the full rule is exercised by Task 4's
+fixtures, and the trial's one read is the run on or after 2027-02-16.
 
 - [ ] **Step 3: Record and commit**
 
 Set `observed.value: insufficient` and `observed.reason: before read date`, and append
 under `## Verdicts`:
-`<run date> insufficient: before read date — pipeline check; --as-of check printed <its first line>`.
+`<run date> insufficient: before read date — pipeline check; --validate printed <its line>`.
 
 ```bash
 git add agents/evals/cases/flow-trial-1-delivery.md

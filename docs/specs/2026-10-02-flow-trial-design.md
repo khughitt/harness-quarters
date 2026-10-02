@@ -1,6 +1,6 @@
 # Randomized flow trial
 
-Status: approved 2026-10-02 at revision 4 (review round 4 accepted; round 1 to 3 findings in §11). Revision 4.1 (plan time): the session rule is global, not per project (§4), and the live run is its own piece (§8). Task: `tack-7d9375`.
+Status: approved 2026-10-02 at revision 4 (review round 4 accepted; round 1 to 3 findings in §11). Revision 4.1 (plan time): the session rule is global, not per project (§4), and the live run is its own piece (§8). Revision 4.2 (plan review 1): the arm names are quoted in YAML, which reads bare on and off as booleans. Task: `tack-7d9375`.
 Inputs: the outcome measures of obs-00809f; the report fields of obs-0491f1 (`--until`,
 `--cohort`, `--units`, the E2 gate); the case shape and the historical flow case of
 `tack-026612` (`docs/specs/2026-10-01-workflow-outcome-eval-design.md`, whose §6 names
@@ -42,7 +42,7 @@ session controls on its own, so it comes first. §9 lists what a later factor re
 ```yaml
 id: flow-trial-1
 factor: flow
-arms: [on, off]
+arms: ["on", "off"]
 projects: [tack, obs]
 enroll: 2026-10-05..2026-11-29
 close_by: 2027-01-10
