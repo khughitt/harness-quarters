@@ -1,13 +1,15 @@
 ---
 id: tack-fc26cf
 title: "Measure whether a review from the other model family finds problems a same-family review missed, in both directions"
-status: todo
+status: doing
 priority: 2
 size: l
 complexity: mid
 process: direct
+owner: main
 created: 2026-09-15T01:01:58Z
-updated: 2026-09-29T20:47:27Z
+updated: 2026-10-02T07:56:05Z
+started: 2026-10-02T07:56:05Z
 depends: []
 parent: tack-67d253
 tags: [flow, skills]
@@ -39,3 +41,5 @@ Smallest super-friends experiment, no bridge: Claude writes a plan, Codex is lau
 - 2026-09-16T15:57:35Z (main): Related: ai-dd66c1 (friends bridge) names this one-hop file exchange as the candidate first step; filed from mindful:thought:34328bb6f74e4517bb0c5a2569ade36b.
 - 2026-09-29T20:39:10Z (main): scope: scoped; retitled to the outcome, body rewritten as a bounded replay of Codex review over four Claude-reviewed trees, todo P2 m/mid/direct, parented under tack-67d253; brief: docs/notes/2026-09-29-cross-harness-review-brief.md
 - 2026-09-29T20:47:27Z (main): Scope widened 2026-09-29 by the user's answer: both directions (Codex → Claude too). Added a Codex-implemented leg (tack-bc49ed plus two ops/obs trees, fresh Codex and claude -p reviews on each); size m → l. Gate-requirement and tack-vs-relay questions stay with the user, undecided; this task's table is the input for the first.
+- 2026-10-02T07:56:05Z (main): started
+  provenance: {"harness_session":"claude-code:9184bb38-6b6b-4acf-a3f3-bd4f5a329f4f","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
