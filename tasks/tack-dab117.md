@@ -1,13 +1,15 @@
 ---
 id: tack-dab117
 title: Agents write scratchpad files as bare 'scratchpad/<file>' paths that resolve nowhere
-status: todo
+status: doing
 priority: 2
 size: xs
 complexity: low
 process: direct
+owner: main
 created: 2026-09-27T12:19:35Z
-updated: 2026-10-02T15:29:13Z
+updated: 2026-10-02T15:36:18Z
+started: 2026-10-02T15:36:18Z
 depends: []
 tags: [rules]
 agent: claude-code/claude-opus-5-5
@@ -22,3 +24,5 @@ Where to look: AGENTS.md "Communication" and the worktree path bullet under "Git
 ## Notes
 
 - 2026-10-02T15:29:12Z (main): scope: scoped; todo P2 xs/low/direct; one Communication-section line for paths shown to the user, distinct from the committed-text absolute-path rule; the session-logs sample made optional
+- 2026-10-02T15:36:18Z (main): started
+  provenance: {"harness_session":"claude-code:e8e1b806-1b76-4ade-bab5-f0cdc5fe34ad","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
