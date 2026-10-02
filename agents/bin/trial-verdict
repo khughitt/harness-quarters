@@ -1,0 +1,362 @@
+#!/usr/bin/env python3
+"""Judge a randomized flow trial from its census and an obs outcomes report.
+
+trial-arm census <trial-id> > census.json
+obs --json outcomes report --since <enroll start> --until <close_by> --cohort --units \
+  | trial-verdict <trial file> --census census.json [--as-of YYYY-MM-DD]
+
+Spec docs/specs/2026-10-02-flow-trial-design.md §6. The first line is the choice:
+flow-better, no-difference-detected, flow-worse, or insufficient: <reason>. Exits 0 with
+a verdict, 2 when the inputs are malformed or disagree.
+"""
+
+import argparse
+import datetime as dt
+import importlib.machinery
+import importlib.util
+import json
+import math
+import statistics
+import sys
+from fractions import Fraction
+from pathlib import Path
+
+
+def _load_trial_arm():
+    path = Path(__file__).resolve().with_name("trial-arm")
+    loader = importlib.machinery.SourceFileLoader("trial_arm", str(path))
+    module = importlib.util.module_from_spec(importlib.util.spec_from_loader("trial_arm", loader))
+    sys.modules["trial_arm"] = module
+    loader.exec_module(module)
+    return module
+
+
+ta = _load_trial_arm()
+
+ALPHA = 0.1
+MIN_ARM = 100
+MIN_ASSESSABLE = 30
+MIN_COMPLIANCE = 0.8
+MAX_UNKNOWN = 0.05
+Z90 = 1.6448536269514722
+LIMITS = (
+    "limit: a unit that flow's gates stop on purpose counts against flow",
+    "limit: defects are watched only after first closes; work reopened and closed again "
+    "has its later episode unobserved (reopens per arm are shown)",
+)
+
+
+class InputError(Exception):
+    """The census and the report cannot be read together (exit 2)."""
+
+
+def _field(container, name, kind, where):
+    if not isinstance(container, dict) or name not in container:
+        raise InputError(f"{where} lacks {name!r}")
+    value = container[name]
+    if not isinstance(value, kind) or isinstance(value, bool) and kind is int:
+        raise InputError(f"{where}.{name} is {value!r}, not {kind.__name__}")
+    return value
+
+
+def _day_ms(ms):
+    return dt.datetime.fromtimestamp(ms / 1000, dt.timezone.utc).date()
+
+
+def _day_iso(text):
+    return None if text is None else dt.date.fromisoformat(text[:10])
+
+
+def fisher_two_sided(a, b, c, d):
+    r1, r2, c1 = a + b, c + d, a + c
+    total = math.comb(r1 + r2, c1)
+
+    def p(x):
+        return Fraction(math.comb(r1, x) * math.comb(r2, c1 - x), total)
+
+    observed = p(a)
+    return float(sum(p(x) for x in range(max(0, c1 - r2), min(c1, r1) + 1) if p(x) <= observed))
+
+
+def wilson(x, n, z=Z90):
+    if n == 0:
+        return 0.0, 1.0
+    phat = x / n
+    denom = 1 + z * z / n
+    centre = (phat + z * z / (2 * n)) / denom
+    half = z * math.sqrt(phat * (1 - phat) / n + z * z / (4 * n * n)) / denom
+    return centre - half, centre + half
+
+
+def newcombe(x1, n1, x2, n2, z=Z90):
+    p1, p2 = x1 / n1, x2 / n2
+    l1, u1 = wilson(x1, n1, z)
+    l2, u2 = wilson(x2, n2, z)
+    d = p1 - p2
+    return d, d - math.sqrt((p1 - l1) ** 2 + (u2 - p2) ** 2), d + math.sqrt((u1 - p1) ** 2 + (p2 - l2) ** 2)
+
+
+COUNTS = ("defects", "changes", "extensions", "reopens")
+STATES = ("done", "dropped", "shelved", "open")
+GATE_STATUSES = ("E2",)
+
+
+def _count(value, where):
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise InputError(f"{where} is {value!r}, not a count")
+    return value
+
+
+def _timestamp(value, where):
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise InputError(f"{where} is {value!r}, not a timestamp")
+    try:
+        dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        raise InputError(f"{where} is {value!r}, not a timestamp") from None
+    return value
+
+
+def _rows(report):
+    rows = {}
+    for row in _field(report, "units", list, "report"):
+        task = _field(row, "task", str, "obs row")
+        if task in rows:
+            raise InputError(f"duplicate obs row for {task}")
+        for name in ("first_start_ms", "first_close_ms", *COUNTS):
+            _count(_field(row, name, int, f"obs row {task}"), f"obs row {task}.{name}")
+        if "output_tokens" not in row:
+            raise InputError(f"obs row {task} lacks 'output_tokens'")
+        if row["output_tokens"] is not None:
+            _count(row["output_tokens"], f"obs row {task}.output_tokens")
+        rows[task] = row
+    return rows
+
+
+def _gate_holds(report):
+    """A missing m4 key clears the gate; "E2" holds it; anything else is malformed."""
+    measures = _field(_field(report, "unvalidated", dict, "report"), "measures", dict, "report.unvalidated")
+    if "m4" not in measures:
+        return False
+    if measures["m4"] not in GATE_STATUSES:
+        raise InputError(f"invalid validation status for m4: {measures['m4']!r}")
+    return True
+
+
+def _census_shape(census):
+    _field(census, "trial", str, "census")
+    _field(census, "as_of", str, "census")
+    late = _field(census, "decided_late", dict, "census")
+    if set(late) != {"on", "off"}:
+        raise InputError(f"census.decided_late has keys {sorted(late)}, not on and off")
+    for arm in ("on", "off"):
+        _count(late[arm], f"census.decided_late.{arm}")
+    _field(census, "conflicts", list, "census")
+    for u in _field(census, "units", list, "census"):
+        root = _field(u, "root", str, "census unit")
+        where = f"census unit {root}"
+        if _field(u, "arm", str, where) not in ("on", "off"):
+            raise InputError(f"{where}.arm is {u['arm']!r}")
+        if _field(u, "decision", str, where) not in ("recorded", "decided late"):
+            raise InputError(f"{where}.decision is {u['decision']!r}")
+        if _field(u, "state", str, where) not in STATES:
+            raise InputError(f"{where}.state is {u['state']!r}")
+        for name in ("enrolled_at", "first_done"):
+            if name not in u:
+                raise InputError(f"{where} lacks {name!r}")
+            _timestamp(u[name], f"{where}.{name}")
+        _field(u, "reopened", bool, where)
+        _field(u, "treated", bool, where)
+        if "compliant" not in u or not (u["compliant"] is None or isinstance(u["compliant"], bool)):
+            raise InputError(f"{where}.compliant is {u.get('compliant')!r}, not true, false or null")
+        stratum = _field(u, "stratum", dict, where)
+        for name in ("project", "size", "complexity", "process"):
+            if name not in stratum:
+                raise InputError(f"{where}.stratum lacks {name!r}")
+        members = _field(u, "members", list, where)
+        if not members:
+            raise InputError(f"{where} has no members")
+        for m in members:
+            task = _field(m, "task", str, f"{where} member")
+            for name in ("first_start", "first_done"):
+                if name not in m:
+                    raise InputError(f"{where} member {task} lacks {name!r}")
+                _timestamp(m[name], f"{where} member {task}.{name}")
+            _field(m, "gates", list, f"{where} member {task}")
+            _field(m, "override", bool, f"{where} member {task}")
+            _field(m, "moves", list, f"{where} member {task}")
+
+
+def read_inputs(trial, census, report):
+    """Validate both inputs and their agreement; return the obs rows by task."""
+    _census_shape(census)
+    rows = _rows(report)
+    _gate_holds(report)
+    if census["trial"] != trial.id:
+        raise InputError(f"census is for {census['trial']!r}, not {trial.id}")
+    if census["as_of"] != trial.close_by.isoformat():
+        raise InputError(f"census is as of {census['as_of']!r}, not close_by {trial.close_by}")
+    seen = set()
+    for u in census["units"]:
+        if u["arm"] != ta.arm_of(trial.id, u["root"]):
+            raise InputError(f"unit {u['root']} has arm {u['arm']}; the function gives {ta.arm_of(trial.id, u['root'])}")
+        for m in u["members"]:
+            if m["task"] in seen:
+                raise InputError(f"task {m['task']} is in two census units")
+            seen.add(m["task"])
+            row = rows.get(m["task"])
+            if row is None:
+                continue
+            if (_day_ms(row["first_start_ms"]), _day_ms(row["first_close_ms"])) != \
+                    (_day_iso(m["first_start"]), _day_iso(m["first_done"])):
+                raise InputError(f"task {m['task']}: census and obs disagree on its first start or first close")
+    return rows
+
+
+def _defect_state(trial, u, rows):
+    present = [rows[m["task"]] for m in u["members"] if m["task"] in rows]
+    if any(row["defects"] > 0 for row in present):
+        return "defective"
+    if any(m["first_done"] and _day_iso(m["first_done"]) <= trial.close_by and m["task"] not in rows
+           for m in u["members"]):
+        return "unknown"
+    return "clean"
+
+
+def _ratio(a, b):
+    return f"{a}/{b}"
+
+
+def judge(trial, census, report):
+    rows = read_inputs(trial, census, report)
+    gated = _gate_holds(report)
+    by_arm = {"on": [], "off": []}
+    for u in census["units"]:
+        delivered = u["first_done"] is not None and _day_iso(u["first_done"]) <= trial.close_by
+        state = _defect_state(trial, u, rows) if delivered else None
+        member_rows = [rows[m["task"]] for m in u["members"] if m["task"] in rows]
+        by_arm[u["arm"]].append({"unit": u, "delivered": delivered, "state": state, "rows": member_rows})
+    count = {arm: {
+        "enrolled": len(items),
+        "delivered": sum(i["delivered"] for i in items),
+        "clean": sum(i["state"] in ("clean", "unknown") for i in items),
+        "strict": sum(i["state"] == "clean" for i in items),
+        "unknown": sum(i["state"] == "unknown" for i in items),
+        "defective": sum(i["state"] == "defective" for i in items),
+    } for arm, items in by_arm.items()}
+    on, off = count["on"], count["off"]
+    comp = ta.compliance(census["units"])
+
+    def test(key):
+        if on["enrolled"] == 0 or off["enrolled"] == 0:
+            return None, None
+        p = fisher_two_sided(on[key], on["enrolled"] - on[key], off[key], off["enrolled"] - off[key])
+        return p, newcombe(on[key], on["enrolled"], off[key], off["enrolled"])
+
+    p, interval = test("clean")
+    delivered_total = on["delivered"] + off["delivered"]
+    unknown_share = (on["unknown"] + off["unknown"]) / delivered_total if delivered_total else 0.0
+    if gated:
+        choice = "insufficient: unvalidated"
+    elif unknown_share > MAX_UNKNOWN:
+        choice = "insufficient: missing defect data"
+    elif on["enrolled"] < MIN_ARM or off["enrolled"] < MIN_ARM:
+        choice = "insufficient: too few"
+    elif any(s["assessable"] < MIN_ASSESSABLE or s["rate"] < MIN_COMPLIANCE for s in comp.values()):
+        choice = "insufficient: compliance"
+    elif p < ALPHA:
+        choice = "flow-better" if on["clean"] / on["enrolled"] > off["clean"] / off["enrolled"] else "flow-worse"
+    else:
+        choice = "no-difference-detected"
+
+    def counts(key, label):
+        p_value, ci = test(key)
+        if p_value is None:
+            return f"{label}on {_ratio(on[key], on['enrolled'])}, off {_ratio(off[key], off['enrolled'])}, p n/a"
+        d, lo, hi = ci
+        return (f"{label}on {_ratio(on[key], on['enrolled'])}, off {_ratio(off[key], off['enrolled'])}, "
+                f"p {p_value:.4f}, risk difference {d:+.3f} [{lo:+.3f}, {hi:+.3f}] (90% Newcombe)")
+
+    def per_arm(fn):
+        return ", ".join(f"{arm} {fn(arm, items)}" for arm, items in by_arm.items())
+
+    def state_count(state):
+        return per_arm(lambda arm, items: sum(i["unit"]["state"] == state for i in items))
+
+    def conditional(name):
+        return per_arm(lambda arm, items: sum(r[name] for i in items if i["delivered"] for r in i["rows"]))
+
+    def tokens(arm, items):
+        sums = [sum(r["output_tokens"] for r in i["rows"] if r.get("output_tokens") is not None)
+                for i in items if i["delivered"]]
+        return statistics.median(sums) if sums else "n/a"
+
+    strata = {}
+    for arm, items in by_arm.items():
+        for i in items:
+            s = i["unit"]["stratum"]
+            key = f"{s['project']}/{s['size']}/{s['complexity']}/{s['process']}"
+            strata.setdefault(key, {"on": 0, "off": 0})[arm] += 1
+    moves = per_arm(lambda arm, items: sum(len(m["moves"]) for i in items for m in i["unit"]["members"]))
+    return [
+        choice,
+        counts("clean", ""),
+        counts("strict", "sensitivity (unknown defect state counted defective): "),
+        "compliance: " + "; ".join(
+            f"{arm} {s['compliant']}/{s['assessable']} assessable"
+            + (f" ({s['rate']:.2f})" if s["rate"] is not None else "")
+            + f", unassessable {s['enrolled'] - s['assessable']}" for arm, s in comp.items()),
+        f"delivered: {per_arm(lambda arm, items: _ratio(count[arm]['delivered'], count[arm]['enrolled']))}; "
+        f"delivered with a defect: {per_arm(lambda arm, items: count[arm]['defective'])}; "
+        f"dropped: {state_count('dropped')}; shelved: {state_count('shelved')}; "
+        f"open on {trial.close_by}: {state_count('open')}; "
+        f"reopened after delivery: {per_arm(lambda arm, items: sum(i['unit']['reopened'] for i in items))}",
+        "conditional on delivery (not causal): "
+        f"defect rate {per_arm(lambda arm, items: _ratio(count[arm]['defective'], count[arm]['delivered']))}; "
+        f"change requests {conditional('changes')}; extensions {conditional('extensions')}; "
+        f"reopens {conditional('reopens')}",
+        f"median output_tokens per delivered unit: {per_arm(tokens)}",
+        "strata (project/size/complexity/process): "
+        + "; ".join(f"{k} on {v['on']} off {v['off']}" for k, v in sorted(strata.items())),
+        f"decided late: {', '.join(f'{a} {n}' for a, n in census['decided_late'].items())}; "
+        f"moves: {moves}; membership conflicts: {len(census['conflicts'])}",
+        *LIMITS,
+    ]
+
+
+def main(argv=None, stdin=None, stdout=None):
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("trial")
+    parser.add_argument("--census", required=True)
+    parser.add_argument("--as-of", type=dt.date.fromisoformat)
+    parser.add_argument("--validate", action="store_true",
+                        help="check both inputs and print only what was read; compute no outcome")
+    args = parser.parse_args(argv)
+    stdin, out = stdin or sys.stdin, stdout or sys.stdout
+    try:
+        trial = ta.parse_trial(Path(args.trial).read_text(), args.trial)
+        if args.validate:
+            census = json.loads(Path(args.census).read_text())
+            rows = read_inputs(trial, census, json.load(stdin))
+            members = {m["task"] for u in census["units"] for m in u["members"]}
+            print(f"inputs valid: {len(census['units'])} census units, "
+                  f"{len(members & set(rows))} obs rows for their members", file=out)
+            return 0
+        as_of = args.as_of or dt.datetime.now(dt.timezone.utc).date()
+        if as_of < trial.read_on:
+            print("insufficient: before read date", file=out)
+            print(f"read on {trial.read_on}; nothing computed", file=out)
+            return 0
+        census = json.loads(Path(args.census).read_text())
+        lines = judge(trial, census, json.load(stdin))
+    except (InputError, ta.TrialError, json.JSONDecodeError) as error:
+        print(f"trial-verdict: {error}", file=sys.stderr)
+        return 2
+    print("\n".join(lines), file=out)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
