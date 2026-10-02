@@ -1,10 +1,10 @@
 ---
 id: tack-c437b4
 title: "Subagent-driven workers force-staged ignored reports, and per-task reviews accepted these scratch artifacts as repository changes."
-status: idea
+status: shelved
 priority: 2
 created: 2026-09-30T13:34:48Z
-updated: 2026-10-02T15:17:21Z
+updated: 2026-10-02T15:24:38Z
 depends: []
 tags: [feedback, gap, "from:sci"]
 agent: codex
@@ -22,3 +22,5 @@ Proposed fix (upstream, obra/superpowers): the implementer report contract (`ski
 
 - 2026-10-02T14:53:45Z (main): scope: question; body rewritten with cause, upstream-only fix location, and one question: file it upstream as an issue (draft first)
 - 2026-10-02T15:17:21Z (main): Answered: file upstream; issue drafted from Codex session 01a0f21d (2026-09-30), pending approval to post
+- 2026-10-02T15:24:37Z (main): Filed upstream: https://github.com/obra/superpowers/issues/2443
+- 2026-10-02T15:24:37Z (main): shelved: obra/superpowers#2443 is answered or fixed in a release — then bump agents/vendor/superpowers, or close if declined
