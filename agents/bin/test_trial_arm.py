@@ -208,3 +208,293 @@ def test_trial_notes_parse():
     assert ta.moves_of(task, T) == [("tack-200000", "off")]
     assert ta.overridden(task, T) is True
     assert ta.member_of(rec("tack-000002", notes=[(IN, f"arm: {T} — unit tack-1 — not enrolled")]), T) == ("tack-1", None)
+
+
+import json
+import os
+import stat
+import subprocess
+
+
+def test_first_lookup_decides_the_unit_and_records_the_task():
+    root = pick("on")
+    t = tree(rec(root, process="planned", notes=[(IN, "started")]))
+    result = ta.lookup(TRIAL, t, root)
+    assert result.line == f"{T}: flow on (unit {root})"
+    assert result.writes == [(root, f"trial: {T} — enrolled — flow on"),
+                             (root, f"arm: {T} — unit {root} — flow on")]
+
+
+def test_lookup_on_a_child_uses_the_unit_arm_and_writes_once():
+    root = pick("off")
+    child = "tack-f00001"
+    t = tree(rec(root, process="planned", notes=[(IN, "started"), (IN, f"trial: {T} — enrolled — flow off"),
+                                                 (IN, f"arm: {T} — unit {root} — flow off")]),
+             rec(child, parent=root, notes=[(LATER, "started")]))
+    first = ta.lookup(TRIAL, t, child)
+    assert first.line == f"{T}: flow off (unit {root})"
+    assert first.writes == [(child, f"arm: {T} — unit {root} — flow off")]
+    t.records[child]["notes"].append({"at": LATER, "by": "main", "text": first.writes[0][1]})
+    assert ta.lookup(TRIAL, t, child).writes == []
+
+
+def apply(t, writes):
+    for target, text in writes:
+        t.records[target]["notes"].append({"at": LATER, "by": "main", "text": text})
+
+
+def child_first_then_root_moved():
+    """A child's lookup decides the unit; then the root moves under an off parent before
+    its own lookup. Returns the tree, the two roots, the child and both lookups."""
+    root, child = pick("on"), "tack-f00001"
+    off_root = pick("off")
+    t = tree(rec(root, process="planned", notes=[(IN, "started")]),
+             rec(child, parent=root, notes=[(IN, "started")]),
+             rec(off_root, process="planned", notes=[(IN, "started"), (IN, f"trial: {T} — enrolled — flow off"),
+                                                     (IN, f"arm: {T} — unit {off_root} — flow off")]))
+    first = ta.lookup(TRIAL, t, child)
+    apply(t, first.writes)
+    t.records[root]["parent"] = off_root
+    moved = ta.lookup(TRIAL, t, root)
+    apply(t, moved.writes)
+    return t, root, off_root, child, first, moved
+
+
+def test_a_child_first_lookup_freezes_the_root_membership_too():
+    t, root, off_root, child, first, moved = child_first_then_root_moved()
+    assert first.writes == [(root, f"trial: {T} — enrolled — flow on"),
+                            (root, f"arm: {T} — unit {root} — flow on"),
+                            (child, f"arm: {T} — unit {root} — flow on")]
+    assert moved.line == f"{T}: flow off (moved from unit {root} to unit {off_root})"
+    assert moved.writes == [(root, f"arm: {T} — moved to unit {off_root} — flow off")]
+    assert t.unit_of(root) == root and t.unit_of(child) == root
+
+
+def test_lookup_on_a_child_started_after_enroll_ends_keeps_the_unit_arm():
+    root = pick("on")
+    child = "tack-f00001"
+    t = tree(rec(root, process="planned", notes=[(IN, "started")]),
+             rec(child, parent=root, notes=[("2026-12-20T00:00:00Z", "started")]))
+    assert ta.lookup(TRIAL, t, child).line == f"{T}: flow on (unit {root})"
+
+
+def test_lookup_records_not_enrolled_members_too():
+    root = pick("on")
+    child = "tack-f00001"
+    t = tree(rec(root, process="planned", notes=[(BEFORE, "started")]),
+             rec(child, parent=root, notes=[(IN, "started")]))
+    result = ta.lookup(TRIAL, t, child)
+    assert result.line == f"not enrolled: unit {root} first started 2026-10-01, outside enroll"
+    assert result.writes == [
+        (root, f"trial: {T} — not enrolled: unit {root} first started 2026-10-01, outside enroll"),
+        (root, f"arm: {T} — unit {root} — not enrolled"),
+        (child, f"arm: {T} — unit {root} — not enrolled")]
+
+
+def test_a_child_detached_from_an_excluded_unit_stays_out_with_its_children():
+    root, child, grandchild = pick("on"), "tack-f00001", "tack-f00002"
+    t = tree(rec(root, process="planned", notes=[(BEFORE, "started"),
+                                                 (BEFORE, f"trial: {T} — not enrolled: unit {root} first started 2026-10-01, outside enroll")]),
+             rec(child, process="planned", notes=[(IN, "started"), (IN, f"arm: {T} — unit {root} — not enrolled")]),
+             rec(grandchild, parent=child, notes=[(LATER, "started")]))
+    assert ta.lookup(TRIAL, t, child).line.startswith("not enrolled: unit")
+    result = ta.lookup(TRIAL, t, grandchild)
+    assert result.line.startswith("not enrolled: unit")
+    assert result.writes == [(grandchild, f"arm: {T} — unit {root} — not enrolled")]
+
+
+def test_a_task_moved_from_an_on_unit_under_an_off_parent_follows_the_destination():
+    on_root = pick("on")
+    off_root = pick("off")
+    task = "tack-f00001"
+    t = tree(rec(on_root, process="planned", notes=[(IN, "started"), (IN, f"trial: {T} — enrolled — flow on")]),
+             rec(off_root, process="planned", notes=[(IN, "started"), (IN, f"trial: {T} — enrolled — flow off")]),
+             rec(task, parent=off_root, notes=[(IN, "started"), (IN, f"arm: {T} — unit {on_root} — flow on")]))
+    result = ta.lookup(TRIAL, t, task)
+    assert result.line == f"{T}: flow off (moved from unit {on_root} to unit {off_root})"
+    assert result.writes == [(task, f"arm: {T} — moved to unit {off_root} — flow off")]
+    t.records[task]["notes"].append({"at": LATER, "by": "main", "text": result.writes[0][1]})
+    assert ta.lookup(TRIAL, t, task).writes == []
+    assert t.unit_of(task) == on_root
+
+
+def test_a_move_under_a_not_enrolled_parent_follows_its_actual_workflow():
+    on_root = pick("off")
+    outside = pick("on", skip=(on_root,))
+    task = "tack-f00001"
+    base = [rec(on_root, process="planned", notes=[(IN, "started"), (IN, f"trial: {T} — enrolled — flow off")]),
+            rec(task, parent=outside, notes=[(IN, "started"), (IN, f"arm: {T} — unit {on_root} — flow off")])]
+    flowing = tree(*base, rec(outside, process="planned", notes=[
+        (BEFORE, "started"), (BEFORE, "gate: scoped — adopted"),
+        (BEFORE, f"trial: {T} — not enrolled: unit {outside} first started 2026-10-01, outside enroll")]))
+    assert ta.lookup(TRIAL, flowing, task).line == f"{T}: flow on (moved from unit {on_root} to unit {outside})"
+    plain = tree(*base, rec(outside, process="planned", notes=[
+        (BEFORE, "started"),
+        (BEFORE, f"trial: {T} — not enrolled: unit {outside} first started 2026-10-01, outside enroll")]))
+    assert ta.lookup(TRIAL, plain, task).line == f"{T}: flow off (moved from unit {on_root} to unit {outside})"
+
+
+def test_a_move_under_a_detached_parent_follows_the_parent_not_its_excluded_origin():
+    """The physical root decides execution: a parent detached from an excluded unit that
+    runs flow carries its children under flow, even though its analysis unit has no gates."""
+    a = pick("off")
+    origin = pick("on", skip=(a,))
+    parent, task = "tack-e00001", "tack-f00001"
+    t = tree(rec(a, process="planned", notes=[(IN, "started"), (IN, f"trial: {T} — enrolled — flow off")]),
+             rec(origin, process="planned", notes=[
+                 (BEFORE, "started"),
+                 (BEFORE, f"trial: {T} — not enrolled: unit {origin} first started 2026-10-01, outside enroll")]),
+             rec(parent, process="planned", notes=[
+                 (IN, "started"), (IN, f"arm: {T} — unit {origin} — not enrolled"),
+                 (IN, "gate: implementing .worktrees/p")]),
+             rec(task, parent=parent, notes=[(IN, "started"), (IN, f"arm: {T} — unit {a} — flow off")]))
+    result = ta.lookup(TRIAL, t, task)
+    assert result.line == f"{T}: flow on (moved from unit {a} to unit {parent})"
+    assert result.writes == [(task, f"arm: {T} — moved to unit {parent} — flow on")]
+    assert t.unit_of(task) == a
+
+
+def test_a_new_child_of_a_detached_flow_parent_is_not_enrolled_and_writes_no_move():
+    origin = pick("on")
+    parent, child = "tack-e00001", "tack-f00002"
+    t = tree(rec(origin, process="planned", notes=[
+                 (BEFORE, "started"),
+                 (BEFORE, f"trial: {T} — not enrolled: unit {origin} first started 2026-10-01, outside enroll")]),
+             rec(parent, process="planned", notes=[(IN, "started"), (IN, f"arm: {T} — unit {origin} — not enrolled"),
+                                                   (IN, "gate: implementing .worktrees/p")]),
+             rec(child, parent=parent, notes=[(LATER, "started")]))
+    result = ta.lookup(TRIAL, t, child)
+    assert result.line.startswith("not enrolled: unit")
+    assert result.writes == [(child, f"arm: {T} — unit {origin} — not enrolled")]
+
+
+def test_a_task_with_an_earlier_start_moved_under_an_enrolled_root_leaves_it_enrolled():
+    root = pick("on")
+    t = tree(rec(root, process="planned", notes=[(IN, "started"), (IN, f"trial: {T} — enrolled — flow on")]),
+             rec("tack-f00001", parent=root, notes=[(BEFORE, "started")]))
+    assert ta.lookup(TRIAL, t, "tack-f00001").line == f"{T}: flow on (unit {root})"
+
+
+def test_check_refuses_a_recorded_arm_that_contradicts_the_function():
+    root = pick("on")
+    t = tree(rec(root, notes=[(IN, "started"), (IN, f"arm: {T} — unit {root} — flow off")]))
+    with pytest.raises(ta.TrialError, match="contradicts"):
+        ta.lookup(TRIAL, t, root)
+
+
+def test_check_refuses_a_decision_that_contradicts_the_function():
+    root = pick("on")
+    t = tree(rec(root, notes=[(IN, "started"), (IN, f"trial: {T} — enrolled — flow off")]))
+    with pytest.raises(ta.TrialError, match="contradicts"):
+        ta.check(TRIAL, t)
+
+
+def test_lookup_on_a_missing_task_raises():
+    with pytest.raises(ta.MissingTask):
+        ta.lookup(TRIAL, tree(), "tack-ffffff")
+
+
+FAKE_TASKS = """#!/usr/bin/env python3
+import json, os, sys
+store = os.environ["FAKE_TASKS_STORE"]
+data = json.load(open(store))
+cmd, args = sys.argv[1], [a for a in sys.argv[2:] if a != "--json"]
+with open(os.environ["FAKE_TASKS_LOG"], "a") as log:
+    log.write(json.dumps(sys.argv[1:]) + "\\n")
+if os.environ.get("TASKS_FORMAT") == "pretty" and "--json" not in sys.argv:
+    print("---\\nid: pretty output, not JSON")
+elif cmd == "list":
+    print(json.dumps({"tasks": [{"id": i} for i in data]}))
+elif cmd == "show":
+    print(json.dumps({"task": data[args[0]]}))
+elif cmd == "note":
+    data[args[0]]["notes"].append({"at": "2026-10-06T12:00:00Z", "by": "main", "text": args[1]})
+    json.dump(data, open(store, "w"))
+    print(json.dumps({"ok": True}))
+"""
+
+
+@pytest.fixture
+def fake_tasks(tmp_path, monkeypatch):
+    exe = tmp_path / "tasks"
+    exe.write_text(FAKE_TASKS)
+    exe.chmod(exe.stat().st_mode | stat.S_IEXEC)
+    store, log = tmp_path / "store.json", tmp_path / "log.jsonl"
+    log.write_text("")
+    monkeypatch.setenv("FAKE_TASKS_STORE", str(store))
+    monkeypatch.setenv("FAKE_TASKS_LOG", str(log))
+    monkeypatch.chdir(tmp_path)
+
+    def load(*records):
+        store.write_text(json.dumps({r["id"]: r for r in records}))
+        return ta.Tasks(str(exe))
+    load.store, load.log = store, log
+    return load
+
+
+def trials_dir(tmp_path):
+    d = tmp_path / "trials"
+    d.mkdir(exist_ok=True)
+    (d / "flow-trial-1.md").write_text(TRIAL_TEXT)
+    return d
+
+
+def test_main_lookup_writes_the_notes_through_tasks(fake_tasks, tmp_path, capsys):
+    root = pick("on")
+    tasks = fake_tasks(rec(root, process="planned", notes=[(IN, "started")]))
+    code = ta.main([root], tasks=tasks, trials_dir=trials_dir(tmp_path), today=dt.date(2026, 10, 6))
+    assert code == 0
+    assert capsys.readouterr().out.strip() == f"{T}: flow on (unit {root})"
+    notes = [n["text"] for n in json.loads(fake_tasks.store.read_text())[root]["notes"]]
+    assert notes[-2:] == [f"trial: {T} — enrolled — flow on", f"arm: {T} — unit {root} — flow on"]
+
+
+def test_main_outside_any_trial_touches_nothing(fake_tasks, tmp_path, capsys):
+    tasks = fake_tasks()
+    code = ta.main(["relay-000001"], tasks=tasks, trials_dir=trials_dir(tmp_path), today=dt.date(2026, 10, 6))
+    assert (code, capsys.readouterr().out.strip()) == (0, "not enrolled: no trial for relay")
+    assert fake_tasks.log.read_text() == ""
+
+
+def test_main_strips_trailing_periods(fake_tasks, tmp_path, capsys):
+    root = pick("off")
+    tasks = fake_tasks(rec(root, notes=[(IN, "started")]))
+    assert ta.main([root + ".."], tasks=tasks, trials_dir=trials_dir(tmp_path), today=dt.date(2026, 10, 6)) == 0
+    assert capsys.readouterr().out.strip() == f"{T}: flow off (unit {root})"
+
+
+def test_main_exit_codes(fake_tasks, tmp_path, capsys):
+    tasks = fake_tasks()
+    assert ta.main(["tack-ffffff"], tasks=tasks, trials_dir=trials_dir(tmp_path), today=dt.date(2026, 10, 6)) == 1
+    d = trials_dir(tmp_path)
+    (d / "b.md").write_text(TRIAL_TEXT.replace("id: flow-trial-1", "id: flow-trial-2"))
+    assert ta.main(["tack-ffffff"], tasks=tasks, trials_dir=d, today=dt.date(2026, 10, 6)) == 2
+
+
+def test_the_client_forces_json_when_pretty_output_is_configured(fake_tasks, tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("TASKS_FORMAT", "pretty")
+    root = pick("on")
+    tasks = fake_tasks(rec(root, process="planned", notes=[(IN, "started")]))
+    assert ta.main([root], tasks=tasks, trials_dir=trials_dir(tmp_path), today=dt.date(2026, 10, 6)) == 0
+    assert capsys.readouterr().out.strip() == f"{T}: flow on (unit {root})"
+
+
+def test_records_reads_the_local_checkout_for_its_own_prefix(fake_tasks, tmp_path, monkeypatch):
+    tasks = fake_tasks(rec("tack-000001"))
+    monkeypatch.setattr(ta, "local_prefix", lambda cwd=None: "tack")
+    tasks.records("tack")
+    tasks.records("obs")
+    calls = [json.loads(line) for line in fake_tasks.log.read_text().splitlines() if line.startswith('["list"')]
+    assert all("--json" in call for call in calls)
+    assert "--project" not in calls[0]
+    assert calls[1][calls[1].index("--project") + 1] == "obs"
+
+
+def test_local_prefix_reads_the_checkout_config(tmp_path):
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    (tmp_path / "tasks").mkdir()
+    (tmp_path / "tasks" / ".config.toml").write_text('prefix = "obs"\n')
+    assert ta.local_prefix(tmp_path) == "obs"
+    bare = tmp_path / "bare"
+    subprocess.run(["git", "init", "-q", str(bare)], check=True)
+    assert ta.local_prefix(bare) is None

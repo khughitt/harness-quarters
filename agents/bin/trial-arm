@@ -14,7 +14,12 @@ from __future__ import annotations
 
 import datetime as dt
 import hashlib
+import json
+import os
 import re
+import subprocess
+import sys
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -22,6 +27,7 @@ import yaml
 
 TRIALS = Path(__file__).resolve().parent.parent / "evals" / "trials"
 TREATED = ("designed", "planned", "implementing", "verified")
+STATUSES = ("idea", "todo", "doing", "blocked", "shelved", "done", "dropped")
 FOLLOW_UP_DAYS = 30
 FIELDS = ("id", "factor", "arms", "projects", "enroll", "close_by", "follow_up_to", "read_on")
 GATE_RE = re.compile(r"^gate:\s*([A-Za-z]+)")
@@ -268,3 +274,156 @@ def decide(trial, tree, root):
     if trial.enroll[0] <= earliest <= trial.enroll[1]:
         return Decision(True, arm_of(trial.id, root), None, False)
     return Decision(False, None, f"unit {root} first started {earliest}, outside enroll", False)
+
+
+def decision_text(trial, d):
+    if d.enrolled:
+        return f"trial: {trial.id} — enrolled — flow {d.arm}"
+    return f"trial: {trial.id} — not enrolled: {d.reason}"
+
+
+def member_text(trial, unit, d):
+    return f"arm: {trial.id} — unit {unit} — " + (f"flow {d.arm}" if d.enrolled else "not enrolled")
+
+
+def move_text(trial, unit, arm):
+    return f"arm: {trial.id} — moved to unit {unit} — flow {arm}"
+
+
+def check(trial, tree):
+    """Refuse records whose trial notes contradict the arm function or their unit's decision."""
+    for task_id, task in tree.records.items():
+        decision = decision_of(task, trial.id)
+        if decision is not None and decision.enrolled and decision.arm != arm_of(trial.id, task_id):
+            raise TrialError(f"{task_id}: decision flow {decision.arm} contradicts the arm function "
+                             f"(flow {arm_of(trial.id, task_id)})")
+        member = member_of(task, trial.id)
+        if member is None:
+            continue
+        unit, arm = member
+        if arm is not None and arm != arm_of(trial.id, unit):
+            raise TrialError(f"{task_id}: recorded flow {arm} for unit {unit} contradicts the arm function")
+        unit_decision = decision_of(tree.records[unit], trial.id) if unit in tree.records else None
+        if unit_decision is not None and unit_decision.arm != arm:
+            raise TrialError(f"{task_id}: recorded arm {arm} contradicts unit {unit}'s decision {unit_decision.arm}")
+
+
+@dataclass
+class Lookup:
+    line: str
+    writes: list
+
+
+def _answer(trial, unit, d):
+    return f"{trial.id}: flow {d.arm} (unit {unit})" if d.enrolled else f"not enrolled: {d.reason}"
+
+
+def _freeze(trial, tree, unit, d, task_id, writes):
+    """Record a fresh decision on the unit's root together with the root's own membership,
+    so a root moved before its own lookup still belongs to the unit it decided."""
+    if d.recorded:
+        return
+    writes.append((unit, decision_text(trial, d)))
+    if unit != task_id and member_of(tree.task(unit), trial.id) is None:
+        writes.append((unit, member_text(trial, unit, d)))
+
+
+def lookup(trial, tree, task_id):
+    """What the session follows after `tasks start`, and the notes to write (§4).
+
+    The analysis unit (frozen by the task's `arm:` note, else resolved from the tree)
+    decides enrollment and arm. The physical root (the top of the task's current parent
+    chain) decides execution when it belongs to another unit: that unit's arm when it is
+    enrolled, otherwise the root's actual workflow (flow when it carries any gate)."""
+    task = tree.task(task_id)
+    check(trial, tree)
+    writes = []
+    member = member_of(task, trial.id)
+    unit = member[0] if member else tree.resolved_unit(task_id)
+    d = decide(trial, tree, unit)
+    if d is None:
+        return Lookup("not enrolled: not started", [])
+    _freeze(trial, tree, unit, d, task_id, writes)
+    if member is None:
+        writes.append((task_id, member_text(trial, unit, d)))
+    root = tree.computed_root(task_id)
+    root_unit = tree.unit_of(root)
+    if root_unit == unit:
+        return Lookup(_answer(trial, unit, d), writes)
+    rd = decide(trial, tree, root_unit)
+    if rd is not None:
+        _freeze(trial, tree, root_unit, rd, task_id, writes)
+    if rd is not None and rd.enrolled:
+        arm = rd.arm
+    elif d.enrolled:
+        arm = "on" if gated(tree.task(root)) else "off"
+    else:
+        return Lookup(_answer(trial, unit, d), writes)
+    if (root, arm) not in moves_of(task, trial.id):
+        writes.append((task_id, move_text(trial, root, arm)))
+    return Lookup(f"{trial.id}: flow {arm} (moved from unit {unit} to unit {root})", writes)
+
+
+def local_prefix(cwd=None):
+    """The tasks prefix of the checkout containing `cwd`, or None outside one."""
+    top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=cwd, text=True, capture_output=True)
+    if top.returncode != 0:
+        return None
+    config = Path(top.stdout.strip()) / "tasks" / ".config.toml"
+    if not config.exists():
+        return None
+    return tomllib.loads(config.read_text()).get("prefix")
+
+
+class Tasks:
+    """The tasks CLI. A project read from inside its own checkout (a task worktree
+    included) reads that checkout, whose records may be newer than the main one's."""
+
+    def __init__(self, exe=None):
+        self.exe = exe or os.environ.get("TRIAL_ARM_TASKS", "tasks")
+
+    def _run(self, *args):
+        r = subprocess.run([self.exe, *args], text=True, capture_output=True)
+        if r.returncode != 0:
+            raise TrialError(f"tasks {' '.join(args[:2])} failed: {(r.stderr or r.stdout).strip()}")
+        return r.stdout
+
+    def records(self, prefix):
+        scope = [] if local_prefix() == prefix else ["--project", prefix]
+        statuses = [arg for status in STATUSES for arg in ("--status", status)]
+        listed = json.loads(self._run("list", "--json", *scope, *statuses))["tasks"]
+        return {row["id"]: json.loads(self._run("show", "--json", row["id"]))["task"] for row in listed}
+
+    def note(self, task_id, text):
+        self._run("note", "--json", task_id, text)
+
+
+def main(argv=None, tasks=None, trials_dir=TRIALS, today=None):
+    argv = sys.argv[1:] if argv is None else argv
+    tasks = tasks or Tasks()
+    today = today or dt.datetime.now(dt.timezone.utc).date()
+    try:
+        trials = load_trials(trials_dir)
+        if len(argv) == 1 and not argv[0].startswith("-") and argv[0] not in ("status", "census"):
+            task_id = argv[0].rstrip(".")
+            trial = trial_for(trials, _prefix(task_id), today)
+            if trial is None:
+                print(f"not enrolled: no trial for {_prefix(task_id)}")
+                return 0
+            result = lookup(trial, Tree(tasks.records(_prefix(task_id)), trial.id), task_id)
+            for target, text in result.writes:
+                tasks.note(target, text)
+            print(result.line)
+            return 0
+        print(__doc__.strip(), file=sys.stderr)
+        return 2
+    except MissingTask as missing:
+        print(f"trial-arm: no task {missing}", file=sys.stderr)
+        return 1
+    except TrialError as error:
+        print(f"trial-arm: {error}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
