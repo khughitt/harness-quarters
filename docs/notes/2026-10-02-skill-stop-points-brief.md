@@ -57,16 +57,16 @@ implementation halts for a user turn that adds no information.
 
 ## 5. Unanswered questions
 
-- Is a local merge of a finished, reviewed branch a decision you want agents to take
-  without asking, with the outside-effect exception above? — the user.
-- Should final-review corrective rounds be capped at five (the task loop's breaker) or
-  at one extra round (#2431's proposal)? — the user; #2431's outcome informs it.
-- Comment on #2431 with the protection-gap case from tack-b8223d? — the user (public post).
+Answered by the user on 2026-10-02:
+
+- Local merge of a finished, reviewed branch: a bounded decision in repositories the
+  user owns; never automatic in work or other external projects.
+- Final-review corrective rounds: up to five, then surface.
+- Upstream: comment on #2431 with the tack-b8223d case; file tack-c437b4 as an issue.
 
 ## 6. Proposed decomposition
 
 Goal: tack-36f493 (this brief). No research is needed: the evidence is the skill text
-above. Once the questions are answered, the change is one Decisions-rule edit under
-`--process direct`, filed as a child of the goal; tack-e293d7 and tack-b8223d wait on
-those answers. tack-c437b4 and tack-89dff8 are review-quality defects in upstream SDD and
+above. The change is one Decisions-rule edit, tack-170418 (`--process direct`), a child of the
+goal; tack-e293d7 and tack-b8223d close with it. tack-c437b4 and tack-89dff8 are review-quality defects in upstream SDD and
 are handled outside this goal.

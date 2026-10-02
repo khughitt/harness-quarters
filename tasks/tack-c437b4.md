@@ -4,7 +4,7 @@ title: "Subagent-driven workers force-staged ignored reports, and per-task revie
 status: idea
 priority: 2
 created: 2026-09-30T13:34:48Z
-updated: 2026-10-02T14:53:46Z
+updated: 2026-10-02T15:17:21Z
 depends: []
 tags: [feedback, gap, "from:sci"]
 agent: codex
@@ -21,3 +21,4 @@ Proposed fix (upstream, obra/superpowers): the implementer report contract (`ski
 ## Notes
 
 - 2026-10-02T14:53:45Z (main): scope: question; body rewritten with cause, upstream-only fix location, and one question: file it upstream as an issue (draft first)
+- 2026-10-02T15:17:21Z (main): Answered: file upstream; issue drafted from Codex session 01a0f21d (2026-09-30), pending approval to post
