@@ -398,6 +398,91 @@ class Tasks:
         self._run("note", "--json", task_id, text)
 
 
+HALT_ASSESSABLE = 15
+HALT_RATE = 0.8
+
+
+def _iso(at):
+    return None if at is None else at.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _unit(trial, tree, root, d, as_of):
+    root_task = tree.records[root]
+    members = []
+    for task_id in tree.members(root):
+        task = tree.records[task_id]
+        members.append({"task": task_id, "first_start": _iso(first_start(task)),
+                        "first_done": _iso(first_done(task)), "gates": gates_past_scoped(task, as_of),
+                        "override": overridden(task, trial.id, as_of),
+                        "moves": [{"unit": unit, "arm": arm} for unit, arm in moves_of(task, trial.id, as_of)]})
+    starts = [first_start(tree.records[m["task"]]) for m in members if m["first_start"]]
+    done = first_done(root_task)
+    treated = any(m["gates"] for m in members)
+    compliant = None
+    if done is not None and done.date() <= as_of:
+        compliant = (treated == (d.arm == "on")
+                     and not any(m["override"] for m in members)
+                     and all(move["arm"] == d.arm for m in members for move in m["moves"]))
+    return {"root": root, "arm": d.arm, "decision": "recorded" if d.recorded else "decided late",
+            "enrolled_at": _iso(min(starts)), "first_done": _iso(done),
+            "state": state_on(root_task, as_of), "reopened": reopened(root_task, as_of),
+            "stratum": {"project": _prefix(root), "size": root_task.get("size"),
+                        "complexity": root_task.get("complexity"), "process": root_task.get("process")},
+            "treated": treated, "compliant": compliant, "members": members}
+
+
+def census(trial, tree, as_of):
+    """Every enrolled unit as of `as_of` (§6 input 1)."""
+    check(trial, tree)
+    units, late = [], {"on": 0, "off": 0}
+    roots = sorted({tree.unit_of(task_id) for task_id in tree.records if _prefix(task_id) in trial.projects})
+    for root in roots:
+        if root not in tree.records:
+            continue
+        d = decide(trial, tree, root)
+        if d is None or not d.enrolled:
+            continue
+        if not d.recorded:
+            late[d.arm] += 1
+        units.append(_unit(trial, tree, root, d, as_of))
+    conflicts = [{"task": task_id, "recorded": tree.unit_of(task_id), "computed": tree.resolved_unit(task_id)}
+                 for task_id in sorted(tree.records)
+                 if member_of(tree.records[task_id], trial.id) and tree.unit_of(task_id) != tree.resolved_unit(task_id)]
+    return {"trial": trial.id, "as_of": as_of.isoformat(), "close_by": trial.close_by.isoformat(),
+            "units": units, "decided_late": late, "conflicts": conflicts}
+
+
+def compliance(units):
+    summary = {}
+    for arm in ("on", "off"):
+        assessed = [u for u in units if u["arm"] == arm and u["compliant"] is not None]
+        complied = sum(u["compliant"] for u in assessed)
+        summary[arm] = {"enrolled": sum(u["arm"] == arm for u in units), "assessable": len(assessed),
+                        "compliant": complied, "rate": complied / len(assessed) if assessed else None}
+    return summary
+
+
+def status_lines(trial, report):
+    summary = compliance(report["units"])
+    lines = [f"{trial.id} as of {report['as_of']}: " + "; ".join(
+        f"{arm} {s['enrolled']} enrolled, {s['assessable']} assessable, {s['compliant']} compliant"
+        + (f" ({s['rate']:.2f})" if s["rate"] is not None else "") for arm, s in summary.items())]
+    for u in report["units"]:
+        verdict = "unassessable" if u["compliant"] is None else ("compliant" if u["compliant"] else "non-compliant")
+        lines.append(f"{u['root']} flow {u['arm']} {u['state']} {'treated' if u['treated'] else 'untreated'} {verdict}")
+    for arm, s in summary.items():
+        if all(x["assessable"] >= HALT_ASSESSABLE for x in summary.values()) and s["rate"] < HALT_RATE:
+            lines.append(f"halt: compliance below {HALT_RATE} in {arm} (spec §7)")
+    return lines
+
+
+def _trial_tree(tasks, trial):
+    records = {}
+    for project in trial.projects:
+        records.update(tasks.records(project))
+    return Tree(records, trial.id)
+
+
 def main(argv=None, tasks=None, trials_dir=TRIALS, today=None):
     argv = sys.argv[1:] if argv is None else argv
     tasks = tasks or Tasks()
@@ -414,6 +499,14 @@ def main(argv=None, tasks=None, trials_dir=TRIALS, today=None):
             for target, text in result.writes:
                 tasks.note(target, text)
             print(result.line)
+            return 0
+        if len(argv) == 2 and argv[0] in ("status", "census"):
+            trial = find_trial(trials, argv[1])
+            tree = _trial_tree(tasks, trial)
+            if argv[0] == "census":
+                print(json.dumps(census(trial, tree, trial.close_by), indent=2))
+            else:
+                print("\n".join(status_lines(trial, census(trial, tree, min(today, trial.close_by)))))
             return 0
         print(__doc__.strip(), file=sys.stderr)
         return 2

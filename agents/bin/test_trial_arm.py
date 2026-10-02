@@ -498,3 +498,126 @@ def test_local_prefix_reads_the_checkout_config(tmp_path):
     bare = tmp_path / "bare"
     subprocess.run(["git", "init", "-q", str(bare)], check=True)
     assert ta.local_prefix(bare) is None
+
+
+def enrolled(root, arm, *extra_notes, process="planned"):
+    return rec(root, process=process, notes=[(IN, "started"), (IN, f"trial: {T} — enrolled — flow {arm}"),
+                                             (IN, f"arm: {T} — unit {root} — flow {arm}"), *extra_notes])
+
+
+def test_census_lists_enrolled_units_with_members_and_state():
+    root = pick("on")
+    t = tree(enrolled(root, "on", (IN, "gate: implementing .worktrees/x"), ("2026-11-01T00:00:00Z", "done")),
+             rec("tack-f00001", parent=root, notes=[(IN, "started"), (IN, "gate: scoped — step"),
+                                                    ("2026-10-20T00:00:00Z", "done")]))
+    out = ta.census(TRIAL, t, TRIAL.close_by)
+    [unit] = out["units"]
+    assert unit["root"] == root and unit["arm"] == "on" and unit["decision"] == "recorded"
+    assert unit["state"] == "done" and unit["first_done"] == "2026-11-01T00:00:00Z"
+    assert [m["task"] for m in unit["members"]] == [root, "tack-f00001"]
+    assert unit["treated"] is True and unit["compliant"] is True
+    assert unit["stratum"]["project"] == "tack"
+    assert out["decided_late"] == {"on": 0, "off": 0}
+
+
+def test_scoped_gates_alone_leave_a_unit_untreated():
+    root = pick("on")
+    t = tree(enrolled(root, "on", (IN, "gate: scoped — adopted"), (LATER, "done")))
+    [unit] = ta.census(TRIAL, t, TRIAL.close_by)["units"]
+    assert (unit["treated"], unit["compliant"]) == (False, False)
+
+
+def test_dropped_and_open_units_are_unassessable():
+    a, b = pick("off"), pick("off", skip=(pick("off"),))
+    t = tree(enrolled(a, "off", (LATER, "dropped"), process="direct"),
+             enrolled(b, "off", process="direct"))
+    units = {u["root"]: u for u in ta.census(TRIAL, t, TRIAL.close_by)["units"]}
+    assert (units[a]["state"], units[a]["compliant"]) == ("dropped", None)
+    assert (units[b]["state"], units[b]["compliant"]) == ("open", None)
+
+
+def test_a_unit_with_no_lookups_is_decided_late():
+    root = pick("off")
+    t = tree(rec(root, notes=[(IN, "started"), (LATER, "done")]))
+    out = ta.census(TRIAL, t, TRIAL.close_by)
+    assert out["units"][0]["decision"] == "decided late"
+    assert out["decided_late"] == {"on": 0, "off": 1}
+
+
+def test_not_enrolled_units_are_left_out():
+    root = pick("on")
+    t = tree(rec(root, notes=[(BEFORE, "started")]))
+    assert ta.census(TRIAL, t, TRIAL.close_by)["units"] == []
+
+
+def test_a_moved_task_stays_in_its_recorded_unit_and_breaks_compliance():
+    on_root, off_root, task = pick("on"), pick("off"), "tack-f00001"
+    t = tree(enrolled(on_root, "on", (IN, "gate: implementing x"), (LATER, "done")),
+             enrolled(off_root, "off", (LATER, "done")),
+             rec(task, parent=off_root, notes=[(IN, "started"), (IN, f"arm: {T} — unit {on_root} — flow on"),
+                                               (IN, f"arm: {T} — moved to unit {off_root} — flow off")]))
+    out = ta.census(TRIAL, t, TRIAL.close_by)
+    units = {u["root"]: u for u in out["units"]}
+    assert task in [m["task"] for m in units[on_root]["members"]]
+    assert task not in [m["task"] for m in units[off_root]["members"]]
+    assert units[on_root]["compliant"] is False
+    assert out["conflicts"] == [{"task": task, "recorded": on_root, "computed": off_root}]
+
+
+def test_an_override_breaks_compliance():
+    root = pick("off")
+    t = tree(enrolled(root, "off", (IN, f"arm: {T} — override: user asked to stop"),
+                      (LATER, "done"), process="direct"))
+    [unit] = ta.census(TRIAL, t, TRIAL.close_by)["units"]
+    assert (unit["treated"], unit["compliant"]) == (False, False)
+
+
+def test_census_state_reads_close_by_and_keeps_the_first_done_date():
+    root = pick("off")
+    t = tree(enrolled(root, "off", ("2026-10-10T00:00:00Z", "done"), ("2026-12-15T00:00:00Z", "resumed"),
+                      ("2027-01-11T00:00:00Z", "done"), process="direct"))
+    [unit] = ta.census(TRIAL, t, TRIAL.close_by)["units"]
+    assert unit["first_done"] == "2026-10-10T00:00:00Z"
+    assert unit["state"] == "open" and unit["reopened"] is True
+
+
+def test_a_root_moved_after_a_child_first_lookup_stays_in_its_unit_in_the_census():
+    t, root, off_root, child, _, _ = child_first_then_root_moved()
+    t.records[root]["notes"].append({"at": LATER, "by": "main", "text": "done"})
+    units = {u["root"]: u for u in ta.census(TRIAL, t, TRIAL.close_by)["units"]}
+    assert [m["task"] for m in units[root]["members"]] == [root, child]
+    assert units[root]["members"][0]["moves"] == [{"unit": off_root, "arm": "off"}]
+    assert units[root]["compliant"] is False
+    assert root not in [m["task"] for m in units[off_root]["members"]]
+
+
+def test_evidence_after_the_cutoff_leaves_the_census_unchanged():
+    root = pick("on")
+    before = tree(enrolled(root, "on", (LATER, "done")))
+    after = tree(enrolled(root, "on", (LATER, "done"), ("2027-01-20T00:00:00Z", "gate: implementing late"),
+                          ("2027-01-21T00:00:00Z", f"arm: {T} — override: late"),
+                          ("2027-01-22T00:00:00Z", f"arm: {T} — moved to unit tack-ffffff — flow off")))
+    assert ta.census(TRIAL, after, TRIAL.close_by) == ta.census(TRIAL, before, TRIAL.close_by)
+    [unit] = ta.census(TRIAL, after, TRIAL.close_by)["units"]
+    assert (unit["treated"], unit["compliant"]) == (False, False)
+
+
+def test_compliance_and_status_lines_flag_a_halt():
+    units = [{"root": f"tack-{i}", "arm": "on", "state": "done", "treated": i >= 4, "compliant": i >= 4}
+             for i in range(16)] + \
+            [{"root": f"obs-{i}", "arm": "off", "state": "done", "treated": False, "compliant": True}
+             for i in range(15)]
+    summary = ta.compliance(units)
+    assert summary["on"] == {"enrolled": 16, "assessable": 16, "compliant": 12, "rate": 0.75}
+    lines = ta.status_lines(TRIAL, {"as_of": "2026-11-20", "units": units})
+    assert any(line.startswith("halt: compliance below 0.8 in on") for line in lines)
+
+
+def test_main_census_reads_every_trial_project(fake_tasks, tmp_path, capsys):
+    tack_root, obs_root = pick("on"), pick("off", prefix="obs")
+    tasks = fake_tasks(enrolled(tack_root, "on", (LATER, "done")),
+                       enrolled(obs_root, "off", (LATER, "done"), process="direct"))
+    assert ta.main(["census", T], tasks=tasks, trials_dir=trials_dir(tmp_path), today=dt.date(2027, 2, 20)) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert sorted(u["root"] for u in out["units"]) == sorted([tack_root, obs_root])
+    assert out["as_of"] == "2027-01-10"
