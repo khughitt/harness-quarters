@@ -1,0 +1,22 @@
+---
+id: tack-1bd166
+title: "Find whether a Codex shell command can resolve its own model from its rollout, in top-level and child sessions"
+status: todo
+priority: 2
+size: s
+complexity: mid
+process: direct
+created: 2026-10-02T15:33:37Z
+updated: 2026-10-02T15:33:37Z
+depends: []
+parent: tack-fce47e
+tags: []
+source: docs/notes/2026-10-02-codex-model-identity-brief.md
+agent: claude-code/claude-opus-5-5
+---
+
+Question: Can a shell command inside a Codex session resolve the session's current model by CODEX_THREAD_ID → rollout file → last turn_context.payload.model, in both a top-level session and a child session (where relay-c85a0f reports conflicting CODEX_SESSION_ID and CODEX_THREAD_ID), and does Codex expose the model any other way (hook payload, env var)?
+Where to start: the brief (docs/notes/2026-10-02-codex-model-identity-brief.md); codex/config.toml:197; obs/codex_adapter.py:66-69 for the rollout fields; relay-c85a0f and relay-60ae9e for the id conflict; the Codex CLI's hook and env documentation for the installed version.
+Bound: One probe script in a scratch directory run from one top-level and one child Codex session, each switching model once with -m or /model; no changes to relay, tasks, obs, or the Codex config.
+Expected result: Per session kind, whether the resolved model matches the running model after a switch, and any other exposure found; a recommendation among the brief's alternatives and which project owns it. Record on this task and in the brief's §5–§6.
+Ideas it wakes: On completion, run tasks note on tack-52ac05 with the finding, in the same commit as this result.
