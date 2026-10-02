@@ -292,3 +292,79 @@ def test_suppressed_and_one_arm_strata_do_not_enter():
     assert [key for key, _ in result["entered"]] == [fv.stratum_key(S1)]
     assert result["skipped"] == {"low_retention": 1}
     assert fv.verdict(make_report(units))["skipped"] == {"one arm": 1}
+
+
+def run_main(report, monkeypatch, capsys):
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(report)))
+    code = fv.main()
+    out, err = capsys.readouterr()
+    return code, out, err
+
+
+def test_main_prints_choice_then_counts(monkeypatch, capsys):
+    units = arm(S1, "a", True, 8, 12) + arm(S1, "b", False, 1, 12)
+    code, out, _ = run_main(make_report(units), monkeypatch, capsys)
+    lines = out.splitlines()
+    assert code == 0 and lines[0] == "regression"
+    assert lines[1].startswith("flow 8/12, no flow 1/12, strata 1/1, p ")
+    assert not lines[2].startswith("provisional")
+
+
+def test_main_under_the_gate_with_an_empty_cohort(monkeypatch, capsys):
+    code, out, _ = run_main(make_report([], gate=True), monkeypatch, capsys)
+    assert code == 0
+    assert out.splitlines()[:3] == [
+        "insufficient: unvalidated",
+        "flow 0/0, no flow 0/0, strata 0/0, p -, OR -",
+        "provisional: M4 is unvalidated:E2; the counts and tables are the strata that would enter once it clears"]
+
+
+@pytest.mark.parametrize("text", ["null", "{}", "not json", '{"units": null}'])
+def test_main_exits_2_on_a_malformed_report(text, monkeypatch, capsys):
+    monkeypatch.setattr(sys, "stdin", io.StringIO(text))
+    assert fv.main() == 2
+    out, err = capsys.readouterr()
+    assert out == "" and err.startswith("flow-outcome-verdict: ")
+
+
+def test_conditions_cover_strata_joint_mix_outcomes_coverage_cost_and_limitations():
+    units = arm(S1, "a", True, 1, 10) + arm(S1, "b", False, 0, 10)
+    units[0]["links"] = [{"kind": "defect", "evidence": "recorded"}]
+    units[0]["changes"] = 1
+    units[1]["factors"]["model"]["values"] = ["gpt-5.6"]
+    units[2]["output_tokens"] = None
+    units[3]["extensions"] = 2
+    units[10]["reopens"] = 1
+    units.append(unit("u", S1, None, state="incomplete"))
+    report = make_report(units)
+    text = "\n".join(fv.conditions(fv.verdict(report), report))
+    assert "tack s mid direct task: flow 1/10, no flow 0/10" in text
+    assert "flow true, claude-code, claude-opus-5-5: 9" in text
+    assert "flow true, claude-code, gpt-5.6: 1" in text
+    assert "flow true: changes 1, extensions 2, reopened 0 of 10" in text
+    assert "flow false: changes 0, extensions 0, reopened 1 of 10" in text
+    assert "defective tasks, flow true: a0" in text
+    assert "defective tasks, flow false: none" in text
+    assert "flow true, recorded: 1" in text
+    assert "flow false, no link: 10" in text
+    assert "excluded authorship: incomplete 1" in text
+    assert "flow true: median 100, total 900, missing 1" in text
+    assert "no exposure: needs obs-db1316" in text
+    assert "pre-start" in text and "uncommitted" in text
+
+
+def test_conditions_leave_out_strata_that_did_not_enter():
+    units = arm(S1, "a", True, 1, 12) + arm(S1, "b", False, 1, 12) \
+        + arm(S2, "c", True, 3, 12) + arm(S2, "d", False, 1, 12)
+    report = make_report(units, gate=True, suppressed={"s": "unvalidated:E2", "m": "low_retention"})
+    text = "\n".join(fv.conditions(fv.verdict(report), report))
+    assert "tack s mid direct task: flow 1/12, no flow 1/12" in text
+    assert "not entered, low_retention: 1" in text
+    assert "c0" not in text and "flow true, claude-code, claude-opus-5-5: 12" in text
+
+
+def test_null_stratum_field_prints_as_dash():
+    unsized = {**S1, "size": None}
+    units = arm(unsized, "a", True, 0, 10) + arm(unsized, "b", False, 0, 10)
+    report = make_report(units)
+    assert "tack - mid direct task: flow 0/10, no flow 0/10" in fv.render(fv.verdict(report), report)

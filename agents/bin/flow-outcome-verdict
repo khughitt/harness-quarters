@@ -13,6 +13,7 @@ filters nothing: the cohort is obs's.
 import collections
 import json
 import math
+import statistics
 import sys
 from fractions import Fraction
 
@@ -24,6 +25,18 @@ UNASSIGNED = ("unknown", "several")
 STRATUM_KEYS = ("project", "size", "complexity", "process", "artifact")
 MIN_ARM = 10
 ALPHA = 0.1
+EXCLUDED = ("incomplete", "mixed", "several", "unknown")
+LIMITATIONS = (
+    "cohort, not execution: pre-start skill loads count (obs credits a skill invoked at or "
+    "before the task's end)",
+    "cohort, not execution: a session keeps skill content it loaded earlier across later "
+    "turns and resumptions",
+    "cohort, not execution: harness homes load the skill from the main checkout's working "
+    "tree, so uncommitted edits can run",
+    "historical association: flow was chosen, not assigned; a verdict does not establish cause",
+)
+PROVISIONAL = (f"provisional: M4 is unvalidated:{GATE}; the counts and tables are the strata "
+               f"that would enter once it clears")
 
 
 class ReportError(Exception):
@@ -237,12 +250,96 @@ def verdict(report):
             "choice": "regression" if p < ALPHA else "no-regression-detected", "reason": None}
 
 
+def _name(value):
+    return "-" if value is None else str(value)
+
+
+def _arm(unit):
+    credit = _credit(unit)
+    return credit["values"][0] if credit["state"] == "attributed" and credit["values"] else None
+
+
+def _attributed(unit, factor):
+    credit = unit["factors"].get(factor, {"state": "unknown", "values": []})
+    if credit["state"] != "attributed":
+        return credit["state"]
+    return "/".join(str(value) for value in credit["values"])
+
+
+def _evidence(unit):
+    kinds = {link["evidence"] for link in unit["links"] if link["kind"] == "defect"}
+    return "recorded" if "recorded" in kinds else "inferred" if kinds else "no link"
+
+
+def _flow(value):
+    return f"flow {str(value).lower()}"
+
+
+def conditions(result, report):
+    """§5's tables over the scored cohort: the units of the entering strata (provisional
+    ones under the gate). A stratum that did not enter is counted by reason, never
+    described."""
+    entered = {key for key, _ in result["entered"]}
+    members = [unit for unit in result["units"] if stratum_key(unit["stratum"]) in entered]
+    scored = [unit for unit in members if _arm(unit) is not None]
+    arms = {flow: [unit for unit in scored if _arm(unit) is flow] for flow in (True, False)}
+    lines = ["strata:"]
+    for key, (fd, fn, od, on) in result["entered"]:
+        lines.append(f"  {' '.join(_name(part) for part in key)}: flow {fd}/{fn}, no flow {od}/{on}")
+    lines += [f"  not entered, {reason}: {count}" for reason, count in sorted(result["skipped"].items())]
+    lines.append("flow x harness x model:")
+    joint = collections.Counter((_arm(unit), _attributed(unit, "harness"), _attributed(unit, "model"))
+                                for unit in scored)
+    lines += [f"  {_flow(flow)}, {harness}, {model}: {count}"
+              for (flow, harness, model), count in sorted(joint.items(), key=repr)]
+    lines.append("after close (shown, not scored):")
+    for flow, group in arms.items():
+        lines.append(f"  {_flow(flow)}: changes {sum(u['changes'] for u in group)}, "
+                     f"extensions {sum(u['extensions'] for u in group)}, "
+                     f"reopened {sum(u['reopens'] > 0 for u in group)} of {len(group)}")
+    for flow, group in arms.items():
+        defective = sorted(unit["task"] for unit in group if unit["defects"] > 0)
+        lines.append(f"  defective tasks, {_flow(flow)}: {' '.join(defective) or 'none'}")
+    lines.append("coverage:")
+    evidence = collections.Counter((_arm(unit), _evidence(unit)) for unit in scored)
+    lines += [f"  {_flow(flow)}, {kind}: {count}"
+              for (flow, kind), count in sorted(evidence.items(), key=repr)]
+    excluded = collections.Counter(_credit(unit)["state"] for unit in members
+                                   if _credit(unit)["state"] in EXCLUDED)
+    lines.append("  excluded authorship: "
+                 + (" ".join(f"{state} {count}" for state, count in sorted(excluded.items())) or "none"))
+    lines.append("cost (output_tokens):")
+    for flow, group in arms.items():
+        known = [unit["output_tokens"] for unit in group if unit["output_tokens"] is not None]
+        median = _name(statistics.median(known) if known else None)
+        lines.append(f"  {_flow(flow)}: median {median}, total {sum(known)}, "
+                     f"missing {len(group) - len(known)}")
+    lines.append("limitations:")
+    lines += [f"  {text}" for text in (*report["limitations"].values(), *LIMITATIONS)]
+    return lines
+
+
+def _number(value):
+    return "-" if value is None or (isinstance(value, float) and math.isnan(value)) else f"{value:.3g}"
+
+
+def render(result, report):
+    head = result["choice"] if result["reason"] is None else f"{result['choice']}: {result['reason']}"
+    (fd, fn), (od, on) = result["flow"], result["other"]
+    counts = (f"flow {fd}/{fn}, no flow {od}/{on}, strata {len(result['entered'])}/{result['strata_total']}, "
+              f"p {_number(result['p'])}, OR {_number(result['odds_ratio'])}")
+    lines = [head, counts, *([PROVISIONAL] if result["provisional"] else []), *conditions(result, report)]
+    return "\n".join(lines) + "\n"
+
+
 def main():
     try:
-        read(json.load(sys.stdin))
+        report = json.load(sys.stdin)
+        text = render(verdict(report), report)
     except (ReportError, KeyError, TypeError, ValueError) as error:
         print(f"flow-outcome-verdict: {type(error).__name__}: {error}", file=sys.stderr)
         return 2
+    sys.stdout.write(text)
     return 0
 
 
