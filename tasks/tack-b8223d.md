@@ -4,7 +4,12 @@ title: "The subagent-driven-development skill stops after one final fix wave eve
 status: idea
 priority: 2
 created: 2026-10-02T01:08:57Z
-updated: 2026-10-02T01:08:57Z
+updated: 2026-10-02T14:53:46Z
 depends: []
+parent: tack-36f493
 tags: [feedback, friction, "from:ops"]
 ---
+
+## Notes
+
+- 2026-10-02T14:53:45Z (main): scope: briefed; parented under tack-36f493; SDD SKILL.md:458-469 forbids a second fix wave; upstream obra/superpowers#2431 (open) proposes one targeted extra round; waits on the corrective-round cap and whether to comment on #2431; brief: docs/notes/2026-10-02-skill-stop-points-brief.md
