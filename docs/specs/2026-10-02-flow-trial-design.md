@@ -1,6 +1,6 @@
 # Randomized flow trial
 
-Status: draft revision 3, for review (round 1 and 2 findings in §11). Task: `tack-7d9375`.
+Status: draft revision 4, for review (round 1 to 3 findings in §11). Task: `tack-7d9375`.
 Inputs: the outcome measures of obs-00809f; the report fields of obs-0491f1 (`--until`,
 `--cohort`, `--units`, the E2 gate); the case shape and the historical flow case of
 `tack-026612` (`docs/specs/2026-10-01-workflow-outcome-eval-design.md`, whose §6 names
@@ -106,33 +106,49 @@ lists it under `decided late` with its count per arm, and gives it no special tr
 in the analysis. That is the one place where the tree at census time decides
 enrollment.
 
-**Membership is frozen per task.** The first lookup on each task writes
-`arm: flow-trial-1 — unit <root id> — flow on|off` on it, and that recorded unit is the
-task's unit for the analysis from then on. A task that never had a lookup belongs to
-the unit computed from the tree when the census runs.
+**Membership is frozen for every looked-up task, enrolled or not.** The first lookup
+on each task in an opted-in project writes
+`arm: flow-trial-1 — unit <root id> — flow on|off|not enrolled` on it. The recorded unit
+is the task's unit for the analysis from then on, and so is that unit's enrollment and
+arm. A task recorded in a unit that was not enrolled stays out of the trial wherever it
+moves. Detaching it never makes it a new unit.
+
+The recorded unit is resolved through any root that is already recorded. When the
+computed root carries an `arm:` note naming another unit (it was moved), the new task
+records that unit, not the computed root. A task detached from an excluded unit
+therefore keeps its descendants excluded with it. A root recorded in another unit gets
+no `trial:` decision of its own. A task that never had a lookup belongs to the unit
+resolved this way from the tree when the census runs.
 
 **Moving a task between units.** On every lookup, `trial-arm` compares the task's
-recorded unit with the unit computed from the tree. When they differ, the task has been
-moved, and the destination unit sets how the remaining work runs, because flow's
-parent and child contract has to hold inside the tree as it now stands. The tool prints
-the destination unit's arm, with `moved from unit <root id>`. It writes
-`arm: flow-trial-1 — moved to unit <root id> — flow on|off` once, and the session
-follows that arm. The analysis keeps the task in its recorded unit, so a move never
-changes which units are enrolled or which arm a unit has. When the two arms differ, the
-recorded unit counts as non-compliant (§5), and moves are counted per arm in the
-output. When the destination unit is not enrolled, the task keeps its recorded unit's
-arm, since no conflicting contract exists.
+recorded unit with the unit resolved from the tree. When they differ, the task has been
+moved. Execution follows the destination, because flow's parent and child contract has
+to hold inside the tree as it now stands. Analysis follows the record.
+
+- **Execution:** when the destination unit is enrolled, the session follows its arm.
+  When the destination is outside the trial, the session follows the workflow the
+  destination is actually running: flow when its root carries any `gate:` note, no
+  flow otherwise. The tool prints that workflow with `moved from unit <root id>`, and
+  writes `arm: flow-trial-1 — moved to unit <root id> — flow on|off` once.
+- **Analysis:** the task stays in its recorded unit, with that unit's enrollment and
+  arm, so a move never changes which units are enrolled or which arm a unit has. When
+  the recorded unit is enrolled and the workflow followed after the move differs from
+  its arm, the recorded unit counts as non-compliant (§5). Moves are counted per arm in
+  the output.
 
 **`agents/bin/trial-arm <task-id>`** finds the active trials, resolves the unit from
 `tasks show`, and prints one line:
 
 - `flow-trial-1: flow on (unit <root id>)`, or the same with `flow off`, or
 - `not enrolled: <reason>` (`no trial for <prefix>`, `unit <root id> first started
-  <date>, outside enroll`, `not started`).
+  <date>, outside enroll`, `not started`), or
+- after a move, `flow-trial-1: flow on|off (moved from unit <root id> to unit <root
+  id>)`.
 
 On the first lookup in a unit it writes the root's `trial:` decision note. On the first
-lookup for a task in an enrolled unit it writes the task's `arm:` note. Later lookups
-write only the move note (above). It exits 0 for both outcomes, 1 when the task is missing, and 2
+lookup for any task in an opted-in project it writes the task's `arm:` note, including
+`not enrolled`. Later lookups write only the move note (above). A `not enrolled` task
+outside any move runs as the session would choose without the trial. It exits 0 for both outcomes, 1 when the task is missing, and 2
 when trial files overlap on a project or when a task's recorded arm disagrees with the
 function.
 
@@ -328,11 +344,15 @@ line in the body giving the reason. The verdict reads what enrolled, usually as
    - the frozen decision: one `trial:` note per root; a task with an earlier start moved
      under an enrolled root leaves it enrolled; a task moved out of a not-enrolled unit
      does not enroll it; a unit with no lookups is `decided late`;
-   - membership: idempotent `arm:` writing; a task moved from an `on` unit under an
-     `off` planned parent prints `flow off … moved from unit …`, writes the move note
-     once, stays in its recorded unit for the census, and makes that unit
-     non-compliant; a move into a not-enrolled unit keeps the recorded arm; a recorded
-     arm that contradicts the function (exits 2);
+   - membership: idempotent `arm:` writing, including `not enrolled`; a task moved from
+     an `on` unit under an `off` planned parent prints `flow off … moved from unit …`,
+     writes the move note once, stays in its recorded unit for the census, and makes that
+     unit non-compliant; a child first started on October 6 under a pre-window parent and
+     then detached stays out of the trial, and so do children filed under it later; an
+     `off` task moved under a not-enrolled parent that carries flow gates is told
+     `flow on` and makes its recorded unit non-compliant; under a not-enrolled parent
+     with no gates it is told `flow off`; a recorded arm that contradicts the function
+     (exits 2);
    - compliance: `gate: scoped` alone is untreated; `gate: implementing` on any member is
      treated; a dropped unit is unassessable;
    - census: state on `close_by` and first `done` close from lifecycle timestamps (a
@@ -396,3 +416,9 @@ the scope is kept.
 | P1: membership notes did not freeze enrollment or prevent conflicting arms | The first lookup decides the unit and records it on the root; nothing re-decides it. A moved task runs under its destination's arm, stays in its recorded unit for the analysis, and makes that unit non-compliant when the arms differ (§4). |
 | P1: missing data overrode a known defect | Defect state is decided in order: a known defect, then unknown, then clean. Imputation applies only without a known defect (§6). |
 | P2: delivery state on `close_by` was mixed with obs's first-close windows | Delivery and defects are both anchored at first closes. The later-episode gap is stated with every verdict, and reopens are printed per arm (§6). |
+
+Round 3 (2026-10-02):
+
+| Finding | Resolution |
+| --- | --- |
+| P1: moves involving units outside the trial | Every looked-up task records its unit, including `not enrolled`, and the record resolves through moved roots, so a detached task never becomes a new unit. Execution after a move follows the destination's actual workflow, including outside the trial. Analysis keeps the original enrollment and arm (§4). |
