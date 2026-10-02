@@ -336,6 +336,7 @@ def test_conditions_cover_strata_joint_mix_outcomes_coverage_cost_and_limitation
     units[3]["extensions"] = 2
     units[10]["reopens"] = 1
     units.append(unit("u", S1, None, state="incomplete"))
+    units.append(unit("m", S1, True, state="mixed"))
     report = make_report(units)
     text = "\n".join(fv.conditions(fv.verdict(report), report))
     assert "tack s mid direct task: flow 1/10, no flow 0/10" in text
@@ -347,7 +348,8 @@ def test_conditions_cover_strata_joint_mix_outcomes_coverage_cost_and_limitation
     assert "defective tasks, flow false: none" in text
     assert "flow true, recorded: 1" in text
     assert "flow false, no link: 10" in text
-    assert "excluded authorship: incomplete 1" in text
+    assert "excluded authorship, no arm: incomplete 1" in text
+    assert "excluded authorship, flow true: mixed 1" in text
     assert "flow true: median 100, total 900, missing 1" in text
     assert "no exposure: needs obs-db1316" in text
     assert "pre-start" in text and "uncommitted" in text
@@ -368,3 +370,57 @@ def test_null_stratum_field_prints_as_dash():
     units = arm(unsized, "a", True, 0, 10) + arm(unsized, "b", False, 0, 10)
     report = make_report(units)
     assert "tack - mid direct task: flow 0/10, no flow 0/10" in fv.render(fv.verdict(report), report)
+
+
+def test_excluded_authorship_is_split_by_arm_in_order():
+    units = arm(S1, "a", True, 0, 10) + arm(S1, "b", False, 0, 10) + [
+        unit("n1", S1, None, state="unknown"), unit("n2", S1, None, state="incomplete"),
+        unit("n3", S1, None, state="unknown"), unit("f1", S1, False, state="several"),
+        unit("t1", S1, True, state="mixed")]
+    report = make_report(units)
+    lines = fv.conditions(fv.verdict(report), report)
+    got = [line for line in lines if "excluded authorship" in line]
+    assert got == ["  excluded authorship, flow true: mixed 1",
+                   "  excluded authorship, flow false: several 1",
+                   "  excluded authorship, no arm: incomplete 1 unknown 2"]
+
+
+def test_no_excluded_authorship_prints_none():
+    units = arm(S1, "a", True, 0, 10) + arm(S1, "b", False, 0, 10)
+    report = make_report(units)
+    assert "  excluded authorship: none" in fv.conditions(fv.verdict(report), report)
+
+
+def _mutate(units, change):
+    rows = rows_for(units)
+    change(rows[0])
+    return make_report(units, rows=rows)
+
+
+@pytest.mark.parametrize("change, match", [
+    (lambda r: r.update(suppressed=True, suppressed_reason=None), "suppressed_reason"),
+    (lambda r: r.update(suppressed=True, suppressed_reason=""), "suppressed_reason"),
+    (lambda r: r.update(suppressed="false"), "suppressed"),
+    (lambda r: r.update(suppressed=False, suppressed_reason="unassigned"), "suppressed_reason"),
+    (lambda r: r.pop("measure"), "measure"),
+])
+def test_read_refuses_inconsistent_comparison_rows(change, match):
+    units = arm(S1, "a", True, 1, 10) + arm(S1, "b", False, 1, 10)
+    with pytest.raises(fv.ReportError, match=match):
+        fv.read(_mutate(units, change))
+
+
+def test_read_refuses_an_unvalidated_row_while_the_gate_is_cleared():
+    units = arm(S1, "a", True, 1, 10) + arm(S1, "b", False, 1, 10)
+    report = make_report(units, suppressed={"s": "unvalidated:E2"})
+    with pytest.raises(fv.ReportError, match="disagree"):
+        fv.read(report)
+
+
+def test_render_of_a_gated_provisional_stratum():
+    units = arm(S1, "a", True, 3, 12) + arm(S1, "b", False, 2, 11)
+    report = make_report(units, gate=True, suppressed={"s": "unvalidated:E2"})
+    lines = fv.render(fv.verdict(report), report).splitlines()
+    assert lines[0] == "insufficient: unvalidated"
+    assert lines[1].startswith("flow 3/12, no flow 2/11, strata 1/1, p -, OR -")
+    assert lines[2] == fv.PROVISIONAL

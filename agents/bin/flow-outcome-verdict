@@ -158,6 +158,24 @@ def _check_unit(unit):
         raise ReportError(f"{where} has no known {FACTOR} values")
 
 
+def _check_suppression(row, gated):
+    """A row's suppression must be self-consistent and agree with the measure-level gate:
+    suppressed is a bool, with a non-empty text reason exactly when true, and the gate's
+    own reason appears only while the gate holds."""
+    suppressed = _field(row, "suppressed", bool, "comparison row")
+    if "suppressed_reason" not in row:
+        raise ReportError("comparison row lacks 'suppressed_reason'")
+    reason = row["suppressed_reason"]
+    if suppressed and not (isinstance(reason, str) and reason):
+        raise ReportError(f"suppressed comparison row has suppressed_reason {reason!r}, "
+                          f"not a non-empty string")
+    if not suppressed and reason is not None:
+        raise ReportError(f"unsuppressed comparison row has suppressed_reason {reason!r}, not null")
+    if reason == f"unvalidated:{GATE}" and not gated:
+        raise ReportError(f"comparison rows and measure-level status disagree: a row is "
+                          f"suppressed as {reason} but {GATE_MEASURE} is cleared")
+
+
 def read(report):
     if isinstance(report, dict) and "units" not in report:
         raise ReportError("report lacks 'units': run obs outcomes report with --units")
@@ -176,7 +194,11 @@ def read(report):
             raise ReportError(f"task {unit['task']} has {unit['defects']} defects and no defect link")
     for row in comparisons:
         _field(row, "factor", str, "comparison row")
-    rows = [row for row in comparisons if row["factor"] == FACTOR and row.get("measure") == MEASURE]
+        _field(row, "measure", str, "comparison row")
+    rows = [row for row in comparisons if row["factor"] == FACTOR and row["measure"] == MEASURE]
+    gated = gate_holds(report)
+    for row in rows:
+        _check_suppression(row, gated)
     cells, unassigned, members = recount(units)
     reconcile(rows, cells, unassigned, members)
     return rows, units, cells
@@ -225,7 +247,7 @@ def verdict(report):
     entered, skipped = [], collections.Counter()
     for row in rows:
         key = stratum_key(row["stratum"])
-        reason = row["suppressed_reason"] if row["suppressed"] else None
+        reason = row["suppressed_reason"]
         if reason is not None and not (gated and reason == f"unvalidated:{GATE}"):
             skipped[reason] += 1
             continue
@@ -304,10 +326,19 @@ def conditions(result, report):
     evidence = collections.Counter((_arm(unit), _evidence(unit)) for unit in scored)
     lines += [f"  {_flow(flow)}, {kind}: {count}"
               for (flow, kind), count in sorted(evidence.items(), key=repr)]
-    excluded = collections.Counter(_credit(unit)["state"] for unit in members
-                                   if _credit(unit)["state"] in EXCLUDED)
-    lines.append("  excluded authorship: "
-                 + (" ".join(f"{state} {count}" for state, count in sorted(excluded.items())) or "none"))
+    excluded = collections.defaultdict(collections.Counter)
+    for unit in members:
+        credit = _credit(unit)
+        if credit["state"] in EXCLUDED:
+            known = [value for value in credit["values"] if value is not None]
+            excluded[known[0] if known else None][credit["state"]] += 1
+    groups = [(True, _flow(True)), (False, _flow(False)), (None, "no arm")]
+    present = [(arm, label) for arm, label in groups if arm in excluded]
+    lines += [f"  excluded authorship, {label}: "
+              + " ".join(f"{state} {count}" for state, count in sorted(excluded[arm].items()))
+              for arm, label in present]
+    if not present:
+        lines.append("  excluded authorship: none")
     lines.append("cost (output_tokens):")
     for flow, group in arms.items():
         known = [unit["output_tokens"] for unit in group if unit["output_tokens"] is not None]
