@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3 standard library (`fractions`, `math`, `statistics`, `collections`, `json`), pytest through `python3 -m pytest agents/bin`, the `tasks` CLI.
 
-**Review:** plan round 1 (codex): revise, P1 1, P2 5, answered in this revision: duplicate strata, task rows and two-valued attributions are refused (Task 2); explicit nulls and wrong types fail closed with exit 2 (Task 2); change requests, extensions, reopens and defective task ids are printed (Task 4); conditions describe only entering strata, provisional ones under the gate (Tasks 3–4); `observed` keeps choice and reason apart (Task 5); the live cross-check reads the filtered M4 rows and counts one-arm strata separately (Task 5).
+**Review:** plan round 1 (codex): revise, P1 1, P2 5, answered in this revision: duplicate strata, task rows and two-valued attributions are refused (Task 2); explicit nulls and wrong types fail closed with exit 2 (Task 2); plan round 2 (codex): revise, P2 1 — task rows' flow credit and counts are validated before the recount (Task 2); change requests, extensions, reopens and defective task ids are printed (Task 4); conditions describe only entering strata, provisional ones under the gate (Tasks 3–4); `observed` keeps choice and reason apart (Task 5); the live cross-check reads the filtered M4 rows and counts one-arm strata separately (Task 5).
 
 **Spec:** `docs/specs/2026-10-01-workflow-outcome-eval-design.md` (approved 2026-10-01, revision 3.1). Read it before any task. Section references (§4 and so on) point into it.
 
@@ -21,6 +21,7 @@
 - Exit codes: `0` when a verdict is printed (any choice, including `insufficient`); `2` when the report is malformed (a missing key, an explicit null or a wrong type where a value is required), holds duplicate strata or task rows, or its comparison rows and task rows disagree. The message goes to stderr, prefixed `flow-outcome-verdict: `.
 - The first stdout line is exactly one of `no-regression-detected`, `regression`, `insufficient: unvalidated`, `insufficient: too few`.
 - Constants from the spec, verbatim: factor `skill:flow`; measure `m4_defective`; gate measure key `m4`, gate value `E2`; minimum arm size 10 scored tasks; one-sided threshold p < 0.1; unassigned states `unknown`, `several`; excluded authorship states `incomplete`, `mixed`, `several`, `unknown`; stratum keys `project`, `size`, `complexity`, `process`, `artifact`.
+- Task rows: `defects`, `changes`, `extensions` and `reopens` are non-negative integers (not booleans); `output_tokens` is a non-negative integer or `null`; `skill:flow` values are booleans, with `null` allowed only beside a known value in a non-attributed credit (outcome spec D4).
 - **The report contract** (what the obs task in Task 1 delivers; the tool reads nothing else):
   - `unvalidated.measures`: an object. The key `m4` mapped to `"E2"` means the gate holds. A missing key means it is cleared. Any other value, `null` included, is malformed.
   - One comparison row per stratum for a factor and measure, and one task row per task. An attributed unit has exactly one value for a factor (outcome spec revision 13: one participant).
@@ -35,6 +36,7 @@
 - A validation status other than `"E2"` for `m4`, an explicit `null` included (a later obs renames it, say `"E2v2"`): exit 2, never read as "gate cleared".
 - A task row with `defects > 0` but no `defect` link: exit 2, because the coverage table could not say where the defect came from.
 - A stratum field that is `null` (an unsized task): the stratum key and the printed table must handle it (printed as `-`), not crash.
+- A task row whose `skill:flow` credit is malformed (`values: [1]`, `values: "x"`, an attributed credit with no value) or whose counts are negative: exit 2, so the headline and the tables never count different tasks.
 - Strata with no defects in either arm: the exact test returns p = 1 and the Mantel–Haenszel ratio is undefined, printed as `-`, with no division error.
 
 Each line has a test in the task that owns the code (Tasks 2–4).
@@ -264,6 +266,45 @@ def test_gate_refuses_any_other_status(status):
         fv.gate_holds(report)
 
 
+@pytest.mark.parametrize("credit", [
+    None,
+    {"state": None, "values": [True]},
+    {"state": "attributed", "values": "x"},
+    {"state": "attributed", "values": [1]},
+    {"state": "attributed", "values": []},
+    {"state": "attributed", "values": [None]},
+    {"state": "unknown", "values": ["yes"]},
+])
+def test_read_refuses_a_malformed_flow_credit(credit):
+    # Plan review round 2: [1] counted as flow true in the headline and vanished from
+    # the tables; an attributed credit with no value passed as unassigned.
+    units = [unit("t1", S1, True), unit("t2", S1, False)]
+    rows = rows_for(units)   # built before the damage, from well-formed rows
+    units[0]["factors"]["skill:flow"] = credit
+    with pytest.raises(fv.ReportError, match="t1"):
+        fv.read(make_report(units, rows=rows))
+
+
+@pytest.mark.parametrize("name, value", [
+    ("defects", -1), ("changes", -1), ("extensions", True), ("reopens", None),
+    ("output_tokens", -5), ("output_tokens", "x"),
+])
+def test_read_refuses_a_bad_count(name, value):
+    units = [unit("t1", S1, True)]
+    rows = rows_for(units)
+    units[0][name] = value
+    with pytest.raises(fv.ReportError, match="t1"):
+        fv.read(make_report(units, rows=rows))
+
+
+def test_read_accepts_an_unknown_credit_carrying_a_known_value():
+    # D4 of the outcome spec: unknown can carry a known value beside an unrecorded one.
+    partial = unit("t1", S1, None, state="unknown")
+    partial["factors"]["skill:flow"]["values"] = [True, None]
+    rows, _, _ = fv.read(make_report([partial]))
+    assert rows[0]["unassigned"] == 1
+
+
 def test_defects_without_a_defect_link_are_refused():
     units = [unit("t1", S1, True, 1, links=[])]
     with pytest.raises(fv.ReportError, match="t1"):
@@ -335,8 +376,8 @@ def _credit(unit):
 def recount(units):
     """The skill:flow x m4_defective cells per stratum, built from task rows the way obs
     builds its comparison cells: unassigned states and empty values go to `unassigned`,
-    and only attributed units are counted in `n` and `sum`. An attributed unit has one
-    participant and so one value."""
+    and only attributed units are counted in `n` and `sum`. `read` has already checked
+    that an attributed unit carries exactly one boolean value."""
     cells = collections.defaultdict(dict)
     unassigned = collections.Counter()
     members = collections.Counter()
@@ -350,8 +391,6 @@ def recount(units):
             continue
         if credit["state"] != "attributed":
             continue
-        if len(values) != 1:
-            raise ReportError(f"task {unit['task']} is attributed with {len(values)} flow values")
         cell = cells[key].setdefault(values[0], {"n": 0, "sum": 0})
         cell["n"] += 1
         cell["sum"] += int(unit["defects"] > 0)
@@ -391,6 +430,38 @@ def gate_holds(report):
     return True
 
 
+def _count(unit, name, where, nullable=False):
+    if name not in unit:
+        raise ReportError(f"{where} lacks {name!r}")
+    value = unit[name]
+    if value is None and nullable:
+        return
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ReportError(f"{where}: {name} is {value!r}, not a count")
+
+
+def _check_unit(unit):
+    """One task row's shape: the fields the recount and the tables read, with counts that
+    are non-negative integers and a skill:flow credit whose values are booleans (or null,
+    beside a known value, in an unknown credit). Attributed means one participant, so
+    exactly one boolean value."""
+    for name, kind in (("task", str), ("stratum", dict), ("factors", dict), ("links", list)):
+        _field(unit, name, kind, "unit")
+    where = f"task {unit['task']}"
+    for name in ("defects", "changes", "extensions", "reopens"):
+        _count(unit, name, where)
+    _count(unit, "output_tokens", where, nullable=True)
+    if FACTOR not in unit["factors"]:
+        return
+    credit = unit["factors"][FACTOR]
+    state = _field(credit, "state", str, f"{where} {FACTOR}")
+    values = _field(credit, "values", list, f"{where} {FACTOR}")
+    if any(value is not None and not isinstance(value, bool) for value in values):
+        raise ReportError(f"{where}: {FACTOR} values {values!r} are not booleans")
+    if state == "attributed" and (len(values) != 1 or values[0] is None):
+        raise ReportError(f"{where} is attributed with flow values {values!r}, not exactly one")
+
+
 def read(report):
     if isinstance(report, dict) and "units" not in report:
         raise ReportError("report lacks 'units': run obs outcomes report with --units")
@@ -399,9 +470,7 @@ def read(report):
     _field(report, "limitations", dict, "report")
     gate_holds(report)
     for unit in units:
-        for name, kind in (("task", str), ("stratum", dict), ("factors", dict), ("defects", int),
-                           ("links", list)):
-            _field(unit, name, kind, "unit")
+        _check_unit(unit)
     repeated = sorted(task for task, count in collections.Counter(u["task"] for u in units).items()
                       if count > 1)
     if repeated:
@@ -437,7 +506,7 @@ Then `chmod +x agents/bin/flow-outcome-verdict`.
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `python3 -m pytest agents/bin/test_flow_outcome_verdict.py -q`
-Expected: 19 passed.
+Expected: 33 passed.
 
 - [ ] **Step 5: Commit**
 
@@ -546,7 +615,7 @@ def test_suppressed_and_one_arm_strata_do_not_enter():
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `python3 -m pytest agents/bin/test_flow_outcome_verdict.py -q`
-Expected: the 10 new tests fail with `AttributeError: ... 'exact_p'` / `'verdict'`; the 19 Task 2 tests pass.
+Expected: the 10 new tests fail with `AttributeError: ... 'exact_p'` / `'verdict'`; the 33 Task 2 tests pass.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -629,7 +698,7 @@ def verdict(report):
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `python3 -m pytest agents/bin/test_flow_outcome_verdict.py -q`
-Expected: 29 passed.
+Expected: 43 passed.
 
 - [ ] **Step 5: Commit**
 
@@ -740,7 +809,7 @@ In the first conditions test, the `incomplete` unit sits in `S1`, which enters, 
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `python3 -m pytest agents/bin/test_flow_outcome_verdict.py -q`
-Expected: the new tests fail (`main` prints nothing; `conditions` and `render` are missing), except the four `test_main_exits_2_on_a_malformed_report` cases, which Task 2's `main` already passes; the 29 earlier tests pass.
+Expected: the new tests fail (`main` prints nothing; `conditions` and `render` are missing), except the four `test_main_exits_2_on_a_malformed_report` cases, which Task 2's `main` already passes; the 43 earlier tests pass.
 
 - [ ] **Step 3: Write the implementation**
 
@@ -863,7 +932,7 @@ def main():
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `python3 -m pytest agents/bin/test_flow_outcome_verdict.py -q`
-Expected: 38 passed.
+Expected: 52 passed.
 
 - [ ] **Step 5: Commit**
 
