@@ -621,3 +621,11 @@ def test_main_census_reads_every_trial_project(fake_tasks, tmp_path, capsys):
     out = json.loads(capsys.readouterr().out)
     assert sorted(u["root"] for u in out["units"]) == sorted([tack_root, obs_root])
     assert out["as_of"] == "2027-01-10"
+
+
+def test_the_shipped_trial_file_loads_with_the_spec_dates():
+    [trial] = [t for t in ta.load_trials(ta.TRIALS) if t.id == "flow-trial-1"]
+    assert trial.projects == ("tack", "obs")
+    assert trial.enroll == (dt.date(2026, 10, 5), dt.date(2026, 11, 29))
+    assert (trial.close_by, trial.follow_up_to, trial.read_on) == (
+        dt.date(2027, 1, 10), dt.date(2027, 2, 9), dt.date(2027, 2, 16))
