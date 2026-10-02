@@ -1,0 +1,178 @@
+#!/usr/bin/env python3
+"""Judge the flow-defects-after-close eval case from an obs outcomes report.
+
+obs --json outcomes report --since <from> --until <to> --cohort --units | flow-outcome-verdict
+
+Reads the report's JSON on stdin (spec docs/specs/2026-10-01-workflow-outcome-eval-design.md
+§4-§5). The first line printed is the choice: no-regression-detected, regression, or
+insufficient: <unvalidated|too few>. The second is the counts behind it; the rest are
+the conditions. Exits 0 with a verdict; 2 when the report is malformed, holds duplicate
+strata or tasks, or its comparison rows and task rows describe different units. It
+filters nothing: the cohort is obs's.
+"""
+import collections
+import json
+import sys
+
+FACTOR = "skill:flow"
+MEASURE = "m4_defective"
+GATE_MEASURE = "m4"
+GATE = "E2"
+UNASSIGNED = ("unknown", "several")
+STRATUM_KEYS = ("project", "size", "complexity", "process", "artifact")
+
+
+class ReportError(Exception):
+    """The report cannot be read as this case's input."""
+
+
+def _field(container, name, kind, where):
+    if not isinstance(container, dict):
+        raise ReportError(f"{where} is {type(container).__name__}, not an object")
+    if name not in container:
+        raise ReportError(f"{where} lacks {name!r}")
+    value = container[name]
+    if not isinstance(value, kind):
+        raise ReportError(f"{where}.{name} is {type(value).__name__}, not {kind.__name__}")
+    return value
+
+
+def stratum_key(stratum):
+    if not isinstance(stratum, dict):
+        raise ReportError(f"stratum is {type(stratum).__name__}, not an object")
+    try:
+        return tuple(stratum[name] for name in STRATUM_KEYS)
+    except KeyError as missing:
+        raise ReportError(f"stratum lacks {missing}") from None
+
+
+def _credit(unit):
+    return unit["factors"].get(FACTOR, {"state": "unknown", "values": []})
+
+
+def recount(units):
+    """The skill:flow x m4_defective cells per stratum, built from task rows the way obs
+    builds its comparison cells: unassigned states and empty values go to `unassigned`,
+    and only attributed units are counted in `n` and `sum`. `read` has already checked
+    that an attributed unit carries exactly one boolean value."""
+    cells = collections.defaultdict(dict)
+    unassigned = collections.Counter()
+    members = collections.Counter()
+    for unit in units:
+        key = stratum_key(unit["stratum"])
+        members[key] += 1
+        credit = _credit(unit)
+        values = [value for value in credit["values"] if value is not None]
+        if credit["state"] in UNASSIGNED or not values:
+            unassigned[key] += 1
+            continue
+        if credit["state"] != "attributed":
+            continue
+        cell = cells[key].setdefault(values[0], {"n": 0, "sum": 0})
+        cell["n"] += 1
+        cell["sum"] += int(unit["defects"] > 0)
+    return cells, unassigned, members
+
+
+def reconcile(rows, cells, unassigned, members):
+    """Refuse unless the comparison rows and the task rows describe the same units, one
+    row per stratum."""
+    keys = collections.Counter(stratum_key(row["stratum"]) for row in rows)
+    repeated = sorted((key for key, count in keys.items() if count > 1), key=repr)
+    if repeated:
+        raise ReportError(f"duplicate comparison rows for strata {repeated}")
+    if set(keys) != set(members):
+        raise ReportError(f"comparison rows and task rows disagree on strata: "
+                          f"rows only {sorted(set(keys) - set(members), key=repr)}, "
+                          f"units only {sorted(set(members) - set(keys), key=repr)}")
+    for row in rows:
+        key = stratum_key(row["stratum"])
+        shown = {cell["value"]: {"n": cell["n"], "sum": cell["sum"]}
+                 for cell in row["cells"] if cell["n"] > 0}
+        if (row["units"], row["unassigned"], shown) != (members[key], unassigned[key], cells[key]):
+            raise ReportError(f"comparison rows and task rows disagree in stratum {key}: "
+                              f"row units={row['units']} unassigned={row['unassigned']} cells={shown}; "
+                              f"recount units={members[key]} unassigned={unassigned[key]} cells={cells[key]}")
+
+
+def gate_holds(report):
+    """A missing m4 key clears the gate; "E2" holds it; any other value, null included,
+    is malformed."""
+    measures = _field(_field(report, "unvalidated", dict, "report"), "measures", dict,
+                      "report.unvalidated")
+    if GATE_MEASURE not in measures:
+        return False
+    if measures[GATE_MEASURE] != GATE:
+        raise ReportError(f"invalid validation status for {GATE_MEASURE}: {measures[GATE_MEASURE]!r}")
+    return True
+
+
+def _count(unit, name, where, nullable=False):
+    if name not in unit:
+        raise ReportError(f"{where} lacks {name!r}")
+    value = unit[name]
+    if value is None and nullable:
+        return
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ReportError(f"{where}: {name} is {value!r}, not a count")
+
+
+def _check_unit(unit):
+    """One task row's shape: the fields the recount and the tables read, with counts that
+    are non-negative integers and a skill:flow credit whose values are booleans (or null,
+    beside a known value, in an unknown credit). Attributed means one participant, so
+    exactly one boolean value."""
+    for name, kind in (("task", str), ("stratum", dict), ("factors", dict), ("links", list)):
+        _field(unit, name, kind, "unit")
+    where = f"task {unit['task']}"
+    for name in ("defects", "changes", "extensions", "reopens"):
+        _count(unit, name, where)
+    _count(unit, "output_tokens", where, nullable=True)
+    if FACTOR not in unit["factors"]:
+        return
+    credit = unit["factors"][FACTOR]
+    state = _field(credit, "state", str, f"{where} {FACTOR}")
+    values = _field(credit, "values", list, f"{where} {FACTOR}")
+    if any(value is not None and not isinstance(value, bool) for value in values):
+        raise ReportError(f"{where}: {FACTOR} values {values!r} are not booleans")
+    if state == "attributed" and (len(values) != 1 or values[0] is None):
+        raise ReportError(f"{where} is attributed with flow values {values!r}, not exactly one")
+    if all(value is None for value in values) and values:
+        raise ReportError(f"{where} has no known {FACTOR} values")
+
+
+def read(report):
+    if isinstance(report, dict) and "units" not in report:
+        raise ReportError("report lacks 'units': run obs outcomes report with --units")
+    units = _field(report, "units", list, "report")
+    comparisons = _field(report, "comparisons", list, "report")
+    _field(report, "limitations", dict, "report")
+    gate_holds(report)
+    for unit in units:
+        _check_unit(unit)
+    repeated = sorted(task for task, count in collections.Counter(u["task"] for u in units).items()
+                      if count > 1)
+    if repeated:
+        raise ReportError(f"duplicate task rows: {repeated}")
+    for unit in units:
+        if unit["defects"] > 0 and not any(link["kind"] == "defect" for link in unit["links"]):
+            raise ReportError(f"task {unit['task']} has {unit['defects']} defects and no defect link")
+    for row in comparisons:
+        _field(row, "factor", str, "comparison row")
+    rows = [row for row in comparisons if row["factor"] == FACTOR and row.get("measure") == MEASURE]
+    cells, unassigned, members = recount(units)
+    reconcile(rows, cells, unassigned, members)
+    return rows, units, cells
+
+
+def main():
+    try:
+        read(json.load(sys.stdin))
+    except (ReportError, KeyError, TypeError, ValueError) as error:
+        print(f"flow-outcome-verdict: {type(error).__name__}: {error}", file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
