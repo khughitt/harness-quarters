@@ -4,7 +4,7 @@ title: "Friends: a bridge for triggering sub-agents that run in another harness 
 status: idea
 priority: 2
 created: 2026-09-16T15:57:15Z
-updated: 2026-09-29T20:47:27Z
+updated: 2026-10-02T08:14:09Z
 depends: []
 parent: tack-67d253
 tags: [quick-add, skills, flow]
@@ -20,3 +20,4 @@ Source: mindful:thought:34328bb6f74e4517bb0c5a2569ade36b
 
 - 2026-09-29T20:39:20Z (main): scope: briefed; framed as a choice between a documented recipe (lean), a thin friend CLI, and a relay-owned bridge, decided by the tack-fc26cf result; parented under tack-67d253; brief: docs/notes/2026-09-29-cross-harness-review-brief.md
 - 2026-09-29T20:47:27Z (main): User 2026-09-29: the Codex → Claude direction is in scope; any recipe or bridge serves both directions. Requiring cross-family review at the gate, and tack vs relay for a bridge, are undecided; brief §5 records both.
+- 2026-10-02T08:14:09Z (exp/cross-family-review): tack-fc26cf finding: cross-family review adds real findings both ways (union 23 real, overlap 4; Codex 100% precise but sparse, Claude broader at 75%), and both headless invocations work in one command with session ids readable, so a bridge is not earned for one-hop review: brief §4 now recommends alternative 1 (a documented recipe).
