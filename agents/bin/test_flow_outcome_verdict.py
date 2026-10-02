@@ -204,3 +204,91 @@ def test_defects_without_a_defect_link_are_refused():
     units = [unit("t1", S1, True, 1, links=[])]
     with pytest.raises(fv.ReportError, match="t1"):
         fv.read(make_report(units))
+
+
+def arm(stratum, prefix, flow, defective, n):
+    return [unit(f"{prefix}{i}", stratum, flow, int(i < defective)) for i in range(n)]
+
+
+def test_exact_p_single_stratum_matches_fisher():
+    # Spec review round 1's example: 2/5 flow defective against 0/5 is p = 10/45.
+    assert fv.exact_p([(2, 5, 0, 5)]) == pytest.approx(10 / 45)
+
+
+def test_exact_p_no_defects_is_one_and_odds_ratio_undefined():
+    assert fv.exact_p([(0, 10, 0, 10)]) == 1.0
+    assert math.isnan(fv.mh_odds_ratio([(0, 10, 0, 10)]))
+
+
+def test_simpsons_paradox_is_not_a_regression():
+    # Flow is better in each stratum (80/100 vs 9/10; 1/10 vs 20/100) and worse pooled
+    # (81/110 vs 29/110). Within strata it must not be called a regression.
+    tables = [(80, 100, 9, 10), (1, 10, 20, 100)]
+    assert fv.exact_p([(81, 110, 29, 110)]) < 0.1   # what pooling would have said
+    assert fv.exact_p(tables) >= 0.1
+    assert fv.mh_odds_ratio(tables) < 1
+    units = arm(S1, "a", True, 80, 100) + arm(S1, "b", False, 9, 10) \
+        + arm(S2, "c", True, 1, 10) + arm(S2, "d", False, 20, 100)
+    result = fv.verdict(make_report(units))
+    assert result["choice"] == "no-regression-detected"
+
+
+def test_regression():
+    units = arm(S1, "a", True, 8, 12) + arm(S1, "b", False, 1, 12)
+    result = fv.verdict(make_report(units))
+    assert (result["choice"], result["reason"], result["provisional"]) == ("regression", None, False)
+    assert result["p"] < 0.1 and result["flow"] == (8, 12) and result["other"] == (1, 12)
+    assert result["validation"] == "cleared"
+
+
+def test_no_regression_detected():
+    units = arm(S1, "a", True, 2, 12) + arm(S1, "b", False, 2, 12)
+    assert fv.verdict(make_report(units))["choice"] == "no-regression-detected"
+
+
+def test_gate_wins_over_counts():
+    units = arm(S1, "a", True, 8, 12) + arm(S1, "b", False, 1, 12)
+    result = fv.verdict(make_report(units, gate=True, suppressed={"s": "unvalidated:E2"}))
+    assert (result["choice"], result["reason"]) == ("insufficient", "unvalidated")
+    assert result["p"] is None
+
+
+def test_empty_cohort_under_the_gate_is_unvalidated_not_too_few():
+    result = fv.verdict(make_report([], gate=True))
+    assert (result["choice"], result["reason"]) == ("insufficient", "unvalidated")
+    assert result["validation"] == "unvalidated:E2"
+    assert result["entered"] == []
+    assert result["strata_total"] == 0
+
+
+def test_coverage_suppression_does_not_mask_the_gate():
+    # The only stratum is coverage-suppressed, so no row carries unvalidated:E2;
+    # the gate still comes from the measure-level status.
+    units = arm(S1, "a", True, 8, 12) + arm(S1, "b", False, 1, 12)
+    result = fv.verdict(make_report(units, gate=True, suppressed={"s": "unassigned"}))
+    assert (result["choice"], result["reason"], result["validation"]) == \
+        ("insufficient", "unvalidated", "unvalidated:E2")
+    assert result["entered"] == [] and result["skipped"] == {"unassigned": 1}
+
+
+def test_provisional_strata_exclude_coverage_suppression():
+    units = arm(S1, "a", True, 1, 12) + arm(S1, "b", False, 1, 12) \
+        + arm(S2, "c", True, 1, 12) + arm(S2, "d", False, 1, 12)
+    result = fv.verdict(make_report(units, gate=True,
+                                    suppressed={"s": "unvalidated:E2", "m": "low_retention"}))
+    assert result["provisional"] is True
+    assert [key for key, _ in result["entered"]] == [fv.stratum_key(S1)]
+    assert result["skipped"] == {"low_retention": 1}
+
+
+def test_too_few():
+    units = arm(S1, "a", True, 8, 9) + arm(S1, "b", False, 1, 12)
+    assert fv.verdict(make_report(units))["reason"] == "too few"
+
+
+def test_suppressed_and_one_arm_strata_do_not_enter():
+    units = arm(S1, "a", True, 1, 12) + arm(S1, "b", False, 1, 12) + arm(S2, "c", True, 5, 6)
+    result = fv.verdict(make_report(units, suppressed={"m": "low_retention"}))
+    assert [key for key, _ in result["entered"]] == [fv.stratum_key(S1)]
+    assert result["skipped"] == {"low_retention": 1}
+    assert fv.verdict(make_report(units))["skipped"] == {"one arm": 1}

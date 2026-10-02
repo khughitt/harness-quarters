@@ -12,7 +12,9 @@ filters nothing: the cohort is obs's.
 """
 import collections
 import json
+import math
 import sys
+from fractions import Fraction
 
 FACTOR = "skill:flow"
 MEASURE = "m4_defective"
@@ -20,6 +22,8 @@ GATE_MEASURE = "m4"
 GATE = "E2"
 UNASSIGNED = ("unknown", "several")
 STRATUM_KEYS = ("project", "size", "complexity", "process", "artifact")
+MIN_ARM = 10
+ALPHA = 0.1
 
 
 class ReportError(Exception):
@@ -163,6 +167,74 @@ def read(report):
     cells, unassigned, members = recount(units)
     reconcile(rows, cells, unassigned, members)
     return rows, units, cells
+
+
+def _hypergeometric(flow_n, other_n, defective):
+    """The flow arm's defective count given the stratum's margins, exactly."""
+    whole = math.comb(flow_n + other_n, defective)
+    return {x: Fraction(math.comb(flow_n, x) * math.comb(other_n, defective - x), whole)
+            for x in range(max(0, defective - other_n), min(flow_n, defective) + 1)}
+
+
+def exact_p(tables):
+    """One-sided p of the exact conditional test of a common odds ratio of 1 (spec §4):
+    the sum over strata of the flow arm's defective count, against the convolution of
+    the per-stratum hypergeometrics. Each table is (flow_defective, flow_n,
+    other_defective, other_n)."""
+    null = {0: Fraction(1)}
+    observed = 0
+    for flow_d, flow_n, other_d, other_n in tables:
+        observed += flow_d
+        step = _hypergeometric(flow_n, other_n, flow_d + other_d)
+        nxt = collections.defaultdict(Fraction)
+        for total, p in null.items():
+            for x, q in step.items():
+                nxt[total + x] += p * q
+        null = nxt
+    return float(sum(p for total, p in null.items() if total >= observed))
+
+
+def mh_odds_ratio(tables):
+    """The Mantel-Haenszel common odds ratio, flow against no flow."""
+    num = sum(Fraction(fd * (on - od), fn + on) for fd, fn, od, on in tables)
+    den = sum(Fraction((fn - fd) * od, fn + on) for fd, fn, od, on in tables)
+    if den == 0:
+        return math.inf if num > 0 else math.nan
+    return float(num / den)
+
+
+def verdict(report):
+    """The §4 rule. The gate is read first and from the measure-level status, so neither an
+    empty cohort nor a coverage suppression can hide it. Under the gate, the strata that
+    would enter once it clears (suppressed only as unvalidated:E2) are kept as provisional."""
+    rows, units, cells = read(report)
+    gated = gate_holds(report)
+    entered, skipped = [], collections.Counter()
+    for row in rows:
+        key = stratum_key(row["stratum"])
+        reason = row["suppressed_reason"] if row["suppressed"] else None
+        if reason is not None and not (gated and reason == f"unvalidated:{GATE}"):
+            skipped[reason] += 1
+            continue
+        flow, other = cells[key].get(True), cells[key].get(False)
+        if flow is None or other is None:   # recount creates a cell only with n >= 1
+            skipped["one arm"] += 1
+            continue
+        entered.append((key, (flow["sum"], flow["n"], other["sum"], other["n"])))
+    tables = [table for _, table in entered]
+    validation = f"unvalidated:{GATE}" if gated else "cleared"
+    result = {"entered": entered, "skipped": skipped, "strata_total": len(rows), "provisional": gated,
+              "validation": validation,
+              "flow": (sum(t[0] for t in tables), sum(t[1] for t in tables)),
+              "other": (sum(t[2] for t in tables), sum(t[3] for t in tables)),
+              "p": None, "odds_ratio": None, "units": units}
+    if gated:
+        return {**result, "choice": "insufficient", "reason": "unvalidated"}
+    if result["flow"][1] < MIN_ARM or result["other"][1] < MIN_ARM:
+        return {**result, "choice": "insufficient", "reason": "too few"}
+    p = exact_p(tables)
+    return {**result, "p": p, "odds_ratio": mh_odds_ratio(tables),
+            "choice": "regression" if p < ALPHA else "no-regression-detected", "reason": None}
 
 
 def main():
