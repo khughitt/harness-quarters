@@ -629,3 +629,111 @@ def test_the_shipped_trial_file_loads_with_the_spec_dates():
     assert trial.enroll == (dt.date(2026, 10, 5), dt.date(2026, 11, 29))
     assert (trial.close_by, trial.follow_up_to, trial.read_on) == (
         dt.date(2027, 1, 10), dt.date(2027, 2, 9), dt.date(2027, 2, 16))
+
+
+# --- final review fixes (F1-F11) ---
+
+def test_the_shipped_trial_file_parses_without_yaml():
+    assert [t.id for t in ta.load_trials(ta.TRIALS)] == ["flow-trial-1"]
+    assert "import yaml" not in SCRIPT.read_text()
+
+
+def test_unquoted_arms_are_strings_not_booleans():
+    trial = ta.parse_trial(TRIAL_TEXT.replace('arms: ["on", "off"]', "arms: [on, off]"), "fixture")
+    assert trial.factor == "flow"
+    assert ta.parse_frontmatter("a: [on, 'off', \"x\"]\nb: 'q'\n\nc: plain\n", "f") == {
+        "a": ["on", "off", "x"], "b": "q", "c": "plain"}
+
+
+@pytest.mark.parametrize("front", ["id flow-trial-1", "a: [on, off", "a:\n  b: 1", "  a: 1", "a: 1\njunk"])
+def test_malformed_frontmatter_raises_trial_error(front):
+    with pytest.raises(ta.TrialError, match="fixture"):
+        ta.parse_trial(f"---\n{front}\n---\n", "fixture")
+
+
+def test_the_script_runs_where_yaml_cannot_be_imported(tmp_path):
+    code = ("import sys, runpy; sys.modules['yaml'] = None; sys.argv = ['trial-arm', 'relay-000001']; "
+            f"runpy.run_path({str(SCRIPT)!r}, run_name='__main__')")
+    r = subprocess.run([sys.executable, "-c", code], text=True, capture_output=True)
+    assert (r.returncode, r.stdout.strip()) == (0, "not enrolled: no trial for relay"), r.stderr
+
+
+def write_exe(tmp_path, body):
+    exe = tmp_path / "badtasks"
+    exe.write_text("#!/bin/sh\n" + body)
+    exe.chmod(exe.stat().st_mode | stat.S_IEXEC)
+    return str(exe)
+
+
+def test_main_exits_2_when_tasks_prints_non_json(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    tasks = ta.Tasks(write_exe(tmp_path, "echo not json\n"))
+    assert ta.main(["tack-ffffff"], tasks=tasks, trials_dir=trials_dir(tmp_path), today=dt.date(2026, 10, 6)) == 2
+    assert "tasks list" in capsys.readouterr().err
+
+
+def test_main_exits_2_when_tasks_json_lacks_fields(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    tasks = ta.Tasks(write_exe(tmp_path, "echo '{}'\n"))
+    assert ta.main(["tack-ffffff"], tasks=tasks, trials_dir=trials_dir(tmp_path), today=dt.date(2026, 10, 6)) == 2
+
+
+def test_main_exits_2_when_tasks_is_missing(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    tasks = ta.Tasks(str(tmp_path / "nonexistent"))
+    assert ta.main(["tack-ffffff"], tasks=tasks, trials_dir=trials_dir(tmp_path), today=dt.date(2026, 10, 6)) == 2
+    assert "nonexistent" in capsys.readouterr().err
+
+
+def test_local_prefix_exits_2_when_git_is_missing(tmp_path, monkeypatch):
+    monkeypatch.setenv("PATH", str(tmp_path))
+    with pytest.raises(ta.TrialError, match="git"):
+        ta.local_prefix(str(tmp_path))
+
+
+def test_a_parent_cycle_is_refused_by_lookup_and_census():
+    a, b = "tack-aaaaa1", "tack-aaaaa2"
+    t = tree(rec(a, parent=b, notes=[(IN, "started")]), rec(b, parent=a, notes=[(IN, "started")]))
+    with pytest.raises(ta.TrialError, match="cycle"):
+        ta.lookup(TRIAL, t, a)
+    with pytest.raises(ta.TrialError, match="cycle"):
+        ta.census(TRIAL, t, dt.date(2026, 12, 1))
+
+
+def test_load_trials_refuses_a_missing_directory_but_not_an_empty_one(tmp_path):
+    assert ta.load_trials(tmp_path) == []
+    with pytest.raises(ta.TrialError, match="missing"):
+        ta.load_trials(tmp_path / "missing")
+
+
+def test_a_prose_gate_note_does_not_gate_a_task():
+    prose = rec("tack-aaaaa1", notes=[(IN, "gate: and more")])
+    real = rec("tack-aaaaa2", notes=[(IN, "gate: planned")])
+    assert not ta.gated(prose) and ta.gated(real)
+    assert ta.gates_past_scoped(prose) == [] and ta.gates_past_scoped(real) == ["planned"]
+
+
+def test_closed_counts_as_treated():
+    assert "closed" in ta.TREATED
+
+
+def test_lifecycle_reads_notes_in_time_order():
+    task = rec("tack-aaaaa1", notes=[(LATER, "done"), (IN, "started")])
+    assert ta.first_start(task) == dt.datetime(2026, 10, 6, 10, tzinfo=dt.timezone.utc)
+    assert ta.state_on(task, dt.date(2026, 10, 7)) == "open"
+    assert ta.state_on(task, dt.date(2026, 12, 2)) == "done"
+    assert ta.first_done(task) is not None
+
+
+def test_override_notes_accept_hand_written_separators():
+    for sep in ("—", "–", "--", "-"):
+        task = rec("tack-aaaaa1", notes=[(IN, f"arm: {T} {sep} override: user said so")])
+        assert ta.overridden(task, T), sep
+
+
+def test_census_refuses_a_unit_whose_root_has_no_record():
+    ghost = "tack-zzzzzz"
+    arm = ta.arm_of(T, ghost)
+    child = rec("tack-aaaaa1", notes=[(IN, "started"), (IN, f"arm: {T} — unit {ghost} — flow {arm}")])
+    with pytest.raises(ta.TrialError, match=ghost):
+        ta.census(TRIAL, tree(child), dt.date(2026, 12, 1))

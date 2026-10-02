@@ -23,18 +23,17 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-import yaml
-
 TRIALS = Path(__file__).resolve().parent.parent / "evals" / "trials"
-TREATED = ("designed", "planned", "implementing", "verified")
+FLOW_STATES = ("scoped", "designed", "planned", "implementing", "verified", "closed")
+TREATED = ("designed", "planned", "implementing", "verified", "closed")
 STATUSES = ("idea", "todo", "doing", "blocked", "shelved", "done", "dropped")
 FOLLOW_UP_DAYS = 30
 FIELDS = ("id", "factor", "arms", "projects", "enroll", "close_by", "follow_up_to", "read_on")
-GATE_RE = re.compile(r"^gate:\s*([A-Za-z]+)")
+GATE_RE = re.compile(r"^gate:\s*(" + "|".join(FLOW_STATES) + r")\b")
 DECISION_RE = re.compile(r"^trial: (?P<trial>\S+) — (?:enrolled — flow (?P<arm>on|off)|not enrolled: (?P<reason>.+))$")
 MEMBER_RE = re.compile(r"^arm: (?P<trial>\S+) — unit (?P<unit>\S+) — (?:flow (?P<arm>on|off)|not enrolled)$")
 MOVE_RE = re.compile(r"^arm: (?P<trial>\S+) — moved to unit (?P<unit>\S+) — flow (?P<arm>on|off)$")
-OVERRIDE_RE = re.compile(r"^arm: (?P<trial>\S+) — override: .+$")
+OVERRIDE_RE = re.compile(r"^arm: (?P<trial>\S+) (?:—|–|--|-) override: .+$")
 
 
 class TrialError(Exception):
@@ -76,11 +75,37 @@ def _day(value, where):
         raise TrialError(f"{where} is {value!r}, not a YYYY-MM-DD date") from None
 
 
+def _unquote(item):
+    if len(item) >= 2 and item[0] == item[-1] and item[0] in "\"'":
+        return item[1:-1]
+    return item
+
+
+def parse_frontmatter(text, where):
+    """Flat `key: value` lines; a value `[a, b]` is a list. Strings stay strings."""
+    meta = {}
+    for number, line in enumerate(text.splitlines(), start=2):
+        if not line.strip():
+            continue
+        m = re.match(r"^([A-Za-z_][A-Za-z0-9_]*): (.*)$", line)
+        if not m:
+            raise TrialError(f"{where} line {number}: not a `key: value` line: {line!r}")
+        key, value = m.group(1), m.group(2).strip()
+        if value.startswith("["):
+            if not value.endswith("]"):
+                raise TrialError(f"{where} line {number}: unterminated list: {line!r}")
+            inner = value[1:-1].strip()
+            meta[key] = [_unquote(i.strip()) for i in inner.split(",")] if inner else []
+        else:
+            meta[key] = _unquote(value)
+    return meta
+
+
 def parse_trial(text, where):
     parts = text.split("---\n")
     if len(parts) < 3 or parts[0] != "":
         raise TrialError(f"{where} has no frontmatter")
-    meta = yaml.safe_load(parts[1])
+    meta = parse_frontmatter(parts[1], where)
     missing = [name for name in FIELDS if name not in meta]
     if missing:
         raise TrialError(f"{where} lacks {missing}")
@@ -104,6 +129,8 @@ def parse_trial(text, where):
 
 
 def load_trials(directory=TRIALS):
+    if not directory.is_dir():
+        raise TrialError(f"trials directory {directory.name} is missing")
     trials = [parse_trial(path.read_text(), str(path.name)) for path in sorted(directory.glob("*.md"))]
     ids = [trial.id for trial in trials]
     if len(set(ids)) != len(ids):
@@ -149,7 +176,8 @@ def _kind(text):
 
 
 def events(task):
-    return [(_at(note), kind) for note in task.get("notes", []) if (kind := _kind(note["text"]))]
+    found = [(_at(note), kind) for note in task.get("notes", []) if (kind := _kind(note["text"]))]
+    return sorted(found, key=lambda event: event[0])
 
 
 def first_start(task):
@@ -243,8 +271,11 @@ class Tree:
         return None
 
     def computed_root(self, task_id):
-        unit = task_id
+        unit, seen = task_id, [task_id]
         while (parent := self.parent(unit)) is not None and self.records[parent].get("process"):
+            if parent in seen:
+                raise TrialError(f"parent cycle: {' -> '.join(seen + [parent])}")
+            seen.append(parent)
             unit = parent
         return unit
 
@@ -366,13 +397,19 @@ def lookup(trial, tree, task_id):
 
 def local_prefix(cwd=None):
     """The tasks prefix of the checkout containing `cwd`, or None outside one."""
-    top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=cwd, text=True, capture_output=True)
+    try:
+        top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=cwd, text=True, capture_output=True)
+    except OSError as error:
+        raise TrialError(f"git rev-parse failed: {error}") from None
     if top.returncode != 0:
         return None
     config = Path(top.stdout.strip()) / "tasks" / ".config.toml"
     if not config.exists():
         return None
-    return tomllib.loads(config.read_text()).get("prefix")
+    try:
+        return tomllib.loads(config.read_text()).get("prefix")
+    except (OSError, tomllib.TOMLDecodeError) as error:
+        raise TrialError(f"cannot read {config.name}: {error}") from None
 
 
 class Tasks:
@@ -383,7 +420,10 @@ class Tasks:
         self.exe = exe or os.environ.get("TRIAL_ARM_TASKS", "tasks")
 
     def _run(self, *args):
-        r = subprocess.run([self.exe, *args], text=True, capture_output=True)
+        try:
+            r = subprocess.run([self.exe, *args], text=True, capture_output=True)
+        except OSError as error:
+            raise TrialError(f"tasks {' '.join(args[:2])} failed: {error}") from None
         if r.returncode != 0:
             raise TrialError(f"tasks {' '.join(args[:2])} failed: {(r.stderr or r.stdout).strip()}")
         return r.stdout
@@ -391,8 +431,14 @@ class Tasks:
     def records(self, prefix):
         scope = [] if local_prefix() == prefix else ["--project", prefix]
         statuses = [arg for status in STATUSES for arg in ("--status", status)]
-        listed = json.loads(self._run("list", "--json", *scope, *statuses))["tasks"]
-        return {row["id"]: json.loads(self._run("show", "--json", row["id"]))["task"] for row in listed}
+        try:
+            listed = json.loads(self._run("list", "--json", *scope, *statuses))["tasks"]
+            return {row["id"]: self._show(row["id"]) for row in listed}
+        except (json.JSONDecodeError, KeyError, TypeError) as error:
+            raise TrialError(f"tasks list/show output for {prefix} is not the expected JSON: {error!r}") from None
+
+    def _show(self, task_id):
+        return json.loads(self._run("show", "--json", task_id))["task"]
 
     def note(self, task_id, text):
         self._run("note", "--json", task_id, text)
@@ -438,7 +484,7 @@ def census(trial, tree, as_of):
     roots = sorted({tree.unit_of(task_id) for task_id in tree.records if _prefix(task_id) in trial.projects})
     for root in roots:
         if root not in tree.records:
-            continue
+            raise TrialError(f"unit root {root} has no task record")
         d = decide(trial, tree, root)
         if d is None or not d.enrolled:
             continue

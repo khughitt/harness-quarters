@@ -351,7 +351,7 @@ def main(argv=None, stdin=None, stdout=None):
             return 0
         census = json.loads(Path(args.census).read_text())
         lines = judge(trial, census, json.load(stdin))
-    except (InputError, ta.TrialError, json.JSONDecodeError) as error:
+    except (InputError, ta.TrialError, json.JSONDecodeError, OSError) as error:
         print(f"trial-verdict: {error}", file=sys.stderr)
         return 2
     print("\n".join(lines), file=out)

@@ -252,3 +252,12 @@ def test_null_close_in_obs_row_is_refused(tmp_path, capsys):
     code, _ = run(tmp_path, census, report)
     assert code == 2
     assert report["units"][0]["task"] in capsys.readouterr().err
+
+
+def test_a_missing_census_file_exits_2(tmp_path, capsys):
+    trial = tmp_path / "trial.md"
+    trial.write_text(TRIAL_TEXT)
+    code = tv.main([str(trial), "--census", str(tmp_path / "absent.json"), "--as-of", "2027-02-16"], stdin=io.StringIO("{}"),
+                   stdout=io.StringIO())
+    assert code == 2
+    assert "absent.json" in capsys.readouterr().err
