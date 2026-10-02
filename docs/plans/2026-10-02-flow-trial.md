@@ -679,6 +679,38 @@ def test_lookup_on_a_child_uses_the_unit_arm_and_writes_once():
     assert ta.lookup(TRIAL, t, child).writes == []
 
 
+def apply(t, writes):
+    for target, text in writes:
+        t.records[target]["notes"].append({"at": LATER, "by": "main", "text": text})
+
+
+def child_first_then_root_moved():
+    """A child's lookup decides the unit; then the root moves under an off parent before
+    its own lookup. Returns the tree, the two roots, the child and both lookups."""
+    root, child = pick("on"), "tack-f00001"
+    off_root = pick("off")
+    t = tree(rec(root, process="planned", notes=[(IN, "started")]),
+             rec(child, parent=root, notes=[(IN, "started")]),
+             rec(off_root, process="planned", notes=[(IN, "started"), (IN, f"trial: {T} — enrolled — flow off"),
+                                                     (IN, f"arm: {T} — unit {off_root} — flow off")]))
+    first = ta.lookup(TRIAL, t, child)
+    apply(t, first.writes)
+    t.records[root]["parent"] = off_root
+    moved = ta.lookup(TRIAL, t, root)
+    apply(t, moved.writes)
+    return t, root, off_root, child, first, moved
+
+
+def test_a_child_first_lookup_freezes_the_root_membership_too():
+    t, root, off_root, child, first, moved = child_first_then_root_moved()
+    assert first.writes == [(root, f"trial: {T} — enrolled — flow on"),
+                            (root, f"arm: {T} — unit {root} — flow on"),
+                            (child, f"arm: {T} — unit {root} — flow on")]
+    assert moved.line == f"{T}: flow off (moved from unit {root} to unit {off_root})"
+    assert moved.writes == [(root, f"arm: {T} — moved to unit {off_root} — flow off")]
+    assert t.unit_of(root) == root and t.unit_of(child) == root
+
+
 def test_lookup_on_a_child_started_after_enroll_ends_keeps_the_unit_arm():
     root = pick("on")
     child = "tack-f00001"
@@ -696,6 +728,7 @@ def test_lookup_records_not_enrolled_members_too():
     assert result.line == f"not enrolled: unit {root} first started 2026-10-01, outside enroll"
     assert result.writes == [
         (root, f"trial: {T} — not enrolled: unit {root} first started 2026-10-01, outside enroll"),
+        (root, f"arm: {T} — unit {root} — not enrolled"),
         (child, f"arm: {T} — unit {root} — not enrolled")]
 
 
@@ -963,6 +996,16 @@ def _answer(trial, unit, d):
     return f"{trial.id}: flow {d.arm} (unit {unit})" if d.enrolled else f"not enrolled: {d.reason}"
 
 
+def _freeze(trial, tree, unit, d, task_id, writes):
+    """Record a fresh decision on the unit's root together with the root's own membership,
+    so a root moved before its own lookup still belongs to the unit it decided."""
+    if d.recorded:
+        return
+    writes.append((unit, decision_text(trial, d)))
+    if unit != task_id and member_of(tree.task(unit), trial.id) is None:
+        writes.append((unit, member_text(trial, unit, d)))
+
+
 def lookup(trial, tree, task_id):
     """What the session follows after `tasks start`, and the notes to write (§4).
 
@@ -978,8 +1021,7 @@ def lookup(trial, tree, task_id):
     d = decide(trial, tree, unit)
     if d is None:
         return Lookup("not enrolled: not started", [])
-    if not d.recorded:
-        writes.append((unit, decision_text(trial, d)))
+    _freeze(trial, tree, unit, d, task_id, writes)
     if member is None:
         writes.append((task_id, member_text(trial, unit, d)))
     root = tree.computed_root(task_id)
@@ -987,8 +1029,8 @@ def lookup(trial, tree, task_id):
     if root_unit == unit:
         return Lookup(_answer(trial, unit, d), writes)
     rd = decide(trial, tree, root_unit)
-    if rd is not None and not rd.recorded:
-        writes.append((root_unit, decision_text(trial, rd)))
+    if rd is not None:
+        _freeze(trial, tree, root_unit, rd, task_id, writes)
     if rd is not None and rd.enrolled:
         arm = rd.arm
     elif d.enrolled:
@@ -1182,6 +1224,16 @@ def test_census_state_reads_close_by_and_keeps_the_first_done_date():
     [unit] = ta.census(TRIAL, t, TRIAL.close_by)["units"]
     assert unit["first_done"] == "2026-10-10T00:00:00Z"
     assert unit["state"] == "open" and unit["reopened"] is True
+
+
+def test_a_root_moved_after_a_child_first_lookup_stays_in_its_unit_in_the_census():
+    t, root, off_root, child, _, _ = child_first_then_root_moved()
+    t.records[root]["notes"].append({"at": LATER, "by": "main", "text": "done"})
+    units = {u["root"]: u for u in ta.census(TRIAL, t, TRIAL.close_by)["units"]}
+    assert [m["task"] for m in units[root]["members"]] == [root, child]
+    assert units[root]["members"][0]["moves"] == [{"unit": off_root, "arm": "off"}]
+    assert units[root]["compliant"] is False
+    assert root not in [m["task"] for m in units[off_root]["members"]]
 
 
 def test_evidence_after_the_cutoff_leaves_the_census_unchanged():
