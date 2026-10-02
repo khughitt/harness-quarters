@@ -61,18 +61,19 @@ What depends on the in-repository location today:
 
 ## 5. Unanswered questions
 
-- Which layers should leave the repository: narrative docs only, or task records too? —
-  the user.
-- Should the agent collection share the user's corpus (mixed graph, tagged by author) or
-  be a separate collection? — the user, after a mindful check below.
+Answered by the user on 2026-10-02: only briefs, handoffs, and plans leave the
+repository (alternative 2); task records and specs stay. Start now rather than after
+flow-trial-1.
+
 - Can mindful hold an agent-authored collection with stable ids that tasks can reference
-  and obs can index? — research in mind6, only if the answer to the first question is
-  not "status quo".
-- Timing: after flow-trial-1 closes (2027-01-10), or narrative docs now, since the
-  trial measures task flow rather than where briefs live? — the user.
+  and obs can index? Shared corpus tagged by author, or a separate collection? —
+  research tack-fa8757.
+- tasks resolves `--plan` under `docs/plans` and checks `--step` against the plan's
+  headings (tasks `src/repo.rs:66`, `src/resolve.rs:181`), so a plan outside the
+  repository needs a tasks change; tack-fa8757 sizes it.
 
 ## 6. Proposed decomposition
 
-No follow-ups are filed until the first question is answered: each alternative needs
-different research (none; mind6 collection model; tasks consistency model). tack-fed9db
-waits on that answer.
+- tack-fa8757: research on mindful, tasks, and obs readiness; wakes tack-fed9db.
+- After it: a design task for the agent collection and the reference form, filed only if
+  the research shows changes in more than one project.

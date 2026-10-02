@@ -4,7 +4,7 @@ title: "Keep agent working docs (handoffs, briefs, plans, tasks) in a shared age
 status: idea
 priority: 2
 created: 2026-09-30T14:12:35Z
-updated: 2026-10-02T15:29:13Z
+updated: 2026-10-02T15:31:04Z
 depends: []
 parent: tack-d7b5b2
 tags: [quick-add]
@@ -17,3 +17,4 @@ Instead of committing scoping docs in each project repo, move the doc types agen
 ## Notes
 
 - 2026-10-02T15:29:12Z (main): scope: briefed; parented under tack-d7b5b2; about 2,770 task records, 300 plans, 148 specs, 73 briefs across 21 checkouts; flow's record-with-code, tasks stale_copy, the design_docs profile field, repo-path links, and obs indexing depend on the location; lean: move the narrative layer (briefs, handoffs, plans) only; waits on which layers leave and on timing vs flow-trial-1; brief: docs/notes/2026-10-02-agent-working-docs-brief.md
+- 2026-10-02T15:31:04Z (main): Answered: narrative layer only (briefs, handoffs, plans); start now; waits on research tack-fa8757
