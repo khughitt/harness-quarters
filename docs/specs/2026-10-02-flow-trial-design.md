@@ -1,6 +1,6 @@
 # Randomized flow trial
 
-Status: draft revision 4, for review (round 1 to 3 findings in §11). Task: `tack-7d9375`.
+Status: approved 2026-10-02 at revision 4 (review round 4 accepted; round 1 to 3 findings in §11). Task: `tack-7d9375`.
 Inputs: the outcome measures of obs-00809f; the report fields of obs-0491f1 (`--until`,
 `--cohort`, `--units`, the E2 gate); the case shape and the historical flow case of
 `tack-026612` (`docs/specs/2026-10-01-workflow-outcome-eval-design.md`, whose §6 names
