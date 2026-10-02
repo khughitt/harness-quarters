@@ -1,6 +1,6 @@
 # Randomized flow trial
 
-Status: approved 2026-10-02 at revision 4 (review round 4 accepted; round 1 to 3 findings in §11). Task: `tack-7d9375`.
+Status: approved 2026-10-02 at revision 4 (review round 4 accepted; round 1 to 3 findings in §11). Revision 4.1 (plan time): the session rule is global, not per project (§4), and the live run is its own piece (§8). Task: `tack-7d9375`.
 Inputs: the outcome measures of obs-00809f; the report fields of obs-0491f1 (`--until`,
 `--cohort`, `--units`, the E2 gate); the case shape and the historical flow case of
 `tack-026612` (`docs/specs/2026-10-01-workflow-outcome-eval-design.md`, whose §6 names
@@ -53,9 +53,9 @@ source: [tack-7d9375]
 
 All dates are whole UTC days, inclusive.
 
-- `projects` is the opt-in. The first list is `tack` and `obs`, the two projects that
-  already use flow. Each one's AGENTS.md also carries the session rule (§4), so a
-  project joins by adding both and leaves by removing both.
+- `projects` is the only opt-in. The first list is `tack` and `obs`, the two projects
+  that already use flow. The session rule (§4) is global and conditional, so a project
+  joins or leaves by editing this list (a new trial, per the freeze below).
 - `enroll`: a unit (§4) enrolls when its earliest first start falls inside this range.
   Enrollment is fixed by date, not by a running count, so the trial holds no state.
   The range is eight weeks because units are work items, not tasks: the 217 first starts
@@ -152,12 +152,21 @@ outside any move runs as the session would choose without the trial. It exits 0 
 when trial files overlap on a project or when a task's recorded arm disagrees with the
 function.
 
-**The rule in each opted-in project's AGENTS.md:**
+**The rule, in the global instructions (tack's `AGENTS.md`):**
 
-> Flow trial: after `tasks start`, run `~/.agents/bin/trial-arm <id>` and follow it.
-> `flow on` runs the task under the flow skill; `flow off` runs it without flow, whatever
-> else would choose it. Every task in a unit has the unit's arm. The task's `process` is
-> unchanged in both arms.
+> Trials: after `tasks start`, run `~/.agents/bin/trial-arm <id>` and follow what it
+> prints. `flow on` runs the task under the flow skill; `flow off` runs it without flow,
+> whatever else would choose it; `not enrolled` changes nothing. Every task in a unit has
+> the unit's arm, and the task's `process` is unchanged in both arms. Only the user
+> overrides an arm: record it with
+> `tasks note <id> "arm: <trial> — override: <why>"`.
+
+It is global because tack's `AGENTS.md` is the global instructions file, which every
+project's Claude Code and Codex sessions load. No tack-only file is read by both. The
+tool answers `not enrolled: no trial for <prefix>` outside the trial's projects, so the
+rule costs other projects one quick command. Rejected alternative: a tack-only
+`CLAUDE.md`, which Codex does not read. The rule leaves the instructions when the
+trial's `close_by` passes, since no new arm is drawn after that.
 
 **Overrides.** The user may override an arm, for example by asking for a unit to run
 under flow. The session then writes `arm: flow-trial-1 — override: <why>` on the task it
@@ -363,13 +372,13 @@ line in the body giving the reason. The verdict reads what enrolled, usually as
    (`not delivered`, not missing); missing defect data at 5% and above it; a unit
    with a defect in a child but not in its root (not clean); a unit with a known defect
    and a member with no obs row (defective, not unknown); the sensitivity line.
-3. **tack: the trial file, the case file, and the AGENTS.md rule in tack.** The case
-   file's first run is before `read_on` and prints `insufficient: before read date`.
-   That checks the pipeline end to end.
-4. **obs: the same rule in its AGENTS.md.** A one-line task filed from here in obs, so
-   that obs's own checkout owns the change.
+3. **tack: the trial file, the case file, and the global rule in `AGENTS.md`.** They
+   land before enrollment opens on 2026-10-05.
+4. **tack: the case's first live run**, once obs-0491f1 adds `--until`, `--cohort` and
+   `--units`. It is before `read_on` and prints `insufficient: before read date`, which
+   checks the pipeline end to end.
 
-Pieces 1 to 3 do not depend on obs-0491f1. Only the verdict's live run does. Enrollment
+Pieces 1 to 3 do not depend on obs-0491f1. Only the live run does. Enrollment
 can open before that obs work lands, because arms come from the function and the census
 from the task records.
 
