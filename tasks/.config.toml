@@ -4,6 +4,7 @@ prefix = "tack"
 scope = "Global agent instructions (AGENTS.md and its mirrors), harness settings, and the flow and session-logs skills with their agents/bin tools."
 
 [tags]
+cross-project = "One piece of a goal that spans projects; its siblings live in the other projects."
 flow = "Agent workflow experiments: distilled superpowers, explicit state machine, agent pairing."
 hooks = "Harness hooks: what runs at session start, before and after tools, and at stop."
 obs = "Observability of agent sessions: logs, stores, retention."
