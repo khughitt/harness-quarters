@@ -6,9 +6,9 @@ priority: 2
 size: s
 complexity: mid
 process: direct
-owner: main
+owner: feat/cli-pane
 created: 2026-10-03T16:34:02Z
-updated: 2026-10-03T17:05:14Z
+updated: 2026-10-03T17:11:42Z
 started: 2026-10-03T17:05:14Z
 depends: []
 tags: [hooks]
@@ -45,3 +45,6 @@ Viewing a task or a mindful thought inline today means `! tasks show <id>`, whos
 
 - 2026-10-03T17:05:14Z (main): started
   provenance: {"harness_session":"claude-code:52b56f25-e54e-4bcf-a122-738bb3c849fd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-03T17:06:15Z (feat/cli-pane): resumed
+  provenance: {"harness_session":"claude-code:52b56f25-e54e-4bcf-a122-738bb3c849fd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-03T17:11:42Z (feat/cli-pane): Text refuses control characters, so hooks/sgr.ts parses SGR into styled Text spans (16 colors by name, 256/truecolor as hex). Mod lives at claude/mods/cli-pane, linked as ~/.claude/mods, loaded by CLAUDE_CODE_PLUGIN_DIRS=~/.claude/mods/cli-pane. Headless check: /tas made no model request and its transcript holds the command record (/tas + args, under the local-command caveat) but no output row; the record cannot be removed (slash commands bypass prompt.submit, session.append cannot refuse a row).

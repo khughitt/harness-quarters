@@ -115,6 +115,10 @@ MIT licensed; see `LICENSE`.
 - `claude/` and `codex/`: per-harness settings and hooks. Each home's settings and hooks
   files are symlinks to them: `~/.claude` and `~/.codex` to the plain files,
   `~/.codex-work` to `codex/hooks.work.json`.
+- `claude/mods/`: Claude Code function-hook plugins, linked as `~/.claude/mods` and
+  loaded by `CLAUDE_CODE_PLUGIN_DIRS` in `claude/settings.json`. `cli-pane` adds
+  `/tas <id>` and `/m <id>`, which show `tasks show` and `mindful show` output in a
+  pane that never enters the conversation. `just mods` validates and tests them.
 - `local/`: untracked, and carried between hosts by Dropbox, not git. It holds
   `claude/settings.work.json`, `codex/config.work.toml` and `codex/rules/`, the files
   a home links to that the repository must not publish. The `~/.claude-work`,
