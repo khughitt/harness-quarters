@@ -1,6 +1,7 @@
 {
   "cleanupPeriodDays": 90,
   "env": {
+    "CLAUDE_CODE_PLUGIN_DIRS": "~/.claude/mods/cli-pane",
     "CLAUDE_CODE_SHELL": "/bin/bash",
     "TASKS_FORMAT": "json"
   },

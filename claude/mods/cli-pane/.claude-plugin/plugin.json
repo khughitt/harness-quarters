@@ -1,0 +1,7 @@
+{
+  "name": "cli-pane",
+  "version": "0.1.0",
+  "description": "/tas and /m show a task or a mindful thought in a pane, outside the conversation",
+  "author": { "name": "Keith Hughitt" },
+  "types": "./types/index.d.ts"
+}
