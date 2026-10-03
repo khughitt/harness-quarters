@@ -19,7 +19,7 @@ export type Span = { text: string; style: SpanStyle }
 const NAMES = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white']
 const BASE16 = [...NAMES, ...NAMES.map(name => `${name}Bright`)]
 
-const SEQUENCE = /\x1b\[([0-9;:]*)m|\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-_]?/g
+const SEQUENCE = /\x1b\[([0-9;:]*)m|\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[ -/]+[0-~]|\x1b[@-_]?/g
 const TAB_STOP = 8
 
 const hex = (r: number, g: number, b: number) =>
@@ -50,12 +50,32 @@ function extended(codes: number[], at: number): [string | undefined, number] {
   return [undefined, 0]
 }
 
+// A colon group (`4:3`, `38:2::255:0:0`) is one parameter with its
+// sub-parameters, never a run of separate codes.
+function applyGroup(style: SpanStyle, group: string): SpanStyle {
+  const [head, ...rest] = group.split(':').map(p => (p === '' ? undefined : Number(p)))
+  const next: SpanStyle = { ...style }
+  if (head === 4) {
+    if (rest[0] === 0) delete next.underline
+    else next.underline = true
+  } else if (head === 38 || head === 48) {
+    // 2 takes r:g:b, after a colour-space slot when one is written.
+    const [r = 0, g = 0, b = 0] = rest.length >= 5 ? rest.slice(2, 5) : rest.slice(1, 4)
+    const value =
+      rest[0] === 5 ? color256(rest[1] ?? -1) : rest[0] === 2 ? hex(r & 255, g & 255, b & 255) : undefined
+    if (value !== undefined) next[head === 38 ? 'color' : 'backgroundColor'] = value
+  }
+  return next
+}
+
 function apply(style: SpanStyle, params: string): SpanStyle {
-  const codes = params === '' ? [0] : params.split(/[;:]/).map(p => (p === '' ? 0 : Number(p)))
+  const groups = params === '' ? ['0'] : params.split(';')
+  const codes = groups.map(g => (g === '' ? 0 : Number(g)))
   let next: SpanStyle = { ...style }
-  for (let i = 0; i < codes.length; i++) {
+  for (let i = 0; i < groups.length; i++) {
     const code = codes[i] ?? 0
-    if (code === 0) next = {}
+    if (groups[i]!.includes(':')) next = applyGroup(next, groups[i]!)
+    else if (code === 0) next = {}
     else if (code === 1) next.bold = true
     else if (code === 2) next.dimColor = true
     else if (code === 3) next.italic = true
@@ -96,6 +116,11 @@ function clean(text: string, column: number): string {
   return out
 }
 
+const sameStyle = (a: SpanStyle, b: SpanStyle) => {
+  const keys = Object.keys(a) as (keyof SpanStyle)[]
+  return keys.length === Object.keys(b).length && keys.every(key => a[key] === b[key])
+}
+
 // Splits `text` into lines of styled spans; style carries across newlines as
 // a terminal carries it.
 export function parse(text: string): Span[][] {
@@ -111,7 +136,10 @@ export function parse(text: string): Span[][] {
       }
       const cleaned = clean(piece, column)
       if (cleaned === '') return
-      lines[lines.length - 1]!.push({ text: cleaned, style })
+      const line = lines[lines.length - 1]!
+      const tail = line[line.length - 1]
+      if (tail !== undefined && sameStyle(tail.style, style)) tail.text += cleaned
+      else line.push({ text: cleaned, style })
       column += cleaned.length
     })
   }

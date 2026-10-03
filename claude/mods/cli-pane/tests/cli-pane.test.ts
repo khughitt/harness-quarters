@@ -23,11 +23,12 @@ const ok = (stdout: string): ProcessRunResult => ({
 })
 
 // Answers the plugin's process runs beneath it and records each pane opened.
-function host(on: On, answer: ProcessRunResult) {
+function host(on: On, answer: ProcessRunResult | Error) {
   const ran: Ran[] = []
   const opened: string[] = []
   on('process.run', async (_$, e) => {
     ran.push({ argv: e.argv, env: e.init?.env })
+    if (answer instanceof Error) throw answer
     return { value: answer }
   })
   on('ui.open', async (_$, e) => {
@@ -91,6 +92,31 @@ describe('commands', () => {
     expect(text).not.toContain('ignored')
   })
 
+  test('a non-zero exit with empty stderr names the exit code', async ($, on) => {
+    host(on, { ...ok(''), exitCode: 2 })
+    await $.command.run(typed('m', 'th-0'))
+
+    expect(await paneText($, 'm')).toContain('mindful exited 2')
+  })
+
+  test('a CLI that cannot start shows why', async ($, on) => {
+    host(on, new Error('not found on PATH'))
+    const result = await $.command.run(typed('tas', 'tack-1'))
+
+    expect(result.text).toBeUndefined()
+    expect(await paneText($, 'tas')).toContain('tasks: ')
+  })
+
+  test('long output is cut to fit the drawing and says so', async ($, on) => {
+    const line = '\x1b[31ma\x1b[32mb\x1b[33mc\x1b[0m\n'
+    host(on, { ...ok(line.repeat(5000)), isStdoutTruncated: true })
+    await $.command.run(typed('tas', 'tack-1'))
+
+    const text = await paneText($, 'tas')
+    expect(text).toMatch(/… \d+ more lines not shown/)
+    expect(text).toContain('output cut at 4 MiB')
+  })
+
   test('a missing ID shows usage without running anything', async ($, on) => {
     const { ran, opened } = host(on, ok(''))
     const result = await $.command.run(typed('m', ''))
@@ -103,6 +129,26 @@ describe('commands', () => {
 })
 
 describe('sgr', () => {
+  test('reads a colon group as one parameter', () => {
+    expect(parse('\x1b[1;4:3ma\x1b[4:0mb\x1b[38:2::255:0:0mc\x1b[48:5:21md')).toEqual([
+      [
+        { text: 'a', style: { bold: true, underline: true } },
+        { text: 'b', style: { bold: true } },
+        { text: 'c', style: { bold: true, color: '#ff0000' } },
+        { text: 'd', style: { bold: true, color: '#ff0000', backgroundColor: '#0000ff' } },
+      ],
+    ])
+  })
+
+  test('drops charset escapes and merges spans of one style', () => {
+    expect(parse('a\x1b(Bb\x1b[31mc\x1b[31md')).toEqual([
+      [
+        { text: 'ab', style: {} },
+        { text: 'cd', style: { color: 'red' } },
+      ],
+    ])
+  })
+
   test('styles spans and drops other escapes', () => {
     const lines = parse('a\x1b[1;33mb\x1b[22mc\x1b[0m\x1b[2Kd\n\x1b[38;5;196me\x1b[48;2;1;2;3mf\n\ng\th')
     expect(lines).toEqual([

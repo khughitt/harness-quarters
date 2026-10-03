@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/cli-pane
 created: 2026-10-03T16:34:02Z
-updated: 2026-10-03T17:11:42Z
+updated: 2026-10-03T17:20:05Z
 started: 2026-10-03T17:05:14Z
 depends: []
 tags: [hooks]
@@ -48,3 +48,5 @@ Viewing a task or a mindful thought inline today means `! tasks show <id>`, whos
 - 2026-10-03T17:06:15Z (feat/cli-pane): resumed
   provenance: {"harness_session":"claude-code:52b56f25-e54e-4bcf-a122-738bb3c849fd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-03T17:11:42Z (feat/cli-pane): Text refuses control characters, so hooks/sgr.ts parses SGR into styled Text spans (16 colors by name, 256/truecolor as hex). Mod lives at claude/mods/cli-pane, linked as ~/.claude/mods, loaded by CLAUDE_CODE_PLUGIN_DIRS=~/.claude/mods/cli-pane. Headless check: /tas made no model request and its transcript holds the command record (/tas + args, under the local-command caveat) but no output row; the record cannot be removed (slash commands bypass prompt.submit, session.append cannot refuse a row).
+- 2026-10-03T17:18:39Z (feat/cli-pane): review: impl round 1 — verdict: revise; findings: Important 1, Minor 7; reviewer: claude-code/claude-opus-5-5
+- 2026-10-03T17:20:05Z (feat/cli-pane): Round 1 fixes: SGR colon groups read as one parameter, ESC charset sequences dropped, same-style spans merged, drawing capped by a 15k node budget with a 'more lines' line, 4 MiB cut marked; tests for start failure and empty stderr. Left: tab stops count code units (wide chars misalign; neither CLI tabs after wide text). A missing CLAUDE_CODE_PLUGIN_DIRS folder is ignored silently (probed headless), so hosts before 'just link --apply' only lack the commands.
