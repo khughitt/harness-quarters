@@ -1,15 +1,16 @@
 ---
 id: tack-effff9
 title: "Local slash commands /tas and /m that show CLI output in a pane, outside the conversation"
-status: doing
+status: done
 priority: 2
 size: s
 complexity: mid
 process: direct
 owner: feat/cli-pane
 created: 2026-10-03T16:34:02Z
-updated: 2026-10-03T17:20:05Z
+updated: 2026-10-03T17:27:37Z
 started: 2026-10-03T17:05:14Z
+completed: 2026-10-03T17:27:36Z
 depends: []
 tags: [hooks]
 agent: claude-code/claude-opus-5-5
@@ -39,7 +40,7 @@ Viewing a task or a mindful thought inline today means `! tasks show <id>`, whos
 
 - `claude plugin validate` and `claude plugin test` pass on the mod, with a `*.test.ts` covering: each command runs the right argv, returns no `text`/`context`, and opens its pane; a failing CLI shows stderr.
 - `tsc -p <mod>` type-checks once loaded.
-- A live session shows `/tas <id>` and `/m <id>` output in a pane, and the next model turn has no trace of it.
+- A live session shows `/tas <id>` and `/m <id>` output in a pane; no output row reaches the model (the command record `/tas <id>` stays: the engine keeps every slash command invocation).
 
 ## Notes
 
@@ -50,3 +51,13 @@ Viewing a task or a mindful thought inline today means `! tasks show <id>`, whos
 - 2026-10-03T17:11:42Z (feat/cli-pane): Text refuses control characters, so hooks/sgr.ts parses SGR into styled Text spans (16 colors by name, 256/truecolor as hex). Mod lives at claude/mods/cli-pane, linked as ~/.claude/mods, loaded by CLAUDE_CODE_PLUGIN_DIRS=~/.claude/mods/cli-pane. Headless check: /tas made no model request and its transcript holds the command record (/tas + args, under the local-command caveat) but no output row; the record cannot be removed (slash commands bypass prompt.submit, session.append cannot refuse a row).
 - 2026-10-03T17:18:39Z (feat/cli-pane): review: impl round 1 — verdict: revise; findings: Important 1, Minor 7; reviewer: claude-code/claude-opus-5-5
 - 2026-10-03T17:20:05Z (feat/cli-pane): Round 1 fixes: SGR colon groups read as one parameter, ESC charset sequences dropped, same-style spans merged, drawing capped by a 15k node budget with a 'more lines' line, 4 MiB cut marked; tests for start failure and empty stderr. Left: tab stops count code units (wide chars misalign; neither CLI tabs after wide text). A missing CLAUDE_CODE_PLUGIN_DIRS folder is ignored silently (probed headless), so hosts before 'just link --apply' only lack the commands.
+- 2026-10-03T17:20:11Z (feat/cli-pane): parked (waiting on user, review): User: live-check /tas and /m via claude --plugin-dir .worktrees/cli-pane/claude/mods/cli-pane (colors, Esc closes), accept or reject rewording Done-when to 'no output row reaches the model; the command record stays', approve merging feat/cli-pane (changes live settings.json). Then agent: merge, just link --apply, tasks done, remove worktree.
+  provenance: {"harness_session":"claude-code:52b56f25-e54e-4bcf-a122-738bb3c849fd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-03T17:27:13Z (feat/cli-pane): resumed
+  provenance: {"harness_session":"claude-code:52b56f25-e54e-4bcf-a122-738bb3c849fd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-03T17:27:13Z (feat/cli-pane): review: impl round 2 — verdict: accept; findings: none; reviewer: human
+- 2026-10-03T17:27:13Z (feat/cli-pane): User live-checked /tas and /m (works), accepted the Done-when rewording and approved the merge.
+- 2026-10-03T17:27:36Z (feat/cli-pane): done
+  provenance: {"harness_session":"claude-code:52b56f25-e54e-4bcf-a122-738bb3c849fd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-03T17:27:36Z (feat/cli-pane): cli-pane mod at claude/mods/cli-pane: /tas and /m show tasks/mindful output in a pane, SGR rendered as styled spans; loaded via ~/.claude/mods link and CLAUDE_CODE_PLUGIN_DIRS; just mods validates and tests it; README documents it.
+  provenance: {"harness_session":"claude-code:52b56f25-e54e-4bcf-a122-738bb3c849fd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

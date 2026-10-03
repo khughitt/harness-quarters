@@ -118,7 +118,7 @@ MIT licensed; see `LICENSE`.
 - `claude/mods/`: Claude Code function-hook plugins, linked as `~/.claude/mods` and
   loaded by `CLAUDE_CODE_PLUGIN_DIRS` in `claude/settings.json`. `cli-pane` adds
   `/tas <id>` and `/m <id>`, which show `tasks show` and `mindful show` output in a
-  pane that never enters the conversation. `just mods` validates and tests them.
+  pane that never enters the conversation (see "Claude Code mods" below).
 - `local/`: untracked, and carried between hosts by Dropbox, not git. It holds
   `claude/settings.work.json`, `codex/config.work.toml` and `codex/rules/`, the files
   a home links to that the repository must not publish. The `~/.claude-work`,
@@ -147,6 +147,31 @@ or run `just setup`. `just link` reports what would change,
 Run `just link --apply` once on each host after pulling a change to `links.toml`, and on
 a new host after installing a harness. It never overwrites a real file (`refuse`) and
 refuses to run from a worktree.
+
+## Claude Code mods
+
+`claude/mods/<name>/` holds Claude Code function-hook plugins. `~/.claude/mods` links
+to `claude/mods` (`just link --apply`), and `CLAUDE_CODE_PLUGIN_DIRS` in the `env`
+block of `claude/settings.json` names each mod folder to load. On a host without the
+link, sessions start normally, just without the mods. A new mod needs its folder
+added to that variable, separated by `:`.
+
+`cli-pane` shows a CLI's output in a pane instead of the conversation:
+
+- `/tas <id>`: `tasks show <id>`, pretty and colored.
+- `/m <id>`: `mindful show <id>`.
+
+Each command opens a pane of its own, focused; Esc closes it, and running the command
+again replaces what it shows. A failing command shows its stderr in red, and a missing
+ID shows a usage line. The model never reads the output. The transcript still records
+the command line itself (`/tas <id>`), because the engine keeps every slash command's
+invocation. Very long output is cut to what a pane can draw, with a line saying how
+many lines were left out.
+
+The engine writes `.claude-plugin/types/` and `tsconfig.json` into each mod folder
+when it loads one, and the mod's `.gitignore` covers them. `tsc -p claude/mods/<name>`
+then type-checks it, and `just mods` runs `claude plugin validate` and
+`claude plugin test` on every mod.
 
 ## Renamed from ai
 
