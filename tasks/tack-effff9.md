@@ -1,13 +1,15 @@
 ---
 id: tack-effff9
 title: "Local slash commands /tas and /m that show CLI output in a pane, outside the conversation"
-status: todo
+status: doing
 priority: 2
 size: s
 complexity: mid
 process: direct
+owner: main
 created: 2026-10-03T16:34:02Z
-updated: 2026-10-03T16:34:02Z
+updated: 2026-10-03T17:05:14Z
+started: 2026-10-03T17:05:14Z
 depends: []
 tags: [hooks]
 agent: claude-code/claude-opus-5-5
@@ -38,3 +40,8 @@ Viewing a task or a mindful thought inline today means `! tasks show <id>`, whos
 - `claude plugin validate` and `claude plugin test` pass on the mod, with a `*.test.ts` covering: each command runs the right argv, returns no `text`/`context`, and opens its pane; a failing CLI shows stderr.
 - `tsc -p <mod>` type-checks once loaded.
 - A live session shows `/tas <id>` and `/m <id>` output in a pane, and the next model turn has no trace of it.
+
+## Notes
+
+- 2026-10-03T17:05:14Z (main): started
+  provenance: {"harness_session":"claude-code:52b56f25-e54e-4bcf-a122-738bb3c849fd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
