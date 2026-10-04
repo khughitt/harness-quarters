@@ -1,17 +1,75 @@
-# Every link from a home directory into this checkout. `just link` reports what it would
+# Every link from a home directory into a registered checkout. `just link` reports what it would
 # change; `just link --apply` converges this host. Required links go on every host;
 # a harness group applies only where that harness's home is a real directory.
 # Targets under local/ are untracked (Dropbox carries them between hosts); `just setup`
 # creates the directories a public clone needs.
 
-[required]
+# A directory's value is its former link target, used to prove ownership before
+# conversion. Targets may be checkout-relative or <project>:<relative-path>.
+[directories]
 "~/.agents" = "agents"
+"~/.agents/bin" = "agents/bin"
+"~/.agents/skills" = "agents/skills"
+
+[required]
 "~/.config/AGENTS.md" = "AGENTS.md"
 "~/.local/bin/harness-state-refresh" = ".githooks/harness-state-refresh"
 "~/.config/systemd/user/session-archive-capture.service" = "systemd/user/session-archive-capture.service"
 "~/.config/systemd/user/session-archive-capture.timer" = "systemd/user/session-archive-capture.timer"
 "~/.config/systemd/user/session-archive-prune.service" = "systemd/user/session-archive-prune.service"
 "~/.config/systemd/user/session-archive-prune.timer" = "systemd/user/session-archive-prune.timer"
+
+# The aggregate surface stays in tack until the owner of each entry moves.
+"~/.agents/.skill-lock.json" = "agents/.skill-lock.json"
+"~/.agents/evals" = "agents/evals"
+"~/.agents/flow" = "agents/flow"
+"~/.agents/profiles" = "agents/profiles"
+"~/.agents/vendor" = "agents/vendor"
+"~/.agents/bin/flow-outcome-verdict" = "agents/bin/flow-outcome-verdict"
+"~/.agents/bin/flow-state" = "agents/bin/flow-state"
+"~/.agents/bin/retros" = "agents/bin/retros"
+"~/.agents/bin/session-episodes" = "agents/bin/session-episodes"
+"~/.agents/bin/skill-sizes.py" = "agents/bin/skill-sizes.py"
+"~/.agents/bin/test_flow_outcome_verdict.py" = "agents/bin/test_flow_outcome_verdict.py"
+"~/.agents/bin/test_flow_state.py" = "agents/bin/test_flow_state.py"
+"~/.agents/bin/test_retros.py" = "agents/bin/test_retros.py"
+"~/.agents/bin/test_session_episodes.py" = "agents/bin/test_session_episodes.py"
+"~/.agents/bin/test_trial_arm.py" = "agents/bin/test_trial_arm.py"
+"~/.agents/bin/test_trial_verdict.py" = "agents/bin/test_trial_verdict.py"
+"~/.agents/bin/test_wake_judge.py" = "agents/bin/test_wake_judge.py"
+"~/.agents/bin/trial-arm" = "agents/bin/trial-arm"
+"~/.agents/bin/trial-verdict" = "agents/bin/trial-verdict"
+"~/.agents/bin/wake-judge" = "agents/bin/wake-judge"
+"~/.agents/skills/README.md" = "agents/skills/README.md"
+"~/.agents/skills/api-and-interface-design" = "agents/skills/api-and-interface-design"
+"~/.agents/skills/brainstorming" = "agents/skills/brainstorming"
+"~/.agents/skills/code-simplification" = "agents/skills/code-simplification"
+"~/.agents/skills/context-engineering" = "agents/skills/context-engineering"
+"~/.agents/skills/curate" = "agents/skills/curate"
+"~/.agents/skills/diagnosing-superpowers" = "agents/skills/diagnosing-superpowers"
+"~/.agents/skills/dispatching-parallel-agents" = "agents/skills/dispatching-parallel-agents"
+"~/.agents/skills/documentation-and-adrs" = "agents/skills/documentation-and-adrs"
+"~/.agents/skills/executing-plans" = "agents/skills/executing-plans"
+"~/.agents/skills/finishing-a-development-branch" = "agents/skills/finishing-a-development-branch"
+"~/.agents/skills/flow" = "agents/skills/flow"
+"~/.agents/skills/observability-and-instrumentation" = "agents/skills/observability-and-instrumentation"
+"~/.agents/skills/performance-optimization" = "agents/skills/performance-optimization"
+"~/.agents/skills/quick-add" = "agents/skills/quick-add"
+"~/.agents/skills/receiving-code-review" = "agents/skills/receiving-code-review"
+"~/.agents/skills/references" = "agents/skills/references"
+"~/.agents/skills/requesting-code-review" = "agents/skills/requesting-code-review"
+"~/.agents/skills/scope" = "agents/skills/scope"
+"~/.agents/skills/security-and-hardening" = "agents/skills/security-and-hardening"
+"~/.agents/skills/session-logs" = "agents/skills/session-logs"
+"~/.agents/skills/subagent-driven-development" = "agents/skills/subagent-driven-development"
+"~/.agents/skills/systematic-debugging" = "agents/skills/systematic-debugging"
+"~/.agents/skills/tasks" = "agents/skills/tasks"
+"~/.agents/skills/test-driven-development" = "agents/skills/test-driven-development"
+"~/.agents/skills/using-git-worktrees" = "agents/skills/using-git-worktrees"
+"~/.agents/skills/using-superpowers" = "agents/skills/using-superpowers"
+"~/.agents/skills/verification-before-completion" = "agents/skills/verification-before-completion"
+"~/.agents/skills/writing-plans" = "agents/skills/writing-plans"
+"~/.agents/skills/writing-skills" = "agents/skills/writing-skills"
 
 [harness.claude]
 home = "~/.claude"
@@ -24,6 +82,9 @@ home = "~/.claude"
 "plans" = "claude/plans"
 "skills/flow" = "agents/skills/flow"
 "skills/session-logs" = "agents/skills/session-logs"
+"skills/curate" = "agents/skills/curate"
+"skills/scope" = "agents/skills/scope"
+"skills/quick-add" = "agents/skills/quick-add"
 
 [harness.claude-work]
 home = "~/.claude-work"

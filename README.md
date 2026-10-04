@@ -100,7 +100,16 @@ Things you can take from here without the rest:
   picks, Codex bookkeeping and Codex project trust out of committed harness configs.
   It is useful on its own for anyone who versions `~/.claude` or `~/.codex`.
 - `tools/tack-link` with `links.toml`: declares every link from a harness home into a
-  checkout. It reports drift and never overwrites a real file.
+  checkout. Targets are checkout-relative or `<project>:<relative-path>`, resolved
+  through `tasks projects --paths`. `[directories]` declares real directories, with
+  each value naming the former link target that may be converted; `[retired]` names
+  links to remove only while their targets still match. `just link` reports,
+  `just link --apply` converges, and `just link-check` fails on drift. A foreign
+  directory link or retired path is refused; undeclared paths are left alone.
+  Converting the declared `~/.agents` directory happens before installing its child
+  links. Its entries stay in tack until their owners move. Fresh clones need the
+  superpowers submodule initialized and the sibling skill sources available before
+  linking; missing targets fail with their paths. Run from the main checkout.
 
 MIT licensed; see `LICENSE`.
 

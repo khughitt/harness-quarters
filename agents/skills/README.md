@@ -1,6 +1,7 @@
 # agents/skills
 
-`~/.agents/skills` symlinks here; it is the skill directory for every harness other
+`links.toml` declares `~/.agents/skills` as a real directory of individual links here;
+it is the skill directory for every harness other
 than Claude Code, which reads skills from `~/.claude/skills` and plugins from its own
 cache. Its readers are Codex (shown as root `r0`), OpenCode (a recursive `**/SKILL.md`
 scan) and Crush (dotfiles' `crush/patch_skills_user_invocable.py` patches the
@@ -13,7 +14,8 @@ dropped or added. Keep new skills at this depth.
 
 - `tasks`, `curate`, `scope`, `quick-add` — symlinks into the tasks and ops checkouts,
   so the skills those repositories ship are always the checked-out version. A new skill
-  needs a link here and one under `~/.claude/skills`; nothing creates them (tasks-ffa10e).
+  needs a source link here and declarations in `links.toml` for the home surfaces;
+  `just link --apply` creates the declared home links.
 - `flow/` — the explicit task state machine (states, gates, `gate:` notes) and
   its walker; `agents/bin/flow-state` derives a task's state. Linked from
   `~/.claude/skills/flow` like the others.
@@ -35,8 +37,10 @@ dropped or added. Keep new skills at this depth.
   keep the submodule on the same version as the installed plugin (`~/.claude/plugins/installed_plugins.json`)
   or the two harnesses run different skills. Bump with
   `git -C agents/vendor/superpowers checkout <tag>` and commit the pointer; when the
-  release adds or removes a skill, add or remove its link here
-  (`ln -s ../vendor/superpowers/skills/<name> agents/skills/<name>`). On a fresh clone,
+  release adds or removes a skill, add or remove its source link here
+  (`ln -s ../vendor/superpowers/skills/<name> agents/skills/<name>`) and update
+  `links.toml`. Move a removed home link's declaration to `[retired]`, keeping its
+  former target so `just link --apply` can safely remove it. On a fresh clone,
   `git submodule update --init`.
 
 Profile fragments — the instructions that differ between kinds of project —

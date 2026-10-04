@@ -64,7 +64,8 @@ def world(tmp_path):
 
 
 def link(root, home, *args, tool=None):
-    env = {**os.environ, "HOME": str(home)}
+    env = {**os.environ, "HOME": str(home), "XDG_CONFIG_HOME": str(home / ".config"),
+           "XDG_STATE_HOME": str(home / ".local/state")}
     return subprocess.run([str(tool or root / "tools" / "tack-link"), *args], env=env,
                           text=True, capture_output=True)
 
@@ -139,10 +140,8 @@ def test_nested_entry_is_rejected(world):
 
 
 def test_real_manifest_validates_in_a_fresh_clone(tmp_path):
-    """The committed links.toml resolves every target in a clone, with Claude alone installed."""
-    repo = Path(__file__).resolve().parent.parent
-    clone = tmp_path / "clone"
-    run("clone", "-q", str(repo), str(clone))
+    """The manifest resolves every target after the clone's skill sources are hydrated."""
+    clone = fresh_clone(tmp_path)
     home = tmp_path / "home"
     (home / ".claude").mkdir(parents=True)
     result = link(clone, home)
@@ -236,6 +235,16 @@ def fresh_clone(tmp_path):
     repo = Path(__file__).resolve().parent.parent
     clone = tmp_path / "clone"
     run("clone", "-q", str(repo), str(clone))
+    # Exercise the working manifest and tool, including changes not committed yet.
+    shutil.copy2(repo / "links.toml", clone / "links.toml")
+    shutil.copy2(TOOL, clone / "tools/tack-link")
+    # A public clone needs the submodule and sibling skill checkouts. Use the local
+    # sources in these fixtures so the tests require neither network nor live writes.
+    main = Path(run("-C", str(repo), "worktree", "list", "--porcelain").stdout.splitlines()[0][9:])
+    for path in (clone / "agents/skills").iterdir():
+        if path.is_symlink():
+            shutil.copytree((main / "agents/skills" / path.name).resolve(), path.resolve(),
+                            dirs_exist_ok=True)
     return clone
 
 
@@ -279,3 +288,234 @@ def test_setup_is_idempotent_and_creates_only_the_rules_directory(tmp_path):
     assert config("core.hooksPath") == ".githooks"
     assert config("filter.harness-state.clean") == ".githooks/harness-state-clean %f"
     assert run("-C", str(clone), "status", "--porcelain", "--", "local").stdout == ""   # ignored
+
+
+DIRECTORIES = '''
+[directories]
+"~/.agents/skills" = "agents/skills"
+"~/.agents" = "agents"
+[required]
+"~/.agents/skills/flow" = "agents/skills/flow"
+'''
+
+
+def register(root, home, prefix):
+    env = {**os.environ, "HOME": str(home), "XDG_CONFIG_HOME": str(home / ".config"),
+           "XDG_STATE_HOME": str(home / ".local/state")}
+    result = subprocess.run(["tasks", "init", "--prefix", prefix], cwd=root, env=env,
+                            text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("format", ["json", "pretty"])
+def test_registry_target_uses_registered_path(world, tmp_path, monkeypatch, format):
+    root, home = world
+    sibling = tmp_path / "non-sibling-location"
+    sibling.mkdir()
+    (sibling / "rules.md").write_text("rules\n")
+    register(sibling, home, "peer")
+    monkeypatch.setenv("TASKS_FORMAT", format)
+    (root / "links.toml").write_text('[required]\n"~/.rules" = "peer:rules.md"\n')
+    result = link(root, home, "--apply")
+    assert result.returncode == 0, result.stderr
+    assert (home / ".rules").resolve() == sibling / "rules.md"
+    assert link(root, home, "--check").returncode == 0
+
+
+@pytest.mark.parametrize("target", ["missing:rules.md", "peer:missing.md"])
+def test_registry_target_errors_before_any_writes(world, target):
+    root, home = world
+    register(root, home, "peer")
+    (root / "links.toml").write_text(MANIFEST + '\n[harness.extra]\nhome = "~/.claude"\n'
+                                     f'[harness.extra.links]\n"rules" = "{target}"\n')
+    result = link(root, home, "--apply")
+    assert result.returncode == 2
+    assert ("not registered" if target.startswith("missing:") else "missing.md") in result.stderr
+    assert not (home / ".agents").exists()
+
+
+def test_registry_target_in_absent_home_is_not_resolved(world):
+    root, home = world
+    (root / "links.toml").write_text(MANIFEST + '\n[harness.extra]\nhome = "~/.absent"\n'
+                                     '[harness.extra.links]\n"rules" = "missing:rules.md"\n')
+    result = link(root, home)
+    assert result.returncode == 0, result.stderr
+    assert states(result)["~/.absent"] == "skipped"
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_directories_are_created_before_child_links(world, existing):
+    root, home = world
+    (root / "links.toml").write_text(DIRECTORIES)
+    if existing:
+        (home / ".agents").symlink_to(root / "agents")
+    result = link(root, home)
+    assert result.returncode == 0, result.stderr
+    assert states(result)["~/.agents"] == ("convert" if existing else "create")
+    assert link(root, home, "--check").returncode == 1
+    assert (home / ".agents").is_symlink() == existing
+    applied = link(root, home, "--apply")
+    assert applied.returncode == 0, applied.stderr
+    assert (home / ".agents").is_dir() and not (home / ".agents").is_symlink()
+    assert (home / ".agents/skills").is_dir() and not (home / ".agents/skills").is_symlink()
+    assert (home / ".agents/skills/flow").is_symlink()
+    assert (home / ".agents/skills/flow").resolve() == root / "agents/skills/flow"
+    assert not (root / "agents/skills/flow").is_symlink()  # no writes through the old parent
+    assert link(root, home, "--check").returncode == 0
+
+
+@pytest.mark.parametrize("existing", ["file", "foreign", "dangling"])
+def test_directory_conversion_refuses_foreign_data(world, tmp_path, existing):
+    root, home = world
+    (root / "links.toml").write_text(DIRECTORIES)
+    path = home / ".agents"
+    if existing == "file":
+        path.write_text("mine\n")
+    else:
+        target = tmp_path / "elsewhere"
+        if existing == "foreign":
+            target.mkdir()
+        path.symlink_to(target)
+    result = link(root, home, "--apply")
+    assert result.returncode == 1, result.stderr
+    assert states(result)["~/.agents"] == "refuse"
+    assert path.is_symlink() if existing != "file" else path.read_text() == "mine\n"
+
+
+def test_directory_conversion_rechecks_target_before_unlink(world, tmp_path, monkeypatch):
+    root, home = world
+    monkeypatch.setenv("HOME", str(home))
+    (root / "links.toml").write_text(DIRECTORIES)
+    path = home / ".agents"
+    path.symlink_to(root / "agents")
+    module = load_tack_link()
+    entries, homes = module.load(root)
+    rows = module.plan(entries, homes)
+    path.unlink()
+    path.symlink_to(tmp_path / "replacement")
+    with pytest.raises(module.ApplyRefused):
+        module.apply(rows)
+    assert os.readlink(path) == str(tmp_path / "replacement")
+    assert not (root / "agents/skills/flow").is_symlink()
+
+
+@pytest.mark.parametrize("existing", ["owned", "dangling", "absent", "foreign", "file", "directory"])
+def test_retired_link_ownership_and_check(world, tmp_path, existing):
+    root, home = world
+    (root / "links.toml").write_text('[retired]\n"~/.old" = "gone"\n')
+    path = home / ".old"
+    if existing == "owned":
+        (root / "gone").mkdir()
+        path.symlink_to(root / "gone")
+    elif existing == "dangling":
+        path.symlink_to(root / "gone")
+    elif existing == "foreign":
+        path.symlink_to(tmp_path / "replacement")
+    elif existing == "file":
+        path.write_text("mine\n")
+    elif existing == "directory":
+        path.mkdir()
+    expected = "remove" if existing in ("owned", "dangling") else (
+        "ok" if existing == "absent" else "refuse")
+    assert states(link(root, home))["~/.old"] == expected
+    assert link(root, home, "--check").returncode == (0 if existing == "absent" else 1)
+    result = link(root, home, "--apply")
+    assert result.returncode == (1 if expected == "refuse" else 0), result.stderr
+    if expected == "refuse":
+        assert path.exists() or path.is_symlink()
+    else:
+        assert not path.exists() and not path.is_symlink()
+
+
+def test_retirement_rechecks_target_before_unlink(world, tmp_path, monkeypatch):
+    root, home = world
+    monkeypatch.setenv("HOME", str(home))
+    (root / "links.toml").write_text('[retired]\n"~/.old" = "gone"\n')
+    path = home / ".old"
+    path.symlink_to(root / "gone")
+    module = load_tack_link()
+    entries, homes = module.load(root)
+    rows = module.plan(entries, homes)
+    path.unlink()
+    path.symlink_to(tmp_path / "replacement")
+    with pytest.raises(module.ApplyRefused):
+        module.apply(rows)
+    assert os.readlink(path) == str(tmp_path / "replacement")
+
+
+def test_declared_and_retired_overlap_is_rejected(world):
+    root, home = world
+    (root / "links.toml").write_text(MANIFEST + '\n[retired]\n"~/.agents" = "agents"\n')
+    result = link(root, home, "--apply")
+    assert result.returncode == 2
+    assert "retired" in result.stderr
+    assert not (home / ".agents").exists()
+
+
+def test_retirement_does_not_claim_a_different_link_to_the_same_destination(world):
+    root, home = world
+    (root / "agents/alias").symlink_to(root / "agents/skills/flow")
+    (root / "links.toml").write_text('[retired]\n"~/.old" = "agents/alias"\n')
+    path = home / ".old"
+    path.symlink_to(root / "agents/skills/flow")
+    result = link(root, home, "--apply")
+    assert result.returncode == 1
+    assert states(result)["~/.old"] == "refuse"
+    assert path.is_symlink()
+
+
+def test_directory_cannot_convert_a_link_into_another_project(world, tmp_path):
+    root, home = world
+    foreign = tmp_path / "peer"
+    (foreign / "agents").mkdir(parents=True)
+    register(foreign, home, "peer")
+    (root / "links.toml").write_text('[directories]\n"~/.agents" = "peer:agents"\n')
+    (home / ".agents").symlink_to(foreign / "agents")
+    result = link(root, home, "--apply")
+    assert result.returncode == 2
+    assert "running checkout" in result.stderr
+    assert (home / ".agents").is_symlink()
+
+
+def test_manifest_declares_every_tracked_agents_entry():
+    import tomllib
+    repo = Path(__file__).resolve().parent.parent
+    data = tomllib.loads((repo / "links.toml").read_text())
+    entries = {**data["directories"], **data["required"]}
+    for name in run("-C", str(repo), "ls-files", "--", "agents").stdout.splitlines():
+        parts = Path(name).parts
+        surface = Path(*parts[:3] if parts[1] in ("bin", "skills") else parts[:2])
+        assert f"~/.{surface.as_posix()}" in entries
+
+
+@pytest.mark.parametrize("kind", ["directories", "retired"])
+def test_ownership_resolves_symlink_parents_before_dotdot(world, tmp_path, kind):
+    root, home = world
+    foreign = tmp_path / "foreign"
+    (foreign / "child").mkdir(parents=True)
+    (foreign / "agents").mkdir()
+    (root / "alias").symlink_to(foreign / "child")
+    (root / "links.toml").write_text(f'[{kind}]\n"~/.agents" = "agents"\n')
+    path = home / ".agents"
+    target = root / "alias/../agents"
+    path.symlink_to(target)
+    assert path.resolve() == foreign / "agents"
+    result = link(root, home, "--apply")
+    assert result.returncode == 1
+    assert states(result)["~/.agents"] == "refuse"
+    assert os.readlink(path) == str(target)
+
+
+@pytest.mark.parametrize("table", ["directories", "required", "retired", "harness"])
+def test_managed_paths_reject_parent_traversal(world, table):
+    root, home = world
+    (home / ".dir").mkdir()
+    (home / ".agents").symlink_to(root / "agents")
+    extra = (f'\n[{table}]\n"~/.dir/../.agents" = "agents"\n' if table != "harness" else
+             '\n[harness.extra]\nhome = "~/.claude"\n[harness.extra.links]\n"../.agents" = "agents"\n')
+    base = '[required]\n"~/.agents" = "agents"\n' if table != "required" else ''
+    (root / "links.toml").write_text(base + extra)
+    result = link(root, home, "--apply")
+    assert result.returncode == 2
+    assert ".." in result.stderr
+    assert (home / ".agents").is_symlink()

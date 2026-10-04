@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Converge this host's home links into the checkout from links.toml.
+"""Converge this host's home links and directories from links.toml.
 
 Report mode prints one line per entry and writes nothing; --check exits 1 on any
 drift; --apply writes, and only when no entry is refused. A link counts as ok when it
@@ -10,8 +10,15 @@ home is a real directory. Run from the main checkout: links must never resolve i
 worktree. A target is checked only when its entry applies (a required link, or a group
 whose home is a real directory); a missing one is an error, never created. Design:
 docs/specs/2026-09-27-rename-to-tack-design.md, docs/specs/2026-09-28-local-layer-design.md.
+
+Targets are checkout-relative or <project>:<relative-path>, resolved through
+`tasks projects --paths`. [directories] maps directory paths to their former link
+targets: only a link to that target can be converted, before child links are made.
+[retired] maps paths to former targets: only matching links, dangling or not, are
+removed. Undeclared paths are never pruned. See the agent-layer split design in ops.
 """
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -35,6 +42,7 @@ class Entry:
     link: Path
     target: Path
     home: Path | None      # None for a required link
+    kind: str = "link"     # link, directory, or retired
 
 
 def git(*args):
@@ -59,15 +67,58 @@ def expand(path):
 
 def load(root):
     data = tomllib.loads((root / "links.toml").read_text())
-    entries = [Entry(expand(link), root / rel, None) for link, rel in data.get("required", {}).items()]
+    projects = None
+
+    def target(value, home=None):
+        nonlocal projects
+        if ":" not in value:
+            if Path(value).is_absolute() or ".." in Path(value).parts:
+                raise ManifestError(f"{value}: target must be a relative path within its checkout")
+            return root / value
+        if home is not None and not is_real_dir(home):
+            return root / value
+        prefix, rel = value.split(":", 1)
+        if not rel or Path(rel).is_absolute() or ".." in Path(rel).parts:
+            raise ManifestError(f"{value}: project target must be a relative path within its checkout")
+        if projects is None:
+            try:
+                result = subprocess.run(["tasks", "projects", "--paths", "--json"], text=True,
+                                        capture_output=True)
+                if result.returncode:
+                    raise ManifestError(f"tasks projects --paths failed: {result.stderr.strip()}")
+                projects = {p["prefix"]: expand(p["root"]) for p in json.loads(result.stdout)["projects"]}
+            except (OSError, ValueError, KeyError) as error:
+                raise ManifestError(f"cannot read the tasks project registry: {error}") from error
+        if prefix not in projects:
+            raise ManifestError(f"{prefix}: project is not registered; register its checkout with tasks init")
+        return projects[prefix] / rel
+
+    entries = [Entry(expand(link), target(rel), None, "directory")
+               for link, rel in data.get("directories", {}).items()]
+    for entry in entries:
+        if root != entry.target and root not in entry.target.parents:
+            raise ManifestError(f"{entry.link}: directory's former target must belong to the running checkout")
+    entries += [Entry(expand(link), target(rel), None) for link, rel in data.get("required", {}).items()]
     homes = []
     for name, table in data.get("harness", {}).items():
         home = expand(table["home"])
         homes.append(home)
-        entries += [Entry(home / link, root / rel, home) for link, rel in table["links"].items()]
-    links = [entry.link for entry in entries]
+        entries += [Entry(home / link, target(rel, home), home) for link, rel in table["links"].items()]
+    declared = {entry.link for entry in entries}
+    for link, rel in data.get("retired", {}).items():
+        path = expand(link)
+        if path in declared:
+            raise ManifestError(f"{path} is both declared and retired")
+        entries.append(Entry(path, target(rel), None, "retired"))
+    links = [entry.link for entry in entries if entry.kind == "link"]
+    paths = [entry.link for entry in entries]
+    for path in [*paths, *homes]:
+        if ".." in path.parts:
+            raise ManifestError(f"{path}: managed home paths must not contain ..")
+    if len(paths) != len(set(paths)):
+        raise ManifestError("a path is declared more than once")
     for managed in links:
-        for path in [*links, *homes]:
+        for path in [*paths, *homes]:
             if path != managed and managed in path.parents:
                 raise ManifestError(f"{path} lies under the managed link {managed}")
     for home in homes:
@@ -88,7 +139,7 @@ def check_targets(root, entries):
     """Every target this host will link to exists. A skipped group's targets are not
     checked: a public clone has no local/, and a host without a work home needs none."""
     for entry in entries:
-        if not active(entry) or entry.target.exists():
+        if entry.kind == "retired" or not active(entry) or entry.target.exists():
             continue
         message = f"{entry.link}: target {entry.target} does not exist"
         if (root / "local") in entry.target.parents:
@@ -98,6 +149,24 @@ def check_targets(root, entries):
 
 
 def state(entry):
+    if entry.kind == "retired":
+        if entry.link.is_symlink():
+            if owns_link(entry):
+                return "remove", ""
+            return "refuse", f"a foreign link is there: {os.readlink(entry.link)}"
+        if not entry.link.exists():
+            return "ok", ""
+        return "refuse", "a real file or directory is there"
+    if entry.kind == "directory":
+        if entry.link.is_symlink():
+            if owns_link(entry):
+                return "convert", f"was {os.readlink(entry.link)}"
+            return "refuse", f"a foreign link is there: {os.readlink(entry.link)}"
+        if is_real_dir(entry.link):
+            return "ok", ""
+        if entry.link.exists():
+            return "refuse", "a real file is there"
+        return "create", ""
     if entry.link.is_symlink():
         if entry.link.exists() and entry.link.resolve() == entry.target.resolve():
             return "ok", ""
@@ -108,26 +177,60 @@ def state(entry):
     return "create", ""
 
 
+def owns_link(entry):
+    # Resolve parent aliases, but not the final target: a replacement link to the
+    # same ultimate object is not the link we installed and cannot prove ownership.
+    actual = entry.link.parent / os.readlink(entry.link)
+    target = entry.target
+    return actual.parent.resolve() / actual.name == target.parent.resolve() / target.name
+
+
 def show(path):
     home = Path.home()
     return f"~/{path.relative_to(home)}" if home in path.parents else str(path)
 
 
 def plan(entries, homes):
-    rows, skipped = [], set()
-    for entry in entries:
+    rows, skipped, converting = [], set(), set()
+    # Parent directories are planned first. Children of a conversion do not exist
+    # in the future home yet: inspecting them now would follow the old checkout link.
+    ordered = sorted(entries, key=lambda e: (e.kind != "directory", len(e.link.parts)))
+    for entry in ordered:
         if not active(entry):
             if entry.home not in skipped:
                 skipped.add(entry.home)
                 rows.append(("skipped", entry.home, f"{show(entry.home)} absent", None))
             continue
-        name, detail = state(entry)
+        if any(parent in converting for parent in entry.link.parents):
+            name, detail = ("ok" if entry.kind == "retired" else "create"), ""
+        else:
+            name, detail = state(entry)
+        if name == "convert":
+            converting.add(entry.link)
         rows.append((name, entry.link, detail, entry))
     return rows
 
 
 def apply(rows):
     for name, _, _, entry in rows:
+        if entry is None:
+            continue
+        if entry.kind == "directory":
+            current, detail = state(entry)
+            if current == "refuse":
+                raise ApplyRefused(f"{show(entry.link)}: {detail}")
+            if current == "convert":
+                entry.link.unlink()
+            entry.link.mkdir(parents=True, exist_ok=True)
+            continue
+        if entry.kind == "retired":
+            if name == "remove":
+                current, detail = state(entry)
+                if current == "refuse":
+                    raise ApplyRefused(f"{show(entry.link)}: {detail}")
+                if current == "remove":
+                    entry.link.unlink()
+            continue
         if name not in ("create", "repoint"):
             continue
         entry.link.parent.mkdir(parents=True, exist_ok=True)
@@ -145,7 +248,8 @@ def apply(rows):
 
 
 def main(argv):
-    parser = argparse.ArgumentParser(prog="tack-link", description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(prog="tack-link", description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--check", action="store_true", help="exit 1 on any drift")
     mode.add_argument("--apply", action="store_true", help="converge the links")
@@ -162,7 +266,7 @@ def main(argv):
         print(f"{name}\t{show(path)}\t{detail}".rstrip("\t"))
     refused = any(row[0] == "refuse" for row in rows)
     if args.check:
-        return 1 if any(row[0] in ("create", "repoint", "refuse") for row in rows) else 0
+        return 1 if any(row[0] in ("create", "repoint", "convert", "remove", "refuse") for row in rows) else 0
     if args.apply and not refused:
         try:
             apply(rows)
