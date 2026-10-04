@@ -219,9 +219,11 @@ to read one of them from anywhere.
 - `beliefs` — beliefs — The epistemic kernel of Science: recording scientific belief
 - `dots` — dotfiles — The dotfiles: shell, editor, desktop, and terminal configuration
 - `fam` — familiar — Agent pets and the session hook bus
+- `flows` — flows — Agent flows: task states, gates, evidence, and the tools that judge them
 - `forge` — familiar-forge — Generative art CAS behind familiar's pet themes
 - `glean` — glean — Finds and retrieves the Google Photos a local photo collection is missing
 - `lit` — lit — Science literature as a world model, a personal corpus, and a walk over both
+- `lore` — lore — Agent context: the instruction corpus, profiles, skills, and traceable assembly
 - `material` — niri-material (niri) — One glass material across niri, terminals, editor, and shell
 - `mind3` — mindful v3 — Mindful v3: the previous generation of the thought store
 - `mind6` — mindful v6 (mindful) — Headless thought, mindmap, and journal store; the current mindful
@@ -244,6 +246,8 @@ The projects that accept feedback, and what each owns. File from a tracked check
 `tasks feedback --project <prefix> "<one line>" --category <friction|gap|idea|positive>`;
 the Feedback section above says when.
 
+- `flows` — The flow skill and state machine, its gate tools, evals and trials.
+- `lore` — The global instructions and profile fragments, the skill corpus, and instruction assembly.
 - `obs` — Execution evidence: session and task indexing, joins, baselines, and their reports.
 - `ops` — Shared tooling in bin/ (including the vendored tt, ops-check, ops-docs), the Claude Code hooks (pretooluse, claim-guard, relay-guard, provenance, profile), profiles, gates, and the quick-add skill.
 - `relay` — Harness adapters, hook dispatch to non-Claude harnesses, the live-agent registry, and relay identity.
