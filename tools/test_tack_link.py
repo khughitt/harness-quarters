@@ -140,10 +140,11 @@ def test_nested_entry_is_rejected(world):
 
 
 def test_real_manifest_validates_in_a_fresh_clone(tmp_path):
-    """The manifest resolves every target after the clone's skill sources are hydrated."""
-    clone = fresh_clone(tmp_path)
+    """The manifest resolves every target after the clone's skill sources are hydrated and
+    the projects it names are staged and registered in the isolated registry."""
     home = tmp_path / "home"
     (home / ".claude").mkdir(parents=True)
+    clone = fresh_clone(tmp_path, home)
     result = link(clone, home)
     assert result.returncode == 0, result.stderr
     assert result.stderr == ""
@@ -231,10 +232,15 @@ def test_local_target_resolves_like_any_other(world):
     assert (home / ".work" / "settings.json").resolve() == (root / "local" / "work.json").resolve()
 
 
-def fresh_clone(tmp_path):
+def fresh_clone(tmp_path, home):
+    """A clone of this checkout with the working manifest and tool. Every `<project>:`
+    target the manifest names gets a sibling under tmp_path holding those targets, copied
+    from the live project's registered root, and registered in `home`'s isolated registry:
+    the real manifest then resolves there as it does on a host."""
     repo = Path(__file__).resolve().parent.parent
     clone = tmp_path / "clone"
     run("clone", "-q", str(repo), str(clone))
+    stage_project_targets(repo / "links.toml", tmp_path, home)
     # Exercise the working manifest and tool, including changes not committed yet.
     shutil.copy2(repo / "links.toml", clone / "links.toml")
     shutil.copy2(TOOL, clone / "tools/tack-link")
@@ -248,16 +254,47 @@ def fresh_clone(tmp_path):
     return clone
 
 
+def stage_project_targets(manifest, tmp_path, home):
+    """For each `<prefix>:<path>` target in the manifest, copy that path from the project's
+    live registered root into tmp_path/<prefix> and register it in home's registry."""
+    import json, re, tomllib
+    live = json.loads(subprocess.run(["tasks", "projects", "--paths", "--json"], text=True,
+                                     capture_output=True, check=True).stdout)
+    roots = {p["prefix"]: Path(p["root"]) for p in live["projects"]}
+    data = tomllib.loads(manifest.read_text())
+    targets = list(data.get("required", {}).values())  # [directories] values are former link targets, never project targets
+    for table in data.get("harness", {}).values():
+        targets += list(table.get("links", {}).values())
+    staged = set()
+    for target in targets:
+        m = re.fullmatch(r"([a-z][a-z0-9]*):(.+)", target)
+        if not m:
+            continue
+        prefix, rel = m.groups()
+        sibling = tmp_path / prefix
+        src = roots[prefix] / rel
+        dst = sibling / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if src.is_dir():
+            shutil.copytree(src, dst, dirs_exist_ok=True, symlinks=True)
+        else:
+            shutil.copy2(src, dst)
+        if prefix not in staged:
+            (sibling / "tasks").mkdir(exist_ok=True)
+            register(sibling, home, prefix)
+            staged.add(prefix)
+
+
 def just_setup(clone):
     assert shutil.which("just"), "just is required for the setup tests"
     return subprocess.run(["just", "setup"], cwd=clone, text=True, capture_output=True)
 
 
 def test_real_manifest_with_codex_needs_setup_first(tmp_path):
-    clone = fresh_clone(tmp_path)
     home = tmp_path / "home"
     (home / ".claude").mkdir(parents=True)
     (home / ".codex").mkdir()
+    clone = fresh_clone(tmp_path, home)
     before = link(clone, home)
     assert before.returncode == 2
     assert "local/codex/rules" in before.stderr and "just setup" in before.stderr
@@ -268,9 +305,9 @@ def test_real_manifest_with_codex_needs_setup_first(tmp_path):
 
 
 def test_real_manifest_work_home_without_local_names_the_file(tmp_path):
-    clone = fresh_clone(tmp_path)
     home = tmp_path / "home"
     (home / ".claude-work").mkdir(parents=True)
+    clone = fresh_clone(tmp_path, home)
     assert just_setup(clone).returncode == 0
     result = link(clone, home)
     assert result.returncode == 2
@@ -278,7 +315,9 @@ def test_real_manifest_work_home_without_local_names_the_file(tmp_path):
 
 
 def test_setup_is_idempotent_and_creates_only_the_rules_directory(tmp_path):
-    clone = fresh_clone(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    clone = fresh_clone(tmp_path, home)
     assert just_setup(clone).returncode == 0
     second = just_setup(clone)
     assert second.returncode == 0, second.stderr
