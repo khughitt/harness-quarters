@@ -1,3 +1,5 @@
+Frozen after move to lore at 37fb4b696f1f038c9f2d26fa1c3519deca84f1c1 on 2026-10-04 (lore-443368); retained for closed task references.
+
 # Project profiles: composable instruction and behavior layers per checkout
 
 Status: approved — user review 2026-09-19 after two revision rounds

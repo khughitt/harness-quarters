@@ -1,3 +1,5 @@
+Frozen after move to lore at 37fb4b696f1f038c9f2d26fa1c3519deca84f1c1 on 2026-10-04 (lore-443368); retained for closed task references.
+
 # Project Profiles (ai side) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

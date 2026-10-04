@@ -1,12 +1,9 @@
 name = "tack"
-purpose = "Agent harness configuration: global instructions, skills, rules"
+purpose = "Harness homes, declared links, settings, and session-state hygiene"
 abstract = """
-The global instructions every Claude Code and Codex session loads, the skills and tools
-those sessions call, and each harness's settings and hooks. Per-project profiles here
-carry what differs between personal, work, and external checkouts.
+The harness homes and declared links that deliver instructions and skills from their
+owners, harness settings and hooks, session-state hygiene and the session archive.
+The instruction corpus and profiles live in lore; the flow system lives in flows.
 """
 authority = []
 subsystems = []
-
-[agents]
-scope = "global"
