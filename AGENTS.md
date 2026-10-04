@@ -225,7 +225,6 @@ to read one of them from anywhere.
 - `lit` — lit — Science literature as a world model, a personal corpus, and a walk over both
 - `lore` — lore — Agent context: the instruction corpus, profiles, skills, and traceable assembly
 - `material` — niri-material (niri) — One glass material across niri, terminals, editor, and shell
-- `mind3` — mindful v3 — Mindful v3: the previous generation of the thought store
 - `mind6` — mindful v6 (mindful) — Headless thought, mindmap, and journal store; the current mindful
 - `nodes` — nodes — A problem-agnostic knowledge substrate: typed markdown nodes
 - `ns` — natural-systems (natural-systems-v2) — Research on structure across representation, observation, scale, and coupling
@@ -240,6 +239,8 @@ to read one of them from anywhere.
 - `vdocs` — docs (verifiably-docs) — The verifiably ecosystem's front door: its goal, overview, and repository map
 - `wali` — wali — Wallpaper switcher with per-image ratings and the Noctalia wali panel
 
+Retired: `mind3` (mindful v3, 2026-10-04) → `mind6`.
+
 ### Feedback owners
 
 The projects that accept feedback, and what each owns. File from a tracked checkout with
@@ -251,6 +252,6 @@ the Feedback section above says when.
 - `obs` — Execution evidence: session and task indexing, joins, baselines, and their reports.
 - `ops` — Shared tooling in bin/ (including the vendored tt, ops-check, ops-docs), the Claude Code hooks (pretooluse, claim-guard, relay-guard, provenance, profile), profiles, gates, and the quick-add skill.
 - `relay` — Harness adapters, hook dispatch to non-Claude harnesses, the live-agent registry, and relay identity.
-- `tack` — Global agent instructions (AGENTS.md and its mirrors), harness settings, and the flow and session-logs skills with their agents/bin tools.
+- `tack` — Global agent instruction delivery, harness settings, state hygiene, the session archive, and the session-logs skill with its tools.
 - `tasks` — The tasks CLI and its tasks, curate, and scope skills.
 <!-- ops:projects end -->
