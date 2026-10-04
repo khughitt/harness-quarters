@@ -1,0 +1,378 @@
+#!/usr/bin/env python3
+"""Judge the flow-defects-after-close eval case from an obs outcomes report.
+
+obs --json outcomes report --since <from> --until <to> --cohort --units | flow-outcome-verdict
+
+Reads the report's JSON on stdin (spec docs/specs/2026-10-01-workflow-outcome-eval-design.md
+§4-§5). The first line printed is the choice: no-regression-detected, regression, or
+insufficient: <unvalidated|too few>. The second is the counts behind it; the rest are
+the conditions. Exits 0 with a verdict; 2 when the report is malformed, holds duplicate
+strata or tasks, or its comparison rows and task rows describe different units. It
+filters nothing: the cohort is obs's.
+"""
+import collections
+import json
+import math
+import statistics
+import sys
+from fractions import Fraction
+
+FACTOR = "skill:flow"
+MEASURE = "m4_defective"
+GATE_MEASURE = "m4"
+GATE = "E2"
+UNASSIGNED = ("unknown", "several")
+STRATUM_KEYS = ("project", "size", "complexity", "process", "artifact")
+MIN_ARM = 10
+ALPHA = 0.1
+EXCLUDED = ("incomplete", "mixed", "several", "unknown")
+LIMITATIONS = (
+    "cohort, not execution: pre-start skill loads count (obs credits a skill invoked at or "
+    "before the task's end)",
+    "cohort, not execution: a session keeps skill content it loaded earlier across later "
+    "turns and resumptions",
+    "cohort, not execution: harness homes load the skill from the main checkout's working "
+    "tree, so uncommitted edits can run",
+    "historical association: flow was chosen, not assigned; a verdict does not establish cause",
+)
+PROVISIONAL = (f"provisional: M4 is unvalidated:{GATE}; the counts and tables are the strata "
+               f"that would enter once it clears")
+
+
+class ReportError(Exception):
+    """The report cannot be read as this case's input."""
+
+
+def _field(container, name, kind, where):
+    if not isinstance(container, dict):
+        raise ReportError(f"{where} is {type(container).__name__}, not an object")
+    if name not in container:
+        raise ReportError(f"{where} lacks {name!r}")
+    value = container[name]
+    if not isinstance(value, kind):
+        raise ReportError(f"{where}.{name} is {type(value).__name__}, not {kind.__name__}")
+    return value
+
+
+def stratum_key(stratum):
+    if not isinstance(stratum, dict):
+        raise ReportError(f"stratum is {type(stratum).__name__}, not an object")
+    try:
+        return tuple(stratum[name] for name in STRATUM_KEYS)
+    except KeyError as missing:
+        raise ReportError(f"stratum lacks {missing}") from None
+
+
+def _credit(unit):
+    return unit["factors"].get(FACTOR, {"state": "unknown", "values": []})
+
+
+def recount(units):
+    """The skill:flow x m4_defective cells per stratum, built from task rows the way obs
+    builds its comparison cells: unassigned states and empty values go to `unassigned`,
+    and only attributed units are counted in `n` and `sum`. `read` has already checked
+    that an attributed unit carries exactly one boolean value."""
+    cells = collections.defaultdict(dict)
+    unassigned = collections.Counter()
+    members = collections.Counter()
+    for unit in units:
+        key = stratum_key(unit["stratum"])
+        members[key] += 1
+        credit = _credit(unit)
+        values = [value for value in credit["values"] if value is not None]
+        if credit["state"] in UNASSIGNED or not values:
+            unassigned[key] += 1
+            continue
+        if credit["state"] != "attributed":
+            continue
+        cell = cells[key].setdefault(values[0], {"n": 0, "sum": 0})
+        cell["n"] += 1
+        cell["sum"] += int(unit["defects"] > 0)
+    return cells, unassigned, members
+
+
+def reconcile(rows, cells, unassigned, members):
+    """Refuse unless the comparison rows and the task rows describe the same units, one
+    row per stratum."""
+    keys = collections.Counter(stratum_key(row["stratum"]) for row in rows)
+    repeated = sorted((key for key, count in keys.items() if count > 1), key=repr)
+    if repeated:
+        raise ReportError(f"duplicate comparison rows for strata {repeated}")
+    if set(keys) != set(members):
+        raise ReportError(f"comparison rows and task rows disagree on strata: "
+                          f"rows only {sorted(set(keys) - set(members), key=repr)}, "
+                          f"units only {sorted(set(members) - set(keys), key=repr)}")
+    for row in rows:
+        key = stratum_key(row["stratum"])
+        shown = {cell["value"]: {"n": cell["n"], "sum": cell["sum"]}
+                 for cell in row["cells"] if cell["n"] > 0}
+        if (row["units"], row["unassigned"], shown) != (members[key], unassigned[key], cells[key]):
+            raise ReportError(f"comparison rows and task rows disagree in stratum {key}: "
+                              f"row units={row['units']} unassigned={row['unassigned']} cells={shown}; "
+                              f"recount units={members[key]} unassigned={unassigned[key]} cells={cells[key]}")
+
+
+def gate_holds(report):
+    """A missing m4 key clears the gate; "E2" holds it; any other value, null included,
+    is malformed."""
+    measures = _field(_field(report, "unvalidated", dict, "report"), "measures", dict,
+                      "report.unvalidated")
+    if GATE_MEASURE not in measures:
+        return False
+    if measures[GATE_MEASURE] != GATE:
+        raise ReportError(f"invalid validation status for {GATE_MEASURE}: {measures[GATE_MEASURE]!r}")
+    return True
+
+
+def _count(unit, name, where, nullable=False):
+    if name not in unit:
+        raise ReportError(f"{where} lacks {name!r}")
+    value = unit[name]
+    if value is None and nullable:
+        return
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ReportError(f"{where}: {name} is {value!r}, not a count")
+
+
+def _check_unit(unit):
+    """One task row's shape: the fields the recount and the tables read, with counts that
+    are non-negative integers and a skill:flow credit whose values are booleans (or null,
+    beside a known value, in an unknown credit). Attributed means one participant, so
+    exactly one boolean value."""
+    for name, kind in (("task", str), ("stratum", dict), ("factors", dict), ("links", list)):
+        _field(unit, name, kind, "unit")
+    where = f"task {unit['task']}"
+    for name in ("defects", "changes", "extensions", "reopens"):
+        _count(unit, name, where)
+    _count(unit, "output_tokens", where, nullable=True)
+    if FACTOR not in unit["factors"]:
+        return
+    credit = unit["factors"][FACTOR]
+    state = _field(credit, "state", str, f"{where} {FACTOR}")
+    values = _field(credit, "values", list, f"{where} {FACTOR}")
+    if any(value is not None and not isinstance(value, bool) for value in values):
+        raise ReportError(f"{where}: {FACTOR} values {values!r} are not booleans")
+    if state == "attributed" and (len(values) != 1 or values[0] is None):
+        raise ReportError(f"{where} is attributed with flow values {values!r}, not exactly one")
+    if all(value is None for value in values) and values:
+        raise ReportError(f"{where} has no known {FACTOR} values")
+
+
+def _check_suppression(row, gated):
+    """A row's suppression must be self-consistent and agree with the measure-level gate:
+    suppressed is a bool, with a non-empty text reason exactly when true, and the gate's
+    own reason appears only while the gate holds."""
+    suppressed = _field(row, "suppressed", bool, "comparison row")
+    if "suppressed_reason" not in row:
+        raise ReportError("comparison row lacks 'suppressed_reason'")
+    reason = row["suppressed_reason"]
+    if suppressed and not (isinstance(reason, str) and reason):
+        raise ReportError(f"suppressed comparison row has suppressed_reason {reason!r}, "
+                          f"not a non-empty string")
+    if not suppressed and reason is not None:
+        raise ReportError(f"unsuppressed comparison row has suppressed_reason {reason!r}, not null")
+    if reason == f"unvalidated:{GATE}" and not gated:
+        raise ReportError(f"comparison rows and measure-level status disagree: a row is "
+                          f"suppressed as {reason} but {GATE_MEASURE} is cleared")
+
+
+def read(report):
+    if isinstance(report, dict) and "units" not in report:
+        raise ReportError("report lacks 'units': run obs outcomes report with --units")
+    units = _field(report, "units", list, "report")
+    comparisons = _field(report, "comparisons", list, "report")
+    _field(report, "limitations", dict, "report")
+    gate_holds(report)
+    for unit in units:
+        _check_unit(unit)
+    repeated = sorted(task for task, count in collections.Counter(u["task"] for u in units).items()
+                      if count > 1)
+    if repeated:
+        raise ReportError(f"duplicate task rows: {repeated}")
+    for unit in units:
+        if unit["defects"] > 0 and not any(link["kind"] == "defect" for link in unit["links"]):
+            raise ReportError(f"task {unit['task']} has {unit['defects']} defects and no defect link")
+    for row in comparisons:
+        _field(row, "factor", str, "comparison row")
+        _field(row, "measure", str, "comparison row")
+    rows = [row for row in comparisons if row["factor"] == FACTOR and row["measure"] == MEASURE]
+    gated = gate_holds(report)
+    for row in rows:
+        _check_suppression(row, gated)
+    cells, unassigned, members = recount(units)
+    reconcile(rows, cells, unassigned, members)
+    return rows, units, cells
+
+
+def _hypergeometric(flow_n, other_n, defective):
+    """The flow arm's defective count given the stratum's margins, exactly."""
+    whole = math.comb(flow_n + other_n, defective)
+    return {x: Fraction(math.comb(flow_n, x) * math.comb(other_n, defective - x), whole)
+            for x in range(max(0, defective - other_n), min(flow_n, defective) + 1)}
+
+
+def exact_p(tables):
+    """One-sided p of the exact conditional test of a common odds ratio of 1 (spec §4):
+    the sum over strata of the flow arm's defective count, against the convolution of
+    the per-stratum hypergeometrics. Each table is (flow_defective, flow_n,
+    other_defective, other_n)."""
+    null = {0: Fraction(1)}
+    observed = 0
+    for flow_d, flow_n, other_d, other_n in tables:
+        observed += flow_d
+        step = _hypergeometric(flow_n, other_n, flow_d + other_d)
+        nxt = collections.defaultdict(Fraction)
+        for total, p in null.items():
+            for x, q in step.items():
+                nxt[total + x] += p * q
+        null = nxt
+    return float(sum(p for total, p in null.items() if total >= observed))
+
+
+def mh_odds_ratio(tables):
+    """The Mantel-Haenszel common odds ratio, flow against no flow."""
+    num = sum(Fraction(fd * (on - od), fn + on) for fd, fn, od, on in tables)
+    den = sum(Fraction((fn - fd) * od, fn + on) for fd, fn, od, on in tables)
+    if den == 0:
+        return math.inf if num > 0 else math.nan
+    return float(num / den)
+
+
+def verdict(report):
+    """The §4 rule. The gate is read first and from the measure-level status, so neither an
+    empty cohort nor a coverage suppression can hide it. Under the gate, the strata that
+    would enter once it clears (suppressed only as unvalidated:E2) are kept as provisional."""
+    rows, units, cells = read(report)
+    gated = gate_holds(report)
+    entered, skipped = [], collections.Counter()
+    for row in rows:
+        key = stratum_key(row["stratum"])
+        reason = row["suppressed_reason"]
+        if reason is not None and not (gated and reason == f"unvalidated:{GATE}"):
+            skipped[reason] += 1
+            continue
+        flow, other = cells[key].get(True), cells[key].get(False)
+        if flow is None or other is None:   # recount creates a cell only with n >= 1
+            skipped["one arm"] += 1
+            continue
+        entered.append((key, (flow["sum"], flow["n"], other["sum"], other["n"])))
+    tables = [table for _, table in entered]
+    validation = f"unvalidated:{GATE}" if gated else "cleared"
+    result = {"entered": entered, "skipped": skipped, "strata_total": len(rows), "provisional": gated,
+              "validation": validation,
+              "flow": (sum(t[0] for t in tables), sum(t[1] for t in tables)),
+              "other": (sum(t[2] for t in tables), sum(t[3] for t in tables)),
+              "p": None, "odds_ratio": None, "units": units}
+    if gated:
+        return {**result, "choice": "insufficient", "reason": "unvalidated"}
+    if result["flow"][1] < MIN_ARM or result["other"][1] < MIN_ARM:
+        return {**result, "choice": "insufficient", "reason": "too few"}
+    p = exact_p(tables)
+    return {**result, "p": p, "odds_ratio": mh_odds_ratio(tables),
+            "choice": "regression" if p < ALPHA else "no-regression-detected", "reason": None}
+
+
+def _name(value):
+    return "-" if value is None else str(value)
+
+
+def _arm(unit):
+    credit = _credit(unit)
+    return credit["values"][0] if credit["state"] == "attributed" and credit["values"] else None
+
+
+def _attributed(unit, factor):
+    credit = unit["factors"].get(factor, {"state": "unknown", "values": []})
+    if credit["state"] != "attributed":
+        return credit["state"]
+    return "/".join(str(value) for value in credit["values"])
+
+
+def _evidence(unit):
+    kinds = {link["evidence"] for link in unit["links"] if link["kind"] == "defect"}
+    return "recorded" if "recorded" in kinds else "inferred" if kinds else "no link"
+
+
+def _flow(value):
+    return f"flow {str(value).lower()}"
+
+
+def conditions(result, report):
+    """§5's tables over the scored cohort: the units of the entering strata (provisional
+    ones under the gate). A stratum that did not enter is counted by reason, never
+    described."""
+    entered = {key for key, _ in result["entered"]}
+    members = [unit for unit in result["units"] if stratum_key(unit["stratum"]) in entered]
+    scored = [unit for unit in members if _arm(unit) is not None]
+    arms = {flow: [unit for unit in scored if _arm(unit) is flow] for flow in (True, False)}
+    lines = ["strata:"]
+    for key, (fd, fn, od, on) in result["entered"]:
+        lines.append(f"  {' '.join(_name(part) for part in key)}: flow {fd}/{fn}, no flow {od}/{on}")
+    lines += [f"  not entered, {reason}: {count}" for reason, count in sorted(result["skipped"].items())]
+    lines.append("flow x harness x model:")
+    joint = collections.Counter((_arm(unit), _attributed(unit, "harness"), _attributed(unit, "model"))
+                                for unit in scored)
+    lines += [f"  {_flow(flow)}, {harness}, {model}: {count}"
+              for (flow, harness, model), count in sorted(joint.items(), key=repr)]
+    lines.append("after close (shown, not scored):")
+    for flow, group in arms.items():
+        lines.append(f"  {_flow(flow)}: changes {sum(u['changes'] for u in group)}, "
+                     f"extensions {sum(u['extensions'] for u in group)}, "
+                     f"reopened {sum(u['reopens'] > 0 for u in group)} of {len(group)}")
+    for flow, group in arms.items():
+        defective = sorted(unit["task"] for unit in group if unit["defects"] > 0)
+        lines.append(f"  defective tasks, {_flow(flow)}: {' '.join(defective) or 'none'}")
+    lines.append("coverage:")
+    evidence = collections.Counter((_arm(unit), _evidence(unit)) for unit in scored)
+    lines += [f"  {_flow(flow)}, {kind}: {count}"
+              for (flow, kind), count in sorted(evidence.items(), key=repr)]
+    excluded = collections.defaultdict(collections.Counter)
+    for unit in members:
+        credit = _credit(unit)
+        if credit["state"] in EXCLUDED:
+            known = [value for value in credit["values"] if value is not None]
+            excluded[known[0] if known else None][credit["state"]] += 1
+    groups = [(True, _flow(True)), (False, _flow(False)), (None, "no arm")]
+    present = [(arm, label) for arm, label in groups if arm in excluded]
+    lines += [f"  excluded authorship, {label}: "
+              + " ".join(f"{state} {count}" for state, count in sorted(excluded[arm].items()))
+              for arm, label in present]
+    if not present:
+        lines.append("  excluded authorship: none")
+    lines.append("cost (output_tokens):")
+    for flow, group in arms.items():
+        known = [unit["output_tokens"] for unit in group if unit["output_tokens"] is not None]
+        median = _name(statistics.median(known) if known else None)
+        lines.append(f"  {_flow(flow)}: median {median}, total {sum(known)}, "
+                     f"missing {len(group) - len(known)}")
+    lines.append("limitations:")
+    lines += [f"  {text}" for text in (*report["limitations"].values(), *LIMITATIONS)]
+    return lines
+
+
+def _number(value):
+    return "-" if value is None or (isinstance(value, float) and math.isnan(value)) else f"{value:.3g}"
+
+
+def render(result, report):
+    head = result["choice"] if result["reason"] is None else f"{result['choice']}: {result['reason']}"
+    (fd, fn), (od, on) = result["flow"], result["other"]
+    counts = (f"flow {fd}/{fn}, no flow {od}/{on}, strata {len(result['entered'])}/{result['strata_total']}, "
+              f"p {_number(result['p'])}, OR {_number(result['odds_ratio'])}")
+    lines = [head, counts, *([PROVISIONAL] if result["provisional"] else []), *conditions(result, report)]
+    return "\n".join(lines) + "\n"
+
+
+def main():
+    try:
+        report = json.load(sys.stdin)
+        text = render(verdict(report), report)
+    except (ReportError, KeyError, TypeError, ValueError) as error:
+        print(f"flow-outcome-verdict: {type(error).__name__}: {error}", file=sys.stderr)
+        return 2
+    sys.stdout.write(text)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

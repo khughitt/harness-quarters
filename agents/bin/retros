@@ -1,0 +1,264 @@
+#!/usr/bin/env python3
+"""List the flow's retro notes across every registered project.
+
+retros [--since <date|Nd|Nw>] [--project <prefix>] [--json]
+
+A task closed under the flow ends with a `retro:` note
+(docs/specs/2026-09-15-flow-state-machine-design.md 3.2). The note is the store:
+this reads the task records through `tasks` and writes nothing. Entries are
+newest first, one per note.
+
+Every read is routed to the project's registered root (`tasks -C <root>`), so
+the listing is the same from any checkout or worktree.
+
+What it could not read is reported, not skipped: an unregistered project is a
+usage error, and an unreachable project or an unreadable record becomes a
+warning (stderr, or `warnings` in --json) beside the listing it left incomplete.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import subprocess
+import sys
+import textwrap
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta, timezone
+
+RETRO_PREFIX = "retro:"
+SINCE_RE = re.compile(r"^(\d+)([dw])$")
+WORKERS = 16
+
+
+class TasksError(Exception):
+    """A `tasks` invocation the listing cannot proceed without."""
+
+
+@dataclass(frozen=True)
+class Entry:
+    project: str
+    task: str
+    date: str
+    at: str
+    title: str
+    text: str
+
+
+# --- core --------------------------------------------------------------------
+
+def retro_text(note_text: str) -> str | None:
+    """The retro's text, or None when the note is not a retro. Read by position in
+    the note, never by content: `retro:` first, then the rest (agents/flow/gate-notes.md)."""
+    t = note_text.strip()
+    if not t.startswith(RETRO_PREFIX):
+        return None
+    body = t[len(RETRO_PREFIX):].strip()
+    return body or None
+
+
+def entries_of(record: dict, project: str) -> list[Entry]:
+    """One entry per retro note on this record. The tracker's notes are single-line
+    (a continuation that is not the provenance JSON fails `tasks check`), so each
+    note's text is the retro whole."""
+    out = []
+    for n in record.get("notes") or []:
+        text = retro_text(n["text"])
+        if text is None:
+            continue
+        at = n["at"]
+        out.append(Entry(project, record["id"], at[:10], at, record["title"], text))
+    return out
+
+
+def since_date(value: str, today: date) -> str:
+    """`YYYY-MM-DD`, or `Nd`/`Nw` counted back from today."""
+    m = SINCE_RE.match(value)
+    if m:
+        days = int(m.group(1)) * (7 if m.group(2) == "w" else 1)
+        return (today - timedelta(days=days)).isoformat()
+    return date.fromisoformat(value).isoformat()
+
+
+def select(entries: list[Entry], since: str | None = None) -> list[Entry]:
+    kept = [e for e in entries if since is None or e.date >= since]
+    kept.sort(key=lambda e: (e.project, e.task))  # ties inside a timestamp read alphabetically
+    kept.sort(key=lambda e: e.at, reverse=True)
+    return kept
+
+
+def render(entries: list[Entry], width: int | None = None) -> str:
+    """One block per entry; `width` wraps the retro text, None leaves it on one line."""
+    if not entries:
+        return "no retro notes"
+    column = max(len(e.project) for e in entries)
+    blocks = []
+    for e in entries:
+        body = (textwrap.fill(e.text, width=max(width, 24), initial_indent="    ",
+                              subsequent_indent="    ")
+                if width else "    " + e.text)
+        blocks.append(f"{e.date}  {e.project.ljust(column)}  {e.task}  {e.title}\n{body}")
+    return "\n\n".join(blocks)
+
+
+def render_warning(w: dict) -> str:
+    if w["kind"] == "unreachable":
+        return f"retros: project {w['project']} unreachable at {w['detail']}"
+    if w["kind"] == "unreadable":
+        return f"retros: {w['task']} unreadable: {w['detail']}"
+    raise TasksError(f"retros: no wording for warning kind {w['kind']}")
+
+
+def statuses(projects: list[dict]) -> list[str]:
+    """The tracker's own status vocabulary, read from the roster's per-status counts:
+    `tasks list` shows open tasks unless every status is named, and naming them from a
+    copy here would silently drop a status the tracker later adds."""
+    names = {s for p in projects for s in (p.get("counts") or {})}
+    if not names:
+        raise TasksError("retros: tasks projects reported no statuses")
+    return sorted(names)
+
+
+# --- shell -------------------------------------------------------------------
+
+def run(args: list[str]) -> subprocess.CompletedProcess:
+    exe = os.environ.get("RETROS_TASKS", "tasks")
+    try:
+        return subprocess.run([exe, *args], text=True, capture_output=True)
+    except OSError as e:
+        raise TasksError(f"retros: cannot run {exe}: {e}") from e
+
+
+def run_tasks(*args: str) -> dict:
+    r = run(list(args))
+    if r.returncode != 0:
+        detail = r.stdout.strip() or r.stderr.strip()
+        raise TasksError(f"retros: tasks {' '.join(args)} failed: {detail}")
+    try:
+        return json.loads(r.stdout)
+    except json.JSONDecodeError as e:
+        raise TasksError(f"retros: tasks {' '.join(args)} returned no JSON: {e}") from e
+
+
+def roster() -> list[dict]:
+    return run_tasks("projects")["projects"]
+
+
+def population(project: dict, status_names: list[str]) -> list[tuple[dict, str]]:
+    """This project's task ids, read from its registered root."""
+    status = [a for s in status_names for a in ("--status", s)]
+    listed = run_tasks("list", "-C", project["root"], *status)["tasks"]
+    return [(project, t["id"]) for t in listed]
+
+
+def show(project: dict, task_id: str) -> tuple[dict, str, dict | None, str]:
+    """This record, or the reason it could not be read. `-C` pins the read to the
+    registered root: `tasks show` otherwise prefers a checkout whose prefix matches,
+    so the same id reads differently from a worktree (agents/skills/curate 2)."""
+    r = run(["show", "-C", project["root"], task_id])
+    if r.returncode != 0:
+        return project, task_id, None, (r.stdout.strip() or r.stderr.strip() or f"exit {r.returncode}")
+    try:
+        record = json.loads(r.stdout)["task"]
+    except (json.JSONDecodeError, KeyError, TypeError) as e:
+        return project, task_id, None, f"unparsed show output: {e}"
+    if not isinstance(record, dict):
+        return project, task_id, None, f"show returned {type(record).__name__}, not a record"
+    return project, task_id, record, ""
+
+
+def collect(project: str | None) -> tuple[list[Entry], list[dict]]:
+    projects = roster()
+    if project is not None:
+        chosen = [p for p in projects if p["prefix"] == project]
+        if not chosen:
+            raise TasksError(f"retros: no registered project {project}")
+    else:
+        chosen = projects
+    warnings = [{"kind": "unreachable", "project": p["prefix"], "detail": p["root"]}
+                for p in chosen if not p["reachable"]]
+    reachable = [p for p in chosen if p["reachable"]]
+    status_names = statuses(projects)
+    entries: list[Entry] = []
+    with ThreadPoolExecutor(WORKERS) as pool:
+        listed = [item for page in pool.map(lambda p: population(p, status_names), reachable)
+                  for item in page]
+        for owner, task_id, record, error in pool.map(lambda job: show(*job), listed):
+            if record is None:
+                warnings.append({"kind": "unreadable", "task": task_id, "detail": error})
+                continue
+            entries.extend(entries_of(record, owner["prefix"]))
+    return entries, warnings
+
+
+def terminal_width() -> int | None:
+    """The wrap width for text output: the terminal, capped; None when piped."""
+    if not sys.stdout.isatty():
+        return None
+    return min(os.get_terminal_size().columns, 100)
+
+
+USAGE = "retros: usage: retros [--since <date|Nd|Nw>] [--project <prefix>] [--json]"
+
+
+def parse_args(argv: list[str]) -> dict:
+    """The flags, in order, with every value taken as given: a value that looks like a
+    flag is a mistake, not a value."""
+    opts: dict = {"help": False, "json": False, "since": None, "project": None}
+    rest = list(argv)
+    while rest:
+        flag = rest.pop(0)
+        if flag in ("-h", "--help"):
+            opts["help"] = True
+        elif flag == "--json":
+            opts["json"] = True
+        elif flag in ("--since", "--project"):
+            if opts[flag[2:]] is not None:
+                raise ValueError(f"{flag} given twice")
+            if not rest or rest[0].startswith("-"):
+                raise ValueError(f"{flag} wants a value")
+            opts[flag[2:]] = rest.pop(0)
+        else:
+            raise ValueError(f"unknown argument {flag}")
+    return opts
+
+
+def main(argv: list[str]) -> int:
+    try:
+        opts = parse_args(argv)
+    except ValueError as e:
+        print(f"{USAGE}\nretros: {e}", file=sys.stderr)
+        return 2
+    if opts["help"]:
+        print(__doc__.strip())
+        return 0
+    since = None
+    if opts["since"] is not None:
+        try:
+            since = since_date(opts["since"], datetime.now(timezone.utc).date())
+        except ValueError:
+            print(f"retros: --since wants a date or Nd/Nw, not {opts['since']!r}", file=sys.stderr)
+            return 2
+    try:
+        entries, warnings = collect(opts["project"])
+        chosen = select(entries, since)
+        if opts["json"]:
+            print(json.dumps({
+                "retros": [{"project": e.project, "task": e.task, "date": e.date, "at": e.at,
+                            "title": e.title, "text": e.text} for e in chosen],
+                "warnings": warnings,
+            }))
+        else:
+            print(render(chosen, terminal_width()))
+            for w in warnings:
+                print(render_warning(w), file=sys.stderr)
+    except TasksError as e:
+        print(e, file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
