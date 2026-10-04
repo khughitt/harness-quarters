@@ -7,8 +7,8 @@ size: l
 complexity: high
 process: planned
 created: 2026-10-04T10:54:36Z
-updated: 2026-10-04T10:54:36Z
-depends: []
+updated: 2026-10-04T10:58:44Z
+depends: [ops-f2405d]
 tags: []
 source: ops-cb9749
 agent: claude-code
