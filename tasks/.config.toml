@@ -1,7 +1,7 @@
 prefix = "tack"
 
 [feedback]
-scope = "Global agent instructions (AGENTS.md and its mirrors), harness settings, and the flow and session-logs skills with their agents/bin tools."
+scope = "Global agent instruction delivery, harness settings, state hygiene, the session archive, and the session-logs skill with its tools."
 
 [tags]
 cross-project = "One piece of a goal that spans projects; its siblings live in the other projects."
