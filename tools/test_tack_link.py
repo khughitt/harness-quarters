@@ -100,6 +100,23 @@ def test_link_through_another_spelling_is_ok(world, tmp_path):
     assert states(link(root, home))["~/.agents"] == "ok"
 
 
+def test_indirect_link_is_repointed_before_intermediate_is_removed(world):
+    root, home = world
+    module = load_tack_link()
+    target = root / "agents/skills/flow"
+    intermediate = root / "skill-alias"
+    intermediate.symlink_to(target)
+    link_path = home / "skill"
+    link_path.symlink_to(intermediate)
+    entry = module.Entry(link_path, target, None)
+    assert module.state(entry)[0] == "repoint"
+    module.apply([("repoint", link_path, "", entry)])
+    assert os.readlink(link_path) == str(target)
+    intermediate.unlink()
+    assert link_path.is_dir()
+    assert module.state(entry)[0] == "ok"
+
+
 def test_dangling_agents_link_is_repointed(world, tmp_path):
     root, home = world
     (home / ".agents").symlink_to(tmp_path / "moved-away" / "agents")

@@ -2,9 +2,10 @@
 """Converge this host's home links and directories from links.toml.
 
 Report mode prints one line per entry and writes nothing; --check exits 1 on any
-drift; --apply writes, and only when no entry is refused. A link counts as ok when it
-resolves to its target by any spelling; a dangling or foreign link is repointed; a real
-file or directory at a link path is refused, never overwritten. Required links go on
+drift; --apply writes, and only when no entry is refused. A link counts as ok when its
+immediate target matches, allowing parent-directory aliases. A dangling or foreign
+link is repointed; a real file or directory at a link path is refused, never
+overwritten. Required links go on
 every host (their parent directory is created); a harness group applies only where its
 home is a real directory. Run from the main checkout: links must never resolve into a
 worktree. A target is checked only when its entry applies (a required link, or a group
@@ -168,7 +169,7 @@ def state(entry):
             return "refuse", "a real file is there"
         return "create", ""
     if entry.link.is_symlink():
-        if entry.link.exists() and entry.link.resolve() == entry.target.resolve():
+        if entry.link.exists() and owns_link(entry):
             return "ok", ""
         return "repoint", f"was {os.readlink(entry.link)}"
     if entry.link.exists():
