@@ -75,7 +75,8 @@ The pre-commit hook refuses any staged path under `local/`, which only `git add 
 can stage. Lore checks the generated Projects block in its global instructions,
 including the staged copy at commit time. Change the owning project's
 `identity.toml` (or its table in ops's identity mirror, until it adopts), then run
-just projects in ops to regenerate lore's block. Tack's six pre-commit tests cover
+just projects in ops to refresh its owned fragment, then just assemble in lore
+to regenerate the delivered instructions and provenance manifest. Tack's six pre-commit tests cover
 the local-layer refusal and the guide check; `just test` runs them.
 
 The same hook runs `tools/ops-docs check`, vendored from ops: the identity regions at
