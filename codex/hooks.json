@@ -2,7 +2,7 @@
   "hooks": {
     "SessionStart": [
       { "hooks": [{ "type": "command", "command": "~/d/familiar/bin/familiar hook --agent codex SessionStart" }] },
-      { "hooks": [{ "type": "command", "command": "~/d/ops/hooks/claude-profile" }] }
+      { "hooks": [{ "type": "command", "command": "~/d/lore/hooks/claude-profile" }] }
     ],
     "UserPromptSubmit": [
       { "hooks": [{ "type": "command", "command": "~/d/familiar/bin/familiar hook --agent codex UserPromptSubmit" }] }
