@@ -6,9 +6,9 @@ priority: 1
 size: m
 complexity: high
 process: planned
-owner: feat/rename-hq
+owner: main
 created: 2026-10-06T12:59:15Z
-updated: 2026-10-06T19:35:38Z
+updated: 2026-10-06T21:13:28Z
 started: 2026-10-06T16:15:19Z
 depends: [flows-44890e, obs-ff4e76, tasks-7580d2]
 parent: tack-dcb11a
@@ -54,3 +54,8 @@ Why: the user chose the residue's name on 2026-10-06 (parent spec §7.1); the re
   provenance: {"harness_session":"claude-code:529a99ac-8d12-4ea1-b9ff-8f3fd73d2c16","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-06T19:24:26Z (main): From reviewing tasks-7580d2's plan: once [locations] exists, tasks rename and init --force rewrite [locations.<old>]/[locations.<new>] in the registry, and rename-cutover's guard (registry_view keeps every top-level table other than projects, aliases and groups) would then report 'locations' as a foreign change and refuse every rollback. The cutover plan must extend registry_view to drop locations.<old> and locations.<new> and add a test. Also: the second host needs a current tasks binary before its pre-move 'tasks -C <root> init --prefix tack --force' (an older binary drops [locations] on any registry write).
 - 2026-10-06T19:35:38Z (main): From tasks-7580d2 plan round 2: the second host adopts with its new .worktrees link dangling, so its [locations.hq] storage record stays empty until an init --force there. The cutover runbook's second-host sequence should end with 'tasks init --prefix hq --force' in the hq checkout after work-link --ensure, so a later move of hq has a storage fallback on that host.
+- 2026-10-06T20:21:50Z (main): tasks-7580d2 resolver implementation reviewed; runbook adds tasks -C <root> init --prefix tack --force on every host before the move, after installing current tasks there (tasks spec 2026-10-06-project-resolution section 2.3); integration/install follows Task 6
+- 2026-10-06T20:35:32Z (main): other host: user installs current tasks from synced main first (cargo install --path .), then runs init --prefix tack --force in tack and checks git status --porcelain is empty before the cutover move, then hand-adds that host own ai former root per README (tasks-7580d2 Task 6)
+- 2026-10-06T21:10:21Z (main): europa install complete via SSH (tasks-53b444): synced main 9f1c0a5, cargo install --locked --path . under host-budget succeeded; installed tasks resolve tasks resolved with no warnings; registry unchanged. Other-host remaining steps: pre-move init --prefix tack --force with clean status, then approved ai backfill using europa paths.
+- 2026-10-06T21:13:28Z (main): resumed
+  provenance: {"harness_session":"claude-code:529a99ac-8d12-4ea1-b9ff-8f3fd73d2c16","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
