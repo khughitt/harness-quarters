@@ -140,18 +140,81 @@ def validate(path=None, root=None):
     return data
 
 
+def _shown(name, harness, fact, entry):
+    out = {"fact": name, "harness": harness, "type": fact["type"], "status": entry["status"] if entry else "unknown"}
+    if entry and entry["status"] == "probed":
+        value = entry["value"]
+        out.update(value=sorted(value) if fact["type"] == "set" else value, version=entry["version"],
+                   date=entry["date"].isoformat(), evidence=entry["evidence"])
+    if entry and "note" in entry:
+        out["note"] = entry["note"]
+    return out
+
+
+def view(data):
+    """The whole view: every fact, with an entry for every declared harness."""
+    facts = {}
+    for name, fact in data.get("facts", {}).items():
+        shown = {"type": fact["type"], "description": fact["description"]}
+        if "probe" in fact:
+            shown["probe"] = fact["probe"]
+        shown["harness"] = {h: _shown(name, h, fact, fact.get("harness", {}).get(h)) for h in data["harnesses"]}
+        facts[name] = shown
+    return {"schema": data["schema"], "harnesses": list(data["harnesses"]), "facts": facts}
+
+
+def lookup(fact, harness, path=None):
+    """One entry. Invalid for a refused file; LookupError for an undeclared fact or harness,
+    so a misspelt name can never read as unknown."""
+    shown = view(validate(path))
+    if fact not in shown["facts"]:
+        raise LookupError(f"{fact} is not a declared fact")
+    if harness not in shown["harnesses"]:
+        raise LookupError(f"{harness} is not a declared harness")
+    return shown["facts"][fact]["harness"][harness]
+
+
+def _pretty(shown):
+    rows = [("fact", "harness", "status", "value", "version", "date", "evidence")]
+    for name, fact in shown["facts"].items():
+        for harness, entry in fact["harness"].items():
+            value = entry.get("value", "")
+            if isinstance(value, bool):
+                value = str(value).lower()
+            elif isinstance(value, list):
+                value = ",".join(value) or "(none)"
+            rows.append((name, harness, entry["status"], value, entry.get("version", ""), entry.get("date", ""), entry.get("evidence", "").replace(" ", "")))
+    widths = [max(len(row[i]) for row in rows) for i in range(len(rows[0]))]
+    return "".join("  ".join(cell.ljust(width) for cell, width in zip(row, widths)).rstrip() + "\n" for row in rows)
+
+
 def main(argv):
     parser = argparse.ArgumentParser(prog="harness-facts", description=__doc__.splitlines()[0])
     parser.add_argument("--file", type=pathlib.Path, default=None, help="read this file, not the checkout's")
     commands = parser.add_subparsers(dest="command", required=True)
-    check = commands.add_parser("check", help="validate the fact file")
-    check.add_argument("--file", type=pathlib.Path, default=argparse.SUPPRESS)   # accepted before or after the command
+    for name, text in (("check", "validate the fact file"), ("list", "print every fact as JSON"), ("get", "print one entry as JSON")):
+        command = commands.add_parser(name, help=text)
+        command.add_argument("--file", type=pathlib.Path, default=argparse.SUPPRESS)
+        if name == "list":
+            command.add_argument("--pretty", action="store_true", help="a table for a person")
+        if name == "get":
+            command.add_argument("fact")
+            command.add_argument("harness")
     args = parser.parse_args(argv)
     try:
-        validate(args.file)
+        if args.command == "check":
+            validate(args.file)
+        elif args.command == "list":
+            shown = view(validate(args.file))
+            sys.stdout.write(_pretty(shown) if args.pretty else json.dumps(shown, indent=2) + "\n")
+        else:
+            sys.stdout.write(json.dumps(lookup(args.fact, args.harness, args.file)) + "\n")
     except Invalid as error:
         for problem in error.problems:
             sys.stderr.write(f"harness-facts: {problem}\n")
+        return 2
+    except LookupError as error:
+        sys.stderr.write(f"harness-facts: {error.args[0]}\n")
         return 2
     return 0
 
