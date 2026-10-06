@@ -89,6 +89,8 @@ def ops(tmp_path, monkeypatch):
     root.mkdir()
     (root / "justfile").write_text(STUB_JUSTFILE)
     (root / "mirror.py").write_text(STUB_MIRROR)
+    (root / "tests").mkdir()
+    (root / "tests" / "test_claim_guard.py").write_text("")   # what makes it ops
     monkeypatch.setenv("FACTS_MIRROR_OPS", str(root))
     return root
 
@@ -116,11 +118,37 @@ def test_an_unregistered_ops_is_a_notice(repo, capsys):
     assert "the claim-guard mirror was not checked" in capsys.readouterr().err
 
 
-def test_a_missing_ops_directory_is_a_notice(repo, tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("FACTS_MIRROR_OPS", str(tmp_path / "gone"))
+def test_a_missing_registered_ops_is_a_notice(repo, tmp_path, capsys):
+    (tmp_path / "config" / "tasks").mkdir(parents=True)
+    (tmp_path / "config" / "tasks" / "projects.toml").write_text(f'[projects]\nops = "{tmp_path / "gone"}"\n')
     stage(repo)
     assert load_hook().facts_check() == 0
     assert "the claim-guard mirror was not checked" in capsys.readouterr().err
+
+
+def test_a_named_ops_that_is_missing_is_refused(repo, tmp_path, monkeypatch, capsys):
+    """A person who names a worktree for a value change asked for the check: a typo refuses."""
+    monkeypatch.setenv("FACTS_MIRROR_OPS", str(tmp_path / "gone"))
+    stage(repo)
+    assert load_hook().facts_check() == 1
+    assert "FACTS_MIRROR_OPS" in capsys.readouterr().err
+
+
+def test_a_named_directory_that_is_not_ops_is_refused(repo, ops, capsys):
+    (ops / "tests" / "test_claim_guard.py").unlink()
+    stage(repo)
+    assert load_hook().facts_check() == 1
+    assert "FACTS_MIRROR_OPS" in capsys.readouterr().err
+    assert not (ops / "ran").exists()
+
+
+def test_a_mirror_that_hangs_is_refused(repo, ops, capsys):
+    (ops / "justfile").write_text("test-one +args:\n    sleep 30\n")
+    hook = load_hook()
+    hook.MIRROR_TIMEOUT = 1
+    stage(repo)
+    assert hook.facts_check() == 1
+    assert "timed out" in capsys.readouterr().err
 
 
 def test_a_missing_just_is_a_notice(repo, ops, monkeypatch, capsys):
