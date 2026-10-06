@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: feat/residue
 created: 2026-10-04T10:54:36Z
-updated: 2026-10-06T15:31:34Z
+updated: 2026-10-06T15:37:20Z
 started: 2026-10-06T11:20:33Z
 depends: [ops-f2405d]
 tags: []
@@ -64,3 +64,4 @@ Done: tack renamed in place by the rename design's procedure (tasks rename, iden
 - 2026-10-06T15:30:53Z (feat/residue): approvals (user, in session 2026-10-06): titan link step; scope chain; deletion of tack archive/ (24-file checksummed inventory); europa link step when online, applied only if its preview matches its audit
 - 2026-10-06T15:31:33Z (feat/residue): host step done on this host: harness-facts installed and answering; link-check clean; dangling Codex links: vercel-react-best-practices removed, web-design-guidelines removed. Preview/apply scripts ran without just --quiet (just 1.58 suppresses recipe output under --quiet).
 - 2026-10-06T15:31:33Z (feat/residue): review: impl round 2 — verdict: revise; findings: Important 2, Minor 4; reviewer: claude-code/claude-fable-5-1
+- 2026-10-06T15:37:20Z (feat/residue): archive/ deleted from tack (24 untracked files; 21 committed in lore docs/archive/, 3 mindful v3 leftovers removed)
