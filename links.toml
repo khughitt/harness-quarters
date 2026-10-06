@@ -14,6 +14,7 @@
 [required]
 "~/.config/AGENTS.md" = "lore:instructions/AGENTS.md"
 "~/.local/bin/harness-state-refresh" = ".githooks/harness-state-refresh"
+"~/.local/bin/session-archive" = "tools/session-archive"
 "~/.config/systemd/user/session-archive-capture.service" = "systemd/user/session-archive-capture.service"
 "~/.config/systemd/user/session-archive-capture.timer" = "systemd/user/session-archive-capture.timer"
 "~/.config/systemd/user/session-archive-prune.service" = "systemd/user/session-archive-prune.service"
