@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
-"""The ai -> tack cutover: save originals, apply the rename, roll back, verify.
+"""A project rename's cutover: save originals, apply, retarget, link, verify, roll back.
 
-One-off tool for docs/specs/2026-09-27-rename-to-tack-design.md. Every path comes from
-the command line or the snapshot's meta.json, and every tasks call inherits HOME,
-XDG_CONFIG_HOME and XDG_STATE_HOME, so a sandbox rehearsal runs exactly this code.
-`tasks rename` is irreversible; rollback restores the saved originals and stops, leaving
-the state for a person, at the first check that fails.
+Written for docs/specs/2026-09-27-rename-to-tack-design.md and made general by
+docs/specs/2026-10-06-rename-to-hq-design.md §3.1. Every path comes from the command line
+or the snapshot's meta.json, and every tasks call inherits HOME, XDG_CONFIG_HOME and
+XDG_STATE_HOME, so a sandbox rehearsal runs exactly this code. `tasks rename` is
+irreversible; rollback restores the saved originals and stops, leaving the state for a
+person, at the first check that fails.
+
+The renamed project is the checkout; the other repositories are the ones the cutover
+retargets in, and the only ones rollback resets. `apply` renames and moves, `retarget`
+fixes one repository's dependencies on retired ids, `link` applies the home links, and
+`verify` checks the result: the runbook commits between them.
 """
 import argparse
 import filecmp
@@ -13,6 +19,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tomllib
@@ -45,6 +52,26 @@ def branch_of(root):
     return result.stdout.strip() if result.returncode == 0 else ""
 
 
+def record(root):
+    """A repository as save finds it: its path, its commit and its branch."""
+    return {"root": str(root), "head": run("git", "-C", root, "rev-parse", "HEAD").strip(),
+            "branch": branch_of(root)}
+
+
+def load_meta(snap):
+    return json.loads((Path(snap) / "meta.json").read_text())
+
+
+def checkout_now(meta):
+    """The checkout's path at this moment: the new root once apply has moved it."""
+    new_root = Path(meta["new_root"])
+    return new_root if new_root.exists() else Path(meta["checkout"]["root"])
+
+
+def link_tool(root, meta):
+    return Path(root) / meta["link_tool"]
+
+
 def check_environment(command, meta):
     """A rehearsal snapshot and a live one both carry meta.json; refuse to run one
     against the other host's HOME/XDG dirs rather than silently touching the wrong state."""
@@ -59,21 +86,21 @@ def check_environment(command, meta):
 
 
 def check_branches(meta):
-    """The current branch of each repo, checked before any mutation: rollback must not
-    reset a branch a person has since switched away from."""
-    ai, new_root = Path(meta["ai"]), Path(meta["new_root"])
-    checkout = new_root if new_root.exists() else ai
-    for root, expected in ((checkout, meta["ai_branch"]), (Path(meta["ops"]), meta["ops_branch"])):
+    """The current branch of each repository, checked before any mutation: rollback must
+    not reset a branch a person has since switched away from."""
+    pairs = [(checkout_now(meta), meta["checkout"]["branch"])]
+    pairs += [(Path(r["root"]), r["branch"]) for r in meta["repos"]]
+    for root, expected in pairs:
         current = branch_of(root)
         if current != expected:
             raise Stop(f"rollback: {root} is on {current or '(detached)'}, "
                        f"expected {expected or '(detached)'}")
 
 
-def link_report(root):
-    result = subprocess.run([str(Path(root) / "tools" / "tack-link")], text=True, capture_output=True)
+def link_report(tool):
+    result = subprocess.run([str(tool)], text=True, capture_output=True)
     if result.returncode not in (0, 1):
-        raise Stop(f"tack-link: {result.stderr.strip()}")
+        raise Stop(f"{tool.name}: {result.stderr.strip()}")
     return result.stdout
 
 
@@ -81,37 +108,96 @@ def project_prefix(root):
     return tomllib.loads((Path(root) / "tasks" / ".config.toml").read_text())["prefix"]
 
 
-def preconditions(ai, ops, old):
+def unmerged_branches(root):
+    """Local branches holding commits the current branch, main, lacks. Merged after the
+    rename, such a branch would bring old-prefix task files back."""
+    current = branch_of(root)
+    names = run("git", "-C", root, "for-each-ref", "--format=%(refname)", "refs/heads").split()
+    return [name.removeprefix("refs/heads/") for name in names
+            if name != current and run("git", "-C", root, "rev-list", "--count", f"HEAD..{name}").strip() != "0"]
+
+
+def preconditions(checkout, repos, tool):
     claims = json.loads(run("tasks", "claims"))["claims"]
-    ops_prefix = project_prefix(ops)
-    # A dead ops claim would survive save only to be silently pruned by apply's
-    # retarget step (any `tasks dep` write prunes the project's own claims store as a
-    # side effect), leaving the guard to stop on a change the cutover itself made.
-    ops_claims = [c["id"] for c in claims if c.get("prefix") == ops_prefix]
-    if ops_claims:
-        raise Stop(f"save: ops has claims (live or dead): {', '.join(ops_claims)}; "
+    retargeted = {project_prefix(root) for root in repos}
+    # A `tasks dep` write prunes dead claims from the project it writes in, and the guard
+    # compares every other project's claims file byte for byte: a repository the cutover
+    # retargets in must hold no claim at all, live or dead.
+    held = [c["id"] for c in claims if c.get("prefix") in retargeted]
+    if held:
+        raise Stop(f"save: a retargeted repository has claims (live or dead): {', '.join(held)}; "
                    f"end or clear them first")
     live = [c for c in claims if c.get("live")]
     if live:
         raise Stop("preconditions: live claim(s): " + ", ".join(c["id"] for c in live))
-    for root in (ai, ops):
+    for root in (checkout, *repos):
         if porcelain(root):
             raise Stop(f"preconditions: {root} is not clean")
-    if run("git", "-C", ai, "worktree", "list", "--porcelain").count("\nworktree ") != 0:
-        raise Stop(f"preconditions: {ai} has more than one worktree")
-    check = subprocess.run([str(Path(ai) / "tools" / "tack-link"), "--check"], text=True,
-                           capture_output=True)
+    if branch_of(checkout) != "refs/heads/main":
+        raise Stop(f"preconditions: {checkout} is on {branch_of(checkout) or '(detached)'}, not main")
+    if run("git", "-C", checkout, "stash", "list").strip():
+        raise Stop(f"preconditions: {checkout} has stashes; one popped after the rename could bring "
+                   f"old-prefix task files back")
+    if run("git", "-C", checkout, "worktree", "list", "--porcelain").count("\nworktree ") != 0:
+        raise Stop(f"preconditions: {checkout} has more than one worktree")
+    ahead = unmerged_branches(checkout)
+    if ahead:
+        raise Stop(f"preconditions: {checkout} has branches with commits its current branch lacks: "
+                   f"{', '.join(ahead)}")
+    check = subprocess.run([str(tool), "--check"], text=True, capture_output=True)
     if check.returncode != 0:
         raise Stop(f"preconditions: link drift:\n{check.stdout}")
 
 
+def kept_paths(checkout, paths):
+    """Files git cannot restore (a clean filter keeps their live content out of every
+    commit, or they are ignored), named relative to the checkout so they follow its move."""
+    for rel in paths:
+        if Path(rel).is_absolute() or ".." in Path(rel).parts:
+            raise Stop(f"save: --keep {rel}: name a path inside the checkout, relative to it")
+        path = checkout / rel
+        if not path.is_file() or path.is_symlink():
+            raise Stop(f"save: --keep {rel}: no regular file at {path}")
+        if checkout.resolve() not in path.resolve().parents:
+            raise Stop(f"save: --keep {rel}: {path} resolves outside the checkout, to {path.resolve()}")
+    return list(paths)
+
+
+def validate_kept_destinations(meta):
+    """Run before any mutation: each kept file must still be restored inside the checkout,
+    so a link planted in its path since save cannot carry the restore elsewhere."""
+    root = checkout_now(meta).resolve()
+    for entry in meta["kept"]:
+        dest = root / entry["path"]
+        if dest.is_symlink() or root not in dest.resolve().parents:
+            raise Stop(f"rollback: kept {entry['path']} would be written through a link, "
+                       f"to {dest.resolve()}")
+        if dest.exists() and not dest.is_file():
+            raise Stop(f"rollback: kept {entry['path']} is not a regular file; move it aside first")
+
+
 def save(args):
-    ai, ops, snap = Path(args.ai).resolve(), Path(args.ops).resolve(), Path(args.snapshot)
+    checkout, snap = Path(args.checkout).resolve(), Path(args.snapshot)
+    repos = [Path(r).resolve() for r in args.repo]
+    if checkout in repos or len(set(repos)) != len(repos):
+        raise Stop("save: name each --repo once, and never the checkout")
+    tool = checkout / args.link_tool
+    if not tool.is_file():
+        raise Stop(f"save: no link tool at {tool}")
     config, state = xdg("XDG_CONFIG_HOME", ".config") / "tasks", xdg("XDG_STATE_HOME", ".local/state") / "tasks"
-    worktrees = ai / ".worktrees"
+    # `tasks rename` acts on whatever project --old names; it must be this checkout.
+    prefix = project_prefix(checkout)
+    if prefix != args.old:
+        raise Stop(f"save: {checkout} has the prefix {prefix!r}, not --old {args.old!r}")
+    registry = config / "projects.toml"
+    registered = (tomllib.loads(registry.read_text()) if registry.exists() else {}).get("projects", {}).get(args.old)
+    if registered is None or Path(registered).resolve() != checkout:
+        raise Stop(f"save: the registry maps {args.old!r} to {registered!r}, not {checkout}")
+    worktrees = checkout / ".worktrees"
     link_text = os.readlink(worktrees) if worktrees.is_symlink() else None
-    storage_old = (ai / link_text).resolve() if link_text else None
-    protected = {"ai": ai, "ops": ops, "config": config, "state": state}
+    storage_old = (checkout / link_text).resolve() if link_text else None
+    protected = {"checkout": checkout, "config": config, "state": state,
+                 **{f"repo {root}": root for root in repos}}
     if storage_old:
         protected["storage_old"] = storage_old
     snap_resolved = snap.resolve()
@@ -119,35 +205,61 @@ def save(args):
         path = path.resolve()
         if snap_resolved == path or path in snap_resolved.parents:
             raise Stop(f"save: snapshot {snap} lies inside {which}")
-    preconditions(ai, ops, args.old)
+    kept = kept_paths(checkout, args.keep)
+    preconditions(checkout, repos, tool)
     new_root = Path(args.new_root)
     new_root = new_root.parent.resolve() / new_root.name
+    # work-link names a checkout's storage after the checkout's directory, not its prefix.
+    storage_new = storage_old.parent.parent / new_root.name / storage_old.name if storage_old else None
     meta = {
-        "ai": str(ai), "ops": str(ops), "new_root": str(new_root),
-        "old": args.old, "new": args.new, "home": str(Path.home()),
-        "ai_head": run("git", "-C", ai, "rev-parse", "HEAD").strip(),
-        "ops_head": run("git", "-C", ops, "rev-parse", "HEAD").strip(),
-        "ai_branch": branch_of(ai), "ops_branch": branch_of(ops),
-        "config": str(config), "state": str(state), "worktrees_link": link_text,
+        "checkout": record(checkout), "repos": [record(root) for root in repos],
+        "new_root": str(new_root), "old": args.old, "new": args.new, "link_tool": args.link_tool,
+        "home": str(Path.home()), "config": str(config), "state": str(state),
+        "worktrees_link": link_text,
         "storage_old": str(storage_old) if storage_old else None,
-        "storage_new": str(storage_old.parent.parent / args.new / storage_old.name) if storage_old else None,
+        "storage_new": str(storage_new) if storage_new else None,
+        "kept": [{"path": rel, "mode": stat.S_IMODE((checkout / rel).stat().st_mode)} for rel in kept],
     }
     snap.mkdir(parents=True, exist_ok=False)
     shutil.copytree(config, snap / "config", symlinks=True)
     shutil.copytree(state, snap / "state", symlinks=True)
-    (snap / "links.txt").write_text(link_report(ai))
+    (snap / "links.txt").write_text(link_report(tool))
+    for n, rel in enumerate(kept):
+        (snap / "kept").mkdir(exist_ok=True)
+        shutil.copy2(checkout / rel, snap / "kept" / str(n))
     shutil.copy2(Path(__file__).resolve(), snap / "rename-cutover")
     (snap / "meta.json").write_text(json.dumps(meta, indent=2) + "\n")
     print(f"saved {snap}")
 
 
 def registry_view(path, old, new):
-    """The registry with the renamed project's own keys removed, for the guard."""
+    """The registry as the guard compares it: the renamed project's own entries removed,
+    and the rename's own rewrites of other entries read the same on both sides.
+    `tasks rename` retargets an alias that named the old prefix (`ai = "tack"` becomes
+    `ai = "hq"`) and rewrites a group member from the old prefix to the new; reading the
+    old prefix as the new one makes exactly those equal. Every other difference remains,
+    except the order of a group's members: tasks keeps them sorted and re-sorts on the
+    rewrite, so both sides are compared sorted."""
     data = tomllib.loads(path.read_text()) if path.exists() else {}
+
+    def renamed(prefix):
+        return new if prefix == old else prefix
+
     projects = {k: v for k, v in data.get("projects", {}).items() if k not in (old, new)}
-    aliases = {k: v for k, v in data.get("aliases", {}).items() if k != old and v != new}
-    return {**{k: v for k, v in data.items() if k not in ("projects", "aliases")},
-            "projects": projects, "aliases": aliases}
+    aliases = {k: renamed(v) for k, v in data.get("aliases", {}).items() if k not in (old, new)}
+    groups = {k: sorted(renamed(m) for m in members) for k, members in data.get("groups", {}).items()}
+    rest = {k: v for k, v in data.items() if k not in ("projects", "aliases", "groups")}
+    return {**rest, "projects": projects, "aliases": aliases, "groups": groups}
+
+
+def registry_changes(live, saved):
+    """The names of the entries that differ, for the guard's message."""
+    tables = ("projects", "aliases", "groups")
+    names = {k for k in (live.keys() | saved.keys()) - set(tables) if live.get(k) != saved.get(k)}
+    for table in tables:
+        names |= {f"{table}.{k}" for k in live[table].keys() | saved[table].keys()
+                  if live[table].get(k) != saved[table].get(k)}
+    return sorted(names)
 
 
 def files(root, skip):
@@ -161,7 +273,7 @@ def validate_inventory(path, meta):
         data = tomllib.loads(path.read_text())
     except tomllib.TOMLDecodeError as error:
         raise Stop(f"guard: {path} is not a readable rename inventory: {error}")
-    expected = {"source": meta["old"], "target": meta["new"], "root": meta["ai"]}
+    expected = {"source": meta["old"], "target": meta["new"], "root": meta["checkout"]["root"]}
     for key, value in expected.items():
         found = data.get(key)
         same = found is not None and (Path(found).resolve() == Path(value).resolve() if key == "root" else found == value)
@@ -170,11 +282,10 @@ def validate_inventory(path, meta):
 
 
 def claims_tolerated(path, live_root, saved_root):
-    """A `tasks` command against a project this cutover does not own (e.g. `tasks dep`
-    in ops) can create empty claims/<prefix>.{toml,lock} files. An empty claims file
-    records no claim, so it is not a foreign change: tolerate it when the live copy is
-    empty and the saved copy is absent or also empty. A non-empty file is a real claim
-    and must still stop the guard."""
+    """A `tasks` command against a project this cutover does not own can create empty
+    claims/<prefix>.{toml,lock} files. An empty claims file records no claim, so it is
+    not a foreign change: tolerate it when the live copy is empty and the saved copy is
+    absent or also empty. A non-empty file is a real claim and must still stop the guard."""
     if not path.startswith("claims/"):
         return False
     live = live_root / path
@@ -187,11 +298,10 @@ def claims_tolerated(path, live_root, saved_root):
 def guard(meta, snap):
     old, new = meta["old"], meta["new"]
     config, state = Path(meta["config"]), Path(meta["state"])
-    if registry_view(config / "projects.toml", old, new) != registry_view(snap / "config" / "projects.toml", old, new):
-        live = registry_view(config / "projects.toml", old, new)
-        saved = registry_view(snap / "config" / "projects.toml", old, new)
-        extra = sorted(set(live["projects"]) ^ set(saved["projects"]) | set(live["aliases"]) ^ set(saved["aliases"]))
-        raise Stop(f"guard: the registry changed outside {old}/{new}: {', '.join(extra) or 'values'}")
+    live = registry_view(config / "projects.toml", old, new)
+    saved = registry_view(snap / "config" / "projects.toml", old, new)
+    if live != saved:
+        raise Stop(f"guard: the registry changed outside {old}/{new}: {', '.join(registry_changes(live, saved))}")
     own = {f"claims/{p}.{ext}" for p in (old, new) for ext in ("toml", "lock")}
     inventory = state / "rename" / f"{old}.toml"
     if inventory.exists():
@@ -212,16 +322,16 @@ def guard(meta, snap):
 def move_back(meta):
     """Move the checkout (and its worktree storage) back to their pre-rename paths.
 
-    Each pair — (ai, new_root) and, when there is one, (storage_old, storage_new) — must
-    have exactly one side present; both or neither is an ambiguous state a person must
-    resolve. Every check for both pairs, and for a real file/dir blocking the managed
+    Each pair — (checkout, new_root) and, when there is one, (storage_old, storage_new) —
+    must have exactly one side present; both or neither is an ambiguous state a person
+    must resolve. Every check for both pairs, and for a real file/dir blocking the managed
     link, runs before either pair is touched."""
-    ai, new_root = Path(meta["ai"]), Path(meta["new_root"])
-    ai_present, new_root_present = ai.exists(), new_root.exists()
-    if ai_present and new_root_present:
-        raise Stop(f"move back: both {ai} and {new_root} exist")
-    if not ai_present and not new_root_present:
-        raise Stop(f"move back: neither {ai} nor {new_root} exists")
+    checkout, new_root = Path(meta["checkout"]["root"]), Path(meta["new_root"])
+    checkout_present, new_root_present = checkout.exists(), new_root.exists()
+    if checkout_present and new_root_present:
+        raise Stop(f"move back: both {checkout} and {new_root} exist")
+    if not checkout_present and not new_root_present:
+        raise Stop(f"move back: neither {checkout} nor {new_root} exists")
     move_checkout = new_root_present
 
     move_storage = False
@@ -234,16 +344,16 @@ def move_back(meta):
         if not old_present and not new_present:
             raise Stop(f"move back: neither {s_old} nor {s_new} exists")
         move_storage = new_present
-        link = (new_root if move_checkout else ai) / ".worktrees"
+        link = (new_root if move_checkout else checkout) / ".worktrees"
         if link.exists() and not link.is_symlink():
             raise Stop(f"move back: {link} is not a link")
 
     if move_checkout:
-        os.rename(new_root, ai)
+        os.rename(new_root, checkout)
     if meta["storage_old"]:
         if move_storage:
             os.rename(s_new, s_old)
-        link = ai / ".worktrees"
+        link = checkout / ".worktrees"
         if link.is_symlink():
             link.unlink()
         link.symlink_to(meta["worktrees_link"])
@@ -251,12 +361,12 @@ def move_back(meta):
 
 def validate_leftovers(meta):
     """The foreign-untracked check, run before any mutation: whichever checkout path
-    exists (`ai` pre-apply, `new_root` post-apply) may only have rename leftovers
-    untracked — each exactly `tasks/<new>-<hex>.md` with its pre-rename original present
-    at `ai_head` — and `ops` must have none. Returns the validated paths so the caller
-    can delete them after the reset without listing again."""
-    ai, new_root, old, new = Path(meta["ai"]), Path(meta["new_root"]), meta["old"], meta["new"]
-    checkout = new_root if new_root.exists() else ai
+    exists may only have rename leftovers untracked — each exactly `tasks/<new>-<hex>.md`
+    with its pre-rename original present at the saved head — and no other repository may
+    have any. Returns the validated paths so the caller can delete them after the reset
+    without listing again."""
+    old, new, head = meta["old"], meta["new"], meta["checkout"]["head"]
+    checkout = checkout_now(meta)
     untracked = run("git", "-C", checkout, "ls-files", "--others", "--exclude-standard").splitlines()
     for path in untracked:
         parts = Path(path).parts
@@ -264,12 +374,13 @@ def validate_leftovers(meta):
         if not (len(parts) == 2 and parts[0] == "tasks" and name.startswith(f"{new}-")):
             raise Stop(f"leftovers: {path} is not a rename leftover")
         original = f"tasks/{old}-{name[len(new) + 1:]}"
-        check = subprocess.run(["git", "-C", str(checkout), "cat-file", "-e", f"{meta['ai_head']}:{original}"],
+        check = subprocess.run(["git", "-C", str(checkout), "cat-file", "-e", f"{head}:{original}"],
                                capture_output=True)
         if check.returncode != 0:
             raise Stop(f"leftovers: {path} has no restored original {original}")
-    if run("git", "-C", meta["ops"], "ls-files", "--others", "--exclude-standard").strip():
-        raise Stop(f"leftovers: {meta['ops']} has untracked files")
+    for repo in meta["repos"]:
+        if run("git", "-C", repo["root"], "ls-files", "--others", "--exclude-standard").strip():
+            raise Stop(f"leftovers: {repo['root']} has untracked files")
     return untracked
 
 
@@ -293,101 +404,196 @@ def save_reset_patch(root, head, snap, label):
         print(f"rename-cutover: reset {root}: changes since save kept in {path}", file=sys.stderr)
 
 
+def restore_kept(checkout, snap, meta):
+    """Copy each kept file back as it was saved, mode included. Run after the reset,
+    which leaves an ignored file alone and rewrites a filtered one only when it sees a
+    change, so neither can be trusted to have restored it."""
+    for n, entry in enumerate(meta["kept"]):
+        live = checkout / entry["path"]
+        live.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(snap / "kept" / str(n), live)
+        os.chmod(live, entry["mode"])
+
+
+def refresh_kept(checkout, meta):
+    """A filtered file whose size differs from its index entry shows as modified until
+    the entry is refreshed, even when its filtered content is unchanged. Stage each kept
+    file that is tracked and filtered-equal, as harness-state-refresh does: that writes
+    the blob already in the index. A real change is left for the clean check to report."""
+    for entry in meta["kept"]:
+        path = entry["path"]
+        tracked = subprocess.run(["git", "-C", str(checkout), "ls-files", "--error-unmatch", "--", path],
+                                 capture_output=True).returncode == 0
+        if tracked and subprocess.run(["git", "-C", str(checkout), "diff", "--quiet", "--", path]).returncode == 0:
+            run("git", "-C", checkout, "add", "--", path)
+
+
+def check_kept(checkout, snap, meta):
+    for n, entry in enumerate(meta["kept"]):
+        live = checkout / entry["path"]
+        if not filecmp.cmp(live, snap / "kept" / str(n), shallow=False):
+            raise Stop(f"check: {live} differs from its saved copy")
+        if stat.S_IMODE(live.stat().st_mode) != entry["mode"]:
+            raise Stop(f"check: {live} has mode {stat.S_IMODE(live.stat().st_mode):o}, "
+                       f"saved {entry['mode']:o}")
+
+
 def rollback(args):
     snap = Path(args.snapshot)
-    meta = json.loads((snap / "meta.json").read_text())
+    meta = load_meta(snap)
     check_environment("rollback", meta)
-    ai, ops = Path(meta["ai"]), Path(meta["ops"])
+    forward = snap / "forward.json"
+    if forward.exists():
+        try:
+            roots = json.loads(forward.read_text())
+        except json.JSONDecodeError as error:
+            raise Stop(f"rollback: {forward} exists but is unreadable ({error}); rollback has ended")
+        raise Stop("rollback: ended when retarget --forward first wrote outside the snapshot: "
+                   + ", ".join(roots))
     guard(meta, snap)
     check_branches(meta)
     leftovers = validate_leftovers(meta)
+    validate_kept_destinations(meta)
     move_back(meta)
-    save_reset_patch(ai, meta["ai_head"], snap, "ai")
-    run("git", "-C", ai, "reset", "-q", "--hard", meta["ai_head"])
-    save_reset_patch(ops, meta["ops_head"], snap, "ops")
-    run("git", "-C", ops, "reset", "-q", "--hard", meta["ops_head"])
+    checkout = Path(meta["checkout"]["root"])
+    resets = [(checkout, meta["checkout"]["head"], "checkout")]
+    resets += [(Path(r["root"]), r["head"], Path(r["root"]).name) for r in meta["repos"]]
+    for root, head, label in resets:
+        save_reset_patch(root, head, snap, label)
+        run("git", "-C", root, "reset", "-q", "--hard", head)
     for path in leftovers:
-        (ai / path).unlink()
+        (checkout / path).unlink()
+    restore_kept(checkout, snap, meta)
+    refresh_kept(checkout, meta)
     restore_dir(snap / "config", Path(meta["config"]))
     restore_dir(snap / "state", Path(meta["state"]))
-    run(ai / "tools" / "tack-link", "--apply")
-    if link_report(ai) != (snap / "links.txt").read_text():
+    tool = link_tool(checkout, meta)
+    run(tool, "--apply")
+    if link_report(tool) != (snap / "links.txt").read_text():
         raise Stop("links: the fresh report differs from the saved one")
-    for root in (ai, ops):
+    for root, _, _ in resets:
         if run("tasks", "check", cwd=root).strip():
             raise Stop(f"check: tasks check reports findings in {root}")
         if porcelain(root):
             raise Stop(f"check: {root} is not clean")
-    print(f"rolled back to {meta['ai_head'][:7]} (ai) and {meta['ops_head'][:7]} (ops)")
+    check_kept(checkout, snap, meta)
+    print("rolled back to " + ", ".join(f"{head[:7]} ({label})" for _, head, label in resets))
 
 
 RETIRED_PREFIX_RE = re.compile(
     r'^depends on (?P<old_id>\S+) through retired prefix "(?P<prefix>[^"]*)"; it is now (?P<new_id>\S+)$')
 
 
-def retarget_ops_dependencies(ops, old):
-    """After `tasks init --prefix <new> --force`, an ops task that depends on an old-prefix
-    id through `tasks dep` still names it; `tasks check` in ops reports each as a
+def retarget_dependencies(root, old):
+    """After `tasks init --prefix <new> --force`, a task elsewhere that depends on an
+    old-prefix id still names it, and `tasks check` there reports each as a
     `retired_prefix` warning. Retarget each to the id the warning names as canonical, so
-    ops's own `tasks check` comes back clean (`verify` requires that)."""
-    output = run("tasks", "check", cwd=ops)
+    that repository's `tasks check` comes back clean (`verify` requires that).
+
+    Each task's whole list is written in one `tasks edit` save, its old ids replaced in
+    place. Removing and re-adding in two writes would lose the dependency if interrupted
+    between them, and a rerun would not see it again. A rerun reads the warnings left."""
+    output = run("tasks", "check", cwd=root)
     report = json.loads(output) if output.strip() else {"warnings": []}
+    replacements = {}
     for warning in report.get("warnings", []):
         if warning.get("kind") != "retired_prefix":
             continue
         match = RETIRED_PREFIX_RE.match(warning.get("detail", ""))
         if not match:
-            raise Stop(f"apply: unparseable retired_prefix warning for {warning.get('id')}: "
+            raise Stop(f"retarget: unparseable retired_prefix warning for {warning.get('id')}: "
                        f"{warning.get('detail')!r}")
-        if match["prefix"] != old:
-            continue
-        old_id, new_id = match["old_id"], match["new_id"]
-        run("tasks", "dep", warning["id"], "--rm", old_id, cwd=ops)
-        run("tasks", "dep", warning["id"], "--on", new_id, cwd=ops)
-        print(f"retarget: {warning['id']}: {old_id} -> {new_id}")
+        if match["prefix"] == old:
+            replacements.setdefault(warning["id"], {})[match["old_id"]] = match["new_id"]
+    for task, pairs in replacements.items():
+        depends = json.loads(run("tasks", "show", task, cwd=root))["task"].get("depends", [])
+        missing = sorted(set(pairs) - set(depends))
+        if missing:
+            raise Stop(f"retarget: {task} does not list {', '.join(missing)}")
+        listed = [arg for dep in depends for arg in ("--depends", pairs.get(dep, dep))]
+        run("tasks", "edit", task, "--no-depends", *listed, cwd=root)
+        for old_id, new_id in pairs.items():
+            print(f"retarget: {task}: {old_id} -> {new_id}")
 
 
 def apply(args):
     snap = Path(args.snapshot)
-    meta = json.loads((snap / "meta.json").read_text())
+    meta = load_meta(snap)
     check_environment("apply", meta)
-    ai, new_root, old, new = Path(meta["ai"]), Path(meta["new_root"]), meta["old"], meta["new"]
+    checkout, new_root, old, new = Path(meta["checkout"]["root"]), Path(meta["new_root"]), meta["old"], meta["new"]
     if new_root.exists():
         raise Stop(f"apply: {new_root} already exists")
     if meta["storage_new"] and Path(meta["storage_new"]).parent.exists():
         raise Stop(f"apply: {Path(meta['storage_new']).parent} already exists")
-    run("tasks", "rename", old, new, cwd=ai)
-    os.rename(ai, new_root)
+    run("tasks", "rename", old, new, cwd=checkout)
+    os.rename(checkout, new_root)
     if meta["storage_old"]:
         os.rename(Path(meta["storage_old"]).parent, Path(meta["storage_new"]).parent)
         (new_root / ".worktrees").unlink()
         run("work-link", "--root", new_root.parent, "--ensure", ".worktrees", cwd=new_root)
     run("tasks", "init", "--prefix", new, "--force", cwd=new_root)
-    retarget_ops_dependencies(Path(meta["ops"]), old)
-    run(new_root / "tools" / "tack-link", "--apply")
     print(f"applied: {old} -> {new} at {new_root}")
 
 
-def verify(args):
+def record_forward(snap, root):
+    """Rollback could not restore a repository written outside the snapshot, so the
+    first such write ends it. This record, made before the write, is what it refuses on."""
+    path = snap / "forward.json"
+    roots = json.loads(path.read_text()) if path.exists() else []
+    if str(root) not in roots:
+        path.write_text(json.dumps([*roots, str(root)], indent=2) + "\n")
+
+
+def retarget(args):
+    """One repository's retarget, run by the runbook before that repository's commit.
+    A repository outside the snapshot is refused: rollback could not restore it. After
+    the other host has adopted, rollback is over, and `--forward` allows one and records
+    that rollback has ended."""
     snap = Path(args.snapshot)
-    meta = json.loads((snap / "meta.json").read_text())
+    meta = load_meta(snap)
+    check_environment("retarget", meta)
+    root = Path(args.repo).resolve()
+    if root in (Path(meta["new_root"]), Path(meta["checkout"]["root"])):
+        raise Stop(f"retarget: {root} is the renamed checkout; its own ids were renamed, not retargeted")
+    if str(root) not in {r["root"] for r in meta["repos"]}:
+        if not args.forward:
+            raise Stop(f"retarget: {root} is not in the snapshot; after the other host has adopted, "
+                       f"pass --forward")
+        if not (root / "tasks" / ".config.toml").is_file():
+            raise Stop(f"retarget: {root} is not a tasks project")
+        record_forward(snap, root)
+    retarget_dependencies(root, meta["old"])
+
+
+def link(args):
+    meta = load_meta(args.snapshot)
+    check_environment("link", meta)
+    new_root = Path(meta["new_root"])
+    if not new_root.exists():
+        raise Stop(f"link: {new_root} does not exist; run apply first")
+    run(link_tool(new_root, meta), "--apply")
+    print(f"linked from {new_root}")
+
+
+def verify(args):
+    meta = load_meta(args.snapshot)
     check_environment("verify", meta)
-    new_root, old = Path(meta["new_root"]), meta["old"]
-    check = subprocess.run([str(new_root / "tools" / "tack-link"), "--check"], text=True,
-                           capture_output=True)
+    new_root, old, new = Path(meta["new_root"]), meta["old"], meta["new"]
+    check = subprocess.run([str(link_tool(new_root, meta)), "--check"], text=True, capture_output=True)
     if check.returncode != 0:
         raise Stop(f"verify: link drift after apply:\n{check.stdout}")
-    for root in (new_root, Path(meta["ops"])):
+    for root in (new_root, *(Path(r["root"]) for r in meta["repos"])):
         if run("tasks", "check", cwd=root).strip():
             raise Stop(f"verify: tasks check reports findings in {root}")
-    any_old = next(p.stem for p in (new_root / "tasks").glob(f"{meta['new']}-*.md"))
-    run("tasks", "show", f"{old}-{any_old.split('-', 1)[1]}", cwd=new_root)
+    any_new = next(p.stem for p in (new_root / "tasks").glob(f"{new}-*.md"))
+    run("tasks", "show", f"{old}-{any_new.split('-', 1)[1]}", cwd=new_root)
     if meta["storage_new"] and (new_root / ".worktrees").resolve() != Path(meta["storage_new"]).resolve():
         raise Stop("verify: .worktrees does not resolve to the moved storage")
     print("verified")
 
 
-COMMANDS = {"apply": apply, "verify": verify}
+COMMANDS = {"save": save, "apply": apply, "retarget": retarget, "link": link, "verify": verify,
+            "rollback": rollback}
 
 
 def main(argv):
@@ -395,16 +601,27 @@ def main(argv):
     sub = parser.add_subparsers(dest="command", required=True)
     s = sub.add_parser("save")
     s.add_argument("--snapshot", required=True)
-    s.add_argument("--ai", required=True)
-    s.add_argument("--ops", required=True)
+    s.add_argument("--checkout", required=True, help="the renamed project's checkout")
+    s.add_argument("--repo", action="append", required=True,
+                   help="a repository the cutover retargets in and rollback resets (repeatable)")
     s.add_argument("--new-root", required=True)
-    s.add_argument("--old", default="ai")
-    s.add_argument("--new", default="tack")
-    for name in ("apply", "rollback", "verify"):
+    s.add_argument("--old", required=True)
+    s.add_argument("--new", required=True)
+    s.add_argument("--link-tool", default="tools/harness-links",
+                   help="the link tool's path inside the checkout")
+    s.add_argument("--keep", action="append", default=[],
+                   help="a file inside the checkout that git cannot restore, saved and "
+                        "restored as a live file with its mode (repeatable)")
+    r = sub.add_parser("retarget")
+    r.add_argument("--snapshot", required=True)
+    r.add_argument("--repo", required=True)
+    r.add_argument("--forward", action="store_true",
+                   help="allow a repository outside the snapshot, once rollback is over")
+    for name in ("apply", "link", "verify", "rollback"):
         sub.add_parser(name).add_argument("--snapshot", required=True)
     args = parser.parse_args(argv)
     try:
-        {"save": save, "rollback": rollback, **COMMANDS}[args.command](args)
+        COMMANDS[args.command](args)
     except Stop as stop:
         print(f"rename-cutover: {stop}", file=sys.stderr)
         return 1

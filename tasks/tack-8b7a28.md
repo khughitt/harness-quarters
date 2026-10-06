@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: feat/rename-hq
 created: 2026-10-06T12:59:15Z
-updated: 2026-10-06T17:39:08Z
+updated: 2026-10-06T18:30:05Z
 started: 2026-10-06T16:15:19Z
 depends: [flows-44890e, obs-ff4e76, tasks-7580d2]
 parent: tack-dcb11a
@@ -45,3 +45,8 @@ Why: the user chose the residue's name on 2026-10-06 (parent spec §7.1); the re
 - 2026-10-06T17:34:02Z (feat/rename-hq): parked (waiting on user, review): User reviews (GPT round 4) docs/plans/2026-10-06-rename-to-hq-preparation.md in .worktrees/tack-8b7a28 after the round 3 fixes: save checks --old against the checkout's prefix and the registry (Task 4); retarget writes each task's list in one tasks edit save (Task 4); kept files contained by resolved path at save and at rollback before any mutation (Task 5). On acceptance this session executes it inline from Task 1; Task 3 stops for the host-step approval.
   provenance: {"harness_session":"claude-code:529a99ac-8d12-4ea1-b9ff-8f3fd73d2c16","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-06T17:39:08Z (feat/rename-hq): review: plan round 4 — verdict: accept; findings: none; reviewer: codex
+- 2026-10-06T17:57:31Z (feat/rename-hq): resumed
+  provenance: {"harness_session":"claude-code:529a99ac-8d12-4ea1-b9ff-8f3fd73d2c16","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-06T18:06:38Z (feat/rename-hq): review: impl round 1 — verdict: accept; findings: Minor 2; reviewer: claude-code/claude-fable-5-1 (scoped: Tasks 1 and 2, before Task 3's merges)
+- 2026-10-06T18:27:34Z (feat/rename-hq): review: impl round 2 — verdict: revise; findings: Important 1, Minor 6; reviewer: claude-code/claude-fable-5-1 (whole branch cad85ca..5b97a2a)
+- 2026-10-06T18:30:05Z (feat/rename-hq): phase 1 steps 1 to 3 delivered (docs/plans/2026-10-06-rename-to-hq-preparation.md): the units call ~/.local/bin/session-archive on both hosts; rename-cutover is general (a repositories list, a split apply, a guard that knows the alias retarget and group rewrite, kept trust files); tools/harness-links. Deferred minors for the cutover plan are in the plan's execution record.

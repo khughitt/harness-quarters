@@ -101,7 +101,7 @@ Things you can take from here without the rest:
 - `.githooks/harness-state-clean`: a git clean filter that keeps `/model` and `/effort`
   picks, Codex bookkeeping and Codex project trust out of committed harness configs.
   It is useful on its own for anyone who versions `~/.claude` or `~/.codex`.
-- `tools/tack-link` with `links.toml`: declares every link from a harness home into a
+- `tools/harness-links` with `links.toml`: declares every link from a harness home into a
   checkout. Targets are checkout-relative or `<project>:<relative-path>`, resolved
   through `tasks projects --paths`. `[directories]` declares real directories, with
   each value naming the former link target that may be converted; `[retired]` names
@@ -120,7 +120,7 @@ MIT licensed; see `LICENSE`.
 
 - `AGENTS.md`: tack's project guide; `just docs` generates its identity region.
   Harness global-file links target lore's `./instructions/AGENTS.md`.
-- `links.toml` and `tools/tack-link`: declarations and reconciliation for real
+- `links.toml` and `tools/harness-links`: declarations and reconciliation for real
   harness homes and links into registered owner checkouts.
 - `facts/capabilities.toml` and `tools/harness-facts`: capability facts. See below.
 - `agents/skills/session-logs/`: the retained skill. `agents/bin/`: session-episodes,

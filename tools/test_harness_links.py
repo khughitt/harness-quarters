@@ -1,4 +1,4 @@
-"""tack-link converges home links from links.toml and never overwrites data."""
+"""harness-links converges home links from links.toml and never overwrites data."""
 import importlib.machinery
 import importlib.util
 import os
@@ -8,14 +8,14 @@ from pathlib import Path
 
 import pytest
 
-TOOL = Path(__file__).with_name("tack-link")
+TOOL = Path(__file__).with_name("harness-links")
 
 
-def load_tack_link():
-    """Import tools/tack-link as a module, for unit-testing apply() directly.
+def load_harness_links():
+    """Import tools/harness-links as a module, for unit-testing apply() directly.
 
     The file has no .py suffix, so the loader must be given explicitly."""
-    loader = importlib.machinery.SourceFileLoader("tack_link", str(TOOL))
+    loader = importlib.machinery.SourceFileLoader("harness_links", str(TOOL))
     spec = importlib.util.spec_from_loader(loader.name, loader)
     module = importlib.util.module_from_spec(spec)
     loader.exec_module(module)
@@ -49,7 +49,7 @@ def world(tmp_path):
     """A checkout with the tool and targets, and an empty HOME with a Claude home only."""
     root = tmp_path / "checkout"
     (root / "tools").mkdir(parents=True)
-    shutil.copy2(TOOL, root / "tools" / "tack-link")
+    shutil.copy2(TOOL, root / "tools" / "harness-links")
     (root / "links.toml").write_text(MANIFEST)
     (root / "agents" / "skills" / "flow").mkdir(parents=True)
     (root / "hooks").mkdir()
@@ -66,7 +66,7 @@ def world(tmp_path):
 def link(root, home, *args, tool=None):
     env = {**os.environ, "HOME": str(home), "XDG_CONFIG_HOME": str(home / ".config"),
            "XDG_STATE_HOME": str(home / ".local/state")}
-    return subprocess.run([str(tool or root / "tools" / "tack-link"), *args], env=env,
+    return subprocess.run([str(tool or root / "tools" / "harness-links"), *args], env=env,
                           text=True, capture_output=True)
 
 
@@ -102,7 +102,7 @@ def test_link_through_another_spelling_is_ok(world, tmp_path):
 
 def test_indirect_link_is_repointed_before_intermediate_is_removed(world):
     root, home = world
-    module = load_tack_link()
+    module = load_harness_links()
     target = root / "agents/skills/flow"
     intermediate = root / "skill-alias"
     intermediate.symlink_to(target)
@@ -181,7 +181,7 @@ def test_apply_refuses_when_a_real_file_appears_after_planning(world):
     """A TOCTOU safety net: apply() re-checks each link path immediately before the
     os.replace that would otherwise clobber a real file planted after plan() ran."""
     root, home = world
-    module = load_tack_link()
+    module = load_harness_links()
     old_home = os.environ.get("HOME")
     os.environ["HOME"] = str(home)
     try:
@@ -202,7 +202,7 @@ def test_refuses_from_a_worktree(world, tmp_path):
     root, home = world
     wt = tmp_path / "wt"
     run("-C", str(root), "worktree", "add", "-q", str(wt))
-    result = link(root, home, tool=wt / "tools" / "tack-link")
+    result = link(root, home, tool=wt / "tools" / "harness-links")
     assert result.returncode == 2
     assert "not a worktree" in result.stderr
 
@@ -260,7 +260,7 @@ def fresh_clone(tmp_path, home):
     stage_project_targets(repo / "links.toml", tmp_path, home)
     # Exercise the working manifest and tool, including changes not committed yet.
     shutil.copy2(repo / "links.toml", clone / "links.toml")
-    shutil.copy2(TOOL, clone / "tools/tack-link")
+    shutil.copy2(TOOL, clone / "tools/harness-links")
     # A public clone needs the submodule and sibling skill checkouts. Use the local
     # sources in these fixtures so the tests require neither network nor live writes.
     main = Path(run("-C", str(repo), "worktree", "list", "--porcelain").stdout.splitlines()[0][9:])
@@ -444,7 +444,7 @@ def test_directory_conversion_rechecks_target_before_unlink(world, tmp_path, mon
     (root / "links.toml").write_text(DIRECTORIES)
     path = home / ".agents"
     path.symlink_to(root / "agents")
-    module = load_tack_link()
+    module = load_harness_links()
     entries, homes = module.load(root)
     rows = module.plan(entries, homes)
     path.unlink()
@@ -489,7 +489,7 @@ def test_retirement_rechecks_target_before_unlink(world, tmp_path, monkeypatch):
     (root / "links.toml").write_text('[retired]\n"~/.old" = "gone"\n')
     path = home / ".old"
     path.symlink_to(root / "gone")
-    module = load_tack_link()
+    module = load_harness_links()
     entries, homes = module.load(root)
     rows = module.plan(entries, homes)
     path.unlink()

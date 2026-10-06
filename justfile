@@ -11,11 +11,11 @@ docs:
 
 # Report the home links links.toml wants on this host; `just link --apply` converges them.
 link *args:
-    tools/tack-link {{args}}
+    tools/harness-links {{args}}
 
 # Exit non-zero when this host's home links drift from links.toml.
 link-check:
-    tools/tack-link --check
+    tools/harness-links --check
 
 # The fact file's check, then the agents/bin, .githooks and tools tests.
 test:

@@ -25,7 +25,7 @@ The generated global Projects block is checked by lore.
 
 ## Layout
 
-- `links.toml` and `tools/tack-link`: real harness homes, declared home links and
+- `links.toml` and `tools/harness-links`: real harness homes, declared home links and
   their reconciliation through the tasks project registry.
 - `claude/`, `codex/` and `local/`: harness settings, hooks and untracked host state.
   `claude/mods/` holds Claude Code function-hook plugins.
