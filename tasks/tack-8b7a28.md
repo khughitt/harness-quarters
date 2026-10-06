@@ -1,13 +1,15 @@
 ---
 id: tack-8b7a28
 title: "Rename tack to harness quarters (hq): design, plan, rehearsal and cutover"
-status: todo
+status: doing
 priority: 1
 size: m
 complexity: high
 process: planned
+owner: main
 created: 2026-10-06T12:59:15Z
-updated: 2026-10-06T16:00:08Z
+updated: 2026-10-06T16:15:31Z
+started: 2026-10-06T16:15:19Z
 depends: [flows-44890e, obs-ff4e76, tasks-7580d2]
 parent: tack-dcb11a
 tags: []
@@ -27,3 +29,6 @@ Why: the user chose the residue's name on 2026-10-06 (parent spec §7.1); the re
 - 2026-10-06T14:32:54Z (feat/residue): review: spec round 4 — verdict: revise; findings: P2 1; reviewer: codex/gpt-6-astra
 - 2026-10-06T14:52:43Z (feat/residue): review: spec round 5 — verdict: accept; findings: none; reviewer: codex/gpt-6-astra
 - 2026-10-06T16:00:08Z (main): From the residue's execution: if this rename's plan sends host scripts that preview with just, do not use 'just --quiet': in just 1.58 it suppresses the recipe's own output, so a preview prints nothing and a failed apply prints an empty tail. Run 'just link' and filter the echoed recipe line (tack docs/plans/2026-10-06-residue.md, execution record).
+- 2026-10-06T16:15:19Z (main): started
+  provenance: {"harness_session":"claude-code:529a99ac-8d12-4ea1-b9ff-8f3fd73d2c16","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-06T16:15:31Z (main): arm: flow-trial-1 — unit tack-dcb11a — flow off
