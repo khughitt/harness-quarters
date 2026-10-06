@@ -1,6 +1,6 @@
 # Rename tack to harness quarters (hq) — design
 
-Status: draft 2026-10-06, revised after review rounds 1 to 3, awaiting review. Task
+Status: draft 2026-10-06, revised after review rounds 1 to 4, awaiting review. Task
 `tack-8b7a28`, under `tack-dcb11a` and ops `ops-593133`.
 Parent: ops `docs/specs/2026-10-03-agent-layer-split-design.md` §6 phase 3, §7.1.
 Model: `docs/specs/2026-09-27-rename-to-tack-design.md`, whose procedure this reuses.
@@ -209,10 +209,12 @@ session standing in it.
    which the manifest holds; the plan probes that offline, and the fallback is a second
    `just link --apply`. These systemd steps are the runbook's, not the tool's.
 8. Verify (§5), then commit in hq.
-9. **Forward-only, after verification:** every other registered project that reports
-   `retired_prefix` for `tack` is retargeted, one commit each. Today that is relay and
-   tasks. They are outside the snapshot, so they wait until there is nothing left to
-   roll back on this host.
+9. **Forward-only, after the other host has adopted and verified:** every other
+   registered project that reports `retired_prefix` for `tack` is retargeted, one commit
+   each. Today that is relay and tasks. They are outside the snapshot, and rollback is
+   defined until the other host adopts (§4). So they wait for that: a rollback before it
+   would otherwise leave them naming `hq-` ids that no longer exist. Until this step
+   `tasks check` in those projects reports the retired prefix, which is expected.
 10. **Gated, outward-facing:** the GitHub repository is renamed and `origin` updated. The
     user does it or approves it at that moment; GitHub redirects the old URL, so this
     step can also wait.
@@ -349,7 +351,8 @@ commands backwards, exactly as in September; this section states only what diffe
 
 - **Four repositories, not two.** The saved commits, the reset in rollback, and the
   clean-tree checks cover tack, ops, lore and flows. relay and tasks are changed only
-  after verification (step 9) and so never need restoring.
+  at step 9, after the other host has adopted and rollback has ended, and so never need
+  restoring.
 - **Quiescence is wider than it was.** More projects run sessions at once than in
   September, and three timers write or read across checkouts. The window, from the save
   until verification passes or rollback completes, has no other tasks writer on this
@@ -372,8 +375,9 @@ commands backwards, exactly as in September; this section states only what diffe
   4's leftover rule reads `tasks/hq-<hex>.md` beside `tasks/tack-<hex>.md`; and after
   the link apply come a `daemon-reload`, the timer re-enable, a comparison of the enable
   link with its saved target, and the timers' return to their recorded state.
-- **Rollback is defined until the other host adopts.** After that the rename goes
-  forward. Steps 9 and 10 are outside rollback and are therefore last.
+- **One boundary.** Rollback is defined until the other host adopts, and nothing
+  outside the snapshot is written before that. After it the rename goes forward: steps 9
+  and 10 come only then.
 
 **Rehearsal before the live run**, in a sandbox: copies of the four checkouts and of obs,
 a scratch home for the links, and scratch `XDG_CONFIG_HOME` and `XDG_STATE_HOME` both.
