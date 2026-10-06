@@ -4,13 +4,17 @@
 The generated global-instruction block is checked by lore tools/check-projects-block.
 This hook runs the vendored tools/ops-docs against the working tree, preserving the
 README/AGENTS identity contract, and rejects every staged path under local/.
-A staged facts/capabilities.toml is validated as staged.
+A staged facts/capabilities.toml is validated as staged and, until the claim guard reads
+the facts itself, checked against ops's constants by ops's own test.
 Installed by git config core.hooksPath .githooks.
 """
+import os
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 
 
 def fail(message):
@@ -60,6 +64,40 @@ def facts_blob():
     return pathlib.Path(handle.name)
 
 
+MIRROR_TEST = "tests.test_claim_guard.FactsMirrorTests"
+
+
+def ops_root():
+    """The ops checkout whose guard holds the constants: FACTS_MIRROR_OPS (a worktree, when
+    a value change lands as a pair), else the registered one; None when neither is named."""
+    named = os.environ.get("FACTS_MIRROR_OPS")
+    if named:
+        return pathlib.Path(named)
+    registry = pathlib.Path(os.environ.get("XDG_CONFIG_HOME") or pathlib.Path.home() / ".config") / "tasks" / "projects.toml"
+    roots = tomllib.loads(registry.read_text()).get("projects", {}) if registry.is_file() else {}
+    return pathlib.Path(os.path.expanduser(roots["ops"])) if isinstance(roots.get("ops"), str) else None
+
+
+def mirror(candidate):
+    """ops's own test of its constants against this fact file. Interim: deleted with the
+    constants (docs/specs/2026-10-06-residue-design.md §4.7)."""
+    ops = ops_root()
+    if ops is None or not ops.is_dir() or shutil.which("just") is None:
+        sys.stderr.write("pre-commit: no ops checkout to ask (unregistered, missing, or `just` absent); "
+                         "the claim-guard mirror was not checked\n")
+        return 0
+    # git exports this commit's GIT_DIR and index file to a hook. ops's recipes run git, and
+    # must run it against ops.
+    env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    env.update(HARNESS_FACTS_TOOL=str(FACTS_TOOL.resolve()), HARNESS_FACTS_FILE=str(candidate))
+    done = subprocess.run(["just", "test-one", MIRROR_TEST], cwd=ops, env=env, text=True, capture_output=True)
+    if done.returncode:
+        sys.stderr.write((done.stdout + done.stderr)[-2000:])
+        return fail(f"{FACTS} disagrees with, or could not be tested against, claim-guard's constants in {ops}; change them as a pair "
+                    "(README.md, Capability facts), naming an ops worktree with FACTS_MIRROR_OPS")
+    return 0
+
+
 def facts_check():
     """A staged fact file must pass harness-facts as staged."""
     blob = facts_blob()
@@ -70,14 +108,16 @@ def facts_check():
         if done.returncode:
             sys.stderr.write(done.stderr)
             return fail(f"{FACTS} as staged does not pass `{FACTS_TOOL} check`")
-        return 0
+        return mirror(blob)
     finally:
         blob.unlink()
 
 
-def main():
+def main(argv):
+    if argv == ["facts-mirror"]:
+        return mirror(pathlib.Path(FACTS).resolve())
     return local_layer() or docs_check() or facts_check()
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))
