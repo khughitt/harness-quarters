@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: main
 created: 2026-10-06T12:59:15Z
-updated: 2026-10-06T21:13:28Z
+updated: 2026-10-06T21:25:05Z
 started: 2026-10-06T16:15:19Z
 depends: [flows-44890e, obs-ff4e76, tasks-7580d2]
 parent: tack-dcb11a
@@ -59,3 +59,4 @@ Why: the user chose the residue's name on 2026-10-06 (parent spec §7.1); the re
 - 2026-10-06T21:10:21Z (main): europa install complete via SSH (tasks-53b444): synced main 9f1c0a5, cargo install --locked --path . under host-budget succeeded; installed tasks resolve tasks resolved with no warnings; registry unchanged. Other-host remaining steps: pre-move init --prefix tack --force with clean status, then approved ai backfill using europa paths.
 - 2026-10-06T21:13:28Z (main): resumed
   provenance: {"harness_session":"claude-code:529a99ac-8d12-4ea1-b9ff-8f3fd73d2c16","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-06T21:25:05Z (feat/rename-hq-cutover): main's suite went red when tasks 0.2.0 with [locations] was installed: rename-cutover's guard read the renamed project's [locations] tables as a foreign change (18 failures). Fixed on feat/rename-hq-cutover and fast-forwarded to main: registry_view drops locations.<old>/<new> and names other locations entries; tests for both; just test 215 + 533 passed

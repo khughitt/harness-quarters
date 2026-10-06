@@ -867,12 +867,29 @@ def test_registry_view_reads_the_renames_own_rewrites_as_equal(tmp_path):
     assert cutover.registry_view(live, "tack", "hq") == cutover.registry_view(saved, "tack", "hq")
 
 
+def test_registry_view_reads_the_renamed_projects_locations_as_its_own(tmp_path):
+    # tasks moves [locations.<old>] to [locations.<new>] at rename and appends the former
+    # root at init --force; another project's locations still count.
+    cutover = load_cutover()
+    saved, live = tmp_path / "saved.toml", tmp_path / "live.toml"
+    base = '[projects]\nops = "/o"\n{p} = "{r}"\n[locations.ops]\nstorage = "/w/ops"\n'
+    saved.write_text(base.format(p="tack", r="/t") + '[locations.tack]\nstorage = "/w/tack"\n')
+    live.write_text(base.format(p="hq", r="/h") + '[locations.hq]\nstorage = "/w/hq"\n'
+                    '[[locations.hq.former]]\nroot = "/t"\nstorage = "/w/tack"\nuntil = "2026-10-06"\n')
+    assert cutover.registry_view(live, "tack", "hq") == cutover.registry_view(saved, "tack", "hq")
+    live.write_text(live.read_text().replace('storage = "/w/ops"', 'storage = "/w/elsewhere"'))
+    changes = cutover.registry_changes(cutover.registry_view(live, "tack", "hq"),
+                                       cutover.registry_view(saved, "tack", "hq"))
+    assert changes == ["locations.ops"]
+
+
 @pytest.mark.parametrize("change, named", [
     (lambda t: t.replace("[projects]\n", '[projects]\nzz = "/elsewhere"\n'), "projects.zz"),
     (lambda t: t.replace("[aliases]\n", '[aliases]\nzz = "hq"\n'), "aliases.zz"),
     (lambda t: t.replace('ai = "hq"', 'ai = "ops"'), "aliases.ai"),
     (lambda t: t.replace('"flows", ', ""), "groups.agent-layer"),
-    (lambda t: t + 'other = ["ops"]\n', "groups.other"),
+    (lambda t: t.replace("[groups]\n", '[groups]\nother = ["ops"]\n'), "groups.other"),
+    (lambda t: t + '\n[locations.zz]\nstorage = "/elsewhere"\n', "locations.zz"),
 ])
 def test_the_guard_stops_on_any_other_registry_change(hq, change, named):
     hq.save()
