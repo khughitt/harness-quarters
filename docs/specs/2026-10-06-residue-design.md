@@ -1,6 +1,6 @@
 # The residue: name, capability facts, surface audit, archive review — design
 
-Task: `tack-dcb11a`, under ops `ops-cb9749`. Status: draft 2026-10-06, awaiting review.
+Task: `tack-dcb11a`, under ops `ops-cb9749`. Status: accepted 2026-10-06 after four review rounds (GPT 1, 3 and 4; Claude 2). Plan: `docs/plans/2026-10-06-residue.md`.
 Parent design: ops `docs/specs/2026-10-03-agent-layer-split-design.md` §4.1 (harness
 support keeps), §5.3 (capability facts), §6 phase 3, §7.1 (naming gate), §9 (acceptance).
 

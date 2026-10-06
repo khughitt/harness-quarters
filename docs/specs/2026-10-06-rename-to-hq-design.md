@@ -1,6 +1,6 @@
 # Rename tack to harness quarters (hq) — design
 
-Status: draft 2026-10-06, revised after review rounds 1 to 4, awaiting review. Task
+Status: accepted 2026-10-06 after five review rounds (Claude 1 and 2; GPT 3 to 5). Its plan is not yet written. Task
 `tack-8b7a28`, under `tack-dcb11a` and ops `ops-593133`.
 Parent: ops `docs/specs/2026-10-03-agent-layer-split-design.md` §6 phase 3, §7.1.
 Model: `docs/specs/2026-09-27-rename-to-tack-design.md`, whose procedure this reuses.
