@@ -332,13 +332,13 @@ owner:
 
 | Owner | General change | Status |
 |---|---|---|
-| tasks | **Remember where a project has been, and resolve through it.** The registry keeps aliases but no former roots: once a rename completes, nothing on the host records the old directory. tasks records each former root at `rename`, `init --force` and `--adopt`, and offers one resolver: the canonical id for any id form, and the project for any path, former roots and their worktree storage included. | new task, filed with this revision; blocks the cutover |
+| tasks | **Remember where a project has been, and resolve through it.** The registry keeps aliases but no former roots: once a rename completes, nothing on the host records the old directory. tasks records each former root at `rename`, `init --force` and `--adopt`, and offers one resolver: the canonical id for any id form, and the project for any path, former roots and their worktree storage included. | `tasks-7580d2`; blocks the cutover |
 | obs | Follow a renamed project, using that resolver (§3.5) | `obs-ff4e76` |
 | flows | A trial's identity survives a rename of an enrolled project (§3.4) | `flows-44890e` |
 | this project | The cutover tool takes a list of repositories, and its guard knows a rename's own registry changes (§3.1) | phase 1 |
 | this project | Nothing a host runs names this checkout (§3.1) | phase 1 |
-| this project | The same for the other checkouts hook commands name: today they call lore's and ops's hooks by `~/d/lore/…` and `~/d/ops/…`, so renaming either would cost a Codex re-trust in every home | idea, filed; not needed for this rename |
-| ops | The cutover tool belongs with the hub once it is general, since a rename is work that spans projects; and a check that flags a unit file or hook command naming a checkout path | idea, filed; not needed for this rename |
+| this project | The same for the other checkouts hook commands name: today they call lore's and ops's hooks by `~/d/lore/…` and `~/d/ops/…`, so renaming either would cost a Codex re-trust in every home | idea `tack-fe88ef`; not needed for this rename |
+| ops | The cutover tool belongs with the hub once it is general, since a rename is work that spans projects; and a check that flags a unit file or hook command naming a checkout path | idea `ops-2d8813`; not needed for this rename |
 
 The first three block this cutover. The last two are for the next one.
 
@@ -469,8 +469,8 @@ when its preconditions hold, and one line of the consumer table covers whatever 
 residue's has landed by then.
 
 Tasks: `tack-8b7a28` for this design and its plan. The host steps are ops `ops-593133`,
-which the plan unblocks. The tasks task of §3.6 is filed with this revision and
-`tack-8b7a28` depends on it too. The flows task `flows-44890e` (§3.4) and the obs task `obs-ff4e76` (§3.5) are filed
+which the plan unblocks. The tasks task of §3.6 is `tasks-7580d2`, and `tack-8b7a28` depends on it
+too. The flows task `flows-44890e` (§3.4) and the obs task `obs-ff4e76` (§3.5) are filed
 with this draft, and `tack-8b7a28` depends on both.
 
 Done when: both hosts have adopted and verified (§5); the four repositories are
