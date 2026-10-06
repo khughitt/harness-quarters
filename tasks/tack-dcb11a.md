@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: main
 created: 2026-10-04T10:54:36Z
-updated: 2026-10-06T11:34:19Z
+updated: 2026-10-06T11:34:37Z
 started: 2026-10-06T11:20:33Z
 depends: [ops-f2405d]
 tags: []
@@ -30,3 +30,5 @@ Done: tack renamed in place by the rename design's procedure (tasks rename, iden
 - 2026-10-06T11:32:56Z (feat/residue): review: spec round 1 — verdict: revise; findings: P2 3; reviewer: codex/gpt-6-astra
 - 2026-10-06T11:32:57Z (feat/residue): name: the user rejects keeping 'tack' (2026-10-06, leaning strongly to a rename; dislikes the name and its connotation); spec §3 is rewritten once a name is chosen
 - 2026-10-06T11:34:19Z (feat/residue): review: spec round 2 — verdict: revise; findings: Important 5, Minor 6; reviewer: claude-code/claude-fable-5-1
+- 2026-10-06T11:34:37Z (feat/residue): parked (waiting on user, decision): User chooses the residue's new name (candidates given in the session); then this session rewrites spec §3, drafts the rename spec modelled on docs/specs/2026-09-27-rename-to-tack-design.md, and sends the residue spec back for review round 3
+  provenance: {"harness_session":"claude-code:f110e5bf-234d-4815-8f46-8780451c03cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
