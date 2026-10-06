@@ -19,10 +19,10 @@ def unit(name):
 
 
 @pytest.mark.parametrize("name, command", [("capture", "capture"), ("prune", "prune")])
-def test_service_runs_tool_with_path(name, command):
+def test_service_runs_the_linked_tool_with_path(name, command):
     service = unit(f"session-archive-{name}.service")["Service"]
     assert service["Type"] == "oneshot"
-    assert service["ExecStart"] == f"/usr/bin/python3 %h/d/tack/tools/session-archive {command}"
+    assert service["ExecStart"] == f"/usr/bin/python3 %h/.local/bin/session-archive {command}"
     assert service["Environment"] == "PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin"
 
 
@@ -54,3 +54,13 @@ def test_the_tool_runs_through_a_link_from_any_directory(tmp_path):
                             capture_output=True)
     assert result.returncode == 0, result.stderr
     assert "capture" in result.stdout and "prune" in result.stdout
+
+
+def test_no_unit_names_the_checkout():
+    """A rename moves the checkout; a unit that names its path stops working
+    (docs/specs/2026-10-06-rename-to-hq-design.md §3.1)."""
+    for path in sorted(UNITS.iterdir()):
+        for line in path.read_text().splitlines():
+            if line.startswith("#"):
+                continue
+            assert "%h/d/" not in line and "file://" not in line, f"{path.name}: {line}"
