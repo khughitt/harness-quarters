@@ -1,5 +1,6 @@
 """The units call the tool with PATH set, on the spec's schedule, and links.toml links them."""
 import configparser
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -7,6 +8,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 UNITS = ROOT / "systemd" / "user"
+TOOL = ROOT / "tools" / "session-archive"
 
 
 def unit(name):
@@ -36,3 +38,19 @@ def test_units_are_linked():
         for suffix in ("service", "timer"):
             filename = f"session-archive-{name}.{suffix}"
             assert required[f"~/.config/systemd/user/{filename}"] == f"systemd/user/{filename}"
+
+
+def test_the_tool_is_linked_onto_path():
+    """The units call the tool through this link, so they never name the checkout."""
+    required = tomllib.loads((ROOT / "links.toml").read_text())["required"]
+    assert required["~/.local/bin/session-archive"] == "tools/session-archive"
+
+
+def test_the_tool_runs_through_a_link_from_any_directory(tmp_path):
+    link = tmp_path / "bin" / "session-archive"
+    link.parent.mkdir()
+    link.symlink_to(TOOL)
+    result = subprocess.run(["/usr/bin/python3", str(link), "--help"], cwd=tmp_path, text=True,
+                            capture_output=True)
+    assert result.returncode == 0, result.stderr
+    assert "capture" in result.stdout and "prune" in result.stdout
