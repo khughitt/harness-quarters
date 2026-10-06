@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: feat/residue
 created: 2026-10-04T10:54:36Z
-updated: 2026-10-06T12:56:06Z
+updated: 2026-10-06T13:19:00Z
 started: 2026-10-06T11:20:33Z
 depends: [ops-f2405d]
 tags: []
@@ -36,3 +36,5 @@ Done: tack renamed in place by the rename design's procedure (tasks rename, iden
   provenance: {"harness_session":"claude-code:f110e5bf-234d-4815-8f46-8780451c03cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-06T12:56:04Z (feat/residue): review: spec round 3 — verdict: revise; findings: P2 1, P3 1; reviewer: codex/gpt-6-astra
 - 2026-10-06T12:56:04Z (feat/residue): name chosen by the user 2026-10-06: 'harness quarters', prefix hq
+- 2026-10-06T13:19:00Z (feat/residue): parked (waiting on user, review): User reviews both specs (GPT round): docs/specs/2026-10-06-residue-design.md (after round 3) and docs/specs/2026-10-06-rename-to-hq-design.md (after two fresh-context rounds), and confirms or overrides: the rename no longer runs first; the cutover waits on flows-44890e and obs-ff4e76. Then this session records the round, fixes findings, and on acceptance writes the residue plan first.
+  provenance: {"harness_session":"claude-code:f110e5bf-234d-4815-8f46-8780451c03cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
