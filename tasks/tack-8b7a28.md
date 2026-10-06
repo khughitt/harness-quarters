@@ -7,7 +7,7 @@ size: m
 complexity: high
 process: planned
 created: 2026-10-06T12:59:15Z
-updated: 2026-10-06T14:52:43Z
+updated: 2026-10-06T16:00:08Z
 depends: [flows-44890e, obs-ff4e76, tasks-7580d2]
 parent: tack-dcb11a
 tags: []
@@ -26,3 +26,4 @@ Why: the user chose the residue's name on 2026-10-06 (parent spec §7.1); the re
 - 2026-10-06T13:21:53Z (feat/residue): user 2026-10-06: keep the rename despite the added work; first make other projects handle a rename in general, since this will not be the last one
 - 2026-10-06T14:32:54Z (feat/residue): review: spec round 4 — verdict: revise; findings: P2 1; reviewer: codex/gpt-6-astra
 - 2026-10-06T14:52:43Z (feat/residue): review: spec round 5 — verdict: accept; findings: none; reviewer: codex/gpt-6-astra
+- 2026-10-06T16:00:08Z (main): From the residue's execution: if this rename's plan sends host scripts that preview with just, do not use 'just --quiet': in just 1.58 it suppresses the recipe's own output, so a preview prints nothing and a failed apply prints an empty tail. Run 'just link' and filter the echoed recipe line (tack docs/plans/2026-10-06-residue.md, execution record).
