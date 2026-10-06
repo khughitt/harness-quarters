@@ -30,11 +30,17 @@ def task_id(output):
     return added.get("id") or added["task"]["id"]
 
 
-class Sandbox:
-    """The September rename's shape: checkout `ai` (prefix ai) becomes `tack`, and the
-    cutover retargets in the repositories named by `repos` (ops, unless a test asks)."""
+KEPT = ("codex/config.toml", "local/codex/trust.toml")
 
-    def __init__(self, tmp, repos=("ops",)):
+
+class Sandbox:
+    """A rename in a sandbox that shares no live state. The September shape: checkout
+    `ai` (prefix ai) becomes `tack`, retargeting in `repos` (ops, unless a test asks).
+    The hq shape (`hq=True`): checkout `tack`, renamed once before from `ai` so the
+    registry holds `ai = "tack"`, in the group `agent-layer`, becomes `hq`; its Codex
+    trust files are a filtered tracked file and an ignored one, saved with --keep."""
+
+    def __init__(self, tmp, repos=("ops",), hq=False):
         self.tmp = tmp
         self.env = {**os.environ, "HOME": str(tmp / "home"), "XDG_CONFIG_HOME": str(tmp / "cfg"),
                     "XDG_STATE_HOME": str(tmp / "state"), "GIT_AUTHOR_NAME": "t",
@@ -43,8 +49,9 @@ class Sandbox:
         for d in ("home", "cfg", "state"):
             (tmp / d).mkdir()
         self.sync = tmp / "sync"
-        self.old, self.new = "ai", "tack"
-        self.checkout, self.new_root = self.sync / "ai", self.sync / "tack"
+        self.hq = hq
+        self.old, self.new = ("tack", "hq") if hq else ("ai", "tack")
+        self.checkout, self.new_root = self.sync / self.old, self.sync / self.new
         self.repos = [self.sync / name for name in repos]
         self.ops = self.repos[0]
         self.snapshot = tmp / "snap"
@@ -66,14 +73,14 @@ class Sandbox:
         self.run("git", "commit", "-qm", message, cwd=root)
 
     def build(self):
-        self.repo(self.checkout, self.old)
+        self.repo(self.checkout, "ai")
         (self.checkout / "tools").mkdir()
         for name in ("tack-link", "rename-cutover"):
             shutil.copy2(TOOLS / name, self.checkout / "tools" / name)
         (self.checkout / "agents").mkdir()
         (self.checkout / "agents" / "README").write_text("x\n")
         (self.checkout / "links.toml").write_text('[required]\n"~/.agents" = "agents"\n')
-        (self.checkout / ".gitignore").write_text(".worktrees\n")
+        (self.checkout / ".gitignore").write_text(".worktrees\nlocal/\n")
         tid = task_id(self.run("tasks", "add", "one", "--process", "direct", cwd=self.checkout).stdout)
         self.run("tasks", "add", "two", "--process", "direct", cwd=self.checkout)
         self.run("tasks", "start", tid, cwd=self.checkout)
@@ -85,8 +92,32 @@ class Sandbox:
         for root in self.repos:
             self.repo(root, root.name)
             self.commit(root, "init")
+        if self.hq:
+            self.build_hq()
         self.run(self.checkout / "tools" / "tack-link", "--apply")
         return self
+
+    def build_hq(self):
+        """The earlier rename, done in place; the group; the two trust files."""
+        self.run("tasks", "rename", "ai", "tack", cwd=self.checkout)
+        self.commit(self.checkout, "the earlier rename")
+        self.run("tasks", "group", "set", "agent-layer", "tack", *(r.name for r in self.repos))
+        # The live checkout's filter keeps trust tables out of commits; this one keeps
+        # out any line starting with "trust".
+        self.run("git", "config", "filter.harness-state.clean", "sed '/^trust/d'", cwd=self.checkout)
+        (self.checkout / ".gitattributes").write_text("codex/config*.toml filter=harness-state\n")
+        (self.checkout / "codex").mkdir()
+        (self.checkout / "codex" / "config.toml").write_text('model = "m"\n')
+        self.commit(self.checkout, "a filtered config")
+        with (self.checkout / "codex" / "config.toml").open("a") as f:
+            f.write(f'trust = "{self.checkout}"\n')
+        # git calls a filtered file modified when only its size differs; staging it, as
+        # harness-state-refresh does, refreshes the entry and stages nothing new.
+        self.run("git", "add", "codex/config.toml", cwd=self.checkout)
+        (self.checkout / "local" / "codex").mkdir(parents=True)
+        (self.checkout / "local" / "codex" / "trust.toml").write_text(f'"{self.checkout}" = "trusted"\n')
+        (self.checkout / "local" / "codex" / "trust.toml").chmod(0o600)
+        assert self.run("git", "status", "--porcelain", cwd=self.checkout).stdout == ""
 
     def cutover(self, *args, check=True):
         tool = self.snapshot / "rename-cutover" if (self.snapshot / "rename-cutover").exists() \
@@ -97,6 +128,9 @@ class Sandbox:
         args = ["save", "--snapshot", self.snapshot, "--checkout", self.checkout,
                 "--new-root", self.new_root, "--old", self.old, "--new", self.new,
                 "--link-tool", LINK_TOOL]
+        if self.hq:
+            for rel in KEPT:
+                args += ["--keep", rel]
         for root in self.repos:
             args += ["--repo", root]
         return args
@@ -130,7 +164,18 @@ class Sandbox:
         return {"checkout": tree(self.checkout), **{r.name: tree(r) for r in self.repos},
                 "cfg": tree(self.tmp / "cfg" / "tasks"), "state": tree(self.tmp / "state" / "tasks"),
                 "worktrees": os.readlink(self.checkout / ".worktrees"),
-                "agents": os.path.realpath(self.tmp / "home" / ".agents")}
+                "agents": os.path.realpath(self.tmp / "home" / ".agents"),
+                "modes": {rel: oct((self.checkout / rel).stat().st_mode) for rel in KEPT
+                          if (self.checkout / rel).exists()}}
+
+    def edit_trust(self):
+        """What the runbook's step 4 does to the trust files at the new root."""
+        with (self.new_root / "codex" / "config.toml").open("a") as f:
+            f.write(f'trust = "{self.new_root}"\n')
+        trust = self.new_root / "local" / "codex" / "trust.toml"
+        with trust.open("a") as f:
+            f.write(f'"{self.new_root}" = "trusted"\n')
+        trust.chmod(0o644)
 
 
 @pytest.fixture
@@ -142,6 +187,12 @@ def box(tmp_path):
 def box2(tmp_path):
     """Two retargeted repositories, ops and lore."""
     return Sandbox(tmp_path, repos=("ops", "lore")).build()
+
+
+@pytest.fixture
+def hq(tmp_path):
+    """This rename's shape, retargeting in ops, lore and flows."""
+    return Sandbox(tmp_path, repos=("ops", "lore", "flows"), hq=True).build()
 
 
 # --- save ---------------------------------------------------------------------
@@ -788,3 +839,141 @@ def test_second_host_adopts_the_rename(box):
     parked = json.loads(run2("tasks", "list", "--parked", cwd=box.new_root))
     assert f"tack-{hex_}" in [t["id"] for t in parked["tasks"]]
     assert first_host() == first
+
+
+# --- this rename's shape: an earlier alias, a group, the trust files ------------
+
+
+def test_registry_view_reads_the_renames_own_rewrites_as_equal(tmp_path):
+    cutover = load_cutover()
+    saved, live = tmp_path / "saved.toml", tmp_path / "live.toml"
+    saved.write_text('[projects]\nops = "/o"\ntack = "/t"\n[aliases]\nai = "tack"\n'
+                     '[groups]\nagent-layer = ["ops", "tack"]\n')
+    live.write_text('[projects]\nhq = "/h"\nops = "/o"\n[aliases]\nai = "hq"\ntack = "hq"\n'
+                    '[groups]\nagent-layer = ["hq", "ops"]\n')
+    assert cutover.registry_view(live, "tack", "hq") == cutover.registry_view(saved, "tack", "hq")
+
+
+@pytest.mark.parametrize("change, named", [
+    (lambda t: t.replace("[projects]\n", '[projects]\nzz = "/elsewhere"\n'), "projects.zz"),
+    (lambda t: t.replace("[aliases]\n", '[aliases]\nzz = "hq"\n'), "aliases.zz"),
+    (lambda t: t.replace('ai = "hq"', 'ai = "ops"'), "aliases.ai"),
+    (lambda t: t.replace('"flows", ', ""), "groups.agent-layer"),
+    (lambda t: t + 'other = ["ops"]\n', "groups.other"),
+])
+def test_the_guard_stops_on_any_other_registry_change(hq, change, named):
+    hq.save()
+    hq.cutover("apply", "--snapshot", hq.snapshot)
+    registry = hq.tmp / "cfg" / "tasks" / "projects.toml"
+    text = registry.read_text()
+    assert 'ai = "hq"' in text and '"flows", "hq"' in text
+    registry.write_text(change(text))
+    assert registry.read_text() != text
+    result = hq.cutover("rollback", "--snapshot", hq.snapshot, check=False)
+    assert result.returncode == 1
+    assert "guard: the registry changed" in result.stderr and named in result.stderr
+    assert hq.new_root.exists() and not hq.checkout.exists()
+
+
+def test_this_renames_cutover_and_rollback_before_commit(hq):
+    for root in hq.repos:
+        hq.depend_on_checkout(root)
+    before = hq.fingerprint()
+    hq.save()
+    hq.forward()
+    hq.edit_trust()
+    hq.cutover("verify", "--snapshot", hq.snapshot)
+    registry = (hq.tmp / "cfg" / "tasks" / "projects.toml").read_text()
+    assert 'ai = "hq"' in registry and 'tack = "hq"' in registry
+    assert '"hq"' in registry.split("[groups]")[1]
+    hq.cutover("rollback", "--snapshot", hq.snapshot)
+    assert hq.fingerprint() == before
+
+
+def test_this_renames_rollback_after_commit_restores_the_trust_files(hq):
+    for root in hq.repos:
+        hq.depend_on_checkout(root)
+    before = hq.fingerprint()
+    hq.save()
+    hq.forward()
+    hq.edit_trust()
+    hq.commit(hq.new_root, "rename")
+    for root in hq.repos:
+        hq.commit(root, "retarget")
+    hq.cutover("rollback", "--snapshot", hq.snapshot)
+    assert hq.fingerprint() == before
+    assert oct((hq.checkout / KEPT[1]).stat().st_mode).endswith("600")
+
+
+def test_this_renames_second_host_adopts(hq):
+    second = {**hq.env, "XDG_CONFIG_HOME": str(hq.tmp / "cfg2"), "XDG_STATE_HOME": str(hq.tmp / "state2")}
+    shutil.copytree(hq.tmp / "cfg", hq.tmp / "cfg2")       # the second host's registry, as it was
+    (hq.tmp / "state2").mkdir()
+    hq.save()
+    hq.forward()
+    hq.commit(hq.new_root, "rename")
+    hq.run("tasks", "rename", "tack", "hq", "--adopt", cwd=hq.new_root, env=second)
+    registry = (hq.tmp / "cfg2" / "tasks" / "projects.toml").read_text()
+    assert f'hq = "{hq.new_root}"' in registry
+    assert 'ai = "hq"' in registry and 'tack = "hq"' in registry
+    assert '"hq"' in registry.split("[groups]")[1] and '"tack"' not in registry.split("[groups]")[1]
+
+
+def test_save_refuses_a_kept_path_that_is_not_a_file(hq):
+    args = [str(a) for a in hq.save_args()]
+    args[args.index("--keep") + 1] = "codex/absent.toml"
+    result = hq.cutover(*args, check=False)
+    assert result.returncode == 1
+    assert "no regular file" in result.stderr
+    assert not hq.snapshot.exists()
+
+
+@pytest.mark.parametrize("path", ["/etc/hostname", "../outside.toml"])
+def test_save_refuses_a_kept_path_outside_the_checkout(hq, path):
+    args = [str(a) for a in hq.save_args()]
+    args[args.index("--keep") + 1] = path
+    result = hq.cutover(*args, check=False)
+    assert result.returncode == 1
+    assert "name a path inside the checkout" in result.stderr
+    assert not hq.snapshot.exists()
+
+
+def link_away(directory, outside):
+    """Replace a directory by a link to `outside`, which holds the same files."""
+    shutil.copytree(directory, outside)
+    shutil.rmtree(directory)
+    directory.symlink_to(outside)
+
+
+def test_save_refuses_a_kept_path_through_a_linked_directory(hq, tmp_path):
+    link_away(hq.checkout / "local" / "codex", tmp_path / "outside")
+    result = hq.save(check=False)
+    assert result.returncode == 1
+    assert "resolves outside the checkout" in result.stderr
+    assert not hq.snapshot.exists()
+
+
+def test_rollback_refuses_a_kept_path_linked_away_since_save(hq, tmp_path):
+    """The restore would overwrite a file outside the checkout; nothing moves."""
+    hq.save()
+    hq.cutover("apply", "--snapshot", hq.snapshot)
+    outside = tmp_path / "outside"
+    link_away(hq.new_root / "local" / "codex", outside)
+    (outside / "trust.toml").write_text("someone else's\n")
+    result = hq.cutover("rollback", "--snapshot", hq.snapshot, check=False)
+    assert result.returncode == 1
+    assert "would be written through a link" in result.stderr
+    assert (outside / "trust.toml").read_text() == "someone else's\n"
+    assert hq.new_root.exists() and not hq.checkout.exists()
+
+
+def test_check_kept_names_a_mode_that_differs(tmp_path):
+    cutover = load_cutover()
+    checkout, snap = tmp_path / "c", tmp_path / "s"
+    (snap / "kept").mkdir(parents=True)
+    checkout.mkdir()
+    (checkout / "f").write_text("x\n")
+    (snap / "kept" / "0").write_text("x\n")
+    (checkout / "f").chmod(0o644)
+    with pytest.raises(cutover.Stop, match="mode 644, saved 600"):
+        cutover.check_kept(checkout, snap, {"kept": [{"path": "f", "mode": 0o600}]})

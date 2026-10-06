@@ -19,6 +19,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tomllib
@@ -148,6 +149,31 @@ def preconditions(checkout, repos, tool):
         raise Stop(f"preconditions: link drift:\n{check.stdout}")
 
 
+def kept_paths(checkout, paths):
+    """Files git cannot restore (a clean filter keeps their live content out of every
+    commit, or they are ignored), named relative to the checkout so they follow its move."""
+    for rel in paths:
+        if Path(rel).is_absolute() or ".." in Path(rel).parts:
+            raise Stop(f"save: --keep {rel}: name a path inside the checkout, relative to it")
+        path = checkout / rel
+        if not path.is_file() or path.is_symlink():
+            raise Stop(f"save: --keep {rel}: no regular file at {path}")
+        if checkout.resolve() not in path.resolve().parents:
+            raise Stop(f"save: --keep {rel}: {path} resolves outside the checkout, to {path.resolve()}")
+    return list(paths)
+
+
+def validate_kept_destinations(meta):
+    """Run before any mutation: each kept file must still be restored inside the checkout,
+    so a link planted in its path since save cannot carry the restore elsewhere."""
+    root = checkout_now(meta).resolve()
+    for entry in meta["kept"]:
+        dest = root / entry["path"]
+        if dest.is_symlink() or root not in dest.resolve().parents:
+            raise Stop(f"rollback: kept {entry['path']} would be written through a link, "
+                       f"to {dest.resolve()}")
+
+
 def save(args):
     checkout, snap = Path(args.checkout).resolve(), Path(args.snapshot)
     repos = [Path(r).resolve() for r in args.repo]
@@ -177,6 +203,7 @@ def save(args):
         path = path.resolve()
         if snap_resolved == path or path in snap_resolved.parents:
             raise Stop(f"save: snapshot {snap} lies inside {which}")
+    kept = kept_paths(checkout, args.keep)
     preconditions(checkout, repos, tool)
     new_root = Path(args.new_root)
     new_root = new_root.parent.resolve() / new_root.name
@@ -189,23 +216,48 @@ def save(args):
         "worktrees_link": link_text,
         "storage_old": str(storage_old) if storage_old else None,
         "storage_new": str(storage_new) if storage_new else None,
+        "kept": [{"path": rel, "mode": stat.S_IMODE((checkout / rel).stat().st_mode)} for rel in kept],
     }
     snap.mkdir(parents=True, exist_ok=False)
     shutil.copytree(config, snap / "config", symlinks=True)
     shutil.copytree(state, snap / "state", symlinks=True)
     (snap / "links.txt").write_text(link_report(tool))
+    for n, rel in enumerate(kept):
+        (snap / "kept").mkdir(exist_ok=True)
+        shutil.copy2(checkout / rel, snap / "kept" / str(n))
     shutil.copy2(Path(__file__).resolve(), snap / "rename-cutover")
     (snap / "meta.json").write_text(json.dumps(meta, indent=2) + "\n")
     print(f"saved {snap}")
 
 
 def registry_view(path, old, new):
-    """The registry with the renamed project's own keys removed, for the guard."""
+    """The registry as the guard compares it: the renamed project's own entries removed,
+    and the rename's own rewrites of other entries read the same on both sides.
+    `tasks rename` retargets an alias that named the old prefix (`ai = "tack"` becomes
+    `ai = "hq"`) and rewrites a group member from the old prefix to the new; reading the
+    old prefix as the new one makes exactly those equal. Every other difference remains,
+    except the order of a group's members: tasks keeps them sorted and re-sorts on the
+    rewrite, so both sides are compared sorted."""
     data = tomllib.loads(path.read_text()) if path.exists() else {}
+
+    def renamed(prefix):
+        return new if prefix == old else prefix
+
     projects = {k: v for k, v in data.get("projects", {}).items() if k not in (old, new)}
-    aliases = {k: v for k, v in data.get("aliases", {}).items() if k != old and v != new}
-    return {**{k: v for k, v in data.items() if k not in ("projects", "aliases")},
-            "projects": projects, "aliases": aliases}
+    aliases = {k: renamed(v) for k, v in data.get("aliases", {}).items() if k not in (old, new)}
+    groups = {k: sorted(renamed(m) for m in members) for k, members in data.get("groups", {}).items()}
+    rest = {k: v for k, v in data.items() if k not in ("projects", "aliases", "groups")}
+    return {**rest, "projects": projects, "aliases": aliases, "groups": groups}
+
+
+def registry_changes(live, saved):
+    """The names of the entries that differ, for the guard's message."""
+    tables = ("projects", "aliases", "groups")
+    names = {k for k in (live.keys() | saved.keys()) - set(tables) if live.get(k) != saved.get(k)}
+    for table in tables:
+        names |= {f"{table}.{k}" for k in live[table].keys() | saved[table].keys()
+                  if live[table].get(k) != saved[table].get(k)}
+    return sorted(names)
 
 
 def files(root, skip):
@@ -247,8 +299,7 @@ def guard(meta, snap):
     live = registry_view(config / "projects.toml", old, new)
     saved = registry_view(snap / "config" / "projects.toml", old, new)
     if live != saved:
-        extra = sorted(set(live["projects"]) ^ set(saved["projects"]) | set(live["aliases"]) ^ set(saved["aliases"]))
-        raise Stop(f"guard: the registry changed outside {old}/{new}: {', '.join(extra) or 'values'}")
+        raise Stop(f"guard: the registry changed outside {old}/{new}: {', '.join(registry_changes(live, saved))}")
     own = {f"claims/{p}.{ext}" for p in (old, new) for ext in ("toml", "lock")}
     inventory = state / "rename" / f"{old}.toml"
     if inventory.exists():
@@ -351,6 +402,40 @@ def save_reset_patch(root, head, snap, label):
         print(f"rename-cutover: reset {root}: changes since save kept in {path}", file=sys.stderr)
 
 
+def restore_kept(checkout, snap, meta):
+    """Copy each kept file back as it was saved, mode included. Run after the reset,
+    which leaves an ignored file alone and rewrites a filtered one only when it sees a
+    change, so neither can be trusted to have restored it."""
+    for n, entry in enumerate(meta["kept"]):
+        live = checkout / entry["path"]
+        live.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(snap / "kept" / str(n), live)
+        os.chmod(live, entry["mode"])
+
+
+def refresh_kept(checkout, meta):
+    """A filtered file whose size differs from its index entry shows as modified until
+    the entry is refreshed, even when its filtered content is unchanged. Stage each kept
+    file that is tracked and filtered-equal, as harness-state-refresh does: that writes
+    the blob already in the index. A real change is left for the clean check to report."""
+    for entry in meta["kept"]:
+        path = entry["path"]
+        tracked = subprocess.run(["git", "-C", str(checkout), "ls-files", "--error-unmatch", "--", path],
+                                 capture_output=True).returncode == 0
+        if tracked and subprocess.run(["git", "-C", str(checkout), "diff", "--quiet", "--", path]).returncode == 0:
+            run("git", "-C", checkout, "add", "--", path)
+
+
+def check_kept(checkout, snap, meta):
+    for n, entry in enumerate(meta["kept"]):
+        live = checkout / entry["path"]
+        if not filecmp.cmp(live, snap / "kept" / str(n), shallow=False):
+            raise Stop(f"check: {live} differs from its saved copy")
+        if stat.S_IMODE(live.stat().st_mode) != entry["mode"]:
+            raise Stop(f"check: {live} has mode {stat.S_IMODE(live.stat().st_mode):o}, "
+                       f"saved {entry['mode']:o}")
+
+
 def rollback(args):
     snap = Path(args.snapshot)
     meta = load_meta(snap)
@@ -366,6 +451,7 @@ def rollback(args):
     guard(meta, snap)
     check_branches(meta)
     leftovers = validate_leftovers(meta)
+    validate_kept_destinations(meta)
     move_back(meta)
     checkout = Path(meta["checkout"]["root"])
     resets = [(checkout, meta["checkout"]["head"], "checkout")]
@@ -375,6 +461,8 @@ def rollback(args):
         run("git", "-C", root, "reset", "-q", "--hard", head)
     for path in leftovers:
         (checkout / path).unlink()
+    restore_kept(checkout, snap, meta)
+    refresh_kept(checkout, meta)
     restore_dir(snap / "config", Path(meta["config"]))
     restore_dir(snap / "state", Path(meta["state"]))
     tool = link_tool(checkout, meta)
@@ -386,6 +474,7 @@ def rollback(args):
             raise Stop(f"check: tasks check reports findings in {root}")
         if porcelain(root):
             raise Stop(f"check: {root} is not clean")
+    check_kept(checkout, snap, meta)
     print("rolled back to " + ", ".join(f"{head[:7]} ({label})" for _, head, label in resets))
 
 
@@ -516,6 +605,9 @@ def main(argv):
     s.add_argument("--new", required=True)
     s.add_argument("--link-tool", default="tools/tack-link",
                    help="the link tool's path inside the checkout")
+    s.add_argument("--keep", action="append", default=[],
+                   help="a file inside the checkout that git cannot restore, saved and "
+                        "restored as a live file with its mode (repeatable)")
     r = sub.add_parser("retarget")
     r.add_argument("--snapshot", required=True)
     r.add_argument("--repo", required=True)
