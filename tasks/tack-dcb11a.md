@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: feat/residue
 created: 2026-10-04T10:54:36Z
-updated: 2026-10-06T15:18:47Z
+updated: 2026-10-06T15:31:34Z
 started: 2026-10-06T11:20:33Z
 depends: [ops-f2405d]
 tags: []
@@ -60,3 +60,7 @@ Done: tack renamed in place by the rename design's procedure (tasks rename, iden
   provenance: {"harness_session":"claude-code:856ae840-5763-49d7-a62e-93994791cdcb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-06T15:15:21Z (feat/residue): review: impl round 1 — verdict: accept; findings: Minor 8; reviewer: claude-code/claude-fable-5-1
 - 2026-10-06T15:18:47Z (feat/residue): merged to tack main a803d37: facts and tool on main; nothing applied to any host yet
+- 2026-10-06T15:25:39Z (feat/residue): surface audit, this host: report non-ok: create ~/.agents/bin/harness-facts (status 0); skills/tasks ok; DANGLING ~/.codex/skills/vercel-react-best-practices -> ../../.agents/skills/vercel-react-best-practices; DANGLING ~/.codex/skills/web-design-guidelines -> ../../.agents/skills/web-design-guidelines; harness-owned real dirs: ~/.claude/skills/{synced,.trash}, ~/.claude-work/skills/synced, ~/.codex/skills/.system, ~/.codex-work/skills/.system
+- 2026-10-06T15:30:53Z (feat/residue): approvals (user, in session 2026-10-06): titan link step; scope chain; deletion of tack archive/ (24-file checksummed inventory); europa link step when online, applied only if its preview matches its audit
+- 2026-10-06T15:31:33Z (feat/residue): host step done on this host: harness-facts installed and answering; link-check clean; dangling Codex links: vercel-react-best-practices removed, web-design-guidelines removed. Preview/apply scripts ran without just --quiet (just 1.58 suppresses recipe output under --quiet).
+- 2026-10-06T15:31:33Z (feat/residue): review: impl round 2 — verdict: revise; findings: Important 2, Minor 4; reviewer: claude-code/claude-fable-5-1
