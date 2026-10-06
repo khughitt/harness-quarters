@@ -19,7 +19,8 @@
 "~/.config/systemd/user/session-archive-prune.service" = "systemd/user/session-archive-prune.service"
 "~/.config/systemd/user/session-archive-prune.timer" = "systemd/user/session-archive-prune.timer"
 
-# The aggregate surface stays in tack until the owner of each entry moves.
+# The aggregate surface: each entry targets its owner. Adding or removing a skill or a
+# tool is a line here; a removed one moves to [retired] with its target.
 "~/.agents/.skill-lock.json" = "lore:.skill-lock.json"
 "~/.agents/evals" = "flows:evals"
 "~/.agents/flow" = "flows:flow"
@@ -27,6 +28,7 @@
 "~/.agents/vendor" = "lore:vendor"
 "~/.agents/bin/flow-outcome-verdict" = "flows:bin/flow-outcome-verdict"
 "~/.agents/bin/flow-state" = "flows:bin/flow-state"
+"~/.agents/bin/harness-facts" = "tools/harness-facts"
 "~/.agents/bin/retros" = "flows:bin/retros"
 "~/.agents/bin/session-episodes" = "agents/bin/session-episodes"
 "~/.agents/bin/skill-sizes.py" = "lore:bin/skill-sizes.py"
@@ -84,6 +86,7 @@ home = "~/.claude"
 "skills/session-logs" = "agents/skills/session-logs"
 "skills/curate" = "tasks:skills/curate"
 "skills/scope" = "tasks:skills/scope"
+"skills/tasks" = "tasks:skills/tasks"
 "skills/quick-add" = "ops:skills/quick-add"
 
 [harness.claude-work]

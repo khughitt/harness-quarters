@@ -1,0 +1,223 @@
+#!/usr/bin/env python3
+"""Capability facts: validate facts/capabilities.toml and read it.
+
+A fact is an operational fact about a harness: a typed value and, separately, where the
+value comes from. An entry is `probed` (value, harness version, local date, evidence) or
+`unknown` (no value). A harness with no entry is unknown. Unknown is an answer and never a
+default: what it permits is the consumer's decision.
+
+This tool is the only supported reader. As a command: `check`, `list`, `get`. As a module,
+for a hook that cannot afford a subprocess: load this file with a source loader and call
+`lookup(fact, harness)`. Both validate the whole file first and refuse the same things.
+It opens the fact file for reading only. Design: docs/specs/2026-10-06-residue-design.md §4.
+"""
+import argparse
+import datetime
+import json
+import pathlib
+import re
+import sys
+import tomllib
+
+CHECKOUT = pathlib.Path(__file__).resolve().parent.parent
+DEFAULT = CHECKOUT / "facts" / "capabilities.toml"
+NAME = re.compile(r"[a-z][a-z0-9-]*\Z")
+TYPES = ("boolean", "set")
+VALUE = {"boolean": "a boolean", "set": "a list of unique strings"}
+FACT_KEYS = {"type", "description", "probe", "harness"}
+PROBED_KEYS = {"status", "value", "version", "date", "evidence", "note"}
+UNKNOWN_KEYS = {"status", "note"}
+
+
+class Invalid(Exception):
+    """The fact file is refused; `problems` has one line per reason."""
+
+    def __init__(self, problems):
+        super().__init__("; ".join(problems))
+        self.problems = problems
+
+
+def _text(value):
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _value_ok(kind, value):
+    if kind == "boolean":
+        return isinstance(value, bool)
+    return (isinstance(value, list) and all(isinstance(item, str) for item in value)
+            and len(set(value)) == len(value))
+
+
+def _entry(where, kind, entry, out):
+    if not isinstance(entry, dict):
+        out.append(f"{where}: must be a table")
+        return
+    status = entry.get("status")
+    if status == "unknown":
+        extra = sorted(set(entry) - UNKNOWN_KEYS)
+        if extra:
+            out.append(f"{where}: an unknown entry carries only status and note, not {extra[0]}")
+    elif status == "probed":
+        extra = sorted(set(entry) - PROBED_KEYS)
+        if extra:
+            out.append(f"{where}: unknown key {extra[0]}")
+        if kind in TYPES and ("value" not in entry or not _value_ok(kind, entry["value"])):
+            out.append(f"{where}: value must be {VALUE[kind]}")
+        if not _text(entry.get("version")):
+            out.append(f"{where}: version must be a non-empty string")
+        if type(entry.get("date")) is not datetime.date:  # a date-time is a subclass; refuse it
+            out.append(f"{where}: date must be a local date")
+        if not _text(entry.get("evidence")):
+            out.append(f"{where}: evidence must be a non-empty string")
+    else:
+        out.append(f"{where}: status must be probed or unknown")
+    if "note" in entry and not _text(entry["note"]):
+        out.append(f"{where}: note must be a non-empty string")
+
+
+def problems(data, root):
+    out = []
+    for key in sorted(set(data) - {"schema", "harnesses", "facts"}):
+        out.append(f"unknown key {key}")
+    if type(data.get("schema")) is not int or data["schema"] != 1:   # true == 1 and 1.0 == 1 in Python
+        out.append("schema must be 1")
+    harnesses = data.get("harnesses")
+    if not isinstance(harnesses, list) or not harnesses or not all(isinstance(h, str) for h in harnesses):
+        out.append("harnesses must be a non-empty list of names")
+        harnesses = []
+    elif len(set(harnesses)) != len(harnesses):
+        out.append("harnesses must be unique")
+    for harness in harnesses:
+        if not NAME.match(harness):
+            out.append(f"harnesses: {harness} is not a valid name")
+    table = data.get("facts", {})
+    if not isinstance(table, dict):
+        out.append("facts must be a table")
+        table = {}
+    for name, fact in table.items():
+        where = f"facts.{name}"
+        if not NAME.match(name):
+            out.append(f"{where}: {name} is not a valid name")
+        if not isinstance(fact, dict):
+            out.append(f"{where}: must be a table")
+            continue
+        for key in sorted(set(fact) - FACT_KEYS):
+            out.append(f"{where}: unknown key {key}")
+        kind = fact.get("type")
+        if kind not in TYPES:
+            out.append(f"{where}: type must be boolean or set")
+        if not _text(fact.get("description")):
+            out.append(f"{where}: description must be a non-empty string")
+        if "probe" in fact:
+            probe = fact["probe"]
+            inside = _text(probe) and (root / probe).resolve().is_relative_to(root.resolve()) and (root / probe).is_file()
+            if not inside:
+                out.append(f"{where}: probe {probe} is not a file in this checkout")
+        entries = fact.get("harness", {})
+        if not isinstance(entries, dict):
+            out.append(f"{where}.harness: must be a table")
+            continue
+        for harness, entry in entries.items():
+            if harness not in harnesses:
+                out.append(f"{where}.harness.{harness}: {harness} is not a declared harness")
+            _entry(f"{where}.harness.{harness}", kind, entry, out)
+    return out
+
+
+def validate(path=None, root=None):
+    """The parsed fact file, or Invalid. Opens the file for reading only."""
+    path = pathlib.Path(path or DEFAULT)
+    try:
+        with open(path, "rb") as handle:
+            data = tomllib.load(handle)
+    except OSError as error:
+        raise Invalid([f"{path}: {error.strerror or error}"]) from None
+    except (tomllib.TOMLDecodeError, UnicodeDecodeError) as error:
+        raise Invalid([f"not valid TOML: {error}"]) from None
+    found = problems(data, pathlib.Path(root or CHECKOUT))
+    if found:
+        raise Invalid(found)
+    return data
+
+
+def _shown(name, harness, fact, entry):
+    out = {"fact": name, "harness": harness, "type": fact["type"], "status": entry["status"] if entry else "unknown"}
+    if entry and entry["status"] == "probed":
+        value = entry["value"]
+        out.update(value=sorted(value) if fact["type"] == "set" else value, version=entry["version"],
+                   date=entry["date"].isoformat(), evidence=entry["evidence"])
+    if entry and "note" in entry:
+        out["note"] = entry["note"]
+    return out
+
+
+def view(data):
+    """The whole view: every fact, with an entry for every declared harness."""
+    facts = {}
+    for name, fact in data.get("facts", {}).items():
+        shown = {"type": fact["type"], "description": fact["description"]}
+        if "probe" in fact:
+            shown["probe"] = fact["probe"]
+        shown["harness"] = {h: _shown(name, h, fact, fact.get("harness", {}).get(h)) for h in data["harnesses"]}
+        facts[name] = shown
+    return {"schema": data["schema"], "harnesses": list(data["harnesses"]), "facts": facts}
+
+
+def lookup(fact, harness, path=None):
+    """One entry. Invalid for a refused file; LookupError for an undeclared fact or harness,
+    so a misspelt name can never read as unknown."""
+    shown = view(validate(path))
+    if fact not in shown["facts"]:
+        raise LookupError(f"{fact} is not a declared fact")
+    if harness not in shown["harnesses"]:
+        raise LookupError(f"{harness} is not a declared harness")
+    return shown["facts"][fact]["harness"][harness]
+
+
+def _pretty(shown):
+    rows = [("fact", "harness", "status", "value", "version", "date", "evidence")]
+    for name, fact in shown["facts"].items():
+        for harness, entry in fact["harness"].items():
+            value = entry.get("value", "")
+            if isinstance(value, bool):
+                value = str(value).lower()
+            elif isinstance(value, list):
+                value = ",".join(value) or "(none)"
+            rows.append((name, harness, entry["status"], value, entry.get("version", ""), entry.get("date", ""), entry.get("evidence", "").replace(" ", "")))
+    widths = [max(len(row[i]) for row in rows) for i in range(len(rows[0]))]
+    return "".join("  ".join(cell.ljust(width) for cell, width in zip(row, widths)).rstrip() + "\n" for row in rows)
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(prog="harness-facts", description=__doc__.splitlines()[0])
+    parser.add_argument("--file", type=pathlib.Path, default=None, help="read this file, not the checkout's")
+    commands = parser.add_subparsers(dest="command", required=True)
+    for name, text in (("check", "validate the fact file"), ("list", "print every fact as JSON"), ("get", "print one entry as JSON")):
+        command = commands.add_parser(name, help=text)
+        command.add_argument("--file", type=pathlib.Path, default=argparse.SUPPRESS)
+        if name == "list":
+            command.add_argument("--pretty", action="store_true", help="a table for a person")
+        if name == "get":
+            command.add_argument("fact")
+            command.add_argument("harness")
+    args = parser.parse_args(argv)
+    try:
+        if args.command == "check":
+            validate(args.file)
+        elif args.command == "list":
+            shown = view(validate(args.file))
+            sys.stdout.write(_pretty(shown) if args.pretty else json.dumps(shown, indent=2) + "\n")
+        else:
+            sys.stdout.write(json.dumps(lookup(args.fact, args.harness, args.file)) + "\n")
+    except Invalid as error:
+        for problem in error.problems:
+            sys.stderr.write(f"harness-facts: {problem}\n")
+        return 2
+    except LookupError as error:
+        sys.stderr.write(f"harness-facts: {error.args[0]}\n")
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

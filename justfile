@@ -17,8 +17,9 @@ link *args:
 link-check:
     tools/tack-link --check
 
-# The agents/bin, .githooks and tools tests.
+# The fact file's check, then the agents/bin, .githooks and tools tests.
 test:
+    tools/harness-facts check
     python3 -m pytest agents/bin -q
     uv run -q --with pytest pytest .githooks tools -q
 
