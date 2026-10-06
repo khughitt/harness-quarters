@@ -151,7 +151,10 @@ def test_a_mirror_that_hangs_is_refused(repo, ops, capsys):
     assert "timed out" in capsys.readouterr().err
 
 
-def test_a_missing_just_is_a_notice(repo, ops, monkeypatch, capsys):
+def test_a_missing_just_is_a_notice(repo, ops, tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("FACTS_MIRROR_OPS")                 # the registered ops, not a named one
+    (tmp_path / "config" / "tasks").mkdir(parents=True)
+    (tmp_path / "config" / "tasks" / "projects.toml").write_text(f'[projects]\nops = "{ops}"\n')
     hook = load_hook()
     monkeypatch.setattr(hook.shutil, "which", lambda name: None)
     stage(repo)
@@ -167,3 +170,11 @@ def test_gits_hook_environment_does_not_reach_ops(repo, ops, monkeypatch):
     stage(repo)
     assert load_hook().facts_check() == 0
     assert (ops / "gitenv").read_text() == ""
+
+
+def test_a_named_ops_without_just_is_refused(repo, ops, monkeypatch, capsys):
+    hook = load_hook()
+    monkeypatch.setattr(hook.shutil, "which", lambda name: None)
+    stage(repo)
+    assert hook.facts_check() == 1
+    assert "FACTS_MIRROR_OPS" in capsys.readouterr().err
