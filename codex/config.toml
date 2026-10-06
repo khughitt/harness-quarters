@@ -102,13 +102,13 @@ trusted_hash = "sha256:a6555e48b5638508aff7df9affa5b84abac398e5a15f1f15a624d2560
 trusted_hash = "sha256:b88c003a21c220fac0ced66adb28ee2e011db2c31be5d441ef4627ea44593e26"
 
 [hooks.state."ponytail@ponytail:hooks/claude-codex-hooks.json:session_start:0:0"]
-trusted_hash = "sha256:5f81d38f47448a1581c08ec877e044d9e04dd6f814dce3f2671f7a8edadd719b"
+trusted_hash = "sha256:7ee5d5ae1f4a9e55f1f429f2960c2f9f32293f198c0e8e2e42b2fb3b4eeda142"
 
 [hooks.state."ponytail@ponytail:hooks/claude-codex-hooks.json:user_prompt_submit:0:0"]
-trusted_hash = "sha256:6a6f42bc3b58d6262db38bfd74d7f340fcca2b09cdb134aad365063f0bfefca4"
+trusted_hash = "sha256:8c9efc5a5e649c8cdca3f0b7bf4cba81d9717d1bc930c7dbc18b6efd66c7c58c"
 
 [hooks.state."ponytail@ponytail:hooks/claude-codex-hooks.json:subagent_start:0:0"]
-trusted_hash = "sha256:1423b56c1322f96c8f74c51c1e7ae9a047b904c1fa43ee9165d462fd7a6e70ef"
+trusted_hash = "sha256:7954d675ef3bafd5e5a6073ae51d7de57a08f21340f241c332f99078e955675d"
 
 [hooks.state."/mnt/ssd/Dropbox/mindful/v6/.codex/hooks.json:post_tool_use:0:0"]
 trusted_hash = "sha256:f217fbcf8ebe41da3413e01f17f17afcb1cae89c2b995feccd9ebbc4b2297fb6"
@@ -117,7 +117,7 @@ trusted_hash = "sha256:f217fbcf8ebe41da3413e01f17f17afcb1cae89c2b995feccd9ebbc4b
 trusted_hash = "sha256:6eb46df3fb741be24b7d49bd375f6a1b24257fa297b6f0f886c1e34a32ef4dfb"
 
 [hooks.state."/home/keith/.codex/hooks.json:session_start:1:0"]
-trusted_hash = "sha256:e7998d355e4004214533301360a7ac9779953e5df677f8e43823ddd61dfdb4d4"
+trusted_hash = "sha256:589e521c4e97756cff31ed61c7a46da0f3254b18ae491e997213bc865204b63a"
 
 [hooks.state."/home/keith/.codex/hooks.json:stop:1:0"]
 trusted_hash = "sha256:19c30d87a87c005ad66dce25343b7f71289c03ed6a659ba8cdb03adbfb4a51fe"
