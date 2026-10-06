@@ -262,12 +262,31 @@ else
   echo "capture timer not enabled here: no manual run"
 fi
 EOF
-git -C "$TACK" merge-base --is-ancestor "$TASK1_COMMIT" "$BRANCH" && echo "scripts written; Task 1 at ${TASK1_COMMIT:0:7}, Task 2 at ${TASK2_COMMIT:0:7}"
+git -C "$TACK" merge-base --is-ancestor "$TASK1_COMMIT" "$TASK2_COMMIT" && git -C "$TACK" merge-base --is-ancestor "$TASK2_COMMIT" "$BRANCH" && echo "scripts written; Task 1 at ${TASK1_COMMIT:0:7}, Task 2 at ${TASK2_COMMIT:0:7}"
 ```
 
 Replace `<the second host>` with the name before running.
 
-Task 3 merges Tasks 1 and 2 to main before the whole-branch review in Task 7, so they get their own review first. A fresh-context reviewer reads `git diff "$TASK1_COMMIT~1" "$TASK2_COMMIT" -- links.toml systemd tools/test_session_archive_units.py` together with spec §3.1 step 1. The question: does any path a host runs still name the checkout, and can the units run before the link exists on a host? Note the round on `tack-8b7a28`; fix Critical and Important findings with a test that fails first; re-review once. Then park:
+Task 3 merges Tasks 1 and 2 to main before the whole-branch review in Task 7, so they get their own review first. A fresh-context reviewer reads `git diff "$TASK1_COMMIT~1" "$TASK2_COMMIT" -- links.toml systemd tools/test_session_archive_units.py` together with spec §3.1 step 1. The question: does any path a host runs still name the checkout, and can the units run before the link exists on a host? Note the round on `tack-8b7a28`; fix Critical and Important findings with a test that fails first; re-review once.
+
+Step 2 merges `$TASK1_COMMIT` and Step 4 merges `$TASK2_COMMIT`, so a fix must land in the commit that is merged, and the link must still reach main before the units. This review runs before Tasks 4 to 6, so the branch tip is Task 2's commit plus this task's record commits.
+
+- A fix to Task 2's files is committed on top, and recorded with `git rev-parse HEAD > "$STATE/task2-commit"`.
+- A fix to Task 1's files is made in order:
+  1. `git branch -f rename-hq-review HEAD`, a pointer to everything before the rewrite;
+  2. `git reset -q --hard "$TASK1_COMMIT"`;
+  3. commit the fix, then `git rev-parse HEAD > "$STATE/task1-commit"`;
+  4. `git cherry-pick "$TASK2_COMMIT"`, then `git rev-parse HEAD > "$STATE/task2-commit"`;
+  5. cherry-pick each record commit from `rename-hq-review` that came after Task 2, then `git branch -D rename-hq-review`.
+
+Then confirm the recorded commits, in their order, with the environment file sourced again (the values changed):
+
+```sh
+. "$(tasks root tack-8b7a28 --pretty)/.worktrees/tack-8b7a28/docs/plans/2026-10-06-rename-to-hq-preparation.env.sh" && cd "$WT" && need TASK1_COMMIT TASK2_COMMIT && \
+git merge-base --is-ancestor "$TASK1_COMMIT" "$TASK2_COMMIT" && git merge-base --is-ancestor "$TASK2_COMMIT" HEAD && echo "Task 1 at ${TASK1_COMMIT:0:7}, then Task 2 at ${TASK2_COMMIT:0:7}"
+```
+
+Then park:
 
 ```sh
 . "$(tasks root tack-8b7a28 --pretty)/.worktrees/tack-8b7a28/docs/plans/2026-10-06-rename-to-hq-preparation.env.sh" && cd "$WT" && \
@@ -697,6 +716,17 @@ def test_retarget_refuses_a_repository_outside_the_snapshot(box):
     assert box.run("tasks", "check", cwd=outside).stdout == ""
 
 
+def test_a_forward_retarget_of_a_non_project_records_nothing(box, tmp_path):
+    """A mistyped --repo is refused before it can end rollback."""
+    box.save()
+    box.forward()
+    result = box.cutover("retarget", "--snapshot", box.snapshot, "--repo", tmp_path / "typo", "--forward",
+                         check=False)
+    assert result.returncode == 1 and "is not a tasks project" in result.stderr
+    assert not (box.snapshot / "forward.json").exists()
+    box.cutover("rollback", "--snapshot", box.snapshot)
+
+
 def test_rollback_refuses_after_a_forward_retarget(box):
     """A forward write is one rollback could not undo: it ends rollback, and nothing moves."""
     outside = box.sync / "relay"
@@ -1083,7 +1113,7 @@ def test_second_host_adopts_the_rename(box):
 - [ ] **Step 2: Run them to see them fail**
 
 Run: `uv run -q --with pytest pytest tools/test_rename_cutover.py -q`
-Expected: 46 failed, 1 passed. The unit test of `save_reset_patch` passes; every other test fails on `--checkout`, `--repo` or `--link-tool` (argparse's `unrecognized arguments`) or on `meta_for`'s new layout.
+Expected: 47 failed, 1 passed. The unit test of `save_reset_patch` passes; every other test fails on `--checkout`, `--repo` or `--link-tool` (argparse's `unrecognized arguments`) or on `meta_for`'s new layout.
 
 - [ ] **Step 3: Replace the tool**
 
@@ -1441,8 +1471,12 @@ def rollback(args):
     check_environment("rollback", meta)
     forward = snap / "forward.json"
     if forward.exists():
+        try:
+            roots = json.loads(forward.read_text())
+        except json.JSONDecodeError as error:
+            raise Stop(f"rollback: {forward} exists but is unreadable ({error}); rollback has ended")
         raise Stop("rollback: ended when retarget --forward first wrote outside the snapshot: "
-                   + ", ".join(json.loads(forward.read_text())))
+                   + ", ".join(roots))
     guard(meta, snap)
     check_branches(meta)
     leftovers = validate_leftovers(meta)
@@ -1536,6 +1570,8 @@ def retarget(args):
         if not args.forward:
             raise Stop(f"retarget: {root} is not in the snapshot; after the other host has adopted, "
                        f"pass --forward")
+        if not (root / "tasks" / ".config.toml").is_file():
+            raise Stop(f"retarget: {root} is not a tasks project")
         record_forward(snap, root)
     retarget_dependencies(root, meta["old"])
 
@@ -1604,12 +1640,12 @@ if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))
 ```
 
-What changed, for the reviewer: `record`, `checkout_now`, `link_tool`, `unmerged_branches`, `record_forward` and the three new commands are new. `preconditions` takes every repository. It refuses any claim in a retargeted one, any unclean tree, a checkout not on main, a stash, and any local branch with commits main lacks. `retarget --forward` records each repository it writes outside the snapshot in `forward.json` before writing, and `rollback` refuses while that file exists: rollback could not restore those repositories (spec §3.2 step 9, §4). `rollback` resets the checkout and every repository, each with its own patch. `retarget_dependencies` is the September `retarget_ops_dependencies`, run per repository. `storage_new` follows the directory. `registry_view`, `guard`, `move_back`, `save_reset_patch` and `claims_tolerated` keep their logic.
+What changed, for the reviewer: `record`, `checkout_now`, `link_tool`, `unmerged_branches`, `record_forward` and the three new commands are new. `preconditions` takes every repository. It refuses any claim in a retargeted one, any unclean tree, a checkout not on main, a stash, and any local branch with commits main lacks. `retarget --forward` refuses a path that is not a tasks project, then records the repository in `forward.json` before writing, whether or not the write then succeeds. `rollback` refuses while that file exists, readable or not: rollback could not restore those repositories (spec §3.2 step 9, §4). `rollback` resets the checkout and every repository, each with its own patch. `retarget_dependencies` is the September `retarget_ops_dependencies`, run per repository. `storage_new` follows the directory. `registry_view`, `guard`, `move_back`, `save_reset_patch` and `claims_tolerated` keep their logic.
 
 - [ ] **Step 4: Run the focused tests, then the suite**
 
 Run: `uv run -q --with pytest pytest tools/test_rename_cutover.py -q`
-Expected: `47 passed`.
+Expected: `48 passed`.
 
 Run: `just test`
 Expected: every suite passes.
@@ -1770,7 +1806,7 @@ git apply - <<'PATCH' && echo applied
  # --- save ---------------------------------------------------------------------
  
  
-@@ -715,3 +766,112 @@
+@@ -726,3 +777,112 @@
      parked = json.loads(run2("tasks", "list", "--parked", cwd=box.new_root))
      assert f"tack-{hex_}" in [t["id"] for t in parked["tasks"]]
      assert first_host() == first
@@ -1891,7 +1927,7 @@ The `hq` sandbox does what the live checkout has done. It is renamed once before
 - [ ] **Step 2: Run them to see them fail**
 
 Run: `uv run -q --with pytest pytest tools/test_rename_cutover.py -q`
-Expected: 13 failed, 47 passed. The `registry_view` unit test fails on the alias and the group. Every test that builds the `hq` sandbox and saves fails on `--keep`. `test_check_kept_names_a_mode_that_differs` fails on the missing `check_kept`.
+Expected: 13 failed, 48 passed. The `registry_view` unit test fails on the alias and the group. Every test that builds the `hq` sandbox and saves fails on `--keep`. `test_check_kept_names_a_mode_that_differs` fails on the missing `check_kept`.
 
 - [ ] **Step 3: Implement**
 
@@ -2040,7 +2076,7 @@ git apply - <<'PATCH' && echo applied
  def rollback(args):
      snap = Path(args.snapshot)
      meta = load_meta(snap)
-@@ -363,6 +434,8 @@
+@@ -367,6 +438,8 @@
          run("git", "-C", root, "reset", "-q", "--hard", head)
      for path in leftovers:
          (checkout / path).unlink()
@@ -2049,7 +2085,7 @@ git apply - <<'PATCH' && echo applied
      restore_dir(snap / "config", Path(meta["config"]))
      restore_dir(snap / "state", Path(meta["state"]))
      tool = link_tool(checkout, meta)
-@@ -374,6 +447,7 @@
+@@ -378,6 +451,7 @@
              raise Stop(f"check: tasks check reports findings in {root}")
          if porcelain(root):
              raise Stop(f"check: {root} is not clean")
@@ -2057,7 +2093,7 @@ git apply - <<'PATCH' && echo applied
      print("rolled back to " + ", ".join(f"{head[:7]} ({label})" for _, head, label in resets))
  
  
-@@ -492,6 +566,9 @@
+@@ -498,6 +572,9 @@
      s.add_argument("--new", required=True)
      s.add_argument("--link-tool", default="tools/tack-link",
                     help="the link tool's path inside the checkout")
@@ -2078,7 +2114,7 @@ Two points for the reviewer:
 - [ ] **Step 4: Run the focused tests, then the suite**
 
 Run: `uv run -q --with pytest pytest tools/test_rename_cutover.py -q`
-Expected: `60 passed`.
+Expected: `61 passed`.
 
 Run: `just test`
 Expected: every suite passes.
@@ -2117,7 +2153,7 @@ Expected: `git grep` prints nothing. Dated specs, plans and task records keep th
 - [ ] **Step 2: Run the focused tests, then the suite, then the recipes**
 
 Run: `uv run -q --with pytest pytest tools/test_harness_links.py tools/test_rename_cutover.py -q`
-Expected: `107 passed`.
+Expected: `108 passed`.
 
 Run: `just test`
 Expected: every suite passes.
