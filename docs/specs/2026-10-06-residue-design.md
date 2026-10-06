@@ -195,8 +195,12 @@ value. A hand-written reader would have neither guarantee, which is why none is
 supported.
 
 A reader sees main's working tree, not a commit. The file is therefore edited only in a
-worktree and reaches main by merge, and a half-written file (an interrupted sync between
-hosts) fails validation as a whole, which a guard treats as a failed read. The module
+worktree and reaches main by merge. A file cut short inside an entry (an interrupted sync
+between hosts) fails validation as a whole, which a guard treats as a failed read. A file
+cut cleanly between two entries is a well-formed shorter file that validation cannot tell
+from an intended one: the entries it lost read as `unknown`, never as a value, and a
+consumer already treats `unknown` as permitting nothing (corrected at plan review round
+1, where every cut point was tried). The module
 route finds this checkout in the tasks registry file (`projects.toml` under the tasks
 config directory), read directly, as lore's hook does; that is accepted here as it was
 there, although the parent's wording names `tasks projects --paths`.

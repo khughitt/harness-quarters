@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: feat/residue
 created: 2026-10-04T10:54:36Z
-updated: 2026-10-06T13:31:51Z
+updated: 2026-10-06T13:48:21Z
 started: 2026-10-06T11:20:33Z
 depends: [ops-f2405d]
 tags: []
@@ -42,3 +42,4 @@ Done: tack renamed in place by the rename design's procedure (tasks rename, iden
 - 2026-10-06T13:21:53Z (feat/residue): resumed
   provenance: {"harness_session":"claude-code:f110e5bf-234d-4815-8f46-8780451c03cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-06T13:21:53Z (feat/residue): review: spec round 4 — verdict: accept; findings: none; reviewer: codex/gpt-6-astra
+- 2026-10-06T13:48:21Z (feat/residue): review: plan round 1 — verdict: revise; findings: Critical 2, Important 10, Minor 6; reviewer: claude-code/claude-fable-5-1
