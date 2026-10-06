@@ -10,9 +10,9 @@ Phase 3 finishes the split in the repository that stayed. Flows and lore have le
 remains is harness support: homes, declared links, settings, state hygiene, the session
 archive, mods. This design settles five things:
 
-1. **The name.** The residue keeps `tack` (§3). This is the user's decision under the
-   parent's §7.1; the recommendation and its alternative are stated there, and every other
-   section stands whichever way it goes.
+1. **The name.** Open. The draft recommended keeping `tack`; the user rejected that on
+   2026-10-06 and is choosing a new name (§3). Every other section stands whichever name
+   is chosen, and the rename gets its own spec.
 2. **Capability facts.** A tracked fact file with typed values and separate evidence, one
    tool that validates and prints it, and the first three facts carried out of ops
    `hooks/claim-guard` (§4).
@@ -62,7 +62,13 @@ change to `tack-link`'s behaviour; a staleness signal for facts (§4.6, filed as
 
 ## 3. The name
 
-**Decision: the residue keeps the name `tack` and the prefix `tack`.**
+**Superseded 2026-10-06.** The user rejected keeping `tack` and is choosing a new name.
+This section is rewritten when the name is chosen; the text below is the draft's
+recommendation, kept until then so the review history reads straight. The rename then
+runs first in this phase, under its own spec, so that the new consumers in §4 are
+written against the final registry key.
+
+**Draft recommendation, rejected: the residue keeps the name `tack` and the prefix `tack`.**
 
 - The name already fits. Tack is the word for harness gear, and the identity line was
   rewritten for the residue during phase 2.
@@ -169,12 +175,21 @@ It never writes. `--file PATH` points it at another file, for tests.
 
 ### 4.4 The consumer contract
 
-A consumer reads the view one of two ways, both supported:
+Every reader goes through the tool's own validation. There are two ways in, and parsing
+the TOML by hand is not one of them:
 
-- **The file**, located through the tasks registry (`[projects] tack`), parsed as TOML.
-  The reader checks `schema == 1` and treats a missing harness table as `unknown`. This is
-  the way for a hook that cannot afford a subprocess.
-- **The tool**, by its installed path.
+- **The tool as a command**, by its installed path: `get` or `list`.
+- **The tool as a module**, for a Python hook that cannot afford a subprocess: locate this
+  checkout through the tasks registry, load `tools/harness-facts` with a source loader
+  (the pattern lore's profile hook uses for ops's resolver), and call
+  `lookup(fact, harness)`. It validates the whole file first, by the rules of §4.2, and
+  returns the same entry `get` prints.
+
+Both refuse the same things: an invalid file, an undeclared fact, an undeclared harness.
+So a misspelt harness can never read as `unknown`, and a value of the wrong type (the
+string `"false"` where a boolean is declared) can never reach a consumer as a truthy
+value. A hand-written reader would have neither guarantee, which is why none is
+supported.
 
 Either way the consumer owns three decisions the view does not make: what `unknown`
 permits (the current `claim-guard` rule, "an unprobed kind allows nothing", is the
@@ -191,7 +206,7 @@ Carried from `claim-guard` with their evidence, value for value:
 
 | Fact | Type | Entries |
 |---|---|---|
-| `controller-wake` | boolean | claude-code `true` (2.1.282, 2026-09-24, `tack-00ccb6`); codex `false` (0.156.1, 2026-09-24, `tack-00ccb6`) |
+| `controller-wake` | boolean | claude-code `true` (2.1.282, 2026-09-24, `tack-00ccb6`); codex `false` (0.156.1, 2026-09-24, `tack-00ccb6`), with the note that it rests on a bounded 170-second observation for both child kinds and not on a judge verdict (§4.6) |
 | `controller-wake-kinds` | set | claude-code `["shell", "subagent"]` (same probe): the child kinds for which the wake was shown |
 | `stop-input-in-flight-statuses` | set | claude-code `["running", "pending"]` (2.1.284, 2026-09-29, `ops-ed76fe`), with the note that the probe showed `running` and `pending` is from the input's schema |
 
@@ -202,9 +217,34 @@ any difference from the code comments.
 ### 4.6 The probe tool, and re-probing
 
 `agents/bin/wake-judge` stays here as the probe tool for `controller-wake` and
-`controller-wake-kinds`; the fact names it in `probe`. The README gains a short section,
-"Re-probing a fact": run the probe on the new harness version, record the run on a task,
-then edit `version`, `date`, `evidence` and, if it changed, `value` in one commit.
+`controller-wake-kinds`; the fact names it in `probe`. It can establish a wake. It cannot
+establish the absence of one: it prints `FAIL` for a transcript it cannot classify as
+well as for a run with no wake, and it knows no Codex completion form at all. The Codex
+entry above rests on a separate observation, recorded on `tack-00ccb6`: the controller's
+turn ended, the child finished, and no new turn began within 170 seconds.
+
+So a probe run for one child kind (a subagent, a background command) has three outcomes,
+and the README's "Re-probing a fact" section defines them:
+
+- **Woke.** `wake-judge` prints `PASS` for the run's transcript.
+- **Did not wake.** A bounded negative observation, recorded on the evidence task with
+  the transcript's path: the controller's turn ended, the child's own output shows it
+  finished, and no controller turn began in the 170 seconds after that. A judge `FAIL`
+  is not this observation and never stands in for it.
+- **Inconclusive.** Anything else, including a judge `FAIL` with no bounded observation
+  behind it.
+
+Both child kinds are probed before the aggregate fact is touched:
+
+| The two runs | `controller-wake` | `controller-wake-kinds` |
+|---|---|---|
+| both woke | `true` | both kinds |
+| either inconclusive | unchanged, with its old version and evidence | unchanged |
+| neither inconclusive, at least one did not wake | `false` | the kinds that woke, possibly none |
+
+A refresh edits `version`, `date`, `evidence` and the values in one commit. An
+inconclusive run is recorded on its task and changes nothing in the file, so the entry
+keeps saying which version it was last established on.
 
 A fact goes stale silently when a harness upgrades. This design does not solve that. It
 is filed as an idea in tack (compare the installed version with `version` and report the
@@ -222,9 +262,24 @@ One test guards the gap, on the consumer's side so the data still flows one way:
 `tests/test_claim_guard.py` gains a test that locates tack through the registry, reads
 `facts/capabilities.toml`, and asserts that `CHILD_WAKES`, `WAKING` and `IN_FLIGHT` equal
 the three facts (sets compared as sets; `CHILD_WAKES` against the probed boolean entries).
-It skips, with the reason printed, only when the registry has no `tack` entry; a missing
-file, a wrong schema or a difference fails. It is deleted with the constants, and a note
-on `tasks-56b450` names the file's path, the contract in §4.4 and this test.
+It reads through the tool's module (§4.4), and reads the file named by
+`HARNESS_FACTS_FILE` when that is set, so it can be pointed at a candidate. It skips,
+with the reason printed, only when the registry has no `tack` entry and no candidate is
+named; an invalid file or a difference fails.
+
+That test alone would only catch a change made in ops. A change made here would pass
+tack's gates, merge, and leave the live guard on its old constants until someone next ran
+ops's suite. So the check also runs from this side, against the candidate, before a fact
+change can be committed: tack's pre-commit hook, when `facts/capabilities.toml` is
+staged, runs ops's mirror test with `HARNESS_FACTS_FILE` set to the staged file, in the
+registered ops checkout, and refuses the commit if it fails. `just facts-mirror` runs the
+same check by hand. A refresh that changes only `version`, `date` or `evidence` passes
+untouched. A refresh that changes a value lands as a pair: the constant is changed in an
+ops worktree, the hook is pointed there with `FACTS_MIRROR_OPS=<that worktree>`, tack's
+commit passes, and the two merge together, tack first.
+
+Both halves, the ops test and the hook step, are deleted with the constants. A note on
+`tasks-56b450` names the file's path, the contract in §4.4, and the two things to remove.
 
 Rejected: switching `claim-guard` to read the view in this phase. It would close the gap
 at once, but it changes a Stop hook that tasks is redesigning this week, and the parent
@@ -238,8 +293,11 @@ catalog of relay's facts (events, replies, budgets). Relay has no stored evidenc
 to read (§2), so schema 1 of the view holds harness support's own facts only. Including
 relay's by reference waits for two things: relay keeping its live evidence record at a
 stable path, and a consumer that needs it through this view. An idea is filed in relay
-for the first. This is a deliberate shortfall against the parent's wording, named here so
-the review can accept or reject it.
+for the first. This is a deliberate shortfall against the parent's wording, accepted at
+review round 1 (2026-10-06). The parent spec records it, so its requirement and this
+phase's acceptance agree: §5.3 gains one dated sentence saying the consolidated view
+starts with harness support's own facts and takes relay's by reference once relay stores
+its evidence record and a consumer asks.
 
 ## 5. The agent surface
 
@@ -314,8 +372,10 @@ and one new link.
    `links.toml` lines, the front door, the removal of the rename tool. Reviewed, then
    merged to tack main. Nothing on a host has changed yet: links apply only on
    `just link --apply`.
-2. **In an ops worktree**: the mirror test (§4.7) and the parent spec's dated sentence.
-   Merged to ops main after tack main holds the file.
+2. **In an ops worktree**: the mirror test (§4.7) and the parent spec's dated sentences
+   (the name, §3; the relay deferral, §4.8). Merged to ops main after tack main holds the
+   file. tack's hook step is enabled in a follow-up commit here once ops main holds the
+   test, since it runs that test.
 3. **Gated on the user, per host**: `just link` previewed, then `just link --apply` from
    tack main (two new links); the two dangling Codex links removed; the three leftover
    files deleted. The second host repeats the link step after sync.
@@ -332,8 +392,12 @@ The deletion in step 3 is the one step with no revert.
 
 - `tools/test_harness_facts.py`, test-first: each validator refusal in §4.2 by name; the
   shipped file passes `check`; `list` fills `unknown` for an undeclared harness table;
-  `get` exits 2 for an undeclared fact or harness and 0 for `unknown`; the tool opens the
-  file read-only.
+  `get` exits 2 for an undeclared fact or harness and 0 for `unknown`; `lookup`, loaded
+  as a module, refuses exactly what `get` refuses, including a string where a boolean is
+  declared; the tool opens the file read-only.
+- The pre-commit step: a staged fact file that disagrees with a scratch copy of the guard
+  is refused, one that agrees passes, and a commit that does not stage the file never
+  runs the check.
 - `tools/test_tack_link.py` gains nothing: no link behaviour changes. `just link-check`
   on main after the apply is the check for the two new lines.
 - ops: the mirror test, shown failing against a deliberately wrong scratch fact file
@@ -346,8 +410,9 @@ The deletion in step 3 is the one step with no revert.
 
 1. The name decision is recorded in the parent spec, and `ops-593133` is closed to match.
 2. `facts/capabilities.toml` holds the three facts with their evidence; `harness-facts`
-   is installed on both hosts; ops's mirror test passes; `tasks-56b450` carries the
-   hand-off note.
+   is installed on both hosts; ops's mirror test passes and tack's hook runs it on a
+   staged fact change; the parent spec records the relay deferral; `tasks-56b450` carries
+   the hand-off note.
 3. The surface audit is recorded for both hosts, `link-check` passes on both, and the two
    dangling links are gone.
 4. Every item in §6 has its disposition carried out, and `lore-d6acd5` covers the moved

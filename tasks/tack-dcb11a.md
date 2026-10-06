@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: main
 created: 2026-10-04T10:54:36Z
-updated: 2026-10-06T11:26:14Z
+updated: 2026-10-06T11:32:57Z
 started: 2026-10-06T11:20:33Z
 depends: [ops-f2405d]
 tags: []
@@ -27,3 +27,5 @@ Done: tack renamed in place by the rename design's procedure (tasks rename, iden
   provenance: {"harness_session":"claude-code:f110e5bf-234d-4815-8f46-8780451c03cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-06T11:20:37Z (main): trial: flow-trial-1 — enrolled — flow off
 - 2026-10-06T11:20:37Z (main): arm: flow-trial-1 — unit tack-dcb11a — flow off
+- 2026-10-06T11:32:56Z (feat/residue): review: spec round 1 — verdict: revise; findings: P2 3; reviewer: codex/gpt-6-astra
+- 2026-10-06T11:32:57Z (feat/residue): name: the user rejects keeping 'tack' (2026-10-06, leaning strongly to a rename; dislikes the name and its connotation); spec §3 is rewritten once a name is chosen
