@@ -201,6 +201,13 @@ Probe both kinds before touching `controller-wake`:
 A refresh edits `version`, `date`, `evidence` and the values in one commit. An
 inconclusive run is recorded on its task and changes nothing in the file.
 
+Until ops's claim guard reads these facts itself, it keeps three constants that must
+equal them, and the pre-commit hook runs ops's own test of that against a staged fact
+file (`just facts-mirror` runs it by hand). A refresh that changes only `version`,
+`date` or `evidence` passes untouched. One that changes a value lands as a pair: change
+the constant in an ops worktree, commit here with `FACTS_MIRROR_OPS=<that worktree>`,
+and merge the two together, this project first.
+
 ## Home links
 
 Every managed home link into tack or another owner checkout is listed in `links.toml`:
