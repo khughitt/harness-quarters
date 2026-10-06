@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: feat/residue
 created: 2026-10-04T10:54:36Z
-updated: 2026-10-06T15:49:42Z
+updated: 2026-10-06T15:52:57Z
 started: 2026-10-06T11:20:33Z
 depends: [ops-f2405d]
 tags: []
@@ -67,3 +67,6 @@ Done: tack renamed in place by the rename design's procedure (tasks rename, iden
 - 2026-10-06T15:37:20Z (feat/residue): archive/ deleted from tack (24 untracked files; 21 committed in lore docs/archive/, 3 mindful v3 leftovers removed)
 - 2026-10-06T15:45:39Z (feat/residue): review: impl round 3 — verdict: accept; findings: Important 1, Minor 4; reviewer: claude-code/claude-fable-5-1
 - 2026-10-06T15:49:42Z (feat/residue): residue acceptance (spec §10): items 1, 4 and 5 delivered; items 2 and 3 delivered on this host, the second host's audit, link apply and dangling-link removal pending under tack-f548ee (that host is still syncing); item 6, the rename to hq, continues under tack-8b7a28
+- 2026-10-06T15:50:38Z (feat/residue): surface audit, second host: report non-ok: create ~/.agents/bin/harness-facts; create ~/.claude/skills/tasks (absent there); no DANGLING links; harness-owned real dirs as here plus ~/.codex/skills/security-best-practices (left alone)
+- 2026-10-06T15:51:30Z (feat/residue): host step done on the second host: preview matched its audit (create harness-facts, create skills/tasks); apply converged, link-check clean, harness-facts answers; no dangling Codex links existed there
+- 2026-10-06T15:52:57Z (feat/residue): residue acceptance items 1 to 5 delivered (spec §10), on both hosts; item 6, the rename to hq, continues under tack-8b7a28 and this goal stays open for it
