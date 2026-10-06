@@ -10,9 +10,8 @@ Phase 3 finishes the split in the repository that stayed. Flows and lore have le
 remains is harness support: homes, declared links, settings, state hygiene, the session
 archive, mods. This design settles five things:
 
-1. **The name.** Open. The draft recommended keeping `tack`; the user rejected that on
-   2026-10-06 and is choosing a new name (§3). Every other section stands whichever name
-   is chosen, and the rename gets its own spec.
+1. **The name.** The residue becomes "harness quarters", prefix `hq` (§3). The rename has
+   its own spec and runs first; nothing else here depends on which name was chosen.
 2. **Capability facts.** A tracked fact file with typed values and separate evidence, one
    tool that validates and prints it, and the first three facts carried out of ops
    `hooks/claim-guard` (§4).
@@ -67,39 +66,27 @@ and which arrive when a consumer needs one; and the parent's §4.4 suggestion th
 
 ## 3. The name
 
-**Superseded 2026-10-06.** The user rejected keeping `tack` and is choosing a new name.
-This section is rewritten when the name is chosen; the text below is the draft's
-recommendation, kept until then so the review history reads straight. The rename then
-runs first in this phase, under its own spec, so that the new consumers in §4 are
-written against the final registry key.
+**Decision (the user, 2026-10-06): the residue is renamed "harness quarters", prefix
+`hq`.** The identity name is `harness-quarters` and the checkout directory is `hq`.
 
-**Draft recommendation, rejected: the residue keeps the name `tack` and the prefix `tack`.**
+- It says what the project is: the quarters each harness lives in on a host, with what is
+  installed there and what is known about it.
+- `hq` is short as a task prefix and a registry key, and reads as a home base.
+- The draft recommended keeping `tack`, which had been the name for nine days. The user
+  rejected it for the word's connotation, and review rounds 1 to 3 record that.
 
-- The name already fits. Tack is the word for harness gear, and the identity line was
-  rewritten for the residue during phase 2.
-- A second rename buys nothing functional and costs a full all-host barrier: another
-  irreversible `tasks rename`, a second reserved alias (`ai` is already one), the registry
-  and mirror on each host, and an edit wherever another project names the registry key.
-- Every reference written during phases 1 and 2 (`tack-link`, the `tack` registry key,
-  the task ids in three projects' records) stays true.
+The rename has its own design, `docs/specs/2026-10-06-rename-to-hq-design.md`, modelled
+on the September rename, and runs first in this phase: everything in §4 to §7 is then
+built under the final name, and the new consumers in §4 are written against the final
+registry key. Until it lands this document says `tack` for the project as it stands, and
+`hq` where it names something a consumer will look up afterwards.
 
-Rejected: a functional name such as `harness`. It reads more plainly to a newcomer, but
-relay's purpose line already says "harness adapters", so the word would name two
-projects' subject at once.
+Consequences for this design:
 
-Consequences, all in the plan:
-
-- ops `ops-593133` ("the residue rename on every host") is dropped with this decision as
-  its reason; nothing is renamed on any host.
-- The parent spec's §7.1 and status line gain one dated sentence: the residue keeps
-  `tack`. Its §9 item 3 ("the residue's rename") is met by the recorded decision.
-- `tools/rename-cutover` and `tools/test_rename_cutover.py` are removed. The tool is a
-  one-off for a finished cutover; its design document stays, and history keeps the code.
-  The plan first confirms the three task records that cite it are closed.
-
-If the user names a new name instead: §4 to §7 are unchanged, `ops-593133` stays, the
-one-off tool stays as the starting point, and the rename gets its own spec modelled on
-the 2026-09-27 design, after this one lands.
+- ops `ops-593133` ("the residue rename on every host") stays and is the hub's task for
+  the rename's host steps.
+- The parent spec's §7.1 and status line record the name.
+- `tools/rename-cutover` is the rename design's subject, not this one's.
 
 ## 4. Capability facts
 
@@ -299,14 +286,14 @@ twice: here, authoritative from the commit that adds them, and as constants in
 `claim-guard`.
 
 One test guards the gap, on the consumer's side so the data still flows one way: ops
-`tests/test_claim_guard.py` gains a test that locates tack through the registry, reads
+`tests/test_claim_guard.py` gains a test that locates this checkout through the registry, reads
 `facts/capabilities.toml`, and asserts that the constants equal the facts: `CHILD_WAKES`
 against the probed `controller-wake` entry of each harness it names, and `WAKING` and
 `IN_FLIGHT`, which the guard applies only to Claude Code, against the claude-code entries
 of the other two, sets compared as sets.
 It reads through the tool's module (§4.4), and reads the file named by
 `HARNESS_FACTS_FILE` when that is set, so it can be pointed at a candidate. It skips,
-with the reason printed, only when the registry has no `tack` entry and no candidate is
+with the reason printed, only when the registry has no `hq` entry and no candidate is
 named; an invalid file or a difference fails.
 
 That test alone would only catch a change made in ops. A change made here would pass
@@ -449,10 +436,14 @@ and one new link, `~/.agents/bin/harness-facts`.
 5. **In a lore worktree**: the archive moves, then their removal here.
 
 Rollback is by revert at each step. The `harness-facts` link is removed through a
-`[retired]` entry. The `skills/tasks` declaration is rolled back by deleting its line and
-nothing more: the link predates this change on this host, a `[retired]` entry would
-remove it and take the tasks skill from Claude Code, and nothing prunes an undeclared
-path. Only on a host where the apply created that link does it go through `[retired]`.
+`[retired]` entry, since this change creates it on every host. The `skills/tasks`
+declaration is rolled back by deleting its line, on every host at once because the
+manifest is shared: `[retired]` has no host selector and no memory of who created a link,
+so an entry there would also remove the link that predates this change on this host and
+take the tasks skill from Claude Code. Nothing prunes an undeclared path, so deleting the
+line leaves every link in place. On a host whose recorded preview showed `create` for
+that path, the link is then removed by hand, after rechecking that its target is the
+tasks checkout's `skills/tasks`.
 The scope is rolled back by reverting the three commits and regenerating in the same
 order; the archive moves by reverting lore's commit and restoring from tack's history or
 the file sync's. The deletion in step 3 is the one step with no revert.
@@ -484,11 +475,11 @@ the file sync's. The deletion in step 3 is the one step with no revert.
    the hand-off note.
 3. The surface audit is recorded for both hosts, `link-check` passes on both, and the two
    dangling links are gone.
-4. Every item in §6 has its disposition carried out, and `lore-d6acd5` covers the moved
-   text.
+4. Every item in §6 has its disposition carried out, and the new lore review task filed
+   by the plan covers the moved text.
 5. The feedback scope reads as in §7 in tack, the mirror and the assembled instructions,
    and the guide and README describe the facts.
-6. The rename, under its own spec, is done and `ops-593133` is closed.
+6. The rename to `hq`, under its own spec, is done and `ops-593133` is closed.
 
 Filed by the plan: the staleness idea (tack), the stored-evidence idea (relay), the work
 home's skills idea (tack), the lock file's two stale skill names (lore), the archive

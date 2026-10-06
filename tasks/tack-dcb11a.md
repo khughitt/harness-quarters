@@ -6,9 +6,9 @@ priority: 1
 size: l
 complexity: high
 process: planned
-owner: main
+owner: feat/residue
 created: 2026-10-04T10:54:36Z
-updated: 2026-10-06T11:34:37Z
+updated: 2026-10-06T12:56:06Z
 started: 2026-10-06T11:20:33Z
 depends: [ops-f2405d]
 tags: []
@@ -32,3 +32,7 @@ Done: tack renamed in place by the rename design's procedure (tasks rename, iden
 - 2026-10-06T11:34:19Z (feat/residue): review: spec round 2 — verdict: revise; findings: Important 5, Minor 6; reviewer: claude-code/claude-fable-5-1
 - 2026-10-06T11:34:37Z (feat/residue): parked (waiting on user, decision): User chooses the residue's new name (candidates given in the session); then this session rewrites spec §3, drafts the rename spec modelled on docs/specs/2026-09-27-rename-to-tack-design.md, and sends the residue spec back for review round 3
   provenance: {"harness_session":"claude-code:f110e5bf-234d-4815-8f46-8780451c03cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-06T12:56:04Z (feat/residue): resumed
+  provenance: {"harness_session":"claude-code:f110e5bf-234d-4815-8f46-8780451c03cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-06T12:56:04Z (feat/residue): review: spec round 3 — verdict: revise; findings: P2 1, P3 1; reviewer: codex/gpt-6-astra
+- 2026-10-06T12:56:04Z (feat/residue): name chosen by the user 2026-10-06: 'harness quarters', prefix hq
