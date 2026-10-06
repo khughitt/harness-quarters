@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: main
 created: 2026-10-06T12:59:15Z
-updated: 2026-10-06T22:18:14Z
+updated: 2026-10-06T22:22:39Z
 started: 2026-10-06T16:15:19Z
 depends: [flows-44890e, obs-ff4e76, tasks-7580d2]
 parent: tack-dcb11a
@@ -62,3 +62,4 @@ Why: the user chose the residue's name on 2026-10-06 (parent spec §7.1); the re
 - 2026-10-06T21:25:05Z (feat/rename-hq-cutover): main's suite went red when tasks 0.2.0 with [locations] was installed: rename-cutover's guard read the renamed project's [locations] tables as a foreign change (18 failures). Fixed on feat/rename-hq-cutover and fast-forwarded to main: registry_view drops locations.<old>/<new> and names other locations entries; tests for both; just test 215 + 533 passed
 - 2026-10-06T22:12:09Z (main): review: plan round 1 — verdict: revise; findings: P1 4, P2 4; reviewer: codex/gpt-6-astra
 - 2026-10-06T22:18:14Z (main): plan round 1 addressed: subshell loops with exit 1; trial join checked on raw census/report strings per run plus non-empty coverage and unit membership; rollback holds the other host's timers until its checkouts match the restored heads; clones get core.hooksPath and the live uv cache; second-host-record (pre-move state file) and an idempotent second-host, rehearsed interrupted and with the other host's own trust table; per-attempt directories; trust via saved copy + codex-trust restore, tested against the real filter
+- 2026-10-06T22:22:39Z (main): review: plan round 2 — verdict: revise; findings: Critical 1, Important 6, Minor 5; reviewer: claude-code/claude-opus-5-5
