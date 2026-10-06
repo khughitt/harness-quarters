@@ -25,7 +25,10 @@ archive, mods. This design settles five things:
 
 Not in this design: moving the claim rule or switching `claim-guard` to read the facts
 (tasks `tasks-56b450`, by the parent's §6); OpenCode's skills link (`tack-915ef2`); any
-change to `tack-link`'s behaviour; a staleness signal for facts (§4.6, filed as an idea).
+change to `tack-link`'s behaviour; a staleness signal for facts (§4.6, filed as an idea);
+facts about homes, tools and models, which the parent's §5.3 names as harness support's
+and which arrive when a consumer needs one; and the parent's §4.4 suggestion that
+`claude-provenance` might move here once facts exist, which stays a suggestion.
 
 ## 2. Evidence from the tree (2026-10-06)
 
@@ -37,10 +40,12 @@ change to `tack-link`'s behaviour; a staleness signal for facts (§4.6, filed as
   hygiene".
 - **The facts are three constants in a policy.** ops `hooks/claim-guard` holds
   `CHILD_WAKES = {"claude-code": True, "codex": False}` (probed 2026-09-24 on Claude Code
-  2.1.282 and Codex 0.156.1, `tack-00ccb6`), `WAKING = ("shell", "subagent")` (the child
-  kinds that probe covered) and `IN_FLIGHT = ("running", "pending")` (Claude Code's Stop
-  input statuses, probed 2026-09-29 on 2.1.284, `ops-ed76fe`; the probe showed `running`,
-  and `pending` comes from the input's schema). Their evidence lives in code comments.
+  2.1.282 and Codex 0.156.1, `tack-00ccb6`), `WAKING = ("shell", "subagent")` (the Stop
+  input's `type` strings for the two child kinds that probe covered, first seen in
+  `ops-ed76fe`) and `IN_FLIGHT = ("running", "pending")` (Claude Code's Stop input
+  statuses, probed 2026-09-29 on 2.1.284, `ops-ed76fe`; the probe showed `running`, and
+  `pending` was never observed). Their evidence lives in code comments, and the comments
+  say more than the cited records do (§4.5).
   `agents/bin/wake-judge` here is the tool that judged the wake probe.
 - **Relay keeps no store of its evidence records.** Its installer takes one as
   `--evidence FILE` and records only the harness and version in the installation artifact.
@@ -143,14 +148,20 @@ Rules the validator enforces, each a refusal with the table's name:
 
 - `schema` is 1. `harnesses` is a non-empty list of unique names; every `harness.<name>`
   table names one of them.
-- `type` is `boolean`, `number` or `set`. A `set` value is a list of unique strings; a
-  `number` is an integer or float; a `boolean` is a TOML boolean.
-- A `probed` entry has `value` of the fact's type, a non-empty `version`, a TOML `date`,
-  and a non-empty `evidence`. An `unknown` entry has `status` and nothing else except an
+- Fact and harness names match `[a-z][a-z0-9-]*`.
+- `type` is `boolean` or `set`. A `boolean` value is a TOML boolean. A `set` value is a
+  list of unique strings, and the empty list is valid: it says "none", which is a probed
+  answer. There is no `number` type yet; it is added with the first numeric fact, and
+  because the tool ships beside the file (§4.4) adding it needs no schema bump.
+- A `probed` entry has `value` of the fact's type, a non-empty `version`, a `date`, and a
+  non-empty `evidence`. `date` is a TOML local date, never a date-time, and is the local
+  calendar date of the probe. An `unknown` entry has `status` and nothing else except an
   optional `note`.
-- `description` is required. `probe` (the tool that judges the fact, as a path in this
-  checkout) and `note` (a qualifier on an entry) are optional. No other key is accepted
-  anywhere, so a misspelt key is an error and not a silent omission.
+- `description` is required. `probe` (the tool that judges the fact) is optional and, when
+  given, must be a file in this checkout. `note` (a qualifier on an entry: the probe's
+  mode, what was and was not observed, where a field's value comes from) is optional. No
+  other key is accepted anywhere, so a misspelt key is an error and not a silent
+  omission.
 
 `evidence` is an opaque pointer: a task id or a record path. The validator checks that it
 is present, not that it resolves, because resolving would make a commit here depend on
@@ -160,10 +171,13 @@ another project's checkout.
 
 `tools/harness-facts`, Python, standard library only, linked as
 `~/.agents/bin/harness-facts`. The name is functional, like `harness-state-refresh`, so
-it would survive a rename.
+it survives the rename. Its default file is `facts/capabilities.toml` in the checkout
+that holds the tool, found from the tool's own resolved path, so the installed link reads
+main's file. In its JSON a date prints as an ISO string and a set prints sorted.
 
 - `harness-facts check` validates the file. Exit 0, or exit 2 with one line per refusal.
-  `just test` runs it, and the pre-commit hook runs it when the file is staged.
+  `just test` runs it on the working tree, and the pre-commit hook runs it on the staged
+  blob when the file is staged.
 - `harness-facts list` prints the whole view as JSON: `schema`, `harnesses`, and for each
   fact its type, description, probe and one entry per declared harness, with `unknown`
   filled in for harnesses that have no table. `--pretty` prints a table for a person.
@@ -191,6 +205,13 @@ string `"false"` where a boolean is declared) can never reach a consumer as a tr
 value. A hand-written reader would have neither guarantee, which is why none is
 supported.
 
+A reader sees main's working tree, not a commit. The file is therefore edited only in a
+worktree and reaches main by merge, and a half-written file (an interrupted sync between
+hosts) fails validation as a whole, which a guard treats as a failed read. The module
+route finds this checkout in the tasks registry file (`projects.toml` under the tasks
+config directory), read directly, as lore's hook does; that is accepted here as it was
+there, although the parent's wording names `tasks projects --paths`.
+
 Either way the consumer owns three decisions the view does not make: what `unknown`
 permits (the current `claim-guard` rule, "an unprobed kind allows nothing", is the
 conservative default the parent names), what to do when the read fails (a guard fails
@@ -207,12 +228,31 @@ Carried from `claim-guard` with their evidence, value for value:
 | Fact | Type | Entries |
 |---|---|---|
 | `controller-wake` | boolean | claude-code `true` (2.1.282, 2026-09-24, `tack-00ccb6`); codex `false` (0.156.1, 2026-09-24, `tack-00ccb6`), with the note that it rests on a bounded 170-second observation for both child kinds and not on a judge verdict (§4.6) |
-| `controller-wake-kinds` | set | claude-code `["shell", "subagent"]` (same probe): the child kinds for which the wake was shown |
-| `stop-input-in-flight-statuses` | set | claude-code `["running", "pending"]` (2.1.284, 2026-09-29, `ops-ed76fe`), with the note that the probe showed `running` and `pending` is from the input's schema |
+| `controller-wake-kinds` | set | claude-code `["shell", "subagent"]`; codex `[]` (same probe: both kinds were run there and neither woke) |
+| `stop-input-in-flight-statuses` | set | claude-code `["running", "pending"]` (2.1.284, 2026-09-29, `ops-ed76fe`) |
 
-OpenCode has no entry for any of them and reads as `unknown`. The plan checks each value,
-version and date against the cited task records before committing the file, and records
-any difference from the code comments.
+The values of `controller-wake-kinds` are the `type` strings Claude Code's Stop input
+uses for a child: `shell` for a background command, `subagent` for a subagent. The wake
+probe established the two kinds (`tack-00ccb6`); the strings were first recorded in
+`ops-ed76fe`. The entry cites both. OpenCode has no entry for any fact and reads as
+`unknown`. Codex has no entry for `stop-input-in-flight-statuses`, which describes an
+input only Claude Code has.
+
+Three places where the code comments say more than the cited records, each carried in
+the entry's `note` and not smoothed over:
+
+- **The Claude Code version of the wake probe.** `tack-00ccb6` records Codex 0.156.1 and
+  never names the Claude Code version. 2.1.282 comes from the guard's comment and the
+  same-day design (`docs/specs/2026-09-24-turn-boundary-gate-design.md`); the note says
+  so.
+- **The date.** The probe's task notes are stamped 2026-09-25 in UTC; the fact records
+  the local date, 2026-09-24, by the rule in §4.2.
+- **`pending`.** No record shows it observed or shows it in the input's schema. The note
+  reads "not observed; kept from the guard's review in `ops-ed76fe`".
+
+Each entry's note also names the probe's mode (Codex in its terminal interface, the
+Stop-input probe headless), since entries key on the harness alone. The plan checks every
+value, version and date against the records once more before committing the file.
 
 ### 4.6 The probe tool, and re-probing
 
@@ -260,8 +300,10 @@ twice: here, authoritative from the commit that adds them, and as constants in
 
 One test guards the gap, on the consumer's side so the data still flows one way: ops
 `tests/test_claim_guard.py` gains a test that locates tack through the registry, reads
-`facts/capabilities.toml`, and asserts that `CHILD_WAKES`, `WAKING` and `IN_FLIGHT` equal
-the three facts (sets compared as sets; `CHILD_WAKES` against the probed boolean entries).
+`facts/capabilities.toml`, and asserts that the constants equal the facts: `CHILD_WAKES`
+against the probed `controller-wake` entry of each harness it names, and `WAKING` and
+`IN_FLIGHT`, which the guard applies only to Claude Code, against the claude-code entries
+of the other two, sets compared as sets.
 It reads through the tool's module (§4.4), and reads the file named by
 `HARNESS_FACTS_FILE` when that is set, so it can be pointed at a candidate. It skips,
 with the reason printed, only when the registry has no `tack` entry and no candidate is
@@ -277,6 +319,12 @@ same check by hand. A refresh that changes only `version`, `date` or `evidence` 
 untouched. A refresh that changes a value lands as a pair: the constant is changed in an
 ops worktree, the hook is pointed there with `FACTS_MIRROR_OPS=<that worktree>`, tack's
 commit passes, and the two merge together, tack first.
+
+This makes ops's gate depend on tack's working tree, the kind of cross-checkout
+dependency §4.2 refuses for `evidence`. It is accepted here because it is temporary and
+guards a gate's input; the `evidence` check would have been permanent and guards nothing.
+The ops-side commits (this test, the parent spec's sentences) run under an ops task the
+plan files as a child of `ops-cb9749`.
 
 Both halves, the ops test and the hook step, are deleted with the constants. A note on
 `tasks-56b450` names the file's path, the contract in §4.4, and the two things to remove.
@@ -307,9 +355,12 @@ entry is a declared link to its owner. Phase 3 audits it and closes what the aud
 - **Declare** `~/.claude/skills/tasks` in `[harness.claude.links]` as
   `"skills/tasks" = "tasks:skills/tasks"`. It is installed and in use; this is the line
   it never had.
-- **Remove** the two dangling links under `~/.codex/skills`. They were never declared, so
-  `[retired]` cannot prove ownership of them; the plan shows each link's target and
-  removes it by hand at a gated host step, on each host where it exists.
+- **Remove** the two dangling links under `~/.codex/skills`. `[retired]` cannot do it:
+  their target is a relative path into `~/.agents/skills`, which no manifest target can
+  express, so the ownership test would report `refuse`, and a `refuse` row blocks every
+  `--apply`. The plan shows each link's target and removes it by hand at a gated host
+  step, on each host where it exists. lore's `.skill-lock.json` still names the two
+  skills; that is filed with lore.
 - **Rewrite** the stale comment above the aggregate entries in `links.toml`: each entry
   targets its owner, and adding or removing a skill is a line here.
 - **Leave** harness-owned real directories alone. Nothing prunes undeclared paths (parent
@@ -324,29 +375,35 @@ Whether that is intended is the user's call.
 ## 6. Old material: dispositions
 
 Being old does not make an item irrelevant (parent §6), and instruction text is lore's
-subject now. So old instruction text goes to lore's archive for the review lore already
-owns (`lore-d6acd5`, whose scope the plan extends by a note), project leftovers are
-deleted, and retired harness definitions stay where they are.
+subject now. So old instruction text goes to lore's archive, project leftovers are
+deleted, and retired harness definitions stay where they are. lore's existing review task
+(`lore-d6acd5`) covers one file; these 23 get a sibling task there, filed by the plan,
+so the size of the review is stated and not hidden in a note.
 
 | Item | What it is | Disposition |
 |---|---|---|
-| `archive/agents-md/AGENTS-longer.md`, `AGENTS-ohai.md`, `python.md` | Earlier versions and a language section of the global instructions, 2026-02 to 2026-08, never committed | Move to lore `docs/archive/agents-md/`, committed for the first time; reviewed under `lore-d6acd5` |
-| `archive/cursor/cursor-rules/**` (18 files) | Cursor rule files per stack (Python, TypeScript, Docker), 2026-01 | Move to lore `docs/archive/cursor-rules/`; same review |
+| `archive/agents-md/AGENTS-longer.md`, `AGENTS-ohai.md`, `python.md` | Earlier versions and a language section of the global instructions, 2026-02 to 2026-08, never committed | Move to lore `docs/archive/agents-md/`, committed for the first time; reviewed under a new lore task |
+| `archive/cursor/cursor-rules/**` (18 files) | Cursor rule files per stack (Python, TypeScript, Docker), last edited 2025-03 to 2025-09 | Move to lore `docs/archive/cursor-rules/`; same review |
 | `archive/cursor/check-health.cjs`, `fix-imports.ts`, `workspaces/v3.code-workspace` | Scripts and a workspace file for the retired mindful v3 checkout, 2025-07 | Delete |
-| `doc/ref/marimo-best-practices.md`, `doc/ref/xstate_timer_testing.md` | Two debugging notes on tools other projects use; nothing here or in lore cites them | Move to lore `docs/archive/ref/`; the review decides whether either becomes a skill reference |
+| `doc/ref/marimo-best-practices.md`, `doc/ref/xstate_timer_testing.md` | Two debugging notes on tools other projects use; only two closed tack tasks cite them | Move to lore `docs/archive/ref/`; the review decides whether either becomes a skill reference |
 | `claude/archive/**` (16 files) | Retired Claude Code agent and command definitions | Keep in place: tracked, harness-specific, and inert because nothing links them |
 
 Rules for the moves:
 
 - A moved file is committed in lore with a message naming its source (the tack commit for
-  tracked files; "untracked, from tack's `archive/`" for the rest), then removed here in
-  the commit that follows lore's.
-- lore's pre-commit hygiene check applies to the moved text and is never bypassed. If it
-  refuses a literal (a machine path, a host name), that literal is replaced and the commit
-  message says so.
-- The deletion is of untracked files and cannot be undone from git. It runs at a gated
-  step, after the plan lists the three files, and Dropbox's own history is the only
-  recovery.
+  tracked files; "untracked, from tack's `archive/`" for the rest). The two tracked notes
+  are then removed here by a commit. The untracked originals are removed by a filesystem
+  delete, once, since the file sync carries it to the other host.
+- lore's pre-commit hygiene check applies to the moved text and is never bypassed. One
+  refusal is known in advance: `AGENTS-ohai.md` ends with a line holding the home
+  directory and the sync root. A refused literal is replaced and the commit message says
+  so.
+- None of the untracked text passed the publication scrub tack's tracked files went
+  through, and the Cursor rules and `AGENTS-longer.md` read as partly third-party text.
+  lore's `docs/archive/` gains a short README saying so: unscrubbed, provenance mixed,
+  not for publication until the review has passed over it.
+- The deletion of the three leftovers cannot be undone from git. It runs at a gated step,
+  once, after the plan lists the files; the file sync's own history is the only recovery.
 - After the moves `archive/` and `doc/` no longer exist here.
 
 ## 7. The front door
@@ -355,38 +412,50 @@ Rules for the moves:
   install the agent surface, harness settings and hook wiring, capability facts, state
   hygiene, the session archive, and the session-logs skill with its tools." It reaches
   the global instructions in the order phase 2 established: tack main, then ops main with
-  `just projects` (mirror and fragment), then lore's `assemble-instructions write`.
+  `just projects` (mirror and fragment), then lore's `assemble-instructions write`. ops
+  compares each project's live scope with its mirror at every session start and in its
+  own check, so the scope line is not part of the front-door commit: it lands on tack
+  main only as the first act of that chain (§8 step 4), with the other two right behind.
 - **`identity.toml`**: `authority` gains this spec; the abstract gains the capability
   facts.
 - **`AGENTS.md` and `README.md`**: the layout names `facts/` and `tools/harness-facts`;
-  the README gains the consumer contract in brief and the re-probing section; the lines
-  about `doc/` and the rename tool go.
+  the README gains the consumer contract in brief and the re-probing section. Neither
+  file mentions `doc/` today, so nothing is removed for it. The README's "Renamed from
+  ai" section belongs to the rename's spec.
 
 ## 8. Order and gates
 
 Structural changes land before behavioural ones (parent §5.6). Nothing in this phase
 changes what a running session does except the scope sentence in the global instructions
-and one new link.
+and one new link, `~/.agents/bin/harness-facts`.
 
 1. **In the tack worktree**, test-first: the facts tool and its tests, the fact file, the
-   `links.toml` lines, the front door, the removal of the rename tool. Reviewed, then
-   merged to tack main. Nothing on a host has changed yet: links apply only on
+   `links.toml` lines, and the front door without the scope line. Reviewed, then merged
+   to tack main. Nothing on a host has changed yet: links apply only on
    `just link --apply`.
 2. **In an ops worktree**: the mirror test (§4.7) and the parent spec's dated sentences
    (the name, §3; the relay deferral, §4.8). Merged to ops main after tack main holds the
    file. tack's hook step is enabled in a follow-up commit here once ops main holds the
    test, since it runs that test.
 3. **Gated on the user, per host**: `just link` previewed, then `just link --apply` from
-   tack main (two new links); the two dangling Codex links removed; the three leftover
-   files deleted. The second host repeats the link step after sync.
-4. **Gated, once**: the scope chain (tack, ops with `just projects`, lore assembly), which
-   changes the global instruction file every session reads.
+   tack main. On this host the preview must show one `create` (`harness-facts`) and `ok`
+   for `skills/tasks`, which already exists; the second host's expectation comes from its
+   audit, where `skills/tasks` may be a `create`. Then the two dangling Codex links are
+   removed where they exist. The second host repeats this after sync. The three leftover
+   files are deleted once, from this host.
+4. **Gated, once**: the scope chain, in order and without a pause between: the scope line
+   on tack main, ops with `just projects`, lore's assembly. It changes the global
+   instruction file every session reads.
 5. **In a lore worktree**: the archive moves, then their removal here.
 
-Rollback is by revert at each step: the links through a `[retired]` entry for the two new
-paths, the scope by reverting the three commits and regenerating in the same order, the
-archive moves by reverting lore's commit and restoring from tack's history or Dropbox.
-The deletion in step 3 is the one step with no revert.
+Rollback is by revert at each step. The `harness-facts` link is removed through a
+`[retired]` entry. The `skills/tasks` declaration is rolled back by deleting its line and
+nothing more: the link predates this change on this host, a `[retired]` entry would
+remove it and take the tasks skill from Claude Code, and nothing prunes an undeclared
+path. Only on a host where the apply created that link does it go through `[retired]`.
+The scope is rolled back by reverting the three commits and regenerating in the same
+order; the archive moves by reverting lore's commit and restoring from tack's history or
+the file sync's. The deletion in step 3 is the one step with no revert.
 
 ## 9. Testing
 
@@ -417,8 +486,12 @@ The deletion in step 3 is the one step with no revert.
    dangling links are gone.
 4. Every item in §6 has its disposition carried out, and `lore-d6acd5` covers the moved
    text.
-5. The feedback scope reads as in §7 in tack, the mirror and the assembled instructions.
+5. The feedback scope reads as in §7 in tack, the mirror and the assembled instructions,
+   and the guide and README describe the facts.
+6. The rename, under its own spec, is done and `ops-593133` is closed.
 
 Filed by the plan: the staleness idea (tack), the stored-evidence idea (relay), the work
-home's skills idea (tack). With this task done, `ops-cb9749` waits only on
-`tasks-56b450`.
+home's skills idea (tack), the lock file's two stale skill names (lore), the archive
+review task (lore), and the ops task for the ops-side commits. With this task done,
+`ops-cb9749` is checked against the parent's §9: its item 3 asks of tasks only that the
+claim-guard decision be recorded as a task there, and `tasks-56b450` is that task.
