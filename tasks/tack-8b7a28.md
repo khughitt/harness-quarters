@@ -6,9 +6,9 @@ priority: 1
 size: m
 complexity: high
 process: planned
-owner: main
+owner: plan/rename-hq
 created: 2026-10-06T12:59:15Z
-updated: 2026-10-06T16:15:31Z
+updated: 2026-10-06T16:38:09Z
 started: 2026-10-06T16:15:19Z
 depends: [flows-44890e, obs-ff4e76, tasks-7580d2]
 parent: tack-dcb11a
@@ -16,6 +16,7 @@ tags: []
 source: tack-dcb11a
 agent: claude-code/claude-fable-5-1
 spec: docs/specs/2026-10-06-rename-to-hq-design.md
+plan: docs/plans/2026-10-06-rename-to-hq-preparation.md
 ---
 
 Why: the user chose the residue's name on 2026-10-06 (parent spec §7.1); the rename runs first in phase 3 so the residue's new consumers are written against the final registry key. Done: the rename design's §7: both hosts adopted and verified, four repositories committed and tasks check clean, the parent spec records the name, the GitHub repository renamed or its rename recorded as deferred, ops-593133 closed.
@@ -32,3 +33,5 @@ Why: the user chose the residue's name on 2026-10-06 (parent spec §7.1); the re
 - 2026-10-06T16:15:19Z (main): started
   provenance: {"harness_session":"claude-code:529a99ac-8d12-4ea1-b9ff-8f3fd73d2c16","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-06T16:15:31Z (main): arm: flow-trial-1 — unit tack-dcb11a — flow off
+- 2026-10-06T16:15:42Z (plan/rename-hq): resumed
+  provenance: {"harness_session":"claude-code:529a99ac-8d12-4ea1-b9ff-8f3fd73d2c16","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
