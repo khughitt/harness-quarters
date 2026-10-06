@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: feat/rename-hq
 created: 2026-10-06T12:59:15Z
-updated: 2026-10-06T18:32:21Z
+updated: 2026-10-06T19:24:26Z
 started: 2026-10-06T16:15:19Z
 depends: [flows-44890e, obs-ff4e76, tasks-7580d2]
 parent: tack-dcb11a
@@ -52,3 +52,4 @@ Why: the user chose the residue's name on 2026-10-06 (parent spec §7.1); the re
 - 2026-10-06T18:30:05Z (feat/rename-hq): phase 1 steps 1 to 3 delivered (docs/plans/2026-10-06-rename-to-hq-preparation.md): the units call ~/.local/bin/session-archive on both hosts; rename-cutover is general (a repositories list, a split apply, a guard that knows the alias retarget and group rewrite, kept trust files); tools/harness-links. Deferred minors for the cutover plan are in the plan's execution record.
 - 2026-10-06T18:32:21Z (main): parked (waiting on agent, dependency): When tasks-7580d2 has landed its resolver, write docs/plans/<date>-rename-to-hq-cutover.md for spec §3.1 steps 4 and 5 and phase 2 (the rehearsal; the runbook with its timers, attestations and systemd steps; the second host; verification), taking what flows-44890e and obs-ff4e76 chose, and the deferred minors in the preparation plan's execution record.
   provenance: {"harness_session":"claude-code:529a99ac-8d12-4ea1-b9ff-8f3fd73d2c16","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-06T19:24:26Z (main): From reviewing tasks-7580d2's plan: once [locations] exists, tasks rename and init --force rewrite [locations.<old>]/[locations.<new>] in the registry, and rename-cutover's guard (registry_view keeps every top-level table other than projects, aliases and groups) would then report 'locations' as a foreign change and refuse every rollback. The cutover plan must extend registry_view to drop locations.<old> and locations.<new> and add a test. Also: the second host needs a current tasks binary before its pre-move 'tasks -C <root> init --prefix tack --force' (an older binary drops [locations] on any registry write).
