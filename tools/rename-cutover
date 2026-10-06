@@ -172,6 +172,8 @@ def validate_kept_destinations(meta):
         if dest.is_symlink() or root not in dest.resolve().parents:
             raise Stop(f"rollback: kept {entry['path']} would be written through a link, "
                        f"to {dest.resolve()}")
+        if dest.exists() and not dest.is_file():
+            raise Stop(f"rollback: kept {entry['path']} is not a regular file; move it aside first")
 
 
 def save(args):
@@ -551,6 +553,8 @@ def retarget(args):
     meta = load_meta(snap)
     check_environment("retarget", meta)
     root = Path(args.repo).resolve()
+    if root in (Path(meta["new_root"]), Path(meta["checkout"]["root"])):
+        raise Stop(f"retarget: {root} is the renamed checkout; its own ids were renamed, not retargeted")
     if str(root) not in {r["root"] for r in meta["repos"]}:
         if not args.forward:
             raise Stop(f"retarget: {root} is not in the snapshot; after the other host has adopted, "

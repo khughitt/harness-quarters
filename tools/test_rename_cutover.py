@@ -458,6 +458,19 @@ def test_a_forward_retarget_of_a_non_project_records_nothing(box, tmp_path):
     box.cutover("rollback", "--snapshot", box.snapshot)
 
 
+def test_retarget_refuses_the_renamed_checkout(box):
+    """Its own ids were renamed, not retargeted; --forward on it would end rollback for nothing."""
+    box.save()
+    box.forward()
+    for extra in ((), ("--forward",)):
+        result = box.cutover("retarget", "--snapshot", box.snapshot, "--repo", box.new_root, *extra,
+                             check=False)
+        assert result.returncode == 1
+        assert "is the renamed checkout" in result.stderr and "pass --forward" not in result.stderr
+    assert not (box.snapshot / "forward.json").exists()
+    box.cutover("rollback", "--snapshot", box.snapshot)
+
+
 def test_rollback_refuses_after_a_forward_retarget(box):
     """A forward write is one rollback could not undo: it ends rollback, and nothing moves."""
     outside = box.sync / "relay"
@@ -964,6 +977,19 @@ def test_rollback_refuses_a_kept_path_linked_away_since_save(hq, tmp_path):
     assert result.returncode == 1
     assert "would be written through a link" in result.stderr
     assert (outside / "trust.toml").read_text() == "someone else's\n"
+    assert hq.new_root.exists() and not hq.checkout.exists()
+
+
+def test_rollback_refuses_a_kept_path_that_became_a_directory(hq):
+    """The restore could not write it; rollback stops before anything moves."""
+    hq.save()
+    hq.cutover("apply", "--snapshot", hq.snapshot)
+    trust = hq.new_root / "local" / "codex" / "trust.toml"
+    trust.unlink()
+    trust.mkdir()
+    result = hq.cutover("rollback", "--snapshot", hq.snapshot, check=False)
+    assert result.returncode == 1
+    assert "is not a regular file" in result.stderr and "Traceback" not in result.stderr
     assert hq.new_root.exists() and not hq.checkout.exists()
 
 
