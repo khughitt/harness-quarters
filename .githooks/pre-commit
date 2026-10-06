@@ -88,6 +88,8 @@ def mirror(candidate):
     if named and not (ops / "tests" / "test_claim_guard.py").is_file():
         # Named for a value change landing as a pair: a typo must not skip the check.
         return fail(f"FACTS_MIRROR_OPS={named} is not an ops checkout (no tests/test_claim_guard.py there)")
+    if named and shutil.which("just") is None:
+        return fail(f"FACTS_MIRROR_OPS={named} names a checkout to test against, but `just` is not on PATH")
     if ops is None or not ops.is_dir() or shutil.which("just") is None:
         sys.stderr.write("pre-commit: no ops checkout to ask (unregistered, missing, or `just` absent); "
                          "the claim-guard mirror was not checked\n")

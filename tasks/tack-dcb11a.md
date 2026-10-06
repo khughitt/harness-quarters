@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: feat/residue
 created: 2026-10-04T10:54:36Z
-updated: 2026-10-06T15:31:34Z
+updated: 2026-10-06T15:49:42Z
 started: 2026-10-06T11:20:33Z
 depends: [ops-f2405d]
 tags: []
@@ -61,6 +61,9 @@ Done: tack renamed in place by the rename design's procedure (tasks rename, iden
 - 2026-10-06T15:15:21Z (feat/residue): review: impl round 1 — verdict: accept; findings: Minor 8; reviewer: claude-code/claude-fable-5-1
 - 2026-10-06T15:18:47Z (feat/residue): merged to tack main a803d37: facts and tool on main; nothing applied to any host yet
 - 2026-10-06T15:25:39Z (feat/residue): surface audit, this host: report non-ok: create ~/.agents/bin/harness-facts (status 0); skills/tasks ok; DANGLING ~/.codex/skills/vercel-react-best-practices -> ../../.agents/skills/vercel-react-best-practices; DANGLING ~/.codex/skills/web-design-guidelines -> ../../.agents/skills/web-design-guidelines; harness-owned real dirs: ~/.claude/skills/{synced,.trash}, ~/.claude-work/skills/synced, ~/.codex/skills/.system, ~/.codex-work/skills/.system
-- 2026-10-06T15:30:53Z (feat/residue): approvals (user, in session 2026-10-06): titan link step; scope chain; deletion of tack archive/ (24-file checksummed inventory); europa link step when online, applied only if its preview matches its audit
+- 2026-10-06T15:30:53Z (feat/residue): approvals (user, in session 2026-10-06): this host's link step; scope chain; deletion of tack archive/ (24-file checksummed inventory); the second host's link step when online, applied only if its preview matches its audit
 - 2026-10-06T15:31:33Z (feat/residue): host step done on this host: harness-facts installed and answering; link-check clean; dangling Codex links: vercel-react-best-practices removed, web-design-guidelines removed. Preview/apply scripts ran without just --quiet (just 1.58 suppresses recipe output under --quiet).
 - 2026-10-06T15:31:33Z (feat/residue): review: impl round 2 — verdict: revise; findings: Important 2, Minor 4; reviewer: claude-code/claude-fable-5-1
+- 2026-10-06T15:37:20Z (feat/residue): archive/ deleted from tack (24 untracked files; 21 committed in lore docs/archive/, 3 mindful v3 leftovers removed)
+- 2026-10-06T15:45:39Z (feat/residue): review: impl round 3 — verdict: accept; findings: Important 1, Minor 4; reviewer: claude-code/claude-fable-5-1
+- 2026-10-06T15:49:42Z (feat/residue): residue acceptance (spec §10): items 1, 4 and 5 delivered; items 2 and 3 delivered on this host, the second host's audit, link apply and dangling-link removal pending under tack-f548ee (that host is still syncing); item 6, the rename to hq, continues under tack-8b7a28
