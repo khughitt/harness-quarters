@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: feat/residue
 created: 2026-10-04T10:54:36Z
-updated: 2026-10-06T14:52:44Z
+updated: 2026-10-06T14:52:45Z
 started: 2026-10-06T11:20:33Z
 depends: [ops-f2405d]
 tags: []
@@ -54,3 +54,5 @@ Done: tack renamed in place by the rename design's procedure (tasks rename, iden
 - 2026-10-06T14:52:43Z (feat/residue): resumed
   provenance: {"harness_session":"claude-code:f110e5bf-234d-4815-8f46-8780451c03cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-06T14:52:43Z (feat/residue): review: plan round 4 — verdict: accept; findings: none; reviewer: codex/gpt-6-astra
+- 2026-10-06T14:52:43Z (feat/residue): parked (waiting on user, decision): Paused at the user's request after acceptance. On the user's go: this session executes docs/plans/2026-10-06-residue.md inline from Task 1 (it stops for approval at Tasks 8, 9 and 10). Separately, the rename's plan is still to be written under tack-8b7a28.
+  provenance: {"harness_session":"claude-code:f110e5bf-234d-4815-8f46-8780451c03cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
