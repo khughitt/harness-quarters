@@ -282,3 +282,12 @@ def test_the_shipped_file_is_valid_and_holds_the_three_facts():
     assert facts.lookup("controller-wake-kinds", "codex")["value"] == []
     assert facts.lookup("stop-input-in-flight-statuses", "claude-code")["value"] == ["pending", "running"]
     assert facts.lookup("stop-input-in-flight-statuses", "codex")["status"] == "unknown"
+
+
+def test_every_shipped_note_names_the_probe_mode():
+    """Entries key on the harness alone, so each note says how the probe ran (spec §4.5)."""
+    modes = {"claude-code": "interactive session", "codex": "terminal interface"}
+    for fact in ("controller-wake", "controller-wake-kinds"):
+        for harness, mode in modes.items():
+            assert mode in facts.lookup(fact, harness)["note"], (fact, harness)
+    assert "headless" in facts.lookup("stop-input-in-flight-statuses", "claude-code")["note"]

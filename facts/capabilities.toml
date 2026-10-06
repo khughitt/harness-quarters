@@ -36,7 +36,7 @@ value = ["shell", "subagent"]
 version = "2.1.282"
 date = 2026-09-24
 evidence = "tack-00ccb6; ops-ed76fe"
-note = "The wake probe established the two kinds (tack-00ccb6). The type strings were first recorded on 2.1.284 (ops-ed76fe)."
+note = "The wake probe established the two kinds, in an interactive session (tack-00ccb6). The type strings were first recorded on 2.1.284 (ops-ed76fe)."
 
 [facts.controller-wake-kinds.harness.codex]
 status = "probed"
@@ -44,7 +44,7 @@ value = []
 version = "0.156.1"
 date = 2026-09-24
 evidence = "tack-00ccb6"
-note = "Both kinds were run and neither woke."
+note = "Both kinds were run, in the terminal interface, and neither woke."
 
 [facts.stop-input-in-flight-statuses]
 type = "set"
