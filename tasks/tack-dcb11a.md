@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: feat/residue
 created: 2026-10-04T10:54:36Z
-updated: 2026-10-06T15:45:39Z
+updated: 2026-10-06T15:49:42Z
 started: 2026-10-06T11:20:33Z
 depends: [ops-f2405d]
 tags: []
@@ -66,3 +66,4 @@ Done: tack renamed in place by the rename design's procedure (tasks rename, iden
 - 2026-10-06T15:31:33Z (feat/residue): review: impl round 2 — verdict: revise; findings: Important 2, Minor 4; reviewer: claude-code/claude-fable-5-1
 - 2026-10-06T15:37:20Z (feat/residue): archive/ deleted from tack (24 untracked files; 21 committed in lore docs/archive/, 3 mindful v3 leftovers removed)
 - 2026-10-06T15:45:39Z (feat/residue): review: impl round 3 — verdict: accept; findings: Important 1, Minor 4; reviewer: claude-code/claude-fable-5-1
+- 2026-10-06T15:49:42Z (feat/residue): residue acceptance (spec §10): items 1, 4 and 5 delivered; items 2 and 3 delivered on this host, the second host's audit, link apply and dangling-link removal pending under tack-f548ee (that host is still syncing); item 6, the rename to hq, continues under tack-8b7a28
