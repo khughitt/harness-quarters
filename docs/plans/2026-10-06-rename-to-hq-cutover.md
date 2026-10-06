@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** draft 2026-10-06, for review. Task `tack-8b7a28`. Round 1 (Codex GPT-6-Astra): revise, P1 4 and P2 4, all addressed. Round 2 (a Claude reviewer that rebuilt Tasks 1 to 5 and ran the rehearsal): revise, Critical 1, Important 6 (two already fixed by round 1), Minor 5, all addressed: rollback accepts renamed attachment folders, `save` refuses `tasks check` findings, the rehearsal fetches submodules from the live checkouts, copies lock files and stands links in for un-cloned projects, and the runbook clears live records and findings first. Round 3 (the same reviewer, scoped, rebuilding from the revised plan): revise, Important 3 and Minor 4, all addressed: the attachments test attaches through `tasks attach`, stand-in links follow nested mirror paths, Task 11 forgets each distinct old path only where it has a table, and an attempt can be abandoned before `apply`. Round 4 (the same reviewer, scoped): accept, Minor 1, addressed: the abandon block restores the other host's timers only when its `current` link names this attempt. Loops stop their block; the trial join compares raw strings within each run; the other host's timers wait for a synced restore; every clone gets its live hooks; the second host's adoption resumes from a pre-move record and carries its own trust; each attempt has its own directory; trust goes through `codex-trust restore`.
+**Status:** draft 2026-10-06, for review. Task `tack-8b7a28`. Round 1 (Codex GPT-6-Astra): revise, P1 4 and P2 4, all addressed. Round 2 (a Claude reviewer that rebuilt Tasks 1 to 5 and ran the rehearsal): revise, Critical 1, Important 6 (two already fixed by round 1), Minor 5, all addressed: rollback accepts renamed attachment folders, `save` refuses `tasks check` findings, the rehearsal fetches submodules from the live checkouts, copies lock files and stands links in for un-cloned projects, and the runbook clears live records and findings first. Round 3 (the same reviewer, scoped, rebuilding from the revised plan): revise, Important 3 and Minor 4, all addressed: the attachments test attaches through `tasks attach`, stand-in links follow nested mirror paths, Task 11 forgets each distinct old path only where it has a table, and an attempt can be abandoned before `apply`. Round 4 (the same reviewer, scoped): accept, Minor 1, addressed: the abandon block restores the other host's timers only when its `current` link names this attempt. Round 5 (Codex, model unstated): revise, P1 2 and P2 2, all addressed: rollback re-establishes quiescence after Step 13 (sessions closed, timers stopped and drained again); `rolled-back` is written only after both hosts recover; `second-host` always reruns the idempotent adoption, rehearsed at tasks' own `resume_cleanup` boundary; the trial join must include a task of the renamed project. Loops stop their block; the trial join compares raw strings within each run; the other host's timers wait for a synced restore; every clone gets its live hooks; the second host's adoption resumes from a pre-move record and carries its own trust; each attempt has its own directory; trust goes through `codex-trust restore`.
 
 **Goal:** Finish the rename design: `session-episodes` follows ids written under a retired prefix (phase 1 step 4), the consumers' edits are prepared and reviewed without activating (step 5), the rehearsal passes on copies, and the cutover runs on both hosts (phase 2).
 
@@ -93,7 +93,7 @@ One step record per task, children of `tack-8b7a28`, created with this plan's dr
 
 Each task's first step starts its record. A code task closes its record in its code commit.
 
-**Order.** Tasks 1 to 5 are independent. Task 6 runs the tools of Tasks 2, 4 and 5. Task 7 merges Tasks 1 to 6. Task 8 waits on `flows-44890e` and `obs-ff4e76`. Tasks 9 to 11 run in one sitting each, in that order.
+**Order.** Tasks 1 to 5 are independent and can run now. Task 6 runs the tools of Tasks 2, 4 and 5, and its preflight needs the live records committed and `tasks check` clean in tack, ops, lore and flows. On 2026-10-06 that waits on other sessions' untracked records and on ops's `ops-be8b06` shelved dependency, so Task 6, and Task 7 after it, wait on the user's call there. Task 7 merges Tasks 1 to 6. Task 8 waits on `flows-44890e` and `obs-ff4e76`. Tasks 9 to 11 run in one sitting each, in that order.
 
 ---
 
@@ -1677,10 +1677,11 @@ def step_second_host(args):
     if link.exists() and not link.is_symlink():
         raise Stop(f"second-host: {link} is not a link")
     projects = tomllib.loads(registry_path().read_text()).get("projects", {})
-    if OLD in projects:
-        print(run("tasks", "rename", OLD, NEW, "--adopt", cwd=root), end="")
-    elif NEW not in projects or Path(projects[NEW]).resolve() != root:
+    if OLD not in projects and (NEW not in projects or Path(projects[NEW]).resolve() != root):
         raise Stop(f"second-host: the registry maps neither {OLD} nor {NEW} to {root}")
+    # Always: the adoption is idempotent, and a rerun finishes its own interrupted cleanup
+    # (tasks' resume_cleanup: the registry adopted, the old claim store not yet removed).
+    print(run("tasks", "rename", OLD, NEW, "--adopt", cwd=root), end="")
     if old_present:
         os.rename(storage_old.parent, storage_new.parent)
     if not (link.is_symlink() and link.resolve() == storage_new.resolve()):
@@ -2173,7 +2174,15 @@ def test_the_second_host_finishes_an_interrupted_adoption(hosts):
     carry(h1, h2)
     # second-host got as far as the adoption, then stopped: the registry no longer names tack.
     h2.run("tasks", "rename", OLD, NEW, "--adopt", cwd=h2.path("hq"))
+    # And tasks itself stopped between adopting the registry and removing the old claim
+    # store: its resume_cleanup state, which only a rerun of the adoption finishes.
+    old_store = h2.state / "tasks" / "claims" / f"{OLD}.toml"
+    old_store.parent.mkdir(parents=True, exist_ok=True)
+    old_store.write_text("")
+    explained = json.loads(h2.run("tasks", "rename", OLD, NEW, "--adopt", "--explain", cwd=h2.path("hq")).stdout)
+    assert "resume_cleanup" in json.dumps(explained), explained
     h2.run("python3", STEPS, "second-host", "--root", h2.path("hq"), "--state", h2.second_state)
+    assert not old_store.exists()
     assert_adopted(h2)
     # A rerun of a finished adoption changes nothing and passes.
     h2.run("python3", STEPS, "second-host", "--root", h2.path("hq"), "--state", h2.second_state)
@@ -2430,6 +2439,8 @@ def test_the_trial_join_survives_the_rename(hosts):
     ids = {x for c in (census_b, census_a) for u in c["units"] for x in (u["root"], *(m["task"] for m in u["members"]))}
     names = canonical(h1, ids)
     assert ids <= set(names), f"ids tasks resolve does not know: {sorted(ids - set(names))}"
+    assert any(names[t].startswith(f"{NEW}-") for t in before), \
+        "no task of the renamed project joined a report row before the rename: coverage came from obs alone"
     after_member = {names[m["task"]]: m["task"] for u in census_a["units"] for m in u["members"]}
     for task, row in before.items():
         now = after_member.get(names[task])
@@ -2448,7 +2459,7 @@ def test_the_trial_join_survives_the_rename(hosts):
 ```
 
 The cross-run comparison goes through canonical ids, so it holds whichever single id form the contract picked. The join inside each run does not: there, a census member counts only when the report has a row under exactly its string, as `trial-verdict` reads it, and that join must be non-empty. The test requires:
-- the join is exercised: at least one member joins a row before the rename;
+- the join is exercised for the renamed project: at least one of its tasks joins a row before the rename, since obs's rows alone would pass every other condition;
 - every member that joined a row before still joins one after, under the string the census now gives it, with the same values. So no member becomes unknown;
 - every unit enrolled before keeps its arm and its members;
 - the planted unit, whose two id forms hash to different arms, keeps the arm of the listed prefix.
@@ -2699,15 +2710,22 @@ Then ask the user to open one fresh session in each of the four homes in `hq`:
 
 Record what they report on `hq-8b7a28`.
 
-**Rollback (from Step 7 until Task 10 Step 2).** First this host:
+**Rollback (from Step 7 until Task 10 Step 2).** After Step 13, this host's timers run again, and the user has opened fresh sessions in `hq`. So rollback starts by re-establishing quiescence:
+- the user closes every harness session opened since Step 13, and attests again that only this ops session runs (note it on `hq-8b7a28`);
+- this host's timers are stopped and drained again, under a fresh record. Before Step 13 that record finds them already stopped, which is harmless.
+
+Then this host rolls back:
 
 ```sh
-. "$HOME/.local/state/rename-hq/env.sh" && cd "$OPS_ROOT" && t "$SNAP/rename-cutover" rollback --snapshot "$SNAP" && systemctl --user daemon-reload && \
+. "$HOME/.local/state/rename-hq/env.sh" && cd "$OPS_ROOT" && RB="$RUN/rollback-$(date -u +%Y%m%dT%H%M%SZ)" && mkdir -p "$RB" && \
+t "$RUN/bin/quiesce-timers" record --state "$RB/timers.json" $(cat "$RUN/timers") && \
+t "$RUN/bin/quiesce-timers" stop --state "$RB/timers.json" && t "$RUN/bin/quiesce-timers" wait --state "$RB/timers.json" --timeout 3600 && \
+t "$SNAP/rename-cutover" rollback --snapshot "$SNAP" && systemctl --user daemon-reload && \
 ( for u in $(awk '$1 ~ /\.timer$/ && $2 == "enabled" {print $1}' "$RUN/archive-units.txt"); do systemctl --user reenable "$u" || exit 1; done ) && \
 [ "$({ readlink "$HOME/.config/systemd/user/timers.target.wants/session-archive-capture.timer" || echo none; })" = "$(cat "$RUN/enable-link.txt")" ] && \
 (cd "$OLD_ROOT" && just link-check >/dev/null) && t "$RUN/bin/quiesce-timers" restore --state "$RUN/timers.json" && \
 for r in "$OLD_ROOT" "$OPS_ROOT" "$LORE_ROOT" "$FLOWS_ROOT"; do printf '%s %s\n' "$(basename "$r")" "$(git -C "$r" rev-parse HEAD)"; done > "$RUN/restored-heads.txt" && \
-touch "$RUN/rolled-back" && echo "rolled back on this host"
+echo "rolled back on this host; the attempt is not finished until the other host recovers"
 ```
 
 The other host's timers stay paused until the sync has carried the restored checkouts there. Its writers would otherwise run against a renamed or half-restored tree. Then, once the user says the sync has settled:
@@ -2718,10 +2736,11 @@ on_second 'R="$(tasks resolve tack --json | python3 -c "import json,sys; print(j
 test -d "$R" && test ! -e "$(dirname "$R")/hq" && grep -q "^prefix = \"tack\"" "$R/tasks/.config.toml" && \
 while read -r name head; do [ "$(git -C "$(dirname "$R")/$name" rev-parse HEAD)" = "$head" ] && [ -z "$(git -C "$(dirname "$R")/$name" status --porcelain)" ] || { echo "NOT YET: $name"; exit 1; }; done && \
 cd "$R" && just link-check >/dev/null && echo "the other host sees the restored checkouts"' < "$RUN/restored-heads.txt" && \
-on_second '~/.local/state/rename-hq/current/bin/quiesce-timers restore --state ~/.local/state/rename-hq/current/timers.json' && echo "the other host's timers restored"
+on_second '~/.local/state/rename-hq/current/bin/quiesce-timers restore --state ~/.local/state/rename-hq/current/timers.json' && \
+touch "$RUN/rolled-back" && echo "the other host's timers restored; the attempt is rolled back"
 ```
 
-`NOT YET` means the sync has not finished. Wait and rerun, and never restore its timers before this passes. Then note on `tack-8b7a28` what failed and where. A new attempt starts at Step 1 with a fresh window, and Step 2 gives it its own directory beside this one, which stays as evidence. The other host's `second-host-record` needs no undo: it re-registered the root it already had. The next attempt's Step 5 writes a new record in the new attempt's directory.
+`NOT YET` means the sync has not finished. Wait and rerun, and never restore its timers before this passes. `rolled-back` is written only here, after both hosts have recovered. Step 2 accepts no new attempt before then, so a new attempt cannot repoint `current` and record the other host's still-paused timers as their original state. Then note on `tack-8b7a28` what failed and where. A new attempt starts at Step 1 with a fresh window, and Step 2 gives it its own directory beside this one, which stays as evidence. The other host's `second-host-record` needs no undo: it re-registered the root it already had. The next attempt's Step 5 writes a new record in the new attempt's directory.
 
 ---
 
