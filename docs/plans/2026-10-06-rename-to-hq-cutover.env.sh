@@ -26,3 +26,15 @@ SECOND="$(cat "$CUT/second-host" 2>/dev/null)"
 on_second() { ssh -4 -o BatchMode=yes "$SECOND" "export PATH=\"\$HOME/.cargo/bin:\$HOME/.local/bin:\$HOME/bin:\$PATH\"; $1"; }
 # list_timers: each loaded user timer, with what its service runs.
 list_timers() { systemctl --user list-timers --all --no-legend | awk '{print $(NF-1)}' | while read -r timer; do svc="$(systemctl --user show -p Unit --value "$timer")"; printf '%s\t%s\n' "$timer" "$(systemctl --user show -p ExecStart -p ExecStartPost --value "$svc" | sed -n 's/.*argv\[\]=\([^;]*\) ;.*/\1/p' | tr '\n' ' ')"; done; }
+# carry_memory OLD_ROOT NEW_ROOT: copy each Claude home's project memory to the new root's
+# key. A copy an earlier attempt left identical is accepted; a changed one is moved aside,
+# never overwritten, and named for reconciliation.
+carry_memory() { local home old new aside; for home in "$HOME/.claude" "$HOME/.claude-work"; do
+  old="$home/projects/$(printf %s "$1" | tr / -)/memory"; new="$home/projects/$(printf %s "$2" | tr / -)/memory"
+  [ -d "$old" ] || continue
+  if [ -e "$new" ]; then
+    if diff -rq "$old" "$new" >/dev/null; then echo "memory already carried in $home"; continue; fi
+    aside="$new.kept-$(date -u +%Y%m%dT%H%M%SZ)"; mv "$new" "$aside" || return 1; echo "KEPT FOR RECONCILIATION: $aside"
+  fi
+  mkdir -p "$(dirname "$new")" && cp -a "$old" "$new" && echo "memory carried in $home" || return 1
+done; }

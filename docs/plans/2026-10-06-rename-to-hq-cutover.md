@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** draft 2026-10-06, for review. Task `tack-8b7a28`. Round 1 (Codex GPT-6-Astra): revise, P1 4 and P2 4, all addressed. Round 2 (a Claude reviewer that rebuilt Tasks 1 to 5 and ran the rehearsal): revise, Critical 1, Important 6 (two already fixed by round 1), Minor 5, all addressed: rollback accepts renamed attachment folders, `save` refuses `tasks check` findings, the rehearsal fetches submodules from the live checkouts, copies lock files and stands links in for un-cloned projects, and the runbook clears live records and findings first. Round 3 (the same reviewer, scoped, rebuilding from the revised plan): revise, Important 3 and Minor 4, all addressed: the attachments test attaches through `tasks attach`, stand-in links follow nested mirror paths, Task 11 forgets each distinct old path only where it has a table, and an attempt can be abandoned before `apply`. Round 4 (the same reviewer, scoped): accept, Minor 1, addressed: the abandon block restores the other host's timers only when its `current` link names this attempt. Round 5 (Codex, model unstated): revise, P1 2 and P2 2, all addressed: rollback re-establishes quiescence after Step 13 (sessions closed, timers stopped and drained again); `rolled-back` is written only after both hosts recover; `second-host` always reruns the idempotent adoption, rehearsed at tasks' own `resume_cleanup` boundary; the trial join must include a task of the renamed project. Loops stop their block; the trial join compares raw strings within each run; the other host's timers wait for a synced restore; every clone gets its live hooks; the second host's adoption resumes from a pre-move record and carries its own trust; each attempt has its own directory; trust goes through `codex-trust restore`.
+**Status:** draft 2026-10-06, for review. Task `tack-8b7a28`. Round 1 (Codex GPT-6-Astra): revise, P1 4 and P2 4, all addressed. Round 2 (a Claude reviewer that rebuilt Tasks 1 to 5 and ran the rehearsal): revise, Critical 1, Important 6 (two already fixed by round 1), Minor 5, all addressed: rollback accepts renamed attachment folders, `save` refuses `tasks check` findings, the rehearsal fetches submodules from the live checkouts, copies lock files and stands links in for un-cloned projects, and the runbook clears live records and findings first. Round 3 (the same reviewer, scoped, rebuilding from the revised plan): revise, Important 3 and Minor 4, all addressed: the attachments test attaches through `tasks attach`, stand-in links follow nested mirror paths, Task 11 forgets each distinct old path only where it has a table, and an attempt can be abandoned before `apply`. Round 4 (the same reviewer, scoped): accept, Minor 1, addressed: the abandon block restores the other host's timers only when its `current` link names this attempt. Round 5 (Codex, model unstated): revise, P1 2 and P2 2, all addressed: rollback re-establishes quiescence after Step 13 (sessions closed, timers stopped and drained again); `rolled-back` is written only after both hosts recover; `second-host` always reruns the idempotent adoption, rehearsed at tasks' own `resume_cleanup` boundary; the trial join must include a task of the renamed project. Round 6 (Codex, model unstated): revise, P1 2 and P2 3, all addressed: Task 10 checks all four repositories at this host's heads, clean; Step 3 commits the notes and sees them synced before `second-host-record`; `anchor_ids` reads transition ids raw, before confirmation; Claude's memory copy accepts an identical earlier copy and keeps a changed one aside; new files are staged before their commits. Loops stop their block; the trial join compares raw strings within each run; the other host's timers wait for a synced restore; every clone gets its live hooks; the second host's adoption resumes from a pre-move record and carries its own trust; each attempt has its own directory; trust goes through `codex-trust restore`.
 
 **Goal:** Finish the rename design: `session-episodes` follows ids written under a retired prefix (phase 1 step 4), the consumers' edits are prepared and reviewed without activating (step 5), the rehearsal passes on copies, and the cutover runs on both hosts (phase 2).
 
@@ -53,7 +53,7 @@ Task 7 reviews and merges. Task 8 adds the flow trial's end-to-end join to the r
 
 - The project is called `tack` until Task 9 Step 7 (`apply`), and `hq` from then on. Ids written `tack-<hex>` keep resolving through the alias.
 - Tasks 1 to 7 work in `.worktrees/rename-hq-cutover` (branch `feat/rename-hq-cutover`; exists, set up with `just setup`). Task 8 works in a fresh worktree at the same path on branch `feat/rename-hq-trial-join`. Tasks 9 to 11 change live state from a session started in ops: the checkout moves from under any session standing in it (spec §3.2).
-- No AI attribution in any commit. Conventional commit subjects. Never bypass a hook. A commit names its paths: `git commit -m … -- <paths>`. The exception is `rename-hq-steps`, which stages everything (`git add -A`), because `save` refused unless every tree was clean.
+- No AI attribution in any commit. Conventional commit subjects. Never bypass a hook. A commit names its paths: `git commit -m … -- <paths>`. A new file is staged first (`git add -- <new paths>`), because a path git does not track does not match `-- <paths>`. The exception is `rename-hq-steps`, which stages everything (`git add -A`), because `save` refused unless every tree was clean.
 - A loop inside a block's chain runs in a subshell and stops with `exit 1`: `( for …; do … || exit 1; done ) && next`. A `break` would end the loop with status 0, and the chain would go on past a refusal.
 - Shell state does not carry from one block to the next.
   - Every block in Tasks 1 to 8 opens by sourcing `docs/plans/2026-10-06-rename-to-hq-cutover.env.sh`. It sets:
@@ -201,6 +201,28 @@ def test_anchor_ids_names_the_start_and_the_close(tmp_path):
     s = codex_story(tmp_path, start_cmd=start_js("tack-000001"), start_out='{"id":"tack-000001","warnings":[]}\n',
                     extra=extra, next_text=None)
     assert se.anchor_ids([s]) == ["hq-000001", "tack-000001"]
+
+
+def test_anchor_ids_names_a_close_written_under_the_retired_prefix(tmp_path):
+    # Started as hq-…, closed as tack-…, which prints hq-…: unconfirmed until resolved.
+    extra = [x_custom("c2", 'text(await tools.exec_command({cmd:"tasks done tack-000001 landed"}));', 120),
+             x_custom_out("c2", '{"id":"hq-000001","warnings":[]}\n', 130)]
+    s = codex_story(tmp_path, start_cmd=start_js("hq-000001"), start_out='{"id":"hq-000001","warnings":[]}\n',
+                    extra=extra, next_text=None)
+    assert "tack-000001" in se.anchor_ids([s])
+
+
+def test_extract_closes_with_a_close_written_under_the_retired_prefix(tmp_path):
+    extra = [x_event("task_started", 100, "t2"), x_user("finish it", 100),
+             x_custom("c2", 'text(await tools.exec_command({cmd:"tasks done tack-000001 landed"}));', 120),
+             x_custom_out("c2", '{"id":"hq-000001","warnings":[]}\n', 130), x_event("task_complete", 131, "t2")]
+    codex_story(tmp_path, start_cmd=start_js("hq-000001"), start_out='{"id":"hq-000001","warnings":[]}\n',
+                extra=extra, next_text=None)
+    out = tmp_path / "episodes.jsonl"
+    env = cli_env(tmp_path, renamed_project(tmp_path), aliases={"tack": "hq"})
+    assert run_cli(["extract", "--out", str(out)], env)[0] == 0
+    row = json.loads(out.read_text().splitlines()[0])
+    assert row["task_id"] == "hq-000001" and row["closed_at"] == ms(130) and row["closure_source"] == "transcript"
 
 
 def test_resolve_ids_follows_an_alias_through_tasks_resolve(tmp_path):
@@ -357,11 +379,18 @@ After `build_episodes`, add:
 
 ```python
 def anchor_ids(sessions: list[Session]) -> list[str]:
-    """Every task id these sessions' anchors and transitions name, as written: what
-    extract asks tasks resolve about before it builds the episodes."""
+    """Every task id these sessions' anchors and transition commands name, as written:
+    what extract asks tasks resolve about before it builds the episodes. Transitions are
+    read raw, not confirmed: a close written under a retired prefix prints its canonical
+    id, so it confirms only once that id is known."""
     probe = Inputs(sessions, {}, {}, {}, 0, 0)
-    anchors, transitions = _collect_anchors(probe, _new_summary(probe))
-    return sorted({a.written for a in anchors.values()} | {task_id for task_id, _ in transitions})
+    anchors, _ = _collect_anchors(probe, _new_summary(probe))
+    written = {a.written for a in anchors.values()}
+    for s in sessions:
+        for e in s.events:
+            if e.kind == "tool_call":
+                written.update(task_id for c in e.commands for _, task_id in transitions_in(c))
+    return sorted(written)
 ```
 
 Replace `cmd_extract` with:
@@ -1198,6 +1227,7 @@ Expected: 9 passed.
 ```sh
 . "$(tasks root tack-8b7a28 --pretty)/.worktrees/rename-hq-cutover/docs/plans/2026-10-06-rename-to-hq-cutover.env.sh" && cd "$WT" && t just test && \
 tasks done "$STEP4" "quiesce-timers records, stops, waits for and restores a window's user timers; it never kills a running service" >/dev/null && \
+git add -- tools/quiesce-timers tools/test_quiesce_timers.py && \
 git commit -q -m "feat(tools): quiesce-timers for a rename's window (tack-8b7a28)" -- tools/quiesce-timers tools/test_quiesce_timers.py "tasks/$STEP4.md" && git log --oneline -1
 ```
 
@@ -1764,6 +1794,7 @@ Expected: `every edit matches once`. A mismatch names the repository, the file a
 ```sh
 . "$(tasks root tack-8b7a28 --pretty)/.worktrees/rename-hq-cutover/docs/plans/2026-10-06-rename-to-hq-cutover.env.sh" && cd "$WT" && t just test && \
 tasks done "$STEP5" "rename-hq-steps holds the cutover's reviewed edits and commits for tack, ops, lore and flows, the Codex trust entry, and the second host's adoption" >/dev/null && \
+git add -- tools/rename-hq-steps tools/test_rename_hq_steps.py && \
 git commit -q -m "feat(tools): rename-hq-steps, the cutover's edits and the second host's adoption (tack-8b7a28)" -- tools/rename-hq-steps tools/test_rename_hq_steps.py "tasks/$STEP5.md" && git log --oneline -1
 ```
 
@@ -2279,6 +2310,7 @@ Record each fix as a ruling in the ledger, and rerun until all eight pass. The r
 . "$(tasks root tack-8b7a28 --pretty)/.worktrees/rename-hq-cutover/docs/plans/2026-10-06-rename-to-hq-cutover.env.sh" && cd "$WT" && \
 tasks note tack-8b7a28 "rehearsal: passed $(date -u +%F) without the trial join (Task 6): cutover and second-host adoption, rollback before and after the commits, the guard on three foreign changes, a dead claim refused; $(tail -n 1 "$STATE/rehearsal.log")" >/dev/null && \
 tasks done "$STEP6" "the rehearsal clones the live checkouts into two scratch hosts and passes: cutover, adoption, both rollbacks, the guard, the dead claim" >/dev/null && \
+git add -- tools/rehearse_rename_hq.py && \
 git commit -q -m "test(rename): the rehearsal on clones of the live checkouts (tack-8b7a28)" -- tools/rehearse_rename_hq.py "tasks/$STEP6.md" tasks/tack-8b7a28.md && git log --oneline -1
 ```
 
@@ -2556,6 +2588,16 @@ Act on what it prints. Every item below must hold before Step 4.
   - each `tasks check` finding is resolved with its owner (on 2026-10-06, `ops-be8b06` depended on the shelved `material-764d8c`).
 - **ops tests.** The files that name `tack` are exactly the fixtures spec §1 keeps: `test_claim_guard.py`, `test_ops_profile.py`, `test_ops_projects.py` and `test_sessionstart.py`. Any other file is the residue's mirror test or something like it. It gets its edit in `rename-hq-steps`'s ops table and a rehearsal rerun, the same day, before going on.
 - **The other host.** It answers, its `tasks` has `resolve`, and both of its tasks directories are real. Its systemd version is recorded in a note on `tack-8b7a28`.
+- **The notes so far are committed, and the other host has them.** Step 5's `second-host-record` refuses a dirty tree there, and the Step 1 attestation and this step's notes are uncommitted until now. Commit them, then confirm the sync has carried the commit. Rerun the check until it passes:
+
+  ```sh
+  . "$HOME/.local/state/rename-hq/env.sh" && \
+  { [ -z "$(git -C "$OLD_ROOT" status --porcelain -- tasks)" ] || git -C "$OLD_ROOT" commit -q -m "chore(tasks): the cutover's attestation and preconditions (tack-8b7a28)" -- tasks/; } && \
+  H="$(git -C "$OLD_ROOT" rev-parse HEAD)" && [ -z "$(git -C "$OLD_ROOT" status --porcelain)" ] && \
+  on_second 'R="$(tasks root tack-8b7a28 --pretty)"; [ "$(git -C "$R" rev-parse HEAD)" = "'"$H"'" ] && [ -z "$(git -C "$R" status --porcelain)" ] && echo "the other host has the notes, clean"'
+  ```
+
+  Nothing writes a note into tack between this check and Step 5. Step 5's own note (that host's `ai` backfill) comes after its record, and Step 6 commits it.
 
 - [ ] **Step 4: Quiesce the timers, on both hosts, before anything shared changes**
 
@@ -2694,14 +2736,14 @@ A failure here goes to the rollback block.
 
 ```sh
 . "$HOME/.local/state/rename-hq/env.sh" && cd "$OPS_ROOT" && t "$RUN/bin/quiesce-timers" restore --state "$RUN/timers.json" && \
-( for home in "$HOME/.claude" "$HOME/.claude-work"; do old="$home/projects/$(printf %s "$OLD_ROOT" | tr / -)"; new="$home/projects/$(printf %s "$NEW_ROOT" | tr / -)"; \
-  [ -d "$old/memory" ] || continue; [ ! -e "$new/memory" ] || { echo "REFUSE: $new/memory exists"; exit 1; }; \
-  mkdir -p "$new" && cp -a "$old/memory" "$new/memory" && echo "memory carried in $home" || exit 1; done ) && \
+carry_memory "$OLD_ROOT" "$NEW_ROOT" && \
 tasks start "$STEP9" >/dev/null && \
 tasks done "$STEP9" "this host: renamed, moved, committed in hq, ops, lore and flows, linked, verified (suites green), timers restored, Claude memory carried; rollback stays defined until the other host adopts" >/dev/null && \
 tasks park hq-8b7a28 "The user confirms the file sync has carried hq to the other host; then this ops session runs Task 10. Until then the other host's timers stay paused and its sessions start without instructions." --waiting-on user --reason approval >/dev/null && \
 git -C "$NEW_ROOT" commit -q -m "chore(tasks): the cutover verified on this host (hq-8b7a28)" -- tasks/ && echo recorded
 ```
+
+`carry_memory` (in the env file) is safe across attempts. A copy an earlier, rolled-back attempt left is accepted when it is identical. A copy that has changed since is moved aside under a `.kept-<time>` name, never overwritten, and printed for you to reconcile.
 
 Then ask the user to open one fresh session in each of the four homes in `hq`:
 - Claude Code asks once to trust the folder, which is expected.
@@ -2752,11 +2794,14 @@ On the other host, over ssh, from the same ops session.
 
 ```sh
 . "$HOME/.local/state/rename-hq/env.sh" && tasks start "$STEP10" >/dev/null && \
-on_second 'R="$(tasks resolve tack --json | python3 -c "import json,sys; print(json.load(sys.stdin)[\"results\"][0][\"root\"])")"; N="$(dirname "$R")/hq"; \
-test ! -e "$R" && test -d "$N" && grep -q "^prefix = \"hq\"" "$N/tasks/.config.toml" && [ "$(git -C "$N" rev-parse HEAD)" = "'"$(git -C "$NEW_ROOT" rev-parse HEAD)"'" ] && echo "carried to $N"'
+for r in "$NEW_ROOT" "$OPS_ROOT" "$LORE_ROOT" "$FLOWS_ROOT"; do printf '%s %s\n' "$(basename "$r")" "$(git -C "$r" rev-parse HEAD)"; done > "$RUN/forward-heads.txt" && \
+on_second 'R="$(tasks resolve tack --json | python3 -c "import json,sys; print(json.load(sys.stdin)[\"results\"][0][\"root\"])")"; S="$(dirname "$R")"; \
+test ! -e "$R" && test -d "$S/hq" && grep -q "^prefix = \"hq\"" "$S/hq/tasks/.config.toml" && \
+while read -r name head; do [ "$(git -C "$S/$name" rev-parse HEAD)" = "$head" ] && [ -z "$(git -C "$S/$name" status --porcelain)" ] || { echo "NOT YET: $name"; exit 1; }; done && \
+echo "carried to $S/hq, with ops, lore and flows at this host'"'"'s heads"' < "$RUN/forward-heads.txt"
 ```
 
-Expected: `carried to <that host's hq>`. Otherwise wait for the sync, or ask the user to look at it. Do not continue on a partial sync.
+Expected: `carried to <that host's hq>, …`. hq, ops, lore and flows must all be at this host's heads, with clean trees. A repository that synced later would otherwise meet an adoption against mixed versions, and adoption ends rollback. Otherwise wait for the sync, or ask the user to look at it. Do not continue on a partial sync.
 
 - [ ] **Step 2: Adopt (rollback ends here)**
 
@@ -2787,11 +2832,8 @@ find "$HOME" -maxdepth 6 -xtype l 2>/dev/null | sort > "$C/broken-after.txt" && 
 
 ```sh
 . "$HOME/.local/state/rename-hq/env.sh" && \
-on_second 'N="$(tasks resolve hq --json | python3 -c "import json,sys; print(json.load(sys.stdin)[\"results\"][0][\"root\"])")"; O="$(dirname "$N")/tack"; \
-~/.local/state/rename-hq/current/bin/quiesce-timers restore --state ~/.local/state/rename-hq/current/timers.json && \
-for home in "$HOME/.claude" "$HOME/.claude-work"; do old="$home/projects/$(printf %s "$O" | tr / -)"; new="$home/projects/$(printf %s "$N" | tr / -)"; \
-  [ -d "$old/memory" ] || continue; [ ! -e "$new/memory" ] || { echo "REFUSE: $new/memory exists"; exit 1; }; \
-  mkdir -p "$new" && cp -a "$old/memory" "$new/memory" && echo "memory carried in $home" || exit 1; done' && \
+on_second "$(declare -f carry_memory)"'; N="$(tasks resolve hq --json | python3 -c "import json,sys; print(json.load(sys.stdin)[\"results\"][0][\"root\"])")"; O="$(dirname "$N")/tack"; \
+~/.local/state/rename-hq/current/bin/quiesce-timers restore --state ~/.local/state/rename-hq/current/timers.json && carry_memory "$O" "$N"' && \
 tasks done "$STEP10" "the other host adopted and verified; its timers restored" >/dev/null && \
 git -C "$NEW_ROOT" commit -q -m "chore(tasks): the other host adopted hq (hq-8b7a28)" -- tasks/ && echo recorded
 ```
