@@ -11,7 +11,7 @@ remains is harness support: homes, declared links, settings, state hygiene, the 
 archive, mods. This design settles five things:
 
 1. **The name.** The residue becomes "harness quarters", prefix `hq` (§3). The rename has
-   its own spec and runs first; nothing else here depends on which name was chosen.
+   its own spec and its own pace; nothing else here waits for it.
 2. **Capability facts.** A tracked fact file with typed values and separate evidence, one
    tool that validates and prints it, and the first three facts carried out of ops
    `hooks/claim-guard` (§4).
@@ -76,16 +76,18 @@ and which arrive when a consumer needs one; and the parent's §4.4 suggestion th
   rejected it for the word's connotation, and review rounds 1 to 3 record that.
 
 The rename has its own design, `docs/specs/2026-10-06-rename-to-hq-design.md`, modelled
-on the September rename, and runs first in this phase: everything in §4 to §7 is then
-built under the final name, and the new consumers in §4 are written against the final
-registry key. Until it lands this document says `tack` for the project as it stands, and
-`hq` where it names something a consumer will look up afterwards.
+on the September rename. Its cutover waits on work in flows and obs (the flow trial and
+obs's indexer both key on the prefix) and on a quiet window on the host, so it does not
+run first: everything in §4 to §7 lands under the name `tack`, and the rename's consumer
+table carries the one thing here that names the registry key, ops's mirror test (§4.7).
+This document says `tack` throughout for the project as it stands.
 
 Consequences for this design:
 
 - ops `ops-593133` ("the residue rename on every host") stays and is the hub's task for
   the rename's host steps.
-- The parent spec's §7.1 and status line record the name.
+- The parent spec's §7.1 and status line record the name; the rename's cutover makes
+  that edit, not this design.
 - `tools/rename-cutover` is the rename design's subject, not this one's.
 
 ## 4. Capability facts
@@ -293,8 +295,8 @@ against the probed `controller-wake` entry of each harness it names, and `WAKING
 of the other two, sets compared as sets.
 It reads through the tool's module (§4.4), and reads the file named by
 `HARNESS_FACTS_FILE` when that is set, so it can be pointed at a candidate. It skips,
-with the reason printed, only when the registry has no `hq` entry and no candidate is
-named; an invalid file or a difference fails.
+with the reason printed, only when the registry has no entry for this project (`tack`
+today; the rename changes the key it looks up) and no candidate is named; an invalid file or a difference fails.
 
 That test alone would only catch a change made in ops. A change made here would pass
 tack's gates, merge, and leave the live guard on its old constants until someone next ran
@@ -420,8 +422,8 @@ and one new link, `~/.agents/bin/harness-facts`.
    `links.toml` lines, and the front door without the scope line. Reviewed, then merged
    to tack main. Nothing on a host has changed yet: links apply only on
    `just link --apply`.
-2. **In an ops worktree**: the mirror test (§4.7) and the parent spec's dated sentences
-   (the name, §3; the relay deferral, §4.8). Merged to ops main after tack main holds the
+2. **In an ops worktree**: the mirror test (§4.7) and the parent spec's dated sentence
+   recording the relay deferral (§4.8). Merged to ops main after tack main holds the
    file. tack's hook step is enabled in a follow-up commit here once ops main holds the
    test, since it runs that test.
 3. **Gated on the user, per host**: `just link` previewed, then `just link --apply` from
@@ -468,7 +470,7 @@ the file sync's. The deletion in step 3 is the one step with no revert.
 
 `tack-dcb11a` is done when:
 
-1. The name decision is recorded in the parent spec, and `ops-593133` is closed to match.
+1. The name decision is recorded on this task and in the rename design.
 2. `facts/capabilities.toml` holds the three facts with their evidence; `harness-facts`
    is installed on both hosts; ops's mirror test passes and tack's hook runs it on a
    staged fact change; the parent spec records the relay deferral; `tasks-56b450` carries
@@ -479,7 +481,8 @@ the file sync's. The deletion in step 3 is the one step with no revert.
    by the plan covers the moved text.
 5. The feedback scope reads as in §7 in tack, the mirror and the assembled instructions,
    and the guide and README describe the facts.
-6. The rename to `hq`, under its own spec, is done and `ops-593133` is closed.
+6. The rename to `hq`, under its own spec and its child task `tack-8b7a28`, is done and
+   `ops-593133` is closed. Items 1 to 5 do not wait for it.
 
 Filed by the plan: the staleness idea (tack), the stored-evidence idea (relay), the work
 home's skills idea (tack), the lock file's two stale skill names (lore), the archive

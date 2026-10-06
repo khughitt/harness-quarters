@@ -7,8 +7,8 @@ size: m
 complexity: high
 process: planned
 created: 2026-10-06T12:59:15Z
-updated: 2026-10-06T12:59:15Z
-depends: []
+updated: 2026-10-06T13:09:15Z
+depends: [flows-44890e, obs-ff4e76]
 parent: tack-dcb11a
 tags: []
 source: tack-dcb11a
@@ -17,3 +17,7 @@ spec: docs/specs/2026-10-06-rename-to-hq-design.md
 ---
 
 Why: the user chose the residue's name on 2026-10-06 (parent spec §7.1); the rename runs first in phase 3 so the residue's new consumers are written against the final registry key. Done: the rename design's §7: both hosts adopted and verified, four repositories committed and tasks check clean, the parent spec records the name, the GitHub repository renamed or its rename recorded as deferred, ops-593133 closed.
+
+## Notes
+
+- 2026-10-06T13:08:45Z (feat/residue): review: spec round 1 — verdict: revise; findings: Critical 1, Important 5, Minor 6; reviewer: claude-code/claude-fable-5-1
