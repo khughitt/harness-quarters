@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: feat/residue
 created: 2026-10-04T10:54:36Z
-updated: 2026-10-06T14:32:55Z
+updated: 2026-10-06T14:33:38Z
 started: 2026-10-06T11:20:33Z
 depends: [ops-f2405d]
 tags: []
@@ -49,3 +49,5 @@ Done: tack renamed in place by the rename design's procedure (tasks rename, iden
 - 2026-10-06T14:32:54Z (feat/residue): resumed
   provenance: {"harness_session":"claude-code:f110e5bf-234d-4815-8f46-8780451c03cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-06T14:32:54Z (feat/residue): review: plan round 3 — verdict: revise; findings: P1 1, P2 2; reviewer: codex/gpt-6-astra
+- 2026-10-06T14:33:38Z (feat/residue): parked (waiting on user, review): User reviews (GPT round): docs/plans/2026-10-06-residue.md after its round 3 fixes (Tasks 8 and 10), and docs/specs/2026-10-06-rename-to-hq-design.md after its round 4 fix (§3.2 step 9, §4). On acceptance of the plan this session executes it inline from Task 1.
+  provenance: {"harness_session":"claude-code:f110e5bf-234d-4815-8f46-8780451c03cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
