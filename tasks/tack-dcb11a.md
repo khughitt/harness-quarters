@@ -8,13 +8,14 @@ complexity: high
 process: planned
 owner: feat/residue
 created: 2026-10-04T10:54:36Z
-updated: 2026-10-06T13:21:54Z
+updated: 2026-10-06T13:31:51Z
 started: 2026-10-06T11:20:33Z
 depends: [ops-f2405d]
 tags: []
 source: ops-cb9749
 agent: claude-code
 spec: docs/specs/2026-10-06-residue-design.md
+plan: docs/plans/2026-10-06-residue.md
 ---
 
 Why: phase 3 of the agent layer split (ops docs/specs/2026-10-03-agent-layer-split-design.md §4.1, §5.3, §6). What remains of tack after flows and lore leave is harness support: homes, links, state hygiene, session archive, mods, capability facts.
