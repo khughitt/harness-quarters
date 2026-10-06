@@ -1,0 +1,59 @@
+# Capability facts: what each harness has been shown to do, and where that is recorded.
+# Read only through tools/harness-facts (a command, or a module). Edit in a worktree.
+# Re-probing: README.md, "Re-probing a fact". Design: docs/specs/2026-10-06-residue-design.md §4.
+schema = 1
+harnesses = ["claude-code", "codex", "opencode"]
+
+[facts.controller-wake]
+type = "boolean"
+description = "The harness starts a new controller turn, without human input, when a child it runs finishes."
+probe = "agents/bin/wake-judge"
+
+[facts.controller-wake.harness.claude-code]
+status = "probed"
+value = true
+version = "2.1.282"
+date = 2026-09-24
+evidence = "tack-00ccb6"
+note = "A subagent and a background command both woke the controller (judge PASS), in an interactive session. The version is from the guard's comment and docs/specs/2026-09-24-turn-boundary-gate-design.md; the task record does not name it. The date is local; the task's notes are stamped 2026-09-25 UTC."
+
+[facts.controller-wake.harness.codex]
+status = "probed"
+value = false
+version = "0.156.1"
+date = 2026-09-24
+evidence = "tack-00ccb6"
+note = "Neither child kind woke the controller: for each, the turn ended, the child finished, and no new turn began within 170 seconds, in the terminal interface. A bounded observation, not a judge verdict: the judge knows no Codex completion form."
+
+[facts.controller-wake-kinds]
+type = "set"
+description = "The kinds of child for which a wake was shown, as Claude Code's Stop input names them in `type`: shell is a background command, subagent a subagent."
+probe = "agents/bin/wake-judge"
+
+[facts.controller-wake-kinds.harness.claude-code]
+status = "probed"
+value = ["shell", "subagent"]
+version = "2.1.282"
+date = 2026-09-24
+evidence = "tack-00ccb6; ops-ed76fe"
+note = "The wake probe established the two kinds (tack-00ccb6). The type strings were first recorded on 2.1.284 (ops-ed76fe)."
+
+[facts.controller-wake-kinds.harness.codex]
+status = "probed"
+value = []
+version = "0.156.1"
+date = 2026-09-24
+evidence = "tack-00ccb6"
+note = "Both kinds were run and neither woke."
+
+[facts.stop-input-in-flight-statuses]
+type = "set"
+description = "The statuses Claude Code's Stop input gives, in background_tasks, to work that is still to finish."
+
+[facts.stop-input-in-flight-statuses.harness.claude-code]
+status = "probed"
+value = ["running", "pending"]
+version = "2.1.284"
+date = 2026-09-29
+evidence = "ops-ed76fe"
+note = "A headless probe listed a background command and a background subagent as running. pending was not observed; it is kept from the guard's review in ops-ed76fe."

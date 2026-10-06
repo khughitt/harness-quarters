@@ -4,11 +4,13 @@
 The generated global-instruction block is checked by lore tools/check-projects-block.
 This hook runs the vendored tools/ops-docs against the working tree, preserving the
 README/AGENTS identity contract, and rejects every staged path under local/.
+A staged facts/capabilities.toml is validated as staged.
 Installed by git config core.hooksPath .githooks.
 """
 import pathlib
 import subprocess
 import sys
+import tempfile
 
 
 def fail(message):
@@ -41,8 +43,40 @@ def local_layer():
     return 0
 
 
+FACTS = "facts/capabilities.toml"
+FACTS_TOOL = pathlib.Path("tools") / "harness-facts"
+
+
+def facts_blob():
+    """The staged fact file, written to a temporary file; None when it is not staged."""
+    names = subprocess.run(["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR", "--", FACTS],
+                           check=True, text=True, capture_output=True).stdout.split()
+    if not names:
+        return None
+    blob = subprocess.run(["git", "show", f":{FACTS}"], check=True, capture_output=True).stdout
+    handle = tempfile.NamedTemporaryFile(prefix="capabilities-", suffix=".toml", delete=False)
+    with handle:
+        handle.write(blob)
+    return pathlib.Path(handle.name)
+
+
+def facts_check():
+    """A staged fact file must pass harness-facts as staged."""
+    blob = facts_blob()
+    if blob is None:
+        return 0
+    try:
+        done = subprocess.run([sys.executable, str(FACTS_TOOL), "check", "--file", str(blob)], text=True, capture_output=True)
+        if done.returncode:
+            sys.stderr.write(done.stderr)
+            return fail(f"{FACTS} as staged does not pass `{FACTS_TOOL} check`")
+        return 0
+    finally:
+        blob.unlink()
+
+
 def main():
-    return local_layer() or docs_check()
+    return local_layer() or docs_check() or facts_check()
 
 
 if __name__ == "__main__":
