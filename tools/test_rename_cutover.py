@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 TOOLS = Path(__file__).parent
+LINK_TOOL = "tools/tack-link"
 
 
 def load_cutover():
@@ -24,8 +25,16 @@ def load_cutover():
     return module
 
 
+def task_id(output):
+    added = json.loads(output)
+    return added.get("id") or added["task"]["id"]
+
+
 class Sandbox:
-    def __init__(self, tmp):
+    """The September rename's shape: checkout `ai` (prefix ai) becomes `tack`, and the
+    cutover retargets in the repositories named by `repos` (ops, unless a test asks)."""
+
+    def __init__(self, tmp, repos=("ops",)):
         self.tmp = tmp
         self.env = {**os.environ, "HOME": str(tmp / "home"), "XDG_CONFIG_HOME": str(tmp / "cfg"),
                     "XDG_STATE_HOME": str(tmp / "state"), "GIT_AUTHOR_NAME": "t",
@@ -34,11 +43,14 @@ class Sandbox:
         for d in ("home", "cfg", "state"):
             (tmp / d).mkdir()
         self.sync = tmp / "sync"
-        self.ai, self.ops, self.new_root = self.sync / "ai", self.sync / "ops", self.sync / "tack"
+        self.old, self.new = "ai", "tack"
+        self.checkout, self.new_root = self.sync / "ai", self.sync / "tack"
+        self.repos = [self.sync / name for name in repos]
+        self.ops = self.repos[0]
         self.snapshot = tmp / "snap"
 
-    def run(self, *cmd, cwd=None, check=True):
-        result = subprocess.run([str(c) for c in cmd], cwd=cwd, env=self.env, text=True,
+    def run(self, *cmd, cwd=None, check=True, env=None):
+        result = subprocess.run([str(c) for c in cmd], cwd=cwd, env=env or self.env, text=True,
                                 capture_output=True)
         if check and result.returncode != 0:
             raise AssertionError(f"{cmd}: {result.stdout}{result.stderr}")
@@ -46,51 +58,78 @@ class Sandbox:
 
     def repo(self, path, prefix):
         path.mkdir(parents=True)
-        self.run("git", "init", "-q", path)
+        self.run("git", "init", "-q", "-b", "main", path)
         self.run("tasks", "init", "--prefix", prefix, cwd=path)
 
+    def commit(self, root, message):
+        self.run("git", "add", "-A", cwd=root)
+        self.run("git", "commit", "-qm", message, cwd=root)
+
     def build(self):
-        self.repo(self.ai, "ai")
-        (self.ai / "tools").mkdir()
+        self.repo(self.checkout, self.old)
+        (self.checkout / "tools").mkdir()
         for name in ("tack-link", "rename-cutover"):
-            shutil.copy2(TOOLS / name, self.ai / "tools" / name)
-        (self.ai / "agents").mkdir()
-        (self.ai / "agents" / "README").write_text("x\n")
-        (self.ai / "links.toml").write_text('[required]\n"~/.agents" = "agents"\n')
-        (self.ai / ".gitignore").write_text(".worktrees\n")
-        first = json.loads(self.run("tasks", "add", "one", "--process", "direct", cwd=self.ai).stdout)
-        tid = first.get("id") or first["task"]["id"]
-        self.run("tasks", "add", "two", "--process", "direct", cwd=self.ai)
-        self.run("tasks", "start", tid, cwd=self.ai)
-        self.run("tasks", "park", tid, "next", cwd=self.ai)
-        storage = self.sync.parent / ".dropbox-work" / "ai" / ".worktrees"
+            shutil.copy2(TOOLS / name, self.checkout / "tools" / name)
+        (self.checkout / "agents").mkdir()
+        (self.checkout / "agents" / "README").write_text("x\n")
+        (self.checkout / "links.toml").write_text('[required]\n"~/.agents" = "agents"\n')
+        (self.checkout / ".gitignore").write_text(".worktrees\n")
+        tid = task_id(self.run("tasks", "add", "one", "--process", "direct", cwd=self.checkout).stdout)
+        self.run("tasks", "add", "two", "--process", "direct", cwd=self.checkout)
+        self.run("tasks", "start", tid, cwd=self.checkout)
+        self.run("tasks", "park", tid, "next", cwd=self.checkout)
+        storage = self.sync.parent / ".dropbox-work" / self.checkout.name / ".worktrees"
         storage.mkdir(parents=True)
-        (self.ai / ".worktrees").symlink_to("../../.dropbox-work/ai/.worktrees")
-        self.run("git", "add", "-A", cwd=self.ai)
-        self.run("git", "commit", "-qm", "init", cwd=self.ai)
-        self.repo(self.ops, "ops")
-        self.run("git", "add", "-A", cwd=self.ops)
-        self.run("git", "commit", "-qm", "init", cwd=self.ops)
-        self.run(self.ai / "tools" / "tack-link", "--apply")
+        (self.checkout / ".worktrees").symlink_to(f"../../.dropbox-work/{self.checkout.name}/.worktrees")
+        self.commit(self.checkout, "init")
+        for root in self.repos:
+            self.repo(root, root.name)
+            self.commit(root, "init")
+        self.run(self.checkout / "tools" / "tack-link", "--apply")
         return self
 
     def cutover(self, *args, check=True):
         tool = self.snapshot / "rename-cutover" if (self.snapshot / "rename-cutover").exists() \
-            else self.ai / "tools" / "rename-cutover"
+            else self.checkout / "tools" / "rename-cutover"
         return self.run(tool, *args, check=check)
 
-    def save(self):
-        return self.cutover("save", "--snapshot", self.snapshot, "--ai", self.ai, "--ops", self.ops,
-                            "--new-root", self.new_root)
+    def save_args(self):
+        args = ["save", "--snapshot", self.snapshot, "--checkout", self.checkout,
+                "--new-root", self.new_root, "--old", self.old, "--new", self.new,
+                "--link-tool", LINK_TOOL]
+        for root in self.repos:
+            args += ["--repo", root]
+        return args
+
+    def save(self, check=True):
+        return self.cutover(*self.save_args(), check=check)
+
+    def forward(self):
+        """The whole cutover up to the runbook's commits: apply, retarget everywhere, link."""
+        self.cutover("apply", "--snapshot", self.snapshot)
+        for root in self.repos:
+            self.cutover("retarget", "--snapshot", self.snapshot, "--repo", root)
+        self.cutover("link", "--snapshot", self.snapshot)
+
+    def depend_on_checkout(self, root):
+        """A task in `root` that depends on a checkout task, both committed. Returns
+        (checkout id, dependent id)."""
+        target = task_id(self.run("tasks", "add", "depended on", "--process", "direct",
+                                  cwd=self.checkout).stdout)
+        self.commit(self.checkout, "a task to depend on")
+        dependent = task_id(self.run("tasks", "add", "depends", "--process", "direct", cwd=root).stdout)
+        self.run("tasks", "dep", dependent, "--on", target, cwd=root)
+        self.commit(root, "depend on the checkout")
+        return target, dependent
 
     def fingerprint(self):
         """Everything rollback must restore, as comparable data."""
         def tree(root):
             return {str(p.relative_to(root)): p.read_bytes() for p in sorted(root.rglob("*"))
                     if p.is_file() and ".git" not in p.parts}
-        return {"ai": tree(self.ai), "ops": tree(self.ops),
+        return {"checkout": tree(self.checkout), **{r.name: tree(r) for r in self.repos},
                 "cfg": tree(self.tmp / "cfg" / "tasks"), "state": tree(self.tmp / "state" / "tasks"),
-                "worktrees": os.readlink(self.ai / ".worktrees"),
+                "worktrees": os.readlink(self.checkout / ".worktrees"),
                 "agents": os.path.realpath(self.tmp / "home" / ".agents")}
 
 
@@ -99,47 +138,381 @@ def box(tmp_path):
     return Sandbox(tmp_path).build()
 
 
+@pytest.fixture
+def box2(tmp_path):
+    """Two retargeted repositories, ops and lore."""
+    return Sandbox(tmp_path, repos=("ops", "lore")).build()
+
+
+# --- save ---------------------------------------------------------------------
+
+
 def test_save_refuses_with_a_live_claim(box):
-    tid = json.loads(box.run("tasks", "add", "three", "--process", "direct", cwd=box.ai).stdout)
-    tid = tid.get("id") or tid["task"]["id"]
-    box.run("tasks", "start", tid, cwd=box.ai)
-    result = box.cutover("save", "--snapshot", box.snapshot, "--ai", box.ai, "--ops", box.ops,
-                         "--new-root", box.new_root, check=False)
+    tid = task_id(box.run("tasks", "add", "three", "--process", "direct", cwd=box.checkout).stdout)
+    box.run("tasks", "start", tid, cwd=box.checkout)
+    result = box.save(check=False)
     assert result.returncode == 1
     assert "live claim" in result.stderr
 
 
 def test_save_refuses_a_dirty_tree(box):
     (box.ops / "stray").write_text("x\n")
-    result = box.cutover("save", "--snapshot", box.snapshot, "--ai", box.ai, "--ops", box.ops,
-                         "--new-root", box.new_root, check=False)
+    result = box.save(check=False)
     assert result.returncode == 1
     assert "not clean" in result.stderr
 
 
-def test_rollback_before_commit_restores_everything(box):
-    before = box.fingerprint()
+def test_save_refuses_a_dirty_tree_in_any_repository(box2):
+    (box2.repos[1] / "stray").write_text("x\n")
+    result = box2.save(check=False)
+    assert result.returncode == 1
+    assert f"{box2.repos[1]} is not clean" in result.stderr
+
+
+def test_save_refuses_a_snapshot_path_inside_the_checkout(box):
+    box.snapshot = box.checkout / "snap"
+    result = box.save(check=False)
+    assert result.returncode == 1
+    assert "lies inside checkout" in result.stderr
+    assert not (box.checkout / "snap").exists()
+
+
+def test_save_resolves_new_roots_parent_through_a_symlink(box, tmp_path):
+    alias = tmp_path / "alias"
+    alias.symlink_to(box.sync)
+    box.new_root = alias / "tack"
+    box.save()
+    meta = json.loads((box.snapshot / "meta.json").read_text())
+    assert meta["new_root"] == str((box.sync / "tack").resolve())
+
+
+def test_save_refuses_the_checkout_named_as_a_repository(box):
+    box.repos.append(box.checkout)
+    result = box.save(check=False)
+    assert result.returncode == 1
+    assert "never the checkout" in result.stderr
+    assert not box.snapshot.exists()
+
+
+def test_save_refuses_a_repository_named_twice(box):
+    box.repos.append(box.ops)
+    result = box.save(check=False)
+    assert result.returncode == 1
+    assert "name each --repo once" in result.stderr
+    assert not box.snapshot.exists()
+
+
+def test_save_refuses_a_link_tool_that_is_not_there(box):
+    args = [str(a) for a in box.save_args()]
+    args[args.index("--link-tool") + 1] = "tools/no-such-tool"
+    result = box.cutover(*args, check=False)
+    assert result.returncode == 1
+    assert "no link tool at" in result.stderr
+    assert not box.snapshot.exists()
+
+
+def test_save_refuses_a_branch_with_commits_main_lacks(box):
+    """Merged after the rename, such a branch would bring old-prefix task files back."""
+    box.run("git", "checkout", "-qb", "feature", cwd=box.checkout)
+    (box.checkout / "agents" / "more").write_text("y\n")
+    box.commit(box.checkout, "unmerged work")
+    box.run("git", "checkout", "-q", "main", cwd=box.checkout)
+    result = box.save(check=False)
+    assert result.returncode == 1
+    assert "feature" in result.stderr
+    assert not box.snapshot.exists()
+
+
+def test_save_accepts_a_branch_main_already_holds(box):
+    box.run("git", "branch", "merged", cwd=box.checkout)
+    box.save()
+
+
+def test_save_refuses_a_checkout_off_main(box):
+    box.run("git", "checkout", "-qb", "side", cwd=box.checkout)
+    result = box.save(check=False)
+    assert result.returncode == 1
+    assert "is on refs/heads/side, not main" in result.stderr
+    assert not box.snapshot.exists()
+
+
+def test_save_refuses_a_stash(box):
+    """A stash popped after the rename could bring old-prefix task files back."""
+    (box.checkout / "agents" / "README").write_text("stashed\n")
+    box.run("git", "stash", "-q", cwd=box.checkout)
+    result = box.save(check=False)
+    assert result.returncode == 1
+    assert "has stashes" in result.stderr
+    assert not box.snapshot.exists()
+
+
+def test_save_refuses_a_dead_claim_in_any_retargeted_repository(box2):
+    """`tasks dep` prunes dead claims from the project it writes in, so a dead claim in a
+    retargeted repository would be dropped by retarget and then stop the guard. The
+    claim is dead the moment it is written: its session's pid does not exist."""
+    lore = box2.repos[1]
+    tid = task_id(box2.run("tasks", "add", "orphaned claim", "--process", "direct", cwd=lore).stdout)
+    ghost = {**box2.env, "TASKS_SESSION": "ghost", "TASKS_SESSION_PID": "999999"}
+    box2.run("tasks", "start", tid, cwd=lore, env=ghost)
+    box2.commit(lore, "start under a dead session")
+    claims = json.loads(box2.run("tasks", "claims").stdout)["claims"]
+    assert any(c["id"] == tid and not c["live"] for c in claims), claims
+    result = box2.save(check=False)
+    assert result.returncode == 1
+    assert "a retargeted repository has claims" in result.stderr and tid in result.stderr
+    assert not box2.snapshot.exists()
+
+
+def test_save_refuses_an_old_prefix_that_is_another_project(box):
+    """`tasks rename` would rename whatever --old names; rollback could not undo that."""
+    box.old = "ops"
+    result = box.save(check=False)
+    assert result.returncode == 1
+    assert "has the prefix 'ai', not --old 'ops'" in result.stderr
+    assert not box.snapshot.exists()
+
+
+def test_save_refuses_a_checkout_the_registry_does_not_map(box, tmp_path):
+    copy = tmp_path / "elsewhere"
+    registry = box.tmp / "cfg" / "tasks" / "projects.toml"
+    registry.write_text(registry.read_text().replace(f'ai = "{box.checkout}"', f'ai = "{copy}"'))
+    result = box.save(check=False)
+    assert result.returncode == 1
+    assert "the registry maps 'ai'" in result.stderr
+    assert not box.snapshot.exists()
+
+
+def test_save_records_every_repository(box2):
+    box2.save()
+    meta = json.loads((box2.snapshot / "meta.json").read_text())
+    assert meta["checkout"]["root"] == str(box2.checkout)
+    assert [r["root"] for r in meta["repos"]] == [str(r) for r in box2.repos]
+    assert all(r["branch"] == "refs/heads/main" and len(r["head"]) == 40 for r in meta["repos"])
+    assert meta["link_tool"] == LINK_TOOL
+
+
+# --- apply, retarget, link, verify ---------------------------------------------
+
+
+def test_apply_renames_and_moves_but_neither_retargets_nor_links(box):
+    box.depend_on_checkout(box.ops)
     box.save()
     box.cutover("apply", "--snapshot", box.snapshot)
-    assert (box.new_root / "tasks").is_dir() and not box.ai.exists()
+    assert not box.checkout.exists()
+    assert any(p.name.startswith("tack-") for p in (box.new_root / "tasks").glob("*.md"))
+    registry = (box.tmp / "cfg" / "tasks" / "projects.toml").read_text()
+    assert f'tack = "{box.new_root}"' in registry and 'ai = "tack"' in registry
+    assert (box.new_root / ".worktrees").resolve() == \
+        (box.sync.parent / ".dropbox-work" / "tack" / ".worktrees").resolve()
+    assert "retired_prefix" in box.run("tasks", "check", cwd=box.ops).stdout
+    assert not os.path.exists(box.tmp / "home" / ".agents")     # still names the old path
+
+
+def test_the_whole_cutover_retargets_links_and_verifies(box2):
+    hexes = {}
+    for root in box2.repos:
+        target, dependent = box2.depend_on_checkout(root)
+        hexes[root] = (target.split("-", 1)[1], dependent)
+    box2.save()
+    box2.cutover("apply", "--snapshot", box2.snapshot)
+    for root in box2.repos:
+        result = box2.cutover("retarget", "--snapshot", box2.snapshot, "--repo", root)
+        hex_, dependent = hexes[root]
+        assert f"retarget: {dependent}: ai-{hex_} -> tack-{hex_}" in result.stdout
+        assert box2.run("tasks", "check", cwd=root).stdout == ""
+    box2.cutover("link", "--snapshot", box2.snapshot)
+    assert os.path.realpath(box2.tmp / "home" / ".agents") == str((box2.new_root / "agents").resolve())
+    box2.cutover("verify", "--snapshot", box2.snapshot)
+
+
+def test_retarget_keeps_every_dependency_and_its_order(box):
+    """Two old ids and one other dependency on one task: all three survive, in order."""
+    first = task_id(box.run("tasks", "add", "first", "--process", "direct", cwd=box.checkout).stdout)
+    second = task_id(box.run("tasks", "add", "second", "--process", "direct", cwd=box.checkout).stdout)
+    box.commit(box.checkout, "two tasks to depend on")
+    other = task_id(box.run("tasks", "add", "other", "--process", "direct", cwd=box.ops).stdout)
+    dependent = task_id(box.run("tasks", "add", "depends", "--process", "direct", cwd=box.ops).stdout)
+    for target in (first, other, second):
+        box.run("tasks", "dep", dependent, "--on", target, cwd=box.ops)
+    box.commit(box.ops, "three dependencies")
+    box.save()
+    box.cutover("apply", "--snapshot", box.snapshot)
+    box.cutover("retarget", "--snapshot", box.snapshot, "--repo", box.ops)
+    shown = json.loads(box.run("tasks", "show", dependent, cwd=box.ops).stdout)
+    assert shown["task"]["depends"] == [f"tack-{first[3:]}", other, f"tack-{second[3:]}"]
+    assert box.run("tasks", "check", cwd=box.ops).stdout == ""
+
+
+def test_retarget_writes_each_task_once(tmp_path, monkeypatch):
+    """No remove-then-add: one `tasks edit` save per task, the list replaced whole."""
+    cutover = load_cutover()
+    calls = []
+    check = {"warnings": [
+        {"id": "ops-1", "kind": "retired_prefix",
+         "detail": 'depends on ai-a through retired prefix "ai"; it is now tack-a'},
+        {"id": "ops-1", "kind": "retired_prefix",
+         "detail": 'depends on ai-b through retired prefix "ai"; it is now tack-b'}]}
+
+    def fake_run(*cmd, cwd=None):
+        calls.append(cmd)
+        if cmd[:2] == ("tasks", "check"):
+            return json.dumps(check)
+        if cmd[:2] == ("tasks", "show"):
+            return json.dumps({"task": {"depends": ["ai-a", "ops-9", "ai-b"]}})
+        return ""
+
+    monkeypatch.setattr(cutover, "run", fake_run)
+    cutover.retarget_dependencies(tmp_path, "ai")
+    writes = [c for c in calls if c[:2] in (("tasks", "edit"), ("tasks", "dep"))]
+    assert writes == [("tasks", "edit", "ops-1", "--no-depends", "--depends", "tack-a",
+                       "--depends", "ops-9", "--depends", "tack-b")]
+
+
+def test_verify_fails_while_a_repository_still_names_a_retired_id(box2):
+    box2.depend_on_checkout(box2.repos[1])
+    box2.save()
+    box2.cutover("apply", "--snapshot", box2.snapshot)
+    box2.cutover("retarget", "--snapshot", box2.snapshot, "--repo", box2.repos[0])
+    box2.cutover("link", "--snapshot", box2.snapshot)
+    result = box2.cutover("verify", "--snapshot", box2.snapshot, check=False)
+    assert result.returncode == 1
+    assert f"tasks check reports findings in {box2.repos[1]}" in result.stderr
+
+
+def test_retarget_refuses_a_repository_outside_the_snapshot(box):
+    """Rollback could not restore it; nothing is written there."""
+    outside = box.sync / "relay"
+    box.repo(outside, "relay")
+    box.commit(outside, "init")
+    _, dependent = box.depend_on_checkout(outside)
+    box.save()
+    box.cutover("apply", "--snapshot", box.snapshot)
+    before = (outside / "tasks" / f"{dependent}.md").read_bytes()
+    result = box.cutover("retarget", "--snapshot", box.snapshot, "--repo", outside, check=False)
+    assert result.returncode == 1
+    assert "not in the snapshot" in result.stderr and "--forward" in result.stderr
+    assert (outside / "tasks" / f"{dependent}.md").read_bytes() == before
+    box.cutover("retarget", "--snapshot", box.snapshot, "--repo", outside, "--forward")
+    assert box.run("tasks", "check", cwd=outside).stdout == ""
+
+
+def test_a_forward_retarget_of_a_non_project_records_nothing(box, tmp_path):
+    """A mistyped --repo is refused before it can end rollback."""
+    box.save()
+    box.forward()
+    result = box.cutover("retarget", "--snapshot", box.snapshot, "--repo", tmp_path / "typo", "--forward",
+                         check=False)
+    assert result.returncode == 1 and "is not a tasks project" in result.stderr
+    assert not (box.snapshot / "forward.json").exists()
+    box.cutover("rollback", "--snapshot", box.snapshot)
+
+
+def test_rollback_refuses_after_a_forward_retarget(box):
+    """A forward write is one rollback could not undo: it ends rollback, and nothing moves."""
+    outside = box.sync / "relay"
+    box.repo(outside, "relay")
+    box.commit(outside, "init")
+    box.depend_on_checkout(outside)
+    box.save()
+    box.forward()
+    box.cutover("retarget", "--snapshot", box.snapshot, "--repo", outside, "--forward")
+    result = box.cutover("rollback", "--snapshot", box.snapshot, check=False)
+    assert result.returncode == 1
+    assert "ended when retarget --forward" in result.stderr and str(outside) in result.stderr
+    assert box.new_root.exists() and not box.checkout.exists()
+
+
+def test_link_refuses_before_apply(box):
+    box.save()
+    result = box.cutover("link", "--snapshot", box.snapshot, check=False)
+    assert result.returncode == 1
+    assert "run apply first" in result.stderr
+
+
+def test_apply_refuses_when_new_root_already_exists(box):
+    box.save()
+    box.new_root.mkdir()
+    result = box.cutover("apply", "--snapshot", box.snapshot, check=False)
+    assert result.returncode == 1
+    assert "already exists" in result.stderr
+    assert box.checkout.exists()
+    assert box.new_root.is_dir() and not (box.new_root / "tasks").exists()
+
+
+def test_apply_refuses_when_storage_new_parent_already_exists(box):
+    box.save()
+    (box.sync.parent / ".dropbox-work" / "tack").mkdir(parents=True)
+    result = box.cutover("apply", "--snapshot", box.snapshot, check=False)
+    assert result.returncode == 1
+    assert "already exists" in result.stderr
+    assert box.checkout.exists()
+    assert not box.new_root.exists()
+
+
+def test_the_storage_follows_the_checkout_directory_not_the_prefix(box):
+    """work-link names storage after the directory; a new root whose name differs from
+    the new prefix moves the storage to the directory's name."""
+    box.new_root = box.sync / "renamed"
+    box.save()
+    meta = json.loads((box.snapshot / "meta.json").read_text())
+    assert meta["storage_new"] == str((box.sync.parent / ".dropbox-work" / "renamed" / ".worktrees").resolve())
+    box.forward()
+    box.cutover("verify", "--snapshot", box.snapshot)
+
+
+# --- rollback -----------------------------------------------------------------
+
+
+def test_rollback_before_commit_restores_everything(box2):
+    box2.depend_on_checkout(box2.repos[1])
+    before = box2.fingerprint()
+    box2.save()
+    box2.forward()
+    assert (box2.new_root / "tasks").is_dir() and not box2.checkout.exists()
+    box2.cutover("rollback", "--snapshot", box2.snapshot)
+    assert box2.fingerprint() == before
+    for root in (box2.checkout, *box2.repos):
+        assert box2.run("tasks", "check", cwd=root).stdout == ""
+        assert box2.run("git", "status", "--porcelain", cwd=root).stdout == ""
+
+
+def test_rollback_after_commit_restores_everything(box2):
+    for root in box2.repos:
+        box2.depend_on_checkout(root)
+    before = box2.fingerprint()
+    box2.save()
+    box2.forward()
+    box2.commit(box2.new_root, "rename")
+    for root in box2.repos:
+        box2.commit(root, "retarget")
+    box2.cutover("rollback", "--snapshot", box2.snapshot)
+    assert box2.fingerprint() == before
+    assert all((box2.snapshot / f"rollback-{r.name}-1.patch").read_text().strip() for r in box2.repos)
+
+
+def test_rollback_after_partial_apply(box):
+    before = box.fingerprint()
+    box.save()
+    box.run("tasks", "rename", "ai", "tack", cwd=box.checkout)
+    os.rename(box.checkout, box.new_root)      # interrupted before storage, init --force, links
     box.cutover("rollback", "--snapshot", box.snapshot)
     assert box.fingerprint() == before
-    assert box.run("tasks", "check", cwd=box.ai).stdout == ""
-    assert box.run("git", "status", "--porcelain", cwd=box.ai).stdout == ""
 
 
-def test_rollback_after_commit_restores_everything(box):
+def test_rollback_after_rename_stopped_midway(box):
+    """A rename stopped after moving its files leaves rename/ai.toml; rollback accepts
+    this rename's own inventory and restores everything."""
     before = box.fingerprint()
     box.save()
-    box.cutover("apply", "--snapshot", box.snapshot)
-    box.run("git", "add", "-A", cwd=box.new_root)
-    box.run("git", "commit", "-qm", "rename", cwd=box.new_root)
+    env = {**box.env, "TASKS_RENAME_STOP_AFTER": "files"}
+    subprocess.run(["tasks", "rename", "ai", "tack"], cwd=box.checkout, env=env, text=True, capture_output=True)
+    assert (box.tmp / "state" / "tasks" / "rename" / "ai.toml").exists()
     box.cutover("rollback", "--snapshot", box.snapshot)
     assert box.fingerprint() == before
 
 
 def test_rollback_stops_on_foreign_untracked_file(box):
-    """The check now runs before move_back: nothing has moved when it stops."""
+    """The check runs before move_back: nothing has moved when it stops."""
     box.save()
     box.cutover("apply", "--snapshot", box.snapshot)
     (box.new_root / "tasks" / "note.md").write_text("mine\n")
@@ -148,8 +521,18 @@ def test_rollback_stops_on_foreign_untracked_file(box):
     assert result.returncode == 1
     assert "tasks/note.md" in result.stderr
     assert (box.new_root / "tasks" / "note.md").read_text() == "mine\n"
-    assert box.new_root.exists() and not box.ai.exists()
+    assert box.new_root.exists() and not box.checkout.exists()
     assert (box.tmp / "cfg" / "tasks" / "projects.toml").read_text() == registry_before
+
+
+def test_rollback_stops_on_an_untracked_file_in_any_repository(box2):
+    box2.save()
+    box2.cutover("apply", "--snapshot", box2.snapshot)
+    (box2.repos[1] / "stray").write_text("mine\n")
+    result = box2.cutover("rollback", "--snapshot", box2.snapshot, check=False)
+    assert result.returncode == 1
+    assert f"{box2.repos[1]} has untracked files" in result.stderr
+    assert box2.new_root.exists() and not box2.checkout.exists()
 
 
 def test_rollback_stops_on_a_nested_leftover(box):
@@ -162,7 +545,83 @@ def test_rollback_stops_on_a_nested_leftover(box):
     result = box.cutover("rollback", "--snapshot", box.snapshot, check=False)
     assert result.returncode == 1
     assert "tasks/x/tack-deadbeef.md" in result.stderr
-    assert box.new_root.exists() and not box.ai.exists()
+    assert box.new_root.exists() and not box.checkout.exists()
+
+
+def test_rollback_stops_when_home_does_not_match_the_snapshot(box):
+    box.save()
+    box.cutover("apply", "--snapshot", box.snapshot)
+    other_home = box.tmp / "other-home"
+    other_home.mkdir()
+    env = {**box.env, "HOME": str(other_home)}
+    result = box.run(box.snapshot / "rename-cutover", "rollback", "--snapshot", box.snapshot,
+                     check=False, env=env)
+    assert result.returncode == 1
+    assert "environment does not match the snapshot" in result.stderr and "home" in result.stderr
+    assert box.new_root.exists() and not box.checkout.exists()
+
+
+def test_rollback_stops_when_a_repository_changed_branch(box2):
+    box2.save()
+    box2.cutover("apply", "--snapshot", box2.snapshot)
+    box2.run("git", "checkout", "-qb", "other", cwd=box2.repos[1])
+    result = box2.cutover("rollback", "--snapshot", box2.snapshot, check=False)
+    assert result.returncode == 1
+    assert "other" in result.stderr
+    assert box2.new_root.exists() and not box2.checkout.exists()
+
+
+def test_rollback_saves_a_patch_of_edits_since_save(box):
+    """git reset --hard is destructive; a tracked edit made after save must survive as a patch."""
+    box.save()
+    config_file = box.ops / "tasks" / ".config.toml"
+    config_file.write_text(config_file.read_text() + "# stray edit\n")
+    result = box.cutover("rollback", "--snapshot", box.snapshot)
+    patch = box.snapshot / "rollback-ops-1.patch"
+    assert "stray edit" in patch.read_text()
+    assert f"changes since save kept in {patch}" in result.stderr
+    assert box.run("git", "status", "--porcelain", cwd=box.ops).stdout == ""
+
+
+def test_rollback_refuses_when_the_worktrees_link_is_a_real_file(box):
+    """move_back must not delete a real file sitting where the managed symlink goes."""
+    box.save()
+    link = box.checkout / ".worktrees"
+    link.unlink()
+    link.write_text("mine\n")
+    result = box.cutover("rollback", "--snapshot", box.snapshot, check=False)
+    assert result.returncode == 1
+    assert "not a link" in result.stderr
+    assert link.is_file() and not link.is_symlink() and link.read_text() == "mine\n"
+
+
+def test_rollback_refuses_when_the_worktrees_link_is_a_real_directory(box):
+    box.save()
+    link = box.checkout / ".worktrees"
+    link.unlink()
+    link.mkdir()
+    (link / "note.txt").write_text("mine\n")
+    result = box.cutover("rollback", "--snapshot", box.snapshot, check=False)
+    assert result.returncode == 1
+    assert "not a link" in result.stderr
+    assert link.is_dir() and not link.is_symlink() and (link / "note.txt").read_text() == "mine\n"
+
+
+def test_rollback_tolerates_empty_foreign_claims_files(box):
+    """A `tasks` command run elsewhere during the window can create empty
+    claims/<prefix>.{toml,lock} files; an empty claims file records no claim."""
+    before = box.fingerprint()
+    box.save()
+    box.cutover("apply", "--snapshot", box.snapshot)
+    claims = box.tmp / "state" / "tasks" / "claims"
+    claims.mkdir(parents=True, exist_ok=True)
+    (claims / "ops.lock").write_text("")
+    (claims / "ops.toml").write_text("")
+    box.cutover("rollback", "--snapshot", box.snapshot)
+    assert box.fingerprint() == before
+
+
+# --- the guard ----------------------------------------------------------------
 
 
 def test_guard_stops_on_foreign_registry_change(box):
@@ -176,26 +635,13 @@ def test_guard_stops_on_foreign_registry_change(box):
     assert box.new_root.exists()                      # nothing was moved back
 
 
-def test_rollback_after_rename_stopped_midway(box):
-    """A rename stopped after moving its files leaves rename/ai.toml; rollback accepts
-    this rename's own inventory and restores everything."""
-    before = box.fingerprint()
-    box.save()
-    env = {**box.env, "TASKS_RENAME_STOP_AFTER": "files"}
-    subprocess.run(["tasks", "rename", "ai", "tack"], cwd=box.ai, env=env, text=True, capture_output=True)
-    assert (box.tmp / "state" / "tasks" / "rename" / "ai.toml").exists()
-    box.cutover("rollback", "--snapshot", box.snapshot)
-    assert box.fingerprint() == before
-
-
 def test_guard_rejects_an_inventory_for_another_root(box):
     """Same prefixes, a root that merely starts with the checkout's path: not ours."""
     box.save()
     env = {**box.env, "TASKS_RENAME_STOP_AFTER": "files"}
-    subprocess.run(["tasks", "rename", "ai", "tack"], cwd=box.ai, env=env, text=True, capture_output=True)
+    subprocess.run(["tasks", "rename", "ai", "tack"], cwd=box.checkout, env=env, text=True, capture_output=True)
     inventory = box.tmp / "state" / "tasks" / "rename" / "ai.toml"
-    text = inventory.read_text()
-    inventory.write_text(text.replace(f'"{box.ai}"', f'"{box.ai}-other"'))
+    inventory.write_text(inventory.read_text().replace(f'"{box.checkout}"', f'"{box.checkout}-other"'))
     result = box.cutover("rollback", "--snapshot", box.snapshot, check=False)
     assert result.returncode == 1 and "inventory" in result.stderr
     assert inventory.exists()                         # the foreign inventory was not deleted
@@ -211,273 +657,7 @@ def test_guard_rejects_a_foreign_inventory(box):
     assert result.returncode == 1 and "inventory" in result.stderr
 
 
-# --- fix round 1 -------------------------------------------------------------
-
-
-def test_rollback_refuses_when_the_worktrees_link_is_a_real_file(box):
-    """move_back must not delete a real file sitting where the managed symlink goes."""
-    box.save()
-    link = box.ai / ".worktrees"
-    link.unlink()
-    link.write_text("mine\n")
-    result = box.cutover("rollback", "--snapshot", box.snapshot, check=False)
-    assert result.returncode == 1
-    assert "not a link" in result.stderr
-    assert link.is_file() and not link.is_symlink()
-    assert link.read_text() == "mine\n"
-
-
-def test_rollback_refuses_when_the_worktrees_link_is_a_real_directory(box):
-    """Same guard, the other failure mode of the old unconditional unlink() (a traceback)."""
-    box.save()
-    link = box.ai / ".worktrees"
-    link.unlink()
-    link.mkdir()
-    (link / "note.txt").write_text("mine\n")
-    result = box.cutover("rollback", "--snapshot", box.snapshot, check=False)
-    assert result.returncode == 1
-    assert "not a link" in result.stderr
-    assert link.is_dir() and not link.is_symlink()
-    assert (link / "note.txt").read_text() == "mine\n"
-
-
-def test_move_back_stops_when_both_checkout_and_new_root_exist(tmp_path):
-    """Unit-tested directly: move_back must check both ends before moving either."""
-    cutover = load_cutover()
-    ai, new_root = tmp_path / "ai", tmp_path / "tack"
-    ai.mkdir()
-    new_root.mkdir()
-    meta = {"ai": str(ai), "new_root": str(new_root), "storage_old": None,
-            "storage_new": None, "worktrees_link": None}
-    with pytest.raises(cutover.Stop, match="both"):
-        cutover.move_back(meta)
-    assert ai.is_dir() and new_root.is_dir()
-
-
-def test_move_back_stops_when_neither_checkout_nor_new_root_exist(tmp_path):
-    cutover = load_cutover()
-    ai, new_root = tmp_path / "ai", tmp_path / "tack"
-    meta = {"ai": str(ai), "new_root": str(new_root), "storage_old": None,
-            "storage_new": None, "worktrees_link": None}
-    with pytest.raises(cutover.Stop, match="neither"):
-        cutover.move_back(meta)
-
-
-def test_move_back_stops_when_both_storage_dirs_exist(tmp_path):
-    cutover = load_cutover()
-    ai, new_root = tmp_path / "ai", tmp_path / "tack"
-    ai.mkdir()
-    storage_old = tmp_path / "dw" / "ai" / ".worktrees"
-    storage_new = tmp_path / "dw" / "tack" / ".worktrees"
-    storage_old.parent.mkdir(parents=True)
-    storage_old.mkdir()
-    storage_new.parent.mkdir(parents=True)
-    storage_new.mkdir()
-    meta = {"ai": str(ai), "new_root": str(new_root), "storage_old": str(storage_old),
-            "storage_new": str(storage_new), "worktrees_link": "../../dw/ai/.worktrees"}
-    with pytest.raises(cutover.Stop, match="both"):
-        cutover.move_back(meta)
-    assert storage_old.parent.is_dir() and storage_new.parent.is_dir()
-
-
-def test_move_back_stops_when_neither_storage_dir_exists(tmp_path):
-    cutover = load_cutover()
-    ai, new_root = tmp_path / "ai", tmp_path / "tack"
-    ai.mkdir()
-    storage_old = tmp_path / "dw" / "ai" / ".worktrees"
-    storage_new = tmp_path / "dw" / "tack" / ".worktrees"
-    meta = {"ai": str(ai), "new_root": str(new_root), "storage_old": str(storage_old),
-            "storage_new": str(storage_new), "worktrees_link": "../../dw/ai/.worktrees"}
-    with pytest.raises(cutover.Stop, match="neither"):
-        cutover.move_back(meta)
-
-
-def test_apply_renames_moves_and_relinks(box):
-    box.save()
-    box.cutover("apply", "--snapshot", box.snapshot)
-    assert not box.ai.exists()
-    assert (box.new_root / "tasks").is_dir()
-    assert any(p.name.startswith("tack-") for p in (box.new_root / "tasks").glob("*.md"))
-    registry = (box.tmp / "cfg" / "tasks" / "projects.toml").read_text()
-    assert f'tack = "{box.new_root}"' in registry and 'ai = "tack"' in registry
-    assert os.path.realpath(box.tmp / "home" / ".agents") == str((box.new_root / "agents").resolve())
-    assert (box.new_root / ".worktrees").resolve() == (box.sync.parent / ".dropbox-work" / "tack" / ".worktrees").resolve()
-    box.cutover("verify", "--snapshot", box.snapshot)
-
-
-def test_rollback_after_partial_apply(box):
-    before = box.fingerprint()
-    box.save()
-    box.run("tasks", "rename", "ai", "tack", cwd=box.ai)
-    os.rename(box.ai, box.new_root)              # interrupted before storage, init --force, links
-    box.cutover("rollback", "--snapshot", box.snapshot)
-    assert box.fingerprint() == before
-
-
-def test_rollback_stops_when_home_does_not_match_the_snapshot(box):
-    box.save()
-    box.cutover("apply", "--snapshot", box.snapshot)
-    other_home = box.tmp / "other-home"
-    other_home.mkdir()
-    env = {**box.env, "HOME": str(other_home)}
-    tool = box.snapshot / "rename-cutover"
-    result = subprocess.run([str(tool), "rollback", "--snapshot", str(box.snapshot)], env=env,
-                            text=True, capture_output=True)
-    assert result.returncode == 1
-    assert "environment does not match the snapshot" in result.stderr
-    assert "home" in result.stderr
-    assert box.new_root.exists() and not box.ai.exists()
-
-
-def test_rollback_stops_when_the_branch_changed_since_save(box):
-    box.save()
-    box.cutover("apply", "--snapshot", box.snapshot)
-    box.run("git", "checkout", "-qb", "other", cwd=box.new_root)
-    result = box.cutover("rollback", "--snapshot", box.snapshot, check=False)
-    assert result.returncode == 1
-    assert "other" in result.stderr
-    assert box.new_root.exists() and not box.ai.exists()
-
-
-def test_save_refuses_a_snapshot_path_inside_ai(box):
-    result = box.cutover("save", "--snapshot", box.ai / "snap", "--ai", box.ai, "--ops", box.ops,
-                         "--new-root", box.new_root, check=False)
-    assert result.returncode == 1
-    assert "lies inside ai" in result.stderr
-    assert not (box.ai / "snap").exists()
-
-
-def test_save_resolves_new_roots_parent_through_a_symlink(box, tmp_path):
-    alias = tmp_path / "alias"
-    alias.symlink_to(box.sync)
-    box.cutover("save", "--snapshot", box.snapshot, "--ai", box.ai, "--ops", box.ops,
-               "--new-root", alias / "tack")
-    meta = json.loads((box.snapshot / "meta.json").read_text())
-    assert meta["new_root"] == str(box.new_root.resolve())
-
-
-def test_save_reset_patch_never_overwrites_an_earlier_patch(tmp_path):
-    cutover = load_cutover()
-    root = tmp_path / "repo"
-    root.mkdir()
-    subprocess.run(["git", "init", "-q", str(root)], check=True)
-    (root / "a.txt").write_text("zero\n")
-    subprocess.run(["git", "-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t",
-                    "add", "-A"], check=True)
-    subprocess.run(["git", "-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t",
-                    "commit", "-qm", "init"], check=True)
-    head = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], check=True, text=True,
-                          capture_output=True).stdout.strip()
-    snap = tmp_path / "snap"
-    snap.mkdir()
-    (root / "a.txt").write_text("one\n")
-    cutover.save_reset_patch(root, head, snap, "ai")
-    first = snap / "rollback-ai-1.patch"
-    assert first.is_file()
-    first_content = first.read_text()
-    assert "one" in first_content
-    (root / "a.txt").write_text("two\n")
-    cutover.save_reset_patch(root, head, snap, "ai")
-    second = snap / "rollback-ai-2.patch"
-    assert second.is_file()
-    assert first.read_text() == first_content
-    assert "two" in second.read_text()
-
-
-def test_apply_refuses_when_new_root_already_exists(box):
-    box.save()
-    box.new_root.mkdir()
-    result = box.cutover("apply", "--snapshot", box.snapshot, check=False)
-    assert result.returncode == 1
-    assert "already exists" in result.stderr
-    assert box.ai.exists()
-    assert box.new_root.is_dir() and not (box.new_root / "tasks").exists()
-
-
-def test_apply_refuses_when_storage_new_parent_already_exists(box):
-    box.save()
-    storage_new_parent = box.sync.parent / ".dropbox-work" / "tack"
-    storage_new_parent.mkdir(parents=True)
-    result = box.cutover("apply", "--snapshot", box.snapshot, check=False)
-    assert result.returncode == 1
-    assert "already exists" in result.stderr
-    assert box.ai.exists()
-    assert not box.new_root.exists()
-
-
-def test_rollback_saves_a_patch_of_edits_since_save(box):
-    """git reset --hard is destructive; a tracked edit made after save must survive as a patch."""
-    box.save()
-    config_file = box.ops / "tasks" / ".config.toml"
-    config_file.write_text(config_file.read_text() + "# stray edit\n")
-    result = box.cutover("rollback", "--snapshot", box.snapshot)
-    patch = box.snapshot / "rollback-ops-1.patch"
-    assert patch.is_file()
-    assert "stray edit" in patch.read_text()
-    assert f"changes since save kept in {patch}" in result.stderr
-    assert box.run("git", "status", "--porcelain", cwd=box.ops).stdout == ""
-
-
-def test_second_host_adopts_the_rename(box):
-    """A second host, sharing the synced checkout, adopts the first host's rename."""
-    second = {**box.env, "XDG_CONFIG_HOME": str(box.tmp / "cfg2"), "XDG_STATE_HOME": str(box.tmp / "state2")}
-
-    def run2(*cmd, cwd):
-        result = subprocess.run([str(c) for c in cmd], cwd=cwd, env=second, text=True, capture_output=True)
-        assert result.returncode == 0, f"{cmd}: {result.stdout}{result.stderr}"
-        return result.stdout
-
-    run2("tasks", "init", "--prefix", "ai", "--force", cwd=box.ai)
-    added = json.loads(run2("tasks", "add", "on the second host", "--process", "direct", cwd=box.ai))
-    tid = added.get("id") or added["task"]["id"]
-    run2("tasks", "start", tid, cwd=box.ai)
-    run2("tasks", "park", tid, "resume here", cwd=box.ai)
-    box.run("git", "add", "-A", cwd=box.ai)
-    box.run("git", "commit", "-qm", "second host work", cwd=box.ai)
-
-    box.save()
-    box.cutover("apply", "--snapshot", box.snapshot)
-    box.run("git", "add", "-A", cwd=box.new_root)
-    box.run("git", "commit", "-qm", "rename", cwd=box.new_root)
-    def first_host():
-        return {str(p): p.read_bytes() for d in ("cfg", "state") for p in sorted((box.tmp / d).rglob("*"))
-                if p.is_file()}
-
-    first = first_host()
-
-    run2("tasks", "rename", "ai", "tack", "--adopt", cwd=box.new_root)
-
-    registry = (box.tmp / "cfg2" / "tasks" / "projects.toml").read_text()
-    assert f'tack = "{box.new_root}"' in registry and 'ai = "tack"' in registry
-    hex_ = tid.split("-", 1)[1]
-    assert json.loads(run2("tasks", "show", f"ai-{hex_}", cwd=box.new_root))
-    parked = json.loads(run2("tasks", "list", "--parked", cwd=box.new_root))
-    assert f"tack-{hex_}" in [t["id"] for t in parked["tasks"]]
-    assert first_host() == first
-
-
-# --- fix round 2 (empty foreign claims files, ops retargeting) --------------
-
-
-def test_rollback_tolerates_empty_foreign_claims_files(box):
-    """A `tasks` command run elsewhere (e.g. ops) during the window can create empty
-    claims/<prefix>.{toml,lock} files for a project this cutover does not own. An empty
-    claims file records no claim, so the guard must not treat it as a foreign change —
-    and restore replaces the state dir, so the files simply disappear afterwards."""
-    before = box.fingerprint()
-    box.save()
-    box.cutover("apply", "--snapshot", box.snapshot)
-    claims = box.tmp / "state" / "tasks" / "claims"
-    claims.mkdir(parents=True, exist_ok=True)
-    (claims / "ops.lock").write_text("")
-    (claims / "ops.toml").write_text("")
-    box.cutover("rollback", "--snapshot", box.snapshot)
-    assert box.fingerprint() == before
-
-
 def test_guard_stops_on_a_nonempty_foreign_claims_file(box):
-    """A non-empty claims file records a real claim; the guard must still stop, and
-    nothing may be moved back before it does."""
     box.save()
     box.cutover("apply", "--snapshot", box.snapshot)
     claims = box.tmp / "state" / "tasks" / "claims"
@@ -486,99 +666,12 @@ def test_guard_stops_on_a_nonempty_foreign_claims_file(box):
     result = box.cutover("rollback", "--snapshot", box.snapshot, check=False)
     assert result.returncode == 1
     assert "guard" in result.stderr and "claims/ops.toml" in result.stderr
-    assert box.new_root.exists() and not box.ai.exists()
-
-
-def test_apply_retargets_ops_dependencies_through_the_retired_prefix(box):
-    """After the rename, an ops task that depends on an ai task through `tasks dep`
-    trips `retired_prefix` in ops's `tasks check`; apply must retarget it so ops comes
-    back clean, and `verify` (which requires a clean `tasks check` in ops) must pass."""
-    added = json.loads(box.run("tasks", "add", "needs an ai task", "--process", "direct",
-                               cwd=box.ai).stdout)
-    ai_tid = added.get("id") or added["task"]["id"]
-    box.run("git", "add", "-A", cwd=box.ai)
-    box.run("git", "commit", "-qm", "add a task for ops to depend on", cwd=box.ai)
-
-    added_ops = json.loads(box.run("tasks", "add", "depends on an ai task", "--process", "direct",
-                                   cwd=box.ops).stdout)
-    ops_tid = added_ops.get("id") or added_ops["task"]["id"]
-    box.run("tasks", "dep", ops_tid, "--on", ai_tid, cwd=box.ops)
-    box.run("git", "add", "-A", cwd=box.ops)
-    box.run("git", "commit", "-qm", "depend on the ai task", cwd=box.ops)
-
-    box.save()
-    result = box.cutover("apply", "--snapshot", box.snapshot)
-    hex_ = ai_tid.split("-", 1)[1]
-    assert f"retarget: {ops_tid}: {ai_tid} -> tack-{hex_}" in result.stdout
-    assert box.run("tasks", "check", cwd=box.ops).stdout == ""
-    shown = json.loads(box.run("tasks", "show", ops_tid, cwd=box.ops).stdout)
-    assert f"tack-{hex_}" in shown["task"]["depends"]
-    box.cutover("verify", "--snapshot", box.snapshot)
-
-
-# --- fix round 3 (a dead ops claim survives save, then gets pruned by retarget) -----
-
-
-def test_save_refuses_a_dead_ops_claim(box):
-    """`tasks dep` (like any task write) prunes dead claims from the project's own
-    claims store as a side effect. If a dead ops claim were present at save time,
-    apply's retarget step would silently drop it from claims/ops.toml when it runs
-    `tasks dep` in ops, and rollback's guard would then stop on a non-empty change the
-    cutover itself made. Refuse at save instead: ops must have no claim, live or dead.
-
-    A dead claim is produced through the real CLI path: `tasks start` with an explicit
-    session/pid pair whose pid does not exist, so the claim is dead (`live: false`) the
-    moment it is written, per `tasks claims`."""
-    tid = json.loads(box.run("tasks", "add", "orphaned claim", "--process", "direct",
-                             cwd=box.ops).stdout)
-    tid = tid.get("id") or tid["task"]["id"]
-    ghost_env = {**box.env, "TASKS_SESSION": "ghost", "TASKS_SESSION_PID": "999999"}
-    started = subprocess.run(["tasks", "start", tid], cwd=box.ops, env=ghost_env, text=True,
-                             capture_output=True)
-    assert started.returncode == 0, started.stdout + started.stderr
-    box.run("git", "add", "-A", cwd=box.ops)
-    box.run("git", "commit", "-qm", "start under a dead session", cwd=box.ops)
-
-    claims = json.loads(box.run("tasks", "claims").stdout)["claims"]
-    assert any(c["id"] == tid and not c["live"] for c in claims), claims
-
-    result = box.cutover("save", "--snapshot", box.snapshot, "--ai", box.ai, "--ops", box.ops,
-                         "--new-root", box.new_root, check=False)
-    assert result.returncode == 1
-    assert "ops has claims" in result.stderr
-    assert tid in result.stderr
-    assert not box.snapshot.exists()
-
-
-def test_rollback_after_apply_with_no_ops_claims_restores_everything(box):
-    """The companion to the retarget test above with no ops claim at all: the round
-    trip through apply's retarget and rollback's restore must still land exactly on the
-    saved fingerprint."""
-    added = json.loads(box.run("tasks", "add", "needs an ai task", "--process", "direct",
-                               cwd=box.ai).stdout)
-    ai_tid = added.get("id") or added["task"]["id"]
-    box.run("git", "add", "-A", cwd=box.ai)
-    box.run("git", "commit", "-qm", "add a task for ops to depend on", cwd=box.ai)
-
-    added_ops = json.loads(box.run("tasks", "add", "depends on an ai task", "--process", "direct",
-                                   cwd=box.ops).stdout)
-    ops_tid = added_ops.get("id") or added_ops["task"]["id"]
-    box.run("tasks", "dep", ops_tid, "--on", ai_tid, cwd=box.ops)
-    box.run("git", "add", "-A", cwd=box.ops)
-    box.run("git", "commit", "-qm", "depend on the ai task", cwd=box.ops)
-
-    before = box.fingerprint()
-    box.save()
-    box.cutover("apply", "--snapshot", box.snapshot)
-    box.cutover("rollback", "--snapshot", box.snapshot)
-    assert box.fingerprint() == before
+    assert box.new_root.exists() and not box.checkout.exists()
 
 
 def test_guard_stops_when_a_claims_file_is_emptied_live(box):
-    """A claims file that was non-empty at save time is a real claim record; the guard
-    must still stop even if it is later found empty live (e.g. pruned by some other
-    `tasks` write) — only a file empty on both sides, or empty live with the saved copy
-    absent, is tolerated."""
+    """Only a file empty on both sides, or empty live with the saved copy absent, is
+    tolerated; a saved claim found empty live is a change."""
     box.save()
     box.cutover("apply", "--snapshot", box.snapshot)
     saved_claims = box.snapshot / "state" / "claims"
@@ -590,4 +683,108 @@ def test_guard_stops_when_a_claims_file_is_emptied_live(box):
     result = box.cutover("rollback", "--snapshot", box.snapshot, check=False)
     assert result.returncode == 1
     assert "guard" in result.stderr and "claims/ops.toml" in result.stderr
-    assert box.new_root.exists() and not box.ai.exists()
+    assert box.new_root.exists() and not box.checkout.exists()
+
+
+# --- move_back and save_reset_patch, directly ----------------------------------
+
+
+def meta_for(checkout, new_root, storage_old=None, storage_new=None, link=None):
+    return {"checkout": {"root": str(checkout)}, "new_root": str(new_root),
+            "storage_old": str(storage_old) if storage_old else None,
+            "storage_new": str(storage_new) if storage_new else None, "worktrees_link": link}
+
+
+def test_move_back_stops_when_both_checkout_and_new_root_exist(tmp_path):
+    cutover = load_cutover()
+    checkout, new_root = tmp_path / "ai", tmp_path / "tack"
+    checkout.mkdir()
+    new_root.mkdir()
+    with pytest.raises(cutover.Stop, match="both"):
+        cutover.move_back(meta_for(checkout, new_root))
+    assert checkout.is_dir() and new_root.is_dir()
+
+
+def test_move_back_stops_when_neither_checkout_nor_new_root_exist(tmp_path):
+    cutover = load_cutover()
+    with pytest.raises(cutover.Stop, match="neither"):
+        cutover.move_back(meta_for(tmp_path / "ai", tmp_path / "tack"))
+
+
+def test_move_back_stops_when_both_storage_dirs_exist(tmp_path):
+    cutover = load_cutover()
+    checkout = tmp_path / "ai"
+    checkout.mkdir()
+    storage_old, storage_new = tmp_path / "dw" / "ai" / ".worktrees", tmp_path / "dw" / "tack" / ".worktrees"
+    storage_old.mkdir(parents=True)
+    storage_new.mkdir(parents=True)
+    with pytest.raises(cutover.Stop, match="both"):
+        cutover.move_back(meta_for(checkout, tmp_path / "tack", storage_old, storage_new, "../../dw/ai/.worktrees"))
+    assert storage_old.parent.is_dir() and storage_new.parent.is_dir()
+
+
+def test_move_back_stops_when_neither_storage_dir_exists(tmp_path):
+    cutover = load_cutover()
+    checkout = tmp_path / "ai"
+    checkout.mkdir()
+    storage_old, storage_new = tmp_path / "dw" / "ai" / ".worktrees", tmp_path / "dw" / "tack" / ".worktrees"
+    with pytest.raises(cutover.Stop, match="neither"):
+        cutover.move_back(meta_for(checkout, tmp_path / "tack", storage_old, storage_new, "../../dw/ai/.worktrees"))
+
+
+def test_save_reset_patch_never_overwrites_an_earlier_patch(tmp_path):
+    cutover = load_cutover()
+    root = tmp_path / "repo"
+    root.mkdir()
+    git = ["git", "-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t"]
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    (root / "a.txt").write_text("zero\n")
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "init"], check=True)
+    head = subprocess.run([*git, "rev-parse", "HEAD"], check=True, text=True, capture_output=True).stdout.strip()
+    snap = tmp_path / "snap"
+    snap.mkdir()
+    (root / "a.txt").write_text("one\n")
+    cutover.save_reset_patch(root, head, snap, "ai")
+    first = snap / "rollback-ai-1.patch"
+    first_content = first.read_text()
+    assert "one" in first_content
+    (root / "a.txt").write_text("two\n")
+    cutover.save_reset_patch(root, head, snap, "ai")
+    assert first.read_text() == first_content
+    assert "two" in (snap / "rollback-ai-2.patch").read_text()
+
+
+# --- the second host ----------------------------------------------------------
+
+
+def test_second_host_adopts_the_rename(box):
+    """A second host, sharing the synced checkout, adopts the first host's rename."""
+    second = {**box.env, "XDG_CONFIG_HOME": str(box.tmp / "cfg2"), "XDG_STATE_HOME": str(box.tmp / "state2")}
+
+    def run2(*cmd, cwd):
+        return box.run(*cmd, cwd=cwd, env=second).stdout
+
+    run2("tasks", "init", "--prefix", "ai", "--force", cwd=box.checkout)
+    tid = task_id(run2("tasks", "add", "on the second host", "--process", "direct", cwd=box.checkout))
+    run2("tasks", "start", tid, cwd=box.checkout)
+    run2("tasks", "park", tid, "resume here", cwd=box.checkout)
+    box.commit(box.checkout, "second host work")
+
+    box.save()
+    box.forward()
+    box.commit(box.new_root, "rename")
+
+    def first_host():
+        return {str(p): p.read_bytes() for d in ("cfg", "state") for p in sorted((box.tmp / d).rglob("*"))
+                if p.is_file()}
+
+    first = first_host()
+    run2("tasks", "rename", "ai", "tack", "--adopt", cwd=box.new_root)
+    registry = (box.tmp / "cfg2" / "tasks" / "projects.toml").read_text()
+    assert f'tack = "{box.new_root}"' in registry and 'ai = "tack"' in registry
+    hex_ = tid.split("-", 1)[1]
+    assert json.loads(run2("tasks", "show", f"ai-{hex_}", cwd=box.new_root))
+    parked = json.loads(run2("tasks", "list", "--parked", cwd=box.new_root))
+    assert f"tack-{hex_}" in [t["id"] for t in parked["tasks"]]
+    assert first_host() == first
