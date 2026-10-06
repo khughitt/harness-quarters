@@ -2,8 +2,9 @@ name = "tack"
 purpose = "Harness homes, declared links, settings, and session-state hygiene"
 abstract = """
 The harness homes and declared links that deliver instructions and skills from their
-owners, harness settings and hooks, session-state hygiene and the session archive.
+owners, harness settings and hooks, capability facts with their evidence, session-state
+hygiene and the session archive.
 The instruction corpus and profiles live in lore; the flow system lives in flows.
 """
-authority = []
+authority = ["docs/specs/2026-10-06-residue-design.md"]
 subsystems = []
