@@ -1,6 +1,6 @@
 # Rename tack to harness quarters (hq) — design
 
-Status: draft 2026-10-06, revised after review rounds 1 and 2, awaiting review. Task
+Status: draft 2026-10-06, revised after review rounds 1 to 3, awaiting review. Task
 `tack-8b7a28`, under `tack-dcb11a` and ops `ops-593133`.
 Parent: ops `docs/specs/2026-10-03-agent-layer-split-design.md` §6 phase 3, §7.1.
 Model: `docs/specs/2026-09-27-rename-to-tack-design.md`, whose procedure this reuses.
@@ -114,7 +114,16 @@ Each step is behaviour-preserving, lands on its own, and reverts on its own.
      dead" in every repository the tool retargets in;
    - one `apply` that retargets and applies the links together, ahead of the hand edits.
      It is split, so the links are applied at step 7, after the commits they depend on;
-   - the name of the link tool, in six places. It becomes an argument.
+   - the name of the link tool, in six places. It becomes an argument;
+   - the rollback guard's view of the registry. It removes the renamed project's own
+     keys before comparing, but it was written for a project with no earlier alias and
+     no group. Here the rename also retargets an existing alias (`ai = "tack"` becomes
+     `ai = "hq"`) and rewrites a group's member (`tack` becomes `hq` in `agent-layer`),
+     and the guard as written reports both as foreign changes and stops (reproduced in a
+     scratch registry at review round 3). The view is extended to treat exactly these as
+     the rename's own: an alias whose value was the old prefix and is now the new one,
+     and a group member that was the old prefix and is now the new one. Every other
+     difference still stops it.
 
    Its test, some 600 lines, runs the September case and this one, and gains a planted
    dead claim in a retargeted repository.
@@ -147,9 +156,9 @@ session standing in it.
      first, because each holds the checkout's absolute path;
    - clean trees in tack, ops, lore and flows; `just link-check` clean.
 
-   The runbook checks these from task records, before it calls the tool: the flows and
-   obs tasks (§3.4, §3.5) are done; phase 1's steps are done; the rehearsal (§4) is
-   recorded as passed on `tack-8b7a28`.
+   The runbook checks these from task records, before it calls the tool: the tasks,
+   flows and obs tasks (§3.4 to §3.6) are done and the identity contract is written;
+   phase 1's steps are done; the rehearsal (§4) is recorded as passed on `tack-8b7a28`.
 
    The user attests these, since no tool on this host can see them:
    - no harness session runs on this host except the cutover session;
@@ -157,11 +166,23 @@ session standing in it.
      file sync would carry that under a running session;
    - the file sync is up to date on both hosts.
 
-   Then every user timer that runs `tasks` or git across checkouts is stopped for the
-   window, and started again after verification or rollback. Today that is four:
-   `obs-index.timer`, `tt-latency.timer`, `work-link.timer` and
-   `dropbox-ignore-flux.timer`. Any of them could act on a half-moved tree or write into
-   a store the rollback guard compares. The runbook lists the timers afresh that day.
+   Then the background work is quieted, **on both hosts, before anything shared
+   changes.** The checkout and the three other repositories travel by file sync, so the
+   other host sees the move while it is still mid-flight; pausing it only at its own
+   adoption would be too late. On each host, for every user timer that runs `tasks` or
+   git across checkouts (today four: `obs-index.timer`, `tt-latency.timer`,
+   `work-link.timer` and `dropbox-ignore-flux.timer`; the runbook lists them afresh that
+   day):
+
+   - the timer's state is recorded first (enabled or not, active or not);
+   - the timer is stopped;
+   - the service it starts is a separate unit, and stopping the timer does not stop a
+     run already under way. The runbook waits until each service is inactive before going
+     on, and it does not kill one: the obs index can run for 45 minutes, and the window
+     simply starts after it;
+   - afterwards each timer is returned to exactly its recorded state, on this host after
+     verification or rollback, on the other host after its adoption and verification.
+
    Then the saved originals of §4 are taken.
 2. `tasks rename tack hq` at the current root.
 3. Move the checkout to `hq` and the worktree storage with it; rewrite the `.worktrees`
@@ -198,8 +219,8 @@ session standing in it.
 
 **The other host**, after the sync carries the move, is where the September design said
 it would be: the files say `hq` while its registry still maps `tack` to the old root.
-Under its own quiescence, with its registry and state directories saved first and the
-same three timers stopped, it runs: `tasks rename tack hq --adopt`, the storage move,
+Its timers have been paused since before the move (step 1). Under its own quiescence,
+with its registry and state directories and its trust files saved first, it runs: `tasks rename tack hq --adopt`, the storage move,
 `work-link --ensure .worktrees`, `just link --apply`, `systemctl --user daemon-reload`,
 and the timer re-enable for whichever archive timers its saved unit listing shows
 enabled. Until then its sessions start without global instructions, skills or hooks; the
@@ -268,13 +289,17 @@ exercises whatever flows builds, on copies, before the live run.
 **One row per task, agreed with obs.** The trial's verdict joins its census to obs's
 report by task id and silently skips a member with no row. If the census kept `tack-`
 ids while obs reported `hq-` ids, a task open across the rename would be dropped, or the
-two would be reported as disagreeing. So the flows task and the obs task settle together,
-and each records, which id form and which project value a task carries in the census and
-in the report: one of each, the same in both, for a task's whole life.
+two would be reported as disagreeing. So the flows task and the obs task settle together
+a **shared identity contract**, written down in flows beside the trial and cited from
+obs: which id form and which project value a task carries in the census and in the
+report. One of each, the same in both, for a task's whole life. The cutover's
+preconditions include that contract existing, and the rehearsal's end-to-end run through
+`trial-verdict` (§4) is what shows both sides keep it.
 
 ### 3.5 What obs must be able to do
 
-Stated as requirements; the mechanism is obs's. An obs task, `obs-ff4e76`, filed with this
+Stated as requirements. The source of former roots and alias prefixes is the tasks
+resolver (§3.6), so that obs, flows and this project's tools do not each invent one. An obs task, `obs-ff4e76`, filed with this
 draft and blocking the cutover, delivers them or records a decision to drop history:
 
 - An id that resolves through an alias is followed to its canonical id, not refused.
@@ -298,6 +323,25 @@ any task id whose prefix is not a current registry key, counting it unregistered
 takes obs's mechanism for both, former roots and alias prefixes, in phase 1; the
 session-logs skill already says the two change together.
 
+### 3.6 Making a rename ordinary
+
+The user's direction on 2026-10-06: keep the rename, and where it helps, first change
+the other projects so that a rename is smoother in general, since this will not be the
+last one. Most of what blocks this cutover is already that kind of work. Stated once, by
+owner:
+
+| Owner | General change | Status |
+|---|---|---|
+| tasks | **Remember where a project has been, and resolve through it.** The registry keeps aliases but no former roots: once a rename completes, nothing on the host records the old directory. tasks records each former root at `rename`, `init --force` and `--adopt`, and offers one resolver: the canonical id for any id form, and the project for any path, former roots and their worktree storage included. | new task, filed with this revision; blocks the cutover |
+| obs | Follow a renamed project, using that resolver (§3.5) | `obs-ff4e76` |
+| flows | A trial's identity survives a rename of an enrolled project (§3.4) | `flows-44890e` |
+| this project | The cutover tool takes a list of repositories, and its guard knows a rename's own registry changes (§3.1) | phase 1 |
+| this project | Nothing a host runs names this checkout (§3.1) | phase 1 |
+| this project | The same for the other checkouts hook commands name: today they call lore's and ops's hooks by `~/d/lore/…` and `~/d/ops/…`, so renaming either would cost a Codex re-trust in every home | idea, filed; not needed for this rename |
+| ops | The cutover tool belongs with the hub once it is general, since a rename is work that spans projects; and a check that flags a unit file or hook command naming a checkout path | idea, filed; not needed for this rename |
+
+The first three block this cutover. The last two are for the next one.
+
 ## 4. Rollback and rehearsal
 
 `tasks rename` cannot be reversed. Rollback restores saved originals and never replays
@@ -313,34 +357,59 @@ commands backwards, exactly as in September; this section states only what diffe
 - **Saved** at the end of step 1: the four commits; copies of the tasks config and state
   directories; the `link-check` report, which by then includes the session-archive link;
   the `.worktrees` link's target; the target of the timer's enable link; the listing of
-  which archive units are enabled; the untracked Codex trust file; and the set of links
+  which archive units are enabled; each timer's recorded state; and the set of links
   under the home directory that are already broken, for §5's comparison.
-- **Rollback on this host** follows September's seven steps with these changes: step 3
-  resets four repositories; step 4's leftover rule reads `tasks/hq-<hex>.md` beside
-  `tasks/tack-<hex>.md`; and after the link apply come a `daemon-reload`, the timer
-  re-enable, and a comparison of the enable link with its saved target.
+- **Saved as live files, because git cannot restore them:** both Codex trust files,
+  with their modes. Step 4 edits both. The trust tables in `codex/config.toml` pass
+  through a clean filter and are not in any commit, and `local/codex/trust.toml` is
+  untracked, so the reset in rollback restores neither. The save copies the live files
+  as they stand on disk; rollback copies them back, modes included, after the reset and
+  before the link apply; and the comparison at the end of rollback is byte for byte and
+  mode for mode.
+- **Rollback on this host** follows September's seven steps with these changes: step 1's
+  guard accepts this rename's own alias retarget and group rewrite and nothing else
+  (§3.1); step 3 resets four repositories and then restores the two trust files; step
+  4's leftover rule reads `tasks/hq-<hex>.md` beside `tasks/tack-<hex>.md`; and after
+  the link apply come a `daemon-reload`, the timer re-enable, a comparison of the enable
+  link with its saved target, and the timers' return to their recorded state.
 - **Rollback is defined until the other host adopts.** After that the rename goes
   forward. Steps 9 and 10 are outside rollback and are therefore last.
 
 **Rehearsal before the live run**, in a sandbox: copies of the four checkouts and of obs,
-a scratch home for the links, and scratch `XDG_CONFIG_HOME` and `XDG_STATE_HOME` both. It
-runs the cutover and the rollback from two points (before and after the commits), the
-second-host adoption against a second pair of scratch directories, and the guard against
-a planted foreign registry entry and a planted dead claim in a retargeted repository. It
-never touches the live user manager: the timer's enable link is a fixture in the scratch
-home, and the rehearsal checks link targets only.
+a scratch home for the links, and scratch `XDG_CONFIG_HOME` and `XDG_STATE_HOME` both.
+The scratch registry starts as the live one does, with the earlier alias and the group,
+so the guard meets this rename's real shape. It never touches the live user manager: the
+timer's enable link is a fixture in the scratch home, and the rehearsal checks link
+targets only.
 
-It also proves the two consumers, together and not one at a time. The trial's whole
-judging pipeline (census, obs's report, the verdict) runs on the copy before the rename
-and after it, and the two runs must agree on the number of members with rows and on the
-row of one task that is open across the rename. A planted unit whose two id forms hash
-to different arms shows that the arm is computed from the listed prefix and not from the
-new one; the live units cannot show that, since theirs happen to agree. And obs's
-indexer, run over the copy, maps a session recorded under the old root to the project
-with one project value.
+It runs:
 
-It passes when each restored sandbox matches its saved originals byte for byte and
-`tasks check` is clean in all four.
+- the cutover and the rollback from two points, before and after the commits. Each
+  rollback must pass the guard on the rename's own alias retarget and group rewrite, and
+  must restore both trust files byte for byte with their modes;
+- the guard against a planted foreign registry entry, a planted foreign alias and a
+  planted foreign group change, each of which must stop it;
+- a planted dead claim in a retargeted repository, which the precondition must refuse;
+- the second-host adoption against a second pair of scratch directories.
+
+**And the trial's join, end to end.** Proving the arm and proving obs's rows one at a
+time is not enough: both could pass while the census emitted `tack-…` members and obs
+emitted `hq-…` rows, and `trial-verdict` joins those strings exactly and counts a
+completed member with no row as unknown. So the rehearsal runs the judging pipeline
+through `trial-verdict` itself, on the copy before the rename and again after it, with
+the trial's read date met inside the sandbox so the join is exercised and not skipped by
+the date gate. It passes only when, for every member enrolled before the rename:
+
+- the arm is the same in both runs;
+- the outcome row is present in both runs and holds the same values;
+- no member that had a row before is unknown after;
+
+and when a planted unit whose two id forms hash to different arms comes out with the arm
+of the listed prefix. The live units cannot show that last point, since theirs happen to
+agree.
+
+The rehearsal as a whole passes when each restored sandbox matches its saved originals
+byte for byte and `tasks check` is clean in all four.
 
 ## 5. Verification
 
@@ -400,7 +469,8 @@ when its preconditions hold, and one line of the consumer table covers whatever 
 residue's has landed by then.
 
 Tasks: `tack-8b7a28` for this design and its plan. The host steps are ops `ops-593133`,
-which the plan unblocks. The flows task `flows-44890e` (§3.4) and the obs task `obs-ff4e76` (§3.5) are filed
+which the plan unblocks. The tasks task of §3.6 is filed with this revision and
+`tack-8b7a28` depends on it too. The flows task `flows-44890e` (§3.4) and the obs task `obs-ff4e76` (§3.5) are filed
 with this draft, and `tack-8b7a28` depends on both.
 
 Done when: both hosts have adopted and verified (§5); the four repositories are
