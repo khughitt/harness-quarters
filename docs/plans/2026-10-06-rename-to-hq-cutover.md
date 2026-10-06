@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** draft 2026-10-06, for review. Task `tack-8b7a28`. Round 1 (Codex GPT-6-Astra): revise, P1 4 and P2 4, all addressed. Loops stop their block; the trial join compares raw strings within each run; the other host's timers wait for a synced restore; every clone gets its live hooks; the second host's adoption resumes from a pre-move record and carries its own trust; each attempt has its own directory; trust goes through `codex-trust restore`.
+**Status:** draft 2026-10-06, for review. Task `tack-8b7a28`. Round 1 (Codex GPT-6-Astra): revise, P1 4 and P2 4, all addressed. Round 2 (a Claude reviewer that rebuilt Tasks 1 to 5 and ran the rehearsal): revise, Critical 1, Important 6 (two already fixed by round 1), Minor 5, all addressed: rollback accepts renamed attachment folders, `save` refuses `tasks check` findings, the rehearsal fetches submodules from the live checkouts, copies lock files and stands links in for un-cloned projects, and the runbook clears live records and findings first. Loops stop their block; the trial join compares raw strings within each run; the other host's timers wait for a synced restore; every clone gets its live hooks; the second host's adoption resumes from a pre-move record and carries its own trust; each attempt has its own directory; trust goes through `codex-trust restore`.
 
 **Goal:** Finish the rename design: `session-episodes` follows ids written under a retired prefix (phase 1 step 4), the consumers' edits are prepared and reviewed without activating (step 5), the rehearsal passes on copies, and the cutover runs on both hosts (phase 2).
 
@@ -231,15 +231,19 @@ def test_extract_project_accepts_a_retired_prefix(tmp_path):
 def test_extract_refuses_an_unregistered_project(tmp_path):
     codex_story(tmp_path)
     env = cli_env(tmp_path, project(tmp_path))
-    with pytest.raises(SystemExit, match="--project zz is not a registered prefix"):
-        run_cli(["extract", "--project", "zz", "--out", str(tmp_path / "e.jsonl")], env)
+    # main() turns a SystemExit carrying a message into exit 2 with the message on stderr.
+    code, _, err = run_cli(["extract", "--project", "zz", "--out", str(tmp_path / "e.jsonl")], env)
+    assert code == 2 and "--project zz is not a registered prefix" in err
 ```
 
 - [ ] **Step 3: Run them to see them fail**
 
-Run: `python3 -m pytest agents/bin/test_session_episodes.py -q -k "retired or alias or anchor_ids or resolve_ids or unregistered_project or after_the_rename"`
+Run: `python3 -m pytest agents/bin/test_session_episodes.py -q -k "retired or alias or anchor_ids or resolve_ids or unregistered_project or the_rename"`
 
-Expected: FAIL. `Inputs` takes no ninth argument (`TypeError`), and `resolve_ids` and `anchor_ids` do not exist (`AttributeError`). `test_without_resolution_a_retired_prefix_counts_unregistered` fails too, with the same `TypeError`, because `inputs()` now passes `canonical`.
+Expected: FAIL.
+- The `build_episodes` tests fail with `TypeError`: `Inputs` takes no ninth argument. That includes `test_without_resolution_a_retired_prefix_counts_unregistered`, because `inputs()` now passes `canonical`.
+- `resolve_ids` and `anchor_ids` do not exist (`AttributeError`).
+- The three extract tests fail on their assertions, because the present `registry()` reads no aliases. The prefix `tack` is unregistered, so there is no episode, and `--project zz` exits 0 with nothing.
 
 - [ ] **Step 4: Implement**
 
@@ -394,8 +398,37 @@ def cmd_extract(args, env: dict) -> int:
 If `tomllib` has no other use left (`grep -n tomllib agents/bin/session-episodes`), remove its import.
 
 In `docs/specs/2026-09-19-session-logs-design.md`:
-- §4, the sentence `the tasks registry ~/.config/tasks/projects.toml supplies project roots, as obs-index and obs stores.py do.` becomes: ``the tasks resolver (`tasks resolve --stdin`, one call per run) supplies project roots and follows an id written under a retired prefix to its canonical id (revised 2026-10-06 for the rename to hq: the episode carries the canonical id, and its episode id still hashes the id as written, so a review keeps its episode).``
-- §4.1's `unregistered` bullet, ``an anchor whose task id's prefix is not a registered project``, becomes ``an anchor whose task id `tasks resolve` does not resolve``.
+- §4: replace these lines, as wrapped in the file:
+
+  ```
+  and `SESSION_LOGS_CODEX` override the store roots (tests use them); the tasks
+  registry `~/.config/tasks/projects.toml` supplies project roots, as `obs-index`
+  and obs `stores.py` do.
+  ```
+
+  with:
+
+  ```
+  and `SESSION_LOGS_CODEX` override the store roots (tests use them); the tasks
+  resolver (`tasks resolve --stdin`, one call per run) supplies project roots and
+  follows an id written under a retired prefix to its canonical id. (Revised
+  2026-10-06 for the rename to hq: an episode carries the canonical id, and its
+  episode id still hashes the id as written, so a review keeps its episode.)
+  ```
+
+- §4.1: replace these lines:
+
+  ```
+  - `unregistered`: an anchor whose task id's prefix is not a registered
+    project. Per anchor.
+  ```
+
+  with:
+
+  ```
+  - `unregistered`: an anchor whose task id `tasks resolve` does not resolve.
+    Per anchor.
+  ```
 
 - [ ] **Step 5: Run the tests**
 
@@ -413,10 +446,10 @@ git commit -q -m "feat(session-episodes): follow ids written under a retired pre
 
 ---
 
-### Task 2: `verify` asks the resolver, and the preparation's deferred minors
+### Task 2: `verify` asks the resolver, rollback knows attachments, and the preparation's deferred minors
 
 **Files:**
-- Modify: `tools/rename-cutover` (`save`, `preconditions`, `rollback`, `verify`; new `reset_all`, `sample_task`)
+- Modify: `tools/rename-cutover` (`save`, `preconditions`, `validate_leftovers`, `rollback`, `verify`; new `reset_all`, `sample_task`, `leftover_original`, `remove_leftovers`)
 - Modify: `tools/test_rename_cutover.py`
 
 **Interfaces:**
@@ -426,6 +459,8 @@ git commit -q -m "feat(session-episodes): follow ids written under a retired pre
   - `sample_task(new_root: Path, new: str) -> str`: the hex of one `<new>-<hex>.md`, or `Stop`.
   - `verify` also refuses when the old id, the old root, or a path under the old storage does not resolve to the new prefix.
   - `save` refuses an existing snapshot path and a linked tasks config or state directory, with `Stop`.
+  - `preconditions` refuses while `tasks check` prints anything in the checkout or a repository: `verify` and `rollback` both treat any output as findings, so a warning that predates the cutover would fail verification and then the rollback's own final check.
+  - `leftover_original(path, old, new) -> str | None` and `remove_leftovers(checkout, leftovers)`. `tasks rename` also renames a task's attachments folder, `tasks/files/<old>-<hex>/`. After rollback's reset the renamed folder is an untracked leftover, accepted when its original exists at the saved head, deleted, and its emptied directories removed.
 
 - [ ] **Step 1: Start the record**
 
@@ -529,6 +564,45 @@ def test_reset_all_writes_every_patch_before_any_reset(tmp_path, monkeypatch):
     assert calls == [("patch", "checkout")]
 
 
+def test_save_refuses_findings_from_tasks_check(box2):
+    lore = box2.repos[1]
+    a = task_id(box2.run("tasks", "add", "parked idea", "--process", "direct", cwd=lore).stdout)
+    b = task_id(box2.run("tasks", "add", "waits on it", "--process", "direct", cwd=lore).stdout)
+    box2.run("tasks", "dep", b, "--on", a, cwd=lore)
+    box2.run("tasks", "shelve", a, "when it is needed", cwd=lore)
+    box2.commit(lore, "a dependency on a shelved task")
+    assert "shelved_dep" in box2.run("tasks", "check", cwd=lore).stdout
+    result = box2.save(check=False)
+    assert result.returncode == 1
+    assert "tasks check reports findings" in result.stderr and str(lore) in result.stderr
+    assert not box2.snapshot.exists()
+
+
+def test_rollback_restores_a_renamed_attachments_folder(box):
+    """`tasks rename` renames tasks/files/<old>-<hex>/ with its task. After the reset the
+    renamed folder is an untracked leftover: removed, emptied folders and all."""
+    hex_ = task_id(box.run("tasks", "add", "with files", "--process", "direct", cwd=box.checkout).stdout).split("-", 1)[1]
+    folder = box.checkout / "tasks" / "files" / f"ai-{hex_}"
+    folder.mkdir(parents=True)
+    (folder / "notes.txt").write_text("evidence\n")
+    box.commit(box.checkout, "a task with an attachment")
+    before = box.fingerprint()
+    box.save()
+    box.forward()
+    assert (box.new_root / "tasks" / "files" / f"tack-{hex_}" / "notes.txt").is_file()
+    box.cutover("rollback", "--snapshot", box.snapshot)
+    assert box.fingerprint() == before
+    assert not (box.checkout / "tasks" / "files" / f"tack-{hex_}").exists()
+
+
+def test_leftover_original_names_records_and_attachments_only():
+    cutover = load_cutover()
+    assert cutover.leftover_original("tasks/hq-abc123.md", "tack", "hq") == "tasks/tack-abc123.md"
+    assert cutover.leftover_original("tasks/files/hq-abc123/a/b.py", "tack", "hq") == "tasks/files/tack-abc123/a/b.py"
+    for path in ("tasks/x/hq-abc123.md", "tasks/files/hq-abc123", "tasks/files/ops-abc123/b.py", "notes/hq-abc123.md"):
+        assert cutover.leftover_original(path, "tack", "hq") is None, path
+
+
 def test_a_retargeted_repository_with_claims_is_a_precondition_message(box2):
     lore = box2.repos[1]
     tid = task_id(box2.run("tasks", "add", "orphaned claim", "--process", "direct", cwd=lore).stdout)
@@ -539,7 +613,7 @@ def test_a_retargeted_repository_with_claims_is_a_precondition_message(box2):
 
 - [ ] **Step 3: Run them to see them fail**
 
-Run: `uv run -q --with pytest pytest tools/test_rename_cutover.py -q -k "resolver or no_longer_resolves or existing_snapshot or linked_tasks or kept_path_that_is_a_link or sample_task or reset_all or precondition_message"`
+Run: `uv run -q --with pytest pytest tools/test_rename_cutover.py -q -k "resolver or no_longer_resolves or existing_snapshot or linked_tasks or kept_path_that_is_a_link or sample_task or reset_all or precondition_message or findings_from_tasks_check or attachments or leftover_original"`
 
 Expected:
 - **Fail:**
@@ -547,7 +621,10 @@ Expected:
   - `test_save_refuses_an_existing_snapshot_without_a_traceback`, which shows a `FileExistsError` traceback;
   - both `test_save_refuses_a_linked_tasks_directory` cases, because save succeeds;
   - `test_sample_task_…` and `test_reset_all_…`, because the names do not exist;
-  - `test_a_retargeted_repository_…`, because the message starts `save:`.
+  - `test_a_retargeted_repository_…`, because the message starts `save:`;
+  - `test_save_refuses_findings_from_tasks_check`, because save succeeds;
+  - `test_rollback_restores_a_renamed_attachments_folder`, which stops with `leftovers: tasks/files/tack-<hex>/notes.txt is not a rename leftover`;
+  - `test_leftover_original_…`, because the name does not exist.
 - **Pass:** `test_verify_asks_the_resolver_…`, since `tasks` records the history already, and `test_save_refuses_a_kept_path_that_is_a_link`, since the behaviour exists. Both are pins.
 
 - [ ] **Step 4: Implement**
@@ -626,6 +703,57 @@ with:
         raise Stop(f"verify: tasks resolve does not answer {new} for " + ", ".join(wrong))
 ```
 
+In `preconditions`, after the loop that refuses an unclean tree, add:
+
+```python
+    for root in (checkout, *repos):
+        if run("tasks", "check", cwd=root).strip():
+            raise Stop(f"preconditions: tasks check reports findings in {root}; verify and rollback "
+                       f"both require it clean, so resolve them first")
+```
+
+Replace the loop in `validate_leftovers` that checks each untracked path with:
+
+```python
+    for path in untracked:
+        original = leftover_original(path, old, new)
+        if original is None:
+            raise Stop(f"leftovers: {path} is not a rename leftover")
+        check = subprocess.run(["git", "-C", str(checkout), "cat-file", "-e", f"{head}:{original}"],
+                               capture_output=True)
+        if check.returncode != 0:
+            raise Stop(f"leftovers: {path} has no restored original {original}")
+```
+
+and add before `validate_leftovers`:
+
+```python
+def leftover_original(path, old, new):
+    """The pre-rename path a rename leftover replaces, or None. `tasks rename` writes
+    tasks/<new>-<hex>.md and moves the task's attachments folder to tasks/files/<new>-<hex>/."""
+    parts = Path(path).parts
+    if len(parts) == 2 and parts[0] == "tasks" and parts[1].startswith(f"{new}-"):
+        return f"tasks/{old}-{parts[1][len(new) + 1:]}"
+    if len(parts) >= 4 and parts[:2] == ("tasks", "files") and parts[2].startswith(f"{new}-"):
+        return "/".join(("tasks", "files", f"{old}-{parts[2][len(new) + 1:]}", *parts[3:]))
+    return None
+
+
+def remove_leftovers(checkout, leftovers):
+    """Delete each validated leftover, then the attachment folders that emptied: an empty
+    tasks/files/<new>-<hex>/ would be an orphan to rollback's final tasks check."""
+    files = checkout / "tasks" / "files"
+    for path in leftovers:
+        (checkout / path).unlink()
+    for path in leftovers:
+        folder = (checkout / path).parent
+        while files in folder.parents and folder.is_dir() and not any(folder.iterdir()):
+            folder.rmdir()
+            folder = folder.parent
+```
+
+In `rollback`, replace `for path in leftovers:` / `(checkout / path).unlink()` with `remove_leftovers(checkout, leftovers)`.
+
 - [ ] **Step 5: Run the tests**
 
 Run: `uv run -q --with pytest pytest tools/test_rename_cutover.py -q`
@@ -636,7 +764,7 @@ Expected: every test passes, including the 71 already there.
 
 ```sh
 . "$(tasks root tack-8b7a28 --pretty)/.worktrees/rename-hq-cutover/docs/plans/2026-10-06-rename-to-hq-cutover.env.sh" && cd "$WT" && t just test && \
-tasks done "$STEP2" "verify asks tasks resolve about the old id, root and storage; save refuses an existing snapshot and linked tasks directories; rollback writes every patch before any reset" >/dev/null && \
+tasks done "$STEP2" "verify asks tasks resolve about the old id, root and storage; save refuses findings from tasks check, an existing snapshot and linked tasks directories; rollback restores renamed attachment folders and writes every patch before any reset" >/dev/null && \
 git commit -q -m "feat(rename-cutover): verify the location history; the preparation's deferred minors (tack-8b7a28)" -- tools/rename-cutover tools/test_rename_cutover.py "tasks/$STEP2.md" && git log --oneline -1
 ```
 
@@ -1785,8 +1913,8 @@ def write_registry(host, roots, extra_former):
 def copy_local(host, clone, live_tack):
     """local/ is ignored and the trust tables are filtered: copy them as the cutover finds
     them, with this host's checkout in place of the live one in each trust table's key."""
-    shutil.copytree(live_tack / "local", clone / "local", dirs_exist_ok=True,
-                    ignore=shutil.ignore_patterns("*.lock"))
+    # Lock files too: codex-trust creates trust.toml.lock, and the live checkout has one.
+    shutil.copytree(live_tack / "local", clone / "local", dirs_exist_ok=True)
     for rel in KEPT:
         text = (live_tack / rel).read_text()
         key = f'[projects."{live_tack}"]'
@@ -1795,6 +1923,28 @@ def copy_local(host, clone, live_tack):
         os.chmod(clone / rel, stat.S_IMODE((live_tack / rel).stat().st_mode))
     host.run("git", "add", "codex/config.toml", cwd=clone)
     assert host.run("git", "status", "--porcelain", "--untracked-files=all", cwd=clone).stdout == ""
+
+
+def init_submodules(host, clone, live_root):
+    """A clone does not fetch submodules (lore's vendor/superpowers, which links.toml
+    targets). Fetch each from the live checkout's own copy, never from the network."""
+    listed = host.run("git", "config", "-f", ".gitmodules", "--get-regexp", r"submodule\..*\.path",
+                      cwd=clone, check=False).stdout.split()
+    for key, path in zip(listed[::2], listed[1::2]):
+        name = key[len("submodule."):-len(".path")]
+        host.run("git", "config", f"submodule.{name}.url", live_root / path, cwd=clone)
+        host.run("git", "-c", "protocol.file.allow=always", "submodule", "update", "--init", "--", path, cwd=clone)
+
+
+def stand_in_for_the_rest(host, live_roots):
+    """ops-projects check, which ops's commit hook runs, reads every registered project at
+    its mirror path under the sync root. Each project this does not clone stands there
+    as a link to its live checkout, read-only by everything the rehearsal runs."""
+    for prefix, root in live_roots.items():
+        if prefix not in CLONED and Path(root).exists():
+            link = host.sync / Path(root).name
+            if not link.exists():
+                link.symlink_to(Path(root).resolve())
 
 
 def install_hooks(host, clone, live_root):
@@ -1825,8 +1975,10 @@ def build_first(host, live_roots):
         host.run("git", "clone", "-q", "--no-hardlinks", Path(live_roots[prefix]).resolve(), clone)
         roots[prefix] = clone
     for prefix in CLONED:
+        init_submodules(host, roots[prefix], Path(live_roots[prefix]).resolve())
         if prefix != "tack":
             install_hooks(host, roots[prefix], Path(live_roots[prefix]).resolve())
+    stand_in_for_the_rest(host, live_roots)
     tack, live_tack = roots["tack"], Path(live_roots["tack"]).resolve()
     host.run("just", "setup", cwd=tack)
     copy_local(host, tack, live_tack)
@@ -1856,6 +2008,7 @@ def build_second(first, host, live_roots):
         roots[prefix] = host.path(name)
     (host.path("tack") / ".worktrees").unlink()
     host.run("work-link", "--root", host.sync, "--ensure", ".worktrees", cwd=host.path("tack"))
+    stand_in_for_the_rest(host, live_roots)
     write_registry(host, roots, {})
     for prefix in CLONED:
         if prefix != "tack":
@@ -2078,7 +2231,20 @@ def test_save_refuses_a_dead_claim_in_a_retargeted_repository(hosts):
 
 - [ ] **Step 3: Run it**
 
-Run (in the background with a 60-minute timeout; the build clones six repositories twice, and each scenario restores a copy):
+The clones hold committed state only (Departure 5). The rehearsal's `save` refuses what the live `save` would. So first check the live checkouts:
+- every task record in tack, ops, lore, flows and obs is committed, since a clone without one finds a dependency unreachable;
+- `tasks check` prints nothing in tack, ops, lore and flows.
+
+```sh
+. "$(tasks root tack-8b7a28 --pretty)/.worktrees/rename-hq-cutover/docs/plans/2026-10-06-rename-to-hq-cutover.env.sh" && \
+( for p in tack ops lore flows obs; do r="$(root_of "$p")" || exit 1; \
+  [ -z "$(git -C "$r" status --porcelain --untracked-files=all -- tasks)" ] || { echo "UNCOMMITTED RECORDS in $r:"; git -C "$r" status --short -- tasks; exit 1; }; \
+  case "$p" in obs) ;; *) [ -z "$(tasks -C "$r" check)" ] || { echo "FINDINGS in $r:"; tasks -C "$r" check; exit 1; };; esac; done ) && echo "live records committed and checks clean"
+```
+
+A record left uncommitted by another session, or a finding, belongs to its owner. Ask the user, who decides whether to commit it, resolve it, or wait. On 2026-10-06 the review found two: ops warned `ops-be8b06` depends on the shelved `material-764d8c`, and four other sessions' records were untracked in flows and obs. The two records this task filed (`flows-44890e`, `obs-ff4e76`) were committed then. The live cutover's `save` refuses the same things (Task 2's precondition), so they are worth clearing now.
+
+Then run the rehearsal (in the background with a 60-minute timeout; the build clones six repositories twice, and each scenario restores a copy):
 
 ```sh
 . "$(tasks root tack-8b7a28 --pretty)/.worktrees/rename-hq-cutover/docs/plans/2026-10-06-rename-to-hq-cutover.env.sh" && cd "$WT" && rm -rf "$STATE/rehearsal" && \
@@ -2129,14 +2295,14 @@ In this plan, set the status line to `approved <date>; Tasks 1 to 7 executed <da
 . "$(tasks root tack-8b7a28 --pretty)/.worktrees/rename-hq-cutover/docs/plans/2026-10-06-rename-to-hq-cutover.env.sh" && cd "$WT" && \
 tasks done "$STEP7" "reviewed and merged; the rehearsal passes without the trial join" >/dev/null && \
 git commit -q -m "docs: the cutover's tools and rehearsal landed (tack-8b7a28)" -- docs/specs/2026-10-06-rename-to-hq-design.md docs/plans/2026-10-06-rename-to-hq-cutover.md "tasks/$STEP7.md" && \
-cd "$TACK" && [ -z "$(git status --porcelain -- tools agents docs justfile)" ] && \
+cd "$TACK" && [ -z "$(git status --porcelain --untracked-files=no -- tools agents docs justfile tasks)" ] && \
 git merge --no-ff "$BRANCH" -m "Merge branch '$BRANCH' (the rename's cutover tools)" && t just test && \
 WT_REAL="$(cd "$WT" && pwd -P)" && [ -z "$(git -C "$WT" status --porcelain)" ] && \
 ! readlink -f ~/bin/* ~/.local/bin/* ~/.config/systemd/user/* 2>/dev/null | grep -qF "$WT_REAL" && \
 tt-report && git worktree unlock "$WT" && git worktree remove "$WT" && git branch -d "$BRANCH" && git log --oneline -3
 ```
 
-Expected: the merge, `just test` green, and the worktree removed. `tt-report` harvests the worktree's test timings before removal. The rehearsal's scratch base was under the worktree's state directory, so it goes with it.
+Expected: the merge, `just test` green, and the worktree removed. A tracked task record modified on main (a note written there and not yet committed) stops the guard before `git merge` would abort on it. Commit it on main first, then merge main into the branch if they touch the same record. `tt-report` harvests the worktree's test timings before removal. The rehearsal's scratch base was under the worktree's state directory, so it goes with it.
 
 - [ ] **Step 3: Park on the trial and obs**
 
@@ -2368,6 +2534,10 @@ need SECOND && on_second 'tasks resolve --help >/dev/null && for d in ~/.config/
 Act on what it prints. Every item below must hold before Step 4.
 - **Extra worktrees.** Each worktree other than the main one is removed, one at a time: its branch has no commits main lacks, no host pointer resolves into it (`readlink -f ~/bin/* ~/.local/bin/* ~/.config/systemd/user/*`), then `tt-report`, `git worktree unlock`, `git worktree remove`. A worktree whose branch is ahead of main stops the runbook: its owner merges it first. On 2026-10-06 the extra worktree was `session-retention-job`, its branch level with main.
 - **Branches.** Every local branch other than main is either level with main and deleted, or stops the runbook.
+- **Clean trees and clean checks.** `save` refuses an unclean tree and, since Task 2, any `tasks check` output in tack, ops, lore or flows. Clear them now, so the refusal does not come at Step 6:
+  - task records other sessions left untracked are committed by their owners, or the user decides;
+  - a tracked harness setting the clean filter keeps in the index on purpose (on 2026-10-06, a plugin toggle in `claude/settings.json`) is committed on main as its own change. AGENTS.md rules out stashing it;
+  - each `tasks check` finding is resolved with its owner (on 2026-10-06, `ops-be8b06` depended on the shelved `material-764d8c`).
 - **ops tests.** The files that name `tack` are exactly the fixtures spec §1 keeps: `test_claim_guard.py`, `test_ops_profile.py`, `test_ops_projects.py` and `test_sessionstart.py`. Any other file is the residue's mirror test or something like it. It gets its edit in `rename-hq-steps`'s ops table and a rehearsal rerun, the same day, before going on.
 - **The other host.** It answers, its `tasks` has `resolve`, and both of its tasks directories are real. Its systemd version is recorded in a note on `tack-8b7a28`.
 
@@ -2564,7 +2734,7 @@ cd "$N" && { just link-check >/dev/null || { just link --apply >/dev/null && jus
 tasks note "$STEP10" "the other host adopted; rollback has ended" >/dev/null
 ```
 
-`second-host` stops before changing anything if that host's pre-move record is missing or its storage is ambiguous. It is safe to rerun: each part checks whether it is done, so a run interrupted after `tasks rename --adopt` finishes from the record. It also copies that host's own Codex trust table for its old path to its new one, when the shared trust files have one (`trust`, not required). A `File exists` from `work-link` means the `.worktrees` link arrived before its storage: run `work-link` there once and rerun.
+`second-host` stops before changing anything if that host's pre-move record is missing or its storage is ambiguous. Rollback has ended at this step. A failure that a rerun cannot finish is left for a person. They work from the attempt directory there: the registry and state copies Step 5 saved, and the record. It is safe to rerun: each part checks whether it is done, so a run interrupted after `tasks rename --adopt` finishes from the record. It also copies that host's own Codex trust table for its old path to its new one, when the shared trust files have one (`trust`, not required). A `File exists` from `work-link` means the `.worktrees` link arrived before its storage: run `work-link` there once and rerun.
 
 - [ ] **Step 3: Verify the other host**
 
