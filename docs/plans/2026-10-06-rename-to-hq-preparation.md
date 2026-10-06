@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** draft 2026-10-06, for review.
+**Status:** approved 2026-10-06 after four review rounds (Claude 1 and 2, with the code rebuilt from the plan text and run in scratch each time; GPT 3 and 4).
 
 **Goal:** Land the rename design's phase 1 steps 1 to 3 under the name `tack`: nothing a host runs names the checkout, the cutover tool is general enough for this rename, and the link tool has a functional name.
 

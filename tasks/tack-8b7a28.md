@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: feat/rename-hq
 created: 2026-10-06T12:59:15Z
-updated: 2026-10-06T17:34:02Z
+updated: 2026-10-06T17:39:08Z
 started: 2026-10-06T16:15:19Z
 depends: [flows-44890e, obs-ff4e76, tasks-7580d2]
 parent: tack-dcb11a
@@ -44,3 +44,4 @@ Why: the user chose the residue's name on 2026-10-06 (parent spec §7.1); the re
   provenance: {"harness_session":"claude-code:529a99ac-8d12-4ea1-b9ff-8f3fd73d2c16","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-06T17:34:02Z (feat/rename-hq): parked (waiting on user, review): User reviews (GPT round 4) docs/plans/2026-10-06-rename-to-hq-preparation.md in .worktrees/tack-8b7a28 after the round 3 fixes: save checks --old against the checkout's prefix and the registry (Task 4); retarget writes each task's list in one tasks edit save (Task 4); kept files contained by resolved path at save and at rollback before any mutation (Task 5). On acceptance this session executes it inline from Task 1; Task 3 stops for the host-step approval.
   provenance: {"harness_session":"claude-code:529a99ac-8d12-4ea1-b9ff-8f3fd73d2c16","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-06T17:39:08Z (feat/rename-hq): review: plan round 4 — verdict: accept; findings: none; reviewer: codex
