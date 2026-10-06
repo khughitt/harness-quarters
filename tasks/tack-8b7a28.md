@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: plan/rename-hq
 created: 2026-10-06T12:59:15Z
-updated: 2026-10-06T17:11:15Z
+updated: 2026-10-06T17:14:05Z
 started: 2026-10-06T16:15:19Z
 depends: [flows-44890e, obs-ff4e76, tasks-7580d2]
 parent: tack-dcb11a
@@ -37,3 +37,5 @@ Why: the user chose the residue's name on 2026-10-06 (parent spec §7.1); the re
   provenance: {"harness_session":"claude-code:529a99ac-8d12-4ea1-b9ff-8f3fd73d2c16","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-06T16:55:59Z (feat/rename-hq): review: plan round 1 — verdict: revise; findings: Important 2, Minor 7; reviewer: claude-code/claude-fable-5-1
 - 2026-10-06T17:11:15Z (feat/rename-hq): review: plan round 2 — verdict: revise; findings: Important 1, Minor 2; reviewer: claude-code/claude-fable-5-1
+- 2026-10-06T17:14:05Z (feat/rename-hq): parked (waiting on user, review): User reviews (GPT round) docs/plans/2026-10-06-rename-to-hq-preparation.md with its .env.sh, in .worktrees/tack-8b7a28, after two fresh-context rounds (its code rebuilt from the plan text and run in scratch both times). On acceptance this session executes it inline from Task 1; Task 3 stops for the host-step approval, which covers both hosts.
+  provenance: {"harness_session":"claude-code:529a99ac-8d12-4ea1-b9ff-8f3fd73d2c16","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
