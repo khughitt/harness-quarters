@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** draft 2026-10-06, for review. Task `tack-8b7a28`. Round 1 (Codex GPT-6-Astra): revise, P1 4 and P2 4, all addressed. Round 2 (a Claude reviewer that rebuilt Tasks 1 to 5 and ran the rehearsal): revise, Critical 1, Important 6 (two already fixed by round 1), Minor 5, all addressed: rollback accepts renamed attachment folders, `save` refuses `tasks check` findings, the rehearsal fetches submodules from the live checkouts, copies lock files and stands links in for un-cloned projects, and the runbook clears live records and findings first. Loops stop their block; the trial join compares raw strings within each run; the other host's timers wait for a synced restore; every clone gets its live hooks; the second host's adoption resumes from a pre-move record and carries its own trust; each attempt has its own directory; trust goes through `codex-trust restore`.
+**Status:** draft 2026-10-06, for review. Task `tack-8b7a28`. Round 1 (Codex GPT-6-Astra): revise, P1 4 and P2 4, all addressed. Round 2 (a Claude reviewer that rebuilt Tasks 1 to 5 and ran the rehearsal): revise, Critical 1, Important 6 (two already fixed by round 1), Minor 5, all addressed: rollback accepts renamed attachment folders, `save` refuses `tasks check` findings, the rehearsal fetches submodules from the live checkouts, copies lock files and stands links in for un-cloned projects, and the runbook clears live records and findings first. Round 3 (the same reviewer, scoped, rebuilding from the revised plan): revise, Important 3 and Minor 4, all addressed: the attachments test attaches through `tasks attach`, stand-in links follow nested mirror paths, Task 11 forgets each distinct old path only where it has a table, and an attempt can be abandoned before `apply`. Loops stop their block; the trial join compares raw strings within each run; the other host's timers wait for a synced restore; every clone gets its live hooks; the second host's adoption resumes from a pre-move record and carries its own trust; each attempt has its own directory; trust goes through `codex-trust restore`.
 
 **Goal:** Finish the rename design: `session-episodes` follows ids written under a retired prefix (phase 1 step 4), the consumers' edits are prepared and reviewed without activating (step 5), the rehearsal passes on copies, and the cutover runs on both hosts (phase 2).
 
@@ -423,7 +423,7 @@ In `docs/specs/2026-09-19-session-logs-design.md`:
     project. Per anchor.
   ```
 
-  with:
+  with the text below. The old text continues on its last line (` Ownership is the task's, …`), which stays; the replacement is that text without a final newline:
 
   ```
   - `unregistered`: an anchor whose task id `tasks resolve` does not resolve.
@@ -582,9 +582,10 @@ def test_rollback_restores_a_renamed_attachments_folder(box):
     """`tasks rename` renames tasks/files/<old>-<hex>/ with its task. After the reset the
     renamed folder is an untracked leftover: removed, emptied folders and all."""
     hex_ = task_id(box.run("tasks", "add", "with files", "--process", "direct", cwd=box.checkout).stdout).split("-", 1)[1]
-    folder = box.checkout / "tasks" / "files" / f"ai-{hex_}"
-    folder.mkdir(parents=True)
-    (folder / "notes.txt").write_text("evidence\n")
+    source = box.tmp / "notes.txt"
+    source.write_text("evidence\n")
+    box.run("tasks", "attach", f"ai-{hex_}", source, cwd=box.checkout)
+    assert (box.checkout / "tasks" / "files" / f"ai-{hex_}" / "notes.txt").is_file()
     box.commit(box.checkout, "a task with an attachment")
     before = box.fingerprint()
     box.save()
@@ -1940,11 +1941,15 @@ def stand_in_for_the_rest(host, live_roots):
     """ops-projects check, which ops's commit hook runs, reads every registered project at
     its mirror path under the sync root. Each project this does not clone stands there
     as a link to its live checkout, read-only by everything the rehearsal runs."""
+    live_sync = Path(live_roots["ops"]).resolve().parent
     for prefix, root in live_roots.items():
-        if prefix not in CLONED and Path(root).exists():
-            link = host.sync / Path(root).name
-            if not link.exists():
-                link.symlink_to(Path(root).resolve())
+        live = Path(root).resolve()
+        if prefix in CLONED or not live.exists() or live_sync not in live.parents:
+            continue
+        link = host.sync / live.relative_to(live_sync)  # mirror paths can nest: mindful/v3
+        if not link.exists():
+            link.parent.mkdir(parents=True, exist_ok=True)
+            link.symlink_to(live)
 
 
 def install_hooks(host, clone, live_root):
@@ -2507,10 +2512,10 @@ On the user's answer, record it verbatim before going on: `tasks note tack-8b7a2
 
 ```sh
 . "$(tasks root tack-8b7a28 --pretty)/docs/plans/2026-10-06-rename-to-hq-cutover.env.sh" && \
-{ [ ! -e "$CUT/env.sh" ] || [ -e "$(. "$CUT/env.sh" && printf %s "$RUN")/rolled-back" ] || { echo "REFUSE: the last attempt was not rolled back; read $CUT/env.sh"; false; }; } && \
+{ [ ! -e "$CUT/env.sh" ] || { last="$(. "$CUT/env.sh" && printf %s "$RUN")"; [ -e "$last/rolled-back" ] || [ -e "$last/abandoned" ]; } || { echo "REFUSE: the last attempt was neither rolled back nor abandoned; read $CUT/env.sh"; false; }; } && \
 ATTEMPT="attempt-$(date -u +%Y%m%dT%H%M%SZ)" && RUN="$CUT/$ATTEMPT" && mkdir -p "$RUN/bin" && ln -sfn "$ATTEMPT" "$CUT/current" && \
 cp "$TACK/tools/rename-cutover" "$TACK/tools/quiesce-timers" "$TACK/tools/rename-hq-steps" "$RUN/bin/" && \
-( for p in ops lore flows relay tasks obs; do r="$(root_of "$p")" && [ -d "$r" ] || { echo "REFUSE: no root for $p"; exit 1; }; \
+( for p in ops lore flows relay tasks obs; do r="$(root_of "$p")" && [ -d "$r" ] || { echo "REFUSE: no root for $p" >&2; exit 1; }; \
   printf '%s_ROOT=%q\n' "$(printf %s "$p" | tr a-z A-Z)" "$r"; done ) > "$RUN/roots.env" && \
 { printf 'CUT=%q\nATTEMPT=%q\nRUN=%q\nOLD_ROOT=%q\nNEW_ROOT=%q\nSNAP=%q\nT_LOG=%q\n' "$CUT" "$ATTEMPT" "$RUN" "$TACK" "$(dirname "$TACK")/hq" "$RUN/snapshot" "$RUN/last.log"; \
   cat "$RUN/roots.env"; \
@@ -2519,7 +2524,7 @@ cp "$TACK/tools/rename-cutover" "$TACK/tools/quiesce-timers" "$TACK/tools/rename
 printf '%s\n' "<the second host's name, from tailscale status>" > "$CUT/second-host" && cat "$CUT/env.sh" | head -16
 ```
 
-Replace the placeholder with the host's name before running; the name never enters a committed file. Each attempt gets its own directory, `$RUN`, under `$CUT`, holding the tools' copies, the snapshot, the timers' record and every saved listing. A rolled-back attempt keeps its directory as evidence. Step 2 refuses to start a new attempt unless the last one was rolled back. `$CUT/current` links to the attempt in progress, and the other host keeps the same layout. Expected: the roots of tack, ops, lore, flows, relay, tasks and obs, each an existing directory.
+Replace the placeholder with the host's name before running; the name never enters a committed file. Each attempt gets its own directory, `$RUN`, under `$CUT`, holding the tools' copies, the snapshot, the timers' record and every saved listing. A rolled-back attempt keeps its directory as evidence. Step 2 refuses to start a new attempt unless the last one was rolled back or abandoned. `$CUT/current` links to the attempt in progress, and the other host keeps the same layout. Expected: the roots of tack, ops, lore, flows, relay, tasks and obs, each an existing directory.
 
 - [ ] **Step 3: Preconditions the tool leaves to the runbook**
 
@@ -2555,7 +2560,7 @@ Choose each timer whose service does one of these:
 - works over the Dropbox tree;
 - reads the session stores.
 
-When unsure, include it: pausing a timer costs one missed run. On 2026-10-06 the listing chose this host's `obs-index.timer`, `tt-latency.timer`, `work-link.timer`, `dropbox-ignore-flux.timer` and `session-archive-capture.timer`. It left out the wallpaper, phone-sync, backup, cache-mirror, tmp-clean, recertify, kernel-nudge and pet-reaper timers, after reading what each runs. Write this host's choice to `$CUT/timers` and the other host's to `$CUT/timers.second`, one name per line. Then:
+When unsure, include it: pausing a timer costs one missed run. On 2026-10-06 the listing chose this host's `obs-index.timer`, `tt-latency.timer`, `work-link.timer`, `dropbox-ignore-flux.timer` and `session-archive-capture.timer`. It left out the wallpaper, phone-sync, backup, cache-mirror, tmp-clean, recertify, kernel-nudge and pet-reaper timers, after reading what each runs. Write this host's choice to `$RUN/timers` and the other host's to `$RUN/timers.second`, one name per line. Then:
 
 ```sh
 . "$HOME/.local/state/rename-hq/env.sh" && \
@@ -2601,6 +2606,17 @@ t "$RUN/bin/rename-cutover" save --snapshot "$SNAP" --checkout "$OLD_ROOT" --new
 ```
 
 Expected: `saved <snapshot>`. A refusal names its precondition. Fix that, and rerun this step; nothing has changed yet.
+
+**Abandon before Step 7.** If Steps 3 to 6 refuse and the fix will not fit the window, nothing shared has changed yet, only the timers. Restore both hosts' timers and mark the attempt abandoned. Each restore runs only if that host's timers were recorded:
+
+```sh
+. "$HOME/.local/state/rename-hq/env.sh" && [ -d "$OLD_ROOT" ] && [ ! -e "$NEW_ROOT" ] && \
+{ [ ! -e "$RUN/timers.json" ] || t "$RUN/bin/quiesce-timers" restore --state "$RUN/timers.json"; } && \
+on_second '[ ! -e ~/.local/state/rename-hq/current/timers.json ] || ~/.local/state/rename-hq/current/bin/quiesce-timers restore --state ~/.local/state/rename-hq/current/timers.json' && \
+touch "$RUN/abandoned" && echo "abandoned before apply; both hosts' timers restored"
+```
+
+Use this only before Step 7 runs. After `apply`, the rollback block below is the only way back. A snapshot from Step 6 can stay where it is: the next attempt saves its own.
 
 - [ ] **Step 7: Rename and move (irreversible; rollback restores saved originals)**
 
@@ -2783,12 +2799,14 @@ Expected on 2026-10-06's evidence: relay and tasks. Each commit names only the t
 
 - [ ] **Step 2: Forget the old directories' Codex trust, on both hosts' paths**
 
-The trust files are shared through the sync. So one `forget` per old path removes it for both hosts, and the second host's old path comes from its record.
+The trust files are shared through the sync. So one `forget` per old path removes it for both hosts, and the second host's old path comes from its record. The two paths are the same when both hosts keep the checkout at the same path, and the second host's may never have been trusted. So each distinct path is forgotten only where it has a table, as `second-host` copies one only where it has one.
 
 ```sh
 . "$HOME/.local/state/rename-hq/env.sh" && \
 SECOND_OLD="$(on_second 'python3 -c "import json,os; print(json.load(open(os.path.expanduser(\"~/.local/state/rename-hq/current/second-host.json\")))[\"old_root\"])"')" && need SECOND_OLD && \
-( for old in "$OLD_ROOT" "$SECOND_OLD"; do python3 "$NEW_ROOT/.githooks/codex-trust" forget "$old" || exit 1; done ) && \
+( for old in $(printf '%s\n' "$OLD_ROOT" "$SECOND_OLD" | sort -u); do \
+    grep -qF "[projects.\"$old\"]" "$NEW_ROOT/codex/config.toml" "$NEW_ROOT/local/codex/trust.toml" || { echo "no trust table for $old"; continue; }; \
+    python3 "$NEW_ROOT/.githooks/codex-trust" forget "$old" || exit 1; done ) && \
 ! grep -qF -e "[projects.\"$OLD_ROOT\"]" -e "[projects.\"$SECOND_OLD\"]" "$NEW_ROOT/codex/config.toml" "$NEW_ROOT/local/codex/trust.toml" && echo forgotten
 ```
 
