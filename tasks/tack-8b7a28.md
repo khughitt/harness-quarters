@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: main
 created: 2026-10-06T12:59:15Z
-updated: 2026-10-06T22:38:04Z
+updated: 2026-10-06T22:42:01Z
 started: 2026-10-06T16:15:19Z
 depends: [flows-44890e, obs-ff4e76, tasks-7580d2]
 parent: tack-dcb11a
@@ -65,3 +65,6 @@ Why: the user chose the residue's name on 2026-10-06 (parent spec §7.1); the re
 - 2026-10-06T22:22:39Z (main): review: plan round 2 — verdict: revise; findings: Critical 1, Important 6, Minor 5; reviewer: claude-code/claude-opus-5-5
 - 2026-10-06T22:25:00Z (main): plan round 2 addressed: rollback accepts and removes renamed tasks/files/<new>-<hex>/ leftovers; save refuses tasks check findings; Task 1's exit-code test and spec text fixed; rehearsal fetches submodules from live, copies lock files, links un-cloned projects at their mirror paths, pre-checks live records and findings; runbook clears untracked records, the settings toggle and check findings; committed flows-44890e and obs-ff4e76 records (6a38d33, 69f2a4c)
 - 2026-10-06T22:38:04Z (main): review: plan round 3 — verdict: revise; findings: Important 3, Minor 4; reviewer: claude-code/claude-opus-5-5
+- 2026-10-06T22:42:00Z (main): review: plan round 4 — verdict: accept; findings: Minor 1; reviewer: claude-code/claude-opus-5-5
+- 2026-10-06T22:42:00Z (main): parked (waiting on user, review): The user reviews .worktrees/rename-hq-cutover/docs/plans/2026-10-06-rename-to-hq-cutover.md (four rounds: GPT-6-Astra revise, then three Claude rebuild rounds ending in accept) and picks the execution method; then the agent runs Tasks 1 to 7 in that worktree.
+  provenance: {"harness_session":"claude-code:529a99ac-8d12-4ea1-b9ff-8f3fd73d2c16","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
