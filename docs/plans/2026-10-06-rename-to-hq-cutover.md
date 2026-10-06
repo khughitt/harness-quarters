@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** draft 2026-10-06, for review. Task `tack-8b7a28`.
+**Status:** draft 2026-10-06, for review. Task `tack-8b7a28`. Round 1 (Codex GPT-6-Astra): revise, P1 4 and P2 4, all addressed. Loops stop their block; the trial join compares raw strings within each run; the other host's timers wait for a synced restore; every clone gets its live hooks; the second host's adoption resumes from a pre-move record and carries its own trust; each attempt has its own directory; trust goes through `codex-trust restore`.
 
 **Goal:** Finish the rename design: `session-episodes` follows ids written under a retired prefix (phase 1 step 4), the consumers' edits are prepared and reviewed without activating (step 5), the rehearsal passes on copies, and the cutover runs on both hosts (phase 2).
 
@@ -54,12 +54,13 @@ Task 7 reviews and merges. Task 8 adds the flow trial's end-to-end join to the r
 - The project is called `tack` until Task 9 Step 7 (`apply`), and `hq` from then on. Ids written `tack-<hex>` keep resolving through the alias.
 - Tasks 1 to 7 work in `.worktrees/rename-hq-cutover` (branch `feat/rename-hq-cutover`; exists, set up with `just setup`). Task 8 works in a fresh worktree at the same path on branch `feat/rename-hq-trial-join`. Tasks 9 to 11 change live state from a session started in ops: the checkout moves from under any session standing in it (spec §3.2).
 - No AI attribution in any commit. Conventional commit subjects. Never bypass a hook. A commit names its paths: `git commit -m … -- <paths>`. The exception is `rename-hq-steps`, which stages everything (`git add -A`), because `save` refused unless every tree was clean.
+- A loop inside a block's chain runs in a subshell and stops with `exit 1`: `( for …; do … || exit 1; done ) && next`. A `break` would end the loop with status 0, and the chain would go on past a refusal.
 - Shell state does not carry from one block to the next.
   - Every block in Tasks 1 to 8 opens by sourcing `docs/plans/2026-10-06-rename-to-hq-cutover.env.sh`. It sets:
     - `TACK`, `WT`, `BRANCH` and `BRANCH8`;
     - the step record ids `STEP1` to `STEP11`;
     - `STATE`, a git-ignored directory in the worktree;
-    - `CUT`, the cutover's host-local directory `~/.local/state/rename-hq`;
+    - `CUT`, the cutover's host-local directory `~/.local/state/rename-hq`. Each attempt works in `$CUT/attempt-<UTC time>` (`$RUN`), written by Task 9 Step 2;
     - two helpers: `t` (run a command, print its last line, keep its status, name the full log on failure) and `need` (refuse when a named variable is empty).
   - Every block in Tasks 9 to 11 sources `$CUT/env.sh`, which Task 9 Step 2 writes with the roots captured before the move.
   - Each block is one `&&` chain.
@@ -79,7 +80,7 @@ Inputs the spec implies and a person will meet. Each has its test in the task th
 1. **A task started under `tack-` before the rename and closed under `hq-` after it.** The start, the close and the record join into one episode, with the canonical id and the old episode id. Task 1: `test_a_close_written_after_the_rename_closes_a_start_written_before`.
 2. **A timer whose service is mid-run when the window opens.** `wait` lets it finish and never stops or kills the service. At the timeout it stops itself, naming the service. Task 4: `test_wait_returns_once_a_running_service_finishes` and `test_wait_stops_at_the_timeout_and_kills_nothing`.
 3. **An edit whose text moved since the script was written**, for example `flows-44890e` rewriting `trial-arm`'s header. `rename-hq-steps` stops at that edit, names the file and the text, and writes nothing to it. Task 5: `test_replace_once_refuses_text_that_is_missing_or_repeated`. The rehearsal (Task 6, and again in Task 8 on the cutover's day) runs every edit against the live mains.
-4. **The second host adopting before its storage moves, with the link dangling.** Its storage record must come back after the post-move `init --force`, and an adoption on a host that skipped the pre-move `init --force` stops before it changes anything. Task 5: `test_second_host_refuses_without_the_pre_move_storage_record`. Task 6: `test_the_cutover_verifies_and_the_second_host_adopts`.
+4. **The second host adopting before its storage moves, with the link dangling.** Its storage record must come back after the post-move `init --force`, and an adoption on a host that skipped the pre-move `init --force` stops before it changes anything. An adoption interrupted after `tasks rename --adopt` must finish on a rerun. Task 5: `test_second_host_refuses_without_its_pre_move_record`. Task 6: `test_the_cutover_verifies_and_the_second_host_adopts` and `test_the_second_host_finishes_an_interrupted_adoption`.
 5. **`verify` on a registry that lost the renamed project's former root.** It refuses, naming the input that no longer answers `hq`. Task 2: `test_verify_refuses_when_the_old_root_no_longer_resolves`.
 
 ## Step records and the environment file
@@ -746,7 +747,7 @@ git commit -q -m "test(session-archive): an allowlist for unit paths; the link r
 
 **Interfaces:**
 - Consumes: `systemctl --user` found on `PATH`. It uses `is-enabled`, `is-active`, `show -p Unit --value`, `stop` and `start`.
-- Produces: `quiesce-timers record|stop|wait|restore --state FILE`. Task 9 and Task 10 run it from a copy in `$CUT/bin`, because the checkout moves.
+- Produces: `quiesce-timers record|stop|wait|restore --state FILE`. Task 9 and Task 10 run it from a copy in `$RUN/bin`, because the checkout moves.
 
 - [ ] **Step 1: Start the record**
 
@@ -1089,8 +1090,8 @@ git commit -q -m "feat(tools): quiesce-timers for a rename's window (tack-8b7a28
 - Produces:
   - `rename-hq-steps tack|ops|lore|flows --snapshot SNAP`, with `--date YYYY-MM-DD` for `ops`;
   - `rename-hq-steps trust --checkout ROOT --old PATH --new PATH [--require]`;
-  - `rename-hq-steps second-host --root ROOT`.
-  - Module functions for the tests: `replace_once(path, old, new)`, `trust_text(text, old, new) -> str | None`, and `Stop`.
+  - `rename-hq-steps second-host-record --root OLD_ROOT --state FILE` (the other host, before the move) and `rename-hq-steps second-host --root NEW_ROOT --state FILE` (after it; a rerun finishes an interrupted adoption).
+  - Module functions for the tests: `replace_once(path, old, new)`, `trust_text(text, old, new) -> str | None`, `add_trust(checkout, old, new, require)`, and `Stop`.
 
 The edit tables below are the reviewed text of spec §3.2 steps 4 to 6 and §3.3. The rehearsal (Task 6, and again in Task 8 on the cutover's day) runs every edit against clones of the live mains.
 
@@ -1109,6 +1110,7 @@ Create `tools/test_rename_hq_steps.py`:
 import importlib.machinery
 import importlib.util
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -1142,12 +1144,10 @@ def test_replace_once_refuses_text_that_is_missing_or_repeated(tmp_path, text):
     assert path.read_text() == text
 
 
-def test_trust_text_copies_the_old_table_for_the_new_path():
+def test_trust_text_appends_a_copy_of_the_old_table_to_the_saved_copy():
     steps = load_steps()
-    text = 'model = "m"\n\n[projects."/s/tack"]\ntrust_level = "trusted"\n\n[tui]\nx = 1\n'
-    assert steps.trust_text(text, "/s/tack", "/s/hq") == (
-        'model = "m"\n\n[projects."/s/tack"]\ntrust_level = "trusted"\n\n[tui]\nx = 1\n'
-        '\n[projects."/s/hq"]\ntrust_level = "trusted"\n')
+    saved = '[projects."/elsewhere"]\ntrust_level = "trusted"\n\n[projects."/s/tack"]\ntrust_level = "trusted"\n'
+    assert steps.trust_text(saved, "/s/tack", "/s/hq") == saved + '\n[projects."/s/hq"]\ntrust_level = "trusted"\n'
 
 
 def test_trust_text_leaves_a_trusted_new_path_alone():
@@ -1161,24 +1161,64 @@ def test_trust_text_has_nothing_to_copy_without_the_old_table():
     assert steps.trust_text('[projects."/elsewhere"]\ntrust_level = "trusted"\n', "/s/tack", "/s/hq") is None
 
 
-def test_second_host_refuses_without_the_pre_move_storage_record(tmp_path):
+def test_add_trust_keeps_what_git_stages_when_a_table_ends_the_live_config(tmp_path):
+    """The live config ends with a non-trust table: an appended trust table would leave a
+    blank line the clean filter keeps. Through codex-trust restore it does not."""
+    steps = load_steps()
+    repo = tmp_path / "tack"
+    (repo / ".githooks").mkdir(parents=True)
+    for name in ("codex-trust", "harness-state-clean"):
+        shutil.copy2(TOOL.parent.parent / ".githooks" / name, repo / ".githooks" / name)
+    git = ["git", "-C", str(repo), "-c", "user.email=t@t", "-c", "user.name=t"]
+    subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
+    subprocess.run([*git, "config", "filter.harness-state.clean", ".githooks/harness-state-clean %f"], check=True)
+    (repo / ".gitattributes").write_text("codex/config*.toml filter=harness-state\n")
+    (repo / ".gitignore").write_text("local/\n")
+    (repo / "codex").mkdir()
+    config = repo / "codex" / "config.toml"
+    config.write_text(f'model = "m"\n\n[projects."{repo}"]\ntrust_level = "trusted"\n\n[tui]\nx = 1\n')
+    config.chmod(0o600)
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "init"], check=True)
+    assert subprocess.run([*git, "diff", "--quiet"]).returncode == 0
+    (repo / "local" / "codex").mkdir(parents=True)
+    new = tmp_path / "hq"
+    steps.add_trust(repo, repo, new, require=True)
+    assert f'[projects."{new}"]' in config.read_text() and f'[projects."{repo}"]' in config.read_text()
+    assert f'[projects."{new}"]' in (repo / "local" / "codex" / "trust.toml").read_text()
+    assert subprocess.run([*git, "diff", "--quiet"]).returncode == 0
+
+
+def test_second_host_refuses_without_its_pre_move_record(tmp_path):
     (tmp_path / "cfg" / "tasks").mkdir(parents=True)
     (tmp_path / "cfg" / "tasks" / "projects.toml").write_text(f'[projects]\ntack = "{tmp_path / "tack"}"\n')
     root = tmp_path / "hq"
     (root / "tasks").mkdir(parents=True)
     (root / "tasks" / ".config.toml").write_text('prefix = "hq"\n')
     env = {**os.environ, "XDG_CONFIG_HOME": str(tmp_path / "cfg"), "HOME": str(tmp_path)}
-    result = subprocess.run([str(TOOL), "second-host", "--root", str(root)], text=True, capture_output=True, env=env)
-    assert result.returncode == 1
-    assert "no storage record for tack" in result.stderr and "init --prefix tack --force" in result.stderr
+    result = subprocess.run([str(TOOL), "second-host", "--root", str(root), "--state", str(tmp_path / "s.json")],
+                            text=True, capture_output=True, env=env)
+    assert result.returncode == 1 and "no record at" in result.stderr and "second-host-record" in result.stderr
     assert (tmp_path / "cfg" / "tasks" / "projects.toml").read_text() == f'[projects]\ntack = "{tmp_path / "tack"}"\n'
+
+
+def test_second_host_record_refuses_a_root_that_is_not_the_old_project(tmp_path):
+    root = tmp_path / "tack"
+    (root / "tasks").mkdir(parents=True)
+    (root / "tasks" / ".config.toml").write_text('prefix = "hq"\n')
+    result = subprocess.run([str(TOOL), "second-host-record", "--root", str(root), "--state", str(tmp_path / "s.json")],
+                            text=True, capture_output=True,
+                            env={**os.environ, "XDG_CONFIG_HOME": str(tmp_path / "cfg"), "HOME": str(tmp_path)})
+    assert result.returncode == 1 and "has the prefix 'hq', not 'tack'" in result.stderr
+    assert not (tmp_path / "s.json").exists()
 
 
 def test_second_host_refuses_before_the_sync_has_carried_the_rename(tmp_path):
     root = tmp_path / "hq"
     (root / "tasks").mkdir(parents=True)
     (root / "tasks" / ".config.toml").write_text('prefix = "tack"\n')
-    result = subprocess.run([str(TOOL), "second-host", "--root", str(root)], text=True, capture_output=True,
+    result = subprocess.run([str(TOOL), "second-host", "--root", str(root), "--state", str(tmp_path / "s.json")],
+                            text=True, capture_output=True,
                             env={**os.environ, "XDG_CONFIG_HOME": str(tmp_path / "cfg"), "HOME": str(tmp_path)})
     assert result.returncode == 1 and "has the prefix 'tack', not 'hq'" in result.stderr
 ```
@@ -1202,7 +1242,8 @@ rename-hq-steps ops   --snapshot SNAP --date YYYY-MM-DD  step 5
 rename-hq-steps lore  --snapshot SNAP                    step 6
 rename-hq-steps flows --snapshot SNAP                    step 6
 rename-hq-steps trust --checkout ROOT --old PATH --new PATH [--require]
-rename-hq-steps second-host --root ROOT                  the other host's adoption, its tasks part
+rename-hq-steps second-host-record --root ROOT --state FILE   on the other host, before the move
+rename-hq-steps second-host --root ROOT --state FILE          its adoption, after the sync carried it
 
 docs/specs/2026-10-06-rename-to-hq-design.md §3.2 and §3.3;
 docs/plans/2026-10-06-rename-to-hq-cutover.md, Tasks 5, 9 and 10. Paths come from the
@@ -1368,8 +1409,9 @@ FLOWS_EDITS = [
 # --- Codex project trust (README, "Codex's project trust") ------------------------------
 
 def trust_text(text, old, new):
-    """The config with a table for `new` that copies `old`'s, appended; the text unchanged
-    when `new` is already trusted; None when there is no table for `old` to copy."""
+    """The saved copy (local/codex/trust.toml: tables separated by one blank line) with a
+    table for `new` that copies `old`'s, appended; the text unchanged when `new` is already
+    there; None when there is no table for `old` to copy."""
     if f'[projects."{new}"]' in text:
         return text
     match = re.search(re.escape(f'[projects."{old}"]') + r"\n((?:(?!\[).*\n?)*)", text)
@@ -1380,23 +1422,31 @@ def trust_text(text, old, new):
 
 
 def add_trust(checkout, old, new, require):
-    """An entry for the new path beside the old one, in the live config and, through
-    codex-trust capture, in the saved copy; so Codex does not ask to trust the directory."""
+    """An entry for the new path beside the old one, so Codex does not ask to trust the
+    directory. The table goes into the saved copy, and codex-trust restore inserts it into
+    the live config where the clean filter's output, and so what git stages, stays the
+    same: before a table header, never appended after the last table."""
     checkout = Path(checkout)
-    config = checkout / "codex" / "config.toml"
-    updated = trust_text(config.read_text(), str(old), str(new))
+    trust = checkout / ".githooks" / "codex-trust"
+    run("python3", trust, "capture", cwd=checkout)
+    saved = checkout / "local" / "codex" / "trust.toml"
+    text = saved.read_text() if saved.exists() else ""
+    updated = trust_text(text, str(old), str(new))
     if updated is None:
         if require:
-            raise Stop(f"trust: {config} has no table for {old}")
+            raise Stop(f"trust: {saved} has no table for {old}")
         print(f"trust: no table for {old}; nothing to add")
         return
-    config.write_text(updated)
-    run("python3", checkout / ".githooks" / "codex-trust", "capture", cwd=checkout)
-    # The clean filter keeps trust tables out of the index: staging the file refreshes its
-    # entry, and a staged difference would be a change beyond the tables.
-    run("git", "-C", checkout, "add", "--", "codex/config.toml")
-    if subprocess.run(["git", "-C", str(checkout), "diff", "--cached", "--quiet", "--", "codex/config.toml"]).returncode:
+    if updated != text:
+        saved.write_text(updated)
+    run("python3", trust, "restore", cwd=checkout)
+    if f'[projects."{new}"]' not in (checkout / "codex" / "config.toml").read_text():
+        raise Stop(f"trust: codex-trust restore did not put {new} into codex/config.toml")
+    if subprocess.run(["git", "-C", str(checkout), "diff", "--quiet", "--", "codex/config.toml"]).returncode:
         raise Stop("trust: codex/config.toml changed beyond its trust tables")
+    # git calls a filtered file modified when only its size changed; staging it, as
+    # harness-state-refresh does, refreshes the entry and stages nothing.
+    run("git", "-C", checkout, "add", "--", "codex/config.toml")
     print(f"trust: {new} trusted as {old} is")
 
 
@@ -1454,20 +1504,41 @@ def check_resolves(probes):
         raise Stop(f"tasks resolve does not answer {NEW} for " + ", ".join(wrong))
 
 
+def step_second_host_record(args):
+    """Before the move, on the other host (Task 9 Step 5; tasks spec §2.3): refresh this
+    host's storage record, and keep the old root and its storage in a state file that
+    outlives the registry entry `tasks rename --adopt` removes."""
+    root, state = Path(args.root).resolve(), Path(args.state)
+    if state.exists():
+        raise Stop(f"second-host-record: {state} exists")
+    if prefix_of(root) != OLD:
+        raise Stop(f"second-host-record: {root} has the prefix {prefix_of(root)!r}, not {OLD!r}")
+    run("tasks", "init", "--prefix", OLD, "--force", cwd=root)
+    if run("git", "-C", root, "status", "--porcelain").strip():
+        raise Stop(f"second-host-record: {root} is not clean after init --force")
+    registry = tomllib.loads(registry_path().read_text())
+    storage = registry.get("locations", {}).get(OLD, {}).get("storage")
+    if Path(registry["projects"][OLD]).resolve() != root or storage is None:
+        raise Stop(f"second-host-record: the registry has no storage record for {OLD} at {root}")
+    state.parent.mkdir(parents=True, exist_ok=True)
+    state.write_text(json.dumps({"old_root": str(root), "storage_old": storage}, indent=2) + "\n")
+    print(f"second-host-record: {root}, storage {storage}")
+
+
 def step_second_host(args):
     """The other host's adoption after the sync has carried the move (spec §3.2, the other
-    host; tasks spec §2.3): adopt, move this host's storage, relink it, record it, link."""
-    root = Path(args.root).resolve()
+    host): adopt, move this host's storage, relink it, record it, link, carry its Codex
+    trust. Each part checks whether it is already done, so a rerun after a failure
+    finishes the adoption from the state file second-host-record wrote."""
+    root, state = Path(args.root).resolve(), Path(args.state)
     if prefix_of(root) != NEW:
         raise Stop(f"second-host: {root} has the prefix {prefix_of(root)!r}, not {NEW!r}; "
                    f"wait for the sync to carry the rename")
-    registry = tomllib.loads(registry_path().read_text()) if registry_path().exists() else {}
-    old_root = registry.get("projects", {}).get(OLD)
-    storage = registry.get("locations", {}).get(OLD, {}).get("storage")
-    if old_root is None or storage is None:
-        raise Stop(f"second-host: no storage record for {OLD} in {registry_path()}; run "
-                   f"`tasks -C <the old root> init --prefix {OLD} --force` before the move (Task 9 Step 5)")
-    storage_old = Path(storage)
+    if not state.exists():
+        raise Stop(f"second-host: no record at {state}; run second-host-record at the old root "
+                   f"before the move (Task 9 Step 5)")
+    recorded = json.loads(state.read_text())
+    old_root, storage_old = Path(recorded["old_root"]), Path(recorded["storage_old"])
     storage_new = storage_old.parent.parent / root.name / storage_old.name
     old_present, new_present = storage_old.parent.exists(), storage_new.parent.exists()
     if old_present == new_present:
@@ -1476,18 +1547,24 @@ def step_second_host(args):
     link = root / ".worktrees"
     if link.exists() and not link.is_symlink():
         raise Stop(f"second-host: {link} is not a link")
-    print(run("tasks", "rename", OLD, NEW, "--adopt", cwd=root), end="")
+    projects = tomllib.loads(registry_path().read_text()).get("projects", {})
+    if OLD in projects:
+        print(run("tasks", "rename", OLD, NEW, "--adopt", cwd=root), end="")
+    elif NEW not in projects or Path(projects[NEW]).resolve() != root:
+        raise Stop(f"second-host: the registry maps neither {OLD} nor {NEW} to {root}")
     if old_present:
         os.rename(storage_old.parent, storage_new.parent)
-    if link.is_symlink():
-        link.unlink()
-    run("work-link", "--root", root.parent, "--ensure", ".worktrees", cwd=root)
+    if not (link.is_symlink() and link.resolve() == storage_new.resolve()):
+        if link.is_symlink():
+            link.unlink()
+        run("work-link", "--root", root.parent, "--ensure", ".worktrees", cwd=root)
     if link.resolve() != storage_new.resolve():
         raise Stop(f"second-host: {link} resolves to {link.resolve()}, not {storage_new}")
     print(run("tasks", "init", "--prefix", NEW, "--force", cwd=root), end="")
     run(root / "tools" / "harness-links", "--apply")
+    add_trust(root, old_root, root, require=False)
     sample = next(p.stem for p in (root / "tasks").glob(f"{NEW}-*.md"))
-    check_resolves([f"{OLD}-{sample.split('-', 1)[1]}", OLD, old_root, str(storage_old / "a-worktree")])
+    check_resolves([f"{OLD}-{sample.split('-', 1)[1]}", OLD, str(old_root), str(storage_old / "a-worktree")])
     print(f"second-host: adopted at {root}; storage at {storage_new}")
 
 
@@ -1504,10 +1581,14 @@ def main(argv):
     tr.add_argument("--old", required=True)
     tr.add_argument("--new", required=True)
     tr.add_argument("--require", action="store_true")
-    sub.add_parser("second-host").add_argument("--root", required=True)
+    for name in ("second-host-record", "second-host"):
+        h = sub.add_parser(name)
+        h.add_argument("--root", required=True)
+        h.add_argument("--state", required=True)
     args = parser.parse_args(argv)
     steps = {"tack": step_tack, "ops": step_ops, "lore": step_lore, "flows": step_flows,
-             "trust": step_trust, "second-host": step_second_host}
+             "trust": step_trust, "second-host-record": step_second_host_record,
+             "second-host": step_second_host}
     try:
         steps[args.command](args)
     except Stop as stop:
@@ -1526,7 +1607,7 @@ Two notes on the edits. The mirror table is renamed to `[hq]` and keeps `name = 
 
 Run: `uv run -q --with pytest pytest tools/test_rename_hq_steps.py -q`
 
-Expected: 8 passed.
+Expected: 10 passed.
 
 - [ ] **Step 6: Check every edit's text against the live mains, read-only**
 
@@ -1568,7 +1649,7 @@ git commit -q -m "feat(tools): rename-hq-steps, the cutover's edits and the seco
   - `rename-cutover` (save, apply, link, verify, rollback) from this worktree, then from its snapshot copy;
   - `rename-hq-steps`;
   - the live registry, read with `tomllib`;
-  - the live checkouts of tack, ops, lore, flows, tasks and obs (cloned);
+  - the live checkouts of tack, ops, lore, flows, tasks and obs (cloned, each given its live `core.hooksPath`, so commits meet the same hooks);
   - the live `local/` and Codex config (copied).
 - Produces: a passing rehearsal, recorded on `tack-8b7a28` as a note `rehearsal: passed <date>; …`. Task 8 adds the trial join and reruns all of it on the cutover's day, and Task 9's preconditions read that note.
 
@@ -1576,7 +1657,8 @@ What it covers, against spec §4:
 
 | Spec §4 asks for | Test |
 |---|---|
-| The cutover, then the second host's adoption against a second pair of scratch directories | `test_the_cutover_verifies_and_the_second_host_adopts` |
+| The cutover, then the second host's adoption against a second pair of scratch directories, with its own checkout path and its own trust table | `test_the_cutover_verifies_and_the_second_host_adopts` |
+| An adoption interrupted after `tasks rename --adopt`, finished by a rerun, and a rerun of a finished one | `test_the_second_host_finishes_an_interrupted_adoption` |
 | Rollback before the commits: the guard passes on the rename's own alias retarget and group rewrite, and both trust files come back byte for byte with their modes | `test_rollback_before_the_commits_restores_everything` |
 | Rollback after the commits, with the same checks | `test_rollback_after_the_commits_restores_everything` |
 | The guard stops on a planted foreign entry, alias and group | `test_the_guard_stops_on_a_foreign_change[projects/aliases/groups]` |
@@ -1634,6 +1716,8 @@ UNIT = Path(".config/systemd/user/session-archive-capture.timer")
 WANTS = Path(".config/systemd/user/timers.target.wants/session-archive-capture.timer")
 GIT_ID = {"GIT_AUTHOR_NAME": "rehearsal", "GIT_AUTHOR_EMAIL": "rehearsal@localhost",
           "GIT_COMMITTER_NAME": "rehearsal", "GIT_COMMITTER_EMAIL": "rehearsal@localhost"}
+# The hooks the commits meet run uv; the live cache lets them resolve offline, as they do live.
+UV_CACHE = subprocess.run(["uv", "cache", "dir"], text=True, capture_output=True, check=True).stdout.strip()
 TODAY = datetime.date.today().isoformat()
 
 
@@ -1654,7 +1738,7 @@ class Host:
         self.home, self.cfg, self.state = self.root / "home", self.root / "cfg", self.root / "state"
         self.registry = self.cfg / "tasks" / "projects.toml"
         self.env = {**os.environ, "HOME": str(self.home), "XDG_CONFIG_HOME": str(self.cfg),
-                    "XDG_STATE_HOME": str(self.state), **GIT_ID}
+                    "XDG_STATE_HOME": str(self.state), "UV_CACHE_DIR": UV_CACHE, **GIT_ID}
         for name_ in ("WORK_ROOT", "TASKS_SESSION", "TASKS_SESSION_PID", "GIT_DIR", "GIT_WORK_TREE"):
             self.env.pop(name_, None)
 
@@ -1669,6 +1753,10 @@ class Host:
 
     def storage(self, name):
         return self.root / ".dropbox-work" / name / ".worktrees"
+
+    @property
+    def second_state(self):
+        return self.root / "second-host.json"
 
 
 def write_registry(host, roots, extra_former):
@@ -1709,6 +1797,17 @@ def copy_local(host, clone, live_tack):
     assert host.run("git", "status", "--porcelain", "--untracked-files=all", cwd=clone).stdout == ""
 
 
+def install_hooks(host, clone, live_root):
+    """A clone does not carry core.hooksPath: give each the live checkout's, so the
+    rehearsal's commits meet the gates the live run's do."""
+    hooks = subprocess.run(["git", "-C", str(live_root), "config", "core.hooksPath"], text=True,
+                           capture_output=True).stdout.strip()
+    if hooks:
+        host.run("git", "config", "core.hooksPath", hooks, cwd=clone)
+        assert (clone / hooks).is_dir(), f"{clone}: no {hooks}"
+    assert host.run("git", "config", "core.hooksPath", cwd=clone, check=False).stdout.strip() == hooks
+
+
 def link_home(host):
     host.run(host.path("tack") / "tools" / "harness-links", "--apply")
     wants = host.home / WANTS
@@ -1725,9 +1824,16 @@ def build_first(host, live_roots):
         clone = host.path(Path(live_roots[prefix]).name)
         host.run("git", "clone", "-q", "--no-hardlinks", Path(live_roots[prefix]).resolve(), clone)
         roots[prefix] = clone
+    for prefix in CLONED:
+        if prefix != "tack":
+            install_hooks(host, roots[prefix], Path(live_roots[prefix]).resolve())
     tack, live_tack = roots["tack"], Path(live_roots["tack"]).resolve()
     host.run("just", "setup", cwd=tack)
     copy_local(host, tack, live_tack)
+    # The trust files are shared through the sync, so they also hold the other host's
+    # table for its own checkout path, which differs from this one's.
+    host.run("python3", STEPS, "trust", "--checkout", tack, "--old", tack, "--new",
+             Host(host.root.parent, "h2").path("tack"), "--require")
     host.run("work-link", "--root", host.sync, "--ensure", ".worktrees", cwd=tack)
     # Sessions recorded under the live checkout resolve to the clone (Task 8's trial join).
     live_storage = (live_tack / ".worktrees").resolve()
@@ -1739,7 +1845,7 @@ def build_first(host, live_roots):
 
 def build_second(first, host, live_roots):
     """The other host: the same synced files, its own registry, storage and home. Its
-    pre-move `init --force` records its storage (tasks spec §2.3; Task 9 Step 5)."""
+    pre-move second-host-record refreshes and keeps its storage (tasks spec §2.3; Task 9 Step 5)."""
     host.sync.mkdir(parents=True)
     for d in (host.home, host.cfg, host.state):
         d.mkdir(parents=True)
@@ -1752,7 +1858,9 @@ def build_second(first, host, live_roots):
     host.run("work-link", "--root", host.sync, "--ensure", ".worktrees", cwd=host.path("tack"))
     write_registry(host, roots, {})
     for prefix in CLONED:
-        host.run("tasks", "init", "--prefix", prefix, "--force", cwd=roots[prefix])
+        if prefix != "tack":
+            host.run("tasks", "init", "--prefix", prefix, "--force", cwd=roots[prefix])
+    host.run("python3", STEPS, "second-host-record", "--root", host.path("tack"), "--state", host.second_state)
     link_home(host)
 
 
@@ -1880,16 +1988,38 @@ def test_the_cutover_verifies_and_the_second_host_adopts(hosts):
 
     first_host = {p: p.read_bytes() for d in (h1.cfg, h1.state) for p in sorted(d.rglob("*")) if p.is_file()}
     carry(h1, h2)
-    h2.run("python3", STEPS, "second-host", "--root", h2.path("hq"))
+    h2.run("python3", STEPS, "second-host", "--root", h2.path("hq"), "--state", h2.second_state)
+    assert_adopted(h2)
+    assert {p: p.read_bytes() for d in (h1.cfg, h1.state) for p in sorted(d.rglob("*")) if p.is_file()} == first_host
+
+
+def assert_adopted(h2):
     location = tomllib.loads(h2.registry.read_text())["locations"]["hq"]
     assert location["storage"] == str(h2.storage("hq"))
     assert {"root": str(h2.path("tack")), "storage": str(h2.storage("tack"))} in [
         {k: e.get(k) for k in ("root", "storage")} for e in location["former"]]
     rows = resolve(h2, ["tack-dcb11a", OLD, h2.path("tack"), h2.storage("tack") / "a-worktree"])
     assert [(r["status"], r.get("prefix")) for r in rows] == [("resolved", NEW)] * 4
+    trust = (h2.path("hq") / "codex" / "config.toml").read_text()
+    assert f'[projects."{h2.path("hq")}"]' in trust and f'[projects."{h2.path("tack")}"]' in trust
     for name in ("hq", *REPOS):
         assert h2.run("tasks", "check", cwd=h2.path(name)).stdout == "", name
-    assert {p: p.read_bytes() for d in (h1.cfg, h1.state) for p in sorted(d.rglob("*")) if p.is_file()} == first_host
+        assert h2.run("git", "status", "--porcelain", "--untracked-files=all", cwd=h2.path(name)).stdout == "", name
+
+
+def test_the_second_host_finishes_an_interrupted_adoption(hosts):
+    h1, h2 = hosts
+    cutover = Cutover(h1)
+    cutover.save()
+    cutover.forward()
+    carry(h1, h2)
+    # second-host got as far as the adoption, then stopped: the registry no longer names tack.
+    h2.run("tasks", "rename", OLD, NEW, "--adopt", cwd=h2.path("hq"))
+    h2.run("python3", STEPS, "second-host", "--root", h2.path("hq"), "--state", h2.second_state)
+    assert_adopted(h2)
+    # A rerun of a finished adoption changes nothing and passes.
+    h2.run("python3", STEPS, "second-host", "--root", h2.path("hq"), "--state", h2.second_state)
+    assert_adopted(h2)
 
 
 def test_rollback_before_the_commits_restores_everything(hosts):
@@ -1955,13 +2085,13 @@ Run (in the background with a 60-minute timeout; the build clones six repositori
 uv run -q --with pytest pytest tools/rehearse_rename_hq.py -q -x --basetemp "$STATE/rehearsal" > "$STATE/rehearsal.log" 2>&1; echo "exit $?"; tail -n 30 "$STATE/rehearsal.log"
 ```
 
-Expected: `7 passed`.
+Expected: `8 passed`.
 
 A failure is a finding about the cutover, not about the rehearsal: an edit's text, a hook that refuses a step's commit, a check that is not clean, a byte that rollback does not restore. Each is fixed in the tool that owns it:
 - an edit table, or a step's order, in `rename-hq-steps` (Task 5);
 - a restore in `rename-cutover` (Task 2), with a test in `tools/test_rename_cutover.py` that fails first.
 
-Record each fix as a ruling in the ledger, and rerun until all seven pass. The rehearsal changes no live state: `git -C "$TACK" status --porcelain` and `tasks claims` read the same before and after.
+Record each fix as a ruling in the ledger, and rerun until all eight pass. The rehearsal changes no live state: `git -C "$TACK" status --porcelain` and `tasks claims` read the same before and after.
 
 - [ ] **Step 4: Record and commit**
 
@@ -2040,7 +2170,7 @@ Runs once `flows-44890e` and `obs-ff4e76` are done, from a tack session, on the 
 
 ```sh
 . "$(tasks root tack-8b7a28 --pretty)/docs/plans/2026-10-06-rename-to-hq-cutover.env.sh" && cd "$TACK" && \
-for t in flows-44890e obs-ff4e76; do [ "$(tasks show "$t" | python3 -c 'import json,sys; print(json.load(sys.stdin)["task"]["status"])')" = done ] || { echo "REFUSE: $t is not done"; false; } || break; done && \
+( for t in flows-44890e obs-ff4e76; do [ "$(tasks show "$t" | python3 -c 'import json,sys; print(json.load(sys.stdin)["task"]["status"])')" = done ] || { echo "REFUSE: $t is not done"; exit 1; }; done ) && \
 tasks start tack-8b7a28 >/dev/null && work-link --ensure .worktrees && git worktree add -q "$WT" -b "$BRANCH8" && \
 git worktree lock --reason "on WORK_ROOT storage (host: $(uname -n))" "$WT" && cd "$WT" && just setup >/dev/null && mkdir -p "$STATE" && tasks start "$STEP8" >/dev/null && echo ready
 ```
@@ -2117,31 +2247,42 @@ def test_the_trial_join_survives_the_rename(hosts):
     cutover.forward()
     census_a, report_a = judge(h1, [NEW, "obs"], full=True)
 
-    def arms(census):
-        return {m["task"]: u["arm"] for u in census["units"] for m in u["members"]}
+    def joined(census, report):
+        """What trial-verdict joins: each census member with a report row under exactly
+        its string. Comparing canonical forms here would hide a census that says tack-…
+        beside a report that says hq-…, the mismatch the spec asks this to catch."""
+        rows = {r["task"]: {k: v for k, v in r.items() if k != "task"} for r in report["units"]}
+        return {m["task"]: rows[m["task"]] for u in census["units"] for m in u["members"] if m["task"] in rows}
 
-    def rows(report):
-        return {r["task"]: {k: v for k, v in r.items() if k != "task"} for r in report["units"]}
+    before, after = joined(census_b, report_b), joined(census_a, report_a)
+    assert before, "no census member joined a report row before the rename: the join was not exercised"
+    ids = {x for c in (census_b, census_a) for u in c["units"] for x in (u["root"], *(m["task"] for m in u["members"]))}
+    names = canonical(h1, ids)
+    assert ids <= set(names), f"ids tasks resolve does not know: {sorted(ids - set(names))}"
+    after_member = {names[m["task"]]: m["task"] for u in census_a["units"] for m in u["members"]}
+    for task, row in before.items():
+        now = after_member.get(names[task])
+        assert now is not None, f"{task} left the census"
+        assert now in after, f"{task}: the census says {now} and the report has no row under that string"
+        assert after[now] == row, f"{task}: its outcome row changed"
 
-    before_arms, after_arms = arms(census_b), arms(census_a)
-    before_rows, after_rows = rows(report_b), rows(report_a)
-    names = canonical(h1, set(before_arms) | set(after_arms) | set(before_rows) | set(after_rows))
-    after_arms = {names[t]: a for t, a in after_arms.items()}
-    after_rows = {names[t]: r for t, r in after_rows.items()}
-    for task, arm in before_arms.items():
-        assert after_arms.get(names[task]) == arm, f"{task}: arm {arm} before, {after_arms.get(names[task])} after"
-    for task, row in before_rows.items():
-        assert after_rows.get(names[task]) == row, f"{task}: outcome row changed or went missing"
+    def units(census):
+        return {names[u["root"]]: (u["arm"], sorted(names[m["task"]] for m in u["members"])) for u in census["units"]}
+
+    after_units = units(census_a)
+    for root, (arm, members) in units(census_b).items():
+        assert after_units.get(root) == (arm, members), f"unit {root}: arm or membership changed"
     first = h1.run(h1.path("flows") / "bin" / "trial-arm", f"hq-{hex_}").stdout.splitlines()[0]
     assert first.startswith(f"{TRIAL}: flow {arm_of(f'tack-{hex_}')} "), first
 ```
 
-This compares by canonical id on both sides, so it holds whichever single id form the contract picked. What it requires is the spec's three conditions:
-- every member enrolled before the rename has the same arm after;
-- every outcome row from before is present after, with the same values;
+The cross-run comparison goes through canonical ids, so it holds whichever single id form the contract picked. The join inside each run does not: there, a census member counts only when the report has a row under exactly its string, as `trial-verdict` reads it, and that join must be non-empty. The test requires:
+- the join is exercised: at least one member joins a row before the rename;
+- every member that joined a row before still joins one after, under the string the census now gives it, with the same values. So no member becomes unknown;
+- every unit enrolled before keeps its arm and its members;
 - the planted unit, whose two id forms hash to different arms, keeps the arm of the listed prefix.
 
-`trial-verdict` must exit 0 on both runs, with the read date met, so the join is exercised.
+`trial-verdict` must exit 0 on both runs, with the read date met.
 
 - [ ] **Step 3: Run the whole rehearsal**
 
@@ -2152,7 +2293,7 @@ Run in the background, with a two-hour timeout. Indexing the live stores for two
 uv run -q --with pytest pytest tools/rehearse_rename_hq.py -q -x --basetemp "$STATE/rehearsal" > "$STATE/rehearsal.log" 2>&1; echo "exit $?"; tail -n 30 "$STATE/rehearsal.log"
 ```
 
-Expected: `8 passed`. A failure is handled as in Task 6 Step 3: fixed in the tool that owns it, with a test that fails first where that tool has a suite, then the whole rehearsal rerun.
+Expected: `9 passed`. A failure is handled as in Task 6 Step 3: fixed in the tool that owns it, with a test that fails first where that tool has a suite, then the whole rehearsal rerun.
 
 - [ ] **Step 4: Record, review, merge, remove the worktree**
 
@@ -2184,8 +2325,8 @@ From a session started in ops, never in tack: step 7 moves the checkout. Every b
 
 ```sh
 . "$(tasks root tack-8b7a28 --pretty)/docs/plans/2026-10-06-rename-to-hq-cutover.env.sh" && cd "$(root_of ops)" && \
-for t in tasks-7580d2 flows-44890e obs-ff4e76 "$STEP1" "$STEP2" "$STEP3" "$STEP4" "$STEP5" "$STEP6" "$STEP7" "$STEP8"; do \
-  [ "$(tasks show "$t" | python3 -c 'import json,sys; print(json.load(sys.stdin)["task"]["status"])')" = done ] || { echo "REFUSE: $t is not done"; false; } || break; done && \
+( for t in tasks-7580d2 flows-44890e obs-ff4e76 "$STEP1" "$STEP2" "$STEP3" "$STEP4" "$STEP5" "$STEP6" "$STEP7" "$STEP8"; do \
+  [ "$(tasks show "$t" | python3 -c 'import json,sys; print(json.load(sys.stdin)["task"]["status"])')" = done ] || { echo "REFUSE: $t is not done"; exit 1; }; done ) && \
 tasks show tack-8b7a28 | grep -qF "rehearsal: passed $(date -u +%F) with the trial join" && echo "records ready"
 ```
 
@@ -2200,15 +2341,19 @@ On the user's answer, record it verbatim before going on: `tasks note tack-8b7a2
 
 ```sh
 . "$(tasks root tack-8b7a28 --pretty)/docs/plans/2026-10-06-rename-to-hq-cutover.env.sh" && \
-[ ! -e "$CUT" ] && mkdir -p "$CUT/bin" && cp "$TACK/tools/rename-cutover" "$TACK/tools/quiesce-timers" "$TACK/tools/rename-hq-steps" "$CUT/bin/" && \
-{ printf 'CUT=%q\nOLD_ROOT=%q\nNEW_ROOT=%q\nSNAP=%q\nT_LOG=%q\n' "$CUT" "$TACK" "$(dirname "$TACK")/hq" "$CUT/snapshot" "$CUT/last.log"; \
-  for p in ops lore flows relay tasks obs; do printf '%s_ROOT=%q\n' "$(printf %s "$p" | tr a-z A-Z)" "$(root_of "$p")"; done; \
+{ [ ! -e "$CUT/env.sh" ] || [ -e "$(. "$CUT/env.sh" && printf %s "$RUN")/rolled-back" ] || { echo "REFUSE: the last attempt was not rolled back; read $CUT/env.sh"; false; }; } && \
+ATTEMPT="attempt-$(date -u +%Y%m%dT%H%M%SZ)" && RUN="$CUT/$ATTEMPT" && mkdir -p "$RUN/bin" && ln -sfn "$ATTEMPT" "$CUT/current" && \
+cp "$TACK/tools/rename-cutover" "$TACK/tools/quiesce-timers" "$TACK/tools/rename-hq-steps" "$RUN/bin/" && \
+( for p in ops lore flows relay tasks obs; do r="$(root_of "$p")" && [ -d "$r" ] || { echo "REFUSE: no root for $p"; exit 1; }; \
+  printf '%s_ROOT=%q\n' "$(printf %s "$p" | tr a-z A-Z)" "$r"; done ) > "$RUN/roots.env" && \
+{ printf 'CUT=%q\nATTEMPT=%q\nRUN=%q\nOLD_ROOT=%q\nNEW_ROOT=%q\nSNAP=%q\nT_LOG=%q\n' "$CUT" "$ATTEMPT" "$RUN" "$TACK" "$(dirname "$TACK")/hq" "$RUN/snapshot" "$RUN/last.log"; \
+  cat "$RUN/roots.env"; \
   printf 'STEP9=%s\nSTEP10=%s\nSTEP11=%s\n' "$STEP9" "$STEP10" "$STEP11"; \
-  sed -n '/^# --- helpers/,$p' "$TACK/docs/plans/2026-10-06-rename-to-hq-cutover.env.sh"; } > "$CUT/env.sh" && \
+  sed -n '/^# --- helpers/,$p' "$TACK/docs/plans/2026-10-06-rename-to-hq-cutover.env.sh"; } > "$RUN/env.sh" && cp "$RUN/env.sh" "$CUT/env.sh" && \
 printf '%s\n' "<the second host's name, from tailscale status>" > "$CUT/second-host" && cat "$CUT/env.sh" | head -16
 ```
 
-Replace the placeholder with the host's name before running; the name never enters a committed file. Expected: the roots of tack, ops, lore, flows, relay, tasks and obs, each an existing directory.
+Replace the placeholder with the host's name before running; the name never enters a committed file. Each attempt gets its own directory, `$RUN`, under `$CUT`, holding the tools' copies, the snapshot, the timers' record and every saved listing. A rolled-back attempt keeps its directory as evidence. Step 2 refuses to start a new attempt unless the last one was rolled back. `$CUT/current` links to the attempt in progress, and the other host keeps the same layout. Expected: the roots of tack, ops, lore, flows, relay, tasks and obs, each an existing directory.
 
 - [ ] **Step 3: Preconditions the tool leaves to the runbook**
 
@@ -2244,24 +2389,25 @@ When unsure, include it: pausing a timer costs one missed run. On 2026-10-06 the
 
 ```sh
 . "$HOME/.local/state/rename-hq/env.sh" && \
-t "$CUT/bin/quiesce-timers" record --state "$CUT/timers.json" $(cat "$CUT/timers") && \
-t "$CUT/bin/quiesce-timers" stop --state "$CUT/timers.json" && \
-on_second 'mkdir -p ~/.local/state/rename-hq/bin' && scp -4 -q "$CUT/bin/quiesce-timers" "$CUT/bin/rename-hq-steps" "$SECOND:.local/state/rename-hq/bin/" && \
-on_second "~/.local/state/rename-hq/bin/quiesce-timers record --state ~/.local/state/rename-hq/timers.json $(tr '\n' ' ' < "$CUT/timers.second") && ~/.local/state/rename-hq/bin/quiesce-timers stop --state ~/.local/state/rename-hq/timers.json" && echo "both hosts stopped"
+t "$RUN/bin/quiesce-timers" record --state "$RUN/timers.json" $(cat "$RUN/timers") && \
+t "$RUN/bin/quiesce-timers" stop --state "$RUN/timers.json" && \
+on_second "mkdir -p ~/.local/state/rename-hq/$ATTEMPT/bin && ln -sfn $ATTEMPT ~/.local/state/rename-hq/current" && \
+scp -4 -q "$RUN/bin/quiesce-timers" "$RUN/bin/rename-hq-steps" "$SECOND:.local/state/rename-hq/current/bin/" && \
+on_second "~/.local/state/rename-hq/current/bin/quiesce-timers record --state ~/.local/state/rename-hq/current/timers.json $(tr '\n' ' ' < "$RUN/timers.second") && ~/.local/state/rename-hq/current/bin/quiesce-timers stop --state ~/.local/state/rename-hq/current/timers.json" && echo "both hosts stopped"
 ```
 
 Then wait on both, in the background with a timeout of 65 minutes. The obs index can run for 45, and the window starts after it:
 
 ```sh
-. "$HOME/.local/state/rename-hq/env.sh" && t "$CUT/bin/quiesce-timers" wait --state "$CUT/timers.json" --timeout 3600 && \
-on_second '~/.local/state/rename-hq/bin/quiesce-timers wait --state ~/.local/state/rename-hq/timers.json --timeout 3600' && echo "both hosts quiet"
+. "$HOME/.local/state/rename-hq/env.sh" && t "$RUN/bin/quiesce-timers" wait --state "$RUN/timers.json" --timeout 3600 && \
+on_second '~/.local/state/rename-hq/current/bin/quiesce-timers wait --state ~/.local/state/rename-hq/current/timers.json --timeout 3600' && echo "both hosts quiet"
 ```
 
 - [ ] **Step 5: The other host's pre-move record and saves**
 
 ```sh
-. "$HOME/.local/state/rename-hq/env.sh" && on_second 'R="$(tasks root tack-8b7a28 --pretty)" && C=~/.local/state/rename-hq && \
-tasks -C "$R" init --prefix tack --force >/dev/null && [ -z "$(git -C "$R" status --porcelain)" ] && \
+. "$HOME/.local/state/rename-hq/env.sh" && on_second 'R="$(tasks root tack-8b7a28 --pretty)" && C=~/.local/state/rename-hq/current && \
+python3 "$C/bin/rename-hq-steps" second-host-record --root "$R" --state "$C/second-host.json" && \
 cp -a ~/.config/tasks "$C/config" && cp -a ~/.local/state/tasks "$C/state" && \
 systemctl --user list-unit-files "session-archive*" --no-legend > "$C/archive-units.txt" && \
 find "$HOME" -maxdepth 6 -xtype l 2>/dev/null | sort > "$C/broken-before.txt" && \
@@ -2269,7 +2415,7 @@ python3 -c "import tomllib,os; t=tomllib.load(open(os.path.expanduser(\"~/.confi
 ```
 
 Expected:
-- **The storage record.** `storage:` names that host's `.dropbox-work/tack/.worktrees`, and the tree is clean.
+- **The storage record.** `second-host-record` ran `init --prefix tack --force` there, found the tree clean, and kept the old root and its storage in `second-host.json`, which Task 10 reads. `storage:` names that host's `.dropbox-work/tack/.worktrees`.
 - **`former:`** shows whether that host's own `ai` backfill is there (tasks spec §6, user-owned). If it is absent, note it on `tack-8b7a28` as the stated limit: that host's `ai` paths stay unregistered. It does not stop the cutover.
 
 - [ ] **Step 6: This host's saves, then the snapshot**
@@ -2277,10 +2423,10 @@ Expected:
 ```sh
 . "$HOME/.local/state/rename-hq/env.sh" && cd "$OPS_ROOT" && \
 { [ -z "$(git -C "$OLD_ROOT" status --porcelain -- tasks)" ] || git -C "$OLD_ROOT" commit -q -m "chore(tasks): the cutover's attestation and preconditions (tack-8b7a28)" -- tasks/; } && \
-find "$HOME" -maxdepth 6 -xtype l 2>/dev/null | sort > "$CUT/broken-before.txt" && \
-{ readlink "$HOME/.config/systemd/user/timers.target.wants/session-archive-capture.timer" || echo none; } > "$CUT/enable-link.txt" && \
-systemctl --user list-unit-files 'session-archive*' --no-legend > "$CUT/archive-units.txt" && \
-t "$CUT/bin/rename-cutover" save --snapshot "$SNAP" --checkout "$OLD_ROOT" --new-root "$NEW_ROOT" --old tack --new hq \
+find "$HOME" -maxdepth 6 -xtype l 2>/dev/null | sort > "$RUN/broken-before.txt" && \
+{ readlink "$HOME/.config/systemd/user/timers.target.wants/session-archive-capture.timer" || echo none; } > "$RUN/enable-link.txt" && \
+systemctl --user list-unit-files 'session-archive*' --no-legend > "$RUN/archive-units.txt" && \
+t "$RUN/bin/rename-cutover" save --snapshot "$SNAP" --checkout "$OLD_ROOT" --new-root "$NEW_ROOT" --old tack --new hq \
   --repo "$OPS_ROOT" --repo "$LORE_ROOT" --repo "$FLOWS_ROOT" --keep codex/config.toml --keep local/codex/trust.toml
 ```
 
@@ -2297,26 +2443,26 @@ Expected: `applied: tack -> hq at <new root>`.
 - [ ] **Step 8: Spec step 4, in hq**
 
 ```sh
-. "$HOME/.local/state/rename-hq/env.sh" && cd "$OPS_ROOT" && t python3 "$CUT/bin/rename-hq-steps" tack --snapshot "$SNAP" && git -C "$NEW_ROOT" show --stat --oneline HEAD | tail -n 5
+. "$HOME/.local/state/rename-hq/env.sh" && cd "$OPS_ROOT" && t python3 "$RUN/bin/rename-hq-steps" tack --snapshot "$SNAP" && git -C "$NEW_ROOT" show --stat --oneline HEAD | tail -n 5
 ```
 
 - [ ] **Step 9: Spec step 5, in ops**
 
 ```sh
-. "$HOME/.local/state/rename-hq/env.sh" && cd "$OPS_ROOT" && t python3 "$CUT/bin/rename-hq-steps" ops --snapshot "$SNAP" --date "$(date -u +%F)" && git -C "$OPS_ROOT" show --stat --oneline HEAD | tail -n 5
+. "$HOME/.local/state/rename-hq/env.sh" && cd "$OPS_ROOT" && t python3 "$RUN/bin/rename-hq-steps" ops --snapshot "$SNAP" --date "$(date -u +%F)" && git -C "$OPS_ROOT" show --stat --oneline HEAD | tail -n 5
 ```
 
 - [ ] **Step 10: Spec step 6, in lore and flows**
 
 ```sh
-. "$HOME/.local/state/rename-hq/env.sh" && cd "$OPS_ROOT" && t python3 "$CUT/bin/rename-hq-steps" lore --snapshot "$SNAP" && t python3 "$CUT/bin/rename-hq-steps" flows --snapshot "$SNAP" && echo "lore and flows committed"
+. "$HOME/.local/state/rename-hq/env.sh" && cd "$OPS_ROOT" && t python3 "$RUN/bin/rename-hq-steps" lore --snapshot "$SNAP" && t python3 "$RUN/bin/rename-hq-steps" flows --snapshot "$SNAP" && echo "lore and flows committed"
 ```
 
 - [ ] **Step 11: Spec step 7: links and units**
 
 ```sh
 . "$HOME/.local/state/rename-hq/env.sh" && cd "$OPS_ROOT" && t "$SNAP/rename-cutover" link --snapshot "$SNAP" && systemctl --user daemon-reload && \
-for u in $(awk '$1 ~ /\.timer$/ && $2 == "enabled" {print $1}' "$CUT/archive-units.txt"); do systemctl --user reenable "$u" || break; done && \
+( for u in $(awk '$1 ~ /\.timer$/ && $2 == "enabled" {print $1}' "$RUN/archive-units.txt"); do systemctl --user reenable "$u" || exit 1; done ) && \
 { (cd "$NEW_ROOT" && just link-check >/dev/null) || { (cd "$NEW_ROOT" && just link --apply >/dev/null && just link-check >/dev/null) && echo "converged after the fallback apply"; }; } && echo converged
 ```
 
@@ -2326,11 +2472,11 @@ Expected: `converged`. The plan's probe expects no fallback on this host. If it 
 
 ```sh
 . "$HOME/.local/state/rename-hq/env.sh" && cd "$OPS_ROOT" && t "$SNAP/rename-cutover" verify --snapshot "$SNAP" && \
-find "$HOME" -maxdepth 6 -xtype l 2>/dev/null | sort > "$CUT/broken-after.txt" && \
-comm -13 "$CUT/broken-before.txt" "$CUT/broken-after.txt" > "$CUT/broken-new.txt" && [ ! -s "$CUT/broken-new.txt" ] && \
+find "$HOME" -maxdepth 6 -xtype l 2>/dev/null | sort > "$RUN/broken-after.txt" && \
+comm -13 "$RUN/broken-before.txt" "$RUN/broken-after.txt" > "$RUN/broken-new.txt" && [ ! -s "$RUN/broken-new.txt" ] && \
 ! find "$HOME" -maxdepth 6 -type l -print0 2>/dev/null | xargs -0 readlink -m | grep -qF "$OLD_ROOT/" && \
 [ "$(readlink -f "$HOME/.config/systemd/user/timers.target.wants/session-archive-capture.timer")" = "$NEW_ROOT/systemd/user/session-archive-capture.timer" ] && \
-systemctl --user list-unit-files 'session-archive*' --no-legend | diff - "$CUT/archive-units.txt" && \
+systemctl --user list-unit-files 'session-archive*' --no-legend | diff - "$RUN/archive-units.txt" && \
 tasks show tack-dcb11a >/dev/null && tasks show ai-4b1878 >/dev/null && \
 systemctl --user start session-archive-capture.service && [ "$(systemctl --user show -p Result --value session-archive-capture.service)" = success ] && \
 ~/.agents/bin/trial-arm hq-dcb11a | head -n 1 | grep -q '^flow-trial-1: flow off (unit ' && ~/.agents/bin/trial-arm status flow-trial-1 >/dev/null && \
@@ -2350,9 +2496,10 @@ A failure here goes to the rollback block.
 - [ ] **Step 13: Restore this host's timers, carry Claude's memory, record**
 
 ```sh
-. "$HOME/.local/state/rename-hq/env.sh" && cd "$OPS_ROOT" && t "$CUT/bin/quiesce-timers" restore --state "$CUT/timers.json" && \
-for home in "$HOME/.claude" "$HOME/.claude-work"; do old="$home/projects/$(printf %s "$OLD_ROOT" | tr / -)"; new="$home/projects/$(printf %s "$NEW_ROOT" | tr / -)"; \
-  if [ -d "$old/memory" ]; then [ ! -e "$new/memory" ] && mkdir -p "$new" && cp -a "$old/memory" "$new/memory" && echo "memory carried in $home" || { echo "REFUSE: $new/memory exists"; false; } || break; fi; done && \
+. "$HOME/.local/state/rename-hq/env.sh" && cd "$OPS_ROOT" && t "$RUN/bin/quiesce-timers" restore --state "$RUN/timers.json" && \
+( for home in "$HOME/.claude" "$HOME/.claude-work"; do old="$home/projects/$(printf %s "$OLD_ROOT" | tr / -)"; new="$home/projects/$(printf %s "$NEW_ROOT" | tr / -)"; \
+  [ -d "$old/memory" ] || continue; [ ! -e "$new/memory" ] || { echo "REFUSE: $new/memory exists"; exit 1; }; \
+  mkdir -p "$new" && cp -a "$old/memory" "$new/memory" && echo "memory carried in $home" || exit 1; done ) && \
 tasks start "$STEP9" >/dev/null && \
 tasks done "$STEP9" "this host: renamed, moved, committed in hq, ops, lore and flows, linked, verified (suites green), timers restored, Claude memory carried; rollback stays defined until the other host adopts" >/dev/null && \
 tasks park hq-8b7a28 "The user confirms the file sync has carried hq to the other host; then this ops session runs Task 10. Until then the other host's timers stay paused and its sessions start without instructions." --waiting-on user --reason approval >/dev/null && \
@@ -2366,17 +2513,29 @@ Then ask the user to open one fresh session in each of the four homes in `hq`:
 
 Record what they report on `hq-8b7a28`.
 
-**Rollback (this host, from Step 7 until Task 10 Step 2):**
+**Rollback (from Step 7 until Task 10 Step 2).** First this host:
 
 ```sh
 . "$HOME/.local/state/rename-hq/env.sh" && cd "$OPS_ROOT" && t "$SNAP/rename-cutover" rollback --snapshot "$SNAP" && systemctl --user daemon-reload && \
-for u in $(awk '$1 ~ /\.timer$/ && $2 == "enabled" {print $1}' "$CUT/archive-units.txt"); do systemctl --user reenable "$u" || break; done && \
-[ "$({ readlink "$HOME/.config/systemd/user/timers.target.wants/session-archive-capture.timer" || echo none; })" = "$(cat "$CUT/enable-link.txt")" ] && \
-(cd "$OLD_ROOT" && just link-check >/dev/null) && t "$CUT/bin/quiesce-timers" restore --state "$CUT/timers.json" && \
-on_second '~/.local/state/rename-hq/bin/quiesce-timers restore --state ~/.local/state/rename-hq/timers.json' && echo "rolled back on this host; the other host's timers restored"
+( for u in $(awk '$1 ~ /\.timer$/ && $2 == "enabled" {print $1}' "$RUN/archive-units.txt"); do systemctl --user reenable "$u" || exit 1; done ) && \
+[ "$({ readlink "$HOME/.config/systemd/user/timers.target.wants/session-archive-capture.timer" || echo none; })" = "$(cat "$RUN/enable-link.txt")" ] && \
+(cd "$OLD_ROOT" && just link-check >/dev/null) && t "$RUN/bin/quiesce-timers" restore --state "$RUN/timers.json" && \
+for r in "$OLD_ROOT" "$OPS_ROOT" "$LORE_ROOT" "$FLOWS_ROOT"; do printf '%s %s\n' "$(basename "$r")" "$(git -C "$r" rev-parse HEAD)"; done > "$RUN/restored-heads.txt" && \
+touch "$RUN/rolled-back" && echo "rolled back on this host"
 ```
 
-Then note on `tack-8b7a28` what failed and where. Leave `$CUT` in place for the next attempt, which starts at Step 1 with a fresh window. The other host's pre-move `init --force` needs no undo: it re-registered the root it already had.
+The other host's timers stay paused until the sync has carried the restored checkouts there. Its writers would otherwise run against a renamed or half-restored tree. Then, once the user says the sync has settled:
+
+```sh
+. "$HOME/.local/state/rename-hq/env.sh" && \
+on_second 'R="$(tasks resolve tack --json | python3 -c "import json,sys; print(json.load(sys.stdin)[\"results\"][0][\"root\"])")"; \
+test -d "$R" && test ! -e "$(dirname "$R")/hq" && grep -q "^prefix = \"tack\"" "$R/tasks/.config.toml" && \
+while read -r name head; do [ "$(git -C "$(dirname "$R")/$name" rev-parse HEAD)" = "$head" ] && [ -z "$(git -C "$(dirname "$R")/$name" status --porcelain)" ] || { echo "NOT YET: $name"; exit 1; }; done && \
+cd "$R" && just link-check >/dev/null && echo "the other host sees the restored checkouts"' < "$RUN/restored-heads.txt" && \
+on_second '~/.local/state/rename-hq/current/bin/quiesce-timers restore --state ~/.local/state/rename-hq/current/timers.json' && echo "the other host's timers restored"
+```
+
+`NOT YET` means the sync has not finished. Wait and rerun, and never restore its timers before this passes. Then note on `tack-8b7a28` what failed and where. A new attempt starts at Step 1 with a fresh window, and Step 2 gives it its own directory beside this one, which stays as evidence. The other host's `second-host-record` needs no undo: it re-registered the root it already had. The next attempt's Step 5 writes a new record in the new attempt's directory.
 
 ---
 
@@ -2399,19 +2558,19 @@ Expected: `carried to <that host's hq>`. Otherwise wait for the sync, or ask the
 ```sh
 . "$HOME/.local/state/rename-hq/env.sh" && \
 on_second 'R="$(tasks resolve tack --json | python3 -c "import json,sys; print(json.load(sys.stdin)[\"results\"][0][\"root\"])")"; N="$(dirname "$R")/hq"; \
-python3 ~/.local/state/rename-hq/bin/rename-hq-steps second-host --root "$N" && systemctl --user daemon-reload && \
-for u in $(awk '"'"'$1 ~ /\.timer$/ && $2 == "enabled" {print $1}'"'"' ~/.local/state/rename-hq/archive-units.txt); do systemctl --user reenable "$u" || break; done && \
+python3 ~/.local/state/rename-hq/current/bin/rename-hq-steps second-host --root "$N" --state ~/.local/state/rename-hq/current/second-host.json && systemctl --user daemon-reload && \
+( for u in $(awk '"'"'$1 ~ /\.timer$/ && $2 == "enabled" {print $1}'"'"' ~/.local/state/rename-hq/current/archive-units.txt); do systemctl --user reenable "$u" || exit 1; done ) && \
 cd "$N" && { just link-check >/dev/null || { just link --apply >/dev/null && just link-check >/dev/null && echo "converged after the fallback apply"; }; } && echo "second host adopted and converged"' && \
 tasks note "$STEP10" "the other host adopted; rollback has ended" >/dev/null
 ```
 
-`second-host` stops before changing anything if that host's pre-move storage record is missing or its storage is ambiguous. A `File exists` from `work-link` means the `.worktrees` link arrived before its storage: run `work-link` there once and rerun.
+`second-host` stops before changing anything if that host's pre-move record is missing or its storage is ambiguous. It is safe to rerun: each part checks whether it is done, so a run interrupted after `tasks rename --adopt` finishes from the record. It also copies that host's own Codex trust table for its old path to its new one, when the shared trust files have one (`trust`, not required). A `File exists` from `work-link` means the `.worktrees` link arrived before its storage: run `work-link` there once and rerun.
 
 - [ ] **Step 3: Verify the other host**
 
 ```sh
 . "$HOME/.local/state/rename-hq/env.sh" && \
-on_second 'N="$(tasks resolve hq --json | python3 -c "import json,sys; print(json.load(sys.stdin)[\"results\"][0][\"root\"])")"; C=~/.local/state/rename-hq; \
+on_second 'N="$(tasks resolve hq --json | python3 -c "import json,sys; print(json.load(sys.stdin)[\"results\"][0][\"root\"])")"; C=~/.local/state/rename-hq/current; \
 for p in hq ops lore flows; do r="$(tasks resolve $p --json | python3 -c "import json,sys; print(json.load(sys.stdin)[\"results\"][0][\"root\"])")"; [ -z "$(tasks -C "$r" check)" ] || { echo "findings in $r"; exit 1; }; done; \
 tasks show tack-dcb11a >/dev/null && tasks show ai-4b1878 >/dev/null && \
 systemctl --user list-unit-files "session-archive*" --no-legend | diff - "$C/archive-units.txt" && \
@@ -2424,9 +2583,10 @@ find "$HOME" -maxdepth 6 -xtype l 2>/dev/null | sort > "$C/broken-after.txt" && 
 ```sh
 . "$HOME/.local/state/rename-hq/env.sh" && \
 on_second 'N="$(tasks resolve hq --json | python3 -c "import json,sys; print(json.load(sys.stdin)[\"results\"][0][\"root\"])")"; O="$(dirname "$N")/tack"; \
-~/.local/state/rename-hq/bin/quiesce-timers restore --state ~/.local/state/rename-hq/timers.json && \
+~/.local/state/rename-hq/current/bin/quiesce-timers restore --state ~/.local/state/rename-hq/current/timers.json && \
 for home in "$HOME/.claude" "$HOME/.claude-work"; do old="$home/projects/$(printf %s "$O" | tr / -)"; new="$home/projects/$(printf %s "$N" | tr / -)"; \
-  if [ -d "$old/memory" ] && [ ! -e "$new/memory" ]; then mkdir -p "$new" && cp -a "$old/memory" "$new/memory" && echo "memory carried in $home"; fi; done' && \
+  [ -d "$old/memory" ] || continue; [ ! -e "$new/memory" ] || { echo "REFUSE: $new/memory exists"; exit 1; }; \
+  mkdir -p "$new" && cp -a "$old/memory" "$new/memory" && echo "memory carried in $home" || exit 1; done' && \
 tasks done "$STEP10" "the other host adopted and verified; its timers restored" >/dev/null && \
 git -C "$NEW_ROOT" commit -q -m "chore(tasks): the other host adopted hq (hq-8b7a28)" -- tasks/ && echo recorded
 ```
@@ -2441,20 +2601,25 @@ Then ask the user to open one fresh session per home on that host, as in Task 9 
 
 ```sh
 . "$HOME/.local/state/rename-hq/env.sh" && cd "$OPS_ROOT" && tasks start "$STEP11" >/dev/null && \
-for r in $(tasks projects --json | python3 -c 'import json,sys; [print(p["root"]) for p in json.load(sys.stdin)["projects"] if p.get("reachable", True)]'); do \
+( for r in $(tasks projects --json | python3 -c 'import json,sys; [print(p["root"]) for p in json.load(sys.stdin)["projects"] if p.get("reachable", True)]'); do \
   case "$r" in "$NEW_ROOT"|"$OPS_ROOT"|"$LORE_ROOT"|"$FLOWS_ROOT") continue;; esac; \
   tasks -C "$r" check 2>/dev/null | grep -qF 'through retired prefix \"tack\"' || continue; \
   t "$SNAP/rename-cutover" retarget --snapshot "$SNAP" --repo "$r" --forward && \
   git -C "$r" commit -q -m "chore(tasks): retarget dependencies on retired tack- ids (hq-8b7a28)" -- $(git -C "$r" diff --name-only -- tasks) && \
-  echo "retargeted in $r" || break; done
+  echo "retargeted in $r" || exit 1; done )
 ```
 
 Expected on 2026-10-06's evidence: relay and tasks. Each commit names only the task files the retarget changed. Then `tasks check` is clean in each.
 
-- [ ] **Step 2: Forget the old directory's Codex trust**
+- [ ] **Step 2: Forget the old directories' Codex trust, on both hosts' paths**
+
+The trust files are shared through the sync. So one `forget` per old path removes it for both hosts, and the second host's old path comes from its record.
 
 ```sh
-. "$HOME/.local/state/rename-hq/env.sh" && python3 "$NEW_ROOT/.githooks/codex-trust" forget "$OLD_ROOT" && ! grep -qF "[projects.\"$OLD_ROOT\"]" "$NEW_ROOT/codex/config.toml" "$NEW_ROOT/local/codex/trust.toml" && echo forgotten
+. "$HOME/.local/state/rename-hq/env.sh" && \
+SECOND_OLD="$(on_second 'python3 -c "import json,os; print(json.load(open(os.path.expanduser(\"~/.local/state/rename-hq/current/second-host.json\")))[\"old_root\"])"')" && need SECOND_OLD && \
+( for old in "$OLD_ROOT" "$SECOND_OLD"; do python3 "$NEW_ROOT/.githooks/codex-trust" forget "$old" || exit 1; done ) && \
+! grep -qF -e "[projects.\"$OLD_ROOT\"]" -e "[projects.\"$SECOND_OLD\"]" "$NEW_ROOT/codex/config.toml" "$NEW_ROOT/local/codex/trust.toml" && echo forgotten
 ```
 
 - [ ] **Step 3: obs follows the rename on live data**
