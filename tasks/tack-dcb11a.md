@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: feat/residue
 created: 2026-10-04T10:54:36Z
-updated: 2026-10-06T15:52:57Z
+updated: 2026-10-06T15:53:20Z
 started: 2026-10-06T11:20:33Z
 depends: [ops-f2405d]
 tags: []
@@ -70,3 +70,5 @@ Done: tack renamed in place by the rename design's procedure (tasks rename, iden
 - 2026-10-06T15:50:38Z (feat/residue): surface audit, second host: report non-ok: create ~/.agents/bin/harness-facts; create ~/.claude/skills/tasks (absent there); no DANGLING links; harness-owned real dirs as here plus ~/.codex/skills/security-best-practices (left alone)
 - 2026-10-06T15:51:30Z (feat/residue): host step done on the second host: preview matched its audit (create harness-facts, create skills/tasks); apply converged, link-check clean, harness-facts answers; no dangling Codex links existed there
 - 2026-10-06T15:52:57Z (feat/residue): residue acceptance items 1 to 5 delivered (spec §10), on both hosts; item 6, the rename to hq, continues under tack-8b7a28 and this goal stays open for it
+- 2026-10-06T15:53:20Z (main): parked (waiting on agent): Continue with the rename to hq under tack-8b7a28: its spec review, then its plan. The residue's own work is delivered.
+  provenance: {"harness_session":"claude-code:856ae840-5763-49d7-a62e-93994791cdcb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
