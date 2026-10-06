@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: feat/residue
 created: 2026-10-04T10:54:36Z
-updated: 2026-10-06T14:59:19Z
+updated: 2026-10-06T15:18:47Z
 started: 2026-10-06T11:20:33Z
 depends: [ops-f2405d]
 tags: []
@@ -58,3 +58,5 @@ Done: tack renamed in place by the rename design's procedure (tasks rename, iden
   provenance: {"harness_session":"claude-code:f110e5bf-234d-4815-8f46-8780451c03cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-06T14:59:19Z (feat/residue): resumed
   provenance: {"harness_session":"claude-code:856ae840-5763-49d7-a62e-93994791cdcb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-06T15:15:21Z (feat/residue): review: impl round 1 — verdict: accept; findings: Minor 8; reviewer: claude-code/claude-fable-5-1
+- 2026-10-06T15:18:47Z (feat/residue): merged to tack main a803d37: facts and tool on main; nothing applied to any host yet
