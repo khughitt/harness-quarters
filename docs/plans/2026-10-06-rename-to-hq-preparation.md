@@ -20,7 +20,8 @@ So these stay with that second plan, although the spec states them:
 
 - the timers' quiescence, the user's attestations, and the systemd steps of rollback (`daemon-reload`, the timer re-enable, the enable link's comparison). Those are the runbook's: the tool must never touch the live user manager, because the rehearsal runs this same code (spec §4);
 - the save of the broken-link set, the enable link's target and the archive units' listing. Those are also the runbook's, written into the snapshot directory beside the tool's own files;
-- the probe of `systemctl reenable` on a linked unit (spec §3.2 step 7).
+- the probe of `systemctl reenable` on a linked unit (spec §3.2 step 7);
+- running `just setup` in each rehearsal copy. Rollback's index refresh of a filtered trust file needs the `harness-state` clean filter configured in the copy's `.git/config`. A copy made by `git clone` alone would stop rollback at "not clean" on its own restore.
 
 ## Global Constraints
 
@@ -43,7 +44,7 @@ Inputs the spec implies and a person will meet. Each has its test in the task th
 1. **The cutover run from its snapshot copy after the checkout has moved.** The runbook runs the copy in the snapshot, since the checkout's own path is gone. `link` and `verify` must find the link tool under the new root. `link` must refuse before `apply` has moved anything. Task 4: `test_the_whole_cutover_retargets_links_and_verifies` (the sandbox runs the snapshot copy) and `test_link_refuses_before_apply`.
 2. **A `--keep` path that is missing, a link, absolute or outside the checkout.** It is refused at save, before the snapshot exists, never skipped. Task 5: `test_save_refuses_a_kept_path_that_is_not_a_file` and `test_save_refuses_a_kept_path_outside_the_checkout`.
 3. **A repository named twice, or the checkout named as a repository.** Refused at save. Task 4: `test_save_refuses_a_repository_named_twice` and `test_save_refuses_the_checkout_named_as_a_repository`.
-4. **A retarget aimed at a repository outside the snapshot while rollback is still possible.** Refused, with the file untouched; `--forward` allows it once rollback is over. Task 4: `test_retarget_refuses_a_repository_outside_the_snapshot`.
+4. **A retarget aimed at a repository outside the snapshot while rollback is still possible.** Refused, with the file untouched. `--forward` allows it once rollback is over, and from then on rollback refuses. Task 4: `test_retarget_refuses_a_repository_outside_the_snapshot` and `test_rollback_refuses_after_a_forward_retarget`.
 5. **The archive tool run through its link from another directory**, as the units will run it. It finds its package. Task 1: `test_the_tool_runs_through_a_link_from_any_directory`.
 
 ## Step records and the environment file
@@ -113,18 +114,16 @@ Run: `uv run -q --with pytest pytest tools/test_session_archive_units.py -q`
 Expected: `7 passed`.
 
 Run: `just test`
-Expected: every suite passes. `tools/test_tack_link.py`'s real-manifest tests clone the committed tree, so they see the new entry only after the commit. Step 5 reruns them.
+Expected: every suite passes, `tools/test_tack_link.py`'s real-manifest tests included: they copy the working `links.toml` into a fresh clone and validate the new entry's target there.
 
-- [ ] **Step 5: Commit, then rerun the manifest tests against the commit**
+- [ ] **Step 5: Commit**
 
 ```sh
 . "$(tasks root tack-8b7a28 --pretty)/.worktrees/tack-8b7a28/docs/plans/2026-10-06-rename-to-hq-preparation.env.sh" && cd "$WT" && \
 tasks done "$STEP1" "links.toml links ~/.local/bin/session-archive to tools/session-archive" >/dev/null && \
 git commit -q -m "feat(links): link the session-archive tool onto PATH (tack-8b7a28)" -- links.toml tools/test_session_archive_units.py "tasks/$STEP1.md" && \
-git rev-parse HEAD > "$STATE/task1-commit" && t uv run -q --with pytest pytest tools/test_tack_link.py -q
+git rev-parse HEAD > "$STATE/task1-commit" && git log --oneline -1
 ```
-
-Expected: the last line reads `passed`, with no failures. The real-manifest tests clone this commit and validate the new entry's target.
 
 ---
 
@@ -220,7 +219,7 @@ git rev-parse HEAD > "$STATE/task2-commit" && git log --oneline -1
 
 Nothing that changes a host runs before the user approves it at that moment. One approval covers both hosts and both halves, and is asked once. The order is fixed: the link exists on both hosts before any host's units name it.
 
-The worktree and its state directory are in this host's own storage and do not sync, so nothing that runs on the second host may source the environment file or enter `$WT`. Two scripts are written here and sent there; each uses only that host's registered main checkout. Every task record is written on this host.
+The worktree and its state directory are in this host's own storage and do not sync, so nothing that runs on the second host may source the environment file or enter `$WT`. Two scripts are written here and sent there; each uses only that host's registered main checkout. Every task record is written on this host. A non-login shell over SSH does not read the profile, so each script sets its own `PATH` (`tasks` lives in `~/.cargo/bin`) and names any command it cannot find.
 
 - [ ] **Step 1: Write the scripts, record the second host, preview this host read-only, and park**
 
@@ -231,7 +230,8 @@ The second host's name comes from `tailscale status` or the user's memory note, 
 need TASK1_COMMIT TASK2_COMMIT && printf '%s\n' "<the second host>" > "$STATE/second-host" && \
 cat > "$STATE/host-link.sh" <<'EOF' &&
 # The session-archive link on this host. No argument: preview only. "apply": apply and check.
-export PATH="$HOME/.local/bin:$HOME/bin:$PATH"
+export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$HOME/bin:$PATH"
+for c in tasks just; do command -v "$c" > /dev/null || { echo "$c is not on PATH here"; exit 1; }; done
 cd "$(tasks root tack-8b7a28 --pretty)" || exit 1
 grep -q '^"~/.local/bin/session-archive"' links.toml || { echo "links.toml has no session-archive entry yet (is the sync up to date?)"; exit 1; }
 LOG="$(mktemp)"
@@ -247,7 +247,8 @@ EOF
 cat > "$STATE/host-units.sh" <<'EOF' &&
 # After the units change reached this host: reload, show what the capture unit runs,
 # and run it once where its timer is enabled.
-export PATH="$HOME/.local/bin:$HOME/bin:$PATH"
+export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$HOME/bin:$PATH"
+for c in tasks systemctl journalctl; do command -v "$c" > /dev/null || { echo "$c is not on PATH here"; exit 1; }; done
 cd "$(tasks root tack-8b7a28 --pretty)" || exit 1
 grep -q '%h/.local/bin/session-archive capture' systemd/user/session-archive-capture.service || { echo "the unit change has not arrived (is the sync up to date?)"; exit 1; }
 [ -x ~/.local/bin/session-archive ] || { echo "~/.local/bin/session-archive is missing: run the link step first"; exit 1; }
@@ -264,11 +265,13 @@ EOF
 git -C "$TACK" merge-base --is-ancestor "$TASK1_COMMIT" "$BRANCH" && echo "scripts written; Task 1 at ${TASK1_COMMIT:0:7}, Task 2 at ${TASK2_COMMIT:0:7}"
 ```
 
-Replace `<the second host>` with the name before running. Then park:
+Replace `<the second host>` with the name before running.
+
+Task 3 merges Tasks 1 and 2 to main before the whole-branch review in Task 7, so they get their own review first. A fresh-context reviewer reads `git diff "$TASK1_COMMIT~1" "$TASK2_COMMIT" -- links.toml systemd tools/test_session_archive_units.py` together with spec §3.1 step 1. The question: does any path a host runs still name the checkout, and can the units run before the link exists on a host? Note the round on `tack-8b7a28`; fix Critical and Important findings with a test that fails first; re-review once. Then park:
 
 ```sh
 . "$(tasks root tack-8b7a28 --pretty)/.worktrees/tack-8b7a28/docs/plans/2026-10-06-rename-to-hq-preparation.env.sh" && cd "$WT" && \
-tasks park "$STEP3" "User approves the session-archive host step on both hosts, in this order: merge Task 1 to main; on this host and then the second host, preview the link (expected: one create, ~/.local/bin/session-archive) and apply it; merge Task 2 to main; on each host, daemon-reload and a manual capture run where its timer is enabled. Then Task 3 Step 2." --waiting-on user --reason approval >/dev/null && \
+tasks park "$STEP3" "User approves the session-archive host step on both hosts (Tasks 1 and 2 reviewed; see the review note on tack-8b7a28), in this order: merge Task 1 to main; on this host and then the second host, preview the link (expected: one create, ~/.local/bin/session-archive) and apply it; merge Task 2 to main; on each host, daemon-reload and a manual capture run where its timer is enabled. Then Task 3 Step 2." --waiting-on user --reason approval >/dev/null && \
 git commit -q -m "chore(tasks): park the session-archive host step for approval (tack-8b7a28)" -- "tasks/$STEP3.md"
 ```
 
@@ -280,7 +283,7 @@ cd "$TACK" && [ -z "$(git status --porcelain -- links.toml tools/test_session_ar
 git merge --no-ff "$TASK1_COMMIT" -m "Merge branch '$BRANCH' (the session-archive link)" && bash "$STATE/host-link.sh"
 ```
 
-Expected: exactly one line, `create	~/.local/bin/session-archive	…`, then `preview exit: 0`. A `skipped` line for an absent harness home is not a change. Anything else (a `refuse`, a `repoint`, a second `create`, a non-zero exit): stop and report; do not apply. Then:
+Expected: exactly one line, `create	~/.local/bin/session-archive`, then `preview exit: 0`. A `skipped` line for an absent harness home is not a change. Anything else (a `refuse`, a `repoint`, a second `create`, a non-zero exit): stop and report; do not apply. Then:
 
 ```sh
 . "$(tasks root tack-8b7a28 --pretty)/.worktrees/tack-8b7a28/docs/plans/2026-10-06-rename-to-hq-preparation.env.sh" && bash "$STATE/host-link.sh" apply
@@ -316,11 +319,13 @@ Then on the second host, once the sync has carried the unit change (the script r
 
 Expected: the timers' states there, then either `capture run: success` or `capture timer not enabled here: no manual run`. If `systemctl --user` cannot reach the user manager over SSH, the user runs the script there in a terminal.
 
+**One departure from the spec.** §3.1 step 1 asks for one manual run of the capture unit on each host. The script runs it only where the capture timer is enabled. The project guide allows the archive timers only on a host with its archive configuration and backup destination, and a host without them must not capture. On such a host, the reload and the `ExecStart` check are the proof. The `tasks done` message says which hosts ran a capture.
+
 - [ ] **Step 5: Record**
 
 ```sh
 . "$(tasks root tack-8b7a28 --pretty)/.worktrees/tack-8b7a28/docs/plans/2026-10-06-rename-to-hq-preparation.env.sh" && cd "$WT" && \
-tasks done "$STEP3" "session-archive host step: link applied and units reloaded on both hosts; this host's capture: <result>; second host: <timer states, capture result or none>" >/dev/null && \
+tasks done "$STEP3" "session-archive host step: link applied and units reloaded on both hosts; this host's capture: <result>; second host: <timer states; capture result, or none run because its capture timer is not enabled (spec §3.1 step 1 departure)>" >/dev/null && \
 git commit -q -m "chore(tasks): the session-archive host step done (tack-8b7a28)" -- "tasks/$STEP3.md" && git log --oneline -1
 ```
 
@@ -338,7 +343,7 @@ The September tool hardcodes exactly two repositories (`--ai`, `--ops`), retarge
 - Produces, as commands:
   - `rename-cutover save --snapshot DIR --checkout ROOT --repo ROOT [--repo ROOT …] --new-root PATH --old OLD --new NEW [--link-tool REL]` (the default for `--link-tool` is `tools/tack-link` until Task 6);
   - `rename-cutover apply --snapshot DIR` (`tasks rename`, the move of the checkout and its storage, `work-link --ensure .worktrees`, `tasks init --prefix NEW --force`);
-  - `rename-cutover retarget --snapshot DIR --repo ROOT [--forward]`;
+  - `rename-cutover retarget --snapshot DIR --repo ROOT [--forward]` (a repository outside the snapshot is refused, unless `--forward`, which first records it in `DIR/forward.json`; `rollback` refuses while that file exists);
   - `rename-cutover link --snapshot DIR`;
   - `rename-cutover verify --snapshot DIR`;
   - `rename-cutover rollback --snapshot DIR`.
@@ -586,6 +591,24 @@ def test_save_accepts_a_branch_main_already_holds(box):
     box.save()
 
 
+def test_save_refuses_a_checkout_off_main(box):
+    box.run("git", "checkout", "-qb", "side", cwd=box.checkout)
+    result = box.save(check=False)
+    assert result.returncode == 1
+    assert "is on refs/heads/side, not main" in result.stderr
+    assert not box.snapshot.exists()
+
+
+def test_save_refuses_a_stash(box):
+    """A stash popped after the rename could bring old-prefix task files back."""
+    (box.checkout / "agents" / "README").write_text("stashed\n")
+    box.run("git", "stash", "-q", cwd=box.checkout)
+    result = box.save(check=False)
+    assert result.returncode == 1
+    assert "has stashes" in result.stderr
+    assert not box.snapshot.exists()
+
+
 def test_save_refuses_a_dead_claim_in_any_retargeted_repository(box2):
     """`tasks dep` prunes dead claims from the project it writes in, so a dead claim in a
     retargeted repository would be dropped by retarget and then stop the guard. The
@@ -672,6 +695,21 @@ def test_retarget_refuses_a_repository_outside_the_snapshot(box):
     assert (outside / "tasks" / f"{dependent}.md").read_bytes() == before
     box.cutover("retarget", "--snapshot", box.snapshot, "--repo", outside, "--forward")
     assert box.run("tasks", "check", cwd=outside).stdout == ""
+
+
+def test_rollback_refuses_after_a_forward_retarget(box):
+    """A forward write is one rollback could not undo: it ends rollback, and nothing moves."""
+    outside = box.sync / "relay"
+    box.repo(outside, "relay")
+    box.commit(outside, "init")
+    box.depend_on_checkout(outside)
+    box.save()
+    box.forward()
+    box.cutover("retarget", "--snapshot", box.snapshot, "--repo", outside, "--forward")
+    result = box.cutover("rollback", "--snapshot", box.snapshot, check=False)
+    assert result.returncode == 1
+    assert "ended when retarget --forward" in result.stderr and str(outside) in result.stderr
+    assert box.new_root.exists() and not box.checkout.exists()
 
 
 def test_link_refuses_before_apply(box):
@@ -1045,7 +1083,7 @@ def test_second_host_adopts_the_rename(box):
 - [ ] **Step 2: Run them to see them fail**
 
 Run: `uv run -q --with pytest pytest tools/test_rename_cutover.py -q`
-Expected: 43 failed, 1 passed. The unit test of `save_reset_patch` passes; every other test fails on `--checkout`, `--repo` or `--link-tool` (argparse's `unrecognized arguments`) or on `meta_for`'s new layout.
+Expected: 46 failed, 1 passed. The unit test of `save_reset_patch` passes; every other test fails on `--checkout`, `--repo` or `--link-tool` (argparse's `unrecognized arguments`) or on `meta_for`'s new layout.
 
 - [ ] **Step 3: Replace the tool**
 
@@ -1162,8 +1200,8 @@ def project_prefix(root):
 
 
 def unmerged_branches(root):
-    """Local branches holding commits the current branch lacks. Merged after the rename,
-    such a branch would bring old-prefix task files back."""
+    """Local branches holding commits the current branch, main, lacks. Merged after the
+    rename, such a branch would bring old-prefix task files back."""
     current = branch_of(root)
     names = run("git", "-C", root, "for-each-ref", "--format=%(refname)", "refs/heads").split()
     return [name.removeprefix("refs/heads/") for name in names
@@ -1186,6 +1224,11 @@ def preconditions(checkout, repos, tool):
     for root in (checkout, *repos):
         if porcelain(root):
             raise Stop(f"preconditions: {root} is not clean")
+    if branch_of(checkout) != "refs/heads/main":
+        raise Stop(f"preconditions: {checkout} is on {branch_of(checkout) or '(detached)'}, not main")
+    if run("git", "-C", checkout, "stash", "list").strip():
+        raise Stop(f"preconditions: {checkout} has stashes; one popped after the rename could bring "
+                   f"old-prefix task files back")
     if run("git", "-C", checkout, "worktree", "list", "--porcelain").count("\nworktree ") != 0:
         raise Stop(f"preconditions: {checkout} has more than one worktree")
     ahead = unmerged_branches(checkout)
@@ -1396,6 +1439,10 @@ def rollback(args):
     snap = Path(args.snapshot)
     meta = load_meta(snap)
     check_environment("rollback", meta)
+    forward = snap / "forward.json"
+    if forward.exists():
+        raise Stop("rollback: ended when retarget --forward first wrote outside the snapshot: "
+                   + ", ".join(json.loads(forward.read_text())))
     guard(meta, snap)
     check_branches(meta)
     leftovers = validate_leftovers(meta)
@@ -1467,16 +1514,29 @@ def apply(args):
     print(f"applied: {old} -> {new} at {new_root}")
 
 
+def record_forward(snap, root):
+    """Rollback could not restore a repository written outside the snapshot, so the
+    first such write ends it. This record, made before the write, is what it refuses on."""
+    path = snap / "forward.json"
+    roots = json.loads(path.read_text()) if path.exists() else []
+    if str(root) not in roots:
+        path.write_text(json.dumps([*roots, str(root)], indent=2) + "\n")
+
+
 def retarget(args):
     """One repository's retarget, run by the runbook before that repository's commit.
     A repository outside the snapshot is refused: rollback could not restore it. After
-    the other host has adopted, rollback is over, and `--forward` allows one."""
-    meta = load_meta(args.snapshot)
+    the other host has adopted, rollback is over, and `--forward` allows one and records
+    that rollback has ended."""
+    snap = Path(args.snapshot)
+    meta = load_meta(snap)
     check_environment("retarget", meta)
     root = Path(args.repo).resolve()
-    if not args.forward and str(root) not in {r["root"] for r in meta["repos"]}:
-        raise Stop(f"retarget: {root} is not in the snapshot; after the other host has adopted, "
-                   f"pass --forward")
+    if str(root) not in {r["root"] for r in meta["repos"]}:
+        if not args.forward:
+            raise Stop(f"retarget: {root} is not in the snapshot; after the other host has adopted, "
+                       f"pass --forward")
+        record_forward(snap, root)
     retarget_dependencies(root, meta["old"])
 
 
@@ -1544,12 +1604,12 @@ if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))
 ```
 
-What changed, for the reviewer: `record`, `checkout_now`, `link_tool`, `unmerged_branches` and the three new commands are new. `preconditions` takes every repository and refuses any claim in a retargeted one, any unclean tree, and any local branch with commits the current branch lacks. `rollback` resets the checkout and every repository, each with its own patch. `retarget_dependencies` is the September `retarget_ops_dependencies`, run per repository. `storage_new` follows the directory. `registry_view`, `guard`, `move_back`, `save_reset_patch` and `claims_tolerated` keep their logic.
+What changed, for the reviewer: `record`, `checkout_now`, `link_tool`, `unmerged_branches`, `record_forward` and the three new commands are new. `preconditions` takes every repository. It refuses any claim in a retargeted one, any unclean tree, a checkout not on main, a stash, and any local branch with commits main lacks. `retarget --forward` records each repository it writes outside the snapshot in `forward.json` before writing, and `rollback` refuses while that file exists: rollback could not restore those repositories (spec §3.2 step 9, §4). `rollback` resets the checkout and every repository, each with its own patch. `retarget_dependencies` is the September `retarget_ops_dependencies`, run per repository. `storage_new` follows the directory. `registry_view`, `guard`, `move_back`, `save_reset_patch` and `claims_tolerated` keep their logic.
 
 - [ ] **Step 4: Run the focused tests, then the suite**
 
 Run: `uv run -q --with pytest pytest tools/test_rename_cutover.py -q`
-Expected: `44 passed`.
+Expected: `47 passed`.
 
 Run: `just test`
 Expected: every suite passes.
@@ -1710,7 +1770,7 @@ git apply - <<'PATCH' && echo applied
  # --- save ---------------------------------------------------------------------
  
  
-@@ -682,3 +733,112 @@
+@@ -715,3 +766,112 @@
      parked = json.loads(run2("tasks", "list", "--parked", cwd=box.new_root))
      assert f"tack-{hex_}" in [t["id"] for t in parked["tasks"]]
      assert first_host() == first
@@ -1831,7 +1891,7 @@ The `hq` sandbox does what the live checkout has done. It is renamed once before
 - [ ] **Step 2: Run them to see them fail**
 
 Run: `uv run -q --with pytest pytest tools/test_rename_cutover.py -q`
-Expected: 13 failed, 44 passed. The `registry_view` unit test fails on the alias and the group. Every test that builds the `hq` sandbox and saves fails on `--keep`. `test_check_kept_names_a_mode_that_differs` fails on the missing `check_kept`.
+Expected: 13 failed, 47 passed. The `registry_view` unit test fails on the alias and the group. Every test that builds the `hq` sandbox and saves fails on `--keep`. `test_check_kept_names_a_mode_that_differs` fails on the missing `check_kept`.
 
 - [ ] **Step 3: Implement**
 
@@ -1850,7 +1910,7 @@ git apply - <<'PATCH' && echo applied
  import subprocess
  import sys
  import tomllib
-@@ -143,6 +144,17 @@
+@@ -148,6 +149,17 @@
          raise Stop(f"preconditions: link drift:\n{check.stdout}")
  
  
@@ -1868,7 +1928,7 @@ git apply - <<'PATCH' && echo applied
  def save(args):
      checkout, snap = Path(args.checkout).resolve(), Path(args.snapshot)
      repos = [Path(r).resolve() for r in args.repo]
-@@ -164,6 +176,7 @@
+@@ -169,6 +181,7 @@
          path = path.resolve()
          if snap_resolved == path or path in snap_resolved.parents:
              raise Stop(f"save: snapshot {snap} lies inside {which}")
@@ -1876,7 +1936,7 @@ git apply - <<'PATCH' && echo applied
      preconditions(checkout, repos, tool)
      new_root = Path(args.new_root)
      new_root = new_root.parent.resolve() / new_root.name
-@@ -176,23 +189,46 @@
+@@ -181,23 +194,48 @@
          "worktrees_link": link_text,
          "storage_old": str(storage_old) if storage_old else None,
          "storage_new": str(storage_new) if storage_new else None,
@@ -1900,7 +1960,9 @@ git apply - <<'PATCH' && echo applied
 +    and the rename's own rewrites of other entries read the same on both sides.
 +    `tasks rename` retargets an alias that named the old prefix (`ai = "tack"` becomes
 +    `ai = "hq"`) and rewrites a group member from the old prefix to the new; reading the
-+    old prefix as the new one makes exactly those equal. Every other difference remains."""
++    old prefix as the new one makes exactly those equal. Every other difference remains,
++    except the order of a group's members: tasks keeps them sorted and re-sorts on the
++    rewrite, so both sides are compared sorted."""
      data = tomllib.loads(path.read_text()) if path.exists() else {}
 +
 +    def renamed(prefix):
@@ -1927,7 +1989,7 @@ git apply - <<'PATCH' && echo applied
  
  
  def files(root, skip):
-@@ -234,8 +270,7 @@
+@@ -239,8 +277,7 @@
      live = registry_view(config / "projects.toml", old, new)
      saved = registry_view(snap / "config" / "projects.toml", old, new)
      if live != saved:
@@ -1937,7 +1999,7 @@ git apply - <<'PATCH' && echo applied
      own = {f"claims/{p}.{ext}" for p in (old, new) for ext in ("toml", "lock")}
      inventory = state / "rename" / f"{old}.toml"
      if inventory.exists():
-@@ -338,6 +373,40 @@
+@@ -343,6 +380,40 @@
          print(f"rename-cutover: reset {root}: changes since save kept in {path}", file=sys.stderr)
  
  
@@ -1978,7 +2040,7 @@ git apply - <<'PATCH' && echo applied
  def rollback(args):
      snap = Path(args.snapshot)
      meta = load_meta(snap)
-@@ -354,6 +423,8 @@
+@@ -363,6 +434,8 @@
          run("git", "-C", root, "reset", "-q", "--hard", head)
      for path in leftovers:
          (checkout / path).unlink()
@@ -1987,7 +2049,7 @@ git apply - <<'PATCH' && echo applied
      restore_dir(snap / "config", Path(meta["config"]))
      restore_dir(snap / "state", Path(meta["state"]))
      tool = link_tool(checkout, meta)
-@@ -365,6 +436,7 @@
+@@ -374,6 +447,7 @@
              raise Stop(f"check: tasks check reports findings in {root}")
          if porcelain(root):
              raise Stop(f"check: {root} is not clean")
@@ -1995,7 +2057,7 @@ git apply - <<'PATCH' && echo applied
      print("rolled back to " + ", ".join(f"{head[:7]} ({label})" for _, head, label in resets))
  
  
-@@ -470,6 +542,9 @@
+@@ -492,6 +566,9 @@
      s.add_argument("--new", required=True)
      s.add_argument("--link-tool", default="tools/tack-link",
                     help="the link tool's path inside the checkout")
@@ -2016,7 +2078,7 @@ Two points for the reviewer:
 - [ ] **Step 4: Run the focused tests, then the suite**
 
 Run: `uv run -q --with pytest pytest tools/test_rename_cutover.py -q`
-Expected: `57 passed`.
+Expected: `60 passed`.
 
 Run: `just test`
 Expected: every suite passes.
@@ -2055,7 +2117,7 @@ Expected: `git grep` prints nothing. Dated specs, plans and task records keep th
 - [ ] **Step 2: Run the focused tests, then the suite, then the recipes**
 
 Run: `uv run -q --with pytest pytest tools/test_harness_links.py tools/test_rename_cutover.py -q`
-Expected: `104 passed`.
+Expected: `107 passed`.
 
 Run: `just test`
 Expected: every suite passes.
@@ -2107,7 +2169,7 @@ git merge --no-ff "$BRANCH" -m "Merge branch '$BRANCH' (the rename's preparation
 Then the second host, read-only, once the sync has carried the merge:
 
 ```sh
-. "$(tasks root tack-8b7a28 --pretty)/.worktrees/tack-8b7a28/docs/plans/2026-10-06-rename-to-hq-preparation.env.sh" && need SECOND && ssh -4 -o BatchMode=yes "$SECOND" 'export PATH="$HOME/.local/bin:$HOME/bin:$PATH"; cd "$(tasks root tack-8b7a28 --pretty)" && test -x tools/harness-links && just link-check > /dev/null 2>&1 && echo "second host converges"'
+. "$(tasks root tack-8b7a28 --pretty)/.worktrees/tack-8b7a28/docs/plans/2026-10-06-rename-to-hq-preparation.env.sh" && need SECOND && ssh -4 -o BatchMode=yes "$SECOND" 'export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$HOME/bin:$PATH"; cd "$(tasks root tack-8b7a28 --pretty)" && test -x tools/harness-links && just link-check > /dev/null 2>&1 && echo "second host converges"'
 ```
 
 Expected: both hosts converge. `harness-links` owns no link and no link targets it, so the rename changes no home.
