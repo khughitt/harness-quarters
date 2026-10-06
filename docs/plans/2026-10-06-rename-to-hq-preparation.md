@@ -42,8 +42,8 @@ So these stay with that second plan, although the spec states them:
 Inputs the spec implies and a person will meet. Each has its test in the task that owns the code.
 
 1. **The cutover run from its snapshot copy after the checkout has moved.** The runbook runs the copy in the snapshot, since the checkout's own path is gone. `link` and `verify` must find the link tool under the new root. `link` must refuse before `apply` has moved anything. Task 4: `test_the_whole_cutover_retargets_links_and_verifies` (the sandbox runs the snapshot copy) and `test_link_refuses_before_apply`.
-2. **A `--keep` path that is missing, a link, absolute or outside the checkout.** It is refused at save, before the snapshot exists, never skipped. Task 5: `test_save_refuses_a_kept_path_that_is_not_a_file` and `test_save_refuses_a_kept_path_outside_the_checkout`.
-3. **A repository named twice, or the checkout named as a repository.** Refused at save. Task 4: `test_save_refuses_a_repository_named_twice` and `test_save_refuses_the_checkout_named_as_a_repository`.
+2. **A `--keep` path that is missing, a link, absolute, outside the checkout, or reached through a linked directory.** It is refused at save, before the snapshot exists, never skipped. A link planted in its path after save stops rollback before anything moves. Task 5: `test_save_refuses_a_kept_path_that_is_not_a_file`, `test_save_refuses_a_kept_path_outside_the_checkout`, `test_save_refuses_a_kept_path_through_a_linked_directory` and `test_rollback_refuses_a_kept_path_linked_away_since_save`.
+3. **A repository named twice, the checkout named as a repository, or an `--old` that names another project.** Refused at save, before `tasks rename` could touch a project rollback cannot restore. Task 4: `test_save_refuses_a_repository_named_twice`, `test_save_refuses_the_checkout_named_as_a_repository`, `test_save_refuses_an_old_prefix_that_is_another_project` and `test_save_refuses_a_checkout_the_registry_does_not_map`.
 4. **A retarget aimed at a repository outside the snapshot while rollback is still possible.** Refused, with the file untouched. `--forward` allows it once rollback is over, and from then on rollback refuses. Task 4: `test_retarget_refuses_a_repository_outside_the_snapshot` and `test_rollback_refuses_after_a_forward_retarget`.
 5. **The archive tool run through its link from another directory**, as the units will run it. It finds its package. Task 1: `test_the_tool_runs_through_a_link_from_any_directory`.
 
@@ -645,6 +645,25 @@ def test_save_refuses_a_dead_claim_in_any_retargeted_repository(box2):
     assert not box2.snapshot.exists()
 
 
+def test_save_refuses_an_old_prefix_that_is_another_project(box):
+    """`tasks rename` would rename whatever --old names; rollback could not undo that."""
+    box.old = "ops"
+    result = box.save(check=False)
+    assert result.returncode == 1
+    assert "has the prefix 'ai', not --old 'ops'" in result.stderr
+    assert not box.snapshot.exists()
+
+
+def test_save_refuses_a_checkout_the_registry_does_not_map(box, tmp_path):
+    copy = tmp_path / "elsewhere"
+    registry = box.tmp / "cfg" / "tasks" / "projects.toml"
+    registry.write_text(registry.read_text().replace(f'ai = "{box.checkout}"', f'ai = "{copy}"'))
+    result = box.save(check=False)
+    assert result.returncode == 1
+    assert "the registry maps 'ai'" in result.stderr
+    assert not box.snapshot.exists()
+
+
 def test_save_records_every_repository(box2):
     box2.save()
     meta = json.loads((box2.snapshot / "meta.json").read_text())
@@ -686,6 +705,49 @@ def test_the_whole_cutover_retargets_links_and_verifies(box2):
     box2.cutover("link", "--snapshot", box2.snapshot)
     assert os.path.realpath(box2.tmp / "home" / ".agents") == str((box2.new_root / "agents").resolve())
     box2.cutover("verify", "--snapshot", box2.snapshot)
+
+
+def test_retarget_keeps_every_dependency_and_its_order(box):
+    """Two old ids and one other dependency on one task: all three survive, in order."""
+    first = task_id(box.run("tasks", "add", "first", "--process", "direct", cwd=box.checkout).stdout)
+    second = task_id(box.run("tasks", "add", "second", "--process", "direct", cwd=box.checkout).stdout)
+    box.commit(box.checkout, "two tasks to depend on")
+    other = task_id(box.run("tasks", "add", "other", "--process", "direct", cwd=box.ops).stdout)
+    dependent = task_id(box.run("tasks", "add", "depends", "--process", "direct", cwd=box.ops).stdout)
+    for target in (first, other, second):
+        box.run("tasks", "dep", dependent, "--on", target, cwd=box.ops)
+    box.commit(box.ops, "three dependencies")
+    box.save()
+    box.cutover("apply", "--snapshot", box.snapshot)
+    box.cutover("retarget", "--snapshot", box.snapshot, "--repo", box.ops)
+    shown = json.loads(box.run("tasks", "show", dependent, cwd=box.ops).stdout)
+    assert shown["task"]["depends"] == [f"tack-{first[3:]}", other, f"tack-{second[3:]}"]
+    assert box.run("tasks", "check", cwd=box.ops).stdout == ""
+
+
+def test_retarget_writes_each_task_once(tmp_path, monkeypatch):
+    """No remove-then-add: one `tasks edit` save per task, the list replaced whole."""
+    cutover = load_cutover()
+    calls = []
+    check = {"warnings": [
+        {"id": "ops-1", "kind": "retired_prefix",
+         "detail": 'depends on ai-a through retired prefix "ai"; it is now tack-a'},
+        {"id": "ops-1", "kind": "retired_prefix",
+         "detail": 'depends on ai-b through retired prefix "ai"; it is now tack-b'}]}
+
+    def fake_run(*cmd, cwd=None):
+        calls.append(cmd)
+        if cmd[:2] == ("tasks", "check"):
+            return json.dumps(check)
+        if cmd[:2] == ("tasks", "show"):
+            return json.dumps({"task": {"depends": ["ai-a", "ops-9", "ai-b"]}})
+        return ""
+
+    monkeypatch.setattr(cutover, "run", fake_run)
+    cutover.retarget_dependencies(tmp_path, "ai")
+    writes = [c for c in calls if c[:2] in (("tasks", "edit"), ("tasks", "dep"))]
+    assert writes == [("tasks", "edit", "ops-1", "--no-depends", "--depends", "tack-a",
+                       "--depends", "ops-9", "--depends", "tack-b")]
 
 
 def test_verify_fails_while_a_repository_still_names_a_retired_id(box2):
@@ -1113,7 +1175,7 @@ def test_second_host_adopts_the_rename(box):
 - [ ] **Step 2: Run them to see them fail**
 
 Run: `uv run -q --with pytest pytest tools/test_rename_cutover.py -q`
-Expected: 47 failed, 1 passed. The unit test of `save_reset_patch` passes; every other test fails on `--checkout`, `--repo` or `--link-tool` (argparse's `unrecognized arguments`) or on `meta_for`'s new layout.
+Expected: 51 failed, 1 passed. The unit test of `save_reset_patch` passes; every other test fails on `--checkout`, `--repo` or `--link-tool` (argparse's `unrecognized arguments`) or on `meta_for`'s new layout.
 
 - [ ] **Step 3: Replace the tool**
 
@@ -1279,6 +1341,14 @@ def save(args):
     if not tool.is_file():
         raise Stop(f"save: no link tool at {tool}")
     config, state = xdg("XDG_CONFIG_HOME", ".config") / "tasks", xdg("XDG_STATE_HOME", ".local/state") / "tasks"
+    # `tasks rename` acts on whatever project --old names; it must be this checkout.
+    prefix = project_prefix(checkout)
+    if prefix != args.old:
+        raise Stop(f"save: {checkout} has the prefix {prefix!r}, not --old {args.old!r}")
+    registry = config / "projects.toml"
+    registered = (tomllib.loads(registry.read_text()) if registry.exists() else {}).get("projects", {}).get(args.old)
+    if registered is None or Path(registered).resolve() != checkout:
+        raise Stop(f"save: the registry maps {args.old!r} to {registered!r}, not {checkout}")
     worktrees = checkout / ".worktrees"
     link_text = os.readlink(worktrees) if worktrees.is_symlink() else None
     storage_old = (checkout / link_text).resolve() if link_text else None
@@ -1511,9 +1581,14 @@ def retarget_dependencies(root, old):
     """After `tasks init --prefix <new> --force`, a task elsewhere that depends on an
     old-prefix id still names it, and `tasks check` there reports each as a
     `retired_prefix` warning. Retarget each to the id the warning names as canonical, so
-    that repository's `tasks check` comes back clean (`verify` requires that)."""
+    that repository's `tasks check` comes back clean (`verify` requires that).
+
+    Each task's whole list is written in one `tasks edit` save, its old ids replaced in
+    place. Removing and re-adding in two writes would lose the dependency if interrupted
+    between them, and a rerun would not see it again. A rerun reads the warnings left."""
     output = run("tasks", "check", cwd=root)
     report = json.loads(output) if output.strip() else {"warnings": []}
+    replacements = {}
     for warning in report.get("warnings", []):
         if warning.get("kind") != "retired_prefix":
             continue
@@ -1521,12 +1596,17 @@ def retarget_dependencies(root, old):
         if not match:
             raise Stop(f"retarget: unparseable retired_prefix warning for {warning.get('id')}: "
                        f"{warning.get('detail')!r}")
-        if match["prefix"] != old:
-            continue
-        old_id, new_id = match["old_id"], match["new_id"]
-        run("tasks", "dep", warning["id"], "--rm", old_id, cwd=root)
-        run("tasks", "dep", warning["id"], "--on", new_id, cwd=root)
-        print(f"retarget: {warning['id']}: {old_id} -> {new_id}")
+        if match["prefix"] == old:
+            replacements.setdefault(warning["id"], {})[match["old_id"]] = match["new_id"]
+    for task, pairs in replacements.items():
+        depends = json.loads(run("tasks", "show", task, cwd=root))["task"].get("depends", [])
+        missing = sorted(set(pairs) - set(depends))
+        if missing:
+            raise Stop(f"retarget: {task} does not list {', '.join(missing)}")
+        listed = [arg for dep in depends for arg in ("--depends", pairs.get(dep, dep))]
+        run("tasks", "edit", task, "--no-depends", *listed, cwd=root)
+        for old_id, new_id in pairs.items():
+            print(f"retarget: {task}: {old_id} -> {new_id}")
 
 
 def apply(args):
@@ -1640,12 +1720,12 @@ if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))
 ```
 
-What changed, for the reviewer: `record`, `checkout_now`, `link_tool`, `unmerged_branches`, `record_forward` and the three new commands are new. `preconditions` takes every repository. It refuses any claim in a retargeted one, any unclean tree, a checkout not on main, a stash, and any local branch with commits main lacks. `retarget --forward` refuses a path that is not a tasks project, then records the repository in `forward.json` before writing, whether or not the write then succeeds. `rollback` refuses while that file exists, readable or not: rollback could not restore those repositories (spec §3.2 step 9, §4). `rollback` resets the checkout and every repository, each with its own patch. `retarget_dependencies` is the September `retarget_ops_dependencies`, run per repository. `storage_new` follows the directory. `registry_view`, `guard`, `move_back`, `save_reset_patch` and `claims_tolerated` keep their logic.
+What changed, for the reviewer: `record`, `checkout_now`, `link_tool`, `unmerged_branches`, `record_forward` and the three new commands are new. `preconditions` takes every repository. It refuses any claim in a retargeted one, any unclean tree, a checkout not on main, a stash, and any local branch with commits main lacks. `save` also refuses unless the checkout's own prefix is `--old` and the registry maps `--old` to the checkout. `tasks rename` acts on whatever project the prefix names, and rollback could restore only the checkout. `retarget --forward` refuses a path that is not a tasks project, then records the repository in `forward.json` before writing, whether or not the write then succeeds. `rollback` refuses while that file exists, readable or not: rollback could not restore those repositories (spec §3.2 step 9, §4). `rollback` resets the checkout and every repository, each with its own patch. `retarget_dependencies` replaces the September `retarget_ops_dependencies` and runs per repository. It writes each task's whole dependency list in one `tasks edit --no-depends --depends …` save, with the old ids replaced in place. September's `dep --rm` then `dep --on` was two writes: interrupted between them, the dependency was gone, and a rerun would not see it again. `storage_new` follows the directory. `registry_view`, `guard`, `move_back`, `save_reset_patch` and `claims_tolerated` keep their logic.
 
 - [ ] **Step 4: Run the focused tests, then the suite**
 
 Run: `uv run -q --with pytest pytest tools/test_rename_cutover.py -q`
-Expected: `48 passed`.
+Expected: `52 passed`.
 
 Run: `just test`
 Expected: every suite passes.
@@ -1665,7 +1745,7 @@ git commit -q -m "feat(rename-cutover): a list of repositories, a split apply, t
 Two things the September tool never met. This rename retargets an existing alias (`ai = "tack"` becomes `ai = "hq"`) and rewrites a group member (`tack` becomes `hq` in `agent-layer`). The tool as Task 4 leaves it reports both as foreign and stops (reproduced in a scratch registry at the spec's review round 3). And two Codex trust files cannot be restored by git: the trust tables in `codex/config.toml` pass through a clean filter and are in no commit, and `local/codex/trust.toml` is ignored.
 
 **Files:**
-- Modify: `tools/rename-cutover` (`registry_view`, new `registry_changes`, `guard`'s message, new `kept_paths`, `restore_kept`, `refresh_kept`, `check_kept`; `save`, `rollback`, `main`)
+- Modify: `tools/rename-cutover` (`registry_view`, new `registry_changes`, `guard`'s message, new `kept_paths`, `validate_kept_destinations`, `restore_kept`, `refresh_kept`, `check_kept`; `save`, `rollback`, `main`)
 - Test: `tools/test_rename_cutover.py` (the `hq` shape and its tests)
 
 **Interfaces:**
@@ -1806,7 +1886,7 @@ git apply - <<'PATCH' && echo applied
  # --- save ---------------------------------------------------------------------
  
  
-@@ -726,3 +777,112 @@
+@@ -788,3 +839,141 @@
      parked = json.loads(run2("tasks", "list", "--parked", cwd=box.new_root))
      assert f"tack-{hex_}" in [t["id"] for t in parked["tasks"]]
      assert first_host() == first
@@ -1909,6 +1989,35 @@ git apply - <<'PATCH' && echo applied
 +    assert not hq.snapshot.exists()
 +
 +
++def link_away(directory, outside):
++    """Replace a directory by a link to `outside`, which holds the same files."""
++    shutil.copytree(directory, outside)
++    shutil.rmtree(directory)
++    directory.symlink_to(outside)
++
++
++def test_save_refuses_a_kept_path_through_a_linked_directory(hq, tmp_path):
++    link_away(hq.checkout / "local" / "codex", tmp_path / "outside")
++    result = hq.save(check=False)
++    assert result.returncode == 1
++    assert "resolves outside the checkout" in result.stderr
++    assert not hq.snapshot.exists()
++
++
++def test_rollback_refuses_a_kept_path_linked_away_since_save(hq, tmp_path):
++    """The restore would overwrite a file outside the checkout; nothing moves."""
++    hq.save()
++    hq.cutover("apply", "--snapshot", hq.snapshot)
++    outside = tmp_path / "outside"
++    link_away(hq.new_root / "local" / "codex", outside)
++    (outside / "trust.toml").write_text("someone else's\n")
++    result = hq.cutover("rollback", "--snapshot", hq.snapshot, check=False)
++    assert result.returncode == 1
++    assert "would be written through a link" in result.stderr
++    assert (outside / "trust.toml").read_text() == "someone else's\n"
++    assert hq.new_root.exists() and not hq.checkout.exists()
++
++
 +def test_check_kept_names_a_mode_that_differs(tmp_path):
 +    cutover = load_cutover()
 +    checkout, snap = tmp_path / "c", tmp_path / "s"
@@ -1927,7 +2036,7 @@ The `hq` sandbox does what the live checkout has done. It is renamed once before
 - [ ] **Step 2: Run them to see them fail**
 
 Run: `uv run -q --with pytest pytest tools/test_rename_cutover.py -q`
-Expected: 13 failed, 48 passed. The `registry_view` unit test fails on the alias and the group. Every test that builds the `hq` sandbox and saves fails on `--keep`. `test_check_kept_names_a_mode_that_differs` fails on the missing `check_kept`.
+Expected: 15 failed, 52 passed. The `registry_view` unit test fails on the alias and the group. Every test that builds the `hq` sandbox and saves fails on `--keep`. `test_check_kept_names_a_mode_that_differs` fails on the missing `check_kept`.
 
 - [ ] **Step 3: Implement**
 
@@ -1946,7 +2055,7 @@ git apply - <<'PATCH' && echo applied
  import subprocess
  import sys
  import tomllib
-@@ -148,6 +149,17 @@
+@@ -148,6 +149,31 @@
          raise Stop(f"preconditions: link drift:\n{check.stdout}")
  
  
@@ -1956,15 +2065,29 @@ git apply - <<'PATCH' && echo applied
 +    for rel in paths:
 +        if Path(rel).is_absolute() or ".." in Path(rel).parts:
 +            raise Stop(f"save: --keep {rel}: name a path inside the checkout, relative to it")
-+        if not (checkout / rel).is_file() or (checkout / rel).is_symlink():
-+            raise Stop(f"save: --keep {rel}: no regular file at {checkout / rel}")
++        path = checkout / rel
++        if not path.is_file() or path.is_symlink():
++            raise Stop(f"save: --keep {rel}: no regular file at {path}")
++        if checkout.resolve() not in path.resolve().parents:
++            raise Stop(f"save: --keep {rel}: {path} resolves outside the checkout, to {path.resolve()}")
 +    return list(paths)
++
++
++def validate_kept_destinations(meta):
++    """Run before any mutation: each kept file must still be restored inside the checkout,
++    so a link planted in its path since save cannot carry the restore elsewhere."""
++    root = checkout_now(meta).resolve()
++    for entry in meta["kept"]:
++        dest = root / entry["path"]
++        if dest.is_symlink() or root not in dest.resolve().parents:
++            raise Stop(f"rollback: kept {entry['path']} would be written through a link, "
++                       f"to {dest.resolve()}")
 +
 +
  def save(args):
      checkout, snap = Path(args.checkout).resolve(), Path(args.snapshot)
      repos = [Path(r).resolve() for r in args.repo]
-@@ -169,6 +181,7 @@
+@@ -177,6 +203,7 @@
          path = path.resolve()
          if snap_resolved == path or path in snap_resolved.parents:
              raise Stop(f"save: snapshot {snap} lies inside {which}")
@@ -1972,7 +2095,7 @@ git apply - <<'PATCH' && echo applied
      preconditions(checkout, repos, tool)
      new_root = Path(args.new_root)
      new_root = new_root.parent.resolve() / new_root.name
-@@ -181,23 +194,48 @@
+@@ -189,23 +216,48 @@
          "worktrees_link": link_text,
          "storage_old": str(storage_old) if storage_old else None,
          "storage_new": str(storage_new) if storage_new else None,
@@ -2025,7 +2148,7 @@ git apply - <<'PATCH' && echo applied
  
  
  def files(root, skip):
-@@ -239,8 +277,7 @@
+@@ -247,8 +299,7 @@
      live = registry_view(config / "projects.toml", old, new)
      saved = registry_view(snap / "config" / "projects.toml", old, new)
      if live != saved:
@@ -2035,7 +2158,7 @@ git apply - <<'PATCH' && echo applied
      own = {f"claims/{p}.{ext}" for p in (old, new) for ext in ("toml", "lock")}
      inventory = state / "rename" / f"{old}.toml"
      if inventory.exists():
-@@ -343,6 +380,40 @@
+@@ -351,6 +402,40 @@
          print(f"rename-cutover: reset {root}: changes since save kept in {path}", file=sys.stderr)
  
  
@@ -2076,7 +2199,15 @@ git apply - <<'PATCH' && echo applied
  def rollback(args):
      snap = Path(args.snapshot)
      meta = load_meta(snap)
-@@ -367,6 +438,8 @@
+@@ -366,6 +451,7 @@
+     guard(meta, snap)
+     check_branches(meta)
+     leftovers = validate_leftovers(meta)
++    validate_kept_destinations(meta)
+     move_back(meta)
+     checkout = Path(meta["checkout"]["root"])
+     resets = [(checkout, meta["checkout"]["head"], "checkout")]
+@@ -375,6 +461,8 @@
          run("git", "-C", root, "reset", "-q", "--hard", head)
      for path in leftovers:
          (checkout / path).unlink()
@@ -2085,7 +2216,7 @@ git apply - <<'PATCH' && echo applied
      restore_dir(snap / "config", Path(meta["config"]))
      restore_dir(snap / "state", Path(meta["state"]))
      tool = link_tool(checkout, meta)
-@@ -378,6 +451,7 @@
+@@ -386,6 +474,7 @@
              raise Stop(f"check: tasks check reports findings in {root}")
          if porcelain(root):
              raise Stop(f"check: {root} is not clean")
@@ -2093,7 +2224,7 @@ git apply - <<'PATCH' && echo applied
      print("rolled back to " + ", ".join(f"{head[:7]} ({label})" for _, head, label in resets))
  
  
-@@ -498,6 +572,9 @@
+@@ -516,6 +605,9 @@
      s.add_argument("--new", required=True)
      s.add_argument("--link-tool", default="tools/tack-link",
                     help="the link tool's path inside the checkout")
@@ -2106,7 +2237,9 @@ git apply - <<'PATCH' && echo applied
 PATCH
 ```
 
-Two points for the reviewer:
+Three points for the reviewer:
+
+- **A kept file is contained by its resolved path, at save and again at rollback.** At save, the file and every directory above it must resolve inside the checkout, so a linked `local/codex` is refused. At rollback, before anything moves, each destination is checked again: a link planted in its path since save stops rollback, and no file outside the checkout is written.
 
 - **The guard reads the old prefix as the new one on both sides**, after removing the renamed project's own keys. So a retargeted alias and a rewritten group member compare equal. Everything else still stops it: a new alias pointing at the new prefix, an alias moved elsewhere, a member removed, a group added. The September filter `v != new` silently ignored any alias pointing at the new prefix; that is gone.
 - **`refresh_kept`.** git calls a filtered file modified when its size differs from the index entry, without running the filter. Restoring `codex/config.toml` with its trust tables would leave the checkout "not clean", and rollback would stop on its own restore. Staging a tracked kept file whose filtered diff is empty writes the blob already in the index, as `.githooks/harness-state-refresh` does. A real change is left for the clean check. The live host meets the same mark (`M claude/settings.json` on main today), and the cutover's runbook clears it before save.
@@ -2114,7 +2247,7 @@ Two points for the reviewer:
 - [ ] **Step 4: Run the focused tests, then the suite**
 
 Run: `uv run -q --with pytest pytest tools/test_rename_cutover.py -q`
-Expected: `61 passed`.
+Expected: `67 passed`.
 
 Run: `just test`
 Expected: every suite passes.
@@ -2153,7 +2286,7 @@ Expected: `git grep` prints nothing. Dated specs, plans and task records keep th
 - [ ] **Step 2: Run the focused tests, then the suite, then the recipes**
 
 Run: `uv run -q --with pytest pytest tools/test_harness_links.py tools/test_rename_cutover.py -q`
-Expected: `108 passed`.
+Expected: `114 passed`.
 
 Run: `just test`
 Expected: every suite passes.
