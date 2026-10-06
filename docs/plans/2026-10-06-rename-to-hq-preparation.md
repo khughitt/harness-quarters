@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** approved 2026-10-06 after four review rounds (Claude 1 and 2, with the code rebuilt from the plan text and run in scratch each time; GPT 3 and 4).
+**Status:** approved 2026-10-06 after four review rounds (Claude 1 and 2, with the code rebuilt from the plan text and run in scratch each time; GPT 3 and 4). Executed 2026-10-06, inline, on both hosts; see the execution record at the end.
 
 **Goal:** Land the rename design's phase 1 steps 1 to 3 under the name `tack`: nothing a host runs names the checkout, the cutover tool is general enough for this rename, and the link tool has a functional name.
 
@@ -2355,3 +2355,23 @@ git commit -q -m "chore(tasks): park tack-8b7a28 on tasks-7580d2 for the cutover
 ```
 
 The worktree is removed because the cutover refuses a checkout with more than one worktree, and the cutover plan will create its own. Its state directory goes with it. The second host's name is no longer needed.
+
+---
+
+## Execution record
+
+- **Order.** Tasks 1 and 2, the scoped review of Tasks 1 and 2, then Tasks 4 to 6 while Task 3 waited for approval. Task 7's whole-branch review then ran before Task 3's host step, because it covers code and not host state. Task 3 ran on the user's approval, and Task 7's merge came last.
+- **Host step.** This host: one `create`, converged, units reloaded, manual capture `success` in 51 s. The second host was offline when the scripts were written and back online at the approval: one `create`, converged, units reloaded (`ExecStart` names the linked tool). Both of its archive timers are only linked, so there was no capture run there (the departure from spec §3.1 step 1 stated in Task 3).
+- **Review rounds (implementation).**
+  - Round 1, Tasks 1 and 2 before their merge: accept, Minor 2.
+  - Round 2, the whole branch: ready with fixes, Important 1, Minor 6. One of the Minors was re-graded Important: `retarget --forward` accepted the renamed checkout, and the tool's own message invited that, ending rollback for nothing.
+  - Both Important findings were fixed, each with a test that failed first: rollback refuses a kept path that is no longer a regular file, and retarget refuses the renamed checkout, before anything moves.
+- **Deferred to the cutover plan** (Minor, from the reviews):
+  - the units test is a denylist (`%h/d/`, `file://`); an allowlist would also catch `/home/…`, `%h/Dropbox/…` and `%h/hq/…`;
+  - the link-run test reaches only `--help`;
+  - rollback writes each repository's patch just before its reset, rather than all patches first;
+  - tracebacks rather than `Stop` in `save` (an existing snapshot directory) and in `verify` (no `<new>-*.md`), both before any write;
+  - there is no test for a `--keep` path that is itself a symlink;
+  - `restore_dir` cannot replace a symlinked `~/.config/tasks` or `~/.local/state/tasks`. Both are real directories on this host; the cutover's preconditions should check the second host;
+  - mixed `save:` and `preconditions:` message prefixes.
+
