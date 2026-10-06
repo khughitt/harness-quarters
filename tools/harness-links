@@ -49,7 +49,7 @@ class Entry:
 def git(*args):
     result = subprocess.run(["git", "-C", str(HERE), *args], text=True, capture_output=True)
     if result.returncode != 0:
-        sys.exit(f"tack-link: git {' '.join(args)}: {result.stderr.strip()}")
+        sys.exit(f"harness-links: git {' '.join(args)}: {result.stderr.strip()}")
     return result.stdout.strip()
 
 
@@ -57,7 +57,7 @@ def checkout_root():
     git_dir = Path(git("rev-parse", "--absolute-git-dir"))
     common = Path(git("rev-parse", "--path-format=absolute", "--git-common-dir"))
     if git_dir.resolve() != common.resolve():
-        print("tack-link: run from the main checkout, not a worktree", file=sys.stderr)
+        print("harness-links: run from the main checkout, not a worktree", file=sys.stderr)
         sys.exit(2)
     return Path(git("rev-parse", "--show-toplevel"))
 
@@ -235,7 +235,7 @@ def apply(rows):
         if name not in ("create", "repoint"):
             continue
         entry.link.parent.mkdir(parents=True, exist_ok=True)
-        staging = entry.link.with_name(f".{entry.link.name}.tack-link")
+        staging = entry.link.with_name(f".{entry.link.name}.harness-links")
         if staging.is_symlink():
             staging.unlink()
         staging.symlink_to(entry.target)
@@ -249,7 +249,7 @@ def apply(rows):
 
 
 def main(argv):
-    parser = argparse.ArgumentParser(prog="tack-link", description=__doc__,
+    parser = argparse.ArgumentParser(prog="harness-links", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--check", action="store_true", help="exit 1 on any drift")
@@ -260,7 +260,7 @@ def main(argv):
         entries, homes = load(root)
         check_targets(root, entries)
     except (ManifestError, KeyError, tomllib.TOMLDecodeError) as error:
-        print(f"tack-link: links.toml: {error}", file=sys.stderr)
+        print(f"harness-links: links.toml: {error}", file=sys.stderr)
         return 2
     rows = plan(entries, homes)
     for name, path, detail, _ in rows:
@@ -272,7 +272,7 @@ def main(argv):
         try:
             apply(rows)
         except ApplyRefused as error:
-            print(f"tack-link: {error}", file=sys.stderr)
+            print(f"harness-links: {error}", file=sys.stderr)
             return 1
     return 1 if refused else 0
 

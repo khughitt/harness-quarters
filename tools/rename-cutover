@@ -603,7 +603,7 @@ def main(argv):
     s.add_argument("--new-root", required=True)
     s.add_argument("--old", required=True)
     s.add_argument("--new", required=True)
-    s.add_argument("--link-tool", default="tools/tack-link",
+    s.add_argument("--link-tool", default="tools/harness-links",
                    help="the link tool's path inside the checkout")
     s.add_argument("--keep", action="append", default=[],
                    help="a file inside the checkout that git cannot restore, saved and "

@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 TOOLS = Path(__file__).parent
-LINK_TOOL = "tools/tack-link"
+LINK_TOOL = "tools/harness-links"
 
 
 def load_cutover():
@@ -75,7 +75,7 @@ class Sandbox:
     def build(self):
         self.repo(self.checkout, "ai")
         (self.checkout / "tools").mkdir()
-        for name in ("tack-link", "rename-cutover"):
+        for name in ("harness-links", "rename-cutover"):
             shutil.copy2(TOOLS / name, self.checkout / "tools" / name)
         (self.checkout / "agents").mkdir()
         (self.checkout / "agents" / "README").write_text("x\n")
@@ -94,7 +94,7 @@ class Sandbox:
             self.commit(root, "init")
         if self.hq:
             self.build_hq()
-        self.run(self.checkout / "tools" / "tack-link", "--apply")
+        self.run(self.checkout / "tools" / "harness-links", "--apply")
         return self
 
     def build_hq(self):
