@@ -1,0 +1,375 @@
+#!/usr/bin/env python3
+"""The rename to hq's own edits and commits, shared by the rehearsal and the live cutover.
+
+rename-hq-steps tack  --snapshot SNAP                    cutover step 4, in the renamed checkout
+rename-hq-steps ops   --snapshot SNAP --date YYYY-MM-DD  step 5
+rename-hq-steps lore  --snapshot SNAP                    step 6
+rename-hq-steps flows --snapshot SNAP                    step 6
+rename-hq-steps trust --checkout ROOT --old PATH --new PATH [--require]
+rename-hq-steps second-host-record --root ROOT --state FILE   on the other host, before the move
+rename-hq-steps second-host --root ROOT --state FILE          its adoption, after the sync carried it
+
+docs/specs/2026-10-06-rename-to-hq-design.md §3.2 and §3.3;
+docs/plans/2026-10-06-rename-to-hq-cutover.md, Tasks 5, 9 and 10. Paths come from the
+snapshot's meta.json, and every git, tasks and python call inherits the environment, so the
+rehearsal runs exactly these steps against its clones. Each edit replaces text that must
+occur exactly once and stops otherwise: a sentence that moved since this was written is a
+finding for the rehearsal, never a silent skip. Each step stages its repository whole,
+because `rename-cutover save` refused unless every tree was clean. This tool names this
+rename's text; it is removed once the rename has landed.
+"""
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import tomllib
+from pathlib import Path
+
+OLD, NEW, NAME = "tack", "hq", "harness-quarters"
+
+
+class Stop(Exception):
+    pass
+
+
+def run(*cmd, cwd=None):
+    result = subprocess.run([str(c) for c in cmd], cwd=cwd, text=True, capture_output=True)
+    if result.returncode != 0:
+        raise Stop(f"{' '.join(map(str, cmd))}: {(result.stderr or result.stdout).strip()}")
+    return result.stdout
+
+
+def replaced_once(path, text, old, new):
+    count = text.count(old)
+    if count != 1:
+        raise Stop(f"{path}: expected exactly one {json.dumps(old)}, found {count}")
+    return text.replace(old, new)
+
+
+def replace_once(path, old, new):
+    Path(path).write_text(replaced_once(path, Path(path).read_text(), old, new))
+
+
+def apply_edits(root, edits):
+    """Every edit in table order, in memory first: a refusal writes no file, so the
+    repository stays as `rename-cutover save` found it and a corrected table can rerun."""
+    texts = {}
+    for rel, old, new in edits:
+        path = Path(root) / rel
+        texts[path] = replaced_once(path, texts[path] if path in texts else path.read_text(), old, new)
+    for path, text in texts.items():
+        path.write_text(text)
+
+
+def load_meta(snap):
+    return json.loads((Path(snap) / "meta.json").read_text())
+
+
+def prefix_of(root):
+    return tomllib.loads((Path(root) / "tasks" / ".config.toml").read_text())["prefix"]
+
+
+def repo_for(meta, prefix):
+    for repo in meta["repos"]:
+        if prefix_of(repo["root"]) == prefix:
+            return Path(repo["root"])
+    raise Stop(f"no repository with the prefix {prefix} in the snapshot")
+
+
+def retarget(snap, root):
+    print(run(Path(snap) / "rename-cutover", "retarget", "--snapshot", snap, "--repo", root), end="")
+
+
+def commit(root, message):
+    run("git", "-C", root, "add", "-A")
+    run("git", "-C", root, "commit", "-q", "-m", message)
+    print(f"{root}: {run('git', '-C', root, 'log', '--oneline', '-1').strip()}")
+
+
+# --- the edits (spec §3.2 steps 4 to 6, §3.3) -----------------------------------------
+
+RENAME_NOTE_OLD = """## Renamed from ai
+
+This project was `ai` until 2026-09. Old `ai-<hex>` task ids resolve through the tasks
+alias. On a host that synced the rename, run once in this checkout, with no harness
+session open: `tasks rename ai tack --adopt`, `just link --apply`, and
+`work-link --ensure .worktrees` after moving `.dropbox-work/ai` to `.dropbox-work/tack`.
+Until then that host's harness sessions start without instructions, skills or hooks.
+"""
+
+RENAME_NOTE_NEW = """## Renamed from tack
+
+This project was `tack` until 2026-10, and `ai` before 2026-09. Old `tack-<hex>` and
+`ai-<hex>` task ids resolve through the tasks aliases, and `tasks resolve` maps the old
+directories and their worktree storage to `hq`. On a host that synced the rename, with no
+harness session open and the host's timers paused, run in this checkout:
+`tasks rename tack hq --adopt`; move `.dropbox-work/tack` to `.dropbox-work/hq`;
+`work-link --ensure .worktrees`; `tasks init --prefix hq --force`; `just link --apply`;
+`systemctl --user daemon-reload`; and `systemctl --user reenable` for each session-archive
+timer the host had enabled. `tools/rename-hq-steps second-host` did the tasks part of this
+on 2026-10. Until then that host's harness sessions start without instructions, skills or
+hooks.
+"""
+
+TACK_EDITS = [
+    ("identity.toml", 'name = "tack"', f'name = "{NAME}"'),
+    ("AGENTS.md", "# tack — agent guide", f"# {NAME} — agent guide"),
+    ("AGENTS.md", "file is tack's project guide", "file is hq's project guide"),
+    ("README.md", "# tack\n", f"# {NAME}\n"),
+    ("README.md", "lore; tack delivers them", "lore; hq delivers them"),
+    ("README.md", "ops, or tack's", "ops, or hq's"),
+    ("README.md", "`AGENTS.md`: tack's project guide", "`AGENTS.md`: hq's project guide"),
+    ("README.md", "`docs/`: tack's specs", "`docs/`: hq's specs"),
+    ("README.md", "declared owner links from tack.", "declared owner links from hq."),
+    ("README.md", "consume tack's capture", "consume hq's capture"),
+    ("README.md", "home link into tack or another", "home link into hq or another"),
+    ("README.md", "harness/session tools target tack.", "harness/session tools target hq."),
+    ("README.md", "through an old tack skill link", "through an old skill link into this checkout"),
+    ("README.md", RENAME_NOTE_OLD, RENAME_NOTE_NEW),
+    ("agents/skills/session-logs/SKILL.md", "in `tack`); nothing puts it on PATH", "in `hq`); nothing puts it on PATH"),
+    ("agents/skills/session-logs/SKILL.md", "in the `tack` checkout.", "in the `hq` checkout."),
+]
+
+
+def ops_edits(date):
+    status_old = "(§7.3 deviation, plan Task 3)."
+    gate_old = "(adjusted 2026-10-04 at plan review round 5; the plan's Task 1 records the choice)."
+    renamed = (f"renamed from `tack` at the cutover on {date} "
+               "(hq docs/specs/2026-10-06-rename-to-hq-design.md)")
+    spec = "docs/specs/2026-10-03-agent-layer-split-design.md"
+    return [
+        ("identity-mirror.toml", '[tack]\nname = "tack"\n', f'[hq]\nname = "{OLD}"\n'),
+        ("identity-mirror.toml", 'path = "tack"\n', 'path = "hq"\n'),
+        ("README.md", "wired from the tack repository's", "wired from the hq repository's"),
+        ("README.md", "registered by\ntack's Claude settings.", "registered by\nhq's Claude settings."),
+        ("README.md", "Design: tack `docs/specs/2026-09-19-project-profiles-design.md`.",
+         "Design: hq `docs/specs/2026-09-19-project-profiles-design.md`."),
+        ("README.md", "in the `tack` repository's Claude settings", "in the `hq` repository's Claude settings"),
+        (spec, status_old, f"{status_old} The residue is named harness quarters (prefix and directory `hq`), {renamed}."),
+        (spec, gate_old, f"{gate_old} Named 2026-10-06: harness quarters, prefix `hq`; {renamed}."),
+    ]
+
+
+LORE_EDITS = [
+    ("AGENTS.md", "served through tack\n  `./links.toml`", "served through hq\n  `./links.toml`"),
+    ("AGENTS.md", "wired from tack's hook files", "wired from hq's hook files"),
+    ("AGENTS.md", "declaration in tack `./links.toml`", "declaration in hq `./links.toml`"),
+    ("README.md", "the files tack's home links serve", "the files hq's home links serve"),
+    ("README.md", "Every harness home through tack's declared links", "Every harness home through hq's declared links"),
+    ("README.md", "session; tack's hook files name it", "session; hq's hook files name it"),
+    ("skills/README.md", "tack's `links.toml` declares `~/.agents/skills`", "hq's `links.toml` declares `~/.agents/skills`"),
+    ("skills/README.md", "declarations in tack's `links.toml`, so the skills", "declarations in hq's `links.toml`, so the skills"),
+    ("skills/README.md", "served from the flows and tack checkouts", "served from the flows and hq checkouts"),
+    ("skills/README.md", "its declaration in tack's `links.toml`", "its declaration in hq's `links.toml`"),
+]
+
+FLOWS_EDITS = [
+    ("AGENTS.md",
+     "  tack `docs/specs/2026-10-02-flow-trial-design.md`, by a path that resolves only in tack; that design and "
+     "its plan stay there until the tack tasks\n  that carry them (`tack-7d9375`, `tack-c4a4da`) close;",
+     "  hq `docs/specs/2026-10-02-flow-trial-design.md`, by a path that resolves only in hq; that design and "
+     "its plan stay there until the hq tasks\n  that carry them (`hq-7d9375`, `hq-c4a4da`) close;"),
+    ("README.md", "through the links tack declares in its links.toml", "through the links hq declares in its links.toml"),
+    ("bin/trial-arm", "(tack docs/specs/2026-10-02-flow-trial-design.md, until it moves here)",
+     "(hq docs/specs/2026-10-02-flow-trial-design.md, until it moves here)"),
+    ("bin/trial-verdict", "Spec tack docs/specs/2026-10-02-flow-trial-design.md §6",
+     "Spec hq docs/specs/2026-10-02-flow-trial-design.md §6"),
+]
+
+
+# --- Codex project trust (README, "Codex's project trust") ------------------------------
+
+def trust_text(text, old, new):
+    """The saved copy (local/codex/trust.toml: tables separated by one blank line) with a
+    table for `new` that copies `old`'s, appended; the text unchanged when `new` is already
+    there; None when there is no table for `old` to copy."""
+    if f'[projects."{new}"]' in text:
+        return text
+    match = re.search(re.escape(f'[projects."{old}"]') + r"\n((?:(?!\[).*\n?)*)", text)
+    if match is None:
+        return None
+    body = match.group(1).rstrip("\n") + "\n"
+    return text.rstrip("\n") + f'\n\n[projects."{new}"]\n{body}'
+
+
+def add_trust(checkout, old, new, require):
+    """An entry for the new path beside the old one, so Codex does not ask to trust the
+    directory. The table goes into the saved copy, and codex-trust restore inserts it into
+    the live config where the clean filter's output, and so what git stages, stays the
+    same: before a table header, never appended after the last table."""
+    checkout = Path(checkout)
+    trust = checkout / ".githooks" / "codex-trust"
+    run("python3", trust, "capture", cwd=checkout)
+    saved = checkout / "local" / "codex" / "trust.toml"
+    text = saved.read_text() if saved.exists() else ""
+    updated = trust_text(text, str(old), str(new))
+    if updated is None:
+        if require:
+            raise Stop(f"trust: {saved} has no table for {old}")
+        print(f"trust: no table for {old}; nothing to add")
+        return
+    if updated != text:
+        saved.write_text(updated)
+    run("python3", trust, "restore", cwd=checkout)
+    if f'[projects."{new}"]' not in (checkout / "codex" / "config.toml").read_text():
+        raise Stop(f"trust: codex-trust restore did not put {new} into codex/config.toml")
+    if subprocess.run(["git", "-C", str(checkout), "diff", "--quiet", "--", "codex/config.toml"]).returncode:
+        raise Stop("trust: codex/config.toml changed beyond its trust tables")
+    # git calls a filtered file modified when only its size changed; staging it, as
+    # harness-state-refresh does, refreshes the entry and stages nothing.
+    run("git", "-C", checkout, "add", "--", "codex/config.toml")
+    print(f"trust: {new} trusted as {old} is")
+
+
+# --- the steps --------------------------------------------------------------------------
+
+def step_tack(args):
+    meta = load_meta(args.snapshot)
+    root, old_root = Path(meta["new_root"]), Path(meta["checkout"]["root"])
+    if not root.is_dir():
+        raise Stop(f"tack: {root} does not exist; run rename-cutover apply first")
+    apply_edits(root, TACK_EDITS)
+    run("python3", root / "tools" / "ops-docs", "write", cwd=root)
+    add_trust(root, old_root, root, require=True)
+    commit(root, f"refactor: tack is {NAME}, prefix and directory hq (hq-8b7a28)")
+
+
+def step_ops(args):
+    meta = load_meta(args.snapshot)
+    ops = repo_for(meta, "ops")
+    apply_edits(ops, ops_edits(args.date))
+    run("python3", ops / "bin" / "ops-projects", "pull", cwd=ops)
+    retarget(args.snapshot, ops)
+    commit(ops, f"chore: tack is {NAME} (hq) in the mirror, the projects block and the split design (hq-8b7a28)")
+
+
+def step_lore(args):
+    meta = load_meta(args.snapshot)
+    lore = repo_for(meta, "lore")
+    apply_edits(lore, LORE_EDITS)
+    run("python3", lore / "bin" / "assemble-instructions", "write", cwd=lore)
+    retarget(args.snapshot, lore)
+    commit(lore, "chore: tack is hq in the prose; assemble ops's regenerated projects block (hq-8b7a28)")
+
+
+def step_flows(args):
+    meta = load_meta(args.snapshot)
+    flows = repo_for(meta, "flows")
+    apply_edits(flows, FLOWS_EDITS)
+    retarget(args.snapshot, flows)
+    commit(flows, "chore: tack is hq in the prose (hq-8b7a28)")
+
+
+def step_trust(args):
+    add_trust(args.checkout, args.old, args.new, args.require)
+
+
+def registry_path():
+    return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "tasks" / "projects.toml"
+
+
+def check_resolves(probes):
+    rows = json.loads(run("tasks", "resolve", "--json", *probes))["results"]
+    wrong = [f"{r['input']} ({r['status']})" for r in rows if r["status"] != "resolved" or r.get("prefix") != NEW]
+    if wrong:
+        raise Stop(f"tasks resolve does not answer {NEW} for " + ", ".join(wrong))
+
+
+def step_second_host_record(args):
+    """Before the move, on the other host (Task 9 Step 5; tasks spec §2.3): refresh this
+    host's storage record, and keep the old root and its storage in a state file that
+    outlives the registry entry `tasks rename --adopt` removes."""
+    root, state = Path(args.root).resolve(), Path(args.state)
+    if state.exists():
+        raise Stop(f"second-host-record: {state} exists")
+    if prefix_of(root) != OLD:
+        raise Stop(f"second-host-record: {root} has the prefix {prefix_of(root)!r}, not {OLD!r}")
+    run("tasks", "init", "--prefix", OLD, "--force", cwd=root)
+    if run("git", "-C", root, "status", "--porcelain").strip():
+        raise Stop(f"second-host-record: {root} is not clean after init --force")
+    registry = tomllib.loads(registry_path().read_text())
+    storage = registry.get("locations", {}).get(OLD, {}).get("storage")
+    if Path(registry["projects"][OLD]).resolve() != root or storage is None:
+        raise Stop(f"second-host-record: the registry has no storage record for {OLD} at {root}")
+    state.parent.mkdir(parents=True, exist_ok=True)
+    state.write_text(json.dumps({"old_root": str(root), "storage_old": storage}, indent=2) + "\n")
+    print(f"second-host-record: {root}, storage {storage}")
+
+
+def step_second_host(args):
+    """The other host's adoption after the sync has carried the move (spec §3.2, the other
+    host): adopt, move this host's storage, relink it, record it, link, carry its Codex
+    trust. Each part checks whether it is already done, so a rerun after a failure
+    finishes the adoption from the state file second-host-record wrote."""
+    root, state = Path(args.root).resolve(), Path(args.state)
+    if prefix_of(root) != NEW:
+        raise Stop(f"second-host: {root} has the prefix {prefix_of(root)!r}, not {NEW!r}; "
+                   f"wait for the sync to carry the rename")
+    if not state.exists():
+        raise Stop(f"second-host: no record at {state}; run second-host-record at the old root "
+                   f"before the move (Task 9 Step 5)")
+    recorded = json.loads(state.read_text())
+    old_root, storage_old = Path(recorded["old_root"]), Path(recorded["storage_old"])
+    storage_new = storage_old.parent.parent / root.name / storage_old.name
+    old_present, new_present = storage_old.parent.exists(), storage_new.parent.exists()
+    if old_present == new_present:
+        raise Stop(f"second-host: {'both' if old_present else 'neither'} of {storage_old.parent} and "
+                   f"{storage_new.parent} exist")
+    link = root / ".worktrees"
+    if link.exists() and not link.is_symlink():
+        raise Stop(f"second-host: {link} is not a link")
+    projects = tomllib.loads(registry_path().read_text()).get("projects", {})
+    if OLD not in projects and (NEW not in projects or Path(projects[NEW]).resolve() != root):
+        raise Stop(f"second-host: the registry maps neither {OLD} nor {NEW} to {root}")
+    # Always: the adoption is idempotent, and a rerun finishes its own interrupted cleanup
+    # (tasks' resume_cleanup: the registry adopted, the old claim store not yet removed).
+    print(run("tasks", "rename", OLD, NEW, "--adopt", cwd=root), end="")
+    if old_present:
+        os.rename(storage_old.parent, storage_new.parent)
+    if not (link.is_symlink() and link.resolve() == storage_new.resolve()):
+        if link.is_symlink():
+            link.unlink()
+        run("work-link", "--root", root.parent, "--ensure", ".worktrees", cwd=root)
+    if link.resolve() != storage_new.resolve():
+        raise Stop(f"second-host: {link} resolves to {link.resolve()}, not {storage_new}")
+    print(run("tasks", "init", "--prefix", NEW, "--force", cwd=root), end="")
+    run(root / "tools" / "harness-links", "--apply")
+    add_trust(root, old_root, root, require=False)
+    sample = next(p.stem for p in (root / "tasks").glob(f"{NEW}-*.md"))
+    check_resolves([f"{OLD}-{sample.split('-', 1)[1]}", OLD, str(old_root), str(storage_old / "a-worktree")])
+    print(f"second-host: adopted at {root}; storage at {storage_new}")
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(prog="rename-hq-steps")
+    sub = parser.add_subparsers(dest="command", required=True)
+    for name in ("tack", "lore", "flows"):
+        sub.add_parser(name).add_argument("--snapshot", required=True)
+    o = sub.add_parser("ops")
+    o.add_argument("--snapshot", required=True)
+    o.add_argument("--date", required=True)
+    tr = sub.add_parser("trust")
+    tr.add_argument("--checkout", required=True)
+    tr.add_argument("--old", required=True)
+    tr.add_argument("--new", required=True)
+    tr.add_argument("--require", action="store_true")
+    for name in ("second-host-record", "second-host"):
+        h = sub.add_parser(name)
+        h.add_argument("--root", required=True)
+        h.add_argument("--state", required=True)
+    args = parser.parse_args(argv)
+    steps = {"tack": step_tack, "ops": step_ops, "lore": step_lore, "flows": step_flows,
+             "trust": step_trust, "second-host-record": step_second_host_record,
+             "second-host": step_second_host}
+    try:
+        steps[args.command](args)
+    except Stop as stop:
+        print(f"rename-hq-steps: {stop}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

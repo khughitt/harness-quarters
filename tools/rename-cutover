@@ -125,7 +125,7 @@ def preconditions(checkout, repos, tool):
     # retargets in must hold no claim at all, live or dead.
     held = [c["id"] for c in claims if c.get("prefix") in retargeted]
     if held:
-        raise Stop(f"save: a retargeted repository has claims (live or dead): {', '.join(held)}; "
+        raise Stop(f"preconditions: a retargeted repository has claims (live or dead): {', '.join(held)}; "
                    f"end or clear them first")
     live = [c for c in claims if c.get("live")]
     if live:
@@ -133,6 +133,10 @@ def preconditions(checkout, repos, tool):
     for root in (checkout, *repos):
         if porcelain(root):
             raise Stop(f"preconditions: {root} is not clean")
+    for root in (checkout, *repos):
+        if run("tasks", "check", cwd=root).strip():
+            raise Stop(f"preconditions: tasks check reports findings in {root}; verify and rollback "
+                       f"both require it clean, so resolve them first")
     if branch_of(checkout) != "refs/heads/main":
         raise Stop(f"preconditions: {checkout} is on {branch_of(checkout) or '(detached)'}, not main")
     if run("git", "-C", checkout, "stash", "list").strip():
@@ -178,6 +182,8 @@ def validate_kept_destinations(meta):
 
 def save(args):
     checkout, snap = Path(args.checkout).resolve(), Path(args.snapshot)
+    if snap.exists():
+        raise Stop(f"save: snapshot {snap} already exists")
     repos = [Path(r).resolve() for r in args.repo]
     if checkout in repos or len(set(repos)) != len(repos):
         raise Stop("save: name each --repo once, and never the checkout")
@@ -185,6 +191,9 @@ def save(args):
     if not tool.is_file():
         raise Stop(f"save: no link tool at {tool}")
     config, state = xdg("XDG_CONFIG_HOME", ".config") / "tasks", xdg("XDG_STATE_HOME", ".local/state") / "tasks"
+    for path in (config, state):
+        if path.is_symlink() or not path.is_dir():
+            raise Stop(f"save: {path} must be a real directory: rollback replaces it whole")
     # `tasks rename` acts on whatever project --old names; it must be this checkout.
     prefix = project_prefix(checkout)
     if prefix != args.old:
@@ -365,21 +374,43 @@ def move_back(meta):
         link.symlink_to(meta["worktrees_link"])
 
 
+def leftover_original(path, old, new):
+    """The pre-rename path a rename leftover replaces, or None. `tasks rename` writes
+    tasks/<new>-<hex>.md and moves the task's attachments folder to tasks/files/<new>-<hex>/."""
+    parts = Path(path).parts
+    if len(parts) == 2 and parts[0] == "tasks" and parts[1].startswith(f"{new}-"):
+        return f"tasks/{old}-{parts[1][len(new) + 1:]}"
+    if len(parts) >= 4 and parts[:2] == ("tasks", "files") and parts[2].startswith(f"{new}-"):
+        return "/".join(("tasks", "files", f"{old}-{parts[2][len(new) + 1:]}", *parts[3:]))
+    return None
+
+
+def remove_leftovers(checkout, leftovers):
+    """Delete each validated leftover, then the attachment folders that emptied: an empty
+    tasks/files/<new>-<hex>/ would be an orphan to rollback's final tasks check."""
+    files = checkout / "tasks" / "files"
+    for path in leftovers:
+        (checkout / path).unlink()
+    for path in leftovers:
+        folder = (checkout / path).parent
+        while files in folder.parents and folder.is_dir() and not any(folder.iterdir()):
+            folder.rmdir()
+            folder = folder.parent
+
+
 def validate_leftovers(meta):
     """The foreign-untracked check, run before any mutation: whichever checkout path
-    exists may only have rename leftovers untracked — each exactly `tasks/<new>-<hex>.md`
-    with its pre-rename original present at the saved head — and no other repository may
+    exists may only have rename leftovers untracked — each a renamed record or attachment
+    (leftover_original) with its pre-rename original present at the saved head — and no other repository may
     have any. Returns the validated paths so the caller can delete them after the reset
     without listing again."""
     old, new, head = meta["old"], meta["new"], meta["checkout"]["head"]
     checkout = checkout_now(meta)
     untracked = run("git", "-C", checkout, "ls-files", "--others", "--exclude-standard").splitlines()
     for path in untracked:
-        parts = Path(path).parts
-        name = Path(path).name
-        if not (len(parts) == 2 and parts[0] == "tasks" and name.startswith(f"{new}-")):
+        original = leftover_original(path, old, new)
+        if original is None:
             raise Stop(f"leftovers: {path} is not a rename leftover")
-        original = f"tasks/{old}-{name[len(new) + 1:]}"
         check = subprocess.run(["git", "-C", str(checkout), "cat-file", "-e", f"{head}:{original}"],
                                capture_output=True)
         if check.returncode != 0:
@@ -408,6 +439,15 @@ def save_reset_patch(root, head, snap, label):
     path.write_text(diff)
     if diff.strip():
         print(f"rename-cutover: reset {root}: changes since save kept in {path}", file=sys.stderr)
+
+
+def reset_all(resets, snap):
+    """Keep every repository's discarded changes as a patch before resetting any: a patch
+    that cannot be written stops rollback before the first reset, not between two."""
+    for root, head, label in resets:
+        save_reset_patch(root, head, snap, label)
+    for root, head, _ in resets:
+        run("git", "-C", root, "reset", "-q", "--hard", head)
 
 
 def restore_kept(checkout, snap, meta):
@@ -464,11 +504,8 @@ def rollback(args):
     checkout = Path(meta["checkout"]["root"])
     resets = [(checkout, meta["checkout"]["head"], "checkout")]
     resets += [(Path(r["root"]), r["head"], Path(r["root"]).name) for r in meta["repos"]]
-    for root, head, label in resets:
-        save_reset_patch(root, head, snap, label)
-        run("git", "-C", root, "reset", "-q", "--hard", head)
-    for path in leftovers:
-        (checkout / path).unlink()
+    reset_all(resets, snap)
+    remove_leftovers(checkout, leftovers)
     restore_kept(checkout, snap, meta)
     refresh_kept(checkout, meta)
     restore_dir(snap / "config", Path(meta["config"]))
@@ -581,6 +618,14 @@ def link(args):
     print(f"linked from {new_root}")
 
 
+def sample_task(new_root, new):
+    """One task under the new prefix, whose old-prefix id verify resolves through the alias."""
+    found = next((p.stem for p in (Path(new_root) / "tasks").glob(f"{new}-*.md")), None)
+    if found is None:
+        raise Stop(f"verify: no {new}-*.md task under {Path(new_root) / 'tasks'} to resolve through the alias")
+    return found.split("-", 1)[1]
+
+
 def verify(args):
     meta = load_meta(args.snapshot)
     check_environment("verify", meta)
@@ -591,8 +636,18 @@ def verify(args):
     for root in (new_root, *(Path(r["root"]) for r in meta["repos"])):
         if run("tasks", "check", cwd=root).strip():
             raise Stop(f"verify: tasks check reports findings in {root}")
-    any_new = next(p.stem for p in (new_root / "tasks").glob(f"{new}-*.md"))
-    run("tasks", "show", f"{old}-{any_new.split('-', 1)[1]}", cwd=new_root)
+    hex_ = sample_task(new_root, new)
+    run("tasks", "show", f"{old}-{hex_}", cwd=new_root)
+    # The registry's location history: the old id, the old root and a path under the old
+    # storage all answer the new prefix (tasks docs/specs/2026-10-06-project-resolution-design.md §4).
+    probes = [f"{old}-{hex_}", meta["checkout"]["root"]]
+    if meta["storage_old"]:
+        probes.append(str(Path(meta["storage_old"]) / "a-worktree"))
+    rows = json.loads(run("tasks", "resolve", "--json", *probes))["results"]
+    wrong = [f"{r['input']} ({r['status']} {r.get('prefix', '')})".replace(" )", ")") for r in rows
+             if r["status"] != "resolved" or r.get("prefix") != new]
+    if wrong:
+        raise Stop(f"verify: tasks resolve does not answer {new} for " + ", ".join(wrong))
     if meta["storage_new"] and (new_root / ".worktrees").resolve() != Path(meta["storage_new"]).resolve():
         raise Stop("verify: .worktrees does not resolve to the moved storage")
     print("verified")
