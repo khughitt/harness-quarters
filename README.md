@@ -258,11 +258,13 @@ This project was `tack` until 2026-10, and `ai` before 2026-09. Old `tack-<hex>`
 directories and their worktree storage to `hq`. On a host that synced the rename, with no
 harness session open and the host's timers paused, run in this checkout:
 `tasks rename tack hq --adopt`; move `.dropbox-work/tack` to `.dropbox-work/hq`;
-`work-link --ensure .worktrees`; `tasks init --prefix hq --force`; `just link --apply`;
-`systemctl --user daemon-reload`; and `systemctl --user reenable` for each session-archive
-timer the host had enabled. `tools/rename-hq-steps second-host` did the tasks part of this
-on 2026-10. Until then that host's harness sessions start without instructions, skills or
-hooks.
+`work-link --ensure .worktrees`; `tasks init --prefix hq --force`; `systemctl --user
+disable` each session-archive timer the host had enabled; `just link --apply`;
+`systemctl --user daemon-reload`; then `systemctl --user enable` each of those timers.
+Never `reenable`: its disable half also removes the unit link `just link` declares, and its
+enable half then finds no unit (2026-10-07). A one-off tool, since removed, did the tasks
+part of this on both hosts on 2026-10-07. Until then that host's harness sessions start
+without instructions, skills or hooks.
 
 ## Local layer (2026-09)
 
