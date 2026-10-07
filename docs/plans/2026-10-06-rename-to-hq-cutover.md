@@ -71,7 +71,7 @@ Task 7 reviews and merges. Task 8 adds the flow trial's end-to-end join to the r
 - Tests:
   - The focused runs are `uv run -q --with pytest pytest tools/<file> -q` and `python3 -m pytest agents/bin/test_session_episodes.py -q`.
   - `just test` runs before every commit that touches code. There is no CI and no pre-push suite here.
-  - The rehearsal runs only when named: `uv run -q --with pytest pytest tools/rehearse_rename_hq.py -q --basetemp "$STATE/rehearsal"`. Its name does not match `test_*.py`, so `just test` never collects it.
+  - The rehearsal runs only when named: `uv run -q --with pytest pytest tools/rehearse_rename_hq.py -q --basetemp "$REHEARSAL"`. Its name does not match `test_*.py`, so `just test` never collects it.
 
 ## Review Focus
 
@@ -2292,8 +2292,8 @@ A record left uncommitted by another session, or a finding, belongs to its owner
 Then run the rehearsal (in the background with a 60-minute timeout; the build clones six repositories twice, and each scenario restores a copy):
 
 ```sh
-. "$(tasks root tack-8b7a28 --pretty)/.worktrees/rename-hq-cutover/docs/plans/2026-10-06-rename-to-hq-cutover.env.sh" && cd "$WT" && rm -rf "$STATE/rehearsal" && \
-uv run -q --with pytest pytest tools/rehearse_rename_hq.py -q -x --basetemp "$STATE/rehearsal" > "$STATE/rehearsal.log" 2>&1; echo "exit $?"; tail -n 30 "$STATE/rehearsal.log"
+. "$(tasks root tack-8b7a28 --pretty)/.worktrees/rename-hq-cutover/docs/plans/2026-10-06-rename-to-hq-cutover.env.sh" && cd "$WT" && rm -rf "$REHEARSAL" && \
+uv run -q --with pytest pytest tools/rehearse_rename_hq.py -q -x --basetemp "$REHEARSAL" > "$STATE/rehearsal.log" 2>&1; echo "exit $?"; tail -n 30 "$STATE/rehearsal.log"
 ```
 
 Expected: `8 passed`.
@@ -2348,7 +2348,7 @@ WT_REAL="$(cd "$WT" && pwd -P)" && [ -z "$(git -C "$WT" status --porcelain)" ] &
 tt-report && git worktree unlock "$WT" && git worktree remove "$WT" && git branch -d "$BRANCH" && git log --oneline -3
 ```
 
-Expected: the merge, `just test` green, and the worktree removed. A tracked task record modified on main (a note written there and not yet committed) stops the guard before `git merge` would abort on it. Commit it on main first, then merge main into the branch if they touch the same record. `tt-report` harvests the worktree's test timings before removal. The rehearsal's scratch base was under the worktree's state directory, so it goes with it.
+Expected: the merge, `just test` green, and the worktree removed. A tracked task record modified on main (a note written there and not yet committed) stops the guard before `git merge` would abort on it. Commit it on main first, then merge main into the branch if they touch the same record. `tt-report` harvests the worktree's test timings before removal. The rehearsal's scratch base, `$REHEARSAL`, lies outside every checkout (the rehearsal refuses a base inside a tasks project), so Task 8 removes it with the worktree.
 
 - [ ] **Step 3: Park on the trial and obs**
 
@@ -2395,18 +2395,29 @@ Append to `tools/rehearse_rename_hq.py` (and add `import hashlib` to its imports
 # --- the trial's join (spec §4, "And the trial's join, end to end") --------------------
 
 TRIAL, ENROLL_FROM, CLOSE_BY, READ_ON = "flow-trial-1", "2026-10-05", "2027-01-10", "2027-02-16"
+# obs's report lists a unit only once its 30-day window is complete (obs
+# docs/specs/2026-10-07-follow-renamed-projects-design.md §4), so no trial unit can have a
+# row before enrollment opened plus 30 days. Until then the join is proved by the two
+# projects' own real-rename suites instead; from then on it must be exercised here.
+JOIN_FROM = "2026-11-04"
+PROXIES = (("flows", ("python3", "-m", "pytest", "bin/test_trial_rename.py", "-q"), {}),
+           ("obs", ("python3", "-m", "unittest", "test_rename_follow"), {"PYTHONPATH": "tests"}))
 
 
 def arm_of(unit):
-    """flow-trial-1's rule (evals/trials/flow-trial-1.md): sha256("flow-trial-1:<root>")[0] & 1."""
-    return ("on", "off")[hashlib.sha256(f"{TRIAL}:{unit}".encode()).digest()[0] & 1]
+    """flow-trial-1's rule (evals/trials/flow-trial-1.md), as flows' bin/trial-arm reads it:
+    "on" when sha256("flow-trial-1:<unit>")[0] & 1 is set."""
+    return "on" if hashlib.sha256(f"{TRIAL}:{unit}".encode()).digest()[0] & 1 else "off"
 
 
 def share_stores(host):
-    """obs reads the live session stores, read-only, through the scratch home."""
+    """obs reads the live session stores, read-only, through the scratch home. The harness
+    homes this creates bring their declared link groups into scope, as on the live host:
+    apply them, or save refuses on link drift."""
     for rel in (".claude/projects", ".codex/sessions"):
         (host.home / rel).parent.mkdir(parents=True, exist_ok=True)
         (host.home / rel).symlink_to(Path.home() / rel)
+    host.run(host.path("tack") / "tools" / "harness-links", "--apply")
 
 
 def plant_unit(host):
@@ -2439,7 +2450,7 @@ def judge(host, projects, full):
     census_file.write_text(census)
     verdict = subprocess.run([str(flows / "bin" / "trial-verdict"), str(flows / "evals" / "trials" / f"{TRIAL}.md"),
                               "--census", str(census_file), "--as-of", READ_ON], input=report, text=True,
-                             capture_output=True, env=host.env)
+                             capture_output=True, env=host.env, cwd=host.root)
     assert verdict.returncode == 0, verdict.stdout + verdict.stderr
     return json.loads(census), json.loads(report)
 
@@ -2467,12 +2478,17 @@ def test_the_trial_join_survives_the_rename(hosts):
         return {m["task"]: rows[m["task"]] for u in census["units"] for m in u["members"] if m["task"] in rows}
 
     before, after = joined(census_b, report_b), joined(census_a, report_a)
-    assert before, "no census member joined a report row before the rename: the join was not exercised"
     ids = {x for c in (census_b, census_a) for u in c["units"] for x in (u["root"], *(m["task"] for m in u["members"]))}
     names = canonical(h1, ids)
     assert ids <= set(names), f"ids tasks resolve does not know: {sorted(ids - set(names))}"
-    assert any(names[t].startswith(f"{NEW}-") for t in before), \
-        "no task of the renamed project joined a report row before the rename: coverage came from obs alone"
+    if before:
+        assert any(names[t].startswith(f"{NEW}-") for t in before), \
+            "no task of the renamed project joined a report row before the rename: coverage came from obs alone"
+    else:
+        assert TODAY < JOIN_FROM, \
+            f"no census member joined a report row before the rename, and from {JOIN_FROM} trial units have rows"
+        for project, cmd, extra in PROXIES:
+            h1.run(*cmd, cwd=h1.path(project), env={**h1.env, **extra})
     after_member = {names[m["task"]]: m["task"] for u in census_a["units"] for m in u["members"]}
     for task, row in before.items():
         now = after_member.get(names[task])
@@ -2486,11 +2502,18 @@ def test_the_trial_join_survives_the_rename(hosts):
     after_units = units(census_a)
     for root, (arm, members) in units(census_b).items():
         assert after_units.get(root) == (arm, members), f"unit {root}: arm or membership changed"
+    # The trial id stays the listed prefix's spelling and decides the arm (flows evals/trial-identity.md, item 4).
+    for census in (census_b, census_a):
+        for u in census["units"]:
+            assert u["arm"] == arm_of(u["unit"]), f"unit {u['unit']}: its arm is not the arm function's"
+    unit_after = {names[u["root"]]: u["unit"] for u in census_a["units"]}
+    for u in census_b["units"]:
+        assert unit_after.get(names[u["root"]]) == u["unit"], f"unit {u['unit']}: its trial id changed"
     first = h1.run(h1.path("flows") / "bin" / "trial-arm", f"hq-{hex_}").stdout.splitlines()[0]
     assert first.startswith(f"{TRIAL}: flow {arm_of(f'tack-{hex_}')} "), first
 ```
 
-The cross-run comparison goes through canonical ids, so it holds whichever single id form the contract picked. The join inside each run does not: there, a census member counts only when the report has a row under exactly its string, as `trial-verdict` reads it, and that join must be non-empty. The test requires:
+Until `JOIN_FROM` (2026-11-04) no trial unit can have an obs report row: obs lists a unit only once its 30-day window is complete, and enrollment opened 2026-10-05. Before that date, an empty join runs the two projects' real-rename suites in its place (flows `bin/test_trial_rename.py`, obs `tests/test_rename_follow.py`) and keeps every census check; from that date it fails unless the join is exercised. The user chose this on 2026-10-07 over holding the cutover for the rows, and a dated task checks the live join once rows exist. The cross-run comparison goes through canonical ids, so it holds whichever single id form the contract picked. The join inside each run does not: there, a census member counts only when the report has a row under exactly its string, as `trial-verdict` reads it, and that join must be non-empty. The test requires:
 - the join is exercised for the renamed project: at least one of its tasks joins a row before the rename, since obs's rows alone would pass every other condition;
 - every member that joined a row before still joins one after, under the string the census now gives it, with the same values. So no member becomes unknown;
 - every unit enrolled before keeps its arm and its members;
@@ -2503,11 +2526,11 @@ The cross-run comparison goes through canonical ids, so it holds whichever singl
 Run in the background, with a two-hour timeout. Indexing the live stores for two projects, twice, is most of it.
 
 ```sh
-. "$(tasks root tack-8b7a28 --pretty)/.worktrees/rename-hq-cutover/docs/plans/2026-10-06-rename-to-hq-cutover.env.sh" && cd "$WT" && rm -rf "$STATE/rehearsal" && \
-uv run -q --with pytest pytest tools/rehearse_rename_hq.py -q -x --basetemp "$STATE/rehearsal" > "$STATE/rehearsal.log" 2>&1; echo "exit $?"; tail -n 30 "$STATE/rehearsal.log"
+. "$(tasks root tack-8b7a28 --pretty)/.worktrees/rename-hq-cutover/docs/plans/2026-10-06-rename-to-hq-cutover.env.sh" && cd "$WT" && rm -rf "$REHEARSAL" && \
+uv run -q --with pytest pytest tools/rehearse_rename_hq.py -q -x --basetemp "$REHEARSAL" > "$STATE/rehearsal.log" 2>&1; echo "exit $?"; tail -n 30 "$STATE/rehearsal.log"
 ```
 
-Expected: `9 passed`. A failure is handled as in Task 6 Step 3: fixed in the tool that owns it, with a test that fails first where that tool has a suite, then the whole rehearsal rerun.
+Expected: `12 passed` (Task 6's eight, impl round 4's two, the base guard and the trial join). A failure is handled as in Task 6 Step 3: fixed in the tool that owns it, with a test that fails first where that tool has a suite, then the whole rehearsal rerun.
 
 - [ ] **Step 4: Record, review, merge, remove the worktree**
 
@@ -2520,7 +2543,7 @@ tasks done "$STEP8" "the rehearsal's trial join passes: arms, outcome rows and t
 git commit -q -m "test(rename): the rehearsal runs the flow trial's join end to end (tack-8b7a28)" -- tools/rehearse_rename_hq.py "tasks/$STEP8.md" tasks/tack-8b7a28.md && \
 cd "$TACK" && git merge --no-ff "$BRANCH8" -m "Merge branch '$BRANCH8' (the rehearsal's trial join)" && t just test && \
 WT_REAL="$(cd "$WT" && pwd -P)" && ! readlink -f ~/bin/* ~/.local/bin/* ~/.config/systemd/user/* 2>/dev/null | grep -qF "$WT_REAL" && \
-tt-report && git worktree unlock "$WT" && git worktree remove "$WT" && git branch -d "$BRANCH8" && \
+rm -rf "$REHEARSAL" && tt-report && git worktree unlock "$WT" && git worktree remove "$WT" && git branch -d "$BRANCH8" && \
 tasks park tack-8b7a28 "An ops session runs docs/plans/2026-10-06-rename-to-hq-cutover.md Task 9 today: the user picks the window and attests first (Step 1)." --waiting-on user --reason approval >/dev/null && \
 git commit -q -m "chore(tasks): tack-8b7a28 is ready for its cutover window" -- tasks/tack-8b7a28.md && git log --oneline -3
 ```

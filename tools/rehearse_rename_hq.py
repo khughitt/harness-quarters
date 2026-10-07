@@ -16,6 +16,7 @@ starts from one pristine copy restored at the same path, because the scratch reg
 hold absolute paths.
 """
 import datetime
+import hashlib
 import json
 import os
 import shutil
@@ -40,6 +41,12 @@ GIT_ID = {"GIT_AUTHOR_NAME": "rehearsal", "GIT_AUTHOR_EMAIL": "rehearsal@localho
 # The hooks the commits meet run uv; the live cache lets them resolve offline, as they do live.
 UV_CACHE = subprocess.run(["uv", "cache", "dir"], text=True, capture_output=True, check=True).stdout.strip()
 TODAY = datetime.date.today().isoformat()
+
+
+def project_above(path):
+    """The nearest directory at or above path holding tasks/.config.toml: the project tasks
+    would take a prefix-matching id from, run there."""
+    return next((p for p in (path, *path.parents) if (p / "tasks" / ".config.toml").is_file()), None)
 
 
 def live():
@@ -71,7 +78,8 @@ class Host:
         return self.sync / name
 
     def run(self, *cmd, cwd=None, check=True, env=None):
-        result = subprocess.run([str(c) for c in cmd], cwd=cwd, env=env or self.env, text=True, capture_output=True)
+        result = subprocess.run([str(c) for c in cmd], cwd=cwd or self.root, env=env or self.env, text=True,
+                                capture_output=True)
         if check and result.returncode != 0:
             raise AssertionError(f"{cmd}: {result.stdout}{result.stderr}")
         return result
@@ -221,6 +229,9 @@ def build_second(first, host, live_roots):
 @pytest.fixture(scope="module")
 def pristine(tmp_path_factory):
     base = tmp_path_factory.getbasetemp().resolve()
+    inside = project_above(base)
+    assert inside is None, (f"--basetemp {base} lies inside the tasks project at {inside}, so its hosts' "
+                            f"commands would read and write there; pass a base outside every checkout")
     run_dir = base / "run"
     live_roots = live()["projects"]
     first = Host(run_dir, "h1")
@@ -452,6 +463,16 @@ def test_a_host_keeps_every_write_under_its_root(tmp_path, monkeypatch):
     assert "RELAY_STATE_DIR" not in host.env
 
 
+def test_the_base_must_lie_outside_every_tasks_project(tmp_path):
+    """tasks finds its project by walking up from the working directory: a base inside a
+    checkout (the worktree's own state directory) would put every scratch host inside it."""
+    (tmp_path / "proj" / "tasks").mkdir(parents=True)
+    (tmp_path / "proj" / "tasks" / ".config.toml").write_text('prefix = "tack"\n')
+    (tmp_path / "proj" / "a" / "b").mkdir(parents=True)
+    (tmp_path / "other").mkdir()
+    assert project_above(tmp_path / "proj" / "a" / "b") == tmp_path / "proj"
+    assert project_above(tmp_path / "other") is None
+
 def test_the_fingerprint_sees_storage_that_did_not_come_back(hosts):
     """The .worktrees link's text is the same wherever its storage went: the fingerprint
     must hold the storage itself, or a rollback that left it under the new name would pass."""
@@ -462,3 +483,124 @@ def test_the_fingerprint_sees_storage_that_did_not_come_back(hosts):
     assert marked != before
     os.rename(h1.storage("tack").parent, h1.storage("hq").parent)
     assert fingerprint(h1) != marked
+
+
+# --- the trial's join (spec §4, "And the trial's join, end to end") --------------------
+
+TRIAL, ENROLL_FROM, CLOSE_BY, READ_ON = "flow-trial-1", "2026-10-05", "2027-01-10", "2027-02-16"
+# obs's report lists a unit only once its 30-day window is complete (obs
+# docs/specs/2026-10-07-follow-renamed-projects-design.md §4), so no trial unit can have a
+# row before enrollment opened plus 30 days. Until then the join is proved by the two
+# projects' own real-rename suites instead; from then on it must be exercised here.
+JOIN_FROM = "2026-11-04"
+PROXIES = (("flows", ("python3", "-m", "pytest", "bin/test_trial_rename.py", "-q"), {}),
+           ("obs", ("python3", "-m", "unittest", "test_rename_follow"), {"PYTHONPATH": "tests"}))
+
+
+def arm_of(unit):
+    """flow-trial-1's rule (evals/trials/flow-trial-1.md), as flows' bin/trial-arm reads it:
+    "on" when sha256("flow-trial-1:<unit>")[0] & 1 is set."""
+    return "on" if hashlib.sha256(f"{TRIAL}:{unit}".encode()).digest()[0] & 1 else "off"
+
+
+def share_stores(host):
+    """obs reads the live session stores, read-only, through the scratch home. The harness
+    homes this creates bring their declared link groups into scope, as on the live host:
+    apply them, or save refuses on link drift."""
+    for rel in (".claude/projects", ".codex/sessions"):
+        (host.home / rel).parent.mkdir(parents=True, exist_ok=True)
+        (host.home / rel).symlink_to(Path.home() / rel)
+    host.run(host.path("tack") / "tools" / "harness-links", "--apply")
+
+
+def plant_unit(host):
+    """A unit enrolled before the rename whose two id forms hash to different arms."""
+    tack = host.path("tack")
+    while True:
+        added = json.loads(host.run("tasks", "add", "planted trial unit", "--process", "direct", cwd=tack).stdout)
+        tid = added.get("id") or added["task"]["id"]
+        hex_ = tid.split("-", 1)[1]
+        if arm_of(f"tack-{hex_}") != arm_of(f"hq-{hex_}"):
+            break
+        host.run("tasks", "drop", tid, "not a flipping unit", cwd=tack)
+    host.run("tasks", "start", tid, cwd=tack)
+    first = host.run(host.path("flows") / "bin" / "trial-arm", tid).stdout.splitlines()[0]
+    assert first.startswith(f"{TRIAL}: flow {arm_of(tid)} "), first
+    host.run("tasks", "park", tid, "rehearsal", cwd=tack)
+    host.run("git", "add", "-A", cwd=tack)
+    host.run("git", "commit", "-qm", "a planted trial unit", cwd=tack)
+    return hex_
+
+
+def judge(host, projects, full):
+    flows, obs = host.path("flows"), host.path("obs")
+    census = host.run(flows / "bin" / "trial-arm", "census", TRIAL).stdout
+    for project in projects:
+        host.run("python3", obs / "obs.py", "index", "--json", *(["--full"] if full else []), "--project", project)
+    report = host.run("python3", obs / "obs.py", "outcomes", "report", "--json", "--since", ENROLL_FROM,
+                      "--until", CLOSE_BY, "--cohort", "--units").stdout
+    census_file = host.root / f"census-{projects[0]}.json"
+    census_file.write_text(census)
+    verdict = subprocess.run([str(flows / "bin" / "trial-verdict"), str(flows / "evals" / "trials" / f"{TRIAL}.md"),
+                              "--census", str(census_file), "--as-of", READ_ON], input=report, text=True,
+                             capture_output=True, env=host.env, cwd=host.root)
+    assert verdict.returncode == 0, verdict.stdout + verdict.stderr
+    return json.loads(census), json.loads(report)
+
+
+def canonical(host, ids):
+    rows = resolve(host, sorted(ids))
+    return {r["input"]: r["id"] for r in rows if r["status"] == "resolved"}
+
+
+def test_the_trial_join_survives_the_rename(hosts):
+    h1, _ = hosts
+    share_stores(h1)
+    hex_ = plant_unit(h1)
+    census_b, report_b = judge(h1, [OLD, "obs"], full=False)
+    cutover = Cutover(h1)
+    cutover.save()
+    cutover.forward()
+    census_a, report_a = judge(h1, [NEW, "obs"], full=True)
+
+    def joined(census, report):
+        """What trial-verdict joins: each census member with a report row under exactly
+        its string. Comparing canonical forms here would hide a census that says tack-…
+        beside a report that says hq-…, the mismatch the spec asks this to catch."""
+        rows = {r["task"]: {k: v for k, v in r.items() if k != "task"} for r in report["units"]}
+        return {m["task"]: rows[m["task"]] for u in census["units"] for m in u["members"] if m["task"] in rows}
+
+    before, after = joined(census_b, report_b), joined(census_a, report_a)
+    ids = {x for c in (census_b, census_a) for u in c["units"] for x in (u["root"], *(m["task"] for m in u["members"]))}
+    names = canonical(h1, ids)
+    assert ids <= set(names), f"ids tasks resolve does not know: {sorted(ids - set(names))}"
+    if before:
+        assert any(names[t].startswith(f"{NEW}-") for t in before), \
+            "no task of the renamed project joined a report row before the rename: coverage came from obs alone"
+    else:
+        assert TODAY < JOIN_FROM, \
+            f"no census member joined a report row before the rename, and from {JOIN_FROM} trial units have rows"
+        for project, cmd, extra in PROXIES:
+            h1.run(*cmd, cwd=h1.path(project), env={**h1.env, **extra})
+    after_member = {names[m["task"]]: m["task"] for u in census_a["units"] for m in u["members"]}
+    for task, row in before.items():
+        now = after_member.get(names[task])
+        assert now is not None, f"{task} left the census"
+        assert now in after, f"{task}: the census says {now} and the report has no row under that string"
+        assert after[now] == row, f"{task}: its outcome row changed"
+
+    def units(census):
+        return {names[u["root"]]: (u["arm"], sorted(names[m["task"]] for m in u["members"])) for u in census["units"]}
+
+    after_units = units(census_a)
+    for root, (arm, members) in units(census_b).items():
+        assert after_units.get(root) == (arm, members), f"unit {root}: arm or membership changed"
+    # The trial id stays the listed prefix's spelling and decides the arm (flows evals/trial-identity.md, item 4).
+    for census in (census_b, census_a):
+        for u in census["units"]:
+            assert u["arm"] == arm_of(u["unit"]), f"unit {u['unit']}: its arm is not the arm function's"
+    unit_after = {names[u["root"]]: u["unit"] for u in census_a["units"]}
+    for u in census_b["units"]:
+        assert unit_after.get(names[u["root"]]) == u["unit"], f"unit {u['unit']}: its trial id changed"
+    first = h1.run(h1.path("flows") / "bin" / "trial-arm", f"hq-{hex_}").stdout.splitlines()[0]
+    assert first.startswith(f"{TRIAL}: flow {arm_of(f'tack-{hex_}')} "), first
