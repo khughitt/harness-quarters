@@ -1,4 +1,4 @@
-prefix = "tack"
+prefix = "hq"
 
 [feedback]
 scope = "Harness homes and the declared links that install the agent surface, harness settings and hook wiring, capability facts, state hygiene, the session archive, and the session-logs skill with its tools."
