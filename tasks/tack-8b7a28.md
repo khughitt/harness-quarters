@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: main
 created: 2026-10-06T12:59:15Z
-updated: 2026-10-07T21:40:28Z
+updated: 2026-10-07T22:32:53Z
 started: 2026-10-06T16:15:19Z
 depends: [flows-44890e, obs-ff4e76, tasks-7580d2]
 parent: tack-dcb11a
@@ -108,3 +108,4 @@ Why: the user chose the residue's name on 2026-10-06 (parent spec §7.1); the re
 - 2026-10-07T20:31:00Z (main): user approved Task 9 on 2026-10-07 (from the tack session that ran Task 8); Step 1's record check passed here ('records ready', no live claims). The ops session still asks for the window and the three attestations at Step 1 and records them verbatim.
 - 2026-10-07T21:39:28Z (main): attest: user answered 'Start now; all three hold' to: (1) on titan no harness session runs except this ops session; (2) europa is idle in tack, ops, lore and flows; (3) Dropbox sync is up to date on both hosts — window starts now, 2026-10-07T21:39:28Z
 - 2026-10-07T21:40:28Z (main): Task 9 Step 3: removed worktree session-retention-job (branch level with main, deleted; its .superpowers plan workspace copied to the attempt directory's kept/); committed other sessions' untracked feedback records (ops 48ac04f: ops-0e3183, ops-38f668; flows 42b2ec4: flows-ad68b2); ops tests naming tack are exactly the four kept fixtures; the other host answers, has tasks resolve, both tasks directories real, systemd 262 (262-1-arch)
+- 2026-10-07T22:32:53Z (main): Task 9 Steps 4-5: timers paused and drained (titan: obs-index, tt-latency, work-link, dropbox-ignore-flux, session-archive-capture; other host: work-link, dropbox-ignore-flux); other host's pre-move record saved, storage .dropbox-work/tack/.worktrees; its own ai backfill is absent (former: []) — stated limit: that host's ai paths stay unregistered. Lesson for Task 10: git status run on the other host rewrites the synced .git/index, which Dropbox carries back here; once it overwrote a fresh commit's index with a stale entry (fixed by git reset of that path here); poll the other host with git --no-optional-locks and confirm indexes match before committing here
