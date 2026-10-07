@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: main
 created: 2026-10-06T12:59:15Z
-updated: 2026-10-07T18:40:06Z
+updated: 2026-10-07T19:49:36Z
 started: 2026-10-06T16:15:19Z
 depends: [flows-44890e, obs-ff4e76, tasks-7580d2]
 parent: tack-dcb11a
@@ -97,3 +97,9 @@ Why: the user chose the residue's name on 2026-10-06 (parent spec §7.1); the re
 - 2026-10-07T18:34:09Z (main): 2026-10-07 dependency met: flows-44890e and obs-ff4e76 done and merged; the identity contract is flows evals/trial-identity.md (e4d5233), and obs-ff4e76's notes of 2026-10-07 18:33 cite it and name Task 9 Step 3's live check (witness ai-6c8245 → hq-6c8245). Its completion note predates both, so read those two notes rather than the completion note. Task 8 can run.
 - 2026-10-07T18:40:06Z (main): resumed
   provenance: {"harness_session":"claude-code:502f3bd0-cddf-4f67-b524-27637f5bd8b6","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-07T18:47:58Z (feat/rename-hq-trial-join): plan change (Task 8, for the Step 4 review): the rehearsal's base moves from $STATE/rehearsal (inside the tack worktree, so tasks read prefix tack from the live checkout: trial-arm 'no task') to $REHEARSAL=~/.local/state/rename-hq-rehearsal, defined in the env file; the rehearsal refuses a base inside any tasks project; Host.run defaults to the host root; Task 8 Step 4 removes $REHEARSAL; expected 12 passed
+- 2026-10-07T19:00:54Z (feat/rename-hq-trial-join): Task 8 blocker: the rehearsal's trial join cannot be exercised before ~2026-11-04. obs outcomes report --units lists only complete 30-day windows (obs docs/specs/2026-10-07-follow-renamed-projects-design.md §4: list empty, earliest 2026-10-17), and trial units enrolled from 2026-10-05; the scratch run had 7 census units and 0 report rows. 11/12 scenarios pass; inside the join scenario the cutover ran and trial-verdict exited 0 before and after the rename. Fixed on the way: stale tack-deb33c step text (main 8e4df43); rehearsal base outside every checkout ($REHEARSAL); arm_of matched to flows; harness links applied after share_stores.
+- 2026-10-07T19:31:52Z (feat/rename-hq-trial-join): user chose 2026-10-07: proceed with proxies for the trial join (flows bin/test_trial_rename.py, obs tests/test_rename_follow.py) until 2026-11-04; live join check filed as tack-e4e58a
+- 2026-10-07T19:39:47Z (feat/rename-hq-trial-join): review dispatched: Task 8 (main..abbf7b4) plus the scoped re-review of impl round 4's two fixes (bfcdcb0)
+- 2026-10-07T19:49:35Z (feat/rename-hq-trial-join): review: impl round 5 — verdict: accept; findings: Minor 6; reviewer: claude-code/claude-fable-5-1 (Task 8 dfbc286..abbf7b4, plus scoped re-review of round 4's fixes bfcdcb0: both fixed, nothing new)
+- 2026-10-07T19:49:35Z (feat/rename-hq-trial-join): rehearsal: passed 2026-10-07 with the trial join (Task 8): 12 passed in 312.62s (0:05:12)
