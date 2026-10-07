@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: feat/rename-hq-cutover
 created: 2026-10-06T12:59:15Z
-updated: 2026-10-07T01:19:36Z
+updated: 2026-10-07T01:22:12Z
 started: 2026-10-06T16:15:19Z
 depends: [flows-44890e, obs-ff4e76, tasks-7580d2]
 parent: tack-dcb11a
@@ -92,3 +92,5 @@ Why: the user chose the residue's name on 2026-10-06 (parent spec §7.1); the re
 - 2026-10-07T00:59:09Z (feat/rename-hq-cutover): rehearsal: passed 2026-10-07 without the trial join (Task 6): cutover and second-host adoption, rollback before and after the commits, the guard on three foreign changes, a dead claim refused; 8 passed in 66.78s (0:01:06)
 - 2026-10-07T01:14:53Z (feat/rename-hq-cutover): review: impl round 4 — verdict: revise; findings: Important 1, Minor 4; reviewer: claude-code/claude-fable-5-1 (whole branch 9beecb6..ce730ed, Task 7)
 - 2026-10-07T01:19:36Z (feat/rename-hq-cutover): rehearsal: passed 2026-10-07 without the trial join, after impl round 4's fixes (hosts isolate XDG_DATA_HOME, XDG_CACHE_HOME, RELAY_STATE_DIR; the rollback fingerprint holds the worktree storage); 10 passed in 71.69s (0:01:11); live heads, trees, registry and tt data unchanged
+- 2026-10-07T01:22:12Z (main): parked (waiting on agent, dependency): When flows-44890e and obs-ff4e76 are done and their identity contract is written, a tack session runs docs/plans/2026-10-06-rename-to-hq-cutover.md Task 8 (the trial join, and the whole rehearsal that day); then an ops session runs Task 9.
+  provenance: {"harness_session":"claude-code:502f3bd0-cddf-4f67-b524-27637f5bd8b6","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
