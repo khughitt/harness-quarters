@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: main
 created: 2026-10-06T12:59:15Z
-updated: 2026-10-07T20:31:00Z
+updated: 2026-10-07T21:40:28Z
 started: 2026-10-06T16:15:19Z
 depends: [flows-44890e, obs-ff4e76, tasks-7580d2]
 parent: tack-dcb11a
@@ -106,3 +106,5 @@ Why: the user chose the residue's name on 2026-10-06 (parent spec §7.1); the re
 - 2026-10-07T19:51:52Z (main): parked (waiting on user, approval): An ops session runs docs/plans/2026-10-06-rename-to-hq-cutover.md Task 9 today: the user picks the window and attests first (Step 1). Today's rehearsal note (2026-10-07) is valid only today; on another day rerun Task 8 Step 3 first. Every live claim must be released before save.
   provenance: {"harness_session":"claude-code:502f3bd0-cddf-4f67-b524-27637f5bd8b6","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-07T20:31:00Z (main): user approved Task 9 on 2026-10-07 (from the tack session that ran Task 8); Step 1's record check passed here ('records ready', no live claims). The ops session still asks for the window and the three attestations at Step 1 and records them verbatim.
+- 2026-10-07T21:39:28Z (main): attest: user answered 'Start now; all three hold' to: (1) on titan no harness session runs except this ops session; (2) europa is idle in tack, ops, lore and flows; (3) Dropbox sync is up to date on both hosts — window starts now, 2026-10-07T21:39:28Z
+- 2026-10-07T21:40:28Z (main): Task 9 Step 3: removed worktree session-retention-job (branch level with main, deleted; its .superpowers plan workspace copied to the attempt directory's kept/); committed other sessions' untracked feedback records (ops 48ac04f: ops-0e3183, ops-38f668; flows 42b2ec4: flows-ad68b2); ops tests naming tack are exactly the four kept fixtures; the other host answers, has tasks resolve, both tasks directories real, systemd 262 (262-1-arch)
