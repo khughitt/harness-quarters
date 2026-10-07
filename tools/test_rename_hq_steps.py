@@ -113,3 +113,22 @@ def test_second_host_refuses_before_the_sync_has_carried_the_rename(tmp_path):
                             text=True, capture_output=True,
                             env={**os.environ, "XDG_CONFIG_HOME": str(tmp_path / "cfg"), "HOME": str(tmp_path)})
     assert result.returncode == 1 and "has the prefix 'tack', not 'hq'" in result.stderr
+
+
+def test_apply_edits_writes_nothing_when_a_later_edit_refuses(tmp_path):
+    """A table stops before its first write: a refusal leaves the repository as save found it,
+    so a corrected table can be rerun instead of rolling the whole cutover back."""
+    steps = load_steps()
+    (tmp_path / "a.md").write_text("tack's links\n")
+    (tmp_path / "b.md").write_text("tack's links twice, tack's links\n")
+    with pytest.raises(steps.Stop, match=r"b.md: expected exactly one"):
+        steps.apply_edits(tmp_path, [("a.md", "tack's links", "hq's links"), ("b.md", "tack's links", "hq's links")])
+    assert (tmp_path / "a.md").read_text() == "tack's links\n"
+    assert (tmp_path / "b.md").read_text() == "tack's links twice, tack's links\n"
+
+
+def test_apply_edits_applies_edits_to_one_file_in_table_order(tmp_path):
+    steps = load_steps()
+    (tmp_path / "a.md").write_text("# tack\n\ntack's links\n")
+    steps.apply_edits(tmp_path, [("a.md", "# tack\n", "# hq\n"), ("a.md", "tack's links", "hq's links")])
+    assert (tmp_path / "a.md").read_text() == "# hq\n\nhq's links\n"

@@ -41,17 +41,26 @@ def run(*cmd, cwd=None):
     return result.stdout
 
 
-def replace_once(path, old, new):
-    text = Path(path).read_text()
+def replaced_once(path, text, old, new):
     count = text.count(old)
     if count != 1:
         raise Stop(f"{path}: expected exactly one {json.dumps(old)}, found {count}")
-    Path(path).write_text(text.replace(old, new))
+    return text.replace(old, new)
+
+
+def replace_once(path, old, new):
+    Path(path).write_text(replaced_once(path, Path(path).read_text(), old, new))
 
 
 def apply_edits(root, edits):
+    """Every edit in table order, in memory first: a refusal writes no file, so the
+    repository stays as `rename-cutover save` found it and a corrected table can rerun."""
+    texts = {}
     for rel, old, new in edits:
-        replace_once(Path(root) / rel, old, new)
+        path = Path(root) / rel
+        texts[path] = replaced_once(path, texts[path] if path in texts else path.read_text(), old, new)
+    for path, text in texts.items():
+        path.write_text(text)
 
 
 def load_meta(snap):
