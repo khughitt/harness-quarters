@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: feat/rename-hq-cutover
 created: 2026-10-06T12:59:15Z
-updated: 2026-10-07T00:53:17Z
+updated: 2026-10-07T00:59:09Z
 started: 2026-10-06T16:15:19Z
 depends: [flows-44890e, obs-ff4e76, tasks-7580d2]
 parent: tack-dcb11a
@@ -87,3 +87,6 @@ Why: the user chose the residue's name on 2026-10-06 (parent spec §7.1); the re
 - 2026-10-07T00:53:16Z (feat/rename-hq-cutover): cutover plan Tasks 1-5 landed on feat/rename-hq-cutover (1d58436..91c60e4); impl round 3 Important fixed in 91c60e4 (apply_edits checks the whole table before writing). Deferred minors: second-host tracebacks (KeyError/FileNotFoundError/StopIteration) instead of Stop; quiesce-timers traceback on a missing --state; probe before cutover day whether is-enabled reads the same word after reenable of session-archive-capture.timer (else restore exits 1 at Task 9 Step 13); anchor_ids repeats the collect pass; check_resolves message omits the answering prefix
 - 2026-10-07T00:53:16Z (feat/rename-hq-cutover): parked (waiting on user, decision): User decides the Task 6 live blockers: other sessions' untracked task records in tack, ops, lore and flows; ops-be8b06's shelved dependency (tasks check findings); the claude/settings.json toggle on main. Then the agent runs Task 6 (rehearsal) and Task 7 (review, merge) in .worktrees/rename-hq-cutover; Tasks 1-5 are committed there (91c60e4).
   provenance: {"harness_session":"claude-code:502f3bd0-cddf-4f67-b524-27637f5bd8b6","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-07T00:56:47Z (feat/rename-hq-cutover): resumed
+  provenance: {"harness_session":"claude-code:502f3bd0-cddf-4f67-b524-27637f5bd8b6","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-07T00:59:09Z (feat/rename-hq-cutover): rehearsal: passed 2026-10-07 without the trial join (Task 6): cutover and second-host adoption, rollback before and after the commits, the guard on three foreign changes, a dead claim refused; 8 passed in 66.78s (0:01:06)
