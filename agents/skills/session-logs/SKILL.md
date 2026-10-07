@@ -8,8 +8,8 @@ description: Use when you need to read a coding agent's local session store — 
 Where each harness keeps its sessions, what the records look like, and how to
 turn them into evidence without pasting transcripts anywhere. The tool is
 `~/.agents/bin/session-episodes` (`agents/bin/session-episodes` when standing
-in `tack`); nothing puts it on PATH. Its contract is
-`docs/specs/2026-09-19-session-logs-design.md` in the `tack` checkout.
+in `hq`); nothing puts it on PATH. Its contract is
+`docs/specs/2026-09-19-session-logs-design.md` in the `hq` checkout.
 
 ## Stores
 
