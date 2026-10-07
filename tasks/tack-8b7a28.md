@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: main
 created: 2026-10-06T12:59:15Z
-updated: 2026-10-06T23:37:30Z
+updated: 2026-10-06T23:51:58Z
 started: 2026-10-06T16:15:19Z
 depends: [flows-44890e, obs-ff4e76, tasks-7580d2]
 parent: tack-dcb11a
@@ -80,3 +80,4 @@ Why: the user chose the residue's name on 2026-10-06 (parent spec §7.1); the re
 - 2026-10-06T23:37:29Z (main): plan round 7 addressed (7d98c6e): Task 10 Step 1 commits hq's gathered task records, requires clean trees here, then captures heads; STEP10 starts only in Step 4
 - 2026-10-06T23:37:29Z (main): parked (waiting on user, review): The user reviews .worktrees/rename-hq-cutover/docs/plans/2026-10-06-rename-to-hq-cutover.md after round 7 and approves; the agent then runs Tasks 1 to 5 inline. Task 6 waits on the user's call on the live blockers (other sessions' untracked records; ops-be8b06's shelved dependency; the claude/settings.json toggle).
   provenance: {"harness_session":"claude-code:529a99ac-8d12-4ea1-b9ff-8f3fd73d2c16","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-06T23:51:58Z (main): review: plan round 8 — verdict: accept; findings: none; reviewer: codex (model unstated)
