@@ -11,6 +11,9 @@ STEP11=tack-39ea31
 # it never syncs, and it goes with the worktree.
 STATE="$WT/.superpowers/sdd/2026-10-06-rename-to-hq-cutover"; [ -d "$WT" ] && mkdir -p "$STATE"
 T_LOG="$STATE/last.log"
+# The rehearsal's scratch base: outside every checkout, because tasks takes a prefix-matching
+# id from the project it stands in, found by walking up from the working directory.
+REHEARSAL="$HOME/.local/state/rename-hq-rehearsal"
 # The cutover's host-local directory (Tasks 9 to 11): outside every checkout and every
 # tasks directory, never synced. The second host keeps its own at the same path.
 CUT="$HOME/.local/state/rename-hq"
