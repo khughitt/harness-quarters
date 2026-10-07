@@ -264,6 +264,7 @@
   "skipDangerousModePermissionPrompt": true,
   "theme": "custom:noctalia",
   "editorMode": "normal",
+  "autoCompactEnabled": true,
   "inputNeededNotifEnabled": false,
   "agentPushNotifEnabled": true,
   "voiceEnabled": true
