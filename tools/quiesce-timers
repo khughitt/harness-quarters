@@ -1,0 +1,129 @@
+#!/usr/bin/env python3
+"""Pause user timers for a window, and return each to exactly its recorded state.
+
+quiesce-timers record  --state FILE TIMER...   save each timer's enablement, activity, service
+quiesce-timers stop    --state FILE            stop every recorded timer
+quiesce-timers wait    --state FILE [--timeout SECONDS] [--poll SECONDS]
+                                               until every recorded timer's service is inactive
+quiesce-timers restore --state FILE            start the timers recorded active, stop the rest,
+                                               then check each matches its record
+
+Stopping a timer does not stop a run its service already began. `wait` lets that run finish
+and never kills it (docs/specs/2026-10-06-rename-to-hq-design.md §3.2 step 1). Only
+`systemctl --user` is called, found on PATH, so a test supplies its own.
+"""
+import argparse
+import json
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+
+class Stop(Exception):
+    pass
+
+
+def systemctl(*args):
+    return subprocess.run(["systemctl", "--user", *args], text=True, capture_output=True)
+
+
+def query(verb, unit):
+    """is-enabled and is-active answer on stdout, and exit non-zero for a negative answer."""
+    result = systemctl(verb, unit)
+    answer = result.stdout.strip()
+    if not answer:
+        raise Stop(f"systemctl --user {verb} {unit}: {result.stderr.strip() or 'no answer'}")
+    return answer
+
+
+def service_of(timer):
+    result = systemctl("show", "-p", "Unit", "--value", timer)
+    unit = result.stdout.strip()
+    if result.returncode != 0 or not unit:
+        raise Stop(f"{timer}: no unit it activates ({result.stderr.strip()})")
+    return unit
+
+
+def load(path):
+    return json.loads(Path(path).read_text())["timers"]
+
+
+def record(args):
+    state = Path(args.state)
+    if state.exists():
+        raise Stop(f"record: {state} exists; one record per window")
+    timers = []
+    for timer in args.timers:
+        if not timer.endswith(".timer"):
+            raise Stop(f"record: {timer} is not a timer")
+        timers.append({"timer": timer, "service": service_of(timer),
+                       "enabled": query("is-enabled", timer), "active": query("is-active", timer)})
+    state.parent.mkdir(parents=True, exist_ok=True)
+    state.write_text(json.dumps({"timers": timers}, indent=2) + "\n")
+    for t in timers:
+        print(f"{t['timer']}: {t['enabled']}, {t['active']} ({t['service']})")
+
+
+def stop(args):
+    for t in load(args.state):
+        result = systemctl("stop", t["timer"])
+        if result.returncode != 0:
+            raise Stop(f"stop {t['timer']}: {result.stderr.strip()}")
+        print(f"stopped {t['timer']}")
+
+
+def wait(args):
+    deadline = time.monotonic() + args.timeout
+    while True:
+        running = [t["service"] for t in load(args.state)
+                   if query("is-active", t["service"]) not in ("inactive", "failed")]
+        if not running:
+            print("every service is inactive")
+            return
+        if time.monotonic() >= deadline:
+            raise Stop("wait: still running after the timeout: " + ", ".join(running) + "; nothing was killed")
+        print("waiting on " + ", ".join(running), flush=True)
+        time.sleep(args.poll)
+
+
+def restore(args):
+    timers = load(args.state)
+    for t in timers:
+        verb = "start" if t["active"] == "active" else "stop"
+        result = systemctl(verb, t["timer"])
+        if result.returncode != 0:
+            raise Stop(f"{verb} {t['timer']}: {result.stderr.strip()}")
+    wrong = []
+    for t in timers:
+        now = (query("is-enabled", t["timer"]), query("is-active", t["timer"]))
+        if now != (t["enabled"], t["active"]):
+            wrong.append(f"{t['timer']} is {now[0]}, {now[1]}; recorded {t['enabled']}, {t['active']}")
+    if wrong:
+        raise Stop("restore: " + "; ".join(wrong))
+    print("every timer matches its record")
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(prog="quiesce-timers")
+    sub = parser.add_subparsers(dest="command", required=True)
+    r = sub.add_parser("record")
+    r.add_argument("--state", required=True)
+    r.add_argument("timers", nargs="+")
+    for name in ("stop", "restore"):
+        sub.add_parser(name).add_argument("--state", required=True)
+    w = sub.add_parser("wait")
+    w.add_argument("--state", required=True)
+    w.add_argument("--timeout", type=float, default=3600)
+    w.add_argument("--poll", type=float, default=30)
+    args = parser.parse_args(argv)
+    try:
+        {"record": record, "stop": stop, "wait": wait, "restore": restore}[args.command](args)
+    except Stop as stop_:
+        print(f"quiesce-timers: {stop_}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
