@@ -7,7 +7,7 @@ complexity: mid
 process: direct
 owner: feat/rename-hq-cutover
 created: 2026-10-06T21:48:52Z
-updated: 2026-10-07T00:31:57Z
+updated: 2026-10-07T18:43:08Z
 started: 2026-10-07T00:28:33Z
 completed: 2026-10-07T00:31:57Z
 depends: []
@@ -16,7 +16,7 @@ tags: []
 model: claude-opus-5-5
 agent: claude-code/claude-opus-5-5
 plan: docs/plans/2026-10-06-rename-to-hq-cutover.md
-step: "Task 2: `verify` asks the resolver, and the preparation's deferred minors"
+step: "Task 2: `verify` asks the resolver, rollback knows attachments, and the preparation's deferred minors"
 ---
 
 ## Notes
