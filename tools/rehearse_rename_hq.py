@@ -51,16 +51,20 @@ def toml(value):
 
 
 class Host:
-    """One scratch host: <base>/<name>/{d, .dropbox-work, home, cfg, state}."""
+    """One scratch host: <base>/<name>/{d, .dropbox-work, home, cfg, state, data, cache}."""
 
     def __init__(self, base, name):
         self.root = base / name
         self.sync = self.root / "d"
         self.home, self.cfg, self.state = self.root / "home", self.root / "cfg", self.root / "state"
+        self.data, self.cache = self.root / "data", self.root / "cache"
         self.registry = self.cfg / "tasks" / "projects.toml"
         self.env = {**os.environ, "HOME": str(self.home), "XDG_CONFIG_HOME": str(self.cfg),
-                    "XDG_STATE_HOME": str(self.state), "UV_CACHE_DIR": UV_CACHE, **GIT_ID}
-        for name_ in ("WORK_ROOT", "TASKS_SESSION", "TASKS_SESSION_PID", "GIT_DIR", "GIT_WORK_TREE"):
+                    "XDG_STATE_HOME": str(self.state), "XDG_DATA_HOME": str(self.data),
+                    "XDG_CACHE_HOME": str(self.cache), "UV_CACHE_DIR": UV_CACHE, **GIT_ID}
+        # tt (in the commit hooks) writes under XDG_DATA_HOME; tasks reads RELAY_STATE_DIR first.
+        for name_ in ("WORK_ROOT", "TASKS_SESSION", "TASKS_SESSION_PID", "GIT_DIR", "GIT_WORK_TREE",
+                      "RELAY_STATE_DIR"):
             self.env.pop(name_, None)
 
     def path(self, name):
@@ -164,7 +168,7 @@ def link_home(host):
 
 def build_first(host, live_roots):
     host.sync.mkdir(parents=True)
-    for d in (host.home, host.cfg, host.state):
+    for d in (host.home, host.cfg, host.state, host.data, host.cache):
         d.mkdir(parents=True)
     roots = dict(live_roots)
     for prefix in CLONED:
@@ -196,7 +200,7 @@ def build_second(first, host, live_roots):
     """The other host: the same synced files, its own registry, storage and home. Its
     pre-move second-host-record refreshes and keeps its storage (tasks spec §2.3; Task 9 Step 5)."""
     host.sync.mkdir(parents=True)
-    for d in (host.home, host.cfg, host.state):
+    for d in (host.home, host.cfg, host.state, host.data, host.cache):
         d.mkdir(parents=True)
     roots = dict(live_roots)
     for prefix in CLONED:
@@ -302,6 +306,9 @@ def fingerprint(host):
         "cfg": tree(host.cfg / "tasks"), "state": tree(host.state / "tasks"),
         "modes": {rel: stat.S_IMODE((tack / rel).stat().st_mode) for rel in KEPT},
         "worktrees": os.readlink(tack / ".worktrees"),
+        # The link's text is host-neutral: the storage itself shows where it came back to.
+        "storage": {str(p.relative_to(host.root)): p.read_bytes() if p.is_file() and not p.is_symlink() else None
+                    for p in sorted((host.root / ".dropbox-work").rglob("*"))},
         "home": {str(p.relative_to(host.home)): os.readlink(p) for p in sorted(host.home.rglob("*")) if p.is_symlink()},
     }
 
@@ -432,3 +439,26 @@ def test_save_refuses_a_dead_claim_in_a_retargeted_repository(hosts):
     result = Cutover(h1).save(check=False)
     assert result.returncode == 1 and "a retargeted repository has claims" in result.stderr and tid in result.stderr
     assert not Cutover(h1).snap.exists()
+
+
+def test_a_host_keeps_every_write_under_its_root(tmp_path, monkeypatch):
+    """The invoking shell's data, cache and relay directories never reach a scratch host:
+    tt, which the commit hooks run, writes under XDG_DATA_HOME, and tasks reads RELAY_STATE_DIR."""
+    for name in ("XDG_DATA_HOME", "XDG_CACHE_HOME", "RELAY_STATE_DIR"):
+        monkeypatch.setenv(name, str(tmp_path / "live" / name))
+    host = Host(tmp_path, "h1")
+    for name in ("HOME", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME"):
+        assert host.root in Path(host.env[name]).parents, name
+    assert "RELAY_STATE_DIR" not in host.env
+
+
+def test_the_fingerprint_sees_storage_that_did_not_come_back(hosts):
+    """The .worktrees link's text is the same wherever its storage went: the fingerprint
+    must hold the storage itself, or a rollback that left it under the new name would pass."""
+    h1, _ = hosts
+    before = fingerprint(h1)
+    (h1.storage("tack") / "a-worktree").mkdir()
+    marked = fingerprint(h1)
+    assert marked != before
+    os.rename(h1.storage("tack").parent, h1.storage("hq").parent)
+    assert fingerprint(h1) != marked
