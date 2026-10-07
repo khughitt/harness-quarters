@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: main
 created: 2026-10-06T12:59:15Z
-updated: 2026-10-07T19:51:52Z
+updated: 2026-10-07T20:31:00Z
 started: 2026-10-06T16:15:19Z
 depends: [flows-44890e, obs-ff4e76, tasks-7580d2]
 parent: tack-dcb11a
@@ -105,3 +105,4 @@ Why: the user chose the residue's name on 2026-10-06 (parent spec §7.1); the re
 - 2026-10-07T19:49:35Z (feat/rename-hq-trial-join): rehearsal: passed 2026-10-07 with the trial join (Task 8): 12 passed in 312.62s (0:05:12)
 - 2026-10-07T19:51:52Z (main): parked (waiting on user, approval): An ops session runs docs/plans/2026-10-06-rename-to-hq-cutover.md Task 9 today: the user picks the window and attests first (Step 1). Today's rehearsal note (2026-10-07) is valid only today; on another day rerun Task 8 Step 3 first. Every live claim must be released before save.
   provenance: {"harness_session":"claude-code:502f3bd0-cddf-4f67-b524-27637f5bd8b6","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-07T20:31:00Z (main): user approved Task 9 on 2026-10-07 (from the tack session that ran Task 8); Step 1's record check passed here ('records ready', no live claims). The ops session still asks for the window and the three attestations at Step 1 and records them verbatim.
