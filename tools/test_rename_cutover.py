@@ -1020,3 +1020,142 @@ def test_check_kept_names_a_mode_that_differs(tmp_path):
     (checkout / "f").chmod(0o644)
     with pytest.raises(cutover.Stop, match="mode 644, saved 600"):
         cutover.check_kept(checkout, snap, {"kept": [{"path": "f", "mode": 0o600}]})
+
+
+# --- the resolver and the preparation's deferred minors --------------------------
+
+
+def drop_former(registry, prefix):
+    """The registry without the renamed project's former roots, as if never recorded."""
+    kept, skipping = [], False
+    for line in registry.read_text().splitlines(keepends=True):
+        if line.startswith("["):
+            skipping = line.strip() == f"[[locations.{prefix}.former]]"
+        if not skipping:
+            kept.append(line)
+    registry.write_text("".join(kept))
+
+
+def test_verify_asks_the_resolver_about_the_old_id_root_and_storage(box):
+    box.save()
+    box.forward()
+    box.cutover("verify", "--snapshot", box.snapshot)
+    rows = json.loads(box.run("tasks", "resolve", "--json", str(box.checkout),
+                              str(box.sync.parent / ".dropbox-work" / "ai" / ".worktrees" / "x")).stdout)["results"]
+    assert [(r["status"], r["prefix"], r["via"]) for r in rows] == [
+        ("resolved", "tack", "former_root"), ("resolved", "tack", "former_storage")]
+
+
+def test_verify_refuses_when_the_old_root_no_longer_resolves(box):
+    box.save()
+    box.forward()
+    registry = box.tmp / "cfg" / "tasks" / "projects.toml"
+    assert "[[locations.tack.former]]" in registry.read_text()
+    drop_former(registry, "tack")
+    result = box.cutover("verify", "--snapshot", box.snapshot, check=False)
+    assert result.returncode == 1
+    assert "tasks resolve does not answer tack for" in result.stderr and str(box.checkout) in result.stderr
+
+
+def test_save_refuses_an_existing_snapshot_without_a_traceback(box):
+    box.snapshot.mkdir()
+    result = box.save(check=False)
+    assert result.returncode == 1
+    assert "already exists" in result.stderr and "Traceback" not in result.stderr
+
+
+@pytest.mark.parametrize("which", ["cfg", "state"])
+def test_save_refuses_a_linked_tasks_directory(box, which):
+    live = box.tmp / which / "tasks"
+    real = box.tmp / f"{which}-real"
+    live.rename(real)
+    live.symlink_to(real)
+    result = box.save(check=False)
+    assert result.returncode == 1 and "must be a real directory" in result.stderr
+    assert not box.snapshot.exists()
+
+
+def test_save_refuses_a_kept_path_that_is_a_link(hq):
+    # The behaviour exists (kept_paths); the preparation's review asked for its test.
+    trust = hq.checkout / "local" / "codex" / "trust.toml"
+    real = hq.tmp / "elsewhere.toml"
+    trust.rename(real)
+    trust.symlink_to(real)
+    result = hq.save(check=False)
+    assert result.returncode == 1 and "no regular file" in result.stderr
+    assert not hq.snapshot.exists()
+
+
+def test_sample_task_stops_without_a_task_under_the_new_prefix(tmp_path):
+    cutover = load_cutover()
+    (tmp_path / "tasks").mkdir()
+    (tmp_path / "tasks" / "ai-123456.md").write_text("x\n")
+    with pytest.raises(cutover.Stop, match=r"no tack-\*\.md task"):
+        cutover.sample_task(tmp_path, "tack")
+    (tmp_path / "tasks" / "tack-abcdef.md").write_text("x\n")
+    assert cutover.sample_task(tmp_path, "tack") == "abcdef"
+
+
+def test_reset_all_writes_every_patch_before_any_reset(tmp_path, monkeypatch):
+    cutover = load_cutover()
+    calls = []
+
+    def patch(root, head, snap, label):
+        if label == "lore":
+            raise cutover.Stop("disk full")
+        calls.append(("patch", label))
+
+    monkeypatch.setattr(cutover, "save_reset_patch", patch)
+    monkeypatch.setattr(cutover, "run", lambda *cmd, cwd=None: calls.append(("run", *map(str, cmd))))
+    resets = [(tmp_path / "a", "h1", "checkout"), (tmp_path / "b", "h2", "lore")]
+    with pytest.raises(cutover.Stop, match="disk full"):
+        cutover.reset_all(resets, tmp_path)
+    assert calls == [("patch", "checkout")]
+
+
+def test_save_refuses_findings_from_tasks_check(box2):
+    lore = box2.repos[1]
+    a = task_id(box2.run("tasks", "add", "parked idea", "--process", "direct", cwd=lore).stdout)
+    b = task_id(box2.run("tasks", "add", "waits on it", "--process", "direct", cwd=lore).stdout)
+    box2.run("tasks", "dep", b, "--on", a, cwd=lore)
+    box2.run("tasks", "shelve", a, "when it is needed", cwd=lore)
+    box2.commit(lore, "a dependency on a shelved task")
+    assert "shelved_dep" in box2.run("tasks", "check", cwd=lore).stdout
+    result = box2.save(check=False)
+    assert result.returncode == 1
+    assert "tasks check reports findings" in result.stderr and str(lore) in result.stderr
+    assert not box2.snapshot.exists()
+
+
+def test_rollback_restores_a_renamed_attachments_folder(box):
+    """`tasks rename` renames tasks/files/<old>-<hex>/ with its task. After the reset the
+    renamed folder is an untracked leftover: removed, emptied folders and all."""
+    hex_ = task_id(box.run("tasks", "add", "with files", "--process", "direct", cwd=box.checkout).stdout).split("-", 1)[1]
+    source = box.tmp / "notes.txt"
+    source.write_text("evidence\n")
+    box.run("tasks", "attach", f"ai-{hex_}", source, cwd=box.checkout)
+    assert (box.checkout / "tasks" / "files" / f"ai-{hex_}" / "notes.txt").is_file()
+    box.commit(box.checkout, "a task with an attachment")
+    before = box.fingerprint()
+    box.save()
+    box.forward()
+    assert (box.new_root / "tasks" / "files" / f"tack-{hex_}" / "notes.txt").is_file()
+    box.cutover("rollback", "--snapshot", box.snapshot)
+    assert box.fingerprint() == before
+    assert not (box.checkout / "tasks" / "files" / f"tack-{hex_}").exists()
+
+
+def test_leftover_original_names_records_and_attachments_only():
+    cutover = load_cutover()
+    assert cutover.leftover_original("tasks/hq-abc123.md", "tack", "hq") == "tasks/tack-abc123.md"
+    assert cutover.leftover_original("tasks/files/hq-abc123/a/b.py", "tack", "hq") == "tasks/files/tack-abc123/a/b.py"
+    for path in ("tasks/x/hq-abc123.md", "tasks/files/hq-abc123", "tasks/files/ops-abc123/b.py", "notes/hq-abc123.md"):
+        assert cutover.leftover_original(path, "tack", "hq") is None, path
+
+
+def test_a_retargeted_repository_with_claims_is_a_precondition_message(box2):
+    lore = box2.repos[1]
+    tid = task_id(box2.run("tasks", "add", "orphaned claim", "--process", "direct", cwd=lore).stdout)
+    box2.run("tasks", "start", tid, cwd=lore, env={**box2.env, "TASKS_SESSION": "ghost", "TASKS_SESSION_PID": "999999"})
+    box2.commit(lore, "start under a dead session")
+    assert "preconditions: a retargeted repository has claims" in box2.save(check=False).stderr
