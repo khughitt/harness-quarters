@@ -6,9 +6,9 @@ priority: 1
 size: m
 complexity: high
 process: planned
-owner: feat/rename-hq-cutover
+owner: main
 created: 2026-10-06T12:59:15Z
-updated: 2026-10-07T18:34:09Z
+updated: 2026-10-07T18:40:06Z
 started: 2026-10-06T16:15:19Z
 depends: [flows-44890e, obs-ff4e76, tasks-7580d2]
 parent: tack-dcb11a
@@ -95,3 +95,5 @@ Why: the user chose the residue's name on 2026-10-06 (parent spec §7.1); the re
 - 2026-10-07T01:22:12Z (main): parked (waiting on agent, dependency): When flows-44890e and obs-ff4e76 are done and their identity contract is written, a tack session runs docs/plans/2026-10-06-rename-to-hq-cutover.md Task 8 (the trial join, and the whole rehearsal that day); then an ops session runs Task 9.
   provenance: {"harness_session":"claude-code:502f3bd0-cddf-4f67-b524-27637f5bd8b6","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-07T18:34:09Z (main): 2026-10-07 dependency met: flows-44890e and obs-ff4e76 done and merged; the identity contract is flows evals/trial-identity.md (e4d5233), and obs-ff4e76's notes of 2026-10-07 18:33 cite it and name Task 9 Step 3's live check (witness ai-6c8245 → hq-6c8245). Its completion note predates both, so read those two notes rather than the completion note. Task 8 can run.
+- 2026-10-07T18:40:06Z (main): resumed
+  provenance: {"harness_session":"claude-code:502f3bd0-cddf-4f67-b524-27637f5bd8b6","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
