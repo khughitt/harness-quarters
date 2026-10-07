@@ -394,14 +394,6 @@ def git_repo(path):
     return path
 
 
-def test_registry_reads_projects_toml(tmp_path):
-    cfg = tmp_path / "cfg" / "tasks"
-    cfg.mkdir(parents=True)
-    (cfg / "projects.toml").write_text(f'[projects]\nai = "{tmp_path / "ai"}"\n')
-    assert se.registry({"XDG_CONFIG_HOME": str(tmp_path / "cfg")}) == {"ai": (tmp_path / "ai").resolve()}
-    assert se.registry({"HOME": str(tmp_path / "nohome")}) == {}
-
-
 def test_task_copies_lists_root_and_worktrees_and_flags_unreadable(tmp_path):
     root = git_repo(tmp_path / "ai")
     (root / "tasks").mkdir()
@@ -596,8 +588,10 @@ def codex_story(tmp_path, *, start_out='{"id":"ai-000001","warnings":[]}\n', nex
     return se.read_codex(codex_file(tmp_path, recs, name=name))
 
 
-def inputs(tmp_path, sessions, roots, now=ms(60) + 10 * 60 * 1000 + 1, labels=None, anchors=None, window_min=10):
-    return se.Inputs(sessions, roots, labels or {}, anchors or {}, now, window_min * 60 * 1000, None, None)
+def inputs(tmp_path, sessions, roots, now=ms(60) + 10 * 60 * 1000 + 1, labels=None, anchors=None, window_min=10,
+           canonical=None):
+    return se.Inputs(sessions, roots, labels or {}, anchors or {}, now, window_min * 60 * 1000, None, None,
+                     canonical or {})
 
 
 def test_episode_from_confirmed_start_no_park_status_question(tmp_path):
@@ -1109,10 +1103,13 @@ def run_cli(argv, env):
     return code, out.getvalue(), err.getvalue()
 
 
-def cli_env(tmp_path, roots):
+def cli_env(tmp_path, roots, aliases=None):
     cfg = tmp_path / "cfg" / "tasks"
     cfg.mkdir(parents=True, exist_ok=True)
-    (cfg / "projects.toml").write_text("[projects]\n" + "".join(f'{k} = "{v}"\n' for k, v in roots.items()))
+    text = "[projects]\n" + "".join(f'{k} = "{v}"\n' for k, v in roots.items())
+    if aliases:
+        text += "[aliases]\n" + "".join(f'{k} = "{v}"\n' for k, v in aliases.items())
+    (cfg / "projects.toml").write_text(text)
     return {"XDG_CONFIG_HOME": str(tmp_path / "cfg"), "SESSION_LOGS_CLAUDE": str(tmp_path / "claude"),
             "SESSION_LOGS_CODEX": str(tmp_path / "codex"), "HOME": str(tmp_path)}
 
@@ -1508,3 +1505,126 @@ def test_before_since_skip_changes_no_output(tmp_path):
     assert with_skip[0] == without_skip[0] and with_skip[1] == without_skip[1]
     assert [e["session_key"] for e in with_skip[0]] == ["codex:NEW"] and with_skip[1] == []
     assert without_skip[2]["anchors_seen"] == 2 and with_skip[2]["anchors_seen"] == 1
+
+
+# --- ids under a retired prefix (docs/specs/2026-10-06-rename-to-hq-design.md §3.5) -----
+
+ALIAS = {"tack-000001": "hq-000001"}
+
+
+def start_js(task_id):
+    return f'text(await tools.exec_command({{cmd:"tasks start {task_id}"}}));'
+
+
+def renamed_project(tmp_path, notes=()):
+    root = git_repo(tmp_path / "proj-hq")
+    task_file(root, list(notes), task_id="hq-000001")
+    return {"hq": root}
+
+
+def test_a_start_written_under_a_retired_prefix_is_an_episode_of_the_canonical_task(tmp_path):
+    # After the rename, `tasks start tack-…` prints the canonical id.
+    s = codex_story(tmp_path, start_cmd=start_js("tack-000001"), start_out='{"id":"hq-000001","warnings":[]}\n')
+    eps, cands, summary = se.build_episodes(inputs(tmp_path, [s], renamed_project(tmp_path), canonical=ALIAS))
+    assert cands == [] and summary["unregistered"] == 0 and len(eps) == 1
+    assert eps[0]["task_id"] == "hq-000001" and eps[0]["anchor_source"] == "result"
+    assert eps[0]["id"] == se.episode_id("codex", "c1", "tack-000001")
+
+
+def test_a_start_from_before_the_rename_keeps_its_episode_id_and_finds_the_renamed_record(tmp_path):
+    s = codex_story(tmp_path, start_cmd=start_js("tack-000001"), start_out='{"id":"tack-000001","warnings":[]}\n')
+    eps, _, summary = se.build_episodes(inputs(tmp_path, [s], renamed_project(tmp_path), canonical=ALIAS))
+    assert summary["unregistered"] == 0 and len(eps) == 1
+    assert eps[0]["task_id"] == "hq-000001" and eps[0]["join_class"] == "inferred"
+    assert eps[0]["id"] == se.episode_id("codex", "c1", "tack-000001")
+
+
+def test_without_resolution_a_retired_prefix_counts_unregistered(tmp_path):
+    s = codex_story(tmp_path, start_cmd=start_js("tack-000001"), start_out='{"id":"tack-000001","warnings":[]}\n')
+    eps, _, summary = se.build_episodes(inputs(tmp_path, [s], renamed_project(tmp_path)))
+    assert eps == [] and summary["unregistered"] == 1
+
+
+def test_a_close_written_after_the_rename_closes_a_start_written_before(tmp_path):
+    extra = [x_event("task_started", 100, "t2"), x_user("finish it", 100),
+             x_custom("c2", 'text(await tools.exec_command({cmd:"tasks done hq-000001 landed"}));', 120),
+             x_custom_out("c2", '{"id":"hq-000001","warnings":[]}\n', 130), x_event("task_complete", 131, "t2")]
+    s = codex_story(tmp_path, start_cmd=start_js("tack-000001"), start_out='{"id":"tack-000001","warnings":[]}\n',
+                    extra=extra, next_text=None)
+    eps, _, _ = se.build_episodes(inputs(tmp_path, [s], renamed_project(tmp_path), canonical=ALIAS))
+    assert len(eps) == 1 and eps[0]["task_id"] == "hq-000001"
+    assert eps[0]["closed_at"] == ms(130) and eps[0]["closure_source"] == "transcript"
+
+
+def test_anchor_ids_names_the_start_and_the_close(tmp_path):
+    extra = [x_custom("c2", 'text(await tools.exec_command({cmd:"tasks done hq-000001 landed"}));', 120),
+             x_custom_out("c2", '{"id":"hq-000001","warnings":[]}\n', 130)]
+    s = codex_story(tmp_path, start_cmd=start_js("tack-000001"), start_out='{"id":"tack-000001","warnings":[]}\n',
+                    extra=extra, next_text=None)
+    assert se.anchor_ids([s]) == ["hq-000001", "tack-000001"]
+
+
+def test_anchor_ids_names_a_close_written_under_the_retired_prefix(tmp_path):
+    # Started as hq-…, closed as tack-…, which prints hq-…: unconfirmed until resolved.
+    extra = [x_custom("c2", 'text(await tools.exec_command({cmd:"tasks done tack-000001 landed"}));', 120),
+             x_custom_out("c2", '{"id":"hq-000001","warnings":[]}\n', 130)]
+    s = codex_story(tmp_path, start_cmd=start_js("hq-000001"), start_out='{"id":"hq-000001","warnings":[]}\n',
+                    extra=extra, next_text=None)
+    assert "tack-000001" in se.anchor_ids([s])
+
+
+def test_extract_closes_with_a_close_written_under_the_retired_prefix(tmp_path):
+    extra = [x_event("task_started", 100, "t2"), x_user("finish it", 100),
+             x_custom("c2", 'text(await tools.exec_command({cmd:"tasks done tack-000001 landed"}));', 120),
+             x_custom_out("c2", '{"id":"hq-000001","warnings":[]}\n', 130), x_event("task_complete", 131, "t2")]
+    codex_story(tmp_path, start_cmd=start_js("hq-000001"), start_out='{"id":"hq-000001","warnings":[]}\n',
+                extra=extra, next_text=None)
+    out = tmp_path / "episodes.jsonl"
+    env = cli_env(tmp_path, renamed_project(tmp_path), aliases={"tack": "hq"})
+    assert run_cli(["extract", "--out", str(out)], env)[0] == 0
+    row = json.loads(out.read_text().splitlines()[0])
+    assert row["task_id"] == "hq-000001" and row["closed_at"] == ms(130) and row["closure_source"] == "transcript"
+
+
+def test_resolve_ids_follows_an_alias_through_tasks_resolve(tmp_path):
+    root = git_repo(tmp_path / "proj-hq")
+    env = cli_env(tmp_path, {"hq": root}, aliases={"tack": "hq"})
+    roots, canonical = se.resolve_ids(["tack-000001", "hq-000002", "tack", "zz-000003"], env)
+    assert roots == {"hq": root}
+    assert canonical == {"tack-000001": "hq-000001", "hq-000002": "hq-000002", "tack": "hq"}
+
+
+def test_extract_follows_an_alias_end_to_end(tmp_path):
+    codex_story(tmp_path, start_cmd=start_js("tack-000001"), start_out='{"id":"hq-000001","warnings":[]}\n')
+    out = tmp_path / "ep" / "episodes.jsonl"
+    env = cli_env(tmp_path, renamed_project(tmp_path), aliases={"tack": "hq"})
+    code, _, stderr = run_cli(["extract", "--out", str(out)], env)
+    assert code == 0 and json.loads(stderr)["unregistered"] == 0
+    assert [json.loads(l)["task_id"] for l in out.read_text().splitlines()] == ["hq-000001"]
+
+
+def test_extract_project_accepts_a_retired_prefix(tmp_path):
+    codex_story(tmp_path, start_cmd=start_js("tack-000001"), start_out='{"id":"hq-000001","warnings":[]}\n')
+    out = tmp_path / "episodes.jsonl"
+    env = cli_env(tmp_path, renamed_project(tmp_path), aliases={"tack": "hq"})
+    assert run_cli(["extract", "--project", "tack", "--out", str(out)], env)[0] == 0
+    assert len(out.read_text().splitlines()) == 1
+
+
+def test_extract_refuses_an_unregistered_project(tmp_path):
+    codex_story(tmp_path)
+    env = cli_env(tmp_path, project(tmp_path))
+    # main() turns a SystemExit carrying a message into exit 2 with the message on stderr.
+    code, _, err = run_cli(["extract", "--project", "zz", "--out", str(tmp_path / "e.jsonl")], env)
+    assert code == 2 and "--project zz is not a registered prefix" in err
+
+
+def test_show_and_label_find_the_call_behind_an_episode_started_under_a_retired_prefix(tmp_path):
+    codex_story(tmp_path, start_cmd=start_js("tack-000001"), start_out='{"id":"hq-000001","warnings":[]}\n')
+    out = tmp_path / "episodes.jsonl"
+    env = cli_env(tmp_path, renamed_project(tmp_path), aliases={"tack": "hq"})
+    assert run_cli(["extract", "--out", str(out)], env)[0] == 0
+    ep = json.loads(out.read_text().splitlines()[0])
+    code, stdout, stderr = run_cli(["show", ep["id"], "--episodes", str(out)], env)
+    assert code == 0 and "tasks start tack-000001" in stdout, stderr
+    assert run_cli(["label", ep["id"], "no", "--episodes", str(out)], env)[0] == 0

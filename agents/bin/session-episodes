@@ -22,7 +22,6 @@ import re
 import shlex
 import subprocess
 import sys
-import tomllib
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
@@ -519,9 +518,11 @@ def ids_in_result(result_text: str) -> list[str]:
     return list(dict.fromkeys(_id_objects(result_text)))
 
 
-def attribute(commands: tuple[str, ...], result_text: str, task_id: str, subcommand: str = "start") -> str:
+def attribute(commands: tuple[str, ...], result_text: str, task_id: str, subcommand: str = "start",
+              canonical: str | None = None) -> str:
     """Does this call's output prove that its `tasks <subcommand> <task_id>` ran? (§4.2)
-    confirmed | outside-grammar | no-id-line | error-output"""
+    confirmed | outside-grammar | no-id-line | error-output. `canonical` is the id tasks
+    prints for an id written under a retired prefix; an id line naming either confirms."""
     if has_error_line(result_text):
         return "error-output"
     if len(commands) != 1:
@@ -531,7 +532,8 @@ def attribute(commands: tuple[str, ...], result_text: str, task_id: str, subcomm
         return "outside-grammar"
     if invocation.subcommand != subcommand or invocation.task_id != task_id:
         return "outside-grammar"
-    return "confirmed" if id_lines(result_text, task_id, invocation.pretty) >= 1 else "no-id-line"
+    named = {task_id, canonical or task_id}
+    return "confirmed" if sum(id_lines(result_text, t, invocation.pretty) for t in named) >= 1 else "no-id-line"
 
 
 # --- task records --------------------------------------------------------------
@@ -560,18 +562,28 @@ class TaskRecord:
     unreadable: list[Path]
 
 
-def registry(env: dict) -> dict[str, Path]:
-    if env.get("XDG_CONFIG_HOME"):
-        config = Path(env["XDG_CONFIG_HOME"])
-    elif env.get("HOME"):
-        config = Path(env["HOME"]) / ".config"
-    else:
-        return {}
-    path = config / "tasks" / "projects.toml"
-    if not path.is_file():
-        return {}
-    projects = tomllib.loads(path.read_text()).get("projects", {})
-    return {prefix: Path(root).expanduser().resolve() for prefix, root in projects.items()}
+def resolve_ids(names: list[str], env: dict) -> tuple[dict[str, Path], dict[str, str]]:
+    """Ask `tasks resolve` once about every id and prefix: the root of each project they
+    resolve to, by live prefix, and each name's canonical form (an id, or a live prefix).
+    An id written under a retired prefix follows its alias (tasks
+    docs/specs/2026-10-06-project-resolution-design.md §3). A name that does not resolve
+    is left out, so its anchor counts as unregistered."""
+    if not names:
+        return {}, {}
+    try:
+        result = subprocess.run(["tasks", "resolve", "--stdin", "--json"], input="".join(f"{n}\n" for n in names),
+                                capture_output=True, text=True, env={"PATH": os.environ.get("PATH", ""), **env})
+    except FileNotFoundError:
+        raise SystemExit("session-episodes: the tasks CLI is not on PATH")
+    if result.returncode != 0:
+        raise SystemExit(f"session-episodes: tasks resolve failed: {(result.stderr or result.stdout).strip()}")
+    roots: dict[str, Path] = {}
+    canonical: dict[str, str] = {}
+    for row in json.loads(result.stdout)["results"]:
+        if row["status"] == "resolved":
+            roots[row["prefix"]] = Path(row["root"])
+            canonical[row["input"]] = row.get("id", row["prefix"])
+    return roots, canonical
 
 
 def task_copies(root: Path) -> tuple[list[Path], list[Path]]:
@@ -820,14 +832,16 @@ class Inputs:
     window_ms: int
     since_ms: int | None = None
     project: str | None = None
+    canonical: dict[str, str] = field(default_factory=dict)  # an id as written -> its canonical id (resolve_ids)
 
 
 @dataclass
 class _Anchor:
-    task_id: str
+    task_id: str  # canonical: the record read and the episode's task_id
     call_id: str
     holders: list[tuple[Session, int]] = field(default_factory=list)
     nested: bool = False  # the start text sits only in executable heredoc/-c text: review only
+    written: str = ""  # the id as the session wrote it; the episode id hashes it, so a review survives a rename
 
 
 def _result_for(session: Session, index: int) -> Event | None:
@@ -851,7 +865,9 @@ def _new_summary(inputs: Inputs) -> dict:
 
 def _collect_anchors(inputs: Inputs, summary: dict) -> tuple[dict[tuple, _Anchor], dict[tuple, dict]]:
     """Every tasks-start candidate keyed by (harness, call_id, task_id), and per-session
-    confirmed transitions keyed the same way for §4.4."""
+    confirmed transitions keyed the same way for §4.4. An id written under a retired prefix
+    joins its canonical id's anchors and transitions; each anchor keeps the id as written."""
+    canon = inputs.canonical.get
     anchors: dict[tuple, _Anchor] = {}
     transitions: dict[tuple, dict] = {}
     for s in inputs.sessions:
@@ -873,18 +889,22 @@ def _collect_anchors(inputs: Inputs, summary: dict) -> tuple[dict[tuple, _Anchor
                 if not named:
                     summary["unsupported_unknown_task"] += 1
                 for task_id in named:
-                    anchors.setdefault((s.harness, e.call_id, task_id), _Anchor(task_id, e.call_id)).holders.append((s, i))
+                    key = (s.harness, e.call_id, canon(task_id, task_id))
+                    anchors.setdefault(key, _Anchor(key[2], e.call_id, written=task_id)).holders.append((s, i))
             for c in e.commands:
                 for task_id in start_candidates(c):
-                    anchors.setdefault((s.harness, e.call_id, task_id), _Anchor(task_id, e.call_id)).holders.append((s, i))
+                    key = (s.harness, e.call_id, canon(task_id, task_id))
+                    anchors.setdefault(key, _Anchor(key[2], e.call_id, written=task_id)).holders.append((s, i))
                 for task_id in nested_start_candidates(c):
-                    anchors.setdefault((s.harness, e.call_id, task_id), _Anchor(task_id, e.call_id, nested=True)).holders.append((s, i))
+                    key = (s.harness, e.call_id, canon(task_id, task_id))
+                    anchors.setdefault(key, _Anchor(key[2], e.call_id, nested=True, written=task_id)).holders.append((s, i))
                 for sub, task_id in transitions_in(c):
                     result = _result_for(s, i)
                     readable = attributable_commands(e)
-                    if result is not None and readable is not None and attribute(readable, result.text, task_id, sub) == "confirmed":
+                    if result is not None and readable is not None and \
+                            attribute(readable, result.text, task_id, sub, canon(task_id, task_id)) == "confirmed":
                         # a fork copies the call under the same id; keep one per (call_id, times)
-                        transitions.setdefault((task_id, sub), {}).setdefault(
+                        transitions.setdefault((canon(task_id, task_id), sub), {}).setdefault(
                             (e.at_ms, result.at_ms, e.call_id), (s, e, result))
     return anchors, transitions
 
@@ -900,11 +920,11 @@ def _confirm(anchor: _Anchor, record: TaskRecord | None, inputs: Inputs, summary
     text = result.text if result is not None else ""
     if anchor.nested:
         reason = "nested"
-    elif call.unsupported and not any(anchor.task_id in start_candidates(c) for c in call.commands):
+    elif call.unsupported and not any(anchor.written in start_candidates(c) for c in call.commands):
         reason = "unsupported-wrapper"
     elif result is not None:
         readable = attributable_commands(call)  # a wrapper outside the single-call forms is unreadable
-        verdict = attribute(readable, text, anchor.task_id) if readable is not None else "outside-grammar"
+        verdict = attribute(readable, text, anchor.written, canonical=anchor.task_id) if readable is not None else "outside-grammar"
         if verdict == "confirmed":
             return "result", None, None
         reason = verdict
@@ -915,7 +935,7 @@ def _confirm(anchor: _Anchor, record: TaskRecord | None, inputs: Inputs, summary
         for n in record.notes:
             if note_kind(n.text) == "start" and n.harness_session in candidates and abs(n.at_ms - call.at_ms) <= TOLERANCE_MS:
                 return "note", None, n.harness_session
-    eid = episode_id(session.harness, anchor.call_id, anchor.task_id)
+    eid = episode_id(session.harness, anchor.call_id, anchor.written)
     review = inputs.anchors.get(eid)
     if review is not None:
         evidence = digest("\n".join(call.commands) + call.raw + "\n" + text)
@@ -1021,7 +1041,7 @@ def build_episodes(inputs: Inputs) -> tuple[list[dict], list[dict], dict]:
                             and n.harness_session in holder_keys and abs(n.at_ms - call.at_ms) <= TOLERANCE_MS), None)
         if inputs.since_ms is not None and call.at_ms < inputs.since_ms:
             continue
-        eid = episode_id(harness, call_id, task_id)
+        eid = episode_id(harness, call_id, anchor.written)
         if source is None:
             if reason == "retired":
                 summary["retired"] += 1
@@ -1098,6 +1118,21 @@ def build_episodes(inputs: Inputs) -> tuple[list[dict], list[dict], dict]:
     summary["episodes"] = len(episodes)
     summary["note_missing"] = len(transcript_only)
     return episodes, candidates, summary
+
+
+def anchor_ids(sessions: list[Session]) -> list[str]:
+    """Every task id these sessions' anchors and transition commands name, as written:
+    what extract asks tasks resolve about before it builds the episodes. Transitions are
+    read raw, not confirmed: a close written under a retired prefix prints its canonical
+    id, so it confirms only once that id is known."""
+    probe = Inputs(sessions, {}, {}, {}, 0, 0)
+    anchors, _ = _collect_anchors(probe, _new_summary(probe))
+    written = {a.written for a in anchors.values()}
+    for s in sessions:
+        for e in s.events:
+            if e.kind == "tool_call":
+                written.update(task_id for c in e.commands for _, task_id in transitions_in(c))
+    return sorted(written)
 
 
 # --- files and CLI -------------------------------------------------------------
@@ -1185,17 +1220,21 @@ def cmd_extract(args, env: dict) -> int:
     out = Path(args.out)
     labels_path = Path(args.labels) if args.labels else sidecar(out, "labels")
     anchors_path = Path(args.anchors) if args.anchors else sidecar(out, "anchors")
-    roots = registry(env)
-    for prefix, root in roots.items():
-        if args.project and prefix != args.project:
-            continue
-        if not (root / "tasks").is_dir():
-            raise SystemExit(f"session-episodes: registered project {prefix} has no tasks/ under {root}")
     claude_root, codex_root = _roots(env)
     now = int(dt.datetime.now(dt.timezone.utc).timestamp() * 1000)
     since = now - args.since * 86_400_000 if args.since is not None else None
-    inputs = Inputs(scan_stores(claude_root, codex_root, since), roots, read_jsonl_map(labels_path), read_jsonl_map(anchors_path),
-                    now, args.window_minutes * 60_000, since, args.project)
+    sessions = scan_stores(claude_root, codex_root, since)
+    roots, canonical = resolve_ids(anchor_ids(sessions) + ([args.project] if args.project else []), env)
+    project = canonical.get(args.project) if args.project else None
+    if args.project and project not in roots:
+        raise SystemExit(f"session-episodes: --project {args.project} is not a registered prefix")
+    for prefix, root in roots.items():
+        if project and prefix != project:
+            continue
+        if not (root / "tasks").is_dir():
+            raise SystemExit(f"session-episodes: registered project {prefix} has no tasks/ under {root}")
+    inputs = Inputs(sessions, roots, read_jsonl_map(labels_path), read_jsonl_map(anchors_path),
+                    now, args.window_minutes * 60_000, since, project, canonical)
     episodes, candidates, summary = build_episodes(inputs)
     summary["roots"] = {"claude": str(claude_root), "codex": str(codex_root)}
     summary["missing_roots"] = [str(r) for r in (claude_root, codex_root) if not r.is_dir()]
@@ -1231,9 +1270,16 @@ def _evidence(row: dict, kind: str, cache: dict) -> tuple[str, str, str, str]:
     """(anchor commands, result text, last assistant text, next human text) for show/confirm/label."""
     session = _session_for(row["source_refs"][0], cache)
     line = _parse_ref(row["source_refs"][0])[2]
-    # the episode id hashes the call id, so the call on this line whose id reproduces it is the one
+    # the episode id hashes the call id and the id as written (the anchor's `written`, which
+    # differs from row["task_id"] under a retired prefix), so the call on this line whose
+    # id reproduces it with one of the ids it writes is the one
+    def written(i: int) -> set[str]:
+        result = _result_for(session, i)
+        return ({row["task_id"]} | {t for c in session.events[i].commands
+                                    for t in start_candidates(c) + nested_start_candidates(c)}
+                | set(ids_in_result(result.text) if result is not None else []))
     index = next((i for i, e in enumerate(session.events) if e.kind == "tool_call" and e.line == line
-                  and episode_id(session.harness, e.call_id, row["task_id"]) == row["id"]), None)
+                  and any(episode_id(session.harness, e.call_id, t) == row["id"] for t in written(i))), None)
     if index is None:
         raise SystemExit(f"session-episodes: {row['source_refs'][0]} no longer holds the call behind {row['id']}; re-run extract")
     call = session.events[index]

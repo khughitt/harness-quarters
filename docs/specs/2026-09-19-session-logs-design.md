@@ -122,8 +122,10 @@ to `<stem>.candidates.jsonl` there, so the loop `extract → show → confirm /
 label → extract` works with the same `--out`/`--episodes` path and nothing
 else. Environment: `SESSION_LOGS_CLAUDE`
 and `SESSION_LOGS_CODEX` override the store roots (tests use them); the tasks
-registry `~/.config/tasks/projects.toml` supplies project roots, as `obs-index`
-and obs `stores.py` do.
+resolver (`tasks resolve --stdin`, one call per run) supplies project roots and
+follows an id written under a retired prefix to its canonical id. (Revised
+2026-10-06 for the rename to hq: an episode carries the canonical id, and its
+episode id still hashes the id as written, so a review keeps its episode.)
 
 ### 4.1 Population
 
@@ -141,8 +143,8 @@ run summary:
   threads under the parent's id.)
 - `non-interactive`: Claude `entrypoint` not `cli`; Codex `originator` not
   `codex-tui`/`codex_exec` — the `obs-index` `INTERACTIVE` table. Per file.
-- `unregistered`: an anchor whose task id's prefix is not a registered
-  project. Per anchor. Ownership is the task's, not the shell's: a
+- `unregistered`: an anchor whose task id `tasks resolve` does not resolve.
+  Per anchor. Ownership is the task's, not the shell's: a
   `tasks start lit-…` run from `/tmp` belongs to `lit`, and the file's `cwd`
   is not consulted. (Revised at plan review, 2026-09-19: the draft excluded
   files by `cwd`, which would have dropped such starts.)
