@@ -13,6 +13,9 @@
     "PermissionRequest": [
       { "hooks": [{ "type": "command", "command": "~/d/familiar/bin/familiar hook --agent codex PermissionRequest" }] }
     ],
+    "SubagentStop": [
+      { "hooks": [{ "type": "command", "command": "~/d/ops/hooks/claim-guard --harness codex" }] }
+    ],
     "Stop": [
       { "hooks": [{ "type": "command", "command": "~/d/familiar/bin/familiar hook --agent codex Stop" }] },
       { "hooks": [{ "type": "command", "command": "~/d/ops/hooks/claim-guard --harness codex" }] },

@@ -153,6 +153,16 @@ instructions come from lore's `./instructions/AGENTS.md`, where ops renders the
 Projects block; ops-profile reads lore's `./profiles/`. The session archive timers
 consume hq's capture and prune tools. Lore owns the corpus and its block check.
 
+## Codex claim guard
+
+`codex/hooks.json` and `codex/hooks.work.json` register ops's claim guard once on
+root `Stop` and once on worker `SubagentStop`. `links.toml` routes them to the
+personal and work homes respectively. The worker event uses `agent_id` to select
+its own claim; shared root metadata does not grant foreign closure authority.
+After a definition changes, inspect and trust that exact definition through
+Codex `/hooks` in each native home. Registration and trust are separate from the
+recorded live-delivery pilot; activate only after the reviewed cutover.
+
 ## Capability facts
 
 `facts/capabilities.toml` records what each harness has been shown to do: a typed value,
