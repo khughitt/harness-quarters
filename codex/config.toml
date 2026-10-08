@@ -125,6 +125,9 @@ trusted_hash = "sha256:19c30d87a87c005ad66dce25343b7f71289c03ed6a659ba8cdb03adbf
 [hooks.state."/home/keith/.codex/hooks.json:stop:2:0"]
 trusted_hash = "sha256:1af4d7b0db7828de49e3ee977c46c56581f393ab882e179db44eb24716951c3a"
 
+[hooks.state."/home/keith/.codex/hooks.json:subagent_stop:0:0"]
+trusted_hash = "sha256:79d4fb5fd6806169a482ae5ea2e69d902506ea9dfe03db2501ca7b2610b5e250"
+
 [marketplaces.ponytail]
 source_type = "git"
 source = "https://github.com/DietrichGebert/ponytail.git"

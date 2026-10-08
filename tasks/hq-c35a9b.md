@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: feat/claim-guard-policy
 created: 2026-10-08T18:06:50Z
-updated: 2026-10-08T18:41:08Z
+updated: 2026-10-08T22:55:45Z
 started: 2026-10-08T18:28:48Z
 completed: 2026-10-08T18:41:04Z
 depends: []
@@ -35,3 +35,4 @@ Execute Task 3 of the approved tasks claim-guard-policy plan. Register the exist
   provenance: {"harness_session":"codex:01a11bed-fe69-7060-9c93-813a4949349b","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-08T18:41:04Z (feat/claim-guard-policy): Prepared worker guard once in both public Codex hook files; preserved root and unrelated hooks/home routes. RED both absent-worker cases, GREEN 226 agents plus 553 hooks/tools; fresh review accepted with one deferred matcher-assertion minor. Tree 6bd8f7333c4249ce56d053ee4ccd2441ab0d5d23; candidate only, no live activation.
   provenance: {"harness_session":"codex:01a11bed-fe69-7060-9c93-813a4949349b","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-08T22:55:45Z (main): Approved live rollout complete: both installed worker definitions trusted through ordinary native /hooks and display active. Personal UI generated one new hooks.state trusted hash in tracked codex/config.toml, which README explicitly keeps tracked; work home's corresponding state is in local/codex/config.work.toml and remains untracked. Actual sources/commands checked, existing Stop hooks active, no model request/login flow. Activated full gate passes 226 agents +553 hook/tools, facts unchanged.
