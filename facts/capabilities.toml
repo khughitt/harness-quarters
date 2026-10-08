@@ -12,10 +12,10 @@ probe = "agents/bin/wake-judge"
 [facts.controller-wake.harness.claude-code]
 status = "probed"
 value = true
-version = "2.1.282"
-date = 2026-09-24
-evidence = "tack-00ccb6"
-note = "A subagent and a background command both woke the controller (judge PASS), in an interactive session. The version is from the guard's comment and docs/specs/2026-09-24-turn-boundary-gate-design.md; the task record does not name it. The date is local; the task's notes are stamped 2026-09-25 UTC."
+version = "2.1.295"
+date = 2026-10-08
+evidence = "hq-b2515c"
+note = "Both child kinds woke in isolated interactive sessions on Claude Code 2.1.295; wake-judge PASS for each final transcript. The judge learned the harness-generated remote_session_change context attachment and exit-time cost-state usage metadata. Evidence and raw transcript references are recorded on hq-b2515c."
 
 [facts.controller-wake.harness.codex]
 status = "probed"
@@ -33,10 +33,10 @@ probe = "agents/bin/wake-judge"
 [facts.controller-wake-kinds.harness.claude-code]
 status = "probed"
 value = ["shell", "subagent"]
-version = "2.1.282"
-date = 2026-09-24
-evidence = "tack-00ccb6; ops-ed76fe"
-note = "The wake probe established the two kinds, in an interactive session (tack-00ccb6). The type strings were first recorded on 2.1.284 (ops-ed76fe)."
+version = "2.1.295"
+date = 2026-10-08
+evidence = "hq-b2515c"
+note = "A background command and a background subagent each woke the controller in isolated interactive sessions (wake-judge PASS). The headless Stop capture also names their types shell and subagent."
 
 [facts.controller-wake-kinds.harness.codex]
 status = "probed"
@@ -53,7 +53,7 @@ description = "The statuses Claude Code's Stop input gives, in background_tasks,
 [facts.stop-input-in-flight-statuses.harness.claude-code]
 status = "probed"
 value = ["running", "pending"]
-version = "2.1.284"
-date = 2026-09-29
-evidence = "ops-ed76fe"
-note = "A headless probe listed a background command and a background subagent as running. pending was not observed; it is kept from the guard's review in ops-ed76fe."
+version = "2.1.295"
+date = 2026-10-08
+evidence = "hq-b2515c; ops-ed76fe"
+note = "The headless Claude Code 2.1.295 Stop capture lists both shell and subagent as running. pending was not observed; it remains supported only by the guard review in ops-ed76fe. The value is unchanged, and this refresh does not newly verify pending."

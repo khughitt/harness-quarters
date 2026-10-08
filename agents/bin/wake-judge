@@ -26,13 +26,15 @@ CLAUDE_CONTEXT_PREFIXES = ("<system-reminder>",)
 # Claude Code record types that carry no model input.
 CLAUDE_NON_INPUT_TYPES = frozenset({"summary", "file-history-snapshot", "system",
                                     # Session metadata seen in the Claude Code 2.1.282 wake probe, 2026-09-24.
-                                    "ai-title", "atis-latch", "mode", "permission-mode", "last-prompt"})
+                                    "ai-title", "atis-latch", "mode", "permission-mode", "last-prompt",
+                                    "cost-state"})  # Exit-time usage totals seen on 2.1.295, 2026-10-08.
 # Attachment subtypes seen carrying harness context, never human input (same probe). Any
 # other subtype fails: an attachment can carry queued or edited user content.
 CLAUDE_CONTEXT_ATTACHMENTS = frozenset({
     "agent_listing_delta", "credential_org", "date", "deferred_tools_delta", "deferred_tools_record",
     "environment", "hook_additional_context", "hook_success", "instructions", "mcp_instructions_delta",
     "model", "prompt_snapshot", "session_context", "skill_listing", "total_tokens_reminder",
+    "remote_session_change",  # Attribution-settings context seen on Claude Code 2.1.295, 2026-10-08.
 })
 CODEX_CONTEXT_PREFIXES = ("<environment_context>", "# AGENTS.md", "<INSTRUCTIONS>", "<user_instructions>")
 CODEX_NOTIFICATION_PREFIXES = ()
