@@ -1,10 +1,10 @@
 ---
 id: hq-3bea62
 title: "Auto-memory is scoped to one repository, so a preference the owner states for all projects reaches only that repository's sessions"
-status: idea
+status: dropped
 priority: 2
 created: 2026-10-06T23:29:41Z
-updated: 2026-10-08T10:38:41Z
+updated: 2026-10-08T10:43:13Z
 depends: []
 tags: [feedback, gap, "from:material"]
 agent: claude-code/claude-opus-5-5
@@ -15,3 +15,7 @@ Claude Code's auto-memory lives in a per-project directory under the harness hom
 ## Notes
 
 - 2026-10-08T10:38:41Z (main): scope: drop; the documented route the idea asked for landed in lore fdbd1c6 (lore-c58645, 2026-10-07): the global Feedback rule files the user's cross-project feedback with the owning project (lore for instructions and skills), and a memory may keep only a local copy; filed from the same review-sheet incident, whose preference is now the global Communication rule on image sheets; a host-wide memory stays unwanted since a memory never replaces the report; proposal: drop as delivered by lore-c58645 (lore fdbd1c6)
+- 2026-10-08T10:43:13Z (main): dropped
+  provenance: {"harness_session":"claude-code:5e81fcdd-c24b-4e90-9137-b291261e8654","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-08T10:43:13Z (main): Delivered by lore-c58645 (lore fdbd1c6): the global Feedback rule routes cross-project preferences to lore; approved by the user 2026-10-08
+  provenance: {"harness_session":"claude-code:5e81fcdd-c24b-4e90-9137-b291261e8654","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
