@@ -29,11 +29,13 @@ that break on a rename, and facts probed on a harness version no longer installe
   Codex's work home reads `~/.agents/skills`, which has them all. The global
   instructions linked into the work home require `tasks` and the Trials rule's flow,
   and lore's `profiles/work.md` writes specs through `tasks where`.
-- **Stale facts (`hq-e18255`).** Installed today: Claude Code 2.1.294 and Codex
-  0.161.0. Every fact entry was probed on Claude Code 2.1.282 or 2.1.284 and Codex
-  0.156.1. `harness-facts` has `check`, `list` and `get`; none compares versions.
-  Codex's `controller-wake = false` is live: ops `hooks/claim-guard` mirrors it as
-  `CHILD_WAKES`, the global Processes rule cites it, and the Codex long-waits brief
+- **Stale facts (`hq-e18255`).** At scoping: Claude Code 2.1.294 and Codex
+  0.161.0 were installed; every fact entry had been probed on Claude Code 2.1.282 or
+  2.1.284 and Codex 0.156.1. The re-probe below records the later installed versions
+  and refreshed entries. `harness-facts` has `check`, `list` and `get`; none compares versions.
+  Codex's `controller-wake = false` is live: ops `hooks/claim-guard` reads the
+  validated view directly after `tasks-56b450`, the global Processes rule cites it,
+  and the Codex long-waits brief
   (`docs/notes/2026-10-08-codex-long-waits-brief.md`) builds its constraint on it.
 - **Hook paths (`hq-fe88ef`).** `claude/settings.json`, `codex/hooks.json`,
   `codex/hooks.work.json` and the untracked `local/claude/settings.work.json` call
@@ -52,8 +54,8 @@ that break on a rename, and facts probed on a harness version no longer installe
 - Home routing changes only in `links.toml`, applied by `just link --apply` from main on
   each host (AGENTS.md). Nothing prunes undeclared paths (residue design §5).
 - Capability facts are read only through `tools/harness-facts`; `unknown` is never a
-  default. A value change lands as a pair with ops's `claim-guard` constants until
-  `tasks-56b450` moves the guard onto the view (residue design §4.7).
+  default. `tasks-56b450` removed the consumer mirrors: a validated hq refresh is
+  consumed directly, without an ops constants or test-pinning change.
 - Re-probing follows the README's "Re-probing a fact": both child kinds, three outcomes,
   one commit.
 - Codex hook trust is live state on both hosts; a command change costs one re-trust per
@@ -84,7 +86,14 @@ routing is declared here), leaving familiar to fam.
 ## Unanswered questions
 
 1. Does any fact's value change on the installed versions? The answer sets how much a
-   staleness check is worth. Answered by `hq-b2515c` (below).
+   staleness check is worth. `hq-b2515c` re-probed Claude Code **2.1.295** and Codex
+   **0.161.0** on 2026-10-08: no value change was established. Both Claude child kinds
+   passed the wake judge; the headless Stop input again showed `running` for both.
+   `pending` remains unobserved and retained from the historical guard review.
+   Claude's entries were refreshed. Codex's subagent did not wake within a verified
+   192-second window after completion; its command run was inconclusive because the
+   transcript did not retain final child output. Both Codex entries keep their old
+   version and evidence, so the aggregate Codex answer is still inconclusive.
 2. Is a version difference stale on any change, or only on a minor or major one? The
    user, once question 1 shows how often values move.
 3. Should a stale fact change a consumer's behaviour, or only be reported? The user;

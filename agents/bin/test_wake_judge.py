@@ -112,6 +112,39 @@ def test_claude_context_records_are_allowed():
     assert verdict("claude-code", records) == "PASS"
 
 
+def test_claude_remote_session_change_is_harness_context():
+    records = claude_wake()
+    records.insert(1, {
+        "type": "attachment",
+        "attachment": {
+            "type": "remote_session_change", "url": None,
+            "commit": "", "pr": "", "sendUserFileHint": False,
+            "managedCommit": False, "managedPr": False,
+        },
+        "rendered": [{"content": "<system-reminder>Harness attribution settings</system-reminder>"}],
+        "renderedRole": "user", "renderedBesideToolResult": True,
+    })
+    assert verdict("claude-code", records) == "PASS"
+
+
+def test_claude_exit_cost_state_does_not_hide_a_wake():
+    records = claude_wake()
+    records.append({
+        "type": "cost-state", "sessionId": "probe-session",
+        "totalCostUSD": 0.1, "totalAPIDuration": 1000,
+        "totalAPIDurationWithoutRetries": 1000, "totalToolDuration": 60,
+        "totalLinesAdded": 0, "totalLinesRemoved": 0,
+        "totalDuration": 310000, "startTime": 1791501725540,
+        "modelUsage": {"probe-model": {
+            "inputTokens": 10, "outputTokens": 20, "thinkingTokens": 0,
+            "cacheReadInputTokens": 0, "cacheCreationInputTokens": 0,
+            "webSearchRequests": 0, "costUSD": 0.1,
+        }},
+        "hasUnknownModelCost": False,
+    })
+    assert verdict("claude-code", records) == "PASS"
+
+
 def ev(kind, **extra):
     return {"type": "event_msg", "payload": {"type": kind, **extra}}
 
