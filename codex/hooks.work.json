@@ -1,9 +1,21 @@
 {
   "hooks": {
     "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "~/d/familiar/bin/familiar hook --agent codex SessionStart" }] },
       { "hooks": [{ "type": "command", "command": "~/d/lore/hooks/claude-profile" }] }
     ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "~/d/familiar/bin/familiar hook --agent codex UserPromptSubmit" }] }
+    ],
+    "PreToolUse": [
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "~/d/familiar/bin/familiar hook --agent codex PreToolUse" }] }
+    ],
+    "PermissionRequest": [
+      { "hooks": [{ "type": "command", "command": "~/d/familiar/bin/familiar hook --agent codex PermissionRequest" }] }
+    ],
     "Stop": [
+      { "hooks": [{ "type": "command", "command": "~/d/familiar/bin/familiar hook --agent codex Stop" }] },
+      { "hooks": [{ "type": "command", "command": "~/d/ops/hooks/claim-guard --harness codex" }] },
       { "hooks": [{ "type": "command", "command": "~/.local/bin/harness-state-refresh" }] }
     ]
   }
