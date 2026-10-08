@@ -201,12 +201,11 @@ Probe both kinds before touching `controller-wake`:
 A refresh edits `version`, `date`, `evidence` and the values in one commit. An
 inconclusive run is recorded on its task and changes nothing in the file.
 
-Until ops's claim guard reads these facts itself, it keeps three constants that must
-equal them, and the pre-commit hook runs ops's own test of that against a staged fact
-file (`just facts-mirror` runs it by hand). A refresh that changes only `version`,
-`date` or `evidence` passes untouched. One that changes a value lands as a pair: change
-the constant in an ops worktree, commit here with `FACTS_MIRROR_OPS=<that worktree>`,
-and merge the two together, this project first.
+Ops's claim guard reads this validated view directly. No consumer mirror runs in
+this hook or gates. Hq still validates the staged fact blob, including when its
+working-tree copy differs; edit facts in a worktree and integrate them only after
+their validation passes. The guard's claim policy belongs to tasks, while ops
+continues to host its executable.
 
 ## Home links
 
