@@ -23,10 +23,6 @@ test:
     python3 -m pytest agents/bin -q
     uv run -q --with pytest pytest .githooks tools -q
 
-# ops's test of its claim-guard constants against this checkout's fact file (interim).
-facts-mirror:
-    python3 .githooks/pre-commit facts-mirror
-
 # Validate and test each Claude Code mod under claude/mods (needs the claude CLI).
 mods:
     for mod in claude/mods/*/; do claude plugin validate "$mod" && claude plugin test "$mod" || exit 1; done

@@ -286,6 +286,11 @@ for it yet.
 
 ### 4.7 Until `claim-guard` reads the view
 
+2026-10-08 supersession: tasks’ approved claim-guard policy design replaces both
+mirror halves with ops’s direct validated reader. Hq’s staged fact validation
+remains. The paragraphs below preserve the interim contract and its evidence;
+see tasks `docs/specs/2026-10-08-claim-guard-policy-design.md`.
+
 The parent leaves the consumer switch to tasks (`tasks-56b450`), in whichever order it
 chooses, and that task is under active design. So for a period the three values exist
 twice: here, authoritative from the commit that adds them, and as constants in
