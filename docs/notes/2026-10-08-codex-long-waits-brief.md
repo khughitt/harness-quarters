@@ -56,11 +56,12 @@ up the second, and Codex's own instructions forbid that trade.
 ## Unanswered questions
 
 1. Does the global rule override Codex's 60 s blocking-wait and commentary lines, and
-   with which cadence: A's single long wait or B's stretches? *The user.*
+   with which cadence: A's single long wait or B's stretches? *Answered by the user
+   2026-10-08: A, one long wait with a line before and after it.*
 2. Does user input during a long `wait_agent` or empty `write_stdin` end the wait, so
    the user can steer mid-wait? If it does, the base instructions' reason ("may prevent
-   you from communicating") is moot. *Research `hq-e314e7` (filed below), a Codex
-   probe.*
+   you from communicating") is moot. *Research `hq-e314e7`, a Codex probe. It no
+   longer gates the rule edit; it records whether the user can steer mid-wait.*
 3. Would a long silent suite be easier to read if the test front door printed phases and
    elapsed time? *Not asked here: `tt` belongs to ops. Raise it with ops only if A or B
    still leave `hq-239c16`'s case unclear.*
@@ -68,7 +69,9 @@ up the second, and Codex's own instructions forbid that trade.
 ## Proposed decomposition
 
 - Goal `hq-3e69a7` holds both ideas.
-- Research `hq-e314e7` answers question 2 and records a capability fact. Both
-  `hq-4ea6fb` and `hq-239c16` wait on it and on the user's answer to question 1.
-- After both are answered, file the rule edit with lore (one clause in Processes, plus
-  any change to the vendored codex-tools reference) and close the two ideas against it.
+- Rule edit `lore-cd01f5` (filed 2026-10-08 after the user's answer): announce each
+  long wait before and report after, and say the rule outranks Codex's 60 s guidance
+  and the vendored codex-tools stretches. `hq-4ea6fb` and `hq-239c16` close when it
+  lands.
+- Research `hq-e314e7` answers question 2 and records a capability fact; it no longer
+  gates anything.
