@@ -1,18 +1,20 @@
 ---
 id: hq-dcb11a
 title: "Residue: rename in place, capability facts, aggregated agent surface, archive review"
-status: doing
-priority: "1"
+status: done
+priority: 1
 size: l
 complexity: high
 process: planned
-owner: feat/residue
+owner: main
 created: 2026-10-04T10:54:36Z
-updated: 2026-10-06T15:53:20Z
+updated: 2026-10-09T01:28:48Z
 started: 2026-10-06T11:20:33Z
+completed: 2026-10-09T01:28:47Z
 depends: [ops-f2405d]
 tags: []
 source: ops-cb9749
+model: claude-opus-5-5
 agent: claude-code
 spec: docs/specs/2026-10-06-residue-design.md
 plan: docs/plans/2026-10-06-residue.md
@@ -72,3 +74,9 @@ Done: tack renamed in place by the rename design's procedure (tasks rename, iden
 - 2026-10-06T15:52:57Z (feat/residue): residue acceptance items 1 to 5 delivered (spec §10), on both hosts; item 6, the rename to hq, continues under tack-8b7a28 and this goal stays open for it
 - 2026-10-06T15:53:20Z (main): parked (waiting on agent): Continue with the rename to hq under tack-8b7a28: its spec review, then its plan. The residue's own work is delivered.
   provenance: {"harness_session":"claude-code:856ae840-5763-49d7-a62e-93994791cdcb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-09T01:28:47Z (main): resumed
+  provenance: {"harness_session":"claude-code:727f050d-a8c4-4871-8561-8f3a44e5ed7b","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-09T01:28:47Z (main): done
+  provenance: {"harness_session":"claude-code:727f050d-a8c4-4871-8561-8f3a44e5ed7b","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-09T01:28:47Z (main): Met: residue items 1-5 delivered on both hosts (2026-10-06); item 6, the rename to hq, closed as hq-8b7a28 on 2026-10-07. No residue worktree remains.
+  provenance: {"harness_session":"claude-code:727f050d-a8c4-4871-8561-8f3a44e5ed7b","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
