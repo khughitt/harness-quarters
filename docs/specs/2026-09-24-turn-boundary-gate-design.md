@@ -427,6 +427,11 @@ which is why the guard now reads the Stop input (§3.2 step 3). Codex showed
 no blocks in 143 rollouts. The deferred count still runs, against the guard
 as it now stands.
 
+The deferred count ran on 2026-10-08 (`hq-a558e8`,
+`docs/notes/2026-10-08-claim-guard-rollout-judgment.md`). On Claude Code, blocks fell to
+1.4% of stops and every one led to a park or to more work, so the reason text stands.
+On Codex no normal turn end held a claim, so the guard had nothing to block.
+
 ## 7. Decomposition
 
 One implementation plan drives all of it
