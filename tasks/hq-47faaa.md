@@ -1,13 +1,15 @@
 ---
 id: hq-47faaa
 title: "Claude's /effort is session state: filter effortLevel and preserve it with live-picks"
-status: todo
+status: doing
 priority: 2
 size: s
 complexity: mid
 process: direct
+owner: main
 created: 2026-10-10T14:07:56Z
-updated: 2026-10-10T19:24:39Z
+updated: 2026-10-10T19:26:50Z
+started: 2026-10-10T19:26:36Z
 depends: []
 tags: []
 agent: claude-code/claude-opus-5-5
@@ -30,3 +32,8 @@ Note: with the committed value gone, a fresh home runs Claude Code's default eff
 - 2026-10-10T19:22:04Z (main): scope: question; body records the filter and live-picks touch points (.githooks/harness-state-clean:20, .githooks/live-picks), that effortLevel has stayed "high" since c28e2da, and the cost of filtering (fresh homes start at the default effort); one open question: is /effort a session pick or a committed default, recommendation filter it
 - 2026-10-10T19:24:33Z (main): Answered 2026-10-10 (user): /effort is a per-session choice; effortLevel is not tracked.
 - 2026-10-10T19:24:33Z (main): scope: scoped; rescoped after the user's answer; todo, P2, size s, complexity mid, process direct; body states the filter, live-picks, test, doc and rollout steps
+- 2026-10-10T19:26:36Z (main): started
+  provenance: {"harness_session":"claude-code:f931dcfe-2b47-4c43-9945-e5557533fdda","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-10T19:26:41Z (main): trial: flow-trial-1 — enrolled — flow on
+- 2026-10-10T19:26:41Z (main): arm: flow-trial-1 — unit tack-47faaa — flow on
+- 2026-10-10T19:26:50Z (main): gate: scoped — adopted
