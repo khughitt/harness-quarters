@@ -1,0 +1,317 @@
+#!/usr/bin/env python3
+"""Keep the model picks in the live harness configs across git commands that drop them.
+
+The harness-state clean filter keeps the picks out of the index: `model` and
+`modelSettings` in claude/settings.json, the top-level `model` and
+`model_reasoning_effort` in codex/config.toml. A git command that writes a new blob of
+either file over the live one drops the pick, and the harness runs on its default. This
+tool saves each file's pick in local/live-picks.json, untracked and carried between
+hosts by Dropbox, and puts it back:
+
+    capture               save the pick each file holds; absence never records a reset
+    restore               put a saved pick into a file holding none of its fields
+    sync                  capture, then restore
+    forget <file>         record the file's default and remove its pick from the file
+    hook <name>           restore from a git hook, then restage what it wrote
+
+A file's owned fields are one unit. Git drops all of them together, so a file holding
+none is the only state a git rewrite leaves; any other state was written by a harness or
+a person, and the live file wins. Absence alone cannot tell a rewrite from a return to
+the default, so only forget records `default`, for either file. Both harnesses capture
+at Stop; picker events are not reliable post-write events. restore never writes a file
+that holds any owned field, so a newer pick is never overwritten. It prepends Codex's lines, which are top-level keys
+whatever follows, and writes only when the result parses to the live values plus the
+saved ones and the filter's output, what git stages, is unchanged.
+
+The record is machine-owned and written whole; an invalid one is refused, never
+overwritten. A file that cannot be read is refused alone: the other is still handled.
+Every operation holds local/harness-state.lock, the host lock codex-trust also takes. A
+hook reports a failure on stderr and exits 0, and skips a linked worktree silently and,
+from post-checkout, a rebase in progress; the next turn end retries. Every other
+operation refuses a linked worktree, whose configs are not live. Design:
+docs/specs/2026-10-10-live-model-preservation-design.md.
+"""
+import json
+import runpy
+import sys
+import tomllib
+
+import harness_state
+
+CHECKOUT = harness_state.Checkout("live-picks")
+fail = CHECKOUT.fail
+REPO = harness_state.REPO
+RECORD_NAME = "local/live-picks.json"
+RECORD = REPO / RECORD_NAME
+CLAUDE = "claude/settings.json"
+CODEX = "codex/config.toml"
+OWNED = (CLAUDE, CODEX)
+USAGE = ("usage: live-picks capture | restore | sync | forget <file> | "
+         "hook post-checkout|post-merge|post-rewrite")
+# The filter decides what a checkout drops; reading its names keeps the owned fields
+# exactly the dropped ones.
+FILTER = runpy.run_path(str(harness_state.HERE / "harness-state-clean"))
+JSON_KEYS = FILTER["JSON_KEYS"]
+TOML_KEYS = tuple(name for table, name in FILTER["TOML_KEYS"] if table.fullmatch(""))
+TOML_HEADER = FILTER["TOML_HEADER"]
+TOML_KEY = FILTER["TOML_KEY"]
+CLEAN = {CLAUDE: FILTER["clean_json"], CODEX: FILTER["clean_toml"]}
+FIELD = {CLAUDE: "values", CODEX: "lines"}
+
+
+class Refused(Exception):
+    """One file cannot be read or written; the other is still handled."""
+
+
+def parse(name, text):
+    try:
+        data = json.loads(text) if name == CLAUDE else tomllib.loads(text)
+    except (json.JSONDecodeError, tomllib.TOMLDecodeError) as error:
+        raise Refused(f"{name} does not parse: {error}")
+    if not isinstance(data, dict):
+        raise Refused(f"{name} is not an object")
+    return data
+
+
+def codex_lines(text):
+    """The owned key lines before the first table header, in file order."""
+    lines = []
+    for line in text.splitlines(keepends=True):
+        if TOML_HEADER.match(line):
+            break
+        key = TOML_KEY.match(line)
+        if key and key.group(1) in TOML_KEYS:
+            lines.append(line if line.endswith("\n") else line + "\n")
+    return lines
+
+
+def toml_or_none(text):
+    try:
+        return tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
+        return None
+
+
+def pick(name, text):
+    """The owned fields text holds: Claude's values or Codex's lines; empty when none.
+
+    A Codex pick the filter could not drop line by line (a multi-line value, a key after
+    a header-like line) is refused.
+    """
+    data = parse(name, text)
+    if name == CLAUDE:
+        return {key: data[key] for key in JSON_KEYS if key in data}
+    lines = codex_lines(text)
+    if toml_or_none("".join(lines)) != {key: data[key] for key in TOML_KEYS if key in data}:
+        raise Refused(f"{name}: write {' and '.join(TOML_KEYS)} as one-line keys "
+                      "before the first table")
+    return lines
+
+
+def invalid(name, saved):
+    """Why a record entry is malformed, or None."""
+    if name not in OWNED:
+        return "not a file live-picks owns"
+    if not isinstance(saved, dict) or saved.get("state") not in ("set", "default"):
+        return 'state must be "set" or "default"'
+    if saved["state"] == "default":
+        return None if set(saved) == {"state"} else "a default entry holds only its state"
+    if set(saved) != {"state", FIELD[name]}:
+        return f'a set entry holds its state and "{FIELD[name]}"'
+    held = saved[FIELD[name]]
+    if name == CLAUDE:
+        if isinstance(held, dict) and held and set(held) <= set(JSON_KEYS):
+            return None
+        return f"values must name some of {', '.join(JSON_KEYS)}"
+    if isinstance(held, list) and held and all(isinstance(line, str) for line in held):
+        text = "".join(held)
+        parsed = toml_or_none(text)
+        if parsed is not None and set(parsed) <= set(TOML_KEYS) and codex_lines(text) == held:
+            return None
+    return f"lines must be one-line {' or '.join(TOML_KEYS)} keys"
+
+
+def read_record():
+    if not RECORD.exists():
+        return {}
+    try:
+        record = json.loads(RECORD.read_text())
+    except json.JSONDecodeError as error:
+        fail(f"{RECORD_NAME} is not valid JSON: {error}; fix or delete it")
+    if not isinstance(record, dict):
+        fail(f"{RECORD_NAME} is not an object; fix or delete it")
+    for name, saved in record.items():
+        problem = invalid(name, saved)
+        if problem:
+            fail(f"{RECORD_NAME}: {name}: {problem}; fix or delete it")
+    return record
+
+
+def write_record(record):
+    harness_state.write(RECORD, json.dumps(record, indent=2, ensure_ascii=False) + "\n")
+
+
+def live(name):
+    path = REPO / name
+    try:
+        if not path.is_file():
+            raise Refused(f"{name} is missing")
+        return path.read_text()
+    except (OSError, UnicodeError) as error:
+        raise Refused(f"{name} cannot be read: {error}") from None
+
+
+def capture():
+    """Save the pick each file holds; returns the refusals."""
+    record = read_record()
+    updated, refusals = dict(record), []
+    for name in OWNED:
+        try:
+            held = pick(name, live(name))
+        except Refused as error:
+            refusals.append(str(error))
+            continue
+        if held:
+            updated[name] = {"state": "set", FIELD[name]: held}
+    if updated != record:
+        write_record(updated)
+    return refusals
+
+
+def checked(name, text, result, want):
+    """result, when it parses to want and the filter's output is text's; else refused."""
+    try:
+        got = parse(name, result)
+    except Refused:
+        got = None
+    if got != want or CLEAN[name](result) != CLEAN[name](text):
+        raise Refused(f"found no way to change {name} that keeps its other values and what "
+                      "git stages; nothing written")
+    return result
+
+
+def with_pick(name, text, saved):
+    data = parse(name, text)
+    if name == CLAUDE:
+        want = {**data, **saved["values"]}
+        result = json.dumps(want, indent=2, ensure_ascii=False) + "\n"
+    else:
+        want = {**data, **tomllib.loads("".join(saved["lines"]))}
+        result = "".join(saved["lines"]) + text
+    return checked(name, text, result, want)
+
+
+def without_pick(name, text):
+    data = parse(name, text)
+    if name == CLAUDE:
+        want = {key: value for key, value in data.items() if key not in JSON_KEYS}
+        result = json.dumps(want, indent=2, ensure_ascii=False) + "\n"
+    else:
+        want = {key: value for key, value in data.items() if key not in TOML_KEYS}
+        kept, top = [], True
+        for line in text.splitlines(keepends=True):
+            top = top and not TOML_HEADER.match(line)
+            key = top and TOML_KEY.match(line)
+            if not (key and key.group(1) in TOML_KEYS):
+                kept.append(line)
+        result = "".join(kept)
+    return checked(name, text, result, want)
+
+
+def restore():
+    """Put each saved pick into a file holding none of its fields.
+
+    Returns the files written and the refusals.
+    """
+    record = read_record()
+    written, refusals = [], []
+    for name in OWNED:
+        saved = record.get(name)
+        if saved is None or saved["state"] != "set":
+            continue
+        try:
+            text = live(name)
+            if pick(name, text):
+                continue
+            result = with_pick(name, text, saved)
+            harness_state.write((REPO / name).resolve(), result)
+        except Refused as error:
+            refusals.append(str(error))
+            continue
+        except (OSError, UnicodeError) as error:
+            refusals.append(f"{name}: {error}")
+            continue
+        written.append(name)
+    return written, refusals
+
+
+def forget(name):
+    record = read_record()
+    try:
+        text = live(name)
+        if pick(name, text):
+            harness_state.write((REPO / name).resolve(), without_pick(name, text))
+    except Refused as error:
+        fail(str(error))
+    record[name] = {"state": "default"}
+    write_record(record)
+    CHECKOUT.restage(name)
+
+
+def refuse(refusals):
+    if refusals:
+        fail("; ".join(refusals))
+
+
+def operate(args):
+    """Run the operation args name under the host lock.
+
+    A filesystem or decoding failure (an unreadable record, a directory where a file
+    belongs) fails like any refusal, with the tool's name and no traceback.
+    """
+    try:
+        with CHECKOUT.locked():
+            if args[0] == "hook":
+                written, refusals = restore()
+                for name in written:
+                    CHECKOUT.restage(name)
+            elif args[0] == "forget":
+                forget(args[1])
+                return
+            else:
+                refusals = []
+                if args[0] in ("capture", "sync"):
+                    refusals += capture()
+                if args[0] in ("restore", "sync"):
+                    refusals += restore()[1]
+            refuse(refusals)
+    except (OSError, UnicodeError) as error:
+        fail(str(error))
+
+
+def main(argv):
+    args = argv[1:]
+    if not (args in (["capture"], ["restore"], ["sync"])
+            or len(args) == 2 and (args[0] == "forget" or args[0] == "hook"
+                                   and args[1] in harness_state.GIT_HOOKS)):
+        fail(USAGE)
+    if args[0] == "forget" and args[1] not in OWNED:
+        fail(f"forget takes {' or '.join(OWNED)}, not {args[1]!r}")
+    if CHECKOUT.linked_worktree():
+        if args[0] == "hook":
+            return
+        fail(f"{REPO} is a linked worktree; its harness configs are not live")
+    if args[0] != "hook":
+        operate(args)
+        return
+    if args[1] == "post-checkout" and CHECKOUT.rebasing():
+        return
+    try:
+        operate(args)
+    except SystemExit as error:
+        print(f"{error}\nlive-picks: a pick was not restored; the next turn end retries",
+              file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main(sys.argv)

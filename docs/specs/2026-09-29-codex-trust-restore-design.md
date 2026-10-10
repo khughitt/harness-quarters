@@ -117,6 +117,8 @@ Otherwise `[projects."/a"]` and `[ projects."/a" ]` would count as two tables.
 
 Both operations run under an exclusive `flock` on `local/codex/trust.toml.lock`, which
 serializes the Stop hooks of concurrent sessions and the git hooks on one host.
+(Since 2026-10-10 the lock is `local/harness-state.lock`, shared with `live-picks`:
+`docs/specs/2026-10-10-live-model-preservation-design.md` §3.3.)
 Without it, two restores racing would each append the same table, and a duplicate
 table makes the file invalid TOML, so Codex would refuse to load it. Every write is
 atomic (a temporary file, then a rename). A write to the live file goes through the

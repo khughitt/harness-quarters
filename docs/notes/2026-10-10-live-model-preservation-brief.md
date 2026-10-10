@@ -2,6 +2,10 @@
 
 Scoped 2026-10-10. Report: hq-a77096. Goal: hq-cc17de.
 
+Settled 2026-10-10 by `docs/specs/2026-10-10-live-model-preservation-design.md`
+(accepted after review round 2) and `docs/plans/2026-10-10-live-model-preservation.md`
+(hq-14d183). The questions below are answered there.
+
 ## Problem
 
 A merge that changes tracked harness settings can silently replace the user's

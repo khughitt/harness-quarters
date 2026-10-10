@@ -29,7 +29,7 @@ The generated global Projects block is checked by lore.
   their reconciliation through the tasks project registry.
 - `claude/`, `codex/` and `local/`: harness settings, hooks and untracked host state.
   `claude/mods/` holds Claude Code function-hook plugins.
-- `.githooks/`: config-state filtering, Codex trust preservation and commit checks.
+- `.githooks/`: config-state filtering, Codex trust and model pick preservation, and commit checks.
 - `facts/capabilities.toml` and `tools/harness-facts`: what each harness has been shown
   to do, with the record behind each value. The tool is the only reader.
 - `agents/skills/session-logs/`: session-store guidance. `agents/bin/` keeps

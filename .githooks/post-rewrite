@@ -1,5 +1,9 @@
 #!/bin/sh
-# Put back the Codex project trust this rebase dropped (.githooks/codex-trust). Git
-# feeds the rewritten commits on stdin; drain them so it never writes to a closed pipe.
+# Put back the Codex project trust and the model picks this rebase dropped
+# (.githooks/codex-trust, .githooks/live-picks). Git feeds the rewritten commits on
+# stdin; drain them so it never writes to a closed pipe. Failures stay on stderr;
+# keep the Git command successful.
 cat >/dev/null
-exec "$(dirname "$0")/codex-trust" hook post-rewrite
+"$(dirname "$0")/codex-trust" hook post-rewrite
+"$(dirname "$0")/live-picks" hook post-rewrite
+exit 0
