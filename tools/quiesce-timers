@@ -45,8 +45,12 @@ def service_of(timer):
     return unit
 
 
-def load(path):
-    return json.loads(Path(path).read_text())["timers"]
+def load(args):
+    """The window's record. A state file that is not there is named, not a traceback."""
+    path = Path(args.state)
+    if not path.is_file():
+        raise Stop(f"{args.command}: no state file at {path}; record writes it")
+    return json.loads(path.read_text())["timers"]
 
 
 def record(args):
@@ -66,7 +70,7 @@ def record(args):
 
 
 def stop(args):
-    for t in load(args.state):
+    for t in load(args):
         result = systemctl("stop", t["timer"])
         if result.returncode != 0:
             raise Stop(f"stop {t['timer']}: {result.stderr.strip()}")
@@ -76,7 +80,7 @@ def stop(args):
 def wait(args):
     deadline = time.monotonic() + args.timeout
     while True:
-        running = [t["service"] for t in load(args.state)
+        running = [t["service"] for t in load(args)
                    if query("is-active", t["service"]) not in ("inactive", "failed")]
         if not running:
             print("every service is inactive")
@@ -88,7 +92,7 @@ def wait(args):
 
 
 def restore(args):
-    timers = load(args.state)
+    timers = load(args)
     for t in timers:
         verb = "start" if t["active"] == "active" else "stop"
         result = systemctl(verb, t["timer"])

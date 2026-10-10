@@ -2873,6 +2873,8 @@ Then ask the user to open one fresh session per home on that host, as in Task 9 
 
 - [ ] **Step 1: Retarget the projects outside the snapshot (spec §3.2 step 9)**
 
+Superseded for later renames (hq-170b28, 2026-10-10): `rename-cutover retarget --snapshot "$SNAP" --forward`, with no `--repo`, selects these projects itself and no longer accepts `--repo` beside `--forward`. It commits nothing: commit `tasks/` in each root `$SNAP/forward.json` lists, which spans every run; a rerun after an interruption prints only the roots it wrote itself. The loop below is the record of this rename's run.
+
 ```sh
 . "$HOME/.local/state/rename-hq/env.sh" && cd "$OPS_ROOT" && tasks start "$STEP11" >/dev/null && \
 ( for r in $(tasks projects --json | python3 -c 'import json,sys; [print(p["root"]) for p in json.load(sys.stdin)["projects"] if p.get("reachable", True)]'); do \
