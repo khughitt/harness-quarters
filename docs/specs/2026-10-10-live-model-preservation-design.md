@@ -1,8 +1,8 @@
 # Live model preservation: keep model picks across Git updates
 
-Status: draft for review 2026-10-10; revised after spec review round 1 (explicit reset
-scoped to Claude, one lock with `codex-trust`, capture before the index-lock skip,
-TOML keys prepended). Task: `hq-14d183` (goal `hq-cc17de`, report
+Status: approved 2026-10-10 (accepted at spec review round 2; the user approved it for
+planning). Round 1 revisions: explicit reset scoped to Claude, one lock with
+`codex-trust`, capture before the index-lock skip, TOML keys prepended. Task: `hq-14d183` (goal `hq-cc17de`, report
 `hq-a77096`). Brief: `docs/notes/2026-10-10-live-model-preservation-brief.md`. Builds
 on the trust restore (`docs/specs/2026-09-29-codex-trust-restore-design.md`), whose
 hook-coverage probe (§1 there) this design relies on unchanged.

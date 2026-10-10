@@ -1,5 +1,9 @@
 # Live Model Preservation Implementation Plan
 
+Status: approved 2026-10-10 by the user after plan review round 2, whose one finding
+(the probe supervisor's tmux cleanup) this revision fixes. Task: `hq-a77096`; design task
+`hq-14d183`. Execution method: not yet chosen.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Model picks in the live harness configs survive every Git command that rewrites them, while a deliberate return to the default stays the default.
@@ -61,25 +65,33 @@ The spec (§4.1) makes two answers prerequisites. Nothing here touches a live ho
 
 - [ ] **Step 1: Start the probe supervisor**
 
-One supervisor owns everything the probe creates: the scratch homes, the copied sign-in credentials, and both tmux sessions. It removes all of them when both sessions have ended, when it is stopped (TERM, INT), or when its runner's timeout kills it, so an interrupted probe leaves nothing behind. `<scratch>` is the session's scratchpad directory.
+One supervisor owns everything the probe creates: the scratch homes, the copied sign-in credentials, and a tmux server of its own on a socket named after its pid (`tmux -L hq-probe-<pid>`), holding both sessions. It removes exactly what it created when both sessions have ended, when it is stopped (TERM, INT), or when its runner's timeout kills it, so an interrupted probe leaves nothing behind and never touches a tmux server or directory it did not create. It refuses to start when its socket or scratch directory already exists, and checks after startup that both sessions are running. `<scratch>` is the session's scratchpad directory.
 
 Write `<scratch>/hq-probe-supervisor.sh`:
 
 ```bash
 #!/bin/bash
 # Probe supervisor for hq live model preservation, Task 1. Builds scratch homes for Claude
-# Code and Codex, runs each in a detached tmux session, and removes the sessions, the
-# homes and the copied credentials when both sessions end or this script is stopped.
+# Code and Codex, runs each in a detached session on a tmux server of its own, and removes
+# only what it created (that server, the homes, the copied credentials) when both sessions
+# end or this script is stopped. It refuses to start over an existing socket or directory.
 set -euo pipefail
 probe=$1
+sock=hq-probe-$$
+owns_server=0
+owns_tree=0
 cleanup() {
-  tmux kill-session -t hq-p1 2>/dev/null || true
-  tmux kill-session -t hq-p2 2>/dev/null || true
-  rm -rf "$probe"
+  if [ "$owns_server" = 1 ]; then tmux -L "$sock" kill-server 2>/dev/null || true; fi
+  if [ "$owns_tree" = 1 ]; then rm -rf "$probe"; fi
 }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
 
+if tmux -L "$sock" list-sessions >/dev/null 2>&1; then
+  echo "supervisor: tmux socket $sock already serves sessions; refusing" >&2; exit 1
+fi
+mkdir "$probe"          # fails, before anything is owned, when the directory exists
+owns_tree=1
 mkdir -p "$probe/home" "$probe/work" "$probe/codex" "$probe/cwork"
 install -m 600 ~/.claude/.credentials.json "$probe/home/.credentials.json"
 install -m 600 ~/.codex/auth.json "$probe/codex/auth.json"
@@ -96,21 +108,29 @@ cat > "$probe/home/settings.json" <<EOF
 EOF
 printf 'model = "gpt-6.1-sol"\nmodel_reasoning_effort = "high"\n' > "$probe/codex/config.toml"
 
-tmux new-session -d -s hq-p1 -x 200 -y 50 -c "$probe/work" "CLAUDE_CONFIG_DIR=$probe/home claude"
-tmux new-session -d -s hq-p2 -x 200 -y 50 -c "$probe/cwork" "CODEX_HOME=$probe/codex codex"
-echo "supervisor $$: sessions hq-p1 (Claude Code), hq-p2 (Codex) under $probe"
-while tmux has-session -t hq-p1 2>/dev/null || tmux has-session -t hq-p2 2>/dev/null; do
+owns_server=1           # set before the first new-session: a partial start is still cleaned
+tmux -L "$sock" new-session -d -s hq-p1 -x 200 -y 50 -c "$probe/work" "CLAUDE_CONFIG_DIR=$probe/home claude"
+tmux -L "$sock" new-session -d -s hq-p2 -x 200 -y 50 -c "$probe/cwork" "CODEX_HOME=$probe/codex codex"
+sleep 1
+for session in hq-p1 hq-p2; do
+  if ! tmux -L "$sock" has-session -t "$session" 2>/dev/null; then
+    echo "supervisor: session $session did not start" >&2; exit 1
+  fi
+done
+echo "supervisor $$: tmux -L $sock, sessions hq-p1 (Claude Code), hq-p2 (Codex) under $probe"
+while tmux -L "$sock" has-session -t hq-p1 2>/dev/null \
+      || tmux -L "$sock" has-session -t hq-p2 2>/dev/null; do
   sleep 2
 done
 ```
 
-Start it through the harness's background runner, never `&` or `nohup`: in Claude Code, Bash with `run_in_background: true` and `timeout: 2700000` (45 minutes), command `bash <scratch>/hq-probe-supervisor.sh <scratch>/hq-probe`. Read its output: the `supervisor <pid>` line names the sessions. Record the background task id; it is how Step 4 stops the supervisor when needed.
+Start it through the harness's background runner, never `&` or `nohup`: in Claude Code, Bash with `run_in_background: true` and `timeout: 2700000` (45 minutes), command `bash <scratch>/hq-probe-supervisor.sh <scratch>/hq-probe`. Read its output: the `supervisor <pid>: tmux -L hq-probe-<pid>` line names the socket every later `tmux` call uses (`sock` below). An error line instead means it refused or a session failed to start; it has already cleaned up what it created, so read the message, fix the cause, and start it again. Record the background task id; it is how Step 4 stops the supervisor when needed.
 
 Evidence goes to `<scratch>/hq-probe-evidence.txt`, outside the supervised tree and free of credentials, so it survives cleanup.
 
 - [ ] **Step 2: Claude Code — pick a model, then the default**
 
-Drive the pane with `tmux send-keys -t hq-p1` and read it with `tmux capture-pane -p -t hq-p1`. Answer first-run prompts (theme, folder trust) as they appear. With `probe=<scratch>/hq-probe` and `evidence=<scratch>/hq-probe-evidence.txt` set in each call:
+Drive the pane with `tmux -L "$sock" send-keys -t hq-p1` and read it with `tmux -L "$sock" capture-pane -p -t hq-p1`. Answer first-run prompts (theme, folder trust) as they appear. With `sock=hq-probe-<pid>`, `probe=<scratch>/hq-probe` and `evidence=<scratch>/hq-probe-evidence.txt` set in each call:
 
 1. `/model`, choose Opus. Then `{ echo "== claude after opus"; cat "$probe/log"; cat "$probe/home/settings.json"; } >> "$evidence"`.
 2. `/model`, choose the Default entry. Then the same, headed `== claude after default`.
@@ -122,7 +142,7 @@ Judge from the evidence file:
 
 - [ ] **Step 3: Codex — walk the picker**
 
-Drive `hq-p2` the same way. Open `/model` and walk every kind of entry the picker offers (another model, another effort, any default or reset entry). After each, `{ echo "== codex after <entry>"; cat "$probe/codex/config.toml"; } >> "$evidence"`. Then exit Codex; the hq-p2 session ends.
+Drive `hq-p2` the same way, on the same socket. Open `/model` and walk every kind of entry the picker offers (another model, another effort, any default or reset entry). After each, `{ echo "== codex after <entry>"; cat "$probe/codex/config.toml"; } >> "$evidence"`. Then exit Codex; the hq-p2 session ends.
 
 `model-reset-clears-pick` (codex) is `true` when any picker action left neither `model` nor `model_reasoning_effort`; `false` when every action wrote both or one.
 
@@ -132,7 +152,7 @@ With both sessions ended, the supervisor exits and its EXIT trap removes the tre
 
 ```bash
 test ! -e <scratch>/hq-probe && echo "scratch tree removed"
-tmux ls 2>/dev/null | grep -E '^hq-p[12]:' || echo "no probe session"
+tmux -L hq-probe-<pid> list-sessions >/dev/null 2>&1 && echo "the probe server is still running" || echo "no probe session"
 ```
 
 Expected: `scratch tree removed` and `no probe session`. No copied credential remains. The end-of-turn report says nothing was left running.
