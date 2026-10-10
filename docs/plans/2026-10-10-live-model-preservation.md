@@ -6,9 +6,10 @@ capture and `forget` fallback spec after Task 1 disproved post-write picker even
 Task: `hq-a77096`; design task: `hq-14d183`. Execution method: native inline
 (chosen 2026-10-10), with flow gates required by the enrolled trial.
 
-Tasks 1–5 are complete; Task 6 documentation is implemented and awaits the final
-fresh branch review. Task 7 rollout remains separately gated. Remaining work captures at Stop, never captures from `PostModelSwitch`,
-and resets only through `forget`. There is one separately approved rollout merge.
+Tasks 1–6 are complete and reviewed; the final hook-status correction passed
+878 tests and a fresh scoped re-review. Task 7 rollout remains separately gated.
+The implementation captures at Stop, never from `PostModelSwitch`, and resets only
+through `forget`. There is one separately approved rollout merge.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
