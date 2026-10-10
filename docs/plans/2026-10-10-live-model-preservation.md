@@ -1,12 +1,12 @@
 # Live Model Preservation Implementation Plan
 
-Status: revised draft awaiting human plan review. The user approved the Stop-only
+Status: revised plan approved 2026-10-10 by the user (plan review round 1 on
+`hq-a77096`). The user approved the Stop-only
 capture and `forget` fallback spec after Task 1 disproved post-write picker events.
 Task: `hq-a77096`; design task: `hq-14d183`. Execution method: native inline
 (chosen 2026-10-10), with flow gates required by the enrolled trial.
 
-Task 1 is complete at `7f53166`; resume at Task 2 only after this revised plan is
-reviewed. Remaining work captures at Stop, never captures from `PostModelSwitch`,
+Task 1 is complete at `7f53166`; native execution resumes at Task 2. Remaining work captures at Stop, never captures from `PostModelSwitch`,
 and resets only through `forget`. There is one separately approved rollout merge.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -96,7 +96,7 @@ needed by this plan.
 **Interfaces:**
 - Produces, in `harness_state`: `HERE`, `REPO`, `LOCAL`, `LOCK` (`Path`), `GIT_HOOKS` (tuple of str), `write(path: Path, text: str) -> None`, and `class Checkout(tool: str)` with `fail(message) -> NoReturn` (exits with `"<tool>: <message>"`), `git(*args) -> str`, `git_path(name) -> Path`, `linked_worktree() -> bool`, `rebasing() -> bool`, `restage(name: str) -> None`, `locked()` (context manager; fails naming `just setup` when `local/` is missing).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `.githooks/test_codex_trust.py`, add `import fcntl` and `import time` to the imports, and add:
 
@@ -113,12 +113,12 @@ def test_codex_trust_waits_for_the_host_lock_live_picks_shares(repo):
     assert run.returncode == 0, err
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `just test`
 Expected: FAIL in `test_codex_trust_waits_for_the_host_lock_live_picks_shares` (`assert run.poll() is None`: the old lock is `local/codex/trust.toml.lock`, so sync finishes at once).
 
-- [ ] **Step 3: Create the module**
+- [x] **Step 3: Create the module**
 
 `.githooks/harness_state.py`:
 
@@ -217,7 +217,7 @@ class Checkout:
             yield
 ```
 
-- [ ] **Step 4: Point `codex-trust` at the module**
+- [x] **Step 4: Point `codex-trust` at the module**
 
 In `.githooks/codex-trust`:
 
@@ -256,7 +256,7 @@ In `.githooks/codex-trust`:
    ```
 6. In the module docstring, after the sentence ending "and Codex's config is private.", add: `Every operation holds local/harness-state.lock, the host lock live-picks also takes.`
 
-- [ ] **Step 5: Ignore bytecode and update the refresh fixture**
+- [x] **Step 5: Ignore bytecode and update the refresh fixture**
 
 Append `__pycache__/` to `.gitignore`. Add `"harness_state.py"` to `HOOK_FILES` in
 `.githooks/test_codex_trust.py` after creating the module. In `.githooks/test_harness_state_refresh.py`, change the fixture's copy loop to:
@@ -266,12 +266,12 @@ Append `__pycache__/` to `.gitignore`. Add `"harness_state.py"` to `HOOK_FILES` 
                  "harness_state.py"):
 ```
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 Run: `just test`
 Expected: PASS, including every existing `test_codex_trust.py` and `test_harness_state_refresh.py` test unchanged.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add .githooks/harness_state.py .githooks/codex-trust .githooks/test_codex_trust.py .githooks/test_harness_state_refresh.py .gitignore

@@ -28,11 +28,12 @@ def repo(tmp_path):
     (repo / "claude").mkdir()
     (repo / "codex").mkdir()
     (repo / "local" / "codex").mkdir(parents=True)
-    for name in ("harness-state-clean", "harness-state-refresh", "codex-trust"):
+    for name in ("harness-state-clean", "harness-state-refresh", "codex-trust",
+                 "harness_state.py"):
         shutil.copy2(HOOKS / name, repo / ".githooks" / name)
     (repo / ".gitattributes").write_text("claude/settings*.json filter=harness-state\n"
                                          "codex/config*.toml filter=harness-state\n")
-    (repo / ".gitignore").write_text("local/\n")
+    (repo / ".gitignore").write_text("local/\n__pycache__/\n")
     (repo / "codex" / "config.toml").write_text("[features]\nhooks = true\n")
     git(tmp_path, "init", "-q", str(repo))
     git(repo, "config", "filter.harness-state.clean", ".githooks/harness-state-clean %f")

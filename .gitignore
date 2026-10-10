@@ -2,3 +2,4 @@
 claude/plans/*
 !claude/plans/.gitkeep
 local/
+__pycache__/

@@ -1,14 +1,16 @@
 """codex-trust saves Codex project trust in local/ and puts back what a checkout dropped."""
+import fcntl
 import shutil
 import stat
 import subprocess
+import time
 import tomllib
 from pathlib import Path
 
 import pytest
 
 HOOKS = Path(__file__).parent
-HOOK_FILES = ("harness-state-clean", "codex-trust", "harness-state-refresh",
+HOOK_FILES = ("harness-state-clean", "harness_state.py", "codex-trust", "harness-state-refresh",
               "post-checkout", "post-merge", "post-rewrite")
 CONFIG = "codex/config.toml"
 BASE = "[features]\nhooks = true\n"
@@ -32,7 +34,7 @@ def repo(tmp_path):
     (repo / "codex").mkdir()
     (repo / "local" / "codex").mkdir(parents=True)
     (repo / ".gitattributes").write_text("codex/config*.toml filter=harness-state\n")
-    (repo / ".gitignore").write_text("local/\n")
+    (repo / ".gitignore").write_text("local/\n__pycache__/\n")
     (repo / CONFIG).write_text(BASE)
     git(tmp_path, "init", "-q", "-b", "main", str(repo))
     git(repo, "config", "filter.harness-state.clean", ".githooks/harness-state-clean %f")
@@ -627,3 +629,15 @@ def test_a_checkout_of_the_file_leaves_the_live_file_private(repo):
     git(repo, "checkout", "--", CONFIG)
 
     assert stat.S_IMODE(live(repo).stat().st_mode) == 0o600
+
+
+def test_codex_trust_waits_for_the_host_lock_live_picks_shares(repo):
+    with open(repo / "local" / "harness-state.lock", "a") as held:
+        fcntl.flock(held, fcntl.LOCK_EX)
+        run = subprocess.Popen([str(repo / ".githooks" / "codex-trust"), "sync"],
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        time.sleep(0.5)
+        assert run.poll() is None
+    _, err = run.communicate(timeout=10)
+
+    assert run.returncode == 0, err
