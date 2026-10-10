@@ -497,3 +497,141 @@ def test_hook_restages_a_restored_file_when_the_other_write_fails(repo):
     assert claude(repo)["model"] == "opus"
     assert "model" not in codex(repo)
     assert git(repo, "diff-files", "--name-only", "--", CLAUDE).stdout == ""
+
+
+def picked(repo):
+    """Both harnesses picked and a turn ended: picks live, saved, git's mark clear."""
+    write_claude(repo, **{**claude(repo), "model": "opus"})
+    (repo / CODEX).write_text(PICK + (repo / CODEX).read_text())
+    assert picks(repo, "capture").returncode == 0
+    git(repo, "add", "--", CLAUDE, CODEX)
+
+
+def commit_settings(repo, message, theme="light", codex_text=TUI + BASE):
+    write_claude(repo, theme=theme)
+    (repo / CODEX).write_text(codex_text)
+    git(repo, "add", "--", CLAUDE, CODEX)
+    git(repo, "commit", "-q", "-m", message)
+
+
+def side_with_settings(repo):
+    git(repo, "switch", "-q", "-c", "side")
+    commit_settings(repo, "side")
+    git(repo, "switch", "-q", "main")
+
+
+def assert_picked(repo, theme="light", codex_text=TUI + BASE):
+    assert claude(repo) == {"theme": theme, "model": "opus"}
+    assert (repo / CODEX).read_text() == PICK + codex_text
+
+
+def test_a_merge_that_rewrites_both_configs_keeps_both_picks(repo):
+    side_with_settings(repo)
+    picked(repo)
+
+    result = git(repo, "merge", "-q", "side")
+
+    assert result.stderr == ""
+    assert_picked(repo)
+    assert status(repo) == ""
+
+
+def test_one_merge_restores_trust_and_picks_together(repo):
+    side_with_settings(repo)
+    picked(repo)
+    (repo / "local" / "codex" / "trust.toml").write_text(A)
+
+    git(repo, "merge", "-q", "side")
+
+    assert codex(repo)["projects"] == {"/work/a": {"trust_level": "trusted"}}
+    assert codex(repo)["model"] == "gpt-6.1-sol"
+    assert status(repo) == ""
+
+
+def test_a_branch_switch_keeps_the_picks_both_ways(repo):
+    side_with_settings(repo)
+    picked(repo)
+
+    git(repo, "switch", "-q", "side")
+    assert_picked(repo)
+    git(repo, "switch", "-q", "main")
+
+    assert_picked(repo, theme="dark-ansi", codex_text=BASE)
+    assert status(repo) == ""
+
+
+@pytest.mark.parametrize("command", [("checkout", "--"), ("restore",)])
+def test_a_checkout_of_a_file_keeps_its_pick(repo, command):
+    picked(repo)
+    write_claude(repo, theme="light", model="opus")
+
+    git(repo, *command, CLAUDE)
+
+    assert claude(repo) == {"theme": "dark-ansi", "model": "opus"}
+    assert status(repo) == ""
+
+
+def test_a_rebase_that_replays_a_settings_commit_keeps_the_picks(repo):
+    git(repo, "switch", "-q", "-c", "side")
+    (repo / "u").write_text("side\n")
+    git(repo, "add", "u")
+    git(repo, "commit", "-q", "-m", "side")
+    git(repo, "switch", "-q", "main")
+    commit_settings(repo, "main settings")
+    picked(repo)
+
+    result = git(repo, "rebase", "side", check=False)
+
+    assert result.returncode == 0, result.stderr
+    assert_picked(repo)
+    assert "model" not in git(repo, "show", "HEAD:" + CLAUDE).stdout
+    assert status(repo) == ""
+
+
+@pytest.mark.parametrize("command", ["checkout --", "switch", "merge"])
+def test_hooks_leave_a_linked_worktree_alone(repo, tmp_path, command):
+    side_with_settings(repo)
+    picked(repo)
+    other = tmp_path / "other"
+    git(repo, "worktree", "add", "-q", "-b", "mine", str(other), "main")
+    if command == "checkout --":
+        (other / CLAUDE).write_text('{"theme": "x"}\n')
+        result = git(other, "checkout", "-q", "--", CLAUDE)
+    elif command == "switch":
+        result = git(other, "switch", "-q", "--detach", "side")
+    else:
+        result = git(other, "merge", "-q", "side")
+
+    assert result.stderr == ""
+    assert "model" not in (other / CLAUDE).read_text()
+    assert "model" not in (other / CODEX).read_text()
+    assert git(other, "status", "--porcelain").stdout == ""
+
+
+def test_a_filesystem_error_in_a_hook_reports_and_lets_the_git_command_succeed(repo):
+    side_with_settings(repo)
+    picked(repo)
+    record_path(repo).unlink()
+    record_path(repo).mkdir()
+
+    result = git(repo, "switch", "-q", "side", check=False)
+
+    assert result.returncode == 0
+    assert "live-picks: " in result.stderr
+    assert "Traceback" not in result.stderr
+    assert git(repo, "branch", "--show-current").stdout.strip() == "side"
+
+
+def test_a_failing_pick_restore_reports_and_trust_still_returns(repo):
+    side_with_settings(repo)
+    picked(repo)
+    (repo / "local" / "codex" / "trust.toml").write_text(A)
+    record_path(repo).write_text("{")
+
+    result = git(repo, "switch", "-q", "side", check=False)
+
+    assert result.returncode == 0
+    assert "live-picks: local/live-picks.json" in result.stderr
+    assert "the next turn end retries" in result.stderr
+    assert "/work/a" in codex(repo)["projects"]
+    assert git(repo, "branch", "--show-current").stdout.strip() == "side"

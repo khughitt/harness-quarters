@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 HOOKS = Path(__file__).parent
-HOOK_FILES = ("harness-state-clean", "harness_state.py", "codex-trust", "harness-state-refresh",
+HOOK_FILES = ("harness-state-clean", "harness_state.py", "codex-trust", "live-picks", "harness-state-refresh",
               "post-checkout", "post-merge", "post-rewrite")
 CONFIG = "codex/config.toml"
 BASE = "[features]\nhooks = true\n"
@@ -32,8 +32,11 @@ def repo(tmp_path):
     for name in HOOK_FILES:
         shutil.copy2(HOOKS / name, repo / ".githooks" / name)
     (repo / "codex").mkdir()
+    (repo / "claude").mkdir()
+    (repo / "claude" / "settings.json").write_text('{\n  "theme": "dark-ansi"\n}\n')
     (repo / "local" / "codex").mkdir(parents=True)
-    (repo / ".gitattributes").write_text("codex/config*.toml filter=harness-state\n")
+    (repo / ".gitattributes").write_text("claude/settings*.json filter=harness-state\n"
+                                         "codex/config*.toml filter=harness-state\n")
     (repo / ".gitignore").write_text("local/\n__pycache__/\n")
     (repo / CONFIG).write_text(BASE)
     git(tmp_path, "init", "-q", "-b", "main", str(repo))

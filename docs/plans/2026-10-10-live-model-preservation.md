@@ -1076,7 +1076,7 @@ git commit -m "feat(hooks): live-picks saves and restores model picks"
 **Interfaces:**
 - Consumes: `live-picks hook <name>` (Task 3).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `.githooks/test_live_picks.py`:
 
@@ -1219,12 +1219,12 @@ def test_a_failing_pick_restore_reports_and_trust_still_returns(repo):
     assert git(repo, "branch", "--show-current").stdout.strip() == "side"
 ```
 
-- [ ] **Step 2: Run them to verify they fail**
+- [x] **Step 2: Run them to verify they fail**
 
 Run: `just test`
 Expected: FAIL in the new tests: after the Git command, `model` is missing (`assert_picked` / `KeyError: 'model'`).
 
-- [ ] **Step 3: Wire the hooks**
+- [x] **Step 3: Wire the hooks**
 
 `.githooks/post-checkout`:
 
@@ -1259,7 +1259,7 @@ cat >/dev/null
 exec "$(dirname "$0")/live-picks" hook post-rewrite
 ```
 
-- [ ] **Step 4: Update the trust fixture**
+- [x] **Step 4: Update the trust fixture**
 
 In `.githooks/test_codex_trust.py`, the hooks now run `live-picks`, which needs both owned files. Add `"live-picks"` to `HOOK_FILES`, and in the `repo` fixture, before `git init`:
 
@@ -1277,12 +1277,12 @@ and change the `.gitattributes` line to:
 
 No trust assertion changes.
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `just test`
 Expected: PASS, the trust suite included.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add .githooks/post-checkout .githooks/post-merge .githooks/post-rewrite .githooks/test_live_picks.py .githooks/test_codex_trust.py

@@ -1,3 +1,5 @@
 #!/bin/sh
-# Put back the Codex project trust this merge dropped (.githooks/codex-trust).
-exec "$(dirname "$0")/codex-trust" hook post-merge
+# Put back the Codex project trust and the model picks this merge dropped
+# (.githooks/codex-trust, .githooks/live-picks). Each reports its own failure and exits 0.
+"$(dirname "$0")/codex-trust" hook post-merge
+exec "$(dirname "$0")/live-picks" hook post-merge
