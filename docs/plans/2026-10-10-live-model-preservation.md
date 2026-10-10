@@ -1318,9 +1318,10 @@ Expected: FAIL in the new tests: after the Git command, `model` is missing (`ass
 ```sh
 #!/bin/sh
 # Put back the Codex project trust and the model picks this checkout dropped
-# (.githooks/codex-trust, .githooks/live-picks). Each reports its own failure and exits 0.
+# (.githooks/codex-trust, .githooks/live-picks). Failures stay on stderr; keep the Git command successful.
 "$(dirname "$0")/codex-trust" hook post-checkout
-exec "$(dirname "$0")/live-picks" hook post-checkout
+"$(dirname "$0")/live-picks" hook post-checkout
+exit 0
 ```
 
 `.githooks/post-merge`:
@@ -1328,9 +1329,10 @@ exec "$(dirname "$0")/live-picks" hook post-checkout
 ```sh
 #!/bin/sh
 # Put back the Codex project trust and the model picks this merge dropped
-# (.githooks/codex-trust, .githooks/live-picks). Each reports its own failure and exits 0.
+# (.githooks/codex-trust, .githooks/live-picks). Failures stay on stderr; keep the Git command successful.
 "$(dirname "$0")/codex-trust" hook post-merge
-exec "$(dirname "$0")/live-picks" hook post-merge
+"$(dirname "$0")/live-picks" hook post-merge
+exit 0
 ```
 
 `.githooks/post-rewrite`:
@@ -1339,11 +1341,12 @@ exec "$(dirname "$0")/live-picks" hook post-merge
 #!/bin/sh
 # Put back the Codex project trust and the model picks this rebase dropped
 # (.githooks/codex-trust, .githooks/live-picks). Git feeds the rewritten commits on
-# stdin; drain them so it never writes to a closed pipe. Each tool reports its own
-# failure and exits 0.
+# stdin; drain them so it never writes to a closed pipe. Failures stay on stderr;
+# keep the Git command successful.
 cat >/dev/null
 "$(dirname "$0")/codex-trust" hook post-rewrite
-exec "$(dirname "$0")/live-picks" hook post-rewrite
+"$(dirname "$0")/live-picks" hook post-rewrite
+exit 0
 ```
 
 - [x] **Step 4: Update the trust fixture**

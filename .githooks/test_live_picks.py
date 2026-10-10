@@ -622,6 +622,45 @@ def test_a_filesystem_error_in_a_hook_reports_and_lets_the_git_command_succeed(r
     assert git(repo, "branch", "--show-current").stdout.strip() == "side"
 
 
+
+@pytest.mark.parametrize("damage", ["missing", "non-executable", "startup-failure"])
+def test_a_pick_launch_failure_keeps_a_successful_checkout_successful(repo, damage):
+    side_with_settings(repo)
+    tool = repo / ".githooks" / "live-picks"
+    if damage == "missing":
+        tool.unlink()
+    elif damage == "non-executable":
+        tool.chmod(0o644)
+    else:
+        tool.write_text("#!/bin/sh\necho 'live-picks: startup failed' >&2\nexit 1\n")
+
+    result = git(repo, "switch", "-q", "side", check=False)
+
+    assert result.returncode == 0, result.stderr
+    assert "live-picks" in result.stderr
+    assert git(repo, "branch", "--show-current").stdout.strip() == "side"
+    assert claude(repo) == {"theme": "light"}
+    assert (repo / CODEX).read_text() == TUI + BASE
+
+
+@pytest.mark.parametrize("hook", ["post-checkout", "post-merge", "post-rewrite"])
+@pytest.mark.parametrize("damage", ["missing", "non-executable", "startup-failure"])
+def test_git_wrappers_keep_zero_status_when_pick_launch_fails(repo, hook, damage):
+    tool = repo / ".githooks" / "live-picks"
+    if damage == "missing":
+        tool.unlink()
+    elif damage == "non-executable":
+        tool.chmod(0o644)
+    else:
+        tool.write_text("#!/bin/sh\necho 'live-picks: startup failed' >&2\nexit 1\n")
+
+    result = subprocess.run([str(repo / ".githooks" / hook)], cwd=repo,
+                            input="old new\n", text=True, capture_output=True)
+
+    assert result.returncode == 0, result.stderr
+    assert "live-picks" in result.stderr
+
+
 def test_a_failing_pick_restore_reports_and_trust_still_returns(repo):
     side_with_settings(repo)
     picked(repo)
