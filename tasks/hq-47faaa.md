@@ -1,17 +1,19 @@
 ---
 id: hq-47faaa
 title: "Claude's /effort is session state: filter effortLevel and preserve it with live-picks"
-status: doing
+status: done
 priority: 2
 size: s
 complexity: mid
 process: direct
-owner: effort-session-state
+owner: main
 created: 2026-10-10T14:07:56Z
-updated: 2026-10-10T19:48:51Z
+updated: 2026-10-10T19:52:11Z
 started: 2026-10-10T19:26:36Z
+completed: 2026-10-10T19:52:09Z
 depends: []
 tags: []
+model: claude-opus-5-5
 agent: claude-code/claude-opus-5-5
 ---
 
@@ -46,4 +48,12 @@ Note: with the committed value gone, a fresh home runs Claude Code's default eff
 - 2026-10-10T19:48:37Z (effort-session-state): gate: verified tree:3b34f8256d297ac1e92d78f1b080de42ffafe4ce — checks: just test 657 passed and each new test seen failing against a targeted break (effortLevel removed from JSON_KEYS or the Claude groups merged); review: important addressed one-unit capture lost the other picker's saved value, important addressed merge drops live effortLevel so spec section 5 names the operator steps, important addressed forget and newer-pick coverage added, minor addressed spec 3.2 table now per unit, minor deferred forget has no per-unit form, minor deferred no test of an unknown key in an old record; reviewer: claude-code subagent
 - 2026-10-10T19:48:46Z (effort-session-state): gate: verified tree:3b34f8256d297ac1e92d78f1b080de42ffafe4ce — checks: just test 657 passed and each new test seen failing against a targeted break (effortLevel removed from JSON_KEYS or the Claude groups merged); review: important addressed one-unit capture lost the other picker's saved value, important addressed merge drops live effortLevel so spec section 5 names the operator steps, important addressed forget and newer-pick coverage added, minor addressed spec 3.2 table now per unit, minor deferred forget has no per-unit form, minor deferred no test of an unknown key in an old record; reviewer: claude-code/claude-opus-5-5
 - 2026-10-10T19:48:51Z (effort-session-state): parked (waiting on user, review): User approves merging effort-session-state into main (activates the live hooks); then Claude merges, re-adds effortLevel high to the live claude/settings.json, runs .githooks/live-picks capture, checks local/live-picks.json and git status, writes the retro and closes
+  provenance: {"harness_session":"claude-code:f931dcfe-2b47-4c43-9945-e5557533fdda","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-10T19:52:08Z (main): resumed
+  provenance: {"harness_session":"claude-code:f931dcfe-2b47-4c43-9945-e5557533fdda","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-10T19:52:08Z (main): rollout: merged f90b6c0 into main by fast-forward after the user's approval; first attempt aborted on the size-only stat mark of claude/settings.json (content equal to the index), cleared by git add; post-merge restored model fable and dropped effortLevel as predicted; re-added effortLevel high, live-picks capture saved {model: fable, effortLevel: high}, git status clean. Also refreshed the stale record (opus) before merging.
+- 2026-10-10T19:52:08Z (main): retro: the first fresh-context review paid for itself: deriving owned fields from the filter made the change look like one line, but two independent pickers sharing one unit silently lost data, which only a hand-traced gap scenario exposed. Simulating the rollout in a temp repo predicted the effortLevel loss and the size-only-mark merge abort exactly.
+- 2026-10-10T19:52:09Z (main): done
+  provenance: {"harness_session":"claude-code:f931dcfe-2b47-4c43-9945-e5557533fdda","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-10T19:52:09Z (main): Claude's /effort is session state: filtered, preserved per picker by live-picks, rolled out on main with effortLevel high restored
   provenance: {"harness_session":"claude-code:f931dcfe-2b47-4c43-9945-e5557533fdda","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
