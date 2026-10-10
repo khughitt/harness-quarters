@@ -1,6 +1,8 @@
 # Live model preservation: keep model picks across Git updates
 
-Status: draft for review 2026-10-10. Task: `hq-14d183` (goal `hq-cc17de`, report
+Status: draft for review 2026-10-10; revised after spec review round 1 (explicit reset
+scoped to Claude, one lock with `codex-trust`, capture before the index-lock skip,
+TOML keys prepended). Task: `hq-14d183` (goal `hq-cc17de`, report
 `hq-a77096`). Brief: `docs/notes/2026-10-10-live-model-preservation-brief.md`. Builds
 on the trust restore (`docs/specs/2026-09-29-codex-trust-restore-design.md`), whose
 hook-coverage probe (§1 there) this design relies on unchanged.
@@ -99,7 +101,7 @@ written by the harness or a person, and the live file wins.
 | Live file holds | Capture does | Restore does |
 |---|---|---|
 | any owned field | record `set` with exactly the fields present | nothing |
-| none, at an explicit pick event (§3.3) | record `default` | nothing |
+| none, in `claude/settings.json` at Claude's pick event (§3.3) | record `default` | nothing |
 | none, anywhere else | nothing: absence alone cannot tell reset from rewrite | insert the record's fields if it is `set` |
 
 This settles the precedence questions in the brief:
@@ -108,28 +110,36 @@ This settles the precedence questions in the brief:
   overwrite a pick. A later pick is present at the next capture and replaces the
   record.
 - **Reset to default.** A reset is recorded as `default` only from an event that
-  proves it was a pick (§3.3), or by `forget` (§3.4). Absence seen at a turn end never
-  changes the record.
+  proves a pick in that same file (§3.3), or by `forget` (§3.4). Claude's pick event
+  says nothing about Codex, so it never resets `codex/config.toml`. Absence seen
+  anywhere else never changes the record.
 - **Partial state** (say `model` without `modelSettings`) is a harness choice: it is
   captured as is and never "completed" from the record.
 
 ### 3.3 Where it runs
 
 The tool `.githooks/live-picks` works on the checkout it lives in, refuses a linked
-worktree as `codex-trust` does, and holds an exclusive `flock` on
-`local/live-picks.json.lock` for every read-modify-write of the record or a live file.
+worktree as `codex-trust` does, and holds an exclusive `flock` for every
+read-modify-write of the record or a live file. Both tools write `codex/config.toml`,
+so they take **one** host lock, `local/harness-state.lock`: `codex-trust` moves to it
+from `local/codex/trust.toml.lock`. Separate locks would let a trust restore and a
+pick restore read the same starting file and each overwrite the other's insert.
 
-- **Turn end, both harnesses.** `harness-state-refresh` (Stop) runs `live-picks sync`
-  (capture then restore) beside `codex-trust sync`, before its staging step, under the
-  same `index.lock` skip. This is the capture point for Codex and the fallback restore
-  for every Git command no hook covers (stash, reset, cherry-pick, revert, aborts, a
-  conflicted merge, a fast-forward-only rebase).
+- **Turn end, both harnesses.** `harness-state-refresh` (Stop) first runs
+  `live-picks capture`, then its existing `index.lock` skip, then `codex-trust sync`,
+  `live-picks restore` and its staging step. Capture reads the live files and writes
+  only the record, never the index, so it runs even while another Git process holds
+  the index; restore and staging keep the skip. This is the capture point for Codex
+  and the fallback restore for every Git command no hook covers (stash, reset,
+  cherry-pick, revert, aborts, a conflicted merge, a fast-forward-only rebase).
 - **Claude's pick event.** `PostModelSwitch` in `claude/settings.json` also runs
   `~/.local/bin/harness-state-refresh`, which reads the payload's `hook_event_name`
-  and runs `live-picks capture --explicit`. Only this capture may record `default`:
-  the event proves a pick happened, so an all-absent file there is a reset. It also
-  clears the size-only `M` mark the pick left. Claude Code has no event for `/effort`,
-  which this design does not own.
+  and runs `live-picks capture --explicit` in that first, unskipped step, so a reset
+  made while the index is locked is still recorded. Only this capture may record
+  `default`, and only for `claude/settings.json`: the event proves a Claude pick
+  happened, so an all-absent Claude file there is a reset. The rest of the run
+  proceeds as at Stop and clears the size-only `M` mark the pick left. Claude Code has
+  no event for `/effort`, which this design does not own.
 - **After a Git command.** `post-checkout`, `post-merge` and `post-rewrite` run
   `live-picks hook <name>` after `codex-trust hook <name>`, each in its own process so
   one failure never hides the other. Like the trust hook, it restores and restages,
@@ -143,11 +153,15 @@ itself; probe P2 (§4.1) settles it, and `forget` covers a hand reset.
 ### 3.4 Operations
 
 - `capture [--explicit]`: apply §3.2's capture column to each owned file.
+  `--explicit` changes the rule for `claude/settings.json` only; `codex/config.toml`
+  is captured by the plain rule either way.
 - `restore`: apply its restore column. JSON: parse the live file, add the recorded
   keys, write with the clean filter's serialization (`indent=2`, `ensure_ascii=False`,
-  final newline). TOML: insert the recorded lines immediately before the first table
-  header (at the end when there is none), the same placement rule the trust restore
-  uses. Before writing, both check that the result parses, holds exactly the live
+  final newline). TOML: prepend the recorded lines to the file. Lines at the start are
+  top-level keys whatever follows, so no header-like line inside a multi-line string
+  can misplace them, and the filter drops them as it drops any top-level owned key.
+  The trust restore's own placement, before the first header, is unaffected. Before
+  writing, both check that the result parses, holds exactly the live
   values plus the recorded ones, and has the same clean-filter output as the live
   file; otherwise nothing is written and the command exits non-zero. Writes are atomic
   through the link's target and keep the file's mode.
@@ -175,9 +189,9 @@ unchanged by the move.
 - **Capture window.** A Codex pick is saved at the next turn end. A Git command that
   drops the file in between restores the previous pick. Claude picks are saved at
   the pick event, so the window there is only probe P1's ordering (§4.1).
-- **Racing writes.** Restore re-reads the live file under the lock just before its
-  atomic replace; a harness write in that instant can still be overwritten. The lock
-  serializes this host's hooks only. Two hosts acting on the shared file at once can
+- **Racing writes.** Restore re-reads the live file under the shared lock just before
+  its atomic replace; a harness write in that instant can still be overwritten, since
+  the harnesses do not take the lock. The lock serializes this host's hooks only. Two hosts acting on the shared file at once can
   leave a Dropbox conflicted copy, as with trust.
 - **No hook** for the commands listed in the trust spec's §1 probe: the next turn end
   restores. A main checkout parked on a branch without these hooks restores nothing
@@ -190,7 +204,8 @@ unchanged by the move.
 
 README Setup replaces "the harness runs on its default model until the next pick" with
 the restore behaviour, `forget`, and the limits above. The `harness-state-clean` and
-`harness-state-refresh` docstrings name `live-picks`. `hq-a77096` gets a finding note
+`harness-state-refresh` docstrings name `live-picks`; `codex-trust`'s docstring and the
+trust spec's §3.2 name the shared `local/harness-state.lock`. `hq-a77096` gets a finding note
 and the brief a "settled by" line in the commit that completes this design and plan.
 
 ## 4. Testing
@@ -234,6 +249,14 @@ hooks, and no live file:
     unchanged after the module extraction.
 11. A conflicted merge leaves the file for the next `sync`, which restores on disk
     without disturbing the merge's staged result.
+12. Codex's keys dropped by a rewrite, then `capture --explicit` (a Claude pick): the
+    Codex entry stays `set`, and the next restore brings the Codex pick back.
+13. A trust restore and a pick restore of `codex/config.toml` started concurrently
+    both land: the file ends with the saved trust tables and the saved pick.
+14. A Claude reset (`capture --explicit` on an all-absent Claude file) with
+    `index.lock` held records `default`; the next Stop restores nothing.
+15. A `codex/config.toml` whose multi-line string holds a line like `[example]`
+    restores its pick, and the string's value is unchanged.
 
 ## 5. Rollout and recovery
 
