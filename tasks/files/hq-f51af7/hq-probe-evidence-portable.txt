@@ -1,0 +1,243 @@
+== codex after other model: GPT-6-Astra medium
+model = "gpt-6-astra"
+model_reasoning_effort = "medium"
+
+[tui]
+screen_reader_detection_done = true
+
+[tui.model_availability_nux]
+"gpt-6.1-sol" = 1
+
+[projects."<checkout>"]
+trust_level = "trusted"
+
+== claude after opus
+--- 1791646748.034115045
+{"session_id":"d1ee8774-e5be-419b-8546-c2a8eec4c126","transcript_path":"<worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe/home/projects/-mnt-ssd3-work-hq--worktrees-live-model-preservation--superpowers-sdd-2026-10-10-live-model-preservation-hq-probe-work/d1ee8774-e5be-419b-8546-c2a8eec4c126.jsonl","cwd":"<worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe/work","scratchpad_dir":"<scratch>/-mnt-ssd3-work-hq--worktrees-live-model-preservation--superpowers-sdd-2026-10-10-live-model-preservation-hq-probe-work/d1ee8774-e5be-419b-8546-c2a8eec4c126/scratchpad","prompt_id":"a8e460b6-069f-4d89-a5aa-6c81b7485f7b","hook_event_name":"PostModelSwitch","from_model":"claude-sonnet-5-5","to_model":"claude-opus-5-5","requested_model":"opus","source":"picker","context_tokens":0,"prompt_cache_warm":false,"cache_ttl":"1h","estimated_cache_write_usd":0,"pricing":"catalog"}
+
+settings at hook time:
+{
+  "model": "sonnet",
+  "hooks": {
+    "PostModelSwitch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PROBE=<worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe <worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe/hook.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "theme": "dark"
+}
+
+{
+  "model": "opus",
+  "hooks": {
+    "PostModelSwitch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PROBE=<worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe <worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe/hook.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "theme": "dark"
+}
+
+== claude after default
+--- 1791646748.034115045
+{"session_id":"d1ee8774-e5be-419b-8546-c2a8eec4c126","transcript_path":"<worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe/home/projects/-mnt-ssd3-work-hq--worktrees-live-model-preservation--superpowers-sdd-2026-10-10-live-model-preservation-hq-probe-work/d1ee8774-e5be-419b-8546-c2a8eec4c126.jsonl","cwd":"<worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe/work","scratchpad_dir":"<scratch>/-mnt-ssd3-work-hq--worktrees-live-model-preservation--superpowers-sdd-2026-10-10-live-model-preservation-hq-probe-work/d1ee8774-e5be-419b-8546-c2a8eec4c126/scratchpad","prompt_id":"a8e460b6-069f-4d89-a5aa-6c81b7485f7b","hook_event_name":"PostModelSwitch","from_model":"claude-sonnet-5-5","to_model":"claude-opus-5-5","requested_model":"opus","source":"picker","context_tokens":0,"prompt_cache_warm":false,"cache_ttl":"1h","estimated_cache_write_usd":0,"pricing":"catalog"}
+
+settings at hook time:
+{
+  "model": "sonnet",
+  "hooks": {
+    "PostModelSwitch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PROBE=<worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe <worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe/hook.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "theme": "dark"
+}
+
+{
+  "hooks": {
+    "PostModelSwitch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PROBE=<worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe <worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe/hook.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "theme": "dark"
+}
+
+== codex after other effort: GPT-6-Astra high
+model = "gpt-6-astra"
+model_reasoning_effort = "high"
+
+[tui]
+screen_reader_detection_done = true
+
+[tui.model_availability_nux]
+"gpt-6.1-sol" = 1
+
+[projects."<checkout>"]
+trust_level = "trusted"
+
+== codex model picker entries (no default or reset entry)
+
+  >_ OpenAI Codex (v0.162.1)
+     <worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe/cwork
+
+• Model changed to gpt-6-astra medium
+
+• Model changed to gpt-6-astra high
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  Select Model and Effort
+
+
+  1. GPT-6.1-Sol            Latest workhorse model for coding and everyday work.
+› 2. GPT-6-Astra (current)  Frontier intelligence for the most demanding work.
+  3. GPT-6-Sol              Previous generation workhorse model.
+  4. GPT-6-Luna             Fast and affordable model for easier tasks.
+  5. GPT-5.6-Sol            Older generation workhorse model.
+  6. GPT-5.6-Terra          Older balanced model for straightforward work.
+  7. GPT-5.6-Luna           Older fast and efficient model.
+
+  enter select · esc back
+== codex after default reasoning level: GPT-6-Astra medium
+model = "gpt-6-astra"
+model_reasoning_effort = "medium"
+
+[tui]
+screen_reader_detection_done = true
+
+[tui.model_availability_nux]
+"gpt-6.1-sol" = 1
+
+[projects."<checkout>"]
+trust_level = "trusted"
+
+== claude after Sonnet then Default (resolved model changes)
+--- 1791646748.034115045
+{"session_id":"d1ee8774-e5be-419b-8546-c2a8eec4c126","transcript_path":"<worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe/home/projects/-mnt-ssd3-work-hq--worktrees-live-model-preservation--superpowers-sdd-2026-10-10-live-model-preservation-hq-probe-work/d1ee8774-e5be-419b-8546-c2a8eec4c126.jsonl","cwd":"<worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe/work","scratchpad_dir":"<scratch>/-mnt-ssd3-work-hq--worktrees-live-model-preservation--superpowers-sdd-2026-10-10-live-model-preservation-hq-probe-work/d1ee8774-e5be-419b-8546-c2a8eec4c126/scratchpad","prompt_id":"a8e460b6-069f-4d89-a5aa-6c81b7485f7b","hook_event_name":"PostModelSwitch","from_model":"claude-sonnet-5-5","to_model":"claude-opus-5-5","requested_model":"opus","source":"picker","context_tokens":0,"prompt_cache_warm":false,"cache_ttl":"1h","estimated_cache_write_usd":0,"pricing":"catalog"}
+
+settings at hook time:
+{
+  "model": "sonnet",
+  "hooks": {
+    "PostModelSwitch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PROBE=<worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe <worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe/hook.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "theme": "dark"
+}
+--- 1791646811.317925986
+{"session_id":"d1ee8774-e5be-419b-8546-c2a8eec4c126","transcript_path":"<worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe/home/projects/-mnt-ssd3-work-hq--worktrees-live-model-preservation--superpowers-sdd-2026-10-10-live-model-preservation-hq-probe-work/d1ee8774-e5be-419b-8546-c2a8eec4c126.jsonl","cwd":"<worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe/work","scratchpad_dir":"<scratch>/-mnt-ssd3-work-hq--worktrees-live-model-preservation--superpowers-sdd-2026-10-10-live-model-preservation-hq-probe-work/d1ee8774-e5be-419b-8546-c2a8eec4c126/scratchpad","prompt_id":"131ba239-d46f-4c7b-a7e6-bcbd235ceef3","hook_event_name":"PostModelSwitch","from_model":"claude-opus-5-5","to_model":"claude-sonnet-5-5","requested_model":"sonnet","source":"picker","context_tokens":0,"prompt_cache_warm":false,"cache_ttl":"1h","estimated_cache_write_usd":0,"pricing":"catalog"}
+
+settings at hook time:
+{
+  "hooks": {
+    "PostModelSwitch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PROBE=<worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe <worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe/hook.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "theme": "dark"
+}
+--- 1791646826.969257310
+{"session_id":"d1ee8774-e5be-419b-8546-c2a8eec4c126","transcript_path":"<worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe/home/projects/-mnt-ssd3-work-hq--worktrees-live-model-preservation--superpowers-sdd-2026-10-10-live-model-preservation-hq-probe-work/d1ee8774-e5be-419b-8546-c2a8eec4c126.jsonl","cwd":"<worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe/work","scratchpad_dir":"<scratch>/-mnt-ssd3-work-hq--worktrees-live-model-preservation--superpowers-sdd-2026-10-10-live-model-preservation-hq-probe-work/d1ee8774-e5be-419b-8546-c2a8eec4c126/scratchpad","prompt_id":"c72ae8ca-7ea3-4220-900b-4533e44dfba1","hook_event_name":"PostModelSwitch","from_model":"claude-sonnet-5-5","to_model":"claude-opus-5-5","requested_model":null,"source":"picker","context_tokens":0,"prompt_cache_warm":false,"cache_ttl":"1h","estimated_cache_write_usd":0,"pricing":"catalog"}
+
+settings at hook time:
+{
+  "hooks": {
+    "PostModelSwitch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PROBE=<worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe <worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe/hook.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "theme": "dark",
+  "model": "sonnet"
+}
+
+{
+  "hooks": {
+    "PostModelSwitch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PROBE=<worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe <worktree>/.superpowers/sdd/2026-10-10-live-model-preservation/hq-probe/hook.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "theme": "dark"
+}

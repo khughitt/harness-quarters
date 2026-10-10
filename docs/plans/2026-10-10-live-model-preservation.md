@@ -2,7 +2,14 @@
 
 Status: approved 2026-10-10 by the user after plan review round 2, whose one finding
 (the probe supervisor's tmux cleanup) this revision fixes. Task: `hq-a77096`; design task
-`hq-14d183`. Execution method: not yet chosen.
+`hq-14d183`. Execution method: native inline (chosen 2026-10-10).
+
+Execution blocked after Task 1 (probe results recorded and reviewed; prerequisites failed): Claude Code 2.1.296 `PostModelSwitch` read the previous
+settings before the pick was written; Opus to Default fired no event when both
+resolved to Opus. `model-pick-event` is false. Evidence is attached to `hq-f51af7`.
+The spec has a proposed `forget` fallback revision awaiting human review; Tasks 3,
+5, 6 and 8 need revision after that review. The remaining plan below is the previously
+approved version and must not be executed against the failed prerequisite.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -63,7 +70,7 @@ The spec (§4.1) makes two answers prerequisites. Nothing here touches a live ho
 **Interfaces:**
 - Produces: facts `model-pick-event` and `model-reset-clears-pick`, read by Tasks 5, 6 and 8 through `tools/harness-facts get <fact> <harness>`.
 
-- [ ] **Step 1: Start the probe supervisor**
+- [x] **Step 1: Start the probe supervisor**
 
 One supervisor owns everything the probe creates: the scratch homes, the copied sign-in credentials, and a tmux server of its own on a socket named after its pid (`tmux -L hq-probe-<pid>`), holding both sessions. It removes exactly what it created when both sessions have ended, when it is stopped (TERM, INT), or when its runner's timeout kills it, so an interrupted probe leaves nothing behind and never touches a tmux server or directory it did not create. It refuses to start when its socket or scratch directory already exists, and checks after startup that both sessions are running. `<scratch>` is the session's scratchpad directory.
 
@@ -128,7 +135,7 @@ Start it through the harness's background runner, never `&` or `nohup`: in Claud
 
 Evidence goes to `<scratch>/hq-probe-evidence.txt`, outside the supervised tree and free of credentials, so it survives cleanup.
 
-- [ ] **Step 2: Claude Code — pick a model, then the default**
+- [x] **Step 2: Claude Code — pick a model, then the default**
 
 Drive the pane with `tmux -L "$sock" send-keys -t hq-p1` and read it with `tmux -L "$sock" capture-pane -p -t hq-p1`. Answer first-run prompts (theme, folder trust) as they appear. With `sock=hq-probe-<pid>`, `probe=<scratch>/hq-probe` and `evidence=<scratch>/hq-probe-evidence.txt` set in each call:
 
@@ -140,13 +147,13 @@ Judge from the evidence file:
 - `model-pick-event` (claude-code) is `true` when each log entry's "settings at hook time" already holds the new pick (`"model": "opus"` after 1; the default's state after 2); `false` when it shows the previous state; inconclusive when no entry was logged.
 - `model-reset-clears-pick` (claude-code) is `true` when the file after 2 has neither `model` nor `modelSettings`; `false` when it holds a model id.
 
-- [ ] **Step 3: Codex — walk the picker**
+- [x] **Step 3: Codex — walk the picker**
 
 Drive `hq-p2` the same way, on the same socket. Open `/model` and walk every kind of entry the picker offers (another model, another effort, any default or reset entry). After each, `{ echo "== codex after <entry>"; cat "$probe/codex/config.toml"; } >> "$evidence"`. Then exit Codex; the hq-p2 session ends.
 
 `model-reset-clears-pick` (codex) is `true` when any picker action left neither `model` nor `model_reasoning_effort`; `false` when every action wrote both or one.
 
-- [ ] **Step 4: Confirm cleanup**
+- [x] **Step 4: Confirm cleanup**
 
 With both sessions ended, the supervisor exits and its EXIT trap removes the tree; its completion notification arrives. If it has not finished (a harness refused to exit), stop it through the runner (Claude Code: `TaskStop` with the Step 1 task id), which sends TERM and runs the same cleanup. Then:
 
@@ -157,7 +164,7 @@ tmux -L hq-probe-<pid> list-sessions >/dev/null 2>&1 && echo "the probe server i
 
 Expected: `scratch tree removed` and `no probe session`. No copied credential remains. The end-of-turn report says nothing was left running.
 
-- [ ] **Step 5: Record the facts**
+- [x] **Step 5: Record the facts**
 
 Append to `facts/capabilities.toml` (values from the evidence file; versions from `claude --version` and `codex --version`; today's date):
 
@@ -201,7 +208,7 @@ note = "Every /model picker action in a scratch CODEX_HOME wrote model and model
 
 Replace each `value`, `version` and `note` with what was observed. An inconclusive probe gets `status = "unknown"` and a note, nothing else.
 
-- [ ] **Step 6: Validate, note, and decide whether to continue**
+- [x] **Step 6: Validate, note, and decide whether to continue**
 
 Run: `tools/harness-facts check && tools/harness-facts get model-pick-event claude-code`
 Expected: check prints nothing; get prints the entry.
@@ -210,12 +217,12 @@ Expected: check prints nothing; get prints the entry.
 
 Continue only if `model-pick-event` (claude-code) is `true`. Otherwise stop: the spec's §3.3 second bullet cannot hold, so Claude resets fall back to `forget`. Park the task `--waiting-on user --reason decision` with the observation; the spec and Tasks 5 and 8 change before implementation. The other two values never stop the plan; Task 6 words the README from them.
 
-- [ ] **Step 7: Run the suite**
+- [x] **Step 7: Run the suite**
 
 Run: `just test`
 Expected: PASS (it runs `tools/harness-facts check` first).
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add facts/capabilities.toml

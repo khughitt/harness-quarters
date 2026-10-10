@@ -57,3 +57,39 @@ version = "2.1.295"
 date = 2026-10-08
 evidence = "hq-b2515c; ops-ed76fe"
 note = "The headless Claude Code 2.1.295 Stop capture lists both shell and subagent as running. pending was not observed; it remains supported only by the guard review in ops-ed76fe. The value is unchanged, and this refresh does not newly verify pending."
+
+[facts.model-pick-event]
+type = "boolean"
+description = "A hook event fires when the session's model is picked, after the pick is written to the user settings file."
+
+[facts.model-pick-event.harness.claude-code]
+status = "probed"
+value = false
+version = "2.1.296"
+date = 2026-10-10
+evidence = "hq-f51af7"
+note = "PostModelSwitch ran before the settings write: Sonnet to Opus logged model=sonnet; Sonnet to Default also logged model=sonnet before it was removed. Opus to Default resolved to the same model and fired no event."
+
+[facts.model-pick-event.harness.codex]
+status = "unknown"
+note = "Codex has no model-picker hook event; Stop is the nearest. Not probed as a hook."
+
+[facts.model-reset-clears-pick]
+type = "boolean"
+description = "Picking the default model through the harness's picker leaves the user settings file with none of the model fields the clean filter drops."
+
+[facts.model-reset-clears-pick.harness.claude-code]
+status = "probed"
+value = true
+version = "2.1.296"
+date = 2026-10-10
+evidence = "hq-f51af7"
+note = "Choosing Default removed model from scratch settings.json and left no modelSettings, both after Opus and after Sonnet."
+
+[facts.model-reset-clears-pick.harness.codex]
+status = "probed"
+value = false
+version = "0.162.1"
+date = 2026-10-10
+evidence = "hq-f51af7"
+note = "Changing to GPT-6-Astra, changing its effort to high, and selecting the medium default reasoning level all retained model and model_reasoning_effort. The model picker offered no default or reset entry."

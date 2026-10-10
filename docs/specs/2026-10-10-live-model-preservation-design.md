@@ -1,7 +1,12 @@
 # Live model preservation: keep model picks across Git updates
 
-Status: approved 2026-10-10 (accepted at spec review round 2; the user approved it for
-planning). Round 1 revisions: explicit reset scoped to Claude, one lock with
+Status: revised draft awaiting human review. The 2026-10-10 Task 1 probe invalidated
+the approved event-ordering assumption: Claude Code 2.1.296 fires PostModelSwitch
+before writing settings, and switching Opus to Default fires no event when both
+resolve to the same model. Evidence: `hq-f51af7`. This revision uses the previously
+specified `forget` fallback for deliberate resets; the implementation plan must be
+revised after this spec is reviewed. Previously accepted at spec review round 2.
+Round 1 revisions: explicit reset scoped to Claude, one lock with
 `codex-trust`, capture before the index-lock skip, TOML keys prepended. Task: `hq-14d183` (goal `hq-cc17de`, report
 `hq-a77096`). Brief: `docs/notes/2026-10-10-live-model-preservation-brief.md`. Builds
 on the trust restore (`docs/specs/2026-09-29-codex-trust-restore-design.md`), whose
@@ -47,7 +52,7 @@ Goals:
 - After any Git command that drops the owned fields, the last pick returns: at once
   where a hook runs, at the next turn end where none does.
 - A pick made after the last capture is never overwritten by an older saved one.
-- A deliberate return to the default stays the default.
+- A deliberate return to the default through `forget` stays the default.
 - Restoring never changes what Git stages, never touches unrelated settings, and keeps
   Codex trust recovery working as it does now.
 - Linked worktrees are never touched: their copies are not live.
@@ -101,18 +106,17 @@ written by the harness or a person, and the live file wins.
 | Live file holds | Capture does | Restore does |
 |---|---|---|
 | any owned field | record `set` with exactly the fields present | nothing |
-| none, in `claude/settings.json` at Claude's pick event (§3.3) | record `default` | nothing |
-| none, anywhere else | nothing: absence alone cannot tell reset from rewrite | insert the record's fields if it is `set` |
+| none | nothing: absence alone cannot tell reset from rewrite | insert the record's fields if it is `set` |
 
 This settles the precedence questions in the brief:
 
 - **Newer live values win.** Restore only fills an all-absent file, so it can never
   overwrite a pick. A later pick is present at the next capture and replaces the
   record.
-- **Reset to default.** A reset is recorded as `default` only from an event that
-  proves a pick in that same file (§3.3), or by `forget` (§3.4). Claude's pick event
-  says nothing about Codex, so it never resets `codex/config.toml`. Absence seen
-  anywhere else never changes the record.
+- **Reset to default.** A reset is recorded as `default` only by `forget` (§3.4).
+  Absence seen at capture never changes the record. Claude's Default picker removes
+  the fields, so a later turn end would restore the old pick: use `forget` for a
+  deliberate reset. The probe showed no reliable post-write picker event (§4.1).
 - **Partial state** (say `model` without `modelSettings`) is a harness choice: it is
   captured as is and never "completed" from the record.
 
@@ -129,32 +133,28 @@ pick restore read the same starting file and each overwrite the other's insert.
   `live-picks capture`, then its existing `index.lock` skip, then `codex-trust sync`,
   `live-picks restore` and its staging step. Capture reads the live files and writes
   only the record, never the index, so it runs even while another Git process holds
-  the index; restore and staging keep the skip. This is the capture point for Codex
+  the index; restore and staging keep the skip. This is the capture point for both harnesses
   and the fallback restore for every Git command no hook covers (stash, reset,
   cherry-pick, revert, aborts, a conflicted merge, a fast-forward-only rebase).
-- **Claude's pick event.** `PostModelSwitch` in `claude/settings.json` also runs
-  `~/.local/bin/harness-state-refresh`, which reads the payload's `hook_event_name`
-  and runs `live-picks capture --explicit` in that first, unskipped step, so a reset
-  made while the index is locked is still recorded. Only this capture may record
-  `default`, and only for `claude/settings.json`: the event proves a Claude pick
-  happened, so an all-absent Claude file there is a reset. The rest of the run
-  proceeds as at Stop and clears the size-only `M` mark the pick left. Claude Code has
-  no event for `/effort`, which this design does not own.
+- **Claude's pick event is not a capture point.** Task 1 showed that
+  `PostModelSwitch` runs before the settings write and may not run at all when a
+  reset resolves to the same model. The refresh runs only at Stop; it does not
+  interpret picker payloads. Both harnesses use `forget` for deliberate resets.
 - **After a Git command.** `post-checkout`, `post-merge` and `post-rewrite` run
   `live-picks hook <name>` after `codex-trust hook <name>`, each in its own process so
   one failure never hides the other. Like the trust hook, it restores and restages,
   never captures (the file is already overwritten), skips a linked worktree silently,
   skips `post-checkout` during a rebase, reports failures on stderr and exits 0.
 
-Codex has no event near its picker, so a Codex reset cannot be told from a rewrite at
-a turn end. That is acceptable only if the picker never writes the all-absent state
-itself; probe P2 (§4.1) settles it, and `forget` covers a hand reset.
+Neither harness has a reliable post-write picker event, so a reset cannot be told
+from a rewrite at a turn end. Task 1 confirmed that Codex's tested picker actions
+retain the model fields, while Claude's Default removes them. `forget` is the
+explicit reset for either file; the README must explain the Claude picker limitation.
 
 ### 3.4 Operations
 
-- `capture [--explicit]`: apply §3.2's capture column to each owned file.
-  `--explicit` changes the rule for `claude/settings.json` only; `codex/config.toml`
-  is captured by the plain rule either way.
+- `capture`: apply §3.2's capture column to each owned file. It never records
+  `default`; only `forget` does that.
 - `restore`: apply its restore column. JSON: parse the live file, add the recorded
   keys, write with the clean filter's serialization (`indent=2`, `ensure_ascii=False`,
   final newline). TOML: prepend the recorded lines to the file. Lines at the start are
@@ -168,7 +168,7 @@ itself; probe P2 (§4.1) settles it, and `forget` covers a hand reset.
 - `sync`: `capture`, then `restore`, under one lock.
 - `forget <file>`: set the entry to `default` and remove the owned fields from the
   live file, keeping its clean-filter output; the way to return Codex to its default,
-  and a manual override for either harness.
+  and the explicit reset for either harness.
 - `hook <name>`: `restore` as the Git hooks run it, then restage the file when its
   filtered diff is empty and no other Git process holds the index.
 
@@ -184,11 +184,12 @@ unchanged by the move.
   and names the file; it is never overwritten, so a person decides. Deleting it is the
   reset.
 - **Invalid live file** (JSON or TOML that does not parse, a TOML owned key spanning
-  lines): refuse for that file, leave both files untouched, report.
+  lines): refuse for that file, leave its live file and saved entry untouched, and
+  continue handling the other file. Report the refusal.
 - **Missing `local/`**: an error naming `just setup`.
-- **Capture window.** A Codex pick is saved at the next turn end. A Git command that
-  drops the file in between restores the previous pick. Claude picks are saved at
-  the pick event, so the window there is only probe P1's ordering (§4.1).
+- **Capture window.** A pick in either harness is saved at the next turn end. A Git
+  command that drops the file in between restores the previous pick. A picker reset
+  that removes the fields is also undone at the next turn end; use `forget` to reset.
 - **Racing writes.** Restore re-reads the live file under the shared lock just before
   its atomic replace; a harness write in that instant can still be overwritten, since
   the harnesses do not take the lock. The lock serializes this host's hooks only. Two hosts acting on the shared file at once can
@@ -218,11 +219,14 @@ its record:
 - **P1 — Claude ordering.** In a scratch Claude home whose `settings.json` is a
   throwaway file, does `PostModelSwitch` fire after the new `model` is on disk, and
   does choosing the default remove `model` (rather than write a resolved id)? If the
-  hook fires first, `--explicit` cannot see the pick: Claude resets fall back to
-  `forget`, and the plan says so before implementing §3.3's second bullet.
+  hook fires first, reading the file at that event cannot capture the pick: Claude
+  resets fall back to `forget`. Task 1 observed that ordering and a missing event
+  when Opus to Default resolved to the same model. This draft applies the fallback.
 - **P2 — Codex picker.** In a scratch `CODEX_HOME`, does any picker action leave the
   config with neither owned key? If yes, a Codex reset is undone at the next turn end;
-  the README states it and `forget` is the reset.
+  the README states it and `forget` is the reset. Task 1 tested a model change, an
+  effort change, and the default reasoning level; all kept both owned fields, and
+  the model picker offered no default or reset entry.
 
 No probe touches the live homes.
 
@@ -237,8 +241,7 @@ hooks, and no live file:
 2. `git stash` / `git reset --hard` drop them; no hook runs; the next `sync` restores.
 3. A later pick (new value present) is captured and survives the next rewrite; the
    older value never returns.
-4. `capture --explicit` on an all-absent file records `default`; a rewrite then
-   restores nothing. `forget` does the same and removes the fields.
+4. `forget` records `default` and removes the fields; a rewrite then restores nothing.
 5. All-absent at a plain `capture` leaves a `set` record unchanged.
 6. Partial state is captured as is and never completed.
 7. Missing record: nothing restored, no error. Invalid record: refused, untouched.
@@ -249,26 +252,22 @@ hooks, and no live file:
     unchanged after the module extraction.
 11. A conflicted merge leaves the file for the next `sync`, which restores on disk
     without disturbing the merge's staged result.
-12. Codex's keys dropped by a rewrite, then `capture --explicit` (a Claude pick): the
-    Codex entry stays `set`, and the next restore brings the Codex pick back.
+12. Plain `capture` after either picker removes fields never records a reset; a
+    following restore brings the saved pick back. `forget` is the explicit reset.
 13. A trust restore and a pick restore of `codex/config.toml` started concurrently
     both land: the file ends with the saved trust tables and the saved pick.
-14. A Claude reset (`capture --explicit` on an all-absent Claude file) with
-    `index.lock` held records `default`; the next Stop restores nothing.
+14. `forget` with `index.lock` held records `default` and removes the pick without
+    staging; the next Stop restores nothing. Plain capture still runs under index lock.
 15. A `codex/config.toml` whose multi-line string holds a line like `[example]`
     restores its pick, and the string's value is unchanged.
 
 ## 5. Rollout and recovery
 
 The main checkout's `.githooks/` is live: merging into main activates the hooks, and
-that merge is a separately approved step. It lands in two merges so the second proves
-the first:
-
-1. **Tool and hooks**, with no change to `claude/settings.json` or `codex/`. Before
-   merging, `git diff main... -- claude/ codex/` is empty. After it, the next turn end
-   creates `local/live-picks.json`; check it holds the current picks.
-2. **`PostModelSwitch` wiring** in `claude/settings.json`. This merge rewrites the live
-   settings, so `post-merge` must restore the pick: check `model` is present afterward.
+that merge is a separately approved step. This revision needs only the tool-and-hooks
+merge: there is no `PostModelSwitch` wiring. Before merging, `git diff main... -- claude/ codex/` must be empty. After merging, capture and verify the current picks in
+`local/live-picks.json`. Settings-changing merges are covered by temporary repository
+tests; no extra live settings change is needed merely to exercise the hook.
 
 Recovery: revert the merge commits, delete `local/live-picks.json`, and re-pick by
 hand, which is today's behaviour. A wrongly restored pick is undone with
