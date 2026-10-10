@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: feat/capture-notice-hook
 created: 2026-10-09T17:59:17Z
-updated: 2026-10-10T12:05:11Z
+updated: 2026-10-10T12:05:17Z
 started: 2026-10-10T11:27:30Z
 completed: 2026-10-10T12:05:09Z
 depends: [ops-1aa710]
@@ -38,3 +38,4 @@ Register ops's hooks/capture-notice as a SessionStart hook in the Claude Code se
   provenance: {"harness_session":"claude-code:b7850bb1-0a62-4fb3-8409-fa6537d7da3b","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-10T12:05:09Z (feat/capture-notice-hook): capture-notice runs at SessionStart in the personal Claude Code and Codex homes (47d9193; trust hash committed on main). Fresh claude -p and codex exec sessions each carried 'captures: 2 awaiting triage, oldest 2026-10-09'. The zero case was checked only at hook level (empty stdout under a store-less HOME) plus ops's tests; no live zero queue.
   provenance: {"harness_session":"claude-code:b7850bb1-0a62-4fb3-8409-fa6537d7da3b","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-10T12:05:17Z (feat/capture-notice-hook): correction: the 'review: impl round 1' note above is wrong; no implementation review ran. The user only trusted the hook definition in Codex /hooks.
