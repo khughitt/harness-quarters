@@ -1,11 +1,12 @@
 # Live model preservation: keep model picks across Git updates
 
-Status: revised draft awaiting human review. The 2026-10-10 Task 1 probe invalidated
+Status: revised fallback approved 2026-10-10 by the user (spec review round 2 on
+`hq-a77096`). The 2026-10-10 Task 1 probe invalidated
 the approved event-ordering assumption: Claude Code 2.1.296 fires PostModelSwitch
 before writing settings, and switching Opus to Default fires no event when both
 resolve to the same model. Evidence: `hq-f51af7`. This revision uses the previously
-specified `forget` fallback for deliberate resets; the implementation plan must be
-revised after this spec is reviewed. Previously accepted at spec review round 2.
+specified `forget` fallback for deliberate resets; the revised implementation plan now awaits
+review for this approved fallback. Previously accepted at spec review round 2.
 Round 1 revisions: explicit reset scoped to Claude, one lock with
 `codex-trust`, capture before the index-lock skip, TOML keys prepended. Task: `hq-14d183` (goal `hq-cc17de`, report
 `hq-a77096`). Brief: `docs/notes/2026-10-10-live-model-preservation-brief.md`. Builds
