@@ -1779,12 +1779,12 @@ git commit -m "docs: model picks return after git rewrites"
 
 Merging activates the hooks in the live main checkout. This is an action the user approves at the time; approving the plan does not grant it.
 
-- [ ] **Step 1: Confirm the branch leaves the live configs alone**
+- [x] **Step 1: Confirm the branch leaves the live configs alone**
 
 Run, from the main checkout: `git diff main...live-model-preservation -- claude/ codex/`
 Expected: no output. Any output stops the rollout: the merge would rewrite a live config before the record exists.
 
-- [ ] **Step 2: Record the live picks the merge must keep**
+- [x] **Step 2: Record the live picks the merge must keep**
 
 From the main checkout: `python3 -c 'import json;print(json.load(open("claude/settings.json")).get("model"))'` and `grep -E '^(model|model_reasoning_effort) ' codex/config.toml`. Note both on the task, including any absent owned fields. An absent pick is valid;
 initial capture need not create an entry for that file.
