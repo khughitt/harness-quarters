@@ -75,6 +75,15 @@
             "command": "~/d/lore/hooks/claude-profile"
           }
         ]
+      },
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/ops/hooks/capture-notice"
+          }
+        ]
       }
     ],
     "PostModelSwitch": [
