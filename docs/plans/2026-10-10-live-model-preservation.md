@@ -6,7 +6,8 @@ capture and `forget` fallback spec after Task 1 disproved post-write picker even
 Task: `hq-a77096`; design task: `hq-14d183`. Execution method: native inline
 (chosen 2026-10-10), with flow gates required by the enrolled trial.
 
-Task 1 is complete at `7f53166`; native execution resumes at Task 2. Remaining work captures at Stop, never captures from `PostModelSwitch`,
+Tasks 1–5 are complete; Task 6 documentation is implemented and awaits the final
+fresh branch review. Task 7 rollout remains separately gated. Remaining work captures at Stop, never captures from `PostModelSwitch`,
 and resets only through `forget`. There is one separately approved rollout merge.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -282,6 +283,9 @@ git commit -m "refactor(hooks): share codex-trust's mechanics and take one host 
 
 ### Task 3: `live-picks` capture, restore, sync and forget
 
+Implementation note: examples include the verified per-file failure isolation fix
+from review round 1 and its regression cases.
+
 **Files:**
 - Create: `.githooks/live-picks` (mode 755)
 - Create: `.githooks/test_live_picks.py`
@@ -348,7 +352,7 @@ def repo(tmp_path):
     (repo / "local" / "codex").mkdir(parents=True)
     (repo / ".gitattributes").write_text("claude/settings*.json filter=harness-state\n"
                                          "codex/config*.toml filter=harness-state\n")
-    (repo / ".gitignore").write_text("local/\n")
+    (repo / ".gitignore").write_text("local/\n__pycache__/\n")
     write_claude(repo)
     (repo / CODEX).write_text(BASE)
     git(tmp_path, "init", "-q", "-b", "main", str(repo))
@@ -449,8 +453,6 @@ def test_a_partial_pick_is_saved_as_is_and_never_completed(repo):
 
     assert record(repo)[CLAUDE] == {"state": "set", "values": {"model": "haiku"}}
     assert "modelSettings" not in claude(repo)
-
-
 
 
 def test_restore_puts_back_both_picks_and_keeps_what_git_stages(repo):
@@ -726,6 +728,85 @@ def test_restore_keeps_a_home_link_and_the_file_mode(repo, tmp_path):
     assert home.is_symlink()
     assert json.loads(home.read_text())["model"] == "opus"
     assert (repo / CLAUDE).stat().st_mode & 0o777 == 0o600
+
+
+def test_capture_keeps_a_new_pick_when_the_other_file_is_missing(repo):
+    saved_both(repo)
+    write_claude(repo, model="sonnet")
+    (repo / CODEX).unlink()
+
+    result = picks(repo, "capture")
+
+    assert result.returncode != 0
+    assert CODEX in result.stderr
+    assert record(repo)[CLAUDE] == {"state": "set", "values": {"model": "sonnet"}}
+    assert record(repo)[CODEX] == CODEX_SET
+
+
+@pytest.mark.parametrize("damage", ["missing", "bad_utf8"])
+def test_restore_handles_the_healthy_file_after_a_live_read_failure(repo, damage):
+    saved_both(repo)
+    if damage == "missing":
+        (repo / CLAUDE).unlink()
+    else:
+        (repo / CLAUDE).write_bytes(b"\xff")
+
+    result = picks(repo, "restore")
+
+    assert result.returncode != 0
+    assert CLAUDE in result.stderr
+    assert "Traceback" not in result.stderr
+    assert codex(repo)["model"] == "gpt-6.1-sol"
+    assert record(repo)[CLAUDE] == CLAUDE_SET
+
+
+def fail_live_tempfile(repo, name):
+    """Inject failure at tempfile creation; every other CLI operation stays real."""
+    tool = repo / ".githooks" / "live-picks"
+    source = tool.with_name("live-picks-source")
+    shutil.copy2(tool, source)
+    tool.write_text(f"""#!/usr/bin/env python3
+import runpy
+from pathlib import Path
+import harness_state
+
+here = Path(__file__).resolve().parent
+create = harness_state.tempfile.mkstemp
+
+def fail_target(*args, **kwargs):
+    if Path(kwargs["dir"]) == (here.parent / {name!r}).parent:
+        raise PermissionError("simulated live-file write failure")
+    return create(*args, **kwargs)
+
+harness_state.tempfile.mkstemp = fail_target
+runpy.run_path(str(here / "live-picks-source"), run_name="__main__")
+""")
+
+
+def test_restore_handles_the_healthy_file_after_a_live_write_failure(repo):
+    saved_both(repo)
+    fail_live_tempfile(repo, CLAUDE)
+
+    result = picks(repo, "restore")
+
+    assert result.returncode != 0
+    assert CLAUDE in result.stderr
+    assert claude(repo) == {"theme": "dark-ansi"}
+    assert codex(repo)["model"] == "gpt-6.1-sol"
+
+
+def test_hook_restages_a_restored_file_when_the_other_write_fails(repo):
+    saved_both(repo)
+    fail_live_tempfile(repo, CODEX)
+
+    result = picks(repo, "hook", "post-merge")
+
+    assert result.returncode == 0
+    assert CODEX in result.stderr
+    assert "Traceback" not in result.stderr
+    assert claude(repo)["model"] == "opus"
+    assert "model" not in codex(repo)
+    assert git(repo, "diff-files", "--name-only", "--", CLAUDE).stdout == ""
 ```
 
 - [x] **Step 2: Run them to verify they fail**
@@ -894,9 +975,12 @@ def write_record(record):
 
 def live(name):
     path = REPO / name
-    if not path.is_file():
-        fail(f"{name} is missing")
-    return path.read_text()
+    try:
+        if not path.is_file():
+            raise Refused(f"{name} is missing")
+        return path.read_text()
+    except (OSError, UnicodeError) as error:
+        raise Refused(f"{name} cannot be read: {error}") from None
 
 
 def capture():
@@ -972,18 +1056,21 @@ def restore():
             if pick(name, text):
                 continue
             result = with_pick(name, text, saved)
+            harness_state.write((REPO / name).resolve(), result)
         except Refused as error:
             refusals.append(str(error))
             continue
-        harness_state.write((REPO / name).resolve(), result)
+        except (OSError, UnicodeError) as error:
+            refusals.append(f"{name}: {error}")
+            continue
         written.append(name)
     return written, refusals
 
 
 def forget(name):
     record = read_record()
-    text = live(name)
     try:
+        text = live(name)
         if pick(name, text):
             harness_state.write((REPO / name).resolve(), without_pick(name, text))
     except Refused as error:
@@ -1293,6 +1380,9 @@ git commit -m "feat(hooks): restore model picks after checkouts, merges and reba
 
 ### Task 5: Capture and restore from the refresh hook
 
+Implementation note: examples include the verified launch-failure continuation and
+Git/tool diagnostic aggregation fixes and their regression cases.
+
 **Files:**
 - Modify: `.githooks/harness-state-refresh`
 - Modify: `.githooks/test_harness_state_refresh.py` (fixture)
@@ -1482,6 +1572,67 @@ def test_a_failed_capture_fails_the_hook_after_the_other_steps(repo):
     assert "claude/settings.json does not parse" in result.stderr
     assert codex(repo)["model"] == "gpt-6.1-sol"
     assert "/work/a" in codex(repo)["projects"]
+
+
+def test_a_missing_pick_tool_does_not_prevent_trust_recovery_or_staging(repo):
+    write_claude(repo, model="sonnet")
+    (repo / "local" / "codex" / "trust.toml").write_text(A)
+    (repo / ".githooks" / "live-picks").unlink()
+
+    result = refresh(repo)
+
+    assert result.returncode != 0
+    assert "live-picks capture" in result.stderr
+    assert "live-picks restore" in result.stderr
+    assert "Traceback" not in result.stderr
+    assert codex(repo)["projects"] == {"/work/a": {"trust_level": "trusted"}}
+    assert claude(repo)["model"] == "sonnet"
+    assert git(repo, "diff-files", "--name-only", "--", CLAUDE, CODEX).stdout == ""
+
+
+@pytest.mark.parametrize("damage", ["missing", "not_executable"])
+def test_a_trust_launch_failure_does_not_prevent_pick_restoration(repo, damage):
+    picked(repo)
+    dirty(repo)
+    git(repo, "reset", "-q", "--hard")
+    trust = repo / ".githooks" / "codex-trust"
+    if damage == "missing":
+        trust.unlink()
+    else:
+        trust.chmod(0o600)
+
+    result = refresh(repo)
+
+    assert result.returncode != 0
+    assert "codex-trust sync" in result.stderr
+    assert "Traceback" not in result.stderr
+    assert_picked(repo, theme="dark-ansi", codex_text=BASE)
+    assert git(repo, "diff-files", "--name-only", "--", CLAUDE, CODEX).stdout == ""
+
+
+def test_a_git_staging_failure_preserves_the_tool_failure_diagnostics(repo, tmp_path, monkeypatch):
+    record_path(repo).write_text("{")
+    original_git = shutil.which("git")
+    commands = tmp_path / "commands"
+    commands.mkdir()
+    fake = commands / "git"
+    fake.write_text(f"""#!/usr/bin/env python3
+import os
+import sys
+if "diff-files" in sys.argv:
+    print("simulated index read failure", file=sys.stderr)
+    sys.exit(23)
+os.execv({original_git!r}, [{original_git!r}, *sys.argv[1:]])
+""")
+    fake.chmod(0o755)
+    monkeypatch.setenv("PATH", str(commands) + os.pathsep + os.environ["PATH"])
+
+    result = refresh(repo)
+
+    assert result.returncode != 0
+    assert "local/live-picks.json" in result.stderr
+    assert "simulated index read failure" in result.stderr
+    assert "Traceback" not in result.stderr
 ```
 
 In `.githooks/test_harness_state_refresh.py`, add `"live-picks"` to the fixture's copy loop (Task 2 added `"harness_state.py"`).
@@ -1505,23 +1656,32 @@ and replace `main` with:
 
 ```python
 def run(label, *command):
-    return label, subprocess.run([str(part) for part in command], text=True, capture_output=True)
+    try:
+        result = subprocess.run([str(part) for part in command], text=True, capture_output=True)
+    except OSError as error:
+        result = subprocess.CompletedProcess(command, 1, stdout="",
+                                             stderr=f"harness-state-refresh: {label}: {error}")
+    return label, result
 
 
 def main():
     sys.stdin.read()
     steps = [run("live-picks capture", PICKS, "capture")]
-    lock = Path(checked("rev-parse", "--path-format=absolute", "--git-path", "index.lock").strip())
-    if not lock.exists():
-        steps.append(run("codex-trust sync", TRUST, "sync"))
-        steps.append(run("live-picks restore", PICKS, "restore"))
-        marked = checked("diff-files", "--name-only", "--", *PATTERNS).split()
-        stale = [path for path in marked if filtered_equal(path)]
-        if stale:
-            checked("add", "--", *stale)
-    failed = [result.stderr.strip()
-              or f"harness-state-refresh: {label} exited {result.returncode} with no message"
-              for label, result in steps if result.returncode != 0]
+    failed = []
+    try:
+        lock = Path(checked("rev-parse", "--path-format=absolute", "--git-path", "index.lock").strip())
+        if not lock.exists():
+            steps.append(run("codex-trust sync", TRUST, "sync"))
+            steps.append(run("live-picks restore", PICKS, "restore"))
+            marked = checked("diff-files", "--name-only", "--", *PATTERNS).split()
+            stale = [path for path in marked if filtered_equal(path)]
+            if stale:
+                checked("add", "--", *stale)
+    except SystemExit as error:
+        failed.append(str(error))
+    failed += [result.stderr.strip()
+               or f"harness-state-refresh: {label} exited {result.returncode} with no message"
+               for label, result in steps if result.returncode != 0]
     if failed:
         sys.exit("\n".join(failed))
 ```
@@ -1564,7 +1724,7 @@ git commit -m "feat(hooks): capture picks before the index-lock skip and restore
 - Modify: `AGENTS.md` (Layout, `.githooks/` bullet)
 - Modify: `docs/specs/2026-09-29-codex-trust-restore-design.md` (§3.2 lock sentence)
 
-- [ ] **Step 1: README**
+- [x] **Step 1: README**
 
 In `README.md`, replace "The working tree keeps the harness's last pick; a checkout of the file drops it, and the harness runs on its default model until the next pick." with the paragraph below, then start "Codex's project trust, …" as its own paragraph. Confirm the recorded probe with `tools/harness-facts get model-reset-clears-pick codex`; the observed value is false.
 
@@ -1589,17 +1749,17 @@ never overwritten, and deleting it starts over.
 
 In the "Do not `git stash` these files…" sentence, replace "so `stash pop` brings back the file without its model pick." with "so `stash pop` brings back the file without its model pick until the next turn end restores it."
 
-- [ ] **Step 2: Filter docstring**
+- [x] **Step 2: Filter docstring**
 
 In `.githooks/harness-state-clean`, replace "the smudge side is identity, so a checkout simply carries no default model until the next pick." with "the smudge side is identity, so a checkout drops the pick and `live-picks` puts the saved one back."
 
-- [ ] **Step 3: AGENTS.md and the trust spec**
+- [x] **Step 3: AGENTS.md and the trust spec**
 
 In `AGENTS.md` Layout, change "`.githooks/`: config-state filtering, Codex trust preservation and commit checks." to "`.githooks/`: config-state filtering, Codex trust and model pick preservation, and commit checks."
 
 In `docs/specs/2026-09-29-codex-trust-restore-design.md` §3.2, after the sentence beginning "Both operations run under an exclusive `flock` on `local/codex/trust.toml.lock`", add: "(Since 2026-10-10 the lock is `local/harness-state.lock`, shared with `live-picks`: `docs/specs/2026-10-10-live-model-preservation-design.md` §3.3.)"
 
-- [ ] **Step 4: Check and commit**
+- [x] **Step 4: Check and commit**
 
 Run: `just test && tools/ops-docs check`
 Expected: PASS; `ops-docs check` prints nothing.

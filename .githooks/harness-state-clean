@@ -10,8 +10,8 @@ dropped the same way. Project trust (`[projects.*]`) is host state and is droppe
 too; `codex-trust` saves it in local/ and puts it back after a checkout drops it.
 Everything else the harness writes (plugin toggles, marketplace sources, hook trust
 hashes) stays tracked. Wired by `.gitattributes` and `git config
-filter.harness-state.clean`; the smudge side is identity, so a checkout simply carries
-no default model until the next pick.
+filter.harness-state.clean`; the smudge side is identity, so a checkout drops the pick and `live-picks` puts
+the saved one back.
 """
 import json
 import re

@@ -27,10 +27,29 @@ under it come from another host's `local/`, never from `just setup`.
 
 The filter keeps `model` and `modelSettings` in `claude/settings*.json` and the
 top-level `model` and `model_reasoning_effort` in `codex/config*.toml` out of
-the index: `/model` and `/effort` write them into the live files (the homes
-symlink here), and they are session state, not configuration. The working tree
-keeps the harness's last pick; a checkout of the file drops it, and the harness
-runs on its default model until the next pick. Codex's project trust, the
+the index: model picks and Codex effort choices write into the live files (the homes
+symlink here), and they are session state, not configuration. Claude's `effortLevel`
+remains tracked and is outside model-pick preservation.
+
+The working tree keeps the harness's last pick, and a checkout of the file drops it.
+`.githooks/live-picks` puts it back. At every turn end it saves the picks from
+`claude/settings.json` and `codex/config.toml` in `local/live-picks.json`. The
+`post-checkout`, `post-merge` and `post-rewrite` hooks restore it right after a git
+command drops it, in the main checkout only, and the next turn end restores it where
+no hook runs (the commands listed below for trust). A file holding any of its model
+fields is never touched, so a newer pick always wins. A file holding none is
+ambiguous, so only an explicit act resets the saved pick: `.githooks/live-picks
+forget claude/settings.json` (or `codex/config.toml`), which also removes the pick
+from the file. Claude's `/model` Default clears its fields and the next turn end may
+restore the saved pick; use `forget` for a deliberate reset. PostModelSwitch fires
+before the settings write and may skip a reset to the same resolved model, so it is
+not a capture point. The tested Codex picker actions kept both model fields; use
+`forget` to return it to its default. A pick in either harness made since the last
+turn end is not saved yet; a git command in that window brings back the one before.
+`local/live-picks.json` is machine-owned: an invalid one is refused, never
+overwritten, and deleting it starts over.
+
+Codex's project trust, the
 `[projects."<path>"]` tables it adds to `codex/config*.toml`, is host state and stays
 out of the index the same way. So any git command that writes a new blob of
 `codex/config.toml` over the live file drops the whole list, on every host at once,
@@ -71,7 +90,7 @@ wired in `claude/settings*.json` and `codex/hooks*.json` through the
 whose filtered diff is empty, so the mark clears at the end of the turn that made
 it; it skips while another git process holds the index lock. By hand,
 `git add -u -- claude codex` does the same while staging only real changes. Do not `git stash` these files to get past it: the stash tree
-equals `HEAD`, so `stash pop` brings back the file without its model pick.
+equals `HEAD`, so `stash pop` brings back the file without its model pick until the next turn end restores it.
 Their tests run with `just test`.
 
 The pre-commit hook refuses any staged path under `local/`, which only `git add -f`
