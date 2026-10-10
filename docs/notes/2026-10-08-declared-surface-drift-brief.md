@@ -37,6 +37,9 @@ that break on a rename, and facts probed on a harness version no longer installe
   validated view directly after `tasks-56b450`, the global Processes rule cites it,
   and the Codex long-waits brief
   (`docs/notes/2026-10-08-codex-long-waits-brief.md`) builds its constraint on it.
+  Rechecked 2026-10-10 through `tools/harness-facts list --pretty` and the installed
+  CLIs: Claude Code is now 2.1.296 against probe version 2.1.295; Codex is 0.162.1
+  against 0.156.1. A further version change alone establishes no capability change.
 - **Hook paths (`hq-fe88ef`).** `claude/settings.json`, `codex/hooks.json`,
   `codex/hooks.work.json` and the untracked `local/claude/settings.work.json` call
   `~/d/lore/hooks/claude-profile` and five ops hooks (`claim-guard`,
@@ -71,8 +74,13 @@ when (`hq-e18255`):
    read must then run the harness's `--version`, and the guard's read path gains a
    subprocess.
 2. **On demand plus a gate.** A `harness-facts stale` command lists entries whose
-   probed version trails the installed one; `just test` (or ops-check) reports it as a
-   warning. Cheap and explicit, but it only fires when someone runs hq's gates. **Lean.**
+   probed version differs from the installed one; `just test` reports it as a
+   warning. Cheap and explicit, but it only fires when someone runs hq's gates.
+   **Selected at scoping on 2026-10-10.** Compare any version mismatch, including
+   patch changes and downgrades. Missing or unreadable installed versions are
+   reported as unavailable comparisons. Neither outcome changes facts or consumer
+   behavior, and existing read paths do not gain subprocesses. Invalid fact data
+   remains an error. This reports an evidence gap, not a regression.
 3. **On upgrade.** A pacman or npm post-install hook files a re-probe task when a
    harness version changes. Timely, but host-specific and one more piece of host state.
 
@@ -94,16 +102,19 @@ routing is declared here), leaving familiar to fam.
    192-second window after completion; its command run was inconclusive because the
    transcript did not retain final child output. Both Codex entries keep their old
    version and evidence, so the aggregate Codex answer is still inconclusive.
-2. Is a version difference stale on any change, or only on a minor or major one? The
-   user, once question 1 shows how often values move.
-3. Should a stale fact change a consumer's behaviour, or only be reported? The user;
-   `unknown` is never a default, so the lean is report only.
+2. Resolved at scoping, 2026-10-10: report any version mismatch. The evidence does
+   not establish a version boundary below which behavior is guaranteed unchanged.
+3. Resolved at scoping, 2026-10-10: report only. The inconclusive Codex result is
+   evidence against changing consumers or stamping a newer verified version.
+   No additional research or user decision blocks the reporting task.
 
 ## Proposed decomposition
 
 - Goal `hq-72fd4b` holds all of these.
-- `hq-b2515c` (research): re-probe the three facts on Claude Code 2.1.294 and Codex
-  0.161.0. Wakes `hq-e18255`.
-- `hq-e18255` stays an idea until that result; then it is designed from this brief.
+- `hq-b2515c` (completed research): re-probed the installed versions, with results
+  above; its finding readmitted `hq-e18255` for scoping.
+- `hq-e18255` is now scoped `todo`, P3, small, mid complexity, direct process:
+  implement the advisory report and deterministic version-command tests. Its body
+  contains the behavior and checks; no additional design task is needed.
 - `hq-b5595a`, `hq-ac80cb`, `hq-fe88ef`: scoped `todo`, independent of each other and of
   the research.
