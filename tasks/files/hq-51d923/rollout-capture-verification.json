@@ -1,0 +1,35 @@
+{
+  "baseline": {
+    "claude": {
+      "values": {
+        "model": "opus"
+      },
+      "absent": [
+        "modelSettings"
+      ]
+    },
+    "codex": {
+      "lines": [
+        "model = \"gpt-6-astra\"\n",
+        "model_reasoning_effort = \"xhigh\"\n"
+      ],
+      "absent": []
+    }
+  },
+  "record": {
+    "claude/settings.json": {
+      "state": "set",
+      "values": {
+        "model": "opus"
+      }
+    },
+    "codex/config.toml": {
+      "state": "set",
+      "lines": [
+        "model = \"gpt-6-astra\"\n",
+        "model_reasoning_effort = \"xhigh\"\n"
+      ]
+    }
+  },
+  "picks_unchanged": true
+}

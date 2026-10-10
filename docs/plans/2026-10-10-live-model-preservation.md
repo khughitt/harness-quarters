@@ -1,15 +1,17 @@
 # Live Model Preservation Implementation Plan
 
-Status: revised plan approved 2026-10-10 by the user (plan review round 1 on
+Status: implemented and rolled out 2026-10-10 in main (merge `83e07f4`).
+Revised plan approved 2026-10-10 by the user (plan review round 1 on
 `hq-a77096`). The user approved the Stop-only
 capture and `forget` fallback spec after Task 1 disproved post-write picker events.
 Task: `hq-a77096`; design task: `hq-14d183`. Execution method: native inline
 (chosen 2026-10-10), with flow gates required by the enrolled trial.
 
-Tasks 1–6 are complete and reviewed; the final hook-status correction passed
-878 tests and a fresh scoped re-review. Task 7 rollout remains separately gated.
-The implementation captures at Stop, never from `PostModelSwitch`, and resets only
-through `forget`. There is one separately approved rollout merge.
+Tasks 1–7 are complete and reviewed. The final hook-status correction and merged
+main each passed 878 tests; fresh corrective and rollout reviews accepted.
+The user separately approved the rollout merge; live picks remained unchanged and
+initial capture matched them exactly. Capture runs at Stop, never from
+`PostModelSwitch`, and resets use `forget`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -1789,7 +1791,7 @@ Expected: no output. Any output stops the rollout: the merge would rewrite a liv
 From the main checkout: `python3 -c 'import json;print(json.load(open("claude/settings.json")).get("model"))'` and `grep -E '^(model|model_reasoning_effort) ' codex/config.toml`. Note both on the task, including any absent owned fields. An absent pick is valid;
 initial capture need not create an entry for that file.
 
-- [ ] **Step 3: Review the completed branch, then ask the user to approve the merge**
+- [x] **Step 3: Review the completed branch, then ask the user to approve the merge**
 
 Before asking, run `just test` in the worktree and obtain the fresh whole-branch review
 required by native execution and flow. The reviewer reads the spec, plan, diff and raw
@@ -1799,7 +1801,7 @@ results on the task. No live merge occurs during this review.
 
 Name the commits, the hooks it activates, and the two checks below. Wait for approval.
 
-- [ ] **Step 4: Merge and verify**
+- [x] **Step 4: Merge and verify**
 
 From the main checkout: `git merge --no-ff live-model-preservation -m "feat(hooks): activate live model preservation (hq-a77096)"`. Then:
 

@@ -1,6 +1,8 @@
 # Live model preservation: keep model picks across Git updates
 
-Status: revised fallback approved 2026-10-10 by the user (spec review round 2 on
+Status: implemented and rolled out 2026-10-10 in main (merge `83e07f4`);
+878 tests passed and fresh rollout review accepted.
+Revised fallback approved 2026-10-10 by the user (spec review round 2 on
 `hq-a77096`). The 2026-10-10 Task 1 probe invalidated
 the approved event-ordering assumption: Claude Code 2.1.296 fires PostModelSwitch
 before writing settings, and switching Opus to Default fires no event when both
