@@ -59,14 +59,30 @@ The spec (§4.1) makes two answers prerequisites. Nothing here touches a live ho
 **Interfaces:**
 - Produces: facts `model-pick-event` and `model-reset-clears-pick`, read by Tasks 5, 6 and 8 through `tools/harness-facts get <fact> <harness>`.
 
-- [ ] **Step 1: Prepare the Claude scratch home with a logging hook**
+- [ ] **Step 1: Start the probe supervisor**
 
-Use one fixed scratch path (`<scratch>` is the session's scratchpad directory); each shell call sets `probe` again, since shell state does not persist between calls. The credential copy is the sign-in only. Step 4 removes the tree and both tmux sessions; if the probe is interrupted, run Step 4's cleanup before anything else.
+One supervisor owns everything the probe creates: the scratch homes, the copied sign-in credentials, and both tmux sessions. It removes all of them when both sessions have ended, when it is stopped (TERM, INT), or when its runner's timeout kills it, so an interrupted probe leaves nothing behind. `<scratch>` is the session's scratchpad directory.
+
+Write `<scratch>/hq-probe-supervisor.sh`:
 
 ```bash
-probe=<scratch>/hq-probe
-mkdir -p "$probe/home" "$probe/work"
+#!/bin/bash
+# Probe supervisor for hq live model preservation, Task 1. Builds scratch homes for Claude
+# Code and Codex, runs each in a detached tmux session, and removes the sessions, the
+# homes and the copied credentials when both sessions end or this script is stopped.
+set -euo pipefail
+probe=$1
+cleanup() {
+  tmux kill-session -t hq-p1 2>/dev/null || true
+  tmux kill-session -t hq-p2 2>/dev/null || true
+  rm -rf "$probe"
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+
+mkdir -p "$probe/home" "$probe/work" "$probe/codex" "$probe/cwork"
 install -m 600 ~/.claude/.credentials.json "$probe/home/.credentials.json"
+install -m 600 ~/.codex/auth.json "$probe/codex/auth.json"
 cat > "$probe/hook.sh" <<'EOF'
 #!/bin/sh
 { echo "--- $(date +%s.%N)"; cat; echo; echo "settings at hook time:"; cat "$CLAUDE_CONFIG_DIR/settings.json"; } >> "$PROBE/log"
@@ -78,45 +94,52 @@ cat > "$probe/home/settings.json" <<EOF
   "hooks": {"PostModelSwitch": [{"hooks": [{"type": "command", "command": "PROBE=$probe $probe/hook.sh"}]}]}
 }
 EOF
-tmux new-session -d -s hq-p1 -x 200 -y 50 -c "$probe/work" "CLAUDE_CONFIG_DIR=$probe/home claude"
-```
-
-- [ ] **Step 2: Pick a model, then the default, reading the file after each**
-
-Drive the pane with `tmux send-keys -t hq-p1` and read it with `tmux capture-pane -p -t hq-p1`. Answer first-run prompts (theme, folder trust) as they appear. Then:
-
-1. `/model`, choose Opus. Run `cat "$probe/log"; cat "$probe/home/settings.json"`.
-2. `/model`, choose the Default entry. Read both again.
-3. `/exit`.
-
-Judge:
-- `model-pick-event` (claude-code) is `true` when each log entry's "settings at hook time" already holds the new pick (`"model": "opus"` after step 1; step 2's state after step 2); `false` when it shows the previous state; inconclusive when no entry was logged.
-- `model-reset-clears-pick` (claude-code) is `true` when the file after step 2 has neither `model` nor `modelSettings`; `false` when it holds a model id.
-
-- [ ] **Step 3: Probe Codex's picker the same way**
-
-```bash
-mkdir -p "$probe/codex" "$probe/cwork"
-install -m 600 ~/.codex/auth.json "$probe/codex/auth.json"
 printf 'model = "gpt-6.1-sol"\nmodel_reasoning_effort = "high"\n' > "$probe/codex/config.toml"
+
+tmux new-session -d -s hq-p1 -x 200 -y 50 -c "$probe/work" "CLAUDE_CONFIG_DIR=$probe/home claude"
 tmux new-session -d -s hq-p2 -x 200 -y 50 -c "$probe/cwork" "CODEX_HOME=$probe/codex codex"
+echo "supervisor $$: sessions hq-p1 (Claude Code), hq-p2 (Codex) under $probe"
+while tmux has-session -t hq-p1 2>/dev/null || tmux has-session -t hq-p2 2>/dev/null; do
+  sleep 2
+done
 ```
 
-Open `/model` and walk every kind of entry the picker offers (another model, another effort, any default or reset entry). After each, `cat "$probe/codex/config.toml"`. `model-reset-clears-pick` (codex) is `true` when any picker action leaves neither `model` nor `model_reasoning_effort`, `false` when every action writes both or one. Then exit Codex.
+Start it through the harness's background runner, never `&` or `nohup`: in Claude Code, Bash with `run_in_background: true` and `timeout: 2700000` (45 minutes), command `bash <scratch>/hq-probe-supervisor.sh <scratch>/hq-probe`. Read its output: the `supervisor <pid>` line names the sessions. Record the background task id; it is how Step 4 stops the supervisor when needed.
 
-- [ ] **Step 4: Clean up**
+Evidence goes to `<scratch>/hq-probe-evidence.txt`, outside the supervised tree and free of credentials, so it survives cleanup.
+
+- [ ] **Step 2: Claude Code — pick a model, then the default**
+
+Drive the pane with `tmux send-keys -t hq-p1` and read it with `tmux capture-pane -p -t hq-p1`. Answer first-run prompts (theme, folder trust) as they appear. With `probe=<scratch>/hq-probe` and `evidence=<scratch>/hq-probe-evidence.txt` set in each call:
+
+1. `/model`, choose Opus. Then `{ echo "== claude after opus"; cat "$probe/log"; cat "$probe/home/settings.json"; } >> "$evidence"`.
+2. `/model`, choose the Default entry. Then the same, headed `== claude after default`.
+3. `/exit`. The hq-p1 session ends.
+
+Judge from the evidence file:
+- `model-pick-event` (claude-code) is `true` when each log entry's "settings at hook time" already holds the new pick (`"model": "opus"` after 1; the default's state after 2); `false` when it shows the previous state; inconclusive when no entry was logged.
+- `model-reset-clears-pick` (claude-code) is `true` when the file after 2 has neither `model` nor `modelSettings`; `false` when it holds a model id.
+
+- [ ] **Step 3: Codex — walk the picker**
+
+Drive `hq-p2` the same way. Open `/model` and walk every kind of entry the picker offers (another model, another effort, any default or reset entry). After each, `{ echo "== codex after <entry>"; cat "$probe/codex/config.toml"; } >> "$evidence"`. Then exit Codex; the hq-p2 session ends.
+
+`model-reset-clears-pick` (codex) is `true` when any picker action left neither `model` nor `model_reasoning_effort`; `false` when every action wrote both or one.
+
+- [ ] **Step 4: Confirm cleanup**
+
+With both sessions ended, the supervisor exits and its EXIT trap removes the tree; its completion notification arrives. If it has not finished (a harness refused to exit), stop it through the runner (Claude Code: `TaskStop` with the Step 1 task id), which sends TERM and runs the same cleanup. Then:
 
 ```bash
-probe=<scratch>/hq-probe
-tmux kill-session -t hq-p1 2>/dev/null; tmux kill-session -t hq-p2 2>/dev/null; rm -rf "$probe"
-tmux ls 2>/dev/null | grep -E '^hq-p[12]:' && echo "a probe session is still running"
+test ! -e <scratch>/hq-probe && echo "scratch tree removed"
+tmux ls 2>/dev/null | grep -E '^hq-p[12]:' || echo "no probe session"
 ```
 
-Expected: no output. No copied credential remains.
+Expected: `scratch tree removed` and `no probe session`. No copied credential remains. The end-of-turn report says nothing was left running.
 
 - [ ] **Step 5: Record the facts**
 
-Append to `facts/capabilities.toml` (values from Steps 2–3; versions from `claude --version` and `codex --version`; today's date):
+Append to `facts/capabilities.toml` (values from the evidence file; versions from `claude --version` and `codex --version`; today's date):
 
 ```toml
 [facts.model-pick-event]
@@ -167,7 +190,12 @@ Expected: check prints nothing; get prints the entry.
 
 Continue only if `model-pick-event` (claude-code) is `true`. Otherwise stop: the spec's §3.3 second bullet cannot hold, so Claude resets fall back to `forget`. Park the task `--waiting-on user --reason decision` with the observation; the spec and Tasks 5 and 8 change before implementation. The other two values never stop the plan; Task 6 words the README from them.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Run the suite**
+
+Run: `just test`
+Expected: PASS (it runs `tools/harness-facts check` first).
+
+- [ ] **Step 8: Commit**
 
 ```bash
 git add facts/capabilities.toml
@@ -313,7 +341,7 @@ class Checkout:
 
 In `.githooks/codex-trust`:
 
-1. Replace the imports `contextlib`, `fcntl`, `os`, `subprocess`, `tempfile` with `import harness_state` (keep `runpy`, `sys`, `tomllib`, `Path`).
+1. Add `import harness_state`. Remove the imports `fcntl`, `subprocess`, `tempfile` and `from pathlib import Path`, which nothing uses after this step. Keep `contextlib` (`locked`), `os` (`keep_private` calls `os.chmod`), `runpy`, `sys` and `tomllib`. After the edit, `grep -nE '\b(fcntl|subprocess|tempfile|Path)\b' .githooks/codex-trust` prints nothing outside comments.
 2. Replace `HERE = Path(__file__).resolve().parent` and `REPO = HERE.parent` with:
    ```python
    CHECKOUT = harness_state.Checkout("codex-trust")
@@ -346,7 +374,6 @@ In `.githooks/codex-trust`:
        with CHECKOUT.locked():
            yield
    ```
-   and keep `import contextlib` for it.
 6. In the module docstring, after the sentence ending "and Codex's config is private.", add: `Every operation holds local/harness-state.lock, the host lock live-picks also takes.`
 
 - [ ] **Step 5: Ignore bytecode and update the refresh fixture**
@@ -671,6 +698,16 @@ def test_forget_records_the_default_and_removes_the_pick(repo):
     for name in (CLAUDE, CODEX):
         assert clean(repo, name, (repo / name).read_text()) == before[name]
     assert status(repo) == ""
+
+
+def test_a_filesystem_error_fails_cleanly(repo):
+    record_path(repo).mkdir()
+
+    result = picks(repo, "sync")
+
+    assert result.returncode != 0
+    assert "live-picks: " in result.stderr
+    assert "Traceback" not in result.stderr
 
 
 def test_forget_of_a_file_it_does_not_own_is_refused(repo):
@@ -1069,6 +1106,32 @@ def refuse(refusals):
         fail("; ".join(refusals))
 
 
+def operate(args):
+    """Run the operation args name under the host lock.
+
+    A filesystem or decoding failure (an unreadable record, a directory where a file
+    belongs) fails like any refusal, with the tool's name and no traceback.
+    """
+    try:
+        with CHECKOUT.locked():
+            if args[0] == "hook":
+                written, refusals = restore()
+                for name in written:
+                    CHECKOUT.restage(name)
+            elif args[0] == "forget":
+                forget(args[1])
+                return
+            else:
+                refusals = []
+                if args[0] in ("capture", "sync"):
+                    refusals += capture(explicit=args[1:] == ["--explicit"])
+                if args[0] in ("restore", "sync"):
+                    refusals += restore()[1]
+            refuse(refusals)
+    except (OSError, UnicodeError) as error:
+        fail(str(error))
+
+
 def main(argv):
     args = argv[1:]
     if not (args in (["capture"], ["capture", "--explicit"], ["restore"], ["sync"])
@@ -1081,29 +1144,16 @@ def main(argv):
         if args[0] == "hook":
             return
         fail(f"{REPO} is a linked worktree; its harness configs are not live")
-    if args[0] == "hook":
-        if args[1] == "post-checkout" and CHECKOUT.rebasing():
-            return
-        try:
-            with CHECKOUT.locked():
-                written, refusals = restore()
-                for name in written:
-                    CHECKOUT.restage(name)
-                refuse(refusals)
-        except SystemExit as error:
-            print(f"{error}\nlive-picks: a pick was not restored; the next turn end retries",
-                  file=sys.stderr)
+    if args[0] != "hook":
+        operate(args)
         return
-    with CHECKOUT.locked():
-        if args[0] == "forget":
-            forget(args[1])
-            return
-        refusals = []
-        if args[0] in ("capture", "sync"):
-            refusals += capture(explicit=args[1:] == ["--explicit"])
-        if args[0] in ("restore", "sync"):
-            refusals += restore()[1]
-        refuse(refusals)
+    if args[1] == "post-checkout" and CHECKOUT.rebasing():
+        return
+    try:
+        operate(args)
+    except SystemExit as error:
+        print(f"{error}\nlive-picks: a pick was not restored; the next turn end retries",
+              file=sys.stderr)
 
 
 if __name__ == "__main__":
@@ -1246,6 +1296,20 @@ def test_hooks_leave_a_linked_worktree_alone(repo, tmp_path, command):
     assert "model" not in (other / CLAUDE).read_text()
     assert "model" not in (other / CODEX).read_text()
     assert git(other, "status", "--porcelain").stdout == ""
+
+
+def test_a_filesystem_error_in_a_hook_reports_and_lets_the_git_command_succeed(repo):
+    side_with_settings(repo)
+    picked(repo)
+    record_path(repo).unlink()
+    record_path(repo).mkdir()
+
+    result = git(repo, "switch", "-q", "side", check=False)
+
+    assert result.returncode == 0
+    assert "live-picks: " in result.stderr
+    assert "Traceback" not in result.stderr
+    assert git(repo, "branch", "--show-current").stdout.strip() == "side"
 
 
 def test_a_failing_pick_restore_reports_and_trust_still_returns(repo):
@@ -1662,8 +1726,10 @@ Name the commits, the hooks it activates, and the two checks below. Wait for app
 From the main checkout: `git merge --no-ff live-model-preservation -m "merge: live model preservation, tool and hooks (hq-a77096)"`. Then:
 
 1. `git status --porcelain` prints nothing for `claude/` and `codex/`; the picks from Step 2 are unchanged.
-2. After the next turn end in this session, `local/live-picks.json` exists and holds the Step 2 picks.
+2. Seed the record now rather than waiting for a turn end: from the main checkout, run `.githooks/live-picks capture`, then `cat local/live-picks.json`. It must hold the Step 2 picks: `claude/settings.json` `set` with that `model` (and `modelSettings` if present), and `codex/config.toml` `set` with the two Step 2 lines. Note the record on the task.
 3. `rm -f local/codex/trust.toml.lock` (no tool takes it now).
+
+Task 8 starts only when check 2 matched. A missing or different record means the second merge could drop an uncaptured pick: stop and report.
 
 ---
 
@@ -1692,7 +1758,10 @@ In the worktree's `claude/settings.json`, append to the `PostModelSwitch` array 
 Run: `python3 -c 'import json;print(json.load(open("claude/settings.json"))["hooks"]["PostModelSwitch"])'`
 Expected: the `claude-provenance` entry, then this one.
 
-- [ ] **Step 2: Commit**
+- [ ] **Step 2: Run the suite and commit**
+
+Run: `just test`
+Expected: PASS.
 
 ```bash
 git add claude/settings.json
@@ -1708,4 +1777,4 @@ Say that this merge rewrites the live Claude settings and that `post-merge` must
 From the main checkout: `git merge --no-ff live-model-preservation -m "merge: save model picks at PostModelSwitch (hq-a77096)"`. Then:
 
 1. `claude/settings.json` holds the Task 7 Step 2 `model` and the new hook entry; `git status --porcelain -- claude/` prints nothing.
-2. Ask the user to run `/model`, pick the same model, and confirm `local/live-picks.json` was rewritten (its mtime moves) without waiting for a turn end.
+2. Prove capture at the pick event. Capture writes only when the record changes, so the check uses a different model: ask the user to run `/model` and pick a model other than the Task 7 Step 2 one, then send any message. At the start of that turn, before any Stop has run since the pick, `local/live-picks.json` must already hold the new model. Then ask the user to pick the original model again, and confirm the record holds it at the start of the next turn.
