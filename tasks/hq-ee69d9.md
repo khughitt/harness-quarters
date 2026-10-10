@@ -7,7 +7,7 @@ size: xs
 complexity: low
 process: direct
 created: 2026-10-08T23:10:34Z
-updated: 2026-10-08T23:10:35Z
+updated: 2026-10-10T19:57:18Z
 depends: []
 tags: []
 source: "tasks-56b450:deferred-minor:matcher"
@@ -18,7 +18,7 @@ Why: the accepted wiring/full reviews deferred a minor: tools/test_claim_guard_w
 
 Bound: strengthen the existing regression for both codex/hooks.json and codex/hooks.work.json. Identify the unique guard group for Stop and SubagentStop and assert the approved unrestricted registration contract; show an intentionally restrictive matcher fails the check. Preserve existing unrelated-hook and links.toml route checks. No live hook or trust change.
 
-Where to start: tools/test_claim_guard_wiring.py test_both_codex_homes_guard_root_and_worker. Evidence: tasks-56b450 and tasks docs/notes/2026-10-08-claim-guard-acceptance.md, Fresh final review.
+Where to start: tools/test_claim_guard_wiring.py test_both_codex_homes_guard_root_and_worker. Evidence: tasks-56b450 and tasks:docs/notes/2026-10-08-claim-guard-acceptance.md, Fresh final review.
 
 Done: both real source files pass; a controlled restrictive matcher mutation fails the regression; the hq front-door suite passes.
 

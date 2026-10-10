@@ -2,16 +2,16 @@
 id: hq-339fdf
 title: End agent waiting loops in both harnesses
 status: todo
-priority: "2"
+priority: 2
 created: 2026-09-27T10:52:32Z
-updated: 2026-09-27T11:08:05Z
+updated: 2026-10-10T19:57:17Z
 depends: [obs-f074aa]
 tags: [rules, obs]
-source: docs/notes/2026-09-27-waiting-loops-brief.md
+source: "lore:docs/notes/2026-09-27-waiting-loops-brief.md"
 agent: claude-code/claude-opus-5-5
 ---
 
-Waiting loops take about 9.2% of agent context tokens (obs report 2026-09-26 §4). Goal: waiting on background work, a child agent or a long command costs a handful of requests in both harnesses. Brief: docs/notes/2026-09-27-waiting-loops-brief.md. Research first, then one fix per loop shape filed from its result.
+Waiting loops take about 9.2% of agent context tokens (obs report 2026-09-26 §4). Goal: waiting on background work, a child agent or a long command costs a handful of requests in both harnesses. Brief: lore:docs/notes/2026-09-27-waiting-loops-brief.md. Research first, then one fix per loop shape filed from its result.
 
 ## Notes
 

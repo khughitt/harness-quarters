@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-10-08T23:10:34Z
-updated: 2026-10-08T23:10:35Z
+updated: 2026-10-10T19:57:17Z
 depends: []
 tags: []
 source: "tasks-56b450:followup:fact-file-lifecycle"
@@ -16,7 +16,7 @@ agent: codex/gpt-6.1-sol
 
 Question: should the staged-facts gate protect the validated reader's default file when the canonical fact file is deleted or renamed? The existing ACMR staged-path filter skips deletion/rename-away; the claim-guard change deliberately preserved that behavior. This is pre-existing protection to investigate, not a rollout regression.
 
-Where to start: .githooks/pre-commit facts_check/main, .githooks/test_pre_commit_facts.py and tools/harness-facts default-file selection. Evidence: tasks-56b450; tasks docs/notes/2026-10-08-claim-guard-execution-ledger.md, Task 2/final canonical-deletion rulings.
+Where to start: .githooks/pre-commit facts_check/main, .githooks/test_pre_commit_facts.py and tools/harness-facts default-file selection. Evidence: tasks-56b450; tasks:docs/notes/2026-10-08-claim-guard-execution-ledger.md, Task 2/final canonical-deletion rulings.
 
 Bound: inspect source and run disposable staged cases for deletion alone, rename without a reader update, and a deliberate move accompanied by the reader's default-path update. Keep all projects/config/state isolated and never mutate live facts, homes or reader endpoints. Distinguish the current working file, index blob and staged reader behavior. No general pre-commit rewrite.
 

@@ -2,16 +2,16 @@
 id: hq-e2ed51
 title: Stop the reviewer and Codex skill-path file-not-found streams
 status: todo
-priority: "2"
+priority: 2
 created: 2026-09-27T11:20:54Z
-updated: 2026-09-27T13:05:55Z
+updated: 2026-10-10T19:57:18Z
 depends: [obs-18b8eb]
 tags: [obs, skills]
-source: docs/notes/2026-09-27-path-mistakes-brief.md
+source: "lore:docs/notes/2026-09-27-path-mistakes-brief.md"
 agent: claude-code/claude-opus-5-5
 ---
 
-Most file-not-found errors in the obs report (2026-09-26 §2–3) are not the working agent: in Claude Code they come from the security-guidance plugin's background reviewer starting in a worktree that finishing the branch has already removed; in Codex, from skill paths shown behind aliases over a nested agents/skills layout. Goal: neither produces a steady stream of failed reads, measured by obs-18b8eb's path-relation labels. Brief: docs/notes/2026-09-27-path-mistakes-brief.md. Research first; the settings or layout change is filed from its results.
+Most file-not-found errors in the obs report (2026-09-26 §2–3) are not the working agent: in Claude Code they come from the security-guidance plugin's background reviewer starting in a worktree that finishing the branch has already removed; in Codex, from skill paths shown behind aliases over a nested agents/skills layout. Goal: neither produces a steady stream of failed reads, measured by obs-18b8eb's path-relation labels. Brief: lore:docs/notes/2026-09-27-path-mistakes-brief.md. Research first; the settings or layout change is filed from its results.
 
 ## Notes
 
