@@ -10,8 +10,9 @@ person, at the first check that fails.
 
 The renamed project is the checkout; the other repositories are the ones the cutover
 retargets in, and the only ones rollback resets. `apply` renames and moves, `retarget`
-fixes one repository's dependencies on retired ids, `link` applies the home links, and
-`verify` checks the result: the runbook commits between them.
+fixes dependencies on retired ids in one of them or, with `--forward`, in every project
+outside them, `link` applies the home links, and `verify` checks the result: the runbook
+commits between them.
 """
 import argparse
 import filecmp
@@ -527,16 +528,17 @@ RETIRED_PREFIX_RE = re.compile(
     r'^depends on (?P<old_id>\S+) through retired prefix "(?P<prefix>[^"]*)"; it is now (?P<new_id>\S+)$')
 
 
-def retarget_dependencies(root, old):
+def dependency_rewrites(root, old):
     """After `tasks init --prefix <new> --force`, a task elsewhere that depends on an
     old-prefix id still names it, and `tasks check` there reports each as a
-    `retired_prefix` warning. Retarget each to the id the warning names as canonical, so
-    that repository's `tasks check` comes back clean (`verify` requires that).
-
-    Each task's whole list is written in one `tasks edit` save, its old ids replaced in
-    place. Removing and re-adding in two writes would lose the dependency if interrupted
-    between them, and a rerun would not see it again. A rerun reads the warnings left."""
-    output = run("tasks", "check", cwd=root)
+    `retired_prefix` warning. Each warning through `old` (and no other rename's) maps the
+    task's old id to the id the warning names as canonical. Returns each task's whole
+    new dependency list, in order, read and validated before anything is written; a
+    check that fails stops here, naming the repository."""
+    try:
+        output = run("tasks", "check", cwd=root)
+    except Stop as error:
+        raise Stop(f"retarget: tasks check fails in {root}: {error}")
     report = json.loads(output) if output.strip() else {"warnings": []}
     replacements = {}
     for warning in report.get("warnings", []):
@@ -548,15 +550,33 @@ def retarget_dependencies(root, old):
                        f"{warning.get('detail')!r}")
         if match["prefix"] == old:
             replacements.setdefault(warning["id"], {})[match["old_id"]] = match["new_id"]
+    rewrites = {}
     for task, pairs in replacements.items():
-        depends = json.loads(run("tasks", "show", task, cwd=root))["task"].get("depends", [])
+        try:
+            depends = json.loads(run("tasks", "show", task, cwd=root))["task"].get("depends", [])
+        except Stop as error:
+            raise Stop(f"retarget: reading {task} fails in {root}: {error}")
         missing = sorted(set(pairs) - set(depends))
         if missing:
             raise Stop(f"retarget: {task} does not list {', '.join(missing)}")
-        listed = [arg for dep in depends for arg in ("--depends", pairs.get(dep, dep))]
-        run("tasks", "edit", task, "--no-depends", *listed, cwd=root)
+        rewrites[task] = (pairs, [pairs.get(dep, dep) for dep in depends])
+    return rewrites
+
+
+def write_rewrites(root, rewrites):
+    """Each task's whole list in one `tasks edit` save, its old ids replaced in place.
+    Removing and re-adding in two writes would lose the dependency if interrupted between
+    them, and a rerun would not see it again. A rerun reads the warnings left."""
+    for task, (pairs, depends) in rewrites.items():
+        run("tasks", "edit", task, "--no-depends", *(arg for dep in depends for arg in ("--depends", dep)),
+            cwd=root)
         for old_id, new_id in pairs.items():
             print(f"retarget: {task}: {old_id} -> {new_id}")
+
+
+def retarget_dependencies(root, old):
+    """Retarget one repository, so its `tasks check` comes back clean (`verify` requires that)."""
+    write_rewrites(root, dependency_rewrites(root, old))
 
 
 def apply(args):
@@ -587,24 +607,66 @@ def record_forward(snap, root):
         path.write_text(json.dumps([*roots, str(root)], indent=2) + "\n")
 
 
+def forward_roots(meta):
+    """Every registered project outside the snapshot's repositories and the renamed
+    checkout, with whether it is retired. One that is unreachable is named and not
+    checked: its records cannot be read."""
+    inside = {Path(r["root"]).resolve() for r in meta["repos"]}
+    inside |= {Path(meta["new_root"]).resolve(), Path(meta["checkout"]["root"]).resolve()}
+    roots = []
+    for project in json.loads(run("tasks", "projects", "--json"))["projects"]:
+        root = Path(project["root"]).resolve()
+        if root in inside:
+            continue
+        if not project["reachable"]:
+            print(f"retarget: {project['prefix']} is unreachable at {project['root']}; not checked")
+        else:
+            roots.append((project["prefix"], project["root"], root,
+                          project.get("retired") is not None))   # omitted when unset
+    return roots
+
+
+def retarget_forward(snap, meta):
+    """Every project outside the snapshot, selected here: each is checked and its rewrites
+    read before anything is written, so a failing check stops the run with nothing
+    changed. A retired project refuses writes, so one that needs a rewrite stops the run
+    too. A project is recorded in forward.json just before its first write, and only when
+    it has one."""
+    found = []
+    for prefix, shown, root, retired in forward_roots(meta):
+        rewrites = dependency_rewrites(root, meta["old"])
+        if retired and rewrites:
+            raise Stop(f"retarget: {prefix} is retired at {shown} and depends on retired ids in "
+                       f"{', '.join(rewrites)}; unretire it to retarget them")
+        if retired:
+            print(f"retarget: {prefix} is retired at {shown}; nothing to retarget")
+        elif rewrites:
+            found.append((root, rewrites))
+    if not found:
+        print("retarget: nothing to retarget outside the snapshot")
+    for root, rewrites in found:
+        record_forward(snap, root)
+        write_rewrites(root, rewrites)
+        print(f"retargeted in {root}")
+
+
 def retarget(args):
-    """One repository's retarget, run by the runbook before that repository's commit.
-    A repository outside the snapshot is refused: rollback could not restore it. After
-    the other host has adopted, rollback is over, and `--forward` allows one and records
-    that rollback has ended."""
+    """`--repo`: one snapshot repository's retarget, run by the runbook before that
+    repository's commit. A repository outside the snapshot is refused: rollback could not
+    restore it. After the other host has adopted, rollback is over, and `--forward`
+    retargets every project outside the snapshot and records that rollback has ended."""
     snap = Path(args.snapshot)
     meta = load_meta(snap)
     check_environment("retarget", meta)
+    if args.forward:
+        retarget_forward(snap, meta)
+        return
     root = Path(args.repo).resolve()
     if root in (Path(meta["new_root"]), Path(meta["checkout"]["root"])):
         raise Stop(f"retarget: {root} is the renamed checkout; its own ids were renamed, not retargeted")
     if str(root) not in {r["root"] for r in meta["repos"]}:
-        if not args.forward:
-            raise Stop(f"retarget: {root} is not in the snapshot; after the other host has adopted, "
-                       f"pass --forward")
-        if not (root / "tasks" / ".config.toml").is_file():
-            raise Stop(f"retarget: {root} is not a tasks project")
-        record_forward(snap, root)
+        raise Stop(f"retarget: {root} is not in the snapshot; after the other host has adopted, "
+                   f"retarget --forward selects the projects outside it")
     retarget_dependencies(root, meta["old"])
 
 
@@ -675,9 +737,10 @@ def main(argv):
                         "restored as a live file with its mode (repeatable)")
     r = sub.add_parser("retarget")
     r.add_argument("--snapshot", required=True)
-    r.add_argument("--repo", required=True)
-    r.add_argument("--forward", action="store_true",
-                   help="allow a repository outside the snapshot, once rollback is over")
+    which = r.add_mutually_exclusive_group(required=True)
+    which.add_argument("--repo", help="a repository in the snapshot")
+    which.add_argument("--forward", action="store_true",
+                       help="every registered project outside the snapshot, once rollback is over")
     for name in ("apply", "link", "verify", "rollback"):
         sub.add_parser(name).add_argument("--snapshot", required=True)
     args = parser.parse_args(argv)
