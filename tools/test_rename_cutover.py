@@ -443,30 +443,136 @@ def test_retarget_refuses_a_repository_outside_the_snapshot(box):
     assert result.returncode == 1
     assert "not in the snapshot" in result.stderr and "--forward" in result.stderr
     assert (outside / "tasks" / f"{dependent}.md").read_bytes() == before
-    box.cutover("retarget", "--snapshot", box.snapshot, "--repo", outside, "--forward")
-    assert box.run("tasks", "check", cwd=outside).stdout == ""
+    assert not (box.snapshot / "forward.json").exists()
 
 
-def test_a_forward_retarget_of_a_non_project_records_nothing(box, tmp_path):
-    """A mistyped --repo is refused before it can end rollback."""
+def test_forward_and_repo_are_one_or_the_other(box):
+    """--forward selects its projects itself; naming one beside it is refused before anything runs."""
     box.save()
     box.forward()
-    result = box.cutover("retarget", "--snapshot", box.snapshot, "--repo", tmp_path / "typo", "--forward",
-                         check=False)
-    assert result.returncode == 1 and "is not a tasks project" in result.stderr
+    result = box.cutover("retarget", "--snapshot", box.snapshot, "--repo", box.ops, "--forward", check=False)
+    assert result.returncode == 2 and "not allowed with" in result.stderr
     assert not (box.snapshot / "forward.json").exists()
-    box.cutover("rollback", "--snapshot", box.snapshot)
 
 
 def test_retarget_refuses_the_renamed_checkout(box):
     """Its own ids were renamed, not retargeted; --forward on it would end rollback for nothing."""
     box.save()
     box.forward()
-    for extra in ((), ("--forward",)):
-        result = box.cutover("retarget", "--snapshot", box.snapshot, "--repo", box.new_root, *extra,
-                             check=False)
-        assert result.returncode == 1
-        assert "is the renamed checkout" in result.stderr and "pass --forward" not in result.stderr
+    result = box.cutover("retarget", "--snapshot", box.snapshot, "--repo", box.new_root, check=False)
+    assert result.returncode == 1
+    assert "is the renamed checkout" in result.stderr and "--forward" not in result.stderr
+    assert not (box.snapshot / "forward.json").exists()
+    box.cutover("rollback", "--snapshot", box.snapshot)
+
+
+def outside_project(box, name):
+    path = box.sync / name
+    box.repo(path, name)
+    box.commit(path, "init")
+    return path
+
+
+def test_forward_retargets_every_project_outside_the_snapshot_and_records_each(box):
+    """It selects relay and tasks itself, leaves the snapshot's ops for --repo, and records
+    exactly the projects it wrote in, before writing."""
+    _, in_ops = box.depend_on_checkout(box.ops)
+    dependents = {name: box.depend_on_checkout(outside_project(box, name)) for name in ("relay", "tasks")}
+    box.save()
+    box.cutover("apply", "--snapshot", box.snapshot)
+    result = box.cutover("retarget", "--snapshot", box.snapshot, "--forward")
+    for name, (target, dependent) in dependents.items():
+        root = box.sync / name
+        assert f"retarget: {dependent}: {target} -> tack-{target[3:]}" in result.stdout
+        assert f"retargeted in {root}" in result.stdout
+        assert box.run("tasks", "check", cwd=root).stdout == ""
+    assert sorted(json.loads((box.snapshot / "forward.json").read_text())) == sorted(
+        str((box.sync / name).resolve()) for name in dependents)
+    assert in_ops in box.run("tasks", "check", cwd=box.ops).stdout
+
+
+def test_an_unrelated_renames_warning_selects_nothing_and_records_nothing(box):
+    """relay depends through another rename's retired prefix: not this cutover's to fix."""
+    relay, other = outside_project(box, "relay"), outside_project(box, "zed")
+    target = task_id(box.run("tasks", "add", "depended on", "--process", "direct", cwd=other).stdout)
+    box.commit(other, "a task to depend on")
+    dependent = task_id(box.run("tasks", "add", "depends", "--process", "direct", cwd=relay).stdout)
+    box.run("tasks", "dep", dependent, "--on", target, cwd=relay)
+    box.commit(relay, "depend on zed")
+    box.run("tasks", "rename", "zed", "zen", cwd=other)
+    box.commit(other, "an unrelated rename")
+    before = (relay / "tasks" / f"{dependent}.md").read_bytes()
+    assert 'retired prefix \\"zed\\"' in box.run("tasks", "check", cwd=relay).stdout
+    box.save()
+    box.cutover("apply", "--snapshot", box.snapshot)
+    result = box.cutover("retarget", "--snapshot", box.snapshot, "--forward")
+    assert "nothing to retarget outside the snapshot" in result.stdout
+    assert (relay / "tasks" / f"{dependent}.md").read_bytes() == before
+    assert not (box.snapshot / "forward.json").exists()
+
+
+def test_a_failing_check_stops_forward_before_any_write(box):
+    """relay sorts before the broken project, so a write-as-you-go loop would have changed it."""
+    relay = outside_project(box, "relay")
+    _, dependent = box.depend_on_checkout(relay)
+    broken = outside_project(box, "zzz")
+    box.save()
+    box.cutover("apply", "--snapshot", box.snapshot)
+    (broken / "tasks" / "files" / "zzz-abcdef").mkdir(parents=True)
+    (broken / "tasks" / "files" / "zzz-abcdef" / "x.txt").write_text("x\n")
+    before = (relay / "tasks" / f"{dependent}.md").read_bytes()
+    result = box.cutover("retarget", "--snapshot", box.snapshot, "--forward", check=False)
+    assert result.returncode == 1
+    assert f"tasks check fails in {broken.resolve()}" in result.stderr and "attachment_orphan" in result.stderr
+    assert (relay / "tasks" / f"{dependent}.md").read_bytes() == before
+    assert not (box.snapshot / "forward.json").exists()
+
+
+def test_a_retired_project_that_needs_a_retarget_stops_forward_before_any_write(box):
+    """A retired project refuses writes; its dependency on this rename's old ids is named,
+    not skipped as nothing to do, and nothing is written anywhere."""
+    relay = outside_project(box, "relay")
+    _, in_relay = box.depend_on_checkout(relay)
+    retired = outside_project(box, "old")
+    _, in_retired = box.depend_on_checkout(retired)
+    box.run("tasks", "drop", in_retired, "over", cwd=retired)
+    box.commit(retired, "drop it")
+    box.run("tasks", "retire", "--reason", "over", cwd=retired)
+    box.save()
+    box.cutover("apply", "--snapshot", box.snapshot)
+    before = (relay / "tasks" / f"{in_relay}.md").read_bytes()
+    result = box.cutover("retarget", "--snapshot", box.snapshot, "--forward", check=False)
+    assert result.returncode == 1
+    assert f"old is retired at {retired} and depends on retired ids in {in_retired}" in result.stderr
+    assert (relay / "tasks" / f"{in_relay}.md").read_bytes() == before
+    assert not (box.snapshot / "forward.json").exists()
+
+
+def test_forward_never_checks_the_renamed_checkout(box):
+    """The checkout's own ids were renamed: a finding there is not forward's to stop on."""
+    relay = outside_project(box, "relay")
+    box.depend_on_checkout(relay)
+    box.save()
+    box.cutover("apply", "--snapshot", box.snapshot)
+    (box.new_root / "tasks" / "files" / "tack-abcdef").mkdir(parents=True)
+    (box.new_root / "tasks" / "files" / "tack-abcdef" / "x.txt").write_text("x\n")
+    result = box.cutover("retarget", "--snapshot", box.snapshot, "--forward")
+    assert f"retargeted in {relay.resolve()}" in result.stdout
+
+
+def test_forward_with_nothing_to_change_records_nothing(box):
+    """After the snapshot's own retargets nothing outside depends on a retired id. An
+    unreachable project and a retired one are named as not checked."""
+    gone, retired = outside_project(box, "gone"), outside_project(box, "old")
+    shutil.rmtree(gone)
+    box.run("tasks", "retire", "--reason", "over", cwd=retired)
+    box.depend_on_checkout(box.ops)
+    box.save()
+    box.forward()
+    result = box.cutover("retarget", "--snapshot", box.snapshot, "--forward")
+    assert "nothing to retarget outside the snapshot" in result.stdout
+    assert f"retarget: gone is unreachable at {gone}; not checked" in result.stdout
+    assert f"retarget: old is retired at {retired}; nothing to retarget" in result.stdout
     assert not (box.snapshot / "forward.json").exists()
     box.cutover("rollback", "--snapshot", box.snapshot)
 
@@ -479,7 +585,7 @@ def test_rollback_refuses_after_a_forward_retarget(box):
     box.depend_on_checkout(outside)
     box.save()
     box.forward()
-    box.cutover("retarget", "--snapshot", box.snapshot, "--repo", outside, "--forward")
+    box.cutover("retarget", "--snapshot", box.snapshot, "--forward")
     result = box.cutover("rollback", "--snapshot", box.snapshot, check=False)
     assert result.returncode == 1
     assert "ended when retarget --forward" in result.stderr and str(outside) in result.stderr
