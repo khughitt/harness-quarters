@@ -1,6 +1,6 @@
 # Agent docs in mindful: the collection and the external document reference — design
 
-Task: `hq-5a3e12`, under `hq-d7b5b2`. Status: draft, revised 2026-10-10 after spec review round 1 (codex).
+Task: `hq-5a3e12`, under `hq-d7b5b2`. Status: draft, revised 2026-10-10 after spec review rounds 1 and 2 (codex/gpt-6.1-sol).
 Brief: lore `docs/notes/2026-10-02-agent-working-docs-brief.md` (§5 holds the user's
 decision and hq-fa8757's findings). Research: `hq-fa8757` (notes of 2026-10-10).
 
@@ -390,24 +390,40 @@ implementation starts. The snapshot closes that gap:
   `.superpowers/sdd/` the helpers already use, so it never reaches `git status` or a
   commit; the name derives from the id, not the title, so it is stable across sessions,
   worktrees of one repository, and title edits, and two plans never collide.
-- **Writer.** `plan-snapshot <task-id>` in ops `bin/`: it reads the record's `plan`
-  (`tasks show --json`); for a repository path it prints that path and writes nothing;
-  for an external link it runs `tasks doc <task-id> --plan`, writes the body to the
-  location above (creating `.superpowers/sdd/` with the same self-ignoring `.gitignore`
-  `sdd-workspace` writes, so the snapshot is ignored from its first byte), and prints
-  the snapshot path. Skills pass its output as `PLAN_FILE`. A fetch failure is the
-  tracker's error, exit non-zero, and nothing is written.
-- **Refresh.** Every call re-fetches and overwrites. The snapshot is read-only by
-  convention: a plan revision goes to mindful through `mindful-op --edit` (§6.3) and the
-  next `plan-snapshot` call brings it down. The executing skills call it at execution
-  start and after every plan revision they make.
+- **Writer.** `plan-snapshot <task-id>` in ops `bin/`: it reads the record through
+  `tasks show --json`. For a repository path it prints `plan_path`, the absolute path the
+  tracker resolved (the worktree's copy, else the main checkout's, else the linked
+  project's overlay; `commands/show.rs:163`), and writes nothing; the stored `plan` value
+  is relative and can name a file the worktree does not hold while the tracker reads it
+  elsewhere. For an external link (the `<scheme>:` shape of §4.1) it runs `tasks doc
+  <task-id> --plan`, writes the body to the location above (creating `.superpowers/sdd/`
+  with the same self-ignoring `.gitignore` `sdd-workspace` writes, so the snapshot is
+  ignored from its first byte), and prints the snapshot path. Skills pass its output as
+  `PLAN_FILE`. A fetch failure is the tracker's error, exit non-zero, and nothing is
+  written.
+- **Refresh, and no reuse of a completed number.** Every call re-fetches and overwrites.
+  The snapshot is read-only by convention: a plan revision goes to mindful through
+  `mindful-op --edit` (§6.3) and the next `plan-snapshot` call brings it down. The
+  executing skills call it at execution start and after every plan revision they make.
+  The ledger records completion by task number (`Task <N>: complete`), so a revision
+  that puts new work under a number already completed would be skipped as done, and
+  `tasks check` cannot catch it: `step_missing` holds only open records (spec §7 of the
+  tracker's link design). `plan-snapshot` therefore enforces the rule **a completed task
+  number is never reused**: before overwriting, it lists the task's closed step children
+  (`tasks list --parent <id> --status done`, each shown for its `step` heading) and
+  requires every such heading, `Task N: <title>` verbatim, in the fetched body. A missing
+  or altered one refuses the refresh, names the heading, leaves the snapshot unchanged
+  and exits non-zero; the author puts the new work under a fresh number and refreshes
+  again. Limit, stated: a step the ledger marks complete whose record is not yet closed
+  is not seen by this check; the executing skills close the record in the same step that
+  writes the ledger line, and the window between the two is theirs.
 - **Resume.** A session that resumes execution calls `plan-snapshot` before
   `sdd-workspace`. The ledger's first line names the snapshot path, which is unchanged,
-  so the ledger is recognised as this plan's; its `Task <N>: complete` lines stay valid
-  because the drift contract (`tasks check` `step_missing`) holds the headings of tasks
-  that are still open, and a renumbering is caught there before execution resumes.
-- Under `design_docs: commit` nothing changes: `plan-snapshot` prints the repository
-  path, and the helpers read the committed file as today.
+  so the ledger is recognised as this plan's; its `Task <N>: complete` lines keep
+  referring to the work they recorded because a completed number is never reused (above)
+  and the headings of open steps are held by `tasks check`.
+- Under `design_docs: commit` nothing changes: `plan-snapshot` prints the resolved
+  repository path, and the helpers read the committed file as today.
 
 ## 7. The profile value and the hook
 
@@ -521,6 +537,14 @@ after the acceptance of §10 is observed.
   show it, `sdd-workspace` and `task-brief` run against it and `task-brief … 1` extracts
   Task 1; after a revision through `mindful-op --edit`, a second `plan-snapshot` call
   overwrites it and the workspace resolved by `sdd-workspace` is the same directory.
+- Resume after a completed task: with the Task 1 child closed and the ledger holding
+  `Task 1: complete`, a revision that replaces Task 1's heading with new work is refused
+  by `plan-snapshot`, which names the heading and leaves the snapshot and ledger
+  untouched; the same work added as the next free number refreshes, `task-brief` for
+  that number extracts it, and Task 1 stays complete.
+- A repository plan committed only in the main checkout (the worktree branched before
+  it): `plan-snapshot` prints the main checkout's absolute path from `plan_path`, and
+  `sdd-workspace` and `task-brief` run against it.
 - obs: the task's plan rounds carry reason `external_doc`; a `review: plan round 1 …`
   note that cites the reference is placed as a plan round; a session that ran `mindful
   --json show` is cleared.
