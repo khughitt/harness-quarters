@@ -1,13 +1,13 @@
 ---
 id: hq-47faaa
-title: "Claude's effortLevel is tracked while Codex's effort is filtered: decide whether /effort is session state"
+title: "Claude's /effort is session state: filter effortLevel and preserve it with live-picks"
 status: todo
 priority: 2
 size: s
 complexity: mid
 process: direct
 created: 2026-10-10T14:07:56Z
-updated: 2026-10-10T19:24:35Z
+updated: 2026-10-10T19:24:39Z
 depends: []
 tags: []
 agent: claude-code/claude-opus-5-5
