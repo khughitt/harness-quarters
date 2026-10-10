@@ -152,3 +152,13 @@ def test_restore_reports_a_timer_whose_enablement_changed(systemd):
     result = systemd.run("restore", "--state", systemd.state_file, check=False)
     assert result.returncode == 1
     assert "obs-index.timer is disabled, active; recorded enabled, active" in result.stderr
+
+
+@pytest.mark.parametrize("command", ["stop", "wait", "restore"])
+def test_a_state_file_that_does_not_exist_is_one_line_naming_it(systemd, command):
+    absent = systemd.state_file.parent / "absent.json"
+    result = systemd.run(command, "--state", absent, check=False)
+    assert result.returncode == 1 and "Traceback" not in result.stderr
+    assert result.stderr.strip().splitlines() == [f"quiesce-timers: {command}: no state file at {absent}; "
+                                                  f"record writes it"]
+    assert systemd.log() == []
