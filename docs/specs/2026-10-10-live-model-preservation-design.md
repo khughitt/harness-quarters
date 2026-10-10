@@ -40,7 +40,7 @@ deliberate return to the default.
 | File (tracked, live on the personal home) | Owned fields | Written by | Fate on a Git rewrite |
 |---|---|---|---|
 | `claude/settings.json` | `model`, `modelSettings` | Claude Code `/model` | dropped (filtered) |
-| `claude/settings.json` | `effortLevel` | Claude Code `/effort` | tracked: replaced by the committed value; out of scope (§2) |
+| `claude/settings.json` | `effortLevel` | Claude Code `/effort` | dropped (filtered); owned since hq-47faaa (§2) |
 | `codex/config.toml` | top-level `model`, `model_reasoning_effort` | Codex `/model` picker | dropped (filtered) |
 | `local/claude/settings.work.json`, `local/codex/config.work.toml` | same keys | work home | untracked; Git never writes them; out of scope |
 
@@ -68,10 +68,10 @@ Non-goals:
   home links into this checkout. Changing that would route every harness write
   (plugin toggles, hook trust) out of tracking, a far larger change made only to
   simplify this one (brief, alternative 2).
-- Claude's `effortLevel`. It is tracked, not filtered, so `/effort` shows as a real
-  change and a checkout restores the committed value rather than dropping it. Whether
-  it should be filtered like Codex's effort is a separate question; a follow-up idea
-  records it.
+- Claude's `effortLevel`, at first. It was tracked, so `/effort` showed as a real
+  change and a checkout restored the committed value. hq-47faaa (2026-10-10) ruled it
+  session state: the filter now drops it and the tool owns it with `model` and
+  `modelSettings`, through the filter's key list.
 - Picks lost before the record first exists, and a pick that lost a race with a Git
   command before any capture saw it (§3.5).
 
@@ -102,18 +102,23 @@ checkout, not per host, because the live files it mirrors are themselves shared.
 
 ### 3.2 The rule
 
-The owned fields of one file form one unit. Git's filter drops all of them together,
-so **all absent** is the only state a Git rewrite produces. Any other state was
-written by the harness or a person, and the live file wins.
+The owned fields one picker writes form one unit: Codex's two keys; Claude's `model`
+and `modelSettings`; and, since hq-47faaa, Claude's `effortLevel`, which `/effort`
+writes independently of `/model`. Git's filter drops all of a file's fields together,
+so **all absent** is the only state a Git rewrite leaves a unit in. Any other state
+was written by the harness or a person, and the live file wins. The rule below applies
+per unit: capture replaces only the units the file holds and keeps the saved value of
+the others, so an `/effort` pick made before a rewrite is restored never erases the
+saved model, and the reverse. `forget` resets every unit of the file.
 
-| Live file holds | Capture does | Restore does |
+| A unit in the live file holds | Capture does | Restore does |
 |---|---|---|
-| any owned field | record `set` with exactly the fields present | nothing |
-| none | nothing: absence alone cannot tell reset from rewrite | insert the record's fields if it is `set` |
+| any of its fields | record `set` with exactly the unit's fields present | nothing |
+| none | keep the saved unit: absence alone cannot tell reset from rewrite | insert the record's fields for the unit if it is `set` |
 
 This settles the precedence questions in the brief:
 
-- **Newer live values win.** Restore only fills an all-absent file, so it can never
+- **Newer live values win.** Restore only fills an all-absent unit, so it can never
   overwrite a pick. A later pick is present at the next capture and replaces the
   record.
 - **Reset to default.** A reset is recorded as `default` only by `forget` (§3.4).
@@ -271,6 +276,13 @@ that merge is a separately approved step. This revision needs only the tool-and-
 merge: there is no `PostModelSwitch` wiring. Before merging, `git diff main... -- claude/ codex/` must be empty. After merging, capture and verify the current picks in
 `local/live-picks.json`. Settings-changing merges are covered by temporary repository
 tests; no extra live settings change is needed merely to exercise the hook.
+
+hq-47faaa's merge drops the live `effortLevel` (the committed blob loses it, and the
+record captured by the old code never held it), and an old record cannot be seeded
+beforehand: the old tool refuses `effortLevel` as invalid. After that merge, put the
+value back in the live `claude/settings.json` (or run `/effort`), run
+`.githooks/live-picks capture`, and check that `local/live-picks.json` holds
+`effortLevel` with the model pick and that `git status` shows the file clean.
 
 Recovery: revert the merge commits, delete `local/live-picks.json`, and re-pick by
 hand, which is today's behaviour. A wrongly restored pick is undone with

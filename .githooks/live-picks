@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Keep the model picks in the live harness configs across git commands that drop them.
+"""Keep the model and effort picks in the live harness configs across git commands that drop them.
 
-The harness-state clean filter keeps the picks out of the index: `model` and
-`modelSettings` in claude/settings.json, the top-level `model` and
+The harness-state clean filter keeps the picks out of the index: `model`,
+`modelSettings` and `effortLevel` in claude/settings.json, the top-level `model` and
 `model_reasoning_effort` in codex/config.toml. A git command that writes a new blob of
 either file over the live one drops the pick, and the harness runs on its default. This
 tool saves each file's pick in local/live-picks.json, untracked and carried between
@@ -14,12 +14,16 @@ hosts by Dropbox, and puts it back:
     forget <file>         record the file's default and remove its pick from the file
     hook <name>           restore from a git hook, then restage what it wrote
 
-A file's owned fields are one unit. Git drops all of them together, so a file holding
-none is the only state a git rewrite leaves; any other state was written by a harness or
-a person, and the live file wins. Absence alone cannot tell a rewrite from a return to
+Each picker's owned fields are one unit: Codex's model and effort; Claude's model and
+modelSettings (/model), and its effortLevel (/effort), which a separate picker writes.
+Git drops all of a file's fields together, so a unit holding none is the only state a
+git rewrite leaves; any other state was written by a harness or a person, and the live
+file wins. Absence alone cannot tell a rewrite from a return to
 the default, so only forget records `default`, for either file. Both harnesses capture
-at Stop; picker events are not reliable post-write events. restore never writes a file
-that holds any owned field, so a newer pick is never overwritten. It prepends Codex's lines, which are top-level keys
+at Stop; picker events are not reliable post-write events. restore fills only units
+holding none of their fields, so a newer pick is never overwritten, and capture replaces
+only the units the file holds, so a pick of one Claude picker keeps the other's saved
+value. forget resets every unit of the file. It prepends Codex's lines, which are top-level keys
 whatever follows, and writes only when the result parses to the live values plus the
 saved ones and the filter's output, what git stages, is unchanged.
 
@@ -55,6 +59,13 @@ JSON_KEYS = FILTER["JSON_KEYS"]
 TOML_KEYS = tuple(name for table, name in FILTER["TOML_KEYS"] if table.fullmatch(""))
 TOML_HEADER = FILTER["TOML_HEADER"]
 TOML_KEY = FILTER["TOML_KEY"]
+# Claude's /model and /effort write their fields independently, so each picker's fields
+# are a unit of their own: a pick of one never replaces the other's saved value. The
+# groups partition the filter's keys. Codex's picker writes both of its keys at once.
+CLAUDE_GROUPS = (("model", "modelSettings"), ("effortLevel",))
+if sorted(sum(CLAUDE_GROUPS, ())) != sorted(JSON_KEYS):
+    sys.exit(f"live-picks: CLAUDE_GROUPS {CLAUDE_GROUPS} must partition the filter's "
+             f"JSON_KEYS {JSON_KEYS}")
 CLEAN = {CLAUDE: FILTER["clean_json"], CODEX: FILTER["clean_toml"]}
 FIELD = {CLAUDE: "values", CODEX: "lines"}
 
@@ -161,6 +172,26 @@ def live(name):
         raise Refused(f"{name} cannot be read: {error}") from None
 
 
+def merged_values(saved, held):
+    """Claude's values to save: each group the file holds, else the saved group."""
+    saved = saved["values"] if saved and saved["state"] == "set" else {}
+    values = {}
+    for group in CLAUDE_GROUPS:
+        source = held if any(key in held for key in group) else saved
+        values.update({key: source[key] for key in group if key in source})
+    return values
+
+
+def missing(name, text, saved):
+    """The saved pick for the groups text holds none of; None when there is none."""
+    held = pick(name, text)
+    if name == CODEX:
+        return None if held else saved
+    values = {key: value for group in CLAUDE_GROUPS if not any(key in held for key in group)
+              for key, value in saved["values"].items() if key in group}
+    return {"state": "set", "values": values} if values else None
+
+
 def capture():
     """Save the pick each file holds; returns the refusals."""
     record = read_record()
@@ -171,6 +202,8 @@ def capture():
         except Refused as error:
             refusals.append(str(error))
             continue
+        if name == CLAUDE:
+            held = merged_values(record.get(name), held)
         if held:
             updated[name] = {"state": "set", FIELD[name]: held}
     if updated != record:
@@ -219,7 +252,7 @@ def without_pick(name, text):
 
 
 def restore():
-    """Put each saved pick into a file holding none of its fields.
+    """Put each saved pick into a file holding none of its fields (for Claude, per group).
 
     Returns the files written and the refusals.
     """
@@ -231,9 +264,10 @@ def restore():
             continue
         try:
             text = live(name)
-            if pick(name, text):
+            wanted = missing(name, text, saved)
+            if wanted is None:
                 continue
-            result = with_pick(name, text, saved)
+            result = with_pick(name, text, wanted)
             harness_state.write((REPO / name).resolve(), result)
         except Refused as error:
             refusals.append(str(error))

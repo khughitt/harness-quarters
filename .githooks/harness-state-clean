@@ -17,7 +17,7 @@ import json
 import re
 import sys
 
-JSON_KEYS = ("model", "modelSettings")
+JSON_KEYS = ("model", "modelSettings", "effortLevel")
 # (table, key) pairs; the table is a full-match pattern over the header's name, "" for
 # the top level before any header.
 TOML_KEYS = (

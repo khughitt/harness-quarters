@@ -25,22 +25,24 @@ It points `core.hooksPath` at `.githooks`, registers the `harness-state` clean f
 and creates `local/codex/rules/`. `local/` is untracked (see Layout). The work configs
 under it come from another host's `local/`, never from `just setup`.
 
-The filter keeps `model` and `modelSettings` in `claude/settings*.json` and the
-top-level `model` and `model_reasoning_effort` in `codex/config*.toml` out of
-the index: model picks and Codex effort choices write into the live files (the homes
-symlink here), and they are session state, not configuration. Claude's `effortLevel`
-remains tracked and is outside model-pick preservation.
+The filter keeps `model`, `modelSettings` and `effortLevel` in `claude/settings*.json`
+and the top-level `model` and `model_reasoning_effort` in `codex/config*.toml` out of
+the index: model and effort picks write into the live files (the homes symlink here),
+and they are session state, not configuration. A fresh home therefore runs each
+harness's default model and effort until the first pick.
 
 The working tree keeps the harness's last pick, and a checkout of the file drops it.
 `.githooks/live-picks` puts it back. At every turn end it saves the picks from
 `claude/settings.json` and `codex/config.toml` in `local/live-picks.json`. The
 `post-checkout`, `post-merge` and `post-rewrite` hooks restore it right after a git
 command drops it, in the main checkout only, and the next turn end restores it where
-no hook runs (the commands listed below for trust). A file holding any of its model
-fields is never touched, so a newer pick always wins. A file holding none is
-ambiguous, so only an explicit act resets the saved pick: `.githooks/live-picks
-forget claude/settings.json` (or `codex/config.toml`), which also removes the pick
-from the file. Claude's `/model` Default clears its fields and the next turn end may
+no hook runs (the commands listed below for trust). Each picker's fields are one unit:
+Claude's `/model` (`model`, `modelSettings`) and `/effort` (`effortLevel`) separately,
+Codex's model and effort together. A unit holding any of its fields is never touched,
+so a newer pick always wins, and a pick of one Claude picker keeps the other's saved
+value. A unit holding none is ambiguous, so only an explicit act resets the saved pick:
+`.githooks/live-picks forget claude/settings.json` (or `codex/config.toml`), which
+resets every unit of that file and removes them from it. Claude's `/model` Default clears its fields and the next turn end may
 restore the saved pick; use `forget` for a deliberate reset. PostModelSwitch fires
 before the settings write and may skip a reset to the same resolved model, so it is
 not a capture point. The tested Codex picker actions kept both model fields; use

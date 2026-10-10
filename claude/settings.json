@@ -264,7 +264,6 @@
     }
   },
   "alwaysThinkingEnabled": true,
-  "effortLevel": "high",
   "tui": "fullscreen",
   "voice": {
     "enabled": true,

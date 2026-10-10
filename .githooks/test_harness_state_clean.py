@@ -21,6 +21,11 @@ def test_json_drops_model_and_model_settings_and_keeps_the_rest():
         {"permissions": {"defaultMode": "auto"}, "hooks": {"Stop": []}, "theme": "dark-ansi"}, indent=2) + "\n"
 
 
+def test_json_drops_the_effort_level_a_claude_effort_pick_writes():
+    text = json.dumps({"theme": "dark-ansi", "effortLevel": "high"}, indent=2) + "\n"
+    assert clean("claude/settings.json", text) == json.dumps({"theme": "dark-ansi"}, indent=2) + "\n"
+
+
 def test_json_without_state_keys_passes_through_byte_for_byte():
     text = json.dumps({"theme": "dark-ansi", "note": "café — ok"}, indent=2, ensure_ascii=False) + "\n"
     assert clean("claude/settings.work.json", text) == text

@@ -6,9 +6,9 @@ priority: 2
 size: s
 complexity: mid
 process: direct
-owner: main
+owner: effort-session-state
 created: 2026-10-10T14:07:56Z
-updated: 2026-10-10T19:26:50Z
+updated: 2026-10-10T19:48:30Z
 started: 2026-10-10T19:26:36Z
 depends: []
 tags: []
@@ -37,3 +37,9 @@ Note: with the committed value gone, a fresh home runs Claude Code's default eff
 - 2026-10-10T19:26:41Z (main): trial: flow-trial-1 — enrolled — flow on
 - 2026-10-10T19:26:41Z (main): arm: flow-trial-1 — unit tack-47faaa — flow on
 - 2026-10-10T19:26:50Z (main): gate: scoped — adopted
+- 2026-10-10T19:26:54Z (effort-session-state): resumed
+  provenance: {"harness_session":"claude-code:f931dcfe-2b47-4c43-9945-e5557533fdda","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-10T19:26:54Z (effort-session-state): gate: implementing .worktrees/effort-session-state
+- 2026-10-10T19:41:14Z (effort-session-state): review: impl round 1 — verdict: revise; findings: important 3, minor 6; reviewer: claude-code subagent
+- 2026-10-10T19:48:19Z (effort-session-state): review: impl round 2 — verdict: accept; findings: minor 3; reviewer: claude-code subagent
+- 2026-10-10T19:48:30Z (effort-session-state): gate: verified tree:3b34f8256d297ac1e92d78f1b080de42ffafe4ce — checks: just test 657 passed; new tests seen failing against effortLevel removed from JSON_KEYS and against one merged Claude group; review: important addressed one-unit capture lost the other picker's saved value, important addressed merge drops live effortLevel so spec section 5 now names the operator steps, important addressed forget and newer-pick coverage added, minor addressed spec 3.2 table now per unit, minor deferred forget has no per-unit form, minor deferred no test of an unknown key in an old record; reviewer: claude-code subagent

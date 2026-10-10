@@ -1,4 +1,4 @@
-"""live-picks saves the model picks in local/ and puts back what a git command dropped."""
+"""live-picks saves the model and effort picks in local/ and puts back what a git command dropped."""
 import json
 import os
 import shutil
@@ -143,6 +143,40 @@ def test_a_partial_pick_is_saved_as_is_and_never_completed(repo):
 
     assert record(repo)[CLAUDE] == {"state": "set", "values": {"model": "haiku"}}
     assert "modelSettings" not in claude(repo)
+
+
+@pytest.mark.parametrize("new, kept", [({"effortLevel": "low"}, {"model": "opus"}),
+                                       ({"model": "sonnet"}, {"effortLevel": "high"})])
+def test_a_pick_of_one_claude_picker_keeps_the_other_pickers_saved_value(repo, new, kept):
+    save(repo, **{CLAUDE: {"state": "set", "values": {"model": "opus", "effortLevel": "high"}}})
+    write_claude(repo, **new)
+
+    result = picks(repo, "sync")
+
+    assert result.returncode == 0, result.stderr
+    assert record(repo)[CLAUDE] == {"state": "set", "values": {**kept, **new}}
+    assert claude(repo) == {"theme": "dark-ansi", **kept, **new}
+
+
+def test_restore_fills_only_the_claude_picker_the_file_lacks(repo):
+    save(repo, **{CLAUDE: {"state": "set", "values": {"model": "opus", "effortLevel": "high"}}})
+    write_claude(repo, effortLevel="low")
+
+    assert picks(repo, "restore").returncode == 0
+
+    assert claude(repo) == {"theme": "dark-ansi", "effortLevel": "low", "model": "opus"}
+
+
+def test_forget_of_claude_resets_both_model_and_effort(repo):
+    write_claude(repo, model="opus", effortLevel="high")
+    assert picks(repo, "capture").returncode == 0
+
+    result = picks(repo, "forget", CLAUDE)
+
+    assert result.returncode == 0, result.stderr
+    assert claude(repo) == {"theme": "dark-ansi"}
+    assert record(repo)[CLAUDE] == {"state": "default"}
+    assert status(repo) == ""
 
 
 def test_restore_puts_back_both_picks_and_keeps_what_git_stages(repo):
@@ -536,6 +570,18 @@ def test_a_merge_that_rewrites_both_configs_keeps_both_picks(repo):
     assert status(repo) == ""
 
 
+def test_a_merge_keeps_an_effort_pick_with_the_model_pick(repo):
+    side_with_settings(repo)
+    write_claude(repo, model="opus", effortLevel="xhigh")
+    assert picks(repo, "capture").returncode == 0
+    git(repo, "add", "--", CLAUDE)
+
+    git(repo, "merge", "-q", "side")
+
+    assert claude(repo) == {"theme": "light", "model": "opus", "effortLevel": "xhigh"}
+    assert status(repo) == ""
+
+
 def test_one_merge_restores_trust_and_picks_together(repo):
     side_with_settings(repo)
     picked(repo)
@@ -714,6 +760,21 @@ def test_the_stop_hook_restores_the_picks_after_a_hard_reset(repo):
 
     assert result.returncode == 0, result.stderr
     assert_picked(repo, theme="dark-ansi", codex_text=BASE)
+    assert status(repo) == ""
+
+
+def test_the_stop_hook_restores_an_effort_pick_made_without_a_model_pick(repo):
+    write_claude(repo, effortLevel="low")
+    assert picks(repo, "capture").returncode == 0
+    write_claude(repo, theme="light", effortLevel="low")
+    git(repo, "reset", "-q", "--hard")
+    assert "effortLevel" not in claude(repo)
+
+    result = refresh(repo)
+
+    assert result.returncode == 0, result.stderr
+    assert record(repo)[CLAUDE] == {"state": "set", "values": {"effortLevel": "low"}}
+    assert claude(repo) == {"theme": "dark-ansi", "effortLevel": "low"}
     assert status(repo) == ""
 
 
