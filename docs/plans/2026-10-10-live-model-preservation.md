@@ -1302,7 +1302,7 @@ git commit -m "feat(hooks): restore model picks after checkouts, merges and reba
 - Consumes: `live-picks capture`, `live-picks restore` (Task 3).
 - Produces: `harness-state-refresh` drains stdin without interpreting picker events, runs plain capture before checking `index.lock`, then trust sync, pick restore and staging. It reports all failed tool steps after finishing the other steps.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `.githooks/test_live_picks.py`:
 
@@ -1486,12 +1486,12 @@ def test_a_failed_capture_fails_the_hook_after_the_other_steps(repo):
 
 In `.githooks/test_harness_state_refresh.py`, add `"live-picks"` to the fixture's copy loop (Task 2 added `"harness_state.py"`).
 
-- [ ] **Step 2: Run them to verify they fail**
+- [x] **Step 2: Run them to verify they fail**
 
 Run: `just test`
 Expected: FAIL in the new `test_live_picks.py` tests (the refresh never runs `live-picks`: no record is written, no pick restored).
 
-- [ ] **Step 3: Rewrite the refresh's `main`**
+- [x] **Step 3: Rewrite the refresh's `main`**
 
 In `.githooks/harness-state-refresh`, replace `TRUST = ...` with:
 
@@ -1542,12 +1542,12 @@ docs/specs/2026-10-10-live-model-preservation-design.md §3.3.
 
 Keep the existing Stop-only wiring; do not add a refresh command to PostModelSwitch.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `just test`
 Expected: PASS, including the four existing refresh tests unchanged.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add .githooks/harness-state-refresh .githooks/test_harness_state_refresh.py .githooks/test_live_picks.py

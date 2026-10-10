@@ -29,7 +29,7 @@ def repo(tmp_path):
     (repo / "codex").mkdir()
     (repo / "local" / "codex").mkdir(parents=True)
     for name in ("harness-state-clean", "harness-state-refresh", "codex-trust",
-                 "harness_state.py"):
+                 "harness_state.py", "live-picks"):
         shutil.copy2(HOOKS / name, repo / ".githooks" / name)
     (repo / ".gitattributes").write_text("claude/settings*.json filter=harness-state\n"
                                          "codex/config*.toml filter=harness-state\n")

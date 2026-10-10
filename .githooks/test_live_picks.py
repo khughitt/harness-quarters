@@ -635,3 +635,241 @@ def test_a_failing_pick_restore_reports_and_trust_still_returns(repo):
     assert "the next turn end retries" in result.stderr
     assert "/work/a" in codex(repo)["projects"]
     assert git(repo, "branch", "--show-current").stdout.strip() == "side"
+
+
+def refresh(repo):
+    """Run the refresh as a harness hook does: from another directory, payload on stdin."""
+    return subprocess.run([str(repo / ".githooks" / "harness-state-refresh")],
+                          cwd=repo.parent, input=json.dumps({"hook_event_name": "Stop"}),
+                          text=True, capture_output=True)
+
+
+def index_lock(repo):
+    return Path(git(repo, "rev-parse", "--path-format=absolute", "--git-path",
+                    "index.lock").stdout.strip())
+
+
+def test_the_stop_hook_saves_a_new_pick(repo):
+    write_claude(repo, model="opus")
+
+    result = refresh(repo)
+
+    assert result.returncode == 0, result.stderr
+    assert record(repo)[CLAUDE] == CLAUDE_SET
+    assert status(repo) == ""
+
+
+def dirty(repo):
+    """Give both files a real change, so a reset or stash rewrites them; picks kept."""
+    write_claude(repo, theme="light", model="opus")
+    (repo / CODEX).write_text(TUI + (repo / CODEX).read_text())
+
+
+def test_the_stop_hook_restores_the_picks_after_a_hard_reset(repo):
+    picked(repo)
+    dirty(repo)
+    git(repo, "reset", "-q", "--hard")
+    assert "model" not in claude(repo)
+
+    result = refresh(repo)
+
+    assert result.returncode == 0, result.stderr
+    assert_picked(repo, theme="dark-ansi", codex_text=BASE)
+    assert status(repo) == ""
+
+
+def test_the_stop_hook_restores_the_picks_after_a_stash_round_trip(repo):
+    picked(repo)
+    write_claude(repo, theme="light", model="opus")
+    git(repo, "stash", "-q")
+    git(repo, "stash", "pop", "-q")
+    assert "model" not in claude(repo)
+
+    assert refresh(repo).returncode == 0
+
+    assert claude(repo) == {"theme": "light", "model": "opus"}
+    assert "model" not in git(repo, "diff", "--", CLAUDE).stdout
+
+
+def test_the_stop_hook_restores_during_a_merge_stopped_on_a_conflict(repo):
+    (repo / "u").write_text("base\n")
+    git(repo, "add", "u")
+    git(repo, "commit", "-q", "-m", "u")
+    git(repo, "switch", "-q", "-c", "side")
+    (repo / "u").write_text("side\n")
+    git(repo, "add", "u")
+    commit_settings(repo, "side")
+    git(repo, "switch", "-q", "main")
+    (repo / "u").write_text("main\n")
+    git(repo, "add", "u")
+    git(repo, "commit", "-q", "-m", "main")
+    picked(repo)
+    assert git(repo, "merge", "-q", "side", check=False).returncode == 1
+
+    assert refresh(repo).returncode == 0
+
+    assert_picked(repo)
+    (repo / "u").write_text("both\n")
+    git(repo, "add", "u")
+    git(repo, "commit", "-q", "--no-edit")
+    assert "model" not in git(repo, "show", "HEAD:" + CLAUDE).stdout
+    assert '"theme": "light"' in git(repo, "show", "HEAD:" + CLAUDE).stdout
+    assert status(repo) == ""
+
+
+def test_a_picker_reset_without_forget_is_restored_at_stop(repo):
+    picked(repo)
+    write_claude(repo)
+
+    result = refresh(repo)
+
+    assert result.returncode == 0, result.stderr
+    assert record(repo)[CLAUDE] == CLAUDE_SET
+    assert claude(repo)["model"] == "opus"
+    assert codex(repo)["model"] == "gpt-6.1-sol"
+
+def test_a_new_claude_pick_after_codex_lost_its_pick_keeps_and_restores_it(repo):
+    picked(repo)
+    dirty(repo)
+    git(repo, "reset", "-q", "--hard")
+    write_claude(repo, model="sonnet")
+
+    result = refresh(repo)
+
+    assert result.returncode == 0, result.stderr
+    assert record(repo)[CODEX] == CODEX_SET
+    assert record(repo)[CLAUDE] == {"state": "set", "values": {"model": "sonnet"}}
+    assert codex(repo)["model"] == "gpt-6.1-sol"
+
+@pytest.mark.parametrize("name", [CLAUDE, CODEX])
+def test_forget_while_the_index_is_locked_records_a_reset_that_stop_keeps(repo, name):
+    picked(repo)
+    before_index = git(repo, "write-tree").stdout
+    lock = index_lock(repo)
+    lock.write_text("")
+
+    result = picks(repo, "forget", name)
+
+    assert result.returncode == 0, result.stderr
+    assert lock.read_text() == ""
+    assert record(repo)[name] == {"state": "default"}
+    assert clean(repo, name, (repo / name).read_text()) == (repo / name).read_text()
+    lock.unlink()
+    assert git(repo, "write-tree").stdout == before_index
+    assert refresh(repo).returncode == 0
+    live = claude(repo) if name == CLAUDE else codex(repo)
+    assert "model" not in live
+    assert record(repo)[name] == {"state": "default"}
+
+@pytest.mark.parametrize("name", [CLAUDE, CODEX])
+def test_stop_saves_a_changed_pick_even_while_the_index_is_locked(repo, name):
+    picked(repo)
+    if name == CLAUDE:
+        write_claude(repo, model="sonnet")
+        want = {"state": "set", "values": {"model": "sonnet"}}
+    else:
+        lines = ['model = "gpt-6-astra"\n', 'model_reasoning_effort = "medium"\n']
+        (repo / CODEX).write_text("".join(lines) + BASE)
+        want = {"state": "set", "lines": lines}
+    before_index = git(repo, "write-tree").stdout
+    lock = index_lock(repo)
+    lock.write_text("")
+
+    result = refresh(repo)
+
+    assert result.returncode == 0, result.stderr
+    assert record(repo)[name] == want
+    assert lock.exists()
+    lock.unlink()
+    assert git(repo, "write-tree").stdout == before_index
+
+
+def test_a_turn_end_with_the_index_locked_saves_but_does_not_restore(repo):
+    picked(repo)
+    dirty(repo)
+    git(repo, "reset", "-q", "--hard")
+    lock = index_lock(repo)
+    lock.write_text("")
+
+    assert refresh(repo).returncode == 0
+
+    assert "model" not in claude(repo)
+    lock.unlink()
+    assert refresh(repo).returncode == 0
+    assert claude(repo)["model"] == "opus"
+
+
+def test_a_failed_capture_fails_the_hook_after_the_other_steps(repo):
+    picked(repo)
+    (repo / "local" / "codex" / "trust.toml").write_text(A)
+    dirty(repo)
+    git(repo, "reset", "-q", "--hard")
+    (repo / CLAUDE).write_text("{\n")
+
+    result = refresh(repo)
+
+    assert result.returncode != 0
+    assert "claude/settings.json does not parse" in result.stderr
+    assert codex(repo)["model"] == "gpt-6.1-sol"
+    assert "/work/a" in codex(repo)["projects"]
+
+
+def test_a_missing_pick_tool_does_not_prevent_trust_recovery_or_staging(repo):
+    write_claude(repo, model="sonnet")
+    (repo / "local" / "codex" / "trust.toml").write_text(A)
+    (repo / ".githooks" / "live-picks").unlink()
+
+    result = refresh(repo)
+
+    assert result.returncode != 0
+    assert "live-picks capture" in result.stderr
+    assert "live-picks restore" in result.stderr
+    assert "Traceback" not in result.stderr
+    assert codex(repo)["projects"] == {"/work/a": {"trust_level": "trusted"}}
+    assert claude(repo)["model"] == "sonnet"
+    assert git(repo, "diff-files", "--name-only", "--", CLAUDE, CODEX).stdout == ""
+
+
+@pytest.mark.parametrize("damage", ["missing", "not_executable"])
+def test_a_trust_launch_failure_does_not_prevent_pick_restoration(repo, damage):
+    picked(repo)
+    dirty(repo)
+    git(repo, "reset", "-q", "--hard")
+    trust = repo / ".githooks" / "codex-trust"
+    if damage == "missing":
+        trust.unlink()
+    else:
+        trust.chmod(0o600)
+
+    result = refresh(repo)
+
+    assert result.returncode != 0
+    assert "codex-trust sync" in result.stderr
+    assert "Traceback" not in result.stderr
+    assert_picked(repo, theme="dark-ansi", codex_text=BASE)
+    assert git(repo, "diff-files", "--name-only", "--", CLAUDE, CODEX).stdout == ""
+
+
+def test_a_git_staging_failure_preserves_the_tool_failure_diagnostics(repo, tmp_path, monkeypatch):
+    record_path(repo).write_text("{")
+    original_git = shutil.which("git")
+    commands = tmp_path / "commands"
+    commands.mkdir()
+    fake = commands / "git"
+    fake.write_text(f"""#!/usr/bin/env python3
+import os
+import sys
+if "diff-files" in sys.argv:
+    print("simulated index read failure", file=sys.stderr)
+    sys.exit(23)
+os.execv({original_git!r}, [{original_git!r}, *sys.argv[1:]])
+""")
+    fake.chmod(0o755)
+    monkeypatch.setenv("PATH", str(commands) + os.pathsep + os.environ["PATH"])
+
+    result = refresh(repo)
+
+    assert result.returncode != 0
+    assert "local/live-picks.json" in result.stderr
+    assert "simulated index read failure" in result.stderr
+    assert "Traceback" not in result.stderr
