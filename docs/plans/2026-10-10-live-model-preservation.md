@@ -290,7 +290,7 @@ git commit -m "refactor(hooks): share codex-trust's mechanics and take one host 
 - Consumes: `harness_state` (Task 2).
 - Produces: the CLI `live-picks capture | restore | sync | forget <file> | hook post-checkout|post-merge|post-rewrite` (`hook` is wired in Task 4 but implemented here), exiting 0 on success and non-zero with `live-picks: <message>` otherwise; the record format of spec §3.1.
 
-- [ ] **Step 1: Write the test file, fixture, and an empty CLI scaffold**
+- [x] **Step 1: Write the test file, fixture, and an empty CLI scaffold**
 
 Create a temporary `.githooks/live-picks` scaffold containing only the following,
 and `chmod 755 .githooks/live-picks`. This has no behavior and is replaced in Step 3;
@@ -728,13 +728,13 @@ def test_restore_keeps_a_home_link_and_the_file_mode(repo, tmp_path):
     assert (repo / CLAUDE).stat().st_mode & 0o777 == 0o600
 ```
 
-- [ ] **Step 2: Run them to verify they fail**
+- [x] **Step 2: Run them to verify they fail**
 
 Run: `just test`
 Expected: FAIL in the direct-operation tests with `live-picks: not implemented`;
 the fixtures complete. Usage-error tests may also fail until the CLI is implemented.
 
-- [ ] **Step 3: Write the tool**
+- [x] **Step 3: Write the tool**
 
 `.githooks/live-picks` (then `chmod 755`):
 
@@ -1052,12 +1052,12 @@ if __name__ == "__main__":
     main(sys.argv)
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `just test`
 Expected: PASS. A failing case names the behaviour; fix the tool, not the test, unless the test contradicts spec §3.2.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add .githooks/live-picks .githooks/test_live_picks.py
