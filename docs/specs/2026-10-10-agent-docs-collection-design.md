@@ -1,6 +1,6 @@
 # Agent docs in mindful: the collection and the external document reference — design
 
-Task: `hq-5a3e12`, under `hq-d7b5b2`. Status: draft, revised 2026-10-10 after spec review rounds 1 and 2 (codex/gpt-6.1-sol).
+Task: `hq-5a3e12`, under `hq-d7b5b2`. Status: draft, revised 2026-10-10 after spec review rounds 1–3 (codex/gpt-6.1-sol).
 Brief: lore `docs/notes/2026-10-02-agent-working-docs-brief.md` (§5 holds the user's
 decision and hq-fa8757's findings). Research: `hq-fa8757` (notes of 2026-10-10).
 
@@ -218,6 +218,10 @@ value it runs the fetch once, returns the canonical reference, and the write sto
 document's body to stdout through `Resolver::read`, for a path or an external link alike,
 and fails with the same errors as `check` would report. It exists so that nothing outside
 the tracker needs to know a scheme's tool to read a linked document (§6.4).
+
+`tasks list --plan <value>` filters to the records whose `plan` is exactly that value,
+matched byte for byte like `--source`, and its rows carry `step` when set. It exists so
+that a tool can find every step a plan has, whatever their parents (§6.4).
 `Resolver::abs`, which builds the display path, returns the reference itself for an
 external link, and `show` prints it as given (no absolute path, no `(main checkout)`
 suffix).
@@ -249,7 +253,9 @@ external form like the flag path.
 
 ### 4.6 Tests
 
-Unit: `validate_doc_shape` accepts `mindful:thought:<hex>` and `x:y`, rejects `:y`, `x:`
+Integration, `list --plan`: the filter returns the planned task's steps across parents
+and the rows carry `step`; a value no record holds returns an empty list. Unit:
+`validate_doc_shape` accepts `mindful:thought:<hex>` and `x:y`, rejects `:y`, `x:`
 and `Docs:plan.md`-style first segments that are not a scheme (`src/format.rs`
 `rejects_non_normalized_doc_paths` gains cases). Integration (`tests/cli.rs`, with a stub
 scheme command written into a scratch host config): `add` and `edit` store the canonical
@@ -408,15 +414,22 @@ implementation starts. The snapshot closes that gap:
   The ledger records completion by task number (`Task <N>: complete`), so a revision
   that puts new work under a number already completed would be skipped as done, and
   `tasks check` cannot catch it: `step_missing` holds only open records (spec §7 of the
-  tracker's link design). `plan-snapshot` therefore enforces the rule **a completed task
-  number is never reused**: before overwriting, it lists the task's closed step children
-  (`tasks list --parent <id> --status done`, each shown for its `step` heading) and
-  requires every such heading, `Task N: <title>` verbatim, in the fetched body. A missing
-  or altered one refuses the refresh, names the heading, leaves the snapshot unchanged
-  and exits non-zero; the author puts the new work under a fresh number and refreshes
-  again. Limit, stated: a step the ledger marks complete whose record is not yet closed
-  is not seen by this check; the executing skills close the record in the same step that
-  writes the ledger line, and the window between the two is theirs.
+  tracker's link design). `plan-snapshot` therefore enforces two rules on the fetched
+  body before overwriting, whichever record it was called with (the planned task or any
+  of its steps, since a step's record links the same plan):
+  1. **A completed task number is never reused.** It lists every closed record linked
+     to the plan in the project, whatever its parent (`tasks list --plan <reference>
+     --status done`, §4.3), and requires each one's `step` heading, `Task N: <title>`
+     verbatim, in the body. A missing or altered heading refuses the refresh.
+  2. **A task number appears once.** Two `### Task N:` headings with the same `N`
+     refuse the refresh, because `task-brief` selects every section under that number
+     and the ledger marks the number, not the heading, complete; a retained old heading
+     beside a new one under the same number would otherwise pass rule 1.
+  A refusal names the heading or number, leaves the snapshot and the ledger unchanged
+  and exits non-zero; the author puts the new work under the next free number and
+  refreshes again. Limit, stated: a step the ledger marks complete whose record is not
+  yet closed is not seen by rule 1; the executing skills close the record in the same
+  step that writes the ledger line, and the window between the two is theirs.
 - **Resume.** A session that resumes execution calls `plan-snapshot` before
   `sdd-workspace`. The ledger's first line names the snapshot path, which is unchanged,
   so the ledger is recognised as this plan's; its `Task <N>: complete` lines keep
@@ -495,8 +508,8 @@ Order matters: a record with an external link must not be written before every h
 the write path exist.
 
 1. **tasks** (piece, planned there: the resolver is a design decision in that project's
-   terms): §4 in full, `tasks doc`, with the tests of §4.6. Install the binary on both
-   hosts.
+   terms): §4 in full, `tasks doc` and `list --plan`, with the tests of §4.6. Install
+   the binary on both hosts.
 2. **ops** (piece, direct): `mindful-doc`; `plan-snapshot`; `mindful-op` `edit`,
    `--as-agent`, `--body-file`, `--edit --etag`; `ops-profile` `mindful` and the session
    line; the hook's new-plan/brief classes and refusal text; `audit()`; tests in
@@ -540,8 +553,11 @@ after the acceptance of §10 is observed.
 - Resume after a completed task: with the Task 1 child closed and the ledger holding
   `Task 1: complete`, a revision that replaces Task 1's heading with new work is refused
   by `plan-snapshot`, which names the heading and leaves the snapshot and ledger
-  untouched; the same work added as the next free number refreshes, `task-brief` for
-  that number extracts it, and Task 1 stays complete.
+  untouched; the same refusal occurs when `plan-snapshot` is called with the open Task 2
+  child's id rather than the planned task's; a revision that keeps `Task 1: <old>` and
+  adds a second `Task 1: <new>` is refused for the duplicate number; the same work added
+  as the next free number refreshes, `task-brief` for that number extracts it, and
+  Task 1 stays complete.
 - A repository plan committed only in the main checkout (the worktree branched before
   it): `plan-snapshot` prints the main checkout's absolute path from `plan_path`, and
   `sdd-workspace` and `task-brief` run against it.
