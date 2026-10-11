@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-10-11T17:52:01Z
-updated: 2026-10-11T18:24:19Z
+updated: 2026-10-11T18:24:24Z
 started: 2026-10-11T18:24:19Z
 depends: []
 tags: [hooks, cross-project]
@@ -32,3 +32,4 @@ Done: one row per harness, session mode and route in facts/capabilities.toml wit
 
 - 2026-10-11T18:24:19Z (main): started
   provenance: {"harness_session":"claude-code:d008368b-1363-45b2-9427-35f33dcaefff","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-11T18:24:24Z (main): trial: flow-trial-1 — enrolled — flow on
