@@ -1,15 +1,16 @@
 ---
 id: hq-d85ede
 title: "Probe whether an answer from outside the terminal can reach a waiting question, per harness"
-status: doing
+status: done
 priority: 2
 size: s
 complexity: mid
 process: direct
 owner: probe/answer-routes
 created: 2026-10-11T17:52:01Z
-updated: 2026-10-11T19:36:42Z
+updated: 2026-10-11T19:36:43Z
 started: 2026-10-11T18:24:19Z
+completed: 2026-10-11T19:36:43Z
 depends: []
 tags: [hooks, cross-project]
 agent: claude-code/claude-fable-5-1
@@ -44,3 +45,7 @@ Done: one row per harness, session mode and route in facts/capabilities.toml wit
 - 2026-10-11T19:36:08Z (probe/answer-routes): gate: verified tree:9f0914941ee634f6f8d226f56cc79fff0f3c54e5 — checks: tools/harness-facts check VALID and just test 657 passed on this tree; probes ran on the installed harnesses (Claude Code 2.1.296 codex-cli 0.162.1 OpenCode 2.0.26) with raw logs in the scratch dir; review: important addressed resume-replay wording overstated a re-ask, important addressed codex recovery turn attributed to the TUI instead of the daemon, important addressed opencode cancel message sent in body not query, important addressed codex exec lists both tools, minor addressed Esc transcript wording, minor addressed timeout wording, minor addressed codex hook route scope, minor addressed opencode restart re-ask scope, minor addressed resolved-to-all-clients evidence, minor addressed async mode and withdrawal attribution, minor addressed request id numbering, minor addressed hook fires in Default mode, minor addressed exec new-turn inference; reviewer: claude-code/claude-opus-5-5
 - 2026-10-11T19:36:18Z (probe/answer-routes): gate: verified tree:9f0914941ee634f6f8d226f56cc79fff0f3c54e5 — checks: tools/harness-facts check VALID, just test 657 passed on this tree, probes on Claude Code 2.1.296 + codex-cli 0.162.1 + OpenCode 2.0.26 with raw logs in the scratch dir; review: important addressed resume-replay wording overstated a re-ask, important addressed codex recovery turn attributed to the TUI instead of the daemon, important addressed opencode cancel message sent in body not query, important addressed codex exec lists both tools, minor addressed Esc transcript wording, minor addressed timeout wording, minor addressed codex hook route scope, minor addressed opencode restart re-ask scope, minor addressed resolved-to-all-clients evidence, minor addressed async mode and withdrawal attribution, minor addressed request id numbering, minor addressed hook fires in Default mode, minor addressed exec new-turn inference; reviewer: claude-code/claude-opus-5-5
 - 2026-10-11T19:36:42Z (probe/answer-routes): retro: isolating every harness (tmux -L, --settings, CODEX_HOME, OpenCode XDG dirs plus --server) let probes run live without touching the desktop or live daemons; reading the generated protocol schema first found the Codex daemon route the task had not named. The fresh reviewer caught four overclaims where probe-client behaviour read as harness behaviour: in a facts note name the actor of every observation. Two pkill/pgrep -f calls killed my own shell because the pattern matched the command line, as the Shell rule warns.
+- 2026-10-11T19:36:43Z (probe/answer-routes): done
+  provenance: {"harness_session":"claude-code:d008368b-1363-45b2-9427-35f33dcaefff","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-11T19:36:43Z (probe/answer-routes): answer-route facts for Claude Code, Codex and OpenCode with evidence; recommendations noted on ops-cb50a8 and relay-f58531
+  provenance: {"harness_session":"claude-code:d008368b-1363-45b2-9427-35f33dcaefff","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

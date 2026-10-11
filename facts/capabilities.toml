@@ -93,3 +93,103 @@ version = "0.162.1"
 date = 2026-10-10
 evidence = "hq-f51af7"
 note = "Changing to GPT-6-Astra, changing its effort to high, and selecting the medium default reasoning level all retained model and model_reasoning_effort. The model picker offered no default or reset entry."
+
+[facts.answer-hook-terminal]
+type = "boolean"
+description = "In an interactive terminal session, a PreToolUse hook that blocks until an answer arrives from outside the terminal can answer the harness's question tool, and the same turn continues with that answer."
+
+[facts.answer-hook-terminal.harness.claude-code]
+status = "probed"
+value = true
+version = "2.1.296"
+date = 2026-10-11
+evidence = "hq-d85ede"
+note = "AskUserQuestion; the hook returned allow with updatedInput echoing questions plus an answers map. Answered after 240 s, 660 s and 2100 s (35 min) with an explicit hook timeout of 86400, which lifts the 600 s default; no ceiling was reached. The terminal shows only a running-hooks spinner, never the question, and stays usable: typed messages queue and join the turn. Esc kills the hook; the terminal shows User declined to answer questions and the transcript records a rejected tool use. Closing the session kills the hook, and resume does not replay the pending call, which was never written to the transcript; asked again after a new prompt, the model re-asks under a new tool_use_id, so an answer keyed by question text alone answers the new question. A second answer has no consumer."
+
+[facts.answer-hook-terminal.harness.codex]
+status = "probed"
+value = false
+version = "0.162.1"
+date = 2026-10-11
+evidence = "hq-d85ede"
+note = "PreToolUse fires on request_user_input in Default mode, where the tool then refuses, and in Plan mode, where the hook returned allow with updatedInput carrying an answers map, no error was shown, and the question stayed pending until dismissed: this route cannot answer. One updatedInput shape was tried. PermissionRequest reserves updatedInput and fails closed, per the hooks documentation."
+
+[facts.answer-hook-terminal.harness.opencode]
+status = "unknown"
+note = "OpenCode plugin hooks were not probed; its server form route answers terminal sessions (answer-server-terminal)."
+
+[facts.answer-defer-managed]
+type = "boolean"
+description = "In a managed session launched headless, the harness can stop at a question and a later resume delivers the answer to the same tool call."
+
+[facts.answer-defer-managed.harness.claude-code]
+status = "probed"
+value = true
+version = "2.1.296"
+date = 2026-10-11
+evidence = "hq-d85ede"
+note = "claude -p offers AskUserQuestion only with --permission-prompt-tool; the permission tool was never called. The hook returned defer: exit with stop_reason tool_deferred and deferred_tool_use. A resume with no answer deferred again on the same tool_use_id; a resume 4 min later returned allow with updatedInput and the turn completed. A second resume after the answer fails with No deferred tool marker found. An interactive session ignores defer and shows the native question."
+
+[facts.answer-defer-managed.harness.codex]
+status = "unknown"
+note = "Codex hooks have no defer decision, codex exec lists both question tools; only the async one was called, and it returned accepted and let the run end, so the answer could only arrive as a new turn on resume, an inference not probed. The blocking tool under exec was not probed."
+
+[facts.answer-server-terminal]
+type = "boolean"
+description = "In an interactive terminal session, an outside client of the harness's own session server receives a pending question, and its answer continues the same turn."
+
+[facts.answer-server-terminal.harness.codex]
+status = "probed"
+value = true
+version = "0.162.1"
+date = 2026-10-11
+evidence = "hq-d85ede"
+note = "The TUI runs on the shared app-server daemon unless --no-daemon; a client speaks WebSocket over its unix control socket and calls thread/resume on the loaded thread. item/tool/requestUserInput reached every attached client and was replayed to one that attached after the question. An answer 120 s later was followed by serverRequest/resolved, which a later probe showed reaching every attached client; the TUI card closed and the same turn continued. A second response to the same request was ignored without error. The blocking tool runs only in Plan mode; Default mode refuses it."
+
+[facts.answer-server-terminal.harness.opencode]
+status = "probed"
+value = true
+version = "2.0.26"
+date = 2026-10-11
+evidence = "hq-d85ede"
+note = "The TUI runs on a server (--server). The question tool raised a form.created event naming the tool call and listed it in GET /api/form; POST .../form/<id>/reply 3 min later returned 204 and the same turn continued. A second reply got 409 FormAlreadySettledError. DELETE on the form cancels it: the tool recorded The user dismissed this question, the step was interrupted and no model step followed. The probe sent the cancel message in the body, while the API declares it a query parameter; whether that message reaches the model was not probed."
+
+[facts.answer-server-terminal.harness.claude-code]
+status = "unknown"
+note = "No session-server route into an interactive Claude Code session was probed."
+
+[facts.answer-server-managed]
+type = "boolean"
+description = "With no terminal attached to the session, an outside client of the harness's session server receives a pending question, and its answer continues the same turn."
+
+[facts.answer-server-managed.harness.codex]
+status = "probed"
+value = true
+version = "0.162.1"
+date = 2026-10-11
+evidence = "hq-d85ede"
+note = "The TUI was closed with a question pending; the thread stayed loaded in the daemon, and a client resuming it 60 s later got the request and its answer completed the turn. A daemon restart aborts the turn; the daemon started a recovery turn (same root turn, with the TUI attached) that asked again under a new itemId; the restarted daemon numbers request ids from 0 again. A client must compare itemId or turnId to tell a re-ask from the original; whether recovery runs with no client attached was not probed."
+
+[facts.answer-server-managed.harness.opencode]
+status = "probed"
+value = true
+version = "2.0.26"
+date = 2026-10-11
+evidence = "hq-d85ede"
+note = "The TUI was closed with a form pending; a reply 30 s later completed the turn. A server restart drops pending forms: the reply gets 404 FormNotFoundError, the TUI shows the turn interrupted, and no re-ask appeared there."
+
+[facts.answer-server-managed.harness.claude-code]
+status = "unknown"
+note = "The Agent SDK canUseTool route was not probed; the headless route probed here is answer-defer-managed."
+
+[facts.answer-async-question]
+type = "boolean"
+description = "A question asked without blocking can be answered from outside the terminal: the turn ends at the question, and the answer reaches the model as a new turn."
+
+[facts.answer-async-question.harness.codex]
+status = "probed"
+value = true
+version = "0.162.1"
+date = 2026-10-11
+evidence = "hq-d85ede"
+note = "request_user_input_async is recorded as an agentMessage with delivery async and its questions, and the turn ends. An outside client's turn/start on the thread appeared in the TUI and the model answered from it. Probed in an interactive TUI session. Nothing ties the answer to the question; that the card cannot be withdrawn rests on hq-5e63d9, not on this probe."
