@@ -154,6 +154,12 @@ MIT licensed; see `LICENSE`.
   loaded by `CLAUDE_CODE_PLUGIN_DIRS` in `claude/settings.json`. `cli-pane` adds
   `/tas <id>` and `/m <id>`, which show `tasks show` and `mindful show` output in a
   pane that never enters the conversation (see "Claude Code mods" below).
+- `pi/`: the pinned pi install. `package.json` and its lock pin the CLI and the
+  pi-durable SDK to one version; `just pi-install` installs it under
+  `~/.local/share/pi/<version>`, outside the synced checkout, and `pi/bin/pi`, linked as
+  `~/.local/bin/pi`, runs it and refuses `pi update`. The home is `~/.pi/agent`, which
+  links lore's instructions and reads `~/.agents/skills` itself. `pi/probes/` holds the
+  probes behind the pi facts (see "Re-probing pi" below).
 - `local/`: untracked, and carried between hosts by Dropbox, not git. It holds
   `claude/settings.work.json`, `codex/config.work.toml` and `codex/rules/`, the files
   a home links to that the repository must not publish. The `~/.claude-work`,
@@ -231,6 +237,24 @@ Probe both kinds before touching `controller-wake`:
 
 A refresh edits `version`, `date`, `evidence` and the values in one commit. An
 inconclusive run is recorded on its task and changes nothing in the file.
+
+### Re-probing pi
+
+pi has two runtimes with different guarantees, declared as two harnesses: `pi` is the
+CLI and its RPC mode (`pi --mode rpc`), and `pi-durable` is the SDK's durable `Harness`,
+which the CLI does not use. A feature shown for one is never an entry for the other.
+Each fact's `version` is the pinned package version. A change to `pi/package.json` is a
+new epoch: run `just pi-install`, then both probes, and update every pi entry in one
+commit before anything relies on the new version unattended.
+
+- `pi/probes/rpc-probe.py` drives `pi/bin/pi --mode rpc` in a temporary agent directory
+  with a local MCP server (`pi/probes/mcp-probe-server.py`).
+- `pi/probes/durable-probe.mjs` drives the SDK; its header says how to run it against
+  the pinned install.
+
+Both need `ANTHROPIC_API_KEY`, use the cheapest Anthropic model, and print one JSON line
+per check with the raw observations; keep that output on the evidence task. An
+`inconclusive` check changes nothing in the file.
 
 Ops's claim guard reads this validated view directly. No consumer mirror runs in
 this hook or gates. Hq still validates the staged fact blob, including when its

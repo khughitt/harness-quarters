@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# The pinned pi: runs the install `just pi-install` made for the version in pi/package.json.
+# An upgrade is a change to that file, and a new epoch for facts/capabilities.toml: rerun
+# the probes under pi/probes before relying on the new version.
+set -euo pipefail
+pin="$(dirname "$(readlink -f "$0")")/../package.json"
+version=$(node -p "require('$pin').dependencies['@earendil-works/pi-coding-agent']")
+bin="${PI_INSTALL_ROOT:-$HOME/.local/share/pi}/$version/node_modules/.bin/pi"
+if [[ ${1-} == update ]]; then
+    echo "pi: this install is pinned; upgrade by editing pi/package.json in hq, then just pi-install" >&2
+    exit 2
+fi
+if [[ ! -x $bin ]]; then
+    echo "pi $version is not installed: run just pi-install in the hq checkout" >&2
+    exit 127
+fi
+export PI_SKIP_VERSION_CHECK=1
+exec "$bin" "$@"

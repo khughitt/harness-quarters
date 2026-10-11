@@ -23,6 +23,17 @@ test:
     python3 -m pytest agents/bin -q
     uv run -q --with pytest pytest .githooks tools -q
 
+# Install the pinned pi (pi/package.json and its lock) under ~/.local/share/pi/<version>,
+# outside the synced checkout; pi/bin/pi runs it. Rerun the pi probes after a version change.
+pi-install:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    version=$(node -p "require('./pi/package.json').dependencies['@earendil-works/pi-coding-agent']")
+    dest="${PI_INSTALL_ROOT:-$HOME/.local/share/pi}/$version"
+    mkdir -p "$dest"
+    cp pi/package.json pi/package-lock.json "$dest/"
+    npm ci --prefix "$dest" --no-fund --no-audit
+
 # Validate and test each Claude Code mod under claude/mods (needs the claude CLI).
 mods:
     for mod in claude/mods/*/; do claude plugin validate "$mod" && claude plugin test "$mod" || exit 1; done

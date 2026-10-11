@@ -1,0 +1,11 @@
+{
+  "name": "hq-pi-pin",
+  "private": true,
+  "description": "The pinned pi install: the CLI/RPC binary and the pi-durable SDK. An upgrade is a new epoch: rerun the probes.",
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "1.1.0",
+    "@earendil-works/pi-durable": "1.1.0",
+    "@earendil-works/pi-ai": "1.1.0",
+    "@earendil-works/chord": "1.1.0"
+  }
+}
