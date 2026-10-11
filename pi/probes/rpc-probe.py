@@ -162,9 +162,11 @@ def orphans():
 
 
 def cleanup():
-    """Stop every Pi, then kill and reap whatever their tools left behind. Exit signals wait
-    until it is done, so a second Ctrl-C cannot cut it short."""
-    signal.pthread_sigmask(signal.SIG_BLOCK, EXIT_SIGNALS)
+    """Stop every Pi, then kill and reap whatever their tools left behind. Exit signals are
+    ignored from here on, so a second Ctrl-C cannot cut it short. (Blocking them would hold
+    only this thread; a reader thread would still take the signal for the handler.)"""
+    for number in EXIT_SIGNALS:
+        signal.signal(number, signal.SIG_IGN)
     for pi in STARTED:
         pi.stop()
     deadline = time.monotonic() + 10
