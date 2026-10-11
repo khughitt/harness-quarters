@@ -1,13 +1,15 @@
 ---
 id: hq-d85ede
 title: "Probe whether an answer from outside the terminal can reach a waiting question, per harness"
-status: todo
+status: doing
 priority: 2
 size: s
 complexity: mid
 process: direct
+owner: main
 created: 2026-10-11T17:52:01Z
-updated: 2026-10-11T18:18:38Z
+updated: 2026-10-11T18:24:19Z
+started: 2026-10-11T18:24:19Z
 depends: []
 tags: [hooks, cross-project]
 agent: claude-code/claude-fable-5-1
@@ -25,3 +27,8 @@ Start from the documented paths, not from workarounds:
 For every route: a delayed answer (minutes), an answer after the session restarted, and two answers to one question.
 
 Done: one row per harness, session mode and route in facts/capabilities.toml with the evidence (version, probe, outcome) in the shape the controller-wake facts use, distinguishing unknown from unsupported; a note on ops-cb50a8 and on relay-f58531 with the recommended route per harness and the constraint it imposes on the relay design (a blocking hook with a ceiling, a resumable managed session, or a protocol client). Keep probe code out of the repository.
+
+## Notes
+
+- 2026-10-11T18:24:19Z (main): started
+  provenance: {"harness_session":"claude-code:d008368b-1363-45b2-9427-35f33dcaefff","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
