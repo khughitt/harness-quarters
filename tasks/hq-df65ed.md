@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: probe-cleanup
 created: 2026-10-11T21:58:41Z
-updated: 2026-10-11T22:59:43Z
+updated: 2026-10-11T22:59:47Z
 started: 2026-10-11T22:16:26Z
 depends: []
 tags: [feedback, friction, "from:hq"]
@@ -36,3 +36,4 @@ Outcome: every pi process the probe starts is stopped and reaped (its process gr
 - 2026-10-11T22:38:35Z (probe-cleanup): review: impl round 2 — verdict: revise; findings: important 2, minor 2; reviewer: claude-code/claude-opus-5-5
 - 2026-10-11T22:59:42Z (probe-cleanup): review: impl round 3 — verdict: accept; findings: minor 4; reviewer: claude-code/claude-opus-5-5
 - 2026-10-11T22:59:43Z (probe-cleanup): gate: verified tree:e5eb50bf0037b24c98c9731c84b41780601779d8 — checks: just test 228 and 678 passed, tools/test_pi_rpc_probe.py 6 passed on repeated runs and failed against each pre-fix probe and against an rmtree-first mutation, real rpc-probe run after the subreaper fix matched every recorded outcome with nothing left running; review: important addressed tool commands in their own sessions escaped the group kill, important addressed SIGHUP skipped cleanup, important addressed a second signal via a reader thread cut cleanup short, important addressed the test did not check stop-before-remove order, minor addressed repeated killpg could hit a reused group id, minor addressed kill wait was unbounded, minor addressed SIGTERM before the try leaked the directory, minor addressed test flake in alive and the group check, minor addressed test lacked the exception path, minor addressed SIGQUIT untested, minor deferred a signal right after mkdtemp leaks the empty directory, minor deferred exit signals taken by a reader thread wait for the main thread's current wait, minor deferred a second signal before the ignore loop can skip cleanup, minor deferred no feedback while cleanup waits, minor deferred the double-signal test fails on the group child and not on pi; reviewer: claude-code/claude-opus-5-5
+- 2026-10-11T22:59:47Z (probe-cleanup): retro: Each review round found a deeper layer of the same process-lifecycle problem (group kill, then detached tool sessions, then signal delivery to reader threads), which a fake pi that mirrored pi's real spawning (a detached child, a stubborn SIGTERM) would have exposed in one pass; for cleanup code, write the adversarial fake from the real tool's source first. Mutation checks per assertion (rmtree-first, no subreaper, no SIGHUP) kept each new test honest.
