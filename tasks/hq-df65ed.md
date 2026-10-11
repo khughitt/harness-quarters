@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: probe-cleanup
 created: 2026-10-11T21:58:41Z
-updated: 2026-10-11T22:25:15Z
+updated: 2026-10-11T22:38:35Z
 started: 2026-10-11T22:16:26Z
 depends: []
 tags: [feedback, friction, "from:hq"]
@@ -33,3 +33,4 @@ Outcome: every pi process the probe starts is stopped and reaped (its process gr
   provenance: {"harness_session":"claude-code:35d7a92f-3c81-499f-9159-da9030d280a7","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-11T22:16:41Z (probe-cleanup): gate: implementing .worktrees/probe-cleanup
 - 2026-10-11T22:25:15Z (probe-cleanup): review: impl round 1 — verdict: revise; findings: important 2, minor 6; reviewer: claude-code/claude-opus-5-5
+- 2026-10-11T22:38:35Z (probe-cleanup): review: impl round 2 — verdict: revise; findings: important 2, minor 2; reviewer: claude-code/claude-opus-5-5
