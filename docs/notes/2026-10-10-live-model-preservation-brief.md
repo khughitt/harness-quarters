@@ -77,5 +77,5 @@ Related hq-e18255 reports version drift; it does not solve or gate this work.
 
 No extra research task: the loss is reproduced, and the remaining questions are
 one interacting persistence contract. Design completion records its finding on
-hq-a77096 in the same commit. Implementation and live-hook activation are later
+hq-a77096 before the result's branch merges. Implementation and live-hook activation are later
 steps, each subject to the normal gates.

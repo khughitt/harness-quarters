@@ -71,4 +71,4 @@ answers the mediated-handoff question.
 | hq-dd66c1 | Keep as an idea; prefer the recipe and revisit a bridge only for demonstrated unmet needs | — |
 
 Reuse hq-67d253; no new goal, lane, bridge, or design task. Research completion
-records findings on both waiting ideas in the same commit as its result.
+records findings on both waiting ideas before the result's branch merges as its result.

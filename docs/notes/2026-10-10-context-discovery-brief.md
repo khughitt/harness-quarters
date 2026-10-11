@@ -78,5 +78,5 @@ Reuse obs's identity research; hq owns the launcher, not a second index.
 | hq-434be2 | P2, medium, mid complexity, direct: at most 60 minutes/eight metadata samples; source and native launch contract |
 
 Both research tasks belong to hq-65f661. Each result updates this brief and adds
-a finding note to its waiting idea in the same commit. Neither follow-up is a
+a finding note to its waiting idea before the result's branch merges. Neither follow-up is a
 production implementation task; no speculative design task is needed yet.

@@ -12,3 +12,6 @@ question = "An open question to investigate or answer."
 quick-add = "Captured or routed through quick add."
 rules = "The instruction files: AGENTS.md and what mirrors it."
 skills = "Skill definitions and the tooling around them."
+
+[git]
+commit = true
