@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# The pinned pi: runs the install `just pi-install` made for the version in pi/package.json.
+# An upgrade is a change to that file, and a new epoch for facts/capabilities.toml: rerun
+# the probes under pi/probes before relying on the new version.
+set -euo pipefail
+pin="$(dirname "$(readlink -f "$0")")/.."
+version=$(node -p 'require(process.argv[1]).dependencies["@earendil-works/pi-coding-agent"]' "$pin/package.json")
+dir="${PI_INSTALL_ROOT:-$HOME/.local/share/pi}/$version"
+
+# `pi update` with no target, or with self, pi, --self or --all, updates pi itself;
+# --models, --extensions and a package source leave the pinned install alone.
+updates_pi() {
+    local arg target=
+    for arg in "$@"; do
+        case $arg in
+            self | pi | --self | --all) return 0 ;;
+            --models | --extensions | --extension) target=1 ;;
+            -*) ;;
+            *) target=1 ;;
+        esac
+    done
+    [[ -z $target ]]
+}
+if [[ ${1-} == update ]] && updates_pi "${@:2}"; then
+    echo "pi: this install is pinned; upgrade by editing pi/package.json in hq, then just pi-install" >&2
+    exit 2
+fi
+if [[ ! -x $dir/node_modules/.bin/pi ]]; then
+    echo "pi $version is not installed: run just pi-install in the hq checkout" >&2
+    exit 127
+fi
+if ! cmp -s "$dir/package-lock.json" "$pin/package-lock.json"; then
+    echo "pi: the install at $dir does not match pi/package-lock.json: run just pi-install in the hq checkout" >&2
+    exit 127
+fi
+export PI_SKIP_VERSION_CHECK=1
+exec "$dir/node_modules/.bin/pi" "$@"

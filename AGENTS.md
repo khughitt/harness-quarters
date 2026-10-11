@@ -34,6 +34,8 @@ The generated global Projects block is checked by lore.
   to do, with the record behind each value. The tool is the only reader.
 - `agents/skills/session-logs/`: session-store guidance. `agents/bin/` keeps
   session-episodes, wake-judge, their tests, and links to tools owned by flows.
+- `pi/`: the pinned pi install (`just pi-install`), its launcher, and the probes behind
+  the `pi` and `pi-durable` facts. A version change reruns the probes (README.md).
 - `tools/session-archive` and `systemd/user/`: transcript capture and pruning.
 - `docs/`: residue specs and plans, including two frozen profiles documents retained
   for closed task references. `tools/ops-docs` is vendored from ops.
