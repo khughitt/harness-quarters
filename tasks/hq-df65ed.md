@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-10-11T21:58:41Z
-updated: 2026-10-11T22:16:28Z
+updated: 2026-10-11T22:16:32Z
 started: 2026-10-11T22:16:26Z
 depends: []
 tags: [feedback, friction, "from:hq"]
@@ -27,3 +27,4 @@ Outcome: every pi process the probe starts is stopped and reaped (its process gr
 - 2026-10-11T22:16:26Z (main): gate: scoped — direct: one cleanup path in one probe script with a fake-process test
 - 2026-10-11T22:16:26Z (main): started
   provenance: {"harness_session":"claude-code:35d7a92f-3c81-499f-9159-da9030d280a7","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-11T22:16:32Z (main): trial: flow-trial-1 — enrolled — flow on
