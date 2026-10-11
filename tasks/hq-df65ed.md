@@ -7,7 +7,7 @@ size: xs
 complexity: low
 process: direct
 created: 2026-10-11T21:58:41Z
-updated: 2026-10-11T22:16:26Z
+updated: 2026-10-11T22:16:27Z
 depends: []
 tags: [feedback, friction, "from:hq"]
 agent: codex
@@ -22,3 +22,4 @@ Outcome: every pi process the probe starts is stopped and reaped (its process gr
 ## Notes
 
 - 2026-10-11T21:58:48Z (main): concerns: hq-57132d defect — The RPC probe failure cleanup removes its temporary directory without stopping its child process; a timeout reproduction left that process alive.
+- 2026-10-11T22:16:26Z (main): gate: scoped — direct: one cleanup path in one probe script with a fake-process test
