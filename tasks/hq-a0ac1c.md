@@ -4,7 +4,7 @@ title: Learn agent-to-agent flows from Claude-Codex exchanges the user mediated
 status: idea
 priority: 2
 created: 2026-10-09T17:39:25Z
-updated: 2026-10-10T12:24:54Z
+updated: 2026-10-11T17:54:14Z
 depends: []
 parent: hq-67d253
 tags: [quick-add]
@@ -17,3 +17,4 @@ agent: claude-code/claude-opus-5-5
 ## Notes
 
 - 2026-10-10T12:24:54Z (main): scope: briefed; retained idea and source; created bounded session annotation research hq-ba1758 under existing goal hq-67d253 before schemas, roles, or a bridge; both typed Mindful sources resolve; brief: docs/notes/2026-10-10-mediated-cross-harness-brief.md
+- 2026-10-11T17:54:14Z (main): ops-cb50a8 (typed exchanges; phone inbox) files the person-facing half of this idea: relay-f58531 designs the envelope and question/answer kinds, flows-912ac5 expresses the flow's human gates as typed messages over them. The agent-to-agent half stays here, gated on hq-ba1758 as the brief says.
