@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: probe/answer-routes
 created: 2026-10-11T17:52:01Z
-updated: 2026-10-11T18:24:44Z
+updated: 2026-10-11T19:24:12Z
 started: 2026-10-11T18:24:19Z
 depends: []
 tags: [hooks, cross-project]
@@ -38,3 +38,4 @@ Done: one row per harness, session mode and route in facts/capabilities.toml wit
 - 2026-10-11T18:24:43Z (probe/answer-routes): resumed
   provenance: {"harness_session":"claude-code:d008368b-1363-45b2-9427-35f33dcaefff","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-11T18:24:43Z (probe/answer-routes): gate: implementing .worktrees/answer-routes
+- 2026-10-11T19:24:12Z (probe/answer-routes): probes 2026-10-11 (scratch /tmp/answer-probe, isolated tmux server, CODEX_HOME and OpenCode XDG dirs; Claude via --settings): Claude interactive hook answered at 240/660/2100 s, Esc and close kill the hook, resume does not replay, re-ask gets a new tool_use_id; claude -p defer needs --permission-prompt-tool, resume replays same tool_use_id, second resume refused; Codex TUI on shared app-server daemon, outside WebSocket client answers requestUserInput (Plan mode only) and survives TUI close, first response wins, daemon restart re-asks under a new request; Codex PreToolUse updatedInput cannot answer; async question answered only by a new turn; OpenCode form reply/cancel over HTTP, 409 on second reply, 404 after server restart, cancel message not shown to the model.
