@@ -29,6 +29,9 @@ WORD = "WORD" + secrets.token_hex(4).upper()
 MODEL = ["--provider", "anthropic", "--model", "claude-haiku-5-5"]
 
 
+STARTED = []  # every Pi this run spawned; main's cleanup stops each before removing its files
+
+
 class Pi:
     """One pi --mode rpc process: commands by id, events kept in arrival order."""
 
@@ -38,6 +41,7 @@ class Pi:
         self.proc = subprocess.Popen([str(PI), "--mode", "rpc", "--session-dir", str(work / "sessions"), *MODEL, *args],
                                      cwd=work / "project", env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                      stderr=open(work / "stderr.log", "ab"), start_new_session=True)
+        STARTED.append(self)
         self.events, self.responses, self.seen = queue.Queue(), {}, []
         self.cond = threading.Condition()
         self.next_id = 0
@@ -109,7 +113,11 @@ class Pi:
                 self.kill()
 
     def kill(self):
-        os.killpg(self.proc.pid, signal.SIGKILL)
+        """Kill pi's whole process group (its tools' children too) and reap pi. Safe to repeat."""
+        try:
+            os.killpg(self.proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
         self.proc.wait()
 
 
@@ -123,6 +131,7 @@ def tool_starts(pi, start, name):
 
 
 def main():
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(128 + signal.SIGTERM))  # run the cleanup below
     keep = "--keep" in sys.argv
     work = pathlib.Path(tempfile.mkdtemp(prefix="pi-rpc-probe."))
     for sub in ("agent", "sessions", "project"):
@@ -261,6 +270,8 @@ def main():
         pi.close()
         report("headless-controls", "true", shown=controls)
     finally:
+        for pi in STARTED:
+            pi.kill()
         if keep:
             print(json.dumps({"kept": str(work)}), file=sys.stderr)
         else:
