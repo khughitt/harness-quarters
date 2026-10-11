@@ -10,6 +10,7 @@ Needs ANTHROPIC_API_KEY; the model is anthropic/claude-haiku-5-5. Spend is a few
 
     pi/probes/rpc-probe.py [--keep]     # --keep leaves the temporary directory for reading
 """
+import ctypes
 import json
 import os
 import pathlib
@@ -29,6 +30,11 @@ WORD = "WORD" + secrets.token_hex(4).upper()
 MODEL = ["--provider", "anthropic", "--model", "claude-haiku-5-5"]
 
 
+STARTED = []  # every Pi this run spawned; cleanup() stops each before its files are removed
+EXIT_SIGNALS = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT)
+PR_SET_CHILD_SUBREAPER = 36
+
+
 class Pi:
     """One pi --mode rpc process: commands by id, events kept in arrival order."""
 
@@ -38,6 +44,8 @@ class Pi:
         self.proc = subprocess.Popen([str(PI), "--mode", "rpc", "--session-dir", str(work / "sessions"), *MODEL, *args],
                                      cwd=work / "project", env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                      stderr=open(work / "stderr.log", "ab"), start_new_session=True)
+        self.stopped = False
+        STARTED.append(self)
         self.events, self.responses, self.seen = queue.Queue(), {}, []
         self.cond = threading.Condition()
         self.next_id = 0
@@ -101,16 +109,81 @@ class Pi:
         return start, response, settled
 
     def close(self):
+        """An orderly shutdown: pi stops its own tool processes on closed stdin."""
         if self.proc.poll() is None:
             self.proc.stdin.close()
             try:
                 self.proc.wait(20)
             except subprocess.TimeoutExpired:
-                self.kill()
+                pass
+        self.kill()
 
     def kill(self):
-        os.killpg(self.proc.pid, signal.SIGKILL)
-        self.proc.wait()
+        """SIGKILL pi's process group and reap pi, once. A crash: pi's bash tool runs each
+        command in a session of its own, which this leaves to the subreaper (cleanup)."""
+        if self.stopped:
+            return  # its group id may since belong to an unrelated process
+        try:
+            os.killpg(self.proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        try:
+            self.proc.wait(10)
+        except subprocess.TimeoutExpired:
+            print(json.dumps({"unreaped": self.proc.pid}), file=sys.stderr)
+        self.stopped = True
+
+    def stop(self):
+        """SIGTERM first, so pi stops its tools' sessions itself, then kill."""
+        if self.stopped:
+            return
+        if self.proc.poll() is None:
+            self.proc.terminate()
+            try:
+                self.proc.wait(5)
+            except subprocess.TimeoutExpired:
+                pass
+        self.kill()
+
+
+def orphans():
+    """Children of this process: what was reparented here as subreaper, once every Pi is stopped."""
+    me, found = str(os.getpid()), []
+    for entry in os.listdir("/proc"):
+        if entry.isdigit():
+            try:
+                with open(f"/proc/{entry}/stat") as handle:
+                    fields = handle.read().rsplit(")", 1)[1].split()
+            except OSError:
+                continue
+            if fields[1] == me:
+                found.append(int(entry))
+    return found
+
+
+def cleanup():
+    """Stop every Pi, then kill and reap whatever their tools left behind. Exit signals are
+    ignored from here on, so a second Ctrl-C cannot cut it short. (Blocking them would hold
+    only this thread; a reader thread would still take the signal for the handler.)"""
+    for number in EXIT_SIGNALS:
+        signal.signal(number, signal.SIG_IGN)
+    for pi in STARTED:
+        pi.stop()
+    deadline = time.monotonic() + 10
+    while (left := orphans()) and time.monotonic() < deadline:
+        for pid in left:
+            try:
+                group = os.getpgid(pid)
+                if group == pid:
+                    os.killpg(group, signal.SIGKILL)  # a tool's own session, as pi starts them
+                else:
+                    os.kill(pid, signal.SIGKILL)
+                os.waitpid(pid, os.WNOHANG)
+            except (ProcessLookupError, ChildProcessError):
+                pass
+        time.sleep(0.05)
+    if left:
+        print(json.dumps({"unreaped": left}), file=sys.stderr)
 
 
 def report(check, outcome, **observed):
@@ -123,16 +196,23 @@ def tool_starts(pi, start, name):
 
 
 def main():
+    for number in EXIT_SIGNALS[1:]:  # SIGINT already raises KeyboardInterrupt
+        signal.signal(number, lambda received, _: sys.exit(128 + received))
+    # pi's bash tool detaches each command; a pi killed mid-tool leaves it to its nearest
+    # subreaper, which this makes the probe, so cleanup() can find and reap it.
+    if ctypes.CDLL(None, use_errno=True).prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) != 0:
+        raise OSError(ctypes.get_errno(), "prctl(PR_SET_CHILD_SUBREAPER)")
     keep = "--keep" in sys.argv
-    work = pathlib.Path(tempfile.mkdtemp(prefix="pi-rpc-probe."))
-    for sub in ("agent", "sessions", "project"):
-        (work / sub).mkdir()
-    server = {"command": sys.executable, "args": [str(HERE / "mcp-probe-server.py")], "exposure": "direct"}
-    (work / "agent" / "mcp.json").write_text(json.dumps({"mcpServers": {"probe": server}}))
-    version = subprocess.run([str(PI), "--version"], capture_output=True, text=True).stdout.strip()
-    report("version", "true", pi=version, work=str(work))
-    controls = []
+    work = None
     try:
+        work = pathlib.Path(tempfile.mkdtemp(prefix="pi-rpc-probe."))
+        for sub in ("agent", "sessions", "project"):
+            (work / sub).mkdir()
+        server = {"command": sys.executable, "args": [str(HERE / "mcp-probe-server.py")], "exposure": "direct"}
+        (work / "agent" / "mcp.json").write_text(json.dumps({"mcpServers": {"probe": server}}))
+        version = subprocess.run([str(PI), "--version"], capture_output=True, text=True).stdout.strip()
+        report("version", "true", pi=version, work=str(work))
+        controls = []
         # MCP over stdio, and a prompt run to completion.
         pi = Pi(work)
         start, response, settled = pi.run("Call the tool mcp__probe__secret_word, then reply with exactly the word it returned.")
@@ -261,9 +341,10 @@ def main():
         pi.close()
         report("headless-controls", "true", shown=controls)
     finally:
-        if keep:
+        cleanup()
+        if work and keep:
             print(json.dumps({"kept": str(work)}), file=sys.stderr)
-        else:
+        elif work:
             shutil.rmtree(work)
 
 
