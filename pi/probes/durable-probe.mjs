@@ -1,11 +1,12 @@
-// Capability probe for @earendil-works/pi-durable 1.1.0 (experimental).
+// Capability probe for @earendil-works/pi-durable, at the version pi/package.json pins (experimental).
 //
 // How to run: ESM resolution walks up from this script's real path, so copy it into a
 // fresh temp dir that also holds a symlink to the pinned install, then run it there:
 //
+//   v=$(node -p 'require("./pi/package.json").dependencies["@earendil-works/pi-durable"]')
 //   T=$(mktemp -d)
 //   cp pi/probes/durable-probe.mjs "$T/"
-//   ln -s "$HOME/.local/share/pi/1.1.0/node_modules" "$T/node_modules"
+//   ln -s "${PI_INSTALL_ROOT:-$HOME/.local/share/pi}/$v/node_modules" "$T/node_modules"
 //   node "$T/durable-probe.mjs" > /tmp/pi-durable-probe-output.jsonl
 //
 // Needs ANTHROPIC_API_KEY. Uses anthropic/claude-haiku-5-5 with short prompts. All sqlite

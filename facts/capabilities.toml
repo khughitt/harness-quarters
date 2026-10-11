@@ -210,10 +210,10 @@ date = 2026-10-11
 evidence = "hq-57132d"
 note = "RPC mode with the server in the agent directory's mcp.json and exposure direct: the model called mcp__probe__secret_word once and replied with the nonce only the server knew. The default exposure, codemode, was not probed."
 
-
 [facts.mcp-stdio.harness.pi-durable]
 status = "unknown"
 note = "Not probed. The pi-durable README and exports name no MCP client; connecting one would be an extension of the integrator's, for example over pi-mcp."
+
 [facts.headless-controls]
 type = "set"
 description = "The controls shown working on a headless session: prompt (start a run that settles), steer (a message joins the running run), abort (stops a run and leaves the session idle), fork (a new session from an earlier entry), session-id (the session id survives a process restart)."
@@ -224,8 +224,7 @@ value = ["prompt", "steer", "abort", "fork", "session-id"]
 version = "1.1.0"
 date = 2026-10-11
 evidence = "hq-57132d"
-note = "RPC commands. A steer sent while bash ran was queued and joined the same run (one agent_settled; reply DONE PINEAPPLE). abort during bash sleep 60 answered in 0.01 s with agent_settled aborted true and isStreaming false. fork from the first user message gave a new session id. Reopening with --session gave the same session id."
-
+note = "RPC commands. A steer sent while bash ran was queued and placed after the tool result, and one reply answered both (DONE PINEAPPLE) with no second run settling in the next 5 s. abort during bash sleep 60 answered in 0.01 s with agent_settled aborted true and isStreaming false. fork from the latest user message gave a new session id holding the earlier messages. Reopening with --session gave the same session id."
 
 [facts.headless-controls.harness.pi-durable]
 status = "probed"
@@ -234,6 +233,7 @@ version = "1.1.0"
 date = 2026-10-11
 evidence = "hq-57132d"
 note = "SDK over sqlite storage. A whenBusy steer submitted while a tool ran was placed after the tool result and answered by the same run. abort() resolved in 6 ms, the tool saw its abort signal, the submission settled unanswered with reason aborted and pi.live was empty. fork(entry) gave a conversation whose context ends at that entry and a fresh pi.provider id. The conversation id and its pi.provider id survived a process restart."
+
 [facts.idempotent-submission]
 type = "boolean"
 description = "Submitting an input again under the same request id returns the existing submission instead of running it a second time."
@@ -244,8 +244,7 @@ value = false
 version = "1.1.0"
 date = 2026-10-11
 evidence = "hq-57132d"
-note = "Two RPC prompt commands with the same id in one process were both accepted as started and ran two agent runs. The RPC id only correlates a response with its command."
-
+note = "Two RPC prompt commands with the same id in one process, the second sent after the first settled, were both accepted as started and ran two agent runs. The RPC id only correlates a response with its command."
 
 [facts.idempotent-submission.harness.pi-durable]
 status = "probed"
@@ -254,6 +253,7 @@ version = "1.1.0"
 date = 2026-10-11
 evidence = "hq-57132d"
 note = "A submission under one requestId, resubmitted from a new process over the same sqlite file, returned the same submission id, already done; the transcript kept one user and one assistant entry and pi.usage was unchanged."
+
 [facts.child-conversations]
 type = "boolean"
 description = "The runtime itself lets a conversation be owned by a task of another, and aborting the owner aborts the owned conversation's work."
@@ -264,8 +264,7 @@ value = false
 version = "1.1.0"
 date = 2026-10-11
 evidence = "hq-57132d"
-note = "An inventory, not a run: the built-in tools (pi --help) are read, bash, powershell, edit, write, grep, find and ls, and get_commands lists only extension, MCP and skill commands; nothing creates a child conversation. An extension could add a subagent tool, which this fact does not cover."
-
+note = "pi's README says it skips features like sub-agents. An inventory agrees: the built-in tools (pi --help) are read, bash, powershell, edit, write, grep, find and ls, and get_commands lists only extension, MCP and skill commands; nothing creates a child conversation. An extension could add a subagent tool, which this fact does not cover."
 
 [facts.child-conversations.harness.pi-durable]
 status = "probed"
@@ -274,6 +273,7 @@ version = "1.1.0"
 date = 2026-10-11
 evidence = "hq-57132d"
 note = "A subagent tool (the README's pattern, integrator code) created the child with ownership by its own pi.tool task; the child ran and answered. Aborting the root while the child's tool ran aborted the child's submission, generation and tool; endedAt order was child tool, child generation, parent call, parent generation, 1 ms apart."
+
 [facts.turn-resumes-after-kill]
 type = "boolean"
 description = "After the process is killed while a tool call runs, reopening the session continues the interrupted turn to an answer without new user input."
@@ -284,8 +284,7 @@ value = false
 version = "1.1.0"
 date = 2026-10-11
 evidence = "hq-57132d"
-note = "The process group was killed during bash sleep 30. Reopened with --session: no run started in 40 s, isStreaming false, and the transcript ended at the assistant tool call with no tool result persisted. A later prompt Continue. made the model run the same command again; nothing pi recorded marks the first call as interrupted."
-
+note = "The process group was killed during bash sleep 30. Reopened with --session: no run started in 40 s, isStreaming false, and the transcript ended at the assistant tool call with no tool result persisted. A later prompt Continue. made the model run the same command again, describing the first call as returning No result provided; nothing pi persisted marks that call as interrupted."
 
 [facts.turn-resumes-after-kill.harness.pi-durable]
 status = "probed"
@@ -294,6 +293,7 @@ version = "1.1.0"
 date = 2026-10-11
 evidence = "hq-57132d"
 note = "The process was SIGKILLed 0.5 s into a 30 s tool call. On reopen the tool task was pending and the submission placed; after resume() the run answered with no new input. A tool not declared replay safe did not rerun: the model got an error result, Tool slow was interrupted and may have partially run (code interrupted). A replay-safe tool reran in the new process and its result reached the answer."
+
 [facts.usage-reported]
 type = "set"
 description = "What the runtime reports of a session's spend, without the integrator counting: tokens, cost."
@@ -306,17 +306,17 @@ date = 2026-10-11
 evidence = "hq-57132d"
 note = "get_session_stats gave input, output, cacheRead, cacheWrite and total tokens and a cost in dollars; per the RPC docs they cover assistant messages, tool-reported usage and compaction across the session."
 
-
 [facts.usage-reported.harness.pi-durable]
 status = "probed"
 value = ["tokens", "cost"]
 version = "1.1.0"
 date = 2026-10-11
 evidence = "hq-57132d"
-note = "Each conversation's pi.usage document and harness.usage() give, per provider/model, input, output, cacheRead, cacheWrite, cacheWrite1h, reasoning and totalTokens, and cost by part with a total; tools that report usage are counted per tool name."
+note = "Each conversation's pi.usage document and harness.usage() give, per provider/model, input, output, cacheRead, cacheWrite, cacheWrite1h, reasoning and totalTokens, and cost by part with a total."
+
 [facts.usage-includes-children]
 type = "boolean"
-description = "The runtime reports a total that includes the spend of the conversations a session's tasks own, without the integrator summing them."
+description = "The usage the runtime reports for a conversation includes the spend of the conversations its tasks own, without the integrator summing them."
 
 [facts.usage-includes-children.harness.pi]
 status = "unknown"
@@ -324,8 +324,8 @@ note = "The CLI has no child conversations at 1.1.0 (child-conversations), so th
 
 [facts.usage-includes-children.harness.pi-durable]
 status = "probed"
-value = true
+value = false
 version = "1.1.0"
 date = 2026-10-11
 evidence = "hq-57132d"
-note = "harness.usage() for the session was 2104 tokens, the root's 1518 plus the child's 586, and the costs summed likewise. The root conversation's own pi.usage holds only its own spend: per conversation, children are not included."
+note = "After a subagent run the root's pi.usage held 1518 tokens, exactly its own assistant entries, and the child's held 586. harness.usage() is every conversation in the storage summed (its type says so): it read 2104 only because the probe gave the run a storage of its own. A task's spend in a shared storage is the integrator's sum over the conversations it owns."

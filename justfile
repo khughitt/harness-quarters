@@ -24,7 +24,8 @@ test:
     uv run -q --with pytest pytest .githooks tools -q
 
 # Install the pinned pi (pi/package.json and its lock) under ~/.local/share/pi/<version>,
-# outside the synced checkout; pi/bin/pi runs it. Rerun the pi probes after a version change.
+# outside the synced checkout; pi/bin/pi runs it. pi needs no lifecycle scripts (its README).
+# Rerun the pi probes after a version change.
 pi-install:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -32,7 +33,7 @@ pi-install:
     dest="${PI_INSTALL_ROOT:-$HOME/.local/share/pi}/$version"
     mkdir -p "$dest"
     cp pi/package.json pi/package-lock.json "$dest/"
-    npm ci --prefix "$dest" --no-fund --no-audit
+    npm ci --prefix "$dest" --ignore-scripts --no-fund --no-audit
 
 # Validate and test each Claude Code mod under claude/mods (needs the claude CLI).
 mods:

@@ -4,6 +4,8 @@ harness carries in facts/capabilities.toml. Each check prints one JSON line: the
 its outcome (true, false or inconclusive) and the raw observations it rests on.
 
 Everything runs in a temporary agent directory and session directory, never ~/.pi/agent.
+pi still reads the host's ~/.agents/skills, so its skills join the prompt and the command
+list the child-conversations check prints.
 Needs ANTHROPIC_API_KEY; the model is anthropic/claude-haiku-5-5. Spend is a few cents.
 
     pi/probes/rpc-probe.py [--keep]     # --keep leaves the temporary directory for reading
@@ -72,6 +74,14 @@ class Pi:
             self.cond.wait_for(match, timeout)
             return found[0] if found else None
 
+    def settled(self, start, count, timeout):
+        """Wait until `count` agent_settled events have arrived since `start`; how many did."""
+        with self.cond:
+            def done():
+                return sum(1 for e in self.seen[start:] if e.get("type") == "agent_settled") >= count
+            self.cond.wait_for(done, timeout)
+            return sum(1 for e in self.seen[start:] if e.get("type") == "agent_settled")
+
     def mark(self):
         with self.cond:
             return len(self.seen)
@@ -138,8 +148,8 @@ def main():
         first = pi.send({"type": "prompt", "message": "Reply with the single word OK."}, ident="dup-1")
         pi.wait(lambda e: e.get("type") == "agent_settled", 60, start)
         second = pi.send({"type": "prompt", "message": "Reply with the single word OK."}, ident="dup-1")
-        pi.wait(lambda e: e.get("type") == "agent_settled", 60, pi.mark() if second["data"]["disposition"] != "started" else start + 1)
-        time.sleep(2)
+        pi.settled(start, 2 if second["data"]["disposition"] == "started" else 1, 60)
+        time.sleep(3)
         with pi.cond:
             runs = sum(1 for e in pi.seen[start:] if e.get("type") == "agent_start")
         report("idempotent-submission", "false" if runs > 1 else "true", first=first.get("data"),
@@ -173,12 +183,17 @@ def main():
         response = pi.send({"type": "prompt", "message": "Run the bash command `sleep 6 && echo first`, then reply DONE."})
         bash = pi.wait(lambda e: e.get("type") == "tool_execution_start" and e.get("toolName") == "bash", 60, start)
         steer = pi.send({"type": "steer", "message": "Also include the word PINEAPPLE in your final reply."}) if bash else None
-        settled = pi.wait(lambda e: e.get("type") == "agent_settled", 120, start)
+        pi.settled(start, 1, 120)
+        time.sleep(5)  # a second run, if the steer started one, would settle separately
+        runs = pi.settled(start, 1, 0)
         text = pi.text_since(start)
-        runs = [e for e in pi.seen[start:] if e.get("type") == "agent_settled"]
-        steered = bool(steer and steer["success"] and "PINEAPPLE" in text and len(runs) == 1)
+        roles = [m.get("role") for m in pi.send({"type": "get_messages"})["data"]["messages"]]
+        order = roles[roles.index("toolResult", len(roles) - 4):] if "toolResult" in roles[-4:] else roles[-4:]
+        steered = bool(steer and steer["success"] and "PINEAPPLE" in text and runs == 1
+                       and order == ["toolResult", "user", "assistant"])
         report("steer", "true" if steered else ("inconclusive" if not bash else "false"),
-               tool_started=bool(bash), steer_response=steer, reply=text, settled_events=len(runs))
+               tool_started=bool(bash), steer_response=steer, reply=text, settled_events=runs,
+               roles_after_tool=order)
         if steered:
             controls.append("steer")
 
@@ -199,16 +214,19 @@ def main():
         else:
             report("abort", "inconclusive", reason="the model did not start the bash tool")
 
-        # Fork from an earlier user message.
-        forks = pi.send({"type": "get_fork_messages"})["data"]
-        entries = forks["messages"]
+        # Fork from the latest user message: the new session keeps what came before it.
+        entries = pi.send({"type": "get_fork_messages"})["data"]["messages"]
         before = pi.send({"type": "get_state"})["data"]
-        fork = pi.send({"type": "fork", "entryId": entries[0]["entryId"]}) if entries else None
+        fork = pi.send({"type": "fork", "entryId": entries[-1]["entryId"]}) if entries else None
         after = pi.send({"type": "get_state"})["data"]
+        texts = [json.dumps(m.get("content")) for m in pi.send({"type": "get_messages"})["data"]["messages"]
+                 if m.get("role") == "user"]
+        kept = any("secret_word" in t for t in texts)
         forked = bool(fork and fork["success"] and not fork["data"].get("cancelled")
-                      and after["sessionId"] != before["sessionId"])
+                      and after["sessionId"] != before["sessionId"] and kept)
         report("fork", "true" if forked else "false", fork_messages=len(entries), response=fork,
-               before=before["sessionId"], after=after["sessionId"], after_messages=after.get("messageCount"))
+               before=before["sessionId"], after=after["sessionId"], after_messages=after.get("messageCount"),
+               first_prompt_kept=kept, user_messages_after=len(texts))
         if forked:
             controls.append("fork")
         pi.close()

@@ -157,8 +157,11 @@ MIT licensed; see `LICENSE`.
 - `pi/`: the pinned pi install. `package.json` and its lock pin the CLI and the
   pi-durable SDK to one version; `just pi-install` installs it under
   `~/.local/share/pi/<version>`, outside the synced checkout, and `pi/bin/pi`, linked as
-  `~/.local/bin/pi`, runs it and refuses `pi update`. The home is `~/.pi/agent`, which
-  links lore's instructions and reads `~/.agents/skills` itself. `pi/probes/` holds the
+  `~/.local/bin/pi`, runs it. The launcher refuses an install whose lock differs from
+  the pin, and refuses `pi update` when it would update pi itself; model catalog and
+  package updates pass through. The home is `~/.pi/agent`, which links lore's
+  instructions and reads `~/.agents/skills` itself; pi creates it on first run, and its
+  link appears at the next `just link --apply`. `pi/probes/` holds the
   probes behind the pi facts (see "Re-probing pi" below).
 - `local/`: untracked, and carried between hosts by Dropbox, not git. It holds
   `claude/settings.work.json`, `codex/config.work.toml` and `codex/rules/`, the files
