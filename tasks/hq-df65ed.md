@@ -1,10 +1,10 @@
 ---
 id: hq-df65ed
 title: "The RPC capability probe leaves its harness subprocess running after a command timeout or interruption, then deletes the temporary session store."
-status: idea
+status: todo
 priority: 2
 created: 2026-10-11T21:58:41Z
-updated: 2026-10-11T21:58:48Z
+updated: 2026-10-11T22:16:25Z
 depends: []
 tags: [feedback, friction, "from:hq"]
 agent: codex
