@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: probe/answer-routes
 created: 2026-10-11T17:52:01Z
-updated: 2026-10-11T19:36:08Z
+updated: 2026-10-11T19:36:18Z
 started: 2026-10-11T18:24:19Z
 depends: []
 tags: [hooks, cross-project]
@@ -42,3 +42,4 @@ Done: one row per harness, session mode and route in facts/capabilities.toml wit
 - 2026-10-11T19:30:56Z (probe/answer-routes): review: impl round 1 — verdict: revise; findings: important 4, minor 6; reviewer: claude-code/claude-opus-5-5
 - 2026-10-11T19:33:02Z (probe/answer-routes): review: impl round 2 — verdict: accept; findings: minor 3; reviewer: claude-code/claude-opus-5-5
 - 2026-10-11T19:36:08Z (probe/answer-routes): gate: verified tree:9f0914941ee634f6f8d226f56cc79fff0f3c54e5 — checks: tools/harness-facts check VALID and just test 657 passed on this tree; probes ran on the installed harnesses (Claude Code 2.1.296 codex-cli 0.162.1 OpenCode 2.0.26) with raw logs in the scratch dir; review: important addressed resume-replay wording overstated a re-ask, important addressed codex recovery turn attributed to the TUI instead of the daemon, important addressed opencode cancel message sent in body not query, important addressed codex exec lists both tools, minor addressed Esc transcript wording, minor addressed timeout wording, minor addressed codex hook route scope, minor addressed opencode restart re-ask scope, minor addressed resolved-to-all-clients evidence, minor addressed async mode and withdrawal attribution, minor addressed request id numbering, minor addressed hook fires in Default mode, minor addressed exec new-turn inference; reviewer: claude-code/claude-opus-5-5
+- 2026-10-11T19:36:18Z (probe/answer-routes): gate: verified tree:9f0914941ee634f6f8d226f56cc79fff0f3c54e5 — checks: tools/harness-facts check VALID, just test 657 passed on this tree, probes on Claude Code 2.1.296 + codex-cli 0.162.1 + OpenCode 2.0.26 with raw logs in the scratch dir; review: important addressed resume-replay wording overstated a re-ask, important addressed codex recovery turn attributed to the TUI instead of the daemon, important addressed opencode cancel message sent in body not query, important addressed codex exec lists both tools, minor addressed Esc transcript wording, minor addressed timeout wording, minor addressed codex hook route scope, minor addressed opencode restart re-ask scope, minor addressed resolved-to-all-clients evidence, minor addressed async mode and withdrawal attribution, minor addressed request id numbering, minor addressed hook fires in Default mode, minor addressed exec new-turn inference; reviewer: claude-code/claude-opus-5-5
