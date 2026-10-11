@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: probe/answer-routes
 created: 2026-10-11T17:52:01Z
-updated: 2026-10-11T19:33:02Z
+updated: 2026-10-11T19:36:08Z
 started: 2026-10-11T18:24:19Z
 depends: []
 tags: [hooks, cross-project]
@@ -41,3 +41,4 @@ Done: one row per harness, session mode and route in facts/capabilities.toml wit
 - 2026-10-11T19:24:12Z (probe/answer-routes): probes 2026-10-11 (scratch /tmp/answer-probe, isolated tmux server, CODEX_HOME and OpenCode XDG dirs; Claude via --settings): Claude interactive hook answered at 240/660/2100 s, Esc and close kill the hook, resume does not replay, re-ask gets a new tool_use_id; claude -p defer needs --permission-prompt-tool, resume replays same tool_use_id, second resume refused; Codex TUI on shared app-server daemon, outside WebSocket client answers requestUserInput (Plan mode only) and survives TUI close, first response wins, daemon restart re-asks under a new request; Codex PreToolUse updatedInput cannot answer; async question answered only by a new turn; OpenCode form reply/cancel over HTTP, 409 on second reply, 404 after server restart, cancel message not shown to the model.
 - 2026-10-11T19:30:56Z (probe/answer-routes): review: impl round 1 — verdict: revise; findings: important 4, minor 6; reviewer: claude-code/claude-opus-5-5
 - 2026-10-11T19:33:02Z (probe/answer-routes): review: impl round 2 — verdict: accept; findings: minor 3; reviewer: claude-code/claude-opus-5-5
+- 2026-10-11T19:36:08Z (probe/answer-routes): gate: verified tree:9f0914941ee634f6f8d226f56cc79fff0f3c54e5 — checks: tools/harness-facts check VALID and just test 657 passed on this tree; probes ran on the installed harnesses (Claude Code 2.1.296 codex-cli 0.162.1 OpenCode 2.0.26) with raw logs in the scratch dir; review: important addressed resume-replay wording overstated a re-ask, important addressed codex recovery turn attributed to the TUI instead of the daemon, important addressed opencode cancel message sent in body not query, important addressed codex exec lists both tools, minor addressed Esc transcript wording, minor addressed timeout wording, minor addressed codex hook route scope, minor addressed opencode restart re-ask scope, minor addressed resolved-to-all-clients evidence, minor addressed async mode and withdrawal attribution, minor addressed request id numbering, minor addressed hook fires in Default mode, minor addressed exec new-turn inference; reviewer: claude-code/claude-opus-5-5
