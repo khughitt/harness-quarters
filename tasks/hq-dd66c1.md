@@ -3,8 +3,9 @@ id: hq-dd66c1
 title: "Friends: a bridge for triggering sub-agents that run in another harness or model family"
 status: idea
 priority: 2
+reviewed: true
 created: 2026-09-16T15:57:15Z
-updated: 2026-10-10T12:24:53Z
+updated: 2026-10-12T18:21:13Z
 depends: []
 parent: hq-67d253
 tags: [quick-add, skills, flow]
