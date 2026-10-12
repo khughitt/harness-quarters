@@ -194,6 +194,19 @@ date = 2026-10-11
 evidence = "hq-d85ede"
 note = "request_user_input_async is recorded as an agentMessage with delivery async and its questions, and the turn ends. An outside client's turn/start on the thread appeared in the TUI and the model answered from it. Probed in an interactive TUI session. Nothing ties the answer to the question; that the card cannot be withdrawn rests on hq-5e63d9, not on this probe."
 
+[facts.subagent-write-refused]
+type = "set"
+description = "The file basenames, as case-insensitive globs, for which the harness's file-write tool refuses a write by a subagent while the main agent may write them."
+probe = "claude/probes/subagent-write-probe.py"
+
+[facts.subagent-write-refused.harness.claude-code]
+status = "probed"
+value = ["ANALYSIS*.md", "FINDINGS*.md", "REPORT*.md", "SUMMARY*.md"]
+version = "2.1.296"
+date = 2026-10-12
+evidence = "hq-7b65dc"
+note = "Write's validateInput refuses a caller with an agent id when path.basename of the file matches /^(REPORT|SUMMARY|FINDINGS|ANALYSIS).*\\.md$/i, with 'Subagents should return findings as text, not write report files. Include this content in your final response instead.' A prefix match: reports.md and sub/report.md were refused; task-1-report.md, my-summary.md, report.txt and report/notes.md were written, and the main agent wrote main/report.md. In the 2.1.296 binary the rule appears only in Write's validateInput; Edit and Bash were not probed. A subagent refused once stops and answers in text, so the probe gives each name its own subagent."
+
 # pi: `pi` is the CLI and its RPC mode, `pi-durable` the SDK's durable Harness; the CLI does
 # not use pi-durable. Each harness's entries come from its own probe under pi/probes;
 # the epoch rule: README.md, "Re-probing pi".

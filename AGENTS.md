@@ -28,7 +28,8 @@ The generated global Projects block is checked by lore.
 - `links.toml` and `tools/harness-links`: real harness homes, declared home links and
   their reconciliation through the tasks project registry.
 - `claude/`, `codex/` and `local/`: harness settings, hooks and untracked host state.
-  `claude/mods/` holds Claude Code function-hook plugins.
+  `claude/mods/` holds Claude Code function-hook plugins; `claude/probes/` the probes
+  behind Claude Code facts.
 - `.githooks/`: config-state filtering, Codex trust and model pick preservation, and commit checks.
 - `facts/capabilities.toml` and `tools/harness-facts`: what each harness has been shown
   to do, with the record behind each value. The tool is the only reader.

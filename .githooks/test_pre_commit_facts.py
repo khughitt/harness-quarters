@@ -3,6 +3,7 @@ import importlib.machinery
 import importlib.util
 import shutil
 import subprocess
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -21,9 +22,11 @@ def load_hook():
 
 @pytest.fixture
 def repo(tmp_path, monkeypatch):
-    """A scratch repository holding the tool, the probe it names, and the shipped fact file."""
+    """A scratch repository holding the tool, the probes the shipped fact file names, and the file."""
     root = tmp_path / "repo"
-    for name in ("tools/harness-facts", "agents/bin/wake-judge", "facts/capabilities.toml"):
+    facts = tomllib.loads((CHECKOUT / "facts" / "capabilities.toml").read_text())["facts"]
+    probes = {fact["probe"] for fact in facts.values() if "probe" in fact}
+    for name in ("tools/harness-facts", "facts/capabilities.toml", *sorted(probes)):
         (root / name).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(CHECKOUT / name, root / name)
     subprocess.run(["git", "init", "-q", str(root)], check=True)

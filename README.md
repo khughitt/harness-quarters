@@ -154,6 +154,12 @@ MIT licensed; see `LICENSE`.
   loaded by `CLAUDE_CODE_PLUGIN_DIRS` in `claude/settings.json`. `cli-pane` adds
   `/tas <id>` and `/m <id>`, which show `tasks show` and `mindful show` output in a
   pane that never enters the conversation (see "Claude Code mods" below).
+- `claude/probes/`: probes behind Claude Code facts. `subagent-write-probe.py` runs
+  `claude -p` on haiku in a temporary directory, without user settings or mods, has one
+  subagent per file name try a Write, and prints each name's prediction and outcome
+  (`subagent-write-refused`). Rerun it after a Claude Code upgrade: `true` refreshes the
+  entry's version and date, `false` means the rule changed, and `inconclusive` changes
+  nothing in the file.
 - `pi/`: the pinned pi install. `package.json` and its lock pin the CLI and the
   pi-durable SDK to one version; `just pi-install` installs it under
   `~/.local/share/pi/<version>`, outside the synced checkout, and `pi/bin/pi`, linked as
