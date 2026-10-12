@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: subagent-write-fact
 created: 2026-10-12T11:00:29Z
-updated: 2026-10-12T11:31:46Z
+updated: 2026-10-12T11:34:24Z
 started: 2026-10-12T11:16:05Z
 depends: []
 tags: []
@@ -34,3 +34,4 @@ Claude Code refuses a subagent's Write when the basename starts with `report` (`
 - 2026-10-12T11:25:44Z (subagent-write-fact): filed lore-d91181: lore's naming rule covers report only; the probed rule has four prefixes
 - 2026-10-12T11:29:44Z (subagent-write-fact): review: impl round 1 — verdict: revise; findings: important 1, minor 9; reviewer: claude-code
 - 2026-10-12T11:31:46Z (subagent-write-fact): probe run 3 (after review fixes) on 2.1.296: outcome true, exit 0, malformed 0, every name as predicted, control written, no session residue left under ~/.claude/projects
+- 2026-10-12T11:34:24Z (subagent-write-fact): review: impl round 2 — verdict: revise; findings: important 0, minor 7; reviewer: claude-code
