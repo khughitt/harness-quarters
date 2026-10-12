@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-10-12T11:00:29Z
-updated: 2026-10-12T11:16:12Z
+updated: 2026-10-12T11:19:28Z
 started: 2026-10-12T11:16:05Z
 depends: []
 tags: []
@@ -24,3 +24,4 @@ Claude Code refuses a subagent's Write when the basename starts with `report` (`
   provenance: {"harness_session":"claude-code:4eec061d-7482-4022-9ce4-5a232f7d9577","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-12T11:16:11Z (main): trial: flow-trial-1 — enrolled — flow on
 - 2026-10-12T11:16:11Z (main): arm: flow-trial-1 — unit tack-7b65dc — flow on
+- 2026-10-12T11:19:28Z (main): gate: scoped — adopted
