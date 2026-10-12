@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-10-12T11:00:29Z
-updated: 2026-10-12T11:19:28Z
+updated: 2026-10-12T11:19:29Z
 started: 2026-10-12T11:16:05Z
 depends: []
 tags: []
@@ -25,3 +25,4 @@ Claude Code refuses a subagent's Write when the basename starts with `report` (`
 - 2026-10-12T11:16:11Z (main): trial: flow-trial-1 — enrolled — flow on
 - 2026-10-12T11:16:11Z (main): arm: flow-trial-1 — unit tack-7b65dc — flow on
 - 2026-10-12T11:19:28Z (main): gate: scoped — adopted
+- 2026-10-12T11:19:28Z (main): binary 2.1.296: Write validateInput refuses when agentId is set and the basename matches /^(REPORT|SUMMARY|FINDINGS|ANALYSIS).*\.md$/i (event tengu_subagent_md_report_blocked, errorCode 5); wider than the task assumed
