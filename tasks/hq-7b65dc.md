@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: subagent-write-fact
 created: 2026-10-12T11:00:29Z
-updated: 2026-10-12T11:19:30Z
+updated: 2026-10-12T11:19:31Z
 started: 2026-10-12T11:16:05Z
 depends: []
 tags: []
@@ -28,3 +28,4 @@ Claude Code refuses a subagent's Write when the basename starts with `report` (`
 - 2026-10-12T11:19:28Z (main): binary 2.1.296: Write validateInput refuses when agentId is set and the basename matches /^(REPORT|SUMMARY|FINDINGS|ANALYSIS).*\.md$/i (event tengu_subagent_md_report_blocked, errorCode 5); wider than the task assumed
 - 2026-10-12T11:19:29Z (subagent-write-fact): resumed
   provenance: {"harness_session":"claude-code:4eec061d-7482-4022-9ce4-5a232f7d9577","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-12T11:19:29Z (subagent-write-fact): gate: implementing .worktrees/subagent-write-fact
