@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: subagent-write-fact
 created: 2026-10-12T11:00:29Z
-updated: 2026-10-12T11:19:31Z
+updated: 2026-10-12T11:24:41Z
 started: 2026-10-12T11:16:05Z
 depends: []
 tags: []
@@ -29,3 +29,4 @@ Claude Code refuses a subagent's Write when the basename starts with `report` (`
 - 2026-10-12T11:19:29Z (subagent-write-fact): resumed
   provenance: {"harness_session":"claude-code:4eec061d-7482-4022-9ce4-5a232f7d9577","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-12T11:19:29Z (subagent-write-fact): gate: implementing .worktrees/subagent-write-fact
+- 2026-10-12T11:24:41Z (subagent-write-fact): attached: subagent-write-probe-2026-10-12.jsonl (204270 bytes): stream-json transcript of the passing probe run on Claude Code 2.1.296
