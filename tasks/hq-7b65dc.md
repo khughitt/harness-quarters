@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: subagent-write-fact
 created: 2026-10-12T11:00:29Z
-updated: 2026-10-12T11:24:42Z
+updated: 2026-10-12T11:25:44Z
 started: 2026-10-12T11:16:05Z
 depends: []
 tags: []
@@ -31,3 +31,4 @@ Claude Code refuses a subagent's Write when the basename starts with `report` (`
 - 2026-10-12T11:19:29Z (subagent-write-fact): gate: implementing .worktrees/subagent-write-fact
 - 2026-10-12T11:24:41Z (subagent-write-fact): attached: subagent-write-probe-2026-10-12.jsonl (204270 bytes): stream-json transcript of the passing probe run on Claude Code 2.1.296
 - 2026-10-12T11:24:41Z (subagent-write-fact): probe run 1 inconclusive: one subagent given all names stopped at its first refusal (the message tells it to answer in text); probe now uses one subagent per name. Run 2 on 2.1.296: outcome true; refused report.md REPORT-probe.md reports.md Summary.md findings-1.md ANALYSIS.MD sub/report.md; written task-1-report.md my-summary.md report.txt report/notes.md notes.md; main agent's main/report.md written
+- 2026-10-12T11:25:44Z (subagent-write-fact): filed lore-d91181: lore's naming rule covers report only; the probed rule has four prefixes
