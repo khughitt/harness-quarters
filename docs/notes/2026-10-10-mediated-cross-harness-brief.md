@@ -36,6 +36,7 @@ session readers; keep private transcript contents out of committed artifacts.
 hq owns session evidence tooling, flows owns workflow gates, lore owns general
 skills, and relay owns cross-harness dispatch. Shared roles across scientific
 disciplines and automatic flow inference remain unvalidated extensions.
+Since 2026-10-11 the person-facing half of hq-a0ac1c is covered by ops-cb50a8: relay-f58531 designs the message envelope and its question and answer kinds, and flows-912ac5 expresses flow gates as typed messages. Only the agent-to-agent half stays here. A typed schema for agent exchanges should reuse that envelope rather than define a second one.
 The shelved hq-91e028 remains unchanged. Existing hq-a15e38 concerns evidence of
 review independence and hq-9dfba9 concerns comparative flow evaluation; neither
 answers the mediated-handoff question.
@@ -69,6 +70,8 @@ answers the mediated-handoff question.
 | hq-ba1758 | Inspect at most 12 candidate sessions, with a 60-minute discovery bound, and annotate up to three supported exchange chains; return a recommendation or precise evidence gaps | hq-a0ac1c, hq-dd66c1 |
 | hq-a0ac1c | Keep as an idea until the sample establishes useful roles, fields, and transitions | — |
 | hq-dd66c1 | Keep as an idea; prefer the recipe and revisit a bridge only for demonstrated unmet needs | — |
+
+Rescoped 2026-10-13: no change in the gate. hq-83c787 (first-prompt motifs) also lists relayed-message sessions by locator, which can seed hq-ba1758's discovery.
 
 Reuse hq-67d253; no new goal, lane, bridge, or design task. Research completion
 records findings on both waiting ideas before the result's branch merges as its result.
