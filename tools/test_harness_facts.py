@@ -226,6 +226,61 @@ def test_lookup_refuses_what_get_refuses(tmp_path):
         facts.lookup("controller-wake", "codex", write(tmp_path, GOOD.replace("value = false", 'value = "false"')))
 
 
+def test_an_absolute_probe_inside_the_checkout_is_refused(tmp_path):
+    """An absolute probe would name one machine's clone path and fail on every other."""
+    absolute = str((ROOT / "agents" / "bin" / "wake-judge").resolve())
+    path = write(tmp_path, GOOD.replace('probe = "agents/bin/wake-judge"', f'probe = "{absolute}"'))
+    problem = f"facts.controller-wake: probe {absolute} is not a file in this checkout"
+    with pytest.raises(facts.Invalid) as caught:
+        facts.validate(path, ROOT)
+    assert problem in caught.value.problems
+    done = run("check", "--file", path)
+    assert done.returncode == 2 and f"harness-facts: {problem}" in done.stderr.splitlines()
+
+
+def test_two_unknown_keys_are_two_problem_lines(tmp_path):
+    path = write(tmp_path, GOOD.replace(
+        'version = "0.156.1"\ndate = 2026-09-24\nevidence = "tack-00ccb6"\n\n[facts.kinds.harness.opencode]',
+        'versio = "0.156.1"\ndate = 2026-09-24\nevidenc = "tack-00ccb6"\n\n[facts.kinds.harness.opencode]'))
+    with pytest.raises(facts.Invalid) as caught:
+        facts.validate(path, ROOT)
+    assert {"facts.kinds.harness.codex: unknown key versio",
+            "facts.kinds.harness.codex: unknown key evidenc"} <= set(caught.value.problems)
+    done = run("check", "--file", path)
+    assert done.returncode == 2
+    assert "harness-facts: facts.kinds.harness.codex: unknown key versio" in done.stderr.splitlines()
+    assert "harness-facts: facts.kinds.harness.codex: unknown key evidenc" in done.stderr.splitlines()
+
+
+def test_two_unknown_keys_in_an_unknown_entry_are_two_problem_lines(tmp_path):
+    path = write(tmp_path, GOOD.replace(
+        'status = "unknown"\nnote = "Never probed."',
+        'status = "unknown"\nnote = "Never probed."\nnots = "why"\nvale = []'))
+    with pytest.raises(facts.Invalid) as caught:
+        facts.validate(path, ROOT)
+    assert {"facts.kinds.harness.opencode: an unknown entry carries only status and note, not nots",
+            "facts.kinds.harness.opencode: an unknown entry carries only status and note, not vale"} <= set(caught.value.problems)
+
+
+def test_an_undeclared_lookup_raises_undeclared_a_lookuperror(tmp_path):
+    path = write(tmp_path, GOOD)
+    with pytest.raises(facts.Undeclared) as caught:
+        facts.lookup("controler-wake", "codex", path)
+    assert isinstance(caught.value, LookupError)
+    with pytest.raises(facts.Undeclared):
+        facts.lookup("controller-wake", "claude_code", path)
+
+
+def test_a_keyerror_inside_view_is_not_swallowed_as_a_refusal(tmp_path, monkeypatch):
+    """A bug in view raises through main instead of printing as a one-line refusal."""
+    path = write(tmp_path, GOOD)
+    monkeypatch.setattr(facts, "view", lambda data: (_ for _ in ()).throw(KeyError("schema")))
+    with pytest.raises(KeyError):
+        facts.main(["list", "--file", str(path)])
+    with pytest.raises(KeyError):
+        facts.main(["get", "kinds", "codex", "--file", str(path)])
+
+
 def test_a_lost_entry_reads_as_unknown_never_as_a_value(tmp_path):
     """A file cut cleanly before codex's entry: the answer for codex is unknown, not false."""
     path = write(tmp_path, GOOD[: GOOD.index("[facts.controller-wake.harness.codex]")])

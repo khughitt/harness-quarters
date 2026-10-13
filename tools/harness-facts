@@ -37,6 +37,10 @@ class Invalid(Exception):
         self.problems = problems
 
 
+class Undeclared(LookupError):
+    """An undeclared fact or harness was looked up; LookupError keeps the consumer contract."""
+
+
 def _text(value):
     return isinstance(value, str) and bool(value.strip())
 
@@ -54,13 +58,11 @@ def _entry(where, kind, entry, out):
         return
     status = entry.get("status")
     if status == "unknown":
-        extra = sorted(set(entry) - UNKNOWN_KEYS)
-        if extra:
-            out.append(f"{where}: an unknown entry carries only status and note, not {extra[0]}")
+        for key in sorted(set(entry) - UNKNOWN_KEYS):
+            out.append(f"{where}: an unknown entry carries only status and note, not {key}")
     elif status == "probed":
-        extra = sorted(set(entry) - PROBED_KEYS)
-        if extra:
-            out.append(f"{where}: unknown key {extra[0]}")
+        for key in sorted(set(entry) - PROBED_KEYS):
+            out.append(f"{where}: unknown key {key}")
         if kind in TYPES and ("value" not in entry or not _value_ok(kind, entry["value"])):
             out.append(f"{where}: value must be {VALUE[kind]}")
         if not _text(entry.get("version")):
@@ -110,7 +112,8 @@ def problems(data, root):
             out.append(f"{where}: description must be a non-empty string")
         if "probe" in fact:
             probe = fact["probe"]
-            inside = _text(probe) and (root / probe).resolve().is_relative_to(root.resolve()) and (root / probe).is_file()
+            inside = _text(probe) and not pathlib.PurePath(probe).is_absolute() \
+                and (root / probe).resolve().is_relative_to(root.resolve()) and (root / probe).is_file()
             if not inside:
                 out.append(f"{where}: probe {probe} is not a file in this checkout")
         entries = fact.get("harness", {})
@@ -164,13 +167,13 @@ def view(data):
 
 
 def lookup(fact, harness, path=None):
-    """One entry. Invalid for a refused file; LookupError for an undeclared fact or harness,
-    so a misspelt name can never read as unknown."""
+    """One entry. Invalid for a refused file; Undeclared (a LookupError) for an undeclared
+    fact or harness, so a misspelt name can never read as unknown."""
     shown = view(validate(path))
     if fact not in shown["facts"]:
-        raise LookupError(f"{fact} is not a declared fact")
+        raise Undeclared(f"{fact} is not a declared fact")
     if harness not in shown["harnesses"]:
-        raise LookupError(f"{harness} is not a declared harness")
+        raise Undeclared(f"{harness} is not a declared harness")
     return shown["facts"][fact]["harness"][harness]
 
 
@@ -213,7 +216,7 @@ def main(argv):
         for problem in error.problems:
             sys.stderr.write(f"harness-facts: {problem}\n")
         return 2
-    except LookupError as error:
+    except Undeclared as error:
         sys.stderr.write(f"harness-facts: {error.args[0]}\n")
         return 2
     return 0
