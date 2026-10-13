@@ -65,18 +65,28 @@ tooling.
 
 - Which motifs recur, and does "copied" combine with the others or stand as its own
   kind? Answered by hq-83c787.
-- Do motifs line up with session shape: human-turn count, duration, whether a task is
-  started or a spec or plan is written? Answered by hq-83c787.
-- Should a skill-opened session count the command (for example `/scope`) as its first
-  prompt? The pilot records both readings, and the owner decides afterwards.
-- What would motif counts feed: routing a session into a flow, a report, or nothing?
-  The owner decides after the pilot.
+- Do motifs line up with session shape (human-turn count, duration, whether a task is
+  started or a spec or plan is written) and with the tool errors a session meets?
+  Answered by hq-83c787, using Claude Code's `is_error` and Codex's `exit_code`, which
+  both stores record.
+
+Decided by the owner, 2026-10-13:
+
+- A session opened by a slash command counts the command (for example `/scope`) as its
+  first prompt. Opening with a command strongly indicates the intent and how the
+  conversation will go, so it is a motif signal, not noise to exclude.
+- Motifs have two consumers. First, obs and any session-data mining or debugging layer:
+  the kinds and rate of errors probably depend on the kind of conversation, which the
+  opening prompt partly reveals, so a motif can stratify error and failure series.
+  Second, flows, or whichever system detects conversation patterns and derives
+  structured flows from them. The pilot's recommendation says which of these its
+  evidence supports.
 
 ## Proposed decomposition
 
 | Task | Next action | Ideas it wakes |
 | --- | --- | --- |
-| hq-83c787 | Label 150 first prompts in two halves, freeze the taxonomy, relate motifs to session shape, recommend option 1, 2 or 3 | hq-1459f0 |
+| hq-83c787 | Label 150 first prompts in two halves, freeze the taxonomy, relate motifs to session shape and tool errors, recommend option 1, 2 or 3 and its consumers | hq-1459f0 |
 | hq-1459f0 | Stays an idea until the pilot shows motifs that separate session shapes | — |
 
 Goal: hq-4c1555. Not a design task: one pilot answers the open questions first.
