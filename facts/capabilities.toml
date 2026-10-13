@@ -213,7 +213,7 @@ note = "Write's validateInput refuses a caller with an agent id when path.basena
 
 [facts.mcp-stdio]
 type = "boolean"
-description = "In a headless run, the harness connects to a local MCP server over stdio from its own configuration, and the model calls one of the server's tools."
+description = "In a headless run, the harness connects to a local MCP server over stdio from its own configuration, and the model calls one of the server's tools. Shown only for the protocol revisions mcp-stdio-revisions names."
 
 [facts.mcp-stdio.harness.pi]
 status = "probed"
@@ -221,11 +221,23 @@ value = true
 version = "1.1.0"
 date = 2026-10-11
 evidence = "hq-57132d"
-note = "RPC mode with the server in the agent directory's mcp.json and exposure direct: the model called mcp__probe__secret_word once and replied with the nonce only the server knew. The default exposure, codemode, was not probed."
+note = "RPC mode with the server in the agent directory's mcp.json and exposure direct: the model called mcp__probe__secret_word once and replied with the nonce only the server knew. The default exposure, codemode, was not probed. The probe server answers the revision pi requests, 2025-11-25; a server speaking only 2026-07-28 does not connect (mcp-stdio-revisions). The probe passed no --tools list: a list of plain names declares no MCP tool that none of its entries matches (such as mcp__<server>__*), and at exposure direct that tool is then unreachable even from codemode (hq-501726; earendil-works/pi#10634)."
 
 [facts.mcp-stdio.harness.pi-durable]
 status = "unknown"
 note = "Not probed. The pi-durable README and exports name no MCP client; connecting one would be an extension of the integrator's, for example over pi-mcp."
+
+[facts.mcp-stdio-revisions]
+type = "set"
+description = "The MCP protocol revisions for which mcp-stdio was shown: the revision the server answered on the connection whose tool the model called. A server that speaks only a revision outside the set was not shown to connect."
+
+[facts.mcp-stdio-revisions.harness.pi]
+status = "probed"
+value = ["2025-11-25"]
+version = "1.1.0"
+date = 2026-10-11
+evidence = "hq-57132d; hq-501726; sci-b40b23"
+note = "pi's MCP runtime builds its client with no protocol version, so initialize requests the bundled pi-mcp's LATEST_PROTOCOL_VERSION, 2025-11-25 (read from the pinned source, hq-501726), and the hq-57132d probe server answers with the requested revision; the probe output does not record it. The same source accepts 2025-06-18, 2025-03-26 and 2024-11-05 from a server; none was probed. science's MCP server, which speaks only 2026-07-28 (stateless: server/discover in place of initialize, _meta on every request), did not connect: pi mcp list reported it failed with Request _meta is required (sci-b40b23 finding F1). Upstream: earendil-works/pi#10416, open."
 
 [facts.headless-controls]
 type = "set"

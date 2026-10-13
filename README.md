@@ -167,8 +167,13 @@ MIT licensed; see `LICENSE`.
   the pin, and refuses `pi update` when it would update pi itself; model catalog and
   package updates pass through. The home is `~/.pi/agent`, which links lore's
   instructions and reads `~/.agents/skills` itself; pi creates it on first run, and its
-  link appears at the next `just link --apply`. `pi/probes/` holds the
-  probes behind the pi facts (see "Re-probing pi" below).
+  link appears at the next `just link --apply`. A `--tools` list of plain names
+  declares no MCP tool that none of its entries matches, and a server at `exposure:
+  direct` then has its tools unreachable even from codemode, with no warning. A run
+  that limits the built-ins and still needs such a server's tools names them too:
+  `--tools 'read,grep,mcp__<server>__*'` (quoted: zsh refuses an unmatched glob). pi 1.1.0's `--help` says plain names keep MCP
+  tools; track earendil-works/pi#10634. `pi/probes/` holds the probes behind the pi
+  facts (see "Re-probing pi" below).
 - `local/`: untracked, and carried between hosts by Dropbox, not git. It holds
   `claude/settings.work.json`, `codex/config.work.toml` and `codex/rules/`, the files
   a home links to that the repository must not publish. The `~/.claude-work`,
@@ -261,9 +266,19 @@ commit before anything relies on the new version unattended.
 - `pi/probes/durable-probe.mjs` drives the SDK; its header says how to run it against
   the pinned install.
 
-Both need `ANTHROPIC_API_KEY`, use the cheapest Anthropic model, and print one JSON line
-per check with the raw observations; keep that output on the evidence task. An
+Both probes need `ANTHROPIC_API_KEY`, use the cheapest Anthropic model, and print one
+JSON line per check with the raw observations; keep that output on the evidence task. An
 `inconclusive` check changes nothing in the file.
+
+`mcp-stdio-revisions` has no probe of its own: the probe server answers whatever
+revision pi requests, and the probe does not record it. After `rpc-probe.py` reports
+`mcp-stdio` true, read the requested revision from the pinned install:
+
+    grep -rhoE 'LATEST_PROTOCOL_VERSION="[^"]*"|new McpClient\(\{.{0,300}' \
+        ~/.local/share/pi/<version>/node_modules/@earendil-works/pi-coding-agent/dist/bundle
+
+The value is the `LATEST_PROTOCOL_VERSION` printed, provided the `new McpClient({…})`
+line passes no `protocolVersion`; if it does, that option's value is the revision.
 
 Ops's claim guard reads this validated view directly. No consumer mirror runs in
 this hook or gates. Hq still validates the staged fact blob, including when its
