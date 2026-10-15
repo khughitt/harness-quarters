@@ -35,23 +35,46 @@ effort until the first pick.
 
 The working tree keeps the harness's last pick, and a checkout of the file drops it.
 `.githooks/live-picks` puts it back. At every turn end it saves the picks from
-`claude/settings.json` and `codex/config.toml` in `local/live-picks.json`. The
+`claude/settings.json` and `codex/config.toml` in `local/live-picks.json`, and
+`pi/settings.json` in the separate `local/live-picks-pi.json` record. The
 `post-checkout`, `post-merge` and `post-rewrite` hooks restore it right after a git
 command drops it, in the main checkout only, and the next turn end restores it where
 no hook runs (the commands listed below for trust). Each picker's fields are one unit:
 Claude's `/model` (`model`, `modelSettings`) and `/effort` (`effortLevel`) separately,
-Codex's model and effort together. A unit holding any of its fields is never touched,
-so a newer pick always wins, and a pick of one Claude picker keeps the other's saved
-value. A unit holding none is ambiguous, so only an explicit act resets the saved pick:
-`.githooks/live-picks forget claude/settings.json` (or `codex/config.toml`), which
-resets every unit of that file and removes them from it. Claude's `/model` Default clears its fields and the next turn end may
+Codex's model and effort together; pi's default model (`defaultProvider`,
+`defaultModel`) and thinking level (`defaultThinkingLevel`) separately. A unit holding
+any of its fields is never touched, so a newer pick always wins, and a pick of one
+Claude or pi picker keeps the other's saved value. A unit holding none is ambiguous,
+so only an explicit act resets the saved pick:
+`.githooks/live-picks forget claude/settings.json` (or `codex/config.toml` or
+`pi/settings.json`), which resets every unit of that file and removes them from it.
+Claude's `/model` Default clears its fields and the next turn end may
 restore the saved pick; use `forget` for a deliberate reset. PostModelSwitch fires
 before the settings write and may skip a reset to the same resolved model, so it is
 not a capture point. The tested Codex picker actions kept both model fields; use
-`forget` to return it to its default. A pick in either harness made since the last
+`forget` to return it to its default. A Claude or Codex pick made since the last
 turn end is not saved yet; a git command in that window brings back the one before.
-`local/live-picks.json` is machine-owned: an invalid one is refused, never
-overwritten, and deleting it starts over.
+
+pi's `extensions/harness-state.ts` calls the same refresh after `model_select` and
+`thinking_level_select` (yielding for the settings write), at `agent_settled` and at
+`session_shutdown`. Setting the current model or thinking level as the default can
+emit no event: that default is saved at the next turn end or exit. A Git rewrite in
+that window restores the previous saved default; set it again or use
+`.githooks/live-picks forget pi/settings.json` to reset both units to the automatic
+default. Runs are serialised, with a 10-second limit followed by one second for
+process-group termination. Picker and turn-end handlers return without waiting;
+shutdown awaits the current run and one final run, delaying exit by at most about
+22 seconds. A failure warns once per session without failing the pi operation.
+
+Both records are machine-owned: an invalid record is refused independently, never
+overwritten, and deleting it starts that record over. pi's separate record lets the
+previous tool keep saving Claude and Codex picks during recovery. This pi rollout is
+pending: after the separately approved merge, run `just link --apply` from main on
+each host to install the extension. To recover, revert the merge, remove the
+`~/.pi/agent/extensions/harness-state.ts` link on each host and run `just link-check`.
+The previous tool ignores `local/live-picks-pi.json`, which may be deleted; Claude and
+Codex preservation continues. pi then keeps defaults only until a Git rewrite drops
+them.
 
 Codex's project trust, the
 `[projects."<path>"]` tables it adds to `codex/config*.toml`, is host state and stays
@@ -92,8 +115,9 @@ is content-true. A Stop hook in both harnesses (`.githooks/harness-state-refresh
 wired in `claude/settings*.json` and `codex/hooks*.json` through the
 `~/.local/bin` link in `links.toml`) stages each harness config
 whose filtered diff is empty, so the mark clears at the end of the turn that made
-it; it skips while another git process holds the index lock. By hand,
-`git add -u -- claude codex` does the same while staging only real changes. Do not `git stash` these files to get past it: the stash tree
+it; pi's extension calls the same refresh at the events above. It skips while another
+git process holds the index lock. By hand, `git add -u -- claude codex pi` does the same
+while staging only real changes. Do not `git stash` these files to get past it: the stash tree
 equals `HEAD`, so `stash pop` brings back the file without its model pick until the next turn end restores it.
 Their tests run with `just test`.
 
@@ -170,8 +194,8 @@ MIT licensed; see `LICENSE`.
   `~/.local/bin/pi`, runs it. The launcher refuses an install whose lock differs from
   the pin, and refuses `pi update` when it would update pi itself; model catalog and
   package updates pass through. The home is `~/.pi/agent`, which links lore's
-  instructions and `pi/settings.json` and reads `~/.agents/skills` itself. On a new
-  host, `mkdir -p ~/.pi/agent` and `just link --apply` before pi's first run. pi's first
+  instructions, `pi/settings.json` and `pi/extensions/harness-state.ts`, and reads
+  `~/.agents/skills` itself. On a new host, `mkdir -p ~/.pi/agent` and `just link --apply` before pi's first run. pi's first
   interactive run otherwise writes `settings.json` there as a real file, which `just
   link --apply` refuses (applying no link at all while one is refused): move it aside,
   carry any configuration it holds into `pi/settings.json`, then apply. pi writes the
@@ -179,10 +203,10 @@ MIT licensed; see `LICENSE`.
   model and thinking level and its installation ids are filtered out of the index, and
   `auth.json`, `trust.json`, `models-store.json` and `sessions/` stay in the home. The
   checkout is shared between hosts, so they share one `deviceId` (the host id pi sends
-  at an OpenAI login). No hook saves pi's defaults yet: a checkout of `pi/settings.json`
-  drops them, and pi starts on its automatic default until one is set again; it drops
-  `deviceId` too, which pi makes anew at the next OpenAI login. Other home files
-  (`keybindings.json`, `APPEND_SYSTEM.md`, `prompts/`, `themes/`, `extensions/`) get a
+  at an OpenAI login). The extension preserves its default model and thinking level
+  after rollout (Setup above); installation ids are not saved, so a checkout drops
+  `deviceId`, which pi makes anew at the next OpenAI login. Other home files
+  (`keybindings.json`, `APPEND_SYSTEM.md`, `prompts/`, `themes/`, other extensions) get a
   `[harness.pi.links]` line once they have content. A `--tools` list of plain names
   declares no MCP tool that none of its entries matches, and a server at `exposure:
   direct` then has its tools unreachable even from codemode, with no warning. A run
@@ -346,11 +370,16 @@ pi has two runtimes with different guarantees, declared as two harnesses: `pi` i
 CLI and its RPC mode (`pi --mode rpc`), and `pi-durable` is the SDK's durable `Harness`,
 which the CLI does not use. A feature shown for one is never an entry for the other.
 Each fact's `version` is the pinned package version. A change to `pi/package.json` is a
-new epoch: run `just pi-install`, then both probes, and update every pi entry in one
-commit before anything relies on the new version unattended. The first interactive run
-on the new pin shows its changelog and writes the new `lastChangelogVersion` into
+new epoch: run `just pi-install`, then the RPC and durable probes below, and update
+every pi entry in one commit before anything relies on the new version unattended.
+The first interactive run on the new pin shows its changelog and writes the new `lastChangelogVersion` into
 `pi/settings.json`, a tracked change: commit it, or a merge that touches the file stops
-on it.
+on it. Also rerun `pi/probes/extension-probe.py` and its tests in
+`tools/test_pi_extension_probe.py`: capture relies on picker event ordering and
+settings writes, not just the RPC facts. The extension probe uses a scratch agent
+directory, a dummy provider and a private tmux server for its picker checks; it makes
+no API requests or live-home changes. Start with `--check P1a` as a pilot, then run all
+checks and retain their JSON observations on the evidence task.
 
 - `pi/probes/rpc-probe.py` drives `pi/bin/pi --mode rpc` in a temporary agent directory
   with a local MCP server (`pi/probes/mcp-probe-server.py`).

@@ -15,6 +15,9 @@ Round 1 revisions: explicit reset scoped to Claude, one lock with
 on the trust restore (`docs/specs/2026-09-29-codex-trust-restore-design.md`), whose
 hook-coverage probe (§1 there) this design relies on unchanged.
 
+Extended by [pi live picks](2026-10-15-pi-live-picks-design.md): separate pi record,
+per-file picker units and an hq-owned capture extension; live rollout pending.
+
 ## 1. Problem
 
 The `harness-state` clean filter keeps the model pick out of the index: `model` and

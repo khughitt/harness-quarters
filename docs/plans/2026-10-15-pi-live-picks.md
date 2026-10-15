@@ -3,7 +3,8 @@
 Status: approved for execution, 2026-10-15 (hq-24416e planned gate, a66b548);
 revised after plan review round 1 (codex/gpt-6.1-sol),
 with the spec's separate pi record. Task: `hq-24416e` (goal `hq-aa9b44`). Execution
-method: inline in this session, under the flow gates of the enrolled trial.
+method: subagent-driven implementation in this session, under the flow gates of the
+enrolled trial. Live rollout remains pending separate approval.
 
 **Goal:** pi's default model and thinking level survive every Git command that
 rewrites `pi/settings.json`, captured by an hq-owned pi extension and restored by the
@@ -164,6 +165,6 @@ the merge (an action outside the repository).
 - [ ] Merge into main; `just link --apply` (creates the extension link); `just
   link-check`.
 - [ ] Spec §5 check: in pi, set a default model and thinking level, quit; check
-  `local/live-picks.json` holds both; `git checkout -- pi/settings.json` in main; the
+  `local/live-picks-pi.json` holds both; `git checkout -- pi/settings.json` in main; the
   defaults are back and `git status` is clean.
 - [ ] Note on `hq-a8d65f` that europa's apply now also creates the extension link.

@@ -22,8 +22,10 @@ Git drops all of a file's fields together, so a unit holding none is the only st
 git rewrite leaves; any other state was written by a harness or a person, and the live
 file wins. Absence alone cannot tell a rewrite from a return to
 the default, so only forget records `default`. Claude and Codex capture at Stop; pi
-captures at its picker events, turn end and shutdown. restore fills only units
-holding none of their fields, so a newer pick is never overwritten, and capture replaces
+captures through its extension after picker events, at turn end and at shutdown.
+Setting the current selection as a default emits no event: it is saved at turn end
+or exit, so a git rewrite before then restores the previous saved default. restore
+fills only units holding none of their fields, so a newer pick is never overwritten, and capture replaces
 only the units the file holds, so a pick of one JSON picker keeps the other's saved
 value. forget resets every unit of the file. It prepends Codex's lines, which are top-level keys
 whatever follows, and writes only when the result parses to the live values plus the
@@ -35,7 +37,8 @@ Every operation holds local/harness-state.lock, the host lock codex-trust also t
 hook reports a failure on stderr and exits 0, and skips a linked worktree silently and,
 from post-checkout, a rebase in progress; the next turn end retries. Every other
 operation refuses a linked worktree, whose configs are not live. Design:
-docs/specs/2026-10-10-live-model-preservation-design.md.
+docs/specs/2026-10-10-live-model-preservation-design.md, extended by
+docs/specs/2026-10-15-pi-live-picks-design.md.
 """
 import fnmatch
 import functools

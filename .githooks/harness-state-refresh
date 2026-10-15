@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stop hook: clear git's size-only "modified" mark on the tracked harness configs.
+"""Harness refresh: clear git's size-only "modified" mark on tracked harness configs.
 
 A model or effort switch rewrites `claude/settings*.json`, `codex/config*.toml` or
 `pi/settings*.json` through the homes' symlinks. The harness-state clean filter keeps
@@ -10,23 +10,24 @@ refreshes its stat; a file with a real change is left alone.
 
 Claude Code runs this from Stop because `/effort` fires no hook (PostModelSwitch covers
 `/model` only; ConfigChange does not fire on the harness's own writes; probed with Claude
-Code 2.1.283); Codex has no event nearer its picker than Stop. pi runs no hooks, so its
-mark clears at the next Claude Code or Codex Stop. The hook fires in every
+Code 2.1.283); Codex has no event nearer its picker than Stop. pi's extension calls
+this after picker events, at turn end and at shutdown. The refresh runs in every
 project, so it works on the checkout it lives in, not the cwd. The mark is cosmetic and
 must never block a turn: when another git process holds the index lock it skips, and the
-next Stop retries. Any other git failure exits non-zero, which both harnesses report
-without blocking. The hooks call it through `~/.local/bin/harness-state-refresh`, a link
-`links.toml` manages, so the command never names the checkout.
+next refresh retries. Any other git failure exits non-zero, which the calling harness
+reports without blocking. The hooks and pi extension call it through
+`~/.local/bin/harness-state-refresh`, a link `links.toml` manages, so the command never
+names the checkout.
 
 It first runs `live-picks capture`, which reads the live configs and writes only
-local/live-picks.json, so it runs even while another git process holds the index. At
-Stop in both harnesses, capture never records an absence as a reset; only forget
-records the default. Then, unless the index is locked, `codex-trust sync` saves and
-restores Codex's project trust
-and `live-picks restore` puts back a dropped pick; the staging below clears the mark
+local/live-picks.json (Claude and Codex) and local/live-picks-pi.json (pi), so it runs
+even while another git process holds the index. Capture never records an absence as a
+reset; only forget records the default. Then, unless the index is locked,
+`codex-trust sync` saves and restores Codex's project trust and `live-picks restore` puts back a dropped pick; the staging below clears the mark
 their inserts leave. A failed step still lets the others run, then fails the hook with
 every failing step's message. Design:
-docs/specs/2026-10-10-live-model-preservation-design.md §3.3.
+docs/specs/2026-10-10-live-model-preservation-design.md §3.3, extended by
+docs/specs/2026-10-15-pi-live-picks-design.md §3.3.
 """
 import subprocess
 import sys

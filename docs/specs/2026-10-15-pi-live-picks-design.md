@@ -239,7 +239,7 @@ in the existing temporary-repository fixtures, plus:
 Merging into main activates the changed Git hooks and refresh (a separately approved
 step, as in the base design), and the extension link appears at the next
 `just link --apply` from main, on each host (`hq-a8d65f` covers europa). After the
-apply: set a default model in pi, check that `local/live-picks.json` holds it, run
+apply: set a default model in pi, check that `local/live-picks-pi.json` holds it, run
 `git checkout -- pi/settings.json` in main, and check that the default is back and
 `git status` is clean.
 
