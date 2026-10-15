@@ -2,8 +2,10 @@
 
 Status: draft for review, 2026-10-15; revised after spec review round 1 (unchanged
 selections emit no event, rollback of the record, a bounded refresh) and round 2
-(rollback order: revert before removing the pi entry). Approved for implementation
-planning by the user on 2026-10-15, after the round 2 fix. Task: `hq-24416e` (goal `hq-aa9b44`). Extends
+(rollback order). Approved for implementation planning by the user on 2026-10-15,
+after the round 2 fix. Revised after plan review round 1: pi's entry moves to its own
+record file (§3.1), which retires the rollback record edit; this revision needs
+re-review. Task: `hq-24416e` (goal `hq-aa9b44`). Extends
 `docs/specs/2026-10-10-live-model-preservation-design.md` (below, "the base design"),
 whose record, rule, operations and failure handling apply unchanged except where this
 document says otherwise. Builds on `hq-61a47e` (merge `6b434eb`), which tracks
@@ -62,14 +64,28 @@ Non-goals:
 
 ### 3.1 Units and record
 
-`pi/settings.json` joins `OWNED`. It is JSON, so its record entry has the Claude shape:
+`pi/settings.json` joins `OWNED`. Its entry lives in its own record,
+`local/live-picks-pi.json`, untracked like `local/live-picks.json`, with the same
+format and validation (one key, `pi/settings.json`; the Claude entry shape):
 
 ```json
-"pi/settings.json": {"state": "set",
+{"pi/settings.json": {"state": "set",
                      "values": {"defaultProvider": "anthropic",
                                 "defaultModel": "claude-opus-5-5",
-                                "defaultThinkingLevel": "high"}}
+                                "defaultThinkingLevel": "high"}}}
 ```
+
+A separate file, not a third key in `local/live-picks.json`, because the pre-change
+tool refuses a record naming a file it does not own, and that refusal stops Claude's
+and Codex's preservation. Kept apart, the old tool never reads pi's record: a rollback
+needs no record edit, and no capture in flight on any host (a pi extension, a Stop
+refresh waiting on the lock with the new code loaded, a host Dropbox has not yet
+synced) can leave the old tool refusing its record (plan review round 1). Each
+owned file maps to one record (`RECORDS = {CLAUDE: …, CODEX: …, PI: …}`); every
+operation reads, validates and writes the records of the files it touches, all under
+the one host lock, and a record no file names (Claude and Codex share theirs) is
+written only when its content changes. The base design's "one record per checkout"
+becomes one record per tool generation.
 
 Its units are `defaultProvider` + `defaultModel` (written together) and
 `defaultThinkingLevel`, so a thinking default set before a rewrite is restored never
@@ -127,9 +143,10 @@ is what keeps a stuck lock holder from holding pi.
 **Awaiting.** pi awaits event handlers (picker actions and shutdown wait on them). The
 `model_select`, `thinking_level_select` and `agent_settled` handlers start a run and
 return without awaiting it. `session_shutdown` awaits the run in flight and one final
-run, each under the same limit, so pi's exit is delayed by at most about 22 seconds and
-never left with an orphaned child. Runs are serialised inside the extension (one at a
-time; a request while one runs schedules one more). A failure or timeout is shown once
+run, each under the same limit; a rerun already pending is replaced by that final run,
+so pi's exit is delayed by at most about 22 seconds and never left with an orphaned
+child. Runs are serialised inside the extension (one at a time; a request while one
+runs schedules one more, and further requests join it). A failure or timeout is shown once
 per session through `ctx.ui.notify` (no-op outside interactive mode) and never fails the
 pi operation. The refresh does what it does at a Claude Stop: capture, then (when the
 index is free) Codex trust sync, restore, and staging of size-only marks.
@@ -159,20 +176,31 @@ extension, `forget pi/settings.json`, and the per-unit rule; the Setup section's
 The extension takes its refresh command from `HQ_HARNESS_STATE_REFRESH` when set (the
 probes' stub), else `~/.local/bin/harness-state-refresh`.
 
-- **P1 — loading, shutdown and the bound.** With the extension linked into a scratch
-  `extensions/` through a symlink and the refresh command replaced by a stub that
-  records each call, `pi --mode rpc` loads it, and closing its stdin runs the stub from
-  `session_shutdown`. With a stub that hangs and starts a child of its own, pi still
-  exits within the bound, and neither the stub nor its child survives. No model call.
-- **P2 — the write precedes the deferred handler, and unchanged selections.** In a
-  detached tmux session (a headless terminal, not the desktop), interactive pi with a
-  `models.json` that defines a local dummy provider, two models in it, and a scratch
-  `settings.json`:
-  - set the other model, then another thinking level, as the default: the stub runs at
-    each, reads the settings file, and sees the new values;
-  - set the session's current model, then its current thinking level, as the default
-    (each differing from the saved default): the stub does not run at the pick, the
-    file holds the new default, and the stub run at `session_shutdown` sees it.
+- **P1 — loading, shutdown and the bound** (`pi --mode rpc`, no TTY, no model call;
+  `set_model` between the dummy provider's two models emits `model_select`, since
+  `setModel` emits on any change, persisted or not):
+  - P1a: with the extension linked into a scratch `extensions/` through a symlink and a
+    stub that records each call, closing stdin runs the stub once, from
+    `session_shutdown`.
+  - P1b: a stub that ignores SIGTERM and starts a descendant that also ignores it
+    (`trap '' TERM`) and sleeps: pi exits within the bound after stdin closes, and no
+    process of the stub's group survives, so the SIGKILL path ran.
+  - P1c: a stub that takes 3 seconds; two `set_model` calls in quick succession (one run
+    in flight, one rerun pending), then stdin closes at once: the stub's start and end
+    times show no overlap, exactly the run in flight and one final run, and pi exits
+    within the bound.
+- **P2 — the write precedes the deferred handler, and unchanged selections.**
+  Interactive pi in a detached tmux session (a headless terminal, not the desktop),
+  with a `models.json` defining a local dummy provider with models A and B. Two
+  sessions, each from a fresh scratch `settings.json` saying default A, thinking
+  `medium`:
+  - Session 1 (changing selections), started with no `--model`, so it runs A/medium:
+    set B as the default, then `high` as the default thinking level. The stub runs at
+    each, and each run reads the new value from the file.
+  - Session 2 (unchanged selections), started with `--model B --thinking high`, so the
+    session's model and level differ from the saved defaults: set the current model,
+    then the current level, as the default. The stub does not run at either pick, the
+    file holds B/high afterwards, and the run at `session_shutdown` reads B/high.
 
   No request reaches any provider.
 
@@ -192,13 +220,15 @@ in the existing temporary-repository fixtures, plus:
 3. The import-time check refuses groups that overlap, or that name a key the filter
    does not drop for that file.
 4. Claude's and Codex's existing `test_live_picks.py` cases pass unchanged.
-5. Rollback interleaving (§5), in a temporary repository whose record holds Claude,
-   Codex and pi entries: with the merge base's `.githooks/` in place (the revert),
-   the old `live-picks capture`, `restore`, `hook post-merge` and
-   `harness-state-refresh` each refuse and leave the record byte for byte; a pi pick in
-   the live file at that point changes nothing. The removal command of §5 step 2 then
-   leaves the Claude and Codex entries byte for byte, and a following old `capture`
-   exits 0 and adds no pi entry.
+5. Rollback against the pre-change tool, pinned at commit `6b434eb` (main before this
+   change, after `hq-61a47e`), read from the repository history with `git show` (the
+   test skips with a named reason only when that commit is absent, as in a shallow
+   clone): in a temporary repository whose `local/` holds a Claude and Codex record and
+   a pi record, the pinned `live-picks` `capture`, `restore`, `hook post-merge` and
+   `harness-state-refresh` all succeed and leave `local/live-picks-pi.json` byte for
+   byte. A capture by this change's tool, started while the pinned tool runs and
+   finishing after it (both under the lock), writes only the pi record, which the
+   pinned tool's next `capture` still ignores.
 
 ## 5. Rollout and recovery
 
@@ -209,35 +239,9 @@ apply: set a default model in pi, check that `local/live-picks.json` holds it, r
 `git checkout -- pi/settings.json` in main, and check that the default is back and
 `git status` is clean.
 
-Recovery, in this order, from main:
-
-1. Revert the merge. From that commit on nothing can write a pi entry: the reverted
-   `live-picks` owns only Claude's and Codex's files, and a pi session still running
-   with the extension loaded calls `~/.local/bin/harness-state-refresh`, which now
-   resolves to the reverted refresh. Until step 2 that tool refuses the record (it
-   names `pi/settings.json`), so each Stop reports the refusal and Git hooks restore
-   nothing; the record is never overwritten (base design §3.5).
-2. Remove the pi entry under the host lock, keeping the others:
-
-       flock local/harness-state.lock python3 - <<'EOF'
-       import json, os
-       path = "local/live-picks.json"
-       record = json.load(open(path))
-       record.pop("pi/settings.json", None)
-       open(path + ".tmp", "w").write(json.dumps(record, indent=2, ensure_ascii=False) + "\n")
-       os.replace(path + ".tmp", path)
-       EOF
-
-   `flock(1)` and the tools' `fcntl.flock` take the same lock, so no refresh runs
-   inside the edit.
-3. Remove the `~/.pi/agent/extensions/harness-state.ts` link on each host (its target
-   is gone) and check `just link-check`. Running pi sessions keep the extension until
-   they exit; per step 1 they can no longer recreate the entry.
-4. Check that `.githooks/live-picks capture` exits 0, that `local/live-picks.json`
-   holds the Claude and Codex picks and no pi entry, and run `git checkout --
-   claude/settings.json` to see the Claude pick restored.
-
-Removing the entry before the revert is unsafe: any refresh in between (a running pi's
-extension, or a Claude or Codex Stop) runs the new tool, which captures pi's live
-defaults again. pi then behaves as after `hq-61a47e`: its defaults stay in the live
-file until a Git rewrite drops them.
+Recovery, from main: revert the merge, then remove the
+`~/.pi/agent/extensions/harness-state.ts` link on each host (its target is gone) and
+check `just link-check`. The reverted tool reads only `local/live-picks.json`, so Claude
+and Codex preservation keeps working throughout, whatever captures are still running;
+`local/live-picks-pi.json` is left unread and may be deleted. pi then behaves as after
+`hq-61a47e`: its defaults stay in the live file until a Git rewrite drops them.

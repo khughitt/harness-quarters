@@ -1,6 +1,7 @@
 # pi Live Picks Implementation Plan
 
-Status: draft for review, 2026-10-15. Task: `hq-24416e` (goal `hq-aa9b44`). Execution
+Status: draft for review, 2026-10-15; revised after plan review round 1 (codex/gpt-6.1-sol),
+with the spec's separate pi record. Task: `hq-24416e` (goal `hq-aa9b44`). Execution
 method: inline in this session, under the flow gates of the enrolled trial.
 
 **Goal:** pi's default model and thinking level survive every Git command that
@@ -8,8 +9,8 @@ rewrites `pi/settings.json`, captured by an hq-owned pi extension and restored b
 existing `live-picks` hooks.
 
 **Architecture:** `.githooks/live-picks` gains `pi/settings.json` as a third owned file,
-with JSON handling driven by a per-file table of picker groups instead of `name ==
-CLAUDE`. A pi extension, `pi/extensions/harness-state.ts`, linked into
+saved in its own record, `local/live-picks-pi.json`, with JSON handling driven by a
+per-file table of picker groups instead of `name == CLAUDE`. A pi extension, `pi/extensions/harness-state.ts`, linked into
 `~/.pi/agent/extensions/`, runs the shared `harness-state-refresh` at pi's picker
 events (deferred one macrotask), at `agent_settled`, and at `session_shutdown`, each run
 in its own process group under a 10-second limit.
@@ -26,6 +27,8 @@ pi's `jiti` with Node's `node:child_process`; tmux for the interactive probe.
 - Owned pi fields are exactly `defaultProvider` + `defaultModel` (one unit) and
   `defaultThinkingLevel` (one unit). `deviceId` and `trackingId` stay filtered and are
   never owned (spec §2).
+- pi's entry lives only in `local/live-picks-pi.json`; `local/live-picks.json` keeps
+  exactly the Claude and Codex entries the pre-change tool accepts (spec §3.1).
 - Owned keys come from the filter's lists (`harness-state-clean`); `live-picks` never
   restates them except as groups, which an import-time check ties to the filter.
 - Claude's and Codex's behaviour and every existing `test_live_picks.py` case stay
@@ -58,18 +61,24 @@ parsing has logic worth a unit test).
   naming the first model as the default) and a stub refresh that appends a JSON line
   (time, event context from an env var the stub reads, the settings file's content) to
   a log. It prints one JSON line per check with raw observations, like `rpc-probe.py`.
-  - P1a: `pi/bin/pi --mode rpc` with the stub; close stdin; the log has one line from
+  - P1a: `pi/bin/pi --mode rpc` with the stub; close stdin; the log has one line, from
     shutdown.
-  - P1b: a stub that sleeps 60 s after starting a `sleep 60` child; pi exits within
-    25 s of stdin closing; no process from the stub's group survives (check by the
-    group id the stub recorded).
-  - P2: interactive `pi/bin/pi` in `tmux new-session -d` (a `trap` kills the session):
-    set the second model as the default, then another thinking level, through the
-    model and thinking selectors with `tmux send-keys`; then set the session's current
-    model and level as the default, each differing from the saved default (start pi
-    with `--model` on a model that is not the default); quit. Expect: a stub line at
-    each changing pick holding the new value; none at the unchanged picks; the
-    shutdown line holding the unchanged-pick defaults.
+  - P1b: a stub that ignores SIGTERM (`trap '' TERM`) and starts a descendant that
+    ignores it too, both sleeping 60 s, each recording its pid and the group id; close
+    stdin; pi exits within 25 s, and no recorded pid survives (so SIGKILL ran).
+  - P1c: a stub that sleeps 3 s and logs start and end times; send two RPC `set_model`
+    calls between models A and B in quick succession (one run in flight, one rerun
+    pending), then close stdin at once: the log shows no overlapping runs, exactly two
+    runs (the one in flight and the final one), and pi exits within 25 s.
+  - P2: two interactive sessions in `tmux new-session -d` (a `trap` kills the tmux
+    session on any exit), each from a fresh scratch `settings.json` with default A and
+    `defaultThinkingLevel: "medium"`:
+    - session 1, started with no `--model` (it runs A/medium): set B as the default
+      through the model selector, then `high` through the thinking selector; quit.
+      Expect a stub line at each pick, each reading the new value.
+    - session 2, started with `--model <provider>/B --thinking high`: set the current
+      model, then the current level, as the default; quit. Expect no stub line at
+      either pick, `settings.json` holding B/high, and the shutdown line reading B/high.
   The probe needs no API key. Record the exact key sequence in the script.
 - [ ] Run the probe, keep its output on the task as a note, and add facts through
   `tools/harness-facts` conventions (status, value, version `1.1.0`, date, evidence
@@ -85,13 +94,24 @@ parsing has logic worth a unit test).
 
 Files: `.githooks/live-picks`, `.githooks/test_live_picks.py`.
 
-- [ ] Tests first, in the existing fixture extended with a tracked `pi/settings.json`
-  (`{"lastChangelogVersion": "1.1.0"}` plus a `theme`) and its `.gitattributes` line:
+- [ ] Extend every fixture that runs `live-picks` or the refresh with a tracked
+  `pi/settings.json` (`{"lastChangelogVersion": "1.1.0"}` plus a `theme`) and its
+  `.gitattributes` line, since a missing owned file is refused: `test_live_picks.py`,
+  `test_codex_trust.py`, and `test_harness_state_refresh.py` (already has the file; add
+  the attribute only if missing). Check with `grep -ln 'live-picks\|harness-state-refresh'
+  .githooks/test_*.py tools/test_*.py` that no other fixture runs them.
+- [ ] Tests first, in those fixtures:
   the base design §4.2 cases 1, 3, 4, 5, 6, 7, 8 and 12 for pi (a parametrised file
   argument where the existing test's shape allows it, a new test otherwise), and spec
   §4.2 cases 1–4. Case 3 loads the tool with patched groups (`runpy` with an edited
   module source, or a helper exposing the check) and expects the import-time refusal.
-- [ ] Implement spec §3.2: `PI = "pi/settings.json"`; `OWNED = (CLAUDE, CODEX, PI)`;
+- [ ] Tests that pi's entry is written only to `local/live-picks-pi.json`, that
+  `local/live-picks.json` never names `pi/settings.json`, that each record is validated
+  on its own (an invalid pi record refuses pi and leaves Claude and Codex handled), and
+  that a record whose content does not change is not rewritten.
+- [ ] Implement spec §3.1-§3.2: `PI = "pi/settings.json"`; `OWNED = (CLAUDE, CODEX, PI)`;
+  `RECORDS = {CLAUDE: "local/live-picks.json", CODEX: "local/live-picks.json", PI:
+  "local/live-picks-pi.json"}`, read and written per record under the one lock;
   `JSON_GROUPS = {CLAUDE: CLAUDE_GROUPS, PI: (("defaultProvider", "defaultModel"),
   ("defaultThinkingLevel",))}`; owned keys per file are the groups' union; the check
   per JSON file (disjoint groups, union within the filter's keys for that file, equal
@@ -112,22 +132,27 @@ Files: `links.toml`, `README.md`, `.githooks/live-picks`, `.githooks/harness-sta
   not have created yet) is not covered, and check what `harness-links` does when the
   parent directory is missing.
 - [ ] Docs per spec §3.5, including the capture window, the bound, `forget
-  pi/settings.json`, and the rollback order of spec §5.
+  pi/settings.json`, the separate pi record, and the recovery of spec §5.
 
 ### Task 4: Rollback interleaving test
 
 Files: `.githooks/test_live_picks.py` (or a new `test_live_picks_rollback.py`).
 
-- [ ] Spec §4.2 case 5: a temporary repository with this branch's hooks and a record
-  holding Claude, Codex and pi entries; replace `.githooks/` with the merge base's
-  (`git show <base>:.githooks/<file>` for each file, the base read from the real
-  repository's `git merge-base main HEAD` at test time, skipped with a named reason when
-  run outside a branch that has one); run the old `capture`, `restore`, `hook
-  post-merge` and `harness-state-refresh`, each refusing with the record unchanged byte
-  for byte, including after a pi pick appears in the live file; run spec §5 step 2's
-  command verbatim (read from the spec's code block, so the test fails if the spec's
-  command drifts); then old `capture` exits 0, the Claude and Codex entries are
-  unchanged and no pi entry appears.
+- [ ] Spec §4.2 case 5, against the pre-change tool pinned at `6b434eb` (a constant in
+  the test, with a comment naming it main before this change). The test reads each
+  `.githooks/` file at that commit with `git -C <hq checkout> show 6b434eb:<path>` and
+  skips with a named reason only when the commit is absent (a shallow clone); it never
+  derives the commit from `merge-base`, so it keeps covering the old tool after this
+  change lands.
+  - In a temporary repository whose `local/` holds a Claude and Codex record and a pi
+    record, the pinned `capture`, `restore`, `hook post-merge` and
+    `harness-state-refresh` all exit 0, and `local/live-picks-pi.json` is unchanged
+    byte for byte.
+  - Interleaving: hold the host lock in the test, start this change's `capture` (it
+    blocks on the lock with the new code loaded), swap `.githooks/` to the pinned files,
+    release the lock; once the blocked capture finishes, it has written only the pi
+    record, and the pinned `capture` then exits 0 with `local/live-picks.json` naming
+    no pi entry.
 
 ### Task 5: Rollout
 
