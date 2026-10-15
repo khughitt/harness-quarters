@@ -426,6 +426,30 @@ def test_listing_survives_a_closed_pipe(env):
     assert "Traceback" not in stderr
 
 
+def run_closed(env, *args: str, input: str | None = None) -> subprocess.CompletedProcess:
+    """Run with stdout a pipe whose reader closed before anything was written."""
+    read, write = os.pipe()
+    os.close(read)
+    try:
+        return subprocess.run([sys.executable, str(TOOL), *args], stdout=write, stderr=subprocess.PIPE,
+                              input=input, text=True, env={"HOME": str(env.home), "PATH": str(env.bin)})
+    finally:
+        os.close(write)
+
+
+def test_short_listing_into_a_closed_pipe_exits_quietly(env):
+    claude_session(env.home / ".claude", SID, env.project("alpha"))
+    result = run_closed(env, "sessions")
+    assert result.returncode == 0 and result.stderr == ""
+
+
+def test_pick_into_a_closed_pipe_fails_and_says_nothing_launched(env):
+    claude_session(env.home / ".claude", SID, env.project("alpha"))
+    result = run_closed(env, "sessions", "-i", input="1\n")
+    assert result.returncode == 1
+    assert "nothing launched" in result.stderr
+
+
 # --- fail early ---------------------------------------------------------------------------
 
 

@@ -183,11 +183,15 @@ def sessions_command(args) -> int:
 def main(argv: list[str]) -> int:
     args = parser().parse_args(argv)
     try:
-        return sessions_command(args)
+        code = sessions_command(args)
+        sys.stdout.flush()   # inside the try: a short listing is otherwise written at exit
+        return code
     except (UsageError, sessions.SourceError, launch.LaunchError) as error:
         print(f"hq: {error}", file=sys.stderr)
         return 1
     except BrokenPipeError:
-        # The reader (`| head`) closed early: stop quietly, as other listing tools do.
         os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
-        return 0
+        if args.interactive:
+            print("hq: output closed before the launch; nothing launched", file=sys.stderr)
+            return 1
+        return 0   # the reader (`| head`) closed early: stop quietly, as other listing tools do
