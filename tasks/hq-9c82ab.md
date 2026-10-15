@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/pi-live-picks
 created: 2026-10-15T22:18:53Z
-updated: 2026-10-15T22:59:46Z
+updated: 2026-10-15T23:00:11Z
 started: 2026-10-15T22:44:02Z
 depends: []
 parent: hq-24416e
@@ -39,3 +39,5 @@ Step of the hq-24416e plan (docs/plans/2026-10-15-pi-live-picks.md, Task 1); con
 - 2026-10-15T22:59:45Z (feat/pi-live-picks): Implementation 2da6a21: pi extension, offline scratch probes, seven focused tests and four measured facts. just test exit 0: 228 agents + 842 hooks/tools, facts check green; git diff --check and tasks check green. Full raw probe notes include all checks true. Detailed implementation report: .worktrees/pi-live-picks/.superpowers/sdd/2026-10-15-pi-live-picks/task-1-report.md. host-load session: nothing left running. Controller review and closure remain.
 - 2026-10-15T22:59:45Z (feat/pi-live-picks): parked (waiting on agent): Controller reviews Task 1 implementation and closes it in .worktrees/pi-live-picks
   provenance: {"harness_session":"codex:01a141b8-aa66-7ee2-aad3-a00ba1296a0c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-15T23:00:11Z (feat/pi-live-picks): resumed
+  provenance: {"harness_session":"codex:01a141b5-89d5-7b72-89c2-3be2a208354f","harness_session_source":"CODEX_THREAD_ID"}
