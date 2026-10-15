@@ -1,4 +1,5 @@
 """live-picks saves the model and effort picks in local/ and puts back what a git command dropped."""
+import ast
 import json
 import os
 import shutil
@@ -13,6 +14,11 @@ HOOK_FILES = ("harness-state-clean", "harness_state.py", "codex-trust", "live-pi
               "harness-state-refresh", "post-checkout", "post-merge", "post-rewrite")
 CLAUDE = "claude/settings.json"
 CODEX = "codex/config.toml"
+PI = "pi/settings.json"
+PI_BASE = {"lastChangelogVersion": "1.1.0", "theme": "system"}
+PI_VALUES = {"defaultProvider": "anthropic", "defaultModel": "claude-opus-5-5",
+             "defaultThinkingLevel": "high"}
+PI_SET = {"state": "set", "values": PI_VALUES}
 BASE = "[features]\nhooks = true\n"
 TUI = "[tui]\nx = 1\n"
 PICK = 'model = "gpt-6.1-sol"\nmodel_reasoning_effort = "high"\n'
@@ -30,6 +36,10 @@ def write_claude(repo, **settings):
     (repo / CLAUDE).write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
 
 
+def write_pi(repo, **settings):
+    (repo / PI).write_text(json.dumps({**PI_BASE, **settings}, indent=2) + "\n")
+
+
 @pytest.fixture
 def repo(tmp_path):
     """A main checkout shaped like this one: the filter, the hooks, both configs, local/."""
@@ -39,12 +49,15 @@ def repo(tmp_path):
         shutil.copy2(HOOKS / name, repo / ".githooks" / name)
     (repo / "claude").mkdir()
     (repo / "codex").mkdir()
+    (repo / "pi").mkdir()
     (repo / "local" / "codex").mkdir(parents=True)
     (repo / ".gitattributes").write_text("claude/settings*.json filter=harness-state\n"
-                                         "codex/config*.toml filter=harness-state\n")
+                                         "codex/config*.toml filter=harness-state\n"
+                                         "pi/settings*.json filter=harness-state\n")
     (repo / ".gitignore").write_text("local/\n__pycache__/\n")
     write_claude(repo)
     (repo / CODEX).write_text(BASE)
+    write_pi(repo)
     git(tmp_path, "init", "-q", "-b", "main", str(repo))
     git(repo, "config", "filter.harness-state.clean", ".githooks/harness-state-clean %f")
     git(repo, "config", "core.hooksPath", ".githooks")
@@ -973,3 +986,237 @@ os.execv({original_git!r}, [{original_git!r}, *sys.argv[1:]])
     assert "local/live-picks.json" in result.stderr
     assert "simulated index read failure" in result.stderr
     assert "Traceback" not in result.stderr
+
+
+def pi_record_path(repo):
+    return repo / "local/live-picks-pi.json"
+
+
+def save_pi(repo, values=PI_VALUES):
+    pi_record_path(repo).write_text(json.dumps({PI: {"state": "set", "values": values}}) + "\n")
+
+
+def pi_settings(repo):
+    return json.loads((repo / PI).read_text())
+
+
+def test_pi_capture_uses_its_own_record_and_keeps_the_old_record_unchanged(repo):
+    saved_both(repo)
+    original = record_path(repo).read_bytes()
+    write_pi(repo, **PI_VALUES)
+
+    result = picks(repo, "capture")
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(pi_record_path(repo).read_text()) == {PI: PI_SET}
+    assert record_path(repo).read_bytes() == original
+    assert PI not in record(repo)
+
+
+def test_pi_later_pick_replaces_the_saved_model_pair(repo):
+    save_pi(repo)
+    write_pi(repo, defaultProvider="openai", defaultModel="gpt-6.1-sol")
+    assert picks(repo, "capture").returncode == 0
+    write_pi(repo)
+
+    result = picks(repo, "restore")
+
+    assert result.returncode == 0, result.stderr
+    assert pi_settings(repo) == {**PI_BASE, "defaultProvider": "openai",
+                                 "defaultModel": "gpt-6.1-sol", "defaultThinkingLevel": "high"}
+
+
+@pytest.mark.parametrize("held, want", [
+    ({"defaultThinkingLevel": "low"}, {**PI_VALUES, "defaultThinkingLevel": "low"}),
+    ({"defaultProvider": "openai", "defaultModel": "gpt-6.1-sol"},
+     {"defaultProvider": "openai", "defaultModel": "gpt-6.1-sol", "defaultThinkingLevel": "high"}),
+])
+def test_pi_restore_fills_only_the_absent_unit_then_capture_saves_both(repo, held, want):
+    save_pi(repo)
+    write_pi(repo, **held)
+
+    assert picks(repo, "restore").returncode == 0
+    assert pi_settings(repo) == {**PI_BASE, **want}
+    assert picks(repo, "capture").returncode == 0
+    assert json.loads(pi_record_path(repo).read_text()) == {PI: {"state": "set", "values": want}}
+
+
+def test_pi_partial_model_pair_is_saved_as_is_and_never_completed(repo):
+    save_pi(repo)
+    write_pi(repo, defaultProvider="openai")
+
+    result = picks(repo, "sync")
+
+    assert result.returncode == 0, result.stderr
+    assert pi_settings(repo) == {**PI_BASE, "defaultProvider": "openai", "defaultThinkingLevel": "high"}
+    assert json.loads(pi_record_path(repo).read_text()) == {
+        PI: {"state": "set", "values": {"defaultProvider": "openai", "defaultThinkingLevel": "high"}}}
+
+
+def test_pi_all_absent_capture_keeps_the_saved_record_and_restore_recovers_it(repo):
+    save_pi(repo)
+    original = pi_record_path(repo).read_bytes()
+
+    assert picks(repo, "capture").returncode == 0
+    assert pi_record_path(repo).read_bytes() == original
+    assert picks(repo, "restore").returncode == 0
+    assert pi_settings(repo) == {**PI_BASE, **PI_VALUES}
+
+
+def test_pi_forget_resets_both_units_and_survives_a_rewrite(repo):
+    write_pi(repo, **PI_VALUES)
+    assert picks(repo, "capture").returncode == 0
+
+    result = picks(repo, "forget", PI)
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(pi_record_path(repo).read_text()) == {PI: {"state": "default"}}
+    assert pi_settings(repo) == PI_BASE
+    write_pi(repo, theme="light")
+    git(repo, "checkout", "--", PI)
+    assert picks(repo, "restore").returncode == 0
+    assert pi_settings(repo) == PI_BASE
+    assert status(repo) == ""
+
+
+def test_pi_missing_record_restores_nothing(repo):
+    before = (repo / PI).read_bytes()
+
+    assert picks(repo, "restore").returncode == 0
+
+    assert (repo / PI).read_bytes() == before
+    assert not pi_record_path(repo).exists()
+
+
+@pytest.mark.parametrize("operation", ["capture", "restore", "sync"])
+@pytest.mark.parametrize("text", [
+    "{", "[]", '{"other.json": {"state": "default"}}',
+    '{"claude/settings.json": {"state": "default"}}',
+    '{"pi/settings.json": {"state": "maybe"}}',
+    '{"pi/settings.json": {"state": "set", "values": {"deviceId": "private"}}}',
+    '{"pi/settings.json": {"state": "default", "values": {}}}',
+])
+def test_invalid_pi_record_is_refused_independently(repo, text, operation):
+    saved_both(repo)
+    write_claude(repo, model="sonnet")
+    pi_record_path(repo).write_text(text)
+    before = (repo / PI).read_bytes()
+
+    result = picks(repo, operation)
+
+    assert result.returncode != 0
+    assert "local/live-picks-pi.json" in result.stderr
+    assert pi_record_path(repo).read_text() == text
+    assert (repo / PI).read_bytes() == before
+    if operation in ("capture", "sync"):
+        assert record(repo)[CLAUDE] == {"state": "set", "values": {"model": "sonnet"}}
+    if operation in ("restore", "sync"):
+        assert codex(repo)["model"] == "gpt-6.1-sol"
+
+
+@pytest.mark.parametrize("operation", ["capture", "restore", "sync"])
+def test_invalid_old_record_does_not_prevent_pi_preservation(repo, operation):
+    record_path(repo).write_text("{")
+    save_pi(repo)
+    write_pi(repo, defaultThinkingLevel="low")
+
+    result = picks(repo, operation)
+
+    assert result.returncode != 0
+    assert "local/live-picks.json" in result.stderr
+    assert record_path(repo).read_text() == "{"
+    if operation in ("capture", "sync"):
+        assert json.loads(pi_record_path(repo).read_text())[PI]["values"] == {
+            **PI_VALUES, "defaultThinkingLevel": "low"}
+    if operation in ("restore", "sync"):
+        assert pi_settings(repo) == {**PI_BASE, **PI_VALUES, "defaultThinkingLevel": "low"}
+
+
+@pytest.mark.parametrize("changed", [CLAUDE, PI])
+def test_capture_rewrites_only_the_record_whose_content_changed(repo, changed):
+    write_claude(repo, model="opus")
+    write_pi(repo, **PI_VALUES)
+    assert picks(repo, "capture").returncode == 0
+    paths = {CLAUDE: record_path(repo), PI: pi_record_path(repo)}
+    before = {name: (path.stat().st_ino, path.stat().st_mtime_ns) for name, path in paths.items()}
+    if changed == PI:
+        write_pi(repo, **{**PI_VALUES, "defaultThinkingLevel": "low"})
+    else:
+        write_claude(repo, model="sonnet")
+
+    assert picks(repo, "capture").returncode == 0
+
+    for name, path in paths.items():
+        assert ((path.stat().st_ino, path.stat().st_mtime_ns) != before[name]) == (name == changed)
+
+
+def test_pi_ids_are_neither_captured_nor_restored_and_other_settings_survive(repo):
+    write_pi(repo, **PI_VALUES, deviceId="device", trackingId="tracking")
+    assert picks(repo, "capture").returncode == 0
+    assert json.loads(pi_record_path(repo).read_text()) == {PI: PI_SET}
+    write_pi(repo, theme="light", notice="café ▸")
+    before = clean(repo, PI, (repo / PI).read_text())
+
+    assert picks(repo, "restore").returncode == 0
+
+    assert pi_settings(repo) == {**PI_BASE, **PI_VALUES, "theme": "light", "notice": "café ▸"}
+    assert clean(repo, PI, (repo / PI).read_text()) == before
+
+
+@pytest.mark.parametrize("groups", [
+    {CLAUDE: (("model", "modelSettings"), ("effortLevel",)),
+     PI: (("defaultProvider", "defaultModel"), ("defaultModel",))},
+    {CLAUDE: (("model", "modelSettings"), ("effortLevel",)), PI: (("theme",),)},
+    {CLAUDE: (("model", "modelSettings"), ("effortLevel", "effortLevel")),
+     PI: (("defaultProvider", "defaultModel"), ("defaultThinkingLevel",))},
+    {CLAUDE: (("model", "modelSettings"),),
+     PI: (("defaultProvider", "defaultModel"), ("defaultThinkingLevel",))},
+])
+def test_json_groups_refuse_overlap_unfiltered_keys_and_missing_claude_keys(repo, groups):
+    tool = repo / ".githooks/live-picks"
+    source = tool.read_text()
+    assignment = next((node for node in ast.parse(source).body if isinstance(node, ast.Assign)
+                       and any(isinstance(target, ast.Name) and target.id == "JSON_GROUPS"
+                               for target in node.targets)), None)
+    if assignment:
+        lines = source.splitlines(keepends=True)
+        lines[assignment.lineno - 1:assignment.end_lineno] = [f"JSON_GROUPS = {groups!r}\n"]
+        source = "".join(lines)
+    else:
+        source = source.replace("if sorted(sum(CLAUDE_GROUPS", f"JSON_GROUPS = {groups!r}\nif sorted(sum(CLAUDE_GROUPS")
+    tool.write_text(source)
+
+    result = picks(repo, "capture")
+
+    assert result.returncode != 0
+    assert "groups" in result.stderr.lower()
+    assert "filter" in result.stderr.lower()
+    assert not record_path(repo).exists()
+    assert not pi_record_path(repo).exists()
+
+
+@pytest.mark.parametrize("rewrite", ["merge", "switch", "checkout", "rebase"])
+def test_pi_git_rewrites_restore_the_pick_without_tracking_it(repo, rewrite):
+    git(repo, "switch", "-q", "-c", "side")
+    write_pi(repo, theme="light")
+    git(repo, "add", PI)
+    git(repo, "commit", "-q", "-m", "side settings")
+    git(repo, "switch", "-q", "main")
+    if rewrite == "rebase":
+        (repo / "u").write_text("main\n")
+        git(repo, "add", "u")
+        git(repo, "commit", "-q", "-m", "main")
+    write_pi(repo, **PI_VALUES)
+    assert picks(repo, "capture").returncode == 0
+    git(repo, "add", PI)
+    if rewrite == "checkout":
+        write_pi(repo, theme="light", **PI_VALUES)
+        result = git(repo, "checkout", "--", PI)
+    else:
+        result = git(repo, rewrite, "-q", "side")
+
+    assert result.stderr == "" or rewrite == "rebase"
+    assert pi_settings(repo) == {**PI_BASE, **PI_VALUES,
+                                 "theme": "system" if rewrite == "checkout" else "light"}
+    assert "defaultModel" not in git(repo, "show", "HEAD:" + PI).stdout
+    assert status(repo) == ""

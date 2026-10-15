@@ -3,10 +3,11 @@
 
 The harness-state clean filter keeps the picks out of the index: `model`,
 `modelSettings` and `effortLevel` in claude/settings.json, the top-level `model` and
-`model_reasoning_effort` in codex/config.toml. A git command that writes a new blob of
-either file over the live one drops the pick, and the harness runs on its default. This
-tool saves each file's pick in local/live-picks.json, untracked and carried between
-hosts by Dropbox, and puts it back:
+`model_reasoning_effort` in codex/config.toml; `defaultProvider`, `defaultModel` and
+`defaultThinkingLevel` in pi/settings.json. A git command that writes a new blob of
+a file over the live one drops the pick, and the harness runs on its default. This
+tool saves Claude and Codex picks in local/live-picks.json and pi picks in
+local/live-picks-pi.json, untracked and carried between hosts by Dropbox, and puts them back:
 
     capture               save the pick each file holds; absence never records a reset
     restore               put a saved pick into a file holding none of its fields
@@ -15,26 +16,28 @@ hosts by Dropbox, and puts it back:
     hook <name>           restore from a git hook, then restage what it wrote
 
 Each picker's owned fields are one unit: Codex's model and effort; Claude's model and
-modelSettings (/model), and its effortLevel (/effort), which a separate picker writes.
+modelSettings (/model), and its effortLevel (/effort); pi's defaultProvider and
+defaultModel, and its defaultThinkingLevel. Each separate picker writes one unit.
 Git drops all of a file's fields together, so a unit holding none is the only state a
 git rewrite leaves; any other state was written by a harness or a person, and the live
 file wins. Absence alone cannot tell a rewrite from a return to
-the default, so only forget records `default`, for either file. Both harnesses capture
-at Stop; picker events are not reliable post-write events. restore fills only units
+the default, so only forget records `default`. Claude and Codex capture at Stop; pi
+captures at its picker events, turn end and shutdown. restore fills only units
 holding none of their fields, so a newer pick is never overwritten, and capture replaces
-only the units the file holds, so a pick of one Claude picker keeps the other's saved
+only the units the file holds, so a pick of one JSON picker keeps the other's saved
 value. forget resets every unit of the file. It prepends Codex's lines, which are top-level keys
 whatever follows, and writes only when the result parses to the live values plus the
 saved ones and the filter's output, what git stages, is unchanged.
 
-The record is machine-owned and written whole; an invalid one is refused, never
-overwritten. A file that cannot be read is refused alone: the other is still handled.
+Each record is machine-owned and written whole only when changed; an invalid one is
+refused independently, never overwritten. A file that cannot be read is refused alone.
 Every operation holds local/harness-state.lock, the host lock codex-trust also takes. A
 hook reports a failure on stderr and exits 0, and skips a linked worktree silently and,
 from post-checkout, a rebase in progress; the next turn end retries. Every other
 operation refuses a linked worktree, whose configs are not live. Design:
 docs/specs/2026-10-10-live-model-preservation-design.md.
 """
+import fnmatch
 import functools
 import json
 import runpy
@@ -46,39 +49,44 @@ import harness_state
 CHECKOUT = harness_state.Checkout("live-picks")
 fail = CHECKOUT.fail
 REPO = harness_state.REPO
-RECORD_NAME = "local/live-picks.json"
-RECORD = REPO / RECORD_NAME
 CLAUDE = "claude/settings.json"
 CODEX = "codex/config.toml"
-OWNED = (CLAUDE, CODEX)
+PI = "pi/settings.json"
+OWNED = (CLAUDE, CODEX, PI)
+RECORDS = {CLAUDE: "local/live-picks.json", CODEX: "local/live-picks.json",
+           PI: "local/live-picks-pi.json"}
 USAGE = ("usage: live-picks capture | restore | sync | forget <file> | "
-         "hook post-checkout|post-merge|post-rewrite")
-# The filter decides what a checkout drops; reading its names keeps the owned fields
-# exactly the dropped ones.
+         "hook post-checkout|post-merge|post-rewrite (files: " + ", ".join(OWNED) + ")")
+# Every owned field must be dropped by the filter for absence to imply a rewrite.
 FILTER = runpy.run_path(str(harness_state.HERE / "harness-state-clean"))
-JSON_KEYS = FILTER["CLAUDE_JSON_KEYS"]
 TOML_KEYS = tuple(name for table, name in FILTER["TOML_KEYS"] if table.fullmatch(""))
 TOML_HEADER = FILTER["TOML_HEADER"]
 TOML_KEY = FILTER["TOML_KEY"]
-# Claude's /model and /effort write their fields independently, so each picker's fields
-# are a unit of their own: a pick of one never replaces the other's saved value. The
-# groups partition the filter's keys. Codex's picker writes both of its keys at once.
+# Each picker is a unit: a pick of one keeps the other picker's saved value.
 CLAUDE_GROUPS = (("model", "modelSettings"), ("effortLevel",))
-if sorted(sum(CLAUDE_GROUPS, ())) != sorted(JSON_KEYS):
-    sys.exit(f"live-picks: CLAUDE_GROUPS {CLAUDE_GROUPS} must partition the filter's "
-             f"JSON_KEYS {JSON_KEYS}")
-CLEAN = {CLAUDE: functools.partial(FILTER["clean_json"], keys=JSON_KEYS),
-         CODEX: FILTER["clean_toml"]}
-FIELD = {CLAUDE: "values", CODEX: "lines"}
+JSON_GROUPS = {CLAUDE: CLAUDE_GROUPS,
+               PI: (("defaultProvider", "defaultModel"), ("defaultThinkingLevel",))}
+JSON_KEYS = {name: sum(groups, ()) for name, groups in JSON_GROUPS.items()}
+for name, keys in JSON_KEYS.items():
+    dropped = [keys for pattern, keys in FILTER["JSON_FILES"] if fnmatch.fnmatch(name, pattern)]
+    if (len(dropped) != 1 or len(keys) != len(set(keys))
+            or not set(keys) <= set(dropped[0])
+            or name == CLAUDE and set(keys) != set(dropped[0])):
+        sys.exit(f"live-picks: {name} groups {JSON_GROUPS[name]} must be disjoint and "
+                 "within the filter's keys (equal for Claude)")
+CLEAN = {CLAUDE: functools.partial(FILTER["clean_json"], keys=FILTER["CLAUDE_JSON_KEYS"]),
+         CODEX: FILTER["clean_toml"],
+         PI: functools.partial(FILTER["clean_json"], keys=FILTER["PI_JSON_KEYS"])}
+FIELD = {CLAUDE: "values", CODEX: "lines", PI: "values"}
 
 
 class Refused(Exception):
-    """One file cannot be read or written; the other is still handled."""
+    """One file cannot be read or written; the others are still handled."""
 
 
 def parse(name, text):
     try:
-        data = json.loads(text) if name == CLAUDE else tomllib.loads(text)
+        data = json.loads(text) if name in JSON_GROUPS else tomllib.loads(text)
     except (json.JSONDecodeError, tomllib.TOMLDecodeError) as error:
         raise Refused(f"{name} does not parse: {error}")
     if not isinstance(data, dict):
@@ -106,14 +114,14 @@ def toml_or_none(text):
 
 
 def pick(name, text):
-    """The owned fields text holds: Claude's values or Codex's lines; empty when none.
+    """The owned fields text holds: JSON values or Codex's lines; empty when none.
 
     A Codex pick the filter could not drop line by line (a multi-line value, a key after
     a header-like line) is refused.
     """
     data = parse(name, text)
-    if name == CLAUDE:
-        return {key: data[key] for key in JSON_KEYS if key in data}
+    if name in JSON_GROUPS:
+        return {key: data[key] for key in JSON_KEYS[name] if key in data}
     lines = codex_lines(text)
     if toml_or_none("".join(lines)) != {key: data[key] for key in TOML_KEYS if key in data}:
         raise Refused(f"{name}: write {' and '.join(TOML_KEYS)} as one-line keys "
@@ -132,10 +140,10 @@ def invalid(name, saved):
     if set(saved) != {"state", FIELD[name]}:
         return f'a set entry holds its state and "{FIELD[name]}"'
     held = saved[FIELD[name]]
-    if name == CLAUDE:
-        if isinstance(held, dict) and held and set(held) <= set(JSON_KEYS):
+    if name in JSON_GROUPS:
+        if isinstance(held, dict) and held and set(held) <= set(JSON_KEYS[name]):
             return None
-        return f"values must name some of {', '.join(JSON_KEYS)}"
+        return f"values must name some of {', '.join(JSON_KEYS[name])}"
     if isinstance(held, list) and held and all(isinstance(line, str) for line in held):
         text = "".join(held)
         parsed = toml_or_none(text)
@@ -144,24 +152,39 @@ def invalid(name, saved):
     return f"lines must be one-line {' or '.join(TOML_KEYS)} keys"
 
 
-def read_record():
-    if not RECORD.exists():
+def read_record(record_name):
+    path = REPO / record_name
+    if not path.exists():
         return {}
     try:
-        record = json.loads(RECORD.read_text())
+        record = json.loads(path.read_text())
     except json.JSONDecodeError as error:
-        fail(f"{RECORD_NAME} is not valid JSON: {error}; fix or delete it")
+        raise Refused(f"{record_name} is not valid JSON: {error}; fix or delete it") from None
     if not isinstance(record, dict):
-        fail(f"{RECORD_NAME} is not an object; fix or delete it")
+        raise Refused(f"{record_name} is not an object; fix or delete it")
     for name, saved in record.items():
-        problem = invalid(name, saved)
+        problem = (invalid(name, saved) if RECORDS.get(name) == record_name
+                   else "not a file this record owns")
         if problem:
-            fail(f"{RECORD_NAME}: {name}: {problem}; fix or delete it")
+            raise Refused(f"{record_name}: {name}: {problem}; fix or delete it")
     return record
 
 
-def write_record(record):
-    harness_state.write(RECORD, json.dumps(record, indent=2, ensure_ascii=False) + "\n")
+def read_records():
+    records, refusals = {}, []
+    for record_name in dict.fromkeys(RECORDS.values()):
+        try:
+            records[record_name] = read_record(record_name)
+        except Refused as error:
+            refusals.append(str(error))
+        except (OSError, UnicodeError) as error:
+            refusals.append(f"{record_name}: {error}")
+    return records, refusals
+
+
+def write_record(record_name, record):
+    path = REPO / record_name
+    harness_state.write(path, json.dumps(record, indent=2, ensure_ascii=False) + "\n")
 
 
 def live(name):
@@ -174,11 +197,11 @@ def live(name):
         raise Refused(f"{name} cannot be read: {error}") from None
 
 
-def merged_values(saved, held):
-    """Claude's values to save: each group the file holds, else the saved group."""
+def merged_values(name, saved, held):
+    """JSON values to save: each group the file holds, else the saved group."""
     saved = saved["values"] if saved and saved["state"] == "set" else {}
     values = {}
-    for group in CLAUDE_GROUPS:
+    for group in JSON_GROUPS[name]:
         source = held if any(key in held for key in group) else saved
         values.update({key: source[key] for key in group if key in source})
     return values
@@ -189,27 +212,34 @@ def missing(name, text, saved):
     held = pick(name, text)
     if name == CODEX:
         return None if held else saved
-    values = {key: value for group in CLAUDE_GROUPS if not any(key in held for key in group)
+    values = {key: value for group in JSON_GROUPS[name] if not any(key in held for key in group)
               for key, value in saved["values"].items() if key in group}
     return {"state": "set", "values": values} if values else None
 
 
 def capture():
     """Save the pick each file holds; returns the refusals."""
-    record = read_record()
-    updated, refusals = dict(record), []
+    records, refusals = read_records()
+    updated = {path: dict(record) for path, record in records.items()}
     for name in OWNED:
+        record_name = RECORDS[name]
+        if record_name not in records:
+            continue
         try:
             held = pick(name, live(name))
         except Refused as error:
             refusals.append(str(error))
             continue
-        if name == CLAUDE:
-            held = merged_values(record.get(name), held)
+        if name in JSON_GROUPS:
+            held = merged_values(name, records[record_name].get(name), held)
         if held:
-            updated[name] = {"state": "set", FIELD[name]: held}
-    if updated != record:
-        write_record(updated)
+            updated[record_name][name] = {"state": "set", FIELD[name]: held}
+    for record_name, record in updated.items():
+        if record != records[record_name]:
+            try:
+                write_record(record_name, record)
+            except (OSError, UnicodeError) as error:
+                refusals.append(f"{record_name}: {error}")
     return refusals
 
 
@@ -227,7 +257,7 @@ def checked(name, text, result, want):
 
 def with_pick(name, text, saved):
     data = parse(name, text)
-    if name == CLAUDE:
+    if name in JSON_GROUPS:
         want = {**data, **saved["values"]}
         result = json.dumps(want, indent=2, ensure_ascii=False) + "\n"
     else:
@@ -238,8 +268,8 @@ def with_pick(name, text, saved):
 
 def without_pick(name, text):
     data = parse(name, text)
-    if name == CLAUDE:
-        want = {key: value for key, value in data.items() if key not in JSON_KEYS}
+    if name in JSON_GROUPS:
+        want = {key: value for key, value in data.items() if key not in JSON_KEYS[name]}
         result = json.dumps(want, indent=2, ensure_ascii=False) + "\n"
     else:
         want = {key: value for key, value in data.items() if key not in TOML_KEYS}
@@ -254,14 +284,14 @@ def without_pick(name, text):
 
 
 def restore():
-    """Put each saved pick into a file holding none of its fields (for Claude, per group).
+    """Put each saved pick into a file holding none of its fields (per JSON picker group).
 
     Returns the files written and the refusals.
     """
-    record = read_record()
-    written, refusals = [], []
+    records, refusals = read_records()
+    written = []
     for name in OWNED:
-        saved = record.get(name)
+        saved = records.get(RECORDS[name], {}).get(name)
         if saved is None or saved["state"] != "set":
             continue
         try:
@@ -282,15 +312,17 @@ def restore():
 
 
 def forget(name):
-    record = read_record()
+    record_name = RECORDS[name]
     try:
+        record = read_record(record_name)
         text = live(name)
         if pick(name, text):
             harness_state.write((REPO / name).resolve(), without_pick(name, text))
     except Refused as error:
         fail(str(error))
-    record[name] = {"state": "default"}
-    write_record(record)
+    if record.get(name) != {"state": "default"}:
+        record[name] = {"state": "default"}
+        write_record(record_name, record)
     CHECKOUT.restage(name)
 
 

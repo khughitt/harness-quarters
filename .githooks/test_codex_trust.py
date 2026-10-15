@@ -33,10 +33,13 @@ def repo(tmp_path):
         shutil.copy2(HOOKS / name, repo / ".githooks" / name)
     (repo / "codex").mkdir()
     (repo / "claude").mkdir()
+    (repo / "pi").mkdir()
+    (repo / "pi/settings.json").write_text('{"lastChangelogVersion": "1.1.0", "theme": "system"}\n')
     (repo / "claude" / "settings.json").write_text('{\n  "theme": "dark-ansi"\n}\n')
     (repo / "local" / "codex").mkdir(parents=True)
     (repo / ".gitattributes").write_text("claude/settings*.json filter=harness-state\n"
-                                         "codex/config*.toml filter=harness-state\n")
+                                         "codex/config*.toml filter=harness-state\n"
+                                         "pi/settings*.json filter=harness-state\n")
     (repo / ".gitignore").write_text("local/\n__pycache__/\n")
     (repo / CONFIG).write_text(BASE)
     git(tmp_path, "init", "-q", "-b", "main", str(repo))

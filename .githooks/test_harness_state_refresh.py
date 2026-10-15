@@ -43,7 +43,7 @@ def repo(tmp_path):
     git(repo, "config", "user.email", "t@example.invalid")
     git(repo, "config", "user.name", "t")
     write_settings(repo, model="opus")
-    (repo / PI_SETTINGS).write_text(json.dumps({"theme": "system"}, indent=2))
+    (repo / PI_SETTINGS).write_text(json.dumps({"lastChangelogVersion": "1.1.0", "theme": "system"}, indent=2))
     git(repo, "add", "-A")
     git(repo, "commit", "-q", "-m", "init")
     return repo
@@ -108,7 +108,8 @@ def test_a_sync_that_dies_without_a_message_still_fails_with_one(repo, tmp_path)
 
 def test_a_pi_model_switch_mark_is_cleared(repo, tmp_path):
     (repo / PI_SETTINGS).write_text(json.dumps(
-        {"theme": "system", "defaultProvider": "anthropic", "defaultModel": "claude-opus-5-5"},
+        {"lastChangelogVersion": "1.1.0", "theme": "system",
+         "defaultProvider": "anthropic", "defaultModel": "claude-opus-5-5"},
         indent=2))
     assert marked(repo, PI_SETTINGS)
 
