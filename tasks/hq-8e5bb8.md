@@ -7,7 +7,7 @@ size: xs
 complexity: low
 process: direct
 created: 2026-10-15T22:18:54Z
-updated: 2026-10-15T22:18:57Z
+updated: 2026-10-15T22:35:27Z
 depends: [hq-031194]
 parent: hq-24416e
 tags: []
@@ -21,3 +21,4 @@ Step of the hq-24416e plan, Task 3; contract: spec §3.5 and §5.
 ## Notes
 
 - 2026-10-15T22:18:57Z (feat/pi-live-picks): gate: scoped — step of hq-24416e plan
+- 2026-10-15T22:35:27Z (feat/pi-live-picks): from plan review round 2 (minor): the rollout checks name the wrong record; change local/live-picks.json to local/live-picks-pi.json in spec §5 (the 'check that local/live-picks.json holds it' line) and plan Task 5's second step
