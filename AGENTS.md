@@ -38,6 +38,8 @@ The generated global Projects block is checked by lore.
 - `pi/`: the pinned pi install (`just pi-install`), its launcher, and the probes behind
   the `pi` and `pi-durable` facts. A version change reruns the probes (README.md).
 - `tools/session-archive` and `systemd/user/`: transcript capture and pruning.
+- `tools/hq` (`tools/hq_cli/`, flags in `tools/hq.toml`): `hq sessions` lists and resumes
+  sessions across harness homes from their own metadata (README.md).
 - `docs/`: residue specs and plans, including two frozen profiles documents retained
   for closed task references. `tools/ops-docs` is vendored from ops.
 

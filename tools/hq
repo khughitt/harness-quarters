@@ -1,0 +1,12 @@
+#!/usr/bin/env python3
+"""hq: a command line over the harness homes. `hq sessions` lists recent agent sessions
+across Claude Code and Codex homes and, with -i, resumes one in its own harness, home
+and cwd (docs/notes/2026-10-15-session-discovery-contract.md)."""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from hq_cli.cli import main  # noqa: E402
+
+sys.exit(main(sys.argv[1:]))

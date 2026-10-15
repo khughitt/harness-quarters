@@ -183,6 +183,9 @@ MIT licensed; see `LICENSE`.
   backup disk, and a monthly prune of what the archive and obs verifiably hold
   (`docs/specs/2026-09-30-session-archive-design.md`). Linked on every host; the
   timers are enabled only on a host with `~/.config/session-archive/config.toml`.
+- `tools/hq`, `tools/hq_cli/` and `tools/hq.toml`: the `hq` command, linked as
+  `~/.local/bin/hq`; `hq sessions` lists and resumes agent sessions (see "Finding a
+  past session" below).
 - `docs/`: hq's specs and plans. The two dated profiles documents are frozen
   references for closed tasks; their maintained copies live in lore.
 - `tools/ops-docs`: vendored from ops; change it there.
@@ -193,6 +196,47 @@ Harnesses consume settings, hooks and declared owner links from hq. Their global
 instructions come from lore's `./instructions/AGENTS.md`, where ops renders the
 Projects block; ops-profile reads lore's `./profiles/`. The session archive timers
 consume hq's capture and prune tools. Lore owns the corpus and its block check.
+
+## Finding a past session
+
+`hq sessions` lists recent Claude Code and Codex sessions from every home (`~/.claude`,
+`~/.claude-work`, `~/.codex`, `~/.codex-work`) and every project, newest first, 20 rows
+by default (`-n` changes it). `hq sessions -i` picks one, with fzf when it is on `PATH`
+and a numbered prompt otherwise, and resumes it in its own harness, home and recorded
+cwd. It reads each harness's own metadata and keeps no index
+(`docs/notes/2026-10-15-session-discovery-contract.md`): Claude's `history.jsonl` with
+the transcript found under `projects/*/<id>.jsonl`, and Codex's `state_5.sqlite`
+`threads` table.
+
+- **Rows.** Harness, home (`personal` or `work`), short id, age, cwd (marked
+  `cwd missing` when the directory is gone, which is common for removed worktrees), and
+  a label: the Codex thread's name or title, or the Claude session's first prompt.
+  Recency is the Claude transcript's mtime and Codex's `recency_at_ms`.
+- **Filters.** `--harness claude|codex`, `--home personal|work`, `--here` (cwd inside
+  the current checkout or one of its worktrees, removed ones included), and `--archived`
+  (archived Codex threads, hidden by default as Codex's picker hides them). Codex
+  threads with an empty preview are always hidden, as Codex's own visible-thread
+  indexes leave them out; most subagent threads are among them.
+- **Footer.** One line counting what the sources show: Claude history lines skipped
+  (without `sessionId`, malformed), and sessions excluded: Claude sessions whose
+  transcript is gone, Codex non-interactive threads (subagents and `exec`) and Codex
+  threads whose rollout is gone. Claude's history never records subagent, `-p` or SDK
+  runs, so there is no Claude count for them. A selected home whose directory does not
+  exist is named as `absent`. Counts follow the filters.
+- **Not listed.** Personal Codex rollouts from before 2026-07-08 that have no `threads`
+  row (491 interactive ones on the first host) are outside the list; resume them with
+  `codex resume <id>` by hand.
+- **Errors.** A missing `history.jsonl` or `state_5.sqlite` in an existing home, or a
+  `threads` table without a column the list reads, stops the command with the file
+  named: Codex's schema is internal, and a version change must stop the list rather
+  than empty it.
+- **Launch.** Claude runs `claude <flags> --resume <id>`, Codex `codex <flags> resume
+  <id>`. A work row sets `CLAUDE_CONFIG_DIR` or `CODEX_HOME` to its home; a personal row
+  unsets both (`CLAUDE_CONFIG_DIR=~/.claude` would read a different `.claude.json`).
+  The cwd and the transcript are rechecked just before launch, and a gone one refuses
+  with its path; nothing is launched elsewhere. Per-home flags live in `tools/hq.toml`
+  (the user's `cl`, `clw`, `cor` and `cowor` aliases); a home missing there is an
+  error. `HQ_CONFIG` points at another file, for tests.
 
 ## Codex claim guard
 
