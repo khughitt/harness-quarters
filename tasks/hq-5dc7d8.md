@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-10-15T22:18:54Z
-updated: 2026-10-15T22:18:55Z
+updated: 2026-10-15T22:18:58Z
 depends: [hq-031194]
 parent: hq-24416e
 tags: []
@@ -17,3 +17,7 @@ step: "Task 4: Rollback interleaving test"
 ---
 
 Step of the hq-24416e plan, Task 4; contract: spec §4.2 case 5 and §5. It reads the removal command from the spec so the documented recovery cannot drift from the tested one.
+
+## Notes
+
+- 2026-10-15T22:18:58Z (feat/pi-live-picks): gate: scoped — step of hq-24416e plan
