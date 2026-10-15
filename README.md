@@ -208,10 +208,32 @@ cwd. It reads each harness's own metadata and keeps no index
 the transcript found under `projects/*/<id>.jsonl`, and Codex's `state_5.sqlite`
 `threads` table.
 
-- **Rows.** Harness, home (`personal` or `work`), short id, age, cwd (marked
+- **Rows.** Harness, home (`personal` or `work`), short id, age, place (marked
   `cwd missing` when the directory is gone, which is common for removed worktrees), and
   a label: the Codex thread's name or title, or the Claude session's first prompt.
   Recency is the Claude transcript's mtime and Codex's `recency_at_ms`.
+- **Place.** The cwd's tasks project prefix (`ops`, `mm`), `prefix@<worktree>` in one
+  of its worktrees, `prefix/.worktrees` for the worktree directory itself, and any
+  directory below them (`hq/tools`). Other cwds show their `~`-shortened path: one
+  outside every project, one that two projects' former locations claim, and one tasks
+  cannot read (permission denied, a stale mount), which the footer counts as
+  `unresolved cwds`. One `tasks resolve --stdin` call names the shown rows' cwds;
+  `tasks` missing from `PATH`, a failed call, or an answer outside its contract stops
+  the command, as an unreadable source does. Launch and `--here` use the cwd itself.
+- **Colour.** `--color auto|always|never`, as the tasks CLI spells it: `auto` (the
+  default) paints only when stdout is a terminal and `NO_COLOR` is unset or empty;
+  `always` paints whatever `NO_COLOR` says. The harness has a hue (claude orange, codex
+  blue), a work home is bold magenta, a worktree name is dimmed, a missing cwd is dimmed
+  with a red marker, and an archived Codex row is dimmed throughout. Age is one teal hue
+  on a log scale from a minute (vivid, lighter) to 90 days and older (near gray,
+  darker). Every hue, before dimming, reads at 3:1 or better on both dark and light
+  backgrounds. Output is 24-bit when `COLORTERM` is `truecolor` or `24bit`; otherwise
+  each colour has a hand-picked xterm-256 stand-in that passes the same check, and age
+  takes five steps that lose saturation, from teal to gray, rather than lightness (under
+  about 10 minutes, 2 hours, 20 hours, 9 days, older; the last two grays are close).
+  Cells are padded outside their colour codes, so the columns line up as in plain
+  output. `-i` hands fzf the same colours (`--ansi`), and the numbered prompt shows them
+  too.
 - **Filters.** `--harness claude|codex`, `--home personal|work`, `--here` (cwd inside
   the current checkout or one of its worktrees, removed ones included), and `--archived`
   (archived Codex threads, hidden by default as Codex's picker hides them). Codex

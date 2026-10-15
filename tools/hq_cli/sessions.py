@@ -41,6 +41,7 @@ class Session:
     label: str
     transcript: Path
     excluded: str | None = None   # "non-interactive" or "transcript gone": counted, not listed
+    archived: bool = False        # an archived Codex thread, listed only under --archived
 
 
 @dataclass
@@ -140,6 +141,7 @@ def check_thread(path: Path, row: dict) -> None:
         "cwd": lambda v: isinstance(v, str) and os.path.isabs(v),
         "rollout_path": lambda v: isinstance(v, str) and os.path.isabs(v),
         "recency_at_ms": lambda v: isinstance(v, int),
+        "archived": lambda v: v in (0, 1) and isinstance(v, int),
         "name": lambda v: v is None or isinstance(v, str),
         "title": lambda v: v is None or isinstance(v, str),
     }
@@ -177,7 +179,7 @@ def read_codex(home: Home, archived: bool) -> list[Session]:
     sessions = []
     for row in rows:
         check_thread(path, dict(zip(CODEX_COLUMNS, row)))
-    for tid, rollout, source, thread_source, _, _, cwd, recency_ms, name, title in rows:
+    for tid, rollout, source, thread_source, archived_flag, _, cwd, recency_ms, name, title in rows:
         transcript = Path(rollout)
         # Subagents carry a JSON source, `exec` runs source "exec"; never has_user_event (always 0).
         if source not in ("cli", "vscode") or thread_source not in (None, "user"):
@@ -188,5 +190,5 @@ def read_codex(home: Home, archived: bool) -> list[Session]:
             excluded = None
         sessions.append(Session(home=home, id=tid, cwd=cwd, recency_ms=recency_ms,
                                 label=name if name and name.strip() else (title or ""),
-                                transcript=transcript, excluded=excluded))
+                                transcript=transcript, excluded=excluded, archived=archived_flag == 1))
     return sessions
