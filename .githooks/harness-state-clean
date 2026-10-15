@@ -1,23 +1,40 @@
 #!/usr/bin/env python3
 """Git clean filter: keep model and effort switches out of the tracked harness configs.
 
-The harness homes symlink to `claude/settings*.json` and `codex/config*.toml`, so
-`/model` and `/effort` in a session write straight into the checkout. Those keys are
-session state, not configuration: this filter drops them from what git stages and
-leaves the working tree — the live file — untouched. Codex also writes bookkeeping
-(the screen-reader probe flag, model-announcement counters, marketplace fetch stamps),
-dropped the same way. Project trust (`[projects.*]`) is host state and is dropped
-too; `codex-trust` saves it in local/ and puts it back after a checkout drops it.
-Everything else the harness writes (plugin toggles, marketplace sources, hook trust
-hashes) stays tracked. Wired by `.gitattributes` and `git config
-filter.harness-state.clean`; the smudge side is identity, so a checkout drops the pick and `live-picks` puts
-the saved one back.
+The harness homes symlink to `claude/settings*.json`, `codex/config*.toml` and
+`pi/settings*.json`, so `/model` and `/effort` in a session write straight into the
+checkout (pi: a model or thinking level set as its default). Those keys are session
+state, not configuration: this filter drops them from what git stages and leaves the
+working tree — the live file — untouched. Codex also writes bookkeeping (the
+screen-reader probe flag, model-announcement counters, marketplace fetch stamps),
+dropped the same way, as are the installation ids pi creates. Project trust
+(`[projects.*]`) is host state and is dropped too; `codex-trust` saves it in local/ and
+puts it back after a checkout drops it. Everything else the harness writes (plugin
+toggles, marketplace sources, hook trust hashes) stays tracked. Wired by
+`.gitattributes` and `git config filter.harness-state.clean`; the smudge side is
+identity, so a checkout drops the pick and `live-picks` puts the saved one back
+(Claude's and Codex's; pi's is not saved yet, so pi then starts on its default).
 """
+import fnmatch
 import json
 import re
 import sys
 
-JSON_KEYS = ("model", "modelSettings", "effortLevel")
+CLAUDE_JSON_KEYS = ("model", "modelSettings", "effortLevel")
+# pi writes defaultProvider and defaultModel together when a model is set as its
+# default, and defaultThinkingLevel when a thinking level is; cycling writes neither.
+# deviceId (made on first use, e.g. at an OpenAI login) and trackingId (made when
+# analytics is enabled) identify the installation: pi's own bug report strips them, and
+# this repository is public. The rest is configuration and stays: what /settings
+# writes, enabledModels (setting a default model outside the enabled scope also adds
+# it), hideThinkingBlock (its keybinding), and lastChangelogVersion, which changes only
+# when pi/package.json's pin does (README, "Re-probing pi"); dropping it would make pi
+# treat each checkout as a fresh install and report it.
+PI_JSON_KEYS = ("defaultProvider", "defaultModel", "defaultThinkingLevel",
+                "deviceId", "trackingId")
+# The keys each JSON config drops, by the repository path git passes as %f.
+JSON_FILES = (("claude/settings*.json", CLAUDE_JSON_KEYS),
+              ("pi/settings*.json", PI_JSON_KEYS))
 # (table, key) pairs; the table is a full-match pattern over the header's name, "" for
 # the top level before any header.
 TOML_KEYS = (
@@ -37,9 +54,9 @@ TOML_HEADER = re.compile(r"^\s*\[\[?\s*(.*?)\s*\]\]?\s*(#.*)?$")
 TOML_KEY = re.compile(r'^\s*("[^"]*"|[A-Za-z0-9_-]+)\s*=')
 
 
-def clean_json(text):
+def clean_json(text, keys):
     data = json.loads(text)
-    for key in JSON_KEYS:
+    for key in keys:
         data.pop(key, None)
     return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
 
@@ -66,8 +83,9 @@ def main(argv):
         sys.exit("harness-state-clean: usage: harness-state-clean <path>  (stdin -> stdout)")
     path = argv[1]
     text = sys.stdin.read()
-    if path.endswith(".json"):
-        sys.stdout.write(clean_json(text))
+    json_keys = [keys for pattern, keys in JSON_FILES if fnmatch.fnmatch(path, pattern)]
+    if json_keys:
+        sys.stdout.write(clean_json(text, json_keys[0]))
     elif path.endswith(".toml"):
         sys.stdout.write(clean_toml(text))
     else:

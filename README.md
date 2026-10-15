@@ -25,11 +25,13 @@ It points `core.hooksPath` at `.githooks`, registers the `harness-state` clean f
 and creates `local/codex/rules/`. `local/` is untracked (see Layout). The work configs
 under it come from another host's `local/`, never from `just setup`.
 
-The filter keeps `model`, `modelSettings` and `effortLevel` in `claude/settings*.json`
-and the top-level `model` and `model_reasoning_effort` in `codex/config*.toml` out of
-the index: model and effort picks write into the live files (the homes symlink here),
-and they are session state, not configuration. A fresh home therefore runs each
-harness's default model and effort until the first pick.
+The filter keeps `model`, `modelSettings` and `effortLevel` in `claude/settings*.json`,
+the top-level `model` and `model_reasoning_effort` in `codex/config*.toml`, and
+`defaultProvider`, `defaultModel` and `defaultThinkingLevel` in `pi/settings*.json`
+(with pi's installation ids, `deviceId` and `trackingId`) out of the index: model and
+effort picks write into the live files (the homes symlink here), and they are session
+state, not configuration. A fresh home therefore runs each harness's default model and
+effort until the first pick.
 
 The working tree keeps the harness's last pick, and a checkout of the file drops it.
 `.githooks/live-picks` puts it back. At every turn end it saves the picks from
@@ -121,7 +123,9 @@ Things you can take from here without the rest:
   session-logs skill.
 - `.githooks/harness-state-clean`: a git clean filter that keeps `/model` and `/effort`
   picks, Codex bookkeeping and Codex project trust out of committed harness configs.
-  It is useful on its own for anyone who versions `~/.claude` or `~/.codex`.
+  It selects its JSON keys by this repository's paths (`claude/settings*.json`,
+  `pi/settings*.json`) and refuses any other JSON path, so a reuse elsewhere edits
+  `JSON_FILES` first.
 - `tools/harness-links` with `links.toml`: declares every link from a harness home into a
   checkout. Targets are checkout-relative or `<project>:<relative-path>`, resolved
   through `tasks projects --paths`. `[directories]` declares real directories, with
@@ -166,8 +170,20 @@ MIT licensed; see `LICENSE`.
   `~/.local/bin/pi`, runs it. The launcher refuses an install whose lock differs from
   the pin, and refuses `pi update` when it would update pi itself; model catalog and
   package updates pass through. The home is `~/.pi/agent`, which links lore's
-  instructions and reads `~/.agents/skills` itself; pi creates it on first run, and its
-  link appears at the next `just link --apply`. A `--tools` list of plain names
+  instructions and `pi/settings.json` and reads `~/.agents/skills` itself. On a new
+  host, `mkdir -p ~/.pi/agent` and `just link --apply` before pi's first run. pi's first
+  interactive run otherwise writes `settings.json` there as a real file, which `just
+  link --apply` refuses (applying no link at all while one is refused): move it aside,
+  carry any configuration it holds into `pi/settings.json`, then apply. pi writes the
+  settings file in place, so `/settings` changes land in `pi/settings.json`; its default
+  model and thinking level and its installation ids are filtered out of the index, and
+  `auth.json`, `trust.json`, `models-store.json` and `sessions/` stay in the home. The
+  checkout is shared between hosts, so they share one `deviceId` (the host id pi sends
+  at an OpenAI login). No hook saves pi's defaults yet: a checkout of `pi/settings.json`
+  drops them, and pi starts on its automatic default until one is set again; it drops
+  `deviceId` too, which pi makes anew at the next OpenAI login. Other home files
+  (`keybindings.json`, `APPEND_SYSTEM.md`, `prompts/`, `themes/`, `extensions/`) get a
+  `[harness.pi.links]` line once they have content. A `--tools` list of plain names
   declares no MCP tool that none of its entries matches, and a server at `exposure:
   direct` then has its tools unreachable even from codemode, with no warning. A run
   that limits the built-ins and still needs such a server's tools names them too:
@@ -331,7 +347,10 @@ CLI and its RPC mode (`pi --mode rpc`), and `pi-durable` is the SDK's durable `H
 which the CLI does not use. A feature shown for one is never an entry for the other.
 Each fact's `version` is the pinned package version. A change to `pi/package.json` is a
 new epoch: run `just pi-install`, then both probes, and update every pi entry in one
-commit before anything relies on the new version unattended.
+commit before anything relies on the new version unattended. The first interactive run
+on the new pin shows its changelog and writes the new `lastChangelogVersion` into
+`pi/settings.json`, a tracked change: commit it, or a merge that touches the file stops
+on it.
 
 - `pi/probes/rpc-probe.py` drives `pi/bin/pi --mode rpc` in a temporary agent directory
   with a local MCP server (`pi/probes/mcp-probe-server.py`).
