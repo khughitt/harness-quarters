@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/pi-live-picks
 created: 2026-10-15T22:18:53Z
-updated: 2026-10-15T22:53:47Z
+updated: 2026-10-15T22:53:48Z
 started: 2026-10-15T22:44:02Z
 depends: []
 parent: hq-24416e
@@ -32,3 +32,4 @@ Step of the hq-24416e plan (docs/plans/2026-10-15-pi-live-picks.md, Task 1); con
 - 2026-10-15T22:53:45Z (feat/pi-live-picks): probe: {"check": "version", "outcome": "true", "observed": {"pi": "1.1.0", "work": "/mnt/ssd3/tmp/pi-extension-probe.7g9phyez"}}
 - 2026-10-15T22:53:46Z (feat/pi-live-picks): probe: {"check": "P1a", "outcome": "true", "observed": {"elapsed": 0.11408701099571772, "exit": 0, "refresh": [{"phase": "refresh", "time": 52877.493576175, "pid": 2972893, "context": "P1a", "settings": {"defaultProvider": "hq-probe", "defaultModel": "A", "defaultThinkingLevel": "medium", "quietStartup": true}}], "stderr": ""}}
 - 2026-10-15T22:53:46Z (feat/pi-live-picks): probe: {"check": "P1b-stubborn", "outcome": "true", "observed": {"elapsed": 11.088406787996064, "exit": 0, "pid_groups": [[2972954, 2972954], [2972955, 2972954]], "survivors": [], "refresh": [{"phase": "start", "time": 52878.207179489, "pid": 2972954, "context": "P1b-stubborn", "settings": {"defaultProvider": "hq-probe", "defaultModel": "A", "defaultThinkingLevel": "medium", "quietStartup": true}}]}}
+- 2026-10-15T22:53:46Z (feat/pi-live-picks): probe: {"check": "P1b-leader-exits", "outcome": "true", "observed": {"elapsed": 11.040311077005754, "exit": 0, "pid_groups": [[2973895, 2973895], [2973910, 2973895]], "survivors": [], "refresh": [{"phase": "start", "time": 52889.898934655, "pid": 2973895, "context": "P1b-leader-exits", "settings": {"defaultProvider": "hq-probe", "defaultModel": "A", "defaultThinkingLevel": "medium", "quietStartup": true}}]}}
