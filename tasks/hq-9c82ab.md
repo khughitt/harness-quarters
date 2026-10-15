@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/pi-live-picks
 created: 2026-10-15T22:18:53Z
-updated: 2026-10-15T23:03:38Z
+updated: 2026-10-15T23:04:03Z
 started: 2026-10-15T22:44:02Z
 depends: []
 parent: hq-24416e
@@ -44,3 +44,5 @@ Step of the hq-24416e plan (docs/plans/2026-10-15-pi-live-picks.md, Task 1); con
 - 2026-10-15T23:03:15Z (feat/pi-live-picks): review: impl round 1 — verdict: revise; findings: Important 1, Minor 1; reviewer: codex
 - 2026-10-15T23:03:38Z (feat/pi-live-picks): parked (waiting on agent): Original implementer addresses Task 1 review I1 early-leader descendant cleanup with RED→GREEN evidence in .worktrees/pi-live-picks; controller then dispatches scoped re-review
   provenance: {"harness_session":"codex:01a141b5-89d5-7b72-89c2-3be2a208354f","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-15T23:04:03Z (feat/pi-live-picks): resumed
+  provenance: {"harness_session":"codex:01a141b8-aa66-7ee2-aad3-a00ba1296a0c","harness_session_source":"CODEX_THREAD_ID"}
