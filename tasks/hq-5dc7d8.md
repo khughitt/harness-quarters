@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/pi-live-picks
 created: 2026-10-15T22:18:54Z
-updated: 2026-10-15T23:43:28Z
+updated: 2026-10-15T23:43:39Z
 started: 2026-10-15T23:43:18Z
 depends: [hq-031194]
 parent: hq-24416e
@@ -26,3 +26,5 @@ Step of the hq-24416e plan, Task 4; contract: spec §4.2 case 5 and §5. The pin
 - 2026-10-15T23:43:18Z (feat/pi-live-picks): started
   provenance: {"harness_session":"codex:01a141f2-1695-7e12-a1c3-f166c9d338e0","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-15T23:43:28Z (feat/pi-live-picks): arm: flow-trial-1 — unit tack-aa9b44 — flow on
+- 2026-10-15T23:43:39Z (feat/pi-live-picks): gate: implementing .worktrees/pi-live-picks — scoped rollback acceptance tests in the existing hydrated worktree
+  provenance: {"harness_session":"codex:01a141f2-1695-7e12-a1c3-f166c9d338e0","harness_session_source":"CODEX_THREAD_ID"}
