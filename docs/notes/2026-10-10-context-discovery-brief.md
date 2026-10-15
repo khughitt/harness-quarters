@@ -116,7 +116,8 @@ focus is proven only as the drawn `autoFocus` prop.
 | hq-b7b9ac | Scoped 2026-10-15: the empty-`/m` picker implementation (s, low, direct) |
 | hq-c677ae | Row color from mindful; waits on mind6-5a8082 and hq-b7b9ac |
 | hq-4ba161 | Done 2026-10-15: interaction, color source and test boundary under Picker findings |
-| hq-839083 | Briefed; retains its source and waits for hq-434be2 |
+| hq-839083 | Scoped 2026-10-15: `hq sessions` list, pick and launch on the native sources (m, mid, direct) |
+| hq-3558a1 | Idea: full-text session search; waits on hq-839083 and obs-914269 |
 | hq-434be2 | Done 2026-10-15: native sources and launch contract in `docs/notes/2026-10-15-session-discovery-contract.md` |
 
 Both research tasks belong to hq-65f661. Each result updates this brief and adds
