@@ -3,8 +3,11 @@
 Colours are defined in OKLCH and kept inside the lightness band where text reads at
 3:1 or better on both a dark and a light terminal background. Output is 24-bit when
 COLORTERM says the terminal takes it; otherwise each colour has a hand-picked xterm-256
-stand-in from the entries that pass the same check."""
+stand-in from the entries that pass the same check. A project's colour comes from its
+tasks config; its stand-in is derived by the source's rule (ops bin/project-colors): the
+xterm-256 entry nearest in OKLab among those that pass that check."""
 import math
+import re
 from dataclasses import dataclass
 
 RGB = tuple[int, int, int]
@@ -35,10 +38,64 @@ def encode(linear: float) -> float:
     return 12.92 * linear if linear <= 0.0031308 else 1.055 * linear ** (1 / 2.4) - 0.055
 
 
+def decode(channel: int) -> float:
+    c = channel / 255
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def oklab(rgb: RGB) -> tuple[float, float, float]:
+    r, g, b = (decode(c) for c in rgb)
+    l_ = (0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b) ** (1 / 3)
+    m_ = (0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b) ** (1 / 3)
+    s_ = (0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b) ** (1 / 3)
+    return (0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
+            1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+            0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_)
+
+
+def contrast(a: RGB, b: RGB) -> float:
+    def luminance(rgb: RGB) -> float:
+        r, g, b = (decode(c) for c in rgb)
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    low, high = sorted((luminance(a), luminance(b)))
+    return (high + 0.05) / (low + 0.05)
+
+
+DARK = (0x1E, 0x1E, 0x1E)
+LIGHT = (0xFF, 0xFF, 0xFF)
+CUBE = (0, 95, 135, 175, 215, 255)
+
+
+def xterm256(index: int) -> RGB:
+    if index >= 232:
+        gray = 8 + 10 * (index - 232)
+        return gray, gray, gray
+    index -= 16
+    return CUBE[index // 36], CUBE[index // 6 % 6], CUBE[index % 6]
+
+
+LEGIBLE_256 = [i for i in range(16, 256)
+               if contrast(xterm256(i), DARK) >= 3 and contrast(xterm256(i), LIGHT) >= 3]
+
+
+def stand_in(rgb: RGB) -> int:
+    """Nearest in OKLab, ties to the lower index, as the source derives it."""
+    lab = oklab(rgb)
+    return min(LEGIBLE_256, key=lambda i: (math.dist(lab, oklab(xterm256(i))), i))
+
+
 @dataclass(frozen=True)
 class Colour:
     rgb: RGB
     index: int   # the xterm-256 stand-in
+
+
+def project_colour(text: str) -> Colour:
+    """A project's `#rrggbb`, lowercase as tasks' JSON carries it; ValueError for anything else."""
+    if not isinstance(text, str) or not re.fullmatch(r"#[0-9a-f]{6}", text):
+        raise ValueError(f"{text!r} is not #rrggbb")
+    rgb = (int(text[1:3], 16), int(text[3:5], 16), int(text[5:7], 16))
+    return Colour(rgb, stand_in(rgb))
 
 
 CLAUDE = Colour(oklch(0.68, 0.14, 55), 166)

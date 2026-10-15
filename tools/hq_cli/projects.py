@@ -5,6 +5,8 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 
+from . import color
+
 
 class ProjectError(Exception):
     """`tasks resolve` is missing or answered something unexpected; listing stops."""
@@ -15,6 +17,7 @@ class Place:
     prefix: str
     worktree: str | None   # the worktree's directory name, None in the main checkout
     relpath: str           # below the checkout or worktree; "" at its top
+    colour: color.Colour | None   # the project's, None when it has none
 
 
 def sendable(path: str) -> bool:
@@ -70,12 +73,18 @@ def resolve(cwds: list[str]) -> tuple[dict[str, Place | None], int]:
 
 def place(row: dict) -> Place:
     """A storage match without a worktree is the storage directory itself (`.worktrees`)."""
+    colour = None
+    if "color" in row:
+        try:
+            colour = color.project_colour(row["color"])
+        except ValueError as error:
+            raise ProjectError(f"tasks resolve: {row['prefix']}: color {error}") from None
     worktree = row.get("worktree")
     if worktree:
-        return Place(row["prefix"], os.path.basename(worktree), row["relpath"])
+        return Place(row["prefix"], os.path.basename(worktree), row["relpath"], colour)
     if row["via"] in ("storage", "former_storage"):
         if row["relpath"]:
             raise ProjectError(f"tasks resolve: {row['location']}: a storage match with relpath "
                                f"{row['relpath']!r} but no worktree")
-        return Place(row["prefix"], None, os.path.basename(row["location"]))
-    return Place(row["prefix"], None, row["relpath"])
+        return Place(row["prefix"], None, os.path.basename(row["location"]), colour)
+    return Place(row["prefix"], None, row["relpath"], colour)

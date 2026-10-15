@@ -142,12 +142,14 @@ def label(text: str) -> str:
     return flat if len(flat) <= LABEL_WIDTH else flat[:LABEL_WIDTH - 1] + "…"
 
 
-def place_parts(cwd: str, place: projects.Place | None, user_home: Path) -> list[tuple[str, tuple[str, ...]]]:
-    """Where a session ran, as (text, SGR params) parts: `prefix`, `prefix@worktree` with the
-    worktree dimmed, then any `/relpath`; the shortened path outside every project."""
+def place_parts(cwd: str, place: projects.Place | None, user_home: Path,
+                painter: color.Painter) -> list[tuple[str, tuple[str, ...]]]:
+    """Where a session ran, as (text, SGR params) parts: `prefix` in its project's colour,
+    `prefix@worktree` with the worktree dimmed, then any `/relpath`; the shortened path
+    outside every project."""
     if place is None:
         return [(printable(tilde(cwd, user_home)), ())]
-    parts = [(place.prefix, ())]
+    parts = [(place.prefix, (painter.fg(place.colour),) if place.colour else ())]
     if place.worktree:   # worktree and relpath repeat the cwd's own directory names
         parts.append(("@" + printable(place.worktree), (color.DIM,)))
     if place.relpath:
@@ -160,7 +162,7 @@ def format_rows(shown: list[sessions.Session], places: dict[str, projects.Place 
     """One line per session. Cells are padded outside their colour codes, so a painted line
     with the codes stripped is the plain line."""
     now_ms = int(time.time() * 1000)
-    parts = [place_parts(s.cwd, places[s.cwd], user_home) for s in shown]
+    parts = [place_parts(s.cwd, places[s.cwd], user_home, painter) for s in shown]
     missing = [not os.path.isdir(s.cwd) for s in shown]
     plain = ["".join(text for text, _ in row_parts) + (MISSING if gone else "")
              for row_parts, gone in zip(parts, missing)]
