@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: direct
 created: 2026-10-15T19:39:21Z
-updated: 2026-10-15T19:43:59Z
+updated: 2026-10-15T20:10:04Z
 depends: []
 tags: []
 agent: claude-code/claude-opus-5-5
@@ -31,3 +31,4 @@ Where: links.toml [harness.pi]; .gitattributes; .githooks/harness-state-clean, l
 - 2026-10-15T19:41:36Z (main): scope: scoped; filed 2026-10-15 from a crew session and scoped against pi 1.1.0's settings-manager, agent-session and interactive-mode code and hq's harness-state-clean, live-picks, harness-state-refresh and harness-links; split into hq-61a47e (link and filter, direct) and hq-24416e (pick preservation and pi turn-end capture, planned, depends on hq-61a47e)
 - 2026-10-15T19:43:58Z (main): trial: flow-trial-1 — enrolled — flow on
 - 2026-10-15T19:43:58Z (main): arm: flow-trial-1 — unit tack-aa9b44 — flow on
+- 2026-10-15T20:10:04Z (main): correction from hq-61a47e's review: pi writes defaultProvider/defaultModel and defaultThinkingLevel only when a model or level is set as the default (persist); cycling writes neither. pi also writes deviceId/trackingId (installation ids, now filtered) and enabledModels/hideThinkingBlock outside /settings (tracked). lastChangelogVersion is tracked, not filtered.
