@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: feat/pi-live-picks
 created: 2026-10-15T22:18:54Z
-updated: 2026-10-15T23:32:19Z
+updated: 2026-10-15T23:32:28Z
 started: 2026-10-15T23:32:12Z
 depends: [hq-031194]
 parent: hq-24416e
@@ -27,3 +27,5 @@ Step of the hq-24416e plan, Task 3; contract: spec §3.5 and §5.
 - 2026-10-15T23:32:12Z (feat/pi-live-picks): started
   provenance: {"harness_session":"codex:01a141e8-01db-70f0-bb7a-ecf8efa56008","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-15T23:32:19Z (feat/pi-live-picks): arm: flow-trial-1 — unit tack-aa9b44 — flow on
+- 2026-10-15T23:32:28Z (feat/pi-live-picks): gate: implementing .worktrees/pi-live-picks — direct documentation and declared link update
+  provenance: {"harness_session":"codex:01a141e8-01db-70f0-bb7a-ecf8efa56008","harness_session_source":"CODEX_THREAD_ID"}
