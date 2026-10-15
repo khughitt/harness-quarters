@@ -7,7 +7,7 @@ size: xs
 complexity: low
 process: direct
 created: 2026-10-15T22:18:54Z
-updated: 2026-10-15T22:18:55Z
+updated: 2026-10-15T22:18:57Z
 depends: [hq-031194]
 parent: hq-24416e
 tags: []
@@ -17,3 +17,7 @@ step: "Task 3: Link and docs"
 ---
 
 Step of the hq-24416e plan, Task 3; contract: spec §3.5 and §5.
+
+## Notes
+
+- 2026-10-15T22:18:57Z (feat/pi-live-picks): gate: scoped — step of hq-24416e plan
