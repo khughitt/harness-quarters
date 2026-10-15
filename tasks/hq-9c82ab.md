@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/pi-live-picks
 created: 2026-10-15T22:18:53Z
-updated: 2026-10-15T23:12:11Z
+updated: 2026-10-15T23:12:34Z
 started: 2026-10-15T22:44:02Z
 depends: []
 parent: hq-24416e
@@ -59,3 +59,5 @@ Step of the hq-24416e plan (docs/plans/2026-10-15-pi-live-picks.md, Task 1); con
 - 2026-10-15T23:12:10Z (feat/pi-live-picks): Fix round 1 I1 implemented in 36be1e6: early leader exit 0/7 retains group ownership and TERM/KILL cleanup before next run. RED two overlap assertions; GREEN nine focused tests, full expanded probe all eight checks, just test 228 agents + 844 hooks/tools. Exact logs/raw output appended to .worktrees/pi-live-picks/.superpowers/sdd/2026-10-15-pi-live-picks/task-1-report.md. M1 warning noise deferred per controller. No process remains; scoped re-review and closure are controller next actions.
 - 2026-10-15T23:12:10Z (feat/pi-live-picks): parked (waiting on agent): Controller runs scoped re-review of fix 36be1e6 and closes Task 1 in .worktrees/pi-live-picks
   provenance: {"harness_session":"codex:01a141b8-aa66-7ee2-aad3-a00ba1296a0c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-15T23:12:34Z (feat/pi-live-picks): resumed
+  provenance: {"harness_session":"codex:01a141b5-89d5-7b72-89c2-3be2a208354f","harness_session_source":"CODEX_THREAD_ID"}
