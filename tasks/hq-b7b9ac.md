@@ -1,10 +1,10 @@
 ---
 id: hq-b7b9ac
 title: "cli-pane /m: pick a thought from a typeahead when no ID is given"
-status: idea
+status: todo
 priority: 2
 created: 2026-10-09T14:46:50Z
-updated: 2026-10-15T08:25:35Z
+updated: 2026-10-15T08:30:04Z
 depends: []
 parent: hq-65f661
 tags: [claude]
