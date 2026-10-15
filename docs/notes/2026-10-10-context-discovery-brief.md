@@ -61,12 +61,16 @@ Reuse obs's identity research; hq owns the launcher, not a second index.
 - Answered 2026-10-15 (hq-4ba161; see Picker findings): an Input over a
   column of Button rows gives typeahead, readable tags and selection; row color
   waits on mind6-5a8082.
-- Which available metadata supplies recency, correct thread identity and
-  home/cwd without reading every transcript? hq-434be2 compares existing
-  sources and names any prerequisite from obs-c7d924.
-- What is the smallest explicit policy for project/home visibility, archived
-  or noninteractive rows, and missing cwd? The same session investigation
-  recommends it from its evidence; unresolved identity stays explicit.
+- Answered 2026-10-15 (hq-434be2; see
+  `docs/notes/2026-10-15-session-discovery-contract.md`): each harness's own
+  list suffices. Claude's `history.jsonl` and Codex's `state_5.sqlite`
+  `threads` give id, home, cwd and recency without a transcript scan or a
+  second index, and nothing waits on obs-c7d924.
+- Answered there too: every home and project by default, newest first, with
+  harness/home/`--here`/`--archived` filters. Subagents, exec and SDK runs, and
+  pruned transcripts are excluded and counted. A missing cwd is shown and its
+  launch refused. Launch flags and 491 older Codex rollouts without a row stay
+  open for the implementation task.
 
 ## Picker findings (hq-4ba161, 2026-10-15)
 
@@ -112,7 +116,7 @@ focus is proven only as the drawn `autoFocus` prop.
 | hq-c677ae | Row color from mindful; waits on mind6-5a8082 and hq-b7b9ac |
 | hq-4ba161 | Done 2026-10-15: interaction, color source and test boundary under Picker findings |
 | hq-839083 | Briefed; retains its source and waits for hq-434be2 |
-| hq-434be2 | P2, medium, mid complexity, direct: at most 60 minutes/eight metadata samples; source and native launch contract |
+| hq-434be2 | Done 2026-10-15: native sources and launch contract in `docs/notes/2026-10-15-session-discovery-contract.md` |
 
 Both research tasks belong to hq-65f661. Each result updates this brief and adds
 a finding note to its waiting idea before the result's branch merges. Neither follow-up is a
