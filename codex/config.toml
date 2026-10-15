@@ -67,6 +67,8 @@ multi_agent = true
 max_concurrent_threads_per_session = 8
 
 [tui]
+# Completion events include internal agents; interrupt only for explicit requests.
+notifications = ["approval-requested", "plan-mode-prompt", "async-question"]
 status_line = ["model-with-reasoning", "context-remaining", "current-dir", "project-name", "git-branch"]
 status_line_use_colors = true
 theme = "noctalia"
