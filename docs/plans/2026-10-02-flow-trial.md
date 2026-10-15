@@ -1,3 +1,5 @@
+Frozen after move to flows at 3d1e1345817f89c08d37c3290d877e588990f9f4 on 2026-10-15 (flows-70595d); retained for closed task references.
+
 # Randomized Flow Trial Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
