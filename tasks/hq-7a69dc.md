@@ -4,8 +4,9 @@ title: "pi for headless workers: an agent-directory template, and probes of the 
 status: idea
 priority: 2
 created: 2026-10-14T01:44:15Z
-updated: 2026-10-14T01:44:15Z
+updated: 2026-10-15T13:05:28Z
 depends: []
+parent: hq-40a8d0
 tags: []
 agent: claude-code/claude-opus-5-5
 ---
