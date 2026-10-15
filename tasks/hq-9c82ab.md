@@ -1,15 +1,16 @@
 ---
 id: hq-9c82ab
 title: "Write the pi harness-state extension and probe its loading, shutdown bound and picker-event ordering"
-status: doing
+status: done
 priority: 3
 size: s
 complexity: mid
 process: direct
 owner: feat/pi-live-picks
 created: 2026-10-15T22:18:53Z
-updated: 2026-10-15T23:14:10Z
+updated: 2026-10-15T23:14:11Z
 started: 2026-10-15T22:44:02Z
+completed: 2026-10-15T23:14:10Z
 depends: []
 parent: hq-24416e
 tags: []
@@ -64,3 +65,7 @@ Step of the hq-24416e plan (docs/plans/2026-10-15-pi-live-picks.md, Task 1); con
 - 2026-10-15T23:13:56Z (feat/pi-live-picks): review: impl round 2 — verdict: accept; findings: none; reviewer: codex
 - 2026-10-15T23:14:09Z (feat/pi-live-picks): gate: verified tree:ba25ec0e64fc780a1cb6c2a6ac50077137af1ad0 — checks: just test exit 0 with 228 agent tests and 844 hook-tool tests plus nine focused tests and eight offline pi probes; review: important addressed early leader descendants cleanup, minor deferred unrelated suite and private tmux warning noise; reviewer: codex
 - 2026-10-15T23:14:09Z (feat/pi-live-picks): retro: Real offline pi probes exposed a model-selection interaction that source-only assumptions missed. Fresh review found early-leader descendant cleanup outside the initial timeout scenario; a RED-to-GREEN regression and scoped re-review resolved it without touching live state.
+- 2026-10-15T23:14:10Z (feat/pi-live-picks): done
+  provenance: {"harness_session":"codex:01a141b5-89d5-7b72-89c2-3be2a208354f","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-15T23:14:10Z (feat/pi-live-picks): Implemented pi capture extension and offline probes; nine focused tests and eight probes pass; just test 228+844 green; early-leader cleanup review finding fixed and fresh scoped re-review accepted. Warning noise deferred.
+  provenance: {"harness_session":"codex:01a141b5-89d5-7b72-89c2-3be2a208354f","harness_session_source":"CODEX_THREAD_ID"}
