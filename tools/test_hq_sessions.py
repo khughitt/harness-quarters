@@ -32,8 +32,9 @@ print(json.dumps({{"tool": {tool!r}, "argv": sys.argv[1:], "cwd": os.getcwd(),
 
 # `tasks resolve --stdin` over the project roots in $TASKS_STUB_ROOTS ({"prefix": root});
 # a path under <root>/.worktrees/<name> is that worktree. A path containing a word from
-# $TASKS_STUB_STATUS ({"word": "ambiguous" | "invalid"}) gets that status; $TASKS_STUB_FAIL
-# makes the command fail; each call appends its input to $TASKS_STUB_LOG.
+# $TASKS_STUB_STATUS ({"word": "ambiguous" | "invalid"}) gets that status; a prefix in
+# $TASKS_STUB_COLORS ({"prefix": "#rrggbb"}) carries that colour; $TASKS_STUB_FAIL makes
+# the command fail; each call appends its input to $TASKS_STUB_LOG.
 TASKS_STUB = """#!{python}
 import json, os, sys
 if sys.argv[1:] != ["resolve", "--stdin"]:
@@ -46,6 +47,7 @@ if os.environ.get("TASKS_STUB_LOG"):
     with open(os.environ["TASKS_STUB_LOG"], "a") as log:
         log.write(json.dumps(paths) + "\\n")
 roots = json.loads(os.environ.get("TASKS_STUB_ROOTS", "{{}}"))
+colors = json.loads(os.environ.get("TASKS_STUB_COLORS", "{{}}"))
 forced = json.loads(os.environ.get("TASKS_STUB_STATUS", "{{}}"))
 results = []
 for path in paths:
@@ -57,6 +59,8 @@ for path in paths:
         if row["status"] == "unregistered" and (path == root or path.startswith(root + "/")):
             rest = path[len(root):].strip("/")
             row.update(status="resolved", prefix=prefix, root=root, via="root", location=root, relpath=rest)
+            if prefix in colors:
+                row["color"] = colors[prefix]
             parts = rest.split("/")
             if parts == [".worktrees"]:
                 row.update(via="storage", location=root + "/.worktrees", relpath="")
@@ -440,7 +444,7 @@ def test_storage_row_with_a_relpath_is_an_error(env):
     row = {"prefix": "hq", "via": "storage", "location": "/x/.worktrees", "relpath": "y"}
     with pytest.raises(hq_projects.ProjectError):
         hq_projects.place(row)
-    assert hq_projects.place({**row, "relpath": ""}) == hq_projects.Place("hq", None, ".worktrees")
+    assert hq_projects.place({**row, "relpath": ""}) == hq_projects.Place("hq", None, ".worktrees", None)
 
 
 def test_unknown_resolve_status_is_an_error(env):
@@ -941,7 +945,17 @@ def populate_classes(env) -> None:
                    age_s=7200)
     claude_session(env.home / ".claude", "ffffffff-6666-4666-8666-000000000006", env.project("beta") / ".worktrees"
                    / "removed", display="gone-worktree", age_s=7300)
-    projects(env, be=env.project("beta"))
+    projects(env, al=env.project("alpha"), be=env.project("beta"))
+    project_colors(env, al=ALPHA_COLOR)
+
+
+ALPHA_COLOR = "#2f9fb1"
+ALPHA_RGB = (0x2f, 0x9f, 0xb1)
+ALPHA_STAND_IN = 67   # ops bin/project-colors stand_in for #2f9fb1
+
+
+def project_colors(env, **colors: str) -> None:
+    env.extra["TASKS_STUB_COLORS"] = json.dumps(colors)
 
 
 def test_color_never_and_auto_into_a_pipe_are_plain(env):
@@ -1044,6 +1058,75 @@ def test_color_worktree_name_is_dimmed(env):
     assert f"be\x1b[{color.DIM}m@feature\x1b[0m" in row_for(out, "in-worktree")
     gone = row_for(out, "gone-worktree")
     assert f"\x1b[{color.DIM}mbe\x1b[0m\x1b[{color.DIM}m@removed\x1b[0m" in gone
+
+
+@pytest.mark.parametrize("colorterm, fg", [("truecolor", "38;2;47;159;177"), ("", f"38;5;{ALPHA_STAND_IN}")])
+def test_color_project_prefix_takes_its_project_colour(env, colorterm, fg):
+    """Only the prefix: the worktree stays dimmed and the relpath plain."""
+    alpha = env.project("alpha")
+    (alpha / ".worktrees" / "feature" / "src").mkdir(parents=True)
+    claude_session(env.home / ".claude", SID, alpha, display="top")
+    claude_session(env.home / ".claude", SID2, alpha / ".worktrees" / "feature" / "src", display="below",
+                   age_s=60)
+    projects(env, al=alpha)
+    project_colors(env, al=ALPHA_COLOR)
+    out = env.run("sessions", "--color", "always", COLORTERM=colorterm).stdout
+    assert f"\x1b[{fg}mal\x1b[0m  " in row_for(out, "top")
+    assert f"\x1b[{fg}mal\x1b[0m\x1b[{color.DIM}m@feature\x1b[0m/src  " in row_for(out, "below")
+
+
+def test_color_project_prefix_dims_with_a_gone_worktree(env):
+    alpha = env.project("alpha")
+    claude_session(env.home / ".claude", SID, alpha / ".worktrees" / "removed", display="gone")
+    projects(env, al=alpha)
+    project_colors(env, al=ALPHA_COLOR)
+    out = env.run("sessions", "--color", "always", COLORTERM="truecolor").stdout
+    assert f"\x1b[{color.DIM};38;2;47;159;177mal\x1b[0m\x1b[{color.DIM}m@removed\x1b[0m" in row_for(out, "gone")
+
+
+def test_color_project_without_a_colour_stays_plain(env):
+    alpha, beta = env.project("alpha"), env.project("beta")
+    claude_session(env.home / ".claude", SID, alpha, display="coloured")
+    claude_session(env.home / ".claude", SID2, beta, display="uncoloured", age_s=60)
+    projects(env, al=alpha, be=beta)
+    project_colors(env, al=ALPHA_COLOR)
+    out = env.run("sessions", "--color", "always", COLORTERM="truecolor").stdout
+    assert "\x1b[38;2;47;159;177mal\x1b[0m" in row_for(out, "coloured")
+    uncoloured = row_for(out, "uncoloured")
+    assert "m  be  " in uncoloured and "mbe" not in uncoloured
+
+
+def test_color_project_prefix_dims_with_its_row(env):
+    populate_classes(env)
+    out = env.run("sessions", "--archived", "--color", "always", COLORTERM="truecolor").stdout
+    assert f"\x1b[{color.DIM};38;2;47;159;177mal\x1b[0m" in row_for(out, "codex-archived")
+
+
+@pytest.mark.parametrize("value", ["2f9fb1", "#2f9fb", "#2f9fbz", "#2f9fb1x", "#2F9FB1", 7])
+def test_malformed_project_colour_is_an_error(env, value):
+    alpha = env.project("alpha")
+    claude_session(env.home / ".claude", SID, alpha)
+    projects(env, al=alpha)
+    env.extra["TASKS_STUB_COLORS"] = json.dumps({"al": value})
+    result = env.run("sessions")
+    assert result.returncode == 1 and "tasks resolve" in result.stderr and "color" in result.stderr
+
+
+@pytest.mark.parametrize("rgb, index", [(ALPHA_RGB, ALPHA_STAND_IN), ((0xd7, 0x26, 0x33), 160),
+                                        ((0x77, 0x65, 0x58), 242), ((0x2f, 0x63, 0xe1), 27),
+                                        ((0xfd, 0x53, 0x8f), 198), ((0x31, 0x7d, 0x01), 28)])
+def test_project_stand_in_matches_the_source(rgb, index):
+    """Pinned from ops bin/project-colors stand_in: the xterm-256 entry nearest in OKLab
+    among those at 3:1 or better on dark and light."""
+    assert color.stand_in(rgb) == index
+
+
+def test_project_stand_in_is_the_nearest_legible_entry():
+    legible = [i for i in range(16, 256) if contrast(xterm256_rgb(i), DARK) >= 3 and contrast(xterm256_rgb(i), LIGHT) >= 3]
+    for rgb in [(0, 0, 0), (255, 255, 255), (255, 0, 0), (0x80, 0x80, 0x80), ALPHA_RGB]:
+        def apart(i):
+            return sum((x - y) ** 2 for x, y in zip(oklab(rgb), oklab(xterm256_rgb(i))))
+        assert color.stand_in(rgb) == min(legible, key=lambda i: (apart(i), i))
 
 
 def test_color_age_cell_takes_the_age_colormap(env):

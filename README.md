@@ -223,17 +223,20 @@ the transcript found under `projects/*/<id>.jsonl`, and Codex's `state_5.sqlite`
 - **Colour.** `--color auto|always|never`, as the tasks CLI spells it: `auto` (the
   default) paints only when stdout is a terminal and `NO_COLOR` is unset or empty;
   `always` paints whatever `NO_COLOR` says. The harness has a hue (claude orange, codex
-  blue), a work home is bold magenta, a worktree name is dimmed, a missing cwd is dimmed
-  with a red marker, and an archived Codex row is dimmed throughout. Age is one teal hue
-  on a log scale from a minute (vivid, lighter) to 90 days and older (near gray,
-  darker). Every hue, before dimming, reads at 3:1 or better on both dark and light
-  backgrounds. Output is 24-bit when `COLORTERM` is `truecolor` or `24bit`; otherwise
-  each colour has a hand-picked xterm-256 stand-in that passes the same check, and age
-  takes five steps that lose saturation, from teal to gray, rather than lightness (under
-  about 10 minutes, 2 hours, 20 hours, 9 days, older; the last two grays are close).
-  Cells are padded outside their colour codes, so the columns line up as in plain
-  output. `-i` hands fzf the same colours (`--ansi`), and the numbered prompt shows them
-  too.
+  blue), a work home is bold magenta, a project prefix takes its project's colour (the
+  `color` on its `tasks resolve` row; a project without one, and a path outside every
+  project, stay plain), a worktree name is dimmed, a missing cwd is dimmed with a red
+  marker, and an archived Codex row is dimmed throughout. Age is one teal hue on a log
+  scale from a minute (vivid, lighter) to 90 days and older (near gray, darker). Every
+  hue, before dimming, reads at 3:1 or better on both dark and light backgrounds. Output
+  is 24-bit when `COLORTERM` is `truecolor` or `24bit`; otherwise each colour has a
+  hand-picked xterm-256 stand-in that passes the same check, a project's stand-in is
+  derived as ops's `bin/project-colors` derives it (the nearest entry in OKLab among
+  those that pass), and age takes five steps that lose saturation, from teal to gray,
+  rather than lightness (under about 10 minutes, 2 hours, 20 hours, 9 days, older; the
+  last two grays are close). Cells are padded outside their colour codes, so the columns
+  line up as in plain output. `-i` hands fzf the same colours (`--ansi`), and the
+  numbered prompt shows them too.
 - **Filters.** `--harness claude|codex`, `--home personal|work`, `--here` (cwd inside
   the current checkout or one of its worktrees, removed ones included), and `--archived`
   (archived Codex threads, hidden by default as Codex's picker hides them). Codex
