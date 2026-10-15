@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/pi-live-picks
 created: 2026-10-15T22:18:54Z
-updated: 2026-10-15T23:54:59Z
+updated: 2026-10-15T23:55:20Z
 started: 2026-10-15T23:43:18Z
 depends: [hq-031194]
 parent: hq-24416e
@@ -37,3 +37,5 @@ Step of the hq-24416e plan, Task 4; contract: spec §4.2 case 5 and §5. The pin
 - 2026-10-15T23:54:58Z (feat/pi-live-picks): review: impl round 1 — verdict: revise; findings: Important 1; reviewer: codex
 - 2026-10-15T23:54:59Z (feat/pi-live-picks): parked (waiting on agent): Original implementer fixes owned subprocess-group cleanup for timeout and interruption in Task 4; controller then dispatches fresh scoped re-review in .worktrees/pi-live-picks
   provenance: {"harness_session":"codex:01a141b5-89d5-7b72-89c2-3be2a208354f","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-15T23:55:20Z (feat/pi-live-picks): resumed
+  provenance: {"harness_session":"codex:01a141f2-1695-7e12-a1c3-f166c9d338e0","harness_session_source":"CODEX_THREAD_ID"}
