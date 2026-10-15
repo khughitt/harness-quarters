@@ -1,13 +1,15 @@
 ---
 id: hq-3cdd68
 title: Verify staged deletion and rename protection for capability facts
-status: todo
+status: doing
 priority: 2
 size: s
 complexity: mid
 process: direct
+owner: main
 created: 2026-10-08T23:10:34Z
-updated: 2026-10-10T19:57:17Z
+updated: 2026-10-15T01:12:50Z
+started: 2026-10-15T01:12:50Z
 depends: []
 tags: []
 source: "tasks-56b450:followup:fact-file-lifecycle"
@@ -25,3 +27,5 @@ Expected result: a small evidence table and a precise disposition: existing beha
 ## Notes
 
 - 2026-10-08T23:10:35Z (main): concerns: tasks-56b450 extension — investigate the pre-existing canonical fact deletion/rename gap without expanding the completed mirror-removal scope.
+- 2026-10-15T01:12:50Z (main): started
+  provenance: {"harness_session":"claude-code:12f40a0d-b227-408f-9d37-d05d8a87e20c","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
