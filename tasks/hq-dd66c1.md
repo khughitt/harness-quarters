@@ -3,8 +3,9 @@ id: hq-dd66c1
 title: "Friends: a bridge for triggering sub-agents that run in another harness or model family"
 status: idea
 priority: 2
+reviewed: true
 created: 2026-09-16T15:57:15Z
-updated: 2026-10-15T11:55:08Z
+updated: 2026-10-15T13:05:37Z
 depends: [crew-ba0a02]
 parent: hq-67d253
 tags: [quick-add, skills, flow]
@@ -24,3 +25,4 @@ Source: mindful:thought:34328bb6f74e4517bb0c5a2569ade36b
 - 2026-10-10T12:24:53Z (main): scope: briefed; retained idea and existing parent hq-67d253; hq-fc26cf supports the recipe, not new transport or mandatory cross-family gates; research hq-ba1758 will test unmet handoff needs; historical brief was transferred to lore in 067b5dc; brief: docs/notes/2026-10-10-mediated-cross-harness-brief.md
 - 2026-10-15T11:46:22Z (main): 2026-10-15: crew-9b4b47 proposes delegation as crew runtimes (Claude Code, Codex) behind crew's Runtime seam with identity, cancellation and evidence in the attempt record; revisit the recipe-versus-adapter choice against that lifecycle requirement
 - 2026-10-15T11:46:30Z (main): readmitted for scope: re-decide against crew-9b4b47
+- 2026-10-15T13:05:37Z (main): scope: drop; no edits; crew-9b4b47 now holds the same outcome (hand bounded work to another harness or model family through one request, without knowing the mechanics) and crew's brief docs/notes/2026-10-15-cross-harness-delegation-brief.md §4 settles this idea's recipe-versus-bridge choice as the existing headless recipe first, then a narrow crew adapter; both ideas already wait on crew-ba0a02; proposal: drop as covered by crew-9b4b47, and on drop remove hq-dd66c1 from the wake lists of crew-ba0a02 and hq-ba1758 (crew-9b4b47 already receives crew-ba0a02's finding)
