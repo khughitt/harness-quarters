@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/pi-live-picks
 created: 2026-10-15T22:18:53Z
-updated: 2026-10-15T23:07:27Z
+updated: 2026-10-15T23:07:28Z
 started: 2026-10-15T22:44:02Z
 depends: []
 parent: hq-24416e
@@ -52,3 +52,4 @@ Step of the hq-24416e plan (docs/plans/2026-10-15-pi-live-picks.md, Task 1); con
 - 2026-10-15T23:07:24Z (feat/pi-live-picks): fix round 1 probe: {"check": "P1b-stubborn", "outcome": "true", "observed": {"elapsed": 11.040206923993537, "exit": 0, "pid_groups": [[3098645, 3098645], [3098646, 3098645]], "survivors": [], "refresh": [{"phase": "start", "time": 53746.895912831, "pid": 3098645, "context": "P1b-stubborn", "settings": {"defaultProvider": "hq-probe", "defaultModel": "A", "defaultThinkingLevel": "medium", "quietStartup": true}}]}}
 - 2026-10-15T23:07:24Z (feat/pi-live-picks): fix round 1 probe: {"check": "P1b-leader-exits", "outcome": "true", "observed": {"elapsed": 11.039236803997483, "exit": 0, "pid_groups": [[3099245, 3099245], [3099252, 3099245]], "survivors": [], "refresh": [{"phase": "start", "time": 53758.6409759, "pid": 3099245, "context": "P1b-leader-exits", "settings": {"defaultProvider": "hq-probe", "defaultModel": "A", "defaultThinkingLevel": "medium", "quietStartup": true}}]}}
 - 2026-10-15T23:07:25Z (feat/pi-live-picks): fix round 1 probe: {"check": "P1b-early-success", "outcome": "true", "observed": {"elapsed": 1.116301049994945, "exit": 0, "pid_groups": [[3100355, 3100355], [3100360, 3100355]], "survivors": [], "refresh": [{"phase": "start", "time": 53770.398676588, "pid": 3100355, "context": "P1b-early-success", "settings": {"defaultProvider": "hq-probe", "defaultModel": "A", "defaultThinkingLevel": "medium", "quietStartup": true}}]}}
+- 2026-10-15T23:07:25Z (feat/pi-live-picks): fix round 1 probe: {"check": "P1b-early-failure", "outcome": "true", "observed": {"elapsed": 1.1163550589990336, "exit": 0, "pid_groups": [[3100553, 3100553], [3100561, 3100553]], "survivors": [], "refresh": [{"phase": "start", "time": 53772.208491444, "pid": 3100553, "context": "P1b-early-failure", "settings": {"defaultProvider": "hq-probe", "defaultModel": "A", "defaultThinkingLevel": "medium", "quietStartup": true}}]}}
