@@ -13,6 +13,8 @@ type CliCommand = {
   description: string
   argv: (id: string) => string[]
   env?: Record<string, string>
+  // An empty argument opens the thought picker in the pane instead of usage.
+  picker?: true
 }
 
 const COMMANDS: readonly CliCommand[] = [
@@ -27,12 +29,14 @@ const COMMANDS: readonly CliCommand[] = [
     name: 'm',
     description: 'Show a mindful thought in a pane, outside the conversation: /m <ID>',
     argv: id => ['mindful', 'show', id],
+    picker: true,
   },
 ]
 
-// The command whose empty argument opens the thought picker in place of usage.
-const M = COMMANDS[1]!
 const SEARCH_LIMIT = 10
+// Typing waits this long for the next key before it searches: one search costs
+// mindful seconds and hundreds of MB, so a word typed is one search, not one a key.
+const SEARCH_PAUSE_MS = 200
 
 // A drawing is refused past 20,000 nodes; lines are drawn until this budget,
 // each costing its Text and string plus a Text and string per span.
@@ -54,12 +58,50 @@ const picker = atom({ plugin: 'cli-pane', key: 'picker' } as const, null as Pick
 
 const OPENED: PickerView = { query: '', rows: [], isEmpty: false, error: null }
 
-// What the picker reads of a `mindful --json search` hit.
-type SearchHit = { row: { id: string; title: string; alias: string | null; tags: { alias: string | null }[] } }
+// The rows of a `mindful --json search` answer; anything else is an error
+// that says so, never an empty result.
+function rowsOf(stdout: string): PickerRow[] {
+  const hits: unknown = JSON.parse(stdout)
+  if (!Array.isArray(hits)) throw new Error('search answered something other than a list of rows')
+  return hits.map(({ row }: { row: { id: unknown; title: unknown; alias: unknown; tags: unknown } }) => {
+    if (typeof row?.id !== 'string' || typeof row.title !== 'string' || !Array.isArray(row.tags)) {
+      throw new Error(`search answered a row without an id, title or tags: ${JSON.stringify(row)}`)
+    }
+    const tags = row.tags as { alias: string | null }[]
+    return {
+      id: row.id,
+      title: row.title,
+      alias: typeof row.alias === 'string' ? row.alias : null,
+      tags: tags.flatMap(tag => (tag.alias === null ? [] : [tag.alias])),
+    }
+  })
+}
+
+// mindful's `--json` failures are one `{ error: { kind, detail } }` on stderr;
+// other stderr is shown as it came.
+function failureOf(stderr: string, exitCode: number): string {
+  try {
+    const { error } = JSON.parse(stderr) as { error?: { kind?: unknown; detail?: unknown } }
+    if (typeof error?.kind === 'string' && typeof error.detail === 'string') return `${error.kind}: ${error.detail}`
+  } catch {
+    // Not mindful's envelope.
+  }
+  return stderr || `mindful exited ${exitCode}`
+}
+
+// Every write to the picker takes the next number, and a search whose number
+// is no longer the latest drops its answer: a slow earlier query must not
+// overwrite a later one's rows, nor reopen the picker over a thought shown since.
+let latest = 0
+
+// The search running now: one runs at a time, and the newest text waiting when
+// it ends runs next.
+let running: Promise<unknown> = Promise.resolve()
 
 // Runs the command's CLI for `id` and shows its output in the command's pane,
 // in place of the picker when one is open there.
 async function show($: EngineInterface, command: CliCommand, id: string) {
+  if (command.picker) latest++
   const argv = command.argv(id)
   let view: CliView
   try {
@@ -76,40 +118,48 @@ async function show($: EngineInterface, command: CliCommand, id: string) {
     }
   }
   await update($, views, all => ({ ...all, [command.name]: view }))
-  if (command === M) await update($, picker, () => null)
+  if (command.picker) await update($, picker, () => null)
   await $.ui.open({ id: command.name, title: `/${command.name} ${id}`, focus: true, closeOnEscape: true })
 }
 
-// Each search takes the next number, and an answer that is no longer the
-// latest is dropped: a slow earlier query must not overwrite a later one's rows.
-let latest = 0
+async function openPicker($: EngineInterface, command: CliCommand) {
+  latest++
+  await update($, picker, () => OPENED)
+  await $.ui.open({ id: command.name, title: `/${command.name}`, focus: true, closeOnEscape: true })
+}
 
-async function search($: EngineInterface, query: string) {
+// Searches for `query` and draws its rows; on Enter (`isSubmit`) it runs at
+// once and shows the first match instead.
+async function search($: EngineInterface, command: CliCommand, query: string, isSubmit: boolean) {
   const mine = ++latest
   const terms = query.trim()
-  let view: PickerView
   if (terms === '') {
-    view = { ...OPENED, query }
-  } else {
-    try {
-      const ran = await $.process.run(['mindful', '--json', 'search', '--limit', String(SEARCH_LIMIT), terms])
-      if (ran.exitCode !== 0) {
-        view = { query, rows: [], isEmpty: false, error: ran.stderr || `mindful exited ${ran.exitCode}` }
-      } else {
-        const rows: PickerRow[] = (JSON.parse(ran.stdout) as SearchHit[]).map(({ row }) => ({
-          id: row.id,
-          title: row.title,
-          alias: row.alias,
-          tags: row.tags.flatMap(tag => (tag.alias === null ? [] : [tag.alias])),
-        }))
-        view = { query, rows, isEmpty: rows.length === 0, error: null }
-      }
-    } catch (error) {
-      view = { query, rows: [], isEmpty: false, error: `mindful: ${error instanceof Error ? error.message : String(error)}` }
+    await update($, picker, () => ({ ...OPENED, query }))
+    return
+  }
+  if (!isSubmit) await $.clock.sleep(SEARCH_PAUSE_MS)
+  await running
+  if (mine !== latest) return
+
+  let view: PickerView
+  // `--` ends mindful's options: a query may start with `-`.
+  const run = $.process.run(['mindful', '--json', 'search', '--limit', String(SEARCH_LIMIT), '--', terms])
+  running = run.catch(() => undefined)
+  try {
+    const ran = await run
+    if (ran.exitCode !== 0) {
+      view = { query, rows: [], isEmpty: false, error: failureOf(ran.stderr, ran.exitCode) }
+    } else {
+      const rows = rowsOf(ran.stdout)
+      view = { query, rows, isEmpty: rows.length === 0, error: null }
     }
+  } catch (error) {
+    view = { query, rows: [], isEmpty: false, error: `mindful: ${error instanceof Error ? error.message : String(error)}` }
   }
   if (mine !== latest) return
-  await update($, picker, () => view)
+  const first = view.rows[0]
+  if (isSubmit && first !== undefined) await show($, command, first.alias ?? first.id)
+  else await update($, picker, () => view)
 }
 
 export const register: Register = on => {
@@ -125,9 +175,8 @@ export const register: Register = on => {
       const id = e.args.trim()
       if (id !== '') {
         await show($, command, id)
-      } else if (command === M) {
-        await update($, picker, () => OPENED)
-        await $.ui.open({ id: command.name, title: `/${command.name}`, focus: true, closeOnEscape: true })
+      } else if (command.picker) {
+        await openPicker($, command)
       } else {
         const view = { text: `usage: /${command.name} <ID>`, isError: true, isTruncated: false }
         await update($, views, all => ({ ...all, [command.name]: view }))
@@ -138,10 +187,10 @@ export const register: Register = on => {
 
     on('ui.render', { component: 'Pane', requestId: command.name }, async ($, e) => {
       const { Box, Text } = $.ui.resolve(e)
-      const pick = command === M ? await read($, picker) : null
+      const pick = command.picker ? await read($, picker) : null
       if (pick !== null) {
         if (e.surface === 'mobile') {
-          return <Text dimColor>This app draws no search field: type /m &lt;ID&gt; to show a thought.</Text>
+          return <Text dimColor>This app draws no search field: type /{command.name} &lt;ID&gt; to show a thought.</Text>
         }
         const { Button, Input } = $.ui.resolve(e)
         const first = pick.rows[0]
@@ -154,12 +203,12 @@ export const register: Register = on => {
               value={pick.query}
               submitLabel="show"
               autoFocus
-              onInput={value => void search($, value)}
+              onInput={value => void search($, command, value, false)}
               onSubmit={value => {
                 // Enter on the query whose rows are drawn shows the first row;
-                // on any other text it searches that text.
+                // on text not searched yet it searches now and shows the first match.
                 if (first !== undefined && value === pick.query) void show($, command, first.alias ?? first.id)
-                else void search($, value)
+                else void search($, command, value, true)
               }}
             />
             {pick.error !== null && <Text color="red">{pick.error}</Text>}
