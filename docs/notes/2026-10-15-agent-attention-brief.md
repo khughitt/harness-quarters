@@ -1,8 +1,8 @@
 # Agent notifications during internal work
 
-Investigation for hq-b339a9, 2026-10-15. The prepared Codex mitigation is
-not activated. The task remains open for the Claude shell case and a live
-acceptance check.
+Investigation for hq-b339a9, 2026-10-15. The Codex mitigation was merged and
+activated in the personal config after user approval on 2026-10-15. The task
+remains open for the Claude shell case and a live acceptance check.
 
 ## Observed paths
 
@@ -39,7 +39,7 @@ module, and the latest stable release changelog were checked. The notification
 module differs only in the enum's Rust visibility on the installed tag versus
 the inspected default branch; no released main-only filter was found.
 
-The prepared change allows `approval-requested`, `plan-mode-prompt`, and
+The change allows `approval-requested`, `plan-mode-prompt`, and
 `async-question` in the personal `codex/config.toml`. It suppresses all native
 completion popups, including ordinary final responses. It does not infer
 whether response prose needs attention. Familiar's visual status remains.
@@ -70,7 +70,7 @@ server need different treatment, and the native idle predicate excludes both.
 
 Disabling Claude's whole native channel would also suppress useful question
 and permission notices. Changing the mobile notification toggles would not
-control this terminal path. Neither is part of the prepared mitigation.
+control this terminal path. Neither is part of this mitigation.
 
 ### Familiar, Kitty, and workspace attention
 
@@ -108,10 +108,11 @@ model calls, live terminal writes, host pointer changes, or desktop capture
 were needed. Throwaway checks and downloaded source are under the host's
 temporary directory, not runtime dependencies.
 
-Before activation, the user must approve merging the personal Codex setting:
-main is linked into the live harness home. Existing sessions may need restarting.
-After activation, verify a real question and a completion in an isolated session
-with captured terminal output before declaring the Codex behavior accepted.
+The user approved activation and the change was merged into main, which is
+linked into the live personal harness home. The link target and the on-disk
+allowlist were verified after the merge. Existing sessions may need restarting.
+A real question and completion still need checking in an isolated session with
+captured terminal output before declaring live Codex behavior accepted.
 
 For Claude and workspace urgency, the next agent step is to correlate a
 current false alert with hook events and running background tasks. Preserve
