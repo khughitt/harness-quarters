@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-10-15T08:25:00Z
-updated: 2026-10-15T09:43:40Z
+updated: 2026-10-15T09:43:46Z
 started: 2026-10-15T09:43:32Z
 depends: []
 tags: []
@@ -23,3 +23,4 @@ claude/mods/cli-pane/tests/cli-pane.test.ts 'a CLI that cannot start shows why' 
   provenance: {"harness_session":"claude-code:f0d949b3-991f-4324-a1ad-6e8803719ec0","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-15T09:43:39Z (main): trial: flow-trial-1 — enrolled — flow on
 - 2026-10-15T09:43:39Z (main): arm: flow-trial-1 — unit tack-8b6ae8 — flow on
+- 2026-10-15T09:43:46Z (main): gate: scoped — adopted
