@@ -116,12 +116,15 @@ def log(phase):
             "settings": json.loads((work / "agent" / "settings.json").read_text())}) + "\\n")
 assert sys.stdin.read() == ""
 mode = os.environ["HQ_PROBE_MODE"]
-if mode in ("stubborn", "leader-exits"):
+if mode in ("stubborn", "leader-exits", "early-success", "early-failure"):
     if mode == "stubborn": signal.signal(signal.SIGTERM, signal.SIG_IGN)
     child = subprocess.Popen(["sh", "-c", 'trap "" TERM; echo "$$ $(ps -o pgid= -p $$)" >> "$HQ_PROBE_WORK/pids"; sleep 60'],
                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     with (work / "pids").open("a") as out: out.write(f"{os.getpid()} {os.getpgrp()}\\n")
     log("start")
+    if mode.startswith("early-"):
+        while len((work / "pids").read_text().splitlines()) < 2: time.sleep(0.01)
+        sys.exit(7 if mode == "early-failure" else 0)
     time.sleep(60)
 elif mode == "slow":
     log("start")
@@ -297,7 +300,8 @@ def main():
     try:
         version = subprocess.run([str(PI), "--version"], capture_output=True, text=True, check=True).stdout.strip()
         report("version", version == "1.1.0", pi=version, work=str(root))
-        checks = {"P1a": [p1a], "P1b": [p1b, lambda r: p1b(r, "leader-exits")],
+        checks = {"P1a": [p1a], "P1b": [p1b, lambda r: p1b(r, "leader-exits"),
+                           lambda r: p1b(r, "early-success"), lambda r: p1b(r, "early-failure")],
                   "P1c": [p1c], "P2": [p2, lambda r: p2(r, True)]}
         outcomes = []
         for name, group in checks.items():

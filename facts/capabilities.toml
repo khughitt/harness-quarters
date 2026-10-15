@@ -379,7 +379,7 @@ value = true
 version = "1.1.0"
 date = 2026-10-15
 evidence = "hq-24416e"
-note = "P1a-c: shutdown refresh completes; TERM-ignoring group and leader-exits cases finish in about 11 seconds with no recorded survivors; active plus final 3-second runs are serial and finish in about 6 seconds."
+note = "P1a-c: shutdown refresh completes; TERM-ignoring group and leader-exits-after-TERM cases finish in about 11 seconds, early leader exit 0/7 with a TERM-ignoring descendant in about 1 second, all with no recorded survivors; active plus final 3-second runs are serial and finish in about 6 seconds."
 
 [facts.pi-default-write-before-deferred-select-handler]
 type = "boolean"

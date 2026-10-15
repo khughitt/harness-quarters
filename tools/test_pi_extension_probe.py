@@ -106,3 +106,63 @@ def test_default_command_resolves_in_scratch_home(tmp_path):
     assert done.returncode == 0, done.stderr
     assert log.read_text() == "done"
     assert json.loads(done.stdout) == []
+
+
+@pytest.fixture
+def reap_refresh_groups(tmp_path):
+    """Adopt the stub's orphaned descendants so failed assertions still kill and reap them."""
+    import ctypes
+    import signal
+
+    libc = ctypes.CDLL(None, use_errno=True)
+    previous = ctypes.c_int()
+    assert libc.prctl(37, ctypes.byref(previous), 0, 0, 0) == 0
+    assert libc.prctl(36, 1, 0, 0, 0) == 0
+    try:
+        yield
+    finally:
+        log = tmp_path / "calls"
+        calls = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+        for record in calls:
+            try:
+                os.killpg(record["group"], signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        for record in calls:
+            try:
+                os.waitpid(record["child"], 0)
+            except ChildProcessError:
+                pass
+        assert libc.prctl(36, previous.value, 0, 0, 0) == 0
+
+
+@pytest.mark.parametrize("exit_code", [0, 7])
+def test_early_leader_exit_cleans_its_group_before_another_run(tmp_path, reap_refresh_groups, exit_code):
+    warnings, calls = run_extension(tmp_path, '''import json, os, signal, subprocess, sys, time
+from pathlib import Path
+log = Path(os.environ["LOG"])
+def alive(pid):
+    try: return Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0] != "Z"
+    except FileNotFoundError: return False
+previous = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+ready = str(log) + f".{os.getpid()}.ready"
+child = subprocess.Popen([sys.executable, "-c", "import os,signal,time; from pathlib import Path; signal.signal(signal.SIGTERM, signal.SIG_IGN); Path(os.environ['READY']).touch(); time.sleep(60)"],
+                         env={**os.environ, "READY": ready}, stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+while not Path(ready).exists(): time.sleep(0.005)
+with log.open("a") as out:
+    out.write(json.dumps({"pid": os.getpid(), "group": os.getpgrp(), "child": child.pid,
+                          "previous_alive": any(alive(r["child"]) for r in previous)}) + "\\n")
+sys.exit(''' + str(exit_code) + ''')
+''', ["agent_settled", "agent_settled"])
+    assert len(calls) == 2
+    assert [record["previous_alive"] for record in calls] == [False, False], calls
+    surviving = []
+    for record in calls:
+        state = Path(f"/proc/{record['child']}/stat")
+        if state.exists() and state.read_text().rsplit(")", 1)[1].split()[0] != "Z":
+            surviving.append(record["child"])
+    assert surviving == [], surviving
+    assert len(warnings) <= 1
+    if exit_code:
+        assert "7" in warnings[0]["message"]

@@ -20,7 +20,7 @@ export default function harnessState(pi: ExtensionAPI) {
       const command = process.env.HQ_HARNESS_STATE_REFRESH ?? join(homedir(), ".local/bin/harness-state-refresh");
       const child = spawn(command, [], { detached: true, stdio: "pipe" });
       let output = "";
-      let timedOut = false;
+      let terminating = false;
       let finished = false;
       let killTimer: ReturnType<typeof setTimeout> | undefined;
       const finish = (failure?: string) => {
@@ -38,20 +38,36 @@ export default function harnessState(pi: ExtensionAPI) {
           if ((error as NodeJS.ErrnoException).code !== "ESRCH") warn(ctx, String(error));
         }
       };
-      const timer = setTimeout(() => {
-        timedOut = true;
+      const terminate = (failure: string) => {
+        clearTimeout(timer);
+        terminating = true;
         killGroup("SIGTERM");
-        // The leader may exit on TERM while a descendant still needs KILL.
+        // A closed leader does not establish that its process group has finished.
         killTimer = setTimeout(() => {
           killGroup("SIGKILL");
-          finish("timed out after 10 seconds");
+          finish(failure);
         }, 1_000);
-      }, 10_000);
+      };
+      const timer = setTimeout(() => terminate("timed out after 10 seconds"), 10_000);
       child.stdout.on("data", (data) => { output += data; });
       child.stderr.on("data", (data) => { output += data; });
       child.on("error", (error) => finish(error.message));
       child.on("close", (code, signal) => {
-        if (!timedOut) finish(code === 0 ? undefined : `exit ${code ?? signal}: ${output.trim()}`);
+        if (terminating) return;
+        const failure = code === 0 ? undefined : `exit ${code ?? signal}: ${output.trim()}`;
+        try {
+          if (child.pid) {
+            process.kill(-child.pid, 0);
+            terminate(failure ?? "refresh exited with running descendants");
+            return;
+          }
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ESRCH") {
+            terminate(failure ?? String(error));
+            return;
+          }
+        }
+        finish(failure);
       });
       child.stdin.on("error", () => {}); // A child that exits early can close stdin before end().
       child.stdin.end("");
