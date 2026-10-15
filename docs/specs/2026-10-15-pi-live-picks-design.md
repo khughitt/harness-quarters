@@ -1,6 +1,7 @@
 # pi live picks: keep pi's default model and thinking level across Git updates
 
-Status: draft for review, 2026-10-15. Task: `hq-24416e` (goal `hq-aa9b44`). Extends
+Status: draft for review, 2026-10-15; revised after spec review round 1 (unchanged
+selections emit no event, rollback of the record, a bounded refresh). Task: `hq-24416e` (goal `hq-aa9b44`). Extends
 `docs/specs/2026-10-10-live-model-preservation-design.md` (below, "the base design"),
 whose record, rule, operations and failure handling apply unchanged except where this
 document says otherwise. Builds on `hq-61a47e` (merge `6b434eb`), which tracks
@@ -26,7 +27,12 @@ point, because pi runs none of the hooks that capture for the other two.
 | `defaultThinkingLevel` | a thinking level is set as the default (`setThinkingLevel` with `persist`) | `agent-session.js` ~2059 |
 | `deviceId`, `trackingId` | first OpenAI login; analytics opt-in | `dist/core/settings-manager.js` ~815-836 |
 
-Cycling without `persist` and RPC mode write none of them. Nothing in pi removes the
+Cycling without `persist` and RPC mode write none of them. The events fire only on a
+change: `_emitModelSelect` returns early when the selected model equals the session's
+(`agent-session.js` ~1930), and `setThinkingLevel` persists the default before it checks
+whether the level changed (~2052-2060). Setting the session's current model or level as
+the default therefore writes the file and emits nothing (reproduced against 1.1.0 in
+spec review round 1). Nothing in pi removes the
 defaults (no setter clears them, and `setDefaultModel`/`setDefaultProvider` have no
 caller alone). pi writes through a
 promise queue (`SettingsManager.enqueueWrite`): the write runs in a microtask queued
@@ -98,16 +104,33 @@ Claude and Codex Stop hooks already call, so the extension never names the check
 with an empty stdin:
 
 - on `model_select` and `thinking_level_select`, after yielding one macrotask
-  (`setImmediate`), so pi's queued settings write has landed: the pick is saved at once;
-- on `agent_settled`, the turn-end backstop matching the other harnesses' Stop, for a
-  write path a later pi version adds without an event;
+  (`setImmediate`), so pi's queued settings write has landed: a selection that changes
+  the session's model or level is saved at once;
+- on `agent_settled`, the turn-end backstop matching the other harnesses' Stop: it saves
+  a default set without an event (the session's current model or level set as the
+  default, §1.1) and any write path a later pi version adds;
 - on `session_shutdown`, so a pick made just before quitting is saved.
 
-Runs are serialised inside the extension (one at a time; a request while one runs
-schedules one more), the refresh takes its own host lock, and a failure is shown once
-per session through `ctx.ui.notify` (no-op outside interactive mode) and never fails
-the pi operation. The refresh does what it does at a Claude Stop: capture, then (when
-the index is free) Codex trust sync, restore, and staging of size-only marks.
+**Capture window.** A default set without an event is saved at the next turn end or
+exit, not at once. A Git rewrite of `pi/settings.json` in that window restores the
+previous saved default, as a Claude or Codex pick made since the last Stop is (base
+design §3.5); setting it again, or `forget`, corrects it.
+
+**Bounded runs.** Each run is a child process started in its own process group, with a
+10-second limit: on expiry the extension sends SIGTERM to the group, then SIGKILL after
+one second, so the refresh and its `git` and `codex-trust` children all end. A run that
+times out counts as a failure. The refresh's host lock waits without limit, so the bound
+is what keeps a stuck lock holder from holding pi.
+
+**Awaiting.** pi awaits event handlers (picker actions and shutdown wait on them). The
+`model_select`, `thinking_level_select` and `agent_settled` handlers start a run and
+return without awaiting it. `session_shutdown` awaits the run in flight and one final
+run, each under the same limit, so pi's exit is delayed by at most about 22 seconds and
+never left with an orphaned child. Runs are serialised inside the extension (one at a
+time; a request while one runs schedules one more). A failure or timeout is shown once
+per session through `ctx.ui.notify` (no-op outside interactive mode) and never fails the
+pi operation. The refresh does what it does at a Claude Stop: capture, then (when the
+index is free) Codex trust sync, restore, and staging of size-only marks.
 
 Rejected: dispatching through relay's planned pi adapter (`relay-828903`), which does
 not exist yet and would make pick preservation wait on it; capturing only at Claude or
@@ -120,7 +143,15 @@ next refresh (any harness's turn end, or a pi event above) is the fallback. A re
 while pi runs is safe for pi's later writes (§1.1); the running pi keeps the model it
 started with, as Claude and Codex do.
 
-### 3.5 Docs
+### 3.5 `drop`
+
+A new operation, `live-picks drop <file>`, removes the file's entry from the record and
+leaves the live file alone. It exists for rollback (§5): a tool without pi refuses any
+record naming `pi/settings.json`, whichever its state, and that refusal stops Claude's
+and Codex's preservation too. It refuses a file `live-picks` does not own, holds the
+host lock, and writes the record whole, as every operation does.
+
+### 3.6 Docs
 
 README: the pi bullet drops "No hook saves pi's defaults yet" and describes the
 extension, `forget pi/settings.json`, and the per-unit rule; the Setup section's
@@ -131,15 +162,25 @@ extension, `forget pi/settings.json`, and the per-unit rule; the Setup section's
 
 ### 4.1 Probes (scratch agent directory, `PI_CODING_AGENT_DIR`, no live home)
 
-- **P1 — loading and shutdown.** With the extension linked into a scratch
+The extension takes its refresh command from `HQ_HARNESS_STATE_REFRESH` when set (the
+probes' stub), else `~/.local/bin/harness-state-refresh`.
+
+- **P1 — loading, shutdown and the bound.** With the extension linked into a scratch
   `extensions/` through a symlink and the refresh command replaced by a stub that
   records each call, `pi --mode rpc` loads it, and closing its stdin runs the stub from
-  `session_shutdown`. No model call.
-- **P2 — the write precedes the deferred handler.** In a detached tmux session (a
-  headless terminal, not the desktop), interactive pi with a `models.json` that defines
-  a local dummy provider: set a model and a thinking level as the default; the stub
-  reads the settings file when it runs and must see the new values. No request reaches
-  any provider.
+  `session_shutdown`. With a stub that hangs and starts a child of its own, pi still
+  exits within the bound, and neither the stub nor its child survives. No model call.
+- **P2 — the write precedes the deferred handler, and unchanged selections.** In a
+  detached tmux session (a headless terminal, not the desktop), interactive pi with a
+  `models.json` that defines a local dummy provider, two models in it, and a scratch
+  `settings.json`:
+  - set the other model, then another thinking level, as the default: the stub runs at
+    each, reads the settings file, and sees the new values;
+  - set the session's current model, then its current thinking level, as the default
+    (each differing from the saved default): the stub does not run at the pick, the
+    file holds the new default, and the stub run at `session_shutdown` sees it.
+
+  No request reaches any provider.
 
 Each result goes into `facts/capabilities.toml` through `tools/harness-facts`, with
 its record. If P2 fails, the picker-event handlers are dropped and capture relies on
@@ -157,6 +198,9 @@ in the existing temporary-repository fixtures, plus:
 3. The import-time check refuses groups that overlap, or that name a key the filter
    does not drop for that file.
 4. Claude's and Codex's existing `test_live_picks.py` cases pass unchanged.
+5. `drop pi/settings.json` (§3.5) removes only that entry, leaves the live file
+   untouched, and the record it leaves is accepted by the pre-change tool (the
+   `.githooks/live-picks` of the merge base, run against a copy of the record).
 
 ## 5. Rollout and recovery
 
@@ -167,5 +211,17 @@ apply: set a default model in pi, check that `local/live-picks.json` holds it, r
 `git checkout -- pi/settings.json` in main, and check that the default is back and
 `git status` is clean.
 
-Recovery: remove the extension link (or revert the merge) and run
-`live-picks forget pi/settings.json`; pi then behaves as after `hq-61a47e`.
+Recovery, in this order, from main:
+
+1. On each host, remove the `~/.pi/agent/extensions/harness-state.ts` link (after the
+   revert its target is gone, and a `[retired]` entry would be reverted with it), so
+   no pi session runs the refresh during the rollback.
+2. `.githooks/live-picks drop pi/settings.json`, while the new tool is still in place;
+   the Claude and Codex entries stay.
+3. Revert the merge; `just link-check` then passes, the settings link untouched.
+4. Check that `.githooks/live-picks capture` exits 0 and `local/live-picks.json` still
+   holds the Claude and Codex picks.
+
+pi then behaves as after `hq-61a47e`: its defaults stay in the live file until a Git
+rewrite drops them. Reverting before step 2 leaves a record the old tool refuses, and
+every Stop then reports that refusal until the entry is removed by hand.
