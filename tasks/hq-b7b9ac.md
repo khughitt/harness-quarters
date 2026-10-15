@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: thought-picker-impl
 created: 2026-10-09T14:46:50Z
-updated: 2026-10-15T09:10:53Z
+updated: 2026-10-15T09:12:03Z
 started: 2026-10-15T08:36:45Z
 depends: []
 parent: hq-65f661
@@ -49,3 +49,4 @@ Where to look: claude/mods/cli-pane/hooks/register.tsx, hooks/sgr.ts, types/inde
 - 2026-10-15T08:54:08Z (thought-picker-impl): review: impl round 1 — verdict: revise; findings: important 2, minor 7; reviewer: claude-code
 - 2026-10-15T09:04:39Z (thought-picker-impl): impl round 1 fixes: typing pauses 200 ms then one search runs at a time (newest text next); show and empty /m drop pending answers; Enter on unsearched text searches at once and shows the first match; -- before terms; mindful's JSON error envelope read as kind: detail; non-row output is a named error; picker attached by a command field
 - 2026-10-15T09:10:53Z (thought-picker-impl): review: impl round 2 — verdict: accept; findings: minor 4; reviewer: claude-code
+- 2026-10-15T09:12:03Z (thought-picker-impl): gate: verified tree:f1b92520c863779fae670e469f91baf7c5f66628 — checks: just mods (validate + claude plugin test) 26 pass 0 fail and tsc against the 2.1.296 API types exit 0 at this tree. Picker tests were seen failing before the code and 26 targeted mutants each failed at least one test (one redundant recheck removed). rowsOf's contract ran over every thought of the live mindful store via search: 6891 of 6891 rows matched with 0 mismatches. just test not rerun (no Python touched and its one failure is hq-a6454e); review: important addressed late search answer reopened the picker over a shown thought, important addressed every keystroke ran a full mindful search with unbounded overlap, minor addressed a query starting with a dash parsed as an option, minor addressed malformed output and the JSON error envelope shown raw, minor addressed Enter before an answer needed a second Enter, minor addressed picker chosen by array position, minor addressed mobile line hard-coded the command, minor deferred Enter repeats a search already in flight (hq-6bc076), minor deferred no test pins that Enter waits for a running search (hq-6bc076), minor deferred rowsOf passes a null hit and an alias-less tag (hq-6bc076), minor deferred process run start sits outside its try (hq-6bc076), minor deferred null tag aliases dropped silently (hq-6bc076), minor deferred void handlers leave rejections unhandled (hq-6bc076), minor deferred typing during a show can redraw the picker (hq-6bc076), minor deferred hot reload resets the sequence counter (hq-6bc076); reviewer: claude-code/claude-opus-5-5
