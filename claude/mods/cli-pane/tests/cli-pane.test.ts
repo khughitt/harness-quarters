@@ -117,14 +117,241 @@ describe('commands', () => {
     expect(text).toContain('output cut at 4 MiB')
   })
 
-  test('a missing ID shows usage without running anything', async ($, on) => {
+  test('/tas with no ID shows usage without running anything', async ($, on) => {
     const { ran, opened } = host(on, ok(''))
-    const result = await $.command.run(typed('m', ''))
+    const result = await $.command.run(typed('tas', ''))
 
     expect(ran).toEqual([])
     expect(result.text).toBeUndefined()
-    expect(opened).toEqual(['m'])
-    expect(await paneText($, 'm')).toContain('usage: /m <ID>')
+    expect(opened).toEqual(['tas'])
+    expect(await paneText($, 'tas')).toContain('usage: /tas <ID>')
+  })
+})
+
+// Two thoughts as `mindful --json search` rows carry them, trimmed to the
+// fields the picker reads.
+const GARDEN = {
+  row: { id: 'thought:u-garden', title: 'Raised beds', alias: 'garden', tags: [{ id: 'thought:t1', alias: 'home' }, { id: 'thought:t2', alias: 'spring' }] },
+}
+const GARAGE = { row: { id: 'thought:u-garage', title: 'Garage shelves', alias: null, tags: [{ id: 'thought:t1', alias: 'home' }] } }
+const GARDEN_ROW = 'Raised beds garden #home #spring'
+const GARAGE_ROW = 'Garage shelves #home'
+
+type Held = { query: string; answer: (result: ProcessRunResult) => void }
+
+// A promise and the function that settles it.
+function signal(): { settled: Promise<void>; settle: () => void } {
+  let settle = () => {}
+  const settled = new Promise<void>(resolve => (settle = resolve))
+  return { settled, settle }
+}
+
+// Answers `mindful show` with its art and each search by its query: from
+// `answers`, where an Error is a run that cannot start, or held for the test
+// to answer when `hold` is set; `bothHeld` settles once two are held.
+function searchHost(on: On, answers: Record<string, ProcessRunResult | Error>, hold = false) {
+  const ran: string[][] = []
+  const held: Held[] = []
+  const both = signal()
+  const opened: { id: string; title: string | undefined }[] = []
+  on('process.run', async (_$, e) => {
+    ran.push([...e.argv])
+    if (e.argv[1] === 'show') return { value: ok('\x1b[32mart\x1b[0m\n') }
+    const query = e.argv[e.argv.length - 1] ?? ''
+    if (hold) {
+      return {
+        value: await new Promise<ProcessRunResult>(answer => {
+          if (held.push({ query, answer }) === 2) both.settle()
+        }),
+      }
+    }
+    const answer = answers[query]
+    if (answer === undefined) return { deny: `unexpected search ${query}` }
+    // A deny rejects the caller as a run that cannot start does; a throwing
+    // hook would be skipped and the host's real mindful would run.
+    if (answer instanceof Error) return { deny: answer.message }
+    return { value: answer }
+  })
+  on('ui.open', async (_$, e) => {
+    opened.push({ id: e.id, title: e.title })
+    return { value: { isPlaced: true } }
+  })
+  return { ran, held, opened, bothHeld: both.settled }
+}
+
+const PICKER_PROPS = {
+  title: '/m',
+  isFocused: true,
+  bodyColumns: 80,
+  placement: 'dock',
+  scroll: { offset: 0, bodyRows: 20 },
+  view: {},
+} as const
+
+const picker = ($: Engine) =>
+  $.ui.mount({ plugin: 'cli-pane', surface: 'terminal', component: 'Pane', requestId: 'm', props: PICKER_PROPS })
+
+const search = (query: string) => ['mindful', '--json', 'search', '--limit', '10', query]
+
+describe('picker', () => {
+  test('/m with no ID opens a focused search field and runs nothing', async ($, on) => {
+    const { ran, opened } = searchHost(on, {})
+    const result = await $.command.run(typed('m', ''))
+
+    expect(result.text).toBeUndefined()
+    expect(result.context).toBeUndefined()
+    expect(ran).toEqual([])
+    expect(opened).toEqual([{ id: 'm', title: '/m' }])
+    const ui = await picker($)
+    expect(await ui.drawn()).toMatchObject({
+      children: [{ type: 'Input', props: { key: 'query', autoFocus: true } }],
+    })
+    expect(await ui.findAll({ type: 'Button' })).toHaveLength(0)
+    await ui.unmount()
+  })
+
+  test('typing searches and draws a row per thought with its alias and tags', async ($, on) => {
+    const { ran } = searchHost(on, { gar: ok(JSON.stringify([GARDEN, GARAGE])) })
+    await $.command.run(typed('m', ''))
+    const ui = await picker($)
+    await ui.input({ key: 'query', text: 'gar', kind: 'change' })
+
+    expect(ran).toEqual([search('gar')])
+    const rows = await ui.findAll({ type: 'Button' })
+    expect(rows.map(row => row.text)).toEqual([GARDEN_ROW, GARAGE_ROW])
+    await ui.unmount()
+  })
+
+  test('pressing a row shows that thought in the same pane, by alias or else id', async ($, on) => {
+    const { ran, opened } = searchHost(on, { gar: ok(JSON.stringify([GARDEN, GARAGE])) })
+    await $.command.run(typed('m', ''))
+    const ui = await picker($)
+    await ui.input({ key: 'query', text: 'gar', kind: 'change' })
+    await ui.press({ key: 'thought:u-garden' })
+
+    expect(ran.at(-1)).toEqual(['mindful', 'show', 'garden'])
+    expect(opened.at(-1)).toEqual({ id: 'm', title: '/m garden' })
+    expect(await ui.find({ type: 'Input' })).toBeUndefined()
+    expect((await ui.find({ type: 'Box' }))?.text).toContain('art')
+
+    await $.command.run(typed('m', ''))
+    await ui.input({ key: 'query', text: 'gar', kind: 'change' })
+    await ui.press({ key: 'thought:u-garage' })
+    expect(ran.at(-1)).toEqual(['mindful', 'show', 'thought:u-garage'])
+    expect(opened.at(-1)).toEqual({ id: 'm', title: '/m thought:u-garage' })
+    await ui.unmount()
+  })
+
+  test('Enter on the query searched shows the first row, by its alias', async ($, on) => {
+    const { ran, opened } = searchHost(on, { gar: ok(JSON.stringify([GARDEN, GARAGE])) })
+    await $.command.run(typed('m', ''))
+    const ui = await picker($)
+    await ui.input({ key: 'query', text: 'gar', kind: 'change' })
+    await ui.input({ key: 'query', text: 'gar', kind: 'submit' })
+
+    expect(ran.at(-1)).toEqual(['mindful', 'show', 'garden'])
+    expect(opened.at(-1)).toEqual({ id: 'm', title: '/m garden' })
+    await ui.unmount()
+  })
+
+  test('Enter on a query not yet searched searches it', async ($, on) => {
+    const { ran } = searchHost(on, { ga: ok(JSON.stringify([GARDEN, GARAGE])), gara: ok(JSON.stringify([GARAGE])) })
+    await $.command.run(typed('m', ''))
+    const ui = await picker($)
+    await ui.input({ key: 'query', text: 'ga', kind: 'change' })
+    await ui.input({ key: 'query', text: 'gara', kind: 'submit' })
+
+    expect(ran).toEqual([search('ga'), search('gara')])
+    expect((await ui.findAll({ type: 'Button' })).map(row => row.text)).toEqual([GARAGE_ROW])
+    await ui.unmount()
+  })
+
+  test('no match says so, and a blank query clears the rows without a search', async ($, on) => {
+    const { ran } = searchHost(on, { gar: ok(JSON.stringify([GARDEN])), zzz: ok('[]') })
+    await $.command.run(typed('m', ''))
+    const ui = await picker($)
+
+    await ui.input({ key: 'query', text: 'zzz', kind: 'change' })
+    expect(await ui.find({ type: 'Text', text: 'No thoughts match.' })).toBeDefined()
+
+    await ui.input({ key: 'query', text: 'gar', kind: 'change' })
+    expect(await ui.find({ type: 'Text', text: 'No thoughts match.' })).toBeUndefined()
+    await ui.input({ key: 'query', text: '  ', kind: 'change' })
+    expect(await ui.findAll({ type: 'Button' })).toHaveLength(0)
+    expect(await ui.find({ type: 'Text', text: 'No thoughts match.' })).toBeUndefined()
+    expect(ran).toEqual([search('zzz'), search('gar')])
+    await ui.unmount()
+  })
+
+  test('a failed search shows its stderr, or why it could not start', async ($, on) => {
+    searchHost(on, {
+      bad: { ...ok(''), exitCode: 2, stderr: 'invalid_query: #' },
+      quiet: { ...ok(''), exitCode: 3 },
+      gone: new Error('not found on PATH'),
+    })
+    await $.command.run(typed('m', ''))
+    const ui = await picker($)
+
+    await ui.input({ key: 'query', text: 'bad', kind: 'change' })
+    expect(await ui.find({ type: 'Text', text: 'invalid_query: #' })).toMatchObject({ props: { color: 'red' } })
+    await ui.input({ key: 'query', text: 'quiet', kind: 'change' })
+    expect(await ui.find({ type: 'Text', text: 'mindful exited 3' })).toBeDefined()
+    await ui.input({ key: 'query', text: 'gone', kind: 'change' })
+    expect(await ui.find({ type: 'Text', text: /^mindful: .*not found on PATH$/ })).toBeDefined()
+    expect(await ui.findAll({ type: 'Button' })).toHaveLength(0)
+    await ui.unmount()
+  })
+
+  test('output that is not search JSON is an error, not an empty result', async ($, on) => {
+    searchHost(on, { gar: ok('not json') })
+    await $.command.run(typed('m', ''))
+    const ui = await picker($)
+    await ui.input({ key: 'query', text: 'gar', kind: 'change' })
+
+    expect(await ui.find({ type: 'Text', text: /^mindful: / })).toMatchObject({ props: { color: 'red' } })
+    expect(await ui.find({ type: 'Text', text: 'No thoughts match.' })).toBeUndefined()
+    await ui.unmount()
+  })
+
+  test('overlapping searches answered out of order: the later query wins', async ($, on) => {
+    const { held, bothHeld } = searchHost(on, {}, true)
+    await $.command.run(typed('m', ''))
+    const ui = await picker($)
+
+    const first = ui.input({ key: 'query', text: 'ga', kind: 'change' })
+    const second = ui.input({ key: 'query', text: 'gar', kind: 'change' })
+    await bothHeld
+    expect(held.map(h => h.query)).toEqual(['ga', 'gar'])
+
+    held[1]!.answer(ok(JSON.stringify([GARDEN])))
+    await second
+    held[0]!.answer(ok(JSON.stringify([GARDEN, GARAGE])))
+    await first
+
+    expect((await ui.findAll({ type: 'Button' })).map(row => row.text)).toEqual([GARDEN_ROW])
+    await ui.unmount()
+  })
+
+  test('/m with an argument still shows it directly, aliases included', async ($, on) => {
+    const { ran, opened } = searchHost(on, {})
+    await $.command.run(typed('m', ''))
+    await $.command.run(typed('m', ' garden '))
+
+    expect(ran).toEqual([['mindful', 'show', 'garden']])
+    expect(opened.at(-1)).toEqual({ id: 'm', title: '/m garden' })
+    const ui = await picker($)
+    expect(await ui.find({ type: 'Input' })).toBeUndefined()
+    expect((await ui.find({ type: 'Box' }))?.text).toContain('art')
+    await ui.unmount()
+  })
+
+  test('mobile, which draws no field, says to type /m <ID>', async ($, on) => {
+    searchHost(on, {})
+    await $.command.run(typed('m', ''))
+    const ui = await $.ui.mount({ plugin: 'cli-pane', surface: 'mobile', component: 'Pane', requestId: 'm', props: PICKER_PROPS })
+
+    expect((await ui.find({ type: 'Text' }))?.text).toContain('type /m <ID>')
+    await ui.unmount()
   })
 })
 
