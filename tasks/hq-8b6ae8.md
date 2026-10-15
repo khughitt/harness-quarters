@@ -1,15 +1,16 @@
 ---
 id: hq-8b6ae8
 title: "cli-pane's cannot-start test throws from its process.run hook, which the kit skips, so the host's real tasks binary runs"
-status: doing
+status: done
 priority: 3
 size: xs
 complexity: low
 process: direct
-owner: main
+owner: fix/cli-pane-cannot-start
 created: 2026-10-15T08:25:00Z
-updated: 2026-10-15T09:43:46Z
+updated: 2026-10-15T09:56:19Z
 started: 2026-10-15T09:43:32Z
+completed: 2026-10-15T09:56:18Z
 depends: []
 tags: []
 agent: claude-code/claude-opus-5-5
@@ -24,3 +25,14 @@ claude/mods/cli-pane/tests/cli-pane.test.ts 'a CLI that cannot start shows why' 
 - 2026-10-15T09:43:39Z (main): trial: flow-trial-1 — enrolled — flow on
 - 2026-10-15T09:43:39Z (main): arm: flow-trial-1 — unit tack-8b6ae8 — flow on
 - 2026-10-15T09:43:46Z (main): gate: scoped — adopted
+- 2026-10-15T09:43:47Z (fix/cli-pane-cannot-start): resumed
+  provenance: {"harness_session":"claude-code:f0d949b3-991f-4324-a1ad-6e8803719ec0","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-15T09:43:47Z (fix/cli-pane-cannot-start): gate: implementing .worktrees/cli-pane-cannot-start
+- 2026-10-15T09:44:26Z (fix/cli-pane-cannot-start): RED: tightened assertion fails with 'tasks: no implementation for process.run' — under the current kit the skipped throwing hook leaves process.run unanswered rather than running the real binary; the old toContain('tasks: ') passed on that
+- 2026-10-15T09:52:35Z (fix/cli-pane-cannot-start): review: impl round 1 — verdict: accept; findings: minor 3; reviewer: claude-code/claude-opus-5-5
+- 2026-10-15T09:56:17Z (fix/cli-pane-cannot-start): gate: verified tree:1462aadc6707c89e6e90013781664d0cfce00b69 — checks: just mods 26 pass and just test passed (228 + 709) and the tightened assertion failed against the old throwing hook and against a pane that drops the start-failure reason; review: minor addressed stale searchHost comment claimed the real mindful runs, minor addressed unneeded regex m flag, minor deferred test does not assert the failure is drawn red; reviewer: claude-code/claude-opus-5-5
+- 2026-10-15T09:56:18Z (fix/cli-pane-cannot-start): retro: tightening the assertion before the fix exposed that the task's diagnosis was wrong (no real binary ran; process.run went unanswered), which a fix-first order would have hidden. The deferred minor (assert the error is drawn red) is a candidate for hq-6bc076's minors pass.
+- 2026-10-15T09:56:18Z (fix/cli-pane-cannot-start): done
+  provenance: {"harness_session":"claude-code:f0d949b3-991f-4324-a1ad-6e8803719ec0","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-15T09:56:18Z (fix/cli-pane-cannot-start): cli-pane's cannot-start test answers process.run with a deny and asserts the reason reaches the pane
+  provenance: {"harness_session":"claude-code:f0d949b3-991f-4324-a1ad-6e8803719ec0","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

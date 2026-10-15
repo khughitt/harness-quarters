@@ -28,7 +28,9 @@ function host(on: On, answer: ProcessRunResult | Error) {
   const opened: string[] = []
   on('process.run', async (_$, e) => {
     ran.push({ argv: e.argv, env: e.init?.env })
-    if (answer instanceof Error) throw answer
+    // A deny rejects the caller as a run that cannot start does; the kit skips a
+    // throwing hook, which would leave the run unanswered.
+    if (answer instanceof Error) return { deny: answer.message }
     return { value: answer }
   })
   on('ui.open', async (_$, e) => {
@@ -104,7 +106,7 @@ describe('commands', () => {
     const result = await $.command.run(typed('tas', 'tack-1'))
 
     expect(result.text).toBeUndefined()
-    expect(await paneText($, 'tas')).toContain('tasks: ')
+    expect(await paneText($, 'tas')).toMatch(/^tasks: .*not found on PATH$/)
   })
 
   test('long output is cut to fit the drawing and says so', async ($, on) => {
@@ -164,8 +166,8 @@ function searchHost(on: On, answers: Record<string, ProcessRunResult | Error>, h
     }
     const answer = answers[query]
     if (answer === undefined) return { deny: `unexpected search ${query}` }
-    // A deny rejects the caller as a run that cannot start does; a throwing
-    // hook would be skipped and the host's real mindful would run.
+    // A deny rejects the caller as a run that cannot start does; the kit skips a
+    // throwing hook, which would leave the run unanswered.
     if (answer instanceof Error) return { deny: answer.message }
     return { value: answer }
   })
