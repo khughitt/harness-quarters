@@ -4,8 +4,8 @@ title: Codex sessions stamp and report a verified model id
 status: todo
 priority: 2
 created: 2026-10-02T15:33:37Z
-updated: 2026-10-15T00:40:10Z
-depends: [relay-2cd4b1]
+updated: 2026-10-15T01:10:35Z
+depends: [relay-2cd4b1, tasks-970049]
 tags: []
 source: "lore:docs/notes/2026-10-02-codex-model-identity-brief.md"
 agent: claude-code/claude-opus-5-5
