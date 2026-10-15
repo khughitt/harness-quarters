@@ -1,15 +1,16 @@
 ---
 id: hq-b7b9ac
 title: "cli-pane /m: pick a thought from a typeahead when no ID is given"
-status: doing
+status: done
 priority: 2
 size: s
 complexity: low
 process: direct
 owner: thought-picker-impl
 created: 2026-10-09T14:46:50Z
-updated: 2026-10-15T09:12:27Z
+updated: 2026-10-15T09:12:28Z
 started: 2026-10-15T08:36:45Z
+completed: 2026-10-15T09:12:28Z
 depends: []
 parent: hq-65f661
 tags: [claude]
@@ -51,3 +52,7 @@ Where to look: claude/mods/cli-pane/hooks/register.tsx, hooks/sgr.ts, types/inde
 - 2026-10-15T09:10:53Z (thought-picker-impl): review: impl round 2 — verdict: accept; findings: minor 4; reviewer: claude-code
 - 2026-10-15T09:12:03Z (thought-picker-impl): gate: verified tree:f1b92520c863779fae670e469f91baf7c5f66628 — checks: just mods (validate + claude plugin test) 26 pass 0 fail and tsc against the 2.1.296 API types exit 0 at this tree. Picker tests were seen failing before the code and 26 targeted mutants each failed at least one test (one redundant recheck removed). rowsOf's contract ran over every thought of the live mindful store via search: 6891 of 6891 rows matched with 0 mismatches. just test not rerun (no Python touched and its one failure is hq-a6454e); review: important addressed late search answer reopened the picker over a shown thought, important addressed every keystroke ran a full mindful search with unbounded overlap, minor addressed a query starting with a dash parsed as an option, minor addressed malformed output and the JSON error envelope shown raw, minor addressed Enter before an answer needed a second Enter, minor addressed picker chosen by array position, minor addressed mobile line hard-coded the command, minor deferred Enter repeats a search already in flight (hq-6bc076), minor deferred no test pins that Enter waits for a running search (hq-6bc076), minor deferred rowsOf passes a null hit and an alias-less tag (hq-6bc076), minor deferred process run start sits outside its try (hq-6bc076), minor deferred null tag aliases dropped silently (hq-6bc076), minor deferred void handlers leave rejections unhandled (hq-6bc076), minor deferred typing during a show can redraw the picker (hq-6bc076), minor deferred hot reload resets the sequence counter (hq-6bc076); reviewer: claude-code/claude-opus-5-5
 - 2026-10-15T09:12:27Z (thought-picker-impl): retro: the hq-4ba161 probe made the build quick, but its two synthetic thoughts hid the real cost: a search takes 3.4 s and 620 MB, so per-keystroke search was the main defect. A probe that drives a real CLI should time one real call. Mutation sweeps earned their keep: one caught a press test that passed vacuously, one found a redundant recheck, and adding clock.settle() fixed held-answer tests that passed for the wrong reason. Splicing edits by offsets computed before an earlier replace corrupted the test file once: edit by unique anchors only.
+- 2026-10-15T09:12:28Z (thought-picker-impl): done
+  provenance: {"harness_session":"claude-code:580b355d-7f7a-47ff-82fa-b402d867244d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-15T09:12:28Z (thought-picker-impl): Empty /m opens a thought picker in its pane: a paused one-at-a-time mindful search drawn as pressable rows with alias and tags; a press or Enter shows the thought in place; late answers never reopen it; mobile says to type /m <ID>. Row color is hq-c677ae (after mind6-5a8082); review minors are hq-6bc076.
+  provenance: {"harness_session":"claude-code:580b355d-7f7a-47ff-82fa-b402d867244d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
