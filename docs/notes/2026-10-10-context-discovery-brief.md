@@ -108,7 +108,8 @@ focus is proven only as the drawn `autoFocus` prop.
 
 | Task | Disposition or next result |
 | --- | --- |
-| hq-b7b9ac | Briefed; hq-4ba161 answered, ready to scope as the picker implementation |
+| hq-b7b9ac | Scoped 2026-10-15: the empty-`/m` picker implementation (s, low, direct) |
+| hq-c677ae | Row color from mindful; waits on mind6-5a8082 and hq-b7b9ac |
 | hq-4ba161 | Done 2026-10-15: interaction, color source and test boundary under Picker findings |
 | hq-839083 | Briefed; retains its source and waits for hq-434be2 |
 | hq-434be2 | P2, medium, mid complexity, direct: at most 60 minutes/eight metadata samples; source and native launch contract |
