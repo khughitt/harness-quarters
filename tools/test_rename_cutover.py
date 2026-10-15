@@ -30,6 +30,28 @@ def task_id(output):
     return added.get("id") or added["task"]["id"]
 
 
+def start_under_a_dead_session(box, tid, cwd):
+    """Claim `tid` for a session whose pid has ended. tasks records the PID view that lets
+    it judge a pid only when the exported pid exists at the claim and the claim is written
+    in the initial PID namespace; otherwise the claim reads `unverifiable`, held rather
+    than dead. So export a real child's pid and reap the child once the claim is written."""
+    nspid = next(line for line in Path("/proc/self/status").read_text().splitlines()
+                 if line.startswith("NSpid:")).split()[1:]
+    assert os.stat("/proc/self/ns/pid").st_ino == INITIAL_PID_NAMESPACE and len(nspid) == 1, (
+        "tasks judges an exported pid only in the initial PID namespace; this test runs in "
+        "another (a container or sandbox), where a claim whose session ended stays held")
+    child = subprocess.Popen(["sleep", "60"])
+    try:
+        box.run("tasks", "start", tid, cwd=cwd,
+                env={**box.env, "TASKS_SESSION": "ghost", "TASKS_SESSION_PID": str(child.pid)})
+    finally:
+        child.kill()
+        child.wait()
+
+
+# The initial PID namespace's nsfs inode, a kernel constant (PROC_PID_INIT_INO).
+INITIAL_PID_NAMESPACE = 0xEFFFFFFC
+
 KEPT = ("codex/config.toml", "local/codex/trust.toml")
 
 
@@ -300,11 +322,10 @@ def test_save_refuses_a_stash(box):
 def test_save_refuses_a_dead_claim_in_any_retargeted_repository(box2):
     """`tasks dep` prunes dead claims from the project it writes in, so a dead claim in a
     retargeted repository would be dropped by retarget and then stop the guard. The
-    claim is dead the moment it is written: its session's pid does not exist."""
+    claim is dead once written: its session's pid has ended."""
     lore = box2.repos[1]
     tid = task_id(box2.run("tasks", "add", "orphaned claim", "--process", "direct", cwd=lore).stdout)
-    ghost = {**box2.env, "TASKS_SESSION": "ghost", "TASKS_SESSION_PID": "999999"}
-    box2.run("tasks", "start", tid, cwd=lore, env=ghost)
+    start_under_a_dead_session(box2, tid, lore)
     box2.commit(lore, "start under a dead session")
     claims = json.loads(box2.run("tasks", "claims").stdout)["claims"]
     assert any(c["id"] == tid and not c["live"] for c in claims), claims
@@ -1262,6 +1283,6 @@ def test_leftover_original_names_records_and_attachments_only():
 def test_a_retargeted_repository_with_claims_is_a_precondition_message(box2):
     lore = box2.repos[1]
     tid = task_id(box2.run("tasks", "add", "orphaned claim", "--process", "direct", cwd=lore).stdout)
-    box2.run("tasks", "start", tid, cwd=lore, env={**box2.env, "TASKS_SESSION": "ghost", "TASKS_SESSION_PID": "999999"})
+    start_under_a_dead_session(box2, tid, lore)
     box2.commit(lore, "start under a dead session")
     assert "preconditions: a retargeted repository has claims" in box2.save(check=False).stderr
