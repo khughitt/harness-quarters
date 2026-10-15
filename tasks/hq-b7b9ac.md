@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-10-09T14:46:50Z
-updated: 2026-10-15T08:36:55Z
+updated: 2026-10-15T08:36:56Z
 started: 2026-10-15T08:36:45Z
 depends: []
 parent: hq-65f661
@@ -41,3 +41,4 @@ Where to look: claude/mods/cli-pane/hooks/register.tsx, hooks/sgr.ts, types/inde
 - 2026-10-15T08:36:45Z (main): started
   provenance: {"harness_session":"claude-code:580b355d-7f7a-47ff-82fa-b402d867244d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-15T08:36:55Z (main): trial: flow-trial-1 — enrolled — flow on
+- 2026-10-15T08:36:55Z (main): arm: flow-trial-1 — unit tack-b7b9ac — flow on
