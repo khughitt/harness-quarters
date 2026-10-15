@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-10-08T23:10:34Z
-updated: 2026-10-15T01:12:56Z
+updated: 2026-10-15T01:12:57Z
 started: 2026-10-15T01:12:50Z
 depends: []
 tags: []
@@ -30,3 +30,4 @@ Expected result: a small evidence table and a precise disposition: existing beha
 - 2026-10-15T01:12:50Z (main): started
   provenance: {"harness_session":"claude-code:12f40a0d-b227-408f-9d37-d05d8a87e20c","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-15T01:12:56Z (main): trial: flow-trial-1 — enrolled — flow on
+- 2026-10-15T01:12:57Z (main): arm: flow-trial-1 — unit tack-3cdd68 — flow on
