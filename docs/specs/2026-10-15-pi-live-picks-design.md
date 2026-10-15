@@ -1,7 +1,9 @@
 # pi live picks: keep pi's default model and thinking level across Git updates
 
 Status: draft for review, 2026-10-15; revised after spec review round 1 (unchanged
-selections emit no event, rollback of the record, a bounded refresh). Task: `hq-24416e` (goal `hq-aa9b44`). Extends
+selections emit no event, rollback of the record, a bounded refresh) and round 2
+(rollback order: revert before removing the pi entry). Approved for implementation
+planning by the user on 2026-10-15, after the round 2 fix. Task: `hq-24416e` (goal `hq-aa9b44`). Extends
 `docs/specs/2026-10-10-live-model-preservation-design.md` (below, "the base design"),
 whose record, rule, operations and failure handling apply unchanged except where this
 document says otherwise. Builds on `hq-61a47e` (merge `6b434eb`), which tracks
@@ -143,15 +145,7 @@ next refresh (any harness's turn end, or a pi event above) is the fallback. A re
 while pi runs is safe for pi's later writes (§1.1); the running pi keeps the model it
 started with, as Claude and Codex do.
 
-### 3.5 `drop`
-
-A new operation, `live-picks drop <file>`, removes the file's entry from the record and
-leaves the live file alone. It exists for rollback (§5): a tool without pi refuses any
-record naming `pi/settings.json`, whichever its state, and that refusal stops Claude's
-and Codex's preservation too. It refuses a file `live-picks` does not own, holds the
-host lock, and writes the record whole, as every operation does.
-
-### 3.6 Docs
+### 3.5 Docs
 
 README: the pi bullet drops "No hook saves pi's defaults yet" and describes the
 extension, `forget pi/settings.json`, and the per-unit rule; the Setup section's
@@ -198,9 +192,13 @@ in the existing temporary-repository fixtures, plus:
 3. The import-time check refuses groups that overlap, or that name a key the filter
    does not drop for that file.
 4. Claude's and Codex's existing `test_live_picks.py` cases pass unchanged.
-5. `drop pi/settings.json` (§3.5) removes only that entry, leaves the live file
-   untouched, and the record it leaves is accepted by the pre-change tool (the
-   `.githooks/live-picks` of the merge base, run against a copy of the record).
+5. Rollback interleaving (§5), in a temporary repository whose record holds Claude,
+   Codex and pi entries: with the merge base's `.githooks/` in place (the revert),
+   the old `live-picks capture`, `restore`, `hook post-merge` and
+   `harness-state-refresh` each refuse and leave the record byte for byte; a pi pick in
+   the live file at that point changes nothing. The removal command of §5 step 2 then
+   leaves the Claude and Codex entries byte for byte, and a following old `capture`
+   exits 0 and adds no pi entry.
 
 ## 5. Rollout and recovery
 
@@ -213,15 +211,33 @@ apply: set a default model in pi, check that `local/live-picks.json` holds it, r
 
 Recovery, in this order, from main:
 
-1. On each host, remove the `~/.pi/agent/extensions/harness-state.ts` link (after the
-   revert its target is gone, and a `[retired]` entry would be reverted with it), so
-   no pi session runs the refresh during the rollback.
-2. `.githooks/live-picks drop pi/settings.json`, while the new tool is still in place;
-   the Claude and Codex entries stay.
-3. Revert the merge; `just link-check` then passes, the settings link untouched.
-4. Check that `.githooks/live-picks capture` exits 0 and `local/live-picks.json` still
-   holds the Claude and Codex picks.
+1. Revert the merge. From that commit on nothing can write a pi entry: the reverted
+   `live-picks` owns only Claude's and Codex's files, and a pi session still running
+   with the extension loaded calls `~/.local/bin/harness-state-refresh`, which now
+   resolves to the reverted refresh. Until step 2 that tool refuses the record (it
+   names `pi/settings.json`), so each Stop reports the refusal and Git hooks restore
+   nothing; the record is never overwritten (base design §3.5).
+2. Remove the pi entry under the host lock, keeping the others:
 
-pi then behaves as after `hq-61a47e`: its defaults stay in the live file until a Git
-rewrite drops them. Reverting before step 2 leaves a record the old tool refuses, and
-every Stop then reports that refusal until the entry is removed by hand.
+       flock local/harness-state.lock python3 - <<'EOF'
+       import json, os
+       path = "local/live-picks.json"
+       record = json.load(open(path))
+       record.pop("pi/settings.json", None)
+       open(path + ".tmp", "w").write(json.dumps(record, indent=2, ensure_ascii=False) + "\n")
+       os.replace(path + ".tmp", path)
+       EOF
+
+   `flock(1)` and the tools' `fcntl.flock` take the same lock, so no refresh runs
+   inside the edit.
+3. Remove the `~/.pi/agent/extensions/harness-state.ts` link on each host (its target
+   is gone) and check `just link-check`. Running pi sessions keep the extension until
+   they exit; per step 1 they can no longer recreate the entry.
+4. Check that `.githooks/live-picks capture` exits 0, that `local/live-picks.json`
+   holds the Claude and Codex picks and no pi entry, and run `git checkout --
+   claude/settings.json` to see the Claude pick restored.
+
+Removing the entry before the revert is unsafe: any refresh in between (a running pi's
+extension, or a Claude or Codex Stop) runs the new tool, which captures pi's live
+defaults again. pi then behaves as after `hq-61a47e`: its defaults stay in the live
+file until a Git rewrite drops them.
