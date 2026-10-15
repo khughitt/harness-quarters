@@ -1,9 +1,13 @@
 """live-picks saves the model and effort picks in local/ and puts back what a git command dropped."""
 import ast
+import fcntl
 import json
 import os
+import select
+import signal
 import shutil
 import subprocess
+import sys
 import tomllib
 from pathlib import Path
 
@@ -1220,3 +1224,115 @@ def test_pi_git_rewrites_restore_the_pick_without_tracking_it(repo, rewrite):
                                  "theme": "system" if rewrite == "checkout" else "light"}
     assert "defaultModel" not in git(repo, "show", "HEAD:" + PI).stdout
     assert status(repo) == ""
+
+
+# Main before this change (after hq-61a47e); keep testing rollback after it lands.
+PRE_PI_COMMIT = "6b434eb"
+
+
+@pytest.fixture(scope="module")
+def pre_pi_hooks():
+    found = git(HOOKS.parent, "rev-parse", "--verify", "--quiet",
+                f"{PRE_PI_COMMIT}^{{commit}}", check=False)
+    if found.returncode == 1 and not found.stderr:
+        pytest.skip(f"pre-pi commit {PRE_PI_COMMIT} is absent (shallow clone)")
+    found.check_returncode()
+    return {name: subprocess.run(
+        ["git", "-C", str(HOOKS.parent), "show", f"{PRE_PI_COMMIT}:.githooks/{name}"],
+        check=True, capture_output=True).stdout for name in HOOK_FILES}
+
+
+def install_pre_pi_hooks(repo, pre_pi_hooks):
+    for name, content in pre_pi_hooks.items():
+        (repo / ".githooks" / name).write_bytes(content)
+
+
+@pytest.mark.parametrize("command", [
+    ("live-picks", "capture"), ("live-picks", "restore"),
+    ("live-picks", "hook", "post-merge"), ("harness-state-refresh",),
+])
+def test_pinned_pre_pi_commands_leave_the_pi_record_untouched(repo, pre_pi_hooks, command):
+    saved_both(repo)
+    write_pi(repo, **PI_VALUES)
+    captured = picks(repo, "capture")
+    assert captured.returncode == 0, captured.stderr
+    before = pi_record_path(repo).read_bytes()
+    install_pre_pi_hooks(repo, pre_pi_hooks)
+
+    result = subprocess.run([str(repo / ".githooks" / command[0]), *command[1:]],
+                            input="", text=True, capture_output=True, timeout=10)
+
+    assert result.returncode == 0, result.stderr
+    assert pi_record_path(repo).read_bytes() == before
+    assert PI not in record(repo)
+
+
+def test_inflight_pi_capture_remains_safe_after_rollback(repo, pre_pi_hooks):
+    saved_both(repo)
+    save_pi(repo)
+    write_claude(repo, model="opus")
+    (repo / CODEX).write_text(PICK + BASE)
+    write_pi(repo, defaultProvider="openai", defaultModel="gpt-6.1-sol",
+             defaultThinkingLevel="medium")
+    lock = repo / "local/harness-state.lock"
+    lock.touch()
+    before = {path: path.read_bytes() for path in (repo / "local").rglob("*")
+              if path.is_file()}
+    live_before = {name: (repo / name).read_bytes() for name in (CLAUDE, CODEX, PI)}
+    # Load every definition first, then announce only a confirmed lock contention.
+    runner = """
+import fcntl, runpy, sys
+sys.path.insert(0, sys.argv[1])
+tool = runpy.run_path(sys.argv[1] + "/live-picks")
+flock = fcntl.flock
+
+def waiting(fd, operation):
+    try:
+        flock(fd, operation | fcntl.LOCK_NB)
+    except BlockingIOError:
+        print("loaded and blocked", flush=True)
+        flock(fd, operation)
+    else:
+        raise AssertionError("capture did not contend for the host lock")
+
+fcntl.flock = waiting
+tool["main"](["live-picks", "capture"])
+"""
+    def interrupted(signum, frame):
+        raise SystemExit(128 + signum)
+
+    previous = signal.signal(signal.SIGTERM, interrupted)
+    run = None
+    try:
+        with lock.open("a") as held:
+            fcntl.flock(held, fcntl.LOCK_EX)
+            run = subprocess.Popen([sys.executable, "-c", runner, str(repo / ".githooks")],
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            ready, _, _ = select.select([run.stdout], [], [], 10)
+            assert ready, "capture did not reach the host lock"
+            assert run.stdout.readline() == "loaded and blocked\n"
+            assert run.poll() is None
+            install_pre_pi_hooks(repo, pre_pi_hooks)
+        _, err = run.communicate(timeout=10)
+        assert run.returncode == 0, err
+    finally:
+        if run is not None:
+            if run.poll() is None:
+                run.kill()
+            run.communicate(timeout=10)
+        signal.signal(signal.SIGTERM, previous)
+
+    after = {path: path.read_bytes() for path in (repo / "local").rglob("*")
+             if path.is_file()}
+    assert set(after) == set(before)
+    assert after.pop(pi_record_path(repo)) != before.pop(pi_record_path(repo))
+    assert after == before
+    assert json.loads(pi_record_path(repo).read_text()) == {PI: {"state": "set", "values": {
+        "defaultProvider": "openai", "defaultModel": "gpt-6.1-sol",
+        "defaultThinkingLevel": "medium"}}}
+    assert {name: (repo / name).read_bytes() for name in live_before} == live_before
+
+    result = picks(repo, "capture")
+    assert result.returncode == 0, result.stderr
+    assert record(repo) == {CLAUDE: CLAUDE_SET, CODEX: CODEX_SET}
+    assert PI not in record(repo)
