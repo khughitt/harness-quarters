@@ -1,3 +1,5 @@
+Frozen after move to flows at d779758fe7c09c362f6a53159b9f063e85505473 on 2026-10-04 (flows-f8ea06); retained for closed task references.
+
 # Workflow evaluation from post-implementation outcomes
 
 Status: approved 2026-10-01 at revision 3 (review round 3, §10); revision 3.1 folds in that round's nonblocking P3. Task: `tack-026612`.

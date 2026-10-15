@@ -1,3 +1,5 @@
+Frozen after move to flows at d779758fe7c09c362f6a53159b9f063e85505473 on 2026-10-04 (flows-f8ea06); retained for closed task references.
+
 # Flow State Machine Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

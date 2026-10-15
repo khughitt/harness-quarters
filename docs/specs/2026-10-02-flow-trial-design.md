@@ -1,3 +1,5 @@
+Frozen after move to flows at 3d1e1345817f89c08d37c3290d877e588990f9f4 on 2026-10-15 (flows-70595d); retained for closed task references.
+
 # Randomized flow trial
 
 Status: approved 2026-10-02 at revision 4 (review round 4 accepted; round 1 to 3 findings in §11). Revision 4.1 (plan time): the session rule is global, not per project (§4), and the live run is its own piece (§8). Revision 4.2 (plan review 1): the arm names are quoted in YAML, which reads bare on and off as booleans. Task: `tack-7d9375`.

@@ -1,3 +1,5 @@
+Frozen after move to flows at d779758fe7c09c362f6a53159b9f063e85505473 on 2026-10-04 (flows-f8ea06); retained for closed task references.
+
 # Flow: an explicit state machine for task work
 
 Status: merged to main 2026-09-15 at ba4f873 (plan executed, six steps and the trial closed)
