@@ -3,9 +3,8 @@ id: hq-b7b9ac
 title: "cli-pane /m: pick a thought from a typeahead when no ID is given"
 status: idea
 priority: 2
-reviewed: true
 created: 2026-10-09T14:46:50Z
-updated: 2026-10-12T18:21:12Z
+updated: 2026-10-15T08:25:35Z
 depends: []
 parent: hq-65f661
 tags: [claude]
@@ -21,3 +20,4 @@ Open: whether the picker inserts a reference into the prompt as well as showing 
 ## Notes
 
 - 2026-10-10T13:27:26Z (main): scope: briefed; hq-4ba161 will verify tags/color and typeahead in the existing pane; preserve nonempty /m arguments and pane-only selection; brief: docs/notes/2026-10-10-context-discovery-brief.md
+- 2026-10-15T08:25:35Z (thought-picker): hq-4ba161 answered: build empty /m as an Input over plain Button rows (Select can't style or preview), latest-sequence guard for overlapping searches, show the pick in the same pane; row color waits on mind6-5a8082, mobile shows a type /m <ID> line; tests and boundary in docs/notes/2026-10-10-context-discovery-brief.md (Picker findings), probe sources attached to hq-4ba161

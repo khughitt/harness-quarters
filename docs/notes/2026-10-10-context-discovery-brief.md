@@ -58,9 +58,9 @@ Reuse obs's identity research; hq owns the launcher, not a second index.
 
 ## Unanswered questions
 
-- Can the existing controls show useful color and tags while preserving
-  typeahead, focus and selection? hq-4ba161 tests a tiny headless fixture,
-  including delayed search responses and empty/error states.
+- Answered 2026-10-15 (hq-4ba161; see Picker findings): an Input over a
+  column of Button rows gives typeahead, readable tags and selection; row color
+  waits on mind6-5a8082.
 - Which available metadata supplies recency, correct thread identity and
   home/cwd without reading every transcript? hq-434be2 compares existing
   sources and names any prerequisite from obs-c7d924.
@@ -68,12 +68,48 @@ Reuse obs's identity research; hq owns the launcher, not a second index.
   or noninteractive rows, and missing cwd? The same session investigation
   recommends it from its evidence; unresolved identity stays explicit.
 
+## Picker findings (hq-4ba161, 2026-10-15)
+
+Probed headlessly under `claude plugin test` (Claude Code 2.1.296, mindful
+0.1.0) with a scratch copy of cli-pane and two synthetic thoughts; no live
+surface. The kit checks the tree a hook returns, never a surface's paint, so
+focus is proven only as the drawn `autoFocus` prop.
+
+- **Interaction.** Empty `/m` opens the pane with an `Input` (`key="query"`,
+  `autoFocus`) and no process run. `onInput` runs `mindful --json search
+  --limit 10 <query>`; each result is a `plain` `Button` keyed by the thought's
+  uid, its children the title, a dim alias and tag chips (`Text`). A press, or
+  Enter on an unchanged query (first row), runs `mindful show <alias|uid>` in the
+  same pane and replaces the picker, as `/m <ID>` does. A blank query clears the
+  rows without running anything. Select is not used: string labels only, no
+  highlight callback.
+- **Overlapping searches.** The kit lets two `ui.input` acts overlap. Each
+  search takes a sequence number and drops an answer that is not the latest;
+  without that guard the slower, earlier query's rows win (checked by removing it).
+- **Empty and error results.** `[]` draws "No thoughts match."; a non-zero exit
+  draws its stderr in red; a run that cannot start draws `mindful: <reason>`.
+  A test simulates that start failure with `{ deny }` from its `process.run` hook:
+  a throwing hook is skipped and the host's real CLI runs (hq-8b6ae8 fixes the
+  existing test that does this).
+- **Color source: (b), mindful resolves it.** Search rows carry slot indices,
+  and the colors the art draws depend on the active scheme, so a row swatch
+  needs a resolved color from mindful: mind6-5a8082. Until it lands, rows carry
+  tags only and the picked thought's `show` art supplies color, as today.
+- **Mobile.** No `Input`, so no search: the pane says to type `/m <ID>`. Button
+  rows with `Text` children do validate on mobile.
+- **Boundary.** Unchanged: `/m <argument>` (aliases included) and `/tas`.
+  Changed: empty `/m` opens the picker, so its usage test becomes the picker's
+  opening test (`/tas` keeps its usage line). Picker state is a second
+  `$.state` value in the mod's contract. Tests the implementation carries: the
+  opening field, typing to rows, press and Enter to show, empty/failed/blank
+  queries, out-of-order answers, the direct path, and mobile's line.
+
 ## Proposed decomposition
 
 | Task | Disposition or next result |
 | --- | --- |
-| hq-b7b9ac | Briefed; retains its source and waits for hq-4ba161 |
-| hq-4ba161 | P2, small, mid complexity, direct: at most 45 minutes; supported picker interaction and verification boundary |
+| hq-b7b9ac | Briefed; hq-4ba161 answered, ready to scope as the picker implementation |
+| hq-4ba161 | Done 2026-10-15: interaction, color source and test boundary under Picker findings |
 | hq-839083 | Briefed; retains its source and waits for hq-434be2 |
 | hq-434be2 | P2, medium, mid complexity, direct: at most 60 minutes/eight metadata samples; source and native launch contract |
 
