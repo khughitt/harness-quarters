@@ -30,6 +30,43 @@ print(json.dumps({{"tool": {tool!r}, "argv": sys.argv[1:], "cwd": os.getcwd(),
                   "CODEX_HOME": os.environ.get("CODEX_HOME")}}))
 """
 
+# `tasks resolve --stdin` over the project roots in $TASKS_STUB_ROOTS ({"prefix": root});
+# a path under <root>/.worktrees/<name> is that worktree. A path containing a word from
+# $TASKS_STUB_STATUS ({"word": "ambiguous" | "invalid"}) gets that status; $TASKS_STUB_FAIL
+# makes the command fail; each call appends its input to $TASKS_STUB_LOG.
+TASKS_STUB = """#!{python}
+import json, os, sys
+if sys.argv[1:] != ["resolve", "--stdin"]:
+    sys.exit("unexpected arguments: " + " ".join(sys.argv[1:]))
+if os.environ.get("TASKS_STUB_FAIL"):
+    print('{{"error":{{"kind":"registry","detail":"broken registry"}}}}', file=sys.stderr)
+    sys.exit(1)
+paths = sys.stdin.read().splitlines()
+if os.environ.get("TASKS_STUB_LOG"):
+    with open(os.environ["TASKS_STUB_LOG"], "a") as log:
+        log.write(json.dumps(paths) + "\\n")
+roots = json.loads(os.environ.get("TASKS_STUB_ROOTS", "{{}}"))
+forced = json.loads(os.environ.get("TASKS_STUB_STATUS", "{{}}"))
+results = []
+for path in paths:
+    row = {{"input": path, "kind": "path", "status": "unregistered"}}
+    for word, status in forced.items():
+        if word in path:
+            row["status"] = status
+    for prefix, root in roots.items():
+        if row["status"] == "unregistered" and (path == root or path.startswith(root + "/")):
+            rest = path[len(root):].strip("/")
+            row.update(status="resolved", prefix=prefix, root=root, via="root", location=root, relpath=rest)
+            parts = rest.split("/")
+            if parts == [".worktrees"]:
+                row.update(via="storage", location=root + "/.worktrees", relpath="")
+            if len(parts) >= 2 and parts[0] == ".worktrees":
+                row.update(via="storage", location=root + "/.worktrees",
+                           worktree=root + "/.worktrees/" + parts[1], relpath="/".join(parts[2:]))
+    results.append(row)
+print(json.dumps({{"results": results, "warnings": []}}))
+"""
+
 # Picks the input line whose leading number is $FZF_PICK, after deleting $FZF_DELETE
 # (a transcript that disappears between listing and launch).
 FZF_STUB = """#!{python}
@@ -58,6 +95,7 @@ class Env:
             codex_db(self.home / name, [])
         for tool in ("claude", "codex"):
             self.script(tool, STUB.format(python=sys.executable, tool=tool))
+        self.script("tasks", TASKS_STUB.format(python=sys.executable))
         (self.bin / "git").symlink_to(shutil.which("git"))
         self.extra: dict[str, str] = {}
 
@@ -243,6 +281,228 @@ def test_long_label_is_trimmed(env):
     claude_session(env.home / ".claude", SID, env.project("alpha"), display="x" * 200)
     [row] = rows(env.run("sessions"))
     assert "x" * 61 not in row and "x" * 50 in row
+
+
+# --- project names ----------------------------------------------------------------------
+
+
+def projects(env, **roots: Path) -> None:
+    env.extra["TASKS_STUB_ROOTS"] = json.dumps({prefix: str(root) for prefix, root in roots.items()})
+
+
+def place(row: str) -> str:
+    """The place column: the fifth whitespace-separated field."""
+    return row.split()[4]
+
+
+def test_cwd_in_a_project_shows_its_prefix(env):
+    alpha = env.project("alpha")
+    claude_session(env.home / ".claude", SID, alpha)
+    projects(env, al=alpha)
+    [row] = rows(env.run("sessions"))
+    assert place(row) == "al" and str(alpha) not in row
+
+
+def test_cwd_below_a_project_root_shows_the_relative_path(env):
+    alpha = env.project("alpha")
+    (alpha / "sub" / "dir").mkdir(parents=True)
+    claude_session(env.home / ".claude", SID, alpha / "sub" / "dir")
+    projects(env, al=alpha)
+    [row] = rows(env.run("sessions"))
+    assert place(row) == "al/sub/dir"
+
+
+def test_cwd_in_a_worktree_shows_prefix_at_worktree(env):
+    alpha = env.project("alpha")
+    (alpha / ".worktrees" / "feature" / "src").mkdir(parents=True)
+    claude_session(env.home / ".claude", SID, alpha / ".worktrees" / "feature", display="top")
+    codex_db(env.home / ".codex", [thread(env.home / ".codex", TID, alpha / ".worktrees" / "feature" / "src",
+                                          age_s=60, name="below")])
+    projects(env, al=alpha)
+    result = env.run("sessions")
+    assert {row.split()[-1]: place(row) for row in rows(result)} == {"top": "al@feature", "below": "al@feature/src"}
+
+
+def test_removed_worktree_keeps_its_name_and_is_marked_missing(env):
+    alpha = env.project("alpha")
+    claude_session(env.home / ".claude", SID, alpha / ".worktrees" / "gone")
+    projects(env, al=alpha)
+    [row] = rows(env.run("sessions"))
+    assert "al@gone (cwd missing)" in row
+
+
+def test_cwd_outside_every_project_keeps_its_path(env):
+    alpha, beta = env.project("alpha"), env.home / "src" / "beta"
+    beta.mkdir(parents=True)
+    claude_session(env.home / ".claude", SID, beta)
+    projects(env, al=alpha)
+    result = env.run("sessions")
+    [row] = rows(result)
+    assert place(row) == "~/src/beta" and "unresolved" not in footer(result)
+
+
+def test_worktree_storage_directory_is_named_as_such(env):
+    alpha = env.project("alpha")
+    (alpha / ".worktrees").mkdir()
+    claude_session(env.home / ".claude", SID, alpha / ".worktrees")
+    projects(env, al=alpha)
+    [row] = rows(env.run("sessions"))
+    assert place(row) == "al/.worktrees"
+
+
+def test_ambiguous_cwd_keeps_its_path(env):
+    alpha = env.project("alpha")
+    claude_session(env.home / ".claude", SID, alpha)
+    projects(env, al=alpha)
+    env.extra["TASKS_STUB_STATUS"] = json.dumps({"alpha": "ambiguous"})
+    result = env.run("sessions")
+    [row] = rows(result)
+    assert place(row) == str(alpha) and "unresolved" not in footer(result)
+
+
+def test_invalid_path_keeps_its_path_and_is_counted(env):
+    """tasks answers `invalid` for one path it cannot read (permission, a stale mount);
+    that row keeps its path and the footer counts it, and the rest still list."""
+    alpha, beta = env.project("alpha"), env.project("beta")
+    claude_session(env.home / ".claude", SID, alpha)
+    claude_session(env.home / ".claude", SID2, beta, age_s=60)
+    projects(env, al=alpha, be=beta)
+    env.extra["TASKS_STUB_STATUS"] = json.dumps({"/alpha": "invalid"})
+    result = env.run("sessions")
+    assert [place(row) for row in rows(result)] == [str(alpha), "be"]
+    assert "unresolved cwds: 1" in footer(result)
+    assert "unresolved" not in footer(env.run("sessions", "-n", "1", "--home", "work"))
+
+
+def test_source_text_cannot_carry_terminal_escapes_or_surrogates(env):
+    """A prompt holding an escape sequence or a session id holding a lone surrogate prints
+    with `?` in their place, so neither reaches the terminal or breaks a UTF-8 stream."""
+    alpha = env.project("alpha")
+    history(env.home / ".claude", '{"display": "red \\u001b[31m text", "timestamp": %d, "project": "%s",'
+            ' "sessionId": "ab\\udcffcdefgh"}' % (NOW_MS, alpha))
+    transcript(env.home / ".claude", "ab\udcffcdefgh")
+    result = env.run("sessions", "--color", "never", PYTHONIOENCODING="utf-8")
+    [row] = rows(result)
+    assert "\x1b" not in result.stdout
+    assert row.split()[2] == "ab?cdefg" and row.endswith("red ?[31m text")
+
+
+def test_resolved_worktree_and_relpath_cannot_carry_controls(env):
+    """A directory name under a project reaches the place column through tasks' answer."""
+    alpha = env.project("alpha")
+    claude_session(env.home / ".claude", SID, alpha / ".worktrees" / "w\x1b]0;t\x07" / "a\tb\u009b2J")
+    projects(env, al=alpha)
+    result = env.run("sessions", "--color", "always", PYTHONIOENCODING="utf-8")
+    [row] = rows(result)
+    assert strip(row).split()[4] == "al@w?]0;t?/a?b?2J"
+    assert "\x07" not in result.stdout and "\t" not in result.stdout and "\u009b" not in result.stdout
+
+
+def test_label_c1_controls_print_as_replacements(env):
+    claude_session(env.home / ".claude", SID, env.project("alpha"), display="clear \u009b2J \u009d0;x")
+    [row] = rows(env.run("sessions", PYTHONIOENCODING="utf-8"))
+    assert row.endswith("clear ?2J ?0;x")
+
+
+def test_unresolved_cwds_count_once_each_across_causes(env):
+    """Two rows in one unreadable cwd count once; an unsendable cwd adds one more."""
+    alpha, beta = env.project("alpha"), env.project("beta")
+    claude_session(env.home / ".claude", SID, alpha)
+    claude_session(env.home / ".claude-work", SID2, alpha, age_s=60)
+    history(env.home / ".claude", '{"display": "odd", "timestamp": %d, "project": "%s/x\\udcff", "sessionId": "%s"}'
+            % (NOW_MS, beta, "cccccccc-3333-4333-8333-000000000003"))
+    transcript(env.home / ".claude", "cccccccc-3333-4333-8333-000000000003", age_s=120)
+    projects(env, al=alpha, be=beta)
+    env.extra["TASKS_STUB_STATUS"] = json.dumps({"/alpha": "invalid"})
+    result = env.run("sessions", PYTHONIOENCODING="utf-8")
+    assert len(rows(result)) == 3
+    assert "unresolved cwds: 2" in footer(result)
+
+
+def test_cwd_with_a_line_break_keeps_its_path_and_is_counted(env):
+    """One stdin line per cwd: a line break would split it, so it is not sent."""
+    alpha = env.project("alpha")
+    history(env.home / ".claude", prompt(SID, alpha / "a\nb", "newline"),
+            prompt(SID2, alpha / "c\rd", "return"))
+    transcript(env.home / ".claude", SID)
+    transcript(env.home / ".claude", SID2)
+    projects(env, al=alpha)
+    result = env.run("sessions")
+    assert len(rows(result)) == 2 and "Traceback" not in result.stderr
+    assert "unresolved cwds: 2" in footer(result)
+    assert "al/" not in result.stdout
+
+
+def test_storage_row_with_a_relpath_is_an_error(env):
+    """The contract leaves relpath empty when a storage match names no worktree."""
+    sys.path.insert(0, str(TOOL.parent))
+    from hq_cli import projects as hq_projects
+    row = {"prefix": "hq", "via": "storage", "location": "/x/.worktrees", "relpath": "y"}
+    with pytest.raises(hq_projects.ProjectError):
+        hq_projects.place(row)
+    assert hq_projects.place({**row, "relpath": ""}) == hq_projects.Place("hq", None, ".worktrees")
+
+
+def test_unknown_resolve_status_is_an_error(env):
+    claude_session(env.home / ".claude", SID, env.project("alpha"))
+    env.extra["TASKS_STUB_STATUS"] = json.dumps({"/alpha": "surprising"})
+    result = env.run("sessions")
+    assert result.returncode != 0
+    assert "tasks resolve" in result.stderr and "surprising" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+def test_lone_surrogates_print_as_replacements_and_the_cwd_is_counted(env):
+    """A \\udcXX escape in a history line decodes to a lone surrogate, which no UTF-8
+    stream can carry: the cwd is not sent to tasks, and both columns print `?` for it."""
+    alpha = env.project("alpha")
+    history(env.home / ".claude", '{"display": "odd \\udcff prompt", "timestamp": %d, "project": "%s/x\\udcff",'
+            ' "sessionId": "%s"}' % (NOW_MS, alpha, SID))
+    transcript(env.home / ".claude", SID)
+    projects(env, al=alpha)
+    result = env.run("sessions", PYTHONIOENCODING="utf-8")
+    [row] = rows(result)
+    assert f"{alpha}/x? (cwd missing)" in row and row.endswith("odd ? prompt")
+    assert "unresolved cwds: 1" in footer(result)
+
+
+def test_failing_tasks_resolve_is_an_error(env):
+    claude_session(env.home / ".claude", SID, env.project("alpha"))
+    result = env.run("sessions", TASKS_STUB_FAIL="1")
+    assert result.returncode != 0
+    assert "tasks resolve" in result.stderr and "broken registry" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+def test_missing_tasks_cli_is_an_error(env):
+    claude_session(env.home / ".claude", SID, env.project("alpha"))
+    (env.bin / "tasks").unlink()
+    result = env.run("sessions")
+    assert result.returncode != 0
+    assert "tasks" in result.stderr and "PATH" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+def test_one_resolve_call_for_the_shown_rows_only(env, tmp_path):
+    alpha, beta = env.project("alpha"), env.project("beta")
+    for n in range(4):
+        history(env.home / ".claude", prompt(f"aaaaaaaa-1111-4111-8111-00000000000{n}", alpha if n % 2 else beta, "x"))
+        transcript(env.home / ".claude", f"aaaaaaaa-1111-4111-8111-00000000000{n}", age_s=n * 60)
+    log = tmp_path / "resolve.log"
+    rows(env.run("sessions", "-n", "1", TASKS_STUB_LOG=str(log)))
+    assert [json.loads(line) for line in log.read_text().splitlines()] == [[str(beta)]]
+
+
+def test_no_rows_needs_no_resolve(env):
+    (env.bin / "tasks").unlink()
+    assert rows(env.run("sessions")) == []
+
+
+def test_launch_uses_the_cwd_not_the_project_name(env):
+    alpha = env.project("alpha")
+    claude_session(env.home / ".claude", SID, alpha)
+    projects(env, al=alpha)
+    assert launched(env.run("sessions", "-i", input="1\n"))["cwd"] == str(alpha)
 
 
 # --- visibility and filters -------------------------------------------------------------
@@ -675,6 +935,13 @@ def populate_classes(env) -> None:
                    display="gone-cwd", age_s=3 * 86_400)
     history(env.home / ".claude", prompt("dddddddd-4444-4444-8444-000000000004", env.project("alpha"), "old"))
     transcript(env.home / ".claude", "dddddddd-4444-4444-8444-000000000004", age_s=200 * 86_400)
+    worktree = env.project("beta") / ".worktrees" / "feature"
+    worktree.mkdir(parents=True)
+    claude_session(env.home / ".claude", "eeeeeeee-5555-4555-8555-000000000005", worktree, display="in-worktree",
+                   age_s=7200)
+    claude_session(env.home / ".claude", "ffffffff-6666-4666-8666-000000000006", env.project("beta") / ".worktrees"
+                   / "removed", display="gone-worktree", age_s=7300)
+    projects(env, be=env.project("beta"))
 
 
 def test_color_never_and_auto_into_a_pipe_are_plain(env):
@@ -769,6 +1036,14 @@ def test_color_classes(env):
     assert len(openings) == len(cells) and all(code.startswith(f"\x1b[{color.DIM};") or code == f"\x1b[{color.DIM}m"
                                                for code in openings)
     assert f"\x1b[{color.DIM};{codex}mcodex\x1b[0m" in archived
+
+
+def test_color_worktree_name_is_dimmed(env):
+    populate_classes(env)
+    out = env.run("sessions", "--color", "always", COLORTERM="truecolor").stdout
+    assert f"be\x1b[{color.DIM}m@feature\x1b[0m" in row_for(out, "in-worktree")
+    gone = row_for(out, "gone-worktree")
+    assert f"\x1b[{color.DIM}mbe\x1b[0m\x1b[{color.DIM}m@removed\x1b[0m" in gone
 
 
 def test_color_age_cell_takes_the_age_colormap(env):
