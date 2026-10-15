@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-10-09T14:46:50Z
-updated: 2026-10-15T08:36:45Z
+updated: 2026-10-15T08:36:55Z
 started: 2026-10-15T08:36:45Z
 depends: []
 parent: hq-65f661
@@ -40,3 +40,4 @@ Where to look: claude/mods/cli-pane/hooks/register.tsx, hooks/sgr.ts, types/inde
 - 2026-10-15T08:30:04Z (main): scope: scoped; the source thought's three asks are answered (pane Input typeahead, color via mind6-5a8082, the existing pane) and hq-4ba161's probe settles approach and tests; body rewritten with done-when; color split to hq-c677ae; brief: docs/notes/2026-10-10-context-discovery-brief.md
 - 2026-10-15T08:36:45Z (main): started
   provenance: {"harness_session":"claude-code:580b355d-7f7a-47ff-82fa-b402d867244d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-15T08:36:55Z (main): trial: flow-trial-1 — enrolled — flow on
