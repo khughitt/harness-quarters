@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/pi-live-picks
 created: 2026-10-15T22:18:53Z
-updated: 2026-10-15T22:44:09Z
+updated: 2026-10-15T22:44:14Z
 started: 2026-10-15T22:44:02Z
 depends: []
 parent: hq-24416e
@@ -26,3 +26,5 @@ Step of the hq-24416e plan (docs/plans/2026-10-15-pi-live-picks.md, Task 1); con
 - 2026-10-15T22:44:02Z (feat/pi-live-picks): started
   provenance: {"harness_session":"codex:01a141b8-aa66-7ee2-aad3-a00ba1296a0c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-15T22:44:09Z (feat/pi-live-picks): arm: flow-trial-1 — unit tack-aa9b44 — flow on
+- 2026-10-15T22:44:14Z (feat/pi-live-picks): gate: implementing .worktrees/pi-live-picks — direct Task 1 follows reviewed scope and existing hydrated worktree
+  provenance: {"harness_session":"codex:01a141b8-aa66-7ee2-aad3-a00ba1296a0c","harness_session_source":"CODEX_THREAD_ID"}
