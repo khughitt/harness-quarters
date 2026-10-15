@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: staged-facts-tree
 created: 2026-10-08T23:10:34Z
-updated: 2026-10-15T02:01:55Z
+updated: 2026-10-15T02:01:56Z
 started: 2026-10-15T01:12:50Z
 depends: []
 tags: []
@@ -39,3 +39,4 @@ Expected result: a small evidence table and a precise disposition: existing beha
 - 2026-10-15T01:38:58Z (staged-facts-tree): review: impl round 2 — verdict: accept; findings: minor 3; reviewer: claude-code/claude-opus-5-5
 - 2026-10-15T01:48:28Z (staged-facts-tree): review: impl round 3 — verdict: accept; findings: minor 3; reviewer: claude-code/claude-opus-5-5
 - 2026-10-15T02:01:55Z (staged-facts-tree): review: impl round 4 — verdict: accept; findings: minor 3; reviewer: claude-code/claude-opus-5-5
+- 2026-10-15T02:01:56Z (staged-facts-tree): gate: verified tree:a520690b48e7f387e1f332823aa1f5d1e165f0d4 — checks: just test 709 passed; .githooks suite 178 passed; real git commits in disposable hq clones through the new hook refuse deletion and index-only deletion and rename without reader and reader default moved without file and invalid content and allow the coordinated move and partial or -a commits follow the committed index; new tests seen failing before each fix; review: minor addressed skip-worktree entries omitted from export, minor addressed temp path not stripped under symlinked TMPDIR, minor addressed intent-to-add entries exported though not committed, minor addressed write-tree locked the real index, minor addressed git step failures shown as tracebacks, minor addressed sparse index hint noise, minor addressed export cleanup unasserted, minor deferred no suite test that the copy follows GIT_INDEX_FILE, minor deferred refusal does not say HEAD may already be broken, minor deferred missing index file traceback when run by hand, minor deferred manual run from a subdirectory reports reader not staged; reviewer: claude-code/claude-opus-5-5
