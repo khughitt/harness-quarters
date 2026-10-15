@@ -9,10 +9,11 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from . import launch, sessions
+from . import color, launch, sessions
 
 DEFAULT_CONFIG = Path(__file__).resolve().parent.parent / "hq.toml"
 LABEL_WIDTH = 60
+MISSING = " (cwd missing)"
 
 
 class UsageError(Exception):
@@ -40,6 +41,9 @@ def parser() -> argparse.ArgumentParser:
                          help="only sessions whose cwd is in this checkout or one of its worktrees")
     listing.add_argument("--archived", action="store_true", help="include archived Codex threads")
     listing.add_argument("-n", "--limit", type=positive, default=20, help="rows to show (default 20)")
+    listing.add_argument("--color", choices=("auto", "always", "never"), default="auto",
+                         help="colour classes and age: auto (when stdout is a terminal and NO_COLOR "
+                              "is unset), always, or never")
     return top
 
 
@@ -131,22 +135,47 @@ def label(text: str) -> str:
     return flat if len(flat) <= LABEL_WIDTH else flat[:LABEL_WIDTH - 1] + "…"
 
 
-def format_rows(shown: list[sessions.Session], user_home: Path) -> list[str]:
+def format_rows(shown: list[sessions.Session], user_home: Path, painter: color.Painter) -> list[str]:
+    """One line per session. Cells are padded outside their colour codes, so a painted line
+    with the codes stripped is the plain line."""
     now_ms = int(time.time() * 1000)
-    places = [tilde(s.cwd, user_home) + ("" if os.path.isdir(s.cwd) else " (cwd missing)") for s in shown]
-    width = max((len(place) for place in places), default=0)
-    return [f"{s.home.harness:<6}  {s.home.kind:<8}  {s.id[:8]}  {age(s.recency_ms, now_ms):>10}  "
-            f"{place:<{width}}  {label(s.label)}".rstrip()
-            for s, place in zip(shown, places)]
+    places = [tilde(s.cwd, user_home) for s in shown]
+    missing = [not os.path.isdir(s.cwd) for s in shown]
+    width = max((len(place) + (len(MISSING) if gone else 0) for place, gone in zip(places, missing)), default=0)
+    harness_hue = {"claude": color.CLAUDE, "codex": color.CODEX}
+    lines = []
+    for s, place, gone in zip(shown, places, missing):
+        row = (color.DIM,) if s.archived else ()
+        seconds = max(0, (now_ms - s.recency_ms) / 1000)
+        when = age(s.recency_ms, now_ms)
+        kind = (color.BOLD, painter.fg(color.WORK)) if s.home.kind == "work" else ()
+        cwd = painter.paint(place, *((color.DIM,) if gone or s.archived else ()))
+        if gone:
+            cwd += " " + painter.paint(MISSING.strip(), *row, painter.fg(color.MISSING))
+        cells = [
+            painter.paint(s.home.harness, *row, painter.fg(harness_hue[s.home.harness])) + pad(s.home.harness, 6),
+            painter.paint(s.home.kind, *row, *kind) + pad(s.home.kind, 8),
+            painter.paint(s.id[:8], *row, color.DIM),
+            pad(when, 10) + painter.paint(when, *row, painter.age(seconds)),
+            cwd + pad(place + (MISSING if gone else ""), width),
+            painter.paint(label(s.label), *row),
+        ]
+        lines.append("  ".join(cells).rstrip())
+    return lines
 
 
-def pick(lines: list[str], footer: str) -> int:
+def pad(text: str, width: int) -> str:
+    return " " * (width - len(text))
+
+
+def pick(lines: list[str], footer: str, painted: bool) -> int:
     """The 0-based index of the chosen row."""
     fzf = shutil.which("fzf")
     if fzf:
         numbered = "".join(f"{n}\t{line}\n" for n, line in enumerate(lines, 1))
         result = subprocess.run([fzf, "--delimiter=\t", "--with-nth=2..", "--no-sort", "--header", footer,
-                                 "--prompt", "session> "], input=numbered, stdout=subprocess.PIPE, text=True)
+                                 "--prompt", "session> ", *(["--ansi"] if painted else [])],
+                                input=numbered, stdout=subprocess.PIPE, text=True)
         if result.returncode in (1, 130):
             raise UsageError("no session picked")
         if result.returncode != 0:
@@ -167,16 +196,18 @@ def sessions_command(args) -> int:
     user_home = Path.home()
     config = Path(os.environ.get("HQ_CONFIG", DEFAULT_CONFIG))
     flags = launch.load_flags(config) if args.interactive else None
+    painter = color.painter(args.color, sys.stdout.isatty(), dict(os.environ))
     shown, footer = collect(args, user_home)
-    lines = format_rows(shown, user_home)
+    lines = format_rows(shown, user_home, painter)
     if not args.interactive:
         for line in lines:
             print(line)
-        print(footer)
+        print(painter.paint(footer, color.DIM))
         return 0
     if not shown:
         raise UsageError(f"no sessions to pick ({footer})")
-    launch.launch(shown[pick(lines, footer)], flags, config)
+    chosen = pick(lines, painter.paint(footer, color.DIM), painter.depth is not None)
+    launch.launch(shown[chosen], flags, config)
     return 0   # not reached: launch replaces this process
 
 

@@ -2,6 +2,8 @@
 executables that print their argv, cwd and both home variables as JSON."""
 import json
 import os
+import pty
+import re
 import shutil
 import sqlite3
 import subprocess
@@ -128,7 +130,7 @@ def thread(home: Path, tid: str, cwd: Path, age_s: float = 0, rollout: bool = Tr
         path.write_text("{}\n")
     return {"id": tid, "rollout_path": str(path), "source": "cli", "thread_source": "user",
             "archived": 0, "preview": "a prompt", "cwd": str(cwd),
-            "recency_at_ms": NOW_MS - int(age_s * 1000), "name": None, "title": "a title", **fields}
+            "recency_at_ms": int(time.time() * 1000) - int(age_s * 1000), "name": None, "title": "a title", **fields}
 
 
 def rows(result: subprocess.CompletedProcess) -> list[str]:
@@ -481,6 +483,16 @@ def test_codex_unexpected_value_is_an_error_naming_the_file(env, field, value):
     assert "Traceback" not in result.stderr
 
 
+@pytest.mark.parametrize("value", [None, 2, "1"])
+def test_codex_unexpected_archived_value_is_an_error_under_archived(env, value):
+    row = thread(env.home / ".codex", TID, env.project("beta"))
+    codex_db(env.home / ".codex", [{**row, "archived": value}])
+    result = env.run("sessions", "--archived")
+    assert result.returncode != 0
+    assert str(env.home / ".codex" / "state_5.sqlite") in result.stderr and "archived" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
 @pytest.mark.skipif(os.geteuid() == 0, reason="root reads unreadable files")
 def test_unreadable_claude_history_is_an_error_naming_the_file(env):
     path = env.home / ".claude" / "history.jsonl"
@@ -614,3 +626,244 @@ def test_tracked_launch_config_matches_the_users_aliases():
     codex = ["--no-daemon", "--dangerously-bypass-approvals-and-sandbox"]
     assert {home: entry["flags"] for home, entry in data["homes"].items()} == {
         "claude": claude, "claude-work": claude, "codex": codex, "codex-work": codex}
+
+
+# --- colour ----------------------------------------------------------------------------
+
+sys.path.insert(0, str(TOOL.parent))
+from hq_cli import color  # noqa: E402
+
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
+DARK = (0x1e, 0x1e, 0x1e)
+LIGHT = (0xff, 0xff, 0xff)
+
+
+def decode(channel: int) -> float:
+    c = channel / 255
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+CUBE = (0, 95, 135, 175, 215, 255)
+
+
+def xterm256_rgb(index: int) -> tuple[int, int, int]:
+    if index >= 232:
+        gray = 8 + 10 * (index - 232)
+        return gray, gray, gray
+    index -= 16
+    return CUBE[index // 36], CUBE[index // 6 % 6], CUBE[index % 6]
+
+
+def oklab(rgb) -> tuple[float, float, float]:
+    r, g, b = (decode(c) for c in rgb)
+    l_ = (0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b) ** (1 / 3)
+    m_ = (0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b) ** (1 / 3)
+    s_ = (0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b) ** (1 / 3)
+    return (0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
+            1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+            0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_)
+
+
+def strip(text: str) -> str:
+    return ANSI.sub("", text)
+
+
+def populate_classes(env) -> None:
+    """Every class: both harnesses, both homes, a gone cwd, an archived thread, a spread of ages."""
+    populate_all(env)
+    claude_session(env.home / ".claude", "cccccccc-3333-4333-8333-000000000003", env.root / "removed",
+                   display="gone-cwd", age_s=3 * 86_400)
+    history(env.home / ".claude", prompt("dddddddd-4444-4444-8444-000000000004", env.project("alpha"), "old"))
+    transcript(env.home / ".claude", "dddddddd-4444-4444-8444-000000000004", age_s=200 * 86_400)
+
+
+def test_color_never_and_auto_into_a_pipe_are_plain(env):
+    populate_classes(env)
+    for args in ((), ("--color", "auto"), ("--color", "never")):
+        result = env.run("sessions", "--archived", *args, COLORTERM="truecolor")
+        assert result.returncode == 0, result.stderr
+        assert "\x1b" not in result.stdout
+
+
+def test_color_never_wins_on_a_terminal(env):
+    populate_classes(env)
+    assert "\x1b" not in run_tty(env, "sessions", "--color", "never")
+
+
+@pytest.mark.parametrize("colorterm", ["truecolor", "24bit", "", "xterm"])
+def test_color_always_strips_to_the_plain_listing_exactly(env, colorterm):
+    populate_classes(env)
+    plain = env.run("sessions", "--archived", "--color", "never")
+    painted = env.run("sessions", "--archived", "--color", "always", COLORTERM=colorterm)
+    assert painted.returncode == 0, painted.stderr
+    assert "\x1b[" in painted.stdout
+    assert strip(painted.stdout) == plain.stdout
+
+
+def test_color_depth_follows_colorterm(env):
+    populate_classes(env)
+    truecolor = env.run("sessions", "--color", "always", COLORTERM="truecolor").stdout
+    fallback = env.run("sessions", "--color", "always").stdout
+    assert "38;2;" in truecolor and "38;5;" not in truecolor
+    assert "38;5;" in fallback and "38;2;" not in fallback
+
+
+def test_color_always_ignores_no_color(env):
+    populate_classes(env)
+    assert "\x1b[" in env.run("sessions", "--color", "always", NO_COLOR="1").stdout
+
+
+def run_tty(env, *args: str, **extra: str) -> str:
+    """Run hq with stdout on a pseudo-terminal; returns what it wrote there."""
+    leader, follower = pty.openpty()
+    environment = {"HOME": str(env.home), "PATH": str(env.bin), **env.extra, **extra}
+    process = subprocess.run([sys.executable, str(TOOL), *args], env=environment, stdout=follower,
+                             stderr=subprocess.PIPE, text=True, cwd=env.root)
+    os.close(follower)
+    chunks = []
+    while True:
+        try:
+            chunk = os.read(leader, 65536)
+        except OSError:
+            break
+        if not chunk:
+            break
+        chunks.append(chunk)
+    os.close(leader)
+    assert process.returncode == 0, process.stderr
+    return b"".join(chunks).decode()
+
+
+def test_color_auto_paints_a_terminal(env):
+    populate_classes(env)
+    assert "\x1b[" in run_tty(env, "sessions")
+
+
+@pytest.mark.parametrize("value, painted", [("1", False), ("", True)])
+def test_color_auto_on_a_terminal_follows_no_color(env, value, painted):
+    populate_classes(env)
+    assert ("\x1b[" in run_tty(env, "sessions", NO_COLOR=value)) is painted
+
+
+def row_for(output: str, text: str) -> str:
+    return next(line for line in output.splitlines() if text in strip(line))
+
+
+def test_color_classes(env):
+    populate_classes(env)
+    out = env.run("sessions", "--archived", "--color", "always", COLORTERM="truecolor").stdout
+    painter = color.Painter("truecolor")
+    claude, codex = painter.fg(color.CLAUDE), painter.fg(color.CODEX)
+    assert f"\x1b[{claude}mclaude\x1b[0m" in row_for(out, "claude-personal")
+    assert f"\x1b[{codex}mcodex\x1b[0m" in row_for(out, "codex-personal")
+    work = f"\x1b[{color.BOLD};{painter.fg(color.WORK)}mwork\x1b[0m"
+    assert work in row_for(out, "claude-work") and work in row_for(out, "codex-work")
+    assert "\x1b[0m  personal  \x1b[" in row_for(out, "claude-personal")   # personal stays plain
+    gone = row_for(out, "gone-cwd")
+    assert f"\x1b[{painter.fg(color.MISSING)}m(cwd missing)\x1b[0m" in gone
+    assert f"\x1b[{color.DIM}m{env.root / 'removed'}\x1b[0m" in gone
+    archived = row_for(out, "codex-archived")
+    cells = [cell for cell in ANSI.split(archived) if cell.strip()]
+    codes = ANSI.findall(archived)
+    openings = [code for code in codes if code != "\x1b[0m"]
+    assert len(openings) == len(cells) and all(code.startswith(f"\x1b[{color.DIM};") or code == f"\x1b[{color.DIM}m"
+                                               for code in openings)
+    assert f"\x1b[{color.DIM};{codex}mcodex\x1b[0m" in archived
+
+
+def test_color_age_cell_takes_the_age_colormap(env):
+    populate_classes(env)
+    out = env.run("sessions", "--color", "always", COLORTERM="truecolor").stdout
+    painter = color.Painter("truecolor")
+    old = row_for(out, " old")
+    assert f"\x1b[{painter.age(200 * 86_400)}m" in old
+    fresh = row_for(out, "claude-personal")
+    assert f"\x1b[{painter.age(0)}mnow\x1b[0m" in fresh
+
+
+def test_age_position_is_log_scaled_and_clamped():
+    assert color.age_position(0) == color.age_position(color.AGE_MIN_S) == 0
+    assert color.age_position(color.AGE_MAX_S) == color.age_position(10 * color.AGE_MAX_S) == 1
+    hour, day = color.age_position(3600), color.age_position(86_400)
+    assert 0.3 < hour < 0.4 and 0.6 < day < 0.7   # linear would put both near 0
+    sweep = [color.age_position(color.AGE_MIN_S * 1.01 ** i) for i in range(1200)]
+    assert all(a < b for a, b in zip(sweep, sweep[1:]) if b < 1)
+
+
+def test_age_colormap_is_monotone_in_age():
+    """24-bit lightness falls at every doubling of age (finer steps sit inside 8-bit
+    rounding). The xterm-256 ladder is walked in order, every step used, and falls in
+    chroma, then in lightness where chroma ties (the grays)."""
+    doublings = [color.AGE_MIN_S * 2 ** i for i in range(18)]
+    lightness = [oklab(color.age_colour(age).rgb)[0] for age in doublings]
+    assert all(a > b for a, b in zip(lightness, lightness[1:])), lightness
+    fine = [color.AGE_MIN_S * 1.02 ** i for i in range(700)]
+    steps = [color.AGE_LADDER.index(color.age_colour(age).index) for age in fine]
+    assert all(a <= b for a, b in zip(steps, steps[1:])) and set(steps) == set(range(len(color.AGE_LADDER)))
+    # Equal log steps: under ~10m, 2h, 20h, 9d, older (README).
+    ages = (5 * 60, 30 * 60, 6 * 3600, 3 * 86_400, 30 * 86_400)
+    assert [color.age_colour(age).index for age in ages] == list(color.AGE_LADDER)
+    span = color.AGE_MAX_S / color.AGE_MIN_S
+    for step in range(1, len(color.AGE_LADDER)):
+        edge = color.AGE_MIN_S * span ** (step / len(color.AGE_LADDER))
+        assert color.age_colour(edge * 0.999).index == color.AGE_LADDER[step - 1]
+        assert color.age_colour(edge * 1.001).index == color.AGE_LADDER[step]
+
+    def chroma_lightness(index):
+        lab = oklab(xterm256_rgb(index))
+        return round((lab[1] ** 2 + lab[2] ** 2) ** 0.5, 2), lab[0]
+    ladder = [chroma_lightness(index) for index in color.AGE_LADDER]
+    assert ladder == sorted(ladder, reverse=True) and len(set(ladder)) == len(ladder)
+
+
+def contrast(a, b) -> float:
+    def luminance(rgb):
+        r, g, b = (decode(c) for c in rgb)
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    low, high = sorted((luminance(a), luminance(b)))
+    return (high + 0.05) / (low + 0.05)
+
+
+def test_colors_read_on_dark_and_light_backgrounds():
+    ages = [color.AGE_MIN_S * 1.1 ** i for i in range(130)]
+    colours = [color.CLAUDE, color.CODEX, color.WORK, color.MISSING, *map(color.age_colour, ages)]
+    for rgb in [c.rgb for c in colours] + [xterm256_rgb(c.index) for c in colours]:
+        assert contrast(rgb, DARK) >= 3 and contrast(rgb, LIGHT) >= 3, rgb
+
+
+@pytest.mark.parametrize("pick", [lambda c: c.rgb, lambda c: xterm256_rgb(c.index)], ids=["truecolor", "256"])
+def test_harness_hues_are_apart(pick):
+    """The one pair of hues that share a column. Other pairs never sit side by side, so
+    they need no floor (claude orange and the missing-cwd red are 10-11 apart)."""
+    a, b = oklab(pick(color.CLAUDE)), oklab(pick(color.CODEX))
+    assert 100 * sum((x - y) ** 2 for x, y in zip(a, b)) ** 0.5 >= 15
+
+
+# Records its argv to $FZF_ARGS, then picks as FZF_STUB does.
+FZF_RECORDING = """#!{python}
+import json, os, sys
+open(os.environ["FZF_ARGS"], "w").write(json.dumps(sys.argv[1:]))
+lines = sys.stdin.read().splitlines()
+open(os.environ["FZF_ARGS"] + ".input", "w").write("\\n".join(lines))
+print(next(line for line in lines if line.split("\\t")[0] == os.environ["FZF_PICK"]))
+"""
+
+
+@pytest.mark.parametrize("when, painted", [("always", True), ("never", False)])
+def test_fzf_gets_ansi_only_with_colour(env, tmp_path, when, painted):
+    populate_all(env)
+    env.script("fzf", FZF_RECORDING.format(python=sys.executable))
+    record = tmp_path / "fzf-args.json"
+    out = launched(env.run("sessions", "-i", "--color", when, FZF_PICK="1", FZF_ARGS=str(record)))
+    assert out["tool"] in ("claude", "codex")
+    assert ("--ansi" in json.loads(record.read_text())) is painted
+    assert ("\x1b[" in Path(str(record) + ".input").read_text()) is painted
+
+
+def test_numbered_prompt_is_painted_like_the_listing(env):
+    populate_all(env)
+    listing = env.run("sessions", "--color", "always").stdout.splitlines()[:-1]
+    result = env.run("sessions", "-i", "--color", "always", input="1\n")
+    assert result.returncode == 0, result.stderr
+    assert all(f"{n:>3}  {line}" in result.stdout for n, line in enumerate(listing, 1))
+    assert "\x1b[" in result.stdout
