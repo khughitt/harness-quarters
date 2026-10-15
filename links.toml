@@ -124,3 +124,4 @@ home = "~/.config/opencode.local"
 home = "~/.pi/agent"
 [harness.pi.links]
 "AGENTS.md" = "lore:instructions/AGENTS.md"
+"settings.json" = "pi/settings.json"

@@ -31,6 +31,30 @@ def test_json_without_state_keys_passes_through_byte_for_byte():
     assert clean("claude/settings.work.json", text) == text
 
 
+def test_pi_json_drops_its_defaults_and_installation_ids_and_keeps_its_configuration():
+    text = json.dumps({"lastChangelogVersion": "1.1.0", "defaultProvider": "anthropic",
+                       "defaultModel": "claude-opus-5-5", "defaultThinkingLevel": "high",
+                       "deviceId": "5f0c", "trackingId": "9a1e", "enableAnalytics": True,
+                       "theme": "system", "modelThinkingLevels": {"anthropic/claude-opus-5-5": "max"},
+                       "enabledModels": ["anthropic/*"]}, indent=2)
+    assert clean("pi/settings.json", text) == json.dumps(
+        {"lastChangelogVersion": "1.1.0", "enableAnalytics": True, "theme": "system",
+         "modelThinkingLevels": {"anthropic/claude-opus-5-5": "max"},
+         "enabledModels": ["anthropic/*"]}, indent=2) + "\n"
+
+
+def test_each_harness_keeps_the_other_harness_state_keys():
+    claude = json.dumps({"defaultModel": "x", "effortLevel": "high"}, indent=2) + "\n"
+    pi = json.dumps({"model": "x", "defaultModel": "y"}, indent=2) + "\n"
+    assert clean("claude/settings.json", claude) == json.dumps({"defaultModel": "x"}, indent=2) + "\n"
+    assert clean("pi/settings.json", pi) == json.dumps({"model": "x"}, indent=2) + "\n"
+
+
+def test_json_paths_that_are_not_a_harness_config_are_refused():
+    with pytest.raises(subprocess.CalledProcessError):
+        clean("codex/hooks.json", "{}\n")
+
+
 def test_toml_drops_top_level_model_and_effort_only_before_the_first_table():
     text = ("default_permissions = \"workspace-local\"\n"
             "model = \"gpt-6-astra\"\n"

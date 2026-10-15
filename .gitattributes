@@ -1,2 +1,3 @@
 claude/settings*.json filter=harness-state
 codex/config*.toml filter=harness-state
+pi/settings*.json filter=harness-state

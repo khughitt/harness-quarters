@@ -35,6 +35,7 @@ from post-checkout, a rebase in progress; the next turn end retries. Every other
 operation refuses a linked worktree, whose configs are not live. Design:
 docs/specs/2026-10-10-live-model-preservation-design.md.
 """
+import functools
 import json
 import runpy
 import sys
@@ -55,7 +56,7 @@ USAGE = ("usage: live-picks capture | restore | sync | forget <file> | "
 # The filter decides what a checkout drops; reading its names keeps the owned fields
 # exactly the dropped ones.
 FILTER = runpy.run_path(str(harness_state.HERE / "harness-state-clean"))
-JSON_KEYS = FILTER["JSON_KEYS"]
+JSON_KEYS = FILTER["CLAUDE_JSON_KEYS"]
 TOML_KEYS = tuple(name for table, name in FILTER["TOML_KEYS"] if table.fullmatch(""))
 TOML_HEADER = FILTER["TOML_HEADER"]
 TOML_KEY = FILTER["TOML_KEY"]
@@ -66,7 +67,8 @@ CLAUDE_GROUPS = (("model", "modelSettings"), ("effortLevel",))
 if sorted(sum(CLAUDE_GROUPS, ())) != sorted(JSON_KEYS):
     sys.exit(f"live-picks: CLAUDE_GROUPS {CLAUDE_GROUPS} must partition the filter's "
              f"JSON_KEYS {JSON_KEYS}")
-CLEAN = {CLAUDE: FILTER["clean_json"], CODEX: FILTER["clean_toml"]}
+CLEAN = {CLAUDE: functools.partial(FILTER["clean_json"], keys=JSON_KEYS),
+         CODEX: FILTER["clean_toml"]}
 FIELD = {CLAUDE: "values", CODEX: "lines"}
 
 

@@ -8,6 +8,7 @@ import pytest
 
 HOOKS = Path(__file__).parent
 SETTINGS = "claude/settings.json"
+PI_SETTINGS = "pi/settings.json"
 
 
 def git(repo, *args, check=True):
@@ -27,12 +28,14 @@ def repo(tmp_path):
     (repo / ".githooks").mkdir(parents=True)
     (repo / "claude").mkdir()
     (repo / "codex").mkdir()
+    (repo / "pi").mkdir()
     (repo / "local" / "codex").mkdir(parents=True)
     for name in ("harness-state-clean", "harness-state-refresh", "codex-trust",
                  "harness_state.py", "live-picks"):
         shutil.copy2(HOOKS / name, repo / ".githooks" / name)
     (repo / ".gitattributes").write_text("claude/settings*.json filter=harness-state\n"
-                                         "codex/config*.toml filter=harness-state\n")
+                                         "codex/config*.toml filter=harness-state\n"
+                                         "pi/settings*.json filter=harness-state\n")
     (repo / ".gitignore").write_text("local/\n__pycache__/\n")
     (repo / "codex" / "config.toml").write_text("[features]\nhooks = true\n")
     git(tmp_path, "init", "-q", str(repo))
@@ -40,6 +43,7 @@ def repo(tmp_path):
     git(repo, "config", "user.email", "t@example.invalid")
     git(repo, "config", "user.name", "t")
     write_settings(repo, model="opus")
+    (repo / PI_SETTINGS).write_text(json.dumps({"theme": "system"}, indent=2))
     git(repo, "add", "-A")
     git(repo, "commit", "-q", "-m", "init")
     return repo
@@ -51,8 +55,8 @@ def refresh(repo, cwd):
                           input='{"hook_event_name":"Stop"}', text=True, capture_output=True)
 
 
-def marked(repo):
-    return git(repo, "diff-files", "--quiet", "--", SETTINGS, check=False).returncode == 1
+def marked(repo, path=SETTINGS):
+    return git(repo, "diff-files", "--quiet", "--", path, check=False).returncode == 1
 
 
 def test_a_model_switch_mark_is_cleared_from_any_cwd(repo, tmp_path):
@@ -100,3 +104,16 @@ def test_a_sync_that_dies_without_a_message_still_fails_with_one(repo, tmp_path)
 
     assert result.returncode != 0
     assert "codex-trust sync exited 3" in result.stderr
+
+
+def test_a_pi_model_switch_mark_is_cleared(repo, tmp_path):
+    (repo / PI_SETTINGS).write_text(json.dumps(
+        {"theme": "system", "defaultProvider": "anthropic", "defaultModel": "claude-opus-5-5"},
+        indent=2))
+    assert marked(repo, PI_SETTINGS)
+
+    result = refresh(repo, cwd=tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert not marked(repo, PI_SETTINGS)
+    assert git(repo, "diff", "--cached", "--quiet", check=False).returncode == 0
