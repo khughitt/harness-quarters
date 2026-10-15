@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/pi-live-picks
 created: 2026-10-15T22:18:53Z
-updated: 2026-10-15T23:05:44Z
+updated: 2026-10-15T23:07:23Z
 started: 2026-10-15T22:44:02Z
 depends: []
 parent: hq-24416e
@@ -47,3 +47,4 @@ Step of the hq-24416e plan (docs/plans/2026-10-15-pi-live-picks.md, Task 1); con
 - 2026-10-15T23:04:03Z (feat/pi-live-picks): resumed
   provenance: {"harness_session":"codex:01a141b8-aa66-7ee2-aad3-a00ba1296a0c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-15T23:05:44Z (feat/pi-live-picks): Fix round 1 I1 verified RED: early refresh leader exits 0 or 7 with a TERM-ignoring descendant on redirected streams; the following final refresh observes previous_alive=true. Both focused cases fail; subreaper test teardown kills/reaps every descendant. Fix retains group responsibility after close and terminates remaining descendants before completing the run.
+- 2026-10-15T23:07:23Z (feat/pi-live-picks): fix round 1 probe: {"check": "version", "outcome": "true", "observed": {"pi": "1.1.0", "work": "/mnt/ssd3/tmp/pi-extension-probe.mdawoj2u"}}
