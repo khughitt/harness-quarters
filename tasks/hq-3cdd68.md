@@ -1,15 +1,16 @@
 ---
 id: hq-3cdd68
 title: Verify staged deletion and rename protection for capability facts
-status: doing
+status: done
 priority: 2
 size: s
 complexity: mid
 process: direct
 owner: staged-facts-tree
 created: 2026-10-08T23:10:34Z
-updated: 2026-10-15T02:02:57Z
+updated: 2026-10-15T02:02:58Z
 started: 2026-10-15T01:12:50Z
+completed: 2026-10-15T02:02:58Z
 depends: []
 tags: []
 source: "tasks-56b450:followup:fact-file-lifecycle"
@@ -42,3 +43,7 @@ Expected result: a small evidence table and a precise disposition: existing beha
 - 2026-10-15T02:01:56Z (staged-facts-tree): gate: verified tree:a520690b48e7f387e1f332823aa1f5d1e165f0d4 — checks: just test 709 passed; .githooks suite 178 passed; real git commits in disposable hq clones through the new hook refuse deletion and index-only deletion and rename without reader and reader default moved without file and invalid content and allow the coordinated move and partial or -a commits follow the committed index; new tests seen failing before each fix; review: minor addressed skip-worktree entries omitted from export, minor addressed temp path not stripped under symlinked TMPDIR, minor addressed intent-to-add entries exported though not committed, minor addressed write-tree locked the real index, minor addressed git step failures shown as tracebacks, minor addressed sparse index hint noise, minor addressed export cleanup unasserted, minor deferred no suite test that the copy follows GIT_INDEX_FILE, minor deferred refusal does not say HEAD may already be broken, minor deferred missing index file traceback when run by hand, minor deferred manual run from a subdirectory reports reader not staged; reviewer: claude-code/claude-opus-5-5
 - 2026-10-15T02:02:27Z (staged-facts-tree): gate: verified tree:a520690b48e7f387e1f332823aa1f5d1e165f0d4 — checks: just test 709 passed, .githooks suite 178 passed, real git commits in disposable hq clones through the new hook refuse deletion and index-only deletion and rename without reader and reader default moved without file and invalid content and allow the coordinated move, partial and -a commits follow the committed index, each new test seen failing before its fix; review: minor addressed skip-worktree entries omitted from export, minor addressed temp path not stripped under symlinked TMPDIR, minor addressed intent-to-add entries exported though not committed, minor addressed write-tree locked the real index, minor addressed git step failures shown as tracebacks, minor addressed sparse index hint noise, minor addressed export cleanup unasserted, minor deferred no suite test that the copy follows GIT_INDEX_FILE, minor deferred refusal does not say HEAD may already be broken, minor deferred missing index file traceback when run by hand, minor deferred manual run from a subdirectory reports reader not staged; reviewer: claude-code/claude-opus-5-5
 - 2026-10-15T02:02:57Z (staged-facts-tree): retro: the disposable real-commit table settled the question in one run and doubled as the regression harness for the fix. Each fresh-context re-review surfaced a deeper git subtlety (skip-worktree, then intent-to-add, then the index lock), so exporting the committed tree through write-tree on a copied index came from the reviews, not the first design. A gate note's checks field must not contain ';' — I wrote a malformed gate first and superseded it.
+- 2026-10-15T02:02:58Z (staged-facts-tree): done
+  provenance: {"harness_session":"claude-code:12f40a0d-b227-408f-9d37-d05d8a87e20c","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-15T02:02:58Z (staged-facts-tree): Gap confirmed: the ACMR filter let commits delete, rename away, or index-only delete the fact file and move the reader default without the file. pre-commit now runs the staged tools/harness-facts check over the tree the commit will hold (write-tree of a copied index), refusing those while allowing a coordinated move. Deferred test: hq-aea33f.
+  provenance: {"harness_session":"claude-code:12f40a0d-b227-408f-9d37-d05d8a87e20c","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

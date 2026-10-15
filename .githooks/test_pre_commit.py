@@ -32,7 +32,9 @@ def world(tmp_path):
     sh(repo, "git", "config", "user.name", "t")
     (repo / "AGENTS.md").write_text("# rules\n")
     docs_stub(repo)
-    sh(repo, "git", "add", "AGENTS.md")
+    facts = repo / "tools" / "harness-facts"                   # the staged tree's fact reader passes
+    facts.write_text("#!/usr/bin/env python3\nimport sys\nassert sys.argv[1:] == ['check']\n")
+    sh(repo, "git", "add", "AGENTS.md", "tools/harness-facts")
     sh(repo, "git", "commit", "-q", "-m", "init")
     env = {**os.environ, "XDG_CONFIG_HOME": str(tmp_path / "config")}
     return repo, env, tmp_path

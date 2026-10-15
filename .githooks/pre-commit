@@ -4,10 +4,12 @@
 The generated global-instruction block is checked by lore tools/check-projects-block.
 This hook runs the vendored tools/ops-docs against the working tree, preserving the
 README/AGENTS identity contract, and rejects every staged path under local/.
-A staged facts/capabilities.toml is validated as staged by its own reader.
+The staged tools/harness-facts must pass its own check over the staged tree.
 Installed by git config core.hooksPath .githooks.
 """
+import os
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -47,32 +49,43 @@ FACTS = "facts/capabilities.toml"
 FACTS_TOOL = pathlib.Path("tools") / "harness-facts"
 
 
-def facts_blob():
-    """The staged fact file, written to a temporary file; None when it is not staged."""
-    names = subprocess.run(["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR", "--", FACTS],
-                           check=True, text=True, capture_output=True).stdout.split()
-    if not names:
-        return None
-    blob = subprocess.run(["git", "show", f":{FACTS}"], check=True, capture_output=True).stdout
-    handle = tempfile.NamedTemporaryFile(prefix="capabilities-", suffix=".toml", delete=False)
-    with handle:
-        handle.write(blob)
-    return pathlib.Path(handle.name)
+def git(*args, env=None):
+    return subprocess.run(["git", *args], check=True, text=True, capture_output=True, env=env).stdout.strip()
+
+
+def staged_tree(directory):
+    """Write the tree this commit will hold into directory/tree. It goes through
+    write-tree and a fresh index, so intent-to-add entries, which the commit leaves out,
+    stay out, and skip-worktree or sparse entries, which it keeps, come along. It works
+    on a copy of the index being committed, so it neither takes nor waits on that
+    index's lock."""
+    index = os.path.join(directory, "index")
+    shutil.copyfile(git("rev-parse", "--git-path", "index"), index)   # honours GIT_INDEX_FILE
+    env = {**os.environ, "GIT_INDEX_FILE": index}
+    git("read-tree", git("write-tree", env=env), env=env)
+    git("checkout-index", "--all", f"--prefix={directory}/tree/", env=env)
+    return pathlib.Path(directory) / "tree"
 
 
 def facts_check():
-    """A staged fact file must pass harness-facts as staged."""
-    blob = facts_blob()
-    if blob is None:
-        return 0
-    try:
-        done = subprocess.run([sys.executable, str(FACTS_TOOL), "check", "--file", str(blob)], text=True, capture_output=True)
+    """The staged reader must pass its own check over the staged tree, at its own default
+    path. A blob check of the fact file alone misses a file deleted or renamed away, a
+    reader whose default moved without the file, and a deleted probe; a move that updates
+    the reader in the same commit passes."""
+    with tempfile.TemporaryDirectory(prefix="staged-tree-") as directory:
+        try:
+            tree = staged_tree(os.path.realpath(directory))     # the reader names resolved paths
+        except subprocess.CalledProcessError as error:
+            return fail(f"could not export the staged tree: `{' '.join(error.cmd)}`: {error.stderr.strip()}")
+        tool = tree / FACTS_TOOL
+        if not tool.is_file():
+            return fail(f"{FACTS_TOOL} is not staged; this commit would leave the fact file without its reader")
+        done = subprocess.run([sys.executable, str(tool), "check"], text=True, capture_output=True)
         if done.returncode:
-            sys.stderr.write(done.stderr)
-            return fail(f"{FACTS} as staged does not pass `{FACTS_TOOL} check`")
-        return 0
-    finally:
-        blob.unlink()
+            sys.stderr.write(done.stderr.replace(f"{tree}/", ""))
+            return fail(f"the staged tree does not pass its own `{FACTS_TOOL} check`; fix what it "
+                        f"names, and if {FACTS} moved, stage the reader's default with it")
+    return 0
 
 
 def main(argv):

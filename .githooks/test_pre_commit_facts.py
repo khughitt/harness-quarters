@@ -3,6 +3,7 @@ import importlib.machinery
 import importlib.util
 import shutil
 import subprocess
+import tempfile
 import tomllib
 from pathlib import Path
 
@@ -32,6 +33,9 @@ def repo(tmp_path, monkeypatch):
     subprocess.run(["git", "init", "-q", str(root)], check=True)
     monkeypatch.chdir(root)
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    subprocess.run(["git", "add", "."], check=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false",
+                    "commit", "-q", "--no-verify", "-m", "base"], check=True)
     return root
 
 
@@ -43,7 +47,7 @@ def stage(root, text=None):
     return path
 
 
-def test_an_unstaged_fact_file_is_not_checked(repo):
+def test_a_broken_working_file_is_not_checked(repo):
     (repo / "facts" / "capabilities.toml").write_text("not toml at all [")
     assert load_hook().facts_check() == 0
 
@@ -74,6 +78,91 @@ def test_a_valid_value_change_needs_no_consumer_mirror(repo, monkeypatch):
         raise AssertionError('consumer mirror still ran')
     monkeypatch.setattr(hook, 'mirror', forbidden, raising=False)
     assert hook.facts_check() == 0
+
+
+def git(*args):
+    subprocess.run(["git", *args], check=True, capture_output=True)
+
+
+def point_reader_at(root, name):
+    tool = root / "tools" / "harness-facts"
+    tool.write_text(tool.read_text().replace('"facts" / "capabilities.toml"', f'"facts" / "{name}"'))
+    git("add", "tools/harness-facts")
+
+
+def test_a_staged_deletion_is_refused(repo, capsys):
+    git("rm", "-q", "facts/capabilities.toml")
+    assert load_hook().facts_check() == 1
+    assert "facts/capabilities.toml: No such file" in capsys.readouterr().err
+
+
+def test_a_deletion_from_the_index_alone_is_refused(repo, capsys):
+    git("rm", "-q", "--cached", "facts/capabilities.toml")    # the working file still reads
+    assert load_hook().facts_check() == 1
+    assert "facts/capabilities.toml: No such file" in capsys.readouterr().err
+
+
+def test_a_skip_worktree_entry_is_still_in_the_staged_tree(repo):
+    git("update-index", "--skip-worktree", "facts/capabilities.toml")
+    assert load_hook().facts_check() == 0
+
+
+def test_messages_name_staged_paths_under_a_linked_tmpdir(repo, tmp_path, monkeypatch, capsys):
+    real = tmp_path / "realtmp"
+    real.mkdir()
+    (tmp_path / "linktmp").symlink_to(real)
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path / "linktmp"))
+    git("rm", "-q", "--cached", "facts/capabilities.toml")
+    assert load_hook().facts_check() == 1
+    assert "harness-facts: facts/capabilities.toml: No such file" in capsys.readouterr().err
+    assert not any(real.iterdir())                             # the export is removed
+
+
+def test_a_held_index_lock_does_not_stop_the_check(repo):
+    (repo / ".git" / "index.lock").write_text("")              # a concurrent `git status`
+    assert load_hook().facts_check() == 0
+
+
+def test_an_intent_to_add_probe_is_not_in_the_staged_tree(repo, capsys):
+    text = (repo / "facts" / "capabilities.toml").read_text()
+    probe = sorted(fact["probe"] for fact in tomllib.loads(text)["facts"].values() if "probe" in fact)[0]
+    (repo / "agents" / "new-probe.sh").write_text("#!/bin/sh\n")
+    git("add", "-N", "agents/new-probe.sh")                    # recorded, but the commit leaves it out
+    stage(repo, text.replace(f'"{probe}"', '"agents/new-probe.sh"'))
+    assert load_hook().facts_check() == 1
+    assert "probe agents/new-probe.sh is not a file" in capsys.readouterr().err
+
+
+def test_a_rename_without_the_reader_is_refused(repo, capsys):
+    git("mv", "facts/capabilities.toml", "facts/moved.toml")
+    assert load_hook().facts_check() == 1
+    assert "facts/capabilities.toml: No such file" in capsys.readouterr().err
+
+
+def test_a_reader_moved_without_its_file_is_refused(repo, capsys):
+    point_reader_at(repo, "moved.toml")
+    assert load_hook().facts_check() == 1
+    assert "facts/moved.toml: No such file" in capsys.readouterr().err
+
+
+def test_a_move_with_its_reader_passes(repo):
+    git("mv", "facts/capabilities.toml", "facts/moved.toml")
+    point_reader_at(repo, "moved.toml")
+    assert load_hook().facts_check() == 0
+
+
+def test_a_staged_reader_deletion_is_refused(repo, capsys):
+    git("rm", "-q", "--cached", "tools/harness-facts")
+    assert load_hook().facts_check() == 1
+    assert "tools/harness-facts is not staged" in capsys.readouterr().err
+
+
+def test_a_staged_probe_deletion_is_refused(repo, capsys):
+    facts = tomllib.loads((repo / "facts" / "capabilities.toml").read_text())["facts"]
+    probe = sorted(fact["probe"] for fact in facts.values() if "probe" in fact)[0]
+    git("rm", "-q", "--cached", probe)
+    assert load_hook().facts_check() == 1
+    assert f"probe {probe} is not a file" in capsys.readouterr().err
 
 
 def test_removed_mirror_command_is_refused(repo, capsys):
