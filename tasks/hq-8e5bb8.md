@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: feat/pi-live-picks
 created: 2026-10-15T22:18:54Z
-updated: 2026-10-15T23:32:28Z
+updated: 2026-10-15T23:39:37Z
 started: 2026-10-15T23:32:12Z
 depends: [hq-031194]
 parent: hq-24416e
@@ -29,3 +29,4 @@ Step of the hq-24416e plan, Task 3; contract: spec §3.5 and §5.
 - 2026-10-15T23:32:19Z (feat/pi-live-picks): arm: flow-trial-1 — unit tack-aa9b44 — flow on
 - 2026-10-15T23:32:28Z (feat/pi-live-picks): gate: implementing .worktrees/pi-live-picks — direct documentation and declared link update
   provenance: {"harness_session":"codex:01a141e8-01db-70f0-bb7a-ecf8efa56008","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-15T23:39:37Z (feat/pi-live-picks): implementation: added the declared nested pi extension link and operational docs only. Existing test_new_host_gets_required_links_and_installed_harnesses_only covers a missing nested parent through skills/flow and harness-links creates parents. No new tests needed for this docs/config change. Focused links: 47 passed. just test: 228 agent tests and 887 hook/tool tests passed. tasks check, ops-docs check and git diff --check passed. Self-review found no issues; independent controller review still required.
