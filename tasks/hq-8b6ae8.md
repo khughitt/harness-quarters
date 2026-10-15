@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: fix/cli-pane-cannot-start
 created: 2026-10-15T08:25:00Z
-updated: 2026-10-15T09:52:35Z
+updated: 2026-10-15T09:56:17Z
 started: 2026-10-15T09:43:32Z
 depends: []
 tags: []
@@ -29,3 +29,4 @@ claude/mods/cli-pane/tests/cli-pane.test.ts 'a CLI that cannot start shows why' 
 - 2026-10-15T09:43:47Z (fix/cli-pane-cannot-start): gate: implementing .worktrees/cli-pane-cannot-start
 - 2026-10-15T09:44:26Z (fix/cli-pane-cannot-start): RED: tightened assertion fails with 'tasks: no implementation for process.run' — under the current kit the skipped throwing hook leaves process.run unanswered rather than running the real binary; the old toContain('tasks: ') passed on that
 - 2026-10-15T09:52:35Z (fix/cli-pane-cannot-start): review: impl round 1 — verdict: accept; findings: minor 3; reviewer: claude-code/claude-opus-5-5
+- 2026-10-15T09:56:17Z (fix/cli-pane-cannot-start): gate: verified tree:1462aadc6707c89e6e90013781664d0cfce00b69 — checks: just mods 26 pass and just test passed (228 + 709) and the tightened assertion failed against the old throwing hook and against a pane that drops the start-failure reason; review: minor addressed stale searchHost comment claimed the real mindful runs, minor addressed unneeded regex m flag, minor deferred test does not assert the failure is drawn red; reviewer: claude-code/claude-opus-5-5
