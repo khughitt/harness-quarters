@@ -62,7 +62,7 @@ def checkout_roots(cwd: str) -> set[str]:
 
 def here_filter(roots: set[str]):
     def keep(session: sessions.Session) -> bool:
-        candidates = {session.cwd, os.path.realpath(session.cwd)}
+        candidates = {os.path.normpath(session.cwd), os.path.realpath(session.cwd)}
         return any(inside(path, root) for path in candidates for root in roots)
     return keep
 
@@ -187,3 +187,7 @@ def main(argv: list[str]) -> int:
     except (UsageError, sessions.SourceError, launch.LaunchError) as error:
         print(f"hq: {error}", file=sys.stderr)
         return 1
+    except BrokenPipeError:
+        # The reader (`| head`) closed early: stop quietly, as other listing tools do.
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        return 0

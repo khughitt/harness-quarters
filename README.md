@@ -219,17 +219,20 @@ the transcript found under `projects/*/<id>.jsonl`, and Codex's `state_5.sqlite`
   indexes leave them out; most subagent threads are among them.
 - **Footer.** One line counting what the sources show: Claude history lines skipped
   (without `sessionId`, malformed), and sessions excluded: Claude sessions whose
-  transcript is gone, Codex non-interactive threads (subagents and `exec`) and Codex
-  threads whose rollout is gone. Claude's history never records subagent, `-p` or SDK
-  runs, so there is no Claude count for them. A selected home whose directory does not
-  exist is named as `absent`. Counts follow the filters.
+  transcript is gone, and Codex threads with a preview that are non-interactive
+  (subagents and `exec`) or whose rollout is gone. Most Codex subagent threads have no
+  preview and are hidden without a count. Claude's history never records subagent, `-p`
+  or SDK runs, so there is no Claude count for them. A selected home whose directory
+  does not exist is named as `absent`. Session counts follow every filter; skipped
+  history lines are counted per selected home, whatever `--here` says.
 - **Not listed.** Personal Codex rollouts from before 2026-07-08 that have no `threads`
-  row (491 interactive ones on the first host) are outside the list; resume them with
-  `codex resume <id>` by hand.
-- **Errors.** A missing `history.jsonl` or `state_5.sqlite` in an existing home, or a
-  `threads` table without a column the list reads, stops the command with the file
-  named: Codex's schema is internal, and a version change must stop the list rather
-  than empty it.
+  row (491 interactive ones on the first host) are outside the list. Whether
+  `codex resume <id>` still opens them has not been tested.
+- **Errors.** A missing or unreadable `history.jsonl` or `state_5.sqlite` in an
+  existing home, a `threads` table without a column the list reads, or a thread value of
+  an unexpected type (a NULL or relative `cwd` or `rollout_path`, say) stops the command
+  with the file named: Codex's schema is internal, and a version change must stop the
+  list rather than empty it.
 - **Launch.** Claude runs `claude <flags> --resume <id>`, Codex `codex <flags> resume
   <id>`. A work row sets `CLAUDE_CONFIG_DIR` or `CODEX_HOME` to its home; a personal row
   unsets both (`CLAUDE_CONFIG_DIR=~/.claude` would read a different `.claude.json`).

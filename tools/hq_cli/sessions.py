@@ -65,12 +65,15 @@ def claude_transcripts(projects: Path) -> dict[str, Path]:
     found: dict[str, Path] = {}
     if not projects.is_dir():
         return found
-    for directory in sorted(os.scandir(projects), key=lambda entry: entry.name):
-        if not directory.is_dir(follow_symlinks=False):
-            continue
-        for entry in os.scandir(directory.path):
-            if entry.name.endswith(".jsonl") and entry.is_file(follow_symlinks=False):
-                found.setdefault(entry.name[:-len(".jsonl")], Path(entry.path))
+    try:
+        for directory in sorted(os.scandir(projects), key=lambda entry: entry.name):
+            if not directory.is_dir(follow_symlinks=False):
+                continue
+            for entry in os.scandir(directory.path):
+                if entry.name.endswith(".jsonl") and entry.is_file(follow_symlinks=False):
+                    found.setdefault(entry.name[:-len(".jsonl")], Path(entry.path))
+    except OSError as error:
+        raise SourceError(f"{projects}: cannot list transcripts: {error}") from None
     return found
 
 
@@ -81,26 +84,34 @@ def read_claude(home: Home) -> tuple[list[Session], Skipped]:
     skipped = Skipped()
     first: dict[str, dict] = {}
     last: dict[str, dict] = {}
-    with path.open(encoding="utf-8", errors="replace") as lines:
-        for line in lines:
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError:
-                skipped.malformed += 1
-                continue
-            if not isinstance(record, dict):
-                skipped.malformed += 1
-                continue
-            sid = record.get("sessionId")
-            if sid is None:
-                skipped.without_id += 1
-                continue
-            if not (isinstance(sid, str) and sid and isinstance(record.get("project"), str)
-                    and isinstance(record.get("timestamp"), int)):
-                skipped.malformed += 1
-                continue
-            first.setdefault(sid, record)
-            last[sid] = record
+    try:
+        # Split on newlines only: str.splitlines also breaks at U+2028, which JSON strings may hold.
+        with path.open(encoding="utf-8", errors="replace", newline="") as handle:
+            lines = handle.read().split("\n")
+    except OSError as error:
+        raise SourceError(f"{path}: cannot read Claude Code history: {error}") from None
+    if lines[-1] == "":
+        lines.pop()   # the final newline
+    for line in lines:
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            skipped.malformed += 1
+            continue
+        if not isinstance(record, dict):
+            skipped.malformed += 1
+            continue
+        sid = record.get("sessionId")
+        if sid is None:
+            skipped.without_id += 1
+            continue
+        project = record.get("project")
+        if not (isinstance(sid, str) and sid and isinstance(project, str) and os.path.isabs(project)
+                and isinstance(record.get("timestamp"), int)):
+            skipped.malformed += 1
+            continue
+        first.setdefault(sid, record)
+        last[sid] = record
     transcripts = claude_transcripts(home.path / "projects")
     sessions = []
     for sid, opening in first.items():
@@ -118,6 +129,24 @@ def read_claude(home: Home) -> tuple[list[Session], Skipped]:
 
 CODEX_COLUMNS = ("id", "rollout_path", "source", "thread_source", "archived", "preview", "cwd",
                  "recency_at_ms", "name", "title")
+
+
+def check_thread(path: Path, row: dict) -> None:
+    """Values the list relies on; anything else is schema drift and stops the list."""
+    expected = {
+        "id": lambda v: isinstance(v, str) and v != "",
+        "source": lambda v: isinstance(v, str),
+        "thread_source": lambda v: v is None or isinstance(v, str),
+        "cwd": lambda v: isinstance(v, str) and os.path.isabs(v),
+        "rollout_path": lambda v: isinstance(v, str) and os.path.isabs(v),
+        "recency_at_ms": lambda v: isinstance(v, int),
+        "name": lambda v: v is None or isinstance(v, str),
+        "title": lambda v: v is None or isinstance(v, str),
+    }
+    for column, valid in expected.items():
+        if not valid(row[column]):
+            raise SourceError(f"{path}: thread {row['id']!r} has {column} = {row[column]!r}; "
+                              "Codex's state schema changed")
 
 
 def read_codex(home: Home, archived: bool) -> list[Session]:
@@ -146,12 +175,14 @@ def read_codex(home: Home, archived: bool) -> list[Session]:
     finally:
         db.close()
     sessions = []
+    for row in rows:
+        check_thread(path, dict(zip(CODEX_COLUMNS, row)))
     for tid, rollout, source, thread_source, _, _, cwd, recency_ms, name, title in rows:
         transcript = Path(rollout)
         # Subagents carry a JSON source, `exec` runs source "exec"; never has_user_event (always 0).
         if source not in ("cli", "vscode") or thread_source not in (None, "user"):
             excluded = "non-interactive"
-        elif not transcript.exists():
+        elif not transcript.is_file():
             excluded = "transcript gone"
         else:
             excluded = None

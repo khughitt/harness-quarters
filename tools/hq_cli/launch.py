@@ -60,8 +60,8 @@ def launch(session: Session, flags_by_home: dict[str, list[str]], config: Path) 
     env = environment(session, dict(os.environ))
     sys.stdout.flush()
     sys.stderr.flush()
-    os.chdir(session.cwd)
     try:
+        os.chdir(session.cwd)
         os.execvpe(command[0], command, env)
     except OSError as error:
-        raise LaunchError(f"cannot run {command[0]}: {error}") from None
+        raise LaunchError(f"cannot run {command[0]} in {session.cwd}: {error}") from None

@@ -16,6 +16,7 @@ SID = "aaaaaaaa-1111-4111-8111-000000000001"
 SID2 = "bbbbbbbb-2222-4222-8222-000000000002"
 TID = "019e0000-0000-7000-8000-00000000000a"
 TID2 = "019e1111-0000-7000-8000-00000000000b"
+TID3 = "019e2222-0000-7000-8000-00000000000c"
 NOW_MS = int(time.time() * 1000)
 CODEX_COLUMNS = ("id", "rollout_path", "source", "thread_source", "archived", "preview", "cwd",
                  "recency_at_ms", "name", "title")
@@ -83,7 +84,7 @@ def env(tmp_path):
 def history(home: Path, *lines) -> None:
     with (home / "history.jsonl").open("a") as handle:
         for line in lines:
-            handle.write((line if isinstance(line, str) else json.dumps(line)) + "\n")
+            handle.write((line if isinstance(line, str) else json.dumps(line, ensure_ascii=False)) + "\n")
 
 
 def prompt(sid: str | None, project: Path, display: str, timestamp: int = NOW_MS) -> dict:
@@ -251,7 +252,7 @@ def populate_all(env) -> dict[str, Path]:
     claude_session(env.home / ".claude-work", SID2, beta, display="claude-work")
     codex_db(env.home / ".codex", [thread(env.home / ".codex", TID, alpha, name="codex-personal"),
                                    thread(env.home / ".codex", TID2, alpha, name="codex-archived", archived=1)])
-    codex_db(env.home / ".codex-work", [thread(env.home / ".codex-work", TID, beta, name="codex-work")])
+    codex_db(env.home / ".codex-work", [thread(env.home / ".codex-work", TID3, beta, name="codex-work")])
     return {"alpha": alpha, "beta": beta}
 
 
@@ -283,10 +284,22 @@ def test_archived_flag_shows_archived_codex_threads(env):
 
 def test_empty_preview_codex_rows_stay_hidden_and_uncounted(env):
     project = env.project("alpha")
-    codex_db(env.home / ".codex", [thread(env.home / ".codex", TID, project, preview="")])
+    codex_db(env.home / ".codex", [
+        thread(env.home / ".codex", TID, project, preview=""),
+        thread(env.home / ".codex", TID2, project, preview="", source="exec"),
+        thread(env.home / ".codex", TID3, project, preview="", rollout=False),
+    ])
     result = env.run("sessions", "--archived")
     assert rows(result) == []
     assert "codex 0 non-interactive, 0 transcript gone" in footer(result)
+
+
+def test_archived_codex_rows_are_counted_only_with_archived(env):
+    project = env.project("alpha")
+    codex_db(env.home / ".codex", [thread(env.home / ".codex", TID, project, archived=1, source="exec"),
+                                   thread(env.home / ".codex", TID2, project, archived=1, rollout=False)])
+    assert "codex 0 non-interactive, 0 transcript gone" in footer(env.run("sessions"))
+    assert "codex 1 non-interactive, 1 transcript gone" in footer(env.run("sessions", "--archived"))
 
 
 def test_here_keeps_sessions_inside_the_checkout_and_its_worktrees(env):
@@ -305,6 +318,31 @@ def test_here_keeps_sessions_inside_the_checkout_and_its_worktrees(env):
     assert labels(env.run("sessions", "--here", cwd=sub)) == {"in-checkout", "in-worktree"}
     assert labels(env.run("sessions", "--here", cwd=linked)) == {"in-checkout", "in-worktree"}
     assert labels(env.run("sessions")) == {"in-checkout", "in-worktree", "outside"}
+
+
+def test_here_follows_symlinks_and_removed_worktrees_and_skips_siblings(env):
+    storage = env.root / "storage" / ".worktrees"
+    storage.mkdir(parents=True)
+    checkout = env.project("repo")
+    git = ["git", "-C", str(checkout)]
+    subprocess.run([*git, "init", "-q"], check=True)
+    subprocess.run([*git, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty",
+                    "-m", "init"], check=True)
+    (checkout / ".worktrees").symlink_to(storage)
+    alias = env.root / "alias"
+    alias.symlink_to(checkout)
+    sibling = env.project("repo2")
+    codex_db(env.home / ".codex", [
+        thread(env.home / ".codex", "019e0000-0000-7000-8000-0000000000c1", alias, name="via-alias"),
+        thread(env.home / ".codex", "019e0000-0000-7000-8000-0000000000c2", storage / "gone", name="removed-real"),
+        thread(env.home / ".codex", "019e0000-0000-7000-8000-0000000000c3", alias / ".worktrees" / "gone2",
+               name="removed-via-alias"),
+        thread(env.home / ".codex", "019e0000-0000-7000-8000-0000000000c4", sibling, name="sibling"),
+        thread(env.home / ".codex", "019e0000-0000-7000-8000-0000000000c5", Path(f"{checkout}/../repo2"),
+               name="dotdot-sibling"),
+    ])
+    assert labels(env.run("sessions", "--here", cwd=checkout)) == {"via-alias", "removed-real",
+                                                                    "removed-via-alias"}
 
 
 def test_here_outside_a_checkout_is_an_error(env):
@@ -353,6 +391,41 @@ def test_absent_home_is_named_not_an_error(env):
     assert "absent: codex-work" in footer(result)
 
 
+def test_line_separator_inside_a_prompt_keeps_the_line_whole(env):
+    claude_session(env.home / ".claude", SID, env.project("alpha"), display="before\u2028after")
+    result = env.run("sessions")
+    assert len(rows(result)) == 1
+    assert "0 without sessionId, 0 malformed" in footer(result)
+
+
+def test_claude_relative_project_is_a_malformed_line(env):
+    history(env.home / ".claude", {"display": "x", "timestamp": NOW_MS, "project": "rel/dir", "sessionId": SID})
+    transcript(env.home / ".claude", SID)
+    result = env.run("sessions")
+    assert rows(result) == []
+    assert "0 without sessionId, 1 malformed" in footer(result)
+
+
+def test_codex_rollout_that_is_a_directory_counts_as_gone(env):
+    row = thread(env.home / ".codex", TID, env.project("beta"), rollout=False)
+    Path(row["rollout_path"]).mkdir(parents=True)
+    codex_db(env.home / ".codex", [row])
+    assert "codex 0 non-interactive, 1 transcript gone" in footer(env.run("sessions"))
+
+
+def test_listing_survives_a_closed_pipe(env):
+    project = env.project("alpha")
+    codex_db(env.home / ".codex", [thread(env.home / ".codex", f"019e0000-0000-7000-8000-{i:012d}", project,
+                                          age_s=i, title="t" * 50) for i in range(3000)])
+    proc = subprocess.Popen([sys.executable, str(TOOL), "sessions", "-n", "3000"], stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, env={"HOME": str(env.home), "PATH": str(env.bin)})
+    proc.stdout.readline()
+    proc.stdout.close()
+    stderr = proc.stderr.read().decode()
+    proc.wait()
+    assert "Traceback" not in stderr
+
+
 # --- fail early ---------------------------------------------------------------------------
 
 
@@ -370,6 +443,27 @@ def test_codex_schema_drift_is_an_error_naming_the_file(env, column):
     assert result.returncode != 0
     assert str(env.home / ".codex" / "state_5.sqlite") in result.stderr
     assert column in result.stderr
+
+
+@pytest.mark.parametrize("field,value", [("cwd", None), ("cwd", "relative/dir"), ("rollout_path", None),
+                                         ("rollout_path", "sessions/r.jsonl"), ("recency_at_ms", "soon"),
+                                         ("id", None), ("source", None)])
+def test_codex_unexpected_value_is_an_error_naming_the_file(env, field, value):
+    row = thread(env.home / ".codex", TID, env.project("beta"))
+    codex_db(env.home / ".codex", [{**row, field: value}])
+    result = env.run("sessions")
+    assert result.returncode != 0
+    assert str(env.home / ".codex" / "state_5.sqlite") in result.stderr and field in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads unreadable files")
+def test_unreadable_claude_history_is_an_error_naming_the_file(env):
+    path = env.home / ".claude" / "history.jsonl"
+    path.chmod(0)
+    result = env.run("sessions")
+    assert result.returncode != 0
+    assert str(path) in result.stderr and "Traceback" not in result.stderr
 
 
 def test_missing_claude_history_is_an_error_naming_the_file(env):
