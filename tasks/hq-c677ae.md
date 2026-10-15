@@ -7,8 +7,8 @@ size: xs
 complexity: low
 process: direct
 created: 2026-10-15T08:29:47Z
-updated: 2026-10-15T08:29:47Z
-depends: []
+updated: 2026-10-15T08:30:03Z
+depends: [mind6-5a8082, hq-b7b9ac]
 parent: hq-65f661
 tags: []
 source: hq-4ba161
