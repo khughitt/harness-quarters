@@ -92,6 +92,12 @@ Codex threads (1 work) point at directories that no longer exist, mostly removed
   and a version bump must stop the list rather than empty it.
 - **Select.** An interactive pick (fzf or a numbered prompt) over the listed rows; mobile
   is out of scope.
+- **Launch flags (decided by the user, 2026-10-15).** The launcher adds the flags the
+  user's own launchers use, configured per home, so a resumed session behaves like one
+  started by hand. Today's values: both Claude homes `--dangerously-skip-permissions`;
+  both Codex homes `--no-daemon --dangerously-bypass-approvals-and-sandbox`, placed
+  before `resume`. The work Codex values follow the work resume alias, not the plain
+  work launcher, which omits the bypass.
 - **Launch.** `exec` in the recorded cwd with the argv above. A personal row unsets
   `CLAUDE_CONFIG_DIR`/`CODEX_HOME` rather than setting them to `~/.claude`/`~/.codex`:
   with `CLAUDE_CONFIG_DIR` set, Claude reads `.claude.json` inside that directory
@@ -101,11 +107,6 @@ Codex threads (1 work) point at directories that no longer exist, mostly removed
 
 ## Unresolved, for the implementation task
 
-- **Launch flags.** The user's own launchers add flags to both harnesses:
-  `--dangerously-skip-permissions` for Claude, and `--no-daemon` with
-  `--dangerously-bypass-approvals-and-sandbox` for Codex. The native command above has
-  none. Whether the launcher adds a per-home configured prefix, or prints the command
-  for the user's alias, is the user's call.
 - **491 personal Codex rollouts without a row.** Whether `codex resume <id>` still opens
   them, and whether the native picker lists them, is unknown without a live launch. They
   date from before 2026-07-08 (the backfill watermark). Leave them out of the list and

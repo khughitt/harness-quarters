@@ -69,8 +69,9 @@ Reuse obs's identity research; hq owns the launcher, not a second index.
 - Answered there too: every home and project by default, newest first, with
   harness/home/`--here`/`--archived` filters. Subagents, exec and SDK runs, and
   pruned transcripts are excluded and counted. A missing cwd is shown and its
-  launch refused. Launch flags and 491 older Codex rollouts without a row stay
-  open for the implementation task.
+  launch refused. The launcher adds the user's per-home permission flags
+  (decided 2026-10-15). 491 older Codex rollouts without a row stay open for the
+  implementation task.
 
 ## Picker findings (hq-4ba161, 2026-10-15)
 
