@@ -7,7 +7,7 @@ size: s
 complexity: low
 process: direct
 created: 2026-10-09T14:46:50Z
-updated: 2026-10-15T08:30:05Z
+updated: 2026-10-15T08:30:06Z
 depends: []
 parent: hq-65f661
 tags: [claude]
@@ -35,3 +35,4 @@ Where to look: claude/mods/cli-pane/hooks/register.tsx, hooks/sgr.ts, types/inde
 
 - 2026-10-10T13:27:26Z (main): scope: briefed; hq-4ba161 will verify tags/color and typeahead in the existing pane; preserve nonempty /m arguments and pane-only selection; brief: docs/notes/2026-10-10-context-discovery-brief.md
 - 2026-10-15T08:25:35Z (thought-picker): hq-4ba161 answered: build empty /m as an Input over plain Button rows (Select can't style or preview), latest-sequence guard for overlapping searches, show the pick in the same pane; row color waits on mind6-5a8082, mobile shows a type /m <ID> line; tests and boundary in docs/notes/2026-10-10-context-discovery-brief.md (Picker findings), probe sources attached to hq-4ba161
+- 2026-10-15T08:30:04Z (main): scope: scoped; the source thought's three asks are answered (pane Input typeahead, color via mind6-5a8082, the existing pane) and hq-4ba161's probe settles approach and tests; body rewritten with done-when; color split to hq-c677ae; brief: docs/notes/2026-10-10-context-discovery-brief.md
