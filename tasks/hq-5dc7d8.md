@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/pi-live-picks
 created: 2026-10-15T22:18:54Z
-updated: 2026-10-15T23:43:39Z
+updated: 2026-10-15T23:46:40Z
 started: 2026-10-15T23:43:18Z
 depends: [hq-031194]
 parent: hq-24416e
@@ -28,3 +28,4 @@ Step of the hq-24416e plan, Task 4; contract: spec §4.2 case 5 and §5. The pin
 - 2026-10-15T23:43:28Z (feat/pi-live-picks): arm: flow-trial-1 — unit tack-aa9b44 — flow on
 - 2026-10-15T23:43:39Z (feat/pi-live-picks): gate: implementing .worktrees/pi-live-picks — scoped rollback acceptance tests in the existing hydrated worktree
   provenance: {"harness_session":"codex:01a141f2-1695-7e12-a1c3-f166c9d338e0","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-15T23:46:40Z (feat/pi-live-picks): Task 4 scope: test-only acceptance in .githooks/test_live_picks.py, reusing the real temporary-repository fixture; no production, caller, export, or host changes. RED: scratch snapshots only, pi copied into old record makes all four pinned-command cases fail, and unconditional record rewrite makes interleaving fail on old-record byte equality. GREEN: unmodified tool passes all 5 new cases (133 deselected). Full just test is tracked and running; no production gaps found.
