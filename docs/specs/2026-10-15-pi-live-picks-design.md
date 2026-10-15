@@ -1,11 +1,12 @@
 # pi live picks: keep pi's default model and thinking level across Git updates
 
-Status: draft for review, 2026-10-15; revised after spec review round 1 (unchanged
+Status: approved for execution, 2026-10-15 (hq-24416e planned gate, a66b548);
+revised after spec review round 1 (unchanged
 selections emit no event, rollback of the record, a bounded refresh) and round 2
 (rollback order). Approved for implementation planning by the user on 2026-10-15,
 after the round 2 fix. Revised after plan review round 1: pi's entry moves to its own
-record file (§3.1), which retires the rollback record edit; this revision needs
-re-review. Task: `hq-24416e` (goal `hq-aa9b44`). Extends
+record file (§3.1), which retires the rollback record edit; spec round 3 and plan
+round 2 accepted this revision before the user approved execution. Task: `hq-24416e` (goal `hq-aa9b44`). Extends
 `docs/specs/2026-10-10-live-model-preservation-design.md` (below, "the base design"),
 whose record, rule, operations and failure handling apply unchanged except where this
 document says otherwise. Builds on `hq-61a47e` (merge `6b434eb`), which tracks
@@ -198,8 +199,11 @@ probes' stub), else `~/.local/bin/harness-state-refresh`.
     set B as the default, then `high` as the default thinking level. The stub runs at
     each, and each run reads the new value from the file.
   - Session 2 (unchanged selections), started with `--model B --thinking high`, so the
-    session's model and level differ from the saved defaults: set the current model,
-    then the current level, as the default. The stub does not run at either pick, the
+    session's model and level differ from the saved defaults: set the current thinking
+    level first,
+    then the current model, as the default. Saving the model reapplies the saved
+    thinking default, so thinking-first keeps both selections unchanged. The stub does
+    not run at either pick, the
     file holds B/high afterwards, and the run at `session_shutdown` reads B/high.
 
   No request reaches any provider.

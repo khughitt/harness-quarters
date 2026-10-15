@@ -1,6 +1,7 @@
 # pi Live Picks Implementation Plan
 
-Status: draft for review, 2026-10-15; revised after plan review round 1 (codex/gpt-6.1-sol),
+Status: approved for execution, 2026-10-15 (hq-24416e planned gate, a66b548);
+revised after plan review round 1 (codex/gpt-6.1-sol),
 with the spec's separate pi record. Task: `hq-24416e` (goal `hq-aa9b44`). Execution
 method: inline in this session, under the flow gates of the enrolled trial.
 
@@ -77,8 +78,9 @@ parsing has logic worth a unit test).
       through the model selector, then `high` through the thinking selector; quit.
       Expect a stub line at each pick, each reading the new value.
     - session 2, started with `--model <provider>/B --thinking high`: set the current
-      model, then the current level, as the default; quit. Expect no stub line at
-      either pick, `settings.json` holding B/high, and the shutdown line reading B/high.
+      thinking level first, then the current model, as the default; quit. Model saving
+      reapplies the saved thinking default, so this order keeps both picks unchanged.
+      Expect no stub line at either pick, `settings.json` holding B/high, and the shutdown line reading B/high.
   The probe needs no API key. Record the exact key sequence in the script.
 - [ ] Run the probe, keep its output on the task as a note, and add facts through
   `tools/harness-facts` conventions (status, value, version `1.1.0`, date, evidence

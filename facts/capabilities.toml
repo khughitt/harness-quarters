@@ -354,3 +354,55 @@ version = "1.1.0"
 date = 2026-10-11
 evidence = "hq-57132d"
 note = "After a subagent run the root's pi.usage held 1518 tokens, exactly its own assistant entries, and the child's held 586. harness.usage() is every conversation in the storage summed (its type says so): it read 2104 only because the probe gave the run a storage of its own. A task's spend in a shared storage is the integrator's sum over the conversations it owns."
+
+[facts.pi-extension-symlink-load]
+type = "boolean"
+description = "pi discovers an extension through a symlink in the agent extensions directory."
+probe = "pi/probes/extension-probe.py"
+
+[facts.pi-extension-symlink-load.harness.pi]
+status = "probed"
+value = true
+version = "1.1.0"
+date = 2026-10-15
+evidence = "hq-24416e"
+note = "P1a: scratch PI_CODING_AGENT_DIR, symlinked extension, closed RPC stdin; exactly one shutdown refresh. Offline, no model request."
+
+[facts.pi-shutdown-awaits-handlers]
+type = "boolean"
+description = "pi awaits asynchronous session_shutdown extension handlers before exiting."
+probe = "pi/probes/extension-probe.py"
+
+[facts.pi-shutdown-awaits-handlers.harness.pi]
+status = "probed"
+value = true
+version = "1.1.0"
+date = 2026-10-15
+evidence = "hq-24416e"
+note = "P1a-c: shutdown refresh completes; TERM-ignoring group and leader-exits cases finish in about 11 seconds with no recorded survivors; active plus final 3-second runs are serial and finish in about 6 seconds."
+
+[facts.pi-default-write-before-deferred-select-handler]
+type = "boolean"
+description = "pi's default settings write precedes a select handler deferred with setImmediate."
+probe = "pi/probes/extension-probe.py"
+
+[facts.pi-default-write-before-deferred-select-handler.harness.pi]
+status = "probed"
+value = true
+version = "1.1.0"
+date = 2026-10-15
+evidence = "hq-24416e"
+note = "P2 changed: headless tmux starts on A/medium; saving B reads B/medium in the refresh, then saving high reads B/high. Each pick has exactly one refresh, followed by shutdown."
+
+[facts.pi-unchanged-default-emits-select]
+type = "boolean"
+description = "Saving the current runtime model or thinking level as the default emits a select event."
+probe = "pi/probes/extension-probe.py"
+
+[facts.pi-unchanged-default-emits-select.harness.pi]
+status = "probed"
+value = false
+version = "1.1.0"
+date = 2026-10-15
+evidence = "hq-24416e"
+note = "P2 unchanged: file A/medium, CLI B/high. Save current thinking high first, then current model B: zero picker refreshes, settings B/high, one shutdown refresh reading B/high. Model-first would reapply saved medium and emit a thinking change."
