@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: direct
 created: 2026-10-15T19:39:21Z
-updated: 2026-10-15T19:41:17Z
+updated: 2026-10-15T19:41:36Z
 depends: []
 tags: []
 agent: claude-code/claude-opus-5-5
@@ -25,3 +25,7 @@ Established (pi 1.1.0, read 2026-10-15 in ~/.local/share/pi/1.1.0, dist/core/set
 - tools/harness-links refuses a real file at a link path, so the existing ~/.pi/agent/settings.json moves aside before `just link --apply`.
 
 Where: links.toml [harness.pi]; .gitattributes; .githooks/harness-state-clean, live-picks, harness-state-refresh and their tests; docs/specs/2026-10-10-live-model-preservation-design.md; README.md's pi/ entry. Related: hq-7a69dc (crew's per-attempt headless agent directories, a different home); relay-828903 (a pi adapter in relay's live-agent registry).
+
+## Notes
+
+- 2026-10-15T19:41:36Z (main): scope: scoped; filed 2026-10-15 from a crew session and scoped against pi 1.1.0's settings-manager, agent-session and interactive-mode code and hq's harness-state-clean, live-picks, harness-state-refresh and harness-links; split into hq-61a47e (link and filter, direct) and hq-24416e (pick preservation and pi turn-end capture, planned, depends on hq-61a47e)
