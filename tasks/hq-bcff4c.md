@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-10-16T16:32:42Z
-updated: 2026-10-16T17:15:15Z
+updated: 2026-10-16T17:15:16Z
 started: 2026-10-16T17:15:08Z
 depends: [ops-e5b39c]
 tags: []
@@ -23,3 +23,4 @@ Rewrite this repository's t <t@t> commits (from the 2026-10-07 global-config lea
 - 2026-10-16T17:15:08Z (main): started
   provenance: {"harness_session":"claude-code:9c070e8d-dc83-4336-8ab8-fa5eb8b20204","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-16T17:15:15Z (main): trial: flow-trial-1 — enrolled — flow off
+- 2026-10-16T17:15:15Z (main): arm: flow-trial-1 — unit tack-bcff4c — flow off
