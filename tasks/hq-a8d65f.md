@@ -7,7 +7,7 @@ size: xs
 complexity: low
 process: direct
 created: 2026-10-15T21:14:37Z
-updated: 2026-10-15T21:14:37Z
+updated: 2026-10-16T00:42:03Z
 depends: []
 parent: hq-aa9b44
 tags: []
@@ -23,3 +23,7 @@ Done, on europa:
 - auth.json is per host: log in on europa as needed; it never enters hq.
 
 Not blocked by hq-24416e: pick preservation reaches europa when that lands, through the same checkout.
+
+## Notes
+
+- 2026-10-16T00:42:03Z (main): hq-24416e is merged and rolled out on titan. Europa: run just link --apply from hq main; it now also creates ~/.pi/agent/extensions/harness-state.ts. Run just link-check and verify pi defaults survive capture plus checkout. Do not point the extension or refresh command at a worktree.
