@@ -4,8 +4,8 @@ Status: approved for execution, 2026-10-15 (hq-24416e planned gate, a66b548);
 revised after plan review round 1 (codex/gpt-6.1-sol),
 with the spec's separate pi record. Task: `hq-24416e` (goal `hq-aa9b44`). Execution
 method: subagent-driven implementation in this session, under the flow gates of the
-enrolled trial. Tasks 1–4 are implemented and independently reviewed; live rollout
-remains pending separate approval.
+enrolled trial. Tasks 1–4 are implemented and independently reviewed. The user
+separately approved Task 5, and titan's live rollout passed on 2026-10-15.
 
 **Goal:** pi's default model and thinking level survive every Git command that
 rewrites `pi/settings.json`, captured by an hq-owned pi extension and restored by the
@@ -163,9 +163,18 @@ Files: `.githooks/test_live_picks.py` (or a new `test_live_picks_rollback.py`).
 Not code: each step is an action on this host's live state, run after the user approves
 the merge (an action outside the repository).
 
-- [ ] Merge into main; `just link --apply` (creates the extension link); `just
+- [x] Merge into main; `just link --apply` (creates the extension link); `just
   link-check`.
-- [ ] Spec §5 check: in pi, set a default model and thinking level, quit; check
+- [x] Spec §5 check: in pi, set a default model and thinking level, quit; check
   `local/live-picks-pi.json` holds both; `git checkout -- pi/settings.json` in main; the
   defaults are back and `git status` is clean.
-- [ ] Note on `hq-a8d65f` that europa's apply now also creates the extension link.
+- [x] Note on `hq-a8d65f` that europa's apply now also creates the extension link.
+
+Rollout evidence: merge `c48ee06` installed the reviewed implementation; the home
+extension and refresh command resolve into main. A private offline pi 1.1.0 session
+saved its current thinking and model defaults, exited successfully and captured all
+three owned fields. Checkout restored those same fields with an empty filtered diff.
+The check then used `live-picks forget pi/settings.json` to restore the user's
+original automatic defaults; all unowned settings were unchanged and no children
+survived. Private backup and raw evidence are retained under
+`local/pi-live-picks-rollout/20261016T003823Z/`. Europa remains a separate host apply.

@@ -13,6 +13,9 @@ document says otherwise. Builds on `hq-61a47e` (merge `6b434eb`), which tracks
 `pi/settings.json`, links it into `~/.pi/agent`, and filters its defaults out of the
 index.
 
+Deployment: titan's separately approved rollout and live capture/checkout recovery
+check passed on 2026-10-15. Europa's host apply is tracked by `hq-a8d65f`.
+
 ## 1. Problem
 
 Since `hq-61a47e`, `~/.pi/agent/settings.json` is a link to `pi/settings.json`, and
