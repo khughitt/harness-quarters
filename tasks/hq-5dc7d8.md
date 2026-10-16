@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/pi-live-picks
 created: 2026-10-15T22:18:54Z
-updated: 2026-10-15T23:58:34Z
+updated: 2026-10-16T00:05:11Z
 started: 2026-10-15T23:43:18Z
 depends: [hq-031194]
 parent: hq-24416e
@@ -40,3 +40,4 @@ Step of the hq-24416e plan, Task 4; contract: spec §4.2 case 5 and §5. The pin
 - 2026-10-15T23:55:20Z (feat/pi-live-picks): resumed
   provenance: {"harness_session":"codex:01a141f2-1695-7e12-a1c3-f166c9d338e0","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-15T23:58:34Z (feat/pi-live-picks): Corrective round 1: addressed Important I1 with a test-only owned_process context for all new rollback capture/refresh/runner calls. Each starts a new session and always SIGKILLs its process group, including after leader exit, while the Popen context reaps its direct child and SIGTERM handling restores on exit. RED cleanup regression: 4 failed for surviving descendants under timeout/SIGINT/SIGTERM/leader-exit; GREEN focused: 9 passed. Real descendant probe adopts and reaps its own orphans even on RED. Full just test is tracked; raw logs are in the plan workspace.
+- 2026-10-16T00:05:11Z (feat/pi-live-picks): Corrective round 1 committed as 8484599: I1 process-group ownership addressed and self-reviewed. Final scratch RED: all 4 cleanup modes fail on surviving descendants under direct-child-only mutation; final focused GREEN 9 passed. Full just test exit 0: 228 agent-tool tests and 896 hook/tool tests. git diff --check and tasks check pass. Full raw logs and exact evidence appended to task-4-report.md. host-load reports nothing left running; controller owns fresh scoped re-review.
