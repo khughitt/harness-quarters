@@ -11,6 +11,7 @@ EXTENSION = ROOT / "pi" / "extensions" / "harness-state.ts"
 DRIVER = r'''
 const { default: extension } = await import(process.env.EXTENSION);
 const handlers = {}, warnings = [];
+const exitListeners = process.listenerCount("exit");
 extension({ on(name, handler) { handlers[name] = handler; } });
 const ctx = { ui: { notify(message, level) { warnings.push({message, level}); } } };
 for (const event of JSON.parse(process.env.EVENTS)) {
@@ -18,6 +19,7 @@ for (const event of JSON.parse(process.env.EVENTS)) {
   else await handlers[event]({}, ctx);
 }
 await handlers.session_shutdown({}, ctx);
+if (process.listenerCount("exit") !== exitListeners) throw new Error("refresh retained an exit listener");
 console.log(JSON.stringify(warnings));
 '''
 
@@ -129,10 +131,11 @@ def reap_refresh_groups(tmp_path):
             except ProcessLookupError:
                 pass
         for record in calls:
-            try:
-                os.waitpid(record["child"], 0)
-            except ChildProcessError:
-                pass
+            for pid in (record["pid"], record["child"]):
+                try:
+                    os.waitpid(pid, 0)
+                except ChildProcessError:
+                    pass
         assert libc.prctl(36, previous.value, 0, 0, 0) == 0
 
 
@@ -166,3 +169,53 @@ sys.exit(''' + str(exit_code) + ''')
     assert len(warnings) <= 1
     if exit_code:
         assert "7" in warnings[0]["message"]
+
+
+@pytest.mark.parametrize("exit_code", [1, 129])
+def test_parent_exit_kills_active_refresh_group(tmp_path, reap_refresh_groups, exit_code):
+    import time
+
+    log, ready = tmp_path / "calls", tmp_path / "ready"
+    stub = tmp_path / "refresh"
+    stub.write_text('''#!/usr/bin/env python3
+import json, os, signal, subprocess, sys, time
+from pathlib import Path
+assert sys.stdin.read() == ""
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+child = subprocess.Popen([sys.executable, "-c", "import os,signal,time; from pathlib import Path; signal.signal(signal.SIGTERM, signal.SIG_IGN); Path(os.environ['READY']).touch(); time.sleep(60)"],
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+Path(os.environ["LOG"]).write_text(json.dumps({"pid": os.getpid(), "group": os.getpgrp(), "child": child.pid}) + "\\n")
+time.sleep(60)
+''')
+    stub.chmod(0o755)
+    driver = r'''
+import { existsSync } from "node:fs";
+const { default: extension } = await import(process.env.EXTENSION);
+const handlers = {};
+extension({ on(name, handler) { handlers[name] = handler; } });
+handlers.agent_settled({}, { ui: { notify() {} } });
+const deadline = Date.now() + 5000;
+while ((!existsSync(process.env.LOG) || !existsSync(process.env.READY)) && Date.now() < deadline) {
+  await new Promise(resolve => setTimeout(resolve, 10));
+}
+if (!existsSync(process.env.LOG) || !existsSync(process.env.READY)) throw new Error("refresh not ready");
+process.exit(Number(process.env.EXIT_CODE));
+'''
+    env = {**os.environ, "EXTENSION": str(EXTENSION), "HQ_HARNESS_STATE_REFRESH": str(stub),
+           "LOG": str(log), "READY": str(ready), "EXIT_CODE": str(exit_code)}
+    done = subprocess.run(["node", "--input-type=module", "-e", driver], env=env,
+                          capture_output=True, text=True, timeout=10, start_new_session=True)
+    assert done.returncode == exit_code, done.stderr
+    record = json.loads(log.read_text())
+    deadline = time.monotonic() + 1
+    while True:
+        survivors = []
+        for pid in (record["pid"], record["child"]):
+            state = Path(f"/proc/{pid}/stat")
+            if state.exists() and state.read_text().rsplit(")", 1)[1].split()[0] != "Z":
+                survivors.append(pid)
+        if not survivors or time.monotonic() >= deadline:
+            break
+        time.sleep(0.01)
+    print(json.dumps({"parent_exit": done.returncode, "pids": record, "survivors_after_exit": survivors}))
+    assert survivors == [], survivors

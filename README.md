@@ -64,7 +64,9 @@ that window restores the previous saved default; set it again or use
 default. Runs are serialised, with a 10-second limit followed by one second for
 process-group termination. Picker and turn-end handlers return without waiting;
 shutdown awaits the current run and one final run, delaying exit by at most about
-22 seconds. A failure warns once per session without failing the pi operation.
+22 seconds. If pi exits without running shutdown handlers, a synchronous exit handler
+kills any refresh group it still owns. A failure warns once per session without
+failing the pi operation.
 
 Both records are machine-owned: an invalid record is refused independently, never
 overwritten, and deleting it starts that record over. pi's separate record lets the

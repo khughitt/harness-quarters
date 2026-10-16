@@ -139,7 +139,10 @@ design §3.5); setting it again, or `forget`, corrects it.
 10-second limit: on expiry the extension sends SIGTERM to the group, then SIGKILL after
 one second, so the refresh and its `git` and `codex-trust` children all end. A run that
 times out counts as a failure. The refresh's host lock waits without limit, so the bound
-is what keeps a stuck lock holder from holding pi.
+is what keeps a stuck lock holder from holding pi. While a run owns a process group,
+a synchronous process-exit handler sends SIGKILL to that group, covering pi's emergency
+exits that skip `session_shutdown`. The handler is removed when the run finishes.
+SIGKILL and host failure cannot run JavaScript cleanup.
 
 **Awaiting.** pi awaits event handlers (picker actions and shutdown wait on them). The
 `model_select`, `thinking_level_select` and `agent_settled` handlers start a run and

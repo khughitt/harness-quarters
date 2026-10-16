@@ -26,6 +26,7 @@ export default function harnessState(pi: ExtensionAPI) {
       const finish = (failure?: string) => {
         if (finished) return;
         finished = true;
+        process.off("exit", onExit);
         clearTimeout(timer);
         if (killTimer) clearTimeout(killTimer);
         if (failure) warn(ctx, failure);
@@ -38,6 +39,8 @@ export default function harnessState(pi: ExtensionAPI) {
           if ((error as NodeJS.ErrnoException).code !== "ESRCH") warn(ctx, String(error));
         }
       };
+      const onExit = () => killGroup("SIGKILL");
+      process.on("exit", onExit);
       const terminate = (failure: string) => {
         clearTimeout(timer);
         terminating = true;
