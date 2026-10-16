@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-10-16T16:32:42Z
-updated: 2026-10-16T17:22:59Z
+updated: 2026-10-16T21:34:16Z
 started: 2026-10-16T17:15:08Z
 completed: 2026-10-16T17:22:59Z
 depends: [ops-e5b39c]
@@ -30,3 +30,4 @@ Rewrite this repository's t <t@t> commits (from the 2026-10-07 global-config lea
   provenance: {"harness_session":"claude-code:9c070e8d-dc83-4336-8ab8-fa5eb8b20204","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-16T17:22:59Z (main): Rewrote 725 commits (717 t@t plus 8 descendants) to Keith Hughitt with filter-repo --mailmap in a scratch mirror; all 725 trees identical; live main moved by guarded update-ref with the working tree untouched; commit map committed as df46d4d (docs/rewrites/2026-10-16-identity-commit-map.txt) for the 38 old SHAs cited in task notes, specs and plans; just test 898 passed; force-pushed with lease (9a69b9a -> df46d4d), origin and main equal, 0 t@t on all refs, no open PRs. Pre-rewrite bundle kept outside Dropbox on titan at /mnt/ssd3/tmp/hq-rewrite-2026-10-16/hq-pre-rewrite.bundle. Closed ahead of runbook ops-e5b39c by user direction: this was its pilot.
   provenance: {"harness_session":"claude-code:9c070e8d-dc83-4336-8ab8-fa5eb8b20204","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-16T21:34:16Z (main): europa verified 2026-10-16 after reconnect (read-only over SSH): Dropbox up to date; main, origin/main and HEAD at 28d7c19; all refs equal titan's; 0 t@t authors on all refs (1081 commits, all keith.hughitt@gmail.com); no conflicted copies; clean working tree; no europa worktrees; fsck connectivity ok (only dangling pre-rewrite objects).
