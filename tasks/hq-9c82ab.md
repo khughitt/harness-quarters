@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/pi-live-picks
 created: 2026-10-15T22:18:53Z
-updated: 2026-10-16T00:26:38Z
+updated: 2026-10-16T00:28:22Z
 started: 2026-10-15T22:44:02Z
 depends: []
 parent: hq-24416e
@@ -78,3 +78,5 @@ Step of the hq-24416e plan (docs/plans/2026-10-15-pi-live-picks.md, Task 1); con
 - 2026-10-16T00:26:37Z (feat/pi-live-picks): Final whole-branch correction committed 5c974c8: synchronous per-run exit listener kills owned group; finish removes listener. RED process.exit1/129 cases left leader+descendant alive; GREEN eleven focused tests plus mutation proof that retained-listener assertion catches missing removal. Current-extension offline probe all eight checks true; just test 228 agents + 898 hooks/tools passed. Detailed evidence: .worktrees/pi-live-picks/.superpowers/sdd/2026-10-15-pi-live-picks/branch-fix-report.md. Deferred M1/M2 unchanged; no live rollout; nothing running. Controller scoped re-review and closure remain.
 - 2026-10-16T00:26:38Z (feat/pi-live-picks): parked (waiting on agent): Controller runs fresh scoped re-review of emergency-exit fix 5c974c8 and closes Task 1 in .worktrees/pi-live-picks
   provenance: {"harness_session":"codex:01a141b8-aa66-7ee2-aad3-a00ba1296a0c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-16T00:28:22Z (feat/pi-live-picks): resumed
+  provenance: {"harness_session":"codex:01a141b5-89d5-7b72-89c2-3be2a208354f","harness_session_source":"CODEX_THREAD_ID"}
