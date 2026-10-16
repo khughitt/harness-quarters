@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/pi-live-picks
 created: 2026-10-15T22:18:54Z
-updated: 2026-10-16T00:07:00Z
+updated: 2026-10-16T00:07:01Z
 started: 2026-10-15T23:43:18Z
 depends: [hq-031194]
 parent: hq-24416e
@@ -47,3 +47,4 @@ Step of the hq-24416e plan, Task 4; contract: spec §4.2 case 5 and §5. The pin
   provenance: {"harness_session":"codex:01a141b5-89d5-7b72-89c2-3be2a208354f","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-16T00:06:49Z (feat/pi-live-picks): review: impl round 2 — verdict: accept; findings: none; reviewer: codex
 - 2026-10-16T00:07:00Z (feat/pi-live-picks): gate: verified tree:de171a4794aeef9c0f24117c1c834964e058641a — checks: just test exit 0 with 228 agent tests and 896 hook-tool tests plus nine rollback-cleanup focused tests and targeted scratch mutation failures; review: important addressed owned subprocess groups and direct-child reaping on timeout or interruption; reviewer: codex
+- 2026-10-16T00:07:00Z (feat/pi-live-picks): retro: A nonblocking-flock handshake proved new code was loaded before rollback without timing guesses. Fresh review found timeout cleanup needed full process groups; real descendant regressions proved timeout and interrupt paths before the green suite and scoped acceptance.
