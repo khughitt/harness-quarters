@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/pi-live-picks
 created: 2026-10-15T22:18:53Z
-updated: 2026-10-16T00:30:16Z
+updated: 2026-10-16T00:30:17Z
 started: 2026-10-15T22:44:02Z
 depends: []
 parent: hq-24416e
@@ -81,3 +81,4 @@ Step of the hq-24416e plan (docs/plans/2026-10-15-pi-live-picks.md, Task 1); con
 - 2026-10-16T00:28:22Z (feat/pi-live-picks): resumed
   provenance: {"harness_session":"codex:01a141b5-89d5-7b72-89c2-3be2a208354f","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-16T00:30:16Z (feat/pi-live-picks): review: impl round 3 — verdict: accept; findings: none; reviewer: codex
+- 2026-10-16T00:30:17Z (feat/pi-live-picks): gate: verified tree:8f4e14c238ffdfa02aaa97498aa94072adfdc88e — checks: just test exit 0 with 228 agent tests and 898 hook-tool tests plus eleven focused extension tests and eight offline pi probes including parent-exit and listener-removal mutation evidence; review: important addressed synchronous emergency-exit group cleanup, minor deferred existing warning noise; reviewer: codex
