@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/pi-live-picks
 created: 2026-10-15T22:18:53Z
-updated: 2026-10-16T00:17:17Z
+updated: 2026-10-16T00:17:57Z
 started: 2026-10-15T22:44:02Z
 depends: []
 parent: hq-24416e
@@ -73,3 +73,5 @@ Step of the hq-24416e plan (docs/plans/2026-10-15-pi-live-picks.md, Task 1); con
 - 2026-10-16T00:17:16Z (feat/pi-live-picks): gate: implementing — reopened: parent final whole-branch review I1 confirms detached refresh groups survive ordinary emergency process.exit; add synchronous exit cleanup and real-process regression without changing the approved capture design
 - 2026-10-16T00:17:17Z (feat/pi-live-picks): parked (waiting on agent): Original extension implementer fixes parent final-review I1 emergency process-exit cleanup in .worktrees/pi-live-picks; controller dispatches fresh scoped re-review before closing Task 1 again
   provenance: {"harness_session":"codex:01a141b5-89d5-7b72-89c2-3be2a208354f","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-16T00:17:57Z (feat/pi-live-picks): resumed
+  provenance: {"harness_session":"codex:01a141b8-aa66-7ee2-aad3-a00ba1296a0c","harness_session_source":"CODEX_THREAD_ID"}
