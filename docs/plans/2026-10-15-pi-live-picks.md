@@ -4,7 +4,8 @@ Status: approved for execution, 2026-10-15 (hq-24416e planned gate, a66b548);
 revised after plan review round 1 (codex/gpt-6.1-sol),
 with the spec's separate pi record. Task: `hq-24416e` (goal `hq-aa9b44`). Execution
 method: subagent-driven implementation in this session, under the flow gates of the
-enrolled trial. Live rollout remains pending separate approval.
+enrolled trial. Tasks 1–4 are implemented and independently reviewed; live rollout
+remains pending separate approval.
 
 **Goal:** pi's default model and thinking level survive every Git command that
 rewrites `pi/settings.json`, captured by an hq-owned pi extension and restored by the
@@ -48,7 +49,7 @@ Files: `pi/extensions/harness-state.ts` (new), `pi/probes/extension-probe.py` (n
 `facts/capabilities.toml`, `tools/test_pi_extension_probe.py` (new, if the probe's
 parsing has logic worth a unit test).
 
-- [ ] Write the extension (spec §3.3). Command: `HQ_HARNESS_STATE_REFRESH`, else
+- [x] Write the extension (spec §3.3). Command: `HQ_HARNESS_STATE_REFRESH`, else
   `~/.local/bin/harness-state-refresh` (resolved with `os.homedir()`). One run at a time;
   a request during a run sets one pending rerun. Spawn with `detached: true`, stdin `""`,
   stdout and stderr captured; on 10 s expiry `process.kill(-pid, "SIGTERM")`, then
@@ -57,7 +58,7 @@ parsing has logic worth a unit test).
   not awaited. `session_shutdown`: await the run in flight, then one final run. The
   first failure or timeout in a session calls `ctx.ui.notify(<message>, "warning")`;
   later ones are silent.
-- [ ] Write `pi/probes/extension-probe.py`. It builds a scratch agent directory (the
+- [x] Write `pi/probes/extension-probe.py`. It builds a scratch agent directory (the
   extension linked into `extensions/` through a symlink; a `models.json` with a local
   dummy provider holding two models, no reachable endpoint; a scratch `settings.json`
   naming the first model as the default) and a stub refresh that appends a JSON line
@@ -83,36 +84,36 @@ parsing has logic worth a unit test).
       reapplies the saved thinking default, so this order keeps both picks unchanged.
       Expect no stub line at either pick, `settings.json` holding B/high, and the shutdown line reading B/high.
   The probe needs no API key. Record the exact key sequence in the script.
-- [ ] Run the probe, keep its output on the task as a note, and add facts through
+- [x] Run the probe, keep its output on the task as a note, and add facts through
   `tools/harness-facts` conventions (status, value, version `1.1.0`, date, evidence
   `hq-24416e`, note), probe `pi/probes/extension-probe.py`:
   `pi-extension-symlink-load` (boolean), `pi-shutdown-awaits-handlers` (boolean),
   `pi-default-write-before-deferred-select-handler` (boolean),
   `pi-unchanged-default-emits-select` (boolean, expected false). `tools/harness-facts
   check` passes.
-- [ ] If P2 shows the write after the deferred handler, remove the picker handlers and
+- [x] If P2 shows the write after the deferred handler, remove the picker handlers and
   note the change on the task and in the spec (§3.3, §4.1) before continuing.
 
 ### Task 2: `live-picks` owns `pi/settings.json`
 
 Files: `.githooks/live-picks`, `.githooks/test_live_picks.py`.
 
-- [ ] Extend every fixture that runs `live-picks` or the refresh with a tracked
+- [x] Extend every fixture that runs `live-picks` or the refresh with a tracked
   `pi/settings.json` (`{"lastChangelogVersion": "1.1.0"}` plus a `theme`) and its
   `.gitattributes` line, since a missing owned file is refused: `test_live_picks.py`,
   `test_codex_trust.py`, and `test_harness_state_refresh.py` (already has the file; add
   the attribute only if missing). Check with `grep -ln 'live-picks\|harness-state-refresh'
   .githooks/test_*.py tools/test_*.py` that no other fixture runs them.
-- [ ] Tests first, in those fixtures:
+- [x] Tests first, in those fixtures:
   the base design §4.2 cases 1, 3, 4, 5, 6, 7, 8 and 12 for pi (a parametrised file
   argument where the existing test's shape allows it, a new test otherwise), and spec
   §4.2 cases 1–4. Case 3 loads the tool with patched groups (`runpy` with an edited
   module source, or a helper exposing the check) and expects the import-time refusal.
-- [ ] Tests that pi's entry is written only to `local/live-picks-pi.json`, that
+- [x] Tests that pi's entry is written only to `local/live-picks-pi.json`, that
   `local/live-picks.json` never names `pi/settings.json`, that each record is validated
   on its own (an invalid pi record refuses pi and leaves Claude and Codex handled), and
   that a record whose content does not change is not rewritten.
-- [ ] Implement spec §3.1-§3.2: `PI = "pi/settings.json"`; `OWNED = (CLAUDE, CODEX, PI)`;
+- [x] Implement spec §3.1-§3.2: `PI = "pi/settings.json"`; `OWNED = (CLAUDE, CODEX, PI)`;
   `RECORDS = {CLAUDE: "local/live-picks.json", CODEX: "local/live-picks.json", PI:
   "local/live-picks-pi.json"}`, read and written per record under the one lock;
   `JSON_GROUPS = {CLAUDE: CLAUDE_GROUPS, PI: (("defaultProvider", "defaultModel"),
@@ -121,7 +122,7 @@ Files: `.githooks/live-picks`, `.githooks/test_live_picks.py`.
   for Claude); `CLEAN[PI]` with the filter's pi keys; `FIELD[PI] = "values"`; every
   `name == CLAUDE` branch becomes a JSON-table lookup. Usage text and the docstring
   name pi.
-- [ ] `uv run -q --with pytest pytest .githooks -q`, then `just test`.
+- [x] `uv run -q --with pytest pytest .githooks -q`, then `just test`.
 
 ### Task 3: Link and docs
 
@@ -129,19 +130,19 @@ Files: `links.toml`, `README.md`, `.githooks/live-picks`, `.githooks/harness-sta
 `.githooks/harness-state-refresh` (docstrings), `AGENTS.md` (the `pi/` entry),
 `docs/specs/2026-10-10-live-model-preservation-design.md` (an "Extended by" line).
 
-- [ ] `[harness.pi.links]` gains `"extensions/harness-state.ts" =
+- [x] `[harness.pi.links]` gains `"extensions/harness-state.ts" =
   "pi/extensions/harness-state.ts"`. `tools/test_harness_links.py` already covers link
   kinds; add a case only if the nested link path (`extensions/…`, a directory pi may
   not have created yet) is not covered, and check what `harness-links` does when the
   parent directory is missing.
-- [ ] Docs per spec §3.5, including the capture window, the bound, `forget
+- [x] Docs per spec §3.5, including the capture window, the bound, `forget
   pi/settings.json`, the separate pi record, and the recovery of spec §5.
 
 ### Task 4: Rollback interleaving test
 
 Files: `.githooks/test_live_picks.py` (or a new `test_live_picks_rollback.py`).
 
-- [ ] Spec §4.2 case 5, against the pre-change tool pinned at `6b434eb` (a constant in
+- [x] Spec §4.2 case 5, against the pre-change tool pinned at `6b434eb` (a constant in
   the test, with a comment naming it main before this change). The test reads each
   `.githooks/` file at that commit with `git -C <hq checkout> show 6b434eb:<path>` and
   skips with a named reason only when the commit is absent (a shallow clone); it never
