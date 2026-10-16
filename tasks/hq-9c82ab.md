@@ -1,16 +1,15 @@
 ---
 id: hq-9c82ab
 title: "Write the pi harness-state extension and probe its loading, shutdown bound and picker-event ordering"
-status: done
+status: todo
 priority: 3
 size: s
 complexity: mid
 process: direct
 owner: feat/pi-live-picks
 created: 2026-10-15T22:18:53Z
-updated: 2026-10-15T23:14:11Z
+updated: 2026-10-16T00:17:09Z
 started: 2026-10-15T22:44:02Z
-completed: 2026-10-15T23:14:10Z
 depends: []
 parent: hq-24416e
 tags: []
