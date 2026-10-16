@@ -5,7 +5,7 @@ status: idea
 priority: 2
 reviewed: true
 created: 2026-10-09T17:39:25Z
-updated: 2026-10-13T09:45:13Z
+updated: 2026-10-16T01:00:15Z
 depends: []
 parent: hq-67d253
 tags: [quick-add]
@@ -20,3 +20,4 @@ agent: claude-code/claude-opus-5-5
 - 2026-10-10T12:24:54Z (main): scope: briefed; retained idea and source; created bounded session annotation research hq-ba1758 under existing goal hq-67d253 before schemas, roles, or a bridge; both typed Mindful sources resolve; brief: docs/notes/2026-10-10-mediated-cross-harness-brief.md
 - 2026-10-11T17:54:14Z (main): ops-cb50a8 (typed exchanges; phone inbox) files the person-facing half of this idea: relay-f58531 designs the envelope and question/answer kinds, flows-912ac5 expresses the flow's human gates as typed messages over them. The agent-to-agent half stays here, gated on hq-ba1758 as the brief says.
 - 2026-10-13T09:45:13Z (main): scope: briefed; unchanged gate: hq-ba1758 is still unclaimed todo with no findings, so no schema, roles or bridge work is earned; brief updated with the ops-cb50a8 split (relay-f58531 envelope, flows-912ac5 gates; only the agent-to-agent half stays here) and with hq-83c787's relayed-message locators as discovery input for hq-ba1758; brief: docs/notes/2026-10-10-mediated-cross-harness-brief.md
+- 2026-10-16T01:00:15Z (main): flows-912ac5's spec landed 2026-10-15 (flows docs/specs/2026-10-15-typed-gates-design.md, approved at revision 7): the person-facing half is designed; human gates are revision-bound relay questions and the reviewer verdict is a typed document bound to the covered tree. The agent-to-agent carrier of that verdict is the named extension (spec §6.3), still gated on hq-ba1758's findings.
