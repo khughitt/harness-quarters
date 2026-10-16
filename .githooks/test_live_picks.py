@@ -1,5 +1,6 @@
 """live-picks saves the model and effort picks in local/ and puts back what a git command dropped."""
 import ast
+import contextlib
 import fcntl
 import json
 import os
@@ -8,6 +9,7 @@ import signal
 import shutil
 import subprocess
 import sys
+import time
 import tomllib
 from pathlib import Path
 
@@ -1247,6 +1249,91 @@ def install_pre_pi_hooks(repo, pre_pi_hooks):
         (repo / ".githooks" / name).write_bytes(content)
 
 
+@contextlib.contextmanager
+def owned_process(command):
+    """Reap rollback commands through timeouts, assertions, and harness interrupts."""
+    def interrupted(signum, frame):
+        raise SystemExit(128 + signum)
+
+    previous = signal.signal(signal.SIGTERM, interrupted)
+    try:
+        with subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE, text=True, start_new_session=True) as run:
+            try:
+                yield run
+            finally:
+                # A finished leader can still leave descendants holding pipes or locks.
+                try:
+                    os.killpg(run.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+    finally:
+        signal.signal(signal.SIGTERM, previous)
+
+
+@pytest.mark.parametrize("stop", ["timeout", "sigint", "sigterm", "leader-exit"])
+def test_rollback_process_cleanup_reaps_leader_and_stops_descendants(stop):
+    import ctypes
+
+    # Reuse the extension probe's subreaper pattern to own even a broken cleanup's orphans.
+    libc = ctypes.CDLL(None, use_errno=True)
+    previous = ctypes.c_int()
+    assert libc.prctl(37, ctypes.byref(previous), 0, 0, 0) == 0
+    assert libc.prctl(36, 1, 0, 0, 0) == 0
+    descendant = """
+import os, signal
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+print(os.getpid(), flush=True)
+signal.pause()
+"""
+    launcher = """
+import signal, subprocess, sys
+child = subprocess.Popen([sys.executable, "-c", sys.argv[1]])
+if sys.argv[2] != "leader-exit":
+    signal.pause()
+"""
+    expected = {"timeout": subprocess.TimeoutExpired, "sigint": KeyboardInterrupt,
+                "sigterm": SystemExit}
+    run = child = None
+    try:
+        with pytest.raises(expected[stop]) if stop in expected else contextlib.nullcontext():
+            with owned_process([sys.executable, "-c", launcher, descendant, stop]) as run:
+                ready, _, _ = select.select([run.stdout], [], [], 10)
+                assert ready, "descendant did not start"
+                child = int(run.stdout.readline())
+                if stop == "leader-exit":
+                    assert run.wait(timeout=10) == 0
+                elif stop == "timeout":
+                    run.communicate(timeout=0.05)
+                else:
+                    os.kill(os.getpid(), {"sigint": signal.SIGINT,
+                                          "sigterm": signal.SIGTERM}[stop])
+        assert run.returncode is not None
+        with pytest.raises(ChildProcessError):
+            os.waitpid(run.pid, os.WNOHANG)
+        deadline = time.monotonic() + 1
+        reaped = 0
+        while not reaped and time.monotonic() < deadline:
+            reaped, _ = os.waitpid(child, os.WNOHANG)
+            if not reaped:
+                time.sleep(0.01)
+        assert reaped == child, "descendant survived rollback command cleanup"
+    finally:
+        if run is not None:
+            try:
+                os.killpg(run.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            run.wait(timeout=10)
+            # Reap by group even if startup failed before the descendant reported its pid.
+            while True:
+                try:
+                    os.waitpid(-run.pid, 0)
+                except ChildProcessError:
+                    break
+        assert libc.prctl(36, previous.value, 0, 0, 0) == 0
+
+
 @pytest.mark.parametrize("command", [
     ("live-picks", "capture"), ("live-picks", "restore"),
     ("live-picks", "hook", "post-merge"), ("harness-state-refresh",),
@@ -1254,15 +1341,15 @@ def install_pre_pi_hooks(repo, pre_pi_hooks):
 def test_pinned_pre_pi_commands_leave_the_pi_record_untouched(repo, pre_pi_hooks, command):
     saved_both(repo)
     write_pi(repo, **PI_VALUES)
-    captured = picks(repo, "capture")
-    assert captured.returncode == 0, captured.stderr
+    with owned_process([str(repo / ".githooks/live-picks"), "capture"]) as captured:
+        _, err = captured.communicate("", timeout=10)
+        assert captured.returncode == 0, err
     before = pi_record_path(repo).read_bytes()
     install_pre_pi_hooks(repo, pre_pi_hooks)
 
-    result = subprocess.run([str(repo / ".githooks" / command[0]), *command[1:]],
-                            input="", text=True, capture_output=True, timeout=10)
-
-    assert result.returncode == 0, result.stderr
+    with owned_process([str(repo / ".githooks" / command[0]), *command[1:]]) as result:
+        _, err = result.communicate("", timeout=10)
+        assert result.returncode == 0, err
     assert pi_record_path(repo).read_bytes() == before
     assert PI not in record(repo)
 
@@ -1298,29 +1385,17 @@ def waiting(fd, operation):
 fcntl.flock = waiting
 tool["main"](["live-picks", "capture"])
 """
-    def interrupted(signum, frame):
-        raise SystemExit(128 + signum)
-
-    previous = signal.signal(signal.SIGTERM, interrupted)
-    run = None
-    try:
-        with lock.open("a") as held:
-            fcntl.flock(held, fcntl.LOCK_EX)
-            run = subprocess.Popen([sys.executable, "-c", runner, str(repo / ".githooks")],
-                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    with lock.open("a") as held:
+        fcntl.flock(held, fcntl.LOCK_EX)
+        with owned_process([sys.executable, "-c", runner, str(repo / ".githooks")]) as run:
             ready, _, _ = select.select([run.stdout], [], [], 10)
             assert ready, "capture did not reach the host lock"
             assert run.stdout.readline() == "loaded and blocked\n"
             assert run.poll() is None
             install_pre_pi_hooks(repo, pre_pi_hooks)
-        _, err = run.communicate(timeout=10)
-        assert run.returncode == 0, err
-    finally:
-        if run is not None:
-            if run.poll() is None:
-                run.kill()
-            run.communicate(timeout=10)
-        signal.signal(signal.SIGTERM, previous)
+            fcntl.flock(held, fcntl.LOCK_UN)
+            _, err = run.communicate("", timeout=10)
+            assert run.returncode == 0, err
 
     after = {path: path.read_bytes() for path in (repo / "local").rglob("*")
              if path.is_file()}
@@ -1332,7 +1407,8 @@ tool["main"](["live-picks", "capture"])
         "defaultThinkingLevel": "medium"}}}
     assert {name: (repo / name).read_bytes() for name in live_before} == live_before
 
-    result = picks(repo, "capture")
-    assert result.returncode == 0, result.stderr
+    with owned_process([str(repo / ".githooks/live-picks"), "capture"]) as result:
+        _, err = result.communicate("", timeout=10)
+        assert result.returncode == 0, err
     assert record(repo) == {CLAUDE: CLAUDE_SET, CODEX: CODEX_SET}
     assert PI not in record(repo)
