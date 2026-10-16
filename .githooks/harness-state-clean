@@ -13,7 +13,7 @@ puts it back after a checkout drops it. Everything else the harness writes (plug
 toggles, marketplace sources, hook trust hashes) stays tracked. Wired by
 `.gitattributes` and `git config filter.harness-state.clean`; the smudge side is
 identity, so a checkout drops the pick and `live-picks` puts the saved one back
-(Claude's and Codex's; pi's is not saved yet, so pi then starts on its default).
+for Claude, Codex and pi; pi's installation ids are not saved.
 """
 import fnmatch
 import json

@@ -125,3 +125,4 @@ home = "~/.pi/agent"
 [harness.pi.links]
 "AGENTS.md" = "lore:instructions/AGENTS.md"
 "settings.json" = "pi/settings.json"
+"extensions/harness-state.ts" = "pi/extensions/harness-state.ts"
