@@ -70,9 +70,10 @@ failing the pi operation.
 
 Both records are machine-owned: an invalid record is refused independently, never
 overwritten, and deleting it starts that record over. pi's separate record lets the
-previous tool keep saving Claude and Codex picks during recovery. This pi rollout is
-pending: after the separately approved merge, run `just link --apply` from main on
-each host to install the extension. To recover, revert the merge, remove the
+previous tool keep saving Claude and Codex picks during recovery. The pi rollout was
+applied and its live capture and checkout recovery verified on titan on 2026-10-15.
+Run `just link --apply` from main on each remaining host to install the extension
+(`hq-a8d65f` tracks europa). To recover, revert the merge, remove the
 `~/.pi/agent/extensions/harness-state.ts` link on each host and run `just link-check`.
 The previous tool ignores `local/live-picks-pi.json`, which may be deleted; Claude and
 Codex preservation continues. pi then keeps defaults only until a Git rewrite drops
