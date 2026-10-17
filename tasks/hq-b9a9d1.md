@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-10-17T02:58:30Z
-updated: 2026-10-17T15:28:01Z
+updated: 2026-10-17T15:28:02Z
 started: 2026-10-17T15:27:54Z
 depends: []
 tags: []
@@ -29,3 +29,4 @@ The personal codex/config.toml now notifies only for approval-requested, plan-mo
 - 2026-10-17T15:27:54Z (main): started
   provenance: {"harness_session":"claude-code:e1f1b4f8-13b9-4598-bd8e-5a7e34905be5","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-17T15:28:01Z (main): trial: flow-trial-1 — enrolled — flow off
+- 2026-10-17T15:28:01Z (main): arm: flow-trial-1 — unit tack-b9a9d1 — flow off
