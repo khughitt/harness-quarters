@@ -3,11 +3,8 @@ id: hq-b9a9d1
 title: Decide whether the work Codex config takes the request-only notification allowlist
 status: idea
 priority: 2
-reviewed: true
-awaiting_user: true
-reviewed_at: 2026-10-17T13:09:21Z
 created: 2026-10-17T02:58:30Z
-updated: 2026-10-17T13:09:21Z
+updated: 2026-10-17T15:27:45Z
 depends: []
 tags: []
 source: hq-1ec500
@@ -23,3 +20,4 @@ The personal codex/config.toml now notifies only for approval-requested, plan-mo
 ## Notes
 
 - 2026-10-17T13:09:21Z (main): scope: question; checked local/codex/config.work.toml: [tui] has no notifications key (all types fire, including completions of internal agents under multi_agent = true) and no approval_policy (approvals reachable); added one open question: whether work sessions take the personal request-only allowlist and lose completion popups
+- 2026-10-17T15:27:45Z (main): answer (user, 2026-10-17): yes — the work Codex config adopts the personal request-only allowlist.
