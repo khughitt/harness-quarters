@@ -2,7 +2,7 @@
 
 Ideas: hq-48c5c6 (git-index unstaging rejected), hq-982164 (forced-remove cleanup
 rejected), hq-5b8413 (conflict-resolution restore rejected). Scoped 2026-10-10;
-hq-5b8413 added 2026-10-11.
+hq-5b8413 added 2026-10-11; hq-52e1d9 (a third unstaging refusal) added 2026-10-17.
 
 ## 1. Problem
 
@@ -34,6 +34,13 @@ it is an upstream behaviour recorded and worked around once.
   check is still to be shown by the probe. The second form overwrites the working
   file, so the guard did its job there; what failed is the message, which names
   neither the risk nor an accepted form.
+- The refusal recurs on Codex 0.163.0. hq-52e1d9 (crew, 2026-10-16) is a third
+  instance: `git restore --staged docs/reports/cheap-model-pilot/round-1.json` in a
+  crew worktree, refused twice (16:36:50Z, chained with `tasks park`; 16:38:50Z alone)
+  with the same message, matching line 45. The agent described it as "automatic
+  approval review", but `approvals_reviewer = "user"` and the error is the exec
+  policy's `Rejected(...)` from `CreateProcess`; it worked around by keeping the
+  artifact staged and repairing it in place.
 - Codex's exec policy resolves overlapping rules to the strictest decision, so an
   `allow` for `["git", "restore", "--staged"]` cannot carve an exception out of the
   `prompt` on `["git", "restore"]` (to be confirmed in the research below). The binary
@@ -84,5 +91,7 @@ if justifications do not surface under `never`.
 
 ## 6. Proposed decomposition
 
-- hq-748431 (research, under goal hq-62c3b1) — wakes hq-48c5c6 and hq-5b8413.
+- hq-748431 (research, under goal hq-62c3b1) — wakes hq-48c5c6 and hq-5b8413, each
+  holding a `depends` edge on it since 2026-10-17.
+- hq-52e1d9 — proposed as a drop: same command shape and rule as hq-48c5c6.
 - ops-278533 (existing research) — covers hq-982164, proposed as a drop.
