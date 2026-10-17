@@ -1,15 +1,17 @@
 ---
 id: hq-b9a9d1
 title: Decide whether the work Codex config takes the request-only notification allowlist
-status: doing
+status: done
 priority: 2
 size: xs
 complexity: low
 process: direct
 owner: main
 created: 2026-10-17T02:58:30Z
-updated: 2026-10-17T15:28:02Z
+updated: 2026-10-17T15:29:00Z
 started: 2026-10-17T15:27:54Z
+completed: 2026-10-17T15:29:00Z
+closed: 2026-10-17T15:29:00Z
 depends: []
 tags: []
 source: hq-1ec500
@@ -30,3 +32,7 @@ The personal codex/config.toml now notifies only for approval-requested, plan-mo
   provenance: {"harness_session":"claude-code:e1f1b4f8-13b9-4598-bd8e-5a7e34905be5","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-17T15:28:01Z (main): trial: flow-trial-1 — enrolled — flow off
 - 2026-10-17T15:28:01Z (main): arm: flow-trial-1 — unit tack-b9a9d1 — flow off
+- 2026-10-17T15:29:00Z (main): done
+  provenance: {"harness_session":"claude-code:e1f1b4f8-13b9-4598-bd8e-5a7e34905be5","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-17T15:29:00Z (main): Adopted per the user's answer: local/codex/config.work.toml [tui] now sets notifications = [approval-requested, plan-mode-prompt, async-question], the personal allowlist (backup of the prior file at /tmp/config.work.toml.bak-hq-b9a9d1). Verified: TOML parses through ~/.codex-work/config.toml (link resolves to the edited file) and Codex 0.163.0 loads the work home (codex features list, exit 0); that command does not validate type names, so value correctness rests on hq-1ec500's live acceptance of the identical list on 0.163.0. Not verified: the second host (europa, ssh timed out 2026-10-17); local/ is untracked, so its copy needs checking there (see hq-e314d4). Takes effect in newly started work Codex sessions.
+  provenance: {"harness_session":"claude-code:e1f1b4f8-13b9-4598-bd8e-5a7e34905be5","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
