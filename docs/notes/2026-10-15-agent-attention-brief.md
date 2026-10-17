@@ -2,7 +2,8 @@
 
 Investigation for hq-b339a9, 2026-10-15. The Codex mitigation was merged and
 activated in the personal config after user approval on 2026-10-15. The task
-remains open for the Claude shell case and a live acceptance check.
+remains open for the Claude shell case. The live Codex acceptance check passed
+on 2026-10-16 (see Live Codex acceptance).
 
 ## Observed paths
 
@@ -111,8 +112,60 @@ temporary directory, not runtime dependencies.
 The user approved activation and the change was merged into main, which is
 linked into the live personal harness home. The link target and the on-disk
 allowlist were verified after the merge. Existing sessions may need restarting.
-A real question and completion still need checking in an isolated session with
-captured terminal output before declaring live Codex behavior accepted.
+
+### Live Codex acceptance
+
+On 2026-10-16 the installed Codex CLI was 0.163.0, while the shared background
+server still ran 0.162.1. The notification filter and its transport are in the
+TUI client. Between the two tags they differ only in the `Notification` enum's
+Rust visibility, so the earlier filter check still applies.
+
+Three fresh TUI sessions ran in a private detached tmux server, each under
+`script` to record raw terminal output. A process listing at the first launch
+showed no Kitty or niri window among its ancestors, so Familiar could not
+target one. `KITTY_WINDOW_ID` was set so the TUI detected Kitty. The terminal
+starts focused, so each check first wrote a focus-lost sequence (`CSI O`) into
+the pane. `script` records output only, so these injected focus sequences are
+absent from the recordings.
+
+The first session passed `-c` overrides, which forced embedded mode instead of
+the shared server; the overrides apply on top of the live config. The others
+ran plain `codex` against the live personal home. The first two sessions unset
+`TMUX` but not `TMUX_PANE`, so the TUI still detected tmux and wrapped each
+OSC 9 in a tmux DCS passthrough. The third also unset `TMUX_PANE` and received
+the bare OSC 9 that Kitty gets. Results:
+
+| Case | Session | Notification payload |
+| --- | --- | --- |
+| Ordinary completion, unfocused | 1 and 2 | none |
+| `request_user_input_async`, unfocused | 1 (DCS-wrapped) | `Question: hq1ec500 probe` |
+| `request_user_input` in plan mode, unfocused | 2 (DCS-wrapped) | `Plan mode prompt: hq1ec500 sync` |
+| Plan implementation prompt, unfocused | 2 (DCS-wrapped) | `Plan mode prompt: Implement this plan?` |
+| `request_user_input_async`, focused (`CSI I`) | 2 | none |
+| `request_user_input_async`, unfocused | 3 (bare OSC 9) | `Question: hq1ec500 plain` |
+
+Each silent ordinary completion is followed in the same session by a
+notification, with no focus-gained sequence injected in between. The private
+server ran without `focus-events`, so nothing else changed the focus flag. The
+async-question turn in session 1 also completed without a second notification.
+The focused question was registered: it appeared on screen and the state went
+to blocked.
+
+The actual TUI therefore loads the filter from the live config. Explicit
+questions and plan prompts still notify when the terminal is unfocused.
+Ordinary completion does not. A focused terminal raises no desktop
+notification, although the TUI still updates the terminal title and its state
+sequence. Every BEL in the recordings ends an OSC sequence; none is bare.
+
+Exec and edit approvals are unreachable under the personal
+`approval_policy = "never"` and were not manufactured. An MCP elicitation,
+which its server initiates, was not exercised. All three variants map to
+`approval-requested`, which the allowlist keeps; that mapping is unchanged in
+0.163.0. Delivery from Kitty to the desktop was not exercised because it would
+take the live desktop. The raw recordings were throwaway files in the host's
+temporary directory.
+
+### Remaining work
 
 For Claude and workspace urgency, the next agent step is to correlate a
 current false alert with hook events and running background tasks. Preserve
