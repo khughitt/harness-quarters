@@ -124,3 +124,6 @@ Nothing in this milestone. obs-c7d924 matters only if listing moves onto obs's i
 (for full-text search or per-session counts), and then through obs-914269: the index
 must cover `archived_sessions/` and `~/.codex-work` under each rollout's thread identity
 before it can replace the native Codex source.
+
+Correction (2026-10-17): obs's index keeps counts and byte sizes, not message text, so it
+cannot serve full-text search; see docs/notes/2026-10-17-session-search-brief.md.
