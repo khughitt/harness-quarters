@@ -1,10 +1,13 @@
 ---
 id: hq-b9a9d1
 title: Decide whether the work Codex config takes the request-only notification allowlist
-status: idea
+status: todo
 priority: 2
+size: xs
+complexity: low
+process: direct
 created: 2026-10-17T02:58:30Z
-updated: 2026-10-17T15:27:45Z
+updated: 2026-10-17T15:27:53Z
 depends: []
 tags: []
 source: hq-1ec500
