@@ -51,6 +51,12 @@ it is an upstream behaviour recorded and worked around once.
   attributes it to Codex's built-in exec policy refusing any forced `rm` under
   `never`). Open research ops-278533 identifies the rejecting layer and intended
   policy for those events; brief: ops `docs/notes/2026-09-30-adaptive-hook-messages-brief.md`.
+- hq-1d228b (relay, 2026-10-17, Codex 0.163.0) is another forced-`rm` refusal: a
+  `trap 'rm -rf "$tmp"' EXIT` around a `mktemp -d` test run was rejected with "rm -f
+  style commands are not permitted. Use a safer approach"; `python3 shutil.rmtree` in
+  the trap passed. That string occurs in the installed Codex binary and in no hook,
+  rule or relay source here, so for this event the rejecting layer is Codex's built-in
+  check. Proposed as a drop covered by ops-75b29a and ops-278533, like hq-982164.
 
 ## 3. Constraints
 
