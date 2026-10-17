@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: planned
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-15T18:47:30Z
+updated: 2026-10-17T12:38:31Z
 depends: [obs-c7d924]
 parent: hq-401088
 tags: [obs]
@@ -28,3 +28,4 @@ Done: reviewed design and plan, implementation and focused checks proving valid 
 ## Notes
 
 - 2026-10-15T18:47:30Z (main): concerns: hq-56ef18 extension — Enforce the stronger readiness contract established by obs-c7d924; the completed input reader implemented the earlier schema-only contract.
+- 2026-10-17T12:38:31Z (main): obs-0bc168 landed (obs c18e0cb): the field contract is obs docs/specs/2026-10-16-index-state-readiness-design.md rev 3 (§3 contract 2, §9 consumer duties: require contract == 2, ready, non-null indexed_span; compare device/inode with its own fstat; require indexed_span.length == live size; hash live file and archive copy against indexed_span.sha256; drop the partial-tail exception; block Codex identity codes; never reject an unfamiliar reason code). Acceptance: run obs tools/retention_readiness.py <hq> --strict-rev <landing commit>; it asserts the strict reader accepts only current/claude_current.
