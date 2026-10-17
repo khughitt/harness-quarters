@@ -5,8 +5,8 @@ status: idea
 priority: 2
 reviewed: true
 created: 2026-10-09T17:39:25Z
-updated: 2026-10-16T01:00:15Z
-depends: []
+updated: 2026-10-17T13:02:47Z
+depends: [hq-ba1758]
 parent: hq-67d253
 tags: [quick-add]
 source: "mindful:thought:47f2f857a23d382e61fa6f4bb210b109"
