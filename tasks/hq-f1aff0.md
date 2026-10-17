@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-10-15T13:04:19Z
-updated: 2026-10-15T13:04:19Z
+updated: 2026-10-17T10:37:56Z
 depends: []
 parent: hq-40a8d0
 tags: []
@@ -20,3 +20,7 @@ Where to start: docs/notes/2026-10-15-headless-workers-brief.md; pi/probes/rpc-p
 Bound: Read the pinned source and docs first; then one scratch probe run per question in a disposable PI_CODING_AGENT_DIR, session directory and working directory, with the provider and spend bound hq-57132d used. Keep probe code out of the repository unless it extends pi/probes. No template implementation, no change to crew, no pi upgrade, no live home rewiring.
 Expected result: facts/capabilities.toml entries for the pi harness (probed, or unknown with a note saying what was missing), passing tools/harness-facts check, with evidence on this task. A recommendation in the brief: which agent-directory files (settings.json keys, models.json, auth) a headless worker needs beyond what crew writes today, or that none are needed. Name any mismatch with crew's contextLookup (pi docs say AGENTS.override.md also replaces CLAUDE.md in the same directory; contextLookup skips only AGENTS.md).
 Ideas it wakes: On completion, run tasks note hq-7a69dc --no-reviewed "<finding>" before this result's branch merges. Also note the context-file finding on lore-ba22f3 (its scope note expects this probe).
+
+## Notes
+
+- 2026-10-17T10:37:56Z (main): context files, from lore-ba22f3's trace (2026-10-17, pi 1.1.0 source + attempt 01M53B7KPR70SKM103V5Q8CRF5): pi has no RPC command listing context files, but persists them in the session file's system message (project_context, each file in <project_instructions path=...>); it loads the first of AGENTS.override.md, AGENTS.md, AGENTS.MD, CLAUDE.md, CLAUDE.MD per directory, agent dir first then root-first ancestors of its real cwd, with linked-worktree shadowing. crew's contextLookup over-records (crew-dac554). A live probe may still confirm; the source reading is in lore docs/notes/2026-10-13-worker-context-brief.md.
