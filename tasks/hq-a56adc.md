@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/relay-cutover
 created: 2026-10-19T21:21:24Z
-updated: 2026-10-19T23:00:46Z
+updated: 2026-10-19T23:00:59Z
 started: 2026-10-19T23:00:46Z
 depends: [hq-1e9103]
 parent: hq-539508
@@ -22,3 +22,4 @@ step: "Task 5: Give the Codex work home a target the installer accepts, and prep
 
 - 2026-10-19T23:00:46Z (feat/relay-cutover): started
   provenance: {"harness_session":"codex:01a15664-7cc0-70c0-9a01-d1cef0d8c24b","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-19T23:00:59Z (feat/relay-cutover): arm: flow-trial-1 — unit tack-539508 — flow off
