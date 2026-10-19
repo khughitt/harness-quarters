@@ -35,6 +35,16 @@ pi-install:
     cp pi/package.json pi/package-lock.json "$dest/"
     npm ci --prefix "$dest" --ignore-scripts --no-fund --no-audit
 
+# Install the pinned relay outside the synced checkout; relay/bin/relay runs it.
+relay-install:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    version=$(/usr/bin/node -p "require('./relay/package.json').dependencies.relay.split('#')[1]")
+    dest="${RELAY_INSTALL_ROOT:-$HOME/.local/share/relay}/$version"
+    mkdir -p "$dest"
+    cp relay/package.json relay/package-lock.json "$dest/"
+    npm ci --prefix "$dest" --ignore-scripts --no-fund --no-audit
+
 # Validate and test each Claude Code mod under claude/mods (needs the claude CLI).
 mods:
     for mod in claude/mods/*/; do claude plugin validate "$mod" && claude plugin test "$mod" || exit 1; done

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+pin="$(dirname "$(readlink -f "$0")")/.."
+version=$(/usr/bin/node -p 'require(process.argv[1]).dependencies.relay.split("#")[1]' "$pin/package.json")
+runtime="${RELAY_INSTALL_ROOT:-$HOME/.local/share/relay}/$version/node_modules/relay/bin/relay.js"
+if [[ ! -f $runtime ]]; then
+    echo "relay $version is not installed: run just relay-install in the hq checkout" >&2
+    exit 127
+fi
+exec /usr/bin/node "$runtime" "$@"

@@ -261,6 +261,7 @@ def fresh_clone(tmp_path, home):
     # Exercise the working manifest and tool, including changes not committed yet.
     shutil.copy2(repo / "links.toml", clone / "links.toml")
     shutil.copy2(TOOL, clone / "tools/harness-links")
+    shutil.copytree(repo / "relay", clone / "relay", dirs_exist_ok=True)
     # A public clone needs the submodule and sibling skill checkouts. Use the local
     # sources in these fixtures so the tests require neither network nor live writes.
     main = Path(run("-C", str(repo), "worktree", "list", "--porcelain").stdout.splitlines()[0][9:])

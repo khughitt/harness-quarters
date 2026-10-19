@@ -16,6 +16,7 @@
 "~/.local/bin/harness-state-refresh" = ".githooks/harness-state-refresh"
 "~/.local/bin/hq" = "tools/hq"
 "~/.local/bin/pi" = "pi/bin/pi"
+"~/.local/bin/relay" = "relay/bin/relay"
 "~/.local/bin/session-archive" = "tools/session-archive"
 "~/.config/systemd/user/session-archive-capture.service" = "systemd/user/session-archive-capture.service"
 "~/.config/systemd/user/session-archive-capture.timer" = "systemd/user/session-archive-capture.timer"
