@@ -251,19 +251,26 @@ detached relay worktree at the tag, `git -C <relay> worktree add --detach
     `--version` equals the evidence file's `version`; on a host without the harness it
     reports `absent` and passes). `--host` re-runs the same checks there with
     `ssh -4 -o BatchMode=yes HOST ~/d/hq/tools/relay-cutover preflight --harness H`.
-  - `relay-cutover familiar-check --expect {relay,native} [--host HOST]`: familiar's
-    source on this host is at the expected side of the merge and runnable with this
-    host's `node_modules`. `relay`: `~/d/familiar/node_modules/relay/package.json`
-    version is `0.1.1` and `~/d/familiar/bin/familiar observe --help` exits 0. `native`:
-    no `node_modules/relay` and `familiar hook --help` exits 0. Both also require
-    `git --no-optional-locks -C ~/d/familiar rev-parse HEAD` to equal `--head SHA` when
-    given (a synced host waits for Dropbox before installing).
-  - `relay-cutover retire-native-guard --target FILE --backup DIR`: writes
-    `DIR/<name>.before-guard` (exact bytes, mode kept), atomically removes the one
-    PreToolUse group whose hooks are exactly `~/d/ops/hooks/claude-pretooluse`, then
-    writes `DIR/<name>.after-guard` (the bytes it wrote). `<name>` is the target's path
-    with `/` replaced by `_`. Refuses when that group is absent, appears twice, or shares
-    its group with another hook, and when `.before-guard` already exists.
+  - `relay-cutover familiar-source --head SHA [--host HOST]`: source readiness only, run
+    before installing dependencies. `git --no-optional-locks -C ~/d/familiar rev-parse
+    HEAD` equals SHA, and `git --no-optional-locks -C ~/d/familiar diff --quiet SHA`
+    exits 0 (every tracked working file, `package-lock.json` included, has synced to
+    that commit; `node_modules` is untracked and ignored). It never runs familiar.
+  - `relay-cutover familiar-check --expect {relay,native} [--host HOST]`: dependency
+    readiness, run after installing or restoring them. `relay`:
+    `~/d/familiar/node_modules/relay/package.json` version is `0.1.1` and
+    `~/d/familiar/bin/familiar observe --help` exits 0. `native`: no
+    `node_modules/relay` and `familiar hook --help` exits 0.
+  - `relay-cutover retire-native-guard --target FILE --backup DIR`: reads the target,
+    computes the bytes without the one PreToolUse group whose hooks are exactly
+    `~/d/ops/hooks/claude-pretooluse`, persists **both** `DIR/<name>.before-guard` (exact
+    bytes, mode kept) and `DIR/<name>.after-guard` (each by temporary file, fsync and
+    rename, then an fsync of DIR), and only then atomically replaces the target (temporary
+    file in the target's directory, fsync, rename). `<name>` is the target's path with
+    `/` replaced by `_`. Refuses, before writing anything, when that group is absent,
+    appears twice, or shares its group with another hook, and when either image already
+    exists. A failure while persisting the images leaves the target untouched; a
+    failure after the replacement leaves a target `restore` recognises.
   - `relay-cutover restore --target FILE --backup DIR [--artifact FILE]`: returns the
     target to its pre-cutover bytes from whatever state a failure left it in, in order:
     (1) the artifact exists and the target equals its `after` for this path: run
@@ -283,9 +290,16 @@ detached relay worktree at the tag, `git -C <relay> worktree add --detach
   `test_subscribers_reports_content_drift`, `test_evidence_reports_version_mismatch`
   (expects the message to name both versions and "rerun the ops relay-guard probe or
   update the harness"), `test_evidence_absent_harness_passes`,
-  `test_familiar_check_relay_and_native_sides`, `test_familiar_check_head_mismatch`,
+  `test_familiar_source_head_and_working_tree` (HEAD mismatch and a modified tracked file
+  each fail; untracked `node_modules` is ignored; familiar is never executed),
+  `test_familiar_check_relay_and_native_sides`,
   `test_retire_removes_only_the_native_guard_group` (every other group equal after a
   `json` round trip), `test_retire_writes_exact_before_and_after_images`,
+  `test_retire_persists_both_images_before_replacing` (an injected failure on the second
+  image write leaves the target byte-identical; a rerun then refuses because an image
+  exists), `test_retire_failure_after_replace_is_restorable` (an injected failure
+  between the target's rename and the command's return: exit nonzero, then `restore`
+  returns the target to the before-image),
   `test_retire_refuses_absent_duplicate_shared_symlink_relative_and_rerun`,
   `test_restore_after_guard_removal_only` (no artifact: target back to before-guard),
   `test_restore_after_relay_apply` (fake rollback runs, then the guard image is restored),
@@ -301,7 +315,8 @@ detached relay worktree at the tag, `git -C <relay> worktree add --detach
   matching relay's installer, so later installs diff cleanly.
 - [ ] **Step 4: Run** the tests, then `just test`. Expected: all pass.
 - [ ] **Step 5: Pilot on titan:** `tools/relay-cutover preflight --harness claude-code`,
-  `--harness codex` and `familiar-check --expect native`. Expected: only `no-live` fails,
+  `--harness codex`, `familiar-source --head "$(git -C ~/d/familiar rev-parse HEAD)"` and
+  `familiar-check --expect native`. Expected: only `no-live` fails,
   because this session is live. Read every line.
 - [ ] **Step 6: Commit** `feat(tools): relay-cutover preflight, guard removal, restore and verify`.
 
@@ -314,24 +329,29 @@ the home path (`/home/keith/.codex-work/hooks.json:…`), so the move changes no
 **Files:**
 - Move: `codex/hooks.work.json` → `codex/work/hooks.json`
 - Modify: `links.toml` (`[harness.codex-work.links] "hooks.json" = "codex/work/hooks.json"`),
-  `tools/test_claim_guard_wiring.py` (parametrize on the new path), `README.md` (the two
-  mentions at today's lines 183 and 314)
+  `tools/test_claim_guard_wiring.py` (parametrize on the new path),
+  `tools/test_capture_notice_wiring.py` (`test_codex_work_home_has_no_capture_notice`
+  reads the new path), `README.md` (the two mentions at today's lines 183 and 314)
 
-- [ ] **Step 1: Update the test first:** `test_both_codex_homes_guard_root_and_worker`
-  reads `codex/work/hooks.json` for `codex-work` and asserts the manifest maps it.
-  Run `uv run -q --with pytest pytest tools/test_claim_guard_wiring.py -q`. Expected: FAIL.
-- [ ] **Step 2: Move and remap:** `git mv`, the `links.toml` line, README. Run the test,
-  then `just test` and `tools/harness-links --check` from the worktree (it reports the
-  link as changed, not broken). Expected: tests pass.
+- [ ] **Step 1: Update the tests first:** `test_both_codex_homes_guard_root_and_worker`
+  reads `codex/work/hooks.json` for `codex-work` and asserts the manifest maps it;
+  `test_codex_work_home_has_no_capture_notice` reads the new path. Run
+  `uv run -q --with pytest pytest tools/test_claim_guard_wiring.py tools/test_capture_notice_wiring.py -q`.
+  Expected: both fail (`FileNotFoundError`, manifest mismatch).
+- [ ] **Step 2: Move and remap:** `git mv`, the `links.toml` line, README. Run the tests,
+  then `just test`. Expected: all pass. The manifest assertion is the worktree's check;
+  `tools/harness-links` refuses to run outside the main checkout, so its preview and
+  convergence check happen on main in Step 5.
 - [ ] **Step 3: Commit** `refactor(codex): name the work home's hooks file hooks.json`.
 - [ ] **Step 4: Land the inert prefix on main.** europa sees only hq main (the worktree is
   titan-local storage). Merge this branch as it stands (the plan, Tasks 1, 2, 4 and 5;
   the settings bytes are unchanged) into hq main locally with `--no-ff`. Main's
   `codex/config.toml` modification stays uncommitted and untouched.
 - [ ] **Step 5: Prepare both hosts.** On titan and, over `ssh -4 -o BatchMode=yes europa`,
-  on europa, from `~/d/hq`: `just link` (expected: `~/.local/bin/relay` added and, on
-  titan only, `~/.codex-work/hooks.json` repointed), then `just link --apply`,
-  `just relay-install`, `just relay-subscribers`; `relay --version` prints `0.1.1`;
+  on europa, from `~/d/hq` (main): `just link` previews exactly `~/.local/bin/relay` added
+  and, on titan only, `~/.codex-work/hooks.json` repointed (anything else: stop); then
+  `just link --apply`, and `just link-check` reports convergence; `just relay-install`,
+  `just relay-subscribers`; `relay --version` prints `0.1.1`;
   `readlink -f ~/.codex-work/hooks.json` ends in `codex/work/hooks.json` on titan.
   The repoint changes no bytes Codex reads; start no Codex session to test it.
 - [ ] **Step 6: Preflight both hosts:** `preflight --harness claude-code --host europa` and
@@ -375,10 +395,14 @@ the home path (`/home/keith/.codex-work/hooks.json:…`), so the move changes no
     SubagentStop and Stop as `test_claim_guard_wiring.py` says; Codex work: the same
     without `capture-notice` (full `~/d/…` strings in the test).
   - `test_statusline_unchanged`: `~/d/familiar/bin/familiar statusline`, refreshInterval 2.
+  - In `tools/test_capture_notice_wiring.py`, `test_codex_appends_capture_notice_after_trusted_entries`
+    expects SessionStart `['~/d/lore/hooks/claude-profile', COMMAND, <the relay
+    SessionStart entry>]`, matched with the shared parser; its comment now says the
+    cutover re-trusts every shifted index, so new entries still go last.
   - In `tools/test_claim_guard_wiring.py`, the Stop `others` become
     `['~/.local/bin/harness-state-refresh', <the relay Stop entry>]`, matched with the
     shared relay-command parser.
-- [ ] **Step 2: Run** `uv run -q --with pytest pytest tools/test_relay_wiring.py tools/test_claim_guard_wiring.py -q`.
+- [ ] **Step 2: Run** `uv run -q --with pytest pytest tools/test_relay_wiring.py tools/test_claim_guard_wiring.py tools/test_capture_notice_wiring.py -q`.
   Expected: the new tests fail on today's files.
 - [ ] **Step 3: Generate the images in the worktree**, with absolute paths throughout:
   `W=$(pwd -P)` at the worktree root, `R=$W/relay/bin/relay`,
@@ -431,20 +455,20 @@ and the resolved path used everywhere so `restore` and relay's artifact agree).
 Ordered procedure (the runbook's numbered sections, each with its expected output):
 
 0. *Agent, before the window:* both hosts pass `preflight` except `no-live`, and
-   `familiar-check --expect native`; record `PRE_FAMILIAR` (familiar main's sha) and
+   `familiar-source --head "$PRE_FAMILIAR"` and `familiar-check --expect native`; record
+   `PRE_FAMILIAR` (familiar main's sha) and
    `FEATURE_TIP`; on each host copy `~/.local/state/familiar` to `$CUTOVER/familiar-state`
    and `cp -a ~/d/familiar/node_modules "$CUTOVER/familiar-node_modules.pre"` (the
    retained runnable install: with the reverted source, it runs the old familiar without
-   fetching); confirm the Mac does not link its Claude or Codex settings into the synced
-   hq checkout (the open question below). *Operator:* `claude update` on any host whose
+   fetching). *Operator:* `claude update` on any host whose
    `evidence` check fails, or the agent reruns Task 3.
 1. *Operator, plain shell on titan:* end every Claude and Codex session on titan and
    europa; `tools/quiesce-timers record --state "$CUTOVER/timers.json" familiar-reap.timer`,
    `stop`, `wait` (and the same on europa over ssh); `preflight` on both hosts, now all green.
 2. Familiar, both hosts: on titan, `git -C ~/d/familiar merge --no-ff "$FEATURE_TIP"` and
-   record `MERGE`; then on **each** host, once `familiar-check` sees `--head "$MERGE"`
-   (europa waits for Dropbox): `npm ci` in `~/d/familiar`, then
-   `familiar-check --expect relay --head "$MERGE"`; restart that host's `familiar-niri
+   record `MERGE`; then on **each** host: `familiar-source --head "$MERGE"` until it
+   passes (europa waits for Dropbox; source only, nothing runs familiar), then `npm ci`
+   in `~/d/familiar`, then `familiar-check --expect relay`; restart that host's `familiar-niri
    watch` and `niri-desktop` quickshell (kill the recorded pids, start the two niri
    `spawn-sh-at-startup` commands from a shell).
 3. Claude, both homes, first as a dry run on copies in `$CUTOVER/dry/` (retire, plan,
@@ -474,9 +498,10 @@ Rollback, any failure from step 2 on, with sessions ended. Settings: for **every
 target that section 3 or 4 touched, in reverse order, `relay-cutover restore --target T
 --backup "$CUTOVER/live" [--artifact A]` (the artifact only when it exists); `restore`
 covers a guard removed with no relay apply. Familiar, when step 2 ran: on titan
-`git -C ~/d/familiar revert -m 1 --no-edit "$MERGE"`; on each host, once synced,
-`rm -rf ~/d/familiar/node_modules && cp -a "$CUTOVER/familiar-node_modules.pre"
-~/d/familiar/node_modules` (no npm, no network), then `familiar-check --expect native`;
+`git -C ~/d/familiar revert -m 1 --no-edit "$MERGE"` and record `REVERT`; on each host,
+once `familiar-source --head "$REVERT"` passes, `rm -rf ~/d/familiar/node_modules &&
+cp -a "$CUTOVER/familiar-node_modules.pre" ~/d/familiar/node_modules` (no npm, no
+network), then `familiar-check --expect native`;
 restart that host's familiar surfaces. Then `quiesce-timers restore` on both hosts and
 fresh sessions. `~/.local/state/relay` is left in place, unused. A later retry re-merges
 by reverting the revert.
@@ -513,7 +538,7 @@ by reverting the revert.
 ### Task 9: Close-out
 
 - [ ] **Step 1: Bring the reviewed tests to main with the live settings.** On hq main,
-  `git checkout feat/relay-cutover -- tools/test_relay_wiring.py tools/test_claim_guard_wiring.py`;
+  `git checkout feat/relay-cutover -- tools/test_relay_wiring.py tools/test_claim_guard_wiring.py tools/test_capture_notice_wiring.py`;
   `just test` passes against the live settings (it would fail on main's old wiring test).
   Commit those tests with `claude/settings.json`, `codex/hooks.json`,
   `codex/work/hooks.json` and only the `[hooks.state]` trust hunks Codex wrote in
@@ -532,9 +557,7 @@ by reverting the revert.
   global rules (ignored files, `tt-report`, no host pointer resolves into it). The
   `$CUTOVER` directories and saved `node_modules` copies stay until you release them.
 
-## Open question for the review
+## Resolved question
 
-The Mac (Darwin) portion waits on relay-848c0f. If the Mac's `~/.claude/settings.json`
-or `~/.codex/hooks.json` links into this synced hq checkout, the window (Task 8, runbook §3) would cut it
-over too, with `/home/keith` paths that do not exist there. The plan assumes it does
-not; please confirm, or the plan adds a Darwin-safe variant before the window.
+The Mac does not link its Claude or Codex settings into the synced hq checkout (the user,
+2026-10-19), so the window leaves it alone; its cutover waits on relay-848c0f.
