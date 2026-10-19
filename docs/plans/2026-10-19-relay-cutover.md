@@ -331,7 +331,7 @@ detached relay worktree at the tag, `git -C <relay> worktree add --detach
 - [ ] **Step 5: Commit** `feat(hooks): relay v0.1.1 replaces familiar and the native ops guard`.
   This commit changes nothing live: the home links resolve to main's files.
 
-### Task 6: Runbook, rehearsal and europa preparation
+### Task 6: Runbook and rehearsal
 
 **Files:**
 - Create: `docs/runbooks/relay-cutover.md`
