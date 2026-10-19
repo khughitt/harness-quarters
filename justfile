@@ -43,7 +43,7 @@ relay-install:
     dest="${RELAY_INSTALL_ROOT:-$HOME/.local/share/relay}/$version"
     mkdir -p "$dest"
     cp relay/package.json relay/package-lock.json "$dest/"
-    npm ci --prefix "$dest" --ignore-scripts --no-fund --no-audit
+    npm ci --prefix "$dest" --ignore-scripts --allow-git=root --no-fund --no-audit
 
 # Render the host subscriber config; FORCE=1 permits replacing different content.
 relay-subscribers:

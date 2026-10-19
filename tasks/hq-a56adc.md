@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/relay-cutover
 created: 2026-10-19T21:21:24Z
-updated: 2026-10-19T23:09:16Z
+updated: 2026-10-19T23:21:55Z
 started: 2026-10-19T23:00:46Z
 depends: [hq-1e9103]
 parent: hq-539508
@@ -29,3 +29,14 @@ step: "Task 5: Give the Codex work home a target the installer accepts, and prep
 - 2026-10-19T23:09:08Z (feat/relay-cutover): resumed
   provenance: {"harness_session":"codex:01a15627-8959-7223-98d3-1c5a0cf587a9","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-19T23:09:16Z (feat/relay-cutover): review: impl round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
+- 2026-10-19T23:12:08Z (feat/relay-cutover): Host prep: inert prefix merged on main; Titan ready and committed code matches tested branch, live settings/trust SHA unchanged. Europa source hashes match and expected two links converge, but npm 12.2.1 defaults allow-git=none and refused relay-install EALLOWGIT; npm 11.17.0 on Titan defaults all. Upstream checked official v12 install docs, npm/cli latest changelog, issues/9189 and PRs/9206, /9466, /8703: intentional npm12 default-deny; root option supported and HTTPS canonicalization fixed in npm12. Correct own recipe with per-command allow-git=root and regenerate HTTPS lock using installed npm12; no global npm configuration change.
+- 2026-10-19T23:13:11Z (feat/relay-cutover): parked (waiting on agent): Task5 implementer: correct npm12 root-Git opt-in and HTTPS lock in .worktrees/relay-cutover, prove tests and return for scoped review before controller retries inert Europa install.
+  provenance: {"harness_session":"codex:01a15627-8959-7223-98d3-1c5a0cf587a9","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-19T23:13:33Z (feat/relay-cutover): resumed
+  provenance: {"harness_session":"codex:01a15664-7cc0-70c0-9a01-d1cef0d8c24b","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-19T23:15:17Z (feat/relay-cutover): Integration correction: upstream default-deny and HTTPS changes confirmed in npm12 docs and npm/cli PRs 9466, 8703, 9206 (controller search already recorded). Real recipe regression RED EALLOWGIT plus SSH URL mismatch; GREEN 8 focused tests. Disposable Europa npm12.2.1 generation and npm ci both succeeded with root-only opt-in; release banner relay 0.1.1; lock unchanged by ci and exact HTTPS release commit retained. No shared install retry or global config change.
+- 2026-10-19T23:20:29Z (feat/relay-cutover): parked (waiting on agent): Controller: scoped-review npm12 correction in .worktrees/relay-cutover, then merge reviewed correction and retry inert Europa installation before completing host preparation; evidence in .superpowers/sdd/2026-10-19-relay-cutover/task-5-report.md
+  provenance: {"harness_session":"codex:01a15664-7cc0-70c0-9a01-d1cef0d8c24b","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-19T23:21:47Z (feat/relay-cutover): resumed
+  provenance: {"harness_session":"codex:01a15627-8959-7223-98d3-1c5a0cf587a9","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-19T23:21:55Z (feat/relay-cutover): review: impl round 2 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
