@@ -217,6 +217,8 @@ MIT licensed; see `LICENSE`.
   `--tools 'read,grep,mcp__<server>__*'` (quoted: zsh refuses an unmatched glob). pi 1.1.0's `--help` says plain names keep MCP
   tools; track earendil-works/pi#10634. `pi/probes/` holds the probes behind the pi
   facts (see "Re-probing pi" below).
+- [Relay operator cutover](docs/runbooks/relay-cutover.md): the two-host plain-shell
+  window, disposable rehearsal evidence, per-home smokes, and offline rollback.
 - `local/`: untracked, and carried between hosts by Dropbox, not git. It holds
   `claude/settings.work.json`, `codex/config.work.toml` and `codex/rules/`, the files
   a home links to that the repository must not publish. The `~/.claude-work`,
