@@ -3,8 +3,8 @@
 Prepared 2026-10-19. This is the Task 8 operator window; preparation and rehearsals
 have **not** activated relay. Run the numbered sections in order, from ordinary
 shells on Titan and Europa, with an observer shell for the smoke checks. Any failed
-check stops the window and invokes rollback. Do not run the live commands inside
-Claude or Codex. Desktop restarts below need the operator's permission at that moment.
+check stops the window: use the §1 abort below before §2, and full rollback from §2
+onward. Do not run the live commands inside Claude or Codex. Desktop restarts below need the operator's permission at that moment.
 
 Claude's personal and work homes run on both hosts. Codex's two homes run only on
 Titan. The four settings targets and familiar source are shared through Dropbox:
@@ -216,11 +216,16 @@ survivor, and rerun strict preflight. Do not kill unrelated node processes or us
 `pkill` patterns. No privilege escalation is needed. The scanner always checks comm
 and readable exe links; unreadable exe plus nonmatching comm is a visibility limit.
 
-On **each host**, using its own shell and saved environment:
+On **each host**, using its own shell and saved environment. Record which hosts
+successfully complete `record` in this window. If any §1 command fails after the
+first host is recorded, including on the second host, perform **Abort during §1** on every recorded host
+before proceeding or retrying; do not leave the first host quiesced.
 
 ```bash
 source "$HOME/.local/state/hq/relay-cutover/operator-env.sh"
 set -euo pipefail
+test ! -e "$CUTOVER/familiar-state.preparation"
+test ! -e "$CUTOVER/familiar-node_modules.preparation"
 "$HQ/tools/quiesce-timers" record --state "$CUTOVER/timers.json" familiar-reap.timer
 "$HQ/tools/quiesce-timers" stop --state "$CUTOVER/timers.json"
 "$HQ/tools/quiesce-timers" wait --state "$CUTOVER/timers.json" --timeout 3600 --poll 30
@@ -230,8 +235,6 @@ set -euo pipefail
 sha256sum -c "$CUTOVER/live-before.sha256"
 (cd "$CUTOVER" && sha256sum -c expected-images.sha256)
 # Preserve preparation snapshots; refresh after all native writers are quiescent.
-test ! -e "$CUTOVER/familiar-state.preparation"
-test ! -e "$CUTOVER/familiar-node_modules.preparation"
 mv "$CUTOVER/familiar-state" "$CUTOVER/familiar-state.preparation"
 mv "$CUTOVER/familiar-node_modules.pre" "$CUTOVER/familiar-node_modules.preparation"
 cp -a "$HOME/.local/state/familiar" "$CUTOVER/familiar-state"
@@ -248,6 +251,48 @@ activity and service recorded; `stopped familiar-reap.timer`; `every service is
 inactive`; **every** applicable preflight check green; hashes all `OK`; both diffs
 empty. A state file already present means an earlier window needs reconciliation,
 not overwrite. A running service is allowed to finish; `wait` never kills it.
+
+### Abort during §1
+
+Before §2 has started, open a fresh plain Bash shell on **each host whose timer
+record succeeded in this window**, source its saved environment, and run this block.
+Do both hosts even if one reports a recovery error. Never use an older window's
+`timers.json`. Restore timers first, then return any moved preparation snapshot to
+its original name; retain new or incomplete copies in a fresh abort directory.
+Do not enter the familiar/settings rollback: neither has been changed yet.
+
+```bash
+source "$HOME/.local/state/hq/relay-cutover/operator-env.sh" || exit 1
+set +e
+set -uo pipefail
+"$HQ/tools/quiesce-timers" restore --state "$CUTOVER/timers.json"
+timer_status=$?
+ABORT=$(mktemp -d "$CUTOVER/section1-abort.XXXXXX") || exit 1
+if (( timer_status == 0 )); then
+  mv "$CUTOVER/timers.json" "$ABORT/timers.json"
+fi
+for name in familiar-state familiar-node_modules; do
+  previous="$CUTOVER/$name.preparation"
+  if [[ $name == familiar-state ]]; then current="$CUTOVER/familiar-state"
+  else current="$CUTOVER/familiar-node_modules.pre"; fi
+  if [[ -e $previous ]]; then
+    if [[ -e $current ]]; then
+      mv "$current" "$ABORT/" || continue
+    fi
+    mv "$previous" "$current"
+  fi
+done
+printf 'Section 1 aborted; timer restore exit=%s; retained evidence: %s\n' "$timer_status" "$ABORT"
+exit 1
+```
+
+Expected: `every timer matches its record` on every recorded host; original
+preparation backups again named `familiar-state` and `familiar-node_modules.pre`.
+Any partial refreshed copies remain under the printed abort directory. The final
+exit1 deliberately stops the window. If timer restore fails its record stays in
+place for retry; inspect every reported error and finish recovery on **both hosts**
+before preparing a new window. No familiar source, live dependency, or settings
+restoration runs in this abort path.
 
 ## 2. Familiar source once, dependencies and surfaces on each host
 
