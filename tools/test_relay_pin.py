@@ -22,8 +22,8 @@ def test_lock_pins_the_release_commit():
     package = json.loads((PIN / "package.json").read_text())
     lock = json.loads((PIN / "package-lock.json").read_text())
     assert package["dependencies"]["relay"] == "git+https://github.com/khughitt/relay.git#v0.1.1"
-    assert lock["packages"]["node_modules/relay"]["resolved"].endswith(
-        "#4ceec5d2ad22b136b37ee360e7a4ed00949f28d9"
+    assert lock["packages"]["node_modules/relay"]["resolved"] == (
+        "git+https://github.com/khughitt/relay.git#4ceec5d2ad22b136b37ee360e7a4ed00949f28d9"
     )
 
 
@@ -42,3 +42,38 @@ def test_launcher_refuses_a_missing_install(tmp_path):
     assert result.stderr.strip() == (
         "relay v0.1.1 is not installed: run just relay-install in the hq checkout"
     )
+
+
+def test_install_recipe_allows_only_root_git_and_keeps_frozen_inputs(tmp_path):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    npm = bin_dir / "npm"
+    npm.write_text("""#!/usr/bin/python3
+import sys
+from pathlib import Path
+args = sys.argv[1:]
+if [arg for arg in args if arg.startswith("--allow-git")] != ["--allow-git=root"]:
+    sys.exit("EALLOWGIT: direct Git dependencies require --allow-git=root")
+assert args[0] == "ci", "installer must use the frozen install command"
+assert "--ignore-scripts" in args, "lifecycle scripts must stay disabled"
+assert "--no-fund" in args and "--no-audit" in args
+prefix = Path(args[args.index("--prefix") + 1])
+assert (prefix / "package.json").is_file()
+assert (prefix / "package-lock.json").is_file()
+(prefix / "npm-ci-finished").touch()
+""")
+    npm.chmod(0o755)
+    install_root = tmp_path / "runtime"
+    result = subprocess.run(
+        ["/usr/bin/just", "relay-install"],
+        cwd=CHECKOUT,
+        env={"PATH": f"{bin_dir}:{os.defpath}", "HOME": str(tmp_path),
+             "RELAY_INSTALL_ROOT": str(install_root)},
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    dest = install_root / "v0.1.1"
+    assert (dest / "npm-ci-finished").exists()
+    for name in ("package.json", "package-lock.json"):
+        assert (dest / name).read_bytes() == (PIN / name).read_bytes()
