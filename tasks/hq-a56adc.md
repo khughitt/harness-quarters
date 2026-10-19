@@ -7,8 +7,8 @@ size: s
 complexity: mid
 process: direct
 created: 2026-10-19T21:21:24Z
-updated: 2026-10-19T21:21:24Z
-depends: []
+updated: 2026-10-19T21:21:25Z
+depends: [hq-1e9103]
 parent: hq-539508
 tags: []
 agent: claude-code/claude-opus-5-5
