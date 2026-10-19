@@ -253,9 +253,12 @@ detached relay worktree at the tag, `git -C <relay> worktree add --detach
     `ssh -4 -o BatchMode=yes HOST ~/d/hq/tools/relay-cutover preflight --harness H`.
   - `relay-cutover familiar-source --head SHA [--host HOST]`: source readiness only, run
     before installing dependencies. `git --no-optional-locks -C ~/d/familiar rev-parse
-    HEAD` equals SHA, and `git --no-optional-locks -C ~/d/familiar diff --quiet SHA`
-    exits 0 (every tracked working file, `package-lock.json` included, has synced to
-    that commit; `node_modules` is untracked and ignored). It never runs familiar.
+    HEAD` equals SHA, and every file of SHA, `package-lock.json` included, matches the
+    working tree. Git indexes are excluded from Dropbox sync, so a synced host's own index
+    is stale and is never read or written: the comparison runs through an isolated index,
+    `GIT_INDEX_FILE=$(mktemp)` (removed on exit), populated by `git read-tree SHA`, then
+    `git diff --quiet SHA` under that index. `node_modules` is untracked and ignored.
+    It never runs familiar.
   - `relay-cutover familiar-check --expect {relay,native} [--host HOST]`: dependency
     readiness, run after installing or restoring them. `relay`:
     `~/d/familiar/node_modules/relay/package.json` version is `0.1.1` and
@@ -292,6 +295,9 @@ detached relay worktree at the tag, `git -C <relay> worktree add --detach
   update the harness"), `test_evidence_absent_harness_passes`,
   `test_familiar_source_head_and_working_tree` (HEAD mismatch and a modified tracked file
   each fail; untracked `node_modules` is ignored; familiar is never executed),
+  `test_familiar_source_ignores_a_stale_live_index` (a repository whose index predates
+  SHA, with HEAD and every new file synced: passes; the live index file is byte-identical
+  afterwards; then a changed source file fails),
   `test_familiar_check_relay_and_native_sides`,
   `test_retire_removes_only_the_native_guard_group` (every other group equal after a
   `json` round trip), `test_retire_writes_exact_before_and_after_images`,
