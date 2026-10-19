@@ -1,15 +1,17 @@
 ---
 id: hq-a8d65f
 title: Install the pinned pi on europa and link its agent directory from hq
-status: doing
+status: done
 priority: 2
 size: xs
 complexity: low
 process: direct
 owner: chore/hq-a8d65f-close
 created: 2026-10-15T21:14:37Z
-updated: 2026-10-19T09:23:04Z
+updated: 2026-10-19T09:23:06Z
 started: 2026-10-19T09:13:59Z
+completed: 2026-10-19T09:23:06Z
+closed: 2026-10-19T09:23:06Z
 depends: []
 parent: hq-aa9b44
 tags: []
@@ -44,3 +46,7 @@ Not blocked by hq-24416e: pick preservation reaches europa when that lands, thro
 - 2026-10-19T09:22:55Z (chore/hq-a8d65f-close): resumed
   provenance: {"harness_session":"claude-code:0b615834-ed7a-43c8-92d4-87a942bab2d7","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-19T09:23:04Z (chore/hq-a8d65f-close): retro: helped: probing europa read-only first (versions, links, Dropbox sync) and running pi in a detached tmux with a logging refresh wrapper made the interactive criterion checkable without the desktop. hurt: the host's stale tasks binary only surfaced as a misleading record-parse error (feedback tasks-476fd7), and closing a host rollout from main collided with unrelated live codex trust edits in the working tree, so the close moved to a worktree (feedback below).
+- 2026-10-19T09:23:06Z (chore/hq-a8d65f-close): done
+  provenance: {"harness_session":"claude-code:0b615834-ed7a-43c8-92d4-87a942bab2d7","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-19T09:23:06Z (chore/hq-a8d65f-close): pi 1.1.0 installed on europa, its agent directory linked from hq (link-check 0), interactive start clean; europa tasks upgraded to 0.4.0; pick survival after login filed as hq-de5be1
+  provenance: {"harness_session":"claude-code:0b615834-ed7a-43c8-92d4-87a942bab2d7","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
