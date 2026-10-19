@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 
+from test_relay_wiring import parse_relay_command
+
 ROOT = Path(__file__).resolve().parents[1]
 COMMAND = '~/d/ops/hooks/capture-notice'
 
@@ -17,11 +19,11 @@ def test_claude_registers_capture_notice_once():
 
 
 def test_codex_appends_capture_notice_after_trusted_entries():
-    # Codex keys trust by entry index, so the existing entries keep theirs.
-    assert session_start(ROOT / 'codex' / 'hooks.json') == [
-        '~/d/familiar/bin/familiar hook --agent codex SessionStart',
-        '~/d/lore/hooks/claude-profile',
-        COMMAND]
+    # The cutover re-trusts every shifted index; new entries still go last.
+    commands = session_start(ROOT / 'codex' / 'hooks.json')
+    assert len(commands) == 3
+    assert commands[:2] == ['~/d/lore/hooks/claude-profile', COMMAND]
+    assert parse_relay_command(commands[2]) == ('codex', 600000, 'SessionStart')
 
 
 def test_codex_work_home_has_no_capture_notice():
