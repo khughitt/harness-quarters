@@ -1,13 +1,15 @@
 ---
 id: hq-a8d65f
 title: Install the pinned pi on europa and link its agent directory from hq
-status: todo
+status: doing
 priority: 2
 size: xs
 complexity: low
 process: direct
+owner: main
 created: 2026-10-15T21:14:37Z
-updated: 2026-10-16T00:42:03Z
+updated: 2026-10-19T09:13:59Z
+started: 2026-10-19T09:13:59Z
 depends: []
 parent: hq-aa9b44
 tags: []
@@ -27,3 +29,5 @@ Not blocked by hq-24416e: pick preservation reaches europa when that lands, thro
 ## Notes
 
 - 2026-10-16T00:42:03Z (main): hq-24416e is merged and rolled out on titan. Europa: run just link --apply from hq main; it now also creates ~/.pi/agent/extensions/harness-state.ts. Run just link-check and verify pi defaults survive capture plus checkout. Do not point the extension or refresh command at a worktree.
+- 2026-10-19T09:13:59Z (main): started
+  provenance: {"harness_session":"claude-code:0b615834-ed7a-43c8-92d4-87a942bab2d7","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
