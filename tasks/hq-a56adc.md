@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/relay-cutover
 created: 2026-10-19T21:21:24Z
-updated: 2026-10-19T23:09:16Z
+updated: 2026-10-19T23:12:08Z
 started: 2026-10-19T23:00:46Z
 depends: [hq-1e9103]
 parent: hq-539508
@@ -29,3 +29,4 @@ step: "Task 5: Give the Codex work home a target the installer accepts, and prep
 - 2026-10-19T23:09:08Z (feat/relay-cutover): resumed
   provenance: {"harness_session":"codex:01a15627-8959-7223-98d3-1c5a0cf587a9","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-19T23:09:16Z (feat/relay-cutover): review: impl round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
+- 2026-10-19T23:12:08Z (feat/relay-cutover): Host prep: inert prefix merged on main; Titan ready and committed code matches tested branch, live settings/trust SHA unchanged. Europa source hashes match and expected two links converge, but npm 12.2.1 defaults allow-git=none and refused relay-install EALLOWGIT; npm 11.17.0 on Titan defaults all. Upstream checked official v12 install docs, npm/cli latest changelog, issues/9189 and PRs/9206, /9466, /8703: intentional npm12 default-deny; root option supported and HTTPS canonicalization fixed in npm12. Correct own recipe with per-command allow-git=root and regenerate HTTPS lock using installed npm12; no global npm configuration change.
