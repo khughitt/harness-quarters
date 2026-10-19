@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "subscribers": [
+    {
+      "name": "ops-guard",
+      "role": "guard",
+      "harnesses": ["claude-code", "codex"],
+      "kinds": ["before-tool"],
+      "tools": ["Bash"],
+      "argv": ["/usr/bin/python3", "@HOME@/d/ops/hooks/relay-guard"],
+      "timeoutMs": 30000
+    },
+    {
+      "name": "familiar",
+      "role": "observer",
+      "harnesses": ["claude-code", "codex"],
+      "kinds": ["session-start", "prompt", "before-tool", "activity", "idle", "needs-input", "needs-approval", "turn-end", "turn-error", "reconcile"],
+      "argv": ["@HOME@/d/familiar/bin/familiar", "observe"],
+      "timeoutMs": 2000
+    },
+    {
+      "name": "familiar-teardown",
+      "role": "observer",
+      "harnesses": ["claude-code", "codex"],
+      "kinds": ["session-end"],
+      "argv": ["@HOME@/d/familiar/bin/familiar", "observe"],
+      "timeoutMs": 200
+    }
+  ]
+}
