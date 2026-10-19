@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-10-15T21:14:37Z
-updated: 2026-10-19T09:14:27Z
+updated: 2026-10-19T09:14:28Z
 started: 2026-10-19T09:13:59Z
 depends: []
 parent: hq-aa9b44
@@ -33,4 +33,6 @@ Not blocked by hq-24416e: pick preservation reaches europa when that lands, thro
   provenance: {"harness_session":"claude-code:0b615834-ed7a-43c8-92d4-87a942bab2d7","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-19T09:14:07Z (main): arm: flow-trial-1 — unit tack-aa9b44 — flow on
 - 2026-10-19T09:14:27Z (main): gate: scoped — adopted
+  provenance: {"harness_session":"claude-code:0b615834-ed7a-43c8-92d4-87a942bab2d7","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-19T09:14:27Z (main): gate: implementing main — host rollout on europa run from hq main as AGENTS.md requires for link apply, no repository change
   provenance: {"harness_session":"claude-code:0b615834-ed7a-43c8-92d4-87a942bab2d7","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
