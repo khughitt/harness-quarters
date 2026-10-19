@@ -393,6 +393,12 @@ def test_retire_persists_both_images_before_replacing(box):
 
 
 def test_retire_fsyncs_images_and_directory_before_replacement(box):
+    target_directory = box.tmp / "targets"
+    target_directory.mkdir()
+    box.target = box.target.rename(target_directory / "settings.json")
+    caller_created = box.tmp / "recovery/caller-created"
+    caller_created.mkdir(parents=True)
+    box.backup = caller_created / "new/backups"
     replace, fsync = box.module.os.replace, box.module.os.fsync
     synced = []
     before, after = box.images()
@@ -404,8 +410,45 @@ def test_retire_fsyncs_images_and_directory_before_replacement(box):
     def check_replace(source, target):
         if target == box.target:
             assert before.read_bytes() == box.before and after.exists()
-            assert synced.count(str(box.backup)) == 2
-            assert len([p for p in synced if str(box.backup) + "/" in p]) == 2
+            image_syncs = [p for p in synced if str(box.backup) + "/" in p]
+            assert len(image_syncs) == 2
+            for directory in (box.backup, box.backup.parent, caller_created,
+                              caller_created.parent, box.tmp):
+                assert str(directory) in synced, f"unsynced backup ancestor: {directory}"
+                assert synced.index(str(directory)) < synced.index(image_syncs[0])
+            backup_syncs = [p for p in synced if p == str(box.backup)
+                            or p.startswith(str(box.backup) + "/")]
+            assert backup_syncs[-4:] == [image_syncs[0], str(box.backup),
+                                        image_syncs[1], str(box.backup)]
+        replace(source, target)
+
+    box.patch.setattr(box.module.os, "fsync", track_sync)
+    box.patch.setattr(box.module.os, "replace", check_replace)
+    assert box.retire().code == 0
+
+
+def test_retire_directory_sync_failure_keeps_target_and_retry_syncs_existing_parents(box):
+    box.backup = box.tmp / "recovery/new/backups"
+    fsync, replace = box.module.os.fsync, box.module.os.replace
+
+    def fail_parent_sync(fd):
+        if os.readlink(f"/proc/self/fd/{fd}") == str(box.backup.parent):
+            raise OSError("injected backup-parent fsync failure")
+        fsync(fd)
+
+    box.patch.setattr(box.module.os, "fsync", fail_parent_sync)
+    assert box.retire().code == 1
+    assert box.target.read_bytes() == box.before
+    assert not any(path.exists() for path in box.images())
+    synced = []
+
+    def track_sync(fd):
+        synced.append(os.readlink(f"/proc/self/fd/{fd}"))
+        fsync(fd)
+
+    def check_replace(source, target):
+        if target == box.target:
+            assert str(box.backup.parent) in synced
         replace(source, target)
 
     box.patch.setattr(box.module.os, "fsync", track_sync)

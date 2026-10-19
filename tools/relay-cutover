@@ -161,6 +161,14 @@ def familiar_check(args):
     print(f"relay-cutover: familiar-check: {args.expect} ok")
 
 
+def sync_directory(path):
+    directory = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+
+
 def atomic_write(path, data, mode):
     fd, name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     temp = Path(name)
@@ -171,11 +179,7 @@ def atomic_write(path, data, mode):
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temp, path)
-        directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
-        try:
-            os.fsync(directory)
-        finally:
-            os.close(directory)
+        sync_directory(path.parent)
     finally:
         temp.unlink(missing_ok=True)
 
@@ -210,7 +214,11 @@ def retire_native_guard(args):
     for image in images:
         if image.exists() or image.is_symlink():
             raise Stop(f"guard image already exists: {image}")
-    images[0].parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    backup = images[0].parent.absolute()
+    backup.mkdir(parents=True, exist_ok=True, mode=0o700)
+    # Existing ancestors may have just been created by the caller or an interrupted attempt.
+    for directory in dict.fromkeys((backup, *backup.parents, *backup.resolve().parents)):
+        sync_directory(directory)
     mode = stat.S_IMODE(target.stat().st_mode)
     atomic_write(images[0], before, mode)
     atomic_write(images[1], after, mode)
