@@ -244,7 +244,12 @@ background task. The list also includes shells and monitors, which may never
 end (a dev server), and a `Stop` with only a scheduled wakeup pending carries
 it in `session_crons` instead. The fix belongs to Familiar and is filed as
 fam-721108: a `Stop` waiting on agent-type work should not reach `done`, while
-shell-only and monitor-only turns keep it.
+shell-only and monitor-only turns keep it. It landed on 2026-10-19 (Familiar
+merge b40c8fd): a `Stop` with a subagent, workflow, teammate or cloud session
+running or pending stays `working`, and a `Stop` with only shells, monitors or
+scheduled wakeups still reaches `done`. The payload lacks the flags Claude's own
+idle check reads to skip an idle teammate or a long-running cloud session, so
+such a task holds the `Stop` at `working` as well.
 
 ### Workspace attention
 
