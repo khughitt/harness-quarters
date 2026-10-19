@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-10-15T21:14:37Z
-updated: 2026-10-19T09:22:20Z
+updated: 2026-10-19T09:22:21Z
 started: 2026-10-19T09:13:59Z
 depends: []
 parent: hq-aa9b44
@@ -38,3 +38,4 @@ Not blocked by hq-24416e: pick preservation reaches europa when that lands, thro
   provenance: {"harness_session":"claude-code:0b615834-ed7a-43c8-92d4-87a942bab2d7","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-19T09:19:00Z (main): europa ran tasks 0.2.0, which failed to parse current records (just link: tasks projects --paths parse error on a quoted-timestamp field); upgraded to 0.4.0 with cargo install --locked --path ~/d/tasks at b253252, the commit titan runs
 - 2026-10-19T09:22:20Z (main): review: impl round 1 — verdict: accept; findings: minor 3; reviewer: claude-code/claude-opus-5-5
+- 2026-10-19T09:22:20Z (main): Correction: europa's tasks was built from b253252, whose source matches titan's binary (built after 102bd23; only chore(tasks) record commits since), not the identical commit. Reviewer also ran pi --version once on europa: bootstrap lock only, no content change.
