@@ -6,9 +6,9 @@ priority: 2
 size: xs
 complexity: low
 process: direct
-owner: main
+owner: chore/hq-a8d65f-close
 created: 2026-10-15T21:14:37Z
-updated: 2026-10-19T09:22:42Z
+updated: 2026-10-19T09:22:55Z
 started: 2026-10-19T09:13:59Z
 depends: []
 parent: hq-aa9b44
@@ -40,4 +40,6 @@ Not blocked by hq-24416e: pick preservation reaches europa when that lands, thro
 - 2026-10-19T09:22:20Z (main): review: impl round 1 — verdict: accept; findings: minor 3; reviewer: claude-code/claude-opus-5-5
 - 2026-10-19T09:22:20Z (main): Correction: europa's tasks was built from b253252, whose source matches titan's binary (built after 102bd23; only chore(tasks) record commits since), not the identical commit. Reviewer also ran pi --version once on europa: bootstrap lock only, no content change.
 - 2026-10-19T09:22:42Z (main): gate: verified tree:a57b7651cf7701723085ef4ec24fa01f246324cd — checks: on europa just pi-install then pi --version 1.1.0 via the hq launcher with lock check passing, just link --apply then just link-check exit 0, pi agent links resolve into hq and lore, two tmux pi starts show no changelog and load AGENTS.md and harness-state.ts, shutdown refresh rc 0, titan git status shows no pi change and no conflicted copies, tree is index and HEAD since the working tree differs only by pre-existing unstaged codex trust hashes outside this task; review: minor addressed tasks build commit wording corrected in a note, minor deferred run evidence lives only in the session transcript, minor deferred pick survival on europa needs a login filed as hq-de5be1; reviewer: claude-code/claude-opus-5-5
+  provenance: {"harness_session":"claude-code:0b615834-ed7a-43c8-92d4-87a942bab2d7","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-19T09:22:55Z (chore/hq-a8d65f-close): resumed
   provenance: {"harness_session":"claude-code:0b615834-ed7a-43c8-92d4-87a942bab2d7","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
