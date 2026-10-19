@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/relay-cutover
 created: 2026-10-19T21:21:24Z
-updated: 2026-10-19T23:20:29Z
+updated: 2026-10-19T23:21:47Z
 started: 2026-10-19T23:00:46Z
 depends: [hq-1e9103]
 parent: hq-539508
@@ -37,3 +37,5 @@ step: "Task 5: Give the Codex work home a target the installer accepts, and prep
 - 2026-10-19T23:15:17Z (feat/relay-cutover): Integration correction: upstream default-deny and HTTPS changes confirmed in npm12 docs and npm/cli PRs 9466, 8703, 9206 (controller search already recorded). Real recipe regression RED EALLOWGIT plus SSH URL mismatch; GREEN 8 focused tests. Disposable Europa npm12.2.1 generation and npm ci both succeeded with root-only opt-in; release banner relay 0.1.1; lock unchanged by ci and exact HTTPS release commit retained. No shared install retry or global config change.
 - 2026-10-19T23:20:29Z (feat/relay-cutover): parked (waiting on agent): Controller: scoped-review npm12 correction in .worktrees/relay-cutover, then merge reviewed correction and retry inert Europa installation before completing host preparation; evidence in .superpowers/sdd/2026-10-19-relay-cutover/task-5-report.md
   provenance: {"harness_session":"codex:01a15664-7cc0-70c0-9a01-d1cef0d8c24b","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-19T23:21:47Z (feat/relay-cutover): resumed
+  provenance: {"harness_session":"codex:01a15627-8959-7223-98d3-1c5a0cf587a9","harness_session_source":"CODEX_THREAD_ID"}
