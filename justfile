@@ -35,6 +35,32 @@ pi-install:
     cp pi/package.json pi/package-lock.json "$dest/"
     npm ci --prefix "$dest" --ignore-scripts --no-fund --no-audit
 
+# Install the pinned relay outside the synced checkout; relay/bin/relay runs it.
+relay-install:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    version=$(/usr/bin/node -p "require('./relay/package.json').dependencies.relay.split('#')[1]")
+    dest="${RELAY_INSTALL_ROOT:-$HOME/.local/share/relay}/$version"
+    mkdir -p "$dest"
+    cp relay/package.json relay/package-lock.json "$dest/"
+    npm ci --prefix "$dest" --ignore-scripts --no-fund --no-audit
+
+# Render the host subscriber config; FORCE=1 permits replacing different content.
+relay-subscribers:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    umask 077
+    rendered=$(mktemp)
+    trap 'rm -f "$rendered"' EXIT
+    sed "s|@HOME@|$HOME|g" relay/subscribers.template.json > "$rendered"
+    dest="$HOME/.config/relay/subscribers.json"
+    if [[ -e "$dest" ]] && ! cmp -s "$rendered" "$dest" && [[ "${FORCE:-0}" != 1 ]]; then
+        echo "refusing to overwrite $dest with different content; rerun with FORCE=1" >&2
+        exit 1
+    fi
+    install -d -m 700 "$HOME/.config/relay"
+    install -m 600 "$rendered" "$dest"
+
 # Validate and test each Claude Code mod under claude/mods (needs the claude CLI).
 mods:
     for mod in claude/mods/*/; do claude plugin validate "$mod" && claude plugin test "$mod" || exit 1; done

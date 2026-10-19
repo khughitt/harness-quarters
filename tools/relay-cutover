@@ -1,0 +1,355 @@
+#!/usr/bin/env python3
+"""Readiness checks and byte-gated recovery for the operator's relay cutover."""
+import argparse
+import difflib
+import json
+import os
+import re
+import shlex
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+GUARD = {"type": "command", "command": "~/d/ops/hooks/claude-pretooluse"}
+
+
+class Stop(Exception):
+    pass
+
+
+def run(*cmd, env=None):
+    result = subprocess.run([str(c) for c in cmd], env=env, text=True,
+                            capture_output=True, timeout=60)
+    if result.returncode:
+        raise Stop((result.stderr or result.stdout).strip().replace("\n", "; ")
+                   or f"{cmd[0]} exited {result.returncode}")
+    return result.stdout
+
+
+def load_json(path):
+    value = json.loads(path.read_bytes())
+    if not isinstance(value, dict):
+        raise Stop(f"{path}: expected a JSON object")
+    return value
+
+
+def target_path(value):
+    path = Path(value)
+    if not path.is_absolute() or path.is_symlink():
+        raise Stop("target must be absolute and not a symlink")
+    if path.exists() and not path.is_file():
+        raise Stop("target must be a regular file")
+    return path
+
+
+def process_rows():
+    for directory in Path("/proc").glob("[0-9]*"):
+        try:
+            comm = (directory / "comm").read_text().strip()
+        except (FileNotFoundError, ProcessLookupError):
+            continue
+        try:
+            exe = str((directory / "exe").readlink())
+        except (FileNotFoundError, ProcessLookupError):
+            exe = ""
+        except PermissionError:
+            # shortcut: unreadable system exe links leave comm checks; use a privileged scan for full visibility.
+            exe = ""
+        yield int(directory.name), comm, exe
+
+
+def no_live(harness):
+    comm = "claude" if harness == "claude-code" else "codex"
+    versions = str(Path.home() / ".local/share/claude/versions") + "/"
+    live = [str(pid) for pid, name, exe in process_rows()
+            if name == comm or (harness == "claude-code" and exe.startswith(versions))]
+    if live:
+        raise Stop(f"live {harness} process ids: {', '.join(live)}; close all sessions first")
+
+
+def runtime():
+    relay = Path.home() / ".local/share/relay/v0.1.1/node_modules/relay/bin/relay.js"
+    if not relay.is_file():
+        raise Stop("missing pinned relay.js; run just relay-install")
+    version = run("/usr/bin/node", relay, "--version").strip()
+    if version != "relay 0.1.1":
+        raise Stop(f"expected relay 0.1.1, found {version!r}")
+
+
+def subscribers():
+    path = Path.home() / ".config/relay/subscribers.json"
+    for item, wanted in ((path.parent, 0o700), (path, 0o600)):
+        mode = stat.S_IMODE(item.stat().st_mode)
+        if mode != wanted:
+            raise Stop(f"{item}: mode {mode:04o}, expected {wanted:04o}")
+    expected = (ROOT / "relay/subscribers.template.json").read_bytes().replace(
+        b"@HOME@", os.fsencode(Path.home()))
+    if path.read_bytes() != expected:
+        raise Stop("installed content differs from rendered subscriber template")
+
+
+def evidence(harness):
+    binary = shutil.which("claude" if harness == "claude-code" else "codex")
+    if binary is None:
+        print(f"relay-cutover: evidence: {harness} absent")
+        return
+    path = Path.home() / "d/ops/docs/runbooks" / f"relay-guard-evidence-{harness}.json"
+    recorded = load_json(path)
+    version = run(binary, "--version").strip()
+    if recorded.get("harness") != harness or recorded.get("version") != version:
+        raise Stop(f"installed {version!r}; evidence {recorded.get('version')!r}; "
+                   "rerun the ops relay-guard probe or update the harness")
+
+
+def preflight(args):
+    failures = 0
+    for check, function in (("no-live", lambda: no_live(args.harness)),
+                            ("runtime", runtime), ("subscribers", subscribers),
+                            ("evidence", lambda: evidence(args.harness))):
+        try:
+            function()
+        except (Stop, OSError, ValueError, subprocess.TimeoutExpired) as error:
+            message = str(error).replace("\n", "; ")
+            print(f"relay-cutover: {check}: {message}", file=sys.stderr)
+            failures += 1
+        else:
+            print(f"relay-cutover: {check}: ok")
+    return int(bool(failures))
+
+
+def familiar_source(args):
+    if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", args.head):
+        raise Stop("expected a full commit SHA")
+    root = Path.home() / "d/familiar"
+    git = ("git", "--no-optional-locks", "-C", root)
+    head = run(*git, "rev-parse", "HEAD").strip()
+    if head != args.head:
+        raise Stop(f"HEAD is {head}, expected {args.head}")
+    fd, index = tempfile.mkstemp(prefix="relay-cutover-index-")
+    os.close(fd)
+    os.unlink(index)
+    try:
+        env = {**os.environ, "GIT_INDEX_FILE": index}
+        run(*git, "read-tree", args.head, env=env)
+        try:
+            run(*git, "diff", "--quiet", args.head, env=env)
+        except Stop:
+            raise Stop(f"working tree differs from {args.head}") from None
+    finally:
+        Path(index).unlink(missing_ok=True)
+        Path(index + ".lock").unlink(missing_ok=True)
+    print("relay-cutover: familiar-source: ok")
+
+
+def familiar_check(args):
+    root = Path.home() / "d/familiar"
+    relay = root / "node_modules/relay"
+    if args.expect == "relay":
+        version = load_json(relay / "package.json").get("version")
+        if version != "0.1.1":
+            raise Stop(f"relay dependency version {version!r}, expected '0.1.1'")
+        command = "observe"
+    else:
+        if relay.exists() or relay.is_symlink():
+            raise Stop("node_modules/relay exists; restore native dependencies")
+        command = "hook"
+    run(root / "bin/familiar", command, "--help")
+    print(f"relay-cutover: familiar-check: {args.expect} ok")
+
+
+def sync_directory(path):
+    directory = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+
+
+def atomic_write(path, data, mode):
+    fd, name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    temp = Path(name)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            os.fchmod(stream.fileno(), mode)
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temp, path)
+        sync_directory(path.parent)
+    finally:
+        temp.unlink(missing_ok=True)
+
+
+def guard_images(target, backup):
+    name = str(target).replace("/", "_")
+    return (Path(backup) / (name + ".before-guard"),
+            Path(backup) / (name + ".after-guard"))
+
+
+def retire_native_guard(args):
+    target = target_path(args.target)
+    before = target.read_bytes()
+    config = json.loads(before)
+    if not isinstance(config, dict):
+        raise Stop("target must contain a JSON object")
+    hooks = config.get("hooks")
+    if not isinstance(hooks, dict) or not isinstance(hooks.get("PreToolUse"), list):
+        raise Stop("native guard group absent")
+    groups = hooks["PreToolUse"]
+    found = [group for group in groups if isinstance(group, dict)
+             and isinstance(group.get("hooks"), list)
+             and any(isinstance(hook, dict) and hook.get("command") == GUARD["command"]
+                     for hook in group["hooks"])]
+    if len(found) != 1:
+        raise Stop(f"expected exactly one native guard group, found {len(found)}")
+    if found[0]["hooks"] != [GUARD]:
+        raise Stop("native guard shares its group or is not the exact command hook")
+    hooks["PreToolUse"] = [group for group in groups if group is not found[0]]
+    after = (json.dumps(config, indent=2, ensure_ascii=False) + "\n").encode()
+    images = guard_images(target, args.backup)
+    for image in images:
+        if image.exists() or image.is_symlink():
+            raise Stop(f"guard image already exists: {image}")
+    backup = images[0].parent.absolute()
+    backup.mkdir(parents=True, exist_ok=True, mode=0o700)
+    # Existing ancestors may have just been created by the caller or an interrupted attempt.
+    for directory in dict.fromkeys((backup, *backup.parents, *backup.resolve().parents)):
+        sync_directory(directory)
+    mode = stat.S_IMODE(target.stat().st_mode)
+    atomic_write(images[0], before, mode)
+    atomic_write(images[1], after, mode)
+    atomic_write(target, after, mode)
+
+
+def artifact_change(path, target):
+    artifact = load_json(path)
+    changes = artifact.get("changes")
+    if artifact.get("schema") != 1 or not isinstance(changes, list):
+        raise Stop("invalid relay artifact")
+    found = [change for change in changes if isinstance(change, dict)
+             and change.get("path") == str(target)]
+    if len(found) != 1:
+        raise Stop("artifact must name the target exactly once")
+    change = found[0]
+    if not {"before", "after"} <= change.keys():
+        raise Stop("artifact change is missing before/after")
+    if not isinstance(change["before"], (str, type(None))) or not isinstance(change["after"], str):
+        raise Stop("artifact before/after must be strings (before may be null)")
+    return {key: value.encode() if value is not None else None
+            for key, value in change.items() if key in ("before", "after")}
+
+
+def restore(args):
+    target = target_path(args.target)
+    before_path, after_path = guard_images(target, args.backup)
+    before = before_path.read_bytes() if before_path.exists() else None
+    after = after_path.read_bytes() if after_path.exists() else None
+    change = None
+    if args.artifact and Path(args.artifact).exists():
+        change = artifact_change(Path(args.artifact), target)
+    current = target.read_bytes() if target.exists() else None
+    if change and current == change["after"]:
+        launcher = os.environ.get("RELAY_CUTOVER_RELAY", ROOT / "relay/bin/relay")
+        run(launcher, "rollback", "--artifact", args.artifact)
+        current = target.read_bytes() if target.exists() else None
+    if after is not None and current == after:
+        if before is None:
+            raise Stop("target matches .after-guard but .before-guard is missing")
+        atomic_write(target, before, stat.S_IMODE(before_path.stat().st_mode))
+        current = target.read_bytes()
+    if before is not None and current == before:
+        return
+    if before is None and after is None and change and current == change["before"]:
+        return
+    matches = [name for name, image in (
+        (".before-guard", before), (".after-guard", after),
+        ("artifact.before", change["before"] if change else None),
+        ("artifact.after", change["after"] if change else None),
+    ) if image is not None and current == image]
+    raise Stop(f"target matches {', '.join(matches) if matches else 'none'}; refusing further writes")
+
+
+def verify(args):
+    target = target_path(args.target)
+    expected = Path(args.expect)
+    def render(path):
+        data = load_json(path)
+        return (json.dumps({key: data[key] for key in ("hooks", "statusLine") if key in data},
+                           sort_keys=True, indent=2, ensure_ascii=False) + "\n").splitlines(True)
+    diff = list(difflib.unified_diff(render(expected), render(target),
+                                     fromfile=str(expected), tofile=str(target)))
+    if diff:
+        sys.stdout.writelines(diff)
+        raise Stop("hooks or statusLine differ")
+
+
+def remote(args):
+    if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.@:-]*", args.host):
+        raise Stop("invalid SSH host")
+    command = [args.command]
+    for flag in ("harness", "head", "expect"):
+        if hasattr(args, flag):
+            command.extend(("--" + flag, getattr(args, flag)))
+    result = subprocess.run(
+        ["ssh", "-4", "-o", "BatchMode=yes", args.host,
+         "~/d/hq/tools/relay-cutover " + shlex.join(command)],
+        text=True, capture_output=True, timeout=60,
+    )
+    sys.stdout.write(result.stdout)
+    if result.returncode and not result.stderr.startswith("relay-cutover: "):
+        raise Stop(result.stderr.strip().replace("\n", "; ") or f"ssh exited {result.returncode}")
+    sys.stderr.write(result.stderr)
+    return int(bool(result.returncode))
+
+
+COMMANDS = {"preflight": preflight, "familiar-source": familiar_source,
+            "familiar-check": familiar_check, "retire-native-guard": retire_native_guard,
+            "restore": restore, "verify": verify}
+
+
+def argument_parser(**kwargs):
+    parser = argparse.ArgumentParser(**kwargs)
+    def error(message):
+        raise Stop(message)
+    parser.error = error
+    return parser
+
+
+def main(argv):
+    parser = argument_parser(prog="relay-cutover")
+    sub = parser.add_subparsers(dest="command", required=True, parser_class=argument_parser)
+    p = sub.add_parser("preflight")
+    p.add_argument("--harness", choices=("claude-code", "codex"), required=True)
+    s = sub.add_parser("familiar-source")
+    s.add_argument("--head", required=True)
+    c = sub.add_parser("familiar-check")
+    c.add_argument("--expect", choices=("relay", "native"), required=True)
+    for command in (p, s, c):
+        command.add_argument("--host")
+    for name in ("retire-native-guard", "restore", "verify"):
+        command = sub.add_parser(name)
+        command.add_argument("--target", required=True)
+        if name == "verify":
+            command.add_argument("--expect", required=True)
+        else:
+            command.add_argument("--backup", required=True)
+        if name == "restore":
+            command.add_argument("--artifact")
+    check = "arguments"
+    try:
+        args = parser.parse_args(argv)
+        check = args.command
+        result = remote(args) if getattr(args, "host", None) else COMMANDS[args.command](args)
+    except (Stop, OSError, ValueError, subprocess.TimeoutExpired) as error:
+        message = str(error).replace("\n", "; ")
+        print(f"relay-cutover: {check}: {message}", file=sys.stderr)
+        return 1
+    return result or 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

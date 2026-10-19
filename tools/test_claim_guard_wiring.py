@@ -10,7 +10,7 @@ COMMAND = '~/d/ops/hooks/claim-guard --harness codex'
 
 
 @pytest.mark.parametrize('file,home', [('hooks.json', 'codex'),
-                                     ('hooks.work.json', 'codex-work')])
+                                     ('work/hooks.json', 'codex-work')])
 def test_both_codex_homes_guard_root_and_worker(file, home):
     hooks = json.loads((ROOT / 'codex' / file).read_text())['hooks']
     for event in ('Stop', 'SubagentStop'):

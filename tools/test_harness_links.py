@@ -261,6 +261,8 @@ def fresh_clone(tmp_path, home):
     # Exercise the working manifest and tool, including changes not committed yet.
     shutil.copy2(repo / "links.toml", clone / "links.toml")
     shutil.copy2(TOOL, clone / "tools/harness-links")
+    shutil.copytree(repo / "relay", clone / "relay", dirs_exist_ok=True)
+    shutil.copytree(repo / "codex/work", clone / "codex/work", dirs_exist_ok=True)
     # A public clone needs the submodule and sibling skill checkouts. Use the local
     # sources in these fixtures so the tests require neither network nor live writes.
     main = Path(run("-C", str(repo), "worktree", "list", "--porcelain").stdout.splitlines()[0][9:])
@@ -311,14 +313,17 @@ def test_real_manifest_with_codex_needs_setup_first(tmp_path):
     home = tmp_path / "home"
     (home / ".claude").mkdir(parents=True)
     (home / ".codex").mkdir()
+    (home / ".codex-work").mkdir()
     clone = fresh_clone(tmp_path, home)
     before = link(clone, home)
     assert before.returncode == 2
     assert "local/codex/rules" in before.stderr and "just setup" in before.stderr
     assert just_setup(clone).returncode == 0
+    (clone / "local/codex/config.work.toml").write_text("")
     after = link(clone, home)
     assert after.returncode == 0, after.stderr
     assert states(after)["~/.codex/rules"] == "create"
+    assert states(after)["~/.codex-work/hooks.json"] == "create"
 
 
 def test_real_manifest_work_home_without_local_names_the_file(tmp_path):

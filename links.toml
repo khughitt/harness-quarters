@@ -16,6 +16,7 @@
 "~/.local/bin/harness-state-refresh" = ".githooks/harness-state-refresh"
 "~/.local/bin/hq" = "tools/hq"
 "~/.local/bin/pi" = "pi/bin/pi"
+"~/.local/bin/relay" = "relay/bin/relay"
 "~/.local/bin/session-archive" = "tools/session-archive"
 "~/.config/systemd/user/session-archive-capture.service" = "systemd/user/session-archive-capture.service"
 "~/.config/systemd/user/session-archive-capture.timer" = "systemd/user/session-archive-capture.timer"
@@ -112,7 +113,7 @@ home = "~/.codex-work"
 [harness.codex-work.links]
 "AGENTS.md" = "lore:instructions/AGENTS.md"
 "config.toml" = "local/codex/config.work.toml"
-"hooks.json" = "codex/hooks.work.json"
+"hooks.json" = "codex/work/hooks.json"
 
 [harness.opencode]
 home = "~/.config/opencode.local"
