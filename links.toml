@@ -113,7 +113,7 @@ home = "~/.codex-work"
 [harness.codex-work.links]
 "AGENTS.md" = "lore:instructions/AGENTS.md"
 "config.toml" = "local/codex/config.work.toml"
-"hooks.json" = "codex/hooks.work.json"
+"hooks.json" = "codex/work/hooks.json"
 
 [harness.opencode]
 home = "~/.config/opencode.local"

@@ -25,7 +25,7 @@ def test_codex_appends_capture_notice_after_trusted_entries():
 
 
 def test_codex_work_home_has_no_capture_notice():
-    hooks = json.loads((ROOT / 'codex' / 'hooks.work.json').read_text())['hooks']
+    hooks = json.loads((ROOT / 'codex' / 'work' / 'hooks.json').read_text())['hooks']
     commands = [h['command'] for groups in hooks.values() for group in groups
                 for h in group['hooks'] if h['type'] == 'command']
     assert COMMAND not in commands

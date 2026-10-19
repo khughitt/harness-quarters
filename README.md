@@ -180,7 +180,7 @@ MIT licensed; see `LICENSE`.
   the remaining skill corpus live in lore.
 - `claude/` and `codex/`: per-harness settings and hooks. Each home's settings and hooks
   files are symlinks to them: `~/.claude` and `~/.codex` to the plain files,
-  `~/.codex-work` to `codex/hooks.work.json`.
+  `~/.codex-work` to `codex/work/hooks.json`.
 - `claude/mods/`: Claude Code function-hook plugins, linked as `~/.claude/mods` and
   loaded by `CLAUDE_CODE_PLUGIN_DIRS` in `claude/settings.json`. `cli-pane` adds
   `/tas <id>` and `/m <id>`, which show `tasks show` and `mindful show` output in a
@@ -311,7 +311,7 @@ the transcript found under `projects/*/<id>.jsonl`, and Codex's `state_5.sqlite`
 
 ## Codex claim guard
 
-`codex/hooks.json` and `codex/hooks.work.json` register ops's claim guard once on
+`codex/hooks.json` and `codex/work/hooks.json` register ops's claim guard once on
 root `Stop` and once on worker `SubagentStop`. `links.toml` routes them to the
 personal and work homes respectively. The worker event uses `agent_id` to select
 its own claim; shared root metadata does not grant foreign closure authority.

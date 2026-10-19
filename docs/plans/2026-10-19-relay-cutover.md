@@ -18,7 +18,7 @@ them.
 npm lockfile pinning, systemd user timers, Codex hook trust.
 
 **Status:** approved by the user on 2026-10-19 after three review rounds (codex/gpt-6-astra);
-execution is subagent-driven, in a fresh session. Not started.
+execution is subagent-driven, in a fresh session. Execution in progress; operator window not run.
 
 **Spec:** ops `docs/specs/2026-09-16-relay-design.md` §8 (approved after `d7e2c33`);
 brief "A" in ops `docs/plans/2026-09-16-relay-bootstrap.md` (approved after
