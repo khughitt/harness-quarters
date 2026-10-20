@@ -7,7 +7,7 @@ size: s
 complexity: low
 process: direct
 created: 2026-10-20T16:05:12Z
-updated: 2026-10-20T16:05:12Z
+updated: 2026-10-20T16:51:34Z
 depends: []
 parent: hq-cff824
 tags: [session-logs]
@@ -21,3 +21,7 @@ Where to look: agents/bin/session-episodes (_roots, scan_stores); obs stores.py 
 ## References
 
 - brief (input, kind=brief): docs/notes/2026-10-20-session-store-reach-brief.md — context and questions for this work
+
+## Notes
+
+- 2026-10-20T16:51:34Z (main): decision 2026-10-20: kept independent of the proposed hq logs shared reader (brief §4): the silent coverage gap in obs's baseline input is worth closing now, and the shared reader, when it lands, replaces _roots with an import. No dependency to add.
