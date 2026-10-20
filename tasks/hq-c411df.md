@@ -4,8 +4,8 @@ title: "session-episodes reads only the default Claude projects store and Codex 
 status: idea
 priority: 2
 created: 2026-10-20T11:19:18Z
-updated: 2026-10-20T16:05:26Z
-depends: []
+updated: 2026-10-20T16:05:27Z
+depends: [hq-a1c591]
 parent: hq-cff824
 tags: [feedback, gap, "from:lore"]
 agent: claude-code
