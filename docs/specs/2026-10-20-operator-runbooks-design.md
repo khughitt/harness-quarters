@@ -2,7 +2,7 @@
 
 Status: approved for planning by Keith after spec round 6, 2026-10-20.
 The round-6 consent clarification is carried into the plan. Preparation/toolchain/
-pilot/update-hold refinements from plan rounds 1–3 await human plan re-review.
+pilot/update-hold refinements from plan rounds 1–4 await human plan re-review.
 Bootstrap/runbook: hq-c6c847. Independent Bash work: dots-55f537.
 Independent instruction work: lore-4c1787.
 This amends the execution arrangement of the approved relay cutover, not its
@@ -409,33 +409,45 @@ Use the supported process environment `DISABLE_UPDATES=1` to block automatic and
 manual updates, without editing the four targets, `~/.claude.json` or shared
 launchers. See the [official update controls](https://code.claude.com/docs/en/setup#disable-auto-updates)
 and [environment reference](https://code.claude.com/docs/en/env-vars).
-This is a scoped process hold, not a machine-wide installation lock. Close unheld
-Claude sessions/updaters on both hosts before final readiness, then use only held
-Claude launches through finish, including probe/help/version/doctor and both homes'
-smokes. Codex's printed launches carry the flag for tool children; the remote
-helper sets it explicitly for its own children. No unheld Claude/IDE client,
-update/install command or external installer may run during that interval.
+This scoped process hold runs only from bootstrap through finish. Ordinary Claude
+use, including `cl`/`clw` and review sessions, remains allowed during preparation,
+pilot and any parked wait. Individual agent diagnostics/probes use the flag
+beforehand, without creating a continuing restriction on ordinary use.
 
-Verify each host/home's held version and doctor's auto-update-disabled diagnostic;
-record the selected installed version, resolved binary digest and hold proof in
-prepared data. Check known owned Claude processes for that identity/hold key only;
-never print full environments. An unproven hold blocks the window before timers
-pause. The normal parent environment is unchanged: future ordinary terminal
-launches use their prior policy, while held sessions remain held until exit. Never
-unset an existing user/admin policy.
+As the last action before every request to close sessions, including after a wait,
+the agent checks both hosts' installed versions against reviewed evidence and
+prepared identities with held commands. If unchanged, no preparation repeats. If
+moved, repeat only implementation-plan Task 9 Steps 5–7 (version/doctor checks,
+original Task 3's isolated held ops probe with required cases and independent
+review, reviewed proof delivery and both-host installer acceptance, refreshed
+inputs/preparation), then check again before asking for closure. Rerun the pilot
+only if its helper/toolchain bytes changed, with their normal checks/review/delivery
+first. Version refresh alone never repeats runner-doc rewriting, implementation
+review/delivery or the pilot; the new evidence still needs its own review/delivery.
+New capabilities changing images still require original Task 6 image review.
+2.1.304 is the current baseline, not a permanent hardcoded requirement. Host
+alignment remains an operator action, never an automatic update/downgrade.
 
-Readiness explicitly compares both hosts' installed version to shared evidence.
-2.1.304 is the current baseline, not a permanent hardcoded requirement. If either
-version moves, require operator alignment to one version, then repeat original
-Task 3's isolated ops guard probe with held Claude children, required cases,
-both-host before/after version checks, ops checks and independent evidence review.
-Land reviewed proof/docs on ops main, verify both hosts' installer acceptance,
-then refresh the protected input/helper manifest. New capabilities that change
-images require original Task 6's image review too. Any pre-window drift or return
-to unheld ordinary use invalidates readiness and repeats this loop.
+The operator closes all Claude/Codex sessions for bootstrap. Before timers pause,
+`run` repeats strict no-live, exact held version checks and each host/home's held
+doctor auto-update-disabled diagnostic; a mismatch or unproven hold refuses
+without mutation. Record selected versions, binary digests and dated diagnostics.
+Only from bootstrap through finish must known live Claude processes match that
+identity/hold key; preparation may observe ordinary unheld sessions as later
+no-live blockers. Inspect only the hold key for owned PIDs, never full environments.
+A recorded manifest flag is not proof of a continuous hold.
+
+From bootstrap until finish, every handoff explicitly says to avoid `cl` and `clw`,
+unheld Claude/IDE clients, update/install commands and external installers; use the
+printed held personal/work/smoke commands. Codex's printed launches carry the flag
+for tool children; the remote helper sets it for its children. The parent shell
+policy remains unchanged, ordinary launches after finish use their prior policy,
+and already-held sessions remain held until exit. Never unset user/admin policy.
 
 Unexpected version drift after bootstrap is a hold breach: stop new smokes, name
-paused timers and require ordinary-shell full recovery before fresh readiness.
+paused timers and require ordinary-shell full recovery before a fresh Steps 5–7
+pass and final held check. Keep this conservative path rather than introducing
+evidence replacement in an active window.
 Stale Claude evidence blocks forward progress, never restoration: recovery uses
 strict no-live, pinned relay and byte/Git/dependency proofs without launching the
 changed Claude or requiring its version to equal obsolete evidence. Restore native
@@ -447,7 +459,7 @@ state and original timers before re-probing; no automatic in-window proof adopti
   `--node /usr/bin/node`. Familiar PRE remains
   `00f4899ae523d613d21f44bfc2c456aac67f8e5f`; its approved feature tip remains
   `a16f4daa59b04e32f1010764d6f94401ca4eed8b`.
-- Exact version evidence is required with the scoped hold from readiness through
+- Exact version evidence is required with the scoped hold from bootstrap through
   finish. Changed versions repeat the reviewed probe loop before a new window;
   stale Claude evidence must not prevent rollback. No automatic harness updates,
   pin changes or relaxed evidence.
