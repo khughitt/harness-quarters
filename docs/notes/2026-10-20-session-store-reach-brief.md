@@ -29,6 +29,17 @@ When the evidence lives elsewhere, the agent gets no result and no explicit
   `sessions.parent_session`, `files.path`, `files.read_path` (an unpacked archive,
   obs-de84cb, done) and `files.missing_since_ms`. No obs command exposes "where is
   session X", and the index is per host.
+- **Location probe (hq-a1c591, completed 2026-10-20).** A read-only snapshot located
+  all 20 sampled audited origins, including the work Codex origin, and all six native
+  Codex parents. One Claude session ID returned a root plus three child files: retain
+  file identity and ambiguity. All four matching rows have `subagent = 0`; native
+  records and the child files' separate agent rows reveal the distinction, so that
+  query's flags alone cannot identify the root (obs-b99310). Separate controls located a readable native Codex
+  archive and an absent Claude file with an explicit missing mark; that session ID
+  also has a readable alternate, so availability must stay per file. The snapshot has
+  739 missing files and zero populated `read_path` values, so replayed-copy retrieval
+  was not observed. Europa had no index at its configured state path. See the
+  [probe report](2026-10-20-session-index-reach.md) for queries, hashes and limits.
 - **The audit (hq-c411df note, 2026-10-20).** Locating the origins of 72 feedback reports
   needed: anchoring on a CLI call's output when the command text differs from the stored
   record (9 of 72); following a Codex subagent to its parent thread, whose dispatch brief
@@ -104,19 +115,29 @@ When the evidence lives elsewhere, the agent gets no result and no explicit
      its turn. Every run reports coverage and truncation (stores searched, unavailable,
      unreadable), so "nothing found" can be interpreted.
 
-Lean: 4, with 2 as its source of location metadata where hq-a1c591 shows the obs index
-covers the case. A second locate surface beside obs's index would duplicate it; a shared
-reader in hq replaces four store lists and three human-or-injected classifiers.
+Recommendation after hq-a1c591: 4, using 2's existing local location metadata. The
+index covers the 20 known-origin ID lookups and six parent links, but feedback-output
+anchoring still needs transcript content. No new index follows. A supported read
+interface must preserve file candidates, subagents, missing state and coverage; the
+research SQL is not an approved API. The accepted boundary work (ops-630a87,
+obs-f5710b) assigns content parsing to obs and location/lifecycle plus harness-version
+store samples to hq. The CLI design must respect that boundary and the transfer's
+trial gate rather than create another parser.
 hq-a60cf5 stays independent: it fixes a silent coverage gap in obs's baseline input now,
 and when the shared reader lands, it replaces `session-episodes`' root list with an
 import. The model route stays a skill addition (hq-7b131a), later a field of `show`.
 
 ## 5. Unanswered questions
 
-- Does obs's index resolve the audited origins, their parents and pruned copies, and
-  which of the audit's three needs remain? Answered by the research task below.
+- **Answered locally by hq-a1c591:** known-origin and parent location are covered in
+  the bounded sample; content/output anchoring remains a reader operation. Missing
+  state is observable, but no replayed-copy locator was populated in this snapshot.
+  The audit had no archived/pruned origin; separate controls do not establish those
+  cases as audited-origin successes.
 - Should locate span hosts (run on each host over ssh), or report "not on this host"?
-  The audit found no origin on europa. The user decides, after the research.
+  Recommend local lookup with explicit unavailable/not-indexed state first: the audit
+  found no origin on europa and no index exists there at its configured state path.
+  Automatic remote access and backup materialization remain decisions for the design.
 - Will tasks-516ab4 land? If so, CLI-output anchoring matters only for older reports.
   The tasks owner decides.
 - Should relay offer `relay model --thread <id>` for controllers, as a verified
@@ -125,7 +146,9 @@ import. The model route stays a skill addition (hq-7b131a), later a field of `sh
 ## 6. Proposed decomposition
 
 - hq-cff824: goal for this cluster.
-- hq-a1c591 (research): obs index coverage of the audited origins. hq-c411df waits on it.
+- hq-a1c591 (research, completed): [index coverage probe](2026-10-20-session-index-reach.md),
+  20 readable origins and six matching parent links; separate archive/missing controls
+  and an explicit replay-coverage limit. hq-c411df can incorporate both research results.
 - hq-de3e4c (research, added 2026-10-20): survey what agents look for in session logs,
   to set the verbs of a proposed `hq logs` / `hq trace` CLI and its usage skill (the
   user's proposal, §4 alternative 4). hq-c411df waits on it too, and its locate-owner
@@ -181,4 +204,4 @@ deferred to hq-edf5de; script and obstacle counts remain lower bounds.
 
 The [episode ledger](data/2026-10-20-session-log-survey.jsonl) preserves paraphrases,
 line/block/call references, line hashes, costs and conservative outcome labels.
-hq-c411df is ready to incorporate this input once its other research dependency lands.
+hq-a1c591 now supplies the other research input; hq-c411df can incorporate both results.
