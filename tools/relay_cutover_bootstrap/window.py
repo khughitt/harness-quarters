@@ -657,9 +657,29 @@ def _migrate(window, prepared, seen, progress):
             "expected_sha256": entry["expected"]["sha256"], "identities": entry["identities"]},
             "target-apply")
         window = _save(window, applied={**window.get("applied", {}), target_id: result})
+
+    def step(name, host):
+        nonlocal window
+        window = _step(window, seen, progress, name, host)
+
+    verified = verified_migration(window, merged["merge"], step)
+    if seen:
+        raise _Interrupt(seen[-1])
+    return _save(window, state="migrated-surfaces-pending",
+                 verified={"at": _now(), "hosts": verified})
+
+
+def verified_migration(window: dict, merge: str, step=None) -> dict:
+    """The verified migration checkpoint's per-host record, or Failed naming the first host that
+    differs: on each host, Titan first, every target holds the window's sealed bytes (Europa's
+    after waiting for synchronization) with hooks, statusLine, installer and evidence verified,
+    and familiar is the merge with its pinned relay dependency. The run and reconciliation both
+    take this one gate; `step(name, host)` is called before each request."""
+    mode, identity, sealed = window["mode"], window["id"], window["sealed"]["inputs"]
     verified = {}
     for host in HOST_ORDER:
-        window = _step(window, seen, progress, "target-verify", host)
+        if step is not None:
+            step("target-verify", host)
         expected = {target_id: result["expected"]["sha256"]
                     for target_id, result in sealed["hosts"][host].items()}
         found, log = _call(host, mode, "target-verify", {
@@ -671,14 +691,12 @@ def _migrate(window, prepared, seen, progress):
             raise Failed("target-verify", host, "blocked", f"{', '.join(missing)} do not hold the "
                          "sealed bytes" + (" after waiting for synchronization"
                                            if host != "titan" else ""), log=log)
-        window = _step(window, seen, progress, "familiar-verify", host)
-        source, _ = _call(host, mode, "familiar-verify",
-                          {"window_id": identity, "merge": merged["merge"]}, "familiar-verify")
+        if step is not None:
+            step("familiar-verify", host)
+        source, _ = _call(host, mode, "familiar-verify", {"window_id": identity, "merge": merge},
+                          "familiar-verify")
         verified[host] = {"targets": expected, "familiar": source}
-    if seen:
-        raise _Interrupt(seen[-1])
-    return _save(window, state="migrated-surfaces-pending",
-                 verified={"at": _now(), "hosts": verified})
+    return verified
 
 
 def _recovery_after(failed):

@@ -28,11 +28,12 @@ stop or signal leaves `recovering`, and the next call repeats from reconciliatio
 actual state shows done. Recovery never runs the forward check, preflight or inventory, nor any
 Claude executable, so stale Claude evidence never blocks it.
 
-`reconcile_window` reads actual state for the next command. A run that stopped past familiar's
-mark without recording its outcome becomes `migrated-surfaces-pending` only when every target on
-both hosts holds its sealed bytes from this window's own artifacts, familiar is the attempted
-merge on both hosts with its pinned relay dependency and the evidence still matches; otherwise
-it becomes `recovery-required`, which blocks fresh sessions and names recover.
+`reconcile_window` reads actual state for the next command and cancels nothing. A run that
+stopped past familiar's mark without recording its outcome becomes `migrated-surfaces-pending`
+only when no operation on either host is unsettled (this window's dead-owner ones included, whose
+children may still be writing) and actual state passes the run's own verified-checkpoint gate
+(`window.verified_migration`) with Titan's four targets holding this window's applied artifacts;
+otherwise it becomes `recovery-required`, which blocks fresh sessions and names recover.
 
 Keys this module adds to the window record: `recovery` {started_at, attempted_at, cancelled,
 timers, check, targets, originals, familiar, dependencies, actions, restored, failure, failures},
@@ -81,11 +82,12 @@ def _prepared(window):
 
 
 def _settle(window, *, cancel):
-    """Each host's unfinished operations. With `cancel`, this window's operations whose owner
-    died are cancelled and recorded; any operation still running, unknown or another window's,
-    and a host that cannot be read, is a blocker for every mutation."""
+    """Each host's unfinished operations, as (blockers, dead): any operation still running,
+    unknown or another window's, and a host that cannot be read, is a blocker for every mutation.
+    This window's operations whose owner died are cancelled and recorded with `cancel` (only
+    recovery does that); without it they are returned in `dead`, untouched."""
     mode, identity = window["mode"], window["id"]
-    blockers, cancelled = [], []
+    blockers, cancelled, dead = [], [], []
     for host in HOST_ORDER:
         try:
             found, _ = _call(host, mode, "pending-operations", {"window_id": identity},
@@ -100,7 +102,9 @@ def _settle(window, *, cancel):
             name = f"operation {entry['operation_id']} ({entry['operation']})"
             if entry["window_id"] == identity and entry["state"] == "owner-lost":
                 if not cancel:
-                    continue  # recovery cancels it first
+                    dead.append(f"{host}: {name} is owner-lost; its recorded children may still "
+                                "run until recover cancels them")
+                    continue
                 outcome, _ = _call(host, mode, "operation-cancel",
                                    {"operation_id": entry["operation_id"]}, "reconcile")
                 cancelled.append({"host": host, "operation_id": entry["operation_id"],
@@ -113,7 +117,7 @@ def _settle(window, *, cancel):
             owner = "this window's" if entry["window_id"] == identity else "not this window's"
             blockers.append(f"{host}: {name} is {entry['state']} and {owner}; let it finish or "
                             "reconcile it with operation-status or operation-cancel")
-    return blockers, cancelled
+    return blockers, cancelled if cancel else dead
 
 
 def _closed(host, mode, identity):
@@ -361,35 +365,28 @@ def restore_window(window: dict) -> dict:
 
 
 def _verify_migration(window, found):
-    """None when actual state on both hosts is the sealed migration, else what differs."""
-    mode, identity = window["mode"], window["id"]
-    sealed = window["sealed"]["inputs"]
+    """(verified, None) when actual state is the sealed migration, else (None, what differs):
+    familiar is the attempted merge, Titan's four targets hold this window's own applied
+    artifacts, and the run's own verified-checkpoint gate passes on both hosts."""
     if found["class"] != "merged":
         return None, f"familiar is {found['class']}, not the attempted merge"
-    merge = found["merge"]
-    titan = sealed["hosts"]["titan"]
-    checked, _ = _call("titan", mode, "target-check", {
-        "window_id": identity,
-        "frozen": {target_id: entry["frozen"]["sha256"] for target_id, entry in titan.items()}},
-        "reconcile")
-    applied = sorted(target_id for target_id, entry in checked["targets"].items()
-                     if entry["verdict"] != "relay-applied"
-                     or entry["sha256"] != titan[target_id]["expected"]["sha256"])
-    if applied:
-        return None, f"{', '.join(applied)} do not hold this window's applied artifact bytes"
-    verified = {}
-    for host in HOST_ORDER:
-        expected = {target_id: entry["expected"]["sha256"]
-                    for target_id, entry in sealed["hosts"][host].items()}
-        report, _ = _call(host, mode, "target-verify", {
-            "window_id": identity, "targets": expected, "wait": host != "titan", "verify": True,
-            "manifest_sha256": sealed["manifest_sha256"]}, "reconcile")
-        if not report["verified"]:
-            return None, f"{host}'s targets, hooks or evidence do not verify"
-        source, _ = _call(host, mode, "familiar-verify", {"window_id": identity, "merge": merge},
-                          "reconcile")
-        verified[host] = {"targets": expected, "familiar": source}
-    return {"at": _now(), "hosts": verified, "reconciled": True}, None
+    titan = window["sealed"]["inputs"]["hosts"]["titan"]
+    try:
+        checked, _ = _call("titan", window["mode"], "target-check", {
+            "window_id": window["id"], "frozen": {target_id: entry["frozen"]["sha256"]
+                                                  for target_id, entry in titan.items()}},
+            "target-check")
+        applied = sorted(target_id for target_id, entry in checked["targets"].items()
+                         if entry["verdict"] != "relay-applied"
+                         or entry["sha256"] != titan[target_id]["expected"]["sha256"])
+        if applied:
+            return None, f"{', '.join(applied)} do not hold this window's applied artifact bytes"
+        hosts_verified = lifecycle.verified_migration(window, found["merge"])
+    except Failed as failed:
+        if failed.status == "interrupted":
+            raise
+        return None, f"{failed.step} on {failed.host}: {failed.error}"
+    return {"at": _now(), "hosts": hosts_verified, "reconciled": True}, None
 
 
 def reconcile_window(window: dict) -> dict:
@@ -408,7 +405,21 @@ def reconcile_window(window: dict) -> dict:
         return {**report, "class": "abort", "next": ["recover"],
                 "observed": ("familiar and settings were never changed: recover completes the "
                              "pre-merge timer and snapshot abort only")}
-    blockers, _ = _settle(window, cancel=False)
+    blockers, dead = _settle(window, cancel=False)
+    if window["state"] == "applying" and (blockers or dead):
+        # Unsettled work may still be writing: never promote beside it. Reconciliation cancels
+        # nothing; recover cancels this window's dead-owner operations before it acts.
+        from .cli import command_line  # the operator's complete command, as cli prints it
+        unsettled = [*blockers, *dead]
+        window = _save(window, state="recovery-required", failure={
+            "step": "reconcile", "host": unsettled[0].split(":", 1)[0], "status": "unsettled",
+            "error": "the run stopped past familiar's mark beside unsettled operations: "
+                     + "; ".join(unsettled), "log": None, "at": _now()})
+        return {**report, "state": window["state"], "class": "recovery-required",
+                "blockers": unsettled, "next": ["recover"],
+                "observed": (f"window {window['id']} is recovery-required: its migration is not "
+                             "verified beside unsettled operations (" + "; ".join(unsettled)
+                             + f"); run {command_line(['recover'])} once they settle. {STOP}")}
     if blockers:
         return {**report, "class": "unsettled", "blockers": blockers, "next": ["status"],
                 "observed": ("unfinished host operations block every retry and recovery "
@@ -425,12 +436,7 @@ def reconcile_window(window: dict) -> dict:
         if "failure" in window or "recovery" in window:
             verified, reason = None, "recovery was already requested for it"
         else:
-            try:
-                verified, reason = _verify_migration(window, found)
-            except Failed as failed:
-                if failed.status == "interrupted":
-                    raise
-                verified, reason = None, f"{failed.step} on {failed.host}: {failed.error}"
+            verified, reason = _verify_migration(window, found)
         if verified is not None:
             merged = {**window["familiar"], "merge": found["merge"],
                       "parents": [inputs.PINS["familiar_pre"], inputs.PINS["familiar_feature_tip"]]}
