@@ -36,7 +36,9 @@ RETAINED = (
     "images/", "claude-work.after.json",              # image directory
     "familiar-node_modules.pre/", "familiar-state/",  # retained original backups
 )
-LAYOUT = ("windows/", "active.json", "operations/")  # operations/: hosts' operation records
+# operations/: hosts' operation records; prepared.json: the last preparation; inputs/: staged
+# reviewed-input generations; quiesce/: each host's per-window timer and snapshot records.
+LAYOUT = ("windows/", "active.json", "operations/", "prepared.json", "inputs/", "quiesce/")
 WINDOW_KEYS = ("schema", "id", "mode", "state", "directory", "created_at",
                "prepared_sha256")
 DECISION_KEYS = {"schema", "kind", "action", "window_id", "attempt_id",

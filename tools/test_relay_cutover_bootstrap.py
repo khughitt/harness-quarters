@@ -1,6 +1,7 @@
-"""Cutover window records, target registration and human decisions, run against
-throwaway roots. Decision dictionaries here are fixtures standing in for a recorded
-reply; nothing in these tests authenticates a human or answers a prompt for a live call."""
+"""Cutover window records, target registration, human decisions, preparation, quiescence
+and the pre-merge abort, run against throwaway roots and the transport tests' fixture hosts.
+Decision dictionaries here are fixtures standing in for a recorded reply; nothing in these
+tests authenticates a human or answers a prompt for a live call."""
 import errno
 import fcntl
 import fnmatch
@@ -8,15 +9,19 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
+import signal
 import stat
 import subprocess
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 
-from relay_cutover_bootstrap import state
+import test_relay_cutover_transport as transport
+from relay_cutover_bootstrap import hosts, inputs, state, window
 from relay_cutover_bootstrap.state import Stop
 
 PREPARED = hashlib.sha256(b"prepared fixture").hexdigest()
@@ -734,3 +739,963 @@ def test_decision_scope_survives_expected_pid_exit(root, events):
     asked = recorded(window, attempt="restart-2", subject=widened, reply="yes, both panels")
     assert authorized_restart(events, window, asked, attempt="restart-2",
                               subject=widened)["subject_sha256"] == sha(widened)
+
+
+# --- preparation, quiescence and the pre-merge abort -------------------------------------
+
+SESSION = "0199f5a1-7c2e-7d3b-9a41-5b6c7d8e9f01"
+HOSTS = ("titan", "europa")
+TOOLS = Path(__file__).resolve().parent
+BOOTSTRAP = TOOLS / "relay-cutover-bootstrap"
+needs_zsh = pytest.mark.skipif(not transport.ZSH.is_file(), reason="the remote login shell is Zsh")
+SECRETS = (transport.ENV_SECRET, transport.OUTPUT_SECRET, "opus[1m]", "alwaysThinkingEnabled",
+           "Bash(git status:*)")
+
+
+@pytest.fixture
+def cutover(tmp_path, monkeypatch):
+    """Both fixture hosts with staged reviewed inputs; the controller runs from Titan's main."""
+    world = transport.World(tmp_path, monkeypatch)
+    world.stage_cutover()
+    monkeypatch.setattr(window, "CHECKOUT", world.home("titan") / "d/hq")
+    yield world
+    world.close()
+
+
+def cutover_root(world, host="titan"):
+    return world.root(host)
+
+
+def staged(world, host):
+    """The reviewed inputs and retained records preparation must never rewrite."""
+    root = world.root(host)
+    paths = [root / name for name in ("claude-work.after.json", "expected-images.sha256",
+                                      "live-before.sha256")]
+    for name in ("inputs", "prep", "images"):
+        paths += sorted((root / name).rglob("*"))
+    return {str(path.relative_to(root)): path.read_bytes() for path in paths if path.is_file()}
+
+
+def changes(before, after):
+    return sorted(key for key in set(before) | set(after) if before.get(key) != after.get(key))
+
+
+def codes(blockers):
+    """Blocker codes from the controller's host-prefixed blockers."""
+    return {blocker.split(": ")[1] for blocker in blockers}
+
+
+def raw_codes(blockers):
+    """Blocker codes from one host operation's own blockers."""
+    return {blocker.split(": ")[0] for blocker in blockers}
+
+
+def observed(world, tool=None, since=0):
+    return [call for call in world.lines("observed")[since:]
+            if tool is None or call["tool"] == tool]
+
+
+def timer_calls(world, since=0):
+    return [(call["host"], call["args"][0]) for call in observed(world, "quiesce-timers", since)]
+
+
+def decision_for(opened, attempt="run-1"):
+    """A fixture of the operator's terminal answer for this run's desktop restart."""
+    subject = {"hosts": list(HOSTS), "surfaces": ["familiar-niri-watch", "niri-desktop"]}
+    answered = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    record = {"schema": 1, "kind": "desktop", "action": window.RUN_ACTION,
+              "window_id": opened["id"], "attempt_id": attempt, "subject_sha256": sha(subject),
+              "verdict": "approved", "source": {
+                  "type": "tty", "response": "y", "answered_at": answered,
+                  "prompt": "Restart the familiar surfaces on titan and europa? [y/N]"}}
+    return state.consume_decision(opened, record, kind="desktop", action=window.RUN_ACTION,
+                                  attempt_id=attempt, subject_sha256=sha(subject))
+
+
+def opened_with_decision(world):
+    prepared = window.prepare(SESSION)
+    opened = window.open_window(prepared)
+    return prepared, opened, decision_for(opened)
+
+
+def inputs_check(world, monkeypatch, number):
+    """Titan's inputs-check inside this process, with the fixture's git for provenance."""
+    monkeypatch.setitem(hosts.TOOLS, "git", world.config["tools"]["git"])
+    response = transport._execute("titan", "inputs-check", {"commits": True}, number)
+    assert response["status"] == "completed", response["error"]
+    return response["result"]
+
+
+def timers_active(world):
+    return {host: world.units(host)["familiar-reap.timer"]["active"] for host in HOSTS}
+
+
+def test_prepare_layout_entries_are_explained(root):
+    retained(root)
+    (root / "prepared.json").write_text("{}\n")
+    for name in ("inputs", "quiesce"):
+        (root / name).mkdir(mode=0o700)
+    assert {"prepared.json", "inputs/", "quiesce/"} <= set(state.LAYOUT)
+    assert state.current_window(root) is None
+
+
+@needs_zsh
+@pytest.mark.parametrize("checkout", ["native", "candidate"])
+def test_prepare_preserves_filter_owned_picks(cutover, monkeypatch, checkout):
+    if checkout == "candidate":
+        # The controller runs from a worktree whose own settings are candidate images: the
+        # targets and pick keys still come from each host's manifest-verified files.
+        monkeypatch.setattr(window, "CHECKOUT", cutover.candidate_checkout())
+    reviewed = {host: staged(cutover, host) for host in HOSTS}
+    before = {host: cutover.snapshot(host) for host in HOSTS}
+    prepared = window.prepare(SESSION)
+
+    root = cutover_root(cutover)
+    assert state.load_record(root / "prepared.json") == prepared
+    keys = list(transport.CLAUDE_KEYS)
+    assert prepared["filter"]["keys"] == keys
+    assert prepared["controller"]["session_id"] == SESSION
+    assert prepared["controller"]["checkout"] == str(window.CHECKOUT)
+    assert prepared["manifest"]["generation"] == "g1"
+    for host in HOSTS:
+        assert set(prepared["hosts"][host]["targets"]) == (
+            {"claude", "claude-work", "codex", "codex-work"} if host == "titan"
+            else {"claude", "claude-work"})
+        for target_id in ("claude", "claude-work"):
+            data = cutover.target(host, target_id).read_bytes()
+            current_before = json.loads(data)
+            reviewed_before = json.loads(cutover.member(host, target_id, "before").read_bytes())
+            recorded = prepared["hosts"][host]["targets"][target_id]
+            assert inputs.nonpick(current_before, keys) == inputs.nonpick(reviewed_before, keys)
+            recorded_picks_and_absence = (recorded["picks"], recorded["absent"])
+            current_picks_and_absence = ({key: current_before[key] for key in keys
+                                          if key in current_before},
+                                         [key for key in keys if key not in current_before])
+            assert recorded_picks_and_absence == current_picks_and_absence
+            assert recorded["sha256"] == hashlib.sha256(data).hexdigest()
+            assert recorded["path"] == os.path.realpath(cutover.target(host, target_id))
+    personal = prepared["hosts"]["titan"]["targets"]["claude"]
+    # The live picks make the raw hashes differ from the reviewed source; that is not drift.
+    assert personal["sha256"] != personal["reviewed"]["before"]
+    assert personal["picks"] == {"model": "opus[1m]", "effortLevel": "high",
+                                 "modelSettings": {"opus[1m]": {"thinking": {"budget": 32000}}}}
+    work = prepared["hosts"]["europa"]["targets"]["claude-work"]
+    assert (work["picks"], work["absent"]) == ({"model": "sonnet"},
+                                               ["modelSettings", "effortLevel"])
+    assert prepared["hosts"]["titan"]["sessions"] == prepared["hosts"]["europa"]["sessions"] == []
+
+    # Reviewed originals stay as staged, no after-image is serialized, and preparation wrote
+    # only its own record beside the operation records.
+    assert {host: staged(cutover, host) for host in HOSTS} == reviewed
+    assert {host: changes(before[host], cutover.snapshot(host)) for host in HOSTS} == {
+        "titan": [".local/state/hq/relay-cutover/prepared.json"], "europa": []}
+    assert transport.RELAY_HOOK.encode() not in (root / "prepared.json").read_bytes()
+    assert stat.S_IMODE((root / "prepared.json").stat().st_mode) == 0o600
+    assert state.current_window(root) is None  # preparation opens no window
+
+
+NESTED = {"tier": ["a", {"\u00fc": None, "n": 1.5}], "on": False}
+
+
+@needs_zsh
+@pytest.mark.parametrize("change", ["nested", "deleted", "added"])
+@pytest.mark.parametrize("key", transport.CLAUDE_KEYS)
+def test_pick_drift_accepts_every_filter_key(cutover, monkeypatch, key, change):
+    target_id = "claude-work" if change == "added" else "claude"
+    current = json.loads(cutover.target("titan", target_id).read_bytes())
+    if change == "deleted":
+        del current[key]
+    else:
+        current[key] = NESTED
+    cutover.write_target(target_id, current)
+    result = inputs_check(cutover, monkeypatch, 1)
+    assert result["blockers"] == []
+    recorded = result["targets"][target_id]
+    keys = transport.CLAUDE_KEYS
+    assert recorded["picks"] == {name: current[name] for name in keys if name in current}
+    assert recorded["absent"] == [name for name in keys if name not in current]
+
+
+@needs_zsh
+def test_pick_keys_come_from_the_manifest_filter(cutover, monkeypatch):
+    current = json.loads(cutover.target("titan", "claude").read_bytes())
+    current["outputStyle"] = "terse"
+    cutover.write_target("claude", current)
+
+    def check(number):
+        return inputs_check(cutover, monkeypatch, number)
+
+    # The filter's own list does not own outputStyle: a non-pick edit.
+    assert raw_codes(check(1)["blockers"]) == {"input-review-required"}
+    # A changed filter is never used until a reviewed manifest names its bytes.
+    cutover.write_filter(transport.CLAUDE_KEYS + ("outputStyle",))
+    result = check(2)
+    assert raw_codes(result["blockers"]) == {"input-manifest"}
+    assert "harness-state-clean" in result["blockers"][0]
+    cutover.write_manifest()
+    result = check(3)
+    assert result["blockers"] == []
+    assert result["filter"]["keys"] == [*transport.CLAUDE_KEYS, "outputStyle"]
+    assert result["targets"]["claude"]["picks"]["outputStyle"] == "terse"
+    # A filter that stops owning effortLevel turns the live effort pick into drift.
+    del current["outputStyle"]
+    cutover.write_target("claude", current)
+    cutover.write_filter(("model", "modelSettings"))
+    cutover.write_manifest()
+    result = check(4)
+    assert raw_codes(result["blockers"]) == {"input-review-required"}
+    assert "(effortLevel)" in result["blockers"][0]
+
+
+def _append_hook(value):
+    value["hooks"]["PreToolUse"].append({"matcher": "Edit", "hooks": [
+        {"type": "command", "command": "~/private/unreviewed-hook"}]})
+
+
+NONPICK = {
+    "hooks": ("claude", _append_hook, "hooks"),
+    "statusLine": ("claude", lambda value: value["statusLine"].update(refreshInterval=5),
+                   "statusLine"),
+    "new-key": ("claude-work", lambda value: value.update(cleanupPeriodDays=7),
+                "cleanupPeriodDays"),
+    "codex-hooks": ("codex", lambda value: value["hooks"].pop("Stop"), "hooks"),
+}
+
+
+@needs_zsh
+@pytest.mark.parametrize("case", sorted(NONPICK))
+def test_nonpick_drift_names_original_image_review(cutover, case):
+    target_id, edit, key = NONPICK[case]
+    value = json.loads(cutover.target("titan", target_id).read_bytes())
+    edit(value)
+    cutover.write_target(target_id, value)
+    kept = {host: staged(cutover, host) for host in HOSTS}
+    with pytest.raises(window.Failed) as raised:
+        window.prepare(SESSION)
+    failed = raised.value
+    assert (failed.step, failed.host, failed.status) == ("inputs-check", "titan", "blocked")
+    review = [blocker for blocker in failed.blockers if "input-review-required" in blocker]
+    assert len(review) == 1 and f"{target_id}:" in review[0] and f"({key})" in review[0]
+    assert "Task 6" in review[0] and "docs/plans/2026-10-19-relay-cutover.md" in review[0]
+    assert failed.next_command[0] == "prepare"
+    # Nothing is adopted: no prepared record, no new generation, the reviewed inputs as staged.
+    root = cutover_root(cutover)
+    assert not (root / "prepared.json").exists()
+    assert sorted(os.listdir(root / "inputs")) == ["designated.json", "g1"]
+    assert {host: staged(cutover, host) for host in HOSTS} == kept
+    assert "unreviewed-hook" not in str(failed) + "".join(failed.blockers)
+
+
+def _unlink(name):
+    return lambda world: world.root("titan").joinpath(name).unlink()
+
+
+def _restaged(change):
+    return lambda world: world.write_manifest(change=change)
+
+
+def _member_path(target_id, role, path):
+    def change(manifest):
+        manifest["targets"][target_id][role]["path"] = path
+    return _restaged(change)
+
+
+def _garbage(target_id, role, data):
+    def arrange(world):
+        world.member("titan", target_id, role).write_bytes(data)
+        world.member("europa", target_id, role).write_bytes(data)
+        world.write_manifest()
+    return arrange
+
+
+def _symlinked(world):
+    path = world.member("titan", "claude", "artifact")
+    shutil.copy2(path, path.with_name("claude.copy.json"))
+    path.unlink()
+    path.symlink_to("claude.copy.json")
+
+
+MANIFEST = {
+    "undesignated": (_unlink("inputs/designated.json"), "input-manifest"),
+    "unknown-generation": (lambda world: transport._stage(
+        world.root("titan"), "inputs/designated.json",
+        b'{"schema": 1, "generation": "g9"}\n'), "input-manifest"),
+    "corrupt-manifest": (lambda world: world.root("titan").joinpath(
+        "inputs/g1/manifest.json").write_bytes(b'{"schema": 1,'), "input-manifest"),
+    "loose-manifest": (lambda world: world.root("titan").joinpath(
+        "inputs/g1/manifest.json").chmod(0o644), "input-manifest"),
+    "missing-pin": (_restaged(lambda manifest: manifest["pins"].pop("relay_commit")),
+                    "input-manifest"),
+    "wrong-pin": (_restaged(lambda manifest: manifest["pins"].update(familiar_pre="1" * 40)),
+                  "input-manifest"),
+    "missing-target": (_restaged(lambda manifest: manifest["targets"].pop("codex-work")),
+                       "input-manifest"),
+    "missing-member": (_unlink("prep/codex.json"), "input-member"),
+    "corrupt-image": (lambda world: world.member("titan", "claude", "after").write_bytes(
+        world.member("titan", "claude", "after").read_bytes() + b" "), "input-member"),
+    "unparsable-image": (_garbage("claude-work", "after", b"not json\n"), "input-member"),
+    "not-an-artifact": (_garbage("codex", "artifact", b'{"schema": 1}\n'), "input-member"),
+    "absolute-path": (_member_path("claude", "artifact", "/etc/hostname"), "input-member"),
+    "escaping-path": (_member_path("claude", "artifact", "prep/../../../../etc/hostname"),
+                      "input-member"),
+    "tool-owned-path": (_member_path("claude", "artifact", "operations/x.json"),
+                        "input-member"),
+    "symlinked-member": (_symlinked, "input-member"),
+}
+
+
+@needs_zsh
+@pytest.mark.parametrize("case", sorted(MANIFEST))
+def test_manifest_refusals(cutover, case):
+    arrange, code = MANIFEST[case]
+    arrange(cutover)
+    kept = staged(cutover, "titan")
+    with pytest.raises(window.Failed) as raised:
+        window.prepare(SESSION)
+    failed = raised.value
+    assert (failed.step, failed.host, failed.status) == ("inputs-check", "titan", "blocked")
+    assert code in codes(failed.blockers), failed.blockers
+    assert not (cutover_root(cutover) / "prepared.json").exists()
+    assert staged(cutover, "titan") == kept
+    assert observed(cutover, "quiesce-timers") == []
+
+
+def _provenance(target_id, role, proof):
+    def change(manifest):
+        if proof is None:
+            del manifest["targets"][target_id][role]["provenance"]
+        else:
+            manifest["targets"][target_id][role]["provenance"] = proof
+    return _restaged(change)
+
+
+def _unrecorded(world):
+    digest = hashlib.sha256(world.member("titan", "claude-work", "before").read_bytes()).hexdigest()
+    path = world.root("titan") / "live-before.sha256"
+    path.write_text("".join(line + "\n" for line in path.read_text().splitlines()
+                            if not line.startswith(digest)))
+
+
+def _other_bytes(world):
+    world.config["blobs"][f"{transport.FIXTURE_COMMIT}:claude/settings.json"] = str(
+        world.member("titan", "codex", "before"))
+    world.save()
+
+
+COMMIT = {"type": "commit", "path": "claude/settings.json"}
+PROVENANCE = {
+    "mutable-ref": _provenance("claude", "before", {**COMMIT, "commit": "main"}),
+    "short-commit": _provenance("claude", "before", {**COMMIT, "commit": "5e1f0c2"}),
+    "unknown-commit": _provenance("claude", "before", {**COMMIT, "commit": "7" * 40}),
+    "other-bytes": _other_bytes,
+    "not-recorded": _unrecorded,
+    "unexplained-record": _provenance("claude-work", "before", {
+        "type": "digest-record", "record": "operator-env.sh"}),
+    "unproven-after": _provenance("codex", "after", None),
+    "task-note": _provenance("codex", "after", {"type": "task-note", "note": "review: accept"}),
+}
+
+
+@needs_zsh
+@pytest.mark.parametrize("case", sorted(PROVENANCE))
+def test_manifest_provenance_refusals(cutover, case):
+    PROVENANCE[case](cutover)
+    with pytest.raises(window.Failed) as raised:
+        window.prepare(SESSION)
+    failed = raised.value
+    assert (failed.step, failed.host) == ("inputs-check", "titan")
+    review = [blocker for blocker in failed.blockers if "input-review-required" in blocker]
+    assert review and all("Task 6" in blocker for blocker in review), failed.blockers
+    assert not (cutover_root(cutover) / "prepared.json").exists()
+
+
+@needs_zsh
+def test_run_input_recheck_accepts_pick_only_drift(cutover):
+    prepared = window.prepare(SESSION)
+    recorded = (cutover_root(cutover) / "prepared.json").read_bytes()
+    keys = transport.CLAUDE_KEYS
+    personal = json.loads(cutover.target("titan", "claude").read_bytes())
+    personal["model"] = {"id": "sonnet", "variants": ["1m"]}
+    del personal["modelSettings"]
+    work = json.loads(cutover.target("titan", "claude-work").read_bytes())
+    work["effortLevel"] = "low"
+    for target_id, value in (("claude", personal), ("claude-work", work)):
+        cutover.write_target(target_id, value)
+
+    result = window.recheck(prepared)
+    assert result["eligible"] and result["blockers"] == []
+    for host in HOSTS:
+        for target_id, value in (("claude", personal), ("claude-work", work)):
+            current = result["targets"][host][target_id]
+            reviewed = json.loads(cutover.member(host, target_id, "before").read_bytes())
+            assert inputs.nonpick(value, keys) == inputs.nonpick(reviewed, keys)
+            assert (current["picks"], current["absent"]) == (
+                {key: value[key] for key in keys if key in value},
+                [key for key in keys if key not in value])
+    # The run-time recheck reads; the preparation record stays as written.
+    assert (cutover_root(cutover) / "prepared.json").read_bytes() == recorded
+
+    personal["statusLine"] = {"type": "command", "command": "~/elsewhere"}
+    cutover.write_target("claude", personal)
+    with pytest.raises(window.Failed) as raised:
+        window.recheck(prepared)
+    assert raised.value.step == "eligibility"
+    assert any("input-review-required" in blocker and "Task 6" in blocker
+               for blocker in raised.value.blockers)
+
+
+@needs_zsh
+def test_system_toolchain_wins_over_nvm(cutover, monkeypatch):
+    nvm = cutover.home("titan") / ".nvm/versions/node/v22.11.0/bin"
+    for name in ("npm", "node"):
+        transport._write(nvm / name, "#!/usr/bin/python3 -S\n"
+                         f"import json\nopen({cutover.config['observed']!r}, 'a').write("
+                         "json.dumps({'host': 'nvm', 'tool': 'nvm', 'args': []}) + '\\n')\n"
+                         "print('11.6.2')\n", 0o755)
+    monkeypatch.setenv("PATH", f"{nvm}:{os.environ['PATH']}")
+    prepared = window.prepare(SESSION)
+    for host in HOSTS:
+        install = prepared["hosts"][host]["install"]
+        npm = prepared["hosts"][host]["toolchain"]["npm"]
+        install_env = {"PATH": install["path"]}
+        assert install_env["PATH"].split(":")[0] == "/usr/bin"
+        assert install_env["PATH"].split(":")[:2] == ["/usr/bin", "/bin"]
+        assert str(nvm) in install_env["PATH"].split(":")[2:]  # kept, after the system
+        npm_executable, npm_version = install["npm"], npm["version"]
+        assert npm_executable == npm["path"] == cutover.config["tools"]["npm"]
+        assert npm_version == "12.2.1" and npm["package_version"] == "12.2.1"
+    assert observed(cutover, "nvm") == []
+    calls = observed(cutover, "npm")
+    assert calls and all(call["path_head"] == "/usr/bin" for call in calls)
+    system_node = shutil.which("node", path="/usr/bin:/bin")
+    if system_node:  # npm's env shebang resolves the system node, never nvm's
+        assert all(call["env_node"] == system_node for call in calls)
+    # Production values: the fixed system npm, and PATH rebuilt with /usr/bin first.
+    assert (hosts.TOOLS["npm"], hosts.TOOLS["node"]) == ("/usr/bin/npm", "/usr/bin/node")
+    assert hosts._child_env({})["PATH"].split(":")[0] == "/usr/bin"
+
+
+def _touch_tool(name):
+    def arrange(world):
+        with open(os.path.realpath(world.config["tools"][name]), "a") as stream:
+            stream.write("# a changed build\n")
+    return arrange
+
+
+TOOLCHAIN = {
+    "npm-11": (lambda world: world.behave("titan", npm_version="11.6.2"), "titan", "toolchain"),
+    "node-changed": (_touch_tool("node"), "titan", "toolchain"),
+    "git-changed": (_touch_tool("git"), "titan", "toolchain"),
+    "python-changed": (lambda world: world.write_manifest(change=lambda manifest: manifest[
+        "hosts"]["europa"]["toolchain"]["python3"].update(sha256="0" * 64)), "europa",
+                       "toolchain"),
+    "cache-in-checkout": (lambda world: world.behave("europa", npm_cache=str(
+        world.home("europa") / "d/hq/.cache/npm")), "europa", "caches"),
+}
+
+
+@needs_zsh
+@pytest.mark.parametrize("case", sorted(TOOLCHAIN))
+def test_toolchain_drift_refuses_prepare(cutover, case):
+    arrange, host, kind = TOOLCHAIN[case]
+    arrange(cutover)
+    with pytest.raises(window.Failed) as raised:
+        window.prepare(SESSION)
+    failed = raised.value
+    assert (failed.host, failed.status) == (host, "blocked")
+    assert kind in codes(failed.blockers), failed.blockers
+    assert not (cutover_root(cutover) / "prepared.json").exists()
+    assert transport.OUTPUT_SECRET not in str(failed) + "".join(failed.blockers)
+
+
+@needs_zsh
+def test_toolchain_drift_after_prepare_blocks_check(cutover):
+    prepared = window.prepare(SESSION)
+    assert window.check(prepared)["eligible"]
+    _touch_tool("git")(cutover)
+    result = window.check(prepared)
+    assert not result["eligible"]
+    assert {blocker.split(": ")[0] for blocker in result["blockers"]
+            if "toolchain" in blocker and "git" in blocker} == {"titan", "europa"}
+    with pytest.raises(window.Failed, match="eligibility"):
+        window.recheck(prepared)
+
+
+def _sessions(world):
+    claude = os.path.realpath(world.home("titan") / ".local/bin/claude")
+    world.spec("titan")["rows"] += [
+        {"pid": 3900301, "start_time": 31, "comm": "claude", "exe": claude, "argv": ["claude"],
+         "held": False},
+        {"pid": 3900302, "start_time": 32, "comm": "claude", "exe": claude,
+         "argv": ["claude", "--resume", "private-session"], "held": True}]
+    europa = os.path.realpath(world.home("europa") / ".local/bin/claude")
+    world.spec("europa")["rows"] += [
+        {"pid": 3900311, "start_time": 41, "comm": "claude", "exe": europa, "argv": ["claude"],
+         "held": False}]
+    world.save()
+
+
+@needs_zsh
+def test_prepare_allows_ordinary_claude_sessions(cutover):
+    _sessions(cutover)
+    prepared = window.prepare(SESSION)  # no refusal, and no hold is demanded of them
+    assert [(entry["pid"], entry["held"]) for entry in prepared["hosts"]["titan"]["sessions"]] \
+        == [(3900301, False), (3900302, True)]
+    assert [entry["pid"] for entry in prepared["hosts"]["europa"]["sessions"]] == [3900311]
+    result = window.check(prepared)
+    assert result["eligible"] and result["blockers"] == []
+    assert [entry["pid"] for entry in result["sessions"]["titan"]] == [3900301, 3900302]
+
+    # The run's strict no-live check refuses them, with no caller exemption.
+    with pytest.raises(window.Failed) as raised:
+        window.require_no_live("live")
+    failed = raised.value
+    assert (failed.step, failed.host, failed.status) == ("no-live", "titan", "blocked")
+    assert any("3900301" in blocker for blocker in failed.blockers)
+    assert "private-session" not in str(failed) + "".join(failed.blockers)
+
+    # Quiescing the window refuses at the same check, before any timer is touched.
+    mark = len(cutover.lines("observed"))
+    opened = window.open_window(prepared)
+    with pytest.raises(window.Failed) as raised:
+        window.quiesce_window(prepared, decision_for(opened))
+    assert (raised.value.step, raised.value.host) == ("no-live", "titan")
+    assert timer_calls(cutover, mark) == []
+    assert state.current_window(cutover_root(cutover))["state"] == "aborted"
+    assert timers_active(cutover) == {"titan": "active", "europa": "active"}
+
+
+@needs_zsh
+def test_prepare_check_is_read_only(cutover):
+    prepared = window.prepare(SESSION)
+    root = cutover_root(cutover)
+    before = {host: cutover.snapshot(host) for host in HOSTS}
+    units = {host: cutover.units(host) for host in HOSTS}
+    mark = len(cutover.lines("observed"))
+    result = window.check(prepared)
+    assert result["eligible"] and result["blockers"] == []
+    report = window.status()
+    assert report["window"] is None and report["prepared"]["sha256"] == \
+        window.prepared_sha256(prepared)
+    # Only private operation records were written: no target, source, dependency, timer,
+    # service, desktop or window change.
+    assert {host: changes(before[host], cutover.snapshot(host)) for host in HOSTS} == {
+        "titan": [], "europa": []}
+    assert {host: cutover.units(host) for host in HOSTS} == units
+    tools = {call["tool"] for call in observed(cutover, since=mark)}
+    assert "quiesce-timers" not in tools and "relay-cutover" not in tools
+    assert not any(call["args"][:1] == ["app-server"] for call in observed(cutover, "codex", mark))
+    assert state.current_window(root) is None
+    assert not (root / "quiesce").exists()
+
+
+@needs_zsh
+def test_quiesce_stops_daemons_and_refreshes_snapshots(cutover):
+    codex = os.path.realpath(cutover.home("titan") / ".local/bin/codex")
+    cutover.spec("titan")["rows"] += [
+        {"pid": 3900401, "start_time": 51, "comm": "codex", "exe": codex,
+         "argv": ["codex", "app-server", "--listen"], "daemon": "personal"},
+        {"pid": 3900402, "start_time": 52, "comm": "codex", "exe": codex,
+         "argv": ["codex", "app-server", "--listen"], "daemon": "work"}]
+    cutover.save()
+    prepared = window.prepare(SESSION)
+    # Daemons are not sessions: preparation records them like any live harness process.
+    assert [entry["pid"] for entry in prepared["hosts"]["titan"]["sessions"]] == [3900401, 3900402]
+    targets = {host: {target_id: cutover.target(host, target_id).read_bytes()
+                      for target_id in transport.TARGET_PATHS} for host in HOSTS}
+    opened = window.open_window(prepared)
+    mark = len(cutover.lines("observed"))
+    quiescent = window.quiesce_window(prepared, decision_for(opened))
+
+    assert quiescent["state"] == "quiescing" and quiescent["id"] == opened["id"]
+    assert quiescent == state.current_window(cutover_root(cutover))
+    assert set(quiescent["quiescent"]["hosts"]) == set(HOSTS)
+    calls = [(call["host"], call["tool"], call["args"][0])
+             for call in observed(cutover, since=mark)]
+    assert calls == [
+        ("titan", "codex", "app-server"), ("titan", "codex", "app-server"),
+        ("titan", "preflight", "preflight"), ("titan", "preflight", "preflight"),
+        ("europa", "preflight", "preflight"),
+        ("titan", "quiesce-timers", "record"), ("titan", "quiesce-timers", "stop"),
+        ("europa", "quiesce-timers", "record"), ("europa", "quiesce-timers", "stop"),
+        ("titan", "quiesce-timers", "wait"), ("europa", "quiesce-timers", "wait"),
+        ("titan", "preflight", "preflight"), ("titan", "preflight", "preflight"),
+        ("europa", "preflight", "preflight"),
+        ("titan", "relay-cutover", "familiar-source"), ("titan", "relay-cutover", "familiar-check"),
+        ("europa", "relay-cutover", "familiar-source"),
+        ("europa", "relay-cutover", "familiar-check")]
+    # Only the supported daemon stop, once per home, held, with no broad kill.
+    daemons = [call for call in observed(cutover, "codex", mark)]
+    assert [(call["args"], call["codex_home"], call["hold"]) for call in daemons] == [
+        (["app-server", "daemon", "stop"], None, "1"),
+        (["app-server", "daemon", "stop"], str(cutover.home("titan") / ".codex-work"), "1")]
+    assert timers_active(cutover) == {"titan": "inactive", "europa": "inactive"}
+    for host in HOSTS:
+        root, home = cutover.root(host), cutover.home(host)
+        host_record = root / "quiesce" / opened["id"] / "timers.json"
+        kept = Path(opened["directory"]) / "hosts" / host / "timers.json"
+        copy = state.load_record(kept)
+        assert copy["sha256"] == hashlib.sha256(host_record.read_bytes()).hexdigest()
+        assert copy["sha256"] == quiescent["timers"][host]["sha256"]
+        assert transport._tree_of(root / "familiar-state") == transport._tree_of(
+            home / ".local/state/familiar")
+        assert "observe/after-preparation.json" not in transport._tree_of(
+            root / "quiesce" / opened["id"] / "preparation" / "familiar-state")
+    # Nothing familiar or settings-related has changed yet.
+    assert {host: {target_id: cutover.target(host, target_id).read_bytes()
+                   for target_id in transport.TARGET_PATHS} for host in HOSTS} == targets
+
+
+@needs_zsh
+def test_quiesce_daemon_survivors_block(cutover):
+    codex = os.path.realpath(cutover.home("titan") / ".local/bin/codex")
+    cutover.spec("titan")["rows"].append(
+        {"pid": 3900501, "start_time": 61, "comm": "codex", "exe": codex,
+         "argv": ["codex", "app-server"], "daemon": "personal"})
+    cutover.behave("titan", daemon="survive")
+    prepared, opened, consumed = opened_with_decision(cutover)
+    mark = len(cutover.lines("observed"))
+    with pytest.raises(window.Failed) as raised:
+        window.quiesce_window(prepared, consumed)
+    failed = raised.value
+    assert (failed.step, failed.host, failed.status) == ("codex-daemon-stop", "titan", "blocked")
+    assert any("3900501" in blocker for blocker in failed.blockers)
+    assert "nothing was killed" in failed.error
+    cutover.reload()
+    assert [row["pid"] for row in cutover.spec("titan")["rows"]].count(3900501) == 1
+    assert timer_calls(cutover, mark) == []
+    assert state.current_window(cutover_root(cutover))["state"] == "aborted"
+
+
+@needs_zsh
+def test_second_host_failure_aborts_both(cutover):
+    cutover.behave("europa", timers={"record": "fail"})
+    prepared, opened, consumed = opened_with_decision(cutover)
+    snapshots = {host: transport._tree_of(cutover.root(host) / "familiar-state") for host in HOSTS}
+    mark = len(cutover.lines("observed"))
+    with pytest.raises(window.Failed) as raised:
+        window.quiesce_window(prepared, consumed)
+    failed = raised.value
+    assert (failed.step, failed.host, failed.status) == ("timer-record", "europa", "failed")
+    assert failed.log.startswith("europa:") and failed.log.endswith("/log")
+    assert "aborted" in failed.observed
+    assert timer_calls(cutover, mark) == [
+        ("titan", "record"), ("titan", "stop"), ("europa", "record"), ("titan", "restore")]
+    record = state.current_window(cutover_root(cutover))
+    assert record["state"] == "aborted"
+    assert record["abort"]["hosts"]["titan"]["complete"] is True
+    assert record["abort"]["hosts"]["europa"]["timers"] == {"recorded": False}
+    assert timers_active(cutover) == {"titan": "active", "europa": "active"}
+    assert (cutover.root("titan") / "quiesce" / opened["id"] / "timers.restored.json").is_file()
+    assert {host: transport._tree_of(cutover.root(host) / "familiar-state")
+            for host in HOSTS} == snapshots
+    assert transport.OUTPUT_SECRET not in str(failed)
+    # A completed abort permits a fresh window; its directory stays.
+    fresh = state.new_window(cutover_root(cutover), window.prepared_sha256(prepared))
+    assert fresh["id"] != opened["id"] and Path(opened["directory"]).is_dir()
+
+
+@needs_zsh
+@pytest.mark.parametrize("name", ["SIGTERM", "SIGINT", "SIGHUP"])
+def test_quiesce_signal_aborts_every_recorded_host(cutover, name):
+    cutover.behave("europa", timers={"wait": "signal"}, signal=name)
+    prepared, opened, consumed = opened_with_decision(cutover)
+    handlers = {signum: signal.getsignal(signum) for signum in hosts.INTERRUPTS}
+    with pytest.raises(window.Failed) as raised:
+        window.quiesce_window(prepared, consumed)
+    failed = raised.value
+    assert (failed.step, failed.host) == ("timer-wait", "europa")
+    assert failed.status == "interrupted" and name in failed.error
+    assert {signum: signal.getsignal(signum) for signum in hosts.INTERRUPTS} == handlers
+    record = state.current_window(cutover_root(cutover))
+    assert record["state"] == "aborted" and record["failure"]["step"] == "timer-wait"
+    assert timers_active(cutover) == {"titan": "active", "europa": "active"}
+    # The remote wait was cancelled explicitly, never by dropping its connection.
+    operations = cutover.root("europa") / "operations"
+    waits = [path.parent for path in operations.glob("*/start.json")
+             if state.load_record(path)["operation"] == "timer-wait"]
+    assert len(waits) == 1 and (waits[0] / "cancel.json").is_file()
+    assert state.load_record(waits[0] / "done.json")["response"]["status"] == "cancelled"
+
+
+@needs_zsh
+def test_quiesce_second_signal_leaves_abort_incomplete(cutover):
+    cutover.behave("europa", timers={"wait": "signal"})
+    cutover.behave("titan", timers={"restore": "signal"})
+    prepared, opened, consumed = opened_with_decision(cutover)
+    with pytest.raises(window.Failed) as raised:
+        window.quiesce_window(prepared, consumed)
+    failed = raised.value
+    assert failed.status == "interrupted" and "abort-incomplete" in failed.observed
+    assert failed.next_command == ["recover"]
+    root = cutover_root(cutover)
+    record = state.current_window(root)
+    assert record["state"] == "abort-incomplete"
+    assert record["abort"]["hosts"]["titan"]["complete"] is False
+    assert "europa" not in record["abort"]["hosts"] or not record["abort"]["hosts"]["europa"][
+        "complete"]
+    assert timers_active(cutover) == {"titan": "inactive", "europa": "inactive"}
+    with pytest.raises(Stop, match="abort-incomplete"):
+        state.new_window(root, window.prepared_sha256(prepared))
+    # Reconciliation and a completed abort clear it.
+    cutover.behave("titan", timers={})
+    outcome = window.abort_window(record)
+    assert outcome["state"] == "aborted"
+    assert timers_active(cutover) == {"titan": "active", "europa": "active"}
+
+
+@needs_zsh
+def test_abort_incomplete_requires_reconciliation(cutover):
+    cutover.behave("europa", timers={"stop": "fail-after", "restore": "fail"})
+    prepared, opened, consumed = opened_with_decision(cutover)
+    with pytest.raises(window.Failed) as raised:
+        window.quiesce_window(prepared, consumed)
+    failed = raised.value
+    assert (failed.step, failed.host) == ("timer-stop", "europa")
+    assert "abort-incomplete" in failed.observed and "europa" in failed.observed
+    assert failed.next_command == ["recover"]
+    root = cutover_root(cutover)
+    record = state.current_window(root)
+    assert record["state"] == "abort-incomplete"
+    assert record["abort"]["hosts"]["titan"]["complete"] is True
+    assert record["abort"]["hosts"]["europa"]["complete"] is False
+    assert timers_active(cutover) == {"titan": "active", "europa": "inactive"}
+    with pytest.raises(Stop, match="abort-incomplete"):
+        state.new_window(root, window.prepared_sha256(prepared))
+    report = window.status()
+    assert report["window"]["state"] == "abort-incomplete" and report["next"] == ["recover"]
+
+    cutover.behave("europa", timers={})
+    outcome = window.abort_window(record)
+    assert outcome["state"] == "aborted" and outcome["hosts"]["europa"]["complete"] is True
+    assert timers_active(cutover) == {"titan": "active", "europa": "active"}
+    # The incomplete attempt stays on the record as evidence.
+    earlier = state.current_window(root)["earlier_aborts"]
+    assert len(earlier) == 1 and earlier[0]["hosts"]["europa"]["complete"] is False
+    with pytest.raises(Stop, match="is aborted"):
+        window.abort_window(state.current_window(root))
+    state.new_window(root, window.prepared_sha256(prepared))
+
+
+QUIESCE_DRIVER = r"""
+import sys
+sys.path.insert(0, @TOOLS@)
+from datetime import datetime, timezone
+from relay_cutover_bootstrap import hosts, state, window
+hosts.TOOLS["ssh"] = @SSH@
+prepared = state.load_record(window._root() / "prepared.json")
+opened = window.open_window(prepared)
+record = {"schema": 1, "kind": "desktop", "action": window.RUN_ACTION, "window_id": opened["id"],
+          "attempt_id": "run-1", "subject_sha256": "0" * 64, "verdict": "approved",
+          "source": {"type": "tty", "prompt": "Restart? [y/N]", "response": "y",
+                     "answered_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}}
+consumed = state.consume_decision(opened, record, kind="desktop", action=window.RUN_ACTION,
+                                  attempt_id="run-1", subject_sha256="0" * 64)
+window.quiesce_window(prepared, consumed)
+"""
+
+
+@needs_zsh
+def test_abort_after_sigkill_reconciles_first(cutover):
+    prepared = window.prepare(SESSION)
+    cutover.behave("europa", timers={"wait": "latch"})
+    script = transport._write(cutover.fixture / "quiesce_driver.py", QUIESCE_DRIVER.replace(
+        "@TOOLS@", repr(str(TOOLS))).replace("@SSH@", repr(str(cutover.ssh))))
+    driver = subprocess.Popen([sys.executable, "-B", str(script)], stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE, env=dict(os.environ))
+    try:
+        transport._until(lambda: ("europa", "wait") in timer_calls(cutover), seconds=60)
+        driver.kill()
+        driver.communicate(timeout=30)
+    finally:
+        if driver.poll() is None:
+            driver.kill()
+            driver.wait()
+    root = cutover_root(cutover)
+    record = state.current_window(root)
+    assert record["state"] == "quiescing"
+    assert timers_active(cutover) == {"titan": "inactive", "europa": "inactive"}
+    with pytest.raises(Stop, match="is quiescing"):
+        state.new_window(root, window.prepared_sha256(prepared))
+    assert window.status()["next"] == ["recover"]
+
+    # The next invocation reconciles first: the remote wait still runs until cancelled.
+    outcome = window.abort_window(record)
+    assert outcome["state"] == "aborted"
+    cancelled = outcome["hosts"]["europa"]["cancelled"]
+    assert len(cancelled) == 1 and cancelled[0]["operation"] == "timer-wait"
+    assert cancelled[0]["state"] == "cancelled"
+    assert timers_active(cutover) == {"titan": "active", "europa": "active"}
+    state.new_window(root, window.prepared_sha256(prepared))
+
+
+def _dead_identity():
+    process = subprocess.Popen(["/usr/bin/sleep", "30"])
+    identity = {"pid": process.pid, "start_time": hosts._start_time(process.pid)}
+    process.kill()
+    process.wait()
+    return identity, process
+
+
+def test_abort_prepared_window_after_crash(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    root = window._root()
+    prepared = {"schema": 1, "prepared_at": "2026-10-20T12:00:00+00:00", "fixture": True}
+    state.save_record(root / "prepared.json", prepared)
+    opened = window.open_window(prepared)
+    assert opened["state"] == "prepared"
+    assert opened["owner"]["pid"] == os.getpid()
+    assert state.load_record(Path(opened["directory"]) / "prepared.json") == prepared
+
+    # A live invocation's window is never aborted from another one.
+    sleeper = subprocess.Popen(["/usr/bin/sleep", "30"])
+    try:
+        alive = with_state({**opened, "owner": {"pid": sleeper.pid, "start_time":
+                                                hosts._start_time(sleeper.pid)}}, "prepared")
+        with pytest.raises(Stop, match=f"pid {sleeper.pid}"):
+            window.abort_window(alive)
+    finally:
+        sleeper.kill()
+        sleeper.wait()
+
+    # A crash before any mutation leaves `prepared`; it blocks a fresh window until this
+    # transition aborts it without contacting either host.
+    dead, _ = _dead_identity()
+    crashed = with_state({**opened, "owner": dead}, "prepared")
+    with pytest.raises(Stop, match="is prepared"):
+        state.new_window(root, window.prepared_sha256(prepared))
+    assert window.status()["next"] == ["recover"]
+    outcome = window.abort_window(crashed)
+    assert outcome["state"] == "aborted" and outcome["hosts"] == {}
+    assert state.current_window(root)["state"] == "aborted"
+    assert not (root / "operations").exists()
+    state.new_window(root, window.prepared_sha256(prepared))
+
+
+ZSH_SCRIPT = r"""
+typeset KEEP='original value'
+typeset -i COUNT=7
+setopt NO_NOMATCH
+options_before=$(setopt)
+@COMMAND@
+rc=$?
+options_after=$(setopt)
+same=changed
+[[ $options_before == $options_after ]] && same=same
+print -r -- "after rc=$rc KEEP=$KEEP COUNT=$COUNT options=$same"
+"""
+
+CLI_DRIVER = r"""
+import sys
+from pathlib import Path
+sys.path.insert(0, @TOOLS@)
+from relay_cutover_bootstrap import cli, hosts, window
+hosts.TOOLS["ssh"] = @SSH@
+window.CHECKOUT = Path(@CHECKOUT@)
+sys.exit(cli.main(sys.argv[1:]))
+"""
+
+
+def _zsh(command, env):
+    result = subprocess.run([str(transport.ZSH), "-f", "-c",
+                             ZSH_SCRIPT.replace("@COMMAND@", command)],
+                            env=env, capture_output=True, text=True, timeout=120)
+    fields = {}
+    for line in result.stderr.splitlines()[1:]:
+        if line.startswith("  ") and ": " in line:
+            key, value = line.strip().split(": ", 1)
+            fields.setdefault(key, value)
+    return result, fields
+
+
+@needs_zsh
+def test_failure_returns_to_zsh(cutover):
+    env = {key: os.environ[key] for key in ("USER", "HOME", "PATH", "LANG", "XDG_RUNTIME_DIR",
+                                            "FIXTURE_ENV_SECRET") if key in os.environ}
+    assert os.access(BOOTSTRAP, os.X_OK)
+    assert BOOTSTRAP.read_text().startswith("#!/usr/bin/python3 -B\n")
+
+    # The thin executable itself: nothing is prepared yet, so check stops before any host.
+    result, fields = _zsh(f"{shlex.quote(str(BOOTSTRAP))} check", env)
+    assert result.stdout.splitlines()[-1] == \
+        "after rc=1 KEEP=original value COUNT=7 options=same"
+    assert result.stderr.splitlines()[0] == "relay-cutover-bootstrap: check stopped"
+    assert (fields["step"], fields["host"], fields["status"], fields["log"]) == (
+        "prepared-record", "titan", "missing", "none")
+    assert fields["next"] == (f"{TOOLS / 'relay-cutover-bootstrap'} prepare "
+                              "--controller-session <native-session-id>")
+    assert not (cutover_root(cutover) / "prepared.json").exists()
+
+    # A failed Europa step: step, host, status, private log and one next command, nothing
+    # private, and the same Zsh, variables and options afterwards.
+    cutover.behave("europa", npm_version="11.6.2")
+    driver = transport._write(cutover.fixture / "cli_driver.py", CLI_DRIVER.replace(
+        "@TOOLS@", repr(str(TOOLS))).replace("@SSH@", repr(str(cutover.ssh))).replace(
+        "@CHECKOUT@", repr(str(window.CHECKOUT))))
+    result, fields = _zsh(f"{shlex.quote(sys.executable)} -B {shlex.quote(str(driver))} "
+                          f"prepare --controller-session {SESSION}", env)
+    assert result.stdout.splitlines()[-1] == \
+        "after rc=1 KEEP=original value COUNT=7 options=same"
+    assert result.stderr.splitlines()[0] == "relay-cutover-bootstrap: prepare stopped"
+    assert (fields["step"], fields["host"], fields["status"]) == ("inventory", "europa", "blocked")
+    assert fields["log"].startswith("europa:") and fields["log"].endswith("/log")
+    log = Path(fields["log"].removeprefix("europa:"))
+    assert log.is_file() and cutover.root("europa") in log.parents
+    assert fields["observed"] == "nothing was changed; no window is open"
+    assert fields["next"] == (f"{window.CHECKOUT / 'tools/relay-cutover-bootstrap'} prepare "
+                              f"--controller-session {SESSION}")
+    assert "npm 12.2.1" in result.stderr
+    for secret in SECRETS:
+        assert secret not in result.stdout + result.stderr
+    assert not (cutover_root(cutover) / "prepared.json").exists()
+
+
+def _opened(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    prepared = {"schema": 1, "prepared_at": "2026-10-20T12:00:00+00:00", "fixture": True}
+    state.save_record(window._root() / "prepared.json", prepared)
+    return prepared, window.open_window(prepared)
+
+
+def test_abort_refuses_past_the_pre_merge_boundary(tmp_path, monkeypatch):
+    prepared, opened = _opened(tmp_path, monkeypatch)
+    for name in ("recovery-required", "recovering", "migrated-surfaces-pending",
+                 "ready-for-smokes", "finishing", "inspection-required"):
+        with pytest.raises(Stop, match="use recover"):
+            window.abort_window(with_state(opened, name))
+    # Applying is pre-merge only until familiar mutation is recorded or a target registers.
+    merging = with_state({**opened, "familiar": {"started_at": "2026-10-20T12:01:00+00:00"}},
+                         "applying")
+    with pytest.raises(Stop, match="familiar or a target changed"):
+        window.abort_window(merging)
+    applying = with_state({key: value for key, value in opened.items()}, "applying")
+    target = settings(tmp_path)
+    state.register_target(applying, "claude", target, Path(applying["directory"]) / "c.json")
+    with pytest.raises(Stop, match="familiar or a target changed"):
+        window.abort_window(applying)
+    # A stale copy of the record is refused rather than acted on.
+    with pytest.raises(Stop, match="not the active one"):
+        window.abort_window(opened)
+    assert not (window._root() / "operations").exists()
+
+
+def test_quiesce_requires_this_runs_consumed_decision(tmp_path, monkeypatch):
+    prepared, opened = _opened(tmp_path, monkeypatch)
+    consumed = decision_for(opened)
+    unconsumed = consumed["decision"]
+    restart = {**consumed, "action": "restart-surfaces"}
+    for decision, fragment in ((unconsumed, "consumed"), (restart, "consumed"),
+                               ({**consumed, "window_id": "20261019T120000Z-0badf00d"},
+                                "does not belong"), (None, "does not belong")):
+        with pytest.raises(window.Failed, match=fragment) as raised:
+            window.quiesce_window(prepared, decision)
+        assert raised.value.observed == "nothing was changed"
+    with pytest.raises(window.Failed, match="another preparation"):
+        window.quiesce_window({**prepared, "fixture": False}, consumed)
+    other = with_state({**opened, "owner": {"pid": 1, "start_time": 1}}, "prepared")
+    with pytest.raises(window.Failed, match="another invocation"):
+        window.quiesce_window(prepared, consumed)
+    with_state({**other, "owner": opened["owner"]}, "quiescing")
+    with pytest.raises(window.Failed, match="is quiescing"):
+        window.quiesce_window(prepared, consumed)
+    assert not (window._root() / "operations").exists()
