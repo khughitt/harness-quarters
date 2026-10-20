@@ -1,15 +1,17 @@
 ---
 id: hq-7efef3
 title: Refresh Claude guard evidence for 2.1.304 before operator cutover
-status: doing
+status: done
 priority: 1
 size: m
 complexity: mid
 process: direct
 owner: feat/relay-cutover
 created: 2026-10-20T01:37:42Z
-updated: 2026-10-20T01:56:55Z
+updated: 2026-10-20T01:56:56Z
 started: 2026-10-20T01:40:58Z
+completed: 2026-10-20T01:56:55Z
+closed: 2026-10-20T01:56:55Z
 depends: []
 parent: hq-539508
 tags: []
@@ -41,3 +43,7 @@ Done: new Claude evidence proves the required routes at the exact installed vers
   provenance: {"harness_session":"codex:01a15627-8959-7223-98d3-1c5a0cf587a9","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-20T01:54:43Z (feat/relay-cutover): review: impl round 1 — verdict: accept; findings: Minor 1; reviewer: codex/gpt-6.1-sol
 - 2026-10-20T01:56:55Z (feat/relay-cutover): Accepted review persisted claude-21304-review-report.md (codex/gpt-6.1-sol high); no Critical/Important. Existing warning noise remains minor (deferred). Ops evidence/docs locally merged6327da47f839683d14a22727913c9e1fd912c585, exact reviewed/tested source; Codex evidence and unrelated dirty files unchanged. Both hosts now evidence/runtime/subscribers OK; Europa no-live OK, Titan no-live correctly refuses live Claude/Codex sessions. All saved before/expected hashes and familiar PRE/native checks pass. No live window marker or application. Credential leftovers0. Safe temporary Titan ops + Europa ops/relay worktrees removed after ignored-file/pointer/ledger/tt-report checks; branches/release and private probe artifacts retained. HQ full branch stays unmerged pending Tasks8–9.
+- 2026-10-20T01:56:55Z (feat/relay-cutover): done
+  provenance: {"harness_session":"codex:01a15627-8959-7223-98d3-1c5a0cf587a9","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-20T01:56:55Z (feat/relay-cutover): Claude2.1.304 Europa live allow/context/denial proof reviewed and integrated into ops main; both host evidence gates pass. Focused53, Titan fast1666, HQ228+966 pass; Europa pre-existing time/npm12 baseline failures and Titan transient snapshot race disclosed with feedback and accepted ruling. HQ runbook updated/reviewed in task worktree; operator Task8 and live Task9 remain pending. No hooks/trust/timers/services/desktops changed, no jobs left.
+  provenance: {"harness_session":"codex:01a15627-8959-7223-98d3-1c5a0cf587a9","harness_session_source":"CODEX_THREAD_ID"}
