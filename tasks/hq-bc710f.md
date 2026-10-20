@@ -1,0 +1,21 @@
+---
+id: hq-bc710f
+title: "Safe resume, smoke receipts and timer finalization"
+status: todo
+priority: 1
+size: m
+complexity: high
+process: direct
+created: 2026-10-20T11:39:31Z
+updated: 2026-10-20T11:39:31Z
+depends: [hq-293e38]
+parent: hq-c6c847
+tags: []
+source: operator-bootstrap-plan-revision-2026-10-20
+agent: codex
+spec: docs/specs/2026-10-20-operator-runbooks-design.md
+plan: docs/plans/2026-10-20-relay-cutover-bootstrap.md
+step: "Task 7: Safe resume, smoke receipts and timer finalization"
+---
+
+Unstarted plan step. Human re-review of the complete implementation plan is pending; no implementation/pilot/live host action before approval. Execute under parent hq-c6c847 and preserved subagent-driven method/trial arm. Human consent and live window gates remain separate.
