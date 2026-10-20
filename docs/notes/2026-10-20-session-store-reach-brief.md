@@ -136,3 +136,49 @@ import. The model route stays a skill addition (hq-7b131a), later a field of `sh
   subagent's runtime model.
 - hq-be3f69: dropped 2026-10-20 after checking its origin session; recorded in §2 as what
   already works.
+
+## 7. Session-log question survey — hq-de3e4c, 2026-10-20
+
+The [completed survey](2026-10-20-session-log-survey.md) classifies **183 episodes**
+from both harnesses and both home profiles: 129 Claude personal, 14 Claude work,
+40 Codex personal; no matching Codex-work investigation was observed. Europa was
+reachable but yielded only memory-file operations. The unit is a question, including
+its repeated parser attempts; batch audits remain one episode. These are sample
+counts, not population prevalence.
+
+| Question | Episodes | Investigation calls |
+|---|---:|---:|
+| Record formats/parser fidelity | 64 | 372 |
+| Reconstruct/verify behavior | 49 | 345 |
+| Runtime identity/model | 21 | 59 |
+| Store coverage/retention | 17 | 51 |
+| Recover earlier content/recipe | 16 | 58 |
+| Aggregate patterns | 15 | 193 |
+| Trace report/task origins | 1 batch | 15 |
+
+Historical tool **outputs were required in 64 episodes**. Required parent
+relationships appear in 18: six child→parent only, ten parent→child only, two both.
+Eight episodes therefore need reverse child→parent binding, twelve forward
+parent→child binding; six need both outputs and reverse binding (fourteen outputs
+and either direction). Field-shape inspection and background shell activity do not
+count as relationship traversal. Provenance and successful task commands remain distinct from
+mere mentions. Outcomes: 177 found, three bounded not-found, three unknown.
+The cost ranking by recorded tool time is formats, behavior, aggregates, inventory,
+recovery, trace, identity. At least 51 scratch scripts and 377 inline parser
+invocations were observed; unknown counts and timing limits remain explicit.
+
+This supports §4 alternative 4's **search + show first**, including metadata filters,
+all record roles, paired tool results, block-level references and per-run coverage.
+A bounded normalized/raw-record stream is needed for the 64 format and 15 aggregate
+questions. It does not justify a new `find` command beside the existing session
+picker. `trace` should compose typed evidence links over the reader and the location
+metadata whose ownership hq-a1c591 still investigates. Its automated precision and
+production search costs remain unmeasured. JSONL/pretty output is a design
+recommendation, not an observed preference. No tool code changed.
+
+Two Minor annotation corrections (one scratch script and three failure tags) are
+deferred to hq-edf5de; script and obstacle counts remain lower bounds.
+
+The [episode ledger](data/2026-10-20-session-log-survey.jsonl) preserves paraphrases,
+line/block/call references, line hashes, costs and conservative outcome labels.
+hq-c411df is ready to incorporate this input once its other research dependency lands.

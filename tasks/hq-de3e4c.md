@@ -1,15 +1,17 @@
 ---
 id: hq-de3e4c
 title: "Survey what agents look for when they read session logs, to set the verbs of an hq logs CLI"
-status: doing
+status: done
 priority: 2
 size: m
 complexity: mid
 process: direct
 owner: docs/logs-survey
 created: 2026-10-20T16:34:37Z
-updated: 2026-10-20T17:52:37Z
+updated: 2026-10-20T17:52:44Z
 started: 2026-10-20T17:00:12Z
+completed: 2026-10-20T17:52:44Z
+closed: 2026-10-20T17:52:44Z
 depends: []
 parent: hq-cff824
 tags: [session-logs]
@@ -50,3 +52,7 @@ Ideas it wakes: On completion, run `tasks note hq-c411df --no-reviewed "<finding
 - 2026-10-20T17:52:29Z (docs/logs-survey): gate: verified tree:e204ae6b77191ec53c1fcb064ca673e1b1c911ed — checks: just test 1184 passed and source hashes and direction assertions and aggregate checks passed and ops-docs and tasks check no errors; review: important addressed parent directions independently re-audited, minor deferred E037 scratch parser count tracked hq-edf5de, minor deferred E008 failure tags tracked hq-edf5de; reviewer: codex/gpt-6.1-sol session:codex:01a15a6b-dac9-7c51-ba74-e0e6f1973ea0
   provenance: {"harness_session":"codex:01a15a40-db33-7ad3-9f26-96bc1d938379","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-20T17:52:37Z (docs/logs-survey): retro: Grouping by question kept repeated parsers and batch audits from distorting frequency. Raw checks of every preliminary parent flag caught a distinction the pilot missed: relationship direction must describe the lookup performed rather than the orientation of a printed field.
+- 2026-10-20T17:52:44Z (docs/logs-survey): done
+  provenance: {"harness_session":"codex:01a15a40-db33-7ad3-9f26-96bc1d938379","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-20T17:52:44Z (docs/logs-survey): Survey complete:183 episodes /1093 calls across Claude and Codex personal/work homes; europa reachable with no qualified episodes. Final report and brief recommend search+show plus typed trace composition. Historical outputs required64; child-to-parent8 and parent-to-child12 (2 both). All2551 source hashes and call/result pairs verify; just test1184 passed. Fresh independent review accepted the parent-direction correction; two Minor annotation omissions disclosed and tracked in hq-edf5de. hq-c411df marked no-reviewed with corrected findings before integration.
+  provenance: {"harness_session":"codex:01a15a40-db33-7ad3-9f26-96bc1d938379","harness_session_source":"CODEX_THREAD_ID"}
