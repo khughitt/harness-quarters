@@ -201,8 +201,12 @@ saw of children, the ways to end, and a pointer to the rules of §3.5, which
 the agent already has in its instructions. On Claude Code:
 
 > You are ending a turn while this session holds a live task claim:
-> `ai-21ea5d` in `/…/ai`. No child the harness tracks is running, so nothing
-> will start your next turn; a job detached with `&` or `nohup` never does.
+> `ai-21ea5d` in `/…/ai`. The Stop input lists no running child. A child that
+> just finished may still have a queued completion that starts your next
+> turn. If you have not received its result and your last message named it,
+> reply with one line naming it again and end; the stop that follows is
+> allowed. Without such a completion, nothing will start your next turn; a
+> job detached with `&` or `nohup` never does.
 > If the user told you this turn to stop, wait or only answer, use (2) with
 > `--waiting-on user`, not (1). Otherwise do one of these before the turn
 > ends:
@@ -213,16 +217,19 @@ the agent already has in its instructions. On Claude Code:
 > (3) Done: `tasks done <id> "<what landed>"`.
 > Decisions and Processes in your instructions give the rules.
 
-That is about 700 characters for one claim; the first text was 1,633.
+That is about 950 characters for one claim; the first text was 1,633.
 
 What the reason says about children depends on whether the harness restarts
 an idle controller when a child finishes. The guard keeps one table,
 `CHILD_WAKES`, and the text follows it:
 
 - **Wakes, and the input listed the background work** (none of it in flight,
-  or step 3 would have allowed): "No child the harness tracks is running, so
-  nothing will start your next turn; a job detached with `&` or `nohup` never
-  does."
+  or step 3 would have allowed): "The Stop input lists no running child. A
+  child that just finished may still have a queued completion that starts
+  your next turn. If you have not received its result and your last message
+  named it, reply with one line naming it again and end; the stop that
+  follows is allowed. Without such a completion, nothing will start your
+  next turn; a job detached with `&` or `nohup` never does."
 - **Wakes, and the guard cannot vouch for what the input says** (any case
   step 3 of §3.2 lists): "The guard cannot see whether a child is running
   (*why*). If one the harness tracks is running and your last message named
