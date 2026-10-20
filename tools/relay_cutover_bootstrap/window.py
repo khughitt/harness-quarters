@@ -17,6 +17,9 @@ targets and familiar is in `targets.py` and `familiar.py`. A run opens the windo
    closed before each install and each target write. The window becomes
    `migrated-surfaces-pending`.
 
+Full recovery of a window past the `familiar` record, and the reconciliation of a run that
+stopped without recording its outcome, are in `recovery.py`; `status` names their states.
+
 Each step is recorded in the window before its request. Any failure before the `familiar` record,
 or an INT, TERM or HUP, aborts every host the window touched: the abort cancels and reconciles
 the window's pending operations, restores timers from their records and then returns the
@@ -734,10 +737,31 @@ def status() -> dict:
                       "familiar's surfaces are pending and timers stay paused on "
                       f"{', '.join(stopped) or 'no host'}", next=["restart-surfaces"])
         return report
-    report["detail"] = (f"window {current['id']} is {current['state']} and no invocation is "
-                        "running it; " + (f"timers may be paused on {', '.join(stopped)}"
-                                          if stopped else
-                                          f"its hosts ({', '.join(attempted)}) have no paused "
-                                          "timer" if attempted else "no host was changed"))
+    paused = (f"timers may be paused on {', '.join(stopped)}" if stopped else
+              f"its hosts ({', '.join(attempted)}) have no paused timer" if attempted
+              else "no host was changed")
     report["next"] = ["recover"]
+    if "familiar" not in current:
+        report["detail"] = (f"window {current['id']} is {current['state']} and no invocation is "
+                            f"running it; {paused}")
+        return report
+    recovery = current.get("recovery") or {}
+    failure = recovery.get("failure") or current.get("failure") or {}
+    stopped_at = (f"{failure.get('step')} on {failure.get('host')} ({failure.get('status')})"
+                  if failure else "an unrecorded point")
+    if current["state"] == "inspection-required":
+        lead = (f"stopped pending inspection at {stopped_at}: {failure.get('error')}; inspect it, "
+                "then run recover; nothing was force-copied, reset or reverted blindly")
+    elif current["state"] == "recovering" and "restored" in recovery:
+        lead = ("recovery restored native settings, source and dependencies on both hosts; "
+                "familiar's surfaces and the original timers are still pending")
+    elif current["state"] == "recovering":
+        lead = f"recovery stopped at {stopped_at}; recover repeats it from actual state"
+    else:
+        lead = (f"familiar or settings may have changed; the run stopped at {stopped_at}"
+                if failure else "the run stopped past familiar's mark without recording its "
+                "outcome; recover reconciles actual state first")
+    report["detail"] = (f"window {current['id']} is {current['state']}: {lead}. Do not open "
+                        "Claude or Codex until recover completes: run is blocked and timers "
+                        f"stay paused on {', '.join(stopped) or 'no host'}")
     return report

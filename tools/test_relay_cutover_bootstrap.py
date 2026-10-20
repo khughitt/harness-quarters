@@ -8,6 +8,7 @@ import fcntl
 import fnmatch
 import hashlib
 import io
+import itertools
 import json
 import os
 import re
@@ -17,6 +18,8 @@ import signal
 import stat
 import subprocess
 import sys
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -24,7 +27,7 @@ from types import SimpleNamespace
 import pytest
 
 import test_relay_cutover_transport as transport
-from relay_cutover_bootstrap import cli, hosts, inputs, state, window
+from relay_cutover_bootstrap import cli, hosts, inputs, recovery, restoration, state, window
 from relay_cutover_bootstrap import prepare as preparation
 from relay_cutover_bootstrap.state import Stop
 
@@ -2149,6 +2152,44 @@ class TestRun:
         assert recorded < stopped
 
 
+    def test_post_resume_pick_drift_refuses_restore(self, migrated):
+        """After the verified migration the operator resumed Claude and changed a model pick,
+        which the handoff forbids until finish. Choosing rollback then stops for inspection
+        before any write: no target, source or dependency changes and nothing is force-copied.
+        It runs last in this class because it changes the class's world."""
+        world = migrated.world
+        assert "do not change or save Claude model or effort defaults" in migrated.out
+        root = cutover_root(world)
+        record = state.current_window(root)
+        assert record["state"] == "migrated-surfaces-pending"
+        value = json.loads(world.target("titan", "claude").read_bytes())
+        value["model"] = "sonnet"
+        world.write_target("claude", json.dumps(value, indent="\t").encode() + b"\n")
+        live = Path(record["directory"]) / "live"
+        before = (_targets(world), _heads(world), _modules(world), transport._tree_of(live))
+        mark = len(world.lines("observed"))
+        with pytest.raises(window.Failed) as raised:
+            recovery.restore_window(record)
+        failed = raised.value
+        assert (failed.step, failed.host, failed.status) == ("target-check", "titan", "blocked")
+        assert "claude" in failed.error and "sonnet" not in failed.error
+        assert "stopped pending inspection" in failed.observed
+        assert "Do not open Claude or Codex" in failed.observed
+        assert failed.next_command == ["recover"]
+        record = state.current_window(root)
+        assert record["state"] == "inspection-required"
+        assert record["recovery"]["check"]["claude"]["verdict"] == "unknown"
+        assert {target_id: entry["verdict"] for target_id, entry in
+                record["recovery"]["check"].items() if target_id != "claude"} == {
+            "claude-work": "relay-applied", "codex": "relay-applied", "codex-work": "relay-applied"}
+        assert (_targets(world), _heads(world), _modules(world),
+                transport._tree_of(live)) == before
+        assert not any(event.startswith(("restore:", "rollback:")) or "git-" in event
+                       for event in _recovery_events(world, mark))
+        report = window.status()
+        assert report["next"] == ["recover"] and "stopped pending inspection" in report["detail"]
+
+
 @needs_zsh
 def test_bootstrap_surviving_probe_refuses_before_mutation(cutover):
     prepared = preparation.prepare(SESSION)
@@ -2425,3 +2466,530 @@ def test_bootstrap_run_needs_the_operator_decision(cutover, monkeypatch, capsys)
     assert consumed["decision"]["source"]["type"] == "session"
     assert window.abort_window(state.current_window(root))["hosts"] == {}
     assert observed(cutover, since=mark) == [] and not (root / "quiesce").exists()
+
+
+# --- recovery: the restoration core and reconciliation of an interrupted run ---------------
+
+
+class Killed(BaseException):
+    """Stands in for SIGKILL at a durable point: no handler runs and the window keeps the last
+    record it saved."""
+
+
+def _dies_once(real, when):
+    """A window save that dies at the first save whose changes `when` names, before it lands."""
+    fired = []
+
+    def save(record, **changes):
+        if not fired and when(changes):
+            fired.append(True)
+            raise Killed()
+        return real(record, **changes)
+
+    return save
+
+
+def _killed_at(monkeypatch, when):
+    """The run dies at the first window save whose changes `when` names."""
+    monkeypatch.setattr(window, "_save", _dies_once(window._save, when))
+
+
+def _failed_run(world, monkeypatch=None, kill=None):
+    """A whole run that stops past familiar's mark, by a fault or by `kill`."""
+    prepared = preparation.prepare(SESSION)
+    opened = window.open_window(prepared)
+    consumed = run_decision(prepared, opened)
+    if kill is not None:
+        _killed_at(monkeypatch, kill)
+    with pytest.raises((window.Failed, Killed)) as raised:
+        window.run_window(prepared, consumed)
+    return raised.value, state.current_window(cutover_root(world))
+
+
+def _targets(world):
+    return {host: {target_id: world.target(host, target_id).read_bytes()
+                   for target_id in transport.TARGET_PATHS} for host in HOSTS}
+
+
+def _heads(world):
+    return {host: transport.familiar_head(world.home(host)) for host in HOSTS}
+
+
+def _modules(world):
+    return {host: transport._tree_of(world.home(host) / "d/familiar/node_modules")
+            for host in HOSTS}
+
+
+def _tree(world, commit):
+    return transport._git(world.home("titan") / "d/familiar", "rev-parse", f"{commit}^{{tree}}")
+
+
+def _parents(world, commit):
+    return transport._git(world.home("titan") / "d/familiar", "rev-list", "--parents", "-n", "1",
+                          commit).split()[1:]
+
+
+def _recovery_events(world, since):
+    """Host effects in order, from the fixture tools' own observations: timer stops, service
+    waits and restores, target restores and relay rollbacks, Git history changes, Codex daemon
+    stops, and any npm, Claude or preflight launch."""
+    names = {str(world.target("titan", target_id)): target_id
+             for target_id in transport.TARGET_PATHS}
+    timers = {"stop": "timer-stopped", "wait": "service-inactive", "restore": "timer-restored"}
+    found = []
+    for call in observed(world, since=since):
+        tool, host = call["tool"], call["host"]
+        if tool == "quiesce-timers":
+            found.append(f"{host}:{timers.get(call['args'][0], call['args'][0])}")
+        elif tool == "relay-cutover" and call["args"][:1] == ["restore"]:
+            found.append(f"restore:{names[_option(call, '--target')]}")
+        elif tool == "installer":
+            found.append(f"{call['phase']}:{call['target_id']}")
+        elif tool == "git" and ("git" in call or "merge" in call):
+            found.append(f"{host}:git-{'-'.join(call.get('git') or ['merge'])}")
+        elif tool in ("npm", "claude", "preflight"):
+            found.append(f"{host}:launched-{tool}")
+        elif tool == "codex":
+            found.append(f"{host}:codex-{call['args'][0]}")
+    return found
+
+
+def _restores(events):
+    return [event for event in events if event.startswith(("restore:", "rollback:"))]
+
+
+def _mutations(world):
+    """Every mutating operation either host has recorded."""
+    return sorted(path.parent.name for host in HOSTS
+                  for path in (world.root(host) / "operations").glob("*/start.json")
+                  if state.load_record(path)["mutation"])
+
+
+def _operations(world):
+    return {path.parent.name: state.load_record(path)["operation"] for host in HOSTS
+            for path in (world.root(host) / "operations").glob("*/start.json")}
+
+
+@needs_zsh
+def test_recovery_requiesces_before_restore(cutover):
+    """All four targets were applied, then Europa's verification failed, and a failed finish had
+    already restored both hosts' timers. Recovery stops both timers again from their original
+    records and waits for both services before any restore, then returns every target, familiar's
+    source and both hosts' dependencies to native, offline, with timers left paused."""
+    cutover.behave("europa", fail=["verify"])
+    cutover.start_dropbox()
+    native = (_targets(cutover), _modules(cutover))
+    failed, record = _failed_run(cutover)
+    assert (failed.step, failed.host) == ("target-verify", "europa")
+    assert record["state"] == "recovery-required"
+    assert sorted(record["applied"]) == sorted(transport.TARGET_PATHS)
+    merge, pre = record["familiar"]["merge"], cutover.pins["familiar_pre"]
+    cutover.behave("europa", fail=[])
+    for host in HOSTS:  # what a failed finish leaves: both hosts' timers restored
+        restored = cutover.request(host, "timer-restore", {
+            "window_id": record["id"], "record_sha256": record["timers"][host]["sha256"],
+            "stopped": True})
+        assert restored["status"] == "completed" and restored["result"]["restored"]
+    assert timers_active(cutover) == {"titan": "active", "europa": "active"}
+    kept = {host: (transport._tree_of(cutover.home(host) / ".local/state/familiar"),
+                   transport._tree_of(cutover.root(host) / "familiar-state")) for host in HOSTS}
+    mark = len(cutover.lines("observed"))
+
+    result = recovery.restore_window(record)
+    events = _recovery_events(cutover, mark)
+    assert events.index("europa:service-inactive") < events.index("restore:claude")
+    first = next(index for index, event in enumerate(events) if event.startswith("rollback:"))
+    assert events[:first] == [
+        "titan:codex-app-server", "titan:codex-app-server", "titan:timer-stopped",
+        "europa:timer-stopped", "titan:service-inactive", "europa:service-inactive"]
+    assert _restores(events) == [f"{kind}:{target_id}" for target_id in
+                                 reversed(list(transport.TARGET_PATHS))
+                                 for kind in ("rollback", "restore")]
+    assert events[first + 8:] == ["titan:git-revert"]
+    # Offline and without Claude: no npm, fetch, reset, Claude or forward preflight.
+    assert not any(":launched-" in event for event in events)
+    restored_target_bytes, original_target_bytes = _targets(cutover), native[0]
+    assert restored_target_bytes == original_target_bytes
+    assert _modules(cutover) == native[1]
+    revert = result["revert"]
+    assert _heads(cutover) == {"titan": revert, "europa": revert}
+    assert _parents(cutover, revert) == [merge] and _tree(cutover, revert) == _tree(cutover, pre)
+    assert (result["class"], result["state"]) == ("restored", "recovering")
+    assert {stage: result["stages"][stage] for stage in ("native-surfaces", "original-timers")} \
+        == {"native-surfaces": "pending", "original-timers": "pending"}
+    assert "Do not open Claude or Codex" in result["observed"] and result["next"] == ["recover"]
+    assert timers_active(cutover) == {"titan": "inactive", "europa": "inactive"}
+    record = state.current_window(cutover_root(cutover))
+    assert record["state"] == "recovering"
+    assert {host: record["recovery"]["timers"][host]["was_restored"] for host in HOSTS} == {
+        "titan": True, "europa": True}
+    assert [(entry["host"], entry["action"]) for entry in record["recovery"]["actions"]] == [
+        *[("titan", "target-restore")] * 4, ("titan", "reverted"),
+        ("titan", "dependency-restore"), ("europa", "dependency-restore")]
+    report = window.status()
+    assert report["next"] == ["recover"] and "still pending" in report["detail"]
+    assert "Do not open Claude or Codex" in report["detail"]
+    # No old familiar state is imported; its snapshot stays as evidence.
+    assert {host: (transport._tree_of(cutover.home(host) / ".local/state/familiar"),
+                   transport._tree_of(cutover.root(host) / "familiar-state"))
+            for host in HOSTS} == kept
+    # Source recovery ends this window: nothing merges the tip again from the recovered commit.
+    again = cutover.request("titan", "familiar-merge", {
+        "window_id": record["id"], "pre": pre, "tip": cutover.pins["familiar_feature_tip"]})
+    assert again["status"] == "failed" and "not at PRE" in again["error"]
+    assert _heads(cutover)["titan"] == revert
+
+
+@needs_zsh
+def test_missing_merge_record_uses_actual_parents(cutover, monkeypatch):
+    """The run died after git committed the merge but before the window recorded it.
+    Reconciliation finds the merge from its actual parents and blocks fresh sessions; recovery
+    records it before reverting it once, stops while Europa's source has not synchronized, and
+    then completes from actual state with no second revert."""
+    cutover.config["sync"]["budget"] = 1.0  # nothing delivers Titan's source to Europa yet
+    cutover.save()
+    native = (_targets(cutover), _modules(cutover))
+    root = cutover_root(cutover)
+    pre, tip = cutover.pins["familiar_pre"], cutover.pins["familiar_feature_tip"]
+    _, record = _failed_run(cutover, monkeypatch,
+                            kill=lambda changes: "merge" in changes.get("familiar", {}))
+    assert record["state"] == "applying" and "merge" not in record["familiar"]
+    head = transport.familiar_head(cutover.home("titan"))
+    assert _parents(cutover, head) == [pre, tip]
+    assert window.status()["next"] == ["recover"]
+
+    report = recovery.reconcile_window(record)
+    assert (report["class"], report["next"]) == ("recovery-required", ["recover"])
+    assert report["familiar"]["class"] == "merged" and report["familiar"]["merge"] == head
+    assert report["familiar"]["discovered"] is True
+    assert "Do not open Claude or Codex" in report["observed"]
+    record = state.current_window(root)
+    assert record["state"] == "recovery-required"
+    assert record["failure"]["status"] == "unverified"
+
+    # History nobody recorded stops recovery for inspection, before any Git write.
+    familiar = cutover.home("titan") / "d/familiar"
+    transport._commit_on(familiar, "later.txt", "a commit after the merge\n")
+    with pytest.raises(window.Failed) as raised:
+        recovery.restore_window(record)
+    failed = raised.value
+    assert (failed.step, failed.status) == ("familiar-reconcile", "blocked")
+    assert "stopped pending inspection" in failed.observed
+    assert state.current_window(root)["state"] == "inspection-required"
+    assert [call for call in observed(cutover, "git") if "git" in call] == []
+    transport._git(familiar, "reset", "-q", "--hard", head)  # the operator's inspection
+    # The revert commits, then recovery dies before recording it.
+    monkeypatch.setattr(recovery, "_save", _dies_once(recovery._save, lambda changes: (
+        (changes.get("recovery") or {}).get("familiar") or {}).get("revert")))
+    with pytest.raises(Killed):
+        recovery.restore_window(state.current_window(root))
+    record = state.current_window(root)
+    assert "revert" not in record["recovery"]["familiar"]
+    reverted = transport.familiar_head(cutover.home("titan"))
+    assert _parents(cutover, reverted) == [head]
+
+    with pytest.raises(window.Failed) as raised:
+        recovery.restore_window(record)
+    failed = raised.value
+    assert (failed.step, failed.host, failed.status) == ("dependency-restore", "europa", "failed")
+    assert "did not reach" in failed.error and failed.next_command == ["recover"]
+    assert "Do not open Claude or Codex" in failed.observed
+    record = state.current_window(root)
+    assert record["state"] == "recovering"
+    recovered = record["recovery"]["familiar"]
+    assert (recovered["merge"], recovered["discovered"]) == (head, True)
+    revert = recovered["revert"]
+    assert revert == reverted and recovered["action"] == "none"  # adopted, never reverted again
+    assert _parents(cutover, revert) == [head] and _tree(cutover, revert) == _tree(cutover, pre)
+    assert _heads(cutover) == {"titan": revert, "europa": pre}
+
+    cutover.start_dropbox()
+    mark = len(cutover.lines("observed"))
+    result = recovery.restore_window(record)
+    assert result["class"] == "restored" and result["revert"] == revert
+    assert _heads(cutover) == {"titan": revert, "europa": revert}
+    assert not any("git-" in event for event in _recovery_events(cutover, mark))
+    assert [call["git"] for call in observed(cutover, "git") if "git" in call] == [["revert"]]
+    assert (_targets(cutover), _modules(cutover)) == native
+    record = state.current_window(root)
+    assert record["recovery"]["actions"] == []  # its one revert was found, not recorded, here
+    assert [entry["step"] for entry in record["recovery"]["failures"]] == [
+        "familiar-reconcile", "dependency-restore"]
+
+
+@needs_zsh
+def test_recovery_works_after_version_hold_breach(cutover):
+    """Claude moved past its reviewed evidence on both hosts after the live plan for claude
+    refused, leaving only its guard retired. Recovery reads neither that evidence nor the new
+    version, launches no Claude, and restores everything by its byte, Git and dependency proofs."""
+    cutover.behave("titan", installer={"live:claude": "plan-fail"})
+    cutover.start_dropbox()
+    native = (_targets(cutover), _modules(cutover))
+    failed, record = _failed_run(cutover)
+    assert (failed.step, failed.host) == ("target-apply", "titan")
+    assert [entry["target_id"] for entry in state.read_ledger(record)] == ["claude"]
+    assert "applied" not in record
+    cutover.behave("titan", installer={})
+    cutover.move_claude()  # the hold breach: a new version, the evidence left behind
+    for host in HOSTS:
+        cutover.behave(host, preflight={"evidence": "fail"})
+    mark, before = len(cutover.lines("observed")), _operations(cutover)
+
+    result = recovery.restore_window(record)
+    assert result["class"] == "restored", result
+    ran = {name: operation for name, operation in _operations(cutover).items()
+           if name not in before}
+    assert set(ran.values()) <= {
+        "pending-operations", "codex-daemon-stop", "recovery-no-live", "timer-requiesce",
+        "timer-wait", "target-check", "target-restore", "target-verify", "familiar-reconcile",
+        "familiar-restore", "dependency-restore"}  # no inventory, inputs-check or preflight
+    assert not any(state.load_record(cutover.root(name.split("-", 1)[0]) / "operations" / name
+                                     / "start.json")["payload"]["verify"]
+                   for name, operation in ran.items() if operation == "target-verify")
+    events = _recovery_events(cutover, mark)
+    assert not any(":launched-" in event for event in events)
+    # The run's own held probes show these launches are observed when they happen.
+    assert {"titan:launched-claude", "europa:launched-preflight"} <= set(
+        _recovery_events(cutover, 0))
+    assert _restores(events) == ["restore:claude"]  # its guard images, with no relay rollback
+    assert (_targets(cutover), _modules(cutover)) == native
+    assert _heads(cutover) == {"titan": result["revert"], "europa": result["revert"]}
+    assert timers_active(cutover) == {"titan": "inactive", "europa": "inactive"}
+
+
+def _signal_when(condition, signum, seconds=60.0):
+    """From another thread, send signum to this process once condition holds."""
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        if condition():
+            os.kill(os.getpid(), signum)
+            return
+        time.sleep(0.02)
+
+
+@needs_zsh
+def test_recovery_signal_is_retried_by_reconciliation(cutover):
+    """A SIGTERM while Europa's dependency restore waits for its source cancels that operation
+    explicitly. Reconciliation then finds nothing running, and the retry completes from actual
+    state, repeating no guard restore, rollback, revert or dependency replacement."""
+    cutover.behave("titan", installer={"live:claude-work": "apply-fail"})
+    sync = {"allowed": True}
+    cutover.start_dropbox(hold=lambda: sync["allowed"])
+    native = (_targets(cutover), _modules(cutover))
+    failed, record = _failed_run(cutover)
+    assert (failed.step, failed.host) == ("target-apply", "titan")
+    assert [entry["target_id"] for entry in state.read_ledger(record)] == ["claude",
+                                                                            "claude-work"]
+    assert list(record["applied"]) == ["claude"]  # claude-work was planned, never applied
+    cutover.behave("titan", installer={})
+    known = {cutover.pins["familiar_pre"], record["familiar"]["merge"]}
+    sync["allowed"] = False
+    waiting = lambda: any(  # noqa: E731
+        call["host"] == "europa" and call["args"][:1] == ["familiar-source"]
+        and call["args"][2] not in known and call["exit"] != 0
+        for call in observed(cutover, "relay-cutover"))
+    root, mark = cutover_root(cutover), len(cutover.lines("observed"))
+    handlers = {signum: signal.getsignal(signum) for signum in hosts.INTERRUPTS}
+    sender = threading.Thread(target=_signal_when, args=(waiting, signal.SIGTERM))
+    sender.start()
+    try:
+        with pytest.raises(window.Failed) as raised:
+            recovery.restore_window(record)
+    finally:
+        sender.join(timeout=90)
+    failed = raised.value
+    assert (failed.step, failed.host, failed.status) == ("dependency-restore", "europa",
+                                                         "interrupted")
+    assert "SIGTERM" in failed.error and failed.next_command == ["recover"]
+    assert {signum: signal.getsignal(signum) for signum in hosts.INTERRUPTS} == handlers
+    record = state.current_window(root)
+    assert record["state"] == "recovering"
+    assert record["recovery"]["failure"]["status"] == "interrupted"
+    # The remote restore was cancelled explicitly, before it changed Europa's dependencies.
+    restores = [name for name, operation in _operations(cutover).items()
+                if operation == "dependency-restore" and name.startswith("europa-")]
+    assert len(restores) == 1
+    directory = cutover.root("europa") / "operations" / restores[0]
+    assert (directory / "cancel.json").is_file()
+    assert state.load_record(directory / "done.json")["response"]["status"] == "cancelled"
+    assert "relay/package.json" in _modules(cutover)["europa"]
+    titan = cutover.home("titan") / "d/familiar/node_modules"
+    assert _modules(cutover)["titan"] == native[1]["titan"]
+    untouched = os.stat(titan).st_ctime_ns, os.stat(titan).st_ino
+
+    report = recovery.reconcile_window(record)
+    assert (report["class"], report["blockers"], report["next"]) == ("recovering", [],
+                                                                     ["recover"])
+    assert "Do not open Claude or Codex" in report["observed"]
+    sync["allowed"] = True
+    result = recovery.restore_window(state.current_window(root))
+    assert result["class"] == "restored"
+    events = _recovery_events(cutover, mark)
+    assert _restores(events) == ["restore:claude-work", "rollback:claude", "restore:claude"]
+    assert [event for event in events if "git-" in event] == ["titan:git-revert"]
+    assert (os.stat(titan).st_ctime_ns, os.stat(titan).st_ino) == untouched
+    assert (_targets(cutover), _modules(cutover)) == native
+    record = state.current_window(root)
+    assert [(entry["host"], entry["action"]) for entry in record["recovery"]["actions"]] == [
+        ("titan", "target-restore"), ("titan", "target-restore"), ("titan", "reverted"),
+        ("titan", "dependency-restore"), ("europa", "dependency-restore")]
+
+
+@needs_zsh
+def test_reconcile_promotes_only_a_verified_migration(cutover, monkeypatch):
+    """The run died writing its verified checkpoint. Reconciliation proves the migration from
+    actual state on both hosts, reading only, and only then names the surface retry."""
+    cutover.start_dropbox()
+    _, record = _failed_run(cutover, monkeypatch, kill=lambda changes: changes.get(
+        "state") == "migrated-surfaces-pending")
+    assert record["state"] == "applying" and "verified" not in record
+    assert "failure" not in record and len(record["applied"]) == 4
+    assert window.status()["next"] == ["recover"]  # status alone never promotes
+    mark, mutations = len(cutover.lines("observed")), _mutations(cutover)
+    report = recovery.reconcile_window(record)
+    assert (report["class"], report["next"]) == ("verified", ["restart-surfaces"])
+    record = state.current_window(cutover_root(cutover))
+    assert record["state"] == "migrated-surfaces-pending"
+    assert record["verified"]["reconciled"] is True and set(record["verified"]["hosts"]) == {
+        "titan", "europa"}
+    assert record["familiar"]["merge"] == transport.familiar_head(cutover.home("titan"))
+    assert _recovery_events(cutover, mark) == [] and _mutations(cutover) == mutations
+    assert timers_active(cutover) == {"titan": "inactive", "europa": "inactive"}
+    assert window.status()["next"] == ["restart-surfaces"]
+
+
+@needs_zsh
+def test_reconcile_unverified_run_blocks_fresh_sessions(cutover, monkeypatch, capsys):
+    """The run died after Titan applied codex but before the window recorded it. An unreachable
+    host, then a remote operation still running, block reconciliation and every recovery
+    mutation. Settled, reconciliation finds the migration unverified, blocks fresh sessions and
+    names the complete recover command; recovery restores codex from its unrecorded apply."""
+    cutover.start_dropbox()
+    native = (_targets(cutover), _modules(cutover))
+    root = cutover_root(cutover)
+    _, record = _failed_run(cutover, monkeypatch,
+                            kill=lambda changes: "codex" in changes.get("applied", {}))
+    assert record["state"] == "applying" and sorted(record["applied"]) == ["claude",
+                                                                           "claude-work"]
+    assert [entry["target_id"] for entry in state.read_ledger(record)] == [
+        "claude", "claude-work", "codex"]
+    cutover.config["unreachable"] = True
+    cutover.save()
+    report = recovery.reconcile_window(record)
+    assert (report["class"], report["next"]) == ("unsettled", ["status"])
+    assert any(blocker.startswith("europa:") for blocker in report["blockers"])
+    assert state.current_window(root) == record
+    cutover.config["unreachable"] = False
+    cutover.save()
+
+    report = recovery.reconcile_window(record)
+    assert (report["class"], report["next"]) == ("recovery-required", ["recover"])
+    record = state.current_window(root)
+    assert record["state"] == "recovery-required" and "codex-work" in record["failure"]["error"]
+    capsys.readouterr()
+    assert cli.main(["status"]) == 0
+    out = capsys.readouterr().out
+    assert cli.command_line(["recover"]) in out and "Do not open Claude or Codex" in out
+
+    # A remote operation still running blocks every recovery mutation until it finishes.
+    latch = cutover.tmp / "latch"
+    operation_id, client = hosts.start_request(
+        "europa", "live", "fixture-step", {"latch": str(latch), "seconds": 60}, timeout=60)
+    try:
+        transport._until(lambda: cutover.lines("pids"))
+        mutations = _mutations(cutover)
+        with pytest.raises(window.Failed) as raised:
+            recovery.restore_window(record)
+        assert raised.value.status == "unsettled" and raised.value.next_command == ["status"]
+        assert any(operation_id in blocker and "running" in blocker
+                   for blocker in raised.value.blockers)
+        assert _mutations(cutover) == mutations
+        latch.touch()
+        transport._until(lambda: (cutover.root("europa") / "operations" / operation_id
+                                  / "done.json").exists())
+    finally:
+        latch.touch()
+        hosts._abandon(client)
+
+    mark = len(cutover.lines("observed"))
+    result = recovery.restore_window(state.current_window(root))
+    assert result["class"] == "restored"
+    assert _restores(_recovery_events(cutover, mark)) == [
+        "rollback:codex", "restore:codex", "rollback:claude-work", "restore:claude-work",
+        "rollback:claude", "restore:claude"]
+    assert (_targets(cutover), _modules(cutover)) == native
+    restored = state.current_window(root)["recovery"]["targets"]
+    assert restored["codex"]["from"] == "relay-applied" and restored["codex"]["rollback"]
+
+
+@needs_zsh
+def test_recover_pre_merge_incomplete_abort_follows_abort_only(cutover):
+    cutover.behave("europa", timers={"stop": "fail-after", "restore": "fail"})
+    prepared, opened, consumed = opened_with_decision(cutover)
+    with pytest.raises(window.Failed):
+        window.quiesce_window(prepared, consumed)
+    root = cutover_root(cutover)
+    record = state.current_window(root)
+    assert record["state"] == "abort-incomplete" and recovery.pre_merge(record)
+    report = recovery.reconcile_window(record)
+    assert (report["class"], report["next"]) == ("abort", ["recover"])
+    assert state.current_window(root) == record
+    cutover.behave("europa", timers={})
+    before = _operations(cutover)
+    result = recovery.restore_window(record)
+    assert (result["class"], result["state"], result["next"]) == ("abort", "aborted", ["run"])
+    assert {operation for name, operation in _operations(cutover).items()
+            if name not in before} <= {"pending-operations", "timer-restore", "snapshot-abort"}
+    assert timers_active(cutover) == {"titan": "active", "europa": "active"}
+    with pytest.raises(Stop, match="nothing to recover"):
+        recovery.restore_window(state.current_window(root))
+
+
+def test_service_run_wait_and_result(cutover, monkeypatch):
+    """service-run starts the recorded timer's service only once this window's timers are
+    restored, waits while it runs and requires success; service-check only reads and waits.
+    Neither kills a service still running past its bound."""
+    numbers = itertools.count(1)
+    monkeypatch.setitem(hosts.TOOLS, "systemctl", cutover.config["tools"]["systemctl"])
+
+    def run(operation, payload):
+        return transport._execute("titan", operation, payload, next(numbers))
+
+    recorded = run("timer-record", {"window_id": transport.WINDOW})["result"]
+    payload = {"window_id": transport.WINDOW, "record_sha256": recorded["sha256"]}
+    assert run("timer-stop", payload)["status"] == "completed"
+    paused = run("service-run", payload)
+    assert paused["status"] == "failed" and "paused" in paused["error"]
+    assert "familiar-reap.service" not in cutover.units("titan")
+    assert run("timer-restore", {**payload, "stopped": True})["status"] == "completed"
+
+    cutover.behave("titan", service={"polls": 3})
+    mark = len(cutover.lines("observed"))
+    started = run("service-run", payload)
+    assert started["status"] == "completed", started["error"]
+    assert {key: started["result"][key] for key in (
+        "service", "started", "active_state", "result", "exec_main_status")} == {
+        "service": "familiar-reap.service", "started": True, "active_state": "inactive",
+        "result": "success", "exec_main_status": "0"}
+    calls = [call["args"][1] for call in observed(cutover, "systemctl", mark)]
+    assert calls == ["start", "show", "show", "show", "show"]  # three reads while it ran
+    assert cutover.units("titan")["familiar-reap.service"]["runs"] == 1
+    checked = run("service-check", payload)
+    assert checked["status"] == "completed" and checked["result"]["started"] is False
+    assert cutover.units("titan")["familiar-reap.service"]["runs"] == 1
+
+    cutover.behave("titan", service={"result": "exit-code", "status": 1})
+    failed = run("service-run", payload)
+    assert failed["status"] == "failed"
+    assert "Result=exit-code" in failed["error"] and "ExecMainStatus=1" in failed["error"]
+    assert run("service-check", payload)["status"] == "failed"
+    cutover.behave("titan", service={"start": "fail"})
+    refused = run("service-run", payload)
+    assert refused["status"] == "failed" and "exited 1" in refused["error"]
+    monkeypatch.setattr(restoration, "SERVICE_SECONDS", 0.2)
+    cutover.behave("titan", service={"polls": 1000})
+    running = run("service-run", payload)
+    assert running["status"] == "failed" and "still activating" in running["error"]
+    assert "nothing was killed" in running["error"]
+    for response in (failed, refused, running):
+        assert transport.OUTPUT_SECRET not in response["error"]
