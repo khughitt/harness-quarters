@@ -2,7 +2,8 @@
 
 Status: approved for planning by Keith after spec round 6, 2026-10-20.
 The round-6 consent clarification is carried into the plan. Preparation/toolchain/
-pilot/update-hold refinements from plan rounds 1–4 await human plan re-review.
+pilot/update-hold refinements were accepted in plan round 5 and approved by Keith;
+the accepted Minor probe-order clarification is included. Execution awaits a fresh session.
 Bootstrap/runbook: hq-c6c847. Independent Bash work: dots-55f537.
 Independent instruction work: lore-4c1787.
 This amends the execution arrangement of the approved relay cutover, not its
@@ -100,7 +101,9 @@ The bootstrap performs the already-reviewed operations in this order:
 1. Resolve paths and validate private prepared inputs, the helper manifest, exact
    installed/evidenced versions, relay runtime, subscribers, expected images and
    native before-images on both hosts. Run the SSH, credentials, user-bus and
-   desktop checks below. Obtain this run's desktop restart consent before the
+   desktop checks below. Complete held Claude version/doctor probes for every
+   host/home and wait for all probe processes to exit before step 2's final no-live
+   check. Obtain this run's desktop restart consent before the
    first mutation. A refusal is a preflight stop with no timer/source change.
 2. Refuse any remaining Claude/Codex session. Stop only the known personal/work
    Codex app-server daemons with their supported CLI, then require strict no-live
@@ -429,8 +432,9 @@ New capabilities changing images still require original Task 6 image review.
 alignment remains an operator action, never an automatic update/downgrade.
 
 The operator closes all Claude/Codex sessions for bootstrap. Before timers pause,
-`run` repeats strict no-live, exact held version checks and each host/home's held
-doctor auto-update-disabled diagnostic; a mismatch or unproven hold refuses
+`run` first completes exact held version/doctor probes for each host/home, waits
+for every probe to exit, then performs the final strict no-live check without
+caller-child exemptions. A mismatch or unproven doctor update-hold diagnostic refuses
 without mutation. Record selected versions, binary digests and dated diagnostics.
 Only from bootstrap through finish must known live Claude processes match that
 identity/hold key; preparation may observe ordinary unheld sessions as later
