@@ -1,7 +1,8 @@
 # Operator runbooks that preserve the operator's shell
 
 Status: approved for planning by Keith after spec round 6, 2026-10-20.
-The round-6 consent-channel clarification below is carried into the plan.
+The round-6 consent clarification is carried into the plan. Preparation/toolchain/
+pilot refinements requested in plan round 1 await human plan re-review.
 Bootstrap/runbook: hq-c6c847. Independent Bash work: dots-55f537.
 Independent instruction work: lore-4c1787.
 This amends the execution arrangement of the approved relay cutover, not its
@@ -314,9 +315,12 @@ After familiar mutation use the explicit full-recovery path until migration is
 verified; an interruption confined to surfaces after that checkpoint stays pending
 for the consented surface retry. SIGKILL cannot run
 cleanup, so the next command reconciles durable records with actual state first.
-Remote helpers own bounded subprocesses and record their PIDs; a lost SSH connection
-does not prove a remote operation stopped. Block retry/recovery mutations until a
-new status query reconciles remote process completion. Never claim remote cleanup
+Remote helpers own bounded subprocesses and record their PIDs. After a complete
+request, SSH EOF/EPIPE is not cancellation: the operation finishes or reaches its
+own deadline, durably records completion, then attempts its reply. Cancellation is
+an explicit request (or an actual signal/deadline), never inferred from pipe loss.
+Local signal handling requests remote cancel and reconciles its result. Block
+retry/recovery mutations until a new status query reconciles remote completion. Never claim remote cleanup
 when the host is unreachable or leave an intentional detached monitor.
 
 The script attempts the existing section 1 timer/snapshot abort when failure occurs
@@ -352,6 +356,35 @@ timers paused. Any handoff explicitly names the paused state and recovery comman
 There are no detached monitors or background scripts; subprocesses are bounded,
 tracked and reaped. A timer intentionally restored to normal service is identified
 as restored host state, not an orphaned test process.
+
+## Preparation refinements from plan review
+
+Claude's live pick keys are owned by `.githooks/harness-state-clean`, not by the
+cutover. `prepare` and run step 1 reuse that module's `CLAUDE_JSON_KEYS` through the
+existing `runpy` loading pattern. Compare every other JSON key/value with the
+reviewed native before-image. For pick-only drift, preserve exact current before
+bytes and derive the after-image from the reviewed one with exactly the current
+picks (including absence); retain the original reviewed images and provenance.
+Hooks/statusLine verification is unchanged. Freeze each window's effective hashes
+before mutation; do not reject normal later pick changes during resumed hook checks.
+Never rewrite rollback originals/artifacts or bypass their unknown-byte refusal.
+
+Non-pick drift takes an explicit `prepare --stage-review` path producing copies,
+plans, artifacts and candidate images for review, without live readiness. Only a
+subsequent `prepare --reviewed-bundle ... --review-ref ...` referring to a real
+review of those exact hashes may use it. Computing a new hash is not review.
+
+Preparation records system `/usr/bin/npm` 12.2.1, `/usr/bin/node`, system Git and
+`/usr/bin/python3` paths/versions/digests per host. Install with `/usr/bin` first in
+an explicit PATH so npm's env-node shebang cannot choose nvm. Include the clean
+filter and per-host toolchain identities in the manifest; reject drift.
+Retain the startup authentication/user-bus/cache environment, with explicit PATH
+and Python bytecode suppression (`-B` at entry, PYTHONDONTWRITEBYTECODE for children).
+Pilot application/config/state/dependency/temp writes remain scratch-contained.
+The plan names the exceptions: validated prepared host-local cache prefixes,
+existing authentication/SSH runtime bookkeeping and the consented no-window niri
+spawn. Cache paths overlapping Dropbox/live checkouts/state are blockers. Report cache
+exceptions rather than claim no writes anywhere outside scratch.
 
 ## Preserved cutover requirements
 
@@ -495,8 +528,9 @@ Provide the separate `tools/relay-cutover-rehearse` entry for the smallest
 end-to-end pilot. It creates protected owned throwaway roots on both hosts and
 uses the runner's real SSH transport/remote helper with a distinct `pilot` request
 mode and validated scratch-root identifiers. The remote helper dispatches an
-explicit mode-specific schema: pilot mutations must resolve within those owned
-roots (including symlink resolution); live mode derives its fixed roots locally
+explicit mode-specific schema: pilot application mutations must resolve within
+those owned roots (including symlink resolution), with only the prepared cache/
+runtime exceptions described above; live mode derives its fixed roots locally
 and rejects supplied root/helper overrides. No caller environment selects pilot
 mode for live `run`/`recover`.
 
@@ -507,7 +541,7 @@ Require the IPC acknowledgement and record its verdict; fixtures separately test
 replacement-process liveness because `true` exits immediately. Preserve any
 explicit explained-absence exemption rather than inventing a desktop on that host.
 Merge/install familiar
-in throwaway clones using the actual per-host npm and credentials; dry/apply/verify
+in throwaway clones using prepared system npm 12.2.1/node and host credentials; dry/apply/verify
 all four copied settings targets on Titan under one touched record, exercise the
 copied Claude targets on Europa and verify remote shared-image expectations; then
 recover the copied targets and both clones/dependencies offline through the
@@ -519,7 +553,10 @@ Preserve private logs, source/target/dependency equality and exact pin evidence.
 execute that narrow pilot over its real transport, it is not ready for the window.
 Live `run`/`recover` must not accept arbitrary host roots/helpers from environment
 overrides. Test rejection of pilot/live mode confusion and scratch-path escape on
-both hosts.
+both hosts. Also exercise one real SSH disconnect during a separate scratch install:
+close only the local client, reconcile the remote operation through completion/
+deadline and its durable result, and never infer cancellation from the lost pipes.
+
 
 Confirm failure returns to the original Zsh prompt and requires no exported caller
 state. A missing current relay row and bypassed resume command are explicit failing
