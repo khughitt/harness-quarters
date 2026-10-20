@@ -7,11 +7,13 @@ records and names the one next command. A stopped command prints its step, host,
 log, observed state and one next command, then returns 1 to the calling shell. It never prints
 settings, plans, environments, credentials or child output.
 
-A decision comes from the operator's terminal (`/dev/tty`: a bounded preview of its subject,
-then an explicit answer recorded as a `tty` source) or from `--decision-file FILE`, the private
-record of an actual session ask and reply for this window. Without either, the command stops
-with instructions before any change. `acquire_decision` consumes it once, before the first
-authorized action; no flag or default answers for the operator."""
+`run` is operator-run: its desktop decision comes only from the operator's terminal
+(`/dev/tty`: a bounded preview of its subject, then an explicit answer recorded as a `tty`
+source). Without a terminal it stops with instructions before any change, and it takes no
+decision file, since its window only exists inside the invocation. `acquire_decision` also reads
+a decision file, the private record of an actual session ask and reply for a window that already
+exists, for later commands such as `restart-surfaces`. It consumes the decision once, before the
+first authorized action; no flag or default answers for the operator."""
 import argparse
 import json
 import os
@@ -31,9 +33,9 @@ TTY = "/dev/tty"
 ANSWER_BYTES = 200
 DECISION_BYTES = 65536
 APPROVE = ("y", "yes")
-NO_TERMINAL = ("this invocation has no terminal for the operator's answer; run it from the "
-               "operator's own shell, or ask in the session, record the actual reply for this "
-               "window and pass --decision-file")
+NO_TERMINAL = ("run is operator-run and this invocation has no terminal for the operator's "
+               "answer: the operator launches it from an ordinary terminal, with every Claude "
+               "and Codex session closed on both hosts")
 
 
 def _clean(text):
@@ -187,14 +189,13 @@ HANDOFF = (
 )
 
 
-def _run(decision_file):
+def _run():
     prepared = preparation.load_prepared()
     opened = window.open_window(prepared)
     try:
         decision = acquire_decision(opened, action=window.RUN_ACTION,
                                     attempt_id=window.RUN_ATTEMPT,
-                                    subject=window.run_subject(prepared),
-                                    decision_file=decision_file)
+                                    subject=window.run_subject(prepared), decision_file=None)
     except Stop as stop:
         outcome = window.abort_window(state.current_window(window._root()))
         raise window.Failed("decision", "titan", "refused", str(stop),
@@ -235,16 +236,15 @@ def main(argv: list[str]) -> int:
     prepare.add_argument("--controller-session", required=True,
                          help="the controller's native personal-home session ID")
     sub.add_parser("check", help="compare both hosts with the prepared record (read-only)")
-    run = sub.add_parser("run", help="run the cutover through the verified migration")
-    run.add_argument("--decision-file", help="the recorded session ask and reply for this "
-                     "run's desktop decision, when no operator terminal answers")
+    sub.add_parser("run", help="run the cutover through the verified migration (operator-run, "
+                   "from an ordinary terminal)")
     sub.add_parser("status", help="report the prepared record, the window and the next command")
     args = parser.parse_args(argv)
     try:
         if args.command == "prepare":
             return _prepare(args.controller_session)
         if args.command == "run":
-            return _run(args.decision_file)
+            return _run()
         return _check() if args.command == "check" else _status()
     except window.Failed as failed:
         _failure(args.command, failed)

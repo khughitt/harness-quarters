@@ -13,7 +13,8 @@ targets and familiar is in `targets.py` and `familiar.py`. A run opens the windo
 3. `dry_targets`: the six dry runs on frozen copies, cross-host agreement and the seal;
 4. the frozen targets unchanged and both hosts closed, then the `familiar` record;
 5. the merge of the immutable tip on Titan; each host's install once the merge reached it; each
-   target registered, then applied once on Titan; every host verified. The window becomes
+   target registered, then applied once on Titan; every host verified. Both hosts are checked
+   closed before each install and each target write. The window becomes
    `migrated-surfaces-pending`.
 
 Each step is recorded in the window before its request. Any failure before the `familiar` record,
@@ -69,7 +70,8 @@ NOTHING = "nothing was changed; no window is open"
 
 class Failed(Stop):
     """A stopped step as the operator sees it: no settings, plans, environments or child
-    output, only tool-authored text, the private log path and one next command."""
+    output, only tool-authored text, the private log path and one next command. `aborted` is
+    true once the pre-merge abort ran for it, so no caller runs that abort again."""
 
     def __init__(self, step, host, status, error, *, log=None, blockers=(), observed=None,
                  next_command=None):
@@ -77,6 +79,7 @@ class Failed(Stop):
         self.step, self.host, self.status, self.error = step, host, status, error
         self.log, self.blockers = log, list(blockers)
         self.observed, self.next_command = observed, next_command
+        self.aborted = False
 
 
 class _Interrupt(BaseException):
@@ -419,6 +422,7 @@ def _describe(outcome):
 
 
 def _abort_after(failed, seen):
+    failed.aborted = True
     try:
         window = state.current_window(_root())
         window = _save(window, failure={"step": failed.step, "host": failed.host,
@@ -505,8 +509,9 @@ def run_window(prepared: dict, decision: dict) -> dict:
     3. `dry_targets`: the six dry runs and the seal.
     4. The frozen targets are unchanged and both hosts are closed; then `familiar` is recorded
        and the immutable tip is merged.
-    5. Each host waits for the merge and installs; each target is registered and applied once
-       on Titan; every host's targets, source, dependencies and evidence are verified.
+    5. With both hosts checked closed before each install and each target write, each host
+       waits for the merge and installs; each target is registered and applied once on Titan;
+       every host's targets, source, dependencies and evidence are verified.
 
     Failures before step 4's record abort every touched host; after it the window becomes
     `recovery-required` and nothing is undone here."""
@@ -529,13 +534,19 @@ def run_window(prepared: dict, decision: dict) -> dict:
             failed = _as_failed(error, progress)
         if failed is not None:
             raise _abort_after(failed, seen)
-        window = dry_targets(quiesce_window(prepared, decision))
         try:
+            # Both abort their own failures; any refusal of theirs that did not (a precondition
+            # after quiescence) still takes the pre-merge abort here.
+            window = quiesce_window(prepared, decision)
+            progress.update(step="target-dry", host="titan")
+            window = dry_targets(window)
             window = _before_merge(window, seen, progress)
             window = _save(window, familiar={"started_at": _now(),
                                              "pre": prepared["pins"]["familiar_pre"],
                                              "tip": prepared["pins"]["familiar_feature_tip"]})
         except (Exception, _Interrupt) as error:
+            if isinstance(error, Failed) and error.aborted:
+                raise
             failed = _as_failed(error, progress)
         if failed is not None:
             raise _abort_after(failed, seen)
@@ -616,6 +627,9 @@ def _migrate(window, prepared, seen, progress):
     window = _save(window, familiar={**window["familiar"], "merge": merged["merge"],
                                      "parents": merged["parents"], "merged_at": _now()})
     for host in HOST_ORDER:
+        for checked in HOST_ORDER:
+            window = _step(window, seen, progress, "no-live", checked)
+            _no_live(checked, mode, identity)
         window = _step(window, seen, progress, "familiar-install", host)
         record = prepared["hosts"][host]
         result, _ = _call(host, mode, "familiar-install", {
