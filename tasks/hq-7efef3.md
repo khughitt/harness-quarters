@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/relay-cutover
 created: 2026-10-20T01:37:42Z
-updated: 2026-10-20T01:50:55Z
+updated: 2026-10-20T01:52:22Z
 started: 2026-10-20T01:40:58Z
 depends: []
 parent: hq-539508
@@ -34,3 +34,4 @@ Done: new Claude evidence proves the required routes at the exact installed vers
 - 2026-10-20T01:44:44Z (feat/relay-cutover): Europa baseline: just test-fast ran1666 tests in123.940s with2 pre-existing audio capture failures and1skip; focused fixture reproduction confirms missing /usr/bin/time (ENOENT), not probe logic. No executable or host setup changed; controller ruling requested before source edits.
 - 2026-10-20T01:45:39Z (feat/relay-cutover): Live Europa Claude2.1.304 attempt20261019T214341 passed allow/context and native deny; optional nested exercised no tools. Copied credentials removed. Relay release baseline:710/712 pass,2pack tests fail because npm12.2.1 emits keyed-object JSON rather than expected array; no tooling changed. Missing GNU time prerequisite feedback: ops-da1ddf.
 - 2026-10-20T01:50:55Z (feat/relay-cutover): Candidate ops57d6167 committed; exact generated Claude304 evidence accepted by real installer plans on both hosts using unchanged native before-image copies (Europa0.136s,Titan0.286s). Relevant Europa53tests pass; docs/syntax/tasks/diff checks pass with existing shelved_dep warning. Controller ruled to document pre-existing Europa audio/time and relay/npm12 baseline failures, and gate integration on Titan exact-candidate test-fast plus review. Feedback ops-da1ddf and relay-721d22. HQ full suite remains tracked.
+- 2026-10-20T01:52:22Z (feat/relay-cutover): Verification complete: HQ just test passed228agent tests/13.43s and966hook-tool tests/286.67s; existing optional flasgger warning only. HQ docs/tasks/diff checks and precommit passed; source34487c4 records current304proof while preserving historical versions and every fenced command. Controller Titan exactops candidate fast gate1666/63.741s passed(1skip). Candidates: ops57d6167 and hq34487c4; no executable/live changes. Report claude-21304-report.md in plan workspace; controller owns review, ops integration and safe cleanup, while HQ stays task branch until Task8/9.
