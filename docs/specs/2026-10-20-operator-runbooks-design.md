@@ -1,6 +1,6 @@
 # Operator runbooks that preserve the operator's shell
 
-Status: revised proposal after spec round 2; awaiting user review.
+Status: revised proposal after spec round 4; awaiting user review.
 Bootstrap/runbook: hq-c6c847. Independent Bash work: dots-55f537.
 Independent instruction work: lore-4c1787.
 This amends the execution arrangement of the approved relay cutover, not its
@@ -110,15 +110,20 @@ The bootstrap performs the already-reviewed operations in this order:
    interruption between merge and record; wait for verified source synchronization
    before each host's dependency installation. Install each host's dependencies
    with the established root-only Git policy and prove the relay dependency pin.
-5. Dry-run all four targets on copies. Before each live mutation durably register
-   that target, its captured original and artifact path in the shared ordered
+5. Dry-run all four targets on Titan copies and both Claude targets on Europa
+   copies, using each host's own installer, runtime and evidence. Before each live
+   mutation durably register that target, its captured original and artifact path in the shared ordered
    touched-target record, including Claude guard removal before relay apply.
    Verify each plan against its reviewed image, apply through relay with an
    artifact, and verify the applied image. Edit each shared target only on Titan;
-   verify every affected host's synchronized bytes. Claude and Codex stay closed.
+   verify every affected host's synchronized bytes, familiar source/dependencies
+   and exact evidence. Durably record the verified migration checkpoint only
+   after all these checks pass. Claude and Codex stay closed during application.
 6. Restart the previously approved familiar surfaces using their validated local
    desktop contexts; verify replacement processes or the approved absent state.
-   Print completion, the exact resume commands below, and the paused timer state.
+   A surface-only failure after the verified migration leaves “migrated, surfaces
+   pending”, with a consented surface-only retry; it does not force rollback.
+   Print the observed state, exact resume commands below, and paused timer state.
    Do not restore timers before smoke/reconciliation prerequisites are complete.
 
 ### SSH and desktop checks before mutation
@@ -150,8 +155,13 @@ Bash setup or assumed shell startup file supplies prerequisites.
   stop for inspection unless that configuration is explicitly explained.
 - In `run`, name what will restart on which hosts and obtain consent before
   mutation, for this foreground invocation only. Revalidate the recorded socket,
-  commands and PIDs immediately before restart. Changed context stops the phase;
-  never silently restart different targets. A retry asks again. Design approval,
+  commands and process identities immediately before restart. A recorded PID
+  exiting is expected: start its recorded command. A PID reused by another process
+  is not that recorded surface. A changed socket/command or an unrecorded new
+  surface process stops the restart for inspection; never kill or restart a new
+  target silently. Validate replacement processes after spawning. A retry asks
+  again, inventories any replacements already started by a partial attempt, and
+  starts only missing recorded surfaces. Design approval,
   preparation probes and an old run's consent grant no desktop access.
 
 Task 7 already ran Europa's real throwaway familiar merge/install/offline rollback
@@ -185,6 +195,25 @@ dependency and version evidence, then run the existing allow/context/denial and
 lifecycle smokes. Codex's work home needs its own human TUI hook review and smoke;
 print an explicit work-home command with `CODEX_HOME` and no bypass flags too.
 
+Resumed controller sessions use each home's default sandbox and approval policy.
+Dedicated smoke sessions retain the runbook's explicit manual-permission/sandbox
+flags so human approval remains observable. Expect human permission prompts for
+observer checks over SSH and `finish`'s SSH/user-systemd
+operations. A declined permission leaves the named check/finalization pending; it
+does not justify a bypass flag or an automatic passed verdict.
+
+Record smoke results through `record-smoke --receipt <private-file>`. The plan
+defines the receipt schema for the existing full-personal and short-work/Europa
+matrices: window ID, host, harness/home, native session ID, tested versions, each
+required case's verdict and private evidence paths, plus the operator's attestation
+for human trust/permission decisions. The agent gathers observations; the operator
+supplies those human verdicts. The tool checks window/home/session binding, exact
+versions, all required cases and readable evidence, then durably stores the receipt
+in the protected window record. It never invents human approval from event delivery.
+Missing, failed, stale or incomplete receipts block `finish`; it rechecks live
+images/source/dependencies and surfaces as well. A receipt records the smoke
+verdict and its evidence, not a general hook-trust bypass.
+
 ## State, failures and recovery
 
 The command loads its own protected data on every invocation. It requires no
@@ -213,12 +242,33 @@ action. A recorded step alone never proves that its mutation completed. Use the
 existing directory-fsync/atomic-write pattern where needed, rather than creating
 a second general transaction framework.
 
-Expose `check`, `run`, `status`, `finish`, and `recover`. `check`/`status` are read-only
-and name blockers. `run` refuses blind repetition; validated pre-merge checkpoints
-may resume, but any failed/interrupted familiar mutation or later apply requires
-`recover`, not forward retry. An already verified successful bootstrap is reported
-without repeating writes. `finish` verifies the recorded smoke prerequisites,
-restores original timers, runs/checks scheduled reconciliation and records closure;
+Expose `check`, `run`, `status`, `restart-surfaces`, `record-smoke`, `finish`, and
+`recover`. `check`/`status` are read-only and name blockers. Ordinary pre-merge
+failures/signals automatically abort the timer/snapshot window; a completed abort
+permits a fresh `run`, not continuation of that old window. After SIGKILL or an
+incomplete abort, reconcile first and complete the section 1 abort via `recover`
+before a fresh run. There is no pre-merge forward-resume path. Any failed or
+interrupted familiar mutation/apply before the verified migration checkpoint
+requires `recover`, not forward retry. If only the checkpoint write was interrupted,
+reconcile actual artifacts, all four images on both hosts, source/dependencies and
+evidence before classifying the migration as verified. Never infer it from a step
+number or successful local apply.
+
+After that verified checkpoint, surface-only failure/interruption is “migrated,
+surfaces pending”. `status` identifies missing/blocked surfaces and prints the
+complete `restart-surfaces` command plus safe resume commands. Opening a harness
+through the prescribed trust/resume path is allowed in this state; the warning
+against opening mixed native/migrated hooks does not apply. `restart-surfaces`
+rechecks the verified migration and desktop inventory, obtains fresh host-use
+consent, and retries only the recorded surface operations. It may run from a
+controller with permission; it never applies hooks/source or restores timers.
+`recover` remains available if the operator chooses full rollback. Drift in
+settings/source/dependencies or ambiguous mutation completion is not a surface-only
+failure and retains the recovery/inspection gate.
+
+`run` reports an already verified migration without repeating writes, directing
+pending surfaces to their explicit retry. `finish` verifies completed surfaces
+and the recorded smoke prerequisites, restores original timers, runs/checks scheduled reconciliation and records closure;
 it never edits hooks/source and may run from a verified migrated controller.
 `recover` is an
 explicit ordinary-shell action with the required harnesses closed, preserves
@@ -229,16 +279,21 @@ observed completed state, and one recovery/status command. It must not print
 private plans, settings, credentials, full environments or arbitrary command text.
 No failure sends the operator into another shell or leaves a sourced partial
 environment. Failures stop the script and return nonzero to the existing Zsh.
-After any post-merge failure, explicitly print “Do not open Claude or Codex”, say
-that `run` is blocked, and print the complete `recover` command. `status` reports
-whether the next action is safe pre-merge `run`, explicit `recover`, a trust/smoke
-handoff, or stopped pending inspection; no generic “try again” advice.
+For failed/interrupted migration before verification, explicitly print “Do not
+open Claude or Codex”, say that `run` is blocked, and print the complete `recover`
+command. For verified migration with surface-only failure, print “migrated, surfaces
+pending”, paused timers, the surface retry and safe resume commands; do not print
+the mixed-migration warning. `status` distinguishes fresh `run` after complete
+abort, incomplete abort/full `recover`, surface retry, trust/smoke handoff and
+stopped pending inspection; no generic “try again” advice.
 
 Handle INT, TERM and HUP as a failed current step. Record interruption state,
 cancel and reap owned subprocess groups, then perform the same automatic section 1
 abort if familiar mutation has not begun. A second interruption or unavailable
 host may interrupt cleanup; preserve the record and report incomplete recovery.
-After familiar mutation use the explicit full-recovery path. SIGKILL cannot run
+After familiar mutation use the explicit full-recovery path until migration is
+verified; an interruption confined to surfaces after that checkpoint stays pending
+for the consented surface retry. SIGKILL cannot run
 cleanup, so the next command reconciles durable records with actual state first.
 Remote helpers own bounded subprocesses and record their PIDs; a lost SSH connection
 does not prove a remote operation stopped. Block retry/recovery mutations until a
@@ -246,9 +301,11 @@ new status query reconciles remote process completion. Never claim remote cleanu
 when the host is unreachable or leave an intentional detached monitor.
 
 The script attempts the existing section 1 timer/snapshot abort when failure occurs
-before familiar mutation. Failures after familiar mutation leave evidence intact
-and require explicit full recovery, rather than guessing whether an external
-operation partially succeeded. Full recovery preserves the complete runbook order:
+before familiar mutation. Failures during familiar mutation or apply before the
+verified checkpoint leave evidence intact and require explicit full recovery,
+rather than guessing whether an external operation partially succeeded. Surface-only
+failures after verification follow the pending/retry path above. Full recovery
+preserves the complete runbook order:
 
 1. Require every Claude/Codex session closed on both hosts, stop both Titan Codex
    daemons with the supported commands, and pass strict no-live checks.
@@ -349,7 +406,12 @@ noninteractive Bash and Claude's shell-snapshot creation: the latter sources
 interactive bashrc even though the later tool command is noninteractive. A
 disposable Claude home must create/load its real snapshot and execute a harmless
 tool command with the intended exit/status/stderr behavior; an ordinary
-noninteractive source test does not establish snapshot compatibility. Existing
+noninteractive source test does not establish snapshot compatibility. The
+snapshot test needs a real Claude model/tool run with credentials. The dotfiles
+plan must define authorized credential copying into the private disposable home,
+restrict file permissions, keep secrets out of commands/logs, and remove credential
+copies and the disposable home on success, failure and signals. Verify cleanup
+without printing credentials; use no live home as the test target. Existing
 literal configuration assertions must be adjusted, with real PTY/snapshot behavior
 supplying the meaningful tests.
 Dotfiles work uses its own worktree, preserves unrelated edits, and activates only
@@ -376,8 +438,10 @@ does not replace the declaration.
   Persistent host changes are restored or explicitly handed over, never hidden.
 
 The feedback entries `lore-881f7a` and `lore-8ce941` remain untriaged. The separate
-lore-4c1787 task is explicitly requested by the user's spec review; it does not
-promote, close or triage those reports. Lore owns its implementation/review.
+lore-4c1787 task implements the user's original request for durable guidance,
+recorded in hq-c6c847's body. Round 2 was an external reviewer's review relayed by
+the user; it asked that the owning task be named. This does not promote, close or
+triage those reports. Lore owns its implementation/review.
 Do not edit generated instructions by hand or alter the vendored skill submodule.
 Publishing live instruction or home-config changes remains separately approved
 after a concrete reviewed result.
@@ -401,27 +465,42 @@ each of the four targets' guard/plan/apply operations; unknown target drift; and
 full offline recovery. Include INT/TERM/HUP during timer and synchronization waits,
 remote disconnection with an operation still running, restart refusal before any
 mutation, explained-absence and bad-socket cases, helper mismatch, refusal to
-reopen a harness after a failed apply, and a `finish` failure after restoring one
-or both timers. Assert
+reopen a harness after a failed apply, a recorded surface PID exiting before
+restart, changed context/unrecorded surfaces, partial restart and consented retry,
+verified-migration surface failure without mandatory rollback, incomplete smoke
+receipts, and a `finish` failure after restoring one or both timers. Assert
 actual final files, Git parents, retained artifacts and timer states, not just
 command spelling. Existing pin, restore and wiring tests remain in place.
 
-Define the smallest end-to-end pilot as one attempt through the implemented
-runner's real SSH entry, with explicit throwaway roots on both hosts: check actual
-batch Git access, bus queries and desktop IPC read-only; merge/install familiar
+Provide the separate `tools/relay-cutover-rehearse` entry for the smallest
+end-to-end pilot. It creates protected owned throwaway roots on both hosts and
+uses the runner's real SSH transport/remote helper with a distinct `pilot` request
+mode and validated scratch-root identifiers. The remote helper dispatches an
+explicit mode-specific schema: pilot mutations must resolve within those owned
+roots (including symlink resolution); live mode derives its fixed roots locally
+and rejects supplied root/helper overrides. No caller environment selects pilot
+mode for live `run`/`recover`.
+
+One pilot attempt checks actual batch Git access, bus queries and desktop IPC;
+with invocation-specific consent, spawn the harmless no-window command `true`
+through the exact same niri IPC spawn path as the surface launcher on each host.
+Require the IPC acknowledgement and record its verdict; fixtures separately test
+replacement-process liveness because `true` exits immediately. Preserve any
+explicit explained-absence exemption rather than inventing a desktop on that host.
+Merge/install familiar
 in throwaway clones using the actual per-host npm and credentials; dry/apply/verify
 all four copied settings targets on Titan under one touched record, exercise the
 copied Claude targets on Europa and verify remote shared-image expectations; then
 recover the copied targets and both clones/dependencies offline through the
-verdict. Keep Codex execution on Titan. Do not stop real
-timers, restart surfaces or edit live targets in the pilot. Real unit queries plus
-fixture timer mutations cover those branches separately, and the pilot records
-that boundary rather than claiming a live timer/restart test. Preserve private
-logs, source/target/dependency equality and exact pin evidence. If the runner cannot
+verdict. Keep Codex execution on Titan. Do not stop real timers, restart actual
+surfaces or edit live targets in the pilot. Real unit queries plus fixture timer
+mutations cover those branches separately; the no-window spawn proves the actual
+IPC launch route, not a live surface restart or persistent-process health check.
+Preserve private logs, source/target/dependency equality and exact pin evidence. If the runner cannot
 execute that narrow pilot over its real transport, it is not ready for the window.
-Scratch-context injection belongs to the rehearsal harness; live `run`/`recover`
-must not accept arbitrary host roots/helpers from environment overrides. Validate
-that the pilot's mutable paths stay inside its owned scratch roots on both hosts.
+Live `run`/`recover` must not accept arbitrary host roots/helpers from environment
+overrides. Test rejection of pilot/live mode confusion and scratch-path escape on
+both hosts.
 
 Confirm failure returns to the original Zsh prompt and requires no exported caller
 state. A missing current relay row and bypassed resume command are explicit failing
@@ -444,7 +523,8 @@ reviews occur after successful bootstrap in each Codex home.
 ## Calls made for review
 
 All-four-target bootstrap, standard-library Python orchestration callable from
-Zsh, explicit full recovery after familiar mutation, a factual nonzero Bash EXIT
+Zsh, explicit full recovery for unverified migration and a consented surface-only
+retry after verified migration, a factual nonzero Bash EXIT
 notice, preserving `ignorespace`, and guarded builtin clear/reload are controller
 recommendations. They replace Codex-first application and the proposed history
 privacy change. The cost is a few more minutes offline; agents assist verification
