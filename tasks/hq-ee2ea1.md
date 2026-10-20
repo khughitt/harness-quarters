@@ -1,13 +1,15 @@
 ---
 id: hq-ee2ea1
 title: "Prepare reviewed inputs, quiesce and abort before merge"
-status: todo
+status: doing
 priority: 1
 size: m
 complexity: high
 process: direct
+owner: feat/relay-cutover
 created: 2026-10-20T11:17:18Z
-updated: 2026-10-20T11:39:29Z
+updated: 2026-10-20T16:39:40Z
+started: 2026-10-20T16:39:40Z
 depends: [hq-df06cc]
 parent: hq-c6c847
 tags: []
@@ -19,3 +21,8 @@ step: "Task 3: Prepare reviewed inputs, quiesce and abort before merge"
 ---
 
 Plan step only: human implementation-plan review is pending; do not start code, live host work or rehearsal before approval. Execute this step under parent hq-c6c847 using its approved plan, preserved subagent-driven method and trial arm. Keep actual human consent and live-window gates distinct from plan approval.
+
+## Notes
+
+- 2026-10-20T16:39:40Z (feat/relay-cutover): started
+  provenance: {"harness_session":"claude-code:393db06d-9424-4fd1-a855-8adaa7768b36","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
