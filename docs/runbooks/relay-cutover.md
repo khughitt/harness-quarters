@@ -120,13 +120,19 @@ pass except `no-live` while agents run. An absent familiar on remote PATH is har
 here because `F` names its resolved main executable explicitly; never invoke an
 unexamined PATH copy instead. Validate the four saved hashes against the table.
 
-Observed at preparation: Titan failed only `no-live`; Europa passed `no-live`,
+Initially at preparation, Titan failed only `no-live`; Europa passed `no-live`,
 runtime and subscribers but failed evidence: installed Claude 2.1.280, evidence
-2.1.302. **Operator**, before starting the window, runs `"$CLAUDE" update` on Europa
-(or any host that fails evidence), then reruns preflight. Only exact evidenced
-`2.1.302 (Claude Code)` passes. If update yields another version, stop and hand back
-to the agent to rerun Task 3's ops probe. Do not update from this agent or weaken the
-version check. Titan's evidenced Codex is `codex-cli 0.163.0`.
+2.1.302. After the operator's updates, both actual CLIs were verified as
+`2.1.304 (Claude Code)` on 2026-10-19. Fresh Europa attempt `20261019T214341` at
+relay v0.1.1 passed allow/context (12.5 s) and native relay denial (11.1 s);
+Claude's optional nested check exercised no tool and proves no nested route.
+Both hosts accepted the refreshed Claude evidence in installer plans against
+native `settings.json` before-image copies; the copies stayed byte-identical.
+Only exact evidenced `2.1.304 (Claude Code)` passes the version gate. Rerun
+preflight before the window; if an operator update yields another version, stop
+and hand back to the agent to rerun Task 3's ops probe. Do not update from this
+agent or weaken the version check. Titan's evidenced Codex remains
+`codex-cli 0.163.0`.
 
 The preparation retained on **both hosts**:
 
@@ -714,5 +720,6 @@ and dependencies at `$CUTOVER/familiar-state` / `familiar-node_modules.pre` on e
 host; Titan settings results at `$CUTOVER/task7/settings-results.json`. All are under
 0700 host-local roots; private artifacts and expected images are 0600. Dependency
 backup executable modes are preserved. Refresh mutable state during §1.
-Preflight still requires the operator's live-session quiescence and Europa Claude
-version correction. Real interactive smokes remain unrun until that window.
+Preflight still requires the operator's live-session quiescence. The later Claude
+2.1.304 evidence refresh is recorded in §0; real interactive smokes remain unrun
+until the operator window.
