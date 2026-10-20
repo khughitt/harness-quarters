@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/logs-survey
 created: 2026-10-20T16:34:37Z
-updated: 2026-10-20T17:52:29Z
+updated: 2026-10-20T17:52:37Z
 started: 2026-10-20T17:00:12Z
 depends: []
 parent: hq-cff824
@@ -49,3 +49,4 @@ Ideas it wakes: On completion, run `tasks note hq-c411df --no-reviewed "<finding
 - 2026-10-20T17:51:59Z (docs/logs-survey): review: impl round 2 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
 - 2026-10-20T17:52:29Z (docs/logs-survey): gate: verified tree:e204ae6b77191ec53c1fcb064ca673e1b1c911ed — checks: just test 1184 passed and source hashes and direction assertions and aggregate checks passed and ops-docs and tasks check no errors; review: important addressed parent directions independently re-audited, minor deferred E037 scratch parser count tracked hq-edf5de, minor deferred E008 failure tags tracked hq-edf5de; reviewer: codex/gpt-6.1-sol session:codex:01a15a6b-dac9-7c51-ba74-e0e6f1973ea0
   provenance: {"harness_session":"codex:01a15a40-db33-7ad3-9f26-96bc1d938379","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-20T17:52:37Z (docs/logs-survey): retro: Grouping by question kept repeated parsers and batch audits from distorting frequency. Raw checks of every preliminary parent flag caught a distinction the pilot missed: relationship direction must describe the lookup performed rather than the orientation of a printed field.
