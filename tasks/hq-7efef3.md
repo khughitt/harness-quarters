@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/relay-cutover
 created: 2026-10-20T01:37:42Z
-updated: 2026-10-20T01:41:11Z
+updated: 2026-10-20T01:44:44Z
 started: 2026-10-20T01:40:58Z
 depends: []
 parent: hq-539508
@@ -31,3 +31,4 @@ Done: new Claude evidence proves the required routes at the exact installed vers
 - 2026-10-20T01:40:58Z (feat/relay-cutover): started
   provenance: {"harness_session":"codex:01a156f7-6259-7d63-93ed-4c23e04ca74c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-20T01:41:11Z (feat/relay-cutover): arm: flow-trial-1 — unit tack-539508 — flow off
+- 2026-10-20T01:44:44Z (feat/relay-cutover): Europa baseline: just test-fast ran1666 tests in123.940s with2 pre-existing audio capture failures and1skip; focused fixture reproduction confirms missing /usr/bin/time (ENOENT), not probe logic. No executable or host setup changed; controller ruling requested before source edits.
