@@ -1,15 +1,17 @@
 ---
 id: hq-df06cc
 title: "Host transport, inventory and operation lifecycle"
-status: doing
+status: done
 priority: 1
 size: s
 complexity: high
 process: direct
 owner: feat/relay-cutover
 created: 2026-10-20T11:17:18Z
-updated: 2026-10-20T16:39:39Z
+updated: 2026-10-20T16:39:40Z
 started: 2026-10-20T15:08:05Z
+completed: 2026-10-20T16:39:39Z
+closed: 2026-10-20T16:39:39Z
 depends: [hq-628027]
 parent: hq-c6c847
 tags: []
@@ -29,3 +31,7 @@ Plan step only: human implementation-plan review is pending; do not start code, 
 - 2026-10-20T15:08:14Z (feat/relay-cutover): arm: flow-trial-1 — unit tack-539508 — flow off
 - 2026-10-20T16:25:30Z (feat/relay-cutover): review: impl round 1 — verdict: revise; findings: Important 2, Minor 11; reviewer: claude-code/claude-opus-5-5
 - 2026-10-20T16:39:39Z (feat/relay-cutover): review: impl round 2 — verdict: accept; findings: none; reviewer: claude-code/claude-sonnet-5-5
+- 2026-10-20T16:39:39Z (feat/relay-cutover): done
+  provenance: {"harness_session":"claude-code:393db06d-9424-4fd1-a855-8adaa7768b36","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-20T16:39:39Z (feat/relay-cutover): Task 2 landed at a515e95+71d91f0: bounded SSH/local host transport with durable operation records, owner-lost reconciliation, Claude hold env, inventory/desktop probes (inventory.py) and an explicit operations table; review accept after 1 fix round, Minor 11 deferred.
+  provenance: {"harness_session":"claude-code:393db06d-9424-4fd1-a855-8adaa7768b36","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
