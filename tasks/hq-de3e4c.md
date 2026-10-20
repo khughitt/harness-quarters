@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/logs-survey
 created: 2026-10-20T16:34:37Z
-updated: 2026-10-20T17:06:55Z
+updated: 2026-10-20T17:12:24Z
 started: 2026-10-20T17:00:12Z
 depends: []
 parent: hq-cff824
@@ -26,6 +26,8 @@ Ideas it wakes: On completion, run `tasks note hq-c411df --no-reviewed "<finding
 ## References
 
 - brief (input, kind=brief): docs/notes/2026-10-20-session-store-reach-brief.md — context and questions for this work
+- survey (output, kind=report): docs/notes/2026-10-20-session-log-survey.md — episode taxonomy, costs and CLI implications
+- episodes (output, kind=dataset): docs/notes/data/2026-10-20-session-log-survey.jsonl — paraphrased classifications with source references
 
 ## Notes
 
