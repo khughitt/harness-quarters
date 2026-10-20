@@ -1,0 +1,5 @@
+{"timestamp":"2026-10-10T08:00:00.000Z","type":"session_meta","payload":{"id":"01900000-0000-7000-8000-0000000000b1","session_id":"01900000-0000-7000-8000-0000000000b1","timestamp":"2026-10-10T08:00:00.000Z","cwd":"/w/beta","originator":"codex-tui","cli_version":"0.163.0","source":"cli","thread_source":"user","model_provider":"openai","base_instructions":{"text":"You are a coding agent.","provenance":{"type":"model","model":"codex-model-a"}}}}
+{"timestamp":"2026-10-10T08:00:01.000Z","type":"event_msg","payload":{"type":"task_started","turn_id":"turn-w1"}}
+{"timestamp":"2026-10-10T08:00:01.000Z","type":"turn_context","payload":{"turn_id":"turn-w1","cwd":"/w/beta","approval_policy":"never","model":"codex-model-a"}}
+{"timestamp":"2026-10-10T08:00:02.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Check the beta build."}]}}
+{"timestamp":"2026-10-10T08:00:09.000Z","type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-w1"}}
