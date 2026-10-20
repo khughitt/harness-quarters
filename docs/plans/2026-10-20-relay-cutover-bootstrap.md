@@ -18,7 +18,7 @@ existing relay v0.1.1, Git/npm, systemd user bus and niri IPC. No new dependency
 **Spec:** `.worktrees/relay-cutover/docs/specs/2026-10-20-operator-runbooks-design.md`
 (approved for planning after round 6; frozen predecessor `07acc26`).
 **Task:** hq-c6c847; parent hq-539508; blocked original window hq-f27918.
-**Status:** revised after plan round 3 at `be9fbdb`; awaiting human plan re-review.
+**Status:** revised after plan round 4 at `d868144`; awaiting human plan re-review.
 No implementation or new window run.
 **Execution:** preserve the user's subagent-driven choice. Work in the existing
 locked, hydrated `.worktrees/relay-cutover/`; do not create another hq worktree.
@@ -76,8 +76,9 @@ recovery again as setup. Keep the existing plan workspace and all review evidenc
 - Claude evidence must exactly match the same installed version on both hosts.
   `2.1.304 (Claude Code)` is the current reviewed baseline, not a permanent pin.
   Task 9 refreshes/reviews proof for the selected actual version if it has moved.
-  Hold every cutover/probe/diagnostic/smoke launch with `DISABLE_UPDATES=1` from
-  final readiness through finish. Codex remains exactly `codex-cli 0.163.0` unless
+  Hold every Claude launch from bootstrap through finish with `DISABLE_UPDATES=1`;
+  agent diagnostics/probes use it individually beforehand without restricting
+  ordinary use. Codex remains exactly `codex-cli 0.163.0` unless
   separately re-probed/reviewed. Never silently update a host or relax equality.
 - Scope: Claude personal/work on Titan and Europa; Codex personal/work on Titan.
   All four settings targets are shared: apply once on Titan, verify synchronized
@@ -236,38 +237,51 @@ policy; already-held sessions stay held until exit. Do not unset an existing use
 Sources: [update controls](https://code.claude.com/docs/en/setup#disable-auto-updates)
 and [environment reference](https://code.claude.com/docs/en/env-vars).
 
-This is a scoped hold, not a machine-wide installation lock. Before final readiness,
-close unheld Claude sessions/updaters on both hosts and require no-live Claude.
-From then through finish, use only the printed held commands for every Claude
-probe/help/version/doctor/personal/work/smoke launch. Apply the flag inside the
-remote helper's child environment; SSH need not forward it. Print Codex resume/
-work-home launches with the flag too so their tool children inherit it. Do not run
-unheld Claude/IDE clients, update/install commands or external installers meanwhile.
-If ordinary use resumes before the window, invalidate readiness and repeat Task 9.
+This is a scoped hold, not a machine-wide installation lock. Ordinary Claude use,
+including `cl`/`clw` and review sessions, remains allowed throughout preparation,
+pilot and any wait for the window. Individual agent diagnostics/probes use the flag
+so those commands cannot update Claude; they establish no ongoing host-use ban.
 
-In both Claude homes on each host, verify the installed version and `claude doctor`
-under that environment and require its auto-update-disabled diagnostic. Record the
-selected version, executable/resolved binary digest and hold check in prepared
-inputs. Known live Claude processes must match that identity and have the hold
-flag; inspect only that key for owned PIDs, never output their environments. Unknown
-or unheld launches invalidate readiness. A mere flag in a manifest is not proof
-that the executable honors it. If the hold cannot be established, do not open a
-window or pause timers.
+Immediately before each request to close sessions, including after a parked wait,
+the agent runs fresh held version checks on both hosts against reviewed evidence
+and prepared identities. If unchanged, no preparation step repeats. If moved,
+repeat Task 9 Steps 5–7 (including the reviewed re-probe), then check again before
+asking for closure. Rerun Step 8's pilot only when helper/toolchain bytes differ
+from its recorded identities; evidence/version refresh alone does not rerun it.
+Do not repeat Task 9 Steps 1–4 or the fault matrix solely for ordinary Claude use
+or a version refresh; Step 6 still requires the new evidence's own review/delivery.
+Changes to helper/toolchain bytes retain their own checks/review/delivery
+requirements before the new pilot.
 
-Task 9 explicitly compares actual versions with evidence. If they differ, align the
-two hosts to one operator-approved installed version (no automatic update/downgrade),
-then repeat the original plan's Task 3 ops probe/review procedure before handoff.
-Use `env DISABLE_UPDATES=1` for the probe so its isolated Claude children inherit
-the hold. Refresh evidence in an ops worktree, review it, land the reviewed docs
-on ops main, verify both hosts' installer acceptance and refresh the private input/
-helper manifest. If capabilities change images, follow original Task 6 review above.
-Any further pre-window drift repeats this readiness loop, not an exception to exact
-version checks. Existing identical-version proof may be retained once the hold is
-verified; a moved version always needs new proof/review.
+The operator closes every Claude/Codex session for the bootstrap. From `run` through
+finish, use only the printed held Claude commands; explicitly avoid habitual `cl`
+and `clw`, unheld Claude/IDE clients, update/install commands and external installers.
+`run` rechecks strict no-live, held versions and each host/home's held `claude doctor`
+auto-update-disabled diagnostic before timers pause. This closes the gap after the
+agent's last check. An unproven hold/version mismatch refuses without mutation.
+Apply the flag inside the remote helper's child environment; SSH need not forward
+it. Printed Codex resume/work launches carry it for their tool children too.
+
+Preparation records selected versions, resolved binary digests and per-command
+doctor checks; these are dated observations, not proof of a continuous hold. Only
+from bootstrap through finish must known live Claude processes match that identity
+and hold key; inspect only that key for owned PIDs, never output full environments.
+Unheld sessions during preparation are expected no-live blockers for `run`, not
+invalidations of completed preparation or pilot. A mere manifest flag never proves
+that the executable honors it.
+
+If installed versions differ from evidence, require operator alignment to one
+version (no automatic update/downgrade), then repeat original Task 3's ops probe
+with `env DISABLE_UPDATES=1` and its independent evidence review. Land reviewed proof/
+docs on ops main, verify both hosts' installer acceptance and refresh the private
+input/helper manifest. Image changes require original Task 6 review. The sole
+version-refresh repeat scope is Task 9 Steps 5–7, followed by the final held check;
+existing identical-version proof is retained. No permanent 2.1.304 pin or waiver.
 
 An unexpected move after bootstrap is a hold breach: stop new smokes, report the
-paused timer state and require ordinary-shell full recovery before a fresh Task 9
-readiness pass. `recover` must still work with stale Claude evidence: it uses strict
+paused timer state and require ordinary-shell full recovery before a fresh
+Task 9 Steps 5–7 pass and final held check. Keep this conservative recovery path
+rather than adding evidence replacement while a live window is active. `recover` must still work with stale Claude evidence: it uses strict
 no-live, pinned relay rollback and byte/Git/dependency proofs, without launching
 Claude or requiring its installed version to equal the obsolete evidence. Restore
 native state and original timers first; do not leave timers paused waiting for an
@@ -449,15 +463,18 @@ record, outputs one final sanitized JSON response, and keeps full logs private.
   Expected RED. Add fixtures for missing USER/user bus, absent SSH_AUTH_SOCK with
   working Git credentials, failed actual pinned-source access, ambiguous desktop
   socket, explained absent surfaces, helper hash drift and unfamiliar executable.
-  A failed/missing doctor disabled-update diagnostic or unheld process rejects
-  readiness; the recorded flag alone cannot pass.
+  A failed/missing doctor disabled-update diagnostic rejects bootstrap readiness;
+  the recorded flag alone cannot pass. Add `test_inventory_reports_unheld_claude`:
+  inventory reports ordinary sessions without rejecting its read-only observation;
+  phase callers enforce closure/hold only for bootstrap and validation.
 - [ ] **Step 3:** Implement only transport/schema/process ownership, inventory,
   read-only prerequisite probes, operation-status and explicit operation-cancel.
   Route Claude diagnostics/children through `claude_hold_env`, including remote
   operations; never rely on SSH forwarding the variable. Tests cover inheritance,
-  unchanged parent env, both homes and refusal of unknown/unheld owned Claude PIDs
-  without exposing other environment keys. Inventory records the version/hold,
-  toolchain/cache contract above, user bus, Git auth and
+  unchanged parent env and both homes without exposing other environment keys.
+  Inventory reports known/unknown/unheld processes; forward callers gate them only
+  from bootstrap through finish. It records the version/hold, toolchain/cache
+  contract above, user bus, Git auth and
   trusted desktop context. `git ls-remote` probes access; the pilot proves install
   of the actual pinned source. Unknown/unimplemented operations refuse before writes.
   Timer/snapshot operations are added with Task 3 tests, merge/install/target apply
@@ -495,7 +512,9 @@ this task does not generate exact expected bytes or expose a live run entry.
 
 - [ ] **Step 1:** Add `test_prepare_preserves_filter_owned_picks`,
   `test_nonpick_drift_names_original_image_review`, `test_run_input_recheck_accepts_pick_only_drift`,
-  `test_system_toolchain_wins_over_nvm` and `test_second_host_failure_aborts_both`.
+  `test_system_toolchain_wins_over_nvm`, `test_second_host_failure_aborts_both`
+  and `test_prepare_allows_ordinary_claude_sessions`. Preparation records sessions
+  as future run blockers without demanding closure or a continuing update hold.
   Vary every key loaded from the filter, missing-key deletion and arbitrary nested
   pick values; non-pick/hook/statusLine edits reject. Mutate the fixture filter key
   list to prove reuse. Record current pick values/absence without serializing
@@ -514,7 +533,8 @@ this task does not generate exact expected bytes or expose a live run entry.
 - [ ] **Step 2:** Run the bootstrap/transport test files with
   `-k 'prepare or pick or manifest or toolchain or quiesce or abort'`: RED. Include invalid
   baseline provenance, corrupt images, npm 11/changed node/Git/Python identity,
-  cache inside a live checkout, active sessions, partial snapshot copies, signals
+  cache inside a live checkout, run refusal for active sessions (prepare records
+  them without refusal), partial snapshot copies, signals
   and second-host failure after the first timer record. No later live writes.
 - [ ] **Step 3:** Implement eligibility/refusal and the staged reviewed input
   manifest checks above. Capture immutable provenance/current input hashes;
@@ -700,10 +720,15 @@ and timer restore reuses Task 3.
 
 - [ ] **Step 1:** Add `test_resume_has_no_bypass_flags`, `test_current_row_is_fresh`,
   `test_receipt_is_bound_to_real_cases`, `test_human_attestation_is_required` and
-  `test_partial_finish_keeps_original_timers`, `test_handoff_freezes_claude_picks`
-  and `test_selected_evidenced_version_can_advance_before_window`.
-  Both ready and surfaces-pending handoffs name both hosts/homes and no model/effort
-  changes until finish. Stale row/cwd, wrong window/home/
+  `test_partial_finish_keeps_original_timers`, `test_handoff_freezes_claude_picks`,
+  `test_selected_evidenced_version_can_advance_before_window` and
+  `test_final_check_names_bounded_refresh`. Assert check/status instructions allow
+  normal use while parked, reuse proof for unchanged final versions, name only
+  Task 9 Steps 5–7 for version movement and require a new pilot only for changed
+  helper/toolchain bytes. Instructions require a fresh held check before each
+  closure ask; the agent performs the refresh/review, not an automatic tool loop.
+  Both ready and surfaces-pending handoffs name both hosts/homes, no model/effort
+  changes and no habitual `cl`/`clw` launches until finish. Stale row/cwd, wrong window/home/
   session/version, pilot receipt, missing/altered evidence or human verdict reject.
   Denial not attempted/Git identity error cannot pass; neither can automatic approval.
   ```python
@@ -712,7 +737,7 @@ and timer restore reuses Task 3.
   assert not finish_called_with_incomplete_receipts
   assert timer_records_after == timer_records_before
   ```
-- [ ] **Step 2:** Run bootstrap/transport tests with `-k 'resume or smoke or finish or receipt or attestation or handoff or selected_evidenced_version'`:
+- [ ] **Step 2:** Run bootstrap/transport tests with `-k 'resume or smoke or finish or receipt or attestation or handoff or selected_evidenced_version or final_check'`:
   RED. Include surface-pending, declined SSH/systemd permission, one timer restored,
   service still running/failing, hold breach during smokes, and accidental targeting
   of the live controller. New selected versions require reviewed matching evidence
@@ -721,7 +746,8 @@ and timer restore reuses Task 3.
   `--no-daemon resume`, never aliases/bypass flags/placeholders. First controller
   check proves its own fresh native ID/PID row before further rollout work. Work
   home gets its explicit command and human hook review too. Print the Claude
-  model/effort freeze and held-launch warnings before every handoff until finish.
+  model/effort freeze and held-launch warnings, naming `cl` and `clw`, before every
+  handoff until finish. Do not extend that restriction into preparation or parking.
   Include `DISABLE_UPDATES=1` in Codex argv and explicit Claude personal/work/smoke
   commands; known Claude children/probes use that held env. Controller policies
   use defaults; dedicated smokes keep Claude `--permission-mode manual` and Codex
@@ -865,12 +891,11 @@ reviewable one-command handoff. Live application remains unperformed.
   npm/node/Git/helper-Python identities/versions/digests. Dropbox may copy inert
   files earlier; main's passing suite gates Europa execution, not a claim that
   automatic synchronization was paused. No home-link/service changes.
-- [ ] **Step 5:** Establish the scoped hold before final readiness: close unheld
-  Claude sessions on both hosts, validate each personal/work home's held doctor/
-  version diagnostic, and record selected version and binary digests. The current
-  Codex controller may stay online; Claude hold is required before probing. If
-  host versions differ, request operator alignment to one selected version without
-  silently updating/downgrading. No timer stop/live settings/source/desktop change.
+- [ ] **Step 5:** Observe both hosts' versions/binary digests and each personal/
+  work home's doctor diagnostic using individually held commands. Ordinary Claude
+  sessions, including reviewers, may stay online; there is no ongoing hold yet.
+  If host versions differ, request operator alignment to one selected version
+  without silently updating/downgrading. No timer/source/settings/desktop change.
 - [ ] **Step 6:** If actual Claude version differs from shared evidence, execute
   original plan Task 3 and the reviewed hq-7efef3 refresh pattern: locked/hydrated
   ops and detached exact-v0.1.1 relay worktrees, isolated Europa probe homes with
@@ -882,15 +907,15 @@ reviewable one-command handoff. Live application remains unperformed.
   approach only with the same evidenced version on both hosts; verify installer
   acceptance on both copies. Refresh the private evidence/input/helper manifest
   only after review. If new capabilities change images, regenerate/review them
-  via original Task 6 first. Do not rerun unchanged Codex evidence. Any later
-  pre-window drift invalidates readiness and repeats Steps 5–6; no version waiver.
+  via original Task 6 first. Do not rerun unchanged Codex evidence. A version move
+  repeats only Steps 5–7; unchanged versions reuse proof. Ordinary use alone never
+  invalidates preparation. No version waiver or continuous pre-window hold.
 - [ ] **Step 7:** Agent-run transport checks on both hosts for credentials, user
   bus, source/runtime, held version/evidence, manifest, targets, desktop inventory
-  and retained state. Current Codex no-live refusal is expected during preparation;
-  no-live Claude/held probes are verified as described above. Capture controller
-  identity/safe executable and run prepare. Retain hold instructions while parked.
-  If the operator resumes unheld ordinary Claude use, redo readiness before window.
-  No live apply/merge/timer stop/desktop use occurs in this step.
+  and retained state. Existing Claude/Codex sessions are expected future no-live
+  blockers, not a reason to close sessions now or reject preparation. Capture
+  controller identity/safe executable and run prepare. Ordinary use remains allowed
+  while parked; no live apply/merge/timer stop/desktop use occurs in this step.
 - [ ] **Step 8:** Ask in the session for the real pilot's no-window `true` spawn
   on the named desktop hosts, explaining that it opens no window and the one-case
   pilot is expected to take at most five minutes. After the explicit reply, pass
@@ -910,17 +935,24 @@ reviewable one-command handoff. Live application remains unperformed.
   gates pass; this unblocks its dependent original window task hq-f27918. Park
   hq-f27918 and parent for the operator's session closure/window, naming that live
   smoke/timer evidence is still owed there and final checks belong to original
-  Task 9. Do not keep original Task 8 dependent on a bootstrap task that waits on its
-  own live results, or claim the rollout done when only preparation is delivered.
+  Task 9. Immediately before each closure request, including when hq-f27918 resumes
+  after a wait, perform the fresh held version check described above. Unchanged:
+  no repeats. Moved: repeat Steps 5–7 and recheck; rerun the pilot only if its helper/
+  toolchain bytes changed. No closure request precedes that final check. Do not keep
+  original Task 8 dependent on a bootstrap task that waits on its own live results,
+  or claim the rollout done when only preparation is delivered.
 
 ## Live handoff after implementation approval and rehearsal
 
 This section names later human gates; approving this plan does not execute them.
-The agent completes Task 9's held evidence/readiness pass first. Keep every Claude
-launch held with DISABLE_UPDATES=1 through finish; no unheld clients/updates.
-The operator then closes every Claude/
-Codex session on both hosts, including the current controller, and runs the single
-Zsh command. The bootstrap obtains that invocation's desktop consent before any
+Ordinary Claude use remains allowed until the window. As the last action before
+asking the operator to close sessions, the agent checks both hosts' versions using
+held commands. Unchanged versions repeat nothing; movement repeats only Task 9
+Steps 5–7 and the final check. Repeat the pilot only for changed helper/toolchain
+bytes. The operator then closes every Claude/Codex session on both hosts, including
+the current controller, and runs the single Zsh command. From bootstrap through
+finish, use only the printed DISABLE_UPDATES=1 launches; avoid `cl` and `clw`.
+The bootstrap obtains that invocation's desktop consent before any
 mutation, quiesces both hosts, freezes inputs and passes all six dry runs before
 familiar/dependency changes and the four target applies.
 
@@ -938,7 +970,8 @@ reconciliation, verify original Task 8 live evidence and perform original Task 9
 Keep backups/worktree through original Task 9. Full recovery remains an operator-run
 closed-harness command, with new desktop consent for its restarts. On unexpected
 version drift after bootstrap, use it to restore native state/timers without stale
-Claude evidence blocking rollback, then repeat held readiness before a new window.
+Claude evidence blocking rollback, then repeat Steps 5–7 and the final held check
+before a new window. No in-window re-probe/continuation path is added.
 
 ## Self-review / coverage before handing this plan back
 
@@ -955,7 +988,10 @@ Claude evidence blocking rollback, then repeat held readiness before a new windo
   scratch application writes from declared host-cache/runtime effects, and
   worktree tests from delivered-main tests. All six authoritative installer-byte
   dry runs precede merge; structural drift names the existing image-review process;
-  held launches plus explicit reviewed re-probe replace a permanent 2.1.304 pin.
+  bootstrap-to-finish held launches plus reviewed re-probe replace a permanent
+  2.1.304 pin. Ordinary pre-window use is unrestricted; final held checks repeat
+  only Steps 5–7 for version movement, with pilot reuse unless helper/toolchain
+  bytes change. Handoffs name habitual unheld launchers `cl` and `clw`.
   Hold breach cannot strand rollback behind stale evidence. Handoffs freeze picks
   and preserve updates disabled through finish. No live results are implied.
 - [ ] Human re-reviews the complete frozen plan before Task 1 implementation.
