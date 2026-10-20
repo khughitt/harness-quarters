@@ -8,7 +8,7 @@ complexity: high
 process: direct
 owner: feat/relay-cutover
 created: 2026-10-20T11:17:19Z
-updated: 2026-10-20T20:14:27Z
+updated: 2026-10-20T20:14:36Z
 started: 2026-10-20T20:14:27Z
 depends: [hq-c6c742]
 parent: hq-c6c847
@@ -26,3 +26,4 @@ Plan step only: human implementation-plan review is pending; do not start code, 
 
 - 2026-10-20T20:14:27Z (feat/relay-cutover): started
   provenance: {"harness_session":"claude-code:393db06d-9424-4fd1-a855-8adaa7768b36","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-20T20:14:36Z (feat/relay-cutover): arm: flow-trial-1 — unit tack-539508 — flow off
