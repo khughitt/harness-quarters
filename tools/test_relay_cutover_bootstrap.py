@@ -22,6 +22,7 @@ import pytest
 
 import test_relay_cutover_transport as transport
 from relay_cutover_bootstrap import hosts, inputs, state, window
+from relay_cutover_bootstrap import prepare as preparation
 from relay_cutover_bootstrap.state import Stop
 
 PREPARED = hashlib.sha256(b"prepared fixture").hexdigest()
@@ -813,7 +814,7 @@ def decision_for(opened, attempt="run-1"):
 
 
 def opened_with_decision(world):
-    prepared = window.prepare(SESSION)
+    prepared = preparation.prepare(SESSION)
     opened = window.open_window(prepared)
     return prepared, opened, decision_for(opened)
 
@@ -848,7 +849,7 @@ def test_prepare_preserves_filter_owned_picks(cutover, monkeypatch, checkout):
         monkeypatch.setattr(window, "CHECKOUT", cutover.candidate_checkout())
     reviewed = {host: staged(cutover, host) for host in HOSTS}
     before = {host: cutover.snapshot(host) for host in HOSTS}
-    prepared = window.prepare(SESSION)
+    prepared = preparation.prepare(SESSION)
 
     root = cutover_root(cutover)
     assert state.load_record(root / "prepared.json") == prepared
@@ -971,7 +972,7 @@ def test_nonpick_drift_names_original_image_review(cutover, case):
     cutover.write_target(target_id, value)
     kept = {host: staged(cutover, host) for host in HOSTS}
     with pytest.raises(window.Failed) as raised:
-        window.prepare(SESSION)
+        preparation.prepare(SESSION)
     failed = raised.value
     assert (failed.step, failed.host, failed.status) == ("inputs-check", "titan", "blocked")
     review = [blocker for blocker in failed.blockers if "input-review-required" in blocker]
@@ -1051,7 +1052,7 @@ def test_manifest_refusals(cutover, case):
     arrange(cutover)
     kept = staged(cutover, "titan")
     with pytest.raises(window.Failed) as raised:
-        window.prepare(SESSION)
+        preparation.prepare(SESSION)
     failed = raised.value
     assert (failed.step, failed.host, failed.status) == ("inputs-check", "titan", "blocked")
     assert code in codes(failed.blockers), failed.blockers
@@ -1101,7 +1102,7 @@ PROVENANCE = {
 def test_manifest_provenance_refusals(cutover, case):
     PROVENANCE[case](cutover)
     with pytest.raises(window.Failed) as raised:
-        window.prepare(SESSION)
+        preparation.prepare(SESSION)
     failed = raised.value
     assert (failed.step, failed.host) == ("inputs-check", "titan")
     review = [blocker for blocker in failed.blockers if "input-review-required" in blocker]
@@ -1111,7 +1112,7 @@ def test_manifest_provenance_refusals(cutover, case):
 
 @needs_zsh
 def test_run_input_recheck_accepts_pick_only_drift(cutover):
-    prepared = window.prepare(SESSION)
+    prepared = preparation.prepare(SESSION)
     recorded = (cutover_root(cutover) / "prepared.json").read_bytes()
     keys = transport.CLAUDE_KEYS
     personal = json.loads(cutover.target("titan", "claude").read_bytes())
@@ -1122,7 +1123,7 @@ def test_run_input_recheck_accepts_pick_only_drift(cutover):
     for target_id, value in (("claude", personal), ("claude-work", work)):
         cutover.write_target(target_id, value)
 
-    result = window.recheck(prepared)
+    result = preparation.recheck(prepared)
     assert result["eligible"] and result["blockers"] == []
     for host in HOSTS:
         for target_id, value in (("claude", personal), ("claude-work", work)):
@@ -1138,7 +1139,7 @@ def test_run_input_recheck_accepts_pick_only_drift(cutover):
     personal["statusLine"] = {"type": "command", "command": "~/elsewhere"}
     cutover.write_target("claude", personal)
     with pytest.raises(window.Failed) as raised:
-        window.recheck(prepared)
+        preparation.recheck(prepared)
     assert raised.value.step == "eligibility"
     assert any("input-review-required" in blocker and "Task 6" in blocker
                for blocker in raised.value.blockers)
@@ -1153,7 +1154,7 @@ def test_system_toolchain_wins_over_nvm(cutover, monkeypatch):
                          "json.dumps({'host': 'nvm', 'tool': 'nvm', 'args': []}) + '\\n')\n"
                          "print('11.6.2')\n", 0o755)
     monkeypatch.setenv("PATH", f"{nvm}:{os.environ['PATH']}")
-    prepared = window.prepare(SESSION)
+    prepared = preparation.prepare(SESSION)
     for host in HOSTS:
         install = prepared["hosts"][host]["install"]
         npm = prepared["hosts"][host]["toolchain"]["npm"]
@@ -1200,7 +1201,7 @@ def test_toolchain_drift_refuses_prepare(cutover, case):
     arrange, host, kind = TOOLCHAIN[case]
     arrange(cutover)
     with pytest.raises(window.Failed) as raised:
-        window.prepare(SESSION)
+        preparation.prepare(SESSION)
     failed = raised.value
     assert (failed.host, failed.status) == (host, "blocked")
     assert kind in codes(failed.blockers), failed.blockers
@@ -1210,15 +1211,15 @@ def test_toolchain_drift_refuses_prepare(cutover, case):
 
 @needs_zsh
 def test_toolchain_drift_after_prepare_blocks_check(cutover):
-    prepared = window.prepare(SESSION)
-    assert window.check(prepared)["eligible"]
+    prepared = preparation.prepare(SESSION)
+    assert preparation.check(prepared)["eligible"]
     _touch_tool("git")(cutover)
-    result = window.check(prepared)
+    result = preparation.check(prepared)
     assert not result["eligible"]
     assert {blocker.split(": ")[0] for blocker in result["blockers"]
             if "toolchain" in blocker and "git" in blocker} == {"titan", "europa"}
     with pytest.raises(window.Failed, match="eligibility"):
-        window.recheck(prepared)
+        preparation.recheck(prepared)
 
 
 def _sessions(world):
@@ -1238,11 +1239,11 @@ def _sessions(world):
 @needs_zsh
 def test_prepare_allows_ordinary_claude_sessions(cutover):
     _sessions(cutover)
-    prepared = window.prepare(SESSION)  # no refusal, and no hold is demanded of them
+    prepared = preparation.prepare(SESSION)  # no refusal, and no hold is demanded of them
     assert [(entry["pid"], entry["held"]) for entry in prepared["hosts"]["titan"]["sessions"]] \
         == [(3900301, False), (3900302, True)]
     assert [entry["pid"] for entry in prepared["hosts"]["europa"]["sessions"]] == [3900311]
-    result = window.check(prepared)
+    result = preparation.check(prepared)
     assert result["eligible"] and result["blockers"] == []
     assert [entry["pid"] for entry in result["sessions"]["titan"]] == [3900301, 3900302]
 
@@ -1267,12 +1268,12 @@ def test_prepare_allows_ordinary_claude_sessions(cutover):
 
 @needs_zsh
 def test_prepare_check_is_read_only(cutover):
-    prepared = window.prepare(SESSION)
+    prepared = preparation.prepare(SESSION)
     root = cutover_root(cutover)
     before = {host: cutover.snapshot(host) for host in HOSTS}
     units = {host: cutover.units(host) for host in HOSTS}
     mark = len(cutover.lines("observed"))
-    result = window.check(prepared)
+    result = preparation.check(prepared)
     assert result["eligible"] and result["blockers"] == []
     report = window.status()
     assert report["window"] is None and report["prepared"]["sha256"] == \
@@ -1298,7 +1299,7 @@ def test_quiesce_stops_daemons_and_refreshes_snapshots(cutover):
         {"pid": 3900402, "start_time": 52, "comm": "codex", "exe": codex,
          "argv": ["codex", "app-server", "--listen"], "daemon": "work"}]
     cutover.save()
-    prepared = window.prepare(SESSION)
+    prepared = preparation.prepare(SESSION)
     # Daemons are not sessions: preparation records them like any live harness process.
     assert [entry["pid"] for entry in prepared["hosts"]["titan"]["sessions"]] == [3900401, 3900402]
     targets = {host: {target_id: cutover.target(host, target_id).read_bytes()
@@ -1393,6 +1394,33 @@ def test_second_host_failure_aborts_both(cutover):
     # A completed abort permits a fresh window; its directory stays.
     fresh = state.new_window(cutover_root(cutover), window.prepared_sha256(prepared))
     assert fresh["id"] != opened["id"] and Path(opened["directory"]).is_dir()
+
+
+@needs_zsh
+@pytest.mark.parametrize("fault", ["fail-after", "partial"])
+def test_abort_completes_after_an_interrupted_timer_record(cutover, fault):
+    # Europa's helper leaves a loose record (whole or torn) and fails before its reply.
+    cutover.behave("europa", timers={"record": fault})
+    prepared, opened, consumed = opened_with_decision(cutover)
+    with pytest.raises(window.Failed) as raised:
+        window.quiesce_window(prepared, consumed)
+    assert (raised.value.step, raised.value.host) == ("timer-record", "europa")
+    assert raised.value.next_command == ["run"] and "aborted" in raised.value.observed
+    root = cutover_root(cutover)
+    record = state.current_window(root)
+    assert record["state"] == "aborted"
+    europa = record["abort"]["hosts"]["europa"]
+    assert europa["complete"] is True and europa["timers"]["stopped"] is False
+    directory = cutover.root("europa") / "quiesce" / opened["id"]
+    assert not (directory / "timers.json").exists()
+    assert (directory / "abort" / "timers.json").is_file()
+    assert state.load_record(directory / "timers.restored.json")["stopped"] is False
+    assert timers_active(cutover) == {"titan": "active", "europa": "active"}
+    # Nothing is left to block the next window on either host.
+    cutover.behave("europa", timers={})
+    result = preparation.check(prepared)
+    assert result["eligible"], result["blockers"]
+    state.new_window(root, window.prepared_sha256(prepared))
 
 
 @needs_zsh
@@ -1497,7 +1525,7 @@ window.quiesce_window(prepared, consumed)
 
 @needs_zsh
 def test_abort_after_sigkill_reconciles_first(cutover):
-    prepared = window.prepare(SESSION)
+    prepared = preparation.prepare(SESSION)
     cutover.behave("europa", timers={"wait": "latch"})
     script = transport._write(cutover.fixture / "quiesce_driver.py", QUIESCE_DRIVER.replace(
         "@TOOLS@", repr(str(TOOLS))).replace("@SSH@", repr(str(cutover.ssh))))

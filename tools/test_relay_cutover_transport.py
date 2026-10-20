@@ -316,7 +316,8 @@ sys.exit(failed)
 FIXTURE_TIMERS = r'''
 """Stands in for tools/quiesce-timers: the same record file, with this host's unit states
 kept in a JSON file. Faults: fail, latch (wait for the latch file), signal (signal the
-controller, then wait to be stopped), fail-after (take effect, then report failure)."""
+controller, then wait to be stopped), fail-after (take effect, then report failure), partial
+(record: write half a record, as an interrupted helper would, then fail)."""
 import json, os, signal, sys, time
 
 with open("@CONFIG@") as stream:
@@ -334,6 +335,11 @@ if fault in ("signal", "latch"):
     end = time.monotonic() + 120
     while not os.path.exists(config["latch"]) and time.monotonic() < end:
         time.sleep(0.02)
+if fault == "partial" and command == "record":
+    with open(path, "w") as stream:
+        stream.write('{"timers": [{"timer": "familiar-reap.timer", "serv')
+    os.chmod(path, 0o644)
+    sys.exit(1)
 if fault not in ("ok", "latch", "fail-after"):
     print(f"quiesce-timers: {command}: fixture failure @SECRET@", file=sys.stderr)
     sys.exit(1)
@@ -355,6 +361,7 @@ if command == "record":
               for name in args[args.index("--state") + 2:]]
     with open(path, "w") as stream:
         stream.write(json.dumps({"timers": timers}, indent=2) + "\n")
+    os.chmod(path, 0o644)  # the real helper's write_text leaves the umask's mode
 elif command == "stop":
     for timer in recorded():
         units[timer["timer"]]["active"] = "inactive"
@@ -1639,7 +1646,8 @@ def test_quiesce_timer_record_is_durable_before_stop(world, monkeypatch):
     other = _execute("titan", "timer-record", {"window_id": "20261020T130000Z-0badf00e"}, 5)
     assert other["status"] == "failed" and WINDOW in other["error"]
     restored = _execute("titan", "timer-restore",
-                        {"window_id": WINDOW, "record_sha256": result["sha256"]}, 6)
+                        {"window_id": WINDOW, "record_sha256": result["sha256"], "stopped": True},
+                        6)
     assert restored["status"] == "completed" and restored["result"]["restored"] is True
     assert world.units("titan")["familiar-reap.timer"]["active"] == "active"
     assert (record.parent / "timers.restored.json").is_file()
@@ -1736,3 +1744,51 @@ def test_abort_returns_partial_snapshot_copies(world, monkeypatch, fault):
     again = _execute("titan", "snapshot-abort", {"window_id": WINDOW}, 4)
     assert again["status"] == "completed"
     assert set(again["result"]["moves"].values()) == {"untouched"}
+
+
+def test_abort_restores_an_interrupted_timer_record(world, monkeypatch):
+    world.stage_cutover()
+    record = world.root("titan") / "quiesce" / WINDOW / "timers.json"
+    # A stopped host's record left loose by an interruption is made private, then replayed.
+    assert _execute("titan", "timer-record", {"window_id": WINDOW}, 1)["status"] == "completed"
+    assert _execute("titan", "timer-stop", {"window_id": WINDOW,
+                                            "record_sha256": _digest(record)}, 2)[
+        "status"] == "completed"
+    record.chmod(0o644)  # the helper writes with the umask's mode
+    with monkeypatch.context() as patch:
+        events = _recorder(patch)
+        restored = _execute("titan", "timer-restore", {"window_id": WINDOW, "stopped": True}, 3)
+    assert restored["status"] == "completed", restored["error"]
+    assert restored["result"] == {"recorded": True, "restored": True}
+    assert _private(record) == 0o600
+    synced = events.index(("fsync", str(record)))
+    assert synced < events.index(("spawn", "quiesce-timers", "restore"))
+    assert world.units("titan")["familiar-reap.timer"]["active"] == "active"
+
+    # A torn record of timers that were stopped cannot be replayed: it stops for inspection.
+    other = "20261020T130000Z-0badf00e"
+    torn = world.root("titan") / "quiesce" / other / "timers.json"
+    world.behave("titan", timers={"record": "partial"})
+    assert _execute("titan", "timer-record", {"window_id": other}, 4)["status"] == "failed"
+    torn.chmod(0o644)  # loose, as the helper's umask would leave it
+    failed = _execute("titan", "timer-restore", {"window_id": other, "stopped": True}, 5)
+    assert failed["status"] == "failed" and "inspect" in failed["error"]
+    assert torn.is_file() and quiesce._unrestored(world.root("titan")) == [other]
+
+    # Timers this window never asked to stop were never paused: the torn record is kept as
+    # evidence and marked restored, so it no longer blocks a later window.
+    kept = _execute("titan", "timer-restore", {"window_id": other, "stopped": False}, 6)
+    assert kept["status"] == "completed", kept["error"]
+    assert kept["result"]["restored"] is False and kept["result"]["stopped"] is False
+    evidence = torn.parent / "abort" / "timers.json"
+    assert kept["result"]["retained"] == str(evidence) and not torn.exists()
+    assert evidence.read_text().startswith('{"timers": [') and _private(evidence) == 0o600
+    marker = state.load_record(torn.parent / "timers.restored.json")
+    assert marker["stopped"] is False and marker["retained"] == str(evidence)
+    assert quiesce._unrestored(world.root("titan")) == []
+    world.behave("titan", timers={})
+    later = _execute("titan", "timer-record", {"window_id": "20261020T140000Z-0badf00f"}, 7)
+    assert later["status"] == "completed", later["error"]
+    # A restore without saying whether timers were stopped is refused before it runs.
+    with pytest.raises(hosts.Refused):
+        world.request("titan", "timer-restore", {"window_id": WINDOW})
