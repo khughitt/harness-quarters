@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/relay-cutover
 created: 2026-10-20T01:37:42Z
-updated: 2026-10-20T01:40:58Z
+updated: 2026-10-20T01:41:11Z
 started: 2026-10-20T01:40:58Z
 depends: []
 parent: hq-539508
@@ -30,3 +30,4 @@ Done: new Claude evidence proves the required routes at the exact installed vers
 - 2026-10-20T01:38:43Z (feat/relay-cutover): concerns: hq-33116d change — Europa's operator update installed Claude 2.1.304; evidence for the formerly installed 2.1.302 must be refreshed before cutover.
 - 2026-10-20T01:40:58Z (feat/relay-cutover): started
   provenance: {"harness_session":"codex:01a156f7-6259-7d63-93ed-4c23e04ca74c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-20T01:41:11Z (feat/relay-cutover): arm: flow-trial-1 — unit tack-539508 — flow off
