@@ -2835,18 +2835,72 @@ def test_recovery_signal_is_retried_by_reconciliation(cutover):
         ("titan", "dependency-restore"), ("europa", "dependency-restore")]
 
 
+def _unsettled_wait(world, record, *, kill_owner):
+    """One of this window's own operations left unfinished on Europa: a timer wait still
+    running, or one whose owner was killed while its recorded child still runs."""
+    world.behave("europa", timers={"wait": "latch"})
+    mark = len(world.lines("observed"))
+    operation_id, client = hosts.start_request("europa", "live", "timer-wait", {
+        "window_id": record["id"], "record_sha256": record["timers"]["europa"]["sha256"]},
+        timeout=60)
+    transport._until(lambda: any(call["host"] == "europa" and call["args"][:1] == ["wait"]
+                                 for call in observed(world, "quiesce-timers", mark)))
+    hosts._abandon(client)  # closing the client is not cancellation: the wait keeps running
+    directory = world.root("europa") / "operations" / operation_id
+    if kill_owner:
+        owner = state.load_record(directory / "start.json")["owner"]
+        os.kill(owner["pid"], signal.SIGKILL)
+        transport._until(lambda: transport._gone(owner["pid"], owner["start_time"]))
+    return operation_id, directory
+
+
+def _settle_wait(world, directory, killed):
+    """Release the fixture wait and let its child, or the whole operation, finish."""
+    Path(world.config["latch"]).touch()
+    if killed:
+        for child in state.load_record(directory / "children.json")["children"]:
+            transport._until(lambda: transport._gone(child["pid"], child["start_time"]))
+    else:
+        transport._until(lambda: (directory / "done.json").exists())
+
+
 @needs_zsh
-def test_reconcile_promotes_only_a_verified_migration(cutover, monkeypatch):
+@pytest.mark.parametrize("unsettled", [None, "running", "owner-lost"])
+def test_reconcile_promotes_only_a_verified_migration(cutover, monkeypatch, unsettled):
     """The run died writing its verified checkpoint. Reconciliation proves the migration from
-    actual state on both hosts, reading only, and only then names the surface retry."""
+    actual state on both hosts, reading only, and only then names the surface retry. Beside one
+    of this window's own operations still running, or whose owner died while its child runs, it
+    never promotes: it cancels nothing, requires recovery and names the complete command."""
     cutover.start_dropbox()
     _, record = _failed_run(cutover, monkeypatch, kill=lambda changes: changes.get(
         "state") == "migrated-surfaces-pending")
     assert record["state"] == "applying" and "verified" not in record
     assert "failure" not in record and len(record["applied"]) == 4
     assert window.status()["next"] == ["recover"]  # status alone never promotes
+    if unsettled is not None:
+        operation_id, directory = _unsettled_wait(cutover, record,
+                                                  kill_owner=unsettled == "owner-lost")
     mark, mutations = len(cutover.lines("observed")), _mutations(cutover)
-    report = recovery.reconcile_window(record)
+    try:
+        report = recovery.reconcile_window(record)
+    finally:
+        if unsettled is not None:
+            cancelled = (directory / "cancel.json").exists()
+            _settle_wait(cutover, directory, unsettled == "owner-lost")
+    if unsettled is not None:
+        assert not cancelled  # reconciliation cancelled nothing
+        assert (report["class"], report["next"]) == ("recovery-required", ["recover"])
+        assert any(operation_id in blocker and unsettled in blocker
+                   for blocker in report["blockers"])
+        assert operation_id in report["observed"]
+        assert cli.command_line(["recover"]) in report["observed"]
+        assert "Do not open Claude or Codex" in report["observed"]
+        record = state.current_window(cutover_root(cutover))
+        assert record["state"] == "recovery-required" and "verified" not in record
+        assert record["failure"]["status"] == "unsettled"
+        assert _mutations(cutover) == mutations
+        assert window.status()["next"] == ["recover"]
+        return
     assert (report["class"], report["next"]) == ("verified", ["restart-surfaces"])
     record = state.current_window(cutover_root(cutover))
     assert record["state"] == "migrated-surfaces-pending"
@@ -2860,10 +2914,11 @@ def test_reconcile_promotes_only_a_verified_migration(cutover, monkeypatch):
 
 @needs_zsh
 def test_reconcile_unverified_run_blocks_fresh_sessions(cutover, monkeypatch, capsys):
-    """The run died after Titan applied codex but before the window recorded it. An unreachable
-    host, then a remote operation still running, block reconciliation and every recovery
-    mutation. Settled, reconciliation finds the migration unverified, blocks fresh sessions and
-    names the complete recover command; recovery restores codex from its unrecorded apply."""
+    """The run died after Titan applied codex but before the window recorded it. With Europa
+    unreachable its operations are unknown, so reconciliation cannot verify the migration: it
+    requires recovery, blocks fresh sessions and names the complete recover command. A remote
+    operation still running blocks every recovery mutation; once it finishes, recovery restores
+    codex from its unrecorded apply."""
     cutover.start_dropbox()
     native = (_targets(cutover), _modules(cutover))
     root = cutover_root(cutover)
@@ -2876,16 +2931,16 @@ def test_reconcile_unverified_run_blocks_fresh_sessions(cutover, monkeypatch, ca
     cutover.config["unreachable"] = True
     cutover.save()
     report = recovery.reconcile_window(record)
-    assert (report["class"], report["next"]) == ("unsettled", ["status"])
+    assert (report["class"], report["next"]) == ("recovery-required", ["recover"])
     assert any(blocker.startswith("europa:") for blocker in report["blockers"])
-    assert state.current_window(root) == record
+    record = state.current_window(root)
+    assert record["state"] == "recovery-required" and "verified" not in record
+    assert record["failure"]["status"] == "unsettled" and "europa" in record["failure"]["error"]
     cutover.config["unreachable"] = False
     cutover.save()
-
-    report = recovery.reconcile_window(record)
+    report = recovery.reconcile_window(record)  # settled now, and still recovery-required
     assert (report["class"], report["next"]) == ("recovery-required", ["recover"])
-    record = state.current_window(root)
-    assert record["state"] == "recovery-required" and "codex-work" in record["failure"]["error"]
+    assert state.current_window(root) == record
     capsys.readouterr()
     assert cli.main(["status"]) == 0
     out = capsys.readouterr().out
