@@ -4,7 +4,7 @@ title: "session-episodes reads only the default Claude projects store and Codex 
 status: idea
 priority: 2
 created: 2026-10-20T11:19:18Z
-updated: 2026-10-20T18:09:22Z
+updated: 2026-10-20T18:09:23Z
 depends: [hq-a1c591, hq-de3e4c]
 parent: hq-cff824
 tags: [feedback, gap, "from:lore"]
@@ -26,3 +26,4 @@ Found while checking whether stamped friction reports can be traced to their ori
 - 2026-10-20T16:34:45Z (main): scope addendum 2026-10-20: the user proposed an hq logs / hq trace CLI with a usage skill; survey hq-de3e4c now precedes the locate-owner decision, which folds into that CLI's design; hq-a1c591 (obs index coverage) remains an input
 - 2026-10-20T17:30:21Z (docs/logs-survey): hq-de3e4c research input: docs/notes/2026-10-20-session-log-survey.md and the brief section 7 classify 183 episodes. Formats/behavior dominate; 64 need historical tool outputs, 32 parent links. Recommend search+show with metadata/raw streams, role filtering, paired results and coverage; trace composes typed evidence. No new find verb justified. Location ownership still depends on hq-a1c591; incorporate both results in the CLI design.
 - 2026-10-20T17:45:51Z (docs/logs-survey): correction to hq-de3e4c preliminary parent count: raw re-audit confirms18 relationship episodes, including8 child-to-parent and12 parent-to-child (2 both). Only6 combine reverse binding with historical outputs. The corrected sample is183 episodes /1093 calls;64 need historical outputs. Use final report section Roles/evidence, not the earlier32 preliminary parent flags.
+- 2026-10-20T18:09:23Z (main): Follow-up review: hq-6e5d88 now derives portable semantic acceptance cases from the completed survey; use them for search/show and evidence-link requirements. Avoid a duplicate CLI design task: this idea already owns that design after hq-a1c591. Reconcile it with the accepted boundary work ops-630a87 and obs-f5710b: obs is to own content parsing and session-logs, hq location/lifecycle and harness-version store samples. The transfer is deferred to 2027-02-17 after flow-trial-1 readout; parser ownership, the consumer interface and any effect on enrolled sessions or measurement are explicit design checks. The new corpus is data-only and does not execute that transfer. Automated trace precision still needs evaluation before a precision claim; a single surveyed batch is insufficient.
