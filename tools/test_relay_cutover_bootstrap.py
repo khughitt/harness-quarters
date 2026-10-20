@@ -2085,6 +2085,14 @@ class TestRun:
             assert before[-1] == 0
             if host == "europa":
                 assert before[0] != 0 and len(before) >= 2
+        # Both hosts are checked closed right before each host's install step.
+        sends = [entry for _, entry in _sends(migrated.requests)]
+        installs = [index for index, entry in enumerate(sends)
+                    if entry["operation"] == "familiar-install"]
+        assert [sends[index]["host"] for index in installs] == list(HOSTS)
+        for index in installs:
+            assert [(sent["host"], sent["operation"]) for sent in sends[index - 2:index]] == [
+                ("titan", "no-live"), ("europa", "no-live")]
         titan_install = next(index for index, call in enumerate(calls) if call["tool"] == "npm"
                              and call["args"][:1] == ["ci"])
         assert all(call["host"] == "titan" for call in calls[:titan_install]
@@ -2231,6 +2239,7 @@ def test_dry_mismatch_aborts_before_merge(cutover, monkeypatch, case):
     assert record["state"] == "aborted" and "familiar" not in record
     assert {host: record["abort"]["hosts"][host]["complete"] for host in HOSTS} == {
         "titan": True, "europa": True}
+    assert record.get("earlier_aborts", []) == []  # aborted once, never again by the run
     # Both timer and snapshot windows are undone; familiar stays at PRE and no live target,
     # ledger entry or merge marker was written.
     assert timers_active(cutover) == {"titan": "active", "europa": "active"}
@@ -2287,6 +2296,73 @@ def test_sync_timeout_requires_recovery(cutover):
 
 
 @needs_zsh
+def test_sync_wait_rechecks_closure_before_install(cutover):
+    """A Claude session opened on Europa while its install waits for the merge to arrive stops
+    the install: closure is checked again after the wait, right before npm ci."""
+    polled, opened = _europa_polled(cutover, cutover.pins["familiar_pre"]), []
+    claude = os.path.realpath(cutover.home("europa") / ".local/bin/claude")
+
+    def hold():
+        if not opened and polled():
+            config = json.loads(cutover.config_path.read_text())
+            config["hosts"]["europa"]["rows"].append({
+                "pid": 3900701, "start_time": 81, "comm": "claude", "exe": claude,
+                "argv": ["claude"], "held": False})
+            temp = cutover.config_path.with_name("config.json.dropbox")
+            temp.write_text(json.dumps(config, indent=2))
+            os.replace(temp, cutover.config_path)  # fixture tools never read a partial file
+            opened.append(True)
+        return bool(opened)
+
+    prepared = preparation.prepare(SESSION)
+    cutover.start_dropbox(hold=hold)
+    opened_window = window.open_window(prepared)
+    consumed = run_decision(prepared, opened_window)
+    with pytest.raises(window.Failed) as raised:
+        window.run_window(prepared, consumed)
+    failed = raised.value
+    assert (failed.step, failed.host, failed.status) == ("familiar-install", "europa", "failed")
+    assert "3900701" in failed.error and failed.next_command == ["recover"]
+    record = state.current_window(cutover_root(cutover))
+    assert record["state"] == "recovery-required" and opened
+    # Europa's source did reach the merge; only the session it found then stopped the install.
+    merged = record["familiar"]["merge"]
+    assert [transport.familiar_head(cutover.home(host)) for host in HOSTS] == [merged, merged]
+    installs = [call["host"] for call in observed(cutover, "npm") if call["args"][:1] == ["ci"]]
+    assert installs == ["titan"] and list(record["dependencies"]) == ["titan"]
+    assert state.read_ledger(record) == []
+
+
+@needs_zsh
+def test_dry_precondition_after_quiesce_aborts(cutover, monkeypatch):
+    """dry_targets refuses a window whose prepared record it cannot read; in a run, that
+    refusal after quiescence still takes the pre-merge abort on every recorded host."""
+    def corrupt(world):
+        current = state.current_window(cutover_root(world))
+        (Path(current["directory"]) / "prepared.json").write_bytes(b"{not json")
+
+    _after("quiesce_window", corrupt)(cutover, monkeypatch)
+    prepared = preparation.prepare(SESSION)
+    opened = window.open_window(prepared)
+    consumed = run_decision(prepared, opened)
+    with pytest.raises(window.Failed) as raised:
+        window.run_window(prepared, consumed)
+    failed = raised.value
+    assert (failed.step, failed.host) == ("target-dry", "titan")
+    assert "prepared.json" in failed.error
+    assert "aborted" in failed.observed and failed.next_command == ["run"]
+    record = state.current_window(cutover_root(cutover))
+    assert record["state"] == "aborted" and "familiar" not in record
+    assert {host: record["abort"]["hosts"][host]["complete"] for host in HOSTS} == {
+        "titan": True, "europa": True}
+    assert timers_active(cutover) == {"titan": "active", "europa": "active"}
+    assert not (cutover.root("titan") / "dry" / record["id"]).exists()
+    # The abort ran once: no earlier abort record, and no dry run was sent.
+    assert record.get("earlier_aborts", []) == []
+    assert not any(attempt["step"] == "target-dry" for attempt in record["attempts"])
+
+
+@needs_zsh
 def test_bootstrap_run_needs_the_operator_decision(cutover, monkeypatch, capsys):
     prepared = preparation.prepare(SESSION)
     mark, root = len(cutover.lines("observed")), cutover_root(cutover)
@@ -2298,11 +2374,14 @@ def test_bootstrap_run_needs_the_operator_decision(cutover, monkeypatch, capsys)
         assert code == 1 and record["state"] == "aborted" and record["abort"]["hosts"] == {}
         return stderr, record
 
-    # Without a terminal or a decision file, run stops with instructions before any change.
+    # Without a terminal, run stops before any change: it is operator-run, from an ordinary
+    # terminal, and no decision file can stand in for the operator's answer.
     monkeypatch.setattr(cli, "TTY", str(cutover.tmp / "no-terminal"))
     stderr, first = run()
     assert "run stopped" in stderr and "step: decision" in stderr
-    assert "--decision-file" in stderr and "terminal" in stderr
+    assert "operator-run" in stderr and "ordinary terminal" in stderr
+    assert "every Claude and Codex session closed" in stderr
+    assert "decision-file" not in stderr and "decision file" not in stderr
     # A declined answer on the terminal authorizes nothing.
     master, slave = os.openpty()
     try:
@@ -2314,13 +2393,35 @@ def test_bootstrap_run_needs_the_operator_decision(cutover, monkeypatch, capsys)
         os.close(slave)
     assert "declined" in stderr and second["id"] != first["id"]
     monkeypatch.setattr(cli, "TTY", str(cutover.tmp / "no-terminal"))
-    # A recorded decision for another window cannot authorize this one.
-    stale = transport._stage(cutover.tmp, "decision.json", json.dumps({
-        "schema": 1, "kind": "desktop", "action": window.RUN_ACTION, "window_id": first["id"],
-        "attempt_id": window.RUN_ATTEMPT, "subject_sha256": sha(window.run_subject(prepared)),
-        "verdict": "approved", "source": {
-            "type": "session", "session_id": SESSION, "ask": "Restart the surfaces?",
-            "reply": "yes", "answered_at": datetime.now(timezone.utc).isoformat()}}).encode())
-    stderr, third = run("--decision-file", str(stale))
-    assert "window_id" in stderr and third["id"] not in (first["id"], second["id"])
+
+    def recorded_reply(window_id, action, attempt, subject, name):
+        return transport._stage(cutover.tmp, name, json.dumps({
+            "schema": 1, "kind": "desktop", "action": action, "window_id": window_id,
+            "attempt_id": attempt, "subject_sha256": sha(subject), "verdict": "approved",
+            "source": {"type": "session", "session_id": SESSION, "ask": "Restart the surfaces?",
+                       "reply": "yes",
+                       "answered_at": datetime.now(timezone.utc).isoformat()}}).encode())
+
+    # run takes no decision file at all: the option does not exist and no window opens.
+    stale = recorded_reply(first["id"], window.RUN_ACTION, window.RUN_ATTEMPT,
+                           window.run_subject(prepared), "run-decision.json")
+    with pytest.raises(SystemExit) as raised:
+        cli.main(["run", "--decision-file", str(stale)])
+    assert raised.value.code == 2
+    assert "unrecognized arguments: --decision-file" in capsys.readouterr().err
+    assert state.current_window(root) == second
+    # The decision-file route stays for a window that already exists, as Task 6's
+    # restart-surfaces needs: a record for another window is refused, a matching one consumed.
+    opened = window.open_window(prepared)
+    subject = {"hosts": ["titan"], "surfaces": ["familiar-niri-watch"]}
+    other = recorded_reply(first["id"], "restart-surfaces", "restart-1", subject, "other.json")
+    with pytest.raises(Stop, match="window_id"):
+        cli.acquire_decision(opened, action="restart-surfaces", attempt_id="restart-1",
+                             subject=subject, decision_file=str(other))
+    mine = recorded_reply(opened["id"], "restart-surfaces", "restart-1", subject, "mine.json")
+    consumed = cli.acquire_decision(opened, action="restart-surfaces", attempt_id="restart-1",
+                                    subject=subject, decision_file=str(mine))
+    assert consumed["subject_sha256"] == sha(subject)
+    assert consumed["decision"]["source"]["type"] == "session"
+    assert window.abort_window(state.current_window(root))["hosts"] == {}
     assert observed(cutover, since=mark) == [] and not (root / "quiesce").exists()

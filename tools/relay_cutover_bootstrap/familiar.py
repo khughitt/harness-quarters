@@ -9,7 +9,8 @@ dry runs and the familiar mark:
   branch name, with `git merge --no-ff --no-edit`. The result must be a clean tree whose commit
   has exactly PRE and the tip as parents.
 - `familiar-install` (both hosts): waits a bounded time for the merge to synchronize into this
-  host's checkout, proved by `familiar-source --head MERGE`. Only then does it run
+  host's checkout, proved by `familiar-source --head MERGE`. Every harness must be closed both
+  before that wait and after it, right before the install. Only then does it run
   `/usr/bin/npm ci --allow-git=root` in the checkout, with the prepared install PATH (`/usr/bin`
   first, so npm's env-node shebang finds the system node) and every prepared cache prefix pinned
   explicitly: `npm_config_cache` to npm's prepared cache, each inherited cache variable to its
@@ -144,6 +145,7 @@ def familiar_install(context):
     path = _install_path(payload["path"])
     pinned = _caches(context, payload["caches"])
     waited = _synchronized(context, payload["merge"])
+    targets.closed(context)  # the wait can be long: a harness opened meanwhile still refuses
     env = hosts.claude_hold_env(hosts._child_env(context))
     for key in inventory.CACHE_KEYS:
         env.pop(key, None)
