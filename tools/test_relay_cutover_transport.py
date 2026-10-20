@@ -14,12 +14,13 @@ import signal
 import stat
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
 import pytest
 
-from relay_cutover_bootstrap import hosts, state
+from relay_cutover_bootstrap import hosts, inventory, operations, state
 from relay_cutover_bootstrap.state import Stop
 
 TOOLS_DIR = Path(__file__).resolve().parent
@@ -55,7 +56,7 @@ def _seconds(value):
 KEYS = {"latch": _latch, "seconds": _seconds, "timeout": _seconds}
 
 
-def register(hosts):
+def register(hosts, operations):
     def step(context):
         payload = context["payload"]
         runs = Path(context["home"]) / "fixture-runs.log"
@@ -69,30 +70,30 @@ def register(hosts):
         return {"runs": len(runs.read_text().splitlines()), "exit": child.returncode}
 
     for name, deadline in (("fixture-step", 60), ("fixture-short", CONFIG["short_deadline"])):
-        hosts.OPERATIONS[name] = hosts.Operation(
+        operations.OPERATIONS[name] = hosts.Operation(
             run=step, deadline=deadline, mutation=True, payload=KEYS,
             required=frozenset({"latch", "seconds"}))
 
 
-def install(hosts):
+def install(hosts, inventory, operations):
     host = CONFIG["by_home"][os.environ["HOME"]]
     spec = CONFIG["hosts"][host]
     hosts._nodename = lambda: host
     hosts.TOOLS.update(CONFIG["tools"])
     rows = spec["rows"]
-    hosts._process_rows = lambda: [{key: value for key, value in row.items() if key != "held"}
-                                   for row in rows]
+    inventory._process_rows = lambda: [
+        {key: value for key, value in row.items() if key != "held"} for row in rows]
     holds = {row["pid"]: row.get("held") for row in rows}
-    hosts._hold = holds.get
-    register(hosts)
+    inventory._hold = holds.get
+    register(hosts, operations)
 '''
 
 FIXTURE_ENTRY = r'''#!/usr/bin/python3 -B
 import sys
 sys.path.insert(0, "@FIXTURE@")
 import fixture_remote
-from relay_cutover_bootstrap import hosts
-fixture_remote.install(hosts)
+from relay_cutover_bootstrap import hosts, inventory, operations
+fixture_remote.install(hosts, inventory, operations)
 sys.exit(hosts.serve())
 '''
 
@@ -275,10 +276,10 @@ DRIVER = r'''
 import json, sys
 sys.path.insert(0, "@TOOLS@")
 sys.path.insert(0, "@FIXTURE@")
-from relay_cutover_bootstrap import hosts
+from relay_cutover_bootstrap import hosts, operations
 import fixture_remote
 hosts.TOOLS["ssh"] = "@SSH@"
-fixture_remote.register(hosts)
+fixture_remote.register(hosts, operations)
 try:
     hosts.request("europa", "live", "fixture-step", {"latch": "@LATCH@", "seconds": 600},
                   timeout=120)
@@ -375,7 +376,7 @@ class World:
             monkeypatch.delenv(key, raising=False)
         monkeypatch.setitem(hosts.TOOLS, "ssh", str(self.ssh))
         for name in ("fixture-step", "fixture-short"):
-            monkeypatch.setitem(hosts.OPERATIONS, name, hosts.Operation(
+            monkeypatch.setitem(operations.OPERATIONS, name, hosts.Operation(
                 run=_never, deadline=60, mutation=True,
                 payload={"latch": _latch, "seconds": _seconds, "timeout": _seconds},
                 required=frozenset({"latch", "seconds"})))
@@ -733,10 +734,10 @@ def test_owned_process_cleanup(world):
     client.wait(timeout=30)
     _until(lambda: _gone(owner["pid"], owner["start_time"]))
     europa = {"host": "europa", "mode": "live"}
-    assert hosts.reconcile_operation(europa, operation_id)["state"] == "interrupted"
+    assert hosts.reconcile_operation(europa, operation_id)["state"] == "owner-lost"
     assert not _gone(*child) and not _gone(*grandchild)
     blocked = world.request("europa", "fixture-step", {"latch": "-", "seconds": 0})
-    assert blocked["status"] == "refused" and "interrupted" in blocked["error"]
+    assert blocked["status"] == "refused" and "owner-lost" in blocked["error"]
     cancel = world.request("europa", "operation-cancel", {"operation_id": operation_id})
     assert cancel["result"]["state"] == "interrupted"
     assert _all_gone(child, grandchild)
@@ -744,6 +745,37 @@ def test_owned_process_cleanup(world):
     assert done["response"]["status"] == "interrupted"
     assert world.request("europa", "fixture-step",
                          {"latch": "-", "seconds": 0})["status"] == "completed"
+
+
+def test_lost_owner_is_unsettled_and_names_cancel(world):
+    killed = {}
+
+    def kill_owner():
+        family = _family(world, 0)
+        start = next((world.root("europa") / "operations").glob("*/start.json"))
+        owner = json.loads(start.read_text())["owner"]
+        os.kill(owner["pid"], signal.SIGKILL)
+        killed.update(family=family, operation_id=start.parent.name)
+
+    killer = threading.Thread(target=kill_owner)
+    killer.start()
+    try:
+        with pytest.raises(hosts.Unsettled) as raised:
+            world.request("europa", "fixture-step", {"latch": "-", "seconds": 600})
+    finally:
+        killer.join(timeout=30)
+    error = raised.value
+    assert not isinstance(error, hosts.Interrupted)
+    assert error.operation_id == killed["operation_id"]
+    assert error.remote["state"] == "owner-lost" and error.remote["response"] is None
+    assert "operation-cancel" in str(error) and "may still be running" in str(error)
+    child, grandchild = killed["family"]
+    assert not _gone(*child) and not _gone(*grandchild)
+    assert not (world.root("europa") / "operations" / error.operation_id / "done.json").exists()
+    cancel = world.request("europa", "operation-cancel", {"operation_id": error.operation_id})
+    assert cancel["result"]["state"] == "interrupted"
+    assert cancel["result"]["response"]["status"] == "interrupted"
+    assert _all_gone(child, grandchild)
 
 
 def _driver(world):
@@ -1075,12 +1107,12 @@ def test_process_table_reads_only_the_hold_key():
     held = subprocess.Popen(["/usr/bin/sleep", "30"], env={**env, "DISABLE_UPDATES": "1"})
     plain = subprocess.Popen(["/usr/bin/sleep", "30"], env=env)
     try:
-        rows = {row["pid"]: row for row in hosts._process_rows()}
+        rows = {row["pid"]: row for row in inventory._process_rows()}
         assert rows[held.pid]["argv"] == ["/usr/bin/sleep", "30"]
         assert rows[held.pid]["comm"] == "sleep"
         assert rows[held.pid]["start_time"] == _proc(held.pid)[1]
         assert ENV_SECRET not in json.dumps([rows[held.pid], rows[plain.pid]])
-        assert hosts._hold(held.pid) is True and hosts._hold(plain.pid) is False
+        assert inventory._hold(held.pid) is True and inventory._hold(plain.pid) is False
     finally:
         for process in (held, plain):
             process.kill()
@@ -1097,7 +1129,7 @@ def test_signal_while_recording_start_cancels(world, monkeypatch):
 
     ran = []
     monkeypatch.setattr(hosts, "_begin", begin_then_signal)
-    monkeypatch.setitem(hosts.OPERATIONS, "fixture-quick", hosts.Operation(
+    monkeypatch.setitem(operations.OPERATIONS, "fixture-quick", hosts.Operation(
         run=lambda context: ran.append(context["operation_id"]) or {}, deadline=10,
         mutation=False))
     handler, mask = signal.getsignal(signal.SIGINT), signal.pthread_sigmask(signal.SIG_BLOCK, [])
