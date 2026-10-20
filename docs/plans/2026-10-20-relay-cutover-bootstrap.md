@@ -18,7 +18,7 @@ existing relay v0.1.1, Git/npm, systemd user bus and niri IPC. No new dependency
 **Spec:** `.worktrees/relay-cutover/docs/specs/2026-10-20-operator-runbooks-design.md`
 (approved for planning after round 6; frozen predecessor `07acc26`).
 **Task:** hq-c6c847; parent hq-539508; blocked original window hq-f27918.
-**Status:** revised after plan round 2 at `20c574b`; awaiting human plan re-review.
+**Status:** revised after plan round 3 at `be9fbdb`; awaiting human plan re-review.
 No implementation or new window run.
 **Execution:** preserve the user's subagent-driven choice. Work in the existing
 locked, hydrated `.worktrees/relay-cutover/`; do not create another hq worktree.
@@ -73,8 +73,12 @@ recovery again as setup. Keep the existing plan workspace and all review evidenc
 - Familiar PRE is `00f4899ae523d613d21f44bfc2c456aac67f8e5f`; feature tip is
   `a16f4daa59b04e32f1010764d6f94401ca4eed8b`. Merge that immutable tip, never a
   moving branch. Familiar-theme keeps its existing SSH pin and Git configuration.
-- Evidence must exactly match installed `2.1.304 (Claude Code)` on both hosts and
-  `codex-cli 0.163.0` on Titan. Drift stops for fresh proof, never auto-update.
+- Claude evidence must exactly match the same installed version on both hosts.
+  `2.1.304 (Claude Code)` is the current reviewed baseline, not a permanent pin.
+  Task 9 refreshes/reviews proof for the selected actual version if it has moved.
+  Hold every cutover/probe/diagnostic/smoke launch with `DISABLE_UPDATES=1` from
+  final readiness through finish. Codex remains exactly `codex-cli 0.163.0` unless
+  separately re-probed/reviewed. Never silently update a host or relax equality.
 - Scope: Claude personal/work on Titan and Europa; Codex personal/work on Titan.
   All four settings targets are shared: apply once on Titan, verify synchronized
   bytes on Europa. Dependencies, registries, snapshots and worktrees are host-local.
@@ -210,31 +214,64 @@ After apply/sync, check exact bytes against that output. Unknown drift after mer
 still requires recovery/inspection. Original reviewed images/provenance and rollback
 artifacts remain immutable. Hooks/statusLine verification remains parsed.
 
-`prepare --stage-review` is the explicit structural-drift path: regenerate on
-copies, retain new before-images, guard snapshots, plans/artifacts and candidate
-after-images as a private review bundle; do not activate it or run live. After a
-real review, `prepare --reviewed-bundle DIR --review-ref REF` validates the binding
-below before using the new structural baseline. Never accept non-pick drift merely
-because new hashes were computed. The closed-harness six dry runs still repeat;
-reviewing a candidate does not replace that window's exact-byte proof.
+For non-pick drift, `prepare` refuses with `input-review-required` and names the
+existing original Task 6 procedure. The agent regenerates before/after images,
+guard snapshots and installer plans/artifacts **on copies**, obtains their review,
+records the actual review note/full report, then stages a new protected input
+generation and expected-image manifest on both hosts. Keep previous generations
+and all active-window rollback originals untouched. The tool checks the designated
+manifest's paths, member hashes, pins and reviewed-baseline comparison; it neither
+creates approval nor queries/interprets task-note/report bindings. Never adopt the
+current file merely by recomputing hashes. Rerun `prepare` and all six closed-harness
+dry runs after the reviewed inputs are staged. No structural-review CLI flags or
+custom review-reference resolver are needed.
 
-`REF` has format `<task-id>@<note-at>#<sha256-of-UTF8-note-text>` and identifies exactly
-one existing binding note returned by `tasks show <task-id>`:
-`image-review: accept; bundle-sha256=<manifest-digest>; review-note=<accepted-review-note-ref>; report=<private-relative-path>; report-sha256=<report-digest>`.
-The immutable bundle manifest names its owning task, every before/after/plan/artifact
-path+hash and pins/helper identities. Its raw SHA256 is the reviewed bundle digest.
-The report is separate evidence, not a manifest member, avoiding a circular digest;
-its path is relative to the protected cutover root and its hash is in the binding
-note. That note must name the exact bundle digest/task;
-its referenced standard `review: impl round ... — verdict: accept; ...` note must
-exist uniquely on the same task, and the full report's digest must match. Save
-that real returned review and standard review note before writing its binding note.
-Check all manifest members and report bytes, references and accepted verdict;
-use the latest binding decision for that exact bundle (later revise/revoke refuses).
-Missing/ambiguous/invented references, a revise/revoked decision, changed bundle or
-wrong task/digest refuse. Do not treat a supplied flag or an unrelated acceptance
-as review. This validates persisted review evidence, not transcript authorship;
-transcript verification remains explicitly deferred below.
+### Claude update hold and evidence refresh
+
+Use the documented process environment `DISABLE_UPDATES=1`, which blocks automatic
+and manual updates, rather than changing any settings/env entry in the four targets
+or editing `~/.claude.json`/shared launchers. Preserve the parent's existing
+environment/update policy: ordinary terminal launches after finish use their prior
+policy; already-held sessions stay held until exit. Do not unset an existing user/admin policy.
+Sources: [update controls](https://code.claude.com/docs/en/setup#disable-auto-updates)
+and [environment reference](https://code.claude.com/docs/en/env-vars).
+
+This is a scoped hold, not a machine-wide installation lock. Before final readiness,
+close unheld Claude sessions/updaters on both hosts and require no-live Claude.
+From then through finish, use only the printed held commands for every Claude
+probe/help/version/doctor/personal/work/smoke launch. Apply the flag inside the
+remote helper's child environment; SSH need not forward it. Print Codex resume/
+work-home launches with the flag too so their tool children inherit it. Do not run
+unheld Claude/IDE clients, update/install commands or external installers meanwhile.
+If ordinary use resumes before the window, invalidate readiness and repeat Task 9.
+
+In both Claude homes on each host, verify the installed version and `claude doctor`
+under that environment and require its auto-update-disabled diagnostic. Record the
+selected version, executable/resolved binary digest and hold check in prepared
+inputs. Known live Claude processes must match that identity and have the hold
+flag; inspect only that key for owned PIDs, never output their environments. Unknown
+or unheld launches invalidate readiness. A mere flag in a manifest is not proof
+that the executable honors it. If the hold cannot be established, do not open a
+window or pause timers.
+
+Task 9 explicitly compares actual versions with evidence. If they differ, align the
+two hosts to one operator-approved installed version (no automatic update/downgrade),
+then repeat the original plan's Task 3 ops probe/review procedure before handoff.
+Use `env DISABLE_UPDATES=1` for the probe so its isolated Claude children inherit
+the hold. Refresh evidence in an ops worktree, review it, land the reviewed docs
+on ops main, verify both hosts' installer acceptance and refresh the private input/
+helper manifest. If capabilities change images, follow original Task 6 review above.
+Any further pre-window drift repeats this readiness loop, not an exception to exact
+version checks. Existing identical-version proof may be retained once the hold is
+verified; a moved version always needs new proof/review.
+
+An unexpected move after bootstrap is a hold breach: stop new smokes, report the
+paused timer state and require ordinary-shell full recovery before a fresh Task 9
+readiness pass. `recover` must still work with stale Claude evidence: it uses strict
+no-live, pinned relay rollback and byte/Git/dependency proofs, without launching
+Claude or requiring its installed version to equal the obsolete evidence. Restore
+native state and original timers first; do not leave timers paused waiting for an
+in-place re-probe or add automatic mid-window evidence acceptance.
 
 **Until `finish` reports complete, do not change/save Claude model or effort defaults
 in either home on either host, including through `/model` or `/effort`.** Print this
@@ -387,6 +424,7 @@ that host's HOME; no caller-controlled live root/helper overrides.
 `request(host: str, mode: str, operation: str, payload: dict, *, timeout: float) -> dict`,
 `execute(context: dict, operation: str, payload: dict) -> dict`,
 `inventory(context: dict) -> dict`, `reconcile_operation(context: dict, operation_id: str) -> dict`,
+`claude_hold_env(base: dict) -> dict` (copy with DISABLE_UPDATES=1; never mutate base),
 `start_request(host: str, mode: str, operation: str, payload: dict, *, timeout: float)
 -> tuple[str, subprocess.Popen]`. `request` wraps `start_request` with bounded
 collection/cleanup; the rehearsal owns the returned handle when testing disconnect.
@@ -395,8 +433,8 @@ and payload. Status/cancel identify that operation; no arbitrary PID is accepted
 The remote executable reads one complete bounded request, writes its durable start
 record, outputs one final sanitized JSON response, and keeps full logs private.
 
-- [ ] **Step 1:** Write `test_remote_payload_is_data`, `test_operation_reply_loss`
-  and `test_owned_process_cleanup` with a fake SSH executable and
+- [ ] **Step 1:** Write `test_remote_payload_is_data`, `test_operation_reply_loss`,
+  `test_owned_process_cleanup` and `test_claude_hold_env_is_scoped` with a fake SSH executable and
   throwaway homes/repos. Assert the remote command is a fixed Zsh-safe entry
   `exec /usr/bin/python3 -B ~/d/hq/tools/relay-cutover-host`, invoked with `ssh -4 -o BatchMode=yes europa`;
   roots/argv never enter the shell string. Reject unknown hosts, operations, mode,
@@ -411,9 +449,15 @@ record, outputs one final sanitized JSON response, and keeps full logs private.
   Expected RED. Add fixtures for missing USER/user bus, absent SSH_AUTH_SOCK with
   working Git credentials, failed actual pinned-source access, ambiguous desktop
   socket, explained absent surfaces, helper hash drift and unfamiliar executable.
+  A failed/missing doctor disabled-update diagnostic or unheld process rejects
+  readiness; the recorded flag alone cannot pass.
 - [ ] **Step 3:** Implement only transport/schema/process ownership, inventory,
   read-only prerequisite probes, operation-status and explicit operation-cancel.
-  Inventory records the toolchain/cache contract above, user bus, Git auth and
+  Route Claude diagnostics/children through `claude_hold_env`, including remote
+  operations; never rely on SSH forwarding the variable. Tests cover inheritance,
+  unchanged parent env, both homes and refusal of unknown/unheld owned Claude PIDs
+  without exposing other environment keys. Inventory records the version/hold,
+  toolchain/cache contract above, user bus, Git auth and
   trusted desktop context. `git ls-remote` probes access; the pilot proves install
   of the actual pinned source. Unknown/unimplemented operations refuse before writes.
   Timer/snapshot operations are added with Task 3 tests, merge/install/target apply
@@ -442,25 +486,25 @@ transport tests. Reuse filter key authority; do not modify the filter itself.
 **Interfaces:**
 
 - Consumes: Tasks 1–2 state, inventory and request interfaces; reviewed input policy above.
-- Produces: window functions `prepare(controller_session: str, *,
-reviewed_bundle: Path | None=None, review_ref: str | None=None) -> dict`,
+- Produces: window functions `prepare(controller_session: str) -> dict`,
 `check(prepared: dict) -> dict`, `quiesce_window(prepared: dict, decision: dict) -> dict`,
 `abort_window(window: dict) -> dict`; CLI `main(argv: list[str]) -> int` for
-prepare/check/status for eligibility and existing reviewed-bundle validation.
-Task 4 adds installer-generated review staging and the closed-harness dry-run gate;
+prepare/check/status for eligibility and staged reviewed-manifest validation.
+Task 4 adds the closed-harness dry-run gate;
 this task does not generate exact expected bytes or expose a live run entry.
 
 - [ ] **Step 1:** Add `test_prepare_preserves_filter_owned_picks`,
-  `test_nonpick_drift_requires_review_bundle`, `test_run_input_recheck_accepts_pick_only_drift`,
+  `test_nonpick_drift_names_original_image_review`, `test_run_input_recheck_accepts_pick_only_drift`,
   `test_system_toolchain_wins_over_nvm` and `test_second_host_failure_aborts_both`.
   Vary every key loaded from the filter, missing-key deletion and arbitrary nested
   pick values; non-pick/hook/statusLine edits reject. Mutate the fixture filter key
   list to prove reuse. Record current pick values/absence without serializing
   a new after-image; reviewed originals stay unchanged. Fixtures provide their
-  own reviewed bundle, not active checkout hooks; test both native and candidate
-  checkout variants. `test_review_ref_is_bound_to_bundle` rejects absent, invented,
-  ambiguous, wrong-task/wrong-digest, revise/revoked and unrelated accept notes;
-  check the referenced full report and every manifest member's bytes.
+  own reviewed input manifest, not active checkout hooks; test both native and
+  candidate checkout variants. Non-pick drift refuses without mutating/adopting
+  inputs and names original Task 6; a corrupt/missing member/pin/path also refuses.
+  Task records and full reports remain the review workflow's evidence, not a
+  custom authorization format interpreted by this tool.
   ```python
   assert nonpick(current_before, filter_keys) == nonpick(reviewed_before, filter_keys)
   assert recorded_picks_and_absence == current_picks_and_absence
@@ -468,12 +512,12 @@ this task does not generate exact expected bytes or expose a live run entry.
   assert npm_executable == "/usr/bin/npm" and npm_version == "12.2.1"
   ```
 - [ ] **Step 2:** Run the bootstrap/transport test files with
-  `-k 'prepare or pick or review_ref or toolchain or quiesce or abort'`: RED. Include invalid
+  `-k 'prepare or pick or manifest or toolchain or quiesce or abort'`: RED. Include invalid
   baseline provenance, corrupt images, npm 11/changed node/Git/Python identity,
   cache inside a live checkout, active sessions, partial snapshot copies, signals
   and second-host failure after the first timer record. No later live writes.
-- [ ] **Step 3:** Implement preparation eligibility and the concrete review-ref/
-  existing-bundle validation above. Capture immutable provenance/current input hashes;
+- [ ] **Step 3:** Implement eligibility/refusal and the staged reviewed input
+  manifest checks above. Capture immutable provenance/current input hashes;
   don't replace reviewed manifests with arbitrary current files. Add daemon-stop,
   no-live, timer-record/stop/wait/restore and snapshot-refresh/abort operations under
   these tests. Supported personal/work `app-server daemon stop` on Titan only;
@@ -497,9 +541,7 @@ this task does not generate exact expected bytes or expose a live run entry.
 - Consumes: Task 3 `prepare`, `check`, `quiesce_window`, `abort_window`; Tasks 1–2 records/transport.
 - Produces: `dry_targets(window: dict) -> dict` and
 `run_window(prepared: dict, decision: dict) -> dict` in window; CLI `run` through the
-verified migration checkpoint. Extend `prepare` with `stage_review: bool=False` and
-`--stage-review` generation using the same copy-only installer pipeline, returning
-unapproved candidates until Task 3's concrete review-binding validation passes.
+verified migration checkpoint. No structural-review subcommands/resolver are added.
 Add target-dry/apply/verify and familiar-merge/install operations with these tests.
 
 - [ ] **Step 1:** Add `test_six_dry_runs_precede_merge`,
@@ -517,17 +559,17 @@ Add target-dry/apply/verify and familiar-merge/install operations with these tes
   assert target_order == ["claude", "claude-work", "codex", "codex-work"]
   ```
 - [ ] **Step 2:** Run both new test files with
-  `-k 'dry or interleaved or apply or bootstrap or sync or guard or installer or stage_review'`: RED.
+  `-k 'dry or interleaved or apply or bootstrap or sync or guard or installer'`: RED.
   Any of six dry plan/apply/semantic/byte failures must abort both timer/snapshot
   windows, leave familiar HEAD at PRE and write no live target/merge marker.
-  Include reviewed-bundle staging without activation, exact-evidence refusal,
+  Include manifest drift and exact-evidence refusal,
   cross-host output disagreement, target drift after freeze and sync timeout.
 - [ ] **Step 3:** At run step 1 repeat eligibility/toolchain checks, then quiesce.
   Freeze the exact synchronized current files and complete all six local dry runs
   before merging. Take expected bytes only from their applied copies after plan-
   byte equality and parsed approval/pick checks above. Seal input/output identities
-  and effective hashes. Use the same pipeline for prepare review staging on copies;
-  generation grants no acceptance. Any failure here uses the pre-merge abort.
+  and effective hashes. Non-pick disagreement points to the original image-review
+  procedure; never updates its own approval baseline. Abort before merge on failure.
 - [ ] **Step 4:** Only after all six verdicts pass, mark familiar mutation and merge
   the immutable feature. Wait for verified source sync before each system npm
   install/pin proof. Register every original/artifact before the first target write;
@@ -561,6 +603,9 @@ No placeholder surface operation or live recovery entry is exposed in this task.
   dependency trees, plus the existing restore helper with actual artifacts. Cover
   guard-only, planned/not-applied, applied/no-step-record and all-four-applied
   failures; unknown bytes must stop without force-copy. Include
+  `test_recovery_works_after_version_hold_breach` to prove stale Claude evidence
+  does not block no-live/byte-gated rollback; Task 6 extends it through original
+  timer restoration. Never launch the changed Claude during recovery.
   `test_post_resume_pick_drift_refuses_restore`: changing a pick after apply still
   stops recovery for inspection; the handoff freezes picks until finish. One/both timers already
   restored by a failed finish must be stopped/waited before any restore operation.
@@ -568,7 +613,7 @@ No placeholder surface operation or live recovery entry is exposed in this task.
   assert events.index("europa:service-inactive") < events.index("restore:claude")
   assert restored_target_bytes == original_target_bytes
   ```
-- [ ] **Step 2:** Run the bootstrap test command with `-k 'recover or reconcile or merge_record or service or pick_drift'`:
+- [ ] **Step 2:** Run the bootstrap test command with `-k 'recover or reconcile or merge_record or service or pick_drift or hold_breach'`:
   RED. Include actual merge committed before its SHA record, merge in progress,
   refused merge at PRE, unexpected parent/HEAD, interrupted revert before record,
   already-complete revert, failed remote sync and interrupted dependency restore.
@@ -581,6 +626,9 @@ No placeholder surface operation or live recovery entry is exposed in this task.
   ledger restore and both-host originals proof; reconcile/abort/revert exact familiar
   merge, wait for source sync and restore each host's dependencies offline. Return
   native-surfaces/timer stages as still pending for Task 6's full recovery join.
+  Do not call forward check/preflight or Claude diagnostics here: obsolete Claude
+  version/evidence/binary identity may differ, while protected rollback inputs,
+  pinned relay and restoration byte/source/dependency checks remain mandatory.
   Never npm/fetch/reset, import old state, replace a timer record or blindly revert
   twice. Verify a recovered revert's tree equals PRE and its parent identifies the
   recorded attempted merge; unexpected history stays inspection-required.
@@ -606,8 +654,10 @@ CLI restart-surfaces/recover, surface-preview/restart and pilot-only fixed-true 
 Full recover dispatches pre-merge abort or Task 5's restoration core, then native
 surfaces with fresh consent, original timer restore and service success. Until
 those pass it retains `recovering` and forbids opening harnesses. Tests assert
-this six-stage order, including retry after partial timer restoration. Initial `run` calls this after its verified checkpoint using the same
-invocation's consumed authorization. A later retry needs fresh actual consent.
+this six-stage order, including retry after partial timer restoration and after a
+Claude hold breach. Recovery uses desktop-only preview, never full forward
+inventory/Claude diagnostics. Initial `run` uses `restart_surfaces` after its verified
+checkpoint with the same invocation's consumed authorization. A later retry needs fresh actual consent.
 
 - [ ] **Step 1:** Add `test_exited_pid_is_expected`, `test_surface_failure_is_pending`,
   `test_changed_context_refuses`, `test_partial_restart_retry` and
@@ -650,24 +700,30 @@ and timer restore reuses Task 3.
 
 - [ ] **Step 1:** Add `test_resume_has_no_bypass_flags`, `test_current_row_is_fresh`,
   `test_receipt_is_bound_to_real_cases`, `test_human_attestation_is_required` and
-  `test_partial_finish_keeps_original_timers` and `test_handoff_freezes_claude_picks`.
+  `test_partial_finish_keeps_original_timers`, `test_handoff_freezes_claude_picks`
+  and `test_selected_evidenced_version_can_advance_before_window`.
   Both ready and surfaces-pending handoffs name both hosts/homes and no model/effort
   changes until finish. Stale row/cwd, wrong window/home/
   session/version, pilot receipt, missing/altered evidence or human verdict reject.
   Denial not attempted/Git identity error cannot pass; neither can automatic approval.
   ```python
   assert "--dangerously-bypass-approvals-and-sandbox" not in resume_args
+  assert "DISABLE_UPDATES=1" in resume_args
   assert not finish_called_with_incomplete_receipts
   assert timer_records_after == timer_records_before
   ```
-- [ ] **Step 2:** Run bootstrap/transport tests with `-k 'resume or smoke or finish or receipt or attestation or handoff'`:
+- [ ] **Step 2:** Run bootstrap/transport tests with `-k 'resume or smoke or finish or receipt or attestation or handoff or selected_evidenced_version'`:
   RED. Include surface-pending, declined SSH/systemd permission, one timer restored,
-  service still running/failing, and accidental targeting of the live controller.
+  service still running/failing, hold breach during smokes, and accidental targeting
+  of the live controller. New selected versions require reviewed matching evidence
+  and fresh receipts; stale proof never passes or permanently pins code to 2.1.304.
 - [ ] **Step 3:** Print concrete Zsh-quoted executable/home/native-session argv with
   `--no-daemon resume`, never aliases/bypass flags/placeholders. First controller
   check proves its own fresh native ID/PID row before further rollout work. Work
   home gets its explicit command and human hook review too. Print the Claude
-  model/effort freeze warning before every resume/handoff until finish. Controller policies
+  model/effort freeze and held-launch warnings before every handoff until finish.
+  Include `DISABLE_UPDATES=1` in Codex argv and explicit Claude personal/work/smoke
+  commands; known Claude children/probes use that held env. Controller policies
   use defaults; dedicated smokes keep Claude `--permission-mode manual` and Codex
   `--no-daemon --sandbox workspace-write --ask-for-approval on-request`.
 - [ ] **Step 4:** Implement the receipt schema above and `record-smoke --receipt FILE
@@ -680,7 +736,10 @@ and timer restore reuses Task 3.
   do not fail hook verification or rewrite rollback originals. Restore original
   per-host timers; run/wait familiar-reap.service; require Result=success and
   ExecMainStatus=0; verify recorded dead rows/intent gone, preserving the current
-  controller. Partial finish reconciles actual timers/services before retry; it
+  controller. Hold/evidence drift stops forward finish and directs full recovery,
+  which must restore timers despite obsolete Claude evidence. A successful finish
+  releases the workflow restriction; held sessions exit for ordinary update policy.
+  Partial finish reconciles actual timers/services before retry; it
   never edits hooks/source or replaces original timer records. GREEN focused tests.
 - [ ] **Step 6:** Mandatory suite; commit
   `feat(relay): validate human smoke evidence and finalize timers`.
@@ -775,7 +834,8 @@ reviewable one-command handoff. Live application remains unperformed.
   Describe observed outcomes, consent channels, trust/smoke/permission interactions,
   surfaces-pending retry, paused timers, finish and complete recover commands.
   State that all six frozen-input dry runs precede merge and expected bytes come
-  from the installer; include the concrete review-ref gate and Claude pick freeze.
+  from the installer; include the original image-review procedure, held launch
+  commands/evidence refresh loop and Claude pick freeze.
   Keep precise smoke prompts/verdicts and earlier rollback fixes in the reference;
   operators never paste the reference's old Bash bodies. Amend the original plan's
   execution status/Task 8 arrangement to point to this replacement; historical
@@ -805,13 +865,33 @@ reviewable one-command handoff. Live application remains unperformed.
   npm/node/Git/helper-Python identities/versions/digests. Dropbox may copy inert
   files earlier; main's passing suite gates Europa execution, not a claim that
   automatic synchronization was paused. No home-link/service changes.
-- [ ] **Step 5:** Agent-run read-only checks through the new transport on both
-  hosts: credentials, USER/user bus, actual source/versions/runtime, manifest,
-  targets, desktop inventory and known retained state. Current controller no-live
-  refusal is expected and named; other blockers are resolved before handoff.
-  Capture controller native session ID and validated safe executable; run prepare.
-  No timer stop, live apply, familiar merge or desktop use occurs in this step.
-- [ ] **Step 6:** Ask in the session for the real pilot's no-window `true` spawn
+- [ ] **Step 5:** Establish the scoped hold before final readiness: close unheld
+  Claude sessions on both hosts, validate each personal/work home's held doctor/
+  version diagnostic, and record selected version and binary digests. The current
+  Codex controller may stay online; Claude hold is required before probing. If
+  host versions differ, request operator alignment to one selected version without
+  silently updating/downgrading. No timer stop/live settings/source/desktop change.
+- [ ] **Step 6:** If actual Claude version differs from shared evidence, execute
+  original plan Task 3 and the reviewed hq-7efef3 refresh pattern: locked/hydrated
+  ops and detached exact-v0.1.1 relay worktrees, isolated Europa probe homes with
+  credential cleanup, `env DISABLE_UPDATES=1` on the probe process, required allow/
+  context/deny proof, and version checks before/after on both hosts. Keep excluded/
+  unproven surfaces excluded. Run ops's declared checks, obtain an independent
+  evidence review and record its standard review note/full report before landing
+  reviewed evidence/probe docs on ops main. Use the established shared-proof
+  approach only with the same evidenced version on both hosts; verify installer
+  acceptance on both copies. Refresh the private evidence/input/helper manifest
+  only after review. If new capabilities change images, regenerate/review them
+  via original Task 6 first. Do not rerun unchanged Codex evidence. Any later
+  pre-window drift invalidates readiness and repeats Steps 5–6; no version waiver.
+- [ ] **Step 7:** Agent-run transport checks on both hosts for credentials, user
+  bus, source/runtime, held version/evidence, manifest, targets, desktop inventory
+  and retained state. Current Codex no-live refusal is expected during preparation;
+  no-live Claude/held probes are verified as described above. Capture controller
+  identity/safe executable and run prepare. Retain hold instructions while parked.
+  If the operator resumes unheld ordinary Claude use, redo readiness before window.
+  No live apply/merge/timer stop/desktop use occurs in this step.
+- [ ] **Step 8:** Ask in the session for the real pilot's no-window `true` spawn
   on the named desktop hosts, explaining that it opens no window and the one-case
   pilot is expected to take at most five minutes. After the explicit reply, pass
   its per-invocation decision into the rehearsal entry and run one end-to-end
@@ -823,7 +903,7 @@ reviewable one-command handoff. Live application remains unperformed.
   Analyze any completed parts before retrying, ask fresh consent for another spawn,
   and retain per-host source/target/dependency equality, approved pin, declared
   cache/runtime-write exceptions, disconnect completion and cleanup.
-- [ ] **Step 7:** Complete the bounded fixture fault matrix, compare helper bytes
+- [ ] **Step 9:** Complete the bounded fixture fault matrix, compare helper bytes
   again if any fix occurred, and rerun only checks justified by that fix. Task-note
   the exact reviewed commit/manifest/pilot verdict and remaining live gates.
   Complete hq-c6c847 only as reviewed workflow/preparation delivery after those
@@ -836,7 +916,9 @@ reviewable one-command handoff. Live application remains unperformed.
 ## Live handoff after implementation approval and rehearsal
 
 This section names later human gates; approving this plan does not execute them.
-The agent prepares everything concrete first. The operator closes every Claude/
+The agent completes Task 9's held evidence/readiness pass first. Keep every Claude
+launch held with DISABLE_UPDATES=1 through finish; no unheld clients/updates.
+The operator then closes every Claude/
 Codex session on both hosts, including the current controller, and runs the single
 Zsh command. The bootstrap obtains that invocation's desktop consent before any
 mutation, quiesces both hosts, freezes inputs and passes all six dry runs before
@@ -854,7 +936,9 @@ Gather human verdicts through the session/TTY channel and record bound receipts;
 permission prompts for SSH/systemctl remain human. Then finish timers and scheduled
 reconciliation, verify original Task 8 live evidence and perform original Task 9 final checks.
 Keep backups/worktree through original Task 9. Full recovery remains an operator-run
-closed-harness command, with new desktop consent for its restarts.
+closed-harness command, with new desktop consent for its restarts. On unexpected
+version drift after bootstrap, use it to restore native state/timers without stale
+Claude evidence blocking rollback, then repeat held readiness before a new window.
 
 ## Self-review / coverage before handing this plan back
 
@@ -870,6 +954,8 @@ closed-harness command, with new desktop consent for its restarts.
   images, pinned system toolchain from login PATH, explicit cancel from pipe loss,
   scratch application writes from declared host-cache/runtime effects, and
   worktree tests from delivered-main tests. All six authoritative installer-byte
-  dry runs precede merge; review-ref identifies bound accepted evidence; handoffs
-  freeze Claude picks through finish. No live results are implied.
+  dry runs precede merge; structural drift names the existing image-review process;
+  held launches plus explicit reviewed re-probe replace a permanent 2.1.304 pin.
+  Hold breach cannot strand rollback behind stale evidence. Handoffs freeze picks
+  and preserve updates disabled through finish. No live results are implied.
 - [ ] Human re-reviews the complete frozen plan before Task 1 implementation.

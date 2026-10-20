@@ -2,7 +2,7 @@
 
 Status: approved for planning by Keith after spec round 6, 2026-10-20.
 The round-6 consent clarification is carried into the plan. Preparation/toolchain/
-pilot refinements from plan rounds 1–2 await human plan re-review.
+pilot/update-hold refinements from plan rounds 1–3 await human plan re-review.
 Bootstrap/runbook: hq-c6c847. Independent Bash work: dots-55f537.
 Independent instruction work: lore-4c1787.
 This amends the execution arrangement of the approved relay cutover, not its
@@ -179,11 +179,13 @@ defined pilot below through the implemented runner's own entry before use.
 
 Preparation captures the selected Codex executable and the controller's native
 personal-home session ID. `run` prints a complete Zsh-quoted command with concrete
-executable, `CODEX_HOME` and session ID. Its argv is `env`, the explicit
+executable, `CODEX_HOME` and session ID. Its argv is `env`, `DISABLE_UPDATES=1`,
+the explicit
 `CODEX_HOME=<resolved-personal-home>` assignment, the validated executable,
 `--no-daemon`, `resume`, and the captured native session ID. The operator receives
 real values with no placeholders or environment preparation. The work-home command
-similarly supplies its own explicit `CODEX_HOME` and the validated executable.
+similarly supplies `DISABLE_UPDATES=1`, its own explicit `CODEX_HOME` and the
+validated executable.
 Do not use `cor`, `co`, sandbox/approval
 bypass flags or hook-trust bypass flags; their effect on hook review is not proven
 by the capability facts. No manual trust hash or approval shortcut is permitted.
@@ -379,15 +381,15 @@ model or effort defaults in either home/on either host until finish reports comp
 If that happens anyway, pick changes can pass hook checks but unknown bytes still
 block full recovery for inspection; no automatic pick-rewriting recovery branch.
 
-Non-pick drift takes an explicit `prepare --stage-review` path producing copies,
-plans, artifacts and candidate images for review, without live readiness. Only a
-subsequent `prepare --reviewed-bundle ... --review-ref ...` may use it. REF resolves
-one existing task binding note by task ID, timestamp and exact note-text SHA256;
-that note binds this manifest digest to a standard accepted review note and full
-private review-report digest on the same owning task. Rehash every bundle/report
-member and reject missing, ambiguous, wrong-task/digest, revise/revoked or unrelated
-acceptance references. Persist the real review before recording its binding. No
-flag creates acceptance, and all six closed-harness dry runs still precede merge.
+For non-pick drift, `prepare` refuses with `input-review-required` and names the
+original plan's Task 6 procedure: regenerate images, guard snapshots and installer
+plans/artifacts on copies, obtain review, retain its actual task note/full report,
+then stage a new protected input generation and expected-image manifest on both
+hosts. Preserve previous generations and active-window rollback originals. The
+tool validates the designated manifest's paths, member hashes, pins and baseline;
+it does not interpret review-note bindings or expose structural-review flags.
+Never adopt current bytes by merely recomputing hashes. Rerun preparation and
+all six closed-harness dry runs against the reviewed inputs.
 
 Preparation records system `/usr/bin/npm` 12.2.1, `/usr/bin/node`, system Git and
 `/usr/bin/python3` paths/versions/digests per host. Install with `/usr/bin` first in
@@ -401,14 +403,54 @@ existing authentication/SSH runtime bookkeeping and the consented no-window niri
 spawn. Cache paths overlapping Dropbox/live checkouts/state are blockers. Report cache
 exceptions rather than claim no writes anywhere outside scratch.
 
+### Claude update hold and readiness
+
+Use the supported process environment `DISABLE_UPDATES=1` to block automatic and
+manual updates, without editing the four targets, `~/.claude.json` or shared
+launchers. See the [official update controls](https://code.claude.com/docs/en/setup#disable-auto-updates)
+and [environment reference](https://code.claude.com/docs/en/env-vars).
+This is a scoped process hold, not a machine-wide installation lock. Close unheld
+Claude sessions/updaters on both hosts before final readiness, then use only held
+Claude launches through finish, including probe/help/version/doctor and both homes'
+smokes. Codex's printed launches carry the flag for tool children; the remote
+helper sets it explicitly for its own children. No unheld Claude/IDE client,
+update/install command or external installer may run during that interval.
+
+Verify each host/home's held version and doctor's auto-update-disabled diagnostic;
+record the selected installed version, resolved binary digest and hold proof in
+prepared data. Check known owned Claude processes for that identity/hold key only;
+never print full environments. An unproven hold blocks the window before timers
+pause. The normal parent environment is unchanged: future ordinary terminal
+launches use their prior policy, while held sessions remain held until exit. Never
+unset an existing user/admin policy.
+
+Readiness explicitly compares both hosts' installed version to shared evidence.
+2.1.304 is the current baseline, not a permanent hardcoded requirement. If either
+version moves, require operator alignment to one version, then repeat original
+Task 3's isolated ops guard probe with held Claude children, required cases,
+both-host before/after version checks, ops checks and independent evidence review.
+Land reviewed proof/docs on ops main, verify both hosts' installer acceptance,
+then refresh the protected input/helper manifest. New capabilities that change
+images require original Task 6's image review too. Any pre-window drift or return
+to unheld ordinary use invalidates readiness and repeats this loop.
+
+Unexpected version drift after bootstrap is a hold breach: stop new smokes, name
+paused timers and require ordinary-shell full recovery before fresh readiness.
+Stale Claude evidence blocks forward progress, never restoration: recovery uses
+strict no-live, pinned relay and byte/Git/dependency proofs without launching the
+changed Claude or requiring its version to equal obsolete evidence. Restore native
+state and original timers before re-probing; no automatic in-window proof adoption.
+
 ## Preserved cutover requirements
 
 - Relay remains v0.1.1 at `4ceec5d2ad22b136b37ee360e7a4ed00949f28d9`, with
   `--node /usr/bin/node`. Familiar PRE remains
   `00f4899ae523d613d21f44bfc2c456aac67f8e5f`; its approved feature tip remains
   `a16f4daa59b04e32f1010764d6f94401ca4eed8b`.
-- Exact version evidence is required; a changed installed version stops the phase
-  for fresh proof. No automatic harness updates, pin changes or relaxed evidence.
+- Exact version evidence is required with the scoped hold from readiness through
+  finish. Changed versions repeat the reviewed probe loop before a new window;
+  stale Claude evidence must not prevent rollback. No automatic harness updates,
+  pin changes or relaxed evidence.
 - Scope stays Claude's two homes on Titan and Europa, and Codex's two homes on
   Titan only. Shared Codex files may be checked for synchronization on Europa;
   do not install/start Codex there or treat it as an affected Codex home.
