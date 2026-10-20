@@ -6,6 +6,7 @@ Inside each helper process a fixture module stands in at the Python boundary for
 name, the process table and the system tools (npm, node, git, systemctl, niri), so nothing
 here contacts a real host, user bus, desktop, harness home or cutover root. The fake ssh
 closes pipes without sending any signal; cancellation is tested separately."""
+import functools
 import hashlib
 import json
 import os
@@ -20,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from relay_cutover_bootstrap import hosts, inventory, operations, state
+from relay_cutover_bootstrap import hosts, inventory, operations, quiesce, state
 from relay_cutover_bootstrap.state import Stop
 
 TOOLS_DIR = Path(__file__).resolve().parent
@@ -75,16 +76,19 @@ def register(hosts, operations):
             required=frozenset({"latch", "seconds"}))
 
 
+def _rows(host):
+    """This host's fixture process table, read on each call: a fixture daemon stop edits it."""
+    return json.loads(Path(__file__).with_name("config.json").read_text())["hosts"][host]["rows"]
+
+
 def install(hosts, inventory, operations):
     host = CONFIG["by_home"][os.environ["HOME"]]
-    spec = CONFIG["hosts"][host]
     hosts._nodename = lambda: host
     hosts.TOOLS.update(CONFIG["tools"])
-    rows = spec["rows"]
     inventory._process_rows = lambda: [
-        {key: value for key, value in row.items() if key != "held"} for row in rows]
-    holds = {row["pid"]: row.get("held") for row in rows}
-    inventory._hold = holds.get
+        {key: value for key, value in row.items() if key not in ("held", "daemon")}
+        for row in _rows(host)]
+    inventory._hold = lambda pid: {row["pid"]: row.get("held") for row in _rows(host)}.get(pid)
     register(hosts, operations)
 '''
 
@@ -172,7 +176,7 @@ os._exit(255)
 '''
 
 FIXTURE_TOOL = r'''#!/usr/bin/python3 -S
-import json, os, subprocess, sys
+import json, os, shutil, subprocess, sys
 
 NAME = "@NAME@"
 with open("@CONFIG@") as stream:
@@ -210,8 +214,23 @@ if NAME == "claude":
         sys.exit(2)
 elif NAME == "codex":
     observe(hold=os.environ.get("DISABLE_UPDATES"), codex_home=os.environ.get("CODEX_HOME"))
-    print("codex-cli 0.163.0")
+    if args == ["app-server", "daemon", "stop"]:
+        daemon = behavior.get("daemon", "ok")
+        if daemon == "fail":
+            print("codex: fixture daemon failure @SECRET@", file=sys.stderr)
+            sys.exit(1)
+        if daemon == "ok":  # "survive" leaves the daemon running
+            work = os.environ.get("CODEX_HOME") == os.path.join(os.environ["HOME"], ".codex-work")
+            spec = config["hosts"][host]
+            spec["rows"] = [row for row in spec["rows"]
+                            if row.get("daemon") != ("work" if work else "personal")]
+            with open("@CONFIG@", "w") as stream:
+                json.dump(config, stream, indent=2)
+        print("daemon stopped @SECRET@")
+    else:
+        print("codex-cli 0.163.0")
 elif NAME == "npm":
+    observe(path_head=os.environ["PATH"].split(":")[0], env_node=shutil.which("node"))
     if args == ["--version"]:
         print(behavior["npm_version"])
     elif args == ["config", "get", "cache"]:
@@ -232,6 +251,14 @@ elif NAME == "git":
             print("git@github.com: Permission denied (publickey). @SECRET@", file=sys.stderr)
             sys.exit(128)
         print("@PIN@\tHEAD")
+    elif args[3:5] == ["cat-file", "blob"]:
+        observe(blob=args[5])
+        blob = config["blobs"].get(args[5])
+        if blob is None:
+            print("fatal: Not a valid object name @SECRET@", file=sys.stderr)
+            sys.exit(128)
+        with open(blob, "rb") as stream:
+            sys.stdout.buffer.write(stream.read())
     else:
         sys.exit(2)
 elif NAME == "systemctl":
@@ -253,23 +280,97 @@ elif NAME == "niri":
 '''
 
 FIXTURE_PREFLIGHT = r'''
+"""Stands in for tools/relay-cutover: preflight (no-live read from the fixture process
+table) and the familiar source and dependency checks."""
 import json, os, sys
 
 with open("@CONFIG@") as stream:
     config = json.load(stream)
 host = config["by_home"][os.environ["HOME"]]
-behavior = config["hosts"][host]["behavior"]
+spec = config["hosts"][host]
+behavior = spec["behavior"]
+args = sys.argv[1:]
 with open(config["observed"], "a") as stream:
-    stream.write(json.dumps({"host": host, "tool": "preflight", "args": sys.argv[1:],
-                             "hold": os.environ.get("DISABLE_UPDATES")}) + "\n")
+    stream.write(json.dumps({"host": host,
+                             "tool": "preflight" if args[:1] == ["preflight"] else "relay-cutover",
+                             "args": args, "hold": os.environ.get("DISABLE_UPDATES")}) + "\n")
+if args[:1] != ["preflight"]:
+    if behavior.get("familiar", "ok") != "ok":
+        print(f"relay-cutover: {args[0]}: fixture failure @SECRET@", file=sys.stderr)
+        sys.exit(1)
+    print(f"relay-cutover: {args[0]}: ok")
+    sys.exit(0)
+comm = "claude" if args[args.index("--harness") + 1] == "claude-code" else "codex"
+live = [row for row in spec["rows"] if row["comm"] == comm]
 failed = 0
 for check in ("no-live", "runtime", "subscribers", "evidence"):
-    if behavior["preflight"].get(check, "ok") == "ok":
+    verdict = behavior["preflight"].get(check, "fail" if check == "no-live" and live else "ok")
+    if verdict == "ok":
         print(f"relay-cutover: {check}: ok")
     else:
         failed = 1
         print(f"relay-cutover: {check}: fixture failure @SECRET@", file=sys.stderr)
 sys.exit(failed)
+'''
+
+FIXTURE_TIMERS = r'''
+"""Stands in for tools/quiesce-timers: the same record file, with this host's unit states
+kept in a JSON file. Faults: fail, latch (wait for the latch file), signal (signal the
+controller, then wait to be stopped), fail-after (take effect, then report failure)."""
+import json, os, signal, sys, time
+
+with open("@CONFIG@") as stream:
+    config = json.load(stream)
+host = config["by_home"][os.environ["HOME"]]
+spec = config["hosts"][host]
+args = sys.argv[1:]
+command, path = args[0], args[args.index("--state") + 1]
+with open(config["observed"], "a") as stream:
+    stream.write(json.dumps({"host": host, "tool": "quiesce-timers", "args": args}) + "\n")
+fault = spec["behavior"].get("timers", {}).get(command, "ok")
+if fault == "signal":
+    os.kill(config["controller"], getattr(signal, spec["behavior"].get("signal", "SIGTERM")))
+if fault in ("signal", "latch"):
+    end = time.monotonic() + 120
+    while not os.path.exists(config["latch"]) and time.monotonic() < end:
+        time.sleep(0.02)
+if fault not in ("ok", "latch", "fail-after"):
+    print(f"quiesce-timers: {command}: fixture failure @SECRET@", file=sys.stderr)
+    sys.exit(1)
+with open(spec["units"]) as stream:
+    units = json.load(stream)
+
+
+def recorded():
+    with open(path) as stream:
+        return json.load(stream)["timers"]
+
+
+if command == "record":
+    if os.path.exists(path):
+        print(f"quiesce-timers: record: {path} exists; one record per window", file=sys.stderr)
+        sys.exit(1)
+    timers = [{"timer": name, "service": name[:-len(".timer")] + ".service",
+               "enabled": units[name]["enabled"], "active": units[name]["active"]}
+              for name in args[args.index("--state") + 2:]]
+    with open(path, "w") as stream:
+        stream.write(json.dumps({"timers": timers}, indent=2) + "\n")
+elif command == "stop":
+    for timer in recorded():
+        units[timer["timer"]]["active"] = "inactive"
+elif command == "wait":
+    recorded()
+    print("every service is inactive")
+elif command == "restore":
+    for timer in recorded():
+        units[timer["timer"]]["active"] = timer["active"]
+    print("every timer matches its record")
+with open(spec["units"], "w") as stream:
+    json.dump(units, stream)
+if fault == "fail-after":
+    print(f"quiesce-timers: {command}: fixture failure after the change @SECRET@",
+          file=sys.stderr)
+    sys.exit(1)
 '''
 
 DRIVER = r'''
@@ -338,6 +439,133 @@ def _digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+CLAUDE_KEYS = ("model", "modelSettings", "effortLevel")
+FIXTURE_FILTER = '''"""Fixture clean filter: the cutover reads only its Claude pick keys."""
+import sys
+
+CLAUDE_JSON_KEYS = @KEYS@
+
+
+def main(argv):
+    sys.exit("the fixture filter is not wired to git")
+
+
+if __name__ == "__main__":
+    main(sys.argv)
+'''
+FIXTURE_COMMIT = "5e1f0c2d9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d"
+PINS = {"relay_version": "0.1.1", "relay_commit": "4ceec5d2ad22b136b37ee360e7a4ed00949f28d9",
+        "familiar_pre": "00f4899ae523d613d21f44bfc2c456aac67f8e5f",
+        "familiar_feature_tip": "a16f4daa59b04e32f1010764d6f94401ca4eed8b",
+        "familiar_theme": THEME_PIN, "claude_version": "2.1.304 (Claude Code)",
+        "codex_version": "codex-cli 0.163.0"}
+TARGET_PATHS = {"claude": "d/hq/claude/settings.json",
+                "claude-work": "d/hq/local/claude/settings.work.json",
+                "codex": "d/hq/codex/hooks.json", "codex-work": "d/hq/codex/work/hooks.json"}
+MEMBERS = {
+    "claude": {"before": "prep/claude.source.json", "after": "images/claude/settings.json",
+               "artifact": "prep/claude.json"},
+    "claude-work": {"before": "prep/claude-work.source.json", "after": "claude-work.after.json",
+                    "artifact": "prep/claude-work.json"},
+    "codex": {"before": "prep/codex.source.json", "after": "images/codex/hooks.json",
+              "artifact": "prep/codex.json"},
+    "codex-work": {"before": "prep/codex-work.source.json",
+                   "after": "images/codex/work/hooks.json", "artifact": "prep/codex-work.json"},
+}
+_RECORDED = {"type": "digest-record", "record": "expected-images.sha256"}
+PROVENANCE = {
+    "claude": {"before": {"type": "commit", "commit": FIXTURE_COMMIT,
+                          "path": "claude/settings.json"}, "after": _RECORDED},
+    "claude-work": {"before": {"type": "digest-record", "record": "live-before.sha256"},
+                    "after": _RECORDED},
+    "codex": {"before": {"type": "commit", "commit": FIXTURE_COMMIT, "path": "codex/hooks.json"},
+              "after": _RECORDED},
+    "codex-work": {"before": {"type": "commit", "commit": FIXTURE_COMMIT,
+                              "path": "codex/work/hooks.json"}, "after": _RECORDED},
+}
+GUARD = {"type": "command", "command": "~/d/ops/hooks/claude-pretooluse"}
+RELAY_HOOK = "/usr/bin/node ~/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js hook"
+STATUS_LINE = {"type": "command", "command": "~/d/familiar/bin/familiar statusline",
+               "refreshInterval": 2}
+
+
+def _command(text):
+    return {"type": "command", "command": text}
+
+
+# The reviewed native before-images: the committed Claude source has no picks; the work
+# source is a copy of the live file and keeps its one pick.
+REVIEWED = {
+    "claude": {"permissions": {"allow": ["Bash(git status:*)"], "deny": []},
+               "hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [GUARD]}],
+                         "SessionStart": [{"matcher": "startup|resume", "hooks": [
+                             _command("~/d/familiar/bin/familiar hook session-start")]}]},
+               "statusLine": STATUS_LINE, "alwaysThinkingEnabled": True},
+    "claude-work": {"model": "sonnet", "permissions": {"allow": ["Read"]},
+                    "hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [GUARD]}]},
+                    "statusLine": STATUS_LINE},
+    "codex": {"hooks": {"SessionStart": [{"hooks": [_command("~/d/lore/hooks/claude-profile")]}],
+                        "Stop": [{"hooks": [_command("~/d/familiar/bin/familiar hook stop")]}]}},
+    "codex-work": {"hooks": {"SessionStart": [{"hooks": [
+        _command("~/d/lore/hooks/claude-profile")]}]}},
+}
+
+
+def _live_claude():
+    """The live layout: model before hooks, effortLevel and modelSettings at the end."""
+    reviewed = REVIEWED["claude"]
+    return {"model": "opus[1m]", **reviewed, "effortLevel": "high",
+            "modelSettings": {"opus[1m]": {"thinking": {"budget": 32000}}}}
+
+
+LIVE = {"claude": _live_claude, "claude-work": lambda: REVIEWED["claude-work"],
+        "codex": lambda: REVIEWED["codex"], "codex-work": lambda: REVIEWED["codex-work"]}
+
+
+def _after(target_id):
+    image = json.loads(json.dumps(REVIEWED[target_id]))
+    image["hooks"] = {"PreToolUse": [{"matcher": "*", "hooks": [
+        _command(f"{RELAY_HOOK} --harness fixture PreToolUse")]}]}
+    return image
+
+
+def _encode_json(value):
+    return (json.dumps(value, indent=2, ensure_ascii=False) + "\n").encode()
+
+
+def _artifact(target_id):
+    return _encode_json({"schema": 1, "changes": [{
+        "path": f"/fixture/worktree/{TARGET_PATHS[target_id]}",
+        "before": _encode_json(REVIEWED[target_id]).decode(),
+        "after": _encode_json(_after(target_id)).decode()}]})
+
+
+MEMBER_DATA = {"before": lambda target_id: _encode_json(REVIEWED[target_id]),
+               "after": lambda target_id: _encode_json(_after(target_id)),
+               "artifact": _artifact}
+
+
+def _sha(data):
+    return hashlib.sha256(data).hexdigest()
+
+
+def _stage(root, name, data):
+    """A protected cutover file: 0700 directories below root, a 0600 file."""
+    path = root / name
+    for directory in reversed(path.parents):
+        if directory != root and root in directory.parents and not directory.exists():
+            directory.mkdir(mode=0o700)
+    path.write_bytes(data)
+    path.chmod(0o600)
+    return path
+
+
+@functools.cache
+def _python_version():
+    return subprocess.run(["/usr/bin/python3", "--version"], capture_output=True,
+                          text=True, check=True).stdout.strip()
+
+
 class World:
     """Two fixture hosts, their fake tools and the fake ssh, configured through one file."""
 
@@ -362,6 +590,7 @@ class World:
             "ssh_log": str(tmp_path / "ssh.log"), "ssh_stdin": str(tmp_path / "ssh.stdin"),
             "observed": str(tmp_path / "observed.log"), "drop": str(tmp_path / "drop.json"),
             "child": str(child), "pids": str(tmp_path / "pids.log"), "short_deadline": 1.5,
+            "blobs": {}, "controller": os.getpid(), "latch": str(tmp_path / "timer-latch"),
         }
         for host, remote in (("titan", False), ("europa", True)):
             self._host(host, remote)
@@ -501,6 +730,157 @@ class World:
                 owner = json.loads(start.read_text())["owner"]
                 if owner["pid"] != os.getpid():  # an in-process execute records pytest
                     yield owner["pid"], owner["start_time"]
+
+    def reload(self):
+        """Pick up the fixture config after a fixture tool edited it (a daemon stop does)."""
+        self.config = json.loads(self.config_path.read_text())
+
+    # --- a staged cutover: reviewed inputs, live targets, timers and familiar snapshots ----
+
+    def stage_cutover(self, keys=CLAUDE_KEYS):
+        """Stage what Task 9's preparation would leave on both hosts, from fixture data only."""
+        for host, spec in self.config["hosts"].items():
+            home, root = self.home(host), self.root(host)
+            hq = home / "d/hq"
+            for name in ("tools/relay-cutover-bootstrap", "tools/relay-cutover-rehearse"):
+                _write(hq / name, "#!/usr/bin/python3 -B\n", 0o755)
+            _write(hq / "tools/quiesce-timers", self._fill(FIXTURE_TIMERS), 0o755)
+            _write(hq / "relay/package.json", json.dumps({"dependencies": {
+                "relay": "git+https://github.com/khughitt/relay.git#v0.1.1"}}) + "\n")
+            _write(hq / "relay/package-lock.json", "{}\n")
+            for harness in ("claude-code", "codex"):
+                _write(home / f"d/ops/docs/runbooks/relay-guard-evidence-{harness}.json",
+                       json.dumps({"harness": harness}) + "\n")
+            self.write_filter(keys, hosts=(host,))
+            for target_id, image in LIVE.items():
+                _write(home / TARGET_PATHS[target_id], _encode_json(image()).decode())
+            live_state = home / ".local/state/familiar"
+            _write(live_state / "registry.json", '{"sessions": []}\n')
+            _write(live_state / "observe/rows.json", '{"rows": [1, 2]}\n')
+            modules = home / "d/familiar/node_modules"
+            _write(modules / "familiar-theme/package.json", '{"name": "familiar-theme"}\n')
+            _write(modules / "familiar-theme/index.js", "module.exports = {};\n")
+            (modules / ".bin").mkdir()
+            (modules / ".bin/theme").symlink_to("../familiar-theme/index.js")
+            root.parent.mkdir(parents=True, exist_ok=True)
+            root.mkdir(mode=0o700)
+            for target_id, roles in MEMBERS.items():
+                for role, name in roles.items():
+                    _stage(root, name, MEMBER_DATA[role](target_id))
+            _stage(root, "expected-images.sha256", "".join(
+                f"{_sha(MEMBER_DATA['after'](target_id))}  {MEMBERS[target_id]['after']}\n"
+                for target_id in MEMBERS).encode())
+            _stage(root, "live-before.sha256", "".join(
+                f"{_sha(MEMBER_DATA['before'](target_id))}  {home / TARGET_PATHS[target_id]}\n"
+                for target_id in MEMBERS).encode())
+            # The preparation snapshots predate a later native write to familiar's state.
+            for name, source in (("familiar-state", live_state),
+                                 ("familiar-node_modules.pre", modules)):
+                shutil.copytree(source, root / name, symlinks=True)
+                (root / name).chmod(0o700)
+            _write(live_state / "observe/after-preparation.json", '{"rows": [3]}\n')
+            spec["units"] = str(self.tmp / host / "units.json")
+            Path(spec["units"]).write_text(json.dumps(
+                {"familiar-reap.timer": {"enabled": "enabled", "active": "active"}}))
+        titan = self.root("titan")
+        for target_id in ("claude", "codex", "codex-work"):
+            proof = PROVENANCE[target_id]["before"]
+            self.config["blobs"][f"{proof['commit']}:{proof['path']}"] = str(
+                titan / MEMBERS[target_id]["before"])
+        self.save()
+        return self.write_manifest()
+
+    def write_filter(self, keys, hosts=("titan", "europa")):
+        for host in hosts:
+            _write(self.home(host) / "d/hq/.githooks/harness-state-clean",
+                   FIXTURE_FILTER.replace("@KEYS@", repr(tuple(keys))), 0o755)
+
+    def toolchain(self):
+        """The fixture's own record of its system tools, as preparation would store it."""
+        tools = self.config["tools"]
+
+        def entry(path, version, **extra):
+            real = os.path.realpath(path)
+            return {"path": path, "real": real, "sha256": _digest(real), "version": version,
+                    **extra}
+
+        return {"npm": entry(tools["npm"], "12.2.1", package_version="12.2.1",
+                             shebang="#!/usr/bin/python3 -S"),
+                "node": entry(tools["node"], "v24.9.0"),
+                "git": entry(tools["git"], "git version 2.51.1"),
+                "python3": entry("/usr/bin/python3", _python_version())}
+
+    def write_manifest(self, generation="g1", change=None, hosts=("titan", "europa")):
+        """Write and designate a reviewed input manifest built from the fixture's inputs."""
+        home = self.home("titan")
+        targets = {}
+        for target_id, roles in MEMBERS.items():
+            targets[target_id] = {}
+            for role, name in roles.items():
+                member = {"path": name, "sha256": _sha((self.root("titan") / name).read_bytes())}
+                if role in PROVENANCE[target_id]:
+                    member["provenance"] = dict(PROVENANCE[target_id][role])
+                targets[target_id][role] = member
+        manifest = {
+            "schema": 1, "generation": generation, "pins": dict(PINS),
+            "helpers": inventory._helpers({"hq": str(home / "d/hq"), "home": str(home)}),
+            "hosts": {host: {"toolchain": self.toolchain(), "absence_reason": None}
+                      for host in self.config["hosts"]},
+            "targets": targets}
+        if change is not None:
+            change(manifest)
+        for host in hosts:
+            root = self.root(host)
+            _stage(root, f"inputs/{generation}/manifest.json", _encode_json(manifest))
+            _stage(root, "inputs/designated.json",
+                     _encode_json({"schema": 1, "generation": generation}))
+        return manifest
+
+    def target(self, host, target_id):
+        return self.home(host) / TARGET_PATHS[target_id]
+
+    def write_target(self, target_id, value, hosts=("titan", "europa")):
+        """Write one shared target on every host, as Dropbox would synchronize it."""
+        data = value if isinstance(value, bytes) else _encode_json(value)
+        for host in hosts:
+            self.target(host, target_id).write_bytes(data)
+        return data
+
+    def member(self, host, target_id, role):
+        return self.root(host) / MEMBERS[target_id][role]
+
+    def units(self, host):
+        return json.loads(Path(self.spec(host)["units"]).read_text())
+
+    def candidate_checkout(self):
+        """A controller worktree: the same helper bytes, but candidate after-images as its
+        settings, which no host target holds."""
+        titan, candidate = self.home("titan") / "d/hq", self.tmp / "candidate"
+        for name in inventory.HELPERS:
+            (candidate / name).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(titan / name, candidate / name)
+        (candidate / "tools/relay_cutover_bootstrap").symlink_to(PACKAGE,
+                                                                 target_is_directory=True)
+        for target_id in ("claude", "codex", "codex-work"):
+            path = candidate / TARGET_PATHS[target_id].removeprefix("d/hq/")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(MEMBER_DATA["after"](target_id))
+        return candidate
+
+    def snapshot(self, host):
+        """Every path under the host's home, excluding its operation records."""
+        home, operations = self.home(host), self.root(host) / "operations"
+        seen = {}
+        for path in sorted(home.rglob("*")):
+            if path == operations or operations in path.parents:
+                continue
+            if path.is_symlink():
+                seen[str(path.relative_to(home))] = ("link", os.readlink(path))
+            elif path.is_file():
+                seen[str(path.relative_to(home))] = ("file", path.read_bytes(), _private(path))
+            elif path.is_dir():
+                seen[str(path.relative_to(home))] = ("dir", stat.S_IMODE(path.lstat().st_mode))
+        return seen
 
     def close(self):
         for pid, start in set(self.owned_pids()):
@@ -1141,3 +1521,218 @@ def test_signal_while_recording_start_cancels(world, monkeypatch):
     assert signal.getsignal(signal.SIGINT) is handler
     assert signal.pthread_sigmask(signal.SIG_BLOCK, []) == mask
     assert signal.getitimer(signal.ITIMER_REAL) == (0.0, 0.0)
+
+
+# --- quiescing a host: timer records, snapshot moves and their abort ----------------------
+
+WINDOW = "20261020T120000Z-0badf00d"
+
+
+def _execute(host, operation, payload, number):
+    """Run one host operation inside this process, against the fixture home HOME names. Its
+    children are real system tools unless the test patched `hosts.TOOLS`."""
+    context = hosts._context(host, "live", f"{host}-20261020T120000Z-{number:012x}")
+    return hosts.execute(context, operation, payload)
+
+
+def _tree_of(path):
+    found = {}
+    for item in sorted(Path(path).rglob("*")):
+        relative = str(item.relative_to(path))
+        if item.is_symlink():
+            found[relative] = ("link", os.readlink(item))
+        elif item.is_file():
+            found[relative] = ("file", item.read_bytes())
+        else:
+            found[relative] = ("dir",)
+    return found
+
+
+def _recorder(monkeypatch):
+    """Durability events in order: fsyncs and renames by path, child launches by argv."""
+    events = []
+    fsync, rename, replace, launch = os.fsync, os.rename, os.replace, hosts._launch
+
+    def on_fsync(fd):
+        events.append(("fsync", os.readlink(f"/proc/self/fd/{fd}")))
+        return fsync(fd)
+
+    def on_rename(source, destination, *args, **kwargs):
+        events.append(("rename", str(source), str(destination)))
+        return rename(source, destination, *args, **kwargs)
+
+    def on_replace(source, destination, *args, **kwargs):
+        events.append(("replace", str(destination)))
+        return replace(source, destination, *args, **kwargs)
+
+    def on_launch(argv, **options):
+        events.append(("spawn", *[Path(arg).name if index == 2 else arg
+                                  for index, arg in enumerate(argv[:4])][2:]))
+        return launch(argv, **options)
+
+    monkeypatch.setattr(os, "fsync", on_fsync)
+    monkeypatch.setattr(os, "rename", on_rename)
+    monkeypatch.setattr(os, "replace", on_replace)
+    monkeypatch.setattr(hosts, "_launch", on_launch)
+    return events
+
+
+def test_quiesce_operations_are_fixed(world):
+    table = operations.OPERATIONS
+    assert table["codex-daemon-stop"].hosts == ("titan",)
+    assert {name for name, spec in table.items()
+            if spec.mutation and not name.startswith("fixture-")} == {
+        "codex-daemon-stop", "timer-record", "timer-stop", "timer-restore", "snapshot-refresh",
+        "snapshot-abort"}
+    assert {"no-live", "timer-wait", "pending-operations", "inputs-check"} <= set(table)
+    assert table["timer-wait"].deadline > hosts.TIMER_WAIT_SECONDS
+    for host, operation, payload in (
+            ("europa", "codex-daemon-stop", {"window_id": WINDOW, "codex_sha256": "0" * 64}),
+            ("titan", "timer-record", {"window_id": "../../etc"}),
+            ("titan", "timer-record", {}),
+            ("titan", "snapshot-refresh", {"window_id": WINDOW, "familiar_pre": "main"})):
+        with pytest.raises(hosts.Refused):
+            world.request(host, operation, payload)
+    assert world.lines("ssh_log") == []
+    # Host effects are live-only here; a pilot names its own scratch roots.
+    response = world.request("titan", "timer-record", {"window_id": WINDOW}, mode="pilot")
+    assert response["status"] == "failed" and "live" in response["error"]
+    assert not (world.root("titan") / "quiesce").exists()
+
+
+def test_quiesce_timer_record_is_durable_before_stop(world, monkeypatch):
+    world.stage_cutover()
+    events = _recorder(monkeypatch)
+    record = world.root("titan") / "quiesce" / WINDOW / "timers.json"
+    response = _execute("titan", "timer-record", {"window_id": WINDOW}, 1)
+    assert response["status"] == "completed", response["error"]
+    result = response["result"]
+    assert result["timers"] == [{"timer": "familiar-reap.timer",
+                                 "service": "familiar-reap.service",
+                                 "enabled": "enabled", "active": "active"}]
+    assert result["sha256"] == _digest(record) and _private(record) == 0o600
+    assert _private(record.parent) == 0o700
+    spawned = events.index(("spawn", "quiesce-timers", "record"))
+    synced = events.index(("fsync", str(record)))
+    parent = events.index(("fsync", str(record.parent)), synced)
+    done = events.index(("replace", str(record.parent.parent.parent / "operations"
+                                         / response["operation_id"] / "done.json")))
+    # The helper's output and its directory are durable before the reply, so before any stop.
+    assert spawned < synced < parent < done
+    assert world.units("titan")["familiar-reap.timer"]["active"] == "active"
+
+    # A stop names the record it expects; a changed record refuses before stopping.
+    changed = _execute("titan", "timer-stop", {"window_id": WINDOW, "record_sha256": "0" * 64}, 2)
+    assert changed["status"] == "failed" and "record" in changed["error"]
+    assert ("spawn", "quiesce-timers", "stop") not in events
+    stopped = _execute("titan", "timer-stop",
+                       {"window_id": WINDOW, "record_sha256": result["sha256"]}, 3)
+    assert stopped["status"] == "completed"
+    assert events.index(("spawn", "quiesce-timers", "stop")) > parent
+    assert world.units("titan")["familiar-reap.timer"]["active"] == "inactive"
+
+    # One record per window: a second record refuses and leaves the first untouched.
+    data = record.read_bytes()
+    again = _execute("titan", "timer-record", {"window_id": WINDOW}, 4)
+    assert again["status"] == "failed" and record.read_bytes() == data
+    # Another window cannot record while this one's timers are paused here.
+    other = _execute("titan", "timer-record", {"window_id": "20261020T130000Z-0badf00e"}, 5)
+    assert other["status"] == "failed" and WINDOW in other["error"]
+    restored = _execute("titan", "timer-restore",
+                        {"window_id": WINDOW, "record_sha256": result["sha256"]}, 6)
+    assert restored["status"] == "completed" and restored["result"]["restored"] is True
+    assert world.units("titan")["familiar-reap.timer"]["active"] == "active"
+    assert (record.parent / "timers.restored.json").is_file()
+
+
+def test_quiesce_snapshot_moves_registered_before_acting(world, monkeypatch):
+    world.stage_cutover()
+    root, home = world.root("titan"), world.home("titan")
+    preparation = {name: _tree_of(root / name)
+                   for name in ("familiar-state", "familiar-node_modules.pre")}
+    assert _execute("titan", "timer-record", {"window_id": WINDOW}, 1)["status"] == "completed"
+    events = _recorder(monkeypatch)
+    response = _execute("titan", "snapshot-refresh",
+                        {"window_id": WINDOW, "familiar_pre": PINS["familiar_pre"]}, 2)
+    assert response["status"] == "completed", response["error"]
+    directory = root / "quiesce" / WINDOW
+    moves = directory / "snapshots.json"
+    registered = events.index(("replace", str(moves)))
+    first_move = next(index for index, event in enumerate(events) if event[0] == "rename")
+    assert events[first_move] == ("rename", str(root / "familiar-state"),
+                                  str(directory / "preparation/familiar-state"))
+    assert registered < events.index(("fsync", str(directory)), registered) < first_move
+    # The native source and dependency checks run before anything moves.
+    checks = [event for event in events[:first_move] if event[:2] == ("spawn", "relay-cutover")]
+    assert [event[2] for event in checks] == ["familiar-source", "familiar-check"]
+    record = state.load_record(moves)
+    assert [move["state"] for move in record["moves"]] == ["verified", "verified"]
+    for name, source in (("familiar-state", home / ".local/state/familiar"),
+                         ("familiar-node_modules.pre", home / "d/familiar/node_modules")):
+        assert _tree_of(root / name) == _tree_of(source)  # refreshed after the native writes
+        assert _tree_of(directory / "preparation" / name) == preparation[name]  # preserved
+        assert _private(root / name) == 0o700
+    assert "observe/after-preparation.json" in _tree_of(root / "familiar-state")
+    assert "observe/after-preparation.json" not in preparation["familiar-state"]
+    assert _tree_of(root / "familiar-node_modules.pre")[".bin/theme"] == (
+        "link", "../familiar-theme/index.js")
+    assert response["result"]["moves"][0]["entries"] > 0
+    again = _execute("titan", "snapshot-refresh",
+                     {"window_id": WINDOW, "familiar_pre": PINS["familiar_pre"]}, 3)
+    assert again["status"] == "failed" and "abort" in again["error"]
+
+
+@pytest.mark.parametrize("fault", ["partial-copy", "before-first-move"])
+def test_abort_returns_partial_snapshot_copies(world, monkeypatch, fault):
+    world.stage_cutover()
+    root = world.root("titan")
+    preparation = {name: _tree_of(root / name)
+                   for name in ("familiar-state", "familiar-node_modules.pre")}
+    assert _execute("titan", "timer-record", {"window_id": WINDOW}, 1)["status"] == "completed"
+    directory = root / "quiesce" / WINDOW
+    with monkeypatch.context() as patch:
+        if fault == "partial-copy":
+            copy, copied = quiesce._copy_file, []
+
+            def failing(source, destination):
+                if "familiar-node_modules.pre" in str(destination) and copied:
+                    raise OSError(5, "injected copy fault", destination)
+                if "familiar-node_modules.pre" in str(destination):
+                    copied.append(destination)
+                return copy(source, destination)
+
+            patch.setattr(quiesce, "_copy_file", failing)
+        else:
+            rename = os.rename
+
+            def failing(source, destination, *args, **kwargs):
+                if str(destination).startswith(str(directory / "preparation")):
+                    raise OSError(5, "injected rename fault", destination)
+                return rename(source, destination, *args, **kwargs)
+
+            patch.setattr(os, "rename", failing)
+        response = _execute("titan", "snapshot-refresh",
+                            {"window_id": WINDOW, "familiar_pre": PINS["familiar_pre"]}, 2)
+    assert response["status"] == "failed"
+    world_home = world.home("titan")
+    aborted = _execute("titan", "snapshot-abort", {"window_id": WINDOW}, 3)
+    assert aborted["status"] == "completed", aborted["error"]
+    for name in preparation:
+        assert _tree_of(root / name) == preparation[name]  # the preparation copy is back
+    retained = directory / "abort"
+    if fault == "partial-copy":
+        assert aborted["result"]["moves"] == {"familiar-state": "returned",
+                                              "familiar-node_modules.pre": "returned"}
+        assert _tree_of(retained / "familiar-state") == _tree_of(
+            world_home / ".local/state/familiar")
+        partial = _tree_of(retained / "familiar-node_modules.pre.partial")
+        assert 0 < len([kind for kind in partial.values() if kind[0] == "file"]) < 3
+    else:
+        assert aborted["result"]["moves"] == {"familiar-state": "untouched",
+                                              "familiar-node_modules.pre": "untouched"}
+        assert not retained.exists()
+    assert not (directory / "preparation" / "familiar-state").exists()
+    # A second abort finds nothing left to move.
+    again = _execute("titan", "snapshot-abort", {"window_id": WINDOW}, 4)
+    assert again["status"] == "completed"
+    assert set(again["result"]["moves"].values()) == {"untouched"}
