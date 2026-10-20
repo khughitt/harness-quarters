@@ -2,10 +2,12 @@
 and the pre-merge abort, run against throwaway roots and the transport tests' fixture hosts.
 Decision dictionaries here are fixtures standing in for a recorded reply; nothing in these
 tests authenticates a human or answers a prompt for a live call."""
+import contextlib
 import errno
 import fcntl
 import fnmatch
 import hashlib
+import io
 import json
 import os
 import re
@@ -17,11 +19,12 @@ import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 import test_relay_cutover_transport as transport
-from relay_cutover_bootstrap import hosts, inputs, state, window
+from relay_cutover_bootstrap import cli, hosts, inputs, state, window
 from relay_cutover_bootstrap import prepare as preparation
 from relay_cutover_bootstrap.state import Stop
 
@@ -1727,3 +1730,597 @@ def test_quiesce_requires_this_runs_consumed_decision(tmp_path, monkeypatch):
     with pytest.raises(window.Failed, match="is quiescing"):
         window.quiesce_window(prepared, consumed)
     assert not (window._root() / "operations").exists()
+
+
+# --- the run: six dry runs, the familiar transition and the verified migration -----------
+
+PICK_TEXT = "Grüße ✓"
+
+
+def _interleaved():
+    """Live targets as the operator's files hold them, the same on both hosts: picks before
+    and after other keys, nested and non-ASCII pick values, absent pick keys and formatting
+    that differs from both the installer's and the guard helper's."""
+    personal = {"model": "opus[1m]", **transport.REVIEWED["claude"], "effortLevel": "höch",
+                "modelSettings": {"opus[1m]": {"thinking": {"budget": 32000}, "label": PICK_TEXT,
+                                               "tiers": [1, 2.5, None, False]}}}
+    work = {**transport.REVIEWED["claude-work"], "model": "opus"}
+    return {"claude": json.dumps(personal, indent=4).encode(),
+            "claude-work": json.dumps(work, separators=(",", ":")).encode(),
+            "codex": json.dumps(transport.REVIEWED["codex"], indent=4).encode(),
+            "codex-work": transport._encode_json(transport.REVIEWED["codex-work"])}
+
+
+def _requests(patch, world):
+    """Every host request in order, with the window record as it stood when each was sent."""
+    log, real, root = [], hosts.request, cutover_root(world)
+
+    def record(host, mode, operation, payload, *, timeout):
+        log.append({"event": "send", "host": host, "operation": operation, "payload": payload,
+                    "window": state.current_window(root)})
+        response = real(host, mode, operation, payload, timeout=timeout)
+        log.append({"event": "reply", "host": host, "operation": operation,
+                    "status": response["status"]})
+        return response
+
+    patch.setattr(hosts, "request", record)
+    return log
+
+
+def _sends(log, operation=None):
+    return [(index, entry) for index, entry in enumerate(log) if entry["event"] == "send"
+            and (operation is None or entry["operation"] == operation)]
+
+
+def _drain(fd):
+    """What the run wrote to its terminal: the preview, the ask and the echoed answer."""
+    os.set_blocking(fd, False)
+    data = b""
+    while True:
+        try:
+            chunk = os.read(fd, 65536)
+        except OSError:
+            break
+        if not chunk:
+            break
+        data += chunk
+    return data.decode("utf-8", "replace")
+
+
+def _option(call, name):
+    return call["args"][call["args"].index(name) + 1]
+
+
+def _europa_polled(world, pre):
+    """True once Europa's check of familiar's source against the merge has failed once."""
+    return lambda: any(call["host"] == "europa" and call["args"][:1] == ["familiar-source"]
+                       and call["args"][2] != pre and call["exit"] != 0
+                       for call in observed(world, "relay-cutover"))
+
+
+def run_decision(prepared, opened, attempt=None):
+    """A fixture of the operator's terminal answer to this run's desktop subject."""
+    attempt = attempt or window.RUN_ATTEMPT
+    subject = window.run_subject(prepared)
+    record = {"schema": 1, "kind": "desktop", "action": window.RUN_ACTION,
+              "window_id": opened["id"], "attempt_id": attempt, "subject_sha256": sha(subject),
+              "verdict": "approved", "source": {
+                  "type": "tty", "prompt": "Restart these familiar surfaces? Type yes:",
+                  "response": "yes",
+                  "answered_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}}
+    return state.consume_decision(opened, record, kind="desktop", action=window.RUN_ACTION,
+                                  attempt_id=attempt, subject_sha256=sha(subject))
+
+
+@pytest.fixture(scope="class")
+def migrated(tmp_path_factory):
+    """One whole run through the CLI, answered on a terminal, whose evidence the class's tests
+    read: interleaved live picks, a Dropbox that delivers familiar's merge to Europa only
+    after Europa first checked for it, and every request with the window as it stood."""
+    with pytest.MonkeyPatch.context() as patch:
+        world = transport.World(tmp_path_factory.mktemp("migrated"), patch)
+        try:
+            world.stage_cutover()
+            live = _interleaved()
+            for target_id, data in live.items():
+                world.write_target(target_id, data)
+            patch.setattr(window, "CHECKOUT", world.home("titan") / "d/hq")
+            # Titan's shell routes a build cache at preparation and elsewhere at the run.
+            patch.setenv("CACHE_DIR", str(world.tmp / "prepared-cache"))
+            prepared = preparation.prepare(SESSION)
+            patch.setenv("CACHE_DIR", str(world.tmp / "unprepared-cache"))
+            marks = {"observed": len(world.lines("observed")),
+                     "probes": len(world.lines("probes"))}
+            requests = _requests(patch, world)
+            world.start_dropbox(hold=_europa_polled(world, world.pins["familiar_pre"]))
+            master, slave = os.openpty()
+            patch.setattr(cli, "TTY", os.ttyname(slave))
+            os.write(master, b"yes\n")
+            out, err = io.StringIO(), io.StringIO()
+            try:
+                with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                    code = cli.main(["run"])
+                terminal = _drain(master)
+            finally:
+                os.close(master)
+                os.close(slave)
+            yield SimpleNamespace(world=world, prepared=prepared, live=live, marks=marks,
+                                  requests=requests, code=code, out=out.getvalue(),
+                                  err=err.getvalue(), terminal=terminal,
+                                  window=state.current_window(cutover_root(world)))
+        finally:
+            world.close()
+
+
+@needs_zsh
+class TestRun:
+    """A whole bootstrap run through the verified migration checkpoint."""
+
+    def test_bootstrap_run_takes_its_terminal_decision(self, migrated):
+        assert migrated.code == 0, migrated.err
+        record = migrated.window
+        assert record["state"] == "migrated-surfaces-pending"
+        subject = window.run_subject(migrated.prepared)
+        assert record["surfaces"] == subject
+        consumed = state.load_record(Path(record["directory"]) / "decisions"
+                                     / f"{window.RUN_ATTEMPT}.json")
+        assert (consumed["kind"], consumed["action"], consumed["subject_sha256"]) == (
+            "desktop", window.RUN_ACTION, sha(subject))
+        source = consumed["decision"]["source"]
+        assert source["type"] == "tty" and source["response"] == "yes"
+        assert source["prompt"] in migrated.terminal
+        assert record["decision"]["attempt_id"] == window.RUN_ATTEMPT
+        # The bounded preview names each host's surfaces, their processes and the impact.
+        assert record["id"] in migrated.terminal and window.IMPACT in migrated.terminal
+        for host in HOSTS:
+            for surface in migrated.prepared["hosts"][host]["desktop"]["surfaces"]:
+                assert surface["name"] in migrated.terminal
+                assert all(str(process["pid"]) in migrated.terminal
+                           for process in surface["processes"])
+        assert migrated.terminal.index(window.IMPACT) < migrated.terminal.index(source["prompt"])
+        # The handoff names what holds until finish and one next command.
+        out = migrated.out
+        assert "migrated-surfaces-pending" in out and "paused" in out
+        assert "do not change or save Claude model or effort defaults" in out
+        assert "avoid cl, clw" in out
+        assert out.splitlines()[-1] == f"  next: {cli.command_line(['restart-surfaces'])}"
+        for secret in SECRETS + (PICK_TEXT, "höch"):
+            assert secret not in out + migrated.err + migrated.terminal
+
+    def test_six_dry_runs_precede_merge(self, migrated):
+        log, pins = migrated.requests, migrated.world.pins
+        assert [(entry["host"], entry["payload"]["target_id"])
+                for _, entry in _sends(log, "target-dry")] == [
+            ("titan", "claude"), ("titan", "claude-work"), ("titan", "codex"),
+            ("titan", "codex-work"), ("europa", "claude"), ("europa", "claude-work")]
+        verdicts = [index for index, entry in enumerate(log) if entry["event"] == "reply"
+                    and entry["operation"] == "target-dry"]
+        assert len(verdicts) == 6 and {log[index]["status"] for index in verdicts} == {"completed"}
+        merges = _sends(log, "familiar-merge")
+        assert len(merges) == 1
+        merge_start_index, merge = merges[0]
+        last_dry_verdict_index = verdicts[-1]
+        assert last_dry_verdict_index < merge_start_index
+        # Between the seal and the merge: the frozen bytes recheck unchanged, both hosts closed.
+        assert [(entry["host"], entry["operation"]) for index, entry in _sends(log)
+                if last_dry_verdict_index < index < merge_start_index] == [
+            ("titan", "target-verify"), ("europa", "target-verify"), ("titan", "no-live"),
+            ("europa", "no-live")]
+        # The immutable tip is merged, marked first, after the seal of the effective inputs.
+        assert merge["payload"] == {"window_id": migrated.window["id"],
+                                    "pre": pins["familiar_pre"],
+                                    "tip": pins["familiar_feature_tip"]}
+        at_merge = merge["window"]
+        assert at_merge["state"] == "applying"
+        assert {key: at_merge["familiar"][key] for key in ("pre", "tip")} == {
+            "pre": pins["familiar_pre"], "tip": pins["familiar_feature_tip"]}
+        assert "merge" not in at_merge["familiar"]
+        sealed = at_merge["sealed"]
+        assert sealed["effective_inputs_sha256"] == sha(sealed["inputs"])
+        assert sealed["inputs"]["prepared_sha256"] == window.prepared_sha256(migrated.prepared)
+        assert sealed == migrated.window["sealed"]
+        assert all(entry["window"].get("sealed") is None and "familiar" not in entry["window"]
+                   for index, entry in _sends(log) if index <= last_dry_verdict_index)
+        homes = [migrated.world.home(host) for host in HOSTS]
+        merged = migrated.window["familiar"]["merge"]
+        assert [transport.familiar_head(home) for home in homes] == [merged, merged]
+        assert transport._git(homes[0] / "d/familiar", "rev-list", "--parents", "-n", "1",
+                              merged).split() == [merged, pins["familiar_pre"],
+                                                  pins["familiar_feature_tip"]]
+        assert migrated.window["familiar"]["parents"] == [pins["familiar_pre"],
+                                                          pins["familiar_feature_tip"]]
+
+    def test_interleaved_picks_use_installer_bytes(self, migrated):
+        world, sealed = migrated.world, migrated.window["sealed"]["inputs"]["hosts"]
+        assert {host: list(sealed[host]) for host in HOSTS} == {
+            "titan": ["claude", "claude-work", "codex", "codex-work"],
+            "europa": ["claude", "claude-work"]}
+        for host in HOSTS:
+            for target_id, result in sealed[host].items():
+                dry_copy = Path(result["copy"])
+                plan = json.loads(Path(result["plan"]["path"]).read_bytes())
+                planned_after, = [change["after"] for change in plan["changes"]
+                                  if change["path"] == str(dry_copy)]
+                expected_bytes = world.target(host, target_id).read_bytes()
+                assert expected_bytes == dry_copy.read_bytes() == planned_after.encode("utf-8")
+                assert hashlib.sha256(expected_bytes).hexdigest() == result["expected"]["sha256"]
+                assert Path(result["frozen"]["path"]).read_bytes() == migrated.live[target_id]
+                value = json.loads(expected_bytes)
+                # Neither the controller's serialization of that value nor the guard helper's.
+                for indent in (2, 4):
+                    assert expected_bytes != (json.dumps(value, indent=indent,
+                                                         ensure_ascii=False) + "\n").encode()
+        personal = world.target("titan", "claude").read_bytes()
+        value, live = json.loads(personal), json.loads(migrated.live["claude"])
+        order = list(value)
+        assert order.index("model") < order.index("hooks")
+        assert order.index("alwaysThinkingEnabled") < order.index("effortLevel") < \
+            order.index("modelSettings")
+        keys = migrated.prepared["filter"]["keys"]
+        assert {key: value[key] for key in keys} == {key: live[key] for key in keys}
+        assert PICK_TEXT.encode() in personal and b"\\u00" not in personal
+        work = json.loads(world.target("titan", "claude-work").read_bytes())
+        assert list(work)[0] == "model" and work["model"] == "opus"
+        assert "effortLevel" not in work and "modelSettings" not in work
+        for target_id in ("codex", "codex-work"):
+            assert Path(sealed["titan"][target_id]["copy"]).name == "hooks.json"
+            reviewed = json.loads(world.member("titan", target_id, "after").read_bytes())
+            assert sha(json.loads(world.target("titan", target_id).read_bytes())) == sha(reviewed)
+
+    def test_all_target_bootstrap_single_writer(self, migrated):
+        world, log = migrated.world, migrated.requests
+        applies = [entry for _, entry in _sends(log, "target-apply")]
+        apply_hosts = [entry["host"] for entry in applies]
+        target_order = [entry["payload"]["target_id"] for entry in applies]
+        assert apply_hosts == ["titan"] * 4
+        assert target_order == ["claude", "claude-work", "codex", "codex-work"]
+        # Both hosts are checked closed right before each write; the migration is marked
+        # verified only after every host's targets, source, dependencies and evidence passed.
+        sends = [entry for _, entry in _sends(log)]
+        for index, entry in enumerate(sends):
+            if entry["operation"] == "target-apply":
+                assert [(sent["host"], sent["operation"]) for sent in sends[index - 2:index]] \
+                    == [("titan", "no-live"), ("europa", "no-live")]
+        last = max(index for index, entry in enumerate(sends)
+                   if entry["operation"] == "target-apply")
+        assert [(entry["host"], entry["operation"], entry["window"]["state"])
+                for entry in sends[last + 1:]] == [
+            ("titan", "target-verify", "applying"), ("titan", "familiar-verify", "applying"),
+            ("europa", "target-verify", "applying"), ("europa", "familiar-verify", "applying")]
+        assert migrated.window["verified"]["hosts"]["europa"]["familiar"]["relay"] == {
+            "version": "0.1.1", "commit": world.pins["relay_commit"]}
+        # Each target is planned and applied once, on Titan only, with the relay flags.
+        live = [call for call in observed(world, "installer") if call["phase"] == "live"]
+        assert [(call["host"], call["target_id"], call["apply"]) for call in live] == [
+            ("titan", target_id, applying) for target_id in target_order
+            for applying in (False, True)]
+        home = world.home("titan")
+        for call in live:
+            harness = "codex" if call["target_id"].startswith("codex") else "claude-code"
+            assert (_option(call, "--harness"), _option(call, "--retire"),
+                    _option(call, "--node")) == (harness, "familiar", "/usr/bin/node")
+            assert _option(call, "--evidence") == str(
+                home / f"d/ops/docs/runbooks/relay-guard-evidence-{harness}.json")
+            assert _option(call, "--subscribers") == str(home / ".config/relay/subscribers.json")
+            assert _option(call, "--target") == str(world.target("titan", call["target_id"]))
+        guards = [call for call in observed(world, "relay-cutover") if "ledger" in call]
+        assert [(call["host"], _option(call, "--target")) for call in guards] == [
+            ("titan", str(world.target("titan", target_id)))
+            for target_id in ("claude", "claude-work")]
+        # One writer per harness: familiar's hooks are retired and relay's entry is the only
+        # hook, on Titan and in Europa's synchronized, verified Claude copies.
+        relay = f"{transport.RELAY_HOOK} --harness fixture PreToolUse"
+        for host in HOSTS:
+            for target_id in inputs.relevant(host):
+                value = json.loads(world.target(host, target_id).read_bytes())
+                commands = [hook["command"] for groups in value["hooks"].values()
+                            for group in groups for hook in group["hooks"]]
+                assert commands == [relay]
+        verifies = [entry for _, entry in _sends(log, "target-verify")
+                    if entry["payload"]["verify"]]
+        assert [(entry["host"], entry["payload"]["wait"]) for entry in verifies] == [
+            ("titan", False), ("europa", True)]
+        ledger = state.read_ledger(migrated.window)
+        assert [entry["target_id"] for entry in ledger] == target_order
+        for entry in ledger:
+            artifact = Path(entry["artifact"])
+            assert artifact.parent == Path(migrated.window["directory"]) / "live"
+            assert [change["path"] for change in json.loads(artifact.read_bytes())["changes"]] \
+                == [entry["target"]]
+            assert mode(artifact) == 0o600
+            assert Path(entry["original"]).read_bytes() == migrated.live[entry["target_id"]]
+
+    def test_europa_claude_uses_local_installer(self, migrated):
+        world, home = migrated.world, migrated.world.home("europa")
+        europa = [call for call in observed(world, "installer") if call["host"] == "europa"]
+        assert sorted({call["target_id"] for call in europa}) == ["claude", "claude-work"]
+        assert {(call["phase"], call["hold"]) for call in europa} == {("dry", "1")}
+        assert {call["script"] for call in europa} == {
+            os.path.realpath(home / "d/hq/relay/bin/relay")}
+        for call in europa:
+            assert _option(call, "--evidence") == str(
+                home / "d/ops/docs/runbooks/relay-guard-evidence-claude-code.json")
+            assert _option(call, "--subscribers") == str(home / ".config/relay/subscribers.json")
+            assert Path(_option(call, "--target")).is_relative_to(world.root("europa") / "dry")
+        sealed = migrated.window["sealed"]["inputs"]["hosts"]
+        members = migrated.prepared["helpers"]["members"]
+        runtime = home / ".local/share/relay/v0.1.1/node_modules/relay/bin/relay.js"
+        for target_id, result in sealed["europa"].items():
+            assert result["identities"] == {
+                "installer": members["hq:relay/bin/relay"],
+                "relay_cutover": members["hq:tools/relay-cutover"],
+                "evidence": members["ops:docs/runbooks/relay-guard-evidence-claude-code.json"],
+                "runtime": transport._digest(runtime),
+                "subscribers": transport._digest(home / ".config/relay/subscribers.json")}
+            # Both hosts' installers agree byte for byte on each shared Claude target.
+            assert result["expected"]["sha256"] == sealed["titan"][target_id]["expected"][
+                "sha256"]
+            assert result["frozen"]["sha256"] == sealed["titan"][target_id]["frozen"]["sha256"]
+
+    def test_sync_before_install(self, migrated):
+        world, merge = migrated.world, migrated.window["familiar"]["merge"]
+        calls = observed(world, since=migrated.marks["observed"])
+        for host in HOSTS:
+            installs = [index for index, call in enumerate(calls) if call["host"] == host
+                        and call["tool"] == "npm" and call["args"][:1] == ["ci"]]
+            checks = [index for index, call in enumerate(calls) if call["host"] == host
+                      and call["args"] == ["familiar-source", "--head", merge]]
+            assert len(installs) == 1 and checks and checks[0] < installs[0]
+            install = calls[installs[0]]
+            record = migrated.prepared["hosts"][host]
+            assert install["cwd"] == str(world.home(host) / "d/familiar")
+            # Installs pin the prepared, revalidated cache prefixes, never the current ones.
+            assert install["cache"] == record["caches"]["prefixes"]["npm"]
+            assert install["cache_dir"] == record["caches"]["prefixes"].get("CACHE_DIR")
+            assert install["cache_dir"] == (str(world.tmp / "prepared-cache")
+                                            if host == "titan" else None)
+            assert (install["path_head"], install["hold"]) == ("/usr/bin", "1")
+            proof = migrated.window["dependencies"][host]
+            assert proof["relay"] == {"version": "0.1.1",
+                                      "commit": world.pins["relay_commit"]}
+            assert proof["cache"]["npm"] == record["caches"]["prefixes"]["npm"]
+            # The install ran only after this host's check against the merge passed; Europa's
+            # first check ran before Dropbox delivered the merge, so it waited and checked again.
+            before = [calls[index]["exit"] for index in checks if index < installs[0]]
+            assert before[-1] == 0
+            if host == "europa":
+                assert before[0] != 0 and len(before) >= 2
+        titan_install = next(index for index, call in enumerate(calls) if call["tool"] == "npm"
+                             and call["args"][:1] == ["ci"])
+        assert all(call["host"] == "titan" for call in calls[:titan_install]
+                   if call["tool"] == "npm" and call["args"][:1] == ["ci"])
+
+    def test_registration_before_guard_write(self, migrated):
+        world = migrated.world
+        by_path = {str(world.target("titan", target_id)): target_id
+                   for target_id in transport.TARGET_PATHS}
+        first = {}
+        for call in observed(world):
+            if call["host"] != "titan" or "ledger" not in call:
+                continue
+            first.setdefault(by_path[_option(call, "--target")], call)
+        assert list(first) == ["claude", "claude-work", "codex", "codex-work"]
+        sealed = migrated.window["sealed"]["inputs"]["hosts"]["titan"]
+        directory = Path(migrated.window["directory"])
+        for target_id, call in first.items():
+            # Claude's first write is its guard retirement; Codex's is the installer's apply.
+            assert call["tool"] == ("relay-cutover" if target_id.startswith("claude")
+                                    else "installer")
+            assert target_id in call["ledger"]["entries"]
+            assert target_id in call["ledger"]["originals"]
+            original = (directory / f"{target_id}.original").read_bytes()
+            assert original == migrated.live[target_id]
+            assert hashlib.sha256(original).hexdigest() == sealed[target_id]["frozen"]["sha256"]
+
+    def test_bootstrap_probes_exit_before_final_no_live(self, migrated):
+        world = migrated.world
+        calls = observed(world, since=migrated.marks["observed"])
+        quiesce = next(index for index, call in enumerate(calls) if call["tool"] == "codex"
+                       and call["args"][:1] == ["app-server"])
+        recorded = next(index for index, call in enumerate(calls)
+                        if call["tool"] == "quiesce-timers" and call["args"][0] == "record")
+        stopped = next(index for index, call in enumerate(calls)
+                       if call["tool"] == "quiesce-timers" and call["args"][0] == "stop")
+        probes = [index for index, call in enumerate(calls) if call["tool"] == "claude"]
+        # Every held version and doctor probe, on both hosts and in both homes, ran first.
+        assert {(calls[index]["host"], calls[index]["args"][0],
+                 calls[index]["config_dir"] is not None) for index in probes} == {
+            (host, probe, work) for host in HOSTS for probe in ("--version", "doctor")
+            for work in (False, True)}
+        assert all(calls[index]["hold"] == "1" for index in probes)
+        assert max(probes) < quiesce
+        # Each left a descendant alive until collected; none was alive at the final no-live.
+        lingered = world.lines("probes")[migrated.marks["probes"]:]
+        assert len(lingered) == len(probes) and {entry["mode"] for entry in lingered} == {
+            "linger"}
+        final = [call for call in calls[quiesce:recorded] if call["tool"] == "preflight"]
+        assert [call["host"] for call in final] == ["titan", "titan", "europa"]
+        assert all(call["probes"] == [] for call in final)
+        assert all(transport._gone(entry["pid"], entry["start_time"]) for entry in lingered)
+        # Timers stop only after that check.
+        assert recorded < stopped
+
+
+@needs_zsh
+def test_bootstrap_surviving_probe_refuses_before_mutation(cutover):
+    prepared = preparation.prepare(SESSION)
+    cutover.behave("europa", probe="survive")
+    opened = window.open_window(prepared)
+    consumed = run_decision(prepared, opened)
+    mark = len(cutover.lines("observed"))
+    with pytest.raises(window.Failed) as raised:
+        window.run_window(prepared, consumed)
+    failed = raised.value
+    assert (failed.step, failed.host, failed.status) == ("no-live", "europa", "blocked")
+    survivors = [entry for entry in cutover.lines("probes") if entry["mode"] == "survive"]
+    assert survivors
+    # No caller-child exemption: the tool's own surviving probes block, and none is killed.
+    assert all(not transport._gone(entry["pid"], entry["start_time"]) for entry in survivors)
+    assert all(any(str(entry["pid"]) in blocker for blocker in failed.blockers)
+               for entry in survivors)
+    calls = observed(cutover, since=mark)
+    assert not any(call["tool"] == "codex" and call["args"][:1] == ["app-server"]
+                   for call in calls)
+    assert timer_calls(cutover, mark) == []
+    record = state.current_window(cutover_root(cutover))
+    assert record["state"] == "aborted" and record["abort"]["hosts"] == {}
+    assert failed.next_command == ["run"]
+
+
+def _after(name, change):
+    """Run `change(world)` once the window's named step has returned."""
+    def arrange(world, monkeypatch):
+        step = getattr(window, name)
+
+        def wrapped(*args):
+            result = step(*args)
+            change(world)
+            return result
+        monkeypatch.setattr(window, name, wrapped)
+    return arrange
+
+
+def _restage(world):
+    world.write_manifest(generation="g2", hosts=("europa",))
+
+
+def _europa_evidence(world):
+    path = world.home("europa") / "d/ops/docs/runbooks/relay-guard-evidence-claude-code.json"
+    path.write_text(json.dumps({"harness": "claude-code", "version": "2.1.999"}) + "\n")
+
+
+def _reformat_codex(world):
+    world.write_target("codex", json.dumps(transport.REVIEWED["codex"]).encode(),
+                       hosts=("titan",))
+
+
+MISMATCH = {
+    "europa-bytes": ({"installer": {"dry:claude-work": "drift"}}, None,
+                     ("target-dry", "europa"), "planned"),
+    "cross-host": ({"installer": {"dry:claude": "variant"}}, None, ("target-dry", "europa"),
+                   "differ between titan and europa"),
+    "manifest": ({}, _after("quiesce_window", _restage), ("target-dry", "europa"),
+                 "input-manifest"),
+    "evidence": ({}, _after("quiesce_window", _europa_evidence), ("target-dry", "europa"),
+                 "evidence"),
+    "frozen": ({}, _after("dry_targets", _reformat_codex), ("target-frozen", "titan"),
+               "after the freeze"),
+}
+
+
+@needs_zsh
+@pytest.mark.parametrize("case", sorted(MISMATCH))
+def test_dry_mismatch_aborts_before_merge(cutover, monkeypatch, case):
+    behavior, arrange, where, fragment = MISMATCH[case]
+    cutover.behave("europa", **behavior)
+    if arrange is not None:
+        arrange(cutover, monkeypatch)
+    prepared = preparation.prepare(SESSION)
+    log = _requests(monkeypatch, cutover)
+    snapshots = {host: transport._tree_of(cutover.root(host) / "familiar-state") for host in HOSTS}
+    opened = window.open_window(prepared)
+    consumed = run_decision(prepared, opened)
+    with pytest.raises(window.Failed) as raised:
+        window.run_window(prepared, consumed)
+    targets = {host: {target_id: cutover.target(host, target_id).read_bytes()
+                      for target_id in transport.TARGET_PATHS} for host in HOSTS}
+    failed = raised.value
+    assert (failed.step, failed.host) == where and fragment in failed.error, failed.error
+    assert "aborted" in failed.observed and failed.next_command == ["run"]
+    record = state.current_window(cutover_root(cutover))
+    assert record["state"] == "aborted" and "familiar" not in record
+    assert {host: record["abort"]["hosts"][host]["complete"] for host in HOSTS} == {
+        "titan": True, "europa": True}
+    # Both timer and snapshot windows are undone; familiar stays at PRE and no live target,
+    # ledger entry or merge marker was written.
+    assert timers_active(cutover) == {"titan": "active", "europa": "active"}
+    assert {host: transport._tree_of(cutover.root(host) / "familiar-state")
+            for host in HOSTS} == snapshots
+    assert [transport.familiar_head(cutover.home(host)) for host in HOSTS] == [
+        cutover.pins["familiar_pre"]] * 2
+    expected = {host: {target_id: transport._encode_json(transport.LIVE[target_id]())
+                       for target_id in transport.TARGET_PATHS} for host in HOSTS}
+    if case == "frozen":  # the test's own write after the freeze, and nothing else
+        expected["titan"]["codex"] = json.dumps(transport.REVIEWED["codex"]).encode()
+    assert targets == expected
+    assert not (Path(record["directory"]) / "touched.tsv").exists()
+    assert not any(entry["operation"] in ("familiar-merge", "familiar-install", "target-apply")
+                   for _, entry in _sends(log))
+    assert not any("merge" in call for call in observed(cutover, "git"))
+    assert not any(call["phase"] == "live" for call in observed(cutover, "installer"))
+    # The dry evidence stays for inspection.
+    assert len(list((cutover.root("titan") / "dry" / record["id"]).iterdir())) == 4
+    assert transport.OUTPUT_SECRET not in str(failed)
+
+
+@needs_zsh
+def test_sync_timeout_requires_recovery(cutover):
+    cutover.config["sync"]["budget"] = 1.0  # familiar's merge never reaches Europa here
+    cutover.save()
+    prepared = preparation.prepare(SESSION)
+    opened = window.open_window(prepared)
+    consumed = run_decision(prepared, opened)
+    with pytest.raises(window.Failed) as raised:
+        window.run_window(prepared, consumed)
+    failed = raised.value
+    assert (failed.step, failed.host, failed.status) == ("familiar-install", "europa", "failed")
+    assert "did not reach" in failed.error
+    assert failed.next_command == ["recover"]
+    assert "Do not open Claude or Codex" in failed.observed
+    record = state.current_window(cutover_root(cutover))
+    assert record["state"] == "recovery-required" and record["failure"]["host"] == "europa"
+    merged = record["familiar"]["merge"]
+    assert transport.familiar_head(cutover.home("titan")) == merged
+    assert transport.familiar_head(cutover.home("europa")) == cutover.pins["familiar_pre"]
+    installs = [call["host"] for call in observed(cutover, "npm") if call["args"][:1] == ["ci"]]
+    assert installs == ["titan"] and list(record["dependencies"]) == ["titan"]
+    assert state.read_ledger(record) == []
+    assert {host: {target_id: cutover.target(host, target_id).read_bytes()
+                   for target_id in transport.TARGET_PATHS} for host in HOSTS} == {
+        host: {target_id: transport._encode_json(transport.LIVE[target_id]())
+               for target_id in transport.TARGET_PATHS} for host in HOSTS}
+    # Timers stay paused for recovery; the pre-merge abort can no longer undo this window.
+    assert timers_active(cutover) == {"titan": "inactive", "europa": "inactive"}
+    with pytest.raises(Stop, match="use recover"):
+        window.abort_window(record)
+    assert window.status()["next"] == ["recover"]
+
+
+@needs_zsh
+def test_bootstrap_run_needs_the_operator_decision(cutover, monkeypatch, capsys):
+    prepared = preparation.prepare(SESSION)
+    mark, root = len(cutover.lines("observed")), cutover_root(cutover)
+
+    def run(*argv):
+        code = cli.main(["run", *argv])
+        stderr = capsys.readouterr().err
+        record = state.current_window(root)
+        assert code == 1 and record["state"] == "aborted" and record["abort"]["hosts"] == {}
+        return stderr, record
+
+    # Without a terminal or a decision file, run stops with instructions before any change.
+    monkeypatch.setattr(cli, "TTY", str(cutover.tmp / "no-terminal"))
+    stderr, first = run()
+    assert "run stopped" in stderr and "step: decision" in stderr
+    assert "--decision-file" in stderr and "terminal" in stderr
+    # A declined answer on the terminal authorizes nothing.
+    master, slave = os.openpty()
+    try:
+        monkeypatch.setattr(cli, "TTY", os.ttyname(slave))
+        os.write(master, b"no\n")
+        stderr, second = run()
+    finally:
+        os.close(master)
+        os.close(slave)
+    assert "declined" in stderr and second["id"] != first["id"]
+    monkeypatch.setattr(cli, "TTY", str(cutover.tmp / "no-terminal"))
+    # A recorded decision for another window cannot authorize this one.
+    stale = transport._stage(cutover.tmp, "decision.json", json.dumps({
+        "schema": 1, "kind": "desktop", "action": window.RUN_ACTION, "window_id": first["id"],
+        "attempt_id": window.RUN_ATTEMPT, "subject_sha256": sha(window.run_subject(prepared)),
+        "verdict": "approved", "source": {
+            "type": "session", "session_id": SESSION, "ask": "Restart the surfaces?",
+            "reply": "yes", "answered_at": datetime.now(timezone.utc).isoformat()}}).encode())
+    stderr, third = run("--decision-file", str(stale))
+    assert "window_id" in stderr and third["id"] not in (first["id"], second["id"])
+    assert observed(cutover, since=mark) == [] and not (root / "quiesce").exists()

@@ -182,9 +182,10 @@ def _drift(host, prepared, observed):
         if name in recorded and _identity(harnesses.get(name) or {}) != recorded[name]:
             found.append(f"{host}: version: the {name} executable or its versions changed "
                          "since prepare; prepare again")
-    if (report.get("desktop") or {}).get("state") != recorded["desktop"]["state"]:
-        found.append(f"{host}: desktop: the desktop surfaces changed since prepare; prepare "
-                     "again")
+    if window.desktop_subject(report.get("desktop")) != window.desktop_subject(
+            recorded["desktop"]):
+        found.append(f"{host}: desktop: the familiar surfaces, their startup commands or "
+                     "processes, or the niri socket changed since prepare; prepare again")
     for target_id, target in recorded["targets"].items():
         current = observed["inputs"]["targets"].get(target_id)
         if current is not None and current["path"] != target["path"]:
@@ -266,15 +267,18 @@ def load_prepared() -> dict:
                      next_command=rerun) from None
 
 
-def check(prepared: dict) -> dict:
+def check(prepared: dict, *, opened: dict | None = None) -> dict:
     """Read-only: every host's eligibility and drift since preparation. Live sessions are
-    listed as run blockers, not eligibility blockers."""
+    listed as run blockers, not eligibility blockers. `opened` is the run's own window, still
+    `prepared`, which is not a blocker for its own gate."""
     root, blockers = _root(), []
     try:
         current = state.current_window(root)
     except Stop:
         current = None  # Titan's inputs-check names the unexplained state
-    if current is not None and current["state"] not in state.TERMINAL:
+    own = (opened is not None and current is not None and current["id"] == opened["id"]
+           and current["state"] == "prepared")
+    if current is not None and current["state"] not in state.TERMINAL and not own:
         blockers.append(f"titan: window: window {current['id']} is {current['state']}")
     active = current["id"] if current is not None else None
     seen = {host: _observe(host, active=active, complete=True) for host in HOST_ORDER}
@@ -296,9 +300,11 @@ def blocking_host(result):
     return first if first in hosts.HOSTS else "titan"
 
 
-def recheck(prepared: dict) -> dict:
-    """The run's eligibility gate: `check`, refusing on any blocker; pick drift passes."""
-    result = check(prepared)
+def recheck(prepared: dict, *, opened: dict | None = None) -> dict:
+    """The run's eligibility gate: `check`, refusing on any blocker; pick drift passes. Its
+    inventory completes and collects the held Claude version and doctor probes on both hosts
+    and in both homes before it reads their process tables."""
+    result = check(prepared, opened=opened)
     if not result["eligible"]:
         host = blocking_host(result)
         raise Failed("eligibility", host, "blocked",

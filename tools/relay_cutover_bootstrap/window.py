@@ -1,36 +1,45 @@
-"""The cutover window on the controller: quiescence and the pre-merge abort.
+"""The cutover window on the controller: the run's lifecycle and the pre-merge abort.
 
-Preparation and eligibility (`prepare`, `check`, `recheck`) are in `prepare.py`. A run
-(Task 4) opens the window with `open_window`, takes the operator's desktop decision in that
-invocation, consumes it with `state.consume_decision` and passes the consumed record to
-`quiesce_window`. Quiescing runs these steps, each recorded in the window before its request:
+Preparation and eligibility (`prepare`, `check`, `recheck`) are in `prepare.py`; the host side of
+targets and familiar is in `targets.py` and `familiar.py`. A run opens the window with
+`open_window`, takes the operator's desktop decision in that invocation (cli.py), consumes it with
+`state.consume_decision` and passes the consumed record to `run_window`, which runs:
 
-1. stop Titan's two Codex daemons with their CLI;
-2. strict no-live on both hosts;
-3. record and stop each host's timers;
-4. wait for their services;
-5. strict no-live again;
-6. refresh the familiar snapshots.
+1. the eligibility gate, whose inventory completes and collects the held Claude version and doctor
+   probes on both hosts and in both homes; a Claude process left afterwards blocks;
+2. `quiesce_window`: stop Titan's two Codex daemons with their CLI; strict no-live on both hosts,
+   with no exemption; record and stop each host's timers; wait for their services; strict no-live
+   again; refresh the familiar snapshots;
+3. `dry_targets`: the six dry runs on frozen copies, cross-host agreement and the seal;
+4. the frozen targets unchanged and both hosts closed, then the `familiar` record;
+5. the merge of the immutable tip on Titan; each host's install once the merge reached it; each
+   target registered, then applied once on Titan; every host verified. The window becomes
+   `migrated-surfaces-pending`.
 
-It returns the quiescent window, still `quiescing`, before any familiar or settings change.
-
-Any failure from `quiescing`, or an INT, TERM or HUP, aborts every host the window touched.
-The abort cancels and reconciles the window's pending operations, restores timers from their
-records and then returns the snapshots. The window goes `aborting` → `aborted`, or to
-`abort-incomplete` when a host cannot finish, including after a second interruption.
-`abort_window` is also how the next invocation reconciles after SIGKILL or an incomplete abort,
-and how it clears a window that a crash left `prepared`. It refuses a window whose recorded
-owner is still running, and any window past the pre-merge boundary. Task 4 must record
-`familiar` in the window before its merge begins.
+Each step is recorded in the window before its request. Any failure before the `familiar` record,
+or an INT, TERM or HUP, aborts every host the window touched: the abort cancels and reconciles
+the window's pending operations, restores timers from their records and then returns the
+snapshots. The window goes `aborting` → `aborted`, or to `abort-incomplete` when a host cannot
+finish, including after a second interruption. `abort_window` is also how the next invocation
+reconciles after SIGKILL or an incomplete abort, and how it clears a window that a crash left
+`prepared`. It refuses a window whose recorded owner is still running, and any window past the
+pre-merge boundary. After the `familiar` record a failure leaves `recovery-required`, with
+timers paused and nothing undone here.
 
 Keys this module adds to the window record:
 
 - `owner` {pid, start_time} and `decision`;
 - `attempts` [{host, step, at}];
 - `timers` {host: {sha256, recorded_at}}, with copies at `hosts/<host>/timers.json`;
-- `quiescent`, `failure`, `abort` and `earlier_aborts` (each incomplete abort's record).
+- `quiescent`, `failure`, `abort` and `earlier_aborts` (each incomplete abort's record);
+- `surfaces`: the consent subject, every host's recorded familiar surfaces;
+- `dry` {host: {target: verdict}} and `sealed` {at, effective_inputs_sha256, inputs};
+- `familiar` {started_at, pre, tip}, recorded before the merge, then merge, parents, merged_at;
+- `dependencies` {host: install proof}, `applied` {target: apply result}, `verified`.
 
-The window directory also keeps the prepared record as `prepared.json`."""
+The window directory also keeps the prepared record as `prepared.json`, the ledger
+(`touched.tsv`, `<target>.original`) and each target's live guard images, plan and artifact
+under `live/`."""
 import os
 import re
 import signal
@@ -39,12 +48,16 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import hosts, operations, state
+from . import hosts, inputs, operations, state, targets
 from .state import Stop
 
 HOST_ORDER = ("titan", "europa")
 PREPARED = "prepared.json"
 RUN_ACTION = "run"
+RUN_ATTEMPT = "run"  # the run's one desktop decision in its window
+IMPACT = ("familiar's niri watcher and desktop panel stop and start again from the merged "
+          "source; the panel is briefly absent")
+DURATION_SECONDS = 30
 BOOTSTRAP = "tools/relay-cutover-bootstrap"
 CHECKOUT = Path(__file__).resolve().parents[2]  # the controller's checkout
 SESSION = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
@@ -183,26 +196,26 @@ def open_window(prepared: dict, *, mode: str = "live") -> dict:
     return _save(window, owner=_me())
 
 
-def _refuse(message):
-    return Failed("quiesce", "titan", "refused", message, observed="nothing was changed",
+def _refuse(message, step="quiesce"):
+    return Failed(step, "titan", "refused", message, observed="nothing was changed",
                   next_command=["status"])
 
 
-def _check_quiesce(window, prepared, decision):
+def _check_quiesce(window, prepared, decision, step="quiesce"):
     if window is None:
-        raise _refuse("no window is open; a run opens one before quiescing")
+        raise _refuse("no window is open; a run opens one before quiescing", step)
     if not isinstance(decision, dict) or decision.get("window_id") != window["id"]:
-        raise _refuse("the decision does not belong to the open window")
+        raise _refuse("the decision does not belong to the open window", step)
     if window["state"] != "prepared":
         raise _refuse(f"window {window['id']} is {window['state']}; only a newly opened "
-                      "window quiesces")
+                      "window quiesces", step)
     if window["prepared_sha256"] != prepared_sha256(prepared):
-        raise _refuse("the window was opened for another preparation")
+        raise _refuse("the window was opened for another preparation", step)
     if window.get("owner") != _me():
-        raise _refuse("another invocation opened this window")
+        raise _refuse("another invocation opened this window", step)
     attempt = decision.get("attempt_id")
     if not isinstance(attempt, str) or not state.ATTEMPT_ID.fullmatch(attempt):
-        raise _refuse("the decision names no attempt")
+        raise _refuse("the decision names no attempt", step)
     try:
         consumed = state.load_record(Path(window["directory"]) / "decisions" / f"{attempt}.json")
     except Stop:
@@ -210,7 +223,8 @@ def _check_quiesce(window, prepared, decision):
     if (consumed != decision or decision.get("kind") != "desktop"
             or decision.get("action") != RUN_ACTION
             or decision.get("prepared_sha256") != window["prepared_sha256"]):
-        raise _refuse("the decision is not this window's consumed desktop decision for this run")
+        raise _refuse("the decision is not this window's consumed desktop decision for this run",
+                      step)
 
 
 def quiesce_window(prepared: dict, decision: dict) -> dict:
@@ -242,16 +256,21 @@ def _as_failed(error, progress):
                   f"unexpected {type(error).__name__}; the window record keeps the step")
 
 
+def _step(window, seen, progress, name, host):
+    """Record one attempt in the window before its request; a signal noted since stops here."""
+    if seen:
+        raise _Interrupt(seen[-1])
+    progress.update(step=name, host=host)
+    return _save(window, attempts=[*window.get("attempts", []),
+                                   {"host": host, "step": name, "at": _now()}])
+
+
 def _quiesce(window, prepared, progress, seen):
     mode, identity = window["mode"], window["id"]
 
     def step(name, host):
         nonlocal window
-        if seen:
-            raise _Interrupt(seen[-1])
-        progress.update(step=name, host=host)
-        window = _save(window, attempts=[*window["attempts"],
-                                         {"host": host, "step": name, "at": _now()}])
+        window = _step(window, seen, progress, name, host)
 
     step("codex-daemon-stop", "titan")
     result, log = _call("titan", mode, "codex-daemon-stop", {
@@ -438,6 +457,230 @@ def abort_window(window: dict) -> dict:
         return _abort(window, seen)
 
 
+# --- the run: eligibility, quiescence, six dry runs, familiar and the four targets ----------
+
+
+def desktop_subject(desktop: dict | None) -> dict:
+    """What desktop consent binds on one host: its state and explained absence, the trusted
+    niri socket and each familiar surface's startup commands and recorded processes."""
+    desktop = desktop or {}
+    return {"state": desktop.get("state"), "absence_reason": desktop.get("absence_reason"),
+            "socket": desktop.get("socket"),
+            "surfaces": [{"name": surface.get("name"), "configured": surface.get("configured"),
+                          "processes": surface.get("processes")}
+                         for surface in desktop.get("surfaces") or []]}
+
+
+def run_subject(prepared: dict) -> dict:
+    """The run's desktop decision subject: every host's recorded surfaces, impact, duration."""
+    return {"action": RUN_ACTION,
+            "hosts": {host: desktop_subject(prepared["hosts"][host]["desktop"])
+                      for host in HOST_ORDER},
+            "impact": IMPACT, "duration_seconds": DURATION_SECONDS}
+
+
+def _probes_collected(result):
+    """After the held probes were collected, a Claude process left on either host blocks; the
+    tool's own probes are not exempt."""
+    blockers = [f"{host}: no-live: claude process {entry['pid']} is still running after the "
+                "held version and doctor probes" for host in HOST_ORDER
+                for entry in result["sessions"][host] if entry["harness"] == "claude"]
+    if blockers:
+        host = blockers[0].split(": ", 1)[0]
+        raise Failed("no-live", host, "blocked", "Claude is still running after the held probes "
+                     "were collected; close every session on both hosts (no process is exempt, "
+                     "this tool's own probes included) and run again",
+                     log=result["logs"].get(host), blockers=blockers)
+
+
+def run_window(prepared: dict, decision: dict) -> dict:
+    """The run from its eligibility gate to the verified migration (`migrated-surfaces-pending`),
+    for the window this invocation opened and the desktop decision it consumed.
+
+    1. The decision's subject must be this preparation's desktop inventory; the window keeps it
+       as `surfaces`. The eligibility gate repeats preparation's checks; its inventory completes
+       and collects the held Claude probes for every host and home, and any Claude process
+       left afterwards blocks.
+    2. `quiesce_window`: daemon stop, the final strict no-live, timers and snapshots.
+    3. `dry_targets`: the six dry runs and the seal.
+    4. The frozen targets are unchanged and both hosts are closed; then `familiar` is recorded
+       and the immutable tip is merged.
+    5. Each host waits for the merge and installs; each target is registered and applied once
+       on Titan; every host's targets, source, dependencies and evidence are verified.
+
+    Failures before step 4's record abort every touched host; after it the window becomes
+    `recovery-required` and nothing is undone here."""
+    from . import prepare as preparation  # prepare imports this module for its step helpers
+    window = state.current_window(_root())
+    _check_quiesce(window, prepared, decision, step="run")
+    progress = {"step": "eligibility", "host": "titan"}
+    failed = None
+    with _signals() as seen:
+        try:
+            subject = run_subject(prepared)
+            if decision.get("subject_sha256") != state._digest(subject):
+                raise Failed("decision", "titan", "refused", "the decision's subject is not this "
+                             "preparation's desktop inventory; ask again")
+            window = _save(window, surfaces=subject)
+            _probes_collected(preparation.recheck(prepared, opened=window))
+            if seen:
+                raise _Interrupt(seen[-1])
+        except (Exception, _Interrupt) as error:
+            failed = _as_failed(error, progress)
+        if failed is not None:
+            raise _abort_after(failed, seen)
+        window = dry_targets(quiesce_window(prepared, decision))
+        try:
+            window = _before_merge(window, seen, progress)
+            window = _save(window, familiar={"started_at": _now(),
+                                             "pre": prepared["pins"]["familiar_pre"],
+                                             "tip": prepared["pins"]["familiar_feature_tip"]})
+        except (Exception, _Interrupt) as error:
+            failed = _as_failed(error, progress)
+        if failed is not None:
+            raise _abort_after(failed, seen)
+        try:
+            return _migrate(window, prepared, seen, progress)
+        except (Exception, _Interrupt) as error:
+            failed = _as_failed(error, progress)
+        raise _recovery_after(failed)
+
+
+def dry_targets(window: dict) -> dict:
+    """The six dry runs before familiar's merge: Titan's four targets, then Europa's two Claude
+    copies, each with its own host's installer, runtime and evidence (targets.py). Then both
+    hosts' shared outputs must agree and the window seals its effective inputs (`sealed`). The
+    quiescent window becomes `applying`; any failure aborts every host it touched."""
+    if state.current_window(_root()) != window:
+        raise Stop("this window record is not the active one on disk; reload it with status")
+    if (window["state"] != "quiescing" or "quiescent" not in window or "familiar" in window
+            or window.get("owner") != _me()):
+        raise _refuse(f"window {window['id']} is not this invocation's quiescent window",
+                      "target-dry")
+    prepared = state.load_record(Path(window["directory"]) / PREPARED)
+    if prepared_sha256(prepared) != window["prepared_sha256"]:
+        raise _refuse("the window's prepared record changed", "target-dry")
+    progress, failed = {"step": "target-dry", "host": "titan"}, None
+    with _signals() as seen:
+        try:
+            window = _save(window, state="applying")
+            results = {}
+            for host in HOST_ORDER:
+                for target_id in inputs.relevant(host):
+                    window = _step(window, seen, progress, "target-dry", host)
+                    result, _ = _call(host, window["mode"], "target-dry", {
+                        "window_id": window["id"], "target_id": target_id,
+                        "manifest_sha256": prepared["manifest"]["sha256"]}, "target-dry")
+                    results.setdefault(host, {})[target_id] = result
+                    window = _save(window, dry={name: dict(verdicts)
+                                                for name, verdicts in results.items()})
+            window = _save(window, sealed=targets.seal(prepared, results))
+            if seen:
+                raise _Interrupt(seen[-1])
+            return window
+        except (Exception, _Interrupt) as error:
+            failed = _as_failed(error, progress)
+        raise _abort_after(failed, seen)
+
+
+def _before_merge(window, seen, progress):
+    """The last pre-merge gate: every frozen target still holds its frozen bytes on both hosts,
+    and both hosts are closed."""
+    mode, identity, sealed = window["mode"], window["id"], window["sealed"]["inputs"]
+    for host in HOST_ORDER:
+        window = _step(window, seen, progress, "target-frozen", host)
+        frozen = {target_id: result["frozen"]["sha256"]
+                  for target_id, result in sealed["hosts"][host].items()}
+        found, log = _call(host, mode, "target-verify", {
+            "window_id": identity, "targets": frozen, "wait": False, "verify": False,
+            "manifest_sha256": sealed["manifest_sha256"]}, "target-frozen")
+        drifted = sorted(target_id for target_id, entry in found["targets"].items()
+                         if not entry["matches"])
+        if drifted:
+            raise Failed("target-frozen", host, "blocked", f"{', '.join(drifted)} changed after "
+                         "the freeze; nothing was written", log=log)
+    for host in HOST_ORDER:
+        window = _step(window, seen, progress, "no-live", host)
+        _no_live(host, mode, identity)
+    return window
+
+
+def _migrate(window, prepared, seen, progress):
+    """Past the familiar record: merge, install, register and apply, then verify both hosts."""
+    mode, identity, sealed = window["mode"], window["id"], window["sealed"]["inputs"]
+    pins = prepared["pins"]
+    window = _step(window, seen, progress, "familiar-merge", "titan")
+    merged, _ = _call("titan", mode, "familiar-merge", {
+        "window_id": identity, "pre": pins["familiar_pre"],
+        "tip": pins["familiar_feature_tip"]}, "familiar-merge")
+    window = _save(window, familiar={**window["familiar"], "merge": merged["merge"],
+                                     "parents": merged["parents"], "merged_at": _now()})
+    for host in HOST_ORDER:
+        window = _step(window, seen, progress, "familiar-install", host)
+        record = prepared["hosts"][host]
+        result, _ = _call(host, mode, "familiar-install", {
+            "window_id": identity, "merge": merged["merge"],
+            "caches": record["caches"]["prefixes"], "path": record["install"]["path"]},
+            "familiar-install")
+        window = _save(window, dependencies={**window.get("dependencies", {}), host: result})
+    titan = sealed["hosts"]["titan"]
+    for target_id in inputs.TARGETS:
+        for host in HOST_ORDER:
+            window = _step(window, seen, progress, "no-live", host)
+            _no_live(host, mode, identity)
+        entry = titan[target_id]
+        window = _step(window, seen, progress, "target-register", "titan")
+        state.register_target(window, target_id, Path(entry["path"]),
+                              Path(window["directory"]) / "live" / f"{target_id}.json")
+        window = _step(window, seen, progress, "target-apply", "titan")
+        result, _ = _call("titan", mode, "target-apply", {
+            "window_id": identity, "target_id": target_id,
+            "manifest_sha256": sealed["manifest_sha256"],
+            "frozen_sha256": entry["frozen"]["sha256"],
+            "expected_sha256": entry["expected"]["sha256"], "identities": entry["identities"]},
+            "target-apply")
+        window = _save(window, applied={**window.get("applied", {}), target_id: result})
+    verified = {}
+    for host in HOST_ORDER:
+        window = _step(window, seen, progress, "target-verify", host)
+        expected = {target_id: result["expected"]["sha256"]
+                    for target_id, result in sealed["hosts"][host].items()}
+        found, log = _call(host, mode, "target-verify", {
+            "window_id": identity, "targets": expected, "wait": host != "titan", "verify": True,
+            "manifest_sha256": sealed["manifest_sha256"]}, "target-verify")
+        missing = sorted(target_id for target_id, entry in found["targets"].items()
+                         if not entry["matches"])
+        if missing or not found["verified"]:
+            raise Failed("target-verify", host, "blocked", f"{', '.join(missing)} do not hold the "
+                         "sealed bytes" + (" after waiting for synchronization"
+                                           if host != "titan" else ""), log=log)
+        window = _step(window, seen, progress, "familiar-verify", host)
+        source, _ = _call(host, mode, "familiar-verify",
+                          {"window_id": identity, "merge": merged["merge"]}, "familiar-verify")
+        verified[host] = {"targets": expected, "familiar": source}
+    if seen:
+        raise _Interrupt(seen[-1])
+    return _save(window, state="migrated-surfaces-pending",
+                 verified={"at": _now(), "hosts": verified})
+
+
+def _recovery_after(failed):
+    """Past the familiar record nothing is undone here: the window needs full recovery."""
+    stop = ("familiar or settings may have changed and timers stay paused. Do not open Claude "
+            "or Codex until recover completes")
+    try:
+        window = state.current_window(_root())
+        window = _save(window, state="recovery-required", failure={
+            "step": failed.step, "host": failed.host, "status": failed.status,
+            "error": failed.error, "log": failed.log, "at": _now()})
+    except (Stop, OSError) as error:
+        failed.observed = f"the window record could not be updated ({hosts._brief(error)}); {stop}"
+    else:
+        failed.observed = f"window {window['id']} is recovery-required: {stop}"
+    failed.next_command = ["recover"]
+    return failed
+
+
 def status() -> dict:
     """Read-only: the prepared record, the active window and the one next command."""
     root = _root()
@@ -472,6 +715,11 @@ def status() -> dict:
                       f"(pid {owner['pid']}) is still running", next=["status"])
         return report
     attempted, stopped = _attempted(current), _stopped(current)
+    if current["state"] == "migrated-surfaces-pending":
+        report.update(detail=f"window {current['id']} verified the migration on both hosts; "
+                      "familiar's surfaces are pending and timers stay paused on "
+                      f"{', '.join(stopped) or 'no host'}", next=["restart-surfaces"])
+        return report
     report["detail"] = (f"window {current['id']} is {current['state']} and no invocation is "
                         "running it; " + (f"timers may be paused on {', '.join(stopped)}"
                                           if stopped else
