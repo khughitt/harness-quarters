@@ -2,7 +2,7 @@
 
 Status: approved for planning by Keith after spec round 6, 2026-10-20.
 The round-6 consent clarification is carried into the plan. Preparation/toolchain/
-pilot refinements requested in plan round 1 await human plan re-review.
+pilot refinements from plan rounds 1–2 await human plan re-review.
 Bootstrap/runbook: hq-c6c847. Independent Bash work: dots-55f537.
 Independent instruction work: lore-4c1787.
 This amends the execution arrangement of the approved relay cutover, not its
@@ -108,19 +108,21 @@ The bootstrap performs the already-reviewed operations in this order:
 3. Record/quiesce both hosts' timers, wait for their services, preserve preparation
    snapshots and refresh/verify the live backups. Recover every recorded host if
    this stage fails, including a first-host success followed by second-host failure.
-4. Merge the immutable familiar feature revision once on Titan; reconcile an
-   interruption between merge and record; wait for verified source synchronization
-   before each host's dependency installation. Install each host's dependencies
-   with the established root-only Git policy and prove the relay dependency pin.
-5. Dry-run all four targets on Titan copies and both Claude targets on Europa
-   copies, using each host's own installer, runtime and evidence. Before each live
-   mutation durably register that target, its captured original and artifact path in the shared ordered
-   touched-target record, including Claude guard removal before relay apply.
-   Verify each plan against its reviewed image, apply through relay with an
-   artifact, and verify the applied image. Edit each shared target only on Titan;
-   verify every affected host's synchronized bytes, familiar source/dependencies
-   and exact evidence. Durably record the verified migration checkpoint only
-   after all these checks pass. Claude and Codex stay closed during application.
+4. After quiescence/strict no-live, freeze exact synchronized current targets and
+   dry-run all four Titan copies and both Claude Europa copies before the familiar
+   merge. Use each host's installer/runtime/evidence. Require the planned after
+   string's exact UTF-8 bytes to equal the dry-applied copy; parsed non-pick content
+   must equal the reviewed after-image and picks/absence the frozen current input.
+   Seal those installer-produced bytes/hashes as this window's exact expectations.
+   Any of the six failures takes the pre-merge abort on every recorded host.
+5. Merge the immutable familiar feature revision once on Titan; reconcile an
+   interruption between merge and record; verify source sync before each host's
+   dependency installation/pin proof. Before each target's first live mutation,
+   durably register its original/artifact, including Claude guard removal. Recheck
+   frozen inputs and the live installer's plan after against the sealed dry output,
+   then apply each shared target only on Titan and verify exact synchronized bytes
+   on affected hosts. Both harnesses stay closed. Mark migration verified only
+   after all targets, source/dependencies and exact evidence pass.
 6. Restart the previously approved familiar surfaces using their validated local
    desktop contexts; verify replacement processes or the approved absent state.
    A surface-only failure after the verified migration leaves “migrated, surfaces
@@ -362,17 +364,30 @@ as restored host state, not an orphaned test process.
 Claude's live pick keys are owned by `.githooks/harness-state-clean`, not by the
 cutover. `prepare` and run step 1 reuse that module's `CLAUDE_JSON_KEYS` through the
 existing `runpy` loading pattern. Compare every other JSON key/value with the
-reviewed native before-image. For pick-only drift, preserve exact current before
-bytes and derive the after-image from the reviewed one with exactly the current
-picks (including absence); retain the original reviewed images and provenance.
-Hooks/statusLine verification is unchanged. Freeze each window's effective hashes
-before mutation; do not reject normal later pick changes during resumed hook checks.
-Never rewrite rollback originals/artifacts or bypass their unknown-byte refusal.
+reviewed native before-image. For pick-only drift, preserve the exact current
+input; never assemble expected bytes by inserting picks into the reviewed image.
+After quiescence, the six pre-merge dry-applied copies supply exact expected bytes.
+Accept only parsed equality of all non-pick content with the reviewed after-image
+and picks/absence with the frozen input. This preserves installer order/serialization,
+including picks before/between other keys. Retain original reviewed images/provenance
+and freeze effective window hashes before familiar/settings mutation. Existing
+hooks/statusLine verification is unchanged; never rewrite rollback artifacts or
+bypass their unknown-byte refusal.
+
+The handoff, including surfaces-pending, explicitly says not to change/save Claude
+model or effort defaults in either home/on either host until finish reports complete.
+If that happens anyway, pick changes can pass hook checks but unknown bytes still
+block full recovery for inspection; no automatic pick-rewriting recovery branch.
 
 Non-pick drift takes an explicit `prepare --stage-review` path producing copies,
 plans, artifacts and candidate images for review, without live readiness. Only a
-subsequent `prepare --reviewed-bundle ... --review-ref ...` referring to a real
-review of those exact hashes may use it. Computing a new hash is not review.
+subsequent `prepare --reviewed-bundle ... --review-ref ...` may use it. REF resolves
+one existing task binding note by task ID, timestamp and exact note-text SHA256;
+that note binds this manifest digest to a standard accepted review note and full
+private review-report digest on the same owning task. Rehash every bundle/report
+member and reject missing, ambiguous, wrong-task/digest, revise/revoked or unrelated
+acceptance references. Persist the real review before recording its binding. No
+flag creates acceptance, and all six closed-harness dry runs still precede merge.
 
 Preparation records system `/usr/bin/npm` 12.2.1, `/usr/bin/node`, system Git and
 `/usr/bin/python3` paths/versions/digests per host. Install with `/usr/bin` first in
@@ -516,8 +531,9 @@ interruptions before/after timer records, backup moves, familiar merge/record, a
 each of the four targets' guard/plan/apply operations; unknown target drift; and
 full offline recovery. Include INT/TERM/HUP during timer and synchronization waits,
 remote disconnection with an operation still running, restart refusal before any
-mutation, explained-absence and bad-socket cases, helper mismatch, refusal to
-reopen a harness after a failed apply, a recorded surface PID exiting before
+mutation, explained-absence and bad-socket cases, helper mismatch, interleaved pick layout,
+installer/dry-copy byte disagreement and all-six verdict ordering before merge,
+refusal to reopen a harness after a failed apply, a recorded surface PID exiting before
 restart, changed context/unrecorded surfaces, partial restart and consented retry,
 verified-migration surface failure without mandatory rollback, incomplete smoke
 receipts, and a `finish` failure after restoring one or both timers. Assert
@@ -540,10 +556,10 @@ through the exact same niri IPC spawn path as the surface launcher on each host.
 Require the IPC acknowledgement and record its verdict; fixtures separately test
 replacement-process liveness because `true` exits immediately. Preserve any
 explicit explained-absence exemption rather than inventing a desktop on that host.
-Merge/install familiar
-in throwaway clones using prepared system npm 12.2.1/node and host credentials; dry/apply/verify
-all four copied settings targets on Titan under one touched record, exercise the
-copied Claude targets on Europa and verify remote shared-image expectations; then
+Clone familiar at PRE, freeze current copied targets with interleaved picks and
+pass the same six dry runs before the scratch merge/install. Use prepared system
+npm 12.2.1/node and host credentials; then apply/verify Titan's four separate target
+copies under one touched record and verify remote shared-image expectations; then
 recover the copied targets and both clones/dependencies offline through the
 verdict. Keep Codex execution on Titan. Do not stop real timers, restart actual
 surfaces or edit live targets in the pilot. Real unit queries plus fixture timer

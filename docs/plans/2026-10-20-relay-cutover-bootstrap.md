@@ -18,7 +18,7 @@ existing relay v0.1.1, Git/npm, systemd user bus and niri IPC. No new dependency
 **Spec:** `.worktrees/relay-cutover/docs/specs/2026-10-20-operator-runbooks-design.md`
 (approved for planning after round 6; frozen predecessor `07acc26`).
 **Task:** hq-c6c847; parent hq-539508; blocked original window hq-f27918.
-**Status:** revised after plan round 1 at `3f010e1`; awaiting human plan re-review.
+**Status:** revised after plan round 2 at `20c574b`; awaiting human plan re-review.
 No implementation or new window run.
 **Execution:** preserve the user's subagent-driven choice. Work in the existing
 locked, hydrated `.worktrees/relay-cutover/`; do not create another hq worktree.
@@ -48,7 +48,7 @@ Task records (all unstarted; revised plan approval pending):
 - hq-628027 — Task 1: Durable records and the human-decision boundary
 - hq-df06cc — Task 2: Host transport, inventory and operation lifecycle
 - hq-ee2ea1 — Task 3: Prepare reviewed inputs, quiesce and abort before merge
-- hq-c6c742 — Task 4: Apply familiar and all four shared targets
+- hq-c6c742 — Task 4: Dry-run all six copies before applying familiar and targets
 - hq-f74ef6 — Task 5: Restore targets and familiar from reconciled state
 - hq-293e38 — Task 6: Consent-bound surface restart and retry
 - hq-bc710f — Task 7: Safe resume, smoke receipts and timer finalization
@@ -124,7 +124,8 @@ recovery again as setup. Keep the existing plan workspace and all review evidenc
 4. **Interruption in a durability gap:** Tasks 3–5 test timer records, snapshot moves,
    merge/record and ordered target writes/restores using actual files and Git.
 5. **Stale preparation or mode confusion:** Task 3 covers live picks/clean-filter
-   policy, non-pick image review and system-toolchain drift; Tasks 7–8 cover stale
+   policy, non-pick image review and system-toolchain drift; Task 4 tests interleaved
+   picks and all six dry-run verdicts before merge; Tasks 7–8 cover stale
    smoke evidence, live/pilot confusion, scratch escape and declared cache exceptions.
 
 ## Files and interfaces
@@ -178,30 +179,69 @@ a new review baseline. If their provenance cannot be verified, require image rev
 The retained personal source's raw hash differs from the old live hash because
 picks differ; that alone is not structural drift.
 
-Default `prepare` accepts only this pick-only difference (plus JSON formatting).
-Derive the expected image by removing every filter-owned pick from the reviewed
-after-image, then inserting exactly the current keys/values; missing keys stay
-missing, including when an old reviewed pick was present. Verify all other before
-content matches. Preserve and hash exact current before bytes and derived after
-bytes privately on both hosts, retaining the original reviewed images unchanged.
+Default `prepare` accepts only this pick-only difference (plus JSON formatting)
+and records eligibility/current originals and reviewed structural expectations.
+It does not assemble an exact expected image by inserting picks into a template.
 `relay-cutover verify` continues comparing only hooks/statusLine.
+
+During `run`, repeat eligibility checks, pass strict no-live and quiesce both
+hosts, then freeze the exact synchronized current files. **Before familiar merge**,
+perform all six dry runs: Titan's four targets and Europa's two Claude copies,
+using each host's pinned installer/runtime/evidence. Claude copies retire the
+native guard first; Codex copies retain the required `hooks.json` basename.
+
+For each dry run, parse the installer's planned `changes[].after` for exactly that
+copy, encode that string as UTF-8 without reserialization or an extra newline,
+and apply to the copy with a separate dry artifact. Require the copy's exact bytes
+to equal the planned bytes. Accept them only if parsed JSON excluding the shared
+filter's pick keys equals the reviewed after-image, and the pick keys/values AND
+absence equal the frozen current file. For Codex, require the complete parsed
+object to equal its reviewed image. The exact expected bytes are the successfully
+dry-applied copy's bytes; the controller never chooses pick position, indentation,
+escaping or newline. Reject mismatches via the pre-merge abort on every recorded
+host, retaining evidence and leaving familiar/targets native.
+
+Seal each frozen original, dry plan/artifact and expected output/hash in the window;
+record `effective_inputs_sha256` before familiar/settings mutation. Require both
+hosts' Claude outputs to agree byte-for-byte for each shared target. Before live
+apply, require unchanged frozen target bytes, installer/evidence/helper identity
+and subscribers; verify the live plan's own after bytes equal the sealed dry output.
+After apply/sync, check exact bytes against that output. Unknown drift after merge
+still requires recovery/inspection. Original reviewed images/provenance and rollback
+artifacts remain immutable. Hooks/statusLine verification remains parsed.
 
 `prepare --stage-review` is the explicit structural-drift path: regenerate on
 copies, retain new before-images, guard snapshots, plans/artifacts and candidate
 after-images as a private review bundle; do not activate it or run live. After a
-real review, `prepare --reviewed-bundle DIR --review-ref REF` verifies the bundle
-hashes/provenance and the recorded review covering those exact inputs before
-using it. Missing/rejected review remains blocked; the flags do not grant review.
-Never accept non-pick drift merely because new hashes were computed.
+real review, `prepare --reviewed-bundle DIR --review-ref REF` validates the binding
+below before using the new structural baseline. Never accept non-pick drift merely
+because new hashes were computed. The closed-harness six dry runs still repeat;
+reviewing a candidate does not replace that window's exact-byte proof.
 
-At `run` step 1, repeat this eligibility check on both hosts. If only picks changed
-since preparation, freeze new exact originals/derived expectations under the new
-window and record `effective_inputs_sha256` before any live mutation. Do not rewrite
-old artifacts or prepared provenance. Recheck after strict no-live/source sync;
-unknown drift after mutation starts requires recovery/inspection. Resumed harnesses
-can later change picks: verification still uses hooks/statusLine, not stale full-file
-pick hashes. Rollback originals/artifacts remain immutable and byte gated; an
-unrecognized post-apply file is inspected, never force-copied over.
+`REF` has format `<task-id>@<note-at>#<sha256-of-UTF8-note-text>` and identifies exactly
+one existing binding note returned by `tasks show <task-id>`:
+`image-review: accept; bundle-sha256=<manifest-digest>; review-note=<accepted-review-note-ref>; report=<private-relative-path>; report-sha256=<report-digest>`.
+The immutable bundle manifest names its owning task, every before/after/plan/artifact
+path+hash and pins/helper identities. Its raw SHA256 is the reviewed bundle digest.
+The report is separate evidence, not a manifest member, avoiding a circular digest;
+its path is relative to the protected cutover root and its hash is in the binding
+note. That note must name the exact bundle digest/task;
+its referenced standard `review: impl round ... — verdict: accept; ...` note must
+exist uniquely on the same task, and the full report's digest must match. Save
+that real returned review and standard review note before writing its binding note.
+Check all manifest members and report bytes, references and accepted verdict;
+use the latest binding decision for that exact bundle (later revise/revoke refuses).
+Missing/ambiguous/invented references, a revise/revoked decision, changed bundle or
+wrong task/digest refuse. Do not treat a supplied flag or an unrelated acceptance
+as review. This validates persisted review evidence, not transcript authorship;
+transcript verification remains explicitly deferred below.
+
+**Until `finish` reports complete, do not change/save Claude model or effort defaults
+in either home on either host, including through `/model` or `/effort`.** Print this
+in successful and surfaces-pending handoffs and the replacement runbook. If picks
+changed anyway, ordinary hooks/statusLine verification can still pass, but unknown
+bytes block full recovery for inspection. Do not force restore or add an unreviewed
+pick-rewriting branch. After finish the restriction ends.
 
 ### Toolchain, environment and permitted cache writes
 
@@ -402,35 +442,38 @@ transport tests. Reuse filter key authority; do not modify the filter itself.
 **Interfaces:**
 
 - Consumes: Tasks 1–2 state, inventory and request interfaces; reviewed input policy above.
-- Produces: window functions `prepare(controller_session: str, *, stage_review: bool=False,
+- Produces: window functions `prepare(controller_session: str, *,
 reviewed_bundle: Path | None=None, review_ref: str | None=None) -> dict`,
 `check(prepared: dict) -> dict`, `quiesce_window(prepared: dict, decision: dict) -> dict`,
 `abort_window(window: dict) -> dict`; CLI `main(argv: list[str]) -> int` for
-prepare/check/status. Partial implementation is not live-runnable yet.
+prepare/check/status for eligibility and existing reviewed-bundle validation.
+Task 4 adds installer-generated review staging and the closed-harness dry-run gate;
+this task does not generate exact expected bytes or expose a live run entry.
 
 - [ ] **Step 1:** Add `test_prepare_preserves_filter_owned_picks`,
-  `test_nonpick_drift_requires_review_bundle`, `test_run_input_recheck_rebases_picks`,
+  `test_nonpick_drift_requires_review_bundle`, `test_run_input_recheck_accepts_pick_only_drift`,
   `test_system_toolchain_wins_over_nvm` and `test_second_host_failure_aborts_both`.
   Vary every key loaded from the filter, missing-key deletion and arbitrary nested
   pick values; non-pick/hook/statusLine edits reject. Mutate the fixture filter key
-  list to prove reuse. Derived images preserve the current pick values/absence;
-  reviewed originals stay unchanged. Fixtures provide their own reviewed bundle,
-  not the checkout's active hooks; `test_inert_main_needs_no_afterimage_activation`
-  runs against native and candidate checkout variants. `--stage-review` never produces live-ready
-  inputs, and reviewed-bundle activation rejects absent/wrong review/digests.
+  list to prove reuse. Record current pick values/absence without serializing
+  a new after-image; reviewed originals stay unchanged. Fixtures provide their
+  own reviewed bundle, not active checkout hooks; test both native and candidate
+  checkout variants. `test_review_ref_is_bound_to_bundle` rejects absent, invented,
+  ambiguous, wrong-task/wrong-digest, revise/revoked and unrelated accept notes;
+  check the referenced full report and every manifest member's bytes.
   ```python
-  assert nonpick(derived_after, filter_keys) == nonpick(reviewed_after, filter_keys)
-  assert current_pick_values_and_absence == derived_pick_values_and_absence
+  assert nonpick(current_before, filter_keys) == nonpick(reviewed_before, filter_keys)
+  assert recorded_picks_and_absence == current_picks_and_absence
   assert install_env["PATH"].split(":")[0] == "/usr/bin"
   assert npm_executable == "/usr/bin/npm" and npm_version == "12.2.1"
   ```
 - [ ] **Step 2:** Run the bootstrap/transport test files with
-  `-k 'prepare or pick or toolchain or quiesce or abort'`: RED. Include invalid
+  `-k 'prepare or pick or review_ref or toolchain or quiesce or abort'`: RED. Include invalid
   baseline provenance, corrupt images, npm 11/changed node/Git/Python identity,
   cache inside a live checkout, active sessions, partial snapshot copies, signals
   and second-host failure after the first timer record. No later live writes.
-- [ ] **Step 3:** Implement preparation/default rebase and explicit review-bundle
-  paths above. Capture immutable preparation plus effective window input hashes;
+- [ ] **Step 3:** Implement preparation eligibility and the concrete review-ref/
+  existing-bundle validation above. Capture immutable provenance/current input hashes;
   don't replace reviewed manifests with arbitrary current files. Add daemon-stop,
   no-live, timer-record/stop/wait/restore and snapshot-refresh/abort operations under
   these tests. Supported personal/work `app-server daemon stop` on Titan only;
@@ -438,6 +481,7 @@ prepare/check/status. Partial implementation is not live-runnable yet.
 - [ ] **Step 4:** Implement quiesce/abort on both hosts. Fsync timer helper output
   and parent before stopping; register snapshot moves before acting. Preserve old
   snapshots, refresh after native writers stop, verify state/dependency trees.
+  Return the quiescent state to Task 4 before any familiar/settings mutation.
   Any pre-merge failure aborts every recorded host; completed abort permits a new
   window, incomplete abort/SIGKILL requires reconciliation and abort first. Add
   `test_failure_returns_to_zsh` with original shell variables retained and sanitized
@@ -445,44 +489,56 @@ prepare/check/status. Partial implementation is not live-runnable yet.
 - [ ] **Step 5:** Mandatory suite; commit
   `feat(relay): prepare pick-safe cutover inputs and quiesce hosts`.
 
-### Task 4: Apply familiar and all four shared targets
+### Task 4: Dry-run all six copies before applying familiar and targets
 
 **Files:** extend window/host/CLI modules and bootstrap/transport tests.
 **Interfaces:**
 
 - Consumes: Task 3 `prepare`, `check`, `quiesce_window`, `abort_window`; Tasks 1–2 records/transport.
-- Produces: `run_window(prepared: dict, decision: dict) -> dict` in the window module;
-CLI `run` through the verified migration checkpoint. Add familiar-merge/install and
-target-dry/apply/verify operations only with this task's tests.
+- Produces: `dry_targets(window: dict) -> dict` and
+`run_window(prepared: dict, decision: dict) -> dict` in window; CLI `run` through the
+verified migration checkpoint. Extend `prepare` with `stage_review: bool=False` and
+`--stage-review` generation using the same copy-only installer pipeline, returning
+unapproved candidates until Task 3's concrete review-binding validation passes.
+Add target-dry/apply/verify and familiar-merge/install operations with these tests.
 
-- [ ] **Step 1:** Add `test_all_target_bootstrap_single_writer`,
-  `test_europa_claude_uses_local_installer`, `test_sync_before_install` and
-  `test_registration_before_guard_write`. Use real temp files/Git and existing
-  helper CLIs with fixture host commands.
+- [ ] **Step 1:** Add `test_six_dry_runs_precede_merge`,
+  `test_interleaved_picks_use_installer_bytes`, `test_dry_mismatch_aborts_before_merge`,
+  `test_all_target_bootstrap_single_writer`, `test_europa_claude_uses_local_installer`,
+  `test_sync_before_install`, and `test_registration_before_guard_write`.
+  The Claude fixture orders `model` before `hooks`, and `effortLevel`/`modelSettings`
+  after `alwaysThinkingEnabled`, matching live positions. Also vary removed keys,
+  nested values, formatting and non-ASCII text. Compare installer plan string bytes,
+  applied-copy bytes and sealed bytes directly, never controller reserialization.
   ```python
+  assert expected_bytes == dry_copy.read_bytes() == planned_after.encode("utf-8")
+  assert last_dry_verdict_index < merge_start_index
   assert apply_hosts == ["titan"] * 4
   assert target_order == ["claude", "claude-work", "codex", "codex-work"]
-  assert state == "migrated-surfaces-pending"
   ```
-- [ ] **Step 2:** Run both new test files with `-k 'apply or bootstrap or sync or guard or installer'`:
-  RED. Include exact-evidence refusal, source drift, target drift after input freeze,
-  merge commit before record, sync timeout and each guard/plan/apply interruption.
-- [ ] **Step 3:** At run step 1 repeat Task 3 pick-only eligibility/rebase and
-  toolchain checks on both hosts, then quiesce and recheck before mutation. Mark
-  familiar mutation before merging the immutable feature. Wait for verified source
-  sync before each `/usr/bin/npm ci --allow-git=root` with recorded system PATH and
-  cache environment; prove installed relay version and lock commit. No use of an
-  unqualified npm or an nvm interpreter.
-- [ ] **Step 4:** Dry-run Titan four targets and Europa two Claude copies using
-  each local installer/runtime/evidence. Register every original/artifact durably
-  before the first write. Apply only Titan, with existing guard retirement and
-  relay `--retire familiar --node /usr/bin/node`/artifact sequence. Existing verify
-  checks hooks/statusLine; exact window before/derived-image hashes gate the initial
-  application/sync. Before each write require affected harnesses still closed.
-  Verify synchronized targets, source, dependencies and evidence on both hosts before
-  marking migration verified. Otherwise preserve evidence/full-recovery gate.
+- [ ] **Step 2:** Run both new test files with
+  `-k 'dry or interleaved or apply or bootstrap or sync or guard or installer or stage_review'`: RED.
+  Any of six dry plan/apply/semantic/byte failures must abort both timer/snapshot
+  windows, leave familiar HEAD at PRE and write no live target/merge marker.
+  Include reviewed-bundle staging without activation, exact-evidence refusal,
+  cross-host output disagreement, target drift after freeze and sync timeout.
+- [ ] **Step 3:** At run step 1 repeat eligibility/toolchain checks, then quiesce.
+  Freeze the exact synchronized current files and complete all six local dry runs
+  before merging. Take expected bytes only from their applied copies after plan-
+  byte equality and parsed approval/pick checks above. Seal input/output identities
+  and effective hashes. Use the same pipeline for prepare review staging on copies;
+  generation grants no acceptance. Any failure here uses the pre-merge abort.
+- [ ] **Step 4:** Only after all six verdicts pass, mark familiar mutation and merge
+  the immutable feature. Wait for verified source sync before each system npm
+  install/pin proof. Register every original/artifact before the first target write;
+  retain frozen native bytes exactly. Apply once on Titan with existing guard
+  retirement, relay flags and artifacts. Recheck frozen input and live plan-after
+  equality to the sealed dry bytes, then applied/synchronized bytes. No second
+  post-merge dry-run phase is needed. Before each write require harnesses closed.
+  Verify all hosts' targets/source/dependencies/evidence before marking migration
+  verified; post-merge unknown drift still requires full recovery/inspection.
 - [ ] **Step 5:** GREEN focused tests and mandatory suite; commit
-  `feat(relay): apply familiar and all shared hook targets`.
+  `feat(relay): dry-run frozen inputs before the familiar transition`.
 
 ### Task 5: Restore targets and familiar from reconciled state
 
@@ -504,13 +560,15 @@ No placeholder surface operation or live recovery entry is exposed in this task.
   using real miniature Git histories and temp
   dependency trees, plus the existing restore helper with actual artifacts. Cover
   guard-only, planned/not-applied, applied/no-step-record and all-four-applied
-  failures; unknown bytes must stop without force-copy. One/both timers already
+  failures; unknown bytes must stop without force-copy. Include
+  `test_post_resume_pick_drift_refuses_restore`: changing a pick after apply still
+  stops recovery for inspection; the handoff freezes picks until finish. One/both timers already
   restored by a failed finish must be stopped/waited before any restore operation.
   ```python
   assert events.index("europa:service-inactive") < events.index("restore:claude")
   assert restored_target_bytes == original_target_bytes
   ```
-- [ ] **Step 2:** Run the bootstrap test command with `-k 'recover or reconcile or merge_record or service'`:
+- [ ] **Step 2:** Run the bootstrap test command with `-k 'recover or reconcile or merge_record or service or pick_drift'`:
   RED. Include actual merge committed before its SHA record, merge in progress,
   refused merge at PRE, unexpected parent/HEAD, interrupted revert before record,
   already-complete revert, failed remote sync and interrupted dependency restore.
@@ -592,7 +650,9 @@ and timer restore reuses Task 3.
 
 - [ ] **Step 1:** Add `test_resume_has_no_bypass_flags`, `test_current_row_is_fresh`,
   `test_receipt_is_bound_to_real_cases`, `test_human_attestation_is_required` and
-  `test_partial_finish_keeps_original_timers`. Stale row/cwd, wrong window/home/
+  `test_partial_finish_keeps_original_timers` and `test_handoff_freezes_claude_picks`.
+  Both ready and surfaces-pending handoffs name both hosts/homes and no model/effort
+  changes until finish. Stale row/cwd, wrong window/home/
   session/version, pilot receipt, missing/altered evidence or human verdict reject.
   Denial not attempted/Git identity error cannot pass; neither can automatic approval.
   ```python
@@ -600,13 +660,14 @@ and timer restore reuses Task 3.
   assert not finish_called_with_incomplete_receipts
   assert timer_records_after == timer_records_before
   ```
-- [ ] **Step 2:** Run bootstrap/transport tests with `-k 'resume or smoke or finish or receipt or attestation'`:
+- [ ] **Step 2:** Run bootstrap/transport tests with `-k 'resume or smoke or finish or receipt or attestation or handoff'`:
   RED. Include surface-pending, declined SSH/systemd permission, one timer restored,
   service still running/failing, and accidental targeting of the live controller.
 - [ ] **Step 3:** Print concrete Zsh-quoted executable/home/native-session argv with
   `--no-daemon resume`, never aliases/bypass flags/placeholders. First controller
   check proves its own fresh native ID/PID row before further rollout work. Work
-  home gets its explicit command and human hook review too. Controller policies
+  home gets its explicit command and human hook review too. Print the Claude
+  model/effort freeze warning before every resume/handoff until finish. Controller policies
   use defaults; dedicated smokes keep Claude `--permission-mode manual` and Codex
   `--no-daemon --sandbox workspace-write --ask-for-approval on-request`.
 - [ ] **Step 4:** Implement the receipt schema above and `record-smoke --receipt FILE
@@ -664,9 +725,11 @@ in CLI and `tools/relay-cutover-rehearse`; private machine-readable pilot verdic
   and cleanup, adding pilot-create/cleanup operations here. Retain the actual
   HOME/SSH authentication, user bus and prepared host-local cache routing, with
   fixed system PATH/Python bytecode policy above; TMPDIR and mutable application
-  roots stay scratch. Use `/usr/bin/npm` 12.2.1 and recorded `/usr/bin/node`. Pilot starts
-  with one case: clone at PRE, merge feature, install/pin-proof both hosts; dry/
-  apply/verify Titan four copies plus Europa Claude copies and remote image checks;
+  roots stay scratch. Use `/usr/bin/npm` 12.2.1 and recorded `/usr/bin/node`.
+  For one case, clone at PRE and freeze copied current targets with interleaved
+  picks. Pass the same six dry-run/parsed-approval/exact-byte checks before the
+  scratch merge/install; then apply/verify Titan's four separate live-simulation
+  target copies and remote image expectations, using those sealed expected bytes;
   use Task 5's same restoration core to restore targets and both clones/dependency
   trees offline to a verdict. Pilot surface/timer mutation stays unexercised, not
   a fabricated full live-recovery pass; the separate true-spawn probe covers IPC.
@@ -711,6 +774,8 @@ reviewable one-command handoff. Live application remains unperformed.
   `~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap run`.
   Describe observed outcomes, consent channels, trust/smoke/permission interactions,
   surfaces-pending retry, paused timers, finish and complete recover commands.
+  State that all six frozen-input dry runs precede merge and expected bytes come
+  from the installer; include the concrete review-ref gate and Claude pick freeze.
   Keep precise smoke prompts/verdicts and earlier rollback fixes in the reference;
   operators never paste the reference's old Bash bodies. Amend the original plan's
   execution status/Task 8 arrangement to point to this replacement; historical
@@ -774,8 +839,12 @@ This section names later human gates; approving this plan does not execute them.
 The agent prepares everything concrete first. The operator closes every Claude/
 Codex session on both hosts, including the current controller, and runs the single
 Zsh command. The bootstrap obtains that invocation's desktop consent before any
-mutation and executes both-host quiescence, familiar/dependencies and all four targets.
+mutation, quiesces both hosts, freezes inputs and passes all six dry runs before
+familiar/dependency changes and the four target applies.
 
+Until finish reports complete, keep Claude model/effort defaults unchanged in
+both homes on both hosts; do not use `/model` or `/effort` to save new defaults.
+Pick changes otherwise leave byte-gated recovery blocked for inspection.
 On verified migration, resume only with the printed explicit command and human
 personal Codex hook review; first prove the current controller's fresh row. If
 surfaces are pending, the agent previews status, asks in the session and records
@@ -797,8 +866,10 @@ closed-harness command, with new desktop consent for its restarts.
   original-window handoff → Task 9; independent dots/lore → their owning tasks.
 - [x] Check signatures/data schemas, step granularity and all five Review Focus
   cases. Each mutation operation lands in its consuming task's RED→GREEN cycle.
-- [x] Distinguish original reviewed images from effective pick-derived window
+- [x] Distinguish original reviewed images from effective installer-produced window
   images, pinned system toolchain from login PATH, explicit cancel from pipe loss,
   scratch application writes from declared host-cache/runtime effects, and
-  worktree tests from delivered-main tests. No live results are implied.
+  worktree tests from delivered-main tests. All six authoritative installer-byte
+  dry runs precede merge; review-ref identifies bound accepted evidence; handoffs
+  freeze Claude picks through finish. No live results are implied.
 - [ ] Human re-reviews the complete frozen plan before Task 1 implementation.
