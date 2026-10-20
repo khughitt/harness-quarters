@@ -4,7 +4,7 @@ title: "session-episodes reads only the default Claude projects store and Codex 
 status: idea
 priority: 2
 created: 2026-10-20T11:19:18Z
-updated: 2026-10-20T17:45:51Z
+updated: 2026-10-20T18:09:22Z
 depends: [hq-a1c591, hq-de3e4c]
 parent: hq-cff824
 tags: [feedback, gap, "from:lore"]
@@ -16,6 +16,7 @@ Found while checking whether stamped friction reports can be traced to their ori
 ## References
 
 - brief (input, kind=brief): docs/notes/2026-10-20-session-store-reach-brief.md — context and questions for this work
+- survey (input, required, kind=report): docs/notes/2026-10-20-session-log-survey.md — completed question and evidence survey
 
 ## Notes
 
