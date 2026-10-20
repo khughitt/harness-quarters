@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: direct
 created: 2026-10-20T01:37:42Z
-updated: 2026-10-20T01:37:42Z
+updated: 2026-10-20T01:38:43Z
 depends: []
 parent: hq-539508
 tags: []
@@ -22,3 +22,7 @@ Repeat the reviewed Task 3 procedure for Claude only at 2.1.304 using the actual
 Update only the Claude evidence and current-evidence paragraph in ops, verify real disposable installer plan acceptance, test and obtain review before local integration. Codex evidence is unchanged. Refresh the hq runbook's evidenced Claude version and recorded observations so operator commands use the accepted version. Check both hosts' exact versions before claiming readiness. No live hook application, timer/service/desktop changes, host-pointer repoints, or harness updates by the agent. No private settings, full inherited environments or credentials in outputs.
 
 Done: new Claude evidence proves the required routes at the exact installed version and pinned relay; candidate evidence is accepted by the real installer without mutating copied targets; relevant gates and review pass, evidence/docs integrated as authorized, both hosts pass the evidence gate (no-live may still refuse), operator handoff remains intact.
+
+## Notes
+
+- 2026-10-20T01:38:43Z (feat/relay-cutover): concerns: hq-33116d change — Europa's operator update installed Claude 2.1.304; evidence for the formerly installed 2.1.302 must be refreshed before cutover.
