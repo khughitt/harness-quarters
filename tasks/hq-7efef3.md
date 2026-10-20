@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/relay-cutover
 created: 2026-10-20T01:37:42Z
-updated: 2026-10-20T01:52:23Z
+updated: 2026-10-20T01:53:16Z
 started: 2026-10-20T01:40:58Z
 depends: []
 parent: hq-539508
@@ -37,3 +37,5 @@ Done: new Claude evidence proves the required routes at the exact installed vers
 - 2026-10-20T01:52:22Z (feat/relay-cutover): Verification complete: HQ just test passed228agent tests/13.43s and966hook-tool tests/286.67s; existing optional flasgger warning only. HQ docs/tasks/diff checks and precommit passed; source34487c4 records current304proof while preserving historical versions and every fenced command. Controller Titan exactops candidate fast gate1666/63.741s passed(1skip). Candidates: ops57d6167 and hq34487c4; no executable/live changes. Report claude-21304-report.md in plan workspace; controller owns review, ops integration and safe cleanup, while HQ stays task branch until Task8/9.
 - 2026-10-20T01:52:22Z (feat/relay-cutover): parked (waiting on agent): Controller: review ops0e468e5..57d6167 and HQ34487c4 using .worktrees/relay-cutover/.superpowers/sdd/2026-10-19-relay-cutover/claude-21304-report.md plus controller validation; integrate accepted ops evidence, retain HQ branch until Task8/9, then perform approved worktree cleanup.
   provenance: {"harness_session":"codex:01a156f7-6259-7d63-93ed-4c23e04ca74c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-20T01:53:16Z (feat/relay-cutover): resumed
+  provenance: {"harness_session":"codex:01a15627-8959-7223-98d3-1c5a0cf587a9","harness_session_source":"CODEX_THREAD_ID"}
