@@ -8,6 +8,7 @@ here contacts a real host, user bus, desktop, harness home or cutover root. The 
 closes pipes without sending any signal; cancellation is tested separately."""
 import functools
 import hashlib
+import itertools
 import json
 import os
 import shutil
@@ -22,7 +23,7 @@ from pathlib import Path
 import pytest
 
 from relay_cutover_bootstrap import (familiar, hosts, inputs, inventory, operations, quiesce,
-                                     state, targets)
+                                     restoration, state, targets)
 from relay_cutover_bootstrap.state import Stop
 
 TOOLS_DIR = Path(__file__).resolve().parent
@@ -109,14 +110,16 @@ def _rows(host):
 
 
 def install(hosts, inventory, operations):
-    from relay_cutover_bootstrap import familiar, inputs, targets
+    from relay_cutover_bootstrap import familiar, inputs, restoration, targets
     host = CONFIG["by_home"][os.environ["HOME"]]
     hosts._nodename = lambda: host
     hosts.TOOLS.update(CONFIG["tools"])
     inputs.PINS.update(CONFIG["pins"])
-    for module in (targets, familiar):
+    for module in (targets, familiar, restoration):
         module.SYNC_BUDGET_SECONDS = CONFIG["sync"]["budget"]
         module.SYNC_POLL_SECONDS = CONFIG["sync"]["poll"]
+    restoration.SERVICE_SECONDS = CONFIG["service"]["budget"]
+    restoration.SERVICE_POLL_SECONDS = CONFIG["service"]["poll"]
     inventory._process_rows = lambda: [
         {key: value for key, value in row.items() if key not in ("held", "daemon")}
         for row in _rows(host)]
@@ -211,6 +214,8 @@ FIXTURE_TOOL = r'''#!/usr/bin/python3 -S
 import json, os, shutil, subprocess, sys
 
 NAME = "@NAME@"
+# Git subcommands that change or fetch history; each such call is observed.
+HISTORY = {"revert", "reset", "fetch", "pull", "checkout", "clean", "stash", "restore", "commit"}
 with open("@CONFIG@") as stream:
     config = json.load(stream)
 host = config["by_home"][os.environ["HOME"]]
@@ -325,14 +330,45 @@ elif NAME == "git":
         # The familiar checkout is a real miniature history: its Git work is real Git's.
         if "merge" in args:
             observe(merge=args[args.index("merge") + 1:])
+        elif HISTORY & set(args):
+            observe(git=[arg for arg in args if arg in HISTORY])
         os.execv("/usr/bin/git", ["/usr/bin/git", *args])
 elif NAME == "systemctl":
     observe()
     if behavior["bus"] != "ok":
         print("Failed to connect to bus: @SECRET@", file=sys.stderr)
         sys.exit(1)
+    units_path = config["hosts"][host].get("units")
     if args == ["--user", "is-system-running"]:
         print("running")
+    elif args[:2] == ["--user", "start"] and len(args) == 3:
+        # A oneshot start: the run stays activating for `polls` state reads, then ends.
+        with open(units_path) as stream:
+            units = json.load(stream)
+        service = behavior.get("service", {})
+        runs = units.get(args[2], {}).get("runs", 0) + 1
+        units[args[2]] = {"polls": service.get("polls", 0), "runs": runs,
+                          "result": service.get("result", "success"),
+                          "status": str(service.get("status", 0))}
+        with open(units_path, "w") as stream:
+            json.dump(units, stream)
+        if service.get("start") == "fail":
+            print("Job failed @SECRET@", file=sys.stderr)
+            sys.exit(1)
+    elif args[:3] == ["--user", "show", "--property=ActiveState,Result,ExecMainStatus"]:
+        with open(units_path) as stream:
+            units = json.load(stream)
+        entry = units.get(args[3], {"polls": 0, "result": "success", "status": "0"})
+        if entry["polls"] > 0:
+            entry["polls"] -= 1
+            units[args[3]] = entry
+            with open(units_path, "w") as stream:
+                json.dump(units, stream)
+            print("ActiveState=activating\nResult=success\nExecMainStatus=0")
+        else:
+            active = "inactive" if entry["result"] == "success" else "failed"
+            print(f"ExecMainStatus={entry['status']}\nResult={entry['result']}\n"
+                  f"ActiveState={active}")
     elif args[:2] == ["--user", "show"]:
         print("loaded")
     else:
@@ -403,7 +439,8 @@ def observe(**fields):
 
 
 if args[:1] != ["preflight"]:
-    if args[0].startswith("familiar-") and behavior.get("familiar", "ok") != "ok":
+    if args[0] in behavior.get("fail", ()) or (
+            args[0].startswith("familiar-") and behavior.get("familiar", "ok") != "ok"):
         observe(exit=1)
         print(f"relay-cutover: {args[0]}: fixture failure @SECRET@", file=sys.stderr)
         sys.exit(1)
@@ -533,6 +570,29 @@ def ledger(window):
         name[:-len(".original")] for name in os.listdir(window) if name.endswith(".original"))}
 
 
+if args[:1] == ["rollback"]:
+    # relay rollback --artifact A: each change returns to its before text when the target
+    # still holds its after text.
+    with open(option("--artifact"), encoding="utf-8") as stream:
+        changes = json.load(stream)["changes"]
+    target_id = next((name for name, path in TARGETS.items()
+                      if changes[0]["path"].endswith("/" + path)), None)
+    with open(config["observed"], "a") as stream:
+        stream.write(json.dumps({"host": host, "tool": "installer", "args": args,
+                                 "phase": "rollback", "target_id": target_id, "apply": False,
+                                 "hold": os.environ.get("DISABLE_UPDATES")}) + "\n")
+    if config["hosts"][host]["behavior"].get("installer", {}).get(f"rollback:{target_id}"):
+        print("relay: error: fixture rollback failure @SECRET@", file=sys.stderr)
+        sys.exit(1)
+    for change in changes:
+        with open(change["path"], encoding="utf-8") as stream:
+            if stream.read() != change["after"]:
+                print("relay: error: the target no longer holds the artifact's after text",
+                      file=sys.stderr)
+                sys.exit(1)
+        write(change["path"], change["before"])
+    print(json.dumps({"rolled_back": [change["path"] for change in changes]}))
+    sys.exit(0)
 target, applying = option("--target"), "--apply" in args
 if "/dry/" in target:
     phase, target_id = "dry", os.path.basename(os.path.dirname(target))
@@ -933,6 +993,7 @@ class World:
             "probes": str(tmp_path / "probes.log"),
             "pins": {key: PINS[key] for key in inputs.PINS},
             "sync": {"budget": 20.0, "poll": 0.05}, "npm_tree": NPM_TREE,
+            "service": {"budget": 20.0, "poll": 0.05},
         }
         self.monkeypatch, self.pins, self.dropbox = monkeypatch, dict(PINS), None
         for host, remote in (("titan", False), ("europa", True)):
@@ -947,9 +1008,11 @@ class World:
                     "npm_config_cache", "XDG_CACHE_HOME", "GIT_SSH_COMMAND", "GIT_DIR",
                     "GIT_WORK_TREE", "GIT_INDEX_FILE"):
             monkeypatch.delenv(key, raising=False)
-        for module in (targets, familiar):
+        for module in (targets, familiar, restoration):
             monkeypatch.setattr(module, "SYNC_BUDGET_SECONDS", self.config["sync"]["budget"])
             monkeypatch.setattr(module, "SYNC_POLL_SECONDS", self.config["sync"]["poll"])
+        monkeypatch.setattr(restoration, "SERVICE_SECONDS", self.config["service"]["budget"])
+        monkeypatch.setattr(restoration, "SERVICE_POLL_SECONDS", self.config["service"]["poll"])
         monkeypatch.setitem(hosts.TOOLS, "ssh", str(self.ssh))
         for name in ("fixture-step", "fixture-short"):
             monkeypatch.setitem(operations.OPERATIONS, name, hosts.Operation(
@@ -1248,6 +1311,18 @@ class World:
             elif path.is_dir():
                 seen[str(path.relative_to(home))] = ("dir", stat.S_IMODE(path.lstat().st_mode))
         return seen
+
+    def move_claude(self, version="2.1.305"):
+        """An unexpected Claude update on every host: a new version installed and linked while
+        the reviewed evidence stays at the old one."""
+        for host in self.config["hosts"]:
+            home = self.home(host)
+            binary = self._tool(home / ".local/share/claude/versions" / version, "claude")
+            link = home / ".local/bin/claude"
+            link.unlink()
+            link.symlink_to(binary)
+            self.spec(host)["behavior"]["claude_version"] = f"{version} (Claude Code)"
+        self.save()
 
     def start_dropbox(self, hold=None):
         self.dropbox = Dropbox(self, hold)
@@ -1956,7 +2031,9 @@ def test_quiesce_operations_are_fixed(world):
     assert {name for name, spec in table.items()
             if spec.mutation and not name.startswith("fixture-")} == {
         "codex-daemon-stop", "timer-record", "timer-stop", "timer-restore", "snapshot-refresh",
-        "snapshot-abort", "target-dry", "target-apply", "familiar-merge", "familiar-install"}
+        "snapshot-abort", "target-dry", "target-apply", "familiar-merge", "familiar-install",
+        "timer-requiesce", "target-restore", "familiar-restore", "dependency-restore",
+        "service-run"}
     assert {"no-live", "timer-wait", "pending-operations", "inputs-check"} <= set(table)
     assert table["timer-wait"].deadline > hosts.TIMER_WAIT_SECONDS
     for host, operation, payload in (
@@ -2392,3 +2469,420 @@ def test_apply_writes_only_the_sealed_dry_output(world, monkeypatch):
     assert _private(directory / "claude.json") == 0o600
     verify = [call for call in world.lines("observed") if call["args"][:1] == ["verify"]]
     assert verify and verify[-1]["exit"] == 0
+
+
+# --- recovery on one host: the byte gate, familiar's Git state, dependencies, timers -------
+
+
+def _quiet(world, monkeypatch):
+    """In this process, as in the fixture helpers: no harness runs, and Git is the fixture's."""
+    monkeypatch.setattr(inventory, "_process_rows", lambda: [])
+    monkeypatch.setitem(hosts.TOOLS, "git", world.config["tools"]["git"])
+
+
+def _applying(world):
+    window = state.new_window(world.root("titan"), hashlib.sha256(b"prepared").hexdigest())
+    window = {**window, "state": "applying"}
+    state.save_record(Path(window["directory"]) / "window.json", window)
+    return window
+
+
+def _to_failure_point(world, monkeypatch, plan):
+    """One window whose ledger holds plan's targets, each taken by the real operations to its
+    failure point: dry run, registration, then target-apply with the named live installer fault
+    (None applies; "registered" stops after registration)."""
+    world.stage_cutover()
+    _quiet(world, monkeypatch)
+    numbers = itertools.count(1)
+    native = {target_id: world.target("titan", target_id).read_bytes()
+              for target_id in TARGET_PATHS}
+    window, dry = _applying(world), {}
+    live = Path(window["directory"]) / "live"
+    for target_id in plan:
+        response = _dry(world, target_id, next(numbers))
+        assert response["status"] == "completed", response["error"]
+        dry[target_id] = response["result"]
+    world.behave("titan", installer={f"live:{target_id}": fault for target_id, fault in
+                                     plan.items() if fault not in (None, "registered")})
+    for target_id, fault in plan.items():
+        state.register_target(window, target_id, Path(dry[target_id]["path"]),
+                              live / f"{target_id}.json")
+        if fault == "registered":
+            continue
+        response = _execute("titan", "target-apply", {
+            "window_id": window["id"], "target_id": target_id,
+            "manifest_sha256": _manifest_sha256(world),
+            "frozen_sha256": dry[target_id]["frozen"]["sha256"],
+            "expected_sha256": dry[target_id]["expected"]["sha256"],
+            "identities": dry[target_id]["identities"]}, next(numbers))
+        assert response["status"] == ("completed" if fault is None else "failed"), \
+            response["error"]
+    world.behave("titan", installer={})
+    return window, native, dry, numbers
+
+
+def _frozen(native):
+    return {target_id: _sha(data) for target_id, data in native.items()}
+
+
+def _pinned_relay(result):
+    return {name: result["identities"][name] for name in restoration.RELAY}
+
+
+def _restore_calls(world, since):
+    calls = world.lines("observed")[since:]
+    return ([call["args"] for call in calls
+             if call["tool"] == "relay-cutover" and call["args"][:1] == ["restore"]],
+            [call for call in calls if call["tool"] == "installer"])
+
+
+FAILURE_POINTS = {
+    "registered-only": ({"codex": "registered"}, {"codex": "original"}),
+    "guard-only": ({"claude": "plan-fail"}, {"claude": "guard-retired"}),
+    "planned-not-applied": ({"claude": None, "claude-work": "apply-fail"},
+                            {"claude": "relay-applied", "claude-work": "guard-retired"}),
+    "applied-without-step-record": ({"codex": None}, {"codex": "relay-applied"}),
+    "all-four-applied": ({target_id: None for target_id in TARGET_PATHS},
+                         {target_id: "relay-applied" for target_id in TARGET_PATHS}),
+}
+
+
+@pytest.mark.parametrize("point", sorted(FAILURE_POINTS))
+def test_recover_targets_from_each_failure_point(world, monkeypatch, point):
+    """The existing restore helper on this window's actual artifacts and guard images returns
+    every touched target to its registered original, in reverse ledger order."""
+    plan, verdicts = FAILURE_POINTS[point]
+    window, native, dry, numbers = _to_failure_point(world, monkeypatch, plan)
+    live = Path(window["directory"]) / "live"
+    evidence = _tree_of(live) if live.exists() else {}
+    checked = _execute("titan", "target-check", {"window_id": window["id"],
+                                                 "frozen": _frozen(native)}, next(numbers))
+    assert checked["status"] == "completed", checked["error"]
+    report = checked["result"]["targets"]
+    assert {target_id: entry["verdict"] for target_id, entry in report.items()} == {
+        target_id: verdicts.get(target_id, "frozen") for target_id in TARGET_PATHS}
+    assert {target_id: entry["native_sha256"] for target_id, entry in report.items()} == \
+        _frozen(native)
+    mark = len(world.lines("observed"))
+    ledger = state.read_ledger(window)
+    for entry in reversed(ledger):
+        target_id = entry["target_id"]
+        response = _execute("titan", "target-restore", {
+            "window_id": window["id"], "target_id": target_id,
+            "identities": _pinned_relay(dry[target_id])}, next(numbers))
+        assert response["status"] == "completed", response["error"]
+        result = response["result"]
+        assert result["from"] == verdicts[target_id]
+        assert result["restored"] is (verdicts[target_id] != "original")
+        assert result["rollback"] is (verdicts[target_id] == "relay-applied")
+    restored = {target_id: world.target("titan", target_id).read_bytes()
+                for target_id in TARGET_PATHS}
+    assert restored == native
+    helper, installer = _restore_calls(world, mark)
+    touched = [entry for entry in reversed(ledger) if verdicts[entry["target_id"]] != "original"]
+    assert [args[args.index("--target") + 1] for args in helper] == [
+        entry["target"] for entry in touched]
+    # This window's own artifact is passed only when its apply wrote one; relay rolls back only
+    # what it applied, with the pinned relay, and the guard images undo a retired guard.
+    assert ["--artifact" in args for args in helper] == [
+        Path(entry["artifact"]).exists() for entry in touched]
+    assert sorted(call["target_id"] for call in installer) == sorted(
+        target_id for target_id, verdict in verdicts.items() if verdict == "relay-applied")
+    assert {call["phase"] for call in installer} <= {"rollback"}
+    # Every image, plan and artifact stays as evidence.
+    assert (_tree_of(live) if live.exists() else {}) == evidence
+    # A retry finds each target original and writes nothing.
+    mark = len(world.lines("observed"))
+    for entry in reversed(ledger):
+        again = _execute("titan", "target-restore", {
+            "window_id": window["id"], "target_id": entry["target_id"],
+            "identities": _pinned_relay(dry[entry["target_id"]])}, next(numbers))
+        assert again["status"] == "completed" and again["result"]["restored"] is False
+    assert _restore_calls(world, mark) == ([], [])
+
+
+def test_recover_byte_gate_refuses_unknown_bytes_despite_hold_breach(world, monkeypatch):
+    window, native, dry, numbers = _to_failure_point(world, monkeypatch,
+                                                     {"claude": None, "codex": None})
+    live = Path(window["directory"]) / "live"
+    evidence = _tree_of(live)
+    target = world.target("titan", "claude")
+    value = json.loads(target.read_bytes())
+    value["model"] = "sonnet[1m]"  # a pick changed after apply
+    drifted = json.dumps(value, indent="\t").encode() + b"\n"
+    target.write_bytes(drifted)
+    world.target("titan", "codex-work").write_bytes(b'{"hooks": {}}\n')  # never registered
+    checked = _execute("titan", "target-check", {"window_id": window["id"],
+                                                 "frozen": _frozen(native)}, next(numbers))
+    assert {target_id: entry["verdict"] for target_id, entry in
+            checked["result"]["targets"].items()} == {
+        "claude": "unknown", "claude-work": "frozen", "codex": "relay-applied",
+        "codex-work": "unknown"}
+    mark = len(world.lines("observed"))
+    refused = _execute("titan", "target-restore", {
+        "window_id": window["id"], "target_id": "claude",
+        "identities": _pinned_relay(dry["claude"])}, next(numbers))
+    assert refused["status"] == "failed" and "no image" in refused["error"]
+    assert "force-copied" in refused["error"] and "sonnet" not in refused["error"]
+    assert target.read_bytes() == drifted and _tree_of(live) == evidence
+    assert _restore_calls(world, mark) == ([], [])
+    # The relay a rollback runs with must be the one this window applied with.
+    applied = world.target("titan", "codex").read_bytes()
+    changed = {**_pinned_relay(dry["codex"]), "runtime": "0" * 64}
+    refused = _execute("titan", "target-restore", {
+        "window_id": window["id"], "target_id": "codex", "identities": changed}, next(numbers))
+    assert refused["status"] == "failed" and "runtime" in refused["error"]
+    assert world.target("titan", "codex").read_bytes() == applied
+    # A hold breach moves Claude past its evidence; the byte gate neither reads nor runs either.
+    _evidence_changed(world)
+    world.move_claude()
+    restored = _execute("titan", "target-restore", {
+        "window_id": window["id"], "target_id": "codex",
+        "identities": _pinned_relay(dry["codex"])}, next(numbers))
+    assert restored["status"] == "completed", restored["error"]
+    assert restored["result"]["rollback"] is True
+    assert world.target("titan", "codex").read_bytes() == native["codex"]
+    assert [call for call in world.lines("observed")[mark:] if call["tool"] == "claude"] == []
+
+
+def _familiar_payload(world, **recorded):
+    return {"window_id": WINDOW, "pre": world.pins["familiar_pre"],
+            "tip": world.pins["familiar_feature_tip"], **recorded}
+
+
+def _merge_by_operation(world, number):
+    response = _execute("titan", "familiar-merge", {
+        "window_id": WINDOW, "pre": world.pins["familiar_pre"],
+        "tip": world.pins["familiar_feature_tip"]}, number)
+    assert response["status"] == "completed", response["error"]
+    return response["result"]["merge"]
+
+
+def _revert_by_operation(world, merge, number):
+    response = _execute("titan", "familiar-restore", {
+        **_familiar_payload(world, merge=merge), "expect": "merged"}, number)
+    assert response["status"] == "completed", response["error"]
+    return response["result"]["revert"]
+
+
+def _history(world):
+    """Git calls that changed or fetched familiar's history."""
+    return [call.get("git") or ["merge", *call["merge"]] for call in world.lines("observed")
+            if call["tool"] == "git" and ("git" in call or "merge" in call)]
+
+
+@pytest.mark.parametrize("case", ["refused-at-pre", "merge-in-progress", "merge-before-record",
+                                  "revert-before-record", "revert-complete"])
+def test_reconcile_familiar_merge_states(world, monkeypatch, case):
+    world.stage_cutover()
+    _quiet(world, monkeypatch)
+    numbers, root = itertools.count(1), world.home("titan") / "d/familiar"
+    pre, tip = world.pins["familiar_pre"], world.pins["familiar_feature_tip"]
+    recorded, merge = {}, None
+    if case == "merge-in-progress":  # interrupted before git committed the merge
+        _git(root, "merge", "--no-ff", "--no-commit", tip)
+    elif case != "refused-at-pre":
+        merge = _merge_by_operation(world, next(numbers))
+    if case in ("revert-before-record", "revert-complete"):
+        revert = _revert_by_operation(world, merge, next(numbers))
+        recorded = {"merge": merge, **({"revert": revert} if case == "revert-complete" else {})}
+    mark = len(_history(world))
+    found = _execute("titan", "familiar-reconcile", _familiar_payload(world, **recorded),
+                     next(numbers))
+    assert found["status"] == "completed", found["error"]
+    expected = {"refused-at-pre": ("at-pre", None, pre, False),
+                "merge-in-progress": ("merge-in-progress", None, None, False),
+                "merge-before-record": ("merged", merge, None, True),
+                "revert-before-record": ("reverted", merge, familiar_head(world.home("titan")),
+                                         True),
+                "revert-complete": ("reverted", merge, familiar_head(world.home("titan")),
+                                    False)}[case]
+    result = found["result"]
+    assert (result["class"], result["merge"], result["revert"], result["discovered"]) == expected
+    assert len(_history(world)) == mark  # reconciliation only reads
+    restored = _execute("titan", "familiar-restore", {
+        **_familiar_payload(world, **recorded), "expect": result["class"]}, next(numbers))
+    assert restored["status"] == "completed", restored["error"]
+    action = {"merge-in-progress": "merge-aborted", "merge-before-record": "reverted"}.get(
+        case, "none")
+    assert restored["result"]["action"] == action
+    head = familiar_head(world.home("titan"))
+    assert restored["result"]["revert"] == head
+    assert _git(root, "rev-parse", "HEAD^{tree}") == _git(root, "rev-parse", f"{pre}^{{tree}}")
+    assert not (root / ".git/MERGE_HEAD").exists() and not (root / ".git/REVERT_HEAD").exists()
+    if action == "reverted":  # one revert, whose parent is the merge found from its parents
+        assert _git(root, "rev-list", "--parents", "-n", "1", head).split() == [head, merge]
+        assert _history(world)[mark:] == [["revert"]]
+        # Recovery never reverts twice: the merge state it reconciled is gone.
+        again = _execute("titan", "familiar-restore", {
+            **_familiar_payload(world, merge=merge), "expect": "merged"}, next(numbers))
+        assert again["status"] == "failed" and "reverted" in again["error"]
+        assert familiar_head(world.home("titan")) == head
+    else:
+        assert _history(world)[mark:] == ([["merge", "--abort"]] if action == "merge-aborted"
+                                          else [])
+    assert len(_history(world)) == mark + (1 if action != "none" else 0)
+
+
+def _commit_on(root, name, text):
+    _write(root / name, text)
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", f"unexpected {name}")
+
+
+UNEXPECTED = ("commit-on-pre", "other-merge", "recorded-merge-differs", "revert-in-progress",
+              "merge-recorded-at-pre")
+
+
+@pytest.mark.parametrize("case", UNEXPECTED)
+def test_reconcile_unexpected_familiar_history_needs_inspection(world, monkeypatch, case):
+    world.stage_cutover()
+    _quiet(world, monkeypatch)
+    numbers, root = itertools.count(1), world.home("titan") / "d/familiar"
+    pre = world.pins["familiar_pre"]
+    recorded = {}
+    if case == "commit-on-pre":
+        _commit_on(root, "later.txt", "someone committed after PRE\n")
+    elif case == "other-merge":
+        _git(root, "checkout", "-q", "-b", "other", pre)
+        _commit_on(root, "other.txt", "another branch\n")
+        _git(root, "checkout", "-q", "main")
+        _git(root, "merge", "--no-ff", "--no-edit", "other")
+    elif case == "recorded-merge-differs":
+        _merge_by_operation(world, next(numbers))
+        recorded = {"merge": "1" * 40}
+    elif case == "revert-in-progress":
+        merge = _merge_by_operation(world, next(numbers))
+        _git(root, "revert", "--no-commit", "-m", "1", merge)
+        recorded = {"merge": merge}
+    else:
+        recorded = {"merge": "1" * 40}
+    head, refs = familiar_head(world.home("titan")), _tree_of(root / ".git/refs")
+    mark = len(_history(world))
+    found = _execute("titan", "familiar-reconcile", _familiar_payload(world, **recorded),
+                     next(numbers))
+    assert found["status"] == "completed", found["error"]
+    assert found["result"]["class"] == "unexpected" and found["result"]["reason"]
+    for expect in ("at-pre", "merged", "reverted"):
+        refused = _execute("titan", "familiar-restore", {
+            **_familiar_payload(world, **recorded), "expect": expect}, next(numbers))
+        assert refused["status"] == "failed" and "unexpected" in refused["error"]
+    assert familiar_head(world.home("titan")) == head
+    assert _tree_of(root / ".git/refs") == refs and len(_history(world)) == mark
+
+
+def _quiesced_snapshot(world, numbers):
+    """The window's timer record and its verified pre-merge snapshots, as quiescence leaves
+    them."""
+    for operation, payload in (("timer-record", {}),
+                               ("snapshot-refresh", {"familiar_pre": world.pins["familiar_pre"]})):
+        response = _execute("titan", operation, {"window_id": WINDOW, **payload}, next(numbers))
+        assert response["status"] == "completed", response["error"]
+
+
+DEPENDENCIES = ("installed", "interrupted", "native", "tampered-snapshot", "unsynchronized")
+
+
+@pytest.mark.parametrize("case", DEPENDENCIES)
+def test_recover_dependency_restore_offline(world, monkeypatch, case):
+    world.stage_cutover()
+    _quiet(world, monkeypatch)
+    numbers = itertools.count(1)
+    _quiesced_snapshot(world, numbers)
+    modules = world.home("titan") / "d/familiar/node_modules"
+    snapshot = world.root("titan") / "familiar-node_modules.pre"
+    native = _tree_of(modules)
+    assert native == _tree_of(snapshot)
+    if case in ("installed", "interrupted", "tampered-snapshot"):  # npm ci added relay
+        _write(modules / "relay/package.json", '{"name": "relay", "version": "0.1.1"}\n')
+    if case == "interrupted":  # a restore stopped partway through its removal
+        shutil.rmtree(modules / "familiar-theme")
+        _write(modules / ".partial", "left by an interrupted copy\n")
+    if case == "tampered-snapshot":
+        _write(snapshot / "familiar-theme/index.js", "module.exports = 'changed';\n")
+    revert = world.pins["familiar_pre"]
+    if case == "unsynchronized":  # the recovered commit has not reached this host
+        monkeypatch.setattr(restoration, "SYNC_BUDGET_SECONDS", 0.3)
+        revert = world.pins["familiar_feature_tip"]
+    before = _tree_of(modules)
+    mark = len(world.lines("observed"))
+    response = _execute("titan", "dependency-restore", {
+        "window_id": WINDOW, "pre": world.pins["familiar_pre"], "revert": revert},
+        next(numbers))
+    calls = world.lines("observed")[mark:]
+    assert [call for call in calls if call["tool"] in ("npm", "git") and
+            ("git" in call or call["tool"] == "npm")] == []  # offline: no npm, fetch or reset
+    if case in ("tampered-snapshot", "unsynchronized"):
+        assert response["status"] == "failed"
+        assert ("differs from the copy" if case == "tampered-snapshot"
+                else "did not reach") in response["error"]
+        assert _tree_of(modules) == before
+        return
+    assert response["status"] == "completed", response["error"]
+    assert response["result"]["replaced"] is (case != "native")
+    assert _tree_of(modules) == native == _tree_of(snapshot)
+    assert _tree_of(modules)[".bin/theme"] == ("link", "../familiar-theme/index.js")
+    checks = [call["args"] for call in calls if call["tool"] == "relay-cutover"]
+    assert checks[-1] == ["familiar-check", "--expect", "native"]
+    # Repeating it finds the snapshot in place and replaces nothing.
+    again = _execute("titan", "dependency-restore", {
+        "window_id": WINDOW, "pre": world.pins["familiar_pre"], "revert": revert},
+        next(numbers))
+    assert again["status"] == "completed" and again["result"]["replaced"] is False
+
+
+def test_recover_timer_requiesce_after_a_restore(world, monkeypatch):
+    world.stage_cutover()
+    numbers = itertools.count(1)
+    record = world.root("titan") / "quiesce" / WINDOW / "timers.json"
+    recorded = _execute("titan", "timer-record", {"window_id": WINDOW}, next(numbers))["result"]
+    payload = {"window_id": WINDOW, "record_sha256": recorded["sha256"]}
+    assert _execute("titan", "timer-stop", payload, next(numbers))["status"] == "completed"
+    restored = _execute("titan", "timer-restore", {**payload, "stopped": True}, next(numbers))
+    assert restored["result"]["restored"] is True
+    assert world.units("titan")["familiar-reap.timer"]["active"] == "active"
+    assert quiesce._unrestored(world.root("titan")) == []
+    data = record.read_bytes()
+    # Recovery stops the restored timer again from the same original record.
+    changed = _execute("titan", "timer-requiesce", {**payload, "record_sha256": "0" * 64},
+                       next(numbers))
+    assert changed["status"] == "failed" and "record" in changed["error"]
+    again = _execute("titan", "timer-requiesce", payload, next(numbers))
+    assert again["status"] == "completed", again["error"]
+    assert again["result"]["was_restored"] is True
+    assert world.units("titan")["familiar-reap.timer"]["active"] == "inactive"
+    assert record.read_bytes() == data  # the original record is never replaced
+    kept = record.parent / "requiesced" / "timers.restored.json"
+    assert again["result"]["retained"] == str(kept) and kept.is_file()
+    # The window reads as pausing this host's timers again.
+    assert quiesce._unrestored(world.root("titan")) == [WINDOW]
+    twice = _execute("titan", "timer-requiesce", payload, next(numbers))
+    assert twice["status"] == "completed" and twice["result"]["was_restored"] is False
+
+
+def test_recovery_operations_are_fixed(world):
+    table = operations.OPERATIONS
+    titan_only = {"target-check", "target-restore", "familiar-reconcile", "familiar-restore"}
+    assert {name for name in table if table[name].hosts == ("titan",)} >= titan_only
+    for name in ("recovery-no-live", "timer-requiesce", "dependency-restore", "service-run",
+                 "service-check"):
+        assert set(table[name].hosts) == {"titan", "europa"}
+    assert not any(table[name].mutation for name in (
+        "recovery-no-live", "target-check", "familiar-reconcile", "service-check"))
+    assert table["dependency-restore"].deadline > hosts.SYNC_SECONDS
+    sha = "0" * 64
+    for host, operation, payload in (
+            ("europa", "target-restore", {"window_id": WINDOW, "target_id": "claude",
+                                          "identities": {"installer": sha, "relay_cutover": sha,
+                                                         "runtime": sha}}),
+            ("titan", "target-restore", {"window_id": WINDOW, "target_id": "claude",
+                                         "identities": {"installer": sha}}),
+            ("titan", "familiar-restore", {"window_id": WINDOW, "pre": "1" * 40, "tip": "2" * 40,
+                                           "expect": "unexpected"}),
+            ("titan", "target-check", {"window_id": WINDOW, "frozen": {"claude": sha}}),
+            ("titan", "service-run", {"window_id": WINDOW})):
+        with pytest.raises(hosts.Refused):
+            world.request(host, operation, payload)
+    assert world.lines("ssh_log") == []
+    pilot = world.request("titan", "recovery-no-live", {"window_id": WINDOW}, mode="pilot")
+    assert pilot["status"] == "failed" and "live" in pilot["error"]
