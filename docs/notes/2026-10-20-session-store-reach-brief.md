@@ -77,10 +77,39 @@ When the evidence lives elsewhere, the agent gets no result and no explicit
    agents search by hand. This costs nothing, but it gives no explicit unavailable
    result and repeats the audit's manual work.
 
-Lean: 2. obs already indexes all six roots, the archive replay and missing state, so a
-second locate surface in hq would duplicate it. The research below decides whether the
-index covers the audited cases. Whatever is chosen, `session-episodes` should read the
-stores obs indexes (hq-a60cf5), and the model route is a skill addition (hq-7b131a).
+4. **An `hq logs` reader and usage skill (the user's proposal, 2026-10-20).** One CLI
+   over every store answers the common questions, for example `hq logs --harness codex
+   --profile work --start-date 2026-10-14 <text>` and `hq trace --task-id <id>`, and the
+   skill teaches question-to-command recipes in place of the hand-written parsers.
+   A pilot found about 1,470 store-reading tool calls since September, 472 of them
+   Python parsers written on the spot (hq-de3e4c). Design inputs from review, which the
+   survey confirms or overturns:
+   - **Release order.** First release `grep` and `show` plus the metadata filters they
+     need. Add `find` only if it differs from `hq sessions`; add `trace` once the
+     survey settles its evidence rules.
+   - **`trace` names its evidence.** A task id in a session does not mean the session
+     worked on it. Each link carries its kind and reference: provenance stamp,
+     successful task command, tool-output match, or textual mention. It searches
+     tool outputs as well as inputs. Child-to-parent links come from recorded metadata
+     (Codex `session_meta.payload.source.subagent.thread_spawn.parent_thread_id`).
+   - **Share discovery and parsing, not selection.** `tools/hq_cli/sessions.py` lists
+     only Codex threads with a preview and excludes non-interactive sessions, which is
+     right for resuming and would hide the subagents an investigation needs. Each
+     consumer applies its own selection. "No new index" does not rule out the existing
+     obs index (hq-a1c591).
+   - **Result contract before verbs.** JSONL with `--pretty`. Each hit carries a
+     reference to its content block, not only its line, because one Claude record can
+     hold several tool calls (275 of 24,919 recent records). It also carries the tool
+     name and call id, so `show` pairs a call with its output, and the runtime model of
+     its turn. Every run reports coverage and truncation (stores searched, unavailable,
+     unreadable), so "nothing found" can be interpreted.
+
+Lean: 4, with 2 as its source of location metadata where hq-a1c591 shows the obs index
+covers the case. A second locate surface beside obs's index would duplicate it; a shared
+reader in hq replaces four store lists and three human-or-injected classifiers.
+hq-a60cf5 stays independent: it fixes a silent coverage gap in obs's baseline input now,
+and when the shared reader lands, it replaces `session-episodes`' root list with an
+import. The model route stays a skill addition (hq-7b131a), later a field of `show`.
 
 ## 5. Unanswered questions
 
@@ -99,11 +128,11 @@ stores obs indexes (hq-a60cf5), and the model route is a skill addition (hq-7b13
 - hq-a1c591 (research): obs index coverage of the audited origins. hq-c411df waits on it.
 - hq-de3e4c (research, added 2026-10-20): survey what agents look for in session logs,
   to set the verbs of a proposed `hq logs` / `hq trace` CLI and its usage skill (the
-  user's proposal). hq-c411df waits on it too, and its locate-owner choice (§4) becomes
-  part of that CLI's design.
-- hq-a60cf5: `session-episodes extract` reads every store obs indexes. Independent
-  of the choice above, but it should take its store list from a shared reader if the
-  CLI lands first.
+  user's proposal, §4 alternative 4). hq-c411df waits on it too, and its locate-owner
+  choice becomes part of that CLI's design.
+- hq-a60cf5: `session-episodes extract` reads every store obs indexes. Kept
+  independent (§4); the shared reader later replaces its root list.
 - hq-7b131a (scoped): the session-logs skill names the route to a Codex session's or
   subagent's runtime model.
-- hq-be3f69: proposed drop. Nothing to change; recorded in §2 as what already works.
+- hq-be3f69: dropped 2026-10-20 after checking its origin session; recorded in §2 as what
+  already works.
