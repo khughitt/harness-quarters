@@ -1,13 +1,15 @@
 ---
 id: hq-7efef3
 title: Refresh Claude guard evidence for 2.1.304 before operator cutover
-status: todo
+status: doing
 priority: 1
 size: m
 complexity: mid
 process: direct
+owner: feat/relay-cutover
 created: 2026-10-20T01:37:42Z
-updated: 2026-10-20T01:38:43Z
+updated: 2026-10-20T01:40:58Z
+started: 2026-10-20T01:40:58Z
 depends: []
 parent: hq-539508
 tags: []
@@ -26,3 +28,5 @@ Done: new Claude evidence proves the required routes at the exact installed vers
 ## Notes
 
 - 2026-10-20T01:38:43Z (feat/relay-cutover): concerns: hq-33116d change — Europa's operator update installed Claude 2.1.304; evidence for the formerly installed 2.1.302 must be refreshed before cutover.
+- 2026-10-20T01:40:58Z (feat/relay-cutover): started
+  provenance: {"harness_session":"codex:01a156f7-6259-7d63-93ed-4c23e04ca74c","harness_session_source":"CODEX_THREAD_ID"}
