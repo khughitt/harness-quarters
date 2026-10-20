@@ -7,7 +7,7 @@ size: xs
 complexity: low
 process: direct
 created: 2026-10-20T17:38:21Z
-updated: 2026-10-20T19:35:02Z
+updated: 2026-10-20T19:35:03Z
 depends: []
 parent: hq-cff824
 tags: []
@@ -23,3 +23,7 @@ Scoped re-review of hq-a1c591 found two additional Minor wording issues in docs/
 
 - survey (input, kind=report): docs/notes/2026-10-20-session-log-survey.md — sample definitions and aggregate counts
 - location-probe (input, kind=report): docs/notes/2026-10-20-session-index-reach.md — six links to five distinct parents and completed research status
+
+## Notes
+
+- 2026-10-20T19:35:03Z (docs/index-reach): review carry-forward: hq-a1c591 impl round2 Minor2 adds brief parent-count wording and stale research status to the existing cleanup. These are pre-close review findings, not post-close concerns.
