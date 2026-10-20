@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/relay-cutover
 created: 2026-10-20T01:37:42Z
-updated: 2026-10-20T01:45:39Z
+updated: 2026-10-20T01:46:47Z
 started: 2026-10-20T01:40:58Z
 depends: []
 parent: hq-539508
@@ -17,7 +17,7 @@ source: hq-33116d
 agent: codex
 ---
 
-The operator updated Europa Claude from 2.1.280 to 2.1.304 as runbook section 0 directs. Existing shared Claude evidence is valid for 2.1.302, so the version gate correctly refuses. Titan currently remains 2.1.302; operator update to the newly probed version is pending.
+The operator updated Europa Claude from 2.1.280 to 2.1.304 as runbook section 0 directs. Existing shared Claude evidence is valid for 2.1.302, so the version gate correctly refuses. Both hosts were subsequently updated by the operator and independently verified as 2.1.304; the fresh live probe runs on Europa.
 
 Repeat the reviewed Task 3 procedure for Claude only at 2.1.304 using the actual Europa installation, isolated disposable harness homes and relay v0.1.1 commit 4ceec5d2ad22b136b37ee360e7a4ed00949f28d9. Use locked, hydrated ops and detached relay worktrees; preserve unrelated main changes. Run the replay pilot then real allow/context/deny probe; retain native records and timing; keep optional/nested surfaces explicitly unproven.
 
