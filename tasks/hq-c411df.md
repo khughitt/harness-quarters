@@ -6,7 +6,7 @@ priority: 2
 reviewed: true
 reviewed_at: 2026-10-20T16:05:27Z
 created: 2026-10-20T11:19:18Z
-updated: 2026-10-20T16:34:44Z
+updated: 2026-10-20T16:34:45Z
 depends: [hq-a1c591, hq-de3e4c]
 parent: hq-cff824
 tags: [feedback, gap, "from:lore"]
@@ -24,3 +24,4 @@ Found while checking whether stamped friction reports can be traced to their ori
 - 2026-10-20T11:41:10Z (main): Audit evidence, 2026-10-20: locating the origins of 72 feedback reports needed three reader capabilities session-episodes lacks. (1) Anchoring on a CLI call's output when the command text differs from the stored record (9 of 72). (2) Following a Codex subagent to its parent thread, since the child's dispatch brief is stored as encrypted_content (6 of 72). (3) Searching the work homes and archived_sessions as well as the default stores. Every origin found was on one host; the other host held none.
   provenance: {"harness_session":"claude-code:737a5757-83af-4e31-9fdd-4ce70dd9e6f1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-20T16:05:27Z (main): scope: briefed; framed which tool owns report-origin lookup across stores (lean: an obs locate query over its index, which already covers all six roots, archive read_path, parent_session and missing state; rejected a new locate surface in hq, which would add a fifth store list); parented under goal hq-cff824; waits on research hq-a1c591; store-list alignment filed independently as hq-a60cf5; brief: docs/notes/2026-10-20-session-store-reach-brief.md
+- 2026-10-20T16:34:45Z (main): scope addendum 2026-10-20: the user proposed an hq logs / hq trace CLI with a usage skill; survey hq-de3e4c now precedes the locate-owner decision, which folds into that CLI's design; hq-a1c591 (obs index coverage) remains an input
