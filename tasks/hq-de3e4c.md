@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/logs-survey
 created: 2026-10-20T16:34:37Z
-updated: 2026-10-20T17:12:24Z
+updated: 2026-10-20T17:28:22Z
 started: 2026-10-20T17:00:12Z
 depends: []
 parent: hq-cff824
@@ -43,3 +43,4 @@ Ideas it wakes: On completion, run `tasks note hq-c411df --no-reviewed "<finding
   provenance: {"harness_session":"codex:01a15a40-db33-7ad3-9f26-96bc1d938379","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-20T17:02:38Z (docs/logs-survey): method: direct read-only episode survey in .worktrees/logs-survey; rebuild the deleted pilot from its source session, screen a 30-episode pilot, then classify at least 150 episodes stratified by harness and home profile; europa is reachable. Raw extracts stay in temporary local storage; committed evidence will use home-relative line/block references and paraphrases.
 - 2026-10-20T17:06:55Z (docs/logs-survey): pilot: 30 manually screened episodes fixed seven question categories (schema, behavior, recover, trace, identity, aggregate, inventory) and conservative outcome rules. Rebuilt screen: 7,648 matching local files, 4,113 deduplicated path/tool-matching calls, 432 candidate groups after mechanical noise exclusions (334 Claude personal, 17 Claude work, 81 Codex personal, zero Codex work). These are screening counts, not episode prevalence. Europa has 18 matching files and five memory-only calls, no candidate investigation.
+- 2026-10-20T17:28:22Z (docs/logs-survey): result: 183 episodes / 1,092 investigation calls across 132 source files; schema 64, behavior 49, identity 21, inventory 17, recovery 16, aggregates 15, trace 1 batch. Historical outputs needed in 64, parent links in 32, both in 24. Outcomes 177 found, 3 bounded not-found, 3 unknown. All 2,549 referenced line hashes and call/result pairings validate. Report and brief section recommend search+show with metadata/raw streaming; trace composes typed evidence, locate ownership remains with hq-a1c591. Fresh independent review and final just test are running.
