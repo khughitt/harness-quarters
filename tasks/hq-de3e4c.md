@@ -6,9 +6,9 @@ priority: 2
 size: m
 complexity: mid
 process: direct
-owner: main
+owner: docs/logs-survey
 created: 2026-10-20T16:34:37Z
-updated: 2026-10-20T17:00:47Z
+updated: 2026-10-20T17:01:02Z
 started: 2026-10-20T17:00:12Z
 depends: []
 parent: hq-cff824
@@ -34,4 +34,6 @@ Ideas it wakes: On completion, run `tasks note hq-c411df --no-reviewed "<finding
 - 2026-10-20T17:00:21Z (main): trial: flow-trial-1 — enrolled — flow on
 - 2026-10-20T17:00:21Z (main): arm: flow-trial-1 — unit tack-de3e4c — flow on
 - 2026-10-20T17:00:47Z (main): gate: scoped — adopted
+  provenance: {"harness_session":"codex:01a15a40-db33-7ad3-9f26-96bc1d938379","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-20T17:01:02Z (docs/logs-survey): resumed
   provenance: {"harness_session":"codex:01a15a40-db33-7ad3-9f26-96bc1d938379","harness_session_source":"CODEX_THREAD_ID"}
