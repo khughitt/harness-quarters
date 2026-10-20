@@ -568,10 +568,33 @@ runbook. No live success is implied by the rehearsal results below.
 ## Rollback: any failure from §2 onward
 
 End every new Claude/Codex session on both hosts, stop both Codex home daemons as in
-§1, and verify `no-live`. Keep timers quiesced until source/dependencies/settings
-agree again. Use the **Titan** shell (or reload its saved `operator-env.sh`). Restore
-**every shared settings target touched**, in reverse order; a guard removed without
-relay apply is covered. The log is registered before the first write:
+§1, and verify `no-live` on both hosts. Section 5 may already have restored one or
+both timers. In a fresh plain **Titan** Bash shell, re-quiesce both hosts using their
+original records. Never run `record` again or replace `timers.json` during rollback.
+Stopping a timer does not finish a running service; wait for it on each host:
+
+```bash
+source "$HOME/.local/state/hq/relay-cutover/operator-env.sh"
+set -euo pipefail
+"$HQ/tools/quiesce-timers" stop --state "$CUTOVER/timers.json"
+ssh -4 -o BatchMode=yes europa 'bash -s' <<'QUIESCE'
+source "$HOME/.local/state/hq/relay-cutover/operator-env.sh"
+set -euo pipefail
+"$HQ/tools/quiesce-timers" stop --state "$CUTOVER/timers.json"
+"$HQ/tools/quiesce-timers" wait --state "$CUTOVER/timers.json" --timeout 3600 --poll 30
+QUIESCE
+"$HQ/tools/quiesce-timers" wait --state "$CUTOVER/timers.json" --timeout 3600 --poll 30
+printf 'Both hosts quiescent for rollback\n'
+```
+
+Expected: both timers stopped, both services inactive, and the final confirmation.
+A stop, SSH or wait failure stops rollback **before any settings, source or dependency
+restoration**. Inspect the error and retry this entry block; leave both timers stopped
+until recovery completes. Do not continue without confirmation from both hosts.
+
+Then in the **same Titan shell**, restore **every shared settings target touched**,
+in reverse order; a guard removed without relay apply is covered. The log is
+registered before the first write:
 
 ```bash
 if [[ -f "$CUTOVER/live/touched.tsv" ]]; then
@@ -599,26 +622,44 @@ Retain all artifacts. On Europa, wait until `sha256sum -c
 If familiar §2 ran, on Titan:
 
 ```bash
-if [[ -f "$CUTOVER/familiar-merge.sha" ]]; then
-  MERGE=$(cat "$CUTOVER/familiar-merge.sha")
-  git -C "$HOME/d/familiar" revert -m 1 --no-edit "$MERGE"
-  REVERT=$(git -C "$HOME/d/familiar" rev-parse HEAD)
-  printf '%s\n' "$REVERT" > "$CUTOVER/familiar-revert.sha"
-  ssh -4 -o BatchMode=yes europa \
-    "umask 077; printf '%s\\n' '$REVERT' > ~/.local/state/hq/relay-cutover/familiar-revert.sha"
-else
-  # Only if the initial merge failed before committing; inspect its state first.
-  git -C "$HOME/d/familiar" status --short
+CURRENT=$(git -C "$HOME/d/familiar" rev-parse HEAD)
+if git -C "$HOME/d/familiar" rev-parse --verify -q MERGE_HEAD > /dev/null; then
+  # Only the attempted immutable merge may be aborted.
+  test "$CURRENT" = "$PRE_FAMILIAR"
+  test "$(git -C "$HOME/d/familiar" rev-parse MERGE_HEAD)" = "$FEATURE_TIP"
+  test ! -e "$CUTOVER/familiar-merge.sha"
   git -C "$HOME/d/familiar" merge --abort
   REVERT=$PRE_FAMILIAR
-  printf '%s\n' "$REVERT" > "$CUTOVER/familiar-revert.sha"
-  ssh -4 -o BatchMode=yes europa \
-    "umask 077; printf '%s\\n' '$REVERT' > ~/.local/state/hq/relay-cutover/familiar-revert.sha"
+elif [[ $CURRENT == "$PRE_FAMILIAR" ]]; then
+  # The merge was refused before starting; there is nothing to abort or revert.
+  test ! -e "$CUTOVER/familiar-merge.sha"
+  REVERT=$PRE_FAMILIAR
+else
+  # A committed merge can precede its SHA record; verify both parents first.
+  test "$(git -C "$HOME/d/familiar" rev-list --parents -n 1 "$CURRENT")" = \
+    "$CURRENT $PRE_FAMILIAR $FEATURE_TIP"
+  "$HQT" familiar-source --head "$CURRENT"
+  if [[ -f "$CUTOVER/familiar-merge.sha" ]]; then
+    test "$(cat "$CUTOVER/familiar-merge.sha")" = "$CURRENT"
+  else
+    printf '%s\n' "$CURRENT" > "$CUTOVER/familiar-merge.sha"
+  fi
+  MERGE=$CURRENT
+  git -C "$HOME/d/familiar" revert -m 1 --no-edit "$MERGE"
+  REVERT=$(git -C "$HOME/d/familiar" rev-parse HEAD)
 fi
+"$HQT" familiar-source --head "$REVERT"
+printf '%s\n' "$REVERT" > "$CUTOVER/familiar-revert.sha"
+ssh -4 -o BatchMode=yes europa \
+  "umask 077; printf '%s\\n' '$REVERT' > ~/.local/state/hq/relay-cutover/familiar-revert.sha"
 ```
 
-Expected: one merge-revert commit recorded as REVERT, or the uncommitted merge
-aborted back to PRE_FAMILIAR. On **each host**, only after source has fully synced:
+Expected: one merge-revert commit recorded as REVERT (recovering a missing MERGE
+record from its verified parents), the in-progress merge aborted, or unchanged
+PRE_FAMILIAR when the merge never started. Any unexpected HEAD, merge parent,
+record mismatch or tracked source drift stops recovery for agent inspection; do not
+force a reset or overwrite the record. An interrupted rollback also needs inspection
+before retrying this source block. On **each host**, only after source has fully synced:
 
 ```bash
 REVERT=$(cat "$CUTOVER/familiar-revert.sha")
