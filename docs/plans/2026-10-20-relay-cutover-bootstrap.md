@@ -18,8 +18,9 @@ existing relay v0.1.1, Git/npm, systemd user bus and niri IPC. No new dependency
 **Spec:** `.worktrees/relay-cutover/docs/specs/2026-10-20-operator-runbooks-design.md`
 (approved for planning after round 6; frozen predecessor `07acc26`).
 **Task:** hq-c6c847; parent hq-539508; blocked original window hq-f27918.
-**Status:** revised after plan round 4 at `d868144`; awaiting human plan re-review.
-No implementation or new window run.
+**Status:** accepted in plan round 5 at `df9848b` and approved by Keith, 2026-10-20;
+the accepted Minor probe-order clarification is included. Execution is parked for
+a fresh subagent-driven session. No implementation or new window run.
 **Execution:** preserve the user's subagent-driven choice. Work in the existing
 locked, hydrated `.worktrees/relay-cutover/`; do not create another hq worktree.
 
@@ -43,7 +44,7 @@ System-toolchain fixture tests intercept process launch at the Python boundary;
 do not prepend fakes to a live system-first PATH or contact the real user bus.
 Existing helper-CLI behavior tests use separate owned fixture environments.
 
-Task records (all unstarted; revised plan approval pending):
+Task records (all unstarted; plan approved, execution deferred to a fresh session):
 
 - hq-628027 — Task 1: Durable records and the human-decision boundary
 - hq-df06cc — Task 2: Host transport, inventory and operation lifecycle
@@ -256,8 +257,10 @@ requirements before the new pilot.
 The operator closes every Claude/Codex session for the bootstrap. From `run` through
 finish, use only the printed held Claude commands; explicitly avoid habitual `cl`
 and `clw`, unheld Claude/IDE clients, update/install commands and external installers.
-`run` rechecks strict no-live, held versions and each host/home's held `claude doctor`
-auto-update-disabled diagnostic before timers pause. This closes the gap after the
+`run` first completes held `claude --version` and `claude doctor` probes for every
+host/home and waits for all probe processes to exit. Then it passes the final strict
+no-live check, before timers pause; no caller-child exemption is allowed.
+Require exact versions and the doctor's auto-update-disabled diagnostic. This closes the gap after the
 agent's last check. An unproven hold/version mismatch refuses without mutation.
 Apply the flag inside the remote helper's child environment; SSH need not forward
 it. Printed Codex resume/work launches carry it for their tool children too.
@@ -567,7 +570,11 @@ Add target-dry/apply/verify and familiar-merge/install operations with these tes
 - [ ] **Step 1:** Add `test_six_dry_runs_precede_merge`,
   `test_interleaved_picks_use_installer_bytes`, `test_dry_mismatch_aborts_before_merge`,
   `test_all_target_bootstrap_single_writer`, `test_europa_claude_uses_local_installer`,
-  `test_sync_before_install`, and `test_registration_before_guard_write`.
+  `test_sync_before_install`, `test_registration_before_guard_write` and
+  `test_bootstrap_probes_exit_before_final_no_live`. Keep probe processes live in
+  the fixture until collected; assert all held version/doctor probes have exited
+  before the final no-live check and that timers stop only afterward. A surviving
+  probe refuses before mutation; no caller-child exemption is accepted.
   The Claude fixture orders `model` before `hooks`, and `effortLevel`/`modelSettings`
   after `alwaysThinkingEnabled`, matching live positions. Also vary removed keys,
   nested values, formatting and non-ASCII text. Compare installer plan string bytes,
@@ -584,7 +591,9 @@ Add target-dry/apply/verify and familiar-merge/install operations with these tes
   windows, leave familiar HEAD at PRE and write no live target/merge marker.
   Include manifest drift and exact-evidence refusal,
   cross-host output disagreement, target drift after freeze and sync timeout.
-- [ ] **Step 3:** At run step 1 repeat eligibility/toolchain checks, then quiesce.
+- [ ] **Step 3:** At run step 1 repeat eligibility/toolchain checks. Complete and
+  collect held version/doctor probes for every host/home, then perform the final
+  strict no-live check without child exemptions, then quiesce.
   Freeze the exact synchronized current files and complete all six local dry runs
   before merging. Take expected bytes only from their applied copies after plan-
   byte equality and parsed approval/pick checks above. Seal input/output identities
@@ -994,4 +1003,5 @@ before a new window. No in-window re-probe/continuation path is added.
   bytes change. Handoffs name habitual unheld launchers `cl` and `clw`.
   Hold breach cannot strand rollback behind stale evidence. Handoffs freeze picks
   and preserve updates disabled through finish. No live results are implied.
-- [ ] Human re-reviews the complete frozen plan before Task 1 implementation.
+- [x] Keith approved the complete plan after round 5 acceptance; the Minor probe
+  ordering is incorporated. Task 1 starts in a fresh subagent-driven session.
