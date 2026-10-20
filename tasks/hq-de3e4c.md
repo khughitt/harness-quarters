@@ -1,13 +1,15 @@
 ---
 id: hq-de3e4c
 title: "Survey what agents look for when they read session logs, to set the verbs of an hq logs CLI"
-status: todo
+status: doing
 priority: 2
 size: m
 complexity: mid
 process: direct
+owner: main
 created: 2026-10-20T16:34:37Z
-updated: 2026-10-20T16:51:09Z
+updated: 2026-10-20T17:00:12Z
+started: 2026-10-20T17:00:12Z
 depends: []
 parent: hq-cff824
 tags: [session-logs]
@@ -24,3 +26,8 @@ Ideas it wakes: On completion, run `tasks note hq-c411df --no-reviewed "<finding
 ## References
 
 - brief (input, kind=brief): docs/notes/2026-10-20-session-store-reach-brief.md — context and questions for this work
+
+## Notes
+
+- 2026-10-20T17:00:12Z (main): started
+  provenance: {"harness_session":"codex:01a15a40-db33-7ad3-9f26-96bc1d938379","harness_session_source":"CODEX_THREAD_ID"}
