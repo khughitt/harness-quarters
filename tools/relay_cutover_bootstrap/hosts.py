@@ -669,11 +669,12 @@ def _child_env(context):
     return env
 
 
-def _run_child(context, label, argv, *, env, timeout):
+def _run_child(context, label, argv, *, env, timeout, cwd=None):
     """Run one owned child group to exit within its timeout and the operation's deadline.
 
     Its PID and start time are recorded before waiting; any descendants left in its group
-    are stopped once it exits; its raw output goes only to the private log."""
+    are stopped once it exits; its raw output goes only to the private log. `cwd` names an
+    explicit working directory for tools that read it (npm ci installs where it runs)."""
     owned = context["owned"]
     remaining = context["deadline"] - time.monotonic()
     if remaining <= 0:
@@ -681,7 +682,8 @@ def _run_child(context, label, argv, *, env, timeout):
     limit = min(timeout, remaining)
     argv = [str(arg) for arg in argv]
     process = _launch(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                      stderr=subprocess.PIPE, env=env, start_new_session=True, close_fds=True)
+                      stderr=subprocess.PIPE, env=env, start_new_session=True, close_fds=True,
+                      **({"cwd": str(cwd)} if cwd is not None else {}))
     child = {"label": label, "pid": process.pid, "start_time": None, "started_at": _now(),
              "exit": None}
     owned.live[process.pid] = (process, child)

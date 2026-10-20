@@ -37,8 +37,10 @@ RETAINED = (
     "familiar-node_modules.pre/", "familiar-state/",  # retained original backups
 )
 # operations/: hosts' operation records; prepared.json: the last preparation; inputs/: staged
-# reviewed-input generations; quiesce/: each host's per-window timer and snapshot records.
-LAYOUT = ("windows/", "active.json", "operations/", "prepared.json", "inputs/", "quiesce/")
+# reviewed-input generations; quiesce/: each host's per-window timer and snapshot records;
+# dry/: each host's per-window frozen targets and installer dry runs.
+LAYOUT = ("windows/", "active.json", "operations/", "prepared.json", "inputs/", "quiesce/",
+          "dry/")
 WINDOW_KEYS = ("schema", "id", "mode", "state", "directory", "created_at",
                "prepared_sha256")
 DECISION_KEYS = {"schema", "kind", "action", "window_id", "attempt_id",

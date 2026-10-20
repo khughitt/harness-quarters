@@ -192,20 +192,28 @@ def _overlaps(first, second):
     return first.is_relative_to(second) or second.is_relative_to(first)
 
 
+def cache_problem(home, key, prefix):
+    """Why a cache prefix may not take writes, or None: it must be absolute and neither it nor
+    its resolution may overlap a live checkout, settings or state (an ancestor included)."""
+    if not prefix or not os.path.isabs(prefix):
+        return f"the {key} cache prefix is not an absolute path"
+    home = Path(home)
+    live = {path for name in LIVE for path in (str(home / name),
+                                                 os.path.realpath(home / name))}
+    if any(_overlaps(candidate, root) for candidate in
+           {os.path.normpath(prefix), os.path.realpath(prefix)} for root in live):
+        return f"the {key} cache prefix overlaps live checkouts, settings or state"
+    return None
+
+
 def _caches(context, env, blockers):
     result = _probe(context, "npm-cache", [hosts.TOOLS["npm"], "config", "get", "cache"], env)
     prefixes = {"npm": _text(result.stdout) if result.returncode == 0 else None}
     prefixes.update({key: os.environ[key] for key in CACHE_KEYS if os.environ.get(key)})
-    home = Path(context["home"])
-    live = {path for name in LIVE for path in (str(home / name),
-                                                 os.path.realpath(home / name))}
     for key, prefix in prefixes.items():
-        if not prefix or not os.path.isabs(prefix):
-            blockers.append(f"caches: the {key} cache prefix is not an absolute path")
-        elif any(_overlaps(candidate, root) for candidate in
-                 {os.path.normpath(prefix), os.path.realpath(prefix)} for root in live):
-            blockers.append(f"caches: the {key} cache prefix overlaps live checkouts, "
-                            "settings or state")
+        problem = cache_problem(context["home"], key, prefix)
+        if problem:
+            blockers.append(f"caches: {problem}")
     return {"prefixes": prefixes, "python_bytecode": "disabled"}
 
 
