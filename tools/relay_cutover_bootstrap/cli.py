@@ -9,6 +9,7 @@ import argparse
 import shlex
 import sys
 
+from . import prepare as preparation
 from . import window
 from .state import Stop
 
@@ -51,7 +52,7 @@ def _sessions(sessions):
 
 
 def _prepare(session):
-    prepared = window.prepare(session)
+    prepared = preparation.prepare(session)
     print(f"{PROG}: prepared {window._root() / window.PREPARED} "
           f"(sha256 {window.prepared_sha256(prepared)})")
     print(f"  inputs: generation {prepared['manifest']['generation']}; Claude picks "
@@ -65,10 +66,10 @@ def _prepare(session):
 
 
 def _check():
-    prepared = window.load_prepared()
-    result = window.check(prepared)
+    prepared = preparation.load_prepared()
+    result = preparation.check(prepared)
     if not result["eligible"]:
-        host = window.blocking_host(result)
+        host = preparation.blocking_host(result)
         raise window.Failed(
             "check", host, "blocked", f"{len(result['blockers'])} blocker(s) since preparation",
             log=result["logs"].get(host), blockers=result["blockers"],

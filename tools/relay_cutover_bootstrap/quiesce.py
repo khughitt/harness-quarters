@@ -5,8 +5,9 @@ These are fixed host operations run by `hosts.execute`; the window orchestration
 `quiesce/<window-id>/` in the cutover root (0700 directories, 0600 files):
 
 - `timers.json`: `tools/quiesce-timers record` output for familiar-reap.timer, made 0600 and
-  fsynced with its directory before the reply, so before any stop. `timers.restored.json`
-  marks a completed restore.
+  fsynced with its directory before the reply, so before any stop, and again before any later
+  read. `timers.restored.json` marks a completed restore; a record of timers this window never
+  stopped is instead kept under `abort/` and marked restored.
 - `snapshots.json`: the registered moves of the preparation snapshots `familiar-state` and
   `familiar-node_modules.pre`, written before the first move. A moved snapshot is kept at
   `preparation/<name>`; a fresh copy is made under `copy/<name>`, fsynced, renamed into the
@@ -180,8 +181,15 @@ def _unrestored(root):
 
 
 def _durable(path):
-    """Make the helper's record private and durable with its directory; return its bytes."""
-    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    """Make the helper's record private and durable with its directory; return its bytes.
+
+    quiesce-timers writes the record non-atomically with the umask's mode, so a record left by
+    an interrupted helper may be loose or torn; it is made private here before any read."""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    except OSError as error:
+        raise Stop(f"{path}: the timer record cannot be opened ({hosts._brief(error)}); "
+                   "inspect it") from None
     try:
         info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid():
@@ -210,10 +218,11 @@ def _parse_timers(data):
 
 
 def _recorded(context, expected=None):
+    """This window's timer record on this host, made private and durable before it is read."""
     path = _directory(context) / RECORD
     if not os.path.lexists(path):
         return path, None
-    data = state._read(path)
+    data = _durable(path)
     if expected is not None and _sha256(data) != expected:
         raise Stop("the timer record differs from the one this window recorded; inspect it")
     return path, data
@@ -257,14 +266,27 @@ def timer_wait(context):
 
 
 def timer_restore(context):
-    """Return this host's timers to this window's record; without one, nothing was paused."""
+    """Return this host's timers to this window's record; without one, nothing was paused.
+
+    `stopped` says whether this window ever asked this host to stop its timers. When it never
+    did, nothing here is paused: the record, whole or torn by an interrupted helper, is kept
+    as abort evidence and marked restored rather than replayed. A stopped host's record must
+    parse, or the restore stops for inspection."""
     _live_only(context)
     path, data = _recorded(context, context["payload"].get("record_sha256"))
     if data is None:
         return {"recorded": False}
+    if not context["payload"]["stopped"]:
+        retained = _retain(path, path.parent / "abort", RECORD)
+        state.save_record(path.parent / RESTORED, {
+            "schema": 1, "restored_at": hosts._now(), "sha256": _sha256(data),
+            "stopped": False, "retained": str(retained)})
+        return {"recorded": True, "restored": False, "stopped": False,
+                "retained": str(retained)}
+    _parse_timers(data)
     _timers(context, "timer-restore", "restore", path)
     state.save_record(path.parent / RESTORED, {"schema": 1, "restored_at": hosts._now(),
-                                               "sha256": _sha256(data)})
+                                               "sha256": _sha256(data), "stopped": True})
     return {"recorded": True, "restored": True}
 
 
@@ -411,6 +433,7 @@ def _retain(path, directory, name):
         number += 1
         target = directory / f"{name}.{number}"
     _move(path, target)
+    return target
 
 
 def snapshot_abort(context):
@@ -465,8 +488,10 @@ OPERATIONS = {
                                   payload=_RECORD, required=frozenset(_RECORD)),
     "timer-wait": hosts.Operation(run=timer_wait, deadline=TIMER_WAIT_DEADLINE, mutation=False,
                                   payload=_RECORD, required=frozenset(_RECORD)),
-    "timer-restore": hosts.Operation(run=timer_restore, deadline=CHILD_SECONDS + 60,
-                                     mutation=True, payload=_RECORD, required=_REQUIRED),
+    "timer-restore": hosts.Operation(
+        run=timer_restore, deadline=CHILD_SECONDS + 60, mutation=True,
+        payload={**_RECORD, "stopped": lambda value: type(value) is bool},
+        required=frozenset({"window_id", "stopped"})),
     "snapshot-refresh": hosts.Operation(
         run=snapshot_refresh, deadline=SNAPSHOT_SECONDS, mutation=True,
         payload={**_WINDOW, "familiar_pre": _commit},
