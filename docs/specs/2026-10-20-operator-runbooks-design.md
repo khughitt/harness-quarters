@@ -1,6 +1,7 @@
 # Operator runbooks that preserve the operator's shell
 
-Status: revised proposal after spec round 4; awaiting user review.
+Status: approved for planning by Keith after spec round 6, 2026-10-20.
+The round-6 consent-channel clarification below is carried into the plan.
 Bootstrap/runbook: hq-c6c847. Independent Bash work: dots-55f537.
 Independent instruction work: lore-4c1787.
 This amends the execution arrangement of the approved relay cutover, not its
@@ -213,6 +214,24 @@ in the protected window record. It never invents human approval from event deliv
 Missing, failed, stale or incomplete receipts block `finish`; it rechecks live
 images/source/dependencies and surfaces as well. A receipt records the smoke
 verdict and its evidence, not a general hook-trust bypass.
+
+### Human decisions when an agent invokes a command
+
+An operator running a command directly may answer its terminal prompt. An agent's
+tool shell cannot collect that answer. Before agent-run `restart-surfaces`, the
+agent asks in the session, naming the hosts, recorded surfaces, expected desktop
+impact and duration. Only an explicit user reply authorizes that invocation. Pass
+it as a protected per-invocation decision argument recording the actual ask/reply,
+session, action and current surface inventory; persist it with the result. A retry
+asks again. No plain approval flag, inferred answer, old consent or agent-generated
+attestation authorizes host use. The argument records consent; it does not create it.
+
+Likewise, before `record-smoke` accepts human trust/permission attestations, the
+operator supplies the relevant verdicts directly in their terminal or answers the
+agent's explicit session question about those cases. Bind that answer to this
+window, home, smoke evidence and recording invocation. The plan specifies the
+argument schema and refusal/replay tests. A missing/declined answer leaves the
+operation pending. It never falls back to prompting in an agent tool shell.
 
 ## State, failures and recovery
 
