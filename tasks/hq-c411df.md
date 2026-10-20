@@ -4,7 +4,7 @@ title: "session-episodes reads only the default Claude projects store and Codex 
 status: idea
 priority: 2
 created: 2026-10-20T11:19:18Z
-updated: 2026-10-20T17:30:21Z
+updated: 2026-10-20T17:45:51Z
 depends: [hq-a1c591, hq-de3e4c]
 parent: hq-cff824
 tags: [feedback, gap, "from:lore"]
@@ -24,3 +24,4 @@ Found while checking whether stamped friction reports can be traced to their ori
 - 2026-10-20T16:05:27Z (main): scope: briefed; framed which tool owns report-origin lookup across stores (lean: an obs locate query over its index, which already covers all six roots, archive read_path, parent_session and missing state; rejected a new locate surface in hq, which would add a fifth store list); parented under goal hq-cff824; waits on research hq-a1c591; store-list alignment filed independently as hq-a60cf5; brief: docs/notes/2026-10-20-session-store-reach-brief.md
 - 2026-10-20T16:34:45Z (main): scope addendum 2026-10-20: the user proposed an hq logs / hq trace CLI with a usage skill; survey hq-de3e4c now precedes the locate-owner decision, which folds into that CLI's design; hq-a1c591 (obs index coverage) remains an input
 - 2026-10-20T17:30:21Z (docs/logs-survey): hq-de3e4c research input: docs/notes/2026-10-20-session-log-survey.md and the brief section 7 classify 183 episodes. Formats/behavior dominate; 64 need historical tool outputs, 32 parent links. Recommend search+show with metadata/raw streams, role filtering, paired results and coverage; trace composes typed evidence. No new find verb justified. Location ownership still depends on hq-a1c591; incorporate both results in the CLI design.
+- 2026-10-20T17:45:51Z (docs/logs-survey): correction to hq-de3e4c preliminary parent count: raw re-audit confirms18 relationship episodes, including8 child-to-parent and12 parent-to-child (2 both). Only6 combine reverse binding with historical outputs. The corrected sample is183 episodes /1093 calls;64 need historical outputs. Use final report section Roles/evidence, not the earlier32 preliminary parent flags.
