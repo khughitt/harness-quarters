@@ -44,9 +44,14 @@ When the evidence lives elsewhere, the agent gets no result and no explicit
   child `01a140a1…`: created under gpt-6.1-sol, ran gpt-6-luna).
   `relay model --harness codex` resolves only the calling session's own thread
   (relay `docs/api.md`, "Codex model resolution").
-- **What already works (hq-be3f69).** The skill's "Human or injected" rules and turn
-  recipe let a Codex session recover review requirements from an earlier human turn
-  without asking again.
+- **What already works (hq-be3f69).** Origin: Codex session `01a153c4…` (a learn-rust
+  plan execution, 2026-10-19), filing call at rollout line 589. Task 1 asked for "eight
+  prior review findings" that the plan did not include. The controller read this skill,
+  listed that day's Codex rollouts whose `session_meta.cwd` matched, printed their human
+  turns, and copied the user's revision report (session `01a1535d…`, line 184) into its
+  plan workspace. It took under a minute and no question to the user. The skill's turn
+  recipe is Claude-only, so all three reads were hand-written Codex scripts. That did not
+  slow it here, but a Codex turn recipe would make the same route shorter.
 
 ## 3. Constraints
 
