@@ -6,8 +6,8 @@ priority: 2
 reviewed: true
 reviewed_at: 2026-10-20T16:05:27Z
 created: 2026-10-20T11:19:18Z
-updated: 2026-10-20T16:05:28Z
-depends: [hq-a1c591]
+updated: 2026-10-20T16:34:44Z
+depends: [hq-a1c591, hq-de3e4c]
 parent: hq-cff824
 tags: [feedback, gap, "from:lore"]
 agent: claude-code
