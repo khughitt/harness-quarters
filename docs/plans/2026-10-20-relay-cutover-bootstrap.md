@@ -18,7 +18,8 @@ existing relay v0.1.1, Git/npm, systemd user bus and niri IPC. No new dependency
 **Spec:** `.worktrees/relay-cutover/docs/specs/2026-10-20-operator-runbooks-design.md`
 (approved for planning after round 6; frozen predecessor `07acc26`).
 **Task:** hq-c6c847; parent hq-539508; blocked original window hq-f27918.
-**Status:** proposal for human plan review; no implementation or new window run.
+**Status:** revised after plan round 1 at `3f010e1`; awaiting human plan re-review.
+No implementation or new window run.
 **Execution:** preserve the user's subagent-driven choice. Work in the existing
 locked, hydrated `.worktrees/relay-cutover/`; do not create another hq worktree.
 
@@ -38,16 +39,21 @@ front door or CI here. Run focused RED→GREEN, then the mandatory suite before 
 implementation commit. Use a minimal nonsecret test environment retaining `USER`,
 HOME, PATH and required task/session identity; omitting USER already caused false
 fixture failures. Preserve unrelated live model/trust changes in main.
+System-toolchain fixture tests intercept process launch at the Python boundary;
+do not prepend fakes to a live system-first PATH or contact the real user bus.
+Existing helper-CLI behavior tests use separate owned fixture environments.
 
-Task records (unstarted; plan approval pending):
+Task records (all unstarted; revised plan approval pending):
 
 - hq-628027 — Task 1: Durable records and the human-decision boundary
-- hq-df06cc — Task 2: Fixed host operations and real-transport prerequisites
-- hq-ee2ea1 — Task 3: Preparation, quiescence and the all-target bootstrap
-- hq-f74ef6 — Task 4: Full recovery and actual-state reconciliation
-- hq-293e38 — Task 5: Surface retry, safe resume, smoke receipts and finish
-- hq-0796bc — Task 6: Isolated rehearsal through the production transport
-- hq-b742e5 — Task 7: Replacement runbook, inert helper delivery and real-host pilot
+- hq-df06cc — Task 2: Host transport, inventory and operation lifecycle
+- hq-ee2ea1 — Task 3: Prepare reviewed inputs, quiesce and abort before merge
+- hq-c6c742 — Task 4: Apply familiar and all four shared targets
+- hq-f74ef6 — Task 5: Restore targets and familiar from reconciled state
+- hq-293e38 — Task 6: Consent-bound surface restart and retry
+- hq-bc710f — Task 7: Safe resume, smoke receipts and timer finalization
+- hq-0796bc — Task 8: Isolated rehearsal through the production transport
+- hq-b742e5 — Task 9: Replacement runbook, inert helper delivery and real-host pilot
 
 ## Execution setup before Task 1
 
@@ -62,7 +68,8 @@ recovery again as setup. Keep the existing plan workspace and all review evidenc
 ## Global Constraints
 
 - Relay remains v0.1.1, commit `4ceec5d2ad22b136b37ee360e7a4ed00949f28d9`,
-  with `--node /usr/bin/node`.
+  with `--node /usr/bin/node`. Installs use recorded `/usr/bin/npm` 12.2.1
+  with `/usr/bin` first on PATH; record node/git/helper-Python identities too.
 - Familiar PRE is `00f4899ae523d613d21f44bfc2c456aac67f8e5f`; feature tip is
   `a16f4daa59b04e32f1010764d6f94401ca4eed8b`. Merge that immutable tip, never a
   moving branch. Familiar-theme keeps its existing SSH pin and Git configuration.
@@ -77,7 +84,8 @@ recovery again as setup. Keep the existing plan workspace and all review evidenc
 - One writer per harness; retire familiar and add relay in the same install.
   No registry import/merge, compatibility layer, automatic trust or synthetic hash.
 - Preserve unrelated settings/model picks, Codex trust and old familiar state.
-  Check exact recorded before/expected-image hashes; changes need reviewed inputs.
+  Claude pick-only drift follows the shared clean-filter policy below; all other
+  drift requires newly reviewed inputs. Window originals remain exact byte snapshots.
 - Every first target write, including guard removal, follows a durable original,
   artifact-path registration and ordered ledger append. Restore refuses unknown bytes.
 - Pre-merge failure automatically aborts both recorded hosts; incomplete abort or
@@ -95,27 +103,29 @@ recovery again as setup. Keep the existing plan workspace and all review evidenc
   subprocess output in summaries. Preserve evidence and host-local backups.
 - Desktop access requires consent for that invocation; plan approval does not grant
   it. Human trust/permission attestations come from the operator, never the agent.
-- Owned subprocesses are bounded and reaped on EXIT/INT/TERM/HUP. A disconnected
-  SSH channel is not proof its remote process stopped. No detached monitor.
+- Owned subprocesses have deadlines and explicit cancellation/reaping. Local
+  controller signals request remote cancellation and reconcile it. Closing SSH
+  pipes is not cancellation: remote work finishes or reaches its own deadline,
+  persists completion, then replies. No detached monitor or unbounded remote job.
 - OpenCode, Darwin, nested code-mode proof and `--with ask` remain excluded.
 
 ## Review Focus
 
-1. **Lost SSH reply after a remote mutation:** reconcile recorded remote operation
-   identity/completion before another mutation; Task 2 transport tests and Task 4
-   recovery tests cover a still-running child and a completed operation with lost reply.
-2. **Human consent silently supplied by an agent:** require the actual session
-   ask/reply bound to one attempt and inventory/receipt, or an operator TTY answer;
-   Task 1 and Task 5 test missing, declined, stale, replayed and mismatched decisions.
-3. **Verified migration followed by a dead/replaced desktop process:** expected
-   exited PIDs restart; new/changed context blocks only surface work, with safe
-   resume and fresh consent; Task 5 tests partial restart and PID reuse.
-4. **Interruption in a durability gap:** timer record, snapshot rename, merge commit,
-   target registration and restore may complete before their step record; Tasks 3–4
-   use actual files/Git plus failure injection, not command-spelling assertions.
-5. **Stale smoke/trust evidence or mode confusion:** a different window/home/version
-   or a pilot receipt cannot finish live rollout; pilot paths cannot escape scratch
-   roots; Tasks 1, 5 and 6 exercise schema/binding, symlinks and live/pilot rejection.
+1. **Lost SSH reply after a remote mutation:** EOF/EPIPE must not signal or cancel
+   the remote operation. Task 2 tests completion-before-reply, explicit cancellation
+   and actual pipe closure; Tasks 5 and 8–9 reconcile a still-running operation,
+   including dropping a real SSH connection during a scratch install.
+2. **Human consent silently supplied by an agent:** Task 1 and Tasks 6–7 require
+   actual session ask/reply bound to one attempt and inventory/receipt, or an operator
+   TTY response. Missing, declined, stale, replayed and mismatched decisions refuse.
+3. **Verified migration followed by a dead/replaced desktop process:** Task 6 tests
+   expected exited PIDs, PID reuse, partial restart and changed context; only surface
+   work stops, with safe resume and fresh consent for retry.
+4. **Interruption in a durability gap:** Tasks 3–5 test timer records, snapshot moves,
+   merge/record and ordered target writes/restores using actual files and Git.
+5. **Stale preparation or mode confusion:** Task 3 covers live picks/clean-filter
+   policy, non-pick image review and system-toolchain drift; Tasks 7–8 cover stale
+   smoke evidence, live/pilot confusion, scratch escape and declared cache exceptions.
 
 ## Files and interfaces
 
@@ -148,13 +158,85 @@ record; `context` is validated local mode/root/host data. Paths in JSON are stri
 
 **Prepared data:** explicit per-host executable/home/root paths, target IDs
 `claude`, `claude-work`, `codex`, `codex-work`, resolved paths, before/expected hashes,
-image/evidence locations, approved pins, helper SHA manifest, captured controller
-native session ID and Codex executable. Never source `operator-env.sh`. Preparation
+image/evidence locations and their immutable review provenance, approved pins,
+per-host toolchain/cache records and helper SHA manifest, captured controller native
+session ID and Codex executable. Include `.githooks/harness-state-clean` in the
+project-helper manifest. Toolchain identities/hashes are per host, not an assumption
+that both hosts have identical OS binaries. Never source `operator-env.sh`. Preparation
 writes only protected cutover artifacts. `prepare` is the agent's explicit artifact
 creation command; `check` and `status` remain read-only.
 
+### Pick drift and explicit image review
+
+Load `CLAUDE_JSON_KEYS` through `runpy.run_path` on the manifest-verified
+`.githooks/harness-state-clean`, as `live-picks` does; never duplicate its list.
+For both Claude targets, compare the whole parsed JSON object excluding those
+keys with the reviewed native before-image. Reuse original cutover Task 6's retained
+`prep/claude.source.json`, `prep/claude-work.source.json` and installer artifacts,
+with their immutable review provenance/digests; do not use a mutable main HEAD as
+a new review baseline. If their provenance cannot be verified, require image review.
+The retained personal source's raw hash differs from the old live hash because
+picks differ; that alone is not structural drift.
+
+Default `prepare` accepts only this pick-only difference (plus JSON formatting).
+Derive the expected image by removing every filter-owned pick from the reviewed
+after-image, then inserting exactly the current keys/values; missing keys stay
+missing, including when an old reviewed pick was present. Verify all other before
+content matches. Preserve and hash exact current before bytes and derived after
+bytes privately on both hosts, retaining the original reviewed images unchanged.
+`relay-cutover verify` continues comparing only hooks/statusLine.
+
+`prepare --stage-review` is the explicit structural-drift path: regenerate on
+copies, retain new before-images, guard snapshots, plans/artifacts and candidate
+after-images as a private review bundle; do not activate it or run live. After a
+real review, `prepare --reviewed-bundle DIR --review-ref REF` verifies the bundle
+hashes/provenance and the recorded review covering those exact inputs before
+using it. Missing/rejected review remains blocked; the flags do not grant review.
+Never accept non-pick drift merely because new hashes were computed.
+
+At `run` step 1, repeat this eligibility check on both hosts. If only picks changed
+since preparation, freeze new exact originals/derived expectations under the new
+window and record `effective_inputs_sha256` before any live mutation. Do not rewrite
+old artifacts or prepared provenance. Recheck after strict no-live/source sync;
+unknown drift after mutation starts requires recovery/inspection. Resumed harnesses
+can later change picks: verification still uses hooks/statusLine, not stale full-file
+pick hashes. Rollback originals/artifacts remain immutable and byte gated; an
+unrecognized post-apply file is inspected, never force-copied over.
+
+### Toolchain, environment and permitted cache writes
+
+On each host record `/usr/bin/npm` (must report `12.2.1`), `/usr/bin/node`, resolved
+system Git and `/usr/bin/python3`: executable/real-entry paths, exact versions and
+SHA256s. Record npm's package version/CLI entry as well as its env-node shebang.
+`check`/`run` compare these identities with prepared data and the per-host manifest;
+version/path/hash drift stops for fresh preparation/proof. No host package updates.
+Run installs as `/usr/bin/npm ci --allow-git=root`, with explicit
+`PATH=/usr/bin:/bin:<recorded validated remainder>` so npm's env shebang resolves
+`/usr/bin/node`, not nvm. The fixed SSH entry is
+`exec /usr/bin/python3 -B ~/d/hq/tools/relay-cutover-host`.
+
+The helper retains the host's startup environment for authentication references,
+user bus and host-local cache routing; it overrides PATH as above and sets
+`PYTHONDONTWRITEBYTECODE=1` for Python children. `-B` covers the remote entry before
+imports. Never clear HOME/authentication or silently fall back to in-checkout
+`__pycache__`. Inspect cache routing without logging credentials or the environment.
+
+Pilot application/config/state/dependency/temp roots are owned scratch roots;
+set TMPDIR there. Explicit permitted writes outside them are the prepared,
+validated host-local cache prefixes (npm_config_cache and any cache roots used by
+install/build subprocesses, including inherited CACHE_DIR/PYTHONPYCACHEPREFIX),
+existing authentication/SSH runtime bookkeeping, and the consented no-window niri
+IPC spawn. Record exact cache prefixes in the pilot report; reject a cache prefix
+overlapping Dropbox or any live checkout/settings/state (including an ancestor
+that contains them), or a symlink into one. Python
+bytecode creation stays disabled despite retaining its configured prefix. Permit
+no other tool-owned writes outside scratch, no real timers/surface restarts, and
+no mutable pilot path into live project data. Fixture containment assertions exclude
+only those declared caches/runtime effects, not arbitrary directories. The pilot
+must report these exceptions instead of claiming the whole host stayed byte-equal.
+
 **Window data:** unique ID; mode; attempted operation IDs; immutable preparation
-hash; original per-host timer records; snapshot move/copy states; familiar merge
+hash plus effective window input hashes; original per-host timer records; snapshot move/copy states; familiar merge
 and revert identity; four originals/artifact paths; verified checkpoints; surfaces
 and consent records; per-home smoke receipts; timer/service completion. Keep one
 active pointer and immutable prior-window directories. Existing retained abort and
@@ -202,6 +284,16 @@ both Europa Claude homes. Both Codex homes require their own human hook-trust re
 Bind evidence to the actual tested sessions and case operations; no pass-by-filename.
 Declined/unanswered human fields cannot pass. Pilot receipts cannot satisfy this gate.
 
+### Optional review suggestion
+
+Transcript validation of agent-authored decision records is deferred. The current
+session-logs skill documents human/injected-turn classification and episode
+extraction, not a live-consent lookup interface. This plan does not add another
+classifier or depend on native log flush timing. Actual session asks and explicit
+human replies remain mandatory; records remain auditable, not transcript-verified.
+A later shared lookup can add that check without changing this cutover's consent
+channel. No fallback accepts fabricated or unanswered decisions.
+
 ### Task 1: Durable records and the human-decision boundary
 
 **Files:** create state module and bootstrap test file from the map above.
@@ -230,7 +322,7 @@ attempt_id: str, subject_sha256: str) -> dict`.
   assert writes_after_replayed_decision == []
   ```
 - [ ] **Step 2:** Run
-  `uv run -q --with pytest pytest .worktrees/relay-cutover/tools/test_relay_cutover_bootstrap.py -q -k 'record or decision or register'`.
+  `uv run -q --with pytest pytest .worktrees/relay-cutover/tools/test_relay_cutover_bootstrap.py -q -k 'record or decision or register or registration'`.
   Expected RED from absent module/functions or failed behavioral assertions.
 - [ ] **Step 3:** Implement those signatures using exclusive window allocation,
   atomic JSON replacement plus parent fsync, immutable originals and durable TSV
@@ -244,7 +336,7 @@ attempt_id: str, subject_sha256: str) -> dict`.
 - [ ] **Step 5:** Run the mandatory suite; commit only this deliverable as
   `feat(relay): persist cutover windows and human decisions`.
 
-### Task 2: Fixed host operations and real-transport prerequisites
+### Task 2: Host transport, inventory and operation lifecycle
 
 **Files:** create host module, remote executable and transport test file.
 **Interfaces:**
@@ -254,19 +346,24 @@ that host's HOME; no caller-controlled live root/helper overrides.
 - Produces: in the host module:
 `request(host: str, mode: str, operation: str, payload: dict, *, timeout: float) -> dict`,
 `execute(context: dict, operation: str, payload: dict) -> dict`,
-`inventory(context: dict) -> dict`, `reconcile_operation(context: dict, operation_id: str) -> dict`.
-The remote executable reads exactly one bounded schema-1 JSON request on stdin,
-outputs one sanitized JSON response, and keeps full subprocess output private.
+`inventory(context: dict) -> dict`, `reconcile_operation(context: dict, operation_id: str) -> dict`,
+`start_request(host: str, mode: str, operation: str, payload: dict, *, timeout: float)
+-> tuple[str, subprocess.Popen]`. `request` wraps `start_request` with bounded
+collection/cleanup; the rehearsal owns the returned handle when testing disconnect.
+The request envelope carries schema/mode/operation, a caller-known operation ID
+and payload. Status/cancel identify that operation; no arbitrary PID is accepted.
+The remote executable reads one complete bounded request, writes its durable start
+record, outputs one final sanitized JSON response, and keeps full logs private.
 
 - [ ] **Step 1:** Write `test_remote_payload_is_data`, `test_operation_reply_loss`
   and `test_owned_process_cleanup` with a fake SSH executable and
   throwaway homes/repos. Assert the remote command is a fixed Zsh-safe entry
-  `~/d/hq/tools/relay-cutover-host`, invoked with `ssh -4 -o BatchMode=yes europa`;
+  `exec /usr/bin/python3 -B ~/d/hq/tools/relay-cutover-host`, invoked with `ssh -4 -o BatchMode=yes europa`;
   roots/argv never enter the shell string. Reject unknown hosts, operations, mode,
   payload keys and oversized/malformed requests. A literal path containing quotes,
   blanks, `$()` or backticks remains data and executes nothing.
   ```python
-  assert ssh_argv[-1] == "~/d/hq/tools/relay-cutover-host"
+  assert ssh_argv[-1] == "exec /usr/bin/python3 -B ~/d/hq/tools/relay-cutover-host"
   assert not injected_marker.exists()
   ```
 - [ ] **Step 2:** Run
@@ -274,97 +371,137 @@ outputs one sanitized JSON response, and keeps full subprocess output private.
   Expected RED. Add fixtures for missing USER/user bus, absent SSH_AUTH_SOCK with
   working Git credentials, failed actual pinned-source access, ambiguous desktop
   socket, explained absent surfaces, helper hash drift and unfamiliar executable.
-- [ ] **Step 3:** Implement the signatures with explicit allowed operations:
-  inventory, daemon-stop, no-live, timer-record/stop/wait/restore/service-check,
-  snapshot-refresh/abort, familiar-merge/install/reconcile/restore, target-dry/apply/
-  verify/restore, surface-preview/restart, smoke-observe, operation-status and
-  pilot-create/cleanup. Derive each argv locally; never expose arbitrary shell/code.
-  Use validated PATH/executables, USER and the actual user's runtime bus. Resolve
-  the trusted niri context without assuming inherited NIRI_SOCKET. Git auth probe
-  uses `git ls-remote` of familiar-theme's pinned SSH source through the same route;
-  actual pin install is proved by Task 7's pilot, not the probe alone.
-- [ ] **Step 4:** Implement process groups, phase-specific deadlines, INT/TERM/HUP
-  cancellation/reaping and private operation PID/start-time/completion records.
-  Timer waits retain `--timeout 3600 --poll 30`; source/target sync gets a bounded
-  600 s wait; installs get 900 s and report timeout as an interrupted mutation.
-  A helper deadline/cancel owns its children; a new status query must settle a lost
-  SSH reply before more writes. No background job waits outside harness tracking.
+- [ ] **Step 3:** Implement only transport/schema/process ownership, inventory,
+  read-only prerequisite probes, operation-status and explicit operation-cancel.
+  Inventory records the toolchain/cache contract above, user bus, Git auth and
+  trusted desktop context. `git ls-remote` probes access; the pilot proves install
+  of the actual pinned source. Unknown/unimplemented operations refuse before writes.
+  Timer/snapshot operations are added with Task 3 tests, merge/install/target apply
+  with Task 4, restoration/service-run/check with Task 5, surfaces with Task 6,
+  smoke observation with Task 7, and pilot-create/cleanup with Task 8; no stubs now.
+- [ ] **Step 4:** Implement private operation IDs/PIDs/start-times, bounded child
+  groups and durable completion records. A complete request followed by EOF/EPIPE
+  does not cancel the remote operation: it finishes or reaches its own deadline,
+  persists its completion record before trying to reply, and tolerates the broken
+  reply pipe. Only operation-cancel or an actual signal/deadline cancels/reaps it.
+  Local INT/TERM/HUP sends explicit cancel and reconciles; if unreachable report
+  pending bounded remote work, never assume it stopped. Timer waits use 3600 s/poll
+  30, source/target sync 600 s, installs 900 s. Operation records survive all replies.
+  Fake SSH closes pipes without delivering a signal; tests separately cover explicit
+  cancel and signal cleanup. Never detach a monitor; never end a controller turn
+  while its own tracked check/child remains running.
 - [ ] **Step 5:** GREEN transport tests must prove timed-out children are gone,
   running remote operation blocks another mutation, completed lost-reply operation
   reconciles without rerunning, and no raw secret-like fixture text reaches output.
   Run mandatory suite; commit `feat(relay): add bounded cutover host transport`.
 
-### Task 3: Preparation, quiescence and the all-target bootstrap
+### Task 3: Prepare reviewed inputs, quiesce and abort before merge
 
-**Files:** create window/CLI modules and bootstrap executable; extend bootstrap tests.
+**Files:** create window/CLI modules and bootstrap executable; extend bootstrap and
+transport tests. Reuse filter key authority; do not modify the filter itself.
 **Interfaces:**
 
-- Consumes: Tasks 1–2 interfaces and existing helper/installer commands.
-- Produces: window functions
-`prepare(controller_session: str) -> dict`, `check(prepared: dict) -> dict`,
-`run_window(prepared: dict, decision: dict) -> dict`, `abort_window(window: dict) -> dict`;
-CLI `main(argv: list[str]) -> int` with prepare/check/run/status initially.
-`prepare --controller-session ID` writes private `prepared.json`; no live inputs
-are changed. CLI loads protected state itself; no source/export requirement.
+- Consumes: Tasks 1–2 state, inventory and request interfaces; reviewed input policy above.
+- Produces: window functions `prepare(controller_session: str, *, stage_review: bool=False,
+reviewed_bundle: Path | None=None, review_ref: str | None=None) -> dict`,
+`check(prepared: dict) -> dict`, `quiesce_window(prepared: dict, decision: dict) -> dict`,
+`abort_window(window: dict) -> dict`; CLI `main(argv: list[str]) -> int` for
+prepare/check/status. Partial implementation is not live-runnable yet.
 
-- [ ] **Step 1:** Add `test_bootstrap_all_targets_both_hosts` and
-  `test_second_host_failure_aborts_every_recorded_host` with actual temp files/Git and
-  existing helper CLIs against fixture commands. Expected trace: both-host checks,
-  strict no-live, timer records/waits, refreshed verified snapshots, one immutable
-  familiar merge, each host's source check/install/pin proof, Titan four dry runs
-  plus Europa two Claude dry runs, then Titan-only ordered live applies and both
-  hosts' verification. Assertion snippets:
-  `assert shared_apply_hosts == ['titan'] * 4`;
-  `assert [r['id'] for r in touched] == ['claude','claude-work','codex','codex-work']`;
-  `assert final_state == 'migrated-surfaces-pending'`.
-- [ ] **Step 2:** Run
-  `uv run -q --with pytest pytest .worktrees/relay-cutover/tools/test_relay_cutover_bootstrap.py -q -k 'prepare or bootstrap or abort'`.
-  Expected RED. Add second-host failure after first timer record, partial snapshot
-  copies, version/before-image drift, active session, missing helper, sync timeout
-  and source-dirty cases; assert no later mutations and restored original timers.
-- [ ] **Step 3:** Implement protected preparation from resolved main paths,
-  existing manifests/images and actual native controller session ID. Keep stable
-  validated CLI executable paths rather than version-directory targets. Check helper
-  bytes across tested worktree/Titan main/Europa main. `check` reports live-session
-  blockers read-only during preparation; `run` requires every gate green after
-  supported personal/work `app-server daemon stop` on Titan. Never adopt newly
-  computed before/image hashes over the reviewed runbook/manifests. No manual daemon kill
-  or broad pattern kill is automated; a survivor blocks for inspection.
-- [ ] **Step 4:** Implement run/abort. For each host, fsync the existing timer
-  helper's completed record and its parent before stopping a timer; do not assume
-  that helper itself uses atomic/fsynced writes. Register snapshot moves before
-  performing them. Preserve preparation originals; verify refreshed state/dependency
-  trees after native writers stop. Reuse the exact runbook sequence for installer
-  dry/plan/apply, `--retire familiar`, evidence, artifact and `/usr/bin/node` flags.
-  Installer plans stay private; verify generated and applied images with existing
-  `relay-cutover verify`, plus captured full-file hashes for cross-host sync and
-  byte-gated restore. Preserve unrelated keys, never normalize them to an image.
-- [ ] **Step 5:** Mark familiar mutation started before `git merge --no-ff --no-edit`
-  of the pinned feature. Install via each host's actual npm `ci --allow-git=root`
-  only after verified source sync. Prove package version and lock commit. Before
-  each target write require all affected harnesses still closed. Durably register
-  original and artifact path before Claude guard removal or any Codex write.
-  Mark migration verified only after all four synchronized targets, source,
-  host-local dependencies and exact evidence pass. A failed before-merge operation
-  attempts abort on every recorded host even if another host is unreachable.
-- [ ] **Step 6:** GREEN focused tests plus injected INT/TERM/HUP during timer/sync
-  waits. A complete abort allows a fresh window; incomplete cleanup preserves state
-  and directs `recover`, never forward resume. Run mandatory suite; commit
-  `feat(relay): automate the closed-harness cutover window`.
+- [ ] **Step 1:** Add `test_prepare_preserves_filter_owned_picks`,
+  `test_nonpick_drift_requires_review_bundle`, `test_run_input_recheck_rebases_picks`,
+  `test_system_toolchain_wins_over_nvm` and `test_second_host_failure_aborts_both`.
+  Vary every key loaded from the filter, missing-key deletion and arbitrary nested
+  pick values; non-pick/hook/statusLine edits reject. Mutate the fixture filter key
+  list to prove reuse. Derived images preserve the current pick values/absence;
+  reviewed originals stay unchanged. Fixtures provide their own reviewed bundle,
+  not the checkout's active hooks; `test_inert_main_needs_no_afterimage_activation`
+  runs against native and candidate checkout variants. `--stage-review` never produces live-ready
+  inputs, and reviewed-bundle activation rejects absent/wrong review/digests.
+  ```python
+  assert nonpick(derived_after, filter_keys) == nonpick(reviewed_after, filter_keys)
+  assert current_pick_values_and_absence == derived_pick_values_and_absence
+  assert install_env["PATH"].split(":")[0] == "/usr/bin"
+  assert npm_executable == "/usr/bin/npm" and npm_version == "12.2.1"
+  ```
+- [ ] **Step 2:** Run the bootstrap/transport test files with
+  `-k 'prepare or pick or toolchain or quiesce or abort'`: RED. Include invalid
+  baseline provenance, corrupt images, npm 11/changed node/Git/Python identity,
+  cache inside a live checkout, active sessions, partial snapshot copies, signals
+  and second-host failure after the first timer record. No later live writes.
+- [ ] **Step 3:** Implement preparation/default rebase and explicit review-bundle
+  paths above. Capture immutable preparation plus effective window input hashes;
+  don't replace reviewed manifests with arbitrary current files. Add daemon-stop,
+  no-live, timer-record/stop/wait/restore and snapshot-refresh/abort operations under
+  these tests. Supported personal/work `app-server daemon stop` on Titan only;
+  survivors block for inspection, no manual/broad kill. `check` remains read-only.
+- [ ] **Step 4:** Implement quiesce/abort on both hosts. Fsync timer helper output
+  and parent before stopping; register snapshot moves before acting. Preserve old
+  snapshots, refresh after native writers stop, verify state/dependency trees.
+  Any pre-merge failure aborts every recorded host; completed abort permits a new
+  window, incomplete abort/SIGKILL requires reconciliation and abort first. Add
+  `test_failure_returns_to_zsh` with original shell variables retained and sanitized
+  step/host/status/log/next-command output. Run focused tests: GREEN.
+- [ ] **Step 5:** Mandatory suite; commit
+  `feat(relay): prepare pick-safe cutover inputs and quiesce hosts`.
 
-### Task 4: Full recovery and actual-state reconciliation
+### Task 4: Apply familiar and all four shared targets
 
 **Files:** extend window/host/CLI modules and bootstrap/transport tests.
 **Interfaces:**
 
-- Consumes: registered originals/guard images/artifacts, per-host timer records
+- Consumes: Task 3 `prepare`, `check`, `quiesce_window`, `abort_window`; Tasks 1–2 records/transport.
+- Produces: `run_window(prepared: dict, decision: dict) -> dict` in the window module;
+CLI `run` through the verified migration checkpoint. Add familiar-merge/install and
+target-dry/apply/verify operations only with this task's tests.
+
+- [ ] **Step 1:** Add `test_all_target_bootstrap_single_writer`,
+  `test_europa_claude_uses_local_installer`, `test_sync_before_install` and
+  `test_registration_before_guard_write`. Use real temp files/Git and existing
+  helper CLIs with fixture host commands.
+  ```python
+  assert apply_hosts == ["titan"] * 4
+  assert target_order == ["claude", "claude-work", "codex", "codex-work"]
+  assert state == "migrated-surfaces-pending"
+  ```
+- [ ] **Step 2:** Run both new test files with `-k 'apply or bootstrap or sync or guard or installer'`:
+  RED. Include exact-evidence refusal, source drift, target drift after input freeze,
+  merge commit before record, sync timeout and each guard/plan/apply interruption.
+- [ ] **Step 3:** At run step 1 repeat Task 3 pick-only eligibility/rebase and
+  toolchain checks on both hosts, then quiesce and recheck before mutation. Mark
+  familiar mutation before merging the immutable feature. Wait for verified source
+  sync before each `/usr/bin/npm ci --allow-git=root` with recorded system PATH and
+  cache environment; prove installed relay version and lock commit. No use of an
+  unqualified npm or an nvm interpreter.
+- [ ] **Step 4:** Dry-run Titan four targets and Europa two Claude copies using
+  each local installer/runtime/evidence. Register every original/artifact durably
+  before the first write. Apply only Titan, with existing guard retirement and
+  relay `--retire familiar --node /usr/bin/node`/artifact sequence. Existing verify
+  checks hooks/statusLine; exact window before/derived-image hashes gate the initial
+  application/sync. Before each write require affected harnesses still closed.
+  Verify synchronized targets, source, dependencies and evidence on both hosts before
+  marking migration verified. Otherwise preserve evidence/full-recovery gate.
+- [ ] **Step 5:** GREEN focused tests and mandatory suite; commit
+  `feat(relay): apply familiar and all shared hook targets`.
+
+### Task 5: Restore targets and familiar from reconciled state
+
+**Files:** extend window/host/CLI modules and bootstrap/transport tests.
+**Interfaces:**
+
+- Consumes: Tasks 3–4 registered originals/guard images/artifacts, per-host timer records
 and saved dependencies; existing `relay-cutover restore` byte gate.
-- Produces: `recover_window(window: dict, decision: dict | None) -> dict` and
-`reconcile_window(window: dict) -> dict` in the window module; `recover` CLI.
-A pre-merge abort needs no desktop decision; full recovery does before desktop use.
+- Produces: `restore_window(window: dict) -> dict` and
+`reconcile_window(window: dict) -> dict` in the window module, plus fixed
+service-run/check host operations used by recovery and later finish.
+This restoration core returns with native targets/source/dependencies verified,
+timers paused and state `recovering`; it cannot report recovery complete. Task 6
+adds the full recover CLI by joining native surfaces and original timers/services.
+No placeholder surface operation or live recovery entry is exposed in this task.
 
 - [ ] **Step 1:** Add `test_recovery_requiesces_before_restore` and
-  `test_missing_merge_record_uses_actual_parents` using real miniature Git histories and temp
+  `test_missing_merge_record_uses_actual_parents` and `test_service_run_wait_and_result`
+  using real miniature Git histories and temp
   dependency trees, plus the existing restore helper with actual artifacts. Cover
   guard-only, planned/not-applied, applied/no-step-record and all-four-applied
   failures; unknown bytes must stop without force-copy. One/both timers already
@@ -373,18 +510,19 @@ A pre-merge abort needs no desktop decision; full recovery does before desktop u
   assert events.index("europa:service-inactive") < events.index("restore:claude")
   assert restored_target_bytes == original_target_bytes
   ```
-- [ ] **Step 2:** Run the bootstrap test command with `-k 'recover or reconcile'`:
+- [ ] **Step 2:** Run the bootstrap test command with `-k 'recover or reconcile or merge_record or service'`:
   RED. Include actual merge committed before its SHA record, merge in progress,
   refused merge at PRE, unexpected parent/HEAD, interrupted revert before record,
   already-complete revert, failed remote sync and interrupted dependency restore.
   Full source recovery ends this window: a later attempt needs newly reviewed
   inputs (the existing runbook describes reverting the recovery revert), not
   blindly merging FEATURE_TIP again or resetting to PRE.
-- [ ] **Step 3:** Implement the spec's six-step recovery in order: strict no-live
-  and supported daemon stop; re-quiesce both original timer records; reverse ledger
-  target restore and both-host originals verification; reconcile/abort or revert
-  the exact familiar merge and wait for source sync; restore each host's original
-  dependencies offline; fresh-consent native surfaces; original timer/service proof.
+- [ ] **Step 3:** Add familiar-reconcile/restore, target-restore and service-run/check
+  operations under these tests. Implement the restoration core in order: strict
+  no-live/supported daemon stop; re-quiesce both original timer records; reverse
+  ledger restore and both-host originals proof; reconcile/abort/revert exact familiar
+  merge, wait for source sync and restore each host's dependencies offline. Return
+  native-surfaces/timer stages as still pending for Task 6's full recovery join.
   Never npm/fetch/reset, import old state, replace a timer record or blindly revert
   twice. Verify a recovered revert's tree equals PRE and its parent identifies the
   recorded attempted merge; unexpected history stays inspection-required.
@@ -398,82 +536,103 @@ A pre-merge abort needs no desktop decision; full recovery does before desktop u
   signals into recovery, retry by reconciliation and verify no repeated destructive
   action. Run mandatory suite; commit `feat(relay): reconcile and recover interrupted cutovers`.
 
-### Task 5: Surface retry, safe resume, smoke receipts and finish
+### Task 6: Consent-bound surface restart and retry
 
-**Files:** create smoke module; extend other modules/executable and bootstrap tests.
+**Files:** extend window/host/CLI modules and bootstrap/transport tests.
 **Interfaces:**
 
-- Consumes: verified migration, Task 1 decision channel, host operation interface.
-- Produces: window functions `restart_surfaces(window: dict, decision: dict) -> dict`,
-`finish_window(window: dict) -> dict`; smoke functions
+- Consumes: verified Task 4 migration, Task 1 consumed invocation decision, Task 2 desktop inventory.
+- Produces: `restart_surfaces(window: dict, decision: dict) -> dict` and
+`recover_window(window: dict, decision: dict | None) -> dict` in the window module;
+CLI restart-surfaces/recover, surface-preview/restart and pilot-only fixed-true probe.
+Full recover dispatches pre-merge abort or Task 5's restoration core, then native
+surfaces with fresh consent, original timer restore and service success. Until
+those pass it retains `recovering` and forbids opening harnesses. Tests assert
+this six-stage order, including retry after partial timer restoration. Initial `run` calls this after its verified checkpoint using the same
+invocation's consumed authorization. A later retry needs fresh actual consent.
+
+- [ ] **Step 1:** Add `test_exited_pid_is_expected`, `test_surface_failure_is_pending`,
+  `test_changed_context_refuses`, `test_partial_restart_retry` and
+  `test_session_decision_required_without_tty`. Cover PID reuse, changed socket/
+  command, unrecorded new process, explained absence and declined/missing/replayed
+  consent. Direct operator TTY and agent session decisions use the same scoped record.
+  ```python
+  assert status["state"] == "migrated-surfaces-pending"
+  assert live_hooks_after == verified_live_hooks_before
+  assert "Do not open Claude or Codex" not in failed_surface_result.stdout
+  ```
+- [ ] **Step 2:** Run bootstrap/transport tests with `-k 'surface or consent or pid or context or restart or decision'`:
+  RED. Failed unverified migration must retain the mixed-hooks ban/full-recovery path.
+- [ ] **Step 3:** Implement recorded PID+start-time/command identity, TERM/wait only
+  recorded live surfaces, exact niri spawn and replacement validation. An exited
+  recorded PID starts its same command. Changed context stops for inspection/new
+  inventory and consent. Persist each replacement before advancing; retry starts
+  only missing recorded surfaces and never kills an unknown process.
+- [ ] **Step 4:** Join initial run/recovery desktop stages to this operation without
+  consuming one invocation decision twice. Non-TTY agent calls require actual
+  session ask/reply and decision-file; no prompt fallback or self-grant flag. Add
+  fixed `true` spawn path for pilot use, including explicit per-invocation consent;
+  no arbitrary probe command. GREEN focused tests plus signal/partial-reply cases.
+- [ ] **Step 5:** Mandatory suite; commit
+  `feat(relay): restart and retry recorded surfaces with consent`.
+
+### Task 7: Safe resume, smoke receipts and timer finalization
+
+**Files:** create smoke module; extend window/host/CLI modules and both test files.
+**Interfaces:**
+
+- Consumes: Task 6 surface readiness, Task 1 decisions, Task 2 transport and Task 4 verified images.
+- Produces: `finish_window(window: dict) -> dict` in window; smoke functions
 `resume_argv(prepared: dict, home: str) -> list[str]`,
 `check_controller(window: dict, observation: dict) -> None`,
 `record_smoke(window: dict, receipt: dict, decision: dict) -> None`,
-`validate_smokes(window: dict) -> None`.
-CLI adds restart-surfaces/record-smoke/finish; status emits a unique next attempt
-and subject digest for an agent's session question, without changing state.
-After `run_window` returns the verified checkpoint, the `run` CLI invokes
-`restart_surfaces` with that same invocation's consumed desktop authorization
-before printing the handoff. A separate retry consumes a fresh decision.
+`validate_smokes(window: dict) -> None`. Add record-smoke/finish CLI and smoke-observe
+operations with their own tests; service-run/check reuse Task 5
+and timer restore reuses Task 3.
 
-- [ ] **Step 1:** Add `test_surface_only_failure_is_resumable`,
-  `test_exited_pid_is_expected`, `test_changed_surface_context_refuses` and
-  `test_session_decision_required_without_tty`: a recorded PID exits before restart, PID reuse,
-  changed socket/command, an unrecorded surface, partial replacements followed by
-  retry, explained absence, declined fresh consent, and no TTY in an agent call.
-  Assert an exited recorded surface starts the same command; changed context never
-  kills another process. Initial `run` continues into the restart with its already
-  consumed invocation authorization; a retry must consume a fresh decision.
-  A verified surface failure preserves migrated hooks and
-  paused timers, offers safe resume/restart, and never prints the mixed-hooks ban.
-  Unverified failures keep the ban/full-recovery path.
+- [ ] **Step 1:** Add `test_resume_has_no_bypass_flags`, `test_current_row_is_fresh`,
+  `test_receipt_is_bound_to_real_cases`, `test_human_attestation_is_required` and
+  `test_partial_finish_keeps_original_timers`. Stale row/cwd, wrong window/home/
+  session/version, pilot receipt, missing/altered evidence or human verdict reject.
+  Denial not attempted/Git identity error cannot pass; neither can automatic approval.
   ```python
-  assert status["state"] == "migrated-surfaces-pending"
-  assert current_target_bytes == verified_migrated_bytes
-  assert "Do not open Claude or Codex" not in result.stdout
+  assert "--dangerously-bypass-approvals-and-sandbox" not in resume_args
+  assert not finish_called_with_incomplete_receipts
+  assert timer_records_after == timer_records_before
   ```
-- [ ] **Step 2:** Run bootstrap tests with `-k 'surface or consent or resume or smoke or finish'`:
-  RED. Receipt tests include wrong window/home/session/version, pilot receipt,
-  substituted evidence, absent human trust/approval, denial never attempted or a
-  Git identity error, and missing full cases. Controller tests require its own
-  fresh native session ID/PID row, not an old matching cwd or stale idle row.
-- [ ] **Step 3:** Implement restarts using recorded PID+start-time/command identity,
-  TERM/wait only recorded running surfaces, exact niri spawn path and replacement
-  validation. Persist each replacement before advancing; retry inventories recorded
-  replacements and starts only missing surfaces. All fresh host-use permission
-  goes through the operator TTY or explicit session ask/reply decision argument.
-  Changed context needs inspection and a new inventory/consent, never automatic
-  adoption. Agent permission prompts remain human and may leave the step pending.
-- [ ] **Step 4:** Implement concrete Zsh-quoted safe resume output:
-  `env CODEX_HOME=<actual-home> <validated-codex> --no-daemon resume <actual-session>`
-  for the controller, plus explicit work-home launch. No aliases, placeholders,
-  bypass flags, trust hashes or default-policy changes. The first controller
-  action checks its fresh live row before further rollout work. Dedicated smokes
-  retain Claude `--permission-mode manual` and Codex `--no-daemon --sandbox
-  workspace-write --ask-for-approval on-request` for human approval coverage.
-- [ ] **Step 5:** Implement the receipt schema above and `record-smoke --receipt FILE
-  --decision-file FILE`. Verify event/session/evidence contents and hashes, then
-  store the human attestation bound to that receipt. The agent asks the operator
-  about only the human trust/permission cases, presenting the relevant host/home
-  and observed verdicts; it waits for their answer. Declined or incomplete cannot
-  pass. Never infer an approval dialog from a generic relay row.
-- [ ] **Step 6:** Implement finish after valid receipts, surface readiness and fresh
-  live source/image/dependency/evidence checks. Restore each original timer state,
-  explicitly run and wait for familiar-reap.service, require Result=success and
-  ExecMainStatus=0, and verify recorded dead rows/intent entries are gone. Preserve
-  the current verified controller row; never reap a live controller as a test.
-  A partial finish is resumable only after actual timer/service checks, never edits
-  hooks/source, and never replaces original timer records. Expose paused/partially
-  restored states and full recovery choice on failure.
-- [ ] **Step 7:** GREEN focused tests plus mandatory suite; commit
-  `feat(relay): verify migration handoffs and finalize with human evidence`.
+- [ ] **Step 2:** Run bootstrap/transport tests with `-k 'resume or smoke or finish or receipt or attestation'`:
+  RED. Include surface-pending, declined SSH/systemd permission, one timer restored,
+  service still running/failing, and accidental targeting of the live controller.
+- [ ] **Step 3:** Print concrete Zsh-quoted executable/home/native-session argv with
+  `--no-daemon resume`, never aliases/bypass flags/placeholders. First controller
+  check proves its own fresh native ID/PID row before further rollout work. Work
+  home gets its explicit command and human hook review too. Controller policies
+  use defaults; dedicated smokes keep Claude `--permission-mode manual` and Codex
+  `--no-daemon --sandbox workspace-write --ask-for-approval on-request`.
+- [ ] **Step 4:** Implement the receipt schema above and `record-smoke --receipt FILE
+  --decision-file FILE`. Validate actual session/case/evidence contents and hashes;
+  obtain the human trust/permission verdicts through actual session ask/reply or
+  operator TTY, bind/consume their decision and persist the receipt. Do not add an
+  untested transcript classifier or infer human approval from event delivery.
+- [ ] **Step 5:** Implement finish after all receipts, surface readiness and fresh
+  source/hooks/statusLine/dependency/evidence checks. Live pick changes after resume
+  do not fail hook verification or rewrite rollback originals. Restore original
+  per-host timers; run/wait familiar-reap.service; require Result=success and
+  ExecMainStatus=0; verify recorded dead rows/intent gone, preserving the current
+  controller. Partial finish reconciles actual timers/services before retry; it
+  never edits hooks/source or replaces original timer records. GREEN focused tests.
+- [ ] **Step 6:** Mandatory suite; commit
+  `feat(relay): validate human smoke evidence and finalize timers`.
 
-### Task 6: Isolated rehearsal through the production transport
+### Task 8: Isolated rehearsal through the production transport
 
 **Files:** create rehearsal executable; extend CLI/host modules and both test files.
+Also modify `.worktrees/relay-cutover/tools/relay-cutover` and
+`.worktrees/relay-cutover/tools/test_relay_cutover.py` for explicit scratch roots
+in its two read-only familiar checks, proven by a failing fixture first.
 **Interfaces:**
 
-- Consumes: the same request/execute/window/restore interfaces; no alternate
+- Consumes: Tasks 1–7, using the same request/execute/window/restore interfaces; no alternate
 implementation of the live operations.
 - Produces: `rehearse(controller_session: str, decision: dict | None) -> dict`
 in CLI and `tools/relay-cutover-rehearse`; private machine-readable pilot verdict.
@@ -483,21 +642,34 @@ in CLI and `tools/relay-cutover-rehearse`; private machine-readable pilot verdic
   for pilot-create ownership, returned opaque
   root IDs, mode mismatch, arbitrary live roots/helpers, traversal/symlink escape,
   a shared live target disguised as scratch and pilot receipts offered to finish.
-  Assert all mutations stay inside owned pilot roots, except the separately
-  consented no-window niri `true` spawn. Real timer operations are queries only;
+  Assert application mutations stay inside owned pilot roots, except the declared
+  prepared cache/runtime writes and consented no-window niri `true` spawn above.
+  Real timer operations are queries only;
   mutation tests use fixture systemctl. No live surface termination or replacement.
   ```python
-  assert outside_files_after == outside_files_before
+  assert outside_application_files_after == outside_application_files_before
   assert live_mutation_calls == []
   ```
 - [ ] **Step 2:** Run both new test files: RED on the missing pilot entry/contract.
-- [ ] **Step 3:** Implement distinct live/pilot request schemas, scratch creation
-  and cleanup. Use actual HOME/SSH configuration for Git credentials, not a fake
-  HOME accidentally losing them; mutable familiar/config/state/dependency roots
-  remain scratch. Use each host's actual npm and validated runtime. Pilot starts
+  Add `test_familiar_checks_use_explicit_root_without_changing_home` to existing
+  helper tests: current hardcoded HOME/d/familiar must not inspect the live source
+  when a pilot root is requested. Prove actual HOME/authentication stays unchanged.
+  Run `uv run -q --with pytest pytest .worktrees/relay-cutover/tools/test_relay_cutover.py -q -k explicit_root`:
+  RED for the missing root argument; retain that check in this task's GREEN run.
+- [ ] **Step 3:** Extend only existing familiar-source/familiar-check with optional
+  `--root <absolute-directory>` (default remains main) for those read-only checks;
+  pilot passes its validated owned scratch root, live driver derives fixed main.
+  No live run/recover root override or fake HOME credential workaround. Implement
+  distinct live/pilot request schemas, scratch creation
+  and cleanup, adding pilot-create/cleanup operations here. Retain the actual
+  HOME/SSH authentication, user bus and prepared host-local cache routing, with
+  fixed system PATH/Python bytecode policy above; TMPDIR and mutable application
+  roots stay scratch. Use `/usr/bin/npm` 12.2.1 and recorded `/usr/bin/node`. Pilot starts
   with one case: clone at PRE, merge feature, install/pin-proof both hosts; dry/
   apply/verify Titan four copies plus Europa Claude copies and remote image checks;
-  reverse restore and recover both clones/dependency trees offline to a verdict.
+  use Task 5's same restoration core to restore targets and both clones/dependency
+  trees offline to a verdict. Pilot surface/timer mutation stays unexercised, not
+  a fabricated full live-recovery pass; the separate true-spawn probe covers IPC.
   It never imports registries or launches a real harness against copied hooks.
 - [ ] **Step 4:** Exercise the same niri IPC spawn operation with the fixed command
   `true` on each applicable host after invocation-specific consent; record IPC
@@ -506,16 +678,30 @@ in CLI and `tools/relay-cutover-rehearse`; private machine-readable pilot verdic
   fabricated pass. Fixtures separately prove replacement liveness and restart
   error handling. Retain private equality/pin/verdict evidence; remove any copied
   credentials if the implementation needed them and prove cleanup without secrets.
-- [ ] **Step 5:** GREEN fixture pilot and interruption tests, mandatory suite; commit
+- [ ] **Step 5:** Add `test_disconnect_closes_pipes_without_signal` and the real
+  disconnect pilot case: create a second scratch clone/install on Europa through
+  `start_request`, query operation-status over a second connection until its durable
+  start is visible, then drop only the returned owned local SSH client
+  while the install is running, then reconnect by operation ID. The helper reaches
+  completion/deadline, persists before reply and never restarts npm from scratch.
+  Require a known completion and equality/pin verdict before cleanup. If install
+  finishes before the disconnect point, the case is unexercised, not passed; retry
+  with an explicit pilot-only latch after npm has actually started (fixtures can
+  wrap the scratch install launch), never alter live install timing or pass a
+  missing install-start observation. Reap the killed local client; the tracked
+  rehearsal keeps reconciling the bounded remote operation before it can exit.
+  The fake SSH closes stdin/stdout/reply pipes, sends no remote signal, and proves
+  the same result. On deadline/failure recover those scratch dependencies offline.
+- [ ] **Step 6:** GREEN fixture pilot and interruption tests, mandatory suite; commit
   `test(relay): rehearse cutover over the real host protocol`.
-  Do not claim the real-host pilot ran yet: Task 7 deploys the inert remote entry.
+  Do not claim the real-host pilot ran yet: Task 9 deploys the inert remote entry.
 
-### Task 7: Replacement runbook, inert helper delivery and real-host pilot
+### Task 9: Replacement runbook, inert helper delivery and real-host pilot
 
 **Files:** update runbook, original plan and README listed above; no live hook images.
 **Interfaces:**
 
-- Consumes: Tasks 1–6 reviewed commits and tests. Original Task 7 historical
+- Consumes: Tasks 1–8 reviewed commits and tests. Original Task 7 historical
 rehearsals remain evidence, not proof of this runner. Dots/lore do not block.
 - Produces: approved-input manifest, retained real-transport pilot report and a
 reviewable one-command handoff. Live application remains unperformed.
@@ -543,10 +729,17 @@ reviewable one-command handoff. Live application remains unperformed.
 - [ ] **Step 4:** Land only reviewed inert implementation/helper/doc commits into
   main using a bounded prefix/cherry-pick as the original Task 5 did. Never merge
   the whole feature branch: it includes hook after-images that must not activate
-  here. Preserve dirty trust/model picks. Verify the delivered tree equals the
-  tested helper bytes, sync main to Europa, and create the private SHA manifest
+  here. Preserve dirty trust/model picks. Run `just test` on the actual delivered
+  main tree: it intentionally lacks the feature branch's hook after-images, so the
+  worktree suite does not prove this combination. If it fails, inspect/fix/review
+  the inert delivery without activating hook images; do not claim it is ready or
+  proceed to Europa helper use. After that pass, verify tested helper-byte equality,
+  wait for matching main bytes on Europa, and create the private SHA manifest
   for bootstrap/package/remote/rehearsal code, existing helpers, runtime launcher,
-  subscribers and installer/evidence inputs. No home-link/service changes.
+  subscribers, clean-filter key authority, installer/evidence inputs and per-host
+  npm/node/Git/helper-Python identities/versions/digests. Dropbox may copy inert
+  files earlier; main's passing suite gates Europa execution, not a claim that
+  automatic synchronization was paused. No home-link/service changes.
 - [ ] **Step 5:** Agent-run read-only checks through the new transport on both
   hosts: credentials, USER/user bus, actual source/versions/runtime, manifest,
   targets, desktop inventory and known retained state. Current controller no-live
@@ -558,10 +751,13 @@ reviewable one-command handoff. Live application remains unperformed.
   pilot is expected to take at most five minutes. After the explicit reply, pass
   its per-invocation decision into the rehearsal entry and run one end-to-end
   pilot through its verdict, foreground or harness-tracked with a covering timeout.
-  Read results before any broader fault matrix. On refusal run only non-desktop
+  Read results before any broader fault matrix, then run Task 8's one real
+  scratch-install disconnect/reconciliation case through its verdict. On refusal
+  run only non-desktop
   parts and record the spawn gate pending; do not claim window readiness.
   Analyze any completed parts before retrying, ask fresh consent for another spawn,
-  and retain per-host source/target/dependency equality, approved pin and cleanup.
+  and retain per-host source/target/dependency equality, approved pin, declared
+  cache/runtime-write exceptions, disconnect completion and cleanup.
 - [ ] **Step 7:** Complete the bounded fixture fault matrix, compare helper bytes
   again if any fix occurred, and rerun only checks justified by that fix. Task-note
   the exact reviewed commit/manifest/pilot verdict and remaining live gates.
@@ -569,7 +765,7 @@ reviewable one-command handoff. Live application remains unperformed.
   gates pass; this unblocks its dependent original window task hq-f27918. Park
   hq-f27918 and parent for the operator's session closure/window, naming that live
   smoke/timer evidence is still owed there and final checks belong to original
-  Task 9. Do not keep Task 8 dependent on a bootstrap task that waits on Task 8's
+  Task 9. Do not keep original Task 8 dependent on a bootstrap task that waits on its
   own live results, or claim the rollout done when only preparation is delivered.
 
 ## Live handoff after implementation approval and rehearsal
@@ -587,20 +783,22 @@ that answer for `restart-surfaces`; declining leaves it pending without rollback
 Run the exact full/short smokes, including both Codex homes' own TUI trust reviews.
 Gather human verdicts through the session/TTY channel and record bound receipts;
 permission prompts for SSH/systemctl remain human. Then finish timers and scheduled
-reconciliation, verify Task 8 live evidence and perform original Task 9 final checks.
-Keep backups/worktree through Task 9. Full recovery remains an operator-run
+reconciliation, verify original Task 8 live evidence and perform original Task 9 final checks.
+Keep backups/worktree through original Task 9. Full recovery remains an operator-run
 closed-harness command, with new desktop consent for its restarts.
 
 ## Self-review / coverage before handing this plan back
 
-- [x] Map the approved spec: shell/one-command and input manifest → Tasks 2–3, 7;
-  all-target record/apply and abort → Tasks 1, 3; actual-state/offline recovery →
-  Task 4; safe resume/trust/smokes/timers/surfaces/consent → Tasks 1, 5;
-  real-SSH pilot/mode isolation/spawn route → Tasks 2, 6–7;
-  independent dots/lore requirements → explicit owning-task handoffs above.
-- [x] Check cross-task signatures and data/schema names; all later consumers refer
-  to the same defined functions. Keep test assertions behavioral and all live
-  mutation roots fixed; no hidden scratch environment escape hatch.
-- [x] Confirm all five Review Focus cases have tests in their owning task. No
-  implementation/test results or live permission is implied by a checked plan.
-- [ ] Human reviews this complete plan before Task 1 implementation begins.
+- [x] Map approved requirements: durable records/consent → Task 1; transport,
+  lifecycle/toolchain/environment → Task 2; pick-safe preparation/quiescence/abort →
+  Task 3; application/sync → Task 4; actual-state/offline recovery → Task 5;
+  surface retry → Task 6; safe resume/trust/receipts/timers → Task 7;
+  mode isolation/spawn/disconnect pilot → Tasks 8–9; delivered-main tests and
+  original-window handoff → Task 9; independent dots/lore → their owning tasks.
+- [x] Check signatures/data schemas, step granularity and all five Review Focus
+  cases. Each mutation operation lands in its consuming task's RED→GREEN cycle.
+- [x] Distinguish original reviewed images from effective pick-derived window
+  images, pinned system toolchain from login PATH, explicit cancel from pipe loss,
+  scratch application writes from declared host-cache/runtime effects, and
+  worktree tests from delivered-main tests. No live results are implied.
+- [ ] Human re-reviews the complete frozen plan before Task 1 implementation.
