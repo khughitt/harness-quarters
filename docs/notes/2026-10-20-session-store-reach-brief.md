@@ -97,8 +97,13 @@ stores obs indexes (hq-a60cf5), and the model route is a skill addition (hq-7b13
 
 - hq-cff824: goal for this cluster.
 - hq-a1c591 (research): obs index coverage of the audited origins. hq-c411df waits on it.
+- hq-de3e4c (research, added 2026-10-20): survey what agents look for in session logs,
+  to set the verbs of a proposed `hq logs` / `hq trace` CLI and its usage skill (the
+  user's proposal). hq-c411df waits on it too, and its locate-owner choice (§4) becomes
+  part of that CLI's design.
 - hq-a60cf5: `session-episodes extract` reads every store obs indexes. Independent
-  of the choice above.
+  of the choice above, but it should take its store list from a shared reader if the
+  CLI lands first.
 - hq-7b131a (scoped): the session-logs skill names the route to a Codex session's or
   subagent's runtime model.
 - hq-be3f69: proposed drop. Nothing to change; recorded in §2 as what already works.
