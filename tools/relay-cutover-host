@@ -1,0 +1,14 @@
+#!/usr/bin/python3 -B
+"""The fixed cutover host entry: one bounded JSON request on stdin, one reply on stdout.
+
+The controller runs it as `exec /usr/bin/python3 -B ~/d/hq/tools/relay-cutover-host`,
+over `ssh -4 -o BatchMode=yes europa` or directly on Titan. It takes no arguments; the
+request names one fixed operation (relay_cutover_bootstrap.hosts) and carries its payload
+as data. Full logs stay private under ~/.local/state/hq/relay-cutover/operations/."""
+import sys
+
+from relay_cutover_bootstrap import hosts
+
+if len(sys.argv) != 1:
+    sys.exit("relay-cutover-host takes no arguments; send one JSON request on stdin")
+sys.exit(hosts.serve())
