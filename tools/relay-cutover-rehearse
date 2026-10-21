@@ -1,0 +1,13 @@
+#!/usr/bin/python3 -B
+"""The rehearsal of hq's relay cutover: one pilot case in owned scratch roots on both hosts,
+through the real host protocol (relay_cutover_bootstrap/pilot.py).
+
+Run it by explicit path, for example
+`~/d/hq/tools/relay-cutover-rehearse --controller-session ID --preview`, then with
+`--decision-file FILE`. Its interpreter is fixed here; it sources nothing and reads no caller
+variable. A stopped or unpassed rehearsal returns 1 to the calling shell (cli.py)."""
+import sys
+
+from relay_cutover_bootstrap import cli
+
+sys.exit(cli.rehearse_main(sys.argv[1:]))

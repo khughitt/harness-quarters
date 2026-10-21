@@ -63,6 +63,7 @@ RECOVERY_IMPACT = ("familiar's niri watcher and desktop panel stop and start aga
                    "restored native source; the panel is briefly absent")
 PROBE_IMPACT = ("niri runs the fixed command true through its spawn on each named host; no "
                 "window opens and no surface stops")
+PROBE_SECONDS = 300  # the rehearsal that runs the spawn takes at most five minutes
 IPC_SECONDS = 10
 SPAWN_SECONDS = 10
 STOP_SECONDS = 10.0  # the wait for a recorded process to exit after TERM
@@ -255,7 +256,6 @@ def _appeared(name, home, before):
 def surface_restart(context):
     """Restart one recorded surface of this host in one phase, or adopt the replacement this
     phase already started. Refuses any changed context before a signal or spawn."""
-    _live_only(context)
     payload = context["payload"]
     recorded, name, phase = payload["recorded"], payload["name"], payload["phase"]
     surface = next((entry for entry in recorded["surfaces"] if entry["name"] == name), None)
@@ -296,8 +296,6 @@ def surface_restart(context):
 
 def surface_probe(context):
     """Pilot only: the fixed command `true` through niri's spawn on the consented socket."""
-    if context["mode"] != "pilot":
-        raise Stop(f"{context['mode']} mode cannot run the fixed true spawn; it is pilot only")
     socket = context["payload"]["socket"]
     if inventory._niri_sockets(inventory._process_rows()) != [socket]:
         raise Stop("the consented niri socket is not this session's one trusted socket; nothing "
@@ -306,12 +304,6 @@ def surface_probe(context):
         raise Stop("read-only niri IPC on the trusted socket failed; nothing was spawned")
     _spawn(context, socket, PROBE_COMMAND, "niri-spawn-probe")
     return {"command": PROBE_COMMAND, "socket": socket, "acknowledged": True}
-
-
-def _live_only(context):
-    if context["mode"] != "live":
-        raise Stop(f"{context['mode']} mode cannot restart familiar's surfaces; this operation "
-                   "is live only")
 
 
 def _path(value):
@@ -361,7 +353,8 @@ OPERATIONS = {
         required=frozenset({"window_id", "phase", "name", "recorded"})),
     "surface-probe": hosts.Operation(
         run=surface_probe, deadline=IPC_SECONDS + SPAWN_SECONDS + 60, mutation=True,
-        payload={**_WINDOW, "socket": _path}, required=frozenset({"window_id", "socket"})),
+        payload={**_WINDOW, "socket": _path}, required=frozenset({"window_id", "socket"}),
+        modes=("pilot",)),
 }
 
 
@@ -773,7 +766,7 @@ def probe_subject(window: dict, sockets: dict) -> dict:
     return {"action": PROBE_ACTION, "window_id": window["id"], "command": [PROBE_COMMAND],
             "hosts": {host: {"socket": sockets[host]} for host in lifecycle.HOST_ORDER
                       if host in sockets},
-            "impact": PROBE_IMPACT, "duration_seconds": 1}
+            "impact": PROBE_IMPACT, "duration_seconds": PROBE_SECONDS}
 
 
 def probe(window: dict, decision: dict, sockets: dict) -> dict:

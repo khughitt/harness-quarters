@@ -28,8 +28,8 @@ from types import SimpleNamespace
 import pytest
 
 import test_relay_cutover_transport as transport
-from relay_cutover_bootstrap import (cli, finish, hosts, inputs, inventory, recovery,
-                                     restoration, smoke, state, surfaces, window)
+from relay_cutover_bootstrap import (cli, finish, hosts, inputs, inventory, operations, pilot,
+                                     recovery, restoration, smoke, state, surfaces, window)
 from relay_cutover_bootstrap import prepare as preparation
 from relay_cutover_bootstrap.state import Stop
 
@@ -2117,6 +2117,10 @@ class TestRun:
                              and call["args"][:1] == ["ci"])
         assert all(call["host"] == "titan" for call in calls[:titan_install]
                    if call["tool"] == "npm" and call["args"][:1] == ["ci"])
+        # Live, the familiar checks read the fixed main checkout: no run names another root.
+        familiar_checks = [call["args"] for call in calls if call["tool"] == "relay-cutover"
+                           and call["args"][0].startswith("familiar-")]
+        assert familiar_checks and not any("--root" in args for args in familiar_checks)
 
     def test_registration_before_guard_write(self, migrated):
         world = migrated.world
@@ -3249,9 +3253,10 @@ def _spawned(world, since=0):
     return [(host, command) for host, command, _ in transport._niri_spawns(world, since)]
 
 
-def _cli(world, monkeypatch, argv, answer=None):
+def _cli(world, monkeypatch, argv, answer=None, entry=None):
     """One in-process CLI invocation, its stdout and stderr together. With `answer` it has the
-    operator's terminal, a pty answering once; without, it has none."""
+    operator's terminal, a pty answering once; without, it has none. `entry` is the CLI's
+    entry, the bootstrap's by default."""
     master = slave = None
     if answer is None:
         monkeypatch.setattr(cli, "TTY", str(world.tmp / "no-terminal"))
@@ -3262,7 +3267,7 @@ def _cli(world, monkeypatch, argv, answer=None):
     stream = io.StringIO()
     try:
         with contextlib.redirect_stdout(stream), contextlib.redirect_stderr(stream):
-            code = cli.main(argv)
+            code = (entry or cli.main)(argv)
         terminal = _drain(master) if master is not None else ""
     finally:
         for fd in (master, slave):
@@ -5116,3 +5121,605 @@ def test_smoke_hold_breach_recovers_to_native(cutover, monkeypatch):
     assert not any(":launched-" in event for event in events), events
     assert observed(cutover, "claude", mark) == [] and observed(cutover, "preflight", mark) == []
     assert "native recovery complete" in recovered.stdout
+
+
+# --- the rehearsal: one pilot case through the real host protocol, in owned scratch roots ----
+
+PILOT_ASK = ("Run the relay-cutover pilot? It spawns the fixed command true through niri IPC on "
+             "titan and europa (no window opens) and takes about 5 minutes.")
+PREVIEWED_PILOT = re.compile(r"window_id (\S+), attempt_id (\S+), subject_sha256 ([0-9a-f]{64})")
+
+
+def _rehearse(world, monkeypatch, *argv, answer=None):
+    return _cli(world, monkeypatch, ["--controller-session", SESSION, *argv], answer=answer,
+                entry=cli.rehearse_main)
+
+
+def _pilot_decision(world, preview, name, verdict="approved", reply="yes, run the pilot"):
+    """What an agent writes after rehearse --preview: the previewed subject's fields and the
+    actual session ask and reply, in a private decision file."""
+    window_id, attempt, digest = PREVIEWED_PILOT.search(preview.stdout).groups()
+    data = json.dumps({"schema": 1, "kind": "desktop", "action": surfaces.PROBE_ACTION,
+                       "window_id": window_id, "attempt_id": attempt, "subject_sha256": digest,
+                       "verdict": verdict,
+                       "source": {"type": "session", "session_id": SESSION, "ask": PILOT_ASK,
+                                  "reply": reply, "answered_at": _now()}})
+    return str(transport._stage(world.tmp, name, data.encode()))
+
+
+def _pilot_requests(patch, world):
+    """Every request in order, as start_request sends it (the dropped install and every status
+    read included), with its mode and the window record as it stood."""
+    log, real, root = [], hosts.start_request, cutover_root(world)
+
+    def record(host, mode, operation, payload, *, timeout):
+        log.append({"host": host, "mode": mode, "operation": operation, "payload": payload,
+                    "window": state.current_window(root)})
+        return real(host, mode, operation, payload, timeout=timeout)
+
+    patch.setattr(hosts, "start_request", record)
+    return log
+
+
+def _verdict(record):
+    path = Path(record["pilot"]["verdict"]["path"])
+    return path, json.loads(path.read_text())
+
+
+def _npm_installs(world, since=0):
+    return [call for call in observed(world, "npm", since) if call["args"][:1] == ["ci"]]
+
+
+@pytest.fixture(scope="class")
+def rehearsed(tmp_path_factory):
+    """One whole rehearsal through its CLI: preparation, the preview, an agent's record of the
+    session ask and reply, then the run, with interleaved live picks on both hosts and every
+    request recorded."""
+    with pytest.MonkeyPatch.context() as patch:
+        world = transport.World(tmp_path_factory.mktemp("rehearsed"), patch)
+        try:
+            world.stage_cutover()
+            live = _interleaved()
+            for target_id, data in live.items():
+                world.write_target(target_id, data)
+            patch.setattr(window, "CHECKOUT", world.home("titan") / "d/hq")
+            prepared = preparation.prepare(SESSION)
+            root = cutover_root(world)
+            before = {host: transport.outside(world, host) for host in HOSTS}
+            marks = {key: len(world.lines(key)) for key in ("observed", "ssh_log")}
+            operations_before = sorted(os.listdir(root / "operations"))
+            preview = _rehearse(world, patch, "--preview")
+            previewed = state.current_window(root)
+            quiet = ({key: len(world.lines(key)) for key in marks} == marks
+                     and sorted(os.listdir(root / "operations")) == operations_before)
+            decision = _pilot_decision(world, preview, "pilot-decision.json")
+            requests = _pilot_requests(patch, world)
+            run = _rehearse(world, patch, "--decision-file", decision)
+            yield SimpleNamespace(
+                world=world, prepared=prepared, live=live, before=before, marks=marks,
+                preview=preview, previewed=previewed, quiet=quiet, decision=decision,
+                requests=requests, run=run, window=state.current_window(root),
+                after={host: transport.outside(world, host) for host in HOSTS})
+        finally:
+            world.close()
+
+
+@needs_zsh
+class TestRehearse:
+    """The smallest end-to-end pilot, run once through the real transport and remote helper."""
+
+    def test_preview_allocates_the_pilot_before_the_ask(self, rehearsed):
+        preview, record = rehearsed.preview, rehearsed.previewed
+        assert preview.code == 0, preview.stdout
+        assert (record["mode"], record["state"]) == ("pilot", "prepared")
+        assert record["prepared_sha256"] == window.prepared_sha256(rehearsed.prepared)
+        sockets = {host: rehearsed.prepared["hosts"][host]["desktop"]["socket"] for host in HOSTS}
+        subject = surfaces.probe_subject(record, sockets)
+        assert record["pilot"]["subject"] == subject
+        assert subject["command"] == ["true"] and subject["duration_seconds"] <= 300
+        text = preview.stdout
+        for host in HOSTS:
+            assert f"{host}: through niri socket {sockets[host]}" in text
+        assert "the fixed command true" in text and "no window opens" in text
+        assert "at most 5 minutes" in text
+        assert (f"window_id {record['id']}, attempt_id probe-1, subject_sha256 "
+                f"{sha(subject)}") in text
+        assert text.splitlines()[-1] == "  next: " + cli.rehearse_line(
+            ["--controller-session", SESSION, "--decision-file", cli.DECISION_PLACEHOLDER])
+        # The preview reads the local prepared record only: no host was asked anything.
+        assert rehearsed.quiet
+        answered = json.loads(Path(rehearsed.decision).read_text())["source"]["answered_at"]
+        assert datetime.fromisoformat(answered) >= datetime.fromisoformat(record["created_at"])
+
+    def test_rehearsal_runs_the_one_case_in_order(self, rehearsed):
+        assert rehearsed.run.code == 0, rehearsed.run.stdout
+        record, sends, pins = rehearsed.window, rehearsed.requests, rehearsed.world.pins
+        assert (record["id"], record["mode"], record["state"]) == (
+            rehearsed.previewed["id"], "pilot", "recovered")
+        assert {entry["mode"] for entry in sends} == {"pilot"}
+        roots = record["pilot"]["roots"]
+        disconnect = record["pilot"]["disconnect"]["root"]
+        for entry in sends:
+            spec = operations.OPERATIONS.get(entry["operation"])
+            if spec is not None and spec.scratch:
+                assert entry["payload"]["scratch"] in (roots[entry["host"]], disconnect)
+            assert not {"root", "helper", "home", "familiar"} & set(entry["payload"])
+        named = [(entry["host"], entry["operation"]) for entry in sends
+                 if entry["operation"] != "operation-status"]
+        first = {name: named.index(name) for name in reversed(named)}
+        assert first[("titan", "inventory")] < first[("titan", "surface-probe")] \
+            < first[("titan", "pilot-create")]
+        dry = [index for index, (_, operation) in enumerate(named) if operation == "target-dry"]
+        assert [(sends_host, payload_target) for sends_host, payload_target in (
+            (entry["host"], entry["payload"]["target_id"]) for entry in sends
+            if entry["operation"] == "target-dry")] == (
+            [("titan", target_id) for target_id in inputs.TARGETS]
+            + [("europa", target_id) for target_id in inputs.CLAUDE_TARGETS])
+        merges = [index for index, (_, operation) in enumerate(named)
+                  if operation == "familiar-merge"]
+        assert max(dry) < min(merges)  # all six dry runs pass before the scratch merge
+        at_merge = next(entry["window"] for entry in sends
+                        if entry["operation"] == "familiar-merge")
+        assert at_merge["familiar"]["pre"] == pins["familiar_pre"]
+        assert "merge" not in at_merge["familiar"] and "sealed" in at_merge
+        assert min(merges) < first[("titan", "familiar-install")] < first[("titan", "target-apply")]
+        # Titan's four live-simulation copies under one touched record, each its scratch copy.
+        ledger = state.read_ledger(record)
+        assert [entry["target_id"] for entry in ledger] == list(inputs.TARGETS)
+        titan = transport.pilot_roots(rehearsed.world, "titan") / roots["titan"]
+        assert all(Path(entry["target"]).is_relative_to(titan) for entry in ledger)
+        assert record["applied"].keys() == set(inputs.TARGETS)
+        # Restoration through the core, offline, ends in cleanup on both hosts.
+        restores = [entry["payload"]["target_id"] for entry in sends
+                    if entry["operation"] == "target-restore"]
+        assert restores == list(reversed(inputs.TARGETS))
+        actions = [(action["host"], action["action"]) for action in record["recovery"]["actions"]]
+        assert actions == [("titan", "target-restore")] * 4 + [
+            ("titan", "reverted"), ("europa", "reverted"), ("titan", "dependency-restore"),
+            ("europa", "dependency-restore")]
+        assert named[-2:] == [("titan", "pilot-cleanup"), ("europa", "pilot-cleanup")]
+        assert max(index for index, (_, operation) in enumerate(named)
+                   if operation == "dependency-restore") < len(named) - 2
+
+    def test_rehearsal_mutations_stay_in_scratch(self, rehearsed):
+        world, mark = rehearsed.world, rehearsed.marks["observed"]
+        outside_application_files_before = rehearsed.before
+        outside_application_files_after = rehearsed.after
+        assert outside_application_files_after == outside_application_files_before
+        live_mutation_calls = transport.live_mutations(world, mark)
+        assert live_mutation_calls == []
+        # Real timer and unit operations are queries; nothing is signalled or restarted, and
+        # niri spawns only the consented `true`.
+        assert {tuple(call["args"][:2]) for call in observed(world, "systemctl", mark)} == {
+            ("--user", "is-system-running"), ("--user", "show")}
+        assert observed(world, "quiesce-timers", mark) == []
+        sockets = {host: rehearsed.prepared["hosts"][host]["desktop"]["socket"] for host in HOSTS}
+        assert transport._niri_spawns(world, mark) == [(host, "true", sockets[host])
+                                                       for host in HOSTS]
+        assert transport._term_signals(world, mark) == []
+        # No harness runs against copied hooks: Claude only answers its held probes.
+        assert {tuple(call["args"]) for call in observed(world, "claude", mark)} <= {
+            ("--version",), ("doctor",)}
+        assert {call["hold"] for call in observed(world, "claude", mark)} == {"1"}
+        # Installs ran in scratch, with TMPDIR there and the prepared caches pinned.
+        roots = [transport.pilot_roots(world, host) for host in HOSTS]
+        installs = _npm_installs(world, mark)
+        assert installs and all(transport._under(call["cwd"], roots)
+                                and transport._under(call["tmpdir"], roots) for call in installs)
+        assert {call["cache"] for call in installs} == {
+            rehearsed.prepared["hosts"][host]["caches"]["prefixes"]["npm"] for host in HOSTS}
+        assert all(os.listdir(root) == [] for root in roots)  # every scratch root is gone
+
+    def test_rehearsal_verdict_is_private(self, rehearsed):
+        record = rehearsed.window
+        path, verdict = _verdict(record)
+        assert path.parent == Path(record["directory"]) and mode(path) == 0o600
+        assert record["pilot"]["verdict"] == {"path": str(path), "verdict": "passed",
+                                              "sha256": sha256_file(path)}
+        assert (verdict["schema"], verdict["kind"], verdict["window_id"]) == (
+            1, pilot.VERDICT_KIND, record["id"])
+        assert verdict["verdict"] == "passed" and verdict["failure"] is None
+        assert verdict["controller_session"] == SESSION
+        assert {name: gate["verdict"] for name, gate in verdict["gates"].items()} == {
+            name: "passed" for name in pilot.GATES}
+        spawn = verdict["gates"]["spawn"]
+        assert {host: entry["verdict"] for host, entry in spawn["hosts"].items()} == {
+            host: "acknowledged" for host in HOSTS}
+        prefixes = {host: rehearsed.prepared["hosts"][host]["caches"]["prefixes"]
+                    for host in HOSTS}
+        assert verdict["permitted_writes"]["caches"] == prefixes
+        assert verdict["host_byte_equal"] is False
+        assert set(verdict["unexercised"]) == set(pilot.UNEXERCISED)
+        pins = verdict["gates"]["dependencies"]
+        assert pins["hosts"] == {host: {"version": "0.1.1", "commit": inputs.PINS["relay_commit"]}
+                                 for host in HOSTS}
+        assert verdict["gates"]["source"]["equal"] is True
+        assert verdict["gates"]["remote-expectations"]["targets"] == {
+            target_id: record["applied"][target_id]["sha256"]
+            for target_id in inputs.CLAUDE_TARGETS}
+        restored = verdict["gates"]["restore"]
+        assert restored["targets"] == {target_id: "native" for target_id in inputs.TARGETS}
+        assert set(restored["dependencies"]) == set(HOSTS)
+        assert verdict["gates"]["cleanup"]["hosts"] == {
+            host: sorted([record["pilot"]["roots"][host]]
+                         + ([record["pilot"]["disconnect"]["root"]] if host == "europa" else []))
+            for host in HOSTS}
+        texts = [path.read_text(), window_file(record).read_text(), rehearsed.run.stdout,
+                 rehearsed.preview.stdout]
+        for secret in SECRETS:
+            assert not any(secret in text for text in texts), secret
+        assert f"verdict: passed ({path})" in rehearsed.run.stdout
+
+    def test_rehearsal_disconnect_reconciles_without_restart(self, rehearsed):
+        world, record = rehearsed.world, rehearsed.window
+        gate = _verdict(record)[1]["gates"]["disconnect"]
+        attempts = gate["attempts"]
+        assert attempts[-1]["exercised"] is True
+        assert all(attempt["exercised"] is False for attempt in attempts[:-1])
+        assert [attempt["latch"] for attempt in attempts] == [False, True][:len(attempts)]
+        assert gate["equal"] is True and gate["relay"] == {
+            "version": "0.1.1", "commit": inputs.PINS["relay_commit"]}
+        clone = str(transport.pilot_roots(world, "europa") / record["pilot"]["disconnect"]["root"]
+                    / "familiar")
+        assert len([call for call in _npm_installs(world, rehearsed.marks["observed"])
+                    if call["cwd"] == clone]) == len(attempts)  # once per attempt, no rerun
+        sends = rehearsed.requests
+        dropped = attempts[-1]["operation_id"]
+        reads = [index for index, entry in enumerate(sends)
+                 if entry["operation"] == "operation-status"
+                 and entry["payload"]["operation_id"] == dropped]
+        cleanup = next(index for index, entry in enumerate(sends)
+                       if entry["operation"] == "pilot-cleanup")
+        assert reads and max(reads) < cleanup  # its completion was known before cleanup
+        assert not any(entry["operation"] == "operation-cancel" for entry in sends)
+
+
+def sha256_file(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def _frozen_drift(monkeypatch):
+    """A frozen copy found changed after the seal, before any merge."""
+    def drifted(record, seen, progress, scopes):
+        raise window.Failed("target-frozen", "europa", "blocked", "claude changed after the "
+                            "freeze; nothing was merged")
+    monkeypatch.setattr(pilot, "_frozen", drifted)
+
+
+@needs_zsh
+@pytest.mark.parametrize("case", ["dry", "frozen"])
+def test_rehearsal_failure_cleans_scratch(cutover, monkeypatch, case):
+    """A rehearsal that stops removes every scratch root and records a failed verdict naming the
+    step: before the seal (Europa's dry run refuses) nothing needs restoring; after it, with no
+    clone merged yet, restoration still runs offline through the core and finds each clone at
+    PRE and its dependencies native. With no answer to the spawn ask, the spawn gate is pending,
+    never passed, and nothing is spawned."""
+    world, root = cutover, cutover_root(cutover)
+    preparation.prepare(SESSION)
+    preview = _rehearse(world, monkeypatch, "--preview")
+    assert preview.code == 0, preview.stdout
+    if case == "dry":
+        world.behave("europa", installer={"dry:claude": "refuse"})
+    else:
+        _frozen_drift(monkeypatch)
+    before = {host: transport.outside(world, host) for host in HOSTS}
+    mark = len(world.lines("observed"))
+    run = _rehearse(world, monkeypatch)  # no terminal and no decision file: absent
+    assert run.code == 1, run.stdout
+    record = state.current_window(root)
+    assert (record["mode"], record["state"]) == ("pilot", "recovered")
+    _, verdict = _verdict(record)
+    assert verdict["verdict"] == "failed"
+    step = "target-dry" if case == "dry" else "target-frozen"
+    assert (verdict["failure"]["step"], verdict["failure"]["host"]) == (step, "europa")
+    assert verdict["gates"]["spawn"]["verdict"] == "pending"
+    assert verdict["gates"]["spawn"]["reason"] == "absent"
+    assert verdict["gates"]["dry-runs"]["verdict"] == "failed"
+    if case == "dry":
+        assert "recovery" not in record and verdict["gates"]["restore"]["verdict"] == "not-run"
+    else:
+        assert verdict["gates"]["restore"]["verdict"] == "passed"
+        recovered = record["recovery"]
+        assert {recovered["familiar"]["class"], recovered["clones"]["europa"]["class"]} == {
+            "at-pre"}
+        assert recovered["actions"] == []  # nothing had changed: nothing was undone
+        assert {host: entry["replaced"] for host, entry in recovered["dependencies"].items()} \
+            == {host: False for host in HOSTS}
+    assert transport._niri_spawns(world, mark) == []
+    assert all(os.listdir(transport.pilot_roots(world, host)) == [] for host in HOSTS)
+    assert {host: transport.outside(world, host) for host in HOSTS} == before
+    assert transport.live_mutations(world, mark) == []
+    assert f"step: {step}" in run.stdout and "verdict: failed" in run.stdout
+    assert run.stdout.splitlines()[-1] == "  next: " + cli.rehearse_line(
+        ["--controller-session", SESSION, "--preview"])
+
+
+@needs_zsh
+def test_rehearse_resumes_an_interrupted_pilot(cutover, monkeypatch):
+    """A rehearsal killed after creating its scratch roots leaves its pilot window open, which
+    blocks a live run; rehearse then reconciles it, removes every scratch root and closes it
+    with an interrupted verdict, never a pass."""
+    world, root = cutover, cutover_root(cutover)
+    prepared = preparation.prepare(SESSION)
+    preview = _rehearse(world, monkeypatch, "--preview")
+    record = state.current_window(root)
+    roots = {host: transport._create(world, host, window_id=record["id"])["root"]
+             for host in HOSTS}
+    dead, _ = _dead_identity()
+    record = {**record, "state": "applying", "owner": dead,
+              "pilot": {**record["pilot"], "roots": roots}}
+    state.save_record(window_file(record), record)
+    blocked = _cli(world, monkeypatch, ["run"])
+    assert blocked.code == 1 and "relay-cutover-rehearse" in blocked.stdout
+    resumed = _rehearse(world, monkeypatch)
+    assert resumed.code == 1, resumed.stdout
+    record = state.current_window(root)
+    assert (record["mode"], record["state"]) == ("pilot", "recovered")
+    _, verdict = _verdict(record)
+    assert verdict["verdict"] == "failed" and verdict["failure"]["status"] == "interrupted"
+    assert verdict["gates"]["cleanup"]["hosts"] == {host: [roots[host]] for host in HOSTS}
+    assert all(os.listdir(transport.pilot_roots(world, host)) == [] for host in HOSTS)
+    assert preview.code == 0 and window.prepared_sha256(prepared) == record["prepared_sha256"]
+
+
+def _pilot_preview(world, *, absent=()):
+    """A previewed pilot for a fixture prepared record whose desktops are the fixture hosts'
+    own, or an explained absence."""
+    prepared = _fixture_prepared(world)
+    for host in HOSTS:
+        prepared["hosts"][host]["desktop"] = ABSENT if host in absent else world.desktop(host)
+    state.save_record(world.root("titan") / window.PREPARED, prepared)
+    return pilot.preview(SESSION)
+
+
+def _pilot_answer(offered, verdict="approved", reply="yes, run the pilot spawn"):
+    record = offered["window"]
+    return {"schema": 1, "kind": "desktop", "action": surfaces.PROBE_ACTION,
+            "window_id": record["id"], "attempt_id": offered["attempt_id"],
+            "subject_sha256": offered["sha256"], "verdict": verdict,
+            "source": {"type": "session", "session_id": SESSION, "ask": PILOT_ASK,
+                       "reply": reply, "answered_at": _now()}}
+
+
+def test_pilot_spawn_gate_records_consent(desktop):
+    """The rehearsal spawns `true` only with this invocation's consumed decision for the
+    previewed subject: an absent or declined answer leaves the gate pending, never passed, and
+    spawns nothing; a declined record for another subject is refused; an explained absent
+    desktop is an exemption."""
+    root = desktop.root("titan")
+    offered = _pilot_preview(desktop)
+    assert set(offered["subject"]["hosts"]) == set(HOSTS) and offered["exempt"] == {}
+    declined = _pilot_answer(offered, "declined", "no")
+    with pytest.raises(Stop, match="does not match"):
+        pilot.answer(offered["window"], {**declined, "subject_sha256": "0" * 64})
+    for answer, reason in ((None, "absent"), (declined, "declined")):
+        answered = pilot.answer(state.current_window(root), answer)
+        record, gate = pilot.spawn_gate(state.current_window(root), answered)
+        assert (gate["verdict"], gate["reason"]) == ("pending", reason)
+        assert {entry["verdict"] for entry in gate["hosts"].values()} == {"pending"}
+        assert record["pilot"]["spawn"] == gate
+    assert transport._niri_spawns(desktop) == []
+    consumed = pilot.answer(state.current_window(root), _pilot_answer(offered))
+    record, gate = pilot.spawn_gate(state.current_window(root), consumed)
+    assert gate["verdict"] == "passed"
+    assert {host: entry["verdict"] for host, entry in gate["hosts"].items()} == {
+        host: "acknowledged" for host in HOSTS}
+    sockets = {host: desktop.desktop(host)["socket"] for host in HOSTS}
+    assert transport._niri_spawns(desktop) == [(host, "true", sockets[host]) for host in HOSTS]
+    with pytest.raises(Stop, match="already consumed"):
+        pilot.answer(state.current_window(root), _pilot_answer(offered))
+    with_state(state.current_window(root), "recovered")
+
+    offered = _pilot_preview(desktop, absent=("europa",))
+    assert set(offered["subject"]["hosts"]) == {"titan"}
+    assert offered["exempt"] == {"europa": ABSENT["absence_reason"]}
+    consumed = pilot.answer(state.current_window(root), _pilot_answer(offered))
+    record, gate = pilot.spawn_gate(state.current_window(root), consumed)
+    assert gate["verdict"] == "passed"
+    assert gate["hosts"] == {
+        "titan": {"verdict": "acknowledged", "socket": sockets["titan"]},
+        "europa": {"verdict": "exempt", "reason": ABSENT["absence_reason"]}}
+    assert transport._niri_spawns(desktop)[2:] == [("titan", "true", sockets["titan"])]
+
+
+def test_pilot_receipt_cannot_finish_live(desktop, monkeypatch):
+    """Smokes recorded in a pilot never finish anything: finish refuses a pilot window; a
+    receipt bound to a pilot, or its recorded entries copied into a live window, refuses
+    there; and the pilot's own verdict is no receipt."""
+    root = desktop.root("titan")
+    rehearsal, prepared = _ready_window(desktop, mode="pilot")
+    receipt = _receipt(rehearsal, "europa", "claude-code", "personal", SESSIONS["europa"],
+                       3999401, "/tmp/scratch", {})
+    with pytest.raises(window.Failed, match="pilot receipts never satisfy"):
+        finish.finish_window(rehearsal)
+    with pytest.raises(window.Failed, match="pilot receipts never satisfy"):
+        smoke.validate_smokes(rehearsal)
+    refused = _cli(desktop, monkeypatch, ["finish"])
+    assert refused.code == 1 and "relay-cutover-rehearse" in refused.stdout
+    with_state(state.current_window(root), "recovered")
+    live, _ = _ready_window(desktop, prepared=prepared)
+    with pytest.raises(window.Failed, match="receipts from another window or a pilot never"):
+        smoke.check_receipt(live, receipt)
+    verdict = {"schema": 1, "kind": pilot.VERDICT_KIND, "window_id": rehearsal["id"],
+               "verdict": "passed", "gates": {}}
+    with pytest.raises(window.Failed, match="schema 1 with exactly"):
+        smoke.check_receipt(live, verdict)
+    forged = {**live, "smokes": {"observations": {}, "receipts": {
+        smoke.slot(*key): {"receipt": {**receipt, "host": key[0], "harness": key[1],
+                                       "home": key[2], "matrix": matrix},
+                           "sha256": "0" * 64, "attempt_id": "smoke-1",
+                           "decision_sha256": "0" * 64, "consumed_sha256": "0" * 64,
+                           "source": "session", "recorded_at": _now()}
+        for key, matrix in smoke.REQUIRED.items()}}}
+    state.save_record(window_file(forged), forged)
+    with pytest.raises(window.Failed, match="receipts from another window or a pilot never"):
+        smoke.validate_smokes(forged)
+
+
+@needs_zsh
+def test_live_rejects_pilot_overrides(cutover, monkeypatch, capsys):
+    """Live mode derives its fixed roots and entry. No live request names a scratch root,
+    another root or helper; no pilot request runs a live-only effect; no flag or caller
+    environment selects pilot mode for run or recover; and while a pilot is open, every live
+    command refuses and names rehearse."""
+    world, root = cutover, cutover_root(cutover)
+    for name, value in (("RELAY_CUTOVER_MODE", "pilot"), ("RELAY_CUTOVER_ROOT", str(world.tmp)),
+                        ("RELAY_CUTOVER_SCRATCH", "0" * 16), ("RELAY_CUTOVER_HELPER", "/tmp/x"),
+                        ("HQ_ROOT", str(world.tmp))):
+        monkeypatch.setenv(name, value)
+    requests = _pilot_requests(monkeypatch, world)
+    prepared = preparation.prepare(SESSION)
+    sent = len(requests)
+    sha, merge = "0" * 64, "1" * 40
+    install = {"window_id": "20261020T120000Z-0bad9110", "merge": merge,
+               "caches": {"npm": "/tmp/npm"}, "path": "/usr/bin:/bin"}
+    for host, operation, payload in (
+            ("titan", "target-dry", {"window_id": install["window_id"], "target_id": "claude",
+                                     "manifest_sha256": sha, "scratch": "0" * 16}),
+            ("europa", "familiar-install", {**install, "root": str(world.tmp)}),
+            ("europa", "dependency-restore", {"window_id": install["window_id"], "pre": merge,
+                                              "revert": merge, "familiar": str(world.tmp)}),
+            ("titan", "inventory", {"home": str(world.tmp)}),
+            ("titan", "target-restore", {"window_id": install["window_id"],
+                                         "target_id": "claude", "helper": "/tmp/x",
+                                         "identities": {}})):
+        with pytest.raises(hosts.Refused):
+            hosts.request(host, "live", operation, payload, timeout=30)
+    for operation in ("pilot-create", "pilot-cleanup", "pilot-install", "pilot-observe",
+                      "surface-probe"):
+        with pytest.raises(hosts.Refused, match="pilot only"):
+            hosts.request("europa", "live", operation, {}, timeout=30)
+    for host, operation in (("titan", "timer-record"), ("titan", "timer-stop"),
+                            ("titan", "codex-daemon-stop"), ("europa", "snapshot-refresh"),
+                            ("europa", "no-live"), ("europa", "recovery-no-live"),
+                            ("europa", "service-run"), ("titan", "inputs-check"),
+                            ("europa", "surface-restart"), ("europa", "smoke-observe")):
+        with pytest.raises(hosts.Refused, match="live only"):
+            hosts.request(host, "pilot", operation, {}, timeout=30)
+    assert len(requests) == sent + 20 and all(
+        entry["mode"] == "live" for entry in requests[:sent])
+    assert len(world.lines("ssh_log")) == len([entry for entry in requests[:sent]
+                                               if entry["host"] == "europa"])
+    assert {json.loads(line)[4] for line in
+            Path(world.config["ssh_log"]).read_text().splitlines()} == {transport.FIXED}
+
+    for argv in (["run", "--mode", "pilot"], ["run", "--root", str(world.tmp)],
+                 ["recover", "--scratch", "0" * 16], ["run", "--helper", "/tmp/x"]):
+        with pytest.raises(SystemExit):
+            cli.main(argv)
+    capsys.readouterr()
+    sent = len(requests)
+    ran = _cli(world, monkeypatch, ["run"])  # no terminal: it stops for the operator
+    assert ran.code == 1, ran.stdout
+    record = state.current_window(root)
+    assert (record["mode"], record["state"]) == ("live", "aborted")
+    recovered = _cli(world, monkeypatch, ["recover"])
+    assert recovered.code == 1 and "no window needs recovery" in recovered.stdout
+    assert all(entry["mode"] == "live" for entry in requests[sent:])
+
+    rehearsal = state.new_window(root, window.prepared_sha256(prepared), mode="pilot")
+    for argv in (["run"], ["recover"], ["restart-surfaces", "--preview"], ["finish"],
+                 ["record-smoke", "--observe", "titan"]):
+        refused = _cli(world, monkeypatch, argv)
+        assert refused.code == 1, (argv, refused.stdout)
+        assert f"{rehearsal['id']} is a pilot" in refused.stdout
+        assert refused.stdout.splitlines()[-1] == "  next: " + cli.rehearse_line(
+            ["--controller-session", SESSION_PLACEHOLDER_PILOT])
+    status = _cli(world, monkeypatch, ["status"])
+    assert status.code == 0 and f"{rehearsal['id']} prepared (pilot)" in status.stdout
+    assert status.stdout.splitlines()[-1] == "  next: " + cli.rehearse_line(
+        ["--controller-session", SESSION_PLACEHOLDER_PILOT])
+    assert state.current_window(root) == rehearsal
+
+
+SESSION_PLACEHOLDER_PILOT = window.SESSION_PLACEHOLDER
+
+
+def _disconnect_world(world):
+    """A pilot window applying on Titan, and the prepared fields the disconnect case reads."""
+    record = state.new_window(world.root("titan"), PREPARED, mode="pilot")
+    record = {**record, "state": "applying", "owner": window._me(), "attempts": [],
+              "pilot": {"controller_session": SESSION, "roots": {}}}
+    state.save_record(window_file(record), record)
+    prepared = {"pins": dict(world.pins), "hosts": {"europa": {
+        "caches": {"prefixes": {"npm": str(world.home("europa") / transport.CACHE)}},
+        "install": {"path": "/usr/bin:/bin"}}}}
+    return record, prepared
+
+
+def _disconnect_reference(world, record):
+    root_id = transport._create(world, "europa", "disconnect", window_id=record["id"])["root"]
+    merged = world.request("europa", "familiar-merge", {
+        "window_id": record["id"], "scratch": root_id, "pre": world.pins["familiar_pre"],
+        "tip": world.pins["familiar_feature_tip"]}, mode="pilot")
+    reference = world.request("europa", "pilot-install", {
+        "window_id": record["id"], "scratch": root_id, "merge": merged["result"]["merge"],
+        "caches": {"npm": str(world.home("europa") / transport.CACHE)}, "path": "/usr/bin:/bin",
+        "latch": False}, mode="pilot", timeout=300)
+    assert reference["status"] == "completed", reference["error"]
+    return reference["result"]
+
+
+@needs_zsh
+def test_disconnect_retries_unexercised_with_the_latch(cutover, monkeypatch):
+    """An install that finished before the disconnect point is unexercised, never passed: the
+    case retries once with the pilot-only latch, which holds after npm started until the
+    dropped client is gone, then requires the equality and pin verdict."""
+    world = cutover
+    record, prepared = _disconnect_world(world)
+    reference = _disconnect_reference(world, record)
+    real, slow = pilot._status, set()
+
+    def late(operation_id):
+        # The first attempt's observer comes late: its install finished before any drop.
+        if not slow or operation_id in slow:
+            slow.add(operation_id)
+            _until_terminal = transport._until(
+                lambda: real(operation_id)["state"] in hosts.TERMINAL, seconds=60)
+            assert _until_terminal
+        return real(operation_id)
+
+    monkeypatch.setattr(pilot, "_status", late)
+    mark = len(world.lines("observed"))
+    record = pilot.disconnect_case(state.current_window(world.root("titan")), prepared,
+                                   reference, [], {})
+    case = record["pilot"]["disconnect"]
+    assert [(attempt["latch"], attempt["exercised"]) for attempt in case["attempts"]] == [
+        (False, False), (True, True)]
+    assert "before the disconnect point" in case["attempts"][0]["reason"]
+    assert case["attempts"][1]["drop"] == "latched"
+    assert (case["verdict"], case["equal"]) == ("passed", True)
+    clone = str(transport.pilot_roots(world, "europa") / case["root"] / "familiar")
+    assert [call["cwd"] for call in _npm_installs(world, mark)] == [clone, clone]
+
+
+@needs_zsh
+def test_disconnect_failure_restores_scratch_dependencies_offline(cutover):
+    """A disconnect install that fails is a failed case, not retried: its scratch clone reverts
+    the merge and its dependencies return offline to the pre-merge snapshot before cleanup."""
+    world = cutover
+    record, prepared = _disconnect_world(world)
+    world.behave("europa", npm_ci="fail-after")
+    mark = len(world.lines("observed"))
+    record = pilot.disconnect_case(record, prepared, {"tree": None, "relay": None}, [], {})
+    case = record["pilot"]["disconnect"]
+    assert case["verdict"] == "failed" and len(case["attempts"]) == 1
+    assert case["attempts"][0]["response"]["status"] == "failed"
+    recovered = case["recovered"]
+    assert recovered["familiar"]["action"] == "reverted"
+    assert recovered["dependencies"]["replaced"] is True
+    clone = transport.pilot_roots(world, "europa") / case["root"] / "familiar"
+    assert quiesce_tree(clone / "node_modules") == quiesce_tree(
+        world.home("europa") / "d/familiar/node_modules")
+    assert transport._git(clone, "rev-parse", "HEAD^{tree}") == transport._git(
+        clone, "rev-parse", world.pins["familiar_pre"] + "^{tree}")
+    assert len([call for call in _npm_installs(world, mark) if call["cwd"] == str(clone)]) == 1
+    assert transport.live_mutations(world, mark) == []
+    cleaned = world.request("europa", "pilot-cleanup", {"window_id": record["id"]},
+                            mode="pilot")
+    assert cleaned["status"] == "completed" and cleaned["result"]["removed"] == [case["root"]]
+
+
+def quiesce_tree(path):
+    from relay_cutover_bootstrap import quiesce
+    return quiesce._tree(path)

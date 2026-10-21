@@ -321,6 +321,60 @@ def test_familiar_check_relay_and_native_sides(box):
     assert box.call("familiar-check", "--expect", "relay").code == 1
 
 
+def test_familiar_checks_use_explicit_root_without_changing_home(box):
+    """A pilot names its owned scratch clone with --root: the two read-only familiar checks read
+    only that clone, never HOME's live checkout, and run with the actual HOME and SSH agent."""
+    live, live_head = box.familiar_repo()  # its bin/familiar refuses to run
+    live_files = {path: path.read_bytes() for path in live.rglob("*") if path.is_file()}
+    scratch = box.tmp / "pilot/0123456789abcdef/familiar"
+    scratch.mkdir(parents=True)
+    box.run("git", "init", "-q", "-b", "main", scratch)
+    (scratch / ".gitignore").write_text("node_modules/\n")
+    (scratch / "source.js").write_text("scratch clone\n")
+    seen = box.tmp / "seen.json"
+    box.script(scratch / "bin/familiar", "import json, os, sys\n"
+               f"open({str(seen)!r}, 'w').write(json.dumps({{'argv': sys.argv[1:], "
+               "'home': os.environ.get('HOME'), 'agent': os.environ.get('SSH_AUTH_SOCK')}))\n")
+    box.run("git", "-C", scratch, "add", ".")
+    box.run("git", "-C", scratch, "commit", "-qm", "scratch")
+    head = box.run("git", "-C", scratch, "rev-parse", "HEAD")
+    agent = str(box.tmp / "agent.sock")
+    box.env["SSH_AUTH_SOCK"] = agent
+    home = box.env["HOME"]
+
+    def helper(*args):
+        """The helper as its own process, with the box's HOME and agent as its environment."""
+        result = subprocess.run([str(TOOL), *map(str, args)], env=box.env,
+                                capture_output=True, text=True)
+        return result.returncode, result.stderr
+
+    assert helper("familiar-source", "--head", head, "--root", scratch)[0] == 0
+    assert helper("familiar-source", "--head", live_head, "--root", scratch)[0] == 1
+    assert helper("familiar-source", "--head", head)[0] == 1  # the default stays main
+    (scratch / "source.js").write_text("changed\n")
+    code, err = helper("familiar-source", "--head", head, "--root", scratch)
+    assert code == 1 and "working tree" in err
+    (scratch / "source.js").write_text("scratch clone\n")
+
+    assert helper("familiar-check", "--expect", "native", "--root", scratch)[0] == 0
+    assert json.loads(seen.read_text()) == {"argv": ["hook", "--help"], "home": home,
+                                            "agent": agent}
+    write_json(scratch / "node_modules/relay/package.json", {"version": "0.1.1"})
+    assert helper("familiar-check", "--expect", "native", "--root", scratch)[0] == 1
+    assert helper("familiar-check", "--expect", "relay", "--root", scratch)[0] == 0
+    assert json.loads(seen.read_text()) == {"argv": ["observe", "--help"], "home": home,
+                                            "agent": agent}
+
+    # Only an absolute directory names a root; nothing falls back to the live checkout.
+    (box.tmp / "linked").symlink_to(scratch)
+    for bad in ("relative/familiar", box.tmp / "absent", box.target, box.tmp / "linked"):
+        code, err = helper("familiar-check", "--expect", "native", "--root", bad)
+        assert code == 1 and "--root" in err
+        assert helper("familiar-source", "--head", head, "--root", bad)[0] == 1
+    assert box.env["HOME"] == home and box.env["SSH_AUTH_SOCK"] == agent
+    assert {path: path.read_bytes() for path in live.rglob("*") if path.is_file()} == live_files
+
+
 @pytest.mark.parametrize("command,args", [
     ("preflight", ["--harness", "codex"]),
     ("familiar-source", ["--head", "1" * 40]),

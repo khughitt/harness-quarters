@@ -5,6 +5,12 @@ The controller runs Titan main's entry directly and reaches Europa through
 bounded JSON object on stdin: schema, mode, operation, a caller-chosen operation ID, the
 payload and the controller's package digest. Nothing from it enters a shell string.
 
+The request schema is mode-specific. Each operation names the modes it runs in; a live
+request derives every root from this host's HOME and takes no root, scratch or helper path,
+while a pilot request for an operation that touches application files names its owned scratch
+root by the opaque ID `pilot-create` returned, which `pilot.resolve` turns into that root's
+paths. Nothing in a request selects the mode for another one.
+
 The entry validates the whole request before any write, durably records the operation's
 start (owner PID and start time) under the cutover root, runs owned child process groups
 under the operation's deadline, durably records completion, and only then writes one reply.
@@ -75,6 +81,9 @@ STATUSES = TERMINAL + ("refused",)
 INTERRUPTS = (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)
 WATCHED = (*INTERRUPTS, signal.SIGALRM)
 OPERATION_ID = re.compile(r"(titan|europa)-\d{8}T\d{6}Z-[0-9a-f]{12}")
+SCRATCH = "scratch"  # the payload key naming a pilot's scratch root by its opaque ID
+ROOT_ID = re.compile(r"[0-9a-f]{16}")
+BOTH = ("live", "pilot")  # the modes of an operation a pilot runs as well as live
 
 
 class Refused(Stop):
@@ -112,13 +121,21 @@ class _Expired(Exception):
 
 @dataclass(frozen=True)
 class Operation:
-    """One fixed operation: `run(context)` returns its JSON result on this host."""
+    """One fixed operation: `run(context)` returns its JSON result on this host.
+
+    `modes` are the request modes it runs in. With `scratch`, a pilot request must also name
+    its owned scratch root (the `SCRATCH` payload key), which every application path resolves
+    inside; a live request never may. `pilot_hosts`, when set, are its hosts in a pilot, whose scratch
+    clones no synchronization joins."""
     run: object
     deadline: float
     mutation: bool
     payload: dict = field(default_factory=dict)  # key -> validator(value) -> bool
     required: frozenset = frozenset()
     hosts: tuple = tuple(HOSTS)
+    modes: tuple = ("live",)
+    scratch: bool = False
+    pilot_hosts: tuple | None = None
 
 
 def _text_field(limit):
@@ -195,6 +212,10 @@ def _operations():
     return OPERATIONS
 
 
+def _hosts(spec, mode):
+    return spec.pilot_hosts if mode == "pilot" and spec.pilot_hosts is not None else spec.hosts
+
+
 def _spec(name):
     if isinstance(name, str) and name in CONTROL:
         return CONTROL[name]
@@ -203,16 +224,35 @@ def _spec(name):
     raise Refused("unknown operation")
 
 
-def _check_payload(spec, payload):
+def _root_id(value):
+    return isinstance(value, str) and ROOT_ID.fullmatch(value) is not None
+
+
+def _check_mode(name, spec, mode):
+    """The operation must run in this request's mode."""
+    if mode not in spec.modes:
+        only = "pilot only" if spec.modes == ("pilot",) else "live only"
+        raise Refused(f"{name} is {only}; a {mode} request cannot run it")
+
+
+def _check_payload(spec, payload, mode):
+    """The payload against the operation's schema in this mode: a pilot request for a scratch
+    operation names its scratch root by ID; no other request may name one."""
     if not isinstance(payload, dict):
         raise Refused("payload must be a JSON object")
-    if set(payload) - set(spec.payload):
+    fields, required = dict(spec.payload), set(spec.required)
+    if spec.scratch and mode == "pilot":
+        fields[SCRATCH] = _root_id
+        required.add(SCRATCH)
+        if SCRATCH not in payload:
+            raise Refused("a pilot request for this operation names its scratch root")
+    if set(payload) - set(fields):
         raise Refused("payload has keys this operation does not take")
-    missing = sorted(spec.required - set(payload))
+    missing = sorted(required - set(payload))
     if missing:
         raise Refused("payload lacks " + ", ".join(missing))
     for key, value in payload.items():
-        if not spec.payload[key](value):
+        if not fields[key](value):
             raise Refused(f"payload {key} is invalid")
 
 
@@ -225,12 +265,13 @@ def _check_envelope(envelope):
         raise Refused("request schema must be 1")
     if not isinstance(envelope["mode"], str) or envelope["mode"] not in state.MODES:
         raise Refused("unknown mode")
-    spec = _spec(envelope["operation"])
-    _check_payload(spec, envelope["payload"])
+    mode, spec = envelope["mode"], _spec(envelope["operation"])
+    _check_mode(envelope["operation"], spec, mode)
+    _check_payload(spec, envelope["payload"], mode)
     if not _operation_id(envelope["operation_id"]):
         raise Refused("operation_id is not an operation id")
     host = envelope["operation_id"].split("-", 1)[0]
-    if host not in spec.hosts:
+    if host not in _hosts(spec, mode):
         raise Refused(f"{envelope['operation']} does not run on {host}")
     digest = envelope["helper_sha256"]
     if not isinstance(digest, str) or not state.SHA256.fullmatch(digest):
@@ -661,11 +702,14 @@ def _child_path(value):
 
 
 def _child_env(context):
-    """The helper's startup environment with the system PATH first and no bytecode."""
+    """The helper's startup environment with the system PATH first and no bytecode; in a
+    pilot, TMPDIR is its scratch root's own. HOME and authentication stay the host's."""
     env = dict(os.environ)
     remainder, _ = _child_path(env.get("PATH", ""))
     env["PATH"] = ":".join((*SYSTEM_PATH, *remainder))
     env["PYTHONDONTWRITEBYTECODE"] = "1"
+    if context.get("tmp"):
+        env["TMPDIR"] = context["tmp"]
     return env
 
 
@@ -715,10 +759,14 @@ def _nodename():
 
 
 def _context(host, mode, operation_id):
+    """This host's fixed roots, derived from HOME. `targets` is the base the settings targets
+    resolve under and `state` the root of the tool's application state (dry runs, snapshots);
+    a pilot's scratch root replaces them, `familiar` and `tmp` (`pilot.resolve`)."""
     home = _home()
     return {"host": host, "mode": mode, "operation_id": operation_id, "home": str(home),
             "root": str(home / ROOT), "hq": str(home / "d/hq"),
-            "familiar": str(home / "d/familiar")}
+            "familiar": str(home / "d/familiar"), "targets": str(home),
+            "state": str(home / ROOT), "tmp": None, "scratch": None}
 
 
 def _response(context, operation, status, result=None, error=None, log=None):
@@ -734,9 +782,14 @@ def _observe(directory, start):
         observed = record["response"]["status"]
     else:
         observed = "running" if _alive(start["owner"]) else "owner-lost"
+    children = directory / "children.json"
+    recorded = state.load_record(children)["children"] if os.path.lexists(children) else []
     return {"operation_id": start["operation_id"], "operation": start["operation"],
             "state": observed, "response": record["response"] if record else None,
-            "cancel_requested": os.path.lexists(directory / "cancel.json")}
+            "cancel_requested": os.path.lexists(directory / "cancel.json"),
+            # Each recorded child's label, whether it started and its exit: never its argv.
+            "children": [{"label": child["label"], "started": child["start_time"] is not None,
+                          "exit": child["exit"]} for child in recorded]}
 
 
 def _recorded(context, target):
@@ -888,7 +941,8 @@ def execute(context: dict, operation: str, payload: dict) -> dict:
     Status and cancel read or reconcile another operation's record. Every other operation
     records its start, runs with its deadline and owned children, then records its reply."""
     spec = _spec(operation)
-    _check_payload(spec, payload)
+    _check_mode(operation, spec, context["mode"])
+    _check_payload(spec, payload, context["mode"])
     if operation in CONTROL:
         target = payload["operation_id"]
         if target.split("-", 1)[0] != context["host"]:
@@ -897,6 +951,9 @@ def execute(context: dict, operation: str, payload: dict) -> dict:
         return _response(context, operation, "completed", result)
     if threading.current_thread() is not threading.main_thread():
         raise Refused("operations run on the main thread, which owns signals and deadlines")
+    if spec.scratch and context["mode"] == "pilot":
+        from .pilot import resolve  # pilot builds on this module
+        context = resolve(context, payload)  # refused before any write
     # Before this, a signal ends the process with nothing recorded; from here it waits
     # until the start record is whole and then cancels the operation.
     mask = signal.pthread_sigmask(signal.SIG_BLOCK, WATCHED)
@@ -983,5 +1040,5 @@ def serve() -> int:
 
 CONTROL = {name: Operation(run=None, deadline=0, mutation=False,
                            payload={"operation_id": _operation_id},
-                           required=frozenset({"operation_id"}))
+                           required=frozenset({"operation_id"}), modes=state.MODES)
            for name in ("operation-status", "operation-cancel")}

@@ -23,7 +23,15 @@ file: the private record of an actual session ask and the human's reply, about t
 before any change. `record-smoke --receipt FILE` takes the same two sources for its smoke
 attestation, about the receipt `record-smoke --preview` shows read-only. Each invocation consumes
 its one decision before the first authorized action; no flag or default answers for the
-operator."""
+operator.
+
+`rehearse_main` is tools/relay-cutover-rehearse, the separate pilot entry (`pilot.py`): with
+`--preview` it allocates the pilot window and shows its spawn's bounded consent subject; then an
+agent's `--decision-file` (the recorded session ask and reply) or the operator's terminal answer
+runs the rehearsal, whose private verdict it summarizes. Without an approval it still runs every
+part but the spawn, whose gate stays pending. While a pilot window is open, run, recover,
+restart-surfaces, record-smoke and finish refuse and name the rehearse entry; nothing in the
+caller's environment selects a pilot for them."""
 import argparse
 import json
 import os
@@ -34,10 +42,12 @@ from datetime import datetime, timezone
 
 from . import finish as finishing
 from . import prepare as preparation
-from . import hosts, recovery, smoke, state, surfaces, window
+from . import hosts, pilot, recovery, smoke, state, surfaces, window
 from .state import Stop
 
 PROG = "relay-cutover-bootstrap"
+REHEARSE_PROG = "relay-cutover-rehearse"
+REHEARSE = "tools/relay-cutover-rehearse"
 LIMIT = 500
 SHOWN = 40
 TTY = "/dev/tty"
@@ -67,6 +77,8 @@ NO_PROOF = ("an agent's session decision for restart-surfaces needs the controll
             "reconciled by run first. The operator may instead answer restart-surfaces at the "
             "terminal")
 HOLD_STATES = ("migrated-surfaces-pending", "ready-for-smokes", "finishing")
+# The commands that act on a live window: each refuses while a pilot window is open.
+LIVE_COMMANDS = ("run", "recover", "restart-surfaces", "record-smoke", "finish")
 # Before run, and in every parked wait: ordinary use stays allowed, and the agent's bounded
 # refresh before each request to close sessions.
 CLOSURE = (
@@ -90,16 +102,28 @@ def _clean(text):
     return "".join(ch if ch.isprintable() else " " for ch in str(text))[:LIMIT]
 
 
-def command_line(argv):
-    """A complete command for the operator: this checkout's bootstrap and its arguments."""
-    words = [shlex.quote(str(window.CHECKOUT / window.BOOTSTRAP))]
+def _words(entry, argv):
+    words = [shlex.quote(str(window.CHECKOUT / entry))]
     words += [arg if arg in (window.SESSION_PLACEHOLDER, DECISION_PLACEHOLDER)
               else shlex.quote(arg) for arg in argv]
     return " ".join(words)
 
 
-def _failure(command, failed, handoff=()):
-    lines = [f"{PROG}: {command} stopped", f"  step: {failed.step}", f"  host: {failed.host}",
+def command_line(argv):
+    """A complete command for the operator: this checkout's bootstrap and its arguments, or its
+    rehearse entry for a next command that starts with `rehearse`."""
+    if argv[:1] == [window.REHEARSE]:
+        return rehearse_line(argv[1:])
+    return _words(window.BOOTSTRAP, argv)
+
+
+def rehearse_line(argv):
+    """A complete command: this checkout's rehearse entry and its arguments."""
+    return _words(REHEARSE, argv)
+
+
+def _failure(command, failed, handoff=(), prog=PROG):
+    lines = [f"{prog}: {command} stopped", f"  step: {failed.step}", f"  host: {failed.host}",
              f"  status: {failed.status}", f"  error: {_clean(failed.error)}",
              f"  log: {failed.log or 'none'}",
              f"  observed: {_clean(failed.observed or 'unknown; run status')}"]
@@ -186,7 +210,8 @@ def _preview(opened, subject, title=None, changes=None):
 
 
 def _ask(opened, action, attempt_id, subject, digest, *, title=None, prompt=None,
-         changes=None, kind="desktop", shown=None):
+         changes=None, kind="desktop", shown=None,
+         tail="nothing has changed yet; any answer but yes stops before any change"):
     """One explicit answer on the operator's terminal, as a decision record. `shown` replaces
     the desktop preview with another bounded subject, such as a smoke receipt's."""
     try:
@@ -199,8 +224,7 @@ def _ask(opened, action, attempt_id, subject, digest, *, title=None, prompt=None
         if not os.isatty(fd):
             raise Stop(NO_TERMINAL)
         shown = shown if shown is not None else _preview(opened, subject, title, changes)
-        os.write(fd, (shown + "  nothing has changed yet; any answer but yes stops before any "
-                      "change\n" + prompt).encode("utf-8"))
+        os.write(fd, (shown + f"  {tail}\n" + prompt).encode("utf-8"))
         try:
             answer = os.read(fd, ANSWER_BYTES).decode("utf-8", "replace").strip()
         except KeyboardInterrupt:
@@ -480,6 +504,17 @@ def _status():
     return 0
 
 
+def _no_pilot():
+    """Live commands refuse beside an open pilot window and name the rehearse entry."""
+    current = state.current_window(window._root())
+    if current is not None and current["mode"] == "pilot" and current["state"] not in \
+            state.TERMINAL:
+        raise window.Failed("pilot", "titan", "refused", window.pilot_open(current),
+                            observed="nothing was changed",
+                            next_command=[window.REHEARSE, "--controller-session",
+                                          window.SESSION_PLACEHOLDER])
+
+
 def _handoff(command):
     """What a report adds from the verified migration until finish: the hold, the pick freeze
     and the held commands; for check, the bounded refresh before a closure request."""
@@ -680,6 +715,8 @@ def main(argv: list[str]) -> int:
     sub.add_parser("status", help="report the prepared record, the window and the next command")
     args = parser.parse_args(argv)
     try:
+        if args.command in LIVE_COMMANDS:
+            _no_pilot()
         if args.command == "prepare":
             return _prepare(args.controller_session)
         if args.command == "run":
@@ -705,4 +742,154 @@ def main(argv: list[str]) -> int:
         _failure(args.command, window.Failed(args.command, "titan", "failed", str(stop),
                                              observed="unknown; run status",
                                              next_command=["status"]))
+    return 1
+
+
+# --- the rehearsal entry: tools/relay-cutover-rehearse --------------------------------------
+
+
+def _pilot_hosts(offer):
+    lines = []
+    for host in window.HOST_ORDER:
+        entry = offer["subject"]["hosts"].get(host)
+        if entry is not None:
+            lines.append(f"  {host}: through niri socket {_clean(entry['socket'])}, spawn the "
+                         f"fixed command {surfaces.PROBE_COMMAND} (niri msg action spawn-sh -- "
+                         f"{surfaces.PROBE_COMMAND})")
+        else:
+            lines.append(f"  {host}: exempt: {_clean(offer['exempt'].get(host))}")
+    return lines
+
+
+def _pilot_subject(record, offer):
+    """The bounded consent subject of the pilot's spawn, as the preview and the terminal ask
+    show it."""
+    return [f"  pilot: window {record['id']} rehearses the cutover once in owned scratch roots on "
+            "titan and europa, through the real host protocol", *_pilot_hosts(offer),
+            f"  effect: {surfaces.PROBE_IMPACT}; the fixed command true exits at once",
+            f"  duration: the rehearsal takes at most {surfaces.PROBE_SECONDS // 60} minutes",
+            "  scratch: every application change stays in the scratch roots, removed at the end; "
+            "real timers are only queried; live targets, surfaces, relay registries and "
+            "harnesses are not touched; the prepared caches take writes"]
+
+
+def _rehearse_preview(session):
+    offer = pilot.preview(session)
+    record = offer["window"]
+    lines = [f"{REHEARSE_PROG}: preview of pilot window {record['id']}: it asks for this "
+             "invocation's consent to one fixed no-window spawn", *_pilot_subject(record, offer),
+             f"  decision: kind desktop, action {surfaces.PROBE_ACTION}, window_id {record['id']}, "
+             f"attempt_id {offer['attempt_id']}, subject_sha256 {offer['sha256']}",
+             "  ask: the user, in the session, naming these hosts, the fixed true spawn through "
+             "niri IPC, that no window opens and the duration; record the actual ask and the "
+             "human's reply (schema 1, verdict, and a session source with session_id, ask, reply "
+             "and answered_at) in a private decision file. Without an approval the rehearsal "
+             "runs every part but the spawn, whose gate stays pending",
+             f"  observed: pilot window {record['id']} is open and prepared; no host was "
+             "contacted",
+             "  next: " + rehearse_line(["--controller-session", session, "--decision-file",
+                                         DECISION_PLACEHOLDER])]
+    print("\n".join(lines))
+    return 0
+
+
+def _rehearse_answer(current, decision_file):
+    """This invocation's answer for an open pilot preview: the decision file's record, the
+    operator's terminal answer, or none."""
+    offer = current["pilot"]
+    if decision_file is not None:
+        record = _decision_file(decision_file)
+    elif _terminal():
+        record = _ask(current, surfaces.PROBE_ACTION, offer["attempt_id"], offer["subject"],
+                      offer["sha256"], shown="\n".join([
+                          f"{REHEARSE_PROG}: pilot {current['id']} asks for this invocation's "
+                          "consent to one fixed no-window spawn",
+                          *_pilot_subject(current, offer)]) + "\n",
+                      prompt=f"Spawn the fixed command true through niri for pilot "
+                      f"{current['id']}? Type yes to approve: ",
+                      tail="any answer but yes runs the rehearsal without the spawn")
+    else:
+        return None
+    return pilot.answer(current, record)
+
+
+def _gates(verdict):
+    return ", ".join(f"{name} {gate['verdict']}" for name, gate in verdict["gates"].items())
+
+
+def _rehearse_run(session, decision_file):
+    current = state.current_window(window._root())
+    answered = None
+    if current is not None and current["mode"] == "pilot" and current["state"] == "prepared":
+        try:
+            answered = _rehearse_answer(current, decision_file)
+        except Stop as stop:
+            raise window.Failed("decision", "titan", "refused", str(stop),
+                                observed=f"nothing was changed; pilot window {current['id']} "
+                                "is prepared",
+                                next_command=[window.REHEARSE, "--controller-session", session,
+                                              "--preview"]) from None
+    elif decision_file is not None:
+        raise window.Failed("decision", "titan", "refused", "a decision file answers only an "
+                            "open pilot preview", observed="nothing was changed",
+                            next_command=[window.REHEARSE, "--controller-session", session,
+                                          "--preview"])
+    verdict = pilot.rehearse(session, answered)
+    record = verdict["window"]
+    lines = [f"{REHEARSE_PROG}: pilot {record['id']}: {verdict['verdict']}"]
+    failure = verdict["failure"]
+    if failure is not None:
+        lines += [f"  step: {failure['step']}", f"  host: {failure['host']}",
+                  f"  status: {failure['status']}", f"  error: {_clean(failure['error'])}",
+                  f"  log: {failure['log'] or 'none'}"]
+    spawn = verdict["gates"]["spawn"]
+    lines.append("  spawn: " + ", ".join(
+        f"{host} {entry['verdict']}" for host, entry in spawn.get("hosts", {}).items())
+        + (f" ({spawn['reason']})" if spawn.get("reason") else ""))
+    lines.append(f"  gates: {_gates(verdict)}")
+    lines.append("  caches: " + "; ".join(
+        f"{host} " + ", ".join(f"{key}={_clean(value)}" for key, value in sorted(prefixes.items()))
+        for host, prefixes in verdict["permitted_writes"]["caches"].items()))
+    lines.append(f"  unexercised: {', '.join(verdict['unexercised'])} (fixtures and the live "
+                 "window cover them; the whole host is not claimed byte-equal)")
+    observed = (f"pilot window {record['id']} is {record['state']}; every scratch root was "
+                "removed" if verdict["closed"] else f"pilot window {record['id']} is "
+                f"{record['state']}: its scratch roots are not all removed; rehearse reconciles "
+                "it again")
+    lines.append(f"  observed: {observed}")
+    lines.append(f"  verdict: {verdict['verdict']} ({verdict['path']})")
+    if not verdict["closed"]:
+        following = [window.REHEARSE, "--controller-session", session]
+    elif verdict["verdict"] == "passed":
+        following = window.status()["next"]
+    else:
+        following = [window.REHEARSE, "--controller-session", session, "--preview"]
+    lines.append(f"  next: {command_line(following)}")
+    print("\n".join(lines))
+    return 0 if verdict["verdict"] == "passed" else 1
+
+
+def rehearse_main(argv: list[str]) -> int:
+    """tools/relay-cutover-rehearse: the pilot's preview, then its run."""
+    parser = argparse.ArgumentParser(
+        prog=REHEARSE_PROG, description="Rehearse hq's relay cutover once in owned scratch roots "
+        "on both hosts, through the real host protocol.")
+    parser.add_argument("--controller-session", required=True,
+                        help="the calling agent's native session ID")
+    chosen = parser.add_mutually_exclusive_group()
+    chosen.add_argument("--preview", action="store_true",
+                        help="allocate the pilot window and show its spawn's consent subject")
+    chosen.add_argument("--decision-file", metavar="FILE",
+                        help="the private record of the session ask and the human's reply")
+    args = parser.parse_args(argv)
+    try:
+        if args.preview:
+            return _rehearse_preview(args.controller_session)
+        return _rehearse_run(args.controller_session, args.decision_file)
+    except window.Failed as failed:
+        _failure("rehearse", failed, prog=REHEARSE_PROG)
+    except Stop as stop:
+        _failure("rehearse", window.Failed("rehearse", "titan", "failed", str(stop),
+                                           observed="unknown; run status",
+                                           next_command=["status"]), prog=REHEARSE_PROG)
     return 1
