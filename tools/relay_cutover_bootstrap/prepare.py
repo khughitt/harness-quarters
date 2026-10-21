@@ -278,9 +278,12 @@ def check(prepared: dict, *, opened: dict | None = None) -> dict:
         current = None  # Titan's inputs-check names the unexplained state
     own = (opened is not None and current is not None and current["id"] == opened["id"]
            and current["state"] == "prepared")
-    if current is not None and current["state"] not in state.TERMINAL and not own:
+    open_window = current is not None and current["state"] not in state.TERMINAL
+    if open_window and not own:
         blockers.append(f"titan: window: window {current['id']} is {current['state']}")
-    active = current["id"] if current is not None else None
+    # Only an open window is named: beside a closed one (a recovered revert, a completed
+    # cutover) the hosts read familiar, which no later window merges from unless it is at PRE.
+    active = current["id"] if open_window else None
     seen = {host: _observe(host, active=active, complete=True) for host in HOST_ORDER}
     for host in HOST_ORDER:
         blockers += seen[host]["blockers"] + _drift(host, prepared, seen[host])
