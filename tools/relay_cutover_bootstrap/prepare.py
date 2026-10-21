@@ -10,8 +10,11 @@ the cache prefixes; Claude's identity and versions (and Codex's on Titan); the d
 inventory; the live Claude and Codex processes, which are future run blockers and never a
 reason to refuse preparation; and for each target its resolved path, current digest, pick
 values and absent pick keys, and the reviewed member digests. No expected after-image is
-built. `check` repeats the reads and compares them with that record; it writes only private
-operation records. `recheck` is the same comparison as the run's gate.
+built. Per host it also holds familiar's base: its HEAD under the base rule, a tasks-only
+descendant of PRE whose merge with the tip equals T0 outside `tasks/`, with its proof;
+Europa's HEAD must equal or precede Titan's. `check` repeats the reads and compares them with
+that record, but a base that moved while it stays eligible is not drift; it writes only
+private operation records. `recheck` is the same comparison as the run's gate.
 
 The window lifecycle that consumes the prepared record is in `window.py`."""
 import os
@@ -26,10 +29,12 @@ from .window import (HOST_ORDER, NOTHING, PREPARED, SESSION, SESSION_PLACEHOLDER
 # --- observation and comparison ------------------------------------------------------------
 
 
-def _observe(host, *, active, complete):
+def _observe(host, *, active, complete, titan_head=None):
     """A host's inputs-check and inventory, with every blocker prefixed by the host. Without
-    `complete`, inventory is skipped once the inputs already block."""
-    payload = {"commits": host == "titan", **({"active": active} if active else {})}
+    `complete`, inventory is skipped once the inputs already block. `titan_head` is Titan's
+    observed familiar base, which Europa's own HEAD must equal or precede."""
+    payload = {"commits": host == "titan", **({"active": active} if active else {}),
+               **({"titan_head": titan_head} if titan_head else {})}
     found, log = _call(host, "live", "inputs-check", payload, "inputs-check")
     manifest = found["manifest"]["content"] if found["manifest"] else None
     seen = {"inputs": found, "manifest": manifest, "inventory": None, "step": None, "log": None,
@@ -105,6 +110,12 @@ def _host_blockers(host, manifest, report):
     return found
 
 
+def _titan_base(seen):
+    """Titan's observed familiar base, which Europa's HEAD must equal or precede; None before
+    Titan is observed or while its familiar fails the base rule (a Titan blocker already)."""
+    return ((seen.get("titan") or {}).get("inputs", {}).get("familiar") or {}).get("base")
+
+
 def _cross_host(seen):
     found = []
     digests = {host: (seen[host]["inputs"]["manifest"] or {}).get("sha256") for host in seen}
@@ -154,7 +165,7 @@ def _host_record(observed):
         "caches": report["caches"], "user_bus": report["user_bus"],
         "git_auth": report["git_auth"], "claude": _identity(report["harnesses"]["claude"]),
         "desktop": report["desktop"], "sessions": _sessions(report),
-        "targets": observed["inputs"]["targets"]}
+        "familiar": observed["inputs"]["familiar"], "targets": observed["inputs"]["targets"]}
     if "codex" in report["harnesses"]:
         record["codex"] = _identity(report["harnesses"]["codex"])
     return record
@@ -224,7 +235,8 @@ def prepare(controller_session: str) -> dict:
         _open(root)
         controller, seen = _controller_helpers(), {}
         for host in HOST_ORDER:
-            observed = _observe(host, active=None, complete=False)
+            observed = _observe(host, active=None, complete=False,
+                                titan_head=_titan_base(seen))
             if observed["blockers"]:
                 raise Failed(observed["step"], host, "blocked",
                              f"{len(observed['blockers'])} blocker(s); none was changed",
@@ -282,9 +294,12 @@ def check(prepared: dict, *, opened: dict | None = None) -> dict:
     if open_window and not own:
         blockers.append(f"titan: window: window {current['id']} is {current['state']}")
     # Only an open window is named: beside a closed one (a recovered revert, a completed
-    # cutover) the hosts read familiar, which no later window merges from unless it is at PRE.
+    # cutover) the hosts read familiar, which no later window merges from unless its HEAD
+    # passes the base rule.
     active = current["id"] if open_window else None
-    seen = {host: _observe(host, active=active, complete=True) for host in HOST_ORDER}
+    seen = {}
+    for host in HOST_ORDER:
+        seen[host] = _observe(host, active=active, complete=True, titan_head=_titan_base(seen))
     for host in HOST_ORDER:
         blockers += seen[host]["blockers"] + _drift(host, prepared, seen[host])
     blockers += _cross_host(seen)
@@ -294,6 +309,7 @@ def check(prepared: dict, *, opened: dict | None = None) -> dict:
             "prepared_sha256": prepared_sha256(prepared),
             "logs": {host: seen[host]["log"] for host in HOST_ORDER},
             "sessions": {host: _sessions(seen[host]["inventory"]) for host in HOST_ORDER},
+            "familiar": {host: seen[host]["inputs"]["familiar"] for host in HOST_ORDER},
             "targets": {host: seen[host]["inputs"]["targets"] for host in HOST_ORDER}}
 
 

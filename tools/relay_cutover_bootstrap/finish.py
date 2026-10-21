@@ -10,7 +10,9 @@ repeats, from actual state:
    executable is still the prepared one, or the hold is breached and the window needs full
    recovery; each target holds the window's sealed bytes apart from Claude's pick keys, which a
    resumed session may have saved, with hooks, statusLine, installer and evidence verified;
-   familiar is the merge with its pinned relay dependency; familiar's recorded surfaces still
+   familiar is the merge or a tasks-only descendant of it, clean outside `tasks/`, with its pinned
+   relay dependency, Europa's HEAD equal to or an ancestor of the HEAD observed on Titan, and
+   each host's observed HEAD recorded; familiar's recorded surfaces still
    run as restarted. Drift beyond picks stops for inspection and recover; a surface that exited,
    was replaced or sits behind a desktop blocker stops finish with nothing changed, for a
    consented `restart-surfaces` retry;
@@ -103,7 +105,7 @@ def _fresh(window, prepared, step):
         seen = smoke.observe(state.current_window(lifecycle._root()), host)
         smoke.hold(seen["window"], prepared, host, seen["observation"])
     window = state.current_window(lifecycle._root())
-    sealed, checks = window["sealed"]["inputs"], {}
+    sealed, checks, observed = window["sealed"]["inputs"], {}, None
     for host in lifecycle.HOST_ORDER:
         step("target-verify", host)
         expected = {target_id: result["expected"]["sha256"]
@@ -119,7 +121,9 @@ def _fresh(window, prepared, step):
                                    "keys; nothing was restored", log=log)
         step("familiar-verify", host)
         source, _ = lifecycle._call(host, mode, "familiar-verify", {
-            "window_id": identity, "merge": window["familiar"]["merge"]}, "familiar-verify")
+            "window_id": identity, "merge": window["familiar"]["merge"],
+            **lifecycle.titan_head(host, observed)}, "familiar-verify")
+        observed = observed or source["head"]
         checks[host] = {"picks": found["picks"], "familiar": source, "surfaces": None}
     from . import surfaces  # surfaces imports the window lifecycle
     recorded = window["desktop"]["hosts"]

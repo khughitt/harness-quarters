@@ -9,8 +9,10 @@ staged under the cutover root (0700 directories, 0600 records):
 The manifest is schema 1 with exactly these keys:
 
 - `generation`: its own name.
-- `pins`: `relay_version`, `relay_commit`, `familiar_pre` and `familiar_feature_tip`, which
-  must equal this tool's approved pins, plus `familiar_theme` (familiar-theme's SSH pin),
+- `pins`: `relay_version`, `relay_commit`, `familiar_pre`, `familiar_feature_tip` and
+  `familiar_merge_tree` (T0: the tree of the reviewed clean merge of PRE and the tip, which
+  every familiar base's merge must equal outside `tasks/`), which must equal this tool's
+  approved pins, plus `familiar_theme` (familiar-theme's SSH pin),
   `claude_version` and `codex_version` (the reviewed evidence versions), compared with each
   host's inventory by the controller.
 - `helpers`: `members` and `package_sha256` exactly as the inventory records them, including
@@ -64,7 +66,10 @@ PROVEN = ("before", "after")
 MEMBER_ROOTS = ("inputs", "prep", "images", "claude-work.after.json")
 PINS = {"relay_version": "0.1.1", "relay_commit": "4ceec5d2ad22b136b37ee360e7a4ed00949f28d9",
         "familiar_pre": "00f4899ae523d613d21f44bfc2c456aac67f8e5f",
-        "familiar_feature_tip": "a16f4daa59b04e32f1010764d6f94401ca4eed8b"}
+        "familiar_feature_tip": "a16f4daa59b04e32f1010764d6f94401ca4eed8b",
+        # T0, computed 2026-10-21 on Titan with git 2.56 by `merge-tree --write-tree PRE tip`
+        # with familiar's fixed merge options (familiar.MERGE_CONFIG).
+        "familiar_merge_tree": "f492e3437577c4b79db379e4cc1fb6771f35b3bb"}
 OBSERVED_PINS = ("familiar_theme", "claude_version", "codex_version")
 MANIFEST_KEYS = {"schema", "generation", "pins", "helpers", "hosts", "targets"}
 REVIEW = "input-review-required"
@@ -348,11 +353,14 @@ def _eligible(context, target_id, keys, before, members):
 
 
 def inputs_check(context):
-    """Read-only: this host's retained state, the designated manifest, its members and
-    provenance, the manifest-verified pick keys and each relevant target's eligibility."""
+    """Read-only: this host's retained state, familiar's base under the base rule (beside
+    `titan_head`, Titan's observed base, which this HEAD must equal or precede), the designated
+    manifest, its members and provenance, the manifest-verified pick keys and each relevant
+    target's eligibility."""
     root = Path(context["root"])
-    blockers = quiesce.readiness(context, PINS["familiar_pre"])
-    report = {"manifest": None, "filter": None, "targets": {}, "blockers": blockers}
+    blockers, base = quiesce.readiness(context)
+    report = {"manifest": None, "filter": None, "targets": {}, "familiar": base,
+              "blockers": blockers}
     try:
         manifest, relative, digest = load_manifest(root)
         keys = claude_keys(context["hq"], manifest["helpers"]["members"][FILTER_MEMBER])
@@ -382,5 +390,6 @@ OPERATIONS = {
         run=inputs_check, deadline=300, mutation=False,
         payload={"commits": lambda value: type(value) is bool,
                  "active": lambda value: isinstance(value, str)
-                 and state.WINDOW_ID.fullmatch(value) is not None}),
+                 and state.WINDOW_ID.fullmatch(value) is not None,
+                 "titan_head": quiesce._commit}),
 }

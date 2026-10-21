@@ -1339,9 +1339,9 @@ def test_familiar_off_pre_refuses_prepare_and_check(prepared_cutover, monkeypatc
     for blocker in found:
         assert "a recovered merge ends this cutover" in blocker
         assert "a new attempt needs newly reviewed pins and inputs" in blocker
+    # The base rule is read by Git plumbing; relay-cutover reads only the native dependencies.
     assert {(call["host"], call["args"][0]) for call in observed(cutover, "relay-cutover", mark)
-            } == {(host, name) for host in HOSTS
-                  for name in ("familiar-source", "familiar-check")}
+            } == {(host, "familiar-check") for host in HOSTS}
     with pytest.raises(window.Failed) as raised:
         preparation.prepare(SESSION)
     assert (raised.value.step, raised.value.host) == ("inputs-check", "titan")
@@ -1423,9 +1423,12 @@ def test_prepare_check_is_read_only(prepared_cutover):
     assert {host: cutover.units(host) for host in HOSTS} == units
     tools = {call["tool"] for call in observed(cutover, since=mark)}
     assert "quiesce-timers" not in tools
-    # relay-cutover only reads familiar there: its source at PRE and its native dependencies.
+    # relay-cutover only reads familiar's native dependencies there; its base is read by Git
+    # plumbing, which writes nothing into the synchronized checkout (checked by the snapshot).
     assert {call["args"][0] for call in observed(cutover, "relay-cutover", mark)} == {
-        "familiar-source", "familiar-check"}
+        "familiar-check"}
+    assert [call for call in observed(cutover, "git", mark) if "git" in call or "merge" in call
+            ] == []
     assert not any(call["args"][:1] == ["app-server"] for call in observed(cutover, "codex", mark))
     assert state.current_window(root) is None
     assert not (root / "quiesce").exists()
@@ -1936,10 +1939,11 @@ def _option(call, name):
 
 
 def _europa_polled(world, pre):
-    """True once Europa's check of familiar's source against the merge has failed once."""
-    return lambda: any(call["host"] == "europa" and call["args"][:1] == ["familiar-source"]
-                       and call["args"][2] != pre and call["exit"] != 0
-                       for call in observed(world, "relay-cutover"))
+    """True once Europa's check of familiar's source against the merge has failed once: its
+    proof's ancestry question about a commit other than PRE (or the base) went unanswered."""
+    return lambda: any(call["host"] == "europa" and call.get("ancestor")
+                       and call["ancestor"][0] != pre and call["exit"] != 0
+                       for call in observed(world, "git"))
 
 
 def run_decision(prepared, opened, attempt=None):
@@ -2059,19 +2063,23 @@ class TestRun:
         merge_start_index, merge = merges[0]
         last_dry_verdict_index = verdicts[-1]
         assert last_dry_verdict_index < merge_start_index
-        # Between the seal and the merge: the frozen bytes recheck unchanged, both hosts closed.
+        # Between the seal and the merge: the frozen bytes recheck unchanged, both hosts closed,
+        # and Titan's familiar still the window's base.
         assert [(entry["host"], entry["operation"]) for index, entry in _sends(log)
                 if last_dry_verdict_index < index < merge_start_index] == [
             ("titan", "target-verify"), ("europa", "target-verify"), ("titan", "no-live"),
-            ("europa", "no-live")]
-        # The immutable tip is merged, marked first, after the seal of the effective inputs.
+            ("europa", "no-live"), ("titan", "familiar-base")]
+        # The immutable tip is merged into the base, marked first, after the seal of the
+        # effective inputs. Here the base is PRE itself.
         assert merge["payload"] == {"window_id": migrated.window["id"],
                                     "pre": pins["familiar_pre"],
-                                    "tip": pins["familiar_feature_tip"]}
+                                    "tip": pins["familiar_feature_tip"],
+                                    "base": pins["familiar_pre"]}
         at_merge = merge["window"]
         assert at_merge["state"] == "applying"
-        assert {key: at_merge["familiar"][key] for key in ("pre", "tip")} == {
-            "pre": pins["familiar_pre"], "tip": pins["familiar_feature_tip"]}
+        assert {key: at_merge["familiar"][key] for key in ("pre", "tip", "base")} == {
+            "pre": pins["familiar_pre"], "tip": pins["familiar_feature_tip"],
+            "base": pins["familiar_pre"]}
         assert "merge" not in at_merge["familiar"]
         sealed = at_merge["sealed"]
         assert sealed["effective_inputs_sha256"] == sha(sealed["inputs"])
@@ -2226,9 +2234,7 @@ class TestRun:
         for host in HOSTS:
             installs = [index for index, call in enumerate(calls) if call["host"] == host
                         and call["tool"] == "npm" and call["args"][:1] == ["ci"]]
-            checks = [index for index, call in enumerate(calls) if call["host"] == host
-                      and call["args"] == ["familiar-source", "--head", merge]]
-            assert len(installs) == 1 and checks and checks[0] < installs[0]
+            assert len(installs) == 1
             install = calls[installs[0]]
             record = migrated.prepared["hosts"][host]
             assert install["cwd"] == str(world.home(host) / "d/familiar")
@@ -2242,12 +2248,15 @@ class TestRun:
             assert proof["relay"] == {"version": "0.1.1",
                                       "commit": world.pins["relay_commit"]}
             assert proof["cache"]["npm"] == record["caches"]["prefixes"]["npm"]
-            # The install ran only after this host's check against the merge passed; Europa's
-            # first check ran before Dropbox delivered the merge, so it waited and checked again.
-            before = [calls[index]["exit"] for index in checks if index < installs[0]]
-            assert before[-1] == 0
+            # The install ran only after this host's proof against the merge passed, at the
+            # HEAD it names; Europa's first proof ran before Dropbox delivered the merge, whose
+            # ancestry it could not answer yet, so it waited and proved again.
+            assert proof["head"] == merge
             if host == "europa":
-                assert before[0] != 0 and len(before) >= 2
+                polls = [index for index, call in enumerate(calls) if call["host"] == "europa"
+                         and (call.get("ancestor") or [None])[0] == merge]
+                assert polls and polls[0] < installs[0] and calls[polls[0]]["exit"] != 0
+                assert proof["waited_seconds"] > 0
         # Both hosts are checked closed right before each host's install step.
         sends = [entry for _, entry in _sends(migrated.requests)]
         installs = [index for index, entry in enumerate(sends)
@@ -2844,7 +2853,8 @@ def test_recovery_requiesces_before_restore(verify_failed):
     assert _restores(events) == [f"{kind}:{target_id}" for target_id in
                                  reversed(list(transport.TARGET_PATHS))
                                  for kind in ("rollback", "restore")]
-    assert events[first + 8:] == ["titan:git-revert"]
+    # familiar's restore R is built by plumbing (never git revert) and HEAD moved onto it.
+    assert events[first + 8:] == ["titan:git-commit-tree", "titan:git-update-ref"]
     # Offline and without Claude: no npm, fetch, reset, Claude or forward preflight.
     assert not any(":launched-" in event for event in events)
     restored_target_bytes, original_target_bytes = _targets(cutover), native[0]
@@ -2874,8 +2884,9 @@ def test_recovery_requiesces_before_restore(verify_failed):
             for host in HOSTS} == kept
     # Source recovery ends this window: nothing merges the tip again from the recovered commit.
     again = cutover.request("titan", "familiar-merge", {
-        "window_id": record["id"], "pre": pre, "tip": cutover.pins["familiar_feature_tip"]})
-    assert again["status"] == "failed" and "not at PRE" in again["error"]
+        "window_id": record["id"], "pre": pre, "tip": cutover.pins["familiar_feature_tip"],
+        "base": pre})
+    assert again["status"] == "failed" and "is not the approved PRE" in again["error"]
     assert _heads(cutover)["titan"] == revert
 
 
@@ -2989,7 +3000,8 @@ def test_missing_merge_record_uses_actual_parents(prepared_cutover, monkeypatch)
     assert result["class"] == "restored" and result["revert"] == revert
     assert _heads(cutover) == {"titan": revert, "europa": revert}
     assert not any("git-" in event for event in _recovery_events(cutover, mark))
-    assert [call["git"] for call in observed(cutover, "git") if "git" in call] == [["revert"]]
+    assert [call["git"] for call in observed(cutover, "git") if "git" in call] == [
+        ["commit-tree"], ["update-ref"]]
     assert (_targets(cutover), _modules(cutover)) == native
     record = state.current_window(root)
     assert record["recovery"]["actions"] == []  # its one revert was found, not recorded, here
@@ -3075,7 +3087,8 @@ def test_recovery_works_after_version_hold_breach(prepared_cutover):
 
 
 # The full recover's six stages, by the host effect each leaves.
-STAGE = {"codex-app-server": 1, "timer-stopped": 2, "service-inactive": 2, "git-revert": 4,
+STAGE = {"codex-app-server": 1, "timer-stopped": 2, "service-inactive": 2,
+         "git-commit-tree": 4, "git-update-ref": 4,
          "surface-stopped": 5, "surface-started": 5, "timer-restored": 6, "service-started": 6}
 
 
@@ -3113,9 +3126,9 @@ def test_recovery_signal_is_retried_by_reconciliation(prepared_cutover):
     known = {cutover.pins["familiar_pre"], record["familiar"]["merge"]}
     sync["allowed"] = False
     waiting = lambda: any(  # noqa: E731
-        call["host"] == "europa" and call["args"][:1] == ["familiar-source"]
-        and call["args"][2] not in known and call["exit"] != 0
-        for call in observed(cutover, "relay-cutover"))
+        call["host"] == "europa" and call.get("ancestor")
+        and call["ancestor"][0] not in known and call["exit"] != 0
+        for call in observed(cutover, "git"))
     root, mark = cutover_root(cutover), len(cutover.lines("observed"))
     handlers = {signum: signal.getsignal(signum) for signum in hosts.INTERRUPTS}
     sender = threading.Thread(target=_signal_when, args=(waiting, signal.SIGTERM))
@@ -3154,7 +3167,8 @@ def test_recovery_signal_is_retried_by_reconciliation(prepared_cutover):
     assert result["class"] == "restored"
     events = _recovery_events(cutover, mark)
     assert _restores(events) == ["restore:claude-work", "rollback:claude", "restore:claude"]
-    assert [event for event in events if "git-" in event] == ["titan:git-revert"]
+    assert [event for event in events if "git-" in event] == ["titan:git-commit-tree",
+                                                              "titan:git-update-ref"]
     assert (os.stat(titan).st_ctime_ns, os.stat(titan).st_ino) == untouched
     assert (_targets(cutover), _modules(cutover)) == native
     record = state.current_window(root)
@@ -5410,10 +5424,11 @@ def test_status_names_the_end_of_the_cutover(desktop, monkeypatch):
     state.save_record(root / window.PREPARED, prepared)
     pre, merge, revert = "a" * 40, "b" * 40, "c" * 40
     cases = (("complete", {}, ["status"], "the cutover is complete"),
-             ("recovered", {"familiar": {"pre": pre, "merge": merge},
-                            "recovery": {"familiar": {"revert": revert}}}, ["status"],
-              "ends this cutover"),
-             ("recovered", {"familiar": {"pre": pre}, "recovery": {"familiar": {"revert": pre}}},
+             ("recovered", {"familiar": {"pre": pre, "base": pre, "merge": merge},
+                            "recovery": {"familiar": {"class": "reverted", "revert": revert}}},
+              ["status"], "ends this cutover"),
+             ("recovered", {"familiar": {"pre": pre, "base": pre},
+                            "recovery": {"familiar": {"class": "at-base", "revert": pre}}},
               ["check"], "a fresh run may start"))
     for name, changes, following, fragment in cases:
         window_file(record).write_bytes(kept)
@@ -6164,7 +6179,7 @@ def test_rehearsal_failure_cleans_scratch(prepared_cutover, monkeypatch, case):
         assert (recovered["familiar"]["class"], recovered["familiar"]["action"]) == (
             "merged", "reverted")
         assert (recovered["clones"]["europa"]["class"],
-                recovered["clones"]["europa"]["action"]) == ("at-pre", "none")
+                recovered["clones"]["europa"]["action"]) == ("at-base", "none")
         assert [(action["host"], action["action"]) for action in recovered["actions"]] == [
             ("titan", "reverted")]
         assert {name: entry["replaced"] for name, entry in recovered["dependencies"].items()} \
@@ -6395,7 +6410,8 @@ def _disconnect_reference(world, record):
     root_id = transport._create(world, "europa", "disconnect", window_id=record["id"])["root"]
     merged = world.request("europa", "familiar-merge", {
         "window_id": record["id"], "scratch": root_id, "pre": world.pins["familiar_pre"],
-        "tip": world.pins["familiar_feature_tip"]}, mode="pilot")
+        "tip": world.pins["familiar_feature_tip"], "base": world.pins["familiar_pre"]},
+        mode="pilot")
     reference = world.request("europa", "pilot-install", {
         "window_id": record["id"], "scratch": root_id, "merge": merged["result"]["merge"],
         "caches": {"npm": str(world.home("europa") / transport.CACHE)}, "path": "/usr/bin:/bin",
@@ -6467,3 +6483,277 @@ def test_disconnect_failure_restores_scratch_dependencies_offline(cutover):
 def quiesce_tree(path):
     from relay_cutover_bootstrap import quiesce
     return quiesce._tree(path)
+
+
+# --- familiar's task-record drift past PRE (amendment 2026-10-21) --------------------------------
+
+
+def _wait_for(condition, seconds=60.0):
+    end = time.monotonic() + seconds
+    while not condition():
+        assert time.monotonic() < end, "the condition never held"
+        time.sleep(0.05)
+
+
+def _familiar(world, host="titan"):
+    return world.home(host) / "d/familiar"
+
+
+def test_prepare_reports_a_tasks_only_base(cutover):
+    """prepare and check apply the base rule to each host's own HEAD and report B: task-record
+    commits past PRE are eligible. Europa equal to or behind Titan is ready; Titan's HEAD not
+    yet synchronized is a sync blocker, and a familiar commit made on Europa (ahead of or
+    diverged from Titan) is a familiar-native blocker naming its HEAD."""
+    titan, europa = _familiar(cutover), _familiar(cutover, "europa")
+    transport._tracker(titan, "fam-ff5351.md", "# a record\n")
+    base = transport._tracker(titan, "fam-ff5351.md", "# a record\n\nedited\n")
+    transport._mirror(cutover)
+    transport._write(titan / "tasks/untracked.md", "an untracked record\n")
+    prepared = preparation.prepare(SESSION)
+    assert {host: prepared["hosts"][host]["familiar"]["base"] for host in HOSTS} == {
+        "titan": base, "europa": base}
+    assert len(prepared["hosts"]["titan"]["familiar"]["commits"]) == 2
+    assert prepared["hosts"]["titan"]["familiar"]["t0"] == cutover.pins["familiar_merge_tree"]
+    later = transport._tracker(titan, "later.md", "a later record\n")
+    behind = preparation.check(prepared)
+    assert behind["familiar"]["titan"]["base"] == later  # B moved while eligible: not drift
+    assert [blocker for blocker in behind["blockers"] if "familiar" in blocker or "sync" in
+            blocker] == [f"europa: sync: titan's familiar HEAD {later[:12]} has not reached this "
+                         "host yet; wait for synchronization and rerun"]
+    transport._mirror(cutover)
+    assert preparation.check(prepared)["eligible"]
+    local = transport._tracker(europa, "europa.md", "europa's own record\n")
+    ahead = preparation.check(prepared)
+    found = [blocker for blocker in ahead["blockers"] if ": familiar-native: " in blocker]
+    assert len(found) == 1 and found[0].startswith("europa: familiar-native: ")
+    assert local[:12] in found[0] and "ahead of or diverged" in found[0]
+
+
+def test_conflicted_merge_tree_refuses_at_prepare(cutover):
+    """A base whose task records conflict with the tip's in `merge-tree --write-tree B tip`
+    refuses at prepare, before anyone is asked to close a session; nothing is written."""
+    transport._retip(cutover, {"tasks/fam-relay.md": "# the tip's record\n"})
+    cutover.write_manifest()
+    titan = _familiar(cutover)
+    transport._tracker(titan, "fam-relay.md", "# the base's own record\n")
+    transport._mirror(cutover)
+    objects = transport._objects(titan)
+    with pytest.raises(window.Failed) as raised:
+        preparation.prepare(SESSION)
+    failed = raised.value
+    assert (failed.step, failed.host) == ("inputs-check", "titan")
+    found = [blocker for blocker in failed.blockers if ": familiar-native: " in blocker]
+    assert len(found) == 1 and "does not merge cleanly" in found[0]
+    assert not (cutover_root(cutover) / window.PREPARED).exists()
+    assert transport._objects(titan) == objects
+
+
+def _drift_after_prepare(cutover):
+    """Task-record commits on Titan after prepare: the base B the run must derive."""
+    titan = _familiar(cutover)
+    transport._tracker(titan, "fam-ff5351.md", "# a record\n")
+    return transport._tracker(titan, "fam-ff5351.md", "# a record\n\nedited\n")
+
+
+@needs_zsh
+def test_run_merges_from_a_tasks_only_base(prepared_cutover, monkeypatch):
+    """B moved past PRE by task records after prepare is no drift: run derives B on Titan after
+    its final strict no-live check and saves it, Europa waits for it before either snapshot
+    refresh, the mark names it, and the merge's parents are B and the tip. Every proof after
+    the mark accepts it."""
+    cutover, prepared = prepared_cutover
+    base = _drift_after_prepare(cutover)
+    requests = _requests(monkeypatch, cutover)
+    cutover.start_dropbox()
+    opened = window.open_window(prepared)
+    migrated = window.run_window(prepared, run_decision(prepared, opened))
+    assert migrated["state"] == "ready-for-smokes"
+    pins = cutover.pins
+    assert migrated["base"]["commit"] == migrated["familiar"]["base"] == base
+    assert migrated["familiar"]["parents"] == [base, pins["familiar_feature_tip"]]
+    merge = migrated["familiar"]["merge"]
+    titan = _familiar(cutover)
+    assert transport._git(titan, "rev-list", "--parents", "-n", "1", merge).split() == [
+        merge, base, pins["familiar_feature_tip"]]
+    sends = [(entry["host"], entry["operation"]) for _, entry in _sends(requests)]
+    quiesce = sends[sends.index(("titan", "familiar-base")) - 2:
+                    sends.index(("europa", "snapshot-refresh")) + 1]
+    assert quiesce == [("titan", "no-live"), ("europa", "no-live"), ("titan", "familiar-base"),
+                       ("europa", "familiar-sync"), ("titan", "snapshot-refresh"),
+                       ("europa", "snapshot-refresh")]
+    derived = next(entry for _, entry in _sends(requests, "familiar-base"))
+    assert "base" not in derived["window"] and "familiar" not in derived["window"]
+    synced = next(entry for _, entry in _sends(requests, "familiar-sync"))
+    assert synced["payload"]["base"] == base and synced["window"]["base"]["commit"] == base
+    refreshes = [entry["payload"] for _, entry in _sends(requests, "snapshot-refresh")]
+    assert refreshes == [{"window_id": migrated["id"], "base": base}] * 2
+    merged = next(entry for _, entry in _sends(requests, "familiar-merge"))
+    assert merged["payload"]["base"] == base and merged["window"]["familiar"]["base"] == base
+    installs = [entry["payload"] for _, entry in _sends(requests, "familiar-install")]
+    assert "titan_head" not in installs[0] and installs[1]["titan_head"] == merge
+    verified = migrated["verified"]["hosts"]
+    assert {host: verified[host]["familiar"]["head"] for host in HOSTS} == {
+        "titan": merge, "europa": merge}
+
+
+@needs_zsh
+def test_familiar_sync_timeout_is_a_clean_pre_merge_abort(prepared_cutover):
+    """Europa never reaches Titan's base B within the bound: the run aborts before the merge,
+    restoring timers and snapshots on both hosts, with familiar untouched; run is next."""
+    cutover, prepared = prepared_cutover
+    cutover.config["sync"]["budget"] = 1.0
+    cutover.save()
+    base = _drift_after_prepare(cutover)  # never synchronized: no Dropbox runs
+    opened = window.open_window(prepared)
+    with pytest.raises(window.Failed) as raised:
+        window.run_window(prepared, run_decision(prepared, opened))
+    failed = raised.value
+    assert (failed.step, failed.host, failed.status) == ("familiar-sync", "europa", "failed")
+    assert "did not reach" in failed.error and failed.next_command == ["run"]
+    assert failed.observed.startswith("aborted:")
+    record = state.current_window(cutover_root(cutover))
+    assert record["state"] == "aborted" and record["base"]["commit"] == base
+    assert "familiar" not in record and state.read_ledger(record) == []
+    assert [transport.familiar_head(cutover.home(host)) for host in HOSTS] == [
+        base, cutover.pins["familiar_pre"]]
+    assert not any("merge" in call for call in observed(cutover, "git"))
+    assert timers_active(cutover) == {"titan": "active", "europa": "active"}
+
+
+@needs_zsh
+def test_titan_commit_before_the_merge_aborts(prepared_cutover, monkeypatch):
+    """A familiar commit on Titan after B was derived, before the merge: the pre-merge gate finds
+    Titan's HEAD off B and the run aborts cleanly, merging nothing."""
+    cutover, prepared = prepared_cutover
+    cutover.start_dropbox()
+    real = window.dry_targets
+    moved = []
+
+    def dry_then_commit(current):
+        result = real(current)
+        moved.append(transport._tracker(_familiar(cutover), "late.md", "a record after B\n"))
+        return result
+
+    monkeypatch.setattr(window, "dry_targets", dry_then_commit)
+    opened = window.open_window(prepared)
+    with pytest.raises(window.Failed) as raised:
+        window.run_window(prepared, run_decision(prepared, opened))
+    failed = raised.value
+    assert (failed.step, failed.host, failed.status) == ("familiar-base", "titan", "blocked")
+    assert "make no familiar commit from run until the merge" in failed.error
+    assert failed.next_command == ["run"] and failed.observed.startswith("aborted:")
+    record = state.current_window(cutover_root(cutover))
+    assert record["state"] == "aborted" and "familiar" not in record
+    assert record["base"]["commit"] == cutover.pins["familiar_pre"]
+    assert transport.familiar_head(cutover.home("titan")) == moved[0]
+    assert not any("merge" in call for call in observed(cutover, "git"))
+
+
+@needs_zsh
+def test_at_base_recovery_does_not_end_the_cutover(prepared_cutover, monkeypatch):
+    """A run from a tasks-only base whose merge failed before committing: recover finds familiar
+    `at-base`, records B as the restoration point and completes; the cutover is not ended, so
+    the parked preparation's check is next."""
+    cutover, prepared = prepared_cutover
+    base = _drift_after_prepare(cutover)
+    cutover.start_dropbox()
+    cutover.behave("titan", merge="fail")
+    failed, record = _failed_run(cutover, prepared=prepared)
+    assert (failed.step, failed.host) == ("familiar-merge", "titan")
+    assert record["state"] == "recovery-required" and record["familiar"]["base"] == base
+    cutover.behave("titan", merge="ok")
+    result = _cli(cutover, monkeypatch, ["recover"], answer=b"yes\n")
+    assert result.code == 0, result.stdout
+    record = state.current_window(cutover_root(cutover))
+    assert record["state"] == "recovered"
+    recovered = record["recovery"]["familiar"]
+    assert (recovered["class"], recovered["action"], recovered["revert"]) == ("at-base", "none",
+                                                                             base)
+    report = window.status()
+    assert report["next"] == ["check"] and "a fresh run may start" in report["detail"]
+    assert window._ended(record) is None
+
+
+@needs_zsh
+def test_missing_recorded_base_is_refused_for_inspection(verify_failed):
+    """A window past familiar's mark with no recorded base is refused for inspection: B is never
+    assumed to be PRE, and nothing is reset or restored."""
+    cutover, run = verify_failed
+    record = run.record
+    cutover.behave("europa", fail=[])
+    head = transport.familiar_head(cutover.home("titan"))
+    record = window._save(record, familiar={key: value for key, value in record["familiar"].items()
+                                            if key != "base"})
+    with pytest.raises(window.Failed) as raised:
+        recovery.restore_window(record)
+    failed = raised.value
+    assert (failed.step, failed.status) == ("familiar-reconcile", "blocked")
+    assert "never assumed to be PRE" in failed.error
+    assert state.current_window(cutover_root(cutover))["state"] == "inspection-required"
+    assert transport.familiar_head(cutover.home("titan")) == head
+    assert not any("git" in call for call in observed(cutover, "git"))
+
+
+def _finishable(cutover, monkeypatch):
+    """A ready window whose receipts are taken as validated and whose controller proved its row,
+    as finish's own tests leave it."""
+    root = cutover_root(cutover)
+    registry = Registry(cutover)
+    _controller_up(cutover, registry)
+    assert smoke.observe_step(state.current_window(root), "titan")["controller"] is not None
+    monkeypatch.setattr(smoke, "validate_smokes", lambda current: None)
+    current = state.current_window(root)
+    window._save(current, smokes={**current["smokes"], "receipts": {}})
+
+
+@needs_zsh
+def test_finish_tolerates_task_records(ready_run, monkeypatch):
+    """After the merge Titan's task-record commits are tolerated: with one committed and a
+    deferred tracker write left, finish's source proofs pass on both hosts, Europa's once Titan's
+    HEAD reached it, and finish records the HEAD each observed."""
+    cutover, run = ready_run
+    _finishable(cutover, monkeypatch)
+    titan = _familiar(cutover)
+    after = transport._tracker(titan, "fam-ff5351.md", "# a record\n")
+    (titan / "tasks/fam-ff5351.md").write_text("# a record\n\na deferred write\n")
+    result = _cli(cutover, monkeypatch, ["finish"])  # Dropbox runs, as during the run
+    assert result.code == 0, result.stdout
+    record = state.current_window(cutover_root(cutover))
+    assert record["state"] == "complete"
+    checks = record["finish"]["checks"]["hosts"]
+    assert {host: checks[host]["familiar"]["head"] for host in HOSTS} == {
+        "titan": after, "europa": after}
+    assert record["familiar"]["merge"] != after
+
+
+DRIFTS = ("outside-tasks", "europa-commit")
+
+
+@needs_zsh
+@pytest.mark.parametrize("drift", DRIFTS)
+def test_finish_refuses_source_drift(ready_run, monkeypatch, drift):
+    """finish refuses, before any timer changes, a modified file outside tasks/ on Titan and a
+    familiar commit made on Europa during the window (Europa's HEAD past Titan's observed
+    HEAD): both stop for inspection."""
+    cutover, run = ready_run
+    _finishable(cutover, monkeypatch)
+    if drift == "outside-tasks":
+        transport._write(_familiar(cutover) / "src/observe.js", "// changed after the merge\n")
+    else:  # committed by its own path, whatever the synchronized index holds, while Dropbox
+        # has not yet replaced Europa's refs with Titan's: the conflict the freeze prevents
+        cutover.dropbox.close()
+        cutover.dropbox = None
+        europa = _familiar(cutover, "europa")
+        transport._write(europa / "tasks/europa.md", "europa's own record\n")
+        transport._git(europa, "add", "--", "tasks/europa.md")
+        transport._git(europa, "commit", "-q", "-m", "chore(tasks): europa", "--",
+                       "tasks/europa.md")
+    result = _cli(cutover, monkeypatch, ["finish"])
+    assert result.code == 1 and "step: familiar-verify" in result.stdout
+    host = "titan" if drift == "outside-tasks" else "europa"
+    assert f"host: {host}" in result.stdout
+    assert ("src/observe.js differs" if drift == "outside-tasks"
+            else "ahead of or diverged") in result.stdout
+    record = state.current_window(cutover_root(cutover))
+    assert record["state"] == "inspection-required"
+    assert timers_active(cutover) == {"titan": "inactive", "europa": "inactive"}
