@@ -1008,10 +1008,12 @@ before a new window. No in-window re-probe/continuation path is added.
 
 ## Amendment 2026-10-21: familiar task-record drift (after Task 9 Step 7)
 
-Implements the spec amendment of the same date (revised after design review rounds 7–8;
+Implements the spec amendment of the same date (revised after design review rounds 7–10;
 rulings R61–R64). One corrective change on the delivered tool, then redelivery:
 
-1. Pins: add T0 `f492e3437577c4b79db379e4cc1fb6771f35b3bb` beside PRE and tip (tool constants
+1. Pins (as the spec's amendment defines, including `core.hooksPath=/dev/null` on every
+   mutating familiar git call and the T0 `diff-tree` under the temporary object environment):
+   add T0 `f492e3437577c4b79db379e4cc1fb6771f35b3bb` beside PRE and tip (tool constants
    and the manifest's pins). One fixed-options helper for every `merge-tree`/`merge` call,
    with read-only `merge-tree` writing to a temporary object directory.
 2. One shared predicate `tasks_only(x, y)` in `familiar.py` (plumbing only, as the spec
@@ -1020,14 +1022,16 @@ rulings R61–R64). One corrective change on the delivered tool, then redelivery
 3. Readiness on both hosts: recompute and compare T0, base rule per host, Europa equal to or an
    ancestor of Titan; report B and its proof.
 4. `run`: derive B on Titan after the second strict no-live; new read-only `familiar-sync`
-   host operation (deadline `SYNC_SECONDS + CHILD_SECONDS + 60`) waits for Europa HEAD = B
+   host operation (one child per poll; deadline `SYNC_SECONDS + CHILD_SECONDS + 60`) waits for Europa HEAD = B
    before either `snapshot-refresh`; `snapshot-refresh` checks HEAD = B without waiting; the
    pre-merge gate rechecks; the mark records B; `familiar-merge` takes B, rechecks, merges with
    the fixed options and proves M (parents, tree, T0).
 5. After the mark: tasks-only-descendant source proofs (install sync, `familiar-verify` in run,
    restart-surfaces and finish, dependency-restore sync), Europa not ahead of or diverged from
    Titan's observed HEAD; finish records the observed HEAD.
-6. Restoration/recovery: first-parent walk to find M and R; classes per the spec; the plumbing
+6. Restoration/recovery (as the spec's amendment defines: temporary-index working-tree
+   equality, `index.lock` refusal, index rebuild before `read-tree -m -u`/`update-ref`, the
+   abandoned-R and R′ rules, tolerant final proof): first-parent walk to find M and R; classes per the spec; the plumbing
    restore (`commit-tree -p P`, durable R record, `read-tree -m -u P R`, `update-ref HEAD R
    P`) with its rerun rules; `at-base` records B; `_ended` only for `merged`/`reverted`; T0
    proof before reconciliation promotes; a window without a recorded base is refused. Every
@@ -1042,7 +1046,8 @@ rulings R61–R64). One corrective change on the delivered tool, then redelivery
    `merge-tree` refuses at prepare; `familiar-sync` timeout is a clean pre-merge abort; the
    plumbing restore's crash points (after `commit-tree`, after `read-tree`, after
    `update-ref`); a stat-dirty live index, an index holding another tree and a stale
-   `index.lock` during the restore; an abandoned R after a tolerated Titan tasks commit;
+   `index.lock` during the restore; an abandoned R after a tolerated Titan tasks commit, and a crash after `read-tree`
+   followed by a Titan tasks commit both by pathspec and through the live index;
    hooks (`post-merge`, `reference-transaction`) not run; `tasks/` absent in B or P; an
    octopus merge in the tip's history; a Europa-local commit after the mark detected; `at-base` recovery does not
    end the cutover; the unchanged B = PRE fixtures as the baseline.

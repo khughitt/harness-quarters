@@ -681,7 +681,7 @@ Approved direction: Keith, 2026-10-21, after the real-host `prepare` refused bec
 had moved two task-record commits past PRE (adding only `tasks/fam-ff5351.md`). Familiar's
 own task tracker commits into the same repository, from any checkout and during smokes, so
 no exact familiar commit can be held through a window. Revised after design review rounds 7
-and 8. Familiar's runtime does not read `tasks/`.
+to 10. Familiar's runtime does not read `tasks/`.
 
 **Tasks-only descendant.** Y is a tasks-only descendant of X when X is an ancestor of Y and
 every commit in `X..Y` has exactly one parent and, against that parent, changes only raw
@@ -740,8 +740,10 @@ under the same object environment. "Equal outside `tasks/`" means `diff-tree -r 
   `merge-in-progress`: HEAD = B and MERGE_HEAD = tip. `merged`: HEAD = P, a tasks-only
   descendant of M, M's parents exactly `[recorded B, tip]` and M equal to T0 outside `tasks/`
   (also required before reconciliation promotes a discovered merge). `reverted`: HEAD a
-  tasks-only descendant of R, R with one parent P that is a tasks-only descendant of M, R's
-  tree equal to B's outside `tasks/` and R's `tasks` entry equal to P's.
+  tasks-only descendant of R, R with one parent P that is a tasks-only descendant of M and R's
+  tree equal to B's outside `tasks/`; R's `tasks` entry is unconstrained, so a tracker commit
+  of R's content through the live index can serve as R without loosening anything outside
+  `tasks/`.
 - **Restore without `git revert`.** The restore builds R by plumbing: R's tree is B's tree
   with its `tasks` entry replaced by P's (added when B has none, removed when P has none; two
   absent entries are equal), assembled from `ls-tree -z B` minus `tasks` plus `ls-tree -z P
@@ -757,9 +759,12 @@ under the same object environment. "Equal outside `tasks/`" means `diff-tree -r 
   - working tree equals R: rebuild the index from R the same way, then `update-ref HEAD R P`;
   - anything else is refused for inspection.
   When HEAD is no longer R's parent and R is not an ancestor of HEAD (a tolerated Titan tasks
-  commit landed after a crash before `update-ref`), R is recorded as abandoned; if HEAD is in
-  the `merged` class with a working tree equal to HEAD, a fresh R is built on HEAD. On every
-  path the final proof is HEAD = R with the working tree equal to R. R keeps familiar's task
+  commit landed after a crash before `update-ref`), R is recorded as abandoned. When HEAD is
+  in the `merged` class, a fresh R′ is built on HEAD (B's tree with HEAD's `tasks` entry): a
+  working tree equal to HEAD proceeds as in the HEAD = P case; a working tree equal to R′
+  rebuilds the index from R′ and runs `update-ref HEAD R′ HEAD`; anything else is refused for
+  inspection. On every path the final proof is HEAD equal to R (or R′) or a tasks-only
+  descendant of it, with the working tree equal to HEAD. R keeps familiar's task
   records as they stand, and cannot conflict.
 - **Ending the cutover.** `_ended` ends the cutover only when recovery's class was `merged`
   or `reverted`; an `at-base` or `merge-in-progress` recovery does not end it.
