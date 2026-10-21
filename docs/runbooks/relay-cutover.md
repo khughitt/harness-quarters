@@ -62,7 +62,9 @@ original plan's Task 9 is complete. The independent Bash (dots-55f537) and instr
   - surface restarts with exited, reused and unrecorded PIDs, a partial restart and a
     consented retry;
   - smoke receipt binding, and finish's gates;
-  - pilot/live mode confusion and scratch-root escape.
+  - pilot/live mode confusion and scratch-root escape;
+  - a terminal held by an agent, a blocked or declined recovery desktop, owner-lost operations
+    of any window, stops classified by cause, and a bypassed resume.
 
   Fixtures are not the real hosts. That suite runs in the worktree, which carries the hook
   after-images. Delivery (bootstrap plan Task 9 Step 4) runs `just test` again on the
@@ -108,11 +110,12 @@ original plan's Task 9 is complete. The independent Bash (dots-55f537) and instr
 
 | Command | Run by | Human decision | May change |
 | --- | --- | --- | --- |
-| `prepare --controller-session ID` | agent | none | the prepared record and private operation records |
-| `check` | agent | none | private operation records only |
+| `prepare --controller-session ID` | agent | none | the prepared record and private operation records; the held Claude probes' own home-state bookkeeping (ruling R43) |
+| `check` | agent | none | private operation records; the held Claude probes' own home-state bookkeeping (R43) |
 | `status` | anyone | none | nothing (local records only) |
+| `reconcile-operations --host HOST` | agent | none | private operation records: only operations whose owner died are cancelled, each recorded `interrupted` |
 | `relay-cutover-rehearse --controller-session ID --preview` | agent | none; prints the consent subject | allocates the pilot window and contacts no host |
-| `relay-cutover-rehearse --controller-session ID` (with `--decision-file FILE` or a terminal answer) | agent | desktop: the no-window `true` spawn; without approval the spawn gate stays pending | owned scratch roots on both hosts, the prepared cache prefixes |
+| `relay-cutover-rehearse --controller-session ID` (with `--decision-file FILE` or a terminal answer) | agent | desktop: the no-window `true` spawn; without approval the spawn gate stays pending | owned scratch roots on both hosts, the prepared cache prefixes, existing authentication and SSH runtime bookkeeping, the held Claude probes' home-state bookkeeping |
 | `run` | operator, from an ordinary terminal | desktop: the operator's `/dev/tty` answer only; no decision file | timers, familiar snapshots, familiar, dependencies, all four targets, familiar's surfaces |
 | `restart-surfaces` (`--preview`, or `--decision-file FILE`) | agent or operator | desktop: the operator's terminal answer, or a session decision file after the controller's proof | familiar's recorded surfaces only |
 | `record-smoke --observe HOST` (optionally `--cwd DIR`) | agent | none | private smoke evidence |
@@ -121,18 +124,26 @@ original plan's Task 9 is complete. The independent Bash (dots-55f537) and instr
 | `recover` | operator, from an ordinary terminal | desktop: the operator's `/dev/tty` answer for recovery's restarts; no decision file | everything back to native |
 
 `prepare`, `check` and `status` never change targets, familiar source, dependencies, timers,
-services, the desktop or window state. `prepare` writes only `prepared.json`. The private
-operation and transport records under the cutover root are the only writes `prepare` and
-`check` add (ruling R16).
+services, the desktop or window state. `prepare` writes `prepared.json`, and it and `check` add
+the private operation and transport records under the cutover root (ruling R16). Their held
+`claude --version` and `claude doctor` probes may also write Claude's own home-state
+bookkeeping, a declared runtime effect (ruling R43).
 
 ### Human decisions
 
 - **At a terminal.** An operator who runs a command directly answers its bounded prompt on
-  `/dev/tty`: a preview of the subject, then `Type yes to approve`. The tool takes `yes` or
-  `y`, in any case, as approval; any other answer stops before any change. `run` and
-  `recover` accept nothing else (rulings R24 and R35).
+  `/dev/tty`: a preview of the subject, then `Type yes to approve` (for a smoke attestation,
+  `Type yes to attest`). The tool takes `yes` or `y`, in any case, as approval; any other
+  answer stops before any change, except in `recover`
+  ([§9](#9-recovery-recover-operator)). `run` and `recover` accept nothing else (rulings R24
+  and R35).
 - **From an agent.** An agent never answers a terminal prompt, even when its tool shell has a
-  terminal; it always passes `--decision-file`. The sequence is:
+  terminal; it always passes `--decision-file`. The tool enforces this: an invocation that runs
+  under a Claude or Codex process (found by walking its parent processes) takes no terminal
+  answer, because that terminal, a pseudo-terminal included, is the agent's own.
+  `restart-surfaces` and `record-smoke` then stop and name `--preview` and `--decision-file`;
+  `run` and `recover` stop as operator-run from an ordinary terminal, and `run` opens no window.
+  The sequence is:
   1. Preview the subject read-only: `restart-surfaces --preview`,
      `record-smoke --preview --receipt FILE`, or `relay-cutover-rehearse … --preview`.
   2. Ask the user in the session, naming the subject:
@@ -214,12 +225,15 @@ any parked wait.
   probes, and Codex's on Titan;
 - the desktop inventory: the trusted niri socket and each familiar surface's startup command
   and process;
-- each target's resolved path, digest and pick values.
+- each target's resolved path, digest and pick values;
+- familiar at PRE with a clean tree and native dependencies, through
+  `relay-cutover familiar-source --head PRE` and `familiar-check --expect native`, read only.
 
-It refuses beside any open window, pilot included. Running Claude and Codex sessions are
-listed as future `run` blockers; they never make preparation fail. `check` repeats every read
-and names any drift since `prepare`. It prints `next: … run` only when everything still
-matches.
+It refuses beside any open window, pilot included, and with `familiar-native` on a host whose
+familiar is not at PRE ([§2](#2-final-pre-closure-step-agent)). Running Claude and Codex
+sessions are listed as future `run` blockers; they never make preparation fail. `check`
+repeats every read and names any drift since `prepare`. It prints `next: … run` only when
+everything still matches.
 
 **Picks and structural drift.** Claude's pick keys are the `CLAUDE_JSON_KEYS` of the
 manifest-verified `.githooks/harness-state-clean`. Their values, or their absence, may differ
@@ -334,6 +348,11 @@ hosts, with the doctor's hold diagnostic, and compares everything with the prepa
   `codex-cli 0.163.0` unless it is separately re-probed and reviewed. Rerun the pilot only
   if helper or toolchain bytes changed from its recorded identities. A version refresh alone
   never reruns it.
+- **`check` reports `familiar-native`:** familiar is not at PRE with a clean, native tree on
+  that host. After a recovered merge this is the recovery revert: that recovery ended the
+  cutover ([§9](#9-recovery-recover-operator)), and a completed cutover leaves familiar merged.
+  Do not ask for closure, and do not reset familiar to PRE by hand. A new attempt needs newly
+  reviewed pins and inputs and its own reviewed procedure, outside this runbook.
 - **Anything else:** follow the blocker's text. The agent performs and reviews any refresh;
   the tool runs no refresh or retry loop.
 
@@ -412,6 +431,7 @@ Task 6 image review, as `prepare` does. The window is aborted, and the agent fol
 | --- | --- | --- | --- |
 | Success | 0 | `ready-for-smokes` | Prints the merge, the four applied targets, each replacement surface PID and the [handoff](#4-from-bootstrap-until-finish). Resume the controller ([§5](#5-resume-and-the-controllers-proof)). |
 | Stopped before any change: no terminal, declined, live sessions, eligibility or hold | 1 | `aborted` | Familiar, settings and timers are unchanged; Titan's Codex daemons may already be stopped. Sessions may reopen. Close any listed PIDs (inspect only those PIDs with `ps -p '<pids>' -o pid,ppid,comm,args`; never `pkill`) and run again, or hand the output to the agent for other blockers. |
+| Started from a Claude or Codex tool shell | 1 | none opened | `run` opens no window and asks nothing: run it from an ordinary terminal. |
 | Pre-merge failure, or INT, TERM or HUP before the familiar record | 1 | `aborted` or `abort-incomplete` | Every touched host's timers are restored and its snapshots returned; familiar and settings were never changed. `aborted` permits a fresh `run` once the cause is fixed. `abort-incomplete` names `recover`, which completes the pre-merge abort and asks nothing. |
 | Failure or interruption after the familiar record, before the verified migration | 1 | `recovery-required` | Prints "Do not open Claude or Codex until recover completes": `run` is blocked and timers stay paused. Run `recover` with every session still closed. |
 | Surface-only failure after the verified migration | 1 | `migrated-surfaces-pending` | Prints "migrated, surfaces pending", the paused timers, the handoff and `restart-surfaces`. Claude and Codex may resume, only through the printed held commands. No rollback is needed. |
@@ -436,12 +456,9 @@ From `run` until `finish` reports complete:
 - Avoid `cl`, `clw`, unheld Claude or IDE clients, and update or install commands and
   external installers.
 - **Do not change or save Claude model or effort defaults in either home on either host**;
-  no `/model` or `/effort` saves. Finish tolerates a saved pick, but a pick changes the
-  target's bytes:
-  - a `restart-surfaces` recheck then finds the migration changed and needs inspection;
-  - `recover`'s byte-gated restore stops for inspection.
-
-  Neither is rewritten automatically.
+  no `/model` or `/effort` saves. Finish and a `restart-surfaces` recheck tolerate a saved
+  pick, but a pick changes the target's bytes, so `recover`'s byte-gated restore then stops
+  for inspection. Nothing rewrites it automatically.
 - Timers stay paused on both hosts until `finish` completes.
 
 Every report from the verified migration until finish (`run`, `status`, `restart-surfaces`,
@@ -483,9 +500,9 @@ re-probe exists.
 A hold breach can only follow the verified migration, so familiar's merge is committed, and
 `recover` reverts it. That recovery ends this cutover window: the current tool merges only
 from PRE and cannot run another window while familiar's HEAD is the recovery revert
-([§9](#9-recovery-recover-operator)). The next attempt needs its own reviewed procedure,
-outside this runbook. Task 9 Steps 5–7 and the final pre-closure step come after that
-procedure, never as a way to reopen this window.
+([§9](#9-recovery-recover-operator)). The next attempt needs newly reviewed pins and inputs
+and its own reviewed procedure, outside this runbook. Task 9 Steps 5–7 and the final
+pre-closure step come after that procedure, never as a way to reopen this window.
 
 ## 5. Resume and the controller's proof
 
@@ -502,10 +519,18 @@ procedure, never as a way to reopen this window.
 
    This passes only for the root Codex row of the captured session. The row must be alive on
    Titan, run by the prepared Codex executable at the row's PID and start time, and be
-   updated since the verified migration. This runs in `migrated-surfaces-pending` too
-   (ruling R40). A missing or stale row proves nothing: report it as the controller's trust
-   or startup blocker, and resume only through the printed command. Never edit configuration
-   from that session. A row proves event delivery, not the smokes.
+   updated since the verified migration. That process must also carry no bypass flag
+   (ruling R49): `--dangerously-bypass-approvals-and-sandbox`,
+   `--dangerously-bypass-hook-trust`, `--dangerously-skip-permissions`, `--yolo`,
+   `--full-auto`, `--approve-for-me`, `--ask-for-approval never` (or `-a never`) or
+   `--permission-mode bypassPermissions`. Each observation reports a per-process `bypass`
+   flag that its host computes; the command line never leaves the host. A bypassed resume,
+   such as `cor`, still writes a fresh row, but proves nothing about the trust review: exit
+   that session and resume through the printed command. This runs in
+   `migrated-surfaces-pending` too (ruling R40). A missing or stale row proves nothing:
+   report it as the controller's trust or startup blocker, and resume only through the
+   printed command. Never edit configuration from that session. A row proves event delivery,
+   not the smokes.
 3. The operator launches the printed "titan Codex work: its own hook review" command and
    reviews that home's hooks the same way. A work home that is not trusted leaves its smoke
    incomplete, even when the personal home passes.
@@ -534,15 +559,18 @@ It never applies hooks or source, and never restores timers.
 - **Operator route.** The operator may instead run `restart-surfaces` with no flag at a
   terminal and answer there. No proof is needed.
 - **What a restart does.** Before touching the desktop it settles this window's own
-  operations and rechecks the verified migration. A recorded process still running gets
-  TERM; one that already exited is expected, and its startup command simply runs through
-  niri's spawn on the recorded socket. Each replacement is recorded before the next
-  surface.
-- **What stops it.** Each of these stops for inspection, and a new inventory needs a new
-  decision:
-  - a changed socket or startup command;
-  - a recorded PID now held by another process;
-  - a surface process nobody recorded.
+  operations and rechecks the verified migration, tolerating Claude's pick keys as finish
+  does. A recorded process still running gets TERM; one that already exited is expected, and
+  its startup command simply runs through niri's spawn on the recorded socket. Each
+  replacement is recorded before the next surface.
+- **A new inventory.** A changed socket, a recorded PID now held by another process, or a
+  surface process nobody recorded: the preview offers that host's new inventory, and only a
+  new decision approves it.
+- **What stops it for inspection.** A changed startup command, a missing or ambiguous
+  socket, failed niri IPC, or two processes for one surface: the preview stops before any
+  ask, with nothing changed. A recheck that finds the migration changed beyond Claude's pick
+  keys makes the window `inspection-required`, then `recover`; a refusal, a transport
+  failure or an unreachable host during the recheck leaves only the surfaces pending.
 - **Declining** leaves the surfaces pending, with no rollback.
 - **Receipts.** A retry from `ready-for-smokes` or `finishing` keeps the recorded smoke
   receipts and returns the window to `ready-for-smokes`.
@@ -566,6 +594,14 @@ It never applies hooks or source, and never restores timers.
 | titan | codex | work | short | start-idle, attribution-denial, normal-exit | trust |
 | europa | claude-code | personal | short | start-idle, attribution-denial, normal-exit | trust |
 | europa | claude-code | work | short | start-idle, attribution-denial, normal-exit | trust |
+
+Once, before the first smoke, create the private smoke state directory on Titan. The Codex
+needs-approval prompt targets a marker there, and projection recovery moves intent there:
+
+```zsh
+mkdir -p ~/.local/state/hq/relay-smoke
+chmod 700 ~/.local/state/hq/relay-smoke
+```
 
 Each smoke runs in a fresh scratch Git repo on the tested host, created with its own
 identity. A full smoke's second session, for abrupt death, uses the same repo. Use a path
@@ -670,6 +706,7 @@ observations of that very session, by content, digest and order, never by file n
 refuses:
 - another window's or a pilot's receipt;
 - the controller's own session;
+- a session launched with a bypass flag (start-idle);
 - a session already used by another receipt;
 - a stale row;
 - any observation made after a hold drift;
@@ -730,7 +767,9 @@ window's original record. Each host then runs `familiar-reap.service` and waits 
 
 The window is then `complete`. The report says the hold is released: ordinary launches use
 their prior update policy again, and `cl`, `clw` and Claude model or effort changes are
-allowed. Held sessions keep `DISABLE_UPDATES=1` until they exit.
+allowed. Held sessions keep `DISABLE_UPDATES=1` until they exit. From then on `status` reports
+the cutover complete and names `status`, never `check` or `run`, and prints no preparation
+guidance.
 
 A stop after `finishing` names the timers already restored and those still paused, and
 `finish` repeats from actual state. Timers stay paused until `finish` reports complete, and
@@ -752,10 +791,14 @@ every Claude and Codex session closed on both hosts, in an ordinary Zsh on Titan
   target takes only the pre-merge abort: timers and snapshots. It asks nothing.
 - **Past familiar's mark.** `recover` needs the operator's terminal. At entry it previews
   the desktop and asks this invocation's consent for recovery's surface restarts; the run's
-  or any earlier consent never covers them. It asks nothing when nothing is left to
-  restart. It then runs six stages, each attempt from actual state:
-  1. reconciles this window's unfinished operations, cancelling those whose owner died. An
-     operation still running, or an unreachable host, stops recovery before any mutation.
+  or any earlier consent never covers them. Its prompt says that recover restores native
+  settings, source and dependencies either way, and that any answer but `yes` restarts no
+  surface. It asks nothing when nothing is left to restart. It then runs six stages, each
+  attempt from actual state:
+  1. reconciles this window's unfinished operations, cancelling those whose owner died, and
+     any other owner-lost read ([§11](#11-fail-closed-facts-and-inspections-agent)). An
+     operation still running, another window's owner-lost mutation, or an unreachable host
+     stops recovery before any mutation.
      It then stops the two Titan Codex daemons through their CLI and passes strict no-live on
      both hosts, using the process table only.
   2. re-quiesces both hosts' timers from the window's original records, even where finish
@@ -775,28 +818,31 @@ every Claude and Codex session closed on both hosts, in an ordinary Zsh on Titan
   6. restores each host's original timer state and requires `familiar-reap.service` to
      succeed. Only then is the window `recovered`, and fresh native sessions may start.
 - **A stop.** Any stop leaves `recovering` and prints "Do not open Claude or Codex until
-  recover completes", with timers paused; rerun `recover`. Bytes that match no recorded
-  image, and unexpected Git history, become `inspection-required`. Inspect, then rerun
-  `recover`.
-- **Desktop blocked.** If the entry preview finds the desktop blocked, `recover` currently
-  stops before any change and names the blocker:
-  - no trusted niri socket, or failed IPC;
-  - a changed startup command;
-  - two processes for one surface.
-
-  Inspect the desktop, then rerun it.
+  recover completes", with timers paused; rerun `recover`. Only a stop that observed drift
+  becomes `inspection-required`: bytes that match no recorded image, unexpected Git history,
+  or a restore that ran and failed. Inspect, then rerun `recover`. A refusal, a transport
+  failure, an unreachable host, or a Claude or Codex session that reopened while recover ran
+  stays `recovering`: resolve it and rerun. Helper drift mid-window also blocks recover until
+  the delivered helper bytes are restored on main.
+- **Desktop blocked or declined** (rulings R36 and R46). If the entry preview finds the
+  desktop blocked (no trusted niri socket, failed IPC, a changed startup command, or two
+  processes for one surface), `recover` asks nothing; if the operator answers anything but
+  `yes`, nothing about the surfaces is authorized. Either way it still runs stages 1–4, which
+  touch no desktop, then stops before stage 5 in `recovering`, naming the blocker or the
+  decline and the complete `recover` command. Timers stay paused. Inspect the desktop if it was
+  blocked, then rerun `recover`: it previews the desktop again, asks, and completes stages 5
+  and 6. A surface that fails to start in stage 5 stops the same way, and the rerun restarts
+  only the surfaces left.
 - **Afterwards: a recovered merge ends this cutover.** `recover` reports where familiar ended
   up (`familiar is at <commit> on titan`); `git -C ~/d/familiar rev-parse HEAD` shows the
   same.
   - **Any commit other than PRE (`00f4899ae523…`).** Recovery reverted a committed merge, so
     HEAD is the recovery revert, and that ends this cutover window. The current tool cannot
-    run another window from here, because it merges only from PRE: its snapshot refresh and
-    its merge both require familiar's HEAD to be exactly PRE. `prepare` and `check` do not
-    look at familiar's HEAD, so they still pass. A new `run` would therefore quiesce both
-    hosts and then take the pre-merge abort, after the operator had closed every session.
-    Do not ask for closure. Do not reset familiar to PRE, revert the revert, or merge the tip
-    again by hand. The next attempt needs its own reviewed procedure and inputs, outside this
-    runbook.
+    run another window from here, because it merges only from PRE. `status` reports that the
+    cutover has ended and names `status`, with no preparation guidance; `prepare` and `check`
+    refuse with `familiar-native` on both hosts. Do not ask for closure. Do not reset familiar
+    to PRE, revert the revert, or merge the tip again by hand. The next attempt needs newly
+    reviewed pins and inputs and its own reviewed procedure, outside this runbook.
   - **PRE.** The merge never committed: recovery aborted it, or it never started. The
     merge-from-PRE precondition no longer stands in the way. No test covers a new window
     after a recovered one, however, so the agent reports this state rather than asking for
@@ -811,7 +857,9 @@ prints the handoff.
 | State | Next | Meaning |
 | --- | --- | --- |
 | no prepared record | `prepare --controller-session <native-session-id>` | nothing prepared |
-| prepared; no open window, or the last one `aborted`, `recovered` or `complete` | `check` | prints the preparation guidance: ordinary use allowed, and the final pre-closure step. After a `recovered` window it still says a fresh run may start; if familiar is at the recovery revert, the cutover has ended instead ([§9](#9-recovery-recover-operator)) |
+| prepared; no open window, or the last one `aborted`, or `recovered` with familiar at PRE | `check` | prints the preparation guidance: ordinary use allowed, and the final pre-closure step |
+| the last window `complete` | `status` | the cutover is complete; no preparation guidance, and no `check` or `run` |
+| the last window `recovered` after reverting a committed merge | `status` | the cutover has ended ([§9](#9-recovery-recover-operator)); no preparation guidance, and no `check` or `run` |
 | pilot window open | `relay-cutover-rehearse --controller-session <native-session-id>` | live commands and `prepare` refuse until the rehearsal runs or reconciles it |
 | any window whose invocation is still running | `status` | wait, or interrupt that invocation |
 | `prepared`, `quiescing` or `applying` before familiar's mark; `aborting`; `abort-incomplete` | `recover` | completes the pre-merge abort only |
@@ -842,6 +890,26 @@ reports. If the shape really differs, the rollout cannot proceed in this window:
 operator runs `recover`, and the tool change needs its own review and delivery before a new
 window.
 
+**An operation whose owner died.** A host operation whose owner ended before it recorded
+completion (a reboot, an OOM kill, or a second signal) is `owner-lost`. Its recorded children
+may still run, and every mutation on that host refuses beside it. The commands that settle a
+window's operations before they act (the pre-merge abort, `recover`, `restart-surfaces`,
+`finish` and the rehearsal) cancel their own window's owner-lost operations as before, and
+any owner-lost operation that changes nothing, a read such as `inventory` or `inputs-check`,
+whichever window ran it, or none (ruling R48). Another window's owner-lost mutation stops
+them and names this command:
+
+```zsh
+~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap reconcile-operations --host titan
+~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap reconcile-operations --host europa
+```
+
+It reports every unfinished operation on that host and sends `operation-cancel` only to the
+owner-lost ones, which stops their recorded children and records each `interrupted`. A
+running operation's owner is alive: it is reported and never cancelled, so let it finish. An
+operation directory without `start.json` is reported for the inspection below. It returns 1
+while anything still needs inspection.
+
 **A decision temp file under `decisions/`.** Consumption writes
 `windows/<window-id>/decisions/.<attempt-id>.json.<random>`, links it to `<attempt-id>.json`,
 then removes the temporary name. A crash in between leaves that temporary name, and every
@@ -868,28 +936,43 @@ mv ~/.local/state/hq/relay-cutover/windows/'<window-id>'/decisions/'<temporary-n
 
 **An orphan pilot scratch root without `scratch.json`.** An interrupted `pilot-create` can
 leave `pilot/<16-hex>/` on a host without its owner record. `pilot-cleanup` then refuses
-`unexplained entries`, the pilot window cannot close, and every live command and `prepare`
-refuse beside it. On the host the error names (Europa through
-`ssh -4 -o BatchMode=yes europa`), inspect:
+`unexplained entries` and cites this section, the pilot window cannot close, and every live
+command and `prepare` refuse beside it. `pilot-create` writes `scratch.json` straight after it
+makes the directory, before any part, so such an orphan is empty or holds only
+`.scratch.json.<random>`. Inspect it on the host the error names. On Titan:
 
 ```zsh
 ls -la ~/.local/state/hq/relay-cutover/pilot
 find -P ~/.local/state/hq/relay-cutover/pilot/'<entry>' -maxdepth 2 -printf '%y %m %u %p\n'
 ```
 
+On Europa, the same reads through SSH, quoted so that `~` expands there:
+
+```zsh
+ssh -4 -o BatchMode=yes europa 'ls -la ~/.local/state/hq/relay-cutover/pilot'
+ssh -4 -o BatchMode=yes europa 'find -P ~/.local/state/hq/relay-cutover/pilot/<entry> -maxdepth 2 -printf "%y %m %u %p\n"'
+```
+
 Move the entry only when all of the following hold:
 - it is your own 0700 directory with a 16-hex name and no `scratch.json`;
-- it holds only scratch parts (`home`, `state`, `tmp` and a partial `familiar` clone or
-  copied dependencies), and no link leads out of it;
+- it is empty, or holds only `.scratch.json.<random>`, and no link leads out of it;
 - this pilot window's attempts show a `pilot-create` on that host whose root was never
   recorded in the window.
 
-Then move it out of the cutover root, keeping it private, because it may hold copies of live
-settings:
+A root that holds scratch parts (`home`, `state`, `tmp`, `familiar`) without `scratch.json` is
+not this case (an interrupted cleanup leaves one): stop and report it. Then move it out of the
+cutover root, keeping it private. On Titan:
 
 ```zsh
 (umask 077; mkdir -p ~/.local/state/hq/relay-cutover-retained)
 mv ~/.local/state/hq/relay-cutover/pilot/'<entry>' ~/.local/state/hq/relay-cutover-retained/
+```
+
+On Europa:
+
+```zsh
+ssh -4 -o BatchMode=yes europa '(umask 077; mkdir -p ~/.local/state/hq/relay-cutover-retained)'
+ssh -4 -o BatchMode=yes europa 'mv ~/.local/state/hq/relay-cutover/pilot/<entry> ~/.local/state/hq/relay-cutover-retained/'
 ```
 
 Then run `relay-cutover-rehearse --controller-session …` again: it settles the window's
