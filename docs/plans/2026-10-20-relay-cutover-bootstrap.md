@@ -1008,42 +1008,41 @@ before a new window. No in-window re-probe/continuation path is added.
 
 ## Amendment 2026-10-21: familiar task-record drift (after Task 9 Step 7)
 
-Implements the spec amendment of the same date (revised after design review round 7; rulings
-R61–R62). One corrective change on the delivered tool, then redelivery:
+Implements the spec amendment of the same date (revised after design review rounds 7–8;
+rulings R61–R63). One corrective change on the delivered tool, then redelivery:
 
-1. One shared predicate `tasks_only(x, y)` in `familiar.py`, returning a proof or a blocker
-   naming the commit and path, built only from plumbing (`rev-list`, `rev-list
-   --min-parents=2`, `diff-tree -r --no-renames --raw -z`) with `GIT_NO_REPLACE_OBJECTS=1`,
-   refusing shallow repositories and `info/grafts`, matching the byte prefix `tasks/` and blob
-   modes 100644/100755 only. Base eligibility adds the clean-tree check (tracked and untracked
-   outside `tasks/` and ignored `node_modules`) and the tip/base `tasks/` disjointness rule.
-2. Readiness (`prepare`/`check`, both hosts): base rule on each host's own HEAD; Europa equal
-   to or an ancestor of Titan is ready, diverged or ahead blocks; report B and its proof.
-3. `run`: derive B on Titan after the second strict no-live and before `snapshot-refresh`,
-   saved in the window; `snapshot-refresh` requires Titan HEAD = B and waits for Europa HEAD =
-   B within the sync budget; the pre-merge gate rechecks Titan HEAD = B; the mark records B;
-   `familiar-merge` takes B in its payload, rechecks it on the host and proves M (parents
-   `[B, tip]`, tree equal to `merge-tree --write-tree B tip`, non-`tasks/` content equal to T0
-   = `merge-tree --write-tree PRE tip`).
-4. After the mark, the source proofs accept a tasks-only descendant of the expected commit:
-   Europa's install sync wait, `familiar-verify` (run, restart-surfaces, finish; finish records
-   the observed HEAD) and the dependency restore's sync wait.
-5. Restoration/recovery classes per the spec (`at-base`, `merge-in-progress`, `merged` with
-   revert on HEAD, `reverted` with the R/P tree proofs); a discovered merge needs parents
-   exactly `[recorded B, tip]`; a window without a recorded base is refused for inspection.
-   Every site the design review listed moves from PRE to the recorded B: `window._ended`,
-   `recovery.reconcile_window` promotion parents, `recovery._familiar_payload`,
-   `restore_dependencies`, `quiesce.snapshot_refresh`, `_familiar_native`, `readiness`, the
-   `OFF_PRE` wording, and `classify`/revert/merge-abort tree checks; host operations re-run
-   the base rule on the payload's B rather than trusting the controller.
-6. Pilot: each host's clone at its own eligible HEAD, recorded per clone.
-7. Handoffs, status and the runbook: no familiar commit on Europa during the window (hard
-   rule); Titan commits discouraged (guidance).
-8. Tests, RED first: every case in the design review's implementer notes (refused and
-   accepted paths, history rewrites, R47 refusal, ordering around refresh/mark/merge, Europa
-   lag and divergence, tasks commits after M and after R, lost-record cases, the missing-base
-   window, `_ended` and reconcile parents, tip/base overlap refused at prepare, the post-merge
-   proof, per-host pilot bases) plus the unchanged B = PRE fixtures as the baseline.
-9. Mandatory suite, scoped review, cherry-pick redelivery with the delivered tree's
-   `just test`, Europa helper-byte check, restaged input generation (helper digests), resume
-   Task 9 Step 7, and rerun the pilot.
+1. Pins: add T0 `f492e3437577c4b79db379e4cc1fb6771f35b3bb` beside PRE and tip (tool constants
+   and the manifest's pins). One fixed-options helper for every `merge-tree`/`merge` call,
+   with read-only `merge-tree` writing to a temporary object directory.
+2. One shared predicate `tasks_only(x, y)` in `familiar.py` (plumbing only, as the spec
+   defines), plus base eligibility (clean tree incl. untracked outside `tasks/`, `merge-tree B
+   tip` exit 0 and equal to T0 outside `tasks/`).
+3. Readiness on both hosts: recompute and compare T0, base rule per host, Europa equal to or an
+   ancestor of Titan; report B and its proof.
+4. `run`: derive B on Titan after the second strict no-live; new read-only `familiar-sync`
+   host operation (deadline `SYNC_SECONDS + CHILD_SECONDS + 60`) waits for Europa HEAD = B
+   before either `snapshot-refresh`; `snapshot-refresh` checks HEAD = B without waiting; the
+   pre-merge gate rechecks; the mark records B; `familiar-merge` takes B, rechecks, merges with
+   the fixed options and proves M (parents, tree, T0).
+5. After the mark: tasks-only-descendant source proofs (install sync, `familiar-verify` in run,
+   restart-surfaces and finish, dependency-restore sync), Europa not ahead of or diverged from
+   Titan's observed HEAD; finish records the observed HEAD.
+6. Restoration/recovery: first-parent walk to find M and R; classes per the spec; the plumbing
+   restore (`commit-tree -p P`, durable R record, `read-tree -m -u P R`, `update-ref HEAD R
+   P`) with its rerun rules; `at-base` records B; `_ended` only for `merged`/`reverted`; T0
+   proof before reconciliation promotes; a window without a recorded base is refused. Every
+   site the round-7 review listed moves from PRE to the recorded B; host operations re-run the
+   base rule on the payload's B.
+7. Pilot: each host's clone at its own eligible HEAD, recorded per clone.
+8. Handoffs, status and runbook: Europa familiar commits forbidden; Titan commits before the
+   merge abort, after it are tolerated.
+9. Tests, RED first: the round-7 implementer notes plus round 8's: a post-M tasks commit
+   touching a path the tip changed (restore succeeds, no conflict); `pull.twohead=resolve` and
+   `branch.<b>.mergeOptions` set in the fixture config do not change the merge; a conflicted
+   `merge-tree` refuses at prepare; `familiar-sync` timeout is a clean pre-merge abort; the
+   plumbing restore's crash points (after `commit-tree`, after `read-tree`, after
+   `update-ref`); a Europa-local commit after the mark detected; `at-base` recovery does not
+   end the cutover; the unchanged B = PRE fixtures as the baseline.
+10. Mandatory suite, scoped review, cherry-pick redelivery with the delivered tree's
+    `just test`, Europa helper-byte check, restaged input generation (helper digests and the
+    T0 pin), resume Task 9 Step 7, and rerun the pilot.
