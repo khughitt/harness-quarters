@@ -34,6 +34,10 @@ relay and helper that applied its targets, and byte, Git and dependency proofs:
   once this window's timers are restored here (run) or only read (check), waited for within a
   bound and required to end with `Result=success` and `ExecMainStatus=0`.
 
+A pilot restores through the same target, familiar and dependency operations on its owned
+scratch root (`pilot.resolve`): its target copies, each host's own clone and its snapshot under
+the root's `state/`. Its timers, no-live and services stay live only.
+
 Children run through `hosts._run_child`; their output stays in the private log."""
 import hashlib
 import os
@@ -58,12 +62,6 @@ SETTLED = ("inactive", "failed")
 SERVICE_PROPERTIES = ("ActiveState", "Result", "ExecMainStatus")
 
 
-def _live_only(context):
-    if context["mode"] != "live":
-        raise Stop(f"{context['mode']} mode cannot restore this host's timers, targets, familiar "
-                   "or services; these operations are live only")
-
-
 def _sha256(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -73,13 +71,11 @@ def _sha256(data):
 
 def recovery_no_live(context):
     """Every Claude or Codex process of this user, known executable or not."""
-    _live_only(context)
     return {"live": quiesce._harness_processes(context)}
 
 
 def timer_requiesce(context):
     """Stop this host's timers again from this window's original record."""
-    _live_only(context)
     path, data = quiesce._recorded(context, context["payload"]["record_sha256"])
     if data is None:
         raise Stop("this window recorded no timers on this host; inspect the window before "
@@ -146,12 +142,11 @@ def _verdict(current, images):
 
 
 def _resolved(context, target_id):
-    return os.path.realpath(Path(context["home"]) / inputs.TARGETS[target_id])
+    return targets.target_path(context, target_id)
 
 
 def target_check(context):
     """Read-only: each target's bytes against the images this window recorded for it."""
-    _live_only(context)
     directory, ledger = _window(context)
     report = {}
     for target_id, frozen in context["payload"]["frozen"].items():
@@ -186,7 +181,6 @@ def _pinned(context, expected):
 
 def target_restore(context):
     """Return one registered target to its original through the existing byte gate."""
-    _live_only(context)
     payload = context["payload"]
     target_id = payload["target_id"]
     directory, ledger = _window(context)
@@ -308,7 +302,6 @@ def classify(context):
 
 
 def familiar_reconcile(context):
-    _live_only(context)
     return classify(context)
 
 
@@ -319,7 +312,6 @@ def _clean(context, commit, label):
 
 def familiar_restore(context):
     """Take the one action familiar's reconciled Git state needs, after classifying it again."""
-    _live_only(context)
     payload = context["payload"]
     pre, _ = _pins(payload)
     targets.closed(context)
@@ -360,7 +352,7 @@ def familiar_restore(context):
 
 def _snapshot(context):
     """This window's verified pre-merge dependency snapshot, unchanged since its refresh."""
-    root, window_id = Path(context["root"]), context["payload"]["window_id"]
+    root, window_id = Path(context["state"]), context["payload"]["window_id"]
     record = root / quiesce.QUIESCE / window_id / quiesce.MOVES
     moves = state.load_record(record) if os.path.lexists(record) else {}
     found = [move for move in moves.get("moves") or [] if move.get("name") == SNAPSHOT]
@@ -401,7 +393,6 @@ def _modules(path):
 
 def dependency_restore(context):
     """familiar's dependencies from this window's pre-merge snapshot, offline."""
-    _live_only(context)
     payload = context["payload"]
     pre, revert = payload["pre"], payload["revert"]
     if pre != inputs.PINS["familiar_pre"]:
@@ -421,8 +412,8 @@ def dependency_restore(context):
     if quiesce._tree(modules) != wanted:
         raise Stop("familiar's node_modules does not equal the pre-merge snapshot after its "
                    "restore; inspect it")
-    if targets._helper(context, "familiar-check", "familiar-check", "--expect",
-                       "native").returncode != 0:
+    if targets._helper(context, "familiar-check", "familiar-check", "--expect", "native",
+                       *familiar.root_args(context)).returncode != 0:
         raise Stop("relay-cutover familiar-check --expect native failed; see the private log")
     return {"revert": revert, "waited_seconds": waited, "replaced": replaced, "tree": wanted}
 
@@ -471,7 +462,6 @@ def _settled(context, service):
 
 def service_run(context):
     """Run the recorded timer's service once its timers are restored, and require success."""
-    _live_only(context)
     path, service = _service(context)
     if not os.path.lexists(path.parent / quiesce.RESTORED):
         raise Stop(f"this window keeps {quiesce.TIMER} paused on this host; restore its timers "
@@ -487,7 +477,6 @@ def service_run(context):
 
 def service_check(context):
     """Read-only: the recorded timer's service, waited for, must have ended in success."""
-    _live_only(context)
     _, service = _service(context)
     return {"started": False, **_settled(context, service)}
 
@@ -523,22 +512,26 @@ OPERATIONS = {
     "target-check": hosts.Operation(run=target_check, deadline=60, mutation=False,
                                     payload={**_WINDOW, "frozen": _frozen},
                                     required=frozenset({"window_id", "frozen"}),
-                                    hosts=("titan",)),
+                                    hosts=("titan",), modes=hosts.BOTH, scratch=True),
     "target-restore": hosts.Operation(
         run=target_restore, deadline=2 * CHILD_SECONDS + 60, mutation=True,
         payload={**_WINDOW, "target_id": targets._target_id, "identities": _relay},
-        required=frozenset({"window_id", "target_id", "identities"}), hosts=("titan",)),
+        required=frozenset({"window_id", "target_id", "identities"}), hosts=("titan",),
+        modes=hosts.BOTH, scratch=True),
     "familiar-reconcile": hosts.Operation(run=familiar_reconcile, deadline=8 * CHILD_SECONDS,
                                           mutation=False, payload=_FAMILIAR,
-                                          required=_FAMILIAR_REQUIRED, hosts=("titan",)),
+                                          required=_FAMILIAR_REQUIRED, hosts=("titan",),
+                                          modes=hosts.BOTH, scratch=True,
+                                          pilot_hosts=tuple(hosts.HOSTS)),
     "familiar-restore": hosts.Operation(
         run=familiar_restore, deadline=14 * CHILD_SECONDS, mutation=True,
         payload={**_FAMILIAR, "expect": _expected},
-        required=_FAMILIAR_REQUIRED | {"expect"}, hosts=("titan",)),
+        required=_FAMILIAR_REQUIRED | {"expect"}, hosts=("titan",), modes=hosts.BOTH,
+        scratch=True, pilot_hosts=tuple(hosts.HOSTS)),
     "dependency-restore": hosts.Operation(
         run=dependency_restore, deadline=hosts.SYNC_SECONDS + hosts.INSTALL_SECONDS
         + 4 * CHILD_SECONDS, mutation=True, payload=_DEPENDENCIES,
-        required=frozenset(_DEPENDENCIES)),
+        required=frozenset(_DEPENDENCIES), modes=hosts.BOTH, scratch=True),
     "service-run": hosts.Operation(run=service_run, deadline=_SERVICE_DEADLINE, mutation=True,
                                    payload=_RECORD, required=frozenset(_RECORD)),
     "service-check": hosts.Operation(run=service_check, deadline=_SERVICE_DEADLINE,

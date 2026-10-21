@@ -20,7 +20,11 @@ dry runs and the familiar mark:
 - `familiar-verify` (both hosts): the same source and dependency proof, read-only, for the
   run's final verification.
 
-Git keeps the host's own configuration, so familiar-theme keeps its SSH pin and credentials."""
+Git keeps the host's own configuration, so familiar-theme keeps its SSH pin and credentials.
+
+In a pilot all three run on the clone in its owned scratch root (`pilot.resolve`), each host
+merging its own clone (no synchronization joins scratch roots), and the existing familiar checks
+read that clone through their explicit `--root`; live, they read the fixed main checkout."""
 import json
 import re
 import time
@@ -36,10 +40,10 @@ RELAY = "node_modules/relay"
 COMMIT = re.compile(r"[0-9a-f]{40}")
 
 
-def _live_only(context):
-    if context["mode"] != "live":
-        raise Stop(f"{context['mode']} mode cannot merge or install this host's familiar "
-                   "checkout; these operations are live only")
+def root_args(context):
+    """The explicit checkout relay-cutover's familiar checks read: a pilot's scratch clone;
+    live, none, so they read the fixed main checkout."""
+    return ["--root", context["familiar"]] if context.get("scratch") is not None else []
 
 
 def _text(result):
@@ -48,7 +52,8 @@ def _text(result):
 
 def _source(context, head, label):
     """Whether familiar's checkout is at head with a clean tree (relay-cutover's own check)."""
-    return targets._helper(context, label, "familiar-source", "--head", head).returncode == 0
+    return targets._helper(context, label, "familiar-source", "--head", head,
+                           *root_args(context)).returncode == 0
 
 
 def _git(context, label, *args):
@@ -60,8 +65,8 @@ def _git(context, label, *args):
 def dependencies(context):
     """familiar's relay dependency: relay-cutover's relay check, then the pinned version and the
     lock's resolved commit."""
-    if targets._helper(context, "familiar-check", "familiar-check", "--expect",
-                       "relay").returncode != 0:
+    if targets._helper(context, "familiar-check", "familiar-check", "--expect", "relay",
+                       *root_args(context)).returncode != 0:
         raise Stop("relay-cutover familiar-check --expect relay failed; see the private log")
     root = Path(context["familiar"])
     try:
@@ -79,7 +84,6 @@ def dependencies(context):
 
 def familiar_merge(context):
     """Merge the approved feature tip once, on Titan, from PRE with every harness closed."""
-    _live_only(context)
     pre, tip = context["payload"]["pre"], context["payload"]["tip"]
     if (pre, tip) != (inputs.PINS["familiar_pre"], inputs.PINS["familiar_feature_tip"]):
         raise Stop("the merge must name the approved familiar PRE and feature tip; nothing was "
@@ -139,7 +143,6 @@ def _synchronized(context, merge):
 
 def familiar_install(context):
     """This host's familiar dependencies, installed only once the merge has reached it."""
-    _live_only(context)
     payload = context["payload"]
     targets.closed(context)
     path = _install_path(payload["path"])
@@ -162,7 +165,6 @@ def familiar_install(context):
 
 def familiar_verify(context):
     """Read-only: familiar's checkout is the merge with a clean tree and the pinned relay."""
-    _live_only(context)
     merge = context["payload"]["merge"]
     if not _source(context, merge, "familiar-source-verify"):
         raise Stop("familiar's source is not the merge with a clean tree on this host")
@@ -182,11 +184,14 @@ OPERATIONS = {
     "familiar-merge": hosts.Operation(
         run=familiar_merge, deadline=7 * CHILD_SECONDS + 60, mutation=True,
         payload={**_WINDOW, "pre": quiesce._commit, "tip": quiesce._commit},
-        required=frozenset({"window_id", "pre", "tip"}), hosts=("titan",)),
+        required=frozenset({"window_id", "pre", "tip"}), hosts=("titan",), modes=hosts.BOTH,
+        scratch=True, pilot_hosts=tuple(hosts.HOSTS)),
     "familiar-install": hosts.Operation(
         run=familiar_install, deadline=hosts.SYNC_SECONDS + hosts.INSTALL_SECONDS
-        + 3 * CHILD_SECONDS + 60, mutation=True, payload=_INSTALL, required=frozenset(_INSTALL)),
+        + 3 * CHILD_SECONDS + 60, mutation=True, payload=_INSTALL, required=frozenset(_INSTALL),
+        modes=hosts.BOTH, scratch=True),
     "familiar-verify": hosts.Operation(run=familiar_verify, deadline=3 * CHILD_SECONDS + 60,
                                        mutation=False, payload=_MERGE,
-                                       required=frozenset(_MERGE)),
+                                       required=frozenset(_MERGE), modes=hosts.BOTH,
+                                       scratch=True),
 }

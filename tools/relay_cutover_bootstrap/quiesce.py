@@ -18,7 +18,9 @@ The Codex daemons stop only through `codex app-server daemon stop` for each Tita
 recovery, with the release installed at the recorded path even if it changed), and a surviving
 Claude or Codex process is reported for inspection, never killed. Strict no-live
 reads this user's whole process table and the existing relay preflight with no exemption.
-Children run through `hosts._run_child`; their raw output stays in the private log."""
+Every operation here but `pending-operations` is live only: a pilot queries real timers through
+the inventory and never changes them. Children run through `hosts._run_child`; their raw output
+stays in the private log."""
 import hashlib
 import json
 import os
@@ -59,12 +61,6 @@ def _commit(value):
                                                                for c in value)
 
 
-def _live_only(context):
-    if context["mode"] != "live":
-        raise Stop(f"{context['mode']} mode cannot change this host's timers, daemons or "
-                   "snapshots; these operations are live only")
-
-
 def _directory(context):
     return Path(context["root"]) / QUIESCE / context["payload"]["window_id"]
 
@@ -96,7 +92,6 @@ def codex_daemon_stop(context):
     Forward, the executable must be the one recorded at preparation. With `recovery`, drift
     blocks forward progress but never restoration: the stop runs whatever standalone Codex
     release is installed at the recorded path and reports its identity."""
-    _live_only(context)
     home = Path(context["home"])
     codex = inventory._resolve(home / ".local/bin/codex",
                                home / ".codex/packages/standalone/releases",
@@ -240,7 +235,6 @@ def _recorded(context, expected=None):
 
 
 def timer_record(context):
-    _live_only(context)
     window_id = context["payload"]["window_id"]
     others = [name for name in _unrestored(context["root"]) if name != window_id]
     if others:
@@ -258,7 +252,6 @@ def timer_record(context):
 
 
 def timer_stop(context):
-    _live_only(context)
     path, data = _recorded(context, context["payload"]["record_sha256"])
     if data is None:
         raise Stop("no timer record for this window here; record before stopping")
@@ -267,7 +260,6 @@ def timer_stop(context):
 
 
 def timer_wait(context):
-    _live_only(context)
     path, data = _recorded(context, context["payload"]["record_sha256"])
     if data is None:
         raise Stop("no timer record for this window here; record before waiting")
@@ -283,7 +275,6 @@ def timer_restore(context):
     did, nothing here is paused: the record, whole or torn by an interrupted helper, is kept
     as abort evidence and marked restored rather than replayed. A stopped host's record must
     parse, or the restore stops for inspection."""
-    _live_only(context)
     path, data = _recorded(context, context["payload"].get("record_sha256"))
     if data is None:
         return {"recorded": False}
@@ -394,7 +385,6 @@ def _move(source, destination):
 
 def snapshot_refresh(context):
     """Keep the preparation snapshots and refresh them from the now quiescent live trees."""
-    _live_only(context)
     root, home, directory = Path(context["root"]), Path(context["home"]), _directory(context)
     if not os.path.lexists(directory / RECORD):
         raise Stop("timers are not recorded for this window here; quiesce them first")
@@ -449,7 +439,6 @@ def _retain(path, directory, name):
 
 def snapshot_abort(context):
     """Return every moved preparation snapshot; keep refreshed and partial copies aside."""
-    _live_only(context)
     root, directory = Path(context["root"]), _directory(context)
     if not os.path.lexists(directory / MOVES):
         return {"moves": {name: "untouched" for name, _ in SNAPSHOTS}}
@@ -492,7 +481,8 @@ OPERATIONS = {
     "no-live": hosts.Operation(run=no_live, deadline=NO_LIVE_SECONDS, mutation=False,
                                payload=_WINDOW),
     "pending-operations": hosts.Operation(run=pending_operations, deadline=60, mutation=False,
-                                          payload=_WINDOW, required=_REQUIRED),
+                                          payload=_WINDOW, required=_REQUIRED,
+                                          modes=hosts.BOTH),
     "timer-record": hosts.Operation(run=timer_record, deadline=CHILD_SECONDS + 60,
                                     mutation=True, payload=_WINDOW, required=_REQUIRED),
     "timer-stop": hosts.Operation(run=timer_stop, deadline=CHILD_SECONDS + 60, mutation=True,

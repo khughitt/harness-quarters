@@ -35,6 +35,10 @@ existing hooks and statusLine check and the exact evidence and installer identit
 this window's sealed dry output only in the clean filter's pick keys passes too; a Codex target
 still needs its exact bytes, and nothing here rewrites a target or a rollback original.
 
+All three also run in a pilot, on the copies in its owned scratch root (`pilot.resolve`): there
+every target path must resolve inside that root, symlinks included, the dry records live in its
+`state/`, and no harness reads the copies, so the closed-harness check has nothing to guard.
+
 Parsed JSON compares canonically, by `json.dumps(value, sort_keys=True, ensure_ascii=False)`,
 so `true`, `1` and `1.0` differ, unlike Python's `==`. Messages name keys and paths, never
 values; children run through `hosts._run_child` and their output stays in the private log."""
@@ -95,10 +99,14 @@ def _parse(data, label):
     return value
 
 
-def _live_only(context):
-    if context["mode"] != "live":
-        raise Stop(f"{context['mode']} mode cannot dry-run, apply or verify this host's settings "
-                   "targets; these operations are live only")
+def target_path(context, target_id):
+    """A target's resolved path: under HOME, or in a pilot under its scratch root's copies,
+    where the resolution must stay inside that root."""
+    resolved = os.path.realpath(Path(context["targets"]) / inputs.TARGETS[target_id])
+    scratch = context.get("scratch")
+    if scratch is not None and not Path(resolved).is_relative_to(scratch["real"]):
+        raise Stop(f"{target_id} resolves outside its scratch root; nothing was written")
+    return resolved
 
 
 def _relevant(context, target_id):
@@ -107,7 +115,10 @@ def _relevant(context, target_id):
 
 
 def closed(context):
-    """Refuse while any Claude or Codex process of this user runs here; none is exempt."""
+    """Refuse while any Claude or Codex process of this user runs here; none is exempt. A
+    pilot's scratch copies and clone are read by no harness, so there is nothing to refuse."""
+    if context.get("scratch") is not None:
+        return
     live = quiesce._harness_processes(context)
     if live:
         raise Stop("Claude or Codex is running on this host (pids "
@@ -211,7 +222,7 @@ def identities(context, manifest, harness):
 
 
 def _live(context, target_id):
-    resolved = os.path.realpath(Path(context["home"]) / inputs.TARGETS[target_id])
+    resolved = target_path(context, target_id)
     return resolved, inputs._read_target(resolved, target_id)
 
 
@@ -306,7 +317,7 @@ def _verify(context, target_id, target, expected):
 
 
 def _dry_directory(context, target_id):
-    base = Path(context["root"]) / DRY / context["payload"]["window_id"]
+    base = Path(context["state"]) / DRY / context["payload"]["window_id"]
     state._make_dirs(base)
     state._check_dir(base)
     directory = base / target_id
@@ -322,7 +333,6 @@ def _dry_directory(context, target_id):
 
 def target_dry(context):
     """Freeze one target, dry-run the pinned installer on a private copy, return its verdict."""
-    _live_only(context)
     target_id = context["payload"]["target_id"]
     _relevant(context, target_id)
     harness = HARNESS[target_id]
@@ -380,11 +390,10 @@ def _registered(context, target_id, resolved, artifact):
 
 def target_apply(context):
     """Write one shared target once on Titan, after its registration, to the sealed bytes."""
-    _live_only(context)
     payload = context["payload"]
     target_id = payload["target_id"]
     harness = HARNESS[target_id]
-    resolved = os.path.realpath(Path(context["home"]) / inputs.TARGETS[target_id])
+    resolved = target_path(context, target_id)
     live = Path(context["root"]) / "windows" / payload["window_id"] / "live"
     artifact = live / f"{target_id}.json"
     entry = _registered(context, target_id, resolved, artifact)
@@ -430,7 +439,7 @@ def _pick_only(context, target_id, path, expected):
     only in the clean filter's pick keys."""
     if HARNESS[target_id] != "claude-code":
         return False
-    sealed = (Path(context["root"]) / DRY / context["payload"]["window_id"] / target_id
+    sealed = (Path(context["state"]) / DRY / context["payload"]["window_id"] / target_id
               / COPY["claude-code"])
     data = _read(sealed)
     if data is None or _sha256(data) != expected:
@@ -448,13 +457,11 @@ def target_verify(context):
     """Each named target's digest against its expectation, waiting a bounded time for
     synchronization; with `verify`, also hooks, statusLine and the exact evidence; with
     `picks`, a Claude target's pick-only difference from its sealed output passes."""
-    _live_only(context)
     payload = context["payload"]
     wanted = payload["targets"]
     for target_id in wanted:
         _relevant(context, target_id)
-    home = Path(context["home"])
-    paths = {target_id: os.path.realpath(home / inputs.TARGETS[target_id]) for target_id in wanted}
+    paths = {target_id: target_path(context, target_id) for target_id in wanted}
     started = time.monotonic()
     while True:
         current = {}
@@ -537,11 +544,13 @@ _VERIFY_REQUIRED = frozenset(_VERIFY)
 
 OPERATIONS = {
     "target-dry": hosts.Operation(run=target_dry, deadline=5 * CHILD_SECONDS + 60,
-                                  mutation=True, payload=_DRY, required=frozenset(_DRY)),
+                                  mutation=True, payload=_DRY, required=frozenset(_DRY),
+                                  modes=hosts.BOTH, scratch=True),
     "target-apply": hosts.Operation(run=target_apply, deadline=5 * CHILD_SECONDS + 60,
                                     mutation=True, payload=_APPLY, required=frozenset(_APPLY),
-                                    hosts=("titan",)),
+                                    hosts=("titan",), modes=hosts.BOTH, scratch=True),
     "target-verify": hosts.Operation(
         run=target_verify, deadline=hosts.SYNC_SECONDS + len(inputs.TARGETS) * CHILD_SECONDS + 60,
-        mutation=False, payload={**_VERIFY, "picks": _flag}, required=_VERIFY_REQUIRED),
+        mutation=False, payload={**_VERIFY, "picks": _flag}, required=_VERIFY_REQUIRED,
+        modes=hosts.BOTH, scratch=True),
 }

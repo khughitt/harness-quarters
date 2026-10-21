@@ -41,9 +41,10 @@ restart-surfaces (or run) reconciles it again; otherwise it names recover. `reco
 always the full rollback.
 
 Keys this module adds to the window record: `recovery` {started_at, attempted_at, cancelled,
-codex, timers, check, targets, originals, familiar, dependencies, actions, restored, surfaces,
-original_timers, services, completed, failure, failures}, where `actions` lists each destructive
-action once, as it is taken, and `codex` is the executable the daemon stop ran. Recovery also
+codex, timers, check, targets, originals, familiar, clones, dependencies, actions, restored,
+surfaces, original_timers, services, completed, failure, failures}, where `actions` lists each
+destructive action once, as it is taken, `codex` is the executable the daemon stop ran and
+`clones` holds a pilot's other scratch clones (`restore_native`, which the pilot shares). Recovery also
 sets `state` and `owner`; reconciliation sets `failure`, or `familiar` and `verified` when it
 promotes, keeping a superseded reconciliation failure in `reconciled`."""
 import signal
@@ -138,13 +139,16 @@ def _closed(host, mode, identity):
                                "running" for entry in found["live"]])
 
 
-def _familiar_payload(window, recovered):
-    """PRE, the tip and whatever merge and revert this window has recorded."""
+def _familiar_payload(window, recovered, clone=None):
+    """PRE, the tip and whatever merge and revert this window has recorded for one checkout:
+    Titan's, or with `clone` a pilot's other scratch clone, whose merge the window keeps under
+    `familiar.clones` (never Titan's)."""
     run = window.get("familiar") or {}
+    merged = run.get("merge") if clone is None else (run.get("clones") or {}).get(clone)
     payload = {"window_id": window["id"], "pre": inputs.PINS["familiar_pre"],
                "tip": inputs.PINS["familiar_feature_tip"]}
     for key in ("merge", "revert"):
-        value = recovered.get(key) or (run.get(key) if key == "merge" else None)
+        value = recovered.get(key) or (merged if key == "merge" else None)
         if value:
             payload[key] = value
     return payload
@@ -214,13 +218,50 @@ def _restore(window, prepared, seen, progress):
         step("no-live", host)
         _closed(host, mode, identity)
 
+    return restore_native(window, seen, progress)
+
+
+def restore_native(window: dict, seen: list, progress: dict, *, clones=("titan",),
+                   scopes: dict | None = None, pending=PENDING) -> dict:
+    """The core's offline restoration, stages 4-6, after the window's operations settled and
+    its hosts are closed: every target checked against this window's images, the registered
+    ones restored in reverse ledger order and all verified native; familiar's actual Git state
+    reconciled and restored in each checkout this window merged (`clones`: Titan's, whose revert
+    reaches Europa by synchronization; a pilot's two scratch clones); then each host's
+    dependencies from its verified pre-merge snapshot. `scopes` adds each host's request scope,
+    a pilot's scratch root. The window records `restored` with what stays `pending`."""
+    scopes = scopes or {host: {} for host in HOST_ORDER}
+    window = _restore_targets(window, seen, progress, scopes)
+    reverts = {}
+    for host in clones:
+        window, recovered = restore_clone(window, host, seen, progress, scope=scopes[host],
+                                          key=None if host == "titan" else host)
+        reverts[host] = recovered["revert"]
+    for host in HOST_ORDER:
+        window, _ = restore_dependencies(window, host, reverts.get(host, reverts["titan"]),
+                                         seen, progress, scope=scopes[host])
+    if seen:
+        raise _Interrupt(seen[-1])
+    return _recorded(window, restored={"at": _now(), "revert": reverts["titan"],
+                                       "pending": list(pending)})
+
+
+def _restore_targets(window, seen, progress, scopes):
+    """Stage 4: every target against this window's images; the registered ones restored in
+    reverse ledger order; all four native on Titan and, once synchronized, Europa's two."""
+    mode, identity = window["mode"], window["id"]
+
+    def step(name, host):
+        nonlocal window
+        window = _step(window, seen, progress, name, host)
+
     sealed = window["sealed"]["inputs"]
     titan = sealed["hosts"]["titan"]
     step("target-check", "titan")
     checked, log = _call("titan", mode, "target-check", {
         "window_id": identity,
-        "frozen": {target_id: entry["frozen"]["sha256"] for target_id, entry in titan.items()}},
-        "target-check")
+        "frozen": {target_id: entry["frozen"]["sha256"] for target_id, entry in titan.items()},
+        **scopes["titan"]}, "target-check")
     window = _recorded(window, check=checked["targets"])
     unknown = sorted(target_id for target_id, entry in checked["targets"].items()
                      if entry["verdict"] == "unknown")
@@ -235,8 +276,8 @@ def _restore(window, prepared, seen, progress):
         step("target-restore", "titan")
         result, _ = _call("titan", mode, "target-restore", {
             "window_id": identity, "target_id": target_id,
-            "identities": {name: titan[target_id]["identities"][name] for name in RELAY}},
-            "target-restore")
+            "identities": {name: titan[target_id]["identities"][name] for name in RELAY},
+            **scopes["titan"]}, "target-restore")
         window = _recorded(window, targets={**window["recovery"].get("targets", {}),
                                             target_id: result})
         if result["restored"]:
@@ -248,7 +289,8 @@ def _restore(window, prepared, seen, progress):
         expected = {target_id: native[target_id] for target_id in inputs.relevant(host)}
         found, log = _call(host, mode, "target-verify", {
             "window_id": identity, "targets": expected, "wait": host != "titan",
-            "verify": False, "manifest_sha256": sealed["manifest_sha256"]}, "target-originals")
+            "verify": False, "manifest_sha256": sealed["manifest_sha256"], **scopes[host]},
+            "target-originals")
         differing = sorted(target_id for target_id, entry in found["targets"].items()
                            if not entry["matches"])
         if differing:
@@ -256,44 +298,68 @@ def _restore(window, prepared, seen, progress):
                          "hold their native bytes" + (" after waiting for synchronization; "
                                                       "it may still be synchronizing"
                                                       if host != "titan" else ""), log=log)
-    window = _recorded(window, originals={"at": _now(), "targets": native})
+    return _recorded(window, originals={"at": _now(), "targets": native})
 
-    recovered = window["recovery"].get("familiar") or {}
-    step("familiar-reconcile", "titan")
-    found, log = _call("titan", mode, "familiar-reconcile", _familiar_payload(window, recovered),
+
+def restore_clone(window: dict, host: str, seen: list, progress: dict, *, scope: dict,
+                  key: str | None = None) -> tuple[dict, dict]:
+    """Stage 5 for one familiar checkout on host: its actual Git state reconciled (a merge
+    committed before its record is recorded from its parents before anything acts on it), then
+    its one action: abort the attempted merge, nothing, or one revert. `key` names the
+    checkout: none for Titan's, recorded under `familiar`; else a pilot's other scratch clone,
+    whose merge is `familiar.clones[key]` and whose record is `clones[key]`. Returns the window
+    and that record."""
+    mode = window["mode"]
+
+    def step(name, on):
+        nonlocal window
+        window = _step(window, seen, progress, name, on)
+
+    def keep(recovered):
+        if key is None:
+            return _recorded(window, familiar=recovered)
+        return _recorded(window, clones={**window["recovery"].get("clones", {}), key: recovered})
+
+    recovered = (window["recovery"].get("familiar") if key is None
+                 else window["recovery"].get("clones", {}).get(key)) or {}
+    step("familiar-reconcile", host)
+    found, log = _call(host, mode, "familiar-reconcile",
+                       {**_familiar_payload(window, recovered, key), **scope},
                        "familiar-reconcile")
     if found["class"] == "unexpected":
-        raise Failed("familiar-reconcile", "titan", "blocked", f"{found['reason']}; inspect "
+        raise Failed("familiar-reconcile", host, "blocked", f"{found['reason']}; inspect "
                      "familiar's checkout; nothing was reset or reverted", log=log)
     if found["merge"] and not recovered.get("merge"):
         # A merge or revert found only in Git is recorded before anything acts on it.
         recovered = {**recovered, "merge": found["merge"], "discovered": found["discovered"],
                      "class": found["class"]}
-        window = _recorded(window, familiar=recovered)
-    step("familiar-restore", "titan")
-    result, _ = _call("titan", mode, "familiar-restore",
-                      {**_familiar_payload(window, recovered), "expect": found["class"]},
-                      "familiar-restore")
+        window = keep(recovered)
+    step("familiar-restore", host)
+    result, _ = _call(host, mode, "familiar-restore",
+                      {**_familiar_payload(window, recovered, key), "expect": found["class"],
+                       **scope}, "familiar-restore")
     recovered = {**recovered, "class": result["class"], "action": result["action"],
                  "revert": result["revert"], "at": _now()}
-    window = _recorded(window, familiar=recovered)
+    window = keep(recovered)
     if result["action"] != "none":
-        window = _act(window, "titan", result["action"], revert=result["revert"])
+        window = _act(window, host, result["action"], revert=result["revert"])
+    return window, recovered
 
-    dependencies = {}
-    for host in HOST_ORDER:
-        step("dependency-restore", host)
-        dependencies[host], _ = _call(host, mode, "dependency-restore", {
-            "window_id": identity, "pre": inputs.PINS["familiar_pre"],
-            "revert": recovered["revert"]}, "dependency-restore")
-        window = _recorded(window, dependencies={**window["recovery"].get("dependencies", {}),
-                                                 host: dependencies[host]})
-        if dependencies[host]["replaced"]:
-            window = _act(window, host, "dependency-restore")
-    if seen:
-        raise _Interrupt(seen[-1])
-    return _recorded(window, restored={"at": _now(), "revert": recovered["revert"],
-                                       "pending": list(PENDING)})
+
+def restore_dependencies(window: dict, host: str, revert: str, seen: list, progress: dict, *,
+                         scope: dict, key: str | None = None) -> tuple[dict, dict]:
+    """Stage 6 on host: once its source is the recovered commit, its dependencies from this
+    window's verified pre-merge snapshot, offline. `key` names the record, the host's own by
+    default. Returns the window and the result."""
+    window = _step(window, seen, progress, "dependency-restore", host)
+    result, _ = _call(host, window["mode"], "dependency-restore", {
+        "window_id": window["id"], "pre": inputs.PINS["familiar_pre"], "revert": revert,
+        **scope}, "dependency-restore")
+    window = _recorded(window, dependencies={**window["recovery"].get("dependencies", {}),
+                                             key or host: result})
+    if result["replaced"]:
+        window = _act(window, host, "dependency-restore")
+    return window, result
 
 
 def _summary(window):

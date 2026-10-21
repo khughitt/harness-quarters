@@ -559,5 +559,6 @@ def inventory(context: dict) -> dict:
 
 OPERATIONS = {
     "inventory": hosts.Operation(run=inventory, deadline=INVENTORY_SECONDS, mutation=False,
-                                 payload={"absence_reason": hosts._text_field(500)}),
+                                 payload={"absence_reason": hosts._text_field(500)},
+                                 modes=hosts.BOTH),
 }

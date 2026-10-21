@@ -67,6 +67,7 @@ IMPACT = ("familiar's niri watcher and desktop panel stop and start again from t
           "source; the panel is briefly absent")
 DURATION_SECONDS = 30
 BOOTSTRAP = "tools/relay-cutover-bootstrap"
+REHEARSE = "rehearse"  # a next command that starts with it names the rehearse entry (cli.py)
 CHECKOUT = Path(__file__).resolve().parents[2]  # the controller's checkout
 SESSION = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 SESSION_PLACEHOLDER = "<native-session-id>"
@@ -593,24 +594,32 @@ def dry_targets(window: dict) -> dict:
     progress, failed = {"step": "target-dry", "host": "titan"}, None
     with _signals() as seen:
         try:
-            window = _save(window, state="applying")
-            results = {}
-            for host in HOST_ORDER:
-                for target_id in inputs.relevant(host):
-                    window = _step(window, seen, progress, "target-dry", host)
-                    result, _ = _call(host, window["mode"], "target-dry", {
-                        "window_id": window["id"], "target_id": target_id,
-                        "manifest_sha256": prepared["manifest"]["sha256"]}, "target-dry")
-                    results.setdefault(host, {})[target_id] = result
-                    window = _save(window, dry={name: dict(verdicts)
-                                                for name, verdicts in results.items()})
-            window = _save(window, sealed=targets.seal(prepared, results))
+            window = dry_runs(_save(window, state="applying"), prepared, seen, progress)
             if seen:
                 raise _Interrupt(seen[-1])
             return window
         except (Exception, _Interrupt) as error:
             failed = _as_failed(error, progress)
         raise _abort_after(failed, seen)
+
+
+def dry_runs(window: dict, prepared: dict, seen: list, progress: dict,
+             scopes: dict | None = None) -> dict:
+    """The six dry runs in order, Titan's four targets then Europa's two Claude copies, each
+    recorded in the window before its request, and the seal of their verdicts. `scopes` adds
+    each host's request scope: a pilot's scratch root, whose copies it dry-runs."""
+    results = {}
+    for host in HOST_ORDER:
+        for target_id in inputs.relevant(host):
+            window = _step(window, seen, progress, "target-dry", host)
+            result, _ = _call(host, window["mode"], "target-dry", {
+                "window_id": window["id"], "target_id": target_id,
+                "manifest_sha256": prepared["manifest"]["sha256"],
+                **(scopes or {}).get(host, {})}, "target-dry")
+            results.setdefault(host, {})[target_id] = result
+            window = _save(window, dry={name: dict(verdicts)
+                                        for name, verdicts in results.items()})
+    return _save(window, sealed=targets.seal(prepared, results))
 
 
 def _before_merge(window, seen, progress):
@@ -732,6 +741,12 @@ def _recovery_after(failed):
     return failed
 
 
+def pilot_open(current: dict) -> str:
+    """What an open pilot window means for the live commands: they refuse beside it."""
+    return (f"window {current['id']} is a pilot rehearsal, {current['state']}; live commands "
+            "refuse until the rehearse entry runs or reconciles it and removes its scratch roots")
+
+
 def status() -> dict:
     """Read-only: the prepared record, the active window and the one next command."""
     root = _root()
@@ -753,6 +768,11 @@ def status() -> dict:
         return report
     if current is not None:
         report["window"] = {key: current[key] for key in ("id", "state", "mode", "created_at")}
+    if current is not None and current["mode"] == "pilot" and current["state"] not in \
+            state.TERMINAL:
+        report.update(detail=pilot_open(current),
+                      next=[REHEARSE, "--controller-session", SESSION_PLACEHOLDER])
+        return report
     if current is None or current["state"] in state.TERMINAL:
         report["detail"] = report["detail"] or (
             "no window is active" if current is None

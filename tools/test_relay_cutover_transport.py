@@ -11,6 +11,7 @@ import hashlib
 import itertools
 import json
 import os
+import re
 import shutil
 import signal
 import stat
@@ -22,8 +23,8 @@ from pathlib import Path
 
 import pytest
 
-from relay_cutover_bootstrap import (familiar, hosts, inputs, inventory, operations, quiesce,
-                                     restoration, state, surfaces, targets)
+from relay_cutover_bootstrap import (familiar, hosts, inputs, inventory, operations, pilot,
+                                     quiesce, restoration, state, surfaces, targets)
 from relay_cutover_bootstrap.state import Stop
 
 TOOLS_DIR = Path(__file__).resolve().parent
@@ -313,20 +314,28 @@ elif NAME == "codex":
 elif NAME == "npm":
     observe(path_head=os.environ["PATH"].split(":")[0], env_node=shutil.which("node"),
             cwd=os.getcwd(), cache=os.environ.get("npm_config_cache"),
-            cache_dir=os.environ.get("CACHE_DIR"), hold=os.environ.get("DISABLE_UPDATES"))
+            cache_dir=os.environ.get("CACHE_DIR"), hold=os.environ.get("DISABLE_UPDATES"),
+            tmpdir=os.environ.get("TMPDIR"))
     if args == ["--version"]:
         print(behavior["npm_version"])
     elif args == ["config", "get", "cache"]:
         print(behavior["npm_cache"])
     elif args == ["ci", "--allow-git=root"]:
-        if behavior.get("npm_ci", "ok") != "ok" or not os.path.isfile("package-lock.json"):
+        # ok; slow (runs npm_seconds first); fail-after (installs, then fails); else fails.
+        mode = behavior.get("npm_ci", "ok")
+        if mode not in ("ok", "slow", "fail-after") or not os.path.isfile("package-lock.json"):
             print("npm error: fixture install failure @SECRET@", file=sys.stderr)
             sys.exit(1)
+        if mode == "slow":
+            time.sleep(behavior.get("npm_seconds", 3))
         shutil.rmtree("node_modules", ignore_errors=True)
         for name, text in config["npm_tree"].items():
             os.makedirs(os.path.dirname(os.path.join("node_modules", name)), exist_ok=True)
             with open(os.path.join("node_modules", name), "w") as stream:
                 stream.write(text)
+        if mode == "fail-after":
+            print("npm error: fixture failure after the install @SECRET@", file=sys.stderr)
+            sys.exit(1)
         print("added 2 packages @SECRET@")
     else:
         sys.exit(2)
@@ -2226,7 +2235,15 @@ def test_quiesce_operations_are_fixed(world):
         "codex-daemon-stop", "timer-record", "timer-stop", "timer-restore", "snapshot-refresh",
         "snapshot-abort", "target-dry", "target-apply", "familiar-merge", "familiar-install",
         "timer-requiesce", "target-restore", "familiar-restore", "dependency-restore",
-        "service-run", "surface-restart", "surface-probe"}
+        "service-run", "surface-restart", "surface-probe", "pilot-create", "pilot-install",
+        "pilot-cleanup"}
+    # Each runs in its declared modes only: the pilot's own operations only in a pilot, and only
+    # the operations that act on a scratch root (and read-only ones) in both.
+    assert {name for name, spec in table.items() if spec.modes == ("pilot",)} == {
+        "pilot-create", "pilot-observe", "pilot-install", "pilot-cleanup", "surface-probe"}
+    assert {name for name, spec in table.items() if "pilot" in spec.modes and "live" in spec.modes
+            and spec.mutation} == {name for name, spec in table.items() if spec.scratch
+                                   and spec.mutation and "live" in spec.modes}
     assert {"no-live", "timer-wait", "pending-operations", "inputs-check"} <= set(table)
     assert table["timer-wait"].deadline > hosts.TIMER_WAIT_SECONDS
     for host, operation, payload in (
@@ -2237,9 +2254,9 @@ def test_quiesce_operations_are_fixed(world):
         with pytest.raises(hosts.Refused):
             world.request(host, operation, payload)
     assert world.lines("ssh_log") == []
-    # Host effects are live-only here; a pilot names its own scratch roots.
-    response = world.request("titan", "timer-record", {"window_id": WINDOW}, mode="pilot")
-    assert response["status"] == "failed" and "live" in response["error"]
+    # Timer effects are live only: a pilot's request for one refuses before any process.
+    with pytest.raises(hosts.Refused, match="live only"):
+        world.request("titan", "timer-record", {"window_id": WINDOW}, mode="pilot")
     assert not (world.root("titan") / "quiesce").exists()
 
 
@@ -2480,13 +2497,13 @@ def test_dry_operations_are_fixed(world):
             world.request(host, operation, payload)
     assert world.lines("ssh_log") == []
     world.stage_cutover()
-    # Europa's harnesses never read the Codex targets; target work is live only for now.
+    # Europa's harnesses never read the Codex targets; a pilot names its own scratch root.
     europa = world.request("europa", "target-dry", {"window_id": WINDOW, "target_id": "codex",
                                                     "manifest_sha256": sha})
     assert europa["status"] == "failed" and "europa" in europa["error"]
-    pilot = world.request("titan", "target-dry", {"window_id": WINDOW, "target_id": "claude",
-                                                  "manifest_sha256": sha}, mode="pilot")
-    assert pilot["status"] == "failed" and "live" in pilot["error"]
+    with pytest.raises(hosts.Refused, match="scratch"):
+        world.request("titan", "target-dry", {"window_id": WINDOW, "target_id": "claude",
+                                              "manifest_sha256": sha}, mode="pilot")
     assert not (world.root("titan") / "dry").exists()
 
 
@@ -3077,8 +3094,8 @@ def test_recovery_operations_are_fixed(world):
         with pytest.raises(hosts.Refused):
             world.request(host, operation, payload)
     assert world.lines("ssh_log") == []
-    pilot = world.request("titan", "recovery-no-live", {"window_id": WINDOW}, mode="pilot")
-    assert pilot["status"] == "failed" and "live" in pilot["error"]
+    with pytest.raises(hosts.Refused, match="live only"):
+        world.request("titan", "recovery-no-live", {"window_id": WINDOW}, mode="pilot")
 
 
 # --- familiar's surfaces: restart, retry and the pilot's fixed spawn --------------------------
@@ -3153,12 +3170,13 @@ def test_surface_operations_are_fixed(world):
         with pytest.raises(hosts.Refused):
             world.request(host, operation, payload)
     assert world.lines("ssh_log") == []
-    # Surfaces restart only live; the fixed true spawn runs only in a pilot.
-    pilot = _restart_surface(world, "titan", "niri-desktop", recorded, mode="pilot")
-    assert pilot["status"] == "failed" and "live only" in pilot["error"]
-    live = world.request("titan", "surface-probe", {"window_id": WINDOW,
-                                                    "socket": recorded["socket"]})
-    assert live["status"] == "failed" and "pilot only" in live["error"]
+    # Surfaces restart only live; the fixed true spawn runs only in a pilot. Both refuse
+    # before any process starts.
+    with pytest.raises(hosts.Refused, match="live only"):
+        _restart_surface(world, "titan", "niri-desktop", recorded, mode="pilot")
+    with pytest.raises(hosts.Refused, match="pilot only"):
+        world.request("titan", "surface-probe", {"window_id": WINDOW,
+                                                 "socket": recorded["socket"]})
     assert _niri_spawns(world) == [] and _term_signals(world) == []
 
 
@@ -3467,7 +3485,7 @@ def test_smoke_observe_is_read_only(world):
     liveness, the session IDs in familiar's intent, this user's Claude and Codex processes
     with only their hold key, the installed executables' identity and, for a scratch repo,
     its markers, commit count and Git identity. It writes nothing outside its operation
-    record, launches no Claude or Codex, and runs in either mode."""
+    record, launches no Claude or Codex, and runs live only."""
     table = operations.OPERATIONS
     spec = table["smoke-observe"]
     assert not spec.mutation and set(spec.hosts) == {"titan", "europa"}
@@ -3520,12 +3538,10 @@ def test_smoke_observe_is_read_only(world):
     text = json.dumps(response)
     assert ENV_SECRET not in text and OUTPUT_SECRET not in text
 
-    # Read-only, so a pilot observes too; without a scratch repo it reads only the host.
-    world.intent("europa", None)
-    pilot = world.request("europa", "smoke-observe", {"window_id": WINDOW}, mode="pilot")
-    assert pilot["status"] == "completed", pilot["error"]
-    assert pilot["result"]["mode"] == "pilot" and pilot["result"]["scratch"] is None
-    assert pilot["result"]["intent"] == {"present": False, "sessions": []}
+    # A pilot never reads the live relay registry or familiar's intent: it routes none into
+    # scratch, so smoke-observe is live only.
+    with pytest.raises(hosts.Refused, match="live only"):
+        world.request("europa", "smoke-observe", {"window_id": WINDOW}, mode="pilot")
     # A scratch path that is no directory, and a registry relay cannot print, stop the read.
     missing = world.request("europa", "smoke-observe",
                             {"window_id": WINDOW, "cwd": scratch + "-absent"})
@@ -3591,3 +3607,308 @@ def test_finish_verify_accepts_only_pick_drift(world):
     Path(results["claude"]["copy"]).write_bytes(b"{}\n")
     changed = verify(picks=True)
     assert changed["status"] == "failed" and "sealed" in changed["error"]
+
+
+# --- the pilot: owned scratch roots, mode-specific schemas and the disconnect case ----------
+
+PILOT_WINDOW = "20261020T120000Z-0bad9110"
+HOSTS = ("titan", "europa")
+CACHE = ".npm"  # the fixture's prepared npm cache prefix: a declared write outside scratch
+
+
+def pilot_roots(world, host):
+    return world.root(host) / "pilot"
+
+
+def _under(path, roots):
+    return path is not None and any(Path(path) == root or root in Path(path).parents
+                                    for root in roots)
+
+
+def outside(world, host):
+    """Every path under host's home except its owned pilot roots, the cutover root's own window
+    and operation records and the declared npm cache: the application files, settings, state
+    and checkouts a pilot must leave unchanged."""
+    home, root = world.home(host), world.root(host)
+    skipped = (root / "pilot", root / "windows", root / "active.json", home / CACHE)
+    return {name: value for name, value in world.snapshot(host).items()
+            if not _under(home / name, skipped)}
+
+
+def _flag(args, name):
+    return args[args.index(name) + 1] if name in args else None
+
+
+def live_mutations(world, since=0):
+    """Observed tool calls that act on live state rather than an owned pilot root: timer or
+    service changes, signals, a spawn other than `true`, a harness launched beyond the held
+    version and doctor probes, a relay registry read, and installs, Git history, target
+    writes or familiar checks outside a scratch root."""
+    scratch = [pilot_roots(world, host) for host in world.config["hosts"]]
+    reads = (["--user", "is-system-running"], ["--user", "show"])
+    found = []
+    for call in world.lines("observed")[since:]:
+        tool, args = call["tool"], call["args"]
+        if tool in ("quiesce-timers", "signal"):
+            found.append(call)
+        elif tool == "systemctl" and args[:2] not in reads:
+            found.append(call)
+        elif tool == "niri" and args[:3] == ["msg", "action", "spawn-sh"] and args[4:] != ["true"]:
+            found.append(call)
+        elif tool == "codex" and args != ["--version"]:
+            found.append(call)
+        elif tool == "claude" and (args not in (["--version"], ["doctor"]) or call["config_dir"]
+                                   not in (None, str(world.home(call["host"]) / ".claude-work"))):
+            found.append(call)
+        elif tool == "installer" and (args[:1] == ["list"] or (
+                args[:1] == ["install"] and not _under(_flag(args, "--target"), scratch))):
+            found.append(call)
+        elif tool == "npm" and args[:1] == ["ci"] and not _under(call["cwd"], scratch):
+            found.append(call)
+        elif tool == "git" and ("merge" in call or "git" in call) and not _under(
+                _flag(args, "-C"), scratch):
+            found.append(call)
+        elif tool == "relay-cutover" and args[0] in ("retire-native-guard", "restore", "verify") \
+                and not _under(_flag(args, "--target"), scratch):
+            found.append(call)
+        elif tool == "relay-cutover" and args[0].startswith("familiar-") and not _under(
+                _flag(args, "--root"), scratch):
+            found.append(call)
+    return found
+
+
+def _sent(world):
+    """Every request the fake ssh carried, in order."""
+    path = Path(world.config["ssh_stdin"])
+    return [json.loads(line) for line in path.read_bytes().splitlines()
+            if line.strip()] if path.exists() else []
+
+
+def _pilot(world, host, operation, payload, timeout=120):
+    return world.request(host, operation, payload, mode="pilot", timeout=timeout)
+
+
+def _create(world, host, purpose="main", window_id=PILOT_WINDOW):
+    response = _pilot(world, host, "pilot-create", {
+        "window_id": window_id, "purpose": purpose, "pre": world.pins["familiar_pre"]})
+    assert response["status"] == "completed", response["error"]
+    return response["result"]
+
+
+def _install_payload(world, host, merge, root_id, latch=None, window_id=PILOT_WINDOW):
+    payload = {"window_id": window_id, "scratch": root_id, "merge": merge,
+               "caches": {"npm": str(world.home(host) / CACHE)}, "path": "/usr/bin:/bin"}
+    return payload if latch is None else {**payload, "latch": latch}
+
+
+def _merged_clone(world, root_id, host="europa"):
+    merged = _pilot(world, host, "familiar-merge", {
+        "window_id": PILOT_WINDOW, "scratch": root_id, "pre": world.pins["familiar_pre"],
+        "tip": world.pins["familiar_feature_tip"]})
+    assert merged["status"] == "completed", merged["error"]
+    return merged["result"]["merge"]
+
+
+def test_pilot_paths_are_contained(world):
+    """pilot-create owns opaque scratch roots on each host. A pilot request names its root by
+    ID; each pilot operation resolves every application path inside it, symlinks included, so a
+    live target or checkout disguised as scratch is refused; cleanup removes the roots. Nothing
+    outside them changes beyond the declared cache."""
+    world.stage_cutover()
+    before = {host: outside(world, host) for host in HOSTS}
+    mark = len(world.lines("observed"))
+    created = {host: _create(world, host) for host in HOSTS}
+    ids = {host: created[host]["root"] for host in HOSTS}
+    assert ids["titan"] != ids["europa"]
+    scratch = {host: pilot_roots(world, host) / ids[host] for host in HOSTS}
+    for host, result in created.items():
+        assert re.fullmatch(r"[0-9a-f]{16}", result["root"])
+        assert str(world.home(host)) not in json.dumps(result)  # opaque: no path travels
+        assert _private(pilot_roots(world, host)) == _private(scratch[host]) == 0o700
+        owner = json.loads((scratch[host] / "scratch.json").read_text())
+        assert (owner["window_id"], owner["purpose"], owner["host"]) == (PILOT_WINDOW, "main",
+                                                                         host)
+        assert set(result["targets"]) == set(inputs.relevant(host))
+        for target_id in inputs.relevant(host):
+            copy = scratch[host] / "home" / TARGET_PATHS[target_id]
+            assert copy.read_bytes() == world.target(host, target_id).read_bytes()
+            assert result["targets"][target_id] == _digest(copy)
+        clone = scratch[host] / "familiar"
+        assert _git(clone, "rev-parse", "HEAD") == world.pins["familiar_pre"]
+        assert _git(clone, "remote") == ""  # no configured path back into the live checkout
+        assert _git(clone, "cat-file", "-t", world.pins["familiar_feature_tip"]) == "commit"
+        live_modules = quiesce._tree(world.home(host) / "d/familiar/node_modules")
+        assert quiesce._tree(clone / "node_modules") == live_modules == result["modules"]
+
+    sha = _manifest_sha256(world)
+    dry = _pilot(world, "titan", "target-dry", {"window_id": PILOT_WINDOW, "scratch": ids["titan"],
+                                               "target_id": "claude", "manifest_sha256": sha})
+    assert dry["status"] == "completed", dry["error"]
+    assert dry["result"]["path"] == str(scratch["titan"] / "home" / TARGET_PATHS["claude"])
+    assert _under(dry["result"]["copy"], [scratch["titan"]])
+    merge = _merged_clone(world, ids["europa"])
+    installed = _pilot(world, "europa", "familiar-install",
+                       _install_payload(world, "europa", merge, ids["europa"]), timeout=300)
+    assert installed["status"] == "completed", installed["error"]
+    assert installed["result"]["relay"] == {"version": "0.1.1", "commit": PINS["relay_commit"]}
+    clone = scratch["europa"] / "familiar"
+    assert (clone / "node_modules/relay/package.json").is_file()
+    assert not (world.home("europa") / "d/familiar/node_modules/relay").exists()
+    npm = [call for call in world.lines("observed")[mark:]
+           if call["tool"] == "npm" and call["args"][:1] == ["ci"]]
+    assert [(call["host"], call["cwd"]) for call in npm] == [("europa", str(clone))]
+    assert _under(npm[0]["tmpdir"], [scratch["europa"]])
+    assert npm[0]["cache"] == str(world.home("europa") / CACHE)
+
+    # The schema differs by mode: a pilot operation names its scratch root; live takes none,
+    # and neither takes a root or helper path. All refuse before any process starts.
+    operations_before = {host: sorted(os.listdir(world.root(host) / "operations"))
+                         for host in HOSTS}
+    ssh_before = len(world.lines("ssh_log"))
+    work = {"window_id": PILOT_WINDOW, "target_id": "claude-work", "manifest_sha256": sha}
+    for host, operation, payload, mode in (
+            ("titan", "target-dry", work, "pilot"),
+            ("titan", "target-dry", {**work, "scratch": "../../../d/hq"}, "pilot"),
+            ("titan", "target-dry", {**work, "scratch": str(scratch["titan"])}, "pilot"),
+            ("titan", "target-dry", {**work, "scratch": ids["titan"]}, "live"),
+            ("titan", "target-dry", {**work, "root": str(scratch["titan"])}, "live"),
+            ("europa", "familiar-install", {**_install_payload(world, "europa", merge,
+                                                               ids["europa"]),
+                                            "helper": "/tmp/x"}, "pilot"),
+            ("titan", "timer-record", {"window_id": PILOT_WINDOW}, "pilot"),
+            ("titan", "pilot-create", {"window_id": PILOT_WINDOW, "purpose": "main",
+                                       "pre": world.pins["familiar_pre"]}, "live"),
+            ("europa", "target-apply", {**work, "scratch": ids["europa"], "target_id": "claude",
+                                        "frozen_sha256": sha, "expected_sha256": sha,
+                                        "identities": _identities()}, "pilot")):
+        with pytest.raises(hosts.Refused):
+            world.request(host, operation, payload, mode=mode)
+    assert len(world.lines("ssh_log")) == ssh_before
+    assert {host: sorted(os.listdir(world.root(host) / "operations"))
+            for host in HOSTS} == operations_before
+
+    # A root ID resolves only to this window's own root on that host.
+    for payload in ({**work, "scratch": "0" * 16}, {**work, "scratch": ids["europa"]},
+                    {**work, "scratch": ids["titan"], "window_id": "20261020T120000Z-00000000"}):
+        refused = _pilot(world, "titan", "target-dry", payload)
+        assert refused["status"] == "refused" and "scratch" in refused["error"]
+    # A live target disguised as scratch: a symlinked copy, or a symlinked directory above one.
+    live_work = world.target("titan", "claude-work")
+    copy = scratch["titan"] / "home" / TARGET_PATHS["claude-work"]
+    copy.unlink()
+    copy.symlink_to(live_work)
+    failed = _pilot(world, "titan", "target-dry", {**work, "scratch": ids["titan"]})
+    assert failed["status"] == "failed" and "scratch root" in failed["error"]
+    hq = scratch["titan"] / "home/d/hq"
+    hq.rename(scratch["titan"] / "home/hq.moved")
+    hq.symlink_to(world.home("titan") / "d/hq")
+    failed = _pilot(world, "titan", "target-dry", {**work, "scratch": ids["titan"],
+                                                   "target_id": "codex"})
+    assert failed["status"] == "failed" and "scratch root" in failed["error"]
+    # The live checkout disguised as the scratch clone, and a planted root that is a symlink.
+    clone.rename(scratch["europa"] / "familiar.moved")
+    clone.symlink_to(world.home("europa") / "d/familiar")
+    refused = _pilot(world, "europa", "familiar-verify", {"window_id": PILOT_WINDOW,
+                                                          "scratch": ids["europa"],
+                                                          "merge": merge})
+    assert refused["status"] == "refused" and "scratch" in refused["error"]
+    planted = pilot_roots(world, "titan") / ("f" * 16)
+    planted.symlink_to(world.home("titan"))
+    refused = _pilot(world, "titan", "target-dry", {**work, "scratch": "f" * 16})
+    assert refused["status"] == "refused" and "scratch" in refused["error"]
+    cleanup = _pilot(world, "titan", "pilot-cleanup", {"window_id": PILOT_WINDOW})
+    assert cleanup["status"] == "failed" and "unexplained" in cleanup["error"]
+    assert scratch["titan"].is_dir()
+    planted.unlink()
+
+    for host in HOSTS:
+        cleaned = _pilot(world, host, "pilot-cleanup", {"window_id": PILOT_WINDOW})
+        assert cleaned["status"] == "completed", cleaned["error"]
+        assert cleaned["result"]["removed"] == [ids[host]]
+        assert os.listdir(pilot_roots(world, host)) == []
+    gone = _pilot(world, "titan", "target-dry", {**work, "scratch": ids["titan"]})
+    assert gone["status"] == "refused"
+    outside_application_files_before = before
+    outside_application_files_after = {host: outside(world, host) for host in HOSTS}
+    assert outside_application_files_after == outside_application_files_before
+    live_mutation_calls = live_mutations(world, mark)
+    assert live_mutation_calls == []
+    assert world.target("titan", "claude-work").read_bytes() == before["titan"][
+        TARGET_PATHS["claude-work"]][1]
+
+
+def test_disconnect_closes_pipes_without_signal(world):
+    """Dropping only the owned local SSH client while Europa's scratch install runs closes its
+    pipes and sends the remote no signal: the install finishes, persists its reply, and
+    reconciliation by operation ID reads the result an undisturbed install gives, with npm run
+    once. With the pilot-only latch the install holds after npm started until its client is
+    gone, so the drop always lands while it runs."""
+    world.stage_cutover()
+    reference_root = _create(world, "europa", "disconnect")["root"]
+    reference = _pilot(world, "europa", "pilot-install", _install_payload(
+        world, "europa", _merged_clone(world, reference_root), reference_root, latch=False),
+        timeout=300)
+    assert reference["status"] == "completed", reference["error"]
+
+    root = _create(world, "europa", "disconnect")["root"]
+    payload = _install_payload(world, "europa", _merged_clone(world, root), root, latch=False)
+    world.behave("europa", npm_ci="slow", npm_seconds=3)
+    mark, sent = len(world.lines("observed")), len(_sent(world))
+    attempt = pilot.dropped_install(payload)
+    world.behave("europa", npm_ci="ok")
+    assert (attempt["exercised"], attempt["drop"]) == (True, "npm-running"), attempt["reason"]
+    before, after = attempt["observed"]
+    assert before["state"] == "running" and after["state"] == "running"
+    assert [(child["label"], child["exit"]) for child in before["children"]
+            if child["label"] == "npm-ci"] == [("npm-ci", None)]
+    assert attempt["client"] is not None and attempt["client"] < 0  # killed, then reaped
+    response = attempt["response"]
+    assert response["status"] == "completed", response["error"]
+    assert {key: response["result"][key] for key in ("relay", "tree")} == {
+        key: reference["result"][key] for key in ("relay", "tree")}
+    operation = world.root("europa") / "operations" / attempt["operation_id"]
+    assert json.loads((operation / "done.json").read_text())["response"] == response
+    assert not (operation / "cancel.json").exists()
+    status = hosts.reconcile_operation({"host": "europa", "mode": "pilot"},
+                                       attempt["operation_id"])
+    assert status["state"] == "completed" and status["response"] == response
+    clone = pilot_roots(world, "europa") / root / "familiar"
+    npm = [call for call in world.lines("observed")[mark:]
+           if call["tool"] == "npm" and call["args"][:1] == ["ci"]]
+    assert [call["cwd"] for call in npm] == [str(clone)]  # reconnecting never reran it
+    assert _term_signals(world, mark) == []
+    # One install request, then only status reads, each over its own connection (the fake ssh
+    # logs concurrent connections in no particular order).
+    requests = [request["operation"] for request in _sent(world)[sent:]]
+    assert requests.count("pilot-install") == 1 and len(requests) > 2
+    assert set(requests) == {"pilot-install", "operation-status"}
+
+    root = _create(world, "europa", "disconnect")["root"]
+    latched = pilot.dropped_install(_install_payload(
+        world, "europa", _merged_clone(world, root), root, latch=True))
+    assert (latched["exercised"], latched["drop"]) == (True, "latched"), latched["reason"]
+    assert latched["response"]["status"] == "completed"
+    assert latched["response"]["result"]["held"]["released"] == "disconnect"
+    assert latched["response"]["result"]["tree"] == reference["result"]["tree"]
+    cleaned = _pilot(world, "europa", "pilot-cleanup", {"window_id": PILOT_WINDOW})
+    assert cleaned["status"] == "completed" and len(cleaned["result"]["removed"]) == 3
+
+
+def test_disconnect_unexercised_never_passes():
+    """A drop counts only with an install-start observation and proof the install was still
+    running across it; an install that finished first is unexercised, never passed."""
+    running = {"state": "running", "children": [{"label": "npm-ci", "started": True,
+                                                 "exit": None}]}
+    exited = {"state": "running", "children": [{"label": "npm-ci", "started": True,
+                                                "exit": 0}]}
+    done = {"state": "completed", "children": exited["children"]}
+    held = {"status": "completed", "result": {"held": {"released": "disconnect"}}}
+    timed = {"status": "completed", "result": {"held": {"released": "timeout"}}}
+    cases = [((False, None, None, None), False), ((False, exited, None, None), False),
+             ((False, done, None, None), False), ((False, running, done, None), False),
+             ((False, running, running, None), True), ((True, running, done, held), True),
+             ((True, running, done, timed), False), ((True, None, done, held), False)]
+    for (latch, before, after, response), passed in cases:
+        exercised, how = pilot.exercised(latch, before, after, response)
+        assert exercised is passed, (latch, before, after, response, how)
+        assert how == ("latched" if latch else "npm-running") or not exercised

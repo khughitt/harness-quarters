@@ -121,10 +121,22 @@ def preflight(args):
     return int(bool(failures))
 
 
+def familiar_root(args):
+    """The checkout a familiar check reads: main by default, or a pilot's explicit scratch clone,
+    which must be an absolute directory (never a symlink). HOME and its credentials stay as
+    they are either way."""
+    if args.root is None:
+        return Path.home() / "d/familiar"
+    root = Path(args.root)
+    if not root.is_absolute() or root.is_symlink() or not root.is_dir():
+        raise Stop("--root must name an absolute directory")
+    return root
+
+
 def familiar_source(args):
     if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", args.head):
         raise Stop("expected a full commit SHA")
-    root = Path.home() / "d/familiar"
+    root = familiar_root(args)
     git = ("git", "--no-optional-locks", "-C", root)
     head = run(*git, "rev-parse", "HEAD").strip()
     if head != args.head:
@@ -146,7 +158,7 @@ def familiar_source(args):
 
 
 def familiar_check(args):
-    root = Path.home() / "d/familiar"
+    root = familiar_root(args)
     relay = root / "node_modules/relay"
     if args.expect == "relay":
         version = load_json(relay / "package.json").get("version")
@@ -291,8 +303,8 @@ def remote(args):
     if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.@:-]*", args.host):
         raise Stop("invalid SSH host")
     command = [args.command]
-    for flag in ("harness", "head", "expect"):
-        if hasattr(args, flag):
+    for flag in ("harness", "head", "expect", "root"):
+        if getattr(args, flag, None) is not None:
             command.extend(("--" + flag, getattr(args, flag)))
     result = subprocess.run(
         ["ssh", "-4", "-o", "BatchMode=yes", args.host,
@@ -328,6 +340,8 @@ def main(argv):
     s.add_argument("--head", required=True)
     c = sub.add_parser("familiar-check")
     c.add_argument("--expect", choices=("relay", "native"), required=True)
+    for command in (s, c):
+        command.add_argument("--root")
     for command in (p, s, c):
         command.add_argument("--host")
     for name in ("retire-native-guard", "restore", "verify"):
