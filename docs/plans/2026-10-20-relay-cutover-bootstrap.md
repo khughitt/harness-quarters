@@ -18,9 +18,14 @@ existing relay v0.1.1, Git/npm, systemd user bus and niri IPC. No new dependency
 **Spec:** `.worktrees/relay-cutover/docs/specs/2026-10-20-operator-runbooks-design.md`
 (approved for planning after round 6; frozen predecessor `07acc26`).
 **Task:** hq-c6c847; parent hq-539508; blocked original window hq-f27918.
-**Status:** accepted in plan round 5 at `df9848b` and approved by Keith, 2026-10-20;
-the accepted Minor probe-order clarification is included. Execution is parked for
-a fresh subagent-driven session. No implementation or new window run.
+**Status:** implemented and delivered, 2026-10-21. Tasks 1–9 ran under subagent-driven
+execution with task reviews, a final whole-branch review (two corrective rounds), an external
+codex review (one round) and the familiar-drift amendment (design rounds 7–12, one fix round).
+The reviewed inert tool reached hq main at `3fe1d4c` (hook after-images excluded); both hosts'
+helper bytes match; the reviewed input generation `g2026-10-21c` is staged on both hosts;
+`prepare` passed; the real-host pilot passed (window `20261021T175701Z-38062328`, every gate,
+unlatched disconnect during npm). The live window, smokes and timer finalization remain
+original Task 8 (hq-f27918).
 **Execution:** preserve the user's subagent-driven choice. Work in the existing
 locked, hydrated `.worktrees/relay-cutover/`; do not create another hq worktree.
 
