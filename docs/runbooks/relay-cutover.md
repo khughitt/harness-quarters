@@ -64,7 +64,11 @@ original plan's Task 9 is complete. The independent Bash (dots-55f537) and instr
   - smoke receipt binding, and finish's gates;
   - pilot/live mode confusion and scratch-root escape;
   - a terminal held by an agent, a blocked or declined recovery desktop, owner-lost operations
-    of any window, stops classified by cause, and a bypassed resume.
+    of any window, stops classified by cause, and a bypassed resume;
+  - familiar task-record drift past PRE (amendment 2026-10-21): the tasks-only predicate's
+    plumbing rules, a base B derived and waited for, Titan commits before and after the merge,
+    a Europa commit after the mark, and the plumbing restore's crash points, live-index cases
+    and recovery classes, on real miniature Git histories.
 
   Fixtures are not the real hosts. That suite runs in the worktree, which carries the hook
   after-images. Delivery (bootstrap plan Task 9 Step 4) runs `just test` again on the
@@ -226,11 +230,26 @@ any parked wait.
 - the desktop inventory: the trusted niri socket and each familiar surface's startup command
   and process;
 - each target's resolved path, digest and pick values;
-- familiar at PRE with a clean tree and native dependencies, through
-  `relay-cutover familiar-source --head PRE` and `familiar-check --expect native`, read only.
+- familiar's base on each host, by the base rule below, and its native dependencies through
+  `familiar-check --expect native`, read only. It prints each host's base (`familiar base
+  <commit>: N tasks-only commit(s) past PRE …`).
+
+**The familiar base rule.** familiar's own task tracker commits task records (`tasks/`) into
+the synchronized checkout from either host, so the tool holds no exact familiar commit. A
+host's HEAD is its base B when it is PRE or a *tasks-only descendant* of PRE: every commit
+since PRE has one parent and changes only regular files (mode 100644 or 100755) whose path
+starts with `tasks/` (a rename counts as its delete and add; `tasks`, `tasks.md`, `Tasks/…`,
+`tasksx/…`, symlinks and gitlinks do not qualify; shallow or grafted history is refused). Its
+tree must be clean: no tracked change, and no untracked path outside `tasks/` and the ignored
+`node_modules`. `git merge-tree --write-tree B tip` must merge cleanly and equal T0, the pinned
+tree of the reviewed merge of PRE and the tip, outside `tasks/`. The check recomputes T0 and
+writes nothing into the checkout. familiar's runtime never reads `tasks/`. Europa's HEAD must
+equal Titan's or be an ancestor of it.
 
 It refuses beside any open window, pilot included, and with `familiar-native` on a host whose
-familiar is not at PRE ([§2](#2-final-pre-closure-step-agent)). Running Claude and Codex
+familiar fails the base rule or, on Europa, is ahead of or diverged from Titan's
+([§2](#2-final-pre-closure-step-agent)). A base that moved by task records since `prepare`
+is not drift: `check` and `run` read it again. Running Claude and Codex
 sessions are listed as future `run` blockers; they never make preparation fail. `check`
 repeats every read and names any drift since `prepare`. It prints `next: … run` only when
 everything still matches.
@@ -284,8 +303,9 @@ does not enforce it.
 The case runs in this order:
 1. held inventory on both hosts: Git access, bus, desktop IPC, toolchain;
 2. the spawn gate;
-3. owned scratch roots, and the six dry runs on frozen scratch copies;
-4. each host's scratch merge and real install;
+3. owned scratch roots, each cloned at that host's own eligible familiar HEAD (its base, by
+   the base rule, recorded per clone), and the six dry runs on frozen scratch copies;
+4. each host's scratch merge into its own base and real install;
 5. Titan's four copies applied under one touched record, and Europa's expectations verified;
 6. one real SSH disconnect during a Europa scratch install, reconciled through its recorded
    result;
@@ -306,7 +326,8 @@ It never claims the whole host stayed byte-equal. If the user refuses the spawn,
 reply as a decision with verdict `declined` and pass it. The rehearsal then runs every part
 but the spawn, whose gate stays pending. Window readiness must not be claimed. Analyze any
 completed parts before a retry; a retry needs a fresh preview and a fresh ask. Rerun the
-pilot only when its helper or toolchain bytes change.
+pilot only when its helper or toolchain bytes change; a later live base B that differs from
+the pilot's clones does not invalidate it.
 
 ## 2. Final pre-closure step (agent)
 
@@ -348,11 +369,21 @@ hosts, with the doctor's hold diagnostic, and compares everything with the prepa
   `codex-cli 0.163.0` unless it is separately re-probed and reviewed. Rerun the pilot only
   if helper or toolchain bytes changed from its recorded identities. A version refresh alone
   never reruns it.
-- **`check` reports `familiar-native`:** familiar is not at PRE with a clean, native tree on
-  that host. After a recovered merge this is the recovery revert: that recovery ended the
-  cutover ([§9](#9-recovery-recover-operator)), and a completed cutover leaves familiar merged.
-  Do not ask for closure, and do not reset familiar to PRE by hand. A new attempt needs newly
-  reviewed pins and inputs and its own reviewed procedure, outside this runbook.
+- **`check` reports `familiar-native`:** familiar fails the base rule on that host (a commit
+  past PRE that changes anything outside `tasks/`, a dirty tree, a conflicting merge with the
+  tip), its dependencies are not native, or Europa's HEAD is ahead of or diverged from
+  Titan's. After a recovered merge this is the restore commit: that recovery ended the cutover
+  ([§9](#9-recovery-recover-operator)), and a completed cutover leaves familiar merged. Do not
+  ask for closure, and do not reset familiar by hand. A Europa commit is reported to the
+  operator, who lets it synchronize to Titan or resolves it; then run `check` again. A new
+  attempt after a recovered merge needs newly reviewed pins and inputs and its own reviewed
+  procedure, outside this runbook.
+- **`check` reports `sync` for familiar:** Titan's HEAD has not reached Europa yet. Wait for
+  Dropbox, then run `check` again.
+- **Familiar commits from here on.** Ask the operator to pause familiar task-record commits
+  (the tracker in any session, and by hand) from the closure request until `run` reports the
+  merge. On Titan a familiar commit before the merge aborts the run cleanly before it; after
+  the merge it is tolerated. On Europa make none until `finish` or `recover` completes.
 - **Anything else:** follow the blocker's text. The agent performs and reviews any refresh;
   the tool runs no refresh or retry loop.
 
@@ -361,7 +392,9 @@ hosts, with the doctor's hold diagnostic, and compares everything with the prepa
 This is the only step that applies familiar and the four hook targets. Agents never apply
 hooks or familiar; `restart-surfaces` and `finish` never edit hooks or source. Close
 **every** Claude and Codex session on Titan and Europa: the controller, reviewer sessions,
-and IDE or desktop clients that reconnect to Codex. Then, in an ordinary Zsh on Titan:
+and IDE or desktop clients that reconnect to Codex. Make no familiar commit (task records
+included) on Titan until `run` reports the merge, and none on Europa until `finish` or
+`recover` completes. Then, in an ordinary Zsh on Titan:
 
 ```zsh
 ~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap run
@@ -386,8 +419,11 @@ With that answer it runs, in order:
    no exemption for any process, the tool's own probes included.
 3. **Quiesce.** Each host's `familiar-reap.timer` state is recorded and the timer stopped.
    `familiar-reap.service` is waited for (up to an hour, never killed). Strict no-live runs
-   again, then familiar's state and dependency snapshots are refreshed. Preparation
-   snapshots are kept.
+   again. Then familiar's base B is derived on Titan by the base rule (`familiar-base`) and
+   saved in the window, and Europa waits for its own HEAD to be B (`familiar-sync`, up to
+   10 min). A timeout, or Europa ahead of or diverged from B, aborts cleanly before the merge.
+   Only then are familiar's state and dependency snapshots refreshed, each host checking its
+   HEAD is B. Preparation snapshots are kept.
 4. **All six dry runs, before the merge.** The current synchronized targets are frozen as
    copies and dry-run: Titan's four, then Europa's two Claude copies, each with its own
    host's pinned installer, runtime and evidence. Claude copies retire the native guard
@@ -400,10 +436,15 @@ With that answer it runs, in order:
    - both hosts agree byte for byte on each shared Claude target.
 
    The window then seals its effective inputs (`effective_inputs_sha256`).
-5. **Merge.** The frozen targets must be unchanged and both hosts closed. The window records
-   `familiar`, and the immutable tip is merged once on Titan. Then, for each host in turn,
-   both hosts are checked closed, and that host:
-   - waits for the merge to synchronize into its checkout (up to 10 min);
+5. **Merge.** The frozen targets must be unchanged, both hosts closed and Titan's HEAD still
+   B; a familiar commit on Titan since B was derived aborts the run here, before the merge.
+   The window records `familiar` with B, and the immutable tip is merged once into B on Titan
+   (`git merge -s ort --no-ff` with fixed rename options, no hooks, no branch merge options).
+   The merge M must have parents B and the tip and equal `merge-tree`'s result and T0 outside
+   `tasks/`. Then, for each host in turn, both hosts are checked closed, and that host:
+   - waits for the merge to synchronize into its checkout (up to 10 min): HEAD is M or a
+     tasks-only descendant of it with a clean tree outside `tasks/` (a deferred task-record
+     write is carried), and Europa's HEAD equals or precedes the HEAD Titan observed;
    - is checked closed again;
    - runs `/usr/bin/npm ci --allow-git=root` with `/usr/bin` first on PATH and every
      prepared cache prefix pinned;
@@ -417,7 +458,8 @@ With that answer it runs, in order:
      output.
 7. **Verified migration.** Every target on each host holds the sealed bytes, Europa's after
    synchronization, with hooks, statusLine, installer and evidence verified. Familiar is the
-   merge with its pinned relay. The window becomes `migrated-surfaces-pending`.
+   merge, or a tasks-only descendant of it, clean outside `tasks/`, with its pinned relay;
+   Europa's HEAD equals or precedes Titan's. The window becomes `migrated-surfaces-pending`.
 8. **Surface restart.** Familiar's recorded surfaces restart under the same answer, and the
    window becomes `ready-for-smokes`.
 
@@ -460,6 +502,10 @@ From `run` until `finish` reports complete:
   pick, but a pick changes the target's bytes, so `recover`'s byte-gated restore then stops
   for inspection. Nothing rewrites it automatically.
 - Timers stay paused on both hosts until `finish` completes.
+- **Make no familiar commit on Europa**, task records included: concurrent ref writes are a
+  Dropbox conflict, and Europa's source proofs (finish, `restart-surfaces`, recovery) refuse a
+  Europa HEAD that is not Titan's or an ancestor of it. Task-record commits on Titan are
+  tolerated after the merge: every proof accepts a tasks-only descendant of the merge.
 
 Every report from the verified migration until finish (`run`, `status`, `restart-surfaces`,
 `record-smoke`, a stopped `finish`) prints this handoff:
@@ -469,6 +515,7 @@ Every report from the verified migration until finish (`run`, `status`, `restart
 - the paused timers;
 - the held-launch rule, naming `cl` and `clw`;
 - the pick freeze;
+- the familiar commit freeze on Europa;
 - twelve concrete, Zsh-quoted held commands.
 
 The commands have these shapes; the tool prints them with real paths and the captured
@@ -498,9 +545,9 @@ installed at the recorded path even if its identity changed (ruling R31). No in-
 re-probe exists.
 
 A hold breach can only follow the verified migration, so familiar's merge is committed, and
-`recover` reverts it. That recovery ends this cutover window: the current tool merges only
-from PRE and cannot run another window while familiar's HEAD is the recovery revert
-([§9](#9-recovery-recover-operator)). The next attempt needs newly reviewed pins and inputs
+`recover` restores familiar from it. That recovery ends this cutover window: the current tool
+merges only from a tasks-only descendant of PRE and cannot run another window while familiar
+descends from the restore commit ([§9](#9-recovery-recover-operator)). The next attempt needs newly reviewed pins and inputs
 and its own reviewed procedure, outside this runbook. Task 9 Steps 5–7 and the final
 pre-closure step come after that procedure, never as a way to reopen this window.
 
@@ -760,7 +807,11 @@ It then checks each host fresh:
 - each target holds its sealed bytes, apart from Claude's pick keys, with hooks,
   statusLine, installer and evidence verified. Drift beyond picks becomes
   `inspection-required`, then `recover`.
-- familiar is the merge with its pinned relay.
+- familiar is the merge or a tasks-only descendant of it, clean outside `tasks/` (a deferred
+  task-record write is carried), with its pinned relay; Europa's HEAD equals or precedes the
+  HEAD observed on Titan, waiting for a tolerated Titan task-record commit to synchronize. A
+  changed file outside `tasks/`, or a familiar commit made on Europa, becomes
+  `inspection-required`. Finish records the HEAD each host observed.
 - familiar's recorded surfaces still run as restarted (ruling R39). A surface that exited or
   was replaced, or a desktop blocker, stops finish for a consented `restart-surfaces`; the
   receipts are kept.
@@ -812,13 +863,28 @@ every Claude and Codex session closed on both hosts, in an ordinary Zsh on Titan
   3. checks every target against the window's images, then restores the registered ones in
      reverse ledger order through the byte gate, guard-only changes included. All four must
      hold native bytes on Titan, and Europa's two after synchronization.
-  4. reconciles familiar's actual Git state:
-     - a merge committed before its record is recorded from its parents;
-     - then exactly one action is taken: abort the attempted merge, do nothing, or revert
-       once.
+  4. reconciles familiar's actual Git state against the window's recorded base B (a window
+     with no recorded base is refused for inspection; B is never assumed to be PRE):
+     - `merge-in-progress` (HEAD B, the tip's merge pending): the live index is rebuilt from
+       the working tree's proven state, then `git merge --abort`; B is the restoration point;
+     - `at-base` (HEAD B or a tasks-only descendant of it): nothing; B is the restoration
+       point;
+     - `merged` (HEAD the merge M, or a tasks-only descendant of it): a restore commit R is
+       built by Git plumbing, never `git revert`: B's tree with HEAD's `tasks/` records,
+       committed on HEAD and recorded on Titan before any index or working-tree change, then
+       HEAD is moved onto it by compare-and-swap. R keeps familiar's task records as they
+       stand and cannot conflict;
+     - `reverted` (HEAD R or a tasks-only descendant of it): nothing.
 
-     Each host waits for the recovered source, then restores its dependencies offline from
-     the window's verified pre-merge snapshot. No npm, fetch or network is used.
+     A merge or restore committed before its record is found from HEAD's first-parent history
+     and recorded first. The live index is never evidence; a present `.git/index.lock`,
+     working-tree bytes that match neither side, or more than one commit above the merge that
+     changes paths outside `tasks/` stop for inspection
+     ([§11](#11-fail-closed-facts-and-inspections-agent)). A restore that R can no longer
+     finish (a tolerated Titan task-record commit landed meanwhile) records R as abandoned and
+     builds a fresh one. Each host waits for the restoration point, or a tasks-only descendant
+     of it (Europa not past Titan's HEAD), then restores its dependencies offline from the
+     window's verified pre-merge snapshot. No npm, fetch or network is used.
   5. restarts familiar's recorded surfaces from the native source, with this invocation's
      consent. An explained absence stays absent.
   6. restores each host's original timer state and requires `familiar-reap.service` to
@@ -840,19 +906,19 @@ every Claude and Codex session closed on both hosts, in an ordinary Zsh on Titan
   and 6. A surface that fails to start in stage 5 stops the same way, and the rerun restarts
   only the surfaces left.
 - **Afterwards: a recovered merge ends this cutover.** `recover` reports where familiar ended
-  up (`familiar is at <commit> on titan`); `git -C ~/d/familiar rev-parse HEAD` shows the
-  same.
-  - **Any commit other than PRE (`00f4899ae523…`).** Recovery reverted a committed merge, so
-    HEAD is the recovery revert, and that ends this cutover window. The current tool cannot
-    run another window from here, because it merges only from PRE. `status` reports that the
+  up (`familiar is at <commit> on titan`), and the window records the class it found;
+  `git -C ~/d/familiar rev-parse HEAD` shows that commit, or a later task-record commit.
+  - **Class `merged` or `reverted`.** Recovery restored familiar from a committed merge, so
+    HEAD descends from the restore commit R, and that ends this cutover window. The current
+    tool cannot run another window from here: no base rule admits R. `status` reports that the
     cutover has ended and names `status`, with no preparation guidance; `prepare` and `check`
-    refuse with `familiar-native` on both hosts. Do not ask for closure. Do not reset familiar
-    to PRE, revert the revert, or merge the tip again by hand. The next attempt needs newly
-    reviewed pins and inputs and its own reviewed procedure, outside this runbook.
-  - **PRE.** The merge never committed: recovery aborted it, or it never started. The
-    merge-from-PRE precondition no longer stands in the way. No test covers a new window
-    after a recovered one, however, so the agent reports this state rather than asking for
-    closure on its own.
+    refuse with `familiar-native` on both hosts. Do not ask for closure. Do not reset familiar,
+    revert R, or merge the tip again by hand. The next attempt needs newly reviewed pins and
+    inputs and its own reviewed procedure, outside this runbook.
+  - **Class `at-base` or `merge-in-progress`.** The merge never committed: recovery aborted
+    it, or it never started, and familiar is at B or a tasks-only descendant of it. The cutover
+    is not ended: `status` names `check`. No test covers a new window after a recovered one,
+    however, so the agent reports this state rather than asking for closure on its own.
 
 ## 10. Status and next commands
 
@@ -863,9 +929,9 @@ prints the handoff.
 | State | Next | Meaning |
 | --- | --- | --- |
 | no prepared record | `prepare --controller-session <native-session-id>` | nothing prepared |
-| prepared; no open window, or the last one `aborted`, or `recovered` with familiar at PRE | `check` | prints the preparation guidance: ordinary use allowed, and the final pre-closure step |
+| prepared; no open window, or the last one `aborted`, or `recovered` from class `at-base` or `merge-in-progress` | `check` | prints the preparation guidance: ordinary use allowed, and the final pre-closure step |
 | the last window `complete` | `status` | the cutover is complete; no preparation guidance, and no `check` or `run` |
-| the last window `recovered` after reverting a committed merge | `status` | the cutover has ended ([§9](#9-recovery-recover-operator)); no preparation guidance, and no `check` or `run` |
+| the last window `recovered` from class `merged` or `reverted` (a committed merge) | `status` | the cutover has ended ([§9](#9-recovery-recover-operator)); no preparation guidance, and no `check` or `run` |
 | pilot window open | `relay-cutover-rehearse --controller-session <native-session-id>` | live commands and `prepare` refuse until the rehearsal runs or reconciles it |
 | any window whose invocation is still running | `status` | wait, or interrupt that invocation |
 | `prepared`, `quiescing` or `applying` before familiar's mark; `aborting`; `abort-incomplete` | `recover` | completes the pre-merge abort only |
@@ -989,6 +1055,26 @@ operations and cleans up its recorded roots.
 by running the rehearsal: `relay-cutover-rehearse --controller-session …`, with a decision
 or without one. Without one, the spawn gate stays pending. No other command closes it.
 
+**familiar stopped for inspection.** `recover` and finish stop for inspection when familiar's
+history or working tree matches no record: a commit outside `tasks/` above the merge, more
+than one such commit, a familiar commit made on Europa during the window, a working tree
+that is neither HEAD nor its restore outside `tasks/`, or a present `.git/index.lock`. Read
+it on the host the stop names; on Titan:
+
+```zsh
+git -C ~/d/familiar rev-parse HEAD
+git -C ~/d/familiar log --first-parent --format='%h %p %s' -8
+git --no-optional-locks -C ~/d/familiar status --short
+ls -l ~/d/familiar/.git/index.lock ~/d/familiar/.git/MERGE_HEAD
+cat ~/.local/state/hq/relay-cutover/quiesce/'<window-id>'/familiar-restore.json
+```
+
+The last file names the restore commit R that recovery built on Titan, its parent and any R
+it abandoned. The tool never deletes `index.lock`: report it with whether a Git process runs
+on either host (`ps -eo pid,args | grep '[g]it '`); moving a stale lock aside is the
+operator's decision. Never reset, revert or commit familiar by hand to clear a stop: report
+what you read, and rerun `recover` once the operator has resolved it.
+
 **Other crash leftovers.** Each of these blocks commands:
 - **An interrupted atomic write** leaves `.NAME.<random>` beside `NAME`. At the cutover
   root's top level it blocks every command, and `status` reports it as unexplained cutover
@@ -1014,7 +1100,9 @@ These hold unchanged in the tool. The relay dependency is
 `4ceec5d2ad22b136b37ee360e7a4ed00949f28d9`. Hook commands use `/usr/bin/node`. Familiar PRE
 is `00f4899ae523d613d21f44bfc2c456aac67f8e5f`, and the approved feature tip
 `a16f4daa59b04e32f1010764d6f94401ca4eed8b` is merged as that immutable commit, never as a
-moving branch. Familiar-theme keeps its existing SSH pin and Git configuration. Every writer
+moving branch, into the window's base B (PRE or a tasks-only descendant of it). T0, the tree
+of the reviewed clean merge of PRE and the tip, is `f492e3437577c4b79db379e4cc1fb6771f35b3bb`
+(git 2.56); every base's merge must equal it outside `tasks/`. Familiar-theme keeps its existing SSH pin and Git configuration. Every writer
 uses v0.1.1 before hooks activate worker rows:
 
 | Writer on each host | Runtime |
