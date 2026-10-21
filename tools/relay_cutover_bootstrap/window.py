@@ -15,7 +15,10 @@ targets and familiar is in `targets.py` and `familiar.py`. A run opens the windo
 5. the merge of the immutable tip on Titan; each host's install once the merge reached it; each
    target registered, then applied once on Titan; every host verified. Both hosts are checked
    closed before each install and each target write. The window becomes
-   `migrated-surfaces-pending`.
+   `migrated-surfaces-pending`;
+6. with that verified checkpoint, familiar's recorded surfaces restart under the same consumed
+   decision (`surfaces.restart_surfaces`), and the window becomes `ready-for-smokes`. A failure
+   from here leaves only the surfaces pending, for a later `restart-surfaces` with a new decision.
 
 Full recovery of a window past the `familiar` record, and the reconciliation of a run that
 stopped without recording its outcome, are in `recovery.py`; `status` names their states.
@@ -36,7 +39,8 @@ Keys this module adds to the window record:
 - `attempts` [{host, step, at}];
 - `timers` {host: {sha256, recorded_at}}, with copies at `hosts/<host>/timers.json`;
 - `quiescent`, `failure`, `abort` and `earlier_aborts` (each incomplete abort's record);
-- `surfaces`: the consent subject, every host's recorded familiar surfaces;
+- `surfaces`: the run's consent subject, every host's recorded familiar surfaces (the restarts
+  themselves are recorded under `desktop` by `surfaces.py`);
 - `dry` {host: {target: verdict}} and `sealed` {at, effective_inputs_sha256, inputs};
 - `familiar` {started_at, pre, tip}, recorded before the merge, then merge, parents, merged_at;
 - `dependencies` {host: install proof}, `applied` {target: apply result}, `verified`.
@@ -516,8 +520,12 @@ def run_window(prepared: dict, decision: dict) -> dict:
        waits for the merge and installs; each target is registered and applied once on Titan;
        every host's targets, source, dependencies and evidence are verified.
 
-    Failures before step 4's record abort every touched host; after it the window becomes
-    `recovery-required` and nothing is undone here."""
+    6. Familiar's surfaces restart with this same consumed decision; the window becomes
+       `ready-for-smokes`.
+
+    Failures before step 4's record abort every touched host; after it, until the verified
+    checkpoint, the window becomes `recovery-required` and nothing is undone here. A failure in
+    step 6 leaves the window `migrated-surfaces-pending`: only the surfaces are pending."""
     from . import prepare as preparation  # prepare imports this module for its step helpers
     window = state.current_window(_root())
     _check_quiesce(window, prepared, decision, step="run")
@@ -554,10 +562,18 @@ def run_window(prepared: dict, decision: dict) -> dict:
         if failed is not None:
             raise _abort_after(failed, seen)
         try:
-            return _migrate(window, prepared, seen, progress)
+            window = _migrate(window, prepared, seen, progress)
         except (Exception, _Interrupt) as error:
             failed = _as_failed(error, progress)
-        raise _recovery_after(failed)
+        if failed is not None:
+            raise _recovery_after(failed)
+        # 6. The checkpoint is verified: the same consumed decision restarts the surfaces.
+        from . import surfaces  # surfaces imports this module for its step helpers
+        if seen:  # noted as the checkpoint was saved: only the surfaces are pending
+            raise surfaces.pending_failure(
+                _as_failed(_Interrupt(seen[-1]), {"step": "surface-restart", "host": "titan"}),
+                surfaces.FORWARD, RUN_ATTEMPT)
+        return surfaces.restart_surfaces(window, decision)["window"]
 
 
 def dry_targets(window: dict) -> dict:
@@ -750,10 +766,9 @@ def status() -> dict:
                       f"(pid {owner['pid']}) is still running", next=["status"])
         return report
     attempted, stopped = _attempted(current), _stopped(current)
-    if current["state"] == "migrated-surfaces-pending":
-        report.update(detail=f"window {current['id']} verified the migration on both hosts; "
-                      "familiar's surfaces are pending and timers stay paused on "
-                      f"{', '.join(stopped) or 'no host'}", next=["restart-surfaces"])
+    if current["state"] in ("migrated-surfaces-pending", "ready-for-smokes"):
+        from . import surfaces  # surfaces imports this module for its step helpers
+        report.update(surfaces.status(current))
         return report
     paused = (f"timers may be paused on {', '.join(stopped)}" if stopped else
               f"its hosts ({', '.join(attempted)}) have no paused timer" if attempted
@@ -763,23 +778,43 @@ def status() -> dict:
         report["detail"] = (f"window {current['id']} is {current['state']} and no invocation is "
                             f"running it; {paused}")
         return report
+    from . import recovery as recovering  # recovery imports this module
     recovery = current.get("recovery") or {}
     failure = recovery.get("failure") or current.get("failure") or {}
     stopped_at = (f"{failure.get('step')} on {failure.get('host')} ({failure.get('status')})"
                   if failure else "an unrecorded point")
+    until = "recover completes: run is blocked"
     if current["state"] == "inspection-required":
         lead = (f"stopped pending inspection at {stopped_at}: {failure.get('error')}; inspect it, "
                 "then run recover; nothing was force-copied, reset or reverted blindly")
     elif current["state"] == "recovering" and "restored" in recovery:
-        lead = ("recovery restored native settings, source and dependencies on both hosts; "
-                "familiar's surfaces and the original timers are still pending")
+        done = "recovery restored native settings, source and dependencies on both hosts"
+        if "surfaces" in recovery:
+            lead = (f"{done} and restarted familiar's surfaces; the original timers are still "
+                    "pending")
+        else:
+            lead = f"{done}; familiar's surfaces and the original timers are still pending"
+        if recovery.get("failure"):
+            lead += f"; it stopped at {stopped_at}"
     elif current["state"] == "recovering":
         lead = f"recovery stopped at {stopped_at}; recover repeats it from actual state"
+    elif recovering.reconcilable(current):
+        # The forward path from here is reconciliation, reached from restart-surfaces (or run);
+        # recover always means the full rollback.
+        cause = ("the run stopped past familiar's mark without recording its outcome"
+                 if not failure else f"reconciliation stopped beside unsettled operations "
+                 f"({failure.get('error')})")
+        report["next"] = failure.get("next") or ["restart-surfaces"]
+        lead = (f"{cause}; restart-surfaces reconciles actual state first and restarts surfaces "
+                "only from a verified migration, and recover rolls the window back"
+                if report["next"] == ["restart-surfaces"] else f"{cause}; recover cancels this "
+                "window's dead-owner operations and rolls the window back")
+        until = "its migration is verified or recover completes: run starts no new window"
     else:
         lead = (f"familiar or settings may have changed; the run stopped at {stopped_at}"
                 if failure else "the run stopped past familiar's mark without recording its "
-                "outcome; recover reconciles actual state first")
+                "outcome")
     report["detail"] = (f"window {current['id']} is {current['state']}: {lead}. Do not open "
-                        "Claude or Codex until recover completes: run is blocked and timers "
-                        f"stay paused on {', '.join(stopped) or 'no host'}")
+                        f"Claude or Codex until {until} and timers stay paused on "
+                        f"{', '.join(stopped) or 'no host'}")
     return report

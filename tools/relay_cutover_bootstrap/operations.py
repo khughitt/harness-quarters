@@ -3,7 +3,7 @@
 To add host-side operations, define them in that concern's module as an `OPERATIONS` dict of
 `hosts.Operation`s, import the module here and list its table in `OPERATIONS` below. Nothing
 else registers operations; `hosts` reads this table when it validates or runs a request."""
-from . import familiar, hosts, inputs, inventory, quiesce, restoration, targets
+from . import familiar, hosts, inputs, inventory, quiesce, restoration, surfaces, targets
 
 
 def _assemble(*tables):
@@ -17,4 +17,5 @@ def _assemble(*tables):
 
 
 OPERATIONS = _assemble(inventory.OPERATIONS, inputs.OPERATIONS, quiesce.OPERATIONS,
-                       targets.OPERATIONS, familiar.OPERATIONS, restoration.OPERATIONS)
+                       targets.OPERATIONS, familiar.OPERATIONS, restoration.OPERATIONS,
+                       surfaces.OPERATIONS)

@@ -27,7 +27,8 @@ from types import SimpleNamespace
 import pytest
 
 import test_relay_cutover_transport as transport
-from relay_cutover_bootstrap import cli, hosts, inputs, recovery, restoration, state, window
+from relay_cutover_bootstrap import (cli, hosts, inputs, recovery, restoration, state, surfaces,
+                                     window)
 from relay_cutover_bootstrap import prepare as preparation
 from relay_cutover_bootstrap.state import Stop
 
@@ -1862,9 +1863,13 @@ class TestRun:
     def test_bootstrap_run_takes_its_terminal_decision(self, migrated):
         assert migrated.code == 0, migrated.err
         record = migrated.window
-        assert record["state"] == "migrated-surfaces-pending"
+        assert record["state"] == "ready-for-smokes"
         subject = window.run_subject(migrated.prepared)
         assert record["surfaces"] == subject
+        # The same consumed decision restarted the surfaces after the verified checkpoint.
+        attempts = record["desktop"]["attempts"]
+        assert [(entry["attempt_id"], entry["outcome"]) for entry in attempts] == [
+            (window.RUN_ATTEMPT, "complete")] and attempts[0]["subject"] == subject
         consumed = state.load_record(Path(record["directory"]) / "decisions"
                                      / f"{window.RUN_ATTEMPT}.json")
         assert (consumed["kind"], consumed["action"], consumed["subject_sha256"]) == (
@@ -1883,10 +1888,14 @@ class TestRun:
         assert migrated.terminal.index(window.IMPACT) < migrated.terminal.index(source["prompt"])
         # The handoff names what holds until finish and one next command.
         out = migrated.out
-        assert "migrated-surfaces-pending" in out and "paused" in out
+        assert "ready-for-smokes" in out and "paused" in out
+        assert "surfaces restarted" in out
+        for host in HOSTS:
+            for name, process in surfaces.restarted(record, surfaces.FORWARD)[host].items():
+                assert f"{name} pid {process['pid']}" in out
         assert "do not change or save Claude model or effort defaults" in out
         assert "avoid cl, clw" in out
-        assert out.splitlines()[-1] == f"  next: {cli.command_line(['restart-surfaces'])}"
+        assert out.splitlines()[-1] == f"  next: {cli.command_line(['record-smoke'])}"
         for secret in SECRETS + (PICK_TEXT, "höch"):
             assert secret not in out + migrated.err + migrated.terminal
 
@@ -1987,9 +1996,14 @@ class TestRun:
         last = max(index for index, entry in enumerate(sends)
                    if entry["operation"] == "target-apply")
         assert [(entry["host"], entry["operation"], entry["window"]["state"])
-                for entry in sends[last + 1:]] == [
+                for entry in sends[last + 1:last + 5]] == [
             ("titan", "target-verify", "applying"), ("titan", "familiar-verify", "applying"),
             ("europa", "target-verify", "applying"), ("europa", "familiar-verify", "applying")]
+        # Only after that checkpoint did the surfaces restart, one at a time.
+        assert [(entry["host"], entry["operation"], entry["window"]["state"])
+                for entry in sends[last + 5:]] == [
+            (host, "surface-restart", "migrated-surfaces-pending") for host in HOSTS
+            for _ in surfaces.SURFACES]
         assert migrated.window["verified"]["hosts"]["europa"]["familiar"]["relay"] == {
             "version": "0.1.1", "commit": world.pins["relay_commit"]}
         # Each target is planned and applied once, on Titan only, with the relay flags.
@@ -2161,7 +2175,7 @@ class TestRun:
         assert "do not change or save Claude model or effort defaults" in migrated.out
         root = cutover_root(world)
         record = state.current_window(root)
-        assert record["state"] == "migrated-surfaces-pending"
+        assert record["state"] == "ready-for-smokes"
         value = json.loads(world.target("titan", "claude").read_bytes())
         value["model"] = "sonnet"
         world.write_target("claude", json.dumps(value, indent="\t").encode() + b"\n")
@@ -2532,7 +2546,7 @@ def _parents(world, commit):
 def _recovery_events(world, since):
     """Host effects in order, from the fixture tools' own observations: timer stops, service
     waits and restores, target restores and relay rollbacks, Git history changes, Codex daemon
-    stops, and any npm, Claude or preflight launch."""
+    stops, surface TERMs and spawns, service starts, and any npm, Claude or preflight launch."""
     names = {str(world.target("titan", target_id)): target_id
              for target_id in transport.TARGET_PATHS}
     timers = {"stop": "timer-stopped", "wait": "service-inactive", "restore": "timer-restored"}
@@ -2551,6 +2565,12 @@ def _recovery_events(world, since):
             found.append(f"{host}:launched-{tool}")
         elif tool == "codex":
             found.append(f"{host}:codex-{call['args'][0]}")
+        elif tool == "signal":
+            found.append(f"{host}:surface-stopped")
+        elif tool == "niri" and call["args"][:3] == ["msg", "action", "spawn-sh"]:
+            found.append(f"{host}:surface-started")
+        elif tool == "systemctl" and call["args"][1:2] == ["start"]:
+            found.append(f"{host}:service-started")
     return found
 
 
@@ -2656,7 +2676,10 @@ def test_missing_merge_record_uses_actual_parents(cutover, monkeypatch):
     assert record["state"] == "applying" and "merge" not in record["familiar"]
     head = transport.familiar_head(cutover.home("titan"))
     assert _parents(cutover, head) == [pre, tip]
-    assert window.status()["next"] == ["recover"]
+    # Its outcome is unrecorded: restart-surfaces reconciles first; sessions stay closed.
+    report = window.status()
+    assert report["next"] == ["restart-surfaces"] and "Do not open Claude or Codex" in report[
+        "detail"]
 
     report = recovery.reconcile_window(record)
     assert (report["class"], report["next"]) == ("recovery-required", ["recover"])
@@ -2717,11 +2740,26 @@ def test_missing_merge_record_uses_actual_parents(cutover, monkeypatch):
         "familiar-reconcile", "dependency-restore"]
 
 
+def _recover_decision(world, record, response="yes"):
+    """This recovery's desktop decision, as recover takes it at its start: the desktop-only
+    preview's subject, the operator's terminal answer consumed and its subject bound."""
+    offered = surfaces.preview(record, surfaces.RECOVER_ACTION)
+    consumed = state.consume_decision(
+        record, _tty(record, surfaces.RECOVER_ACTION, offered["attempt_id"], offered["subject"],
+                     response), kind="desktop", action=surfaces.RECOVER_ACTION,
+        attempt_id=offered["attempt_id"], subject_sha256=offered["sha256"])
+    bound = surfaces.bind(state.current_window(cutover_root(world)), consumed,
+                          offered["subject"])
+    return bound, consumed
+
+
 @needs_zsh
 def test_recovery_works_after_version_hold_breach(cutover):
     """Claude moved past its reviewed evidence on both hosts after the live plan for claude
-    refused, leaving only its guard retired. Recovery reads neither that evidence nor the new
-    version, launches no Claude, and restores everything by its byte, Git and dependency proofs."""
+    refused, leaving only its guard retired, and Codex updated on Titan. The full recover reads
+    neither that evidence nor the new version, launches no Claude, stops the Codex daemons with
+    the release now installed, restores everything by its byte, Git and dependency proofs,
+    restarts the surfaces from a desktop-only preview and restores the original timers."""
     cutover.behave("titan", installer={"live:claude": "plan-fail"})
     cutover.start_dropbox()
     native = (_targets(cutover), _modules(cutover))
@@ -2729,20 +2767,37 @@ def test_recovery_works_after_version_hold_breach(cutover):
     assert (failed.step, failed.host) == ("target-apply", "titan")
     assert [entry["target_id"] for entry in state.read_ledger(record)] == ["claude"]
     assert "applied" not in record
+    cutover.reload()
     cutover.behave("titan", installer={})
     cutover.move_claude()  # the hold breach: a new version, the evidence left behind
+    codex = cutover.move_codex()
     for host in HOSTS:
         cutover.behave(host, preflight={"evidence": "fail"})
     mark, before = len(cutover.lines("observed")), _operations(cutover)
+    # The run's consent never covers recovery's restarts.
+    run = state.load_record(Path(record["directory"]) / "decisions" / f"{window.RUN_ATTEMPT}.json")
+    with pytest.raises(window.Failed, match="earlier run's or retry's consent") as raised:
+        recovery.recover_window(record, run)
+    assert raised.value.observed == "nothing was changed" and _operations(cutover) == before
+    record, consumed = _recover_decision(cutover, record)
 
-    result = recovery.restore_window(record)
-    assert result["class"] == "restored", result
+    result = recovery.recover_window(record, consumed)
+    assert result["class"] == "recovered", result
     ran = {name: operation for name, operation in _operations(cutover).items()
            if name not in before}
     assert set(ran.values()) <= {
         "pending-operations", "codex-daemon-stop", "recovery-no-live", "timer-requiesce",
         "timer-wait", "target-check", "target-restore", "target-verify", "familiar-reconcile",
-        "familiar-restore", "dependency-restore"}  # no inventory, inputs-check or preflight
+        "familiar-restore", "dependency-restore", "surface-preview", "surface-restart",
+        "timer-restore", "service-run"}  # no inventory, inputs-check or preflight
+    # The surfaces stage read only the desktop: no forward inventory or Claude diagnostics.
+    assert {"surface-preview", "surface-restart", "timer-restore", "service-run"} <= set(
+        ran.values())
+    stops = [call for call in observed(cutover, "codex", mark)]
+    assert [call["binary"] for call in stops] == [str(codex)] * 2
+    assert state.current_window(cutover_root(cutover))["recovery"]["codex"] == {
+        "path": str(cutover.home("titan") / ".local/bin/codex"), "real": str(codex),
+        "sha256": transport._digest(codex), "prepared": False}
     assert not any(state.load_record(cutover.root(name.split("-", 1)[0]) / "operations" / name
                                      / "start.json")["payload"]["verify"]
                    for name, operation in ran.items() if operation == "target-verify")
@@ -2753,8 +2808,22 @@ def test_recovery_works_after_version_hold_breach(cutover):
         _recovery_events(cutover, 0))
     assert _restores(events) == ["restore:claude"]  # its guard images, with no relay rollback
     assert (_targets(cutover), _modules(cutover)) == native
-    assert _heads(cutover) == {"titan": result["revert"], "europa": result["revert"]}
-    assert timers_active(cutover) == {"titan": "inactive", "europa": "inactive"}
+    revert = result["window"]["recovery"]["restored"]["revert"]
+    assert _heads(cutover) == {"titan": revert, "europa": revert}
+    stages = [_stage(event) for event in events]
+    assert stages == sorted(stages) and set(stages) == {1, 2, 3, 4, 5, 6}
+    assert timers_active(cutover) == {"titan": "active", "europa": "active"}
+    assert result["state"] == "recovered" and window.status()["next"] == ["check"]
+
+
+# The full recover's six stages, by the host effect each leaves.
+STAGE = {"codex-app-server": 1, "timer-stopped": 2, "service-inactive": 2, "git-revert": 4,
+         "surface-stopped": 5, "surface-started": 5, "timer-restored": 6, "service-started": 6}
+
+
+def _stage(event):
+    head, _, tail = event.partition(":")
+    return 3 if head in ("restore", "rollback") else STAGE[tail]
 
 
 def _signal_when(condition, signum, seconds=60.0):
@@ -2876,7 +2945,12 @@ def test_reconcile_promotes_only_a_verified_migration(cutover, monkeypatch, unse
         "state") == "migrated-surfaces-pending")
     assert record["state"] == "applying" and "verified" not in record
     assert "failure" not in record and len(record["applied"]) == 4
-    assert window.status()["next"] == ["recover"]  # status alone never promotes
+    # Status alone never promotes: it names restart-surfaces, which reconciles first, and
+    # keeps sessions closed until the migration is verified or recovered.
+    report = window.status()
+    assert report["next"] == ["restart-surfaces"] and "Do not open Claude or Codex" in report[
+        "detail"]
+    assert "restart-surfaces reconciles actual state first" in report["detail"]
     if unsettled is not None:
         operation_id, directory = _unsettled_wait(cutover, record,
                                                   kill_owner=unsettled == "owner-lost")
@@ -2888,8 +2962,9 @@ def test_reconcile_promotes_only_a_verified_migration(cutover, monkeypatch, unse
             cancelled = (directory / "cancel.json").exists()
             _settle_wait(cutover, directory, unsettled == "owner-lost")
     if unsettled is not None:
+        following = ["restart-surfaces"] if unsettled == "running" else ["recover"]
         assert not cancelled  # reconciliation cancelled nothing
-        assert (report["class"], report["next"]) == ("recovery-required", ["recover"])
+        assert (report["class"], report["next"]) == ("recovery-required", following)
         assert any(operation_id in blocker and unsettled in blocker
                    for blocker in report["blockers"])
         assert operation_id in report["observed"]
@@ -2899,7 +2974,26 @@ def test_reconcile_promotes_only_a_verified_migration(cutover, monkeypatch, unse
         assert record["state"] == "recovery-required" and "verified" not in record
         assert record["failure"]["status"] == "unsettled"
         assert _mutations(cutover) == mutations
-        assert window.status()["next"] == ["recover"]
+        assert window.status()["next"] == following
+        if unsettled == "owner-lost":
+            # Its recorded child is gone but its owner never recorded completion: only recover's
+            # cancel settles it, so reconciling again changes nothing.
+            again = recovery.reconcile_window(record)
+            assert (again["class"], again["next"]) == ("recovery-required", ["recover"])
+            assert state.current_window(cutover_root(cutover))["failure"]["status"] == "unsettled"
+            return
+        # Settled, the same window reconciles again from restart-surfaces, which promotes the
+        # verified migration and restarts the surfaces under its own session decision.
+        preview = _cli(cutover, monkeypatch, ["restart-surfaces", "--preview"])
+        assert preview.code == 0, preview.stdout
+        assert "not yet verified from actual state" in preview.stdout
+        decision = _decision_from_preview(cutover, record, preview, "restart.json")
+        result = _cli(cutover, monkeypatch, ["restart-surfaces", "--decision-file", decision])
+        assert result.code == 0, result.stdout
+        record = state.current_window(cutover_root(cutover))
+        assert record["state"] == "ready-for-smokes" and record["verified"]["reconciled"]
+        assert [entry["status"] for entry in record["reconciled"]] == ["unsettled"]
+        assert "failure" not in record
         return
     assert (report["class"], report["next"]) == ("verified", ["restart-surfaces"])
     record = state.current_window(cutover_root(cutover))
@@ -2931,16 +3025,21 @@ def test_reconcile_unverified_run_blocks_fresh_sessions(cutover, monkeypatch, ca
     cutover.config["unreachable"] = True
     cutover.save()
     report = recovery.reconcile_window(record)
-    assert (report["class"], report["next"]) == ("recovery-required", ["recover"])
+    assert (report["class"], report["next"]) == ("recovery-required", ["restart-surfaces"])
     assert any(blocker.startswith("europa:") for blocker in report["blockers"])
     record = state.current_window(root)
     assert record["state"] == "recovery-required" and "verified" not in record
     assert record["failure"]["status"] == "unsettled" and "europa" in record["failure"]["error"]
+    assert window.status()["next"] == ["restart-surfaces"]
     cutover.config["unreachable"] = False
     cutover.save()
-    report = recovery.reconcile_window(record)  # settled now, and still recovery-required
+    # Settled now, it reconciles again (no mutation was taken): codex-work was never applied,
+    # so the migration is unverified and only recover remains.
+    report = recovery.reconcile_window(record)
     assert (report["class"], report["next"]) == ("recovery-required", ["recover"])
-    assert state.current_window(root) == record
+    record = state.current_window(root)
+    assert record["failure"]["status"] == "unverified" and "codex-work" in record["failure"][
+        "error"]
     capsys.readouterr()
     assert cli.main(["status"]) == 0
     out = capsys.readouterr().out
@@ -3048,3 +3147,706 @@ def test_service_run_wait_and_result(cutover, monkeypatch):
     assert "nothing was killed" in running["error"]
     for response in (failed, refused, running):
         assert transport.OUTPUT_SECRET not in response["error"]
+
+
+# --- familiar's surfaces: the consent-bound restart, its retry and the full recover ---------
+
+COMMANDS = {"familiar-niri-watch": "~/d/familiar/bin/familiar-niri watch",
+            "niri-desktop": "qs -d -p ~/d/familiar/integrations/niri-desktop"}
+ABSENT = {"state": "explained-absent", "absence_reason": "europa runs no niri session",
+          "socket": None, "surfaces": [{"name": name, "configured": [], "processes": []}
+                                       for name in surfaces.SURFACES]}
+
+
+@pytest.fixture
+def desktop(tmp_path, monkeypatch):
+    """The fixture hosts' desktops and transport, with nothing staged: a surface restart needs
+    only the recorded inventory, niri and the process table."""
+    world = transport.World(tmp_path, monkeypatch)
+    monkeypatch.setattr(window, "CHECKOUT", world.home("titan") / "d/hq")
+    yield world
+    world.close()
+
+
+def _now():
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _tty(record, action, attempt, subject, response="yes"):
+    """A fixture of the operator's terminal answer to this attempt's own prompt."""
+    return {"schema": 1, "kind": "desktop", "action": action, "window_id": record["id"],
+            "attempt_id": attempt, "subject_sha256": sha(subject),
+            "verdict": "approved" if response in cli.APPROVE else "declined",
+            "source": {"type": "tty", "prompt": f"Restart these familiar surfaces ({action} "
+                       f"{attempt})? Type yes:", "response": response, "answered_at": _now()}}
+
+
+def _session(record, action, attempt, digest, reply="yes, restart them", verdict="approved"):
+    """A fixture of an agent's record of the actual session ask and the human's reply."""
+    return {"schema": 1, "kind": "desktop", "action": action, "window_id": record["id"],
+            "attempt_id": attempt, "subject_sha256": digest, "verdict": verdict,
+            "source": {"type": "session", "session_id": SESSION,
+                       "ask": f"Restart familiar's pending surfaces on titan and europa (about "
+                              f"30 s per host) for {attempt}?", "reply": reply,
+                       "answered_at": _now()}}
+
+
+def _pending_window(world, *, absent=()):
+    """A window at its verified migration checkpoint, built from fixture records alone: the
+    run's desktop subject recorded and its decision consumed, every surface still pending."""
+    subject = {"action": window.RUN_ACTION,
+               "hosts": {host: ABSENT if host in absent else world.desktop(host)
+                         for host in HOSTS},
+               "impact": window.IMPACT, "duration_seconds": window.DURATION_SECONDS}
+    opened = state.new_window(world.root("titan"), PREPARED)
+    record = {**opened, "state": "migrated-surfaces-pending", "owner": window._me(),
+              "surfaces": subject, "familiar": {"merge": "1" * 40}}
+    state.save_record(window_file(record), record)
+    consumed = state.consume_decision(
+        record, _tty(record, window.RUN_ACTION, window.RUN_ATTEMPT, subject), kind="desktop",
+        action=window.RUN_ACTION, attempt_id=window.RUN_ATTEMPT, subject_sha256=sha(subject))
+    return record, consumed
+
+
+def _retry(world, reply="yes, restart the pending surfaces"):
+    """A restart-surfaces retry's decision as the CLI takes it: the subject previewed, the
+    recorded session reply consumed, and its subject bound in the window."""
+    root = world.root("titan")
+    record = state.current_window(root)
+    offered = surfaces.preview(record, surfaces.RESTART_ACTION)
+    consumed = state.consume_decision(
+        record, _session(record, surfaces.RESTART_ACTION, offered["attempt_id"],
+                         offered["sha256"], reply),
+        kind="desktop", action=surfaces.RESTART_ACTION, attempt_id=offered["attempt_id"],
+        subject_sha256=offered["sha256"])
+    return surfaces.bind(state.current_window(root), consumed, offered["subject"]), consumed, \
+        offered
+
+
+def _rechecks(monkeypatch):
+    """A retry's recheck of the verified migration, recorded in place of the run's own gate,
+    which the full-run tests exercise."""
+    calls = []
+    monkeypatch.setattr(window, "verified_migration",
+                        lambda record, merge, step=None: calls.append(merge) or {})
+    return calls
+
+
+def _spawned(world, since=0):
+    return [(host, command) for host, command, _ in transport._niri_spawns(world, since)]
+
+
+def _cli(world, monkeypatch, argv, answer=None):
+    """One in-process CLI invocation, its stdout and stderr together. With `answer` it has the
+    operator's terminal, a pty answering once; without, it has none."""
+    master = slave = None
+    if answer is None:
+        monkeypatch.setattr(cli, "TTY", str(world.tmp / "no-terminal"))
+    else:
+        master, slave = os.openpty()
+        monkeypatch.setattr(cli, "TTY", os.ttyname(slave))
+        os.write(master, answer)
+    stream = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(stream), contextlib.redirect_stderr(stream):
+            code = cli.main(argv)
+        terminal = _drain(master) if master is not None else ""
+    finally:
+        for fd in (master, slave):
+            if fd is not None:
+                os.close(fd)
+    return SimpleNamespace(code=code, stdout=stream.getvalue(), terminal=terminal)
+
+
+PREVIEWED = re.compile(r"attempt_id (\S+), subject_sha256 ([0-9a-f]{64})")
+
+
+def _decision_from_preview(world, record, preview, name, **reply):
+    """What an agent writes after the preview: the subject's fields and the actual session ask
+    and reply, in a private decision file."""
+    attempt, digest = PREVIEWED.search(preview.stdout).groups()
+    data = json.dumps(_session(record, surfaces.RESTART_ACTION, attempt, digest, **reply))
+    return str(transport._stage(world.tmp, name, data.encode()))
+
+
+def test_exited_pid_is_expected(desktop):
+    """Titan's recorded watcher exited after the run's consent. Its restart only starts its
+    recorded command; every other surface gets TERM first; the approved subject stays the
+    recording the decision bound."""
+    record, consumed = _pending_window(desktop)
+    recorded = record["surfaces"]["hosts"]
+    watcher = transport._process_of(recorded["titan"], "familiar-niri-watch")
+    spec = desktop.spec("titan")
+    spec["rows"] = [row for row in spec["rows"] if row["pid"] != watcher["pid"]]
+    desktop.save()
+    mark = len(desktop.lines("observed"))
+
+    result = surfaces.restart_surfaces(record, consumed)
+    assert result["state"] == "ready-for-smokes"
+    termed = [("titan", "niri-desktop"), ("europa", "familiar-niri-watch"),
+              ("europa", "niri-desktop")]
+    assert transport._term_signals(desktop, mark) == [
+        (host, transport._process_of(recorded[host], name)["pid"]) for host, name in termed]
+    assert transport._niri_spawns(desktop, mark) == [
+        (host, COMMANDS[name], recorded[host]["socket"]) for host in HOSTS
+        for name in surfaces.SURFACES]
+    current = state.current_window(desktop.root("titan"))
+    done = current["desktop"]["phases"]["forward"]
+    assert (done["titan"]["familiar-niri-watch"]["exited"],
+            done["titan"]["familiar-niri-watch"]["stopped"]) == (True, None)
+    for host, name in termed:
+        assert done[host][name]["stopped"] == transport._process_of(recorded[host], name)
+    # Each validated replacement became its surface's recorded process.
+    for host in HOSTS:
+        for name in surfaces.SURFACES:
+            replacement = done[host][name]["replacement"]
+            assert transport._process_of(current["desktop"]["hosts"][host], name) == \
+                replacement == result["restarted"][host][name]
+            assert replacement in [{key: row[key] for key in ("pid", "start_time", "argv")}
+                                   for row in desktop.surface_rows(host)]
+    # The decision's subject is the recording it approved; the exit changed neither.
+    [attempt] = current["desktop"]["attempts"]
+    assert (attempt["attempt_id"], attempt["outcome"]) == (window.RUN_ATTEMPT, "complete")
+    assert attempt["subject"] == record["surfaces"]
+    assert sha(attempt["subject"]) == consumed["subject_sha256"]
+    # The run's one decision authorized its one restart.
+    with pytest.raises(window.Failed) as raised:
+        surfaces.restart_surfaces(current, consumed)
+    assert raised.value.status == "refused" and "verified migration" in raised.value.error
+    report = window.status()
+    assert report["next"] == ["record-smoke"] and "restarted familiar's surfaces" in report[
+        "detail"]
+
+
+def test_explained_absence_is_never_started(desktop):
+    record, consumed = _pending_window(desktop, absent=("europa",))
+    rows = desktop.on_disk("europa")["rows"]
+    mark = len(desktop.lines("observed"))
+    result = surfaces.restart_surfaces(record, consumed)
+    assert result["state"] == "ready-for-smokes"
+    assert {host for host, _ in transport._term_signals(desktop, mark)} == {"titan"}
+    assert {host for host, _ in _spawned(desktop, mark)} == {"titan"}
+    assert desktop.lines("ssh_log") == []  # nothing even asked Europa
+    assert desktop.on_disk("europa")["rows"] == rows and result["restarted"]["europa"] == {}
+    # A retry or recovery offers nothing there either.
+    assert surfaces.pending(result["window"], surfaces.RECOVERY) == {
+        "titan": list(surfaces.SURFACES), "europa": []}
+
+
+def test_partial_restart_retry(desktop, monkeypatch):
+    """Europa's panel spawn fails during the run's restart. Only that surface stays pending: the
+    migration needs no recovery, and a retry with a fresh decision rechecks the migration and
+    starts only the missing surface."""
+    record, consumed = _pending_window(desktop)
+    recorded = record["surfaces"]["hosts"]
+    desktop.behave("europa", spawn={"niri-desktop": "fail"})
+    with pytest.raises(window.Failed) as raised:
+        surfaces.restart_surfaces(record, consumed)
+    failed = raised.value
+    assert (failed.step, failed.host, failed.status) == ("surface-restart", "europa", "failed")
+    assert "migrated, surfaces pending" in failed.observed
+    assert "pending: europa niri-desktop" in failed.observed
+    assert "Do not open Claude or Codex" not in failed.observed
+    assert failed.next_command == ["restart-surfaces"]
+    current = state.current_window(desktop.root("titan"))
+    assert current["state"] == "migrated-surfaces-pending"
+    done = current["desktop"]["phases"]["forward"]
+    assert {host: sorted(names) for host, names in done.items()} == {
+        "titan": sorted(surfaces.SURFACES), "europa": ["familiar-niri-watch"]}
+    assert current["desktop"]["failure"]["step"] == "surface-restart"
+    report = window.status()
+    assert report["next"] == ["restart-surfaces"]
+    assert "pending: europa niri-desktop" in report["detail"]
+    assert "Do not open Claude or Codex" not in report["detail"]
+    # The run's decision is spent: a retry needs its own.
+    with pytest.raises(window.Failed, match="run's one restart"):
+        surfaces.restart_surfaces(current, consumed)
+
+    desktop.reload()
+    desktop.behave("europa", spawn={})
+    checks = _rechecks(monkeypatch)
+    current, retry, offered = _retry(desktop)
+    # The retry's subject is the recording with the replacements already made, asking only
+    # for the surface still missing.
+    assert offered["attempt_id"] == "restart-1"
+    assert offered["subject"]["restart"] == {"titan": [], "europa": ["niri-desktop"]}
+    assert offered["subject"]["hosts"] == current["desktop"]["hosts"]
+    assert offered["observed"].keys() == {"europa"}
+    mark = len(desktop.lines("observed"))
+    result = surfaces.restart_surfaces(current, retry)
+    assert checks == ["1" * 40]  # the verified migration, rechecked before any desktop
+    assert result["state"] == "ready-for-smokes"
+    # Its recorded panel had exited (TERM went out before the failed spawn): it only starts.
+    assert transport._term_signals(desktop, mark) == []
+    assert transport._niri_spawns(desktop, mark) == [
+        ("europa", COMMANDS["niri-desktop"], recorded["europa"]["socket"])]
+    final = state.current_window(desktop.root("titan"))
+    assert [(entry["attempt_id"], entry["outcome"]) for entry in final["desktop"]["attempts"]] \
+        == [(window.RUN_ATTEMPT, "stopped"), ("restart-1", "complete")]
+    assert final["desktop"]["phases"]["forward"]["europa"]["niri-desktop"]["exited"] is True
+    assert window.status()["next"] == ["record-smoke"]
+
+
+def test_restart_signal_keeps_surfaces_pending(desktop, monkeypatch):
+    """A SIGTERM while Europa starts its watcher cancels that operation explicitly. The
+    operation still journals the replacement it started, the window keeps only the surfaces
+    pending, and the retry adopts that replacement instead of starting it twice."""
+    record, consumed = _pending_window(desktop)
+    recorded = record["surfaces"]["hosts"]
+    desktop.behave("europa", spawn={"familiar-niri": "latch"})
+    operations = desktop.root("europa") / "operations"
+    mark = len(desktop.lines("observed"))
+
+    def interrupt():
+        transport._until(lambda: ("europa", COMMANDS["familiar-niri-watch"]) in _spawned(
+            desktop, mark), seconds=60)
+        os.kill(os.getpid(), signal.SIGTERM)
+        transport._until(lambda: list(operations.glob("*/cancel.json")), seconds=60)
+        Path(desktop.config["latch"]).touch()
+
+    handlers = {signum: signal.getsignal(signum) for signum in hosts.INTERRUPTS}
+    sender = threading.Thread(target=interrupt)
+    sender.start()
+    try:
+        with pytest.raises(window.Failed) as raised:
+            surfaces.restart_surfaces(record, consumed)
+    finally:
+        Path(desktop.config["latch"]).touch()
+        sender.join(timeout=90)
+    failed = raised.value
+    assert (failed.step, failed.host, failed.status) == ("surface-restart", "europa",
+                                                         "interrupted")
+    assert "SIGTERM" in failed.error and "migrated, surfaces pending" in failed.observed
+    assert "Do not open Claude or Codex" not in failed.observed
+    assert {signum: signal.getsignal(signum) for signum in hosts.INTERRUPTS} == handlers
+    current = state.current_window(desktop.root("titan"))
+    assert current["state"] == "migrated-surfaces-pending"
+    assert set(current["desktop"]["phases"]["forward"]) == {"titan"}
+    [cancel] = operations.glob("*/cancel.json")
+    response = state.load_record(cancel.parent / "done.json")["response"]
+    assert response["status"] == "completed"  # it finished starting before it replied
+    started = response["result"]["replacement"]
+    assert transport._surface_journal(desktop, "europa", record["id"])["entries"][
+        "forward:familiar-niri-watch"]["replacement"] == started
+
+    desktop.reload()
+    desktop.behave("europa", spawn={})
+    _rechecks(monkeypatch)
+    current, retry, _ = _retry(desktop)
+    mark = len(desktop.lines("observed"))
+    result = surfaces.restart_surfaces(current, retry)
+    assert result["state"] == "ready-for-smokes"
+    adopted = state.current_window(desktop.root("titan"))["desktop"]["phases"]["forward"][
+        "europa"]["familiar-niri-watch"]
+    assert (adopted["adopted"], adopted["replacement"]) == (True, started)
+    assert transport._niri_spawns(desktop, mark) == [
+        ("europa", COMMANDS["niri-desktop"], recorded["europa"]["socket"])]
+    assert transport._term_signals(desktop, mark) == [
+        ("europa", transport._process_of(recorded["europa"], "niri-desktop")["pid"])]
+
+
+def test_session_decision_required_without_tty(desktop, monkeypatch):
+    """restart-surfaces without a terminal or a decision file stops with instructions before any
+    change; its preview is read-only and names the decision's fields. The agent's recorded
+    session reply and the operator's terminal answer are consumed as the same scoped record,
+    each once; a declined, replayed, partial or unanswered reply authorizes nothing. recover is
+    operator-run: no terminal, no recovery, and it takes no decision file."""
+    record, _ = _pending_window(desktop)
+    root = desktop.root("titan")
+    _rechecks(monkeypatch)
+
+    def unchanged():
+        return (window_file(record).read_bytes(),
+                sorted(os.listdir(Path(record["directory"]) / "decisions")),
+                desktop.on_disk("titan")["rows"], desktop.on_disk("europa")["rows"])
+
+    before, mark = unchanged(), len(desktop.lines("observed"))
+    stopped = _cli(desktop, monkeypatch, ["restart-surfaces"])
+    assert stopped.code == 1 and "restart-surfaces stopped" in stopped.stdout
+    assert "--decision-file" in stopped.stdout and "restart-surfaces --preview" in stopped.stdout
+    assert "observed: nothing was changed" in stopped.stdout
+    assert unchanged() == before and desktop.lines("observed")[mark:] == []
+    assert not (desktop.root("titan") / "operations").exists()
+
+    preview = _cli(desktop, monkeypatch, ["restart-surfaces", "--preview"])
+    assert preview.code == 0, preview.stdout
+    assert unchanged() == before and transport._term_signals(desktop) == []
+    attempt, digest = PREVIEWED.search(preview.stdout).groups()
+    assert attempt == "restart-1"
+    assert digest == surfaces.preview(record, surfaces.RESTART_ACTION)["sha256"]
+    for host in HOSTS:
+        for surface in record["surfaces"]["hosts"][host]["surfaces"]:
+            assert f"{surface['name']} (pid {surface['processes'][0]['pid']}" in preview.stdout
+    assert preview.stdout.splitlines()[-1] == "  next: " + cli.command_line(
+        ["restart-surfaces", "--decision-file", cli.DECISION_PLACEHOLDER])
+
+    # Partial or declined replies refuse before any host is touched.
+    refusals = {
+        "truncated.json": (b'{"schema": 1, "kind": "desktop", "action": "restart-sur',
+                           "not one JSON decision record"),
+        "no-reply.json": (json.dumps(_session(record, surfaces.RESTART_ACTION, attempt, digest,
+                                              reply="   ")).encode(), "reply is empty"),
+        "declined.json": (json.dumps(_session(record, surfaces.RESTART_ACTION, attempt, digest,
+                                              reply="no, not now", verdict="declined")).encode(),
+                          "declined"),
+    }
+    for name, (data, fragment) in refusals.items():
+        path = transport._stage(desktop.tmp, name, data)
+        result = _cli(desktop, monkeypatch, ["restart-surfaces", "--decision-file", str(path)])
+        assert result.code == 1 and fragment in result.stdout, (name, result.stdout)
+        assert transport._term_signals(desktop) == [] and transport._niri_spawns(desktop) == []
+    assert sorted(os.listdir(Path(record["directory"]) / "decisions")) == [
+        f"{window.RUN_ATTEMPT}.json"]
+
+    # The agent's record of the actual ask and reply: Europa's panel fails to start.
+    desktop.behave("europa", spawn={"niri-desktop": "fail"})
+    path = _decision_from_preview(desktop, record, preview, "session.json")
+    first = _cli(desktop, monkeypatch, ["restart-surfaces", "--decision-file", path])
+    assert first.code == 1 and "migrated, surfaces pending" in first.stdout
+    assert "Do not open Claude or Codex" not in first.stdout
+    assert "do not change or save Claude model or effort defaults" in first.stdout
+    assert f"next: {cli.command_line(['restart-surfaces'])}" in first.stdout
+    assert len(transport._niri_spawns(desktop)) == 4
+    # Replayed, the same file authorizes nothing: its attempt is spent, and so is its reply.
+    desktop.reload()
+    desktop.behave("europa", spawn={})
+    replayed = _cli(desktop, monkeypatch, ["restart-surfaces", "--decision-file", path])
+    assert replayed.code == 1 and "attempt_id does not match" in replayed.stdout
+    moved = json.loads(Path(path).read_text())
+    current = state.current_window(root)
+    moved.update(attempt_id="restart-2",
+                 subject_sha256=surfaces.preview(current, surfaces.RESTART_ACTION)["sha256"])
+    again = transport._stage(desktop.tmp, "replayed.json", json.dumps(moved).encode())
+    reused = _cli(desktop, monkeypatch, ["restart-surfaces", "--decision-file", str(again)])
+    assert reused.code == 1 and "reply was already consumed by attempt restart-1" in reused.stdout
+    assert len(transport._niri_spawns(desktop)) == 4
+
+    # The operator's own terminal: an empty answer authorizes nothing; "yes" does, once.
+    empty = _cli(desktop, monkeypatch, ["restart-surfaces"], answer=b"\n")
+    assert empty.code == 1 and "no answer was given" in empty.stdout
+    answered = _cli(desktop, monkeypatch, ["restart-surfaces"], answer=b"yes\n")
+    assert answered.code == 0, answered.stdout
+    # Its bounded preview asked only about the one surface still pending.
+    assert "titan: nothing restarts" in answered.terminal
+    assert "    niri-desktop (" in answered.terminal
+    assert "familiar-niri-watch" not in answered.terminal
+    assert state.current_window(root)["state"] == "ready-for-smokes"
+    assert len(transport._niri_spawns(desktop)) == 5
+    decisions = Path(record["directory"]) / "decisions"
+    session, tty = (state.load_record(decisions / name)
+                    for name in ("restart-1.json", "restart-2.json"))
+    assert session.keys() == tty.keys()
+    scope = ("schema", "window_id", "kind", "action", "prepared_sha256")
+    assert {key: session[key] for key in scope} == {key: tty[key] for key in scope}
+    assert (session["decision"]["source"]["type"], tty["decision"]["source"]["type"]) == (
+        "session", "tty")
+
+    # recover is operator-run: without a terminal it stops before any change, and no decision
+    # file stands in for the operator.
+    with_state(state.current_window(root), "recovery-required")
+    mark = len(desktop.lines("observed"))
+    refused = _cli(desktop, monkeypatch, ["recover"])
+    assert refused.code == 1 and "recover is operator-run" in refused.stdout
+    assert "observed: nothing was changed" in refused.stdout
+    assert desktop.lines("observed")[mark:] == []
+    with pytest.raises(SystemExit) as raised:
+        _cli(desktop, monkeypatch, ["recover", "--decision-file", path])
+    assert raised.value.code == 2
+
+
+def test_unverified_migration_keeps_the_mixed_hooks_ban(desktop, monkeypatch):
+    """A migration that failed before its verified checkpoint is no surface-only failure:
+    restart-surfaces refuses before any ask or host, and the window keeps the ban on opening
+    Claude or Codex with the complete recover command."""
+    record, consumed = _pending_window(desktop)
+    failure = {"step": "target-verify", "host": "europa", "status": "blocked",
+               "error": "claude do not hold the sealed bytes", "log": None, "at": _now()}
+    unverified = with_state({**record, "failure": failure}, "recovery-required")
+    result = _cli(desktop, monkeypatch, ["restart-surfaces"], answer=b"yes\n")
+    assert result.code == 1 and "desktop consent" not in result.terminal  # never asked
+    assert "Do not open Claude or Codex" in result.stdout
+    assert f"next: {cli.command_line(['recover'])}" in result.stdout
+    assert not (desktop.root("titan") / "operations").exists()
+    with pytest.raises(window.Failed) as raised:
+        surfaces.restart_surfaces(unverified, consumed)
+    assert raised.value.status == "refused" and raised.value.next_command == ["recover"]
+    report = window.status()
+    assert report["next"] == ["recover"] and "Do not open Claude or Codex" in report["detail"]
+    assert state.current_window(desktop.root("titan")) == unverified
+
+
+def test_pilot_true_spawn_needs_its_consent(desktop):
+    """A pilot spawns only the fixed `true`, through each named host's trusted niri socket, with
+    its own invocation's consumed decision for exactly that subject, once."""
+    root = desktop.root("titan")
+    pilot = state.new_window(root, PREPARED, mode="pilot")
+    sockets = {host: desktop.desktop(host)["socket"] for host in HOSTS}
+    subject = surfaces.probe_subject(pilot, sockets)
+    assert subject["command"] == ["true"] and set(subject["hosts"]) == set(HOSTS)
+    unconsumed = _tty(pilot, surfaces.PROBE_ACTION, "probe-1", subject)
+    with pytest.raises(window.Failed, match="consumed decision"):
+        surfaces.probe(pilot, unconsumed, sockets)
+    other = state.consume_decision(pilot, _tty(pilot, "restart-surfaces", "probe-0", subject,
+                                               response="y"),
+                                   kind="desktop", action="restart-surfaces",
+                                   attempt_id="probe-0", subject_sha256=sha(subject))
+    with pytest.raises(window.Failed, match="consumed decision"):
+        surfaces.probe(pilot, other, sockets)
+    consumed = state.consume_decision(pilot, unconsumed, kind="desktop",
+                                      action=surfaces.PROBE_ACTION, attempt_id="probe-1",
+                                      subject_sha256=sha(subject))
+    with pytest.raises(window.Failed, match="consumed decision"):  # another subject
+        surfaces.probe(pilot, consumed, {"titan": sockets["titan"]})
+    assert transport._niri_spawns(desktop) == []
+    rows = {host: desktop.on_disk(host)["rows"] for host in HOSTS}
+    result = surfaces.probe(state.current_window(root), consumed, sockets)
+    assert {host: entry["acknowledged"] for host, entry in result["hosts"].items()} == {
+        host: True for host in HOSTS}
+    assert transport._niri_spawns(desktop) == [(host, "true", sockets[host]) for host in HOSTS]
+    assert {host: desktop.on_disk(host)["rows"] for host in HOSTS} == rows
+    assert transport._term_signals(desktop) == []
+    [probed] = state.current_window(root)["probes"]
+    assert (probed["attempt_id"], probed["subject"], set(probed["results"])) == (
+        "probe-1", subject, set(HOSTS))
+    with pytest.raises(window.Failed, match="already ran"):
+        surfaces.probe(state.current_window(root), consumed, sockets)
+    # A live window has no fixed spawn.
+    with_state(state.current_window(root), "aborted")
+    live = state.new_window(root, PREPARED)
+    with pytest.raises(window.Failed, match="only in an open pilot"):
+        surfaces.probe(live, consumed, sockets)
+    assert len(transport._niri_spawns(desktop)) == 2
+
+
+@needs_zsh
+def test_surface_failure_is_pending(cutover, monkeypatch):
+    """A whole run whose migration verified, then Europa's panel failed to start. Only the
+    surfaces are pending: live hooks stay the verified ones, the handoff names the paused timers,
+    the retry and safe resume rather than the mixed-hooks ban, a second run repeats nothing, and
+    restart-surfaces with the agent's session decision rechecks the migration and starts only
+    the missing surface."""
+    cutover.start_dropbox()
+    cutover.behave("europa", spawn={"niri-desktop": "fail"})
+    preparation.prepare(SESSION)
+    root = cutover_root(cutover)
+    failed_surface_result = _cli(cutover, monkeypatch, ["run"], answer=b"yes\n")
+    assert failed_surface_result.code == 1, failed_surface_result.stdout
+    status = window.status()["window"]
+    assert status["state"] == "migrated-surfaces-pending"
+    record = state.current_window(root)
+    sealed = record["sealed"]["inputs"]["hosts"]
+    verified_live_hooks_before = {host: {target_id: entry["expected"]["sha256"]
+                                         for target_id, entry in sealed[host].items()}
+                                  for host in HOSTS}
+    live_hooks_after = {host: {target_id: transport._digest(cutover.target(host, target_id))
+                               for target_id in inputs.relevant(host)} for host in HOSTS}
+    assert live_hooks_after == verified_live_hooks_before
+    assert "Do not open Claude or Codex" not in failed_surface_result.stdout
+    out = failed_surface_result.stdout
+    assert "run stopped" in out and "step: surface-restart" in out and "host: europa" in out
+    assert "migrated, surfaces pending" in out and "pending: europa niri-desktop" in out
+    assert "familiar-reap.timer stays paused on titan and europa until finish" in out
+    assert "may resume through the held trust and resume path" in out
+    assert "do not change or save Claude model or effort defaults" in out
+    assert out.splitlines()[-1] == f"  next: {cli.command_line(['restart-surfaces'])}"
+    for secret in SECRETS + (transport.OUTPUT_SECRET,):
+        assert secret not in out
+    assert timers_active(cutover) == {"titan": "inactive", "europa": "inactive"}
+
+    # A second run finds the verified migration and repeats none of its writes.
+    mutations = _mutations(cutover)
+    again = _cli(cutover, monkeypatch, ["run"])
+    assert again.code == 0, again.stdout
+    assert "already verified its migration; nothing was repeated" in again.stdout
+    assert "do not change or save Claude model or effort defaults" in again.stdout
+    assert again.stdout.splitlines()[-1] == f"  next: {cli.command_line(['restart-surfaces'])}"
+    assert _mutations(cutover) == mutations and state.current_window(root) == record
+
+    # The agent previews, asks in the session and passes the recorded reply.
+    cutover.reload()
+    cutover.behave("europa", spawn={})
+    preview = _cli(cutover, monkeypatch, ["restart-surfaces", "--preview"])
+    assert preview.code == 0, preview.stdout
+    assert "titan: nothing restarts" in preview.stdout and "    niri-desktop (" in preview.stdout
+    decision = _decision_from_preview(cutover, record, preview, "restart.json")
+    requests, mark = _requests(monkeypatch, cutover), len(cutover.lines("observed"))
+    retried = _cli(cutover, monkeypatch, ["restart-surfaces", "--decision-file", decision])
+    assert retried.code == 0, retried.stdout
+    sends = [(entry["host"], entry["operation"], entry["payload"].get("verify"))
+             for _, entry in _sends(requests)]
+    # The invocation reads Europa's desktop for the subject the reply approved, consumes it,
+    # settles its hosts, rechecks the verified migration, and only then starts the panel.
+    assert sends == [
+        ("europa", "surface-preview", None),
+        ("titan", "pending-operations", None), ("europa", "pending-operations", None),
+        ("titan", "target-verify", True), ("titan", "familiar-verify", None),
+        ("europa", "target-verify", True), ("europa", "familiar-verify", None),
+        ("europa", "surface-restart", None)]
+    assert _spawned(cutover, mark) == [("europa", COMMANDS["niri-desktop"])]
+    assert transport._term_signals(cutover, mark) == []
+    record = state.current_window(root)
+    assert record["state"] == "ready-for-smokes"
+    assert {host: {target_id: transport._digest(cutover.target(host, target_id))
+                   for target_id in inputs.relevant(host)} for host in HOSTS} == \
+        verified_live_hooks_before
+    assert retried.stdout.splitlines()[-1] == f"  next: {cli.command_line(['record-smoke'])}"
+
+
+@needs_zsh
+def test_recover_six_stages_and_partial_timer_retry(cutover, monkeypatch):
+    """All four targets were applied, then Europa's verification failed. recover, answered on the
+    operator's terminal at its start, runs its six stages in order: Codex daemons and no-live,
+    timers stopped again, targets, source and dependencies, the surfaces restarted with this
+    recovery's own consent, then the original timers and their service. Europa's timer restore
+    fails once after Titan's succeeded; the next recover stops Titan's timer again before
+    anything else and completes without restarting any surface again."""
+    cutover.behave("europa", fail=["verify"])
+    cutover.start_dropbox()
+    native = (_targets(cutover), _modules(cutover))
+    failed, record = _failed_run(cutover)
+    assert (failed.step, failed.host) == ("target-verify", "europa")
+    root = cutover_root(cutover)
+    cutover.reload()
+    cutover.behave("europa", fail=[], timers={"restore": "fail"})
+    before, mark = _operations(cutover), len(cutover.lines("observed"))
+
+    first = _cli(cutover, monkeypatch, ["recover"], answer=b"yes\n")
+    assert first.code == 1, first.stdout
+    assert "recover stopped" in first.stdout and "step: timer-restore" in first.stdout
+    assert "host: europa" in first.stdout and "Do not open Claude or Codex" in first.stdout
+    assert first.stdout.splitlines()[-1] == f"  next: {cli.command_line(['recover'])}"
+    # The desktop-only preview the operator approved named every surface it restarts.
+    assert surfaces.RECOVERY_IMPACT in first.terminal
+    for host in HOSTS:
+        for surface in record["surfaces"]["hosts"][host]["surfaces"]:
+            assert f"pid {surface['processes'][0]['pid']}" in first.terminal
+    events = _recovery_events(cutover, mark)
+    stages = [_stage(event) for event in events]
+    assert stages == sorted(stages) and set(stages) == {1, 2, 3, 4, 5, 6}
+    assert [event for event in events if _stage(event) == 5] == [
+        f"{host}:surface-{kind}" for host in HOSTS for _ in surfaces.SURFACES
+        for kind in ("stopped", "started")]
+    assert [event for event in events if _stage(event) == 6] == [
+        "titan:timer-restored", "europa:timer-restored"]
+    assert not any(":launched-" in event for event in events)
+    ran = {_operations(cutover)[name] for name in set(_operations(cutover)) - set(before)}
+    assert not ran & {"inventory", "inputs-check", "no-live"}  # desktop-only, no preflight
+    record = state.current_window(root)
+    assert record["state"] == "recovering"
+    consumed = state.load_record(Path(record["directory"]) / "decisions" / "recover-1.json")
+    assert (consumed["kind"], consumed["action"], consumed["decision"]["source"]["type"]) == (
+        "desktop", "recover", "tty")
+    assert {host: sorted(names) for host, names in
+            record["desktop"]["phases"]["recovery"].items()} == {
+        host: sorted(surfaces.SURFACES) for host in HOSTS}
+    assert list(record["recovery"]["original_timers"]) == ["titan"]
+    assert timers_active(cutover) == {"titan": "active", "europa": "inactive"}
+    report = window.status()
+    assert report["next"] == ["recover"] and "restarted familiar's surfaces" in report["detail"]
+    assert "Do not open Claude or Codex" in report["detail"]
+
+    cutover.reload()
+    cutover.behave("europa", timers={})
+    mark = len(cutover.lines("observed"))
+    second = _cli(cutover, monkeypatch, ["recover"], answer=b"")
+    assert second.code == 0, second.stdout
+    assert "desktop consent" not in second.terminal  # nothing left to restart, nothing asked
+    assert _recovery_events(cutover, mark) == [
+        "titan:codex-app-server", "titan:codex-app-server", "titan:timer-stopped",
+        "europa:timer-stopped", "titan:service-inactive", "europa:service-inactive",
+        "titan:timer-restored", "europa:timer-restored", "titan:service-started",
+        "europa:service-started"]
+    record = state.current_window(root)
+    assert record["state"] == "recovered"
+    assert record["recovery"]["timers"]["titan"]["was_restored"] is True
+    assert sorted(os.listdir(Path(record["directory"]) / "decisions")) == [
+        "recover-1.json", f"{window.RUN_ATTEMPT}.json"]
+    assert timers_active(cutover) == {"titan": "active", "europa": "active"}
+    assert {host: cutover.units(host)["familiar-reap.service"]["runs"] for host in HOSTS} == {
+        "titan": 1, "europa": 1}
+    assert (_targets(cutover), _modules(cutover)) == native
+    assert "native recovery complete" in second.stdout and "fresh native sessions may start" in \
+        second.stdout
+    assert window.status()["next"] == ["check"]
+
+
+def test_changed_context_needs_a_new_inventory_and_decision(desktop, monkeypatch):
+    """Niri restarted on Titan after the run's consent, so its socket changed. The run's restart
+    stops there for inspection before any signal or spawn, leaving only the surfaces pending.
+    The retry's preview offers Titan's new inventory; an approval of the old recording does not
+    admit it, the new decision does, and the restart then uses that inventory."""
+    record, consumed = _pending_window(desktop)
+    recorded = record["surfaces"]["hosts"]
+    transport._restarted_niri(desktop, None)
+    desktop.save()
+    mark = len(desktop.lines("observed"))
+    with pytest.raises(window.Failed) as raised:
+        surfaces.restart_surfaces(record, consumed)
+    failed = raised.value
+    assert (failed.step, failed.host, failed.status) == ("surface-restart", "titan", "failed")
+    assert "changed context" in failed.error and "socket is not the recorded one" in failed.error
+    assert "migrated, surfaces pending" in failed.observed
+    assert "Do not open Claude or Codex" not in failed.observed
+    assert transport._term_signals(desktop, mark) == [] and _spawned(desktop, mark) == []
+    current = state.current_window(desktop.root("titan"))
+    assert current["state"] == "migrated-surfaces-pending"
+    assert current["desktop"]["phases"] == {}
+
+    _rechecks(monkeypatch)
+    offered = surfaces.preview(current, surfaces.RESTART_ACTION)
+    new = offered["subject"]["hosts"]["titan"]
+    assert new["socket"].endswith("niri.wayland-1.3900900.sock")
+    assert new == {**recorded["titan"], "socket": new["socket"]}
+    assert offered["subject"]["hosts"]["europa"] == recorded["europa"]
+    assert offered["observed"]["titan"]["changes"] == [
+        "the trusted niri socket is not the recorded one"]
+    stale = {**offered["subject"], "hosts": recorded}
+    with pytest.raises(Stop, match="subject_sha256 does not match"):
+        state.consume_decision(current, _session(current, surfaces.RESTART_ACTION,
+                                                 offered["attempt_id"], sha(stale)),
+                               kind="desktop", action=surfaces.RESTART_ACTION,
+                               attempt_id=offered["attempt_id"], subject_sha256=offered["sha256"])
+    current, retry, _ = _retry(desktop)
+    result = surfaces.restart_surfaces(current, retry)
+    assert result["state"] == "ready-for-smokes"
+    assert transport._niri_spawns(desktop, mark) == [
+        (host, COMMANDS[name], new["socket"] if host == "titan" else recorded[host]["socket"])
+        for host in HOSTS for name in surfaces.SURFACES]
+    final = state.current_window(desktop.root("titan"))["desktop"]["hosts"]["titan"]
+    assert final["socket"] == new["socket"]
+
+
+def test_recheck_drift_needs_inspection(desktop, monkeypatch):
+    """A retry's recheck of the verified migration that cannot reach a host leaves only the
+    surfaces pending; one that finds the migration changed restarts nothing and needs inspection
+    and recover, with the ban on opening Claude or Codex."""
+    record, _ = _pending_window(desktop)
+    outcome = {"status": "unsettled"}
+
+    def recheck(record, merge, step=None):
+        raise window.Failed("target-verify", "europa", outcome["status"],
+                            "claude do not hold the sealed bytes after waiting for "
+                            "synchronization")
+
+    monkeypatch.setattr(window, "verified_migration", recheck)
+    current, retry, _ = _retry(desktop)
+    mark = len(desktop.lines("observed"))
+    with pytest.raises(window.Failed) as raised:
+        surfaces.restart_surfaces(current, retry)
+    assert "migrated, surfaces pending" in raised.value.observed
+    assert raised.value.next_command == ["status"]
+    assert state.current_window(desktop.root("titan"))["state"] == "migrated-surfaces-pending"
+
+    outcome["status"] = "blocked"
+    current, retry, _ = _retry(desktop, reply="yes, try the pending surfaces once more")
+    with pytest.raises(window.Failed) as raised:
+        surfaces.restart_surfaces(current, retry)
+    failed = raised.value
+    assert (failed.step, failed.host, failed.status) == ("target-verify", "europa", "blocked")
+    assert "Do not open Claude or Codex until recover completes" in failed.observed
+    assert failed.next_command == ["recover"]
+    assert transport._term_signals(desktop, mark) == [] and _spawned(desktop, mark) == []
+    assert state.current_window(desktop.root("titan"))["state"] == "inspection-required"
+    report = window.status()
+    assert report["next"] == ["recover"]
+    assert "stopped pending inspection at target-verify on europa (blocked)" in report["detail"]

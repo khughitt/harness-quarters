@@ -38,9 +38,10 @@ RETAINED = (
 )
 # operations/: hosts' operation records; prepared.json: the last preparation; inputs/: staged
 # reviewed-input generations; quiesce/: each host's per-window timer and snapshot records;
-# dry/: each host's per-window frozen targets and installer dry runs.
+# dry/: each host's per-window frozen targets and installer dry runs; surfaces/: each host's
+# per-window journal of familiar surface restarts.
 LAYOUT = ("windows/", "active.json", "operations/", "prepared.json", "inputs/", "quiesce/",
-          "dry/")
+          "dry/", "surfaces/")
 WINDOW_KEYS = ("schema", "id", "mode", "state", "directory", "created_at",
                "prepared_sha256")
 DECISION_KEYS = {"schema", "kind", "action", "window_id", "attempt_id",

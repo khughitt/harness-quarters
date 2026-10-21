@@ -14,8 +14,9 @@ These are fixed host operations run by `hosts.execute`; the window orchestration
   root's name and compared with its live tree. An abort returns each kept snapshot to its name
   and retains refreshed or partial copies under `abort/`.
 
-The Codex daemons stop only through `codex app-server daemon stop` for each Titan home, and a
-surviving Claude or Codex process is reported for inspection, never killed. Strict no-live
+The Codex daemons stop only through `codex app-server daemon stop` for each Titan home (in
+recovery, with the release installed at the recorded path even if it changed), and a surviving
+Claude or Codex process is reported for inspection, never killed. Strict no-live
 reads this user's whole process table and the existing relay preflight with no exemption.
 Children run through `hosts._run_child`; their raw output stays in the private log."""
 import hashlib
@@ -90,15 +91,23 @@ def _harness_processes(context):
 
 
 def codex_daemon_stop(context):
-    """Stop both Titan homes' Codex app-server daemons with the supported CLI."""
+    """Stop both Titan homes' Codex app-server daemons with the supported CLI.
+
+    Forward, the executable must be the one recorded at preparation. With `recovery`, drift
+    blocks forward progress but never restoration: the stop runs whatever standalone Codex
+    release is installed at the recorded path and reports its identity."""
     _live_only(context)
     home = Path(context["home"])
     codex = inventory._resolve(home / ".local/bin/codex",
                                home / ".codex/packages/standalone/releases",
                                inventory.CODEX_FAMILY)
-    if not codex["familiar"] or codex["sha256"] != context["payload"]["codex_sha256"]:
+    prepared = codex["familiar"] and codex["sha256"] == context["payload"]["codex_sha256"]
+    if not context["payload"].get("recovery") and not prepared:
         raise Stop("~/.local/bin/codex is not the Codex executable recorded at preparation; "
                    "prepare again")
+    if not codex["familiar"]:
+        raise Stop("~/.local/bin/codex does not resolve to a standalone Codex release owned by "
+                   "this user; nothing was run; inspect it")
     stopped = []
     for name, codex_home in (("personal", None), ("work", home / ".codex-work")):
         env = _held_env(context)
@@ -113,7 +122,9 @@ def codex_daemon_stop(context):
                        f"{result.returncode}; see the private log")
         stopped.append(name)
     survivors = [entry for entry in _harness_processes(context) if entry["harness"] == "codex"]
-    return {"stopped": stopped, "survivors": survivors}
+    return {"stopped": stopped, "survivors": survivors,
+            "executable": {"path": codex["path"], "real": codex["real"],
+                           "sha256": codex["sha256"], "prepared": prepared}}
 
 
 def no_live(context):
@@ -475,8 +486,8 @@ _REQUIRED = frozenset({"window_id"})
 OPERATIONS = {
     "codex-daemon-stop": hosts.Operation(
         run=codex_daemon_stop, deadline=2 * CHILD_SECONDS + 60, mutation=True,
-        payload={**_WINDOW, "codex_sha256": _sha}, required=frozenset({"window_id",
-                                                                        "codex_sha256"}),
+        payload={**_WINDOW, "codex_sha256": _sha, "recovery": lambda value: type(value) is bool},
+        required=frozenset({"window_id", "codex_sha256"}),
         hosts=("titan",)),
     "no-live": hosts.Operation(run=no_live, deadline=NO_LIVE_SECONDS, mutation=False,
                                payload=_WINDOW),
