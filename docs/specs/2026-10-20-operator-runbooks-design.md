@@ -674,3 +674,32 @@ revision; dotfiles' `bashrc`, `bash_profile` and `shell/history`;
 [Bash set options](https://www.gnu.org/software/bash/manual/html_node/The-Set-Builtin.html),
 [history search commands](https://www.gnu.org/software/bash/manual/html_node/Commands-For-History.html),
 and [history facilities](https://www.gnu.org/software/bash/manual/html_node/Bash-History-Facilities.html).
+
+## Amendment 2026-10-21: familiar task-record drift
+
+Approved direction: Keith, 2026-10-21, after the real-host `prepare` refused because familiar
+had moved two task-record commits past PRE (adding only `tasks/fam-ff5351.md`). Familiar's
+own task tracker commits into the same repository, so an exact PRE cannot be held until the
+window.
+
+- PRE (`00f4899ae523d613d21f44bfc2c456aac67f8e5f`) stays the approved ancestor pin and the
+  feature tip (`a16f4daa59b04e32f1010764d6f94401ca4eed8b`) stays the immutable merge source.
+- The familiar base B is familiar's actual HEAD on Titan. B is eligible only when PRE is an
+  ancestor of B, `PRE..B` holds no merge commit, every commit in `PRE..B` changes only paths
+  under `tasks/`, and the tree is clean and native. B equal to PRE is the original case.
+- `prepare` and `check` report B and its task-only proof (commit count; no path outside
+  `tasks/`). A B that breaks the rule blocks as `familiar-native`, naming the offending
+  commit and path. B moving between `prepare` and `run` while still eligible is not drift.
+- `run` re-derives B after strict no-live and quiescence, and records it in the window's
+  familiar record before the merge mark. The merge's parents must be `[B, tip]`. The
+  pre-merge source check and snapshot refresh use B; Europa's source sync waits for the
+  merge exactly as before.
+- Recovery and restoration use the recorded B wherever they used PRE: a recovered revert's
+  tree must equal B's tree and its parent the merge whose parents are `[B, tip]`; HEAD equal
+  to B is the not-merged case. A merge discovered without its record is accepted only when
+  its first parent is an eligible base.
+- From `run` until `finish` reports complete (or recovery completes), nothing may be
+  committed to familiar, task filing included. A commit after the merge makes recovery
+  report unexpected history and stop for inspection. Every handoff and the runbook state
+  this freeze beside the Claude pick freeze.
+- The pilot applies the same rule to its scratch clone, cloned at the current B.

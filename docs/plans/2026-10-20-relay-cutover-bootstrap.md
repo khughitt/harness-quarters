@@ -1005,3 +1005,29 @@ before a new window. No in-window re-probe/continuation path is added.
   and preserve updates disabled through finish. No live results are implied.
 - [x] Keith approved the complete plan after round 5 acceptance; the Minor probe
   ordering is incorporated. Task 1 starts in a fresh subagent-driven session.
+
+## Amendment 2026-10-21: familiar task-record drift (after Task 9 Step 7)
+
+Implements the spec amendment of the same date. Ruling R61 in the SDD ledger records the
+user's approval. One corrective change on the delivered tool, then redelivery:
+
+1. A shared, read-only base rule: from familiar's HEAD on the host, require PRE as ancestor,
+   no merge commit in `PRE..HEAD`, only `tasks/` paths changed by every commit in the range,
+   and a clean native tree; return B and its proof, or a `familiar-native` blocker naming the
+   commit and path. Readiness (`prepare`/`check`, both hosts) uses it instead of the exact
+   `familiar-source --head PRE`.
+2. `run` derives B after quiescence and records it with the familiar mark before merging;
+   `familiar-merge`, the snapshot refresh's source check and the merge-parent check use B;
+   the pins PRE and tip stay fixed and are still checked.
+3. Restoration and recovery take the recorded B (a discovered merge's first parent must pass
+   the rule): classifier `at-base`, revert tree equals B's tree, dependency restore checks
+   against B. The pilot clones at the current B.
+4. Handoffs and the runbook add the familiar commit freeze from `run` until finish or
+   recovery.
+5. Tests (RED first): tasks-only drift accepted through prepare, check, run, merge and full
+   recovery; a non-`tasks/` path and a merge commit in range refused; B moving with more
+   tasks-only commits between prepare and run accepted; a commit after the merge makes
+   recovery stop for inspection; the original B = PRE case unchanged.
+6. Mandatory suite, scoped review, cherry-pick redelivery with the delivered tree's
+   `just test`, Europa helper-byte check, restaged input generation (helper digests), then
+   resume Task 9 Step 7.
