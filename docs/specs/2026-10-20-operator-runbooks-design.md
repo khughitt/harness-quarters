@@ -452,6 +452,12 @@ Unexpected version drift after bootstrap is a hold breach: stop new smokes, name
 paused timers and require ordinary-shell full recovery before a fresh Steps 5–7
 pass and final held check. Keep this conservative path rather than introducing
 evidence replacement in an active window.
+
+> Note (2026-10-21, ruling R47): a hold breach follows the verified migration, so the
+> recovery reverts a committed merge, and a recovered committed merge ends the window:
+> familiar stays at the recovery revert and the tool merges only from PRE. No fresh
+> Steps 5–7 pass reopens that window; a later attempt needs newly reviewed pins and
+> inputs, as the plan says.
 Stale Claude evidence blocks forward progress, never restoration: recovery uses
 strict no-live, pinned relay and byte/Git/dependency proofs without launching the
 changed Claude or requiring its version to equal obsolete evidence. Restore native
