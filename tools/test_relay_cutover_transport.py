@@ -45,6 +45,7 @@ FIXTURE_REMOTE = r'''
 """Python-boundary stand-ins inside a fixture helper process."""
 import json
 import os
+import signal
 import sys
 from pathlib import Path
 
@@ -79,6 +80,28 @@ def register(hosts, operations):
         operations.OPERATIONS[name] = hosts.Operation(
             run=step, deadline=deadline, mutation=True, payload=KEYS,
             required=frozenset({"latch", "seconds"}))
+
+    def boundary(context):
+        """One child that writes the latch path after `seconds`, with SIGTERM sent to this
+        helper right after the child launched, before the operation records it."""
+        payload, launch = context["payload"], hosts._launch
+
+        def launch_then_signal(argv, **options):
+            process = launch(argv, **options)
+            hosts._launch = launch
+            os.kill(os.getpid(), signal.SIGTERM)
+            return process
+
+        hosts._launch = launch_then_signal
+        hosts._run_child(context, "late-writer", [
+            sys.executable, "-S", "-c", "import sys, time; time.sleep(float(sys.argv[2])); "
+            "open(sys.argv[1], 'w').write('x')", payload["latch"], str(payload["seconds"])],
+            env=hosts._child_env(context), timeout=30)
+        return {}
+
+    operations.OPERATIONS["fixture-boundary"] = hosts.Operation(
+        run=boundary, deadline=30, mutation=True, payload=KEYS,
+        required=frozenset({"latch", "seconds"}))
 
 
 def _alive(pid, start_time):
@@ -535,7 +558,8 @@ if args[:1] != ["preflight"]:
         sys.exit(1)
     # The real helper, with what it and its Git read from the environment its caller built.
     env = {key: os.environ[key] for key in ("PATH", "HOME", "USER", "LANG", "TMPDIR",
-                                            "RELAY_CUTOVER_RELAY") if key in os.environ}
+                                            "RELAY_CUTOVER_RELAY", "RELAY_INSTALL_ROOT")
+           if key in os.environ}
     code = subprocess.run([sys.executable, "-B", "@TOOLS@/relay-cutover", *args],
                           env=env).returncode
     observe(exit=code)
@@ -668,7 +692,8 @@ if args == ["list", "--json"]:
     # relay list --json: this host's fixture registry and liveness, as relay prints them.
     with open(config["observed"], "a") as stream:
         stream.write(json.dumps({"host": host, "tool": "relay", "args": args,
-                                 "hold": os.environ.get("DISABLE_UPDATES")}) + "\n")
+                                 "hold": os.environ.get("DISABLE_UPDATES"),
+                                 "runtime_root": os.environ.get("RELAY_INSTALL_ROOT")}) + "\n")
     if config["hosts"][host]["behavior"].get("relay") == "fail":
         print("relay: error: fixture registry failure @SECRET@", file=sys.stderr)
         sys.exit(1)
@@ -689,7 +714,8 @@ if args[:1] == ["rollback"]:
     with open(config["observed"], "a") as stream:
         stream.write(json.dumps({"host": host, "tool": "installer", "args": args,
                                  "phase": "rollback", "target_id": target_id, "apply": False,
-                                 "hold": os.environ.get("DISABLE_UPDATES")}) + "\n")
+                                 "hold": os.environ.get("DISABLE_UPDATES"),
+                                 "runtime_root": os.environ.get("RELAY_INSTALL_ROOT")}) + "\n")
     if config["hosts"][host]["behavior"].get("installer", {}).get(f"rollback:{target_id}"):
         print("relay: error: fixture rollback failure @SECRET@", file=sys.stderr)
         sys.exit(1)
@@ -710,7 +736,8 @@ else:
     target_id = next((name for name, path in TARGETS.items() if target.endswith("/" + path)), None)
 record = {"host": host, "tool": "installer", "script": os.path.realpath(__file__), "args": args,
           "phase": phase, "target_id": target_id, "apply": applying,
-          "hold": os.environ.get("DISABLE_UPDATES")}
+          "hold": os.environ.get("DISABLE_UPDATES"),
+          "runtime_root": os.environ.get("RELAY_INSTALL_ROOT")}
 if phase == "live" and applying:
     record["ledger"] = ledger(os.path.dirname(os.path.dirname(option("--artifact"))))
 with open(config["observed"], "a") as stream:
@@ -1199,7 +1226,7 @@ class World:
         for name, value in self.config["timing"].items():
             monkeypatch.setattr(hosts, name, value)
         monkeypatch.setitem(hosts.TOOLS, "ssh", str(self.ssh))
-        for name in ("fixture-step", "fixture-short"):
+        for name in ("fixture-step", "fixture-short", "fixture-boundary"):
             monkeypatch.setitem(operations.OPERATIONS, name, hosts.Operation(
                 run=_never, deadline=60, mutation=True,
                 payload={"latch": _latch, "seconds": _seconds, "timeout": _seconds},
@@ -2264,6 +2291,69 @@ def test_signal_while_recording_start_cancels(world, monkeypatch):
     assert signal.getitimer(signal.ITIMER_REAL) == (0.0, 0.0)
 
 
+def test_signal_between_launch_and_ownership_stops_the_child(world):
+    """A signal that lands just after a child launches, before the operation owns it, cancels
+    only once the child is recorded: it is stopped and reaped, and writes nothing afterwards."""
+    marker = world.tmp / "late-write"
+    response = world.request("titan", "fixture-boundary", {"latch": str(marker), "seconds": 1.0})
+    assert response["status"] == "cancelled" and "SIGTERM" in response["error"]
+    operation_id = response["operation_id"]
+    [child] = world.record("titan", operation_id, "children.json")["children"]
+    assert child["label"] == "late-writer" and child["start_time"] is not None
+    [done] = world.record("titan", operation_id, "done.json")["children"]
+    assert (done["pid"], done["start_time"]) == (child["pid"], child["start_time"])
+    assert done["exit"] == -signal.SIGTERM and done["survivors"] == []
+    assert _gone(child["pid"], child["start_time"])
+    time.sleep(1.5)
+    assert not marker.exists()
+
+
+def test_children_start_with_no_signal_blocked(world, monkeypatch):
+    """Holding signals across a launch never reaches the child: it can be stopped by TERM."""
+    seen = world.tmp / "sigblk"
+    script = ("import sys; open(sys.argv[1], 'w').write(next(line for line in "
+              "open('/proc/self/status') if line.startswith('SigBlk:')))")
+
+    def blocked(context):
+        hosts._run_child(context, "sigblk", [sys.executable, "-S", "-c", script, seen],
+                         env=explicit_env(world.tmp), timeout=30)
+        return {}
+
+    monkeypatch.setitem(operations.OPERATIONS, "fixture-sigblk", hosts.Operation(
+        run=blocked, deadline=30, mutation=False))
+    response = hosts.execute(hosts._context("titan", "live", "titan-20261020T120000Z-00000000b10c"),
+                             "fixture-sigblk", {})
+    assert response["status"] == "completed", response["error"]
+    assert int(seen.read_text().split()[1], 16) == 0
+
+
+def test_signal_between_client_launch_and_ownership_cancels(world, monkeypatch):
+    """A local signal that lands after the transport client launched, before the request owns
+    it, still sends the explicit cancel for that operation and reaps the client."""
+    start, clients = hosts.start_request, []
+    before = len(world.lines("pids"))
+
+    def start_then_signal(host, mode, operation, payload, *, timeout):
+        operation_id, client = start(host, mode, operation, payload, timeout=timeout)
+        if operation == "fixture-step":
+            clients.append((operation_id, client, _family(world, before)))
+            signal.pthread_kill(threading.main_thread().ident, signal.SIGTERM)
+        return operation_id, client
+
+    monkeypatch.setattr(hosts, "start_request", start_then_signal)
+    with pytest.raises(hosts.Interrupted) as raised:
+        world.request("europa", "fixture-step", {"latch": "-", "seconds": 600})
+    [(operation_id, client, family)] = clients
+    error = raised.value
+    assert error.operation_id == operation_id
+    assert error.remote is not None and error.remote["state"] == "cancelled"
+    assert client.returncode is not None
+    done = world.record("europa", operation_id, "done.json")
+    assert done["response"]["status"] == "cancelled"
+    assert "operation-cancel" in done["response"]["error"]
+    assert _all_gone(*family)
+
+
 # --- quiescing a host: timer records, snapshot moves and their abort ----------------------
 
 WINDOW = "20261020T120000Z-0badf00d"
@@ -2770,6 +2860,64 @@ def test_apply_writes_only_the_sealed_dry_output(world, monkeypatch):
     assert _private(directory / "claude.json") == 0o600
     verify = [call for call in world.lines("observed") if call["args"][:1] == ["verify"]]
     assert verify and verify[-1]["exit"] == 0
+
+
+def test_children_run_the_recorded_relay_runtime(world, monkeypatch):
+    """The relay launcher honours RELAY_INSTALL_ROOT, so an inherited one would run another
+    runtime than the one whose identity was hashed. Every child runs with the launcher's root
+    pinned to this host's recorded runtime root: the controller's own override, which Titan's
+    helper inherits, and Europa's login override reach no dry run, apply, rollback, pilot dry
+    run or relay list."""
+    elsewhere = world.tmp / "elsewhere/relay"
+    monkeypatch.setenv("RELAY_INSTALL_ROOT", str(elsewhere))
+    world.spec("europa")["env"]["RELAY_INSTALL_ROOT"] = str(elsewhere)
+    world.save()
+    window, native, dry, numbers = _to_failure_point(world, monkeypatch,
+                                                     {"claude": None, "codex": None})
+    for target_id in ("codex", "claude"):
+        restored = _execute("titan", "target-restore", {
+            "window_id": window["id"], "target_id": target_id,
+            "identities": _pinned_relay(dry[target_id])}, next(numbers))
+        assert restored["status"] == "completed" and restored["result"]["rollback"] is True
+    europa = world.request("europa", "target-dry", {
+        "window_id": WINDOW, "target_id": "claude",
+        "manifest_sha256": _manifest_sha256(world, "europa")})
+    assert europa["status"] == "completed", europa["error"]
+    root_id = _create(world, "europa")["root"]
+    scratch = _pilot(world, "europa", "target-dry", {
+        "window_id": PILOT_WINDOW, "scratch": root_id, "target_id": "claude-work",
+        "manifest_sha256": _manifest_sha256(world, "europa")})
+    assert scratch["status"] == "completed", scratch["error"]
+    observed = world.request("europa", "smoke-observe", {"window_id": WINDOW})
+    assert observed["status"] == "completed", observed["error"]
+    calls = [call for call in world.lines("observed") if call["tool"] in ("installer", "relay")]
+    assert {(call["host"], call["tool"], call.get("phase"), call.get("apply"))
+            for call in calls} == {
+        ("titan", "installer", "dry", False), ("titan", "installer", "dry", True),
+        ("titan", "installer", "live", False), ("titan", "installer", "live", True),
+        ("titan", "installer", "rollback", False), ("europa", "installer", "dry", False),
+        ("europa", "installer", "dry", True), ("europa", "relay", None, None)}
+    assert {call["runtime_root"] for call in calls if call["host"] == "titan"} == {
+        str(world.home("titan") / ".local/share/relay")}
+    assert {call["runtime_root"] for call in calls if call["host"] == "europa"} == {
+        str(world.home("europa") / ".local/share/relay")}
+
+
+def test_child_env_pins_the_real_launcher(world, monkeypatch):
+    """The real relay/bin/relay, given a child environment while an override is inherited, runs
+    the runtime under this host's recorded root and never the override's."""
+    launcher = TOOLS_DIR.parent / "relay/bin/relay"
+    version = json.loads((launcher.parents[1] / "package.json").read_text())[
+        "dependencies"]["relay"].split("#")[1]
+    home, elsewhere = world.home("titan"), world.tmp / "elsewhere/relay"
+    for root, name in ((home / ".local/share/relay", "recorded"), (elsewhere, "override")):
+        _write(root / version / "node_modules/relay/bin/relay.js", f'console.log("{name}");\n')
+    monkeypatch.setenv("RELAY_INSTALL_ROOT", str(elsewhere))
+    env = hosts._child_env({"home": str(home), "tmp": None})
+    assert env["RELAY_INSTALL_ROOT"] == str(home / ".local/share/relay")
+    result = subprocess.run([str(launcher), "--version"], env=env, capture_output=True,
+                            text=True, timeout=60)
+    assert (result.returncode, result.stdout) == (0, "recorded\n"), result.stderr
 
 
 # --- recovery on one host: the byte gate, familiar's Git state, dependencies, timers -------
