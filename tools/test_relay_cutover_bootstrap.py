@@ -1343,6 +1343,13 @@ def test_familiar_off_pre_refuses_prepare_and_check(prepared_cutover, monkeypatc
         preparation.prepare(SESSION)
     assert (raised.value.step, raised.value.host) == ("inputs-check", "titan")
     assert any(": familiar-native: " in blocker for blocker in raised.value.blockers)
+    # A closed window, such as the recovered one that left familiar there, is no open window:
+    # check reads familiar beside it too.
+    with_state(state.new_window(cutover_root(cutover), window.prepared_sha256(prepared)),
+               "recovered")
+    beside = preparation.check(prepared)
+    assert {blocker.split(": ", 1)[0] for blocker in beside["blockers"]
+            if ": familiar-native: " in blocker} == {"titan", "europa"}
     # A request that names the open window skips the read.
     named = inputs_check(cutover, monkeypatch, 7, active="20261021T000000Z-0a0b0c0d")
     assert not any(blocker.startswith("familiar-native") for blocker in named["blockers"])
