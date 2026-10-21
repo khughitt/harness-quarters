@@ -103,6 +103,9 @@ CLOSURE = (
     "europa, and unchanged versions keep the existing proof with no preparation repeated",
     "  surface drift: if check reports only the desktop (surface) drift, run prepare again, then "
     "check",
+    "  familiar: from run until finish make no familiar commit on europa; on titan a familiar "
+    "commit before the merge aborts the run cleanly before it (a task-record commit after it is "
+    "tolerated), so pause task-record commits until run reports the merge",
     "  version moved: if Claude moved on either host, repeat only Task 9 Steps 5–7 (the held "
     "re-probe and its independent review, the reviewed proof's delivery and both hosts' "
     "installer acceptance, refreshed inputs and prepare), then run check again before asking; "
@@ -159,6 +162,14 @@ def _sessions(sessions):
             "session on both hosts is closed")
 
 
+def _base(report):
+    """familiar's base on one host, as prepare and check observed it."""
+    if not report:
+        return "familiar's base was not observed"
+    return (f"familiar base {report['base'][:12]}: {len(report['commits'])} tasks-only "
+            "commit(s) past PRE, and its merge with the feature tip equals T0 outside tasks/")
+
+
 def _prepare(session):
     prepared = preparation.prepare(session)
     print(f"{PROG}: prepared {window._root() / window.PREPARED} "
@@ -167,6 +178,7 @@ def _prepare(session):
           f"({', '.join(prepared['filter']['keys'])}) recorded as found")
     for host in window.HOST_ORDER:
         print(f"  {host}: {_sessions(prepared['hosts'][host]['sessions'])}")
+        print(f"  {host}: {_base(prepared['hosts'][host]['familiar'])}")
     print("  observed: no window is open; only the prepared record and private operation "
           "records were written")
     print("\n".join(CLOSURE))
@@ -188,6 +200,7 @@ def _check():
     print(f"{PROG}: check: eligible (prepared {result['prepared_sha256']})")
     for host in window.HOST_ORDER:
         print(f"  {host}: {_sessions(result['sessions'][host])}")
+        print(f"  {host}: {_base(result['familiar'][host])}")
     print("  observed: nothing was changed")
     print("\n".join(CLOSURE))
     print(f"  next: {command_line(['run'])}")

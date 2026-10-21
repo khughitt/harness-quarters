@@ -7,8 +7,10 @@ Host side, the fixed operations in `OPERATIONS` (pilot mode only):
   root, 0700, named afterwards only by its opaque 16-hex ID. `scratch.json` records its window,
   purpose and host before anything else is written. A `main` root holds copies of the current
   targets this host's harnesses read (`home/<target path>`); every root holds a clone of familiar
-  at PRE (`familiar/`, made with Git's own transport from the live checkout, with the approved tip
-  pinned by a local ref and no remote left), the native dependencies copied from the live
+  at this host's own eligible HEAD, its base (`familiar/`, made with Git's own transport from the
+  live checkout, with the approved tip pinned by a local ref and no remote left; the base rule
+  holds on the clone, and the reply records the base), the native dependencies copied from the
+  live
   checkout, their verified pre-merge snapshot (`state/familiar-node_modules.pre`, recorded under
   `state/quiesce/<window>/` as restoration reads it), `state/` for dry runs and `tmp/`, the
   children's TMPDIR.
@@ -141,15 +143,15 @@ def _must(result, message):
     return familiar._text(result)
 
 
-def _clone(context, live, pre, tip):
-    """familiar at PRE in the scratch root: cloned by Git's transport (never hard links into the
-    live checkout), the tip kept reachable by a local ref, and no remote left."""
+def _clone(context, live, base, tip):
+    """familiar at this host's base in the scratch root: cloned by Git's transport (never hard
+    links into the live checkout), the tip kept reachable by a local ref, and no remote left."""
     clone = context["familiar"]
     _must(_git(context, "pilot-clone", "clone", "--no-local", "--no-checkout", "--quiet", "--",
                live, clone), "git clone of familiar's checkout failed")
     os.chmod(clone, 0o700)
-    _must(familiar._git(context, "pilot-checkout", "checkout", "--quiet", "--detach", pre),
-          "familiar's clone cannot check out PRE")
+    _must(familiar._git(context, "pilot-checkout", "checkout", "--quiet", "--detach", base),
+          "familiar's clone cannot check out its base")
     if familiar._text(familiar._git(context, "pilot-tip", "cat-file", "-t", tip)) != "commit":
         raise Stop("the approved feature tip is not a commit in familiar's checkout; nothing "
                    "else was cloned")
@@ -158,8 +160,8 @@ def _clone(context, live, pre, tip):
     _must(familiar._git(context, "pilot-remote", "remote", "remove", "origin"),
           "familiar's clone keeps its remote")
     head = familiar._text(familiar._git(context, "pilot-head", "rev-parse", "HEAD"))
-    if head != pre:
-        raise Stop("familiar's clone is not at PRE")
+    if head != base:
+        raise Stop("familiar's clone is not at its base")
 
 
 def _modules(context, live):
@@ -188,7 +190,11 @@ def pilot_create(context):
     payload, home = context["payload"], Path(context["home"])
     pre, tip = payload["pre"], inputs.PINS["familiar_feature_tip"]
     if pre != inputs.PINS["familiar_pre"]:
-        raise Stop("a pilot clones familiar only at the approved PRE; nothing was created")
+        raise Stop("a pilot clones familiar only from the approved PRE; nothing was created")
+    # This host's own HEAD, which the clone must carry as an eligible base.
+    head = familiar.commit(context, "pilot-live-head", "HEAD")
+    if head is None:
+        raise Stop("familiar's live checkout has no HEAD commit; nothing was created")
     base = _base(context)
     state._make_dirs(base)
     state._check_dir(base)
@@ -214,15 +220,19 @@ def pilot_create(context):
             state._make_dirs(copy.parent)
             targets._write_new(copy, data)
             copied[target_id] = _sha256(data)
-    _clone(scratch, context["familiar"], pre, tip)
+    _clone(scratch, context["familiar"], head, tip)
     modules = _modules(scratch, context["familiar"])
-    if not familiar._source(scratch, pre, "pilot-source-pre"):
-        raise Stop("familiar's clone is not PRE with a clean tree")
+    try:
+        eligible = familiar.eligible_base(scratch)
+    except Stop as stop:
+        raise Stop(f"familiar's clone is not an eligible base: {stop}") from None
+    if eligible["base"] != head:
+        raise Stop("familiar's clone is not at this host's HEAD")
     if targets._helper(scratch, "pilot-check", "familiar-check", "--expect", "native",
                        *familiar.root_args(scratch)).returncode != 0:
         raise Stop("familiar's clone does not check native; see the private log")
-    return {"root": root_id, "purpose": payload["purpose"], "pre": pre, "targets": copied,
-            "modules": modules}
+    return {"root": root_id, "purpose": payload["purpose"], "pre": pre, "base": head,
+            "commits": eligible["commits"], "targets": copied, "modules": modules}
 
 
 def pilot_observe(context):
@@ -238,7 +248,7 @@ def pilot_observe(context):
                   / targets.COPY[targets.HARNESS[target_id]])
         data = targets._read(sealed)
         dry[target_id] = _sha256(data) if data is not None else None
-    return {"head": head, "tree": restoration._tree(context, head) if head else None,
+    return {"head": head, "tree": familiar.tree(context, head) if head else None,
             "clean": bool(head) and familiar._source(context, head, "pilot-source"),
             "modules": restoration._modules(Path(context["familiar"]) / "node_modules"),
             "targets": copies, "dry": dry}
@@ -540,7 +550,8 @@ def _merge_and_install(window, prepared, seen, progress, scopes):
         window = lifecycle._step(window, seen, progress, "familiar-merge", host)
         merged, _ = lifecycle._call(host, "pilot", "familiar-merge", {
             "window_id": window["id"], "pre": pins["familiar_pre"],
-            "tip": pins["familiar_feature_tip"], **scopes[host]}, "familiar-merge")
+            "tip": pins["familiar_feature_tip"], "base": _clone_base(window, host), **scopes[host]},
+            "familiar-merge")
         merges[host] = merged["merge"]
         if host == "titan":
             window = lifecycle._save(window, familiar={
@@ -558,6 +569,12 @@ def _merge_and_install(window, prepared, seen, progress, scopes):
         window = lifecycle._save(window, dependencies={**window.get("dependencies", {}),
                                                        host: result})
     return window, merges
+
+
+def _clone_base(window, key):
+    """The base a scratch clone was cloned at, as the window recorded it."""
+    record = window.get("familiar") or {}
+    return record["base"] if key == "titan" else record["bases"][key]
 
 
 def _clone_merge(window, key, merge):
@@ -594,10 +611,12 @@ def _verify(window, seen, progress, scopes, merges):
         observed[host], _ = lifecycle._call(host, "pilot", "pilot-observe", {
             "window_id": identity, **scopes[host]}, "pilot-observe")
     trees = {host: observed[host]["tree"] for host in lifecycle.HOST_ORDER}
-    equal = len(set(trees.values())) == 1 and all(observed[host]["clean"]
-                                                   for host in lifecycle.HOST_ORDER)
+    # Each clone merged its own base, so the merged trees may differ inside tasks/ only: each
+    # merge was proved equal to T0 outside tasks/. Both must be clean.
+    equal = all(observed[host]["clean"] for host in lifecycle.HOST_ORDER)
     window = _gate(window, "source", "passed" if equal else "failed", equal=equal,
-                   merges=merges, trees=trees)
+                   merges=merges, trees=trees, identical=len(set(trees.values())) == 1,
+                   bases={host: _clone_base(window, host) for host in lifecycle.HOST_ORDER})
     pins = {"version": inputs.PINS["relay_version"], "commit": inputs.PINS["relay_commit"]}
     relays = {host: sources[host]["relay"] for host in lifecycle.HOST_ORDER}
     window = _gate(window, "dependencies", "passed" if all(
@@ -766,8 +785,9 @@ def _recover_clone(window, host, seen, progress, *, scope, key):
                                                    "actions": [], "cancelled": []})
     window, recovered = recovery.restore_clone(window, host, seen, progress, scope=scope,
                                                key=key)
-    window, dependencies = recovery.restore_dependencies(window, host, recovered["revert"],
-                                                         seen, progress, scope=scope, key=key)
+    window, dependencies = recovery.restore_dependencies(
+        window, host, recovered["revert"], seen, progress, scope=scope,
+        base=recovery.base_of(window, key, host), key=key)
     return window, {"familiar": recovered, "dependencies": dependencies}
 
 
@@ -790,10 +810,14 @@ def disconnect_case(window: dict, prepared: dict, reference: dict, seen: list,
     window, created = _create(window, seen, progress, "disconnect")
     scope = {hosts.SCRATCH: created["europa"]["root"]}
     keep(root=created["europa"]["root"], attempts=[], verdict=None)
+    record = window.get("familiar") or {}
+    window = lifecycle._save(window, familiar={**record, "bases": {
+        **record.get("bases", {}), "disconnect": created["europa"]["base"]}})
     step("familiar-merge", "europa")
     merged, _ = lifecycle._call("europa", "pilot", "familiar-merge", {
         "window_id": window["id"], "pre": pins["familiar_pre"],
-        "tip": pins["familiar_feature_tip"], **scope}, "familiar-merge")
+        "tip": pins["familiar_feature_tip"], "base": _clone_base(window, "disconnect"), **scope},
+        "familiar-merge")
     window = _clone_merge(window, "disconnect", merged["merge"])
     keep(merge=merged["merge"])
     recorded = prepared["hosts"]["europa"]
@@ -877,9 +901,12 @@ def _forward(window, prepared, decision, seen, progress):
                    order=[[host, target_id] for host, found in window["dry"].items()
                           for target_id in found],
                    effective_inputs_sha256=window["sealed"]["effective_inputs_sha256"])
+    created = window["pilot"]["created"]  # each clone's own base, recorded per clone
     window = lifecycle._save(window, familiar={"started_at": lifecycle._now(),
                                                "pre": inputs.PINS["familiar_pre"],
-                                               "tip": inputs.PINS["familiar_feature_tip"]})
+                                               "tip": inputs.PINS["familiar_feature_tip"],
+                                               "base": created["titan"]["base"],
+                                               "bases": {"europa": created["europa"]["base"]}})
     window, merges = _merge_and_install(window, prepared, seen, progress, scopes)
     for target_id in inputs.TARGETS:  # live's own registration and apply step
         window = lifecycle.apply_target(window, target_id, seen, progress, scopes["titan"])

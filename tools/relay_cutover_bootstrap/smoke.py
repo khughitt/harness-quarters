@@ -7,7 +7,8 @@ printed here (`commands`), each a concrete argv quoted for Zsh: the controller's
 held Claude launches for both homes on both hosts and the dedicated smoke sessions with the
 runbook's flags (Claude `--permission-mode manual`; Codex `--no-daemon --sandbox
 workspace-write --ask-for-approval on-request`). `handoff` prints them with the paused timers,
-the Claude model and effort freeze and the held-launch rule, naming `cl` and `clw`.
+the Claude model and effort freeze, the familiar commit freeze on Europa and the held-launch
+rule, naming `cl` and `clw`.
 
 Host side, the fixed read-only operation `smoke-observe` (both hosts, either mode) reads relay's
 own registry through `relay list --json` (each row's harness, session, scope, state, cwd,
@@ -81,6 +82,9 @@ HOLD = ("until finish, launch Claude and Codex only with the held commands below
         "clw, unheld Claude or IDE clients, and update or install commands")
 PICKS = ("until finish reports complete, do not change or save Claude model or effort "
          "defaults in either home on either host, including through /model or /effort")
+FAMILIAR = ("until finish reports complete, make no familiar commit on europa (concurrent ref "
+            "writes are a Dropbox conflict, and europa's source proofs refuse one); task-record "
+            "commits on titan are tolerated now that the merge is made")
 # A launch that bypasses approval, sandbox, permission or hook-trust review: any of these flags,
 # or a flag with this value (`--flag value` or `--flag=value`). Ruling R49.
 BYPASS_FLAGS = ("--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust",
@@ -200,8 +204,8 @@ def _first(window):
 
 def handoff(window: dict) -> tuple[str, ...]:
     """What every report from the verified migration until finish says: the controller's proof
-    first, both hosts and homes, the paused timers, the held-launch rule and pick freeze, and
-    the held commands."""
+    first, both hosts and homes, the paused timers, the held-launch rule, the pick freeze, the
+    familiar commit freeze, and the held commands."""
     try:
         prepared = _prepared(window)
         lines = command_lines(prepared)
@@ -210,7 +214,7 @@ def handoff(window: dict) -> tuple[str, ...]:
                  f"({hosts._brief(error)}); run status"]
     return (_first(window), "  hosts: titan (Claude personal and work, Codex personal and work) "
             "and europa (Claude personal and work)", timers_line(window), f"  hold: {HOLD}",
-            f"  picks: {PICKS}", *lines)
+            f"  picks: {PICKS}", f"  familiar: {FAMILIAR}", *lines)
 
 
 # --- host side --------------------------------------------------------------------------------

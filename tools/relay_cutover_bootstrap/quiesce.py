@@ -332,38 +332,51 @@ def _tree(path, digest=True):
             "sha256": _sha256(json.dumps(entries).encode()) if digest else None}
 
 
-# Why familiar off PRE blocks every fresh window, on either host (ruling R47).
+# Why familiar off the base rule blocks every fresh window, on either host (ruling R47).
 OFF_PRE = ("no window runs from here: a recovered merge ends this cutover, as a completed one "
            "does, and a new attempt needs newly reviewed pins and inputs")
 
 
-def _familiar_native(context, pre):
-    """Blockers when familiar is not at PRE with a clean tree, or its dependencies do not check
-    native: read by relay-cutover's own familiar-source and familiar-check."""
-    relay_cutover, found = Path(context["hq"]) / "tools/relay-cutover", []
-    for label, args, what in (
-            ("familiar-source", ["--head", pre],
-             f"familiar is not at the approved PRE {pre[:12]} with a clean tree"),
-            ("familiar-check", ["--expect", "native"],
-             "familiar's dependencies do not check native")):
-        try:
-            result = hosts._run_child(context, f"readiness-{label}", [
-                hosts.TOOLS["python3"], "-B", relay_cutover, label, *args],
-                env=hosts._child_env(context), timeout=CHILD_SECONDS)
-            failed = result.returncode != 0
-        except (Stop, OSError) as error:
-            what, failed = f"relay-cutover {label} did not run ({hosts._brief(error)})", True
-        if failed:
-            found.append(f"familiar-native: {what} (relay-cutover {label}; see the private log); "
-                         f"{OFF_PRE}")
-    return found
+def _familiar_native(context):
+    """Blockers when familiar's HEAD fails the base rule (familiar.eligible_base) or, beside
+    Titan's observed HEAD (`titan_head`), is ahead of or diverged from it, or when its
+    dependencies do not check native (relay-cutover's own familiar-check); and the base with
+    its proof, or None."""
+    from . import familiar  # familiar imports this module for its validators
+    found, report = [], None
+    try:
+        report = familiar.eligible_base(context)
+    except Stop as stop:
+        found.append(f"familiar-native: {stop}; {OFF_PRE}")
+    observed = context["payload"].get("titan_head")
+    if report is not None and observed is not None and report["base"] != observed:
+        related = familiar.ancestor(context, "readiness-titan-head", report["base"], observed)
+        if related is None:
+            found.append(f"sync: titan's familiar HEAD {observed[:12]} has not reached this "
+                         "host yet; wait for synchronization and rerun")
+        elif not related:
+            found.append(f"familiar-native: familiar's HEAD {report['base'][:12]} here is ahead "
+                         f"of or diverged from titan's {observed[:12]}; make familiar commits "
+                         "only on titan, and let this checkout synchronize")
+    relay_cutover = Path(context["hq"]) / "tools/relay-cutover"
+    try:
+        result = hosts._run_child(context, "readiness-familiar-check", [
+            hosts.TOOLS["python3"], "-B", relay_cutover, "familiar-check", "--expect", "native"],
+            env=hosts._child_env(context), timeout=CHILD_SECONDS)
+        what, failed = "familiar's dependencies do not check native", result.returncode != 0
+    except (Stop, OSError) as error:
+        what, failed = f"relay-cutover familiar-check did not run ({hosts._brief(error)})", True
+    if failed:
+        found.append(f"familiar-native: {what} (relay-cutover familiar-check; see the private "
+                     f"log); {OFF_PRE}")
+    return found, report
 
 
-def readiness(context, familiar_pre):
-    """Read-only blockers for a fresh window on this host: unexplained root state, timers an
-    earlier window left paused, missing or uncopyable preparation snapshots and, unless the
-    payload names the active window (a run's own gate, whose quiescence repeats the check),
-    familiar off its approved PRE `familiar_pre`."""
+def readiness(context):
+    """Read-only blockers for a fresh window on this host, and familiar's base with its proof:
+    unexplained root state, timers an earlier window left paused, missing or uncopyable
+    preparation snapshots and, unless the payload names the active window (a run's own gate,
+    which derives the base itself after its final no-live check), familiar off the base rule."""
     root, home, blockers = Path(context["root"]), Path(context["home"]), []
     try:
         state.current_window(root)
@@ -386,9 +399,11 @@ def readiness(context, familiar_pre):
             _tree(home / source, digest=False)
         except (Stop, OSError) as error:
             blockers.append(f"snapshots: {hosts._brief(error)}")
+    report = None
     if active is None:
-        blockers += _familiar_native(context, familiar_pre)
-    return blockers
+        found, report = _familiar_native(context)
+        blockers += found
+    return blockers, report
 
 
 def _copy_file(source, destination):
@@ -416,14 +431,16 @@ def _move(source, destination):
 
 
 def snapshot_refresh(context):
-    """Keep the preparation snapshots and refresh them from the now quiescent live trees."""
+    """Keep the preparation snapshots and refresh them from the now quiescent live trees, once
+    familiar is the window's base B with a clean tree (checked, never waited for: the run's
+    `familiar-sync` waited) and checks native."""
     root, home, directory = Path(context["root"]), Path(context["home"]), _directory(context)
     if not os.path.lexists(directory / RECORD):
         raise Stop("timers are not recorded for this window here; quiesce them first")
     if os.path.lexists(directory / MOVES):
         raise Stop("snapshots already moved for this window; abort it rather than refresh again")
     relay_cutover = Path(context["hq"]) / "tools/relay-cutover"
-    for label, args in (("familiar-source", ["--head", context["payload"]["familiar_pre"]]),
+    for label, args in (("familiar-source", ["--head", context["payload"]["base"]]),
                         ("familiar-check", ["--expect", "native"])):
         result = hosts._run_child(context, label, [hosts.TOOLS["python3"], "-B", relay_cutover,
                                                    label, *args],
@@ -526,8 +543,8 @@ OPERATIONS = {
         required=frozenset({"window_id", "stopped"})),
     "snapshot-refresh": hosts.Operation(
         run=snapshot_refresh, deadline=SNAPSHOT_SECONDS, mutation=True,
-        payload={**_WINDOW, "familiar_pre": _commit},
-        required=frozenset({"window_id", "familiar_pre"})),
+        payload={**_WINDOW, "base": _commit},
+        required=frozenset({"window_id", "base"})),
     "snapshot-abort": hosts.Operation(run=snapshot_abort, deadline=SNAPSHOT_SECONDS,
                                       mutation=True, payload=_WINDOW, required=_REQUIRED),
 }

@@ -20,16 +20,24 @@ relay and helper that applied its targets, and byte, Git and dependency proofs:
   byte gate, with this window's artifact and guard images and the pinned relay for its rollback;
   afterwards it must equal its registered original. Bytes matching no recorded image stop before
   any write: nothing is force-copied.
-- `familiar-reconcile` (Titan): familiar's actual Git state against PRE, the approved tip and the
-  window's merge and revert records: `merge-in-progress` (HEAD at PRE, MERGE_HEAD the tip),
-  `at-pre`, `merged` (HEAD's parents PRE and the tip, recorded or not), `reverted` (one commit
-  whose parent is that merge and whose tree is PRE's, recorded or not) or `unexpected`.
-- `familiar-restore` (Titan): classifies again and takes that state's one action: `git merge
-  --abort`, nothing, `git revert -m 1 --no-edit MERGE` once, or nothing. The result must be a
-  clean tree equal to PRE's; a revert's parent must be the merge.
-- `dependency-restore` (both hosts): once familiar's source here is the recovered commit (a
-  bounded wait for synchronization), replace `node_modules` with this window's verified
-  pre-merge snapshot, offline, unless it already equals it; then familiar must check native.
+- `familiar-reconcile` (Titan): familiar's actual Git state against the window's recorded base
+  B, the approved tip, and the window's merge and restore records (`classify`):
+  `merge-in-progress`, `at-base`, `merged`, `reverted` or `unexpected`. Without a merge record
+  the merge M is found on HEAD's first-parent history since B, and above it the restore R.
+- `familiar-restore` (Titan): classifies again and takes that state's one action, never `git
+  revert`: `merge-in-progress` rebuilds the live index from the working tree's proven state, then
+  `git merge --abort`; `at-base` and `reverted` take none; `merged` builds R by plumbing (B's tree
+  with HEAD's `tasks` entry, `ls-tree -z` and `mktree -z`, `commit-tree -p P`), records it in
+  `quiesce/<window>/familiar-restore.json` before any index or working-tree change, then moves
+  HEAD to it (`read-tree -m -u P R` from a rebuilt index, `update-ref HEAD R P`). A recorded R
+  that can no longer apply is recorded as abandoned. The live index is never evidence, a present
+  `.git/index.lock` refuses, and the result must be HEAD at the restoration point or a
+  tasks-only descendant of it, with the working tree equal to HEAD outside `tasks/`.
+- `dependency-restore` (both hosts): once familiar's source here is the restoration point or a
+  tasks-only descendant of it, clean outside `tasks/` (on Europa, not past the Titan HEAD the
+  controller observed), a bounded wait for synchronization, replace `node_modules` with this
+  window's verified pre-merge snapshot, offline, unless it already equals it; then familiar
+  must check native.
 - `service-run` and `service-check` (both hosts): the recorded timer's service, started only
   once this window's timers are restored here (run) or only read (check), waited for within a
   bound and required to end with `Result=success` and `ExecMainStatus=0`.
@@ -43,6 +51,7 @@ import hashlib
 import os
 import shutil
 import stat
+import tempfile
 import time
 from pathlib import Path
 
@@ -50,14 +59,13 @@ from . import familiar, hosts, inputs, inventory, quiesce, state, targets
 from .state import Stop
 
 CHILD_SECONDS = 120
-SYNC_BUDGET_SECONDS = hosts.SYNC_SECONDS  # the longest wait for the recovered source here
-SYNC_POLL_SECONDS = 2.0
 SERVICE_SECONDS = 600  # the longest wait for a running service to finish
 SERVICE_POLL_SECONDS = 2.0
 REQUIESCED = "requiesced"
 SNAPSHOT = "familiar-node_modules.pre"
 RELAY = ("installer", "relay_cutover", "runtime")  # the pinned relay a rollback runs with
-EXPECTED = ("merge-in-progress", "at-pre", "merged", "reverted")
+EXPECTED = ("merge-in-progress", "at-base", "merged", "reverted")
+RESTORE_RECORD = "familiar-restore.json"  # under quiesce/<window>/: the R built here
 SETTLED = ("inactive", "failed")
 SERVICE_PROPERTIES = ("ActiveState", "Result", "ExecMainStatus")
 
@@ -226,49 +234,84 @@ def target_restore(context):
 
 
 def _ref(context, label, name):
-    result = familiar._git(context, label, "rev-parse", "--verify", "-q", name)
-    text = familiar._text(result)
-    return text if result.returncode == 0 and familiar.COMMIT.fullmatch(text) else None
-
-
-def _parents(context, commit):
-    result = familiar._git(context, "familiar-parents", "rev-list", "--parents", "-n", "1",
-                           commit)
-    words = familiar._text(result).split()
-    if result.returncode != 0 or not words or words[0] != commit:
-        raise Stop(f"familiar's history cannot be read at {commit[:12]}; inspect it")
-    return words[1:]
-
-
-def _tree(context, commit):
-    result = familiar._git(context, "familiar-tree", "rev-parse", "--verify", "-q",
-                           f"{commit}^{{tree}}")
-    text = familiar._text(result)
-    if result.returncode != 0 or not familiar.COMMIT.fullmatch(text):
-        raise Stop(f"familiar's tree at {commit[:12]} cannot be read; inspect it")
-    return text
+    return familiar.commit(context, label, name)
 
 
 def _pins(payload):
+    """The approved PRE and tip, and the window's recorded base B."""
     if (payload["pre"], payload["tip"]) != (inputs.PINS["familiar_pre"],
                                            inputs.PINS["familiar_feature_tip"]):
         raise Stop("recovery must name the approved familiar PRE and feature tip; nothing was "
                    "changed")
-    return payload["pre"], payload["tip"]
+    return payload["pre"], payload["tip"], payload["base"]
+
+
+def _record_path(context):
+    return (Path(context["state"]) / quiesce.QUIESCE / context["payload"]["window_id"]
+            / RESTORE_RECORD)
+
+
+def _host_record(context):
+    """This window's durable restore record on this host: the R it built and every R it
+    abandoned, or an empty record."""
+    path = _record_path(context)
+    if not os.path.lexists(path):
+        return {"schema": 1, "window_id": context["payload"]["window_id"], "revert": None,
+                "parent": None, "abandoned": []}
+    record = state.load_record(path)
+    if record.get("window_id") != context["payload"]["window_id"]:
+        raise Stop(f"{path} names another window; inspect it; nothing was changed")
+    return record
+
+
+def _save_host_record(context, record):
+    state._make_dirs(_record_path(context).parent)
+    state.save_record(_record_path(context), record)
+
+
+def _first_parents(context, base, head):
+    """`rev-list --first-parent --parents base..head`, newest first: (commit, parents)."""
+    result = familiar._git(context, "familiar-first-parents", "rev-list", "--first-parent",
+                           "--parents", f"{base}..{head}")
+    if result.returncode != 0:
+        raise Stop(f"familiar's history between {base[:12]} and {head[:12]} cannot be read; "
+                   "inspect it")
+    return [(words[0], words[1:]) for words in
+            (line.split() for line in familiar._text(result).splitlines()) if words]
+
+
+def _outside(context, label, old, new):
+    return familiar.outside(familiar.changes(context, label, old, new))
 
 
 def classify(context):
-    """familiar's actual Git state against PRE, the tip and the window's records."""
+    """familiar's actual Git state against the window's base B, the tip and the window's
+    records (the payload's, else this host's own durable restore record):
+
+    - `merge-in-progress`: HEAD = B and MERGE_HEAD = the tip;
+    - `at-base`: no merge or revert in progress and HEAD a tasks-only descendant of B;
+    - `merged`: HEAD a tasks-only descendant of the one merge M on HEAD's first-parent history
+      since B, whose parents are exactly B and the tip and whose tree equals T0 outside
+      `tasks/`;
+    - `reverted`: HEAD a tasks-only descendant of the one commit R above M that changes a path
+      outside `tasks/`, whose one parent is a tasks-only descendant of M, whose tree equals B's
+      outside `tasks/` and whose `tasks/` changes are regular files; the walk's R governs, and
+      a recorded R that differs is abandoned;
+    - otherwise `unexpected`, for inspection. B itself must still pass the base rule."""
     payload = context["payload"]
-    pre, tip = _pins(payload)
-    merge, revert = payload.get("merge"), payload.get("revert")
-    found = {"class": "unexpected", "head": None, "merge": merge, "revert": revert,
-             "discovered": False, "reason": None}
+    pre, tip, base = _pins(payload)
+    recorded = _host_record(context)
+    merge, revert = payload.get("merge"), payload.get("revert") or recorded.get("revert")
+    found = {"class": "unexpected", "head": None, "base": base, "merge": merge,
+             "revert": revert, "discovered": False, "reason": None, "abandoned": None}
 
     def unexpected(reason):
         found["reason"] = reason
         return found
 
+    problem = familiar.base_problem(context, base)
+    if problem:
+        return unexpected(f"the window's base fails the base rule: {problem}")
     head = found["head"] = _ref(context, "familiar-head", "HEAD")
     if head is None:
         return unexpected("familiar has no HEAD commit")
@@ -276,44 +319,194 @@ def classify(context):
         return unexpected("a revert is in progress in familiar's checkout")
     merging = _ref(context, "familiar-merge-head", "MERGE_HEAD")
     if merging is not None:
-        if (head, merging, merge, revert) == (pre, tip, None, None):
+        if (head, merging, merge, revert) == (base, tip, None, None):
             found.update({"class": "merge-in-progress", "revert": None})
             return found
         return unexpected("a merge other than the attempted one is in progress")
-    if head == pre:
-        if merge is None and revert in (None, pre):
-            found.update({"class": "at-pre", "revert": pre})
+    if familiar.tasks_only(context, base, head):
+        if merge is None and revert in (None, base):
+            found.update({"class": "at-base", "revert": base})
             return found
-        return unexpected("familiar is at PRE although this window recorded its merge or revert")
-    parents = _parents(context, head)
-    if parents == [pre, tip]:
-        if merge in (None, head) and revert is None:
-            found.update({"class": "merged", "merge": head, "discovered": merge is None})
-            return found
-        return unexpected("HEAD is a merge of PRE and the tip other than this window's records")
-    if (len(parents) == 1 and parents[0] != pre and _parents(context, parents[0]) == [pre, tip]
-            and _tree(context, head) == _tree(context, pre)):
-        if merge in (None, parents[0]) and revert in (None, head):
-            found.update({"class": "reverted", "merge": parents[0], "revert": head,
-                          "discovered": merge is None or revert is None})
-            return found
-        return unexpected("HEAD reverts a merge other than this window's records")
-    return unexpected("HEAD is neither PRE, the attempted merge nor its revert")
+        return unexpected("familiar is at the window's base although this window recorded its "
+                          "merge or restore")
+    if not familiar.ancestor(context, "familiar-base-ancestor", base, head):
+        return unexpected(f"HEAD {head[:12]} does not descend from the window's base "
+                          f"{base[:12]}")
+    walked = _first_parents(context, base, head)
+    merges = [index for index, (_, parents) in enumerate(walked) if len(parents) > 1]
+    if len(merges) != 1:
+        return unexpected(f"HEAD's first-parent history since the window's base holds "
+                          f"{len(merges)} merges, not the attempted one")
+    m, parents = walked[merges[0]]
+    if parents != [base, tip]:
+        return unexpected("the merge above the window's base is not of that base and the "
+                          "feature tip")
+    if merge not in (None, m):
+        return unexpected("HEAD's merge is not the one this window recorded")
+    above = walked[:merges[0]]
+    touching = [(commit, parents) for commit, parents in above
+                if _outside(context, "familiar-walk-diff", parents[0], commit)]
+    if len(touching) > 1:
+        return unexpected(f"{len(touching)} commits above the merge change paths outside "
+                          "tasks/; inspect them")
+    try:
+        with familiar.temporary_objects(context) as env:
+            proof = familiar.merge_proof(context, base, env)
+            stray = familiar.outside(familiar.changes(context, "familiar-merge-t0", proof["t0"],
+                                                      m, env))
+    except Stop as stop:
+        return unexpected(str(stop))
+    if stray:
+        return unexpected("the merge differs from T0 outside tasks/")
+    found.update({"merge": m, "discovered": merge is None})
+    if not touching:
+        if not familiar.tasks_only(context, m, head):
+            return unexpected("HEAD is not the merge or a tasks-only descendant of it")
+        found["class"] = "merged"
+        if revert is not None:
+            if _ref(context, "familiar-revert", revert) is None:
+                return unexpected("the restore commit this window recorded is not here")
+            if familiar.parents(context, revert) != [head]:
+                found.update({"abandoned": revert, "revert": None})
+        return found
+    r, parents = touching[0]
+    if (len(parents) != 1 or not familiar.tasks_only(context, m, parents[0])
+            or _outside(context, "familiar-restore-diff", base, r)
+            or familiar.unfiled([entry for entry in familiar.changes(
+                context, "familiar-restore-tasks", parents[0], r)
+                if entry[3].startswith(familiar.TASKS)])
+            or not familiar.tasks_only(context, r, head)):
+        return unexpected("the commit above the merge that changes paths outside tasks/ is not a "
+                          "restore of the window's base")
+    found.update({"class": "reverted", "revert": r,
+                  "discovered": merge is None or payload.get("revert") != r,
+                  "abandoned": revert if revert not in (None, r) else None})
+    return found
 
 
 def familiar_reconcile(context):
     return classify(context)
 
 
-def _clean(context, commit, label):
-    if not familiar._source(context, commit, label):
-        raise Stop(f"familiar's working tree is not clean at {commit[:12]}; inspect it")
+def _unlocked(context):
+    if familiar.index_locked(context):
+        raise Stop("familiar's .git/index.lock exists: another Git command may be running; "
+                   "inspect it (it is never deleted here); nothing was changed")
+
+
+def _rebuild_index(context, name):
+    """The live index rebuilt from tree-ish `name`, never trusted as evidence (Dropbox
+    synchronizes it): `read-tree`, then `update-index -q --refresh`."""
+    if familiar._git(context, "familiar-index", "read-tree", name).returncode != 0:
+        raise Stop(f"familiar's index cannot be rebuilt from {name[:12]}; inspect it")
+    if familiar._git(context, "familiar-refresh", "update-index", "-q",
+                     "--refresh").returncode not in (0, 1):
+        raise Stop("familiar's index cannot be refreshed; inspect it")
+
+
+def _abort_merge(context, base, tip):
+    """The attempted merge aborted after the live index is rebuilt from the working tree's
+    proven state (judged outside `tasks/`): the merge's tree, or B."""
+    _unlocked(context)
+    # The live index may need this tree, so it is written to the real objects: recovery is
+    # not read-only.
+    merged = familiar.merge_tree(context, "familiar-restore-merge-tree", base, tip)
+    if not familiar.worktree_differs(context, merged, outside_tasks=True):
+        _rebuild_index(context, merged)
+    elif not familiar.worktree_differs(context, base, outside_tasks=True):
+        _rebuild_index(context, base)
+    else:
+        raise Stop("familiar's working tree is neither the attempted merge nor the window's base "
+                   "outside tasks/; inspect it; nothing was changed")
+    if familiar._git(context, "familiar-merge-abort", *familiar.MERGE_CONFIG, "merge",
+                     "--abort").returncode != 0:
+        raise Stop("git merge --abort failed; inspect familiar's checkout before any retry")
+    if (_ref(context, "familiar-merge-head", "MERGE_HEAD") is not None
+            or _ref(context, "familiar-head", "HEAD") != base):
+        raise Stop("familiar did not return to the window's base after the merge abort; "
+                   "inspect it")
+    return base
+
+
+def _restore_tree(context, base, head):
+    """B's tree with its `tasks` entry replaced by HEAD's (`ls-tree -z` and `mktree -z`)."""
+    def entries(label, *args):
+        result = familiar._git(context, label, "ls-tree", "-z", *args)
+        if result.returncode != 0:
+            raise Stop("familiar's tree cannot be listed; inspect it")
+        return [entry for entry in result.stdout.split(b"\0") if entry]
+
+    kept = [entry for entry in entries("familiar-base-tree", base)
+            if entry.split(b"\t", 1)[1] != b"tasks"]
+    tasks = [entry for entry in entries("familiar-tasks-entry", head, "--", "tasks")
+             if entry.split(b"\t", 1)[1] == b"tasks"]
+    with tempfile.TemporaryFile(dir=context.get("tmp")) as stream:
+        stream.write(b"".join(entry + b"\0" for entry in kept + tasks))
+        stream.flush()
+        stream.seek(0)
+        result = familiar._git(context, "familiar-mktree", "mktree", "-z", stdin=stream)
+    tree = familiar._text(result)
+    if result.returncode != 0 or not familiar.COMMIT.fullmatch(tree):
+        raise Stop("familiar's restore tree cannot be written; inspect it")
+    return tree
+
+
+def _restore_merge(context, found, base):
+    """R on HEAD = P: the recorded R when HEAD is its parent, else a fresh one (B's tree with
+    HEAD's `tasks` entry, `commit-tree -p HEAD`) recorded durably here before any index or
+    working-tree change; then HEAD moved to it by compare-and-swap from the proven working
+    tree. Returns R."""
+    head, payload = found["head"], context["payload"]
+    record = _host_record(context)
+    if found["abandoned"]:
+        record["abandoned"] = sorted({*record.get("abandoned", []), found["abandoned"]})
+        record.update(revert=None, parent=None)
+        _save_host_record(context, record)
+    wanted = _restore_tree(context, base, head)
+    if found["revert"] is not None:
+        r = found["revert"]
+        if familiar.tree(context, r) != wanted:
+            raise Stop("the restore commit this window recorded is not the base's tree with "
+                       "HEAD's task records; inspect it; nothing was changed")
+    else:
+        message = (f"Restore familiar to {base[:12]} outside tasks/\n\nrelay cutover recovery "
+                   f"of window {payload['window_id']}: undoes the merge {found['merge'][:12]} of "
+                   "the feature tip and keeps familiar's task records as they stand.\n")
+        result = familiar._git(context, "familiar-commit-tree", "commit-tree", wanted, "-p", head,
+                               "-m", message)
+        r = familiar._text(result)
+        if result.returncode != 0 or not familiar.COMMIT.fullmatch(r):
+            raise Stop("familiar's restore commit cannot be written; inspect it; nothing else was "
+                       "changed")
+        record.update(revert=r, parent=head, built_at=hosts._now())
+        _save_host_record(context, record)  # durable before any index or working-tree change
+    _unlocked(context)
+    if not familiar.worktree_differs(context, head, outside_tasks=True):
+        _rebuild_index(context, head)
+        if familiar._git(context, "familiar-read-tree", "read-tree", "-m", "-u", head,
+                         r).returncode != 0:
+            raise Stop("git read-tree -m -u of the restore failed; inspect familiar's checkout "
+                       "before any retry")
+    elif not familiar.worktree_differs(context, r, outside_tasks=True):
+        _rebuild_index(context, r)
+    else:
+        raise Stop("familiar's working tree is neither HEAD nor its restore outside tasks/; "
+                   "inspect it; HEAD was not moved")
+    if familiar._git(context, "familiar-update-ref", "update-ref", "-m",
+                     "relay cutover recovery", "HEAD", r, head).returncode != 0:
+        raise Stop("git update-ref of HEAD to the restore failed; inspect familiar's checkout "
+                   "before any retry")
+    return r
 
 
 def familiar_restore(context):
-    """Take the one action familiar's reconciled Git state needs, after classifying it again."""
+    """Take the one action familiar's reconciled Git state needs, after classifying it again:
+    abort the attempted merge, nothing, the plumbing restore R, or nothing. On every path HEAD
+    must end as the restoration point or a tasks-only descendant of it, with the working tree
+    equal to HEAD outside `tasks/`, and the restoration point's tree equal to B's outside
+    `tasks/`."""
     payload = context["payload"]
-    pre, _ = _pins(payload)
+    _, tip, base = _pins(payload)
     targets.closed(context)
     found = classify(context)
     if found["class"] != payload["expect"]:
@@ -321,30 +514,30 @@ def familiar_restore(context):
                    "recovery reconciled; nothing was changed; reconcile again")
     action = "none"
     if found["class"] == "merge-in-progress":
-        if familiar._git(context, "familiar-merge-abort", "merge", "--abort").returncode != 0:
-            raise Stop("git merge --abort failed; inspect familiar's checkout before any retry")
-        if (_ref(context, "familiar-merge-head", "MERGE_HEAD") is not None
-                or _ref(context, "familiar-head", "HEAD") != pre):
-            raise Stop("familiar did not return to PRE after the merge abort; inspect it")
-        action, revert = "merge-aborted", pre
+        point, action = _abort_merge(context, base, tip), "merge-aborted"
     elif found["class"] == "merged":
-        merge = found["merge"]
-        _clean(context, merge, "familiar-source-merge")
-        if familiar._git(context, "familiar-revert", "revert", "-m", "1", "--no-edit",
-                         merge).returncode != 0:
-            raise Stop("git revert of the merge failed; inspect familiar's checkout before any "
-                       "retry")
-        revert = _ref(context, "familiar-head", "HEAD")
-        if revert is None or _parents(context, revert) != [merge]:
-            raise Stop("the revert commit's parent is not the merge; inspect familiar's checkout")
-        action = "reverted"
+        point, action = _restore_merge(context, found, base), "reverted"
+    elif found["class"] == "at-base":
+        point = base
     else:
-        revert = found["revert"]
-    if _tree(context, revert) != _tree(context, pre):
-        raise Stop("familiar's recovered tree is not PRE's; inspect it")
-    _clean(context, revert, "familiar-source-revert")
-    return {"class": found["class"], "action": action, "merge": found["merge"],
-            "revert": revert, "discovered": found["discovered"]}
+        point = found["revert"]
+        if found["abandoned"]:
+            record = _host_record(context)
+            record["abandoned"] = sorted({*record.get("abandoned", []), found["abandoned"]})
+            _save_host_record(context, record)
+    if _outside(context, "familiar-restored-diff", base, point):
+        raise Stop("familiar's restoration point differs from the window's base outside tasks/; "
+                   "inspect it")
+    head = _ref(context, "familiar-head", "HEAD")
+    if head is None or not familiar.tasks_only(context, point, head):
+        raise Stop("familiar's HEAD is not its restoration point or a tasks-only descendant of "
+                   "it; inspect it")
+    problems = familiar.worktree_differs(context, head, outside_tasks=True)
+    if problems:
+        raise Stop(f"familiar's recovered working tree differs from HEAD ({problems[0]}); "
+                   "inspect it")
+    return {"class": found["class"], "action": action, "merge": found["merge"], "revert": point,
+            "head": head, "discovered": found["discovered"], "abandoned": found["abandoned"]}
 
 
 # --- familiar's dependencies -------------------------------------------------------------------
@@ -371,17 +564,6 @@ def _snapshot(context):
     return path, tree
 
 
-def _synchronized(context, commit):
-    started = time.monotonic()
-    while not familiar._source(context, commit, "familiar-source-sync"):
-        if time.monotonic() + SYNC_POLL_SECONDS > started + SYNC_BUDGET_SECONDS:
-            raise Stop(f"familiar's source did not reach the recovered commit {commit[:12]} on "
-                       f"this host within {SYNC_BUDGET_SECONDS:g} s; it may still be "
-                       "synchronizing; nothing was restored here")
-        time.sleep(SYNC_POLL_SECONDS)
-    return round(time.monotonic() - started, 3)
-
-
 def _modules(path):
     """node_modules' tree, or None when it is absent; a symlink in its place is refused."""
     if not os.path.lexists(path):
@@ -392,17 +574,22 @@ def _modules(path):
 
 
 def dependency_restore(context):
-    """familiar's dependencies from this window's pre-merge snapshot, offline."""
+    """familiar's dependencies from this window's pre-merge snapshot, offline, once this
+    checkout is the restoration point or a tasks-only descendant of it, clean outside `tasks/`
+    (and on Europa, not past Titan's observed HEAD)."""
     payload = context["payload"]
-    pre, revert = payload["pre"], payload["revert"]
+    pre, base, revert = payload["pre"], payload["base"], payload["revert"]
     if pre != inputs.PINS["familiar_pre"]:
         raise Stop("recovery must name the approved familiar PRE; nothing was restored")
     targets.closed(context)
     snapshot, wanted = _snapshot(context)
-    waited = _synchronized(context, revert)
+    waited, head = familiar.synchronized(context, revert, familiar.titan_head(context),
+                                         "nothing was restored here")
     targets.closed(context)  # the wait can be long: a harness opened meanwhile still refuses
-    if _tree(context, revert) != _tree(context, pre):
-        raise Stop("familiar's source here is not PRE's tree; inspect it; nothing was restored")
+    problem = familiar.base_problem(context, base)
+    if problem or _outside(context, "familiar-restored-diff", base, revert):
+        raise Stop("familiar's restoration point here is not the window's base outside tasks/; "
+                   "inspect it; nothing was restored")
     modules = Path(context["familiar"]) / "node_modules"
     replaced = _modules(modules) != wanted
     if replaced:
@@ -415,7 +602,8 @@ def dependency_restore(context):
     if targets._helper(context, "familiar-check", "familiar-check", "--expect", "native",
                        *familiar.root_args(context)).returncode != 0:
         raise Stop("relay-cutover familiar-check --expect native failed; see the private log")
-    return {"revert": revert, "waited_seconds": waited, "replaced": replaced, "tree": wanted}
+    return {"revert": revert, "head": head, "waited_seconds": waited, "replaced": replaced,
+            "tree": wanted}
 
 
 # --- familiar's service --------------------------------------------------------------------------
@@ -497,10 +685,12 @@ def _expected(value):
 
 _WINDOW = {"window_id": quiesce._window_id}
 _RECORD = {**_WINDOW, "record_sha256": quiesce._sha}
-_FAMILIAR = {**_WINDOW, "pre": quiesce._commit, "tip": quiesce._commit,
+_FAMILIAR = {**_WINDOW, "pre": quiesce._commit, "tip": quiesce._commit, "base": quiesce._commit,
              "merge": quiesce._commit, "revert": quiesce._commit}
-_FAMILIAR_REQUIRED = frozenset({"window_id", "pre", "tip"})
-_DEPENDENCIES = {**_WINDOW, "pre": quiesce._commit, "revert": quiesce._commit}
+_FAMILIAR_REQUIRED = frozenset({"window_id", "pre", "tip", "base"})
+_DEPENDENCIES = {**_WINDOW, "pre": quiesce._commit, "base": quiesce._commit,
+                 "revert": quiesce._commit}
+_SOURCE_DEADLINE = familiar.PROOF_CHILDREN * CHILD_SECONDS
 _SERVICE_DEADLINE = 2 * SERVICE_SECONDS + 4 * CHILD_SECONDS
 
 OPERATIONS = {
@@ -518,19 +708,21 @@ OPERATIONS = {
         payload={**_WINDOW, "target_id": targets._target_id, "identities": _relay},
         required=frozenset({"window_id", "target_id", "identities"}), hosts=("titan",),
         modes=hosts.BOTH, scratch=True),
-    "familiar-reconcile": hosts.Operation(run=familiar_reconcile, deadline=8 * CHILD_SECONDS,
+    "familiar-reconcile": hosts.Operation(run=familiar_reconcile,
+                                          deadline=3 * _SOURCE_DEADLINE + 8 * CHILD_SECONDS,
                                           mutation=False, payload=_FAMILIAR,
                                           required=_FAMILIAR_REQUIRED, hosts=("titan",),
                                           modes=hosts.BOTH, scratch=True,
                                           pilot_hosts=tuple(hosts.HOSTS)),
     "familiar-restore": hosts.Operation(
-        run=familiar_restore, deadline=14 * CHILD_SECONDS, mutation=True,
+        run=familiar_restore, deadline=6 * _SOURCE_DEADLINE + 14 * CHILD_SECONDS, mutation=True,
         payload={**_FAMILIAR, "expect": _expected},
         required=_FAMILIAR_REQUIRED | {"expect"}, hosts=("titan",), modes=hosts.BOTH,
         scratch=True, pilot_hosts=tuple(hosts.HOSTS)),
     "dependency-restore": hosts.Operation(
-        run=dependency_restore, deadline=hosts.SYNC_SECONDS + hosts.INSTALL_SECONDS
-        + 4 * CHILD_SECONDS, mutation=True, payload=_DEPENDENCIES,
+        run=dependency_restore, deadline=hosts.SYNC_SECONDS + 3 * _SOURCE_DEADLINE
+        + hosts.INSTALL_SECONDS + 4 * CHILD_SECONDS, mutation=True,
+        payload={**_DEPENDENCIES, "titan_head": quiesce._commit},
         required=frozenset(_DEPENDENCIES), modes=hosts.BOTH, scratch=True),
     "service-run": hosts.Operation(run=service_run, deadline=_SERVICE_DEADLINE, mutation=True,
                                    payload=_RECORD, required=frozenset(_RECORD)),

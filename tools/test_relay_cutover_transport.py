@@ -172,7 +172,7 @@ def install(hosts, inventory, operations):
     hosts._nodename = lambda: host
     hosts.TOOLS.update(CONFIG["tools"])
     inputs.PINS.update(CONFIG["pins"])
-    for module in (targets, familiar, restoration):
+    for module in (targets, familiar):
         module.SYNC_BUDGET_SECONDS = CONFIG["sync"]["budget"]
         module.SYNC_POLL_SECONDS = CONFIG["sync"]["poll"]
     restoration.SERVICE_SECONDS = CONFIG["service"]["budget"]
@@ -285,7 +285,8 @@ import json, os, shutil, subprocess, sys, time
 
 NAME = "@NAME@"
 # Git subcommands that change or fetch history; each such call is observed.
-HISTORY = {"revert", "reset", "fetch", "pull", "checkout", "clean", "stash", "restore", "commit"}
+HISTORY = {"revert", "reset", "fetch", "pull", "checkout", "clean", "stash", "restore", "commit",
+           "commit-tree", "update-ref"}
 with open("@CONFIG@") as stream:
     config = json.load(stream)
 host = config["by_home"][os.environ["HOME"]]
@@ -417,6 +418,12 @@ elif NAME == "git":
                 sys.exit(1)
         elif HISTORY & set(args):
             observe(git=[arg for arg in args if arg in HISTORY])
+        elif "--is-ancestor" in args:
+            # A familiar source proof's ancestry question, observed with its answer: how a
+            # fixture tells that a host has polled for a commit it does not have yet.
+            code = subprocess.run(["/usr/bin/git", *args]).returncode
+            observe(ancestor=args[args.index("--is-ancestor") + 1:], exit=code)
+            sys.exit(code)
         os.execv("/usr/bin/git", ["/usr/bin/git", *args])
 elif NAME == "systemctl":
     observe()
@@ -889,6 +896,7 @@ FIXTURE_COMMIT = "5e1f0c2d9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d"
 PINS = {"relay_version": "0.1.1", "relay_commit": "4ceec5d2ad22b136b37ee360e7a4ed00949f28d9",
         "familiar_pre": "00f4899ae523d613d21f44bfc2c456aac67f8e5f",
         "familiar_feature_tip": "a16f4daa59b04e32f1010764d6f94401ca4eed8b",
+        "familiar_merge_tree": "f492e3437577c4b79db379e4cc1fb6771f35b3bb",
         "familiar_theme": THEME_PIN, "claude_version": "2.1.304 (Claude Code)",
         "codex_version": "codex-cli 0.163.0"}
 TARGET_PATHS = {"claude": "d/hq/claude/settings.json",
@@ -1043,6 +1051,16 @@ def _git(cwd, *args):
            "GIT_COMMITTER_DATE": stamp}
     return subprocess.run(["/usr/bin/git", "-C", str(cwd), *args], env=env, check=True,
                           capture_output=True, text=True).stdout.strip()
+
+
+MERGE_CONFIG = ("-c", "merge.renames=true", "-c", "diff.renames=true",
+                "-c", "merge.directoryRenames=conflict")
+
+
+def merge_tree(root, base, tip):
+    """The tree of base merged with tip, as `merge-tree --write-tree` with familiar's fixed
+    options computes it (T0 for PRE and the tip)."""
+    return _git(root, *MERGE_CONFIG, "merge-tree", "--write-tree", base, tip).splitlines()[0]
 
 
 def familiar_history(root):
@@ -1226,7 +1244,7 @@ class World:
                 monkeypatch.delenv(key)
         for key, value in environment.items():
             monkeypatch.setenv(key, value)
-        for module in (targets, familiar, restoration):
+        for module in (targets, familiar):
             monkeypatch.setattr(module, "SYNC_BUDGET_SECONDS", self.config["sync"]["budget"])
             monkeypatch.setattr(module, "SYNC_POLL_SECONDS", self.config["sync"]["poll"])
         monkeypatch.setattr(restoration, "SERVICE_SECONDS", self.config["service"]["budget"])
@@ -1417,7 +1435,9 @@ class World:
         pre, tip = familiar_history(self.home("titan") / "d/familiar")
         shutil.copytree(self.home("titan") / "d/familiar", self.home("europa") / "d/familiar",
                         symlinks=True, dirs_exist_ok=True)
-        self.pins.update(familiar_pre=pre, familiar_feature_tip=tip)
+        self.pins.update(familiar_pre=pre, familiar_feature_tip=tip,
+                         familiar_merge_tree=merge_tree(self.home("titan") / "d/familiar", pre,
+                                                        tip))
         self.config["pins"] = {key: self.pins[key] for key in inputs.PINS}
         for key, value in self.config["pins"].items():
             self.monkeypatch.setitem(inputs.PINS, key, value)
@@ -2484,7 +2504,7 @@ def test_quiesce_operations_are_fixed(world):
             ("europa", "codex-daemon-stop", {"window_id": WINDOW, "codex_sha256": "0" * 64}),
             ("titan", "timer-record", {"window_id": "../../etc"}),
             ("titan", "timer-record", {}),
-            ("titan", "snapshot-refresh", {"window_id": WINDOW, "familiar_pre": "main"})):
+            ("titan", "snapshot-refresh", {"window_id": WINDOW, "base": "main"})):
         with pytest.raises(hosts.Refused):
             world.request(host, operation, payload)
     assert world.lines("ssh_log") == []
@@ -2548,7 +2568,7 @@ def test_quiesce_snapshot_moves_registered_before_acting(world, monkeypatch):
     assert _execute("titan", "timer-record", {"window_id": WINDOW}, 1)["status"] == "completed"
     events = _recorder(monkeypatch)
     response = _execute("titan", "snapshot-refresh",
-                        {"window_id": WINDOW, "familiar_pre": world.pins["familiar_pre"]}, 2)
+                        {"window_id": WINDOW, "base": world.pins["familiar_pre"]}, 2)
     assert response["status"] == "completed", response["error"]
     directory = root / "quiesce" / WINDOW
     moves = directory / "snapshots.json"
@@ -2573,7 +2593,7 @@ def test_quiesce_snapshot_moves_registered_before_acting(world, monkeypatch):
         "link", "../familiar-theme/index.js")
     assert response["result"]["moves"][0]["entries"] > 0
     again = _execute("titan", "snapshot-refresh",
-                     {"window_id": WINDOW, "familiar_pre": world.pins["familiar_pre"]}, 3)
+                     {"window_id": WINDOW, "base": world.pins["familiar_pre"]}, 3)
     assert again["status"] == "failed" and "abort" in again["error"]
 
 
@@ -2607,7 +2627,7 @@ def test_abort_returns_partial_snapshot_copies(world, monkeypatch, fault):
 
             patch.setattr(os, "rename", failing)
         response = _execute("titan", "snapshot-refresh",
-                            {"window_id": WINDOW, "familiar_pre": world.pins["familiar_pre"]}, 2)
+                            {"window_id": WINDOW, "base": world.pins["familiar_pre"]}, 2)
     assert response["status"] == "failed"
     world_home = world.home("titan")
     aborted = _execute("titan", "snapshot-abort", {"window_id": WINDOW}, 3)
@@ -2715,7 +2735,8 @@ def test_dry_operations_are_fixed(world):
     assert {key: value for key, value in PINS.items() if key in inputs.PINS} == {
         "relay_version": "0.1.1", "relay_commit": "4ceec5d2ad22b136b37ee360e7a4ed00949f28d9",
         "familiar_pre": "00f4899ae523d613d21f44bfc2c456aac67f8e5f",
-        "familiar_feature_tip": "a16f4daa59b04e32f1010764d6f94401ca4eed8b"}
+        "familiar_feature_tip": "a16f4daa59b04e32f1010764d6f94401ca4eed8b",
+        "familiar_merge_tree": "f492e3437577c4b79db379e4cc1fb6771f35b3bb"}
     sha = "0" * 64
     for host, operation, payload in (
             ("europa", "target-apply", {"window_id": WINDOW, "target_id": "claude"}),
@@ -3149,13 +3170,14 @@ def test_recover_byte_gate_refuses_unknown_bytes_despite_hold_breach(world, monk
 
 def _familiar_payload(world, **recorded):
     return {"window_id": WINDOW, "pre": world.pins["familiar_pre"],
-            "tip": world.pins["familiar_feature_tip"], **recorded}
+            "tip": world.pins["familiar_feature_tip"], "base": world.pins["familiar_pre"],
+            **recorded}
 
 
 def _merge_by_operation(world, number):
     response = _execute("titan", "familiar-merge", {
         "window_id": WINDOW, "pre": world.pins["familiar_pre"],
-        "tip": world.pins["familiar_feature_tip"]}, number)
+        "tip": world.pins["familiar_feature_tip"], "base": world.pins["familiar_pre"]}, number)
     assert response["status"] == "completed", response["error"]
     return response["result"]["merge"]
 
@@ -3192,7 +3214,7 @@ def test_reconcile_familiar_merge_states(world, monkeypatch, case):
     found = _execute("titan", "familiar-reconcile", _familiar_payload(world, **recorded),
                      next(numbers))
     assert found["status"] == "completed", found["error"]
-    expected = {"refused-at-pre": ("at-pre", None, pre, False),
+    expected = {"refused-at-pre": ("at-base", None, pre, False),
                 "merge-in-progress": ("merge-in-progress", None, None, False),
                 "merge-before-record": ("merged", merge, None, True),
                 "revert-before-record": ("reverted", merge, familiar_head(world.home("titan")),
@@ -3212,9 +3234,10 @@ def test_reconcile_familiar_merge_states(world, monkeypatch, case):
     assert restored["result"]["revert"] == head
     assert _git(root, "rev-parse", "HEAD^{tree}") == _git(root, "rev-parse", f"{pre}^{{tree}}")
     assert not (root / ".git/MERGE_HEAD").exists() and not (root / ".git/REVERT_HEAD").exists()
-    if action == "reverted":  # one revert, whose parent is the merge found from its parents
+    if action == "reverted":  # one restore R, whose parent is the merge found from HEAD's
+        # history, built by plumbing and moved onto by compare-and-swap, never git revert
         assert _git(root, "rev-list", "--parents", "-n", "1", head).split() == [head, merge]
-        assert _history(world)[mark:] == [["revert"]]
+        assert _history(world)[mark:] == [["commit-tree"], ["update-ref"]]
         # Recovery never reverts twice: the merge state it reconciled is gone.
         again = _execute("titan", "familiar-restore", {
             **_familiar_payload(world, merge=merge), "expect": "merged"}, next(numbers))
@@ -3223,7 +3246,7 @@ def test_reconcile_familiar_merge_states(world, monkeypatch, case):
     else:
         assert _history(world)[mark:] == ([["merge", "--abort"]] if action == "merge-aborted"
                                           else [])
-    assert len(_history(world)) == mark + (1 if action != "none" else 0)
+    assert len(_history(world)) == mark + {"none": 0, "merge-aborted": 1, "reverted": 2}[action]
 
 
 def _commit_on(root, name, text):
@@ -3265,7 +3288,7 @@ def test_reconcile_unexpected_familiar_history_needs_inspection(world, monkeypat
                      next(numbers))
     assert found["status"] == "completed", found["error"]
     assert found["result"]["class"] == "unexpected" and found["result"]["reason"]
-    for expect in ("at-pre", "merged", "reverted"):
+    for expect in ("at-base", "merged", "reverted"):
         refused = _execute("titan", "familiar-restore", {
             **_familiar_payload(world, **recorded), "expect": expect}, next(numbers))
         assert refused["status"] == "failed" and "unexpected" in refused["error"]
@@ -3277,7 +3300,7 @@ def _quiesced_snapshot(world, numbers):
     """The window's timer record and its verified pre-merge snapshots, as quiescence leaves
     them."""
     for operation, payload in (("timer-record", {}),
-                               ("snapshot-refresh", {"familiar_pre": world.pins["familiar_pre"]})):
+                               ("snapshot-refresh", {"base": world.pins["familiar_pre"]})):
         response = _execute("titan", operation, {"window_id": WINDOW, **payload}, next(numbers))
         assert response["status"] == "completed", response["error"]
 
@@ -3304,13 +3327,13 @@ def test_recover_dependency_restore_offline(world, monkeypatch, case):
         _write(snapshot / "familiar-theme/index.js", "module.exports = 'changed';\n")
     revert = world.pins["familiar_pre"]
     if case == "unsynchronized":  # the recovered commit has not reached this host
-        monkeypatch.setattr(restoration, "SYNC_BUDGET_SECONDS", 0.3)
+        monkeypatch.setattr(familiar, "SYNC_BUDGET_SECONDS", 0.3)
         revert = world.pins["familiar_feature_tip"]
     before = _tree_of(modules)
     mark = len(world.lines("observed"))
     response = _execute("titan", "dependency-restore", {
-        "window_id": WINDOW, "pre": world.pins["familiar_pre"], "revert": revert},
-        next(numbers))
+        "window_id": WINDOW, "pre": world.pins["familiar_pre"],
+        "base": world.pins["familiar_pre"], "revert": revert}, next(numbers))
     calls = world.lines("observed")[mark:]
     assert [call for call in calls if call["tool"] in ("npm", "git") and
             ("git" in call or call["tool"] == "npm")] == []  # offline: no npm, fetch or reset
@@ -3328,8 +3351,8 @@ def test_recover_dependency_restore_offline(world, monkeypatch, case):
     assert checks[-1] == ["familiar-check", "--expect", "native"]
     # Repeating it finds the snapshot in place and replaces nothing.
     again = _execute("titan", "dependency-restore", {
-        "window_id": WINDOW, "pre": world.pins["familiar_pre"], "revert": revert},
-        next(numbers))
+        "window_id": WINDOW, "pre": world.pins["familiar_pre"],
+        "base": world.pins["familiar_pre"], "revert": revert}, next(numbers))
     assert again["status"] == "completed" and again["result"]["replaced"] is False
 
 
@@ -3996,7 +4019,7 @@ def _install_payload(world, host, merge, root_id, latch=None, window_id=PILOT_WI
 def _merged_clone(world, root_id, host="europa"):
     merged = _pilot(world, host, "familiar-merge", {
         "window_id": PILOT_WINDOW, "scratch": root_id, "pre": world.pins["familiar_pre"],
-        "tip": world.pins["familiar_feature_tip"]})
+        "tip": world.pins["familiar_feature_tip"], "base": world.pins["familiar_pre"]})
     assert merged["status"] == "completed", merged["error"]
     return merged["result"]["merge"]
 
@@ -4205,3 +4228,673 @@ def test_disconnect_unexercised_never_passes():
         exercised, how = pilot.exercised(latch, before, after, response)
         assert exercised is passed, (latch, before, after, response, how)
         assert how == ("latched" if latch else "npm-running") or not exercised
+
+
+# --- familiar's base, its tasks-only drift and the plumbing restore -----------------------------
+#
+# familiar's own task tracker commits task records into the synchronized checkout: it stages its
+# own paths (`git add -A -- tasks/<name>`) and makes a plain commit, deferring while the index
+# holds other staged changes. These fixtures model it with real Git on the miniature history.
+
+
+def _familiar(world, host="titan"):
+    return world.home(host) / "d/familiar"
+
+
+def _tracker(root, name, text):
+    """familiar's tracker writing one record: staged by its own path and committed plainly, or
+    deferred (left modified and uncommitted) while other changes are staged. The new HEAD, or
+    None when deferred."""
+    _write(root / "tasks" / name, text)
+    if _git(root, "diff", "--cached", "--name-only"):
+        return None
+    _git(root, "add", "-A", "--", f"tasks/{name}")
+    _git(root, "commit", "-q", "-m", f"chore(tasks): edit {name}")
+    return _git(root, "rev-parse", "HEAD")
+
+
+def _commit_paths(root, message="a commit"):
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", message)
+    return _git(root, "rev-parse", "HEAD")
+
+
+def _mirror(world):
+    """What Dropbox delivers once it settles: Titan's familiar source and Git state on Europa,
+    never its host-local node_modules."""
+    titan, europa = _familiar(world), _familiar(world, "europa")
+
+    def files(root):
+        found = {}
+        for directory, names, entries in os.walk(root):
+            if Path(directory) == root:
+                names[:] = [name for name in names if name != "node_modules"]
+            for name in entries + [name for name in names if (Path(directory) / name).is_symlink()]:
+                path = Path(directory) / name
+                found[path.relative_to(root)] = path
+        return found
+
+    source, replica = files(titan), files(europa)
+    for relative, path in source.items():
+        target = europa / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if os.path.lexists(target):
+            if (not target.is_symlink() and not path.is_symlink()
+                    and target.read_bytes() == path.read_bytes()):
+                continue
+            target.unlink()  # Git's objects are read-only; Dropbox replaces, never edits
+        shutil.copy2(path, target, follow_symlinks=False)
+    for relative, path in replica.items():
+        if relative not in source:
+            path.unlink()
+
+
+def _retip(world, files, octopus=False):
+    """familiar's feature tip rebuilt to change task records too, as the real tip does, then
+    re-pinned with its T0 here and in every fixture helper, the same on both hosts. With
+    `octopus` the tip is an octopus merge of two branches off the old tip."""
+    root = _familiar(world)
+    _git(root, "checkout", "-q", "feature/relay")
+    for name, text in files.items():
+        _write(root / name, text)
+    _commit_paths(root, "familiar's own records for relay")
+    if octopus:
+        for side in ("side-a", "side-b"):
+            _git(root, "checkout", "-q", "-b", side, "feature/relay")
+            _write(root / f"src/{side}.js", f"// {side}\n")
+            _commit_paths(root, side)
+        _git(root, "checkout", "-q", "feature/relay")
+        _git(root, "merge", "-q", "--no-ff", "--no-edit", "side-a", "side-b")
+    tip = _git(root, "rev-parse", "HEAD")
+    _git(root, "checkout", "-q", "main")
+    world.pins.update(familiar_feature_tip=tip,
+                      familiar_merge_tree=merge_tree(root, world.pins["familiar_pre"], tip))
+    world.config["pins"] = {key: world.pins[key] for key in inputs.PINS}
+    for key, value in world.config["pins"].items():
+        world.monkeypatch.setitem(inputs.PINS, key, value)
+    world.save()
+    _mirror(world)
+    return tip
+
+
+def _objects(root):
+    """Every object file in a checkout's own store: what a read-only check must not add to."""
+    return sorted(str(path.relative_to(root)) for path in (root / ".git/objects").rglob("*")
+                  if path.is_file())
+
+
+def _hooks(root, marker):
+    """Hooks that would record their run, which no familiar Git call may run."""
+    for name in ("post-merge", "reference-transaction", "pre-merge-commit", "post-commit",
+                 "post-checkout", "post-index-change"):
+        _write(root / ".git/hooks" / name, f"#!/bin/sh\necho {name} >> {marker}\n", 0o755)
+
+
+def _base_tracker(world, root):
+    _tracker(root, "fam-ff5351.md", "# a record\n")
+    return _tracker(root, "fam-ff5351.md", "# a record\n\nedited\n")
+
+
+def _base_executable(world, root):
+    _write(root / "tasks/run.sh", "#!/bin/sh\n", 0o755)
+    return _commit_paths(root, "chore(tasks): an executable record")
+
+
+def _base_rename_within(world, root):
+    _tracker(root, "a.md", "a\n")
+    _git(root, "mv", "tasks/a.md", "tasks/b.md")
+    return _commit_paths(root, "chore(tasks): rename")
+
+
+def _base_rename_out(world, root):
+    _tracker(root, "a.md", "a\n")
+    _git(root, "mv", "tasks/a.md", "a.md")
+    return _commit_paths(root, "move a record out of tasks/")
+
+
+def _base_symlink(world, root):
+    (root / "tasks").mkdir()
+    os.symlink("../package.json", root / "tasks/link")
+    return _commit_paths(root, "a symlinked record")
+
+
+def _base_gitlink(world, root):
+    _git(root, "update-index", "--add", "--cacheinfo",
+         f"160000,{world.pins['familiar_pre']},tasks/sub")
+    _git(root, "commit", "-q", "-m", "a gitlink among the records")
+    return _git(root, "rev-parse", "HEAD")
+
+
+def _base_named(path):
+    def arrange(world, root):
+        _write(root / path, "not a task record\n")
+        return _commit_paths(root, f"add {path}")
+    return arrange
+
+
+def _base_merge(world, root):
+    _git(root, "checkout", "-q", "-b", "records")
+    _tracker(root, "x.md", "x\n")
+    _git(root, "checkout", "-q", "main")
+    _tracker(root, "y.md", "y\n")
+    _git(root, "merge", "-q", "--no-ff", "--no-edit", "records")
+    return _git(root, "rev-parse", "HEAD")
+
+
+def _base_shallow(world, root):
+    head = _tracker(root, "a.md", "a\n")
+    (root / ".git/shallow").write_text(world.pins["familiar_pre"] + "\n")
+    return head
+
+
+def _base_grafts(world, root):
+    head = _tracker(root, "a.md", "a\n")
+    _write(root / ".git/info/grafts", head + "\n")
+    return head
+
+
+def _base_replaced(world, root):
+    """A commit outside tasks/ that a replace object disguises as a task record."""
+    pre = world.pins["familiar_pre"]
+    _git(root, "checkout", "-q", "--detach", pre)
+    disguise = _tracker(root, "a.md", "a\n")
+    _git(root, "checkout", "-q", "main")
+    _write(root / "src/later.js", "// not a record\n")
+    head = _commit_paths(root, "a source change")
+    _git(root, "replace", head, disguise)
+    return head
+
+
+def _base_untracked(path):
+    def arrange(world, root):
+        head = _tracker(root, "a.md", "a\n")
+        _write(root / path, "untracked\n")
+        return head
+    return arrange
+
+
+def _base_modified_record(world, root):
+    head = _tracker(root, "a.md", "a\n")
+    (root / "tasks/a.md").write_text("a deferred write\n")
+    return head
+
+
+def _base_conflict(world, root):
+    _retip(world, {"tasks/fam-relay.md": "# the tip's record\n"})
+    return _tracker(root, "fam-relay.md", "# the base's own record\n")
+
+
+def _base_t0(world, root):
+    world.monkeypatch.setitem(inputs.PINS, "familiar_merge_tree", "0" * 40)
+    return world.pins["familiar_pre"]
+
+
+BASE_RULE = {
+    "tracker": (_base_tracker, None),
+    "executable-record": (_base_executable, None),
+    "rename-within-tasks": (_base_rename_within, None),
+    "untracked-record": (_base_untracked("tasks/new.md"), None),
+    "rename-out-of-tasks": (_base_rename_out, "'a.md' outside tasks/"),
+    "symlink": (_base_symlink, "not a regular file"),
+    "gitlink": (_base_gitlink, "not a regular file"),
+    "tasks-file": (_base_named("tasks"), "'tasks' outside tasks/"),
+    "tasks-md": (_base_named("tasks.md"), "'tasks.md' outside tasks/"),
+    "capital-tasks": (_base_named("Tasks/z"), "'Tasks/z' outside tasks/"),
+    "tasksx": (_base_named("tasksx/a"), "'tasksx/a' outside tasks/"),
+    "merge-commit": (_base_merge, "a merge commit lies between"),
+    "shallow": (_base_shallow, "shallow"),
+    "grafts": (_base_grafts, "info/grafts"),
+    "replace-object": (_base_replaced, "'src/later.js' outside tasks/"),
+    "untracked-outside": (_base_untracked("notes.txt"), "notes.txt is untracked"),
+    "modified-record": (_base_modified_record, "a tracked file differs"),
+    "conflict": (_base_conflict, "does not merge cleanly"),
+    "t0-pin": (_base_t0, "not the pinned T0"),
+}
+
+
+@pytest.mark.parametrize("case", BASE_RULE)
+def test_familiar_base_rule(world, monkeypatch, case):
+    """The base rule on familiar's HEAD: a tasks-only descendant of PRE by plumbing (single
+    parents; raw entries under the bytes `tasks/` with regular-file modes; renames as their
+    delete and add; replace objects ignored; shallow or grafted history refused), a clean tree
+    (untracked task records and node_modules excepted), and its merge with the tip clean and equal
+    to T0 outside `tasks/`. Pathspec magic in the environment changes nothing, and the check
+    writes no object into the synchronized checkout."""
+    world.stage_cutover()
+    _quiet(world, monkeypatch)
+    for name in ("GIT_ICASE_PATHSPECS", "GIT_GLOB_PATHSPECS"):
+        monkeypatch.setenv(name, "1")
+    root = _familiar(world)
+    arrange, fragment = BASE_RULE[case]
+    head = arrange(world, root)
+    objects, marker = _objects(root), world.tmp / "hooks-ran"
+    _hooks(root, marker)
+    response = _execute("titan", "familiar-base", {"window_id": WINDOW}, 1)
+    assert _objects(root) == objects and not marker.exists()
+    if fragment is None:
+        assert response["status"] == "completed", response["error"]
+        result = response["result"]
+        assert result["base"] == head == _git(root, "rev-parse", "HEAD")
+        assert result["commits"] == _git(root, "rev-list", f"{world.pins['familiar_pre']}..HEAD"
+                                         ).split()
+        assert result["t0"] == world.pins["familiar_merge_tree"]
+        return
+    assert response["status"] == "failed" and fragment in response["error"], response["error"]
+
+
+def test_familiar_sync_waits_for_the_base(world):
+    """Europa waits, one child per poll, for its HEAD to be Titan's base B; B not reached in
+    time refuses, and a familiar commit made on Europa refuses at once, naming its HEAD."""
+    world.stage_cutover()
+    world.config["sync"]["budget"] = 1.0
+    world.save()
+    titan, europa = _familiar(world), _familiar(world, "europa")
+    pre = world.pins["familiar_pre"]
+    reached = world.request("europa", "familiar-sync", {"window_id": WINDOW, "base": pre})
+    assert reached["status"] == "completed" and reached["result"]["base"] == pre
+    with pytest.raises(hosts.Refused):
+        world.request("titan", "familiar-sync", {"window_id": WINDOW, "base": pre})
+    base = _tracker(titan, "a.md", "titan's record\n")
+    behind = world.request("europa", "familiar-sync", {"window_id": WINDOW, "base": base})
+    assert behind["status"] == "failed" and "did not reach" in behind["error"]
+    _mirror(world)
+    reached = world.request("europa", "familiar-sync", {"window_id": WINDOW, "base": base})
+    assert reached["status"] == "completed", reached["error"]
+    local = _tracker(europa, "b.md", "europa's own record\n")
+    started = time.monotonic()
+    ahead = world.request("europa", "familiar-sync", {"window_id": WINDOW, "base": base})
+    assert ahead["status"] == "failed" and "ahead of or diverged" in ahead["error"]
+    assert local[:12] in ahead["error"] and time.monotonic() - started < 10
+    children = [child["label"] for child in world.record(
+        "europa", ahead["operation_id"], "done.json")["children"]]
+    assert children == ["familiar-sync", "familiar-head"]
+
+
+def _live_install(world, host, merge, **extra):
+    return world.request(host, "familiar-install", {
+        "window_id": WINDOW, "merge": merge, "caches": {"npm": str(world.home(host) / CACHE)},
+        "path": "/usr/bin:/bin", **extra}, timeout=300)
+
+
+def test_source_proofs_tolerate_task_records(world):
+    """After the mark a source proof accepts the merge or a tasks-only descendant of it with a
+    clean tree judged outside `tasks/`: a tolerated Titan task-record commit and a deferred
+    tracker write pass; a changed file outside `tasks/` and a familiar commit made on Europa
+    (HEAD past the Titan HEAD the controller observed) refuse."""
+    world.stage_cutover()
+    world.config["sync"]["budget"] = 1.0
+    world.save()
+    titan, europa = _familiar(world), _familiar(world, "europa")
+    pre, tip = world.pins["familiar_pre"], world.pins["familiar_feature_tip"]
+    base = _tracker(titan, "a.md", "a\n")
+    _mirror(world)
+    merged = world.request("titan", "familiar-merge", {
+        "window_id": WINDOW, "pre": pre, "tip": tip, "base": base})
+    assert merged["status"] == "completed", merged["error"]
+    merge = merged["result"]["merge"]
+    assert merged["result"]["parents"] == [base, tip]
+    _mirror(world)
+    titan_install = _live_install(world, "titan", merge)
+    assert titan_install["status"] == "completed", titan_install["error"]
+    assert titan_install["result"]["head"] == merge
+    # Europa's install waits for its HEAD to prove the merge, with a deferred record write.
+    (europa / "tasks/a.md").write_text("a deferred write on europa\n")
+    without = _live_install(world, "europa", merge)
+    assert without["status"] == "failed" and "titan HEAD" in without["error"]
+    europa_install = _live_install(world, "europa", merge, titan_head=merge)
+    assert europa_install["status"] == "completed", europa_install["error"]
+    assert europa_install["result"]["head"] == merge
+    # A tolerated task-record commit on Titan after the merge, then a deferred write there.
+    after = _tracker(titan, "b.md", "b\n")
+    (titan / "tasks/b.md").write_text("b, deferred\n")
+    verified = world.request("titan", "familiar-verify", {"window_id": WINDOW, "merge": merge})
+    assert verified["status"] == "completed", verified["error"]
+    assert verified["result"]["head"] == after
+    # Europa behind Titan's observed HEAD waits for it, then proves it.
+    behind = world.request("europa", "familiar-verify", {"window_id": WINDOW, "merge": merge,
+                                                         "titan_head": after})
+    assert behind["status"] == "failed" and "has not reached this host" in behind["error"]
+    _mirror(world)
+    proved = world.request("europa", "familiar-verify", {"window_id": WINDOW, "merge": merge,
+                                                         "titan_head": after})
+    assert proved["status"] == "completed" and proved["result"]["head"] == after
+    # A changed file outside tasks/ refuses on either host, and Europa's install wait too.
+    for host in HOSTS:
+        _write(_familiar(world, host) / "src/observe.js", "// changed\n")
+    changed = world.request("titan", "familiar-verify", {"window_id": WINDOW, "merge": merge})
+    assert changed["status"] == "failed" and "src/observe.js differs" in changed["error"]
+    waited = _live_install(world, "europa", merge, titan_head=after)
+    assert waited["status"] == "failed" and "src/observe.js differs" in waited["error"]
+    for host in HOSTS:
+        _git(_familiar(world, host), "checkout", "-q", "--", "src/observe.js")
+    # A familiar commit made on Europa during the window refuses at once.
+    local = _tracker(europa, "c.md", "europa's own record\n")
+    started = time.monotonic()
+    ahead = world.request("europa", "familiar-verify", {"window_id": WINDOW, "merge": merge,
+                                                        "titan_head": after})
+    assert ahead["status"] == "failed" and "ahead of or diverged" in ahead["error"]
+    assert local[:12] in ahead["error"] and time.monotonic() - started < 10
+
+
+def test_familiar_merge_uses_its_fixed_options(world, monkeypatch):
+    """The merge from a tasks-only base B carries its fixed strategy and options: a checkout's
+    `pull.twohead=resolve` and `branch.<current>.mergeOptions` change nothing, no hook runs, and
+    M is proved (parents B and the tip, merge-tree's tree, T0 outside tasks/). HEAD moved off
+    B refuses before any merge."""
+    world.stage_cutover()
+    _quiet(world, monkeypatch)
+    root, numbers = _familiar(world), itertools.count(1)
+    tip = _retip(world, {"tasks/fam-relay.md": "# the tip's record\n"})
+    pre = world.pins["familiar_pre"]
+    base = _tracker(root, "fam-ff5351.md", "# a record\n")
+    _git(root, "config", "pull.twohead", "resolve")
+    _git(root, "config", "branch.main.mergeOptions", "--squash")
+    moved = _tracker(root, "later.md", "after B was derived\n")
+    refused = _execute("titan", "familiar-merge", {
+        "window_id": WINDOW, "pre": pre, "tip": tip, "base": base}, next(numbers))
+    assert refused["status"] == "failed" and "is not the window's base" in refused["error"]
+    assert _git(root, "rev-parse", "HEAD") == moved
+    _git(root, "reset", "-q", "--hard", base)
+    marker = world.tmp / "hooks-ran"
+    _hooks(root, marker)
+    merged = _execute("titan", "familiar-merge", {
+        "window_id": WINDOW, "pre": pre, "tip": tip, "base": base}, next(numbers))
+    assert merged["status"] == "completed", merged["error"]
+    assert not marker.exists() and not (root / ".git/MERGE_HEAD").exists()
+    merge = merged["result"]["merge"]
+    assert _git(root, "rev-list", "--parents", "-n", "1", merge).split() == [merge, base, tip]
+    assert _git(root, "rev-parse", f"{merge}^{{tree}}") == merge_tree(root, base, tip)
+    assert sorted(_git(root, "ls-tree", "--name-only", "-r", f"{merge}", "--", "tasks"
+                       ).split()) == ["tasks/fam-ff5351.md", "tasks/fam-relay.md"]
+    calls = [call["merge"] for call in world.lines("observed") if "merge" in call]
+    assert calls[-1] == ["-s", "ort", "--no-ff", "--no-edit", "--no-verify", "--no-autostash",
+                         tip]
+
+
+def _merged_at(world, numbers, base, tip=None):
+    pre, tip = world.pins["familiar_pre"], tip or world.pins["familiar_feature_tip"]
+    merged = _execute("titan", "familiar-merge", {"window_id": WINDOW, "pre": pre, "tip": tip,
+                                                  "base": base}, next(numbers))
+    assert merged["status"] == "completed", merged["error"]
+    return merged["result"]["merge"]
+
+
+def _recovered(world, numbers, **recorded):
+    """familiar-reconcile, then familiar-restore of the class it found: (class found, reply)."""
+    payload = _familiar_payload(world, **recorded)
+    found = _execute("titan", "familiar-reconcile", payload, next(numbers))
+    assert found["status"] == "completed", found["error"]
+    restored = _execute("titan", "familiar-restore", {
+        **payload, "expect": found["result"]["class"]}, next(numbers))
+    return found["result"], restored
+
+
+def _crash_after(monkeypatch, point):
+    """The restore dies right after `point`: `commit-tree` (R built and recorded durably), or
+    the familiar Git call `read-tree` (-m -u) or `update-ref`. Its effects stay; nothing after it
+    runs. Returns the undo."""
+    if point == "commit-tree":
+        real_save = restoration._save_host_record
+
+        def save(context, record):
+            real_save(context, record)
+            raise Stop("the fixture's crash after commit-tree and its record")
+
+        monkeypatch.setattr(restoration, "_save_host_record", save)
+        return lambda: monkeypatch.setattr(restoration, "_save_host_record", real_save)
+    real, label = familiar._git, f"familiar-{point}"
+
+    def git(context, name, *args, **options):
+        result = real(context, name, *args, **options)
+        if name == label:
+            raise Stop(f"the fixture's crash after {point}")
+        return result
+
+    monkeypatch.setattr(familiar, "_git", git)
+    return lambda: monkeypatch.setattr(familiar, "_git", real)
+
+
+def _clean_at(root, commit):
+    """HEAD is commit and the working tree equals it outside tasks/."""
+    assert _git(root, "rev-parse", "HEAD") == commit
+    changed = _git(root, "diff", "--name-only", "HEAD").split() + _git(
+        root, "ls-files", "--others", "--exclude-standard").split()
+    assert [path for path in changed if not path.startswith("tasks/")] == []
+
+
+def _is_restore(root, revert, parent, base):
+    """R: one parent, B's tree outside tasks/ and its parent's task records."""
+    assert _git(root, "rev-list", "--parents", "-n", "1", revert).split() == [revert, parent]
+    assert all(path.startswith("tasks/")
+               for path in _git(root, "diff", "--name-only", base, revert).split())
+    assert _git(root, "ls-tree", revert, "--", "tasks") == _git(root, "ls-tree", parent, "--",
+                                                                 "tasks")
+
+
+RECORDS = {  # (B has task records, P has task records)
+    "neither": (False, False), "base-only": (True, False), "merge-only": (False, True),
+    "both": (True, True)}
+
+
+@pytest.mark.parametrize("case", RECORDS)
+def test_plumbing_restore_keeps_task_records(world, monkeypatch, case):
+    """The restore builds R by plumbing, never git revert: B's tree with P's `tasks` entry
+    (added, kept, replaced or removed; two absent entries are equal), committed on P and moved
+    onto by compare-and-swap, with no hook run. A post-merge task-record commit touching a path
+    the tip changed cannot conflict."""
+    world.stage_cutover()
+    _quiet(world, monkeypatch)
+    root, numbers = _familiar(world), itertools.count(1)
+    in_base, in_merge = RECORDS[case]
+    tip = _retip(world, {"tasks/fam-relay.md": "# the tip's record\n"}) if case == "both" \
+        else world.pins["familiar_feature_tip"]
+    base = _tracker(root, "fam-ff5351.md", "# a record\n") if in_base else \
+        world.pins["familiar_pre"]
+    merge = _merged_at(world, numbers, base, tip)
+    head = merge
+    if case == "both":  # the tip's own record, edited after the merge
+        head = _tracker(root, "fam-relay.md", "# the tip's record\n\nedited after the merge\n")
+    elif case == "base-only":  # every record removed after the merge
+        _git(root, "rm", "-q", "-r", "--", "tasks")
+        head = _commit_paths(root, "chore(tasks): archive every record")
+    elif case == "merge-only":
+        head = _tracker(root, "fam-new.md", "# after the merge\n")
+    marker = world.tmp / "hooks-ran"
+    _hooks(root, marker)
+    found, restored = _recovered(world, numbers, base=base, merge=merge)
+    assert not marker.exists()
+    assert found["class"] == "merged"
+    assert restored["status"] == "completed", restored["error"]
+    revert = restored["result"]["revert"]
+    assert restored["result"]["action"] == "reverted" and restored["result"]["head"] == revert
+    _clean_at(root, revert)
+    _is_restore(root, revert, head, base)
+    assert bool(_git(root, "ls-tree", revert, "--", "tasks")) is (case in ("merge-only",
+                                                                           "both"))
+    history = [call.get("git") or ["merge"] for call in world.lines("observed")
+               if call["tool"] == "git" and ("git" in call or "merge" in call)]
+    assert history[-2:] == [["commit-tree"], ["update-ref"]]
+    assert ["revert"] not in history
+    record = json.loads((world.root("titan") / "quiesce" / WINDOW /
+                         "familiar-restore.json").read_text())
+    assert (record["revert"], record["parent"], record["abandoned"]) == (revert, head, [])
+    again, restored = _recovered(world, numbers, base=base, merge=merge, revert=revert)
+    assert (again["class"], restored["result"]["action"]) == ("reverted", "none")
+
+
+@pytest.mark.parametrize("point", ["commit-tree", "read-tree", "update-ref"])
+def test_plumbing_restore_crash_points(world, monkeypatch, point):
+    """A restore that dies after commit-tree (R recorded durably first), after read-tree -m -u
+    or after update-ref completes on its rerun from actual state, with the recorded R."""
+    world.stage_cutover()
+    _quiet(world, monkeypatch)
+    root, numbers = _familiar(world), itertools.count(1)
+    base = _tracker(root, "fam-ff5351.md", "# a record\n")
+    merge = _merged_at(world, numbers, base)
+    undo = _crash_after(monkeypatch, point)
+    _, crashed = _recovered(world, numbers, base=base, merge=merge)
+    undo()
+    assert crashed["status"] == "failed" and point in crashed["error"]
+    record = json.loads((world.root("titan") / "quiesce" / WINDOW /
+                         "familiar-restore.json").read_text())
+    built = record["revert"]
+    assert record["parent"] == merge
+    assert _git(root, "rev-parse", "HEAD") == (built if point == "update-ref" else merge)
+    found, restored = _recovered(world, numbers, base=base, merge=merge)
+    assert restored["status"] == "completed", restored["error"]
+    assert restored["result"]["revert"] == built and found["abandoned"] is None
+    assert (found["class"], restored["result"]["action"]) == (
+        ("reverted", "none") if point == "update-ref" else ("merged", "reverted"))
+    _clean_at(root, built)
+    _is_restore(root, built, merge, base)
+
+
+INDEXES = ("stat-dirty", "other-tree", "index-lock")
+
+
+@pytest.mark.parametrize("case", INDEXES)
+def test_plumbing_restore_never_trusts_the_live_index(world, monkeypatch, case):
+    """Dropbox synchronizes the live index, so it is never evidence: a stat-dirty index and one
+    holding another tree are rebuilt before HEAD moves; a present index.lock refuses for
+    inspection and is never deleted."""
+    world.stage_cutover()
+    _quiet(world, monkeypatch)
+    root, numbers = _familiar(world), itertools.count(1)
+    base = _tracker(root, "fam-ff5351.md", "# a record\n")
+    merge = _merged_at(world, numbers, base)
+    if case == "stat-dirty":
+        for name in ("package.json", "src/observe.js", "tasks/fam-ff5351.md"):
+            os.utime(root / name, (1_000_000_000, 1_000_000_000))
+    elif case == "other-tree":
+        _git(root, "read-tree", world.pins["familiar_pre"])
+    else:
+        _write(root / ".git/index.lock", "")
+    found, restored = _recovered(world, numbers, base=base, merge=merge)
+    assert found["class"] == "merged"
+    if case == "index-lock":
+        assert restored["status"] == "failed" and "index.lock" in restored["error"]
+        assert (root / ".git/index.lock").exists() and _git(root, "rev-parse", "HEAD") == merge
+        return
+    assert restored["status"] == "completed", restored["error"]
+    revert = restored["result"]["revert"]
+    _clean_at(root, revert)
+    assert _git(root, "diff", "--cached", "--name-only") == ""  # the rebuilt index is HEAD's
+
+
+TOLERATED = ("abandoned-after-tasks-commit", "pathspec-commit-after-read-tree",
+             "live-index-commit-after-read-tree", "deferred-write-after-read-tree")
+
+
+@pytest.mark.parametrize("case", TOLERATED)
+def test_plumbing_restore_after_tolerated_titan_commits(world, monkeypatch, case):
+    """Titan task-record commits are tolerated after the merge, even beside a crashed restore:
+    after commit-tree, a later tasks commit abandons R and a fresh R' is built on HEAD; after
+    read-tree, a tasks commit by pathspec leaves the working tree R'-shaped and only HEAD moves;
+    a commit of the whole live index is itself the restore (the walk's R) and the recorded R is
+    abandoned; a deferred tracker write is carried."""
+    world.stage_cutover()
+    _quiet(world, monkeypatch)
+    root, numbers = _familiar(world), itertools.count(1)
+    base = _tracker(root, "fam-ff5351.md", "# a record\n")
+    merge = _merged_at(world, numbers, base)
+    point = "commit-tree" if case == "abandoned-after-tasks-commit" else "read-tree"
+    undo = _crash_after(monkeypatch, point)
+    _recovered(world, numbers, base=base, merge=merge)
+    undo()
+    built = json.loads((world.root("titan") / "quiesce" / WINDOW /
+                        "familiar-restore.json").read_text())["revert"]
+    if case == "abandoned-after-tasks-commit":
+        head = _tracker(root, "later.md", "a tolerated record\n")
+    elif case == "pathspec-commit-after-read-tree":
+        _write(root / "tasks/later.md", "a tolerated record\n")
+        _git(root, "add", "--", "tasks/later.md")
+        _git(root, "commit", "-q", "-m", "chore(tasks): later", "--", "tasks/later.md")
+        head = _git(root, "rev-parse", "HEAD")
+    elif case == "live-index-commit-after-read-tree":
+        _write(root / "tasks/later.md", "a record committed with the whole index\n")
+        head = _commit_paths(root, "chore(tasks): later")
+    else:
+        assert _tracker(root, "fam-ff5351.md", "# a record\n\nwritten after the crash\n") is None
+        head = merge
+    found, restored = _recovered(world, numbers, base=base, merge=merge)
+    assert restored["status"] == "completed", restored["error"]
+    revert = restored["result"]["revert"]
+    if case == "live-index-commit-after-read-tree":
+        assert (found["class"], found["revert"], found["abandoned"]) == ("reverted", head, built)
+        assert (revert, restored["result"]["action"]) == (head, "none")
+    elif case == "deferred-write-after-read-tree":
+        assert (found["class"], found["abandoned"], revert) == ("merged", None, built)
+        assert (root / "tasks/fam-ff5351.md").read_text().endswith("written after the crash\n")
+    else:
+        assert (found["class"], found["abandoned"]) == ("merged", built)
+        assert revert != built
+        _is_restore(root, revert, head, base)
+    _clean_at(root, revert)
+    record = json.loads((world.root("titan") / "quiesce" / WINDOW /
+                         "familiar-restore.json").read_text())
+    assert record["abandoned"] == ([] if case == "deferred-write-after-read-tree" else [built])
+
+
+def test_restore_refuses_two_changes_above_the_merge(world, monkeypatch):
+    """Above the merge, more than one commit changing paths outside tasks/ is refused for
+    inspection: nothing is restored."""
+    world.stage_cutover()
+    _quiet(world, monkeypatch)
+    root, numbers = _familiar(world), itertools.count(1)
+    base = world.pins["familiar_pre"]
+    merge = _merged_at(world, numbers, base)
+    for name in ("one", "two"):
+        _write(root / f"src/{name}.js", f"// {name}\n")
+        _commit_paths(root, name)
+    head = _git(root, "rev-parse", "HEAD")
+    payload = _familiar_payload(world, base=base, merge=merge)
+    found = _execute("titan", "familiar-reconcile", payload, next(numbers))["result"]
+    assert found["class"] == "unexpected" and "2 commits above the merge" in found["reason"]
+    for expect in ("merged", "reverted"):
+        refused = _execute("titan", "familiar-restore", {**payload, "expect": expect},
+                           next(numbers))
+        assert refused["status"] == "failed" and "unexpected" in refused["error"]
+    assert _git(root, "rev-parse", "HEAD") == head
+
+
+def test_merge_in_progress_rebuilds_the_index_before_its_abort(world, monkeypatch):
+    """A merge in progress whose live index Dropbox replaced with B's tree: the index is rebuilt
+    from the working tree's proven state (the merge's tree) before git merge --abort, and the
+    checkout returns clean to B, recorded as the restoration point."""
+    world.stage_cutover()
+    _quiet(world, monkeypatch)
+    root, numbers = _familiar(world), itertools.count(1)
+    base = _tracker(root, "fam-ff5351.md", "# a record\n")
+    _git(root, "merge", "--no-ff", "--no-commit", world.pins["familiar_feature_tip"])
+    _git(root, "read-tree", base)
+    found, restored = _recovered(world, numbers, base=base)
+    assert found["class"] == "merge-in-progress"
+    assert restored["status"] == "completed", restored["error"]
+    assert (restored["result"]["action"], restored["result"]["revert"]) == ("merge-aborted",
+                                                                            base)
+    assert not (root / ".git/MERGE_HEAD").exists()
+    _clean_at(root, base)
+    assert _git(root, "diff", "--cached", "--name-only") == "" and _git(
+        root, "diff", "--name-only") == ""
+    again, restored = _recovered(world, numbers, base=base, revert=base)
+    assert (again["class"], restored["result"]["revert"]) == ("at-base", base)
+
+
+def test_octopus_merge_in_the_tips_history(world, monkeypatch):
+    """A tip whose own history holds an octopus merge: B's first-parent walk still finds the one
+    merge M, and the restore returns to B outside tasks/."""
+    world.stage_cutover()
+    _quiet(world, monkeypatch)
+    root, numbers = _familiar(world), itertools.count(1)
+    tip = _retip(world, {"tasks/fam-relay.md": "# the tip's record\n"}, octopus=True)
+    assert len(_git(root, "rev-list", "--parents", "-n", "1", tip).split()) == 4
+    base = _tracker(root, "fam-ff5351.md", "# a record\n")
+    based = _execute("titan", "familiar-base", {"window_id": WINDOW}, next(numbers))
+    assert based["status"] == "completed", based["error"]
+    merge = _merged_at(world, numbers, base, tip)
+    head = _tracker(root, "later.md", "after the merge\n")
+    found, restored = _recovered(world, numbers, base=base)
+    assert (found["class"], found["merge"], found["discovered"]) == ("merged", merge, True)
+    assert restored["status"] == "completed", restored["error"]
+    _is_restore(root, restored["result"]["revert"], head, base)
+    _clean_at(root, restored["result"]["revert"])

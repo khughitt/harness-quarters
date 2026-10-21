@@ -9,10 +9,14 @@ targets and familiar is in `targets.py` and `familiar.py`. A run opens the windo
    probes on both hosts and in both homes; a Claude process left afterwards blocks;
 2. `quiesce_window`: stop Titan's two Codex daemons with their CLI; strict no-live on both hosts,
    with no exemption; record and stop each host's timers; wait for their services; strict no-live
-   again; refresh the familiar snapshots;
+   again; derive familiar's base B on Titan (`familiar-base`: its HEAD under the base rule) and
+   save it; wait for Europa's HEAD to be B (`familiar-sync`); refresh the familiar snapshots,
+   each host checking HEAD = B;
 3. `dry_targets`: the six dry runs on frozen copies, cross-host agreement and the seal;
-4. the frozen targets unchanged and both hosts closed, then the `familiar` record;
-5. the merge of the immutable tip on Titan; each host's install once the merge reached it; each
+4. the frozen targets unchanged, both hosts closed and Titan's HEAD still B, then the `familiar`
+   record, which names B;
+5. the merge of the immutable tip into B on Titan; each host's install once the merge reached it
+   (HEAD the merge or a tasks-only descendant of it, and Europa's not past Titan's); each
    target registered, then applied once on Titan; every host verified. Both hosts are checked
    closed before each install and each target write. The window becomes
    `migrated-surfaces-pending`;
@@ -42,7 +46,10 @@ Keys this module adds to the window record:
 - `surfaces`: the run's consent subject, every host's recorded familiar surfaces (the restarts
   themselves are recorded under `desktop` by `surfaces.py`);
 - `dry` {host: {target: verdict}} and `sealed` {at, effective_inputs_sha256, inputs};
-- `familiar` {started_at, pre, tip}, recorded before the merge, then merge, parents, merged_at;
+- `base` {commit, derived_at, commits, t0, tree, europa}: familiar's base B and its proof, saved
+  before Europa waits for it, so a merge never exists without it;
+- `familiar` {started_at, pre, tip, base}, recorded before the merge, then merge, parents,
+  merged_at;
 - `dependencies` {host: install proof}, `applied` {target: apply result}, `verified`.
 
 The window directory also keeps the prepared record as `prepared.json`, the ledger
@@ -150,6 +157,17 @@ def _call(host, mode, operation, payload, step):
         raise Failed(step, host, response["status"], response["error"] or "no detail recorded",
                      log=log, cause="refused" if response["status"] == "refused" else "operation")
     return response["result"], log
+
+
+def titan_head(host: str, observed: str | None) -> dict:
+    """The payload key a live Europa source proof compares its HEAD with: the Titan HEAD the
+    controller observed in the same step. Titan's own proof takes none."""
+    if host == "titan":
+        return {}
+    if observed is None:
+        raise Failed("familiar-verify", host, "refused", "europa's familiar proof needs titan's "
+                     "observed HEAD from the same step; nothing was checked")
+    return {"titan_head": observed}
 
 
 @contextmanager
@@ -328,12 +346,23 @@ def _quiesce(window, prepared, progress, seen):
     for host in HOST_ORDER:
         step("no-live", host)
         _no_live(host, mode, identity)
+    # familiar's base B: Titan's HEAD under the base rule, saved before Europa waits for it
+    # and before either host's snapshots are refreshed from it.
+    step("familiar-base", "titan")
+    derived, _ = _call("titan", mode, "familiar-base", {"window_id": identity}, "familiar-base")
+    base = derived["base"]
+    window = _save(window, base={"commit": base, "derived_at": _now(),
+                                 "commits": derived["commits"], "t0": derived["t0"],
+                                 "tree": derived["tree"]})
+    step("familiar-sync", "europa")
+    synced, _ = _call("europa", mode, "familiar-sync", {"window_id": identity, "base": base},
+                      "familiar-sync")
+    window = _save(window, base={**window["base"], "europa": synced})
     snapshots = {}
     for host in HOST_ORDER:
         step("snapshot-refresh", host)
-        result, _ = _call(host, mode, "snapshot-refresh", {
-            "window_id": identity, "familiar_pre": prepared["pins"]["familiar_pre"]},
-            "snapshot-refresh")
+        result, _ = _call(host, mode, "snapshot-refresh", {"window_id": identity, "base": base},
+                          "snapshot-refresh")
         snapshots[host] = result["moves"]
     window = _save(window, quiescent={"at": _now(), "hosts": {
         host: {"timers": records[host], "snapshots": snapshots[host]} for host in HOST_ORDER}})
@@ -585,7 +614,8 @@ def run_window(prepared: dict, decision: dict) -> dict:
             window = _before_merge(window, seen, progress)
             window = _save(window, familiar={"started_at": _now(),
                                              "pre": prepared["pins"]["familiar_pre"],
-                                             "tip": prepared["pins"]["familiar_feature_tip"]})
+                                             "tip": prepared["pins"]["familiar_feature_tip"],
+                                             "base": window["base"]["commit"]})
         except (Exception, _Interrupt) as error:
             if isinstance(error, Failed) and error.aborted:
                 raise
@@ -654,11 +684,20 @@ def dry_runs(window: dict, prepared: dict, seen: list, progress: dict,
 
 def _before_merge(window, seen, progress):
     """The last pre-merge gate: every frozen target still holds its frozen bytes on both hosts,
-    and both hosts are closed."""
+    both hosts are closed, and Titan's familiar is still the window's base B under the base
+    rule: a familiar commit on Titan since B was derived aborts the run before the merge."""
     window = frozen_gate(window, seen, progress)
     for host in HOST_ORDER:
         window = _step(window, seen, progress, "no-live", host)
         _no_live(host, window["mode"], window["id"])
+    window = _step(window, seen, progress, "familiar-base", "titan")
+    found, log = _call("titan", window["mode"], "familiar-base", {"window_id": window["id"]},
+                       "familiar-base")
+    base = window["base"]["commit"]
+    if found["base"] != base:
+        raise Failed("familiar-base", "titan", "blocked", f"familiar's HEAD on titan moved from "
+                     f"the window's base {base[:12]} to {found['base'][:12]} before the merge; "
+                     "make no familiar commit from run until the merge", log=log)
     return window
 
 
@@ -690,9 +729,11 @@ def _migrate(window, prepared, seen, progress):
     window = _step(window, seen, progress, "familiar-merge", "titan")
     merged, _ = _call("titan", mode, "familiar-merge", {
         "window_id": identity, "pre": pins["familiar_pre"],
-        "tip": pins["familiar_feature_tip"]}, "familiar-merge")
+        "tip": pins["familiar_feature_tip"], "base": window["familiar"]["base"]},
+        "familiar-merge")
     window = _save(window, familiar={**window["familiar"], "merge": merged["merge"],
                                      "parents": merged["parents"], "merged_at": _now()})
+    observed = None  # Titan's HEAD as its install observed it, which Europa's must not pass
     for host in HOST_ORDER:
         for checked in HOST_ORDER:
             window = _step(window, seen, progress, "no-live", checked)
@@ -701,8 +742,9 @@ def _migrate(window, prepared, seen, progress):
         record = prepared["hosts"][host]
         result, _ = _call(host, mode, "familiar-install", {
             "window_id": identity, "merge": merged["merge"],
-            "caches": record["caches"]["prefixes"], "path": record["install"]["path"]},
-            "familiar-install")
+            "caches": record["caches"]["prefixes"], "path": record["install"]["path"],
+            **titan_head(host, observed)}, "familiar-install")
+        observed = observed or result["head"]
         window = _save(window, dependencies={**window.get("dependencies", {}), host: result})
     for target_id in inputs.TARGETS:
         for host in HOST_ORDER:
@@ -745,15 +787,17 @@ def verified_migration(window: dict, merge: str, step=None, *, picks: bool = Fal
     """The verified migration checkpoint's per-host record, or Failed naming the first host that
     differs: on each host, Titan first, every target holds the window's sealed bytes (Europa's
     after waiting for synchronization) with hooks, statusLine, installer and evidence verified,
-    and familiar is the merge with its pinned relay dependency. The run and reconciliation both
-    take this one gate, with exact bytes; `step(name, host)` is called before each request.
+    and familiar is the merge or a tasks-only descendant of it, clean outside `tasks/`, with its
+    pinned relay dependency; Europa's HEAD equals or precedes the HEAD Titan's proof observed.
+    The run and reconciliation both take this one gate, with exact bytes; `step(name, host)` is
+    called before each request.
 
     With `picks`, the recheck of a surface retry: as in finish's checks, a Claude target that
     differs from its sealed bytes only in the clean filter's pick keys passes, and each host is
     read as it stands, since the checkpoint already waited for synchronization; the per-host
     record names the targets that passed on their picks."""
     mode, identity, sealed = window["mode"], window["id"], window["sealed"]["inputs"]
-    verified = {}
+    verified, observed = {}, None
     for host in HOST_ORDER:
         if step is not None:
             step("target-verify", host)
@@ -772,8 +816,10 @@ def verified_migration(window: dict, merge: str, step=None, *, picks: bool = Fal
                          + (" after waiting for synchronization" if wait else ""), log=log)
         if step is not None:
             step("familiar-verify", host)
-        source, _ = _call(host, mode, "familiar-verify", {"window_id": identity, "merge": merge},
-                          "familiar-verify")
+        source, _ = _call(host, mode, "familiar-verify", {
+            "window_id": identity, "merge": merge, **titan_head(host, observed)},
+            "familiar-verify")
+        observed = observed or source["head"]
         verified[host] = {"targets": expected, "familiar": source,
                           **({"picks": found["picks"]} if picks else {})}
     return verified
@@ -804,21 +850,22 @@ def pilot_open(current: dict) -> str:
 
 def _ended(current):
     """Why a closed live window ended this cutover, or None. A complete one released its hold. A
-    recovery that reverted familiar's committed merge leaves familiar at that revert, and this
-    tool merges only from PRE: no later window runs from there (ruling R47). A pilot ends
-    nothing, and neither does a recovery whose merge never committed."""
+    recovery whose class was `merged` or `reverted` leaves familiar at the restore commit R,
+    which no base rule admits: no later window runs from there (ruling R47). A pilot ends
+    nothing, and neither does an `at-base` or `merge-in-progress` recovery, whose merge never
+    committed."""
     if current is None or current["mode"] != "live" or current["state"] not in state.TERMINAL:
         return None
     if current["state"] == "complete":
         return (f"window {current['id']} is complete: the cutover is complete and finish released "
                 "its hold; this tool opens no further window")
-    revert = ((current.get("recovery") or {}).get("familiar") or {}).get("revert")
-    if current["state"] == "recovered" and revert not in (None, (current.get("familiar") or {})
-                                                          .get("pre")):
-        return (f"window {current['id']} is recovered: recovery reverted familiar's committed "
-                f"merge (familiar is at {revert[:12]}), which ends this cutover; this tool merges "
-                "only from PRE and opens no further window, and a new attempt needs newly "
-                "reviewed pins and inputs and its own reviewed procedure")
+    recovered = (current.get("recovery") or {}).get("familiar") or {}
+    if current["state"] == "recovered" and recovered.get("class") in ("merged", "reverted"):
+        return (f"window {current['id']} is recovered: recovery restored familiar from its "
+                f"committed merge (familiar is at {recovered['revert'][:12]}), which ends this "
+                "cutover; this tool merges only from a tasks-only descendant of PRE and opens no "
+                "further window, and a new attempt needs newly reviewed pins and inputs and its "
+                "own reviewed procedure")
     return None
 
 
