@@ -1009,7 +1009,7 @@ before a new window. No in-window re-probe/continuation path is added.
 ## Amendment 2026-10-21: familiar task-record drift (after Task 9 Step 7)
 
 Implements the spec amendment of the same date (revised after design review rounds 7–8;
-rulings R61–R63). One corrective change on the delivered tool, then redelivery:
+rulings R61–R64). One corrective change on the delivered tool, then redelivery:
 
 1. Pins: add T0 `f492e3437577c4b79db379e4cc1fb6771f35b3bb` beside PRE and tip (tool constants
    and the manifest's pins). One fixed-options helper for every `merge-tree`/`merge` call,
@@ -1041,7 +1041,10 @@ rulings R61–R63). One corrective change on the delivered tool, then redelivery
    `branch.<b>.mergeOptions` set in the fixture config do not change the merge; a conflicted
    `merge-tree` refuses at prepare; `familiar-sync` timeout is a clean pre-merge abort; the
    plumbing restore's crash points (after `commit-tree`, after `read-tree`, after
-   `update-ref`); a Europa-local commit after the mark detected; `at-base` recovery does not
+   `update-ref`); a stat-dirty live index, an index holding another tree and a stale
+   `index.lock` during the restore; an abandoned R after a tolerated Titan tasks commit;
+   hooks (`post-merge`, `reference-transaction`) not run; `tasks/` absent in B or P; an
+   octopus merge in the tip's history; a Europa-local commit after the mark detected; `at-base` recovery does not
    end the cutover; the unchanged B = PRE fixtures as the baseline.
 10. Mandatory suite, scoped review, cherry-pick redelivery with the delivered tree's
     `just test`, Europa helper-byte check, restaged input generation (helper digests and the

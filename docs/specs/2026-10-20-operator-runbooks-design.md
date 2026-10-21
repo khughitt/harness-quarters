@@ -696,11 +696,14 @@ delete and add and fails only when one side lies outside `tasks/`; symlinks, git
 immutable tip (`a16f4daa59b04e32f1010764d6f94401ca4eed8b`) stay pinned, and T0 is pinned as
 the tree of the reviewed clean merge of PRE and tip: `f492e3437577c4b79db379e4cc1fb6771f35b3bb`
 (computed 2026-10-21 on Titan with git 2.56). Every `merge-tree` and `merge` call carries
-`-c merge.renames=true -c diff.renames=true -c merge.directoryRenames=conflict`; the merge
+`-c merge.renames=true -c diff.renames=true -c merge.directoryRenames=conflict`, and every
+mutating familiar git call (`merge`, `read-tree`, `update-index`, `commit-tree`, `update-ref`)
+also carries `-c core.hooksPath=/dev/null`; the merge
 itself is `git -c branch.<current>.mergeOptions= merge -s ort --no-ff --no-edit --no-verify
 --no-autostash`. A non-zero `merge-tree` exit is a refusal. Read-only `merge-tree` runs with a
 temporary object directory and the real objects as an alternate, so readiness writes nothing
-into the synchronized repository. "Equal outside `tasks/`" means `diff-tree -r --no-renames
+into the synchronized repository; the `diff-tree` that compares its output with T0 runs
+under the same object environment. "Equal outside `tasks/`" means `diff-tree -r --no-renames
 --raw -z` lists only paths beginning with `tasks/`.
 
 - **Base.** B is a tasks-only descendant of PRE with a clean tree (no tracked change, no
@@ -714,7 +717,7 @@ into the synchronized repository. "Equal outside `tasks/`" means `diff-tree -r -
   commit. B moving between `prepare` and `run` while eligible is not drift.
 - **Run.** After the second strict no-live check, `run` derives B on Titan (base rule and
   merge check again) and saves it in the window. A new read-only host operation,
-  `familiar-sync` (deadline `SYNC_SECONDS + CHILD_SECONDS + 60`), then waits for Europa HEAD =
+  `familiar-sync` (each poll runs one child; deadline `SYNC_SECONDS + CHILD_SECONDS + 60`), then waits for Europa HEAD =
   B; a timeout, divergence or Europa ahead is a clean pre-merge abort. Only then does either
   host's `snapshot-refresh` run (its 900 s budget unchanged), checking HEAD = B without
   waiting. The pre-merge gate rechecks Titan HEAD = B; the mark records B; `familiar-merge`
@@ -727,8 +730,8 @@ into the synchronized repository. "Equal outside `tasks/`" means `diff-tree -r -
   restore's sync wait (of R). Europa's proofs also require Europa HEAD equal to, or an
   ancestor of, the Titan HEAD the controller observed in the same step. Finish records the
   observed HEAD.
-- **Finding M and R.** Without a record, the restore walks `rev-list --first-parent --parents
-  B..HEAD`: exactly one entry may have two parents; that is M, and its parents must be
+- **Finding M and R.** Without a record, the restore requires `merge-base --is-ancestor B HEAD`, then
+  walks `rev-list --first-parent --parents B..HEAD`: exactly one entry has more than one parent; that is M, and its parents must be
   `[recorded B, tip]`. Above M, R is the only entry whose `diff-tree` touches a path outside
   `tasks/`. B is saved before the merge request, so a merge never exists without it. A window
   record with no recorded base is refused for inspection, never assumed to be PRE.
@@ -740,12 +743,24 @@ into the synchronized repository. "Equal outside `tasks/`" means `diff-tree -r -
   tasks-only descendant of R, R with one parent P that is a tasks-only descendant of M, R's
   tree equal to B's outside `tasks/` and R's `tasks` entry equal to P's.
 - **Restore without `git revert`.** The restore builds R by plumbing: R's tree is B's tree
-  with its `tasks` entry replaced by P's, written with `commit-tree -p P`; R's OID is recorded
-  durably on the host, then `read-tree -m -u P R` updates the index and working tree and
-  `update-ref HEAD R P` moves HEAD with compare-and-swap. R keeps familiar's task records as
-  they stand, and cannot conflict. A rerun that finds HEAD = P with the recorded R whose tree
-  the index and working tree already equal completes the `update-ref`; one whose working tree
-  still equals P redoes the `read-tree`; any other mix is refused for inspection.
+  with its `tasks` entry replaced by P's (added when B has none, removed when P has none; two
+  absent entries are equal), assembled from `ls-tree -z B` minus `tasks` plus `ls-tree -z P
+  -- tasks` through `mktree -z`, and written with `commit-tree -p P`; R's OID is recorded
+  durably on the host before any index or working-tree change. The live index is never
+  evidence (Dropbox synchronizes it). "The working tree equals T" means: a temporary
+  `GIT_INDEX_FILE` loaded with `read-tree T` gives `diff --quiet T` exit 0, and under that index
+  `ls-files -z --others` lists nothing outside `tasks/` and `node_modules/`. The restore refuses
+  for inspection while `.git/index.lock` exists and never deletes the lock. With HEAD = P (R's
+  recorded parent):
+  - working tree equals P: rebuild the index (`read-tree P`, then `update-index -q
+    --refresh`), run `read-tree -m -u P R`, then `update-ref HEAD R P` (compare-and-swap);
+  - working tree equals R: rebuild the index from R the same way, then `update-ref HEAD R P`;
+  - anything else is refused for inspection.
+  When HEAD is no longer R's parent and R is not an ancestor of HEAD (a tolerated Titan tasks
+  commit landed after a crash before `update-ref`), R is recorded as abandoned; if HEAD is in
+  the `merged` class with a working tree equal to HEAD, a fresh R is built on HEAD. On every
+  path the final proof is HEAD = R with the working tree equal to R. R keeps familiar's task
+  records as they stand, and cannot conflict.
 - **Ending the cutover.** `_ended` ends the cutover only when recovery's class was `merged`
   or `reverted`; an `at-base` or `merge-in-progress` recovery does not end it.
 - **Freeze.** Committing to familiar on Europa during the window is forbidden (concurrent ref
