@@ -679,27 +679,54 @@ and [history facilities](https://www.gnu.org/software/bash/manual/html_node/Bash
 
 Approved direction: Keith, 2026-10-21, after the real-host `prepare` refused because familiar
 had moved two task-record commits past PRE (adding only `tasks/fam-ff5351.md`). Familiar's
-own task tracker commits into the same repository, so an exact PRE cannot be held until the
-window.
+own task tracker commits into the same repository, from any checkout and during smokes, so
+no exact familiar commit can be held through a window. Revised after design review round 7.
 
-- PRE (`00f4899ae523d613d21f44bfc2c456aac67f8e5f`) stays the approved ancestor pin and the
-  feature tip (`a16f4daa59b04e32f1010764d6f94401ca4eed8b`) stays the immutable merge source.
-- The familiar base B is familiar's actual HEAD on Titan. B is eligible only when PRE is an
-  ancestor of B, `PRE..B` holds no merge commit, every commit in `PRE..B` changes only paths
-  under `tasks/`, and the tree is clean and native. B equal to PRE is the original case.
-- `prepare` and `check` report B and its task-only proof (commit count; no path outside
-  `tasks/`). A B that breaks the rule blocks as `familiar-native`, naming the offending
-  commit and path. B moving between `prepare` and `run` while still eligible is not drift.
-- `run` re-derives B after strict no-live and quiescence, and records it in the window's
-  familiar record before the merge mark. The merge's parents must be `[B, tip]`. The
-  pre-merge source check and snapshot refresh use B; Europa's source sync waits for the
-  merge exactly as before.
-- Recovery and restoration use the recorded B wherever they used PRE: a recovered revert's
-  tree must equal B's tree and its parent the merge whose parents are `[B, tip]`; HEAD equal
-  to B is the not-merged case. A merge discovered without its record is accepted only when
-  its first parent is an eligible base.
-- From `run` until `finish` reports complete (or recovery completes), nothing may be
-  committed to familiar, task filing included. A commit after the merge makes recovery
-  report unexpected history and stop for inspection. Every handoff and the runbook state
-  this freeze beside the Claude pick freeze.
-- The pilot applies the same rule to its scratch clone, cloned at the current B.
+**Tasks-only descendant.** Y is a tasks-only descendant of X when X is an ancestor of Y and
+every commit in `X..Y` has exactly one parent and, against that parent, adds, modifies or
+deletes only regular files (mode 100644 or 100755) whose path begins with the bytes `tasks/`.
+Y equal to X qualifies. It is computed with plumbing only (`rev-list`, `rev-list
+--min-parents=2`, `diff-tree -r --no-renames --raw -z`), with `GIT_NO_REPLACE_OBJECTS=1`, and
+refused on a shallow repository or one with `info/grafts`. Renames, copies, symlinks,
+gitlinks, `tasks` itself, `tasks.md`, `Tasks/…` and `tasksx/…` fail it. Familiar's runtime
+does not read `tasks/`.
+
+- **Pins.** PRE (`00f4899ae523d613d21f44bfc2c456aac67f8e5f`) stays the approved ancestor pin
+  and the feature tip (`a16f4daa59b04e32f1010764d6f94401ca4eed8b`) the immutable merge source.
+  T0 is the reviewed source: the non-`tasks/` content of `git merge-tree --write-tree PRE tip`.
+- **Base.** The familiar base B is a tasks-only descendant of PRE with a clean tree: no
+  tracked change and no untracked path outside `tasks/` and the ignored `node_modules`. A
+  fresh window keeps this strict rule, so a recovered revert is never a base (R47 holds).
+  The tasks/ paths changed in `PRE..B` must be disjoint from those the tip changes against
+  `merge-base(PRE, tip)`; otherwise `prepare` refuses before any closure.
+- **Readiness.** `prepare` and `check` apply the base rule to each host's own HEAD and report
+  B with its proof (commit count). Europa's HEAD equal to, or an ancestor of, Titan's is
+  ready (it is still syncing); a diverged or ahead Europa is a `familiar-native` blocker that
+  names the commit and path. B moving between `prepare` and `run` while eligible is not drift.
+- **Run.** After the second strict no-live check and before the snapshot refresh, `run`
+  derives B on Titan and saves it in the window. The snapshot refresh requires Titan HEAD = B
+  and waits, within the sync budget, for Europa HEAD = B; diverged or ahead aborts before the
+  merge. The pre-merge gate rechecks Titan HEAD = B before the mark; the mark records B, and
+  `familiar-merge` receives B, rechecks HEAD = B and the base rule on the host, merges the tip
+  and proves M: parents exactly `[B, tip]`, M's tree equal to `git merge-tree --write-tree B
+  tip`, and its non-`tasks/` content equal to T0.
+- **After the mark.** Every source proof accepts a tasks-only descendant of the expected
+  commit with a clean tree in place of exact HEAD equality: Europa's install sync wait (of
+  M), `familiar-verify` in `run`, `restart-surfaces` and `finish` (of M), and the dependency
+  restore's sync wait (of the revert R). Finish records the observed HEAD.
+- **Recovery classes.** `at-base`: no MERGE_HEAD or REVERT_HEAD and HEAD a tasks-only
+  descendant of the recorded B. `merge-in-progress`: HEAD = B and MERGE_HEAD = tip.
+  `merged`: HEAD a tasks-only descendant of M, M's parents exactly `[recorded B, tip]`; the
+  restore runs `git revert -m 1 M` on HEAD (the disjointness rule means it cannot conflict).
+  `reverted`: HEAD a tasks-only descendant of R, R with one parent P that is a tasks-only
+  descendant of M, R equal to B outside `tasks/` and equal to P inside `tasks/`. A merge
+  discovered without its record must have parents exactly `[recorded B, tip]`; B is saved
+  before the merge request, so a merge never exists without it. A window record without a
+  recorded base (written before this amendment) is refused for inspection, never assumed PRE.
+- **Freeze.** Committing to familiar on Europa during the window is forbidden: concurrent ref
+  writes from both hosts are a Dropbox conflict. Committing on Titan from `run` until finish
+  is discouraged guidance, not a correctness requirement. Handoffs and the runbook say both,
+  beside the Claude pick freeze.
+- **Pilot.** Each host's scratch clone is cloned at that host's own eligible HEAD, recorded
+  per clone. A later live B that differs from the pilot's does not invalidate the pilot; only
+  helper or toolchain bytes do. The pilot reruns after this change because helper bytes change.
