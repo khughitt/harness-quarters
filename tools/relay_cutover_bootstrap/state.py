@@ -431,6 +431,17 @@ def _check_source(source, window):
         raise Stop("decision was answered before this window existed; ask again")
 
 
+def next_attempt(window: dict, prefix: str) -> str:
+    """The next attempt ID `<prefix>-N` after every one this window's decisions already used;
+    a reused ID is refused at consumption, so a replay never authorizes twice."""
+    head = f"{prefix}-"
+    directory = Path(window["directory"]) / "decisions"
+    numbers = [int(name[len(head):-5]) for name in (
+        os.listdir(directory) if os.path.isdir(directory) else ())
+        if name.startswith(head) and name.endswith(".json") and name[len(head):-5].isdigit()]
+    return f"{head}{max(numbers, default=0) + 1}"
+
+
 def consume_decision(window: dict, decision: dict, *, kind: str, action: str,
                      attempt_id: str, subject_sha256: str) -> dict:
     """Bind one recorded human decision to one attempt, durably, before it authorizes."""

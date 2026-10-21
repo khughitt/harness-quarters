@@ -43,7 +43,7 @@ from . import hosts, inventory, quiesce, state, targets
 from .state import Stop
 
 OBSERVE = "smoke-observe"
-KIND, ACTION, PREFIX = "smoke-attestation", "record-smoke", "smoke-"
+KIND, ACTION, PREFIX = "smoke-attestation", "record-smoke", "smoke"
 RECEIPT_PLACEHOLDER = "<receipt-file>"
 CHILD_SECONDS = 60
 INTENT = ".local/state/familiar/intent.json"
@@ -146,36 +146,55 @@ def _prepared(window):
     return recovery._prepared(window)
 
 
-def _paused(window):
+def paused(window: dict) -> list:
     """Hosts this window paused whose timers finish has not restored yet."""
     restored = set((window.get("finish") or {}).get("timers") or {})
     return [host for host in lifecycle._stopped(window) if host not in restored]
 
 
 def timers_line(window):
-    paused = _paused(window)
+    stopped = paused(window)
     restored = [host for host in lifecycle.HOST_ORDER
                 if host in ((window.get("finish") or {}).get("timers") or {})]
     parts = []
     if restored:
         parts.append(f"familiar-reap.timer is restored on {' and '.join(restored)}")
-    if paused:
+    if stopped:
         parts.append(f"{'it' if restored else 'familiar-reap.timer'} stays paused on "
-                     f"{' and '.join(paused)} until finish")
+                     f"{' and '.join(stopped)} until finish")
     return "  timers: " + ("; ".join(parts) or "this window paused no familiar-reap.timer")
 
 
+def _first(window):
+    """The controller's proof: the first step after resuming, until it is recorded."""
+    from .cli import DECISION_PLACEHOLDER, command_line  # the CLI imports this module
+    proof = _smokes(window).get("controller")
+    if proof is not None:
+        return (f"  controller: {proof['row_id']} pid {proof['pid']} is proven: live on titan "
+                "and updated since the verified migration")
+    line = ("  first: resume the controller with its held command below, then prove its fresh "
+            f"row with {command_line(['record-smoke', '--observe', 'titan'])} before any other "
+            "rollout work")
+    if window["state"] == "migrated-surfaces-pending":
+        line += ("; an agent's session decision for "
+                 f"{command_line(['restart-surfaces', '--decision-file', DECISION_PLACEHOLDER])} "
+                 "needs that proof, while the operator's own terminal answer to restart-surfaces "
+                 "does not")
+    return line
+
+
 def handoff(window: dict) -> tuple[str, ...]:
-    """What every report from the verified migration until finish says: both hosts and homes,
-    the paused timers, the held-launch rule and pick freeze, and the held commands."""
+    """What every report from the verified migration until finish says: the controller's proof
+    first, both hosts and homes, the paused timers, the held-launch rule and pick freeze, and
+    the held commands."""
     try:
         prepared = _prepared(window)
         lines = command_lines(prepared)
     except (Stop, OSError, KeyError, TypeError) as error:
         lines = [f"  commands: the window's prepared record cannot be read "
                  f"({hosts._brief(error)}); run status"]
-    return ("  hosts: titan (Claude personal and work, Codex personal and work) and europa "
-            "(Claude personal and work)", timers_line(window), f"  hold: {HOLD}",
+    return (_first(window), "  hosts: titan (Claude personal and work, Codex personal and work) "
+            "and europa (Claude personal and work)", timers_line(window), f"  hold: {HOLD}",
             f"  picks: {PICKS}", *lines)
 
 
@@ -345,9 +364,9 @@ def hold(window: dict, prepared: dict, host: str, observation: dict) -> None:
     moved = drift(prepared, host, observation)
     if not moved:
         return
-    paused = " and ".join(_paused(window)) or "no host"
     error = (f"hold breach: {'; '.join(moved)} on {host} since preparation: stop new smokes; "
-             f"familiar-reap.timer stays paused on {paused}; close every Claude and Codex "
+             f"familiar-reap.timer stays paused on {' and '.join(paused(window)) or 'no host'}; "
+             "close every Claude and Codex "
              "session on both hosts and run recover from an ordinary shell, which needs no "
              "proof for the moved version. Afterwards repeat Task 9 Steps 5–7 and the final "
              "held check before a fresh window")
@@ -424,11 +443,14 @@ def _proof(window, observation, ref):
             "checked_at": lifecycle._now()}
 
 
-def _waiting(window):
-    """Failed unless the window takes smoke steps: ready for smokes, surfaces restarted."""
-    if window is None or window["state"] != "ready-for-smokes":
+def _waiting(window, proof=False):
+    """Failed unless the window takes smoke steps: ready for smokes, surfaces restarted. With
+    `proof` (the controller's own Titan observation) surfaces-pending is enough."""
+    if window is None or window["state"] != "ready-for-smokes" and not (
+            proof and window["state"] == "migrated-surfaces-pending"):
         report = lifecycle.status()
-        reason = ("familiar's surfaces must restart first" if window is not None
+        reason = ("familiar's surfaces must restart first; until then only the controller's "
+                  "proof (record-smoke --observe titan) runs" if window is not None
                   and window["state"] == "migrated-surfaces-pending"
                   else "smokes run only once the migration verified and familiar's surfaces "
                   "restarted, until finish starts")
@@ -453,7 +475,7 @@ def observe_step(window: dict, host: str, cwd: str | None = None) -> dict:
     host, each checked against the hold. Returns {window, controller, observation, ref,
     unheld}, where `controller` is the proof this call made, if any."""
     state._current(window)
-    _waiting(window)
+    _waiting(window, proof=host == "titan" and cwd is None)
     try:
         return _observe_step(window, host, cwd)
     except lifecycle.Failed as failed:
@@ -828,12 +850,8 @@ def check_receipt(window: dict, receipt: dict) -> str:
 
 
 def next_attempt(window: dict) -> str:
-    directory = Path(window["directory"]) / "decisions"
-    numbers = [int(name[len(PREFIX):-5]) for name in (
-        os.listdir(directory) if os.path.isdir(directory) else ())
-        if name.startswith(PREFIX) and name.endswith(".json")
-        and name[len(PREFIX):-5].isdigit()]
-    return f"{PREFIX}{max(numbers, default=0) + 1}"
+    """The attempt ID of this window's next smoke attestation."""
+    return state.next_attempt(window, PREFIX)
 
 
 def record_smoke(window: dict, receipt: dict, decision: dict) -> None:
@@ -865,6 +883,7 @@ def record_smoke(window: dict, receipt: dict, decision: dict) -> None:
     smokes["receipts"][slot(receipt["host"], receipt["harness"], receipt["home"])] = {
         "receipt": receipt, "sha256": digest, "attempt_id": attempt,
         "decision_sha256": decision["decision_sha256"],
+        "consumed_sha256": state._digest(decision),
         "source": decision["decision"]["source"]["type"], "recorded_at": lifecycle._now()}
     lifecycle._save(window, smokes=smokes)
 
@@ -895,7 +914,8 @@ def validate_smokes(window: dict) -> None:
                                          / f"{entry['attempt_id']}.json")
         except Stop:
             consumed = None
-        if (consumed is None or consumed.get("decision_sha256") != entry["decision_sha256"]
+        if (consumed is None or state._digest(consumed) != entry["consumed_sha256"]
+                or consumed.get("decision_sha256") != entry["decision_sha256"]
                 or consumed.get("subject_sha256") != entry["sha256"]
                 or consumed.get("kind") != KIND):
             raise lifecycle.Failed("receipts", "titan", "blocked", f"the {key} receipt's "
