@@ -625,6 +625,17 @@ def dry_runs(window: dict, prepared: dict, seen: list, progress: dict,
 def _before_merge(window, seen, progress):
     """The last pre-merge gate: every frozen target still holds its frozen bytes on both hosts,
     and both hosts are closed."""
+    window = frozen_gate(window, seen, progress)
+    for host in HOST_ORDER:
+        window = _step(window, seen, progress, "no-live", host)
+        _no_live(host, window["mode"], window["id"])
+    return window
+
+
+def frozen_gate(window: dict, seen: list, progress: dict, scopes: dict | None = None) -> dict:
+    """Every frozen target still holds its frozen bytes on each host, Titan first, or Failed
+    naming the first host where one changed. `scopes` adds each host's request scope: a pilot's
+    scratch root, whose copies it checks."""
     mode, identity, sealed = window["mode"], window["id"], window["sealed"]["inputs"]
     for host in HOST_ORDER:
         window = _step(window, seen, progress, "target-frozen", host)
@@ -632,21 +643,19 @@ def _before_merge(window, seen, progress):
                   for target_id, result in sealed["hosts"][host].items()}
         found, log = _call(host, mode, "target-verify", {
             "window_id": identity, "targets": frozen, "wait": False, "verify": False,
-            "manifest_sha256": sealed["manifest_sha256"]}, "target-frozen")
+            "manifest_sha256": sealed["manifest_sha256"], **(scopes or {}).get(host, {})},
+            "target-frozen")
         drifted = sorted(target_id for target_id, entry in found["targets"].items()
                          if not entry["matches"])
         if drifted:
             raise Failed("target-frozen", host, "blocked", f"{', '.join(drifted)} changed after "
                          "the freeze; nothing was written", log=log)
-    for host in HOST_ORDER:
-        window = _step(window, seen, progress, "no-live", host)
-        _no_live(host, mode, identity)
     return window
 
 
 def _migrate(window, prepared, seen, progress):
     """Past the familiar record: merge, install, register and apply, then verify both hosts."""
-    mode, identity, sealed = window["mode"], window["id"], window["sealed"]["inputs"]
+    mode, identity = window["mode"], window["id"]
     pins = prepared["pins"]
     window = _step(window, seen, progress, "familiar-merge", "titan")
     merged, _ = _call("titan", mode, "familiar-merge", {
@@ -665,23 +674,11 @@ def _migrate(window, prepared, seen, progress):
             "caches": record["caches"]["prefixes"], "path": record["install"]["path"]},
             "familiar-install")
         window = _save(window, dependencies={**window.get("dependencies", {}), host: result})
-    titan = sealed["hosts"]["titan"]
     for target_id in inputs.TARGETS:
         for host in HOST_ORDER:
             window = _step(window, seen, progress, "no-live", host)
             _no_live(host, mode, identity)
-        entry = titan[target_id]
-        window = _step(window, seen, progress, "target-register", "titan")
-        state.register_target(window, target_id, Path(entry["path"]),
-                              Path(window["directory"]) / "live" / f"{target_id}.json")
-        window = _step(window, seen, progress, "target-apply", "titan")
-        result, _ = _call("titan", mode, "target-apply", {
-            "window_id": identity, "target_id": target_id,
-            "manifest_sha256": sealed["manifest_sha256"],
-            "frozen_sha256": entry["frozen"]["sha256"],
-            "expected_sha256": entry["expected"]["sha256"], "identities": entry["identities"]},
-            "target-apply")
-        window = _save(window, applied={**window.get("applied", {}), target_id: result})
+        window = apply_target(window, target_id, seen, progress)
 
     def step(name, host):
         nonlocal window
@@ -692,6 +689,26 @@ def _migrate(window, prepared, seen, progress):
         raise _Interrupt(seen[-1])
     return _save(window, state="migrated-surfaces-pending",
                  verified={"at": _now(), "hosts": verified})
+
+
+def apply_target(window: dict, target_id: str, seen: list, progress: dict,
+                 scope: dict | None = None) -> dict:
+    """One target registered in the window's ledger, durably, before its first write, then
+    applied once on Titan to its sealed bytes; the window records the result under `applied`.
+    `scope` adds Titan's request scope: a pilot's scratch root, whose copy it applies."""
+    sealed = window["sealed"]["inputs"]
+    entry = sealed["hosts"]["titan"][target_id]
+    window = _step(window, seen, progress, "target-register", "titan")
+    state.register_target(window, target_id, Path(entry["path"]),
+                          Path(window["directory"]) / "live" / f"{target_id}.json")
+    window = _step(window, seen, progress, "target-apply", "titan")
+    result, _ = _call("titan", window["mode"], "target-apply", {
+        "window_id": window["id"], "target_id": target_id,
+        "manifest_sha256": sealed["manifest_sha256"],
+        "frozen_sha256": entry["frozen"]["sha256"],
+        "expected_sha256": entry["expected"]["sha256"], "identities": entry["identities"],
+        **(scope or {})}, "target-apply")
+    return _save(window, applied={**window.get("applied", {}), target_id: result})
 
 
 def verified_migration(window: dict, merge: str, step=None) -> dict:

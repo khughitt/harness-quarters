@@ -365,6 +365,9 @@ elif NAME == "git":
         # The familiar checkout is a real miniature history: its Git work is real Git's.
         if "merge" in args:
             observe(merge=args[args.index("merge") + 1:])
+            if behavior.get("merge") == "fail" and "--no-ff" in args:
+                print("fatal: fixture merge failure @SECRET@", file=sys.stderr)
+                sys.exit(1)
         elif HISTORY & set(args):
             observe(git=[arg for arg in args if arg in HISTORY])
         os.execv("/usr/bin/git", ["/usr/bin/git", *args])
@@ -609,8 +612,9 @@ keeps the target's own key order, so picks stay where they were, replaces `hooks
 relay entry and is serialized with tab indentation, which no controller serialization
 reproduces. Faults per "<phase>:<target-id>", where the phase is dry for copies under a dry
 directory and live otherwise: plan-fail, refuse (an evidence refusal), apply-fail, drift
-(applies other bytes than it planned), semantic, pick, type (true becomes 1) and variant
-(other formatting, consistent within the host)."""
+(applies other bytes than it planned), semantic, pick, type (true becomes 1), variant
+(other formatting, consistent within the host) and after-freeze (a dry plan during which
+another writer appends to the target the copy was frozen from)."""
 import json, os, sys
 
 with open("@CONFIG@") as stream:
@@ -705,6 +709,16 @@ if fault == "refuse":
 if fault == "plan-fail" and not applying:
     print("relay: error: fixture plan failure @SECRET@", file=sys.stderr)
     sys.exit(1)
+if fault == "after-freeze" and phase == "dry" and not applying:
+    # Another writer changes the target this copy was frozen from, after the freeze: under a
+    # pilot's scratch home (<scratch>/state/dry/<window>/<target>/<copy>), or live under HOME.
+    state_root = target
+    for _ in range(4):
+        state_root = os.path.dirname(state_root)
+    home = (os.path.join(os.path.dirname(state_root), "home")
+            if os.path.basename(state_root) == "state" else os.environ["HOME"])
+    with open(os.path.join(home, TARGETS[target_id]), "a", encoding="utf-8") as stream:
+        stream.write("\n")
 with open(target, encoding="utf-8") as stream:
     before = stream.read()
 value = json.loads(before)
