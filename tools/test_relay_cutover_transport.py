@@ -23,7 +23,7 @@ from pathlib import Path
 import pytest
 
 from relay_cutover_bootstrap import (familiar, hosts, inputs, inventory, operations, quiesce,
-                                     restoration, state, targets)
+                                     restoration, state, surfaces, targets)
 from relay_cutover_bootstrap.state import Stop
 
 TOOLS_DIR = Path(__file__).resolve().parent
@@ -109,8 +109,30 @@ def _rows(host):
     return config["hosts"][host]["rows"] + probes(host)
 
 
+def _terminate(host, identity):
+    """TERM to a fixture surface row: the row leaves the process table unless the host's
+    behavior says its process ignores TERM. Every signal is observed."""
+    path = Path(__file__).with_name("config.json")
+    config = json.loads(path.read_text())
+    spec = config["hosts"][host]
+    row = next((row for row in spec["rows"] if row["pid"] == identity["pid"]
+                and row["start_time"] == identity["start_time"]), None)
+    with open(config["observed"], "a") as stream:
+        stream.write(json.dumps({"host": host, "tool": "signal",
+                                 "args": ["TERM", str(identity["pid"])],
+                                 "argv": row["argv"] if row else None}) + "\n")
+    if row is None:
+        return False
+    if spec["behavior"].get("term") != "ignore":
+        spec["rows"].remove(row)
+        temp = path.with_name("config.json.term")
+        temp.write_text(json.dumps(config, indent=2))
+        os.replace(temp, path)  # fixture tools never read a partial file
+    return True
+
+
 def install(hosts, inventory, operations):
-    from relay_cutover_bootstrap import familiar, inputs, restoration, targets
+    from relay_cutover_bootstrap import familiar, inputs, restoration, surfaces, targets
     host = CONFIG["by_home"][os.environ["HOME"]]
     hosts._nodename = lambda: host
     hosts.TOOLS.update(CONFIG["tools"])
@@ -120,6 +142,9 @@ def install(hosts, inventory, operations):
         module.SYNC_POLL_SECONDS = CONFIG["sync"]["poll"]
     restoration.SERVICE_SECONDS = CONFIG["service"]["budget"]
     restoration.SERVICE_POLL_SECONDS = CONFIG["service"]["poll"]
+    for name, value in CONFIG["surfaces"].items():
+        setattr(surfaces, name, value)
+    surfaces._terminate = lambda identity: _terminate(host, identity)
     inventory._process_rows = lambda: [
         {key: value for key, value in row.items() if key not in ("held", "daemon")}
         for row in _rows(host)]
@@ -211,7 +236,7 @@ os._exit(255)
 '''
 
 FIXTURE_TOOL = r'''#!/usr/bin/python3 -S
-import json, os, shutil, subprocess, sys
+import json, os, shutil, subprocess, sys, time
 
 NAME = "@NAME@"
 # Git subcommands that change or fetch history; each such call is observed.
@@ -268,7 +293,8 @@ if NAME == "claude":
     else:
         sys.exit(2)
 elif NAME == "codex":
-    observe(hold=os.environ.get("DISABLE_UPDATES"), codex_home=os.environ.get("CODEX_HOME"))
+    observe(hold=os.environ.get("DISABLE_UPDATES"), codex_home=os.environ.get("CODEX_HOME"),
+            binary=os.path.realpath(sys.argv[0]))
     if args == ["app-server", "daemon", "stop"]:
         daemon = behavior.get("daemon", "ok")
         if daemon == "fail":
@@ -375,6 +401,43 @@ elif NAME == "systemctl":
         sys.exit(2)
 elif NAME == "niri":
     observe(socket=os.environ.get("NIRI_SOCKET"))
+    if args[:4] == ["msg", "action", "spawn-sh", "--"] and len(args) == 5:
+        # niri's spawn: only through this host's own socket; the spawned command becomes a row
+        # of the fixture process table, as niri's child, with the argv the shell would exec.
+        socket = os.environ.get("NIRI_SOCKET") or ""
+        if os.path.dirname(socket) != config["hosts"][host]["runtime"] or not os.path.exists(socket):
+            print("Error: error connecting to the niri socket @SECRET@", file=sys.stderr)
+            sys.exit(1)
+        command = args[4]
+        outcome = next((value for key, value in behavior.get("spawn", {}).items()
+                        if key in command), "ok")
+        if outcome == "latch":
+            end = time.monotonic() + 120
+            while not os.path.exists(config["latch"]) and time.monotonic() < end:
+                time.sleep(0.02)
+        if outcome == "fail":
+            print("Error: fixture spawn failure @SECRET@", file=sys.stderr)
+            sys.exit(1)
+        if command != "true" and outcome != "silent":
+            words = [os.environ["HOME"] + word[1:] if word.startswith("~/") else word
+                     for word in command.split()]
+            if words[0].endswith("/familiar-niri"):
+                argv, comm, exe = ["node", *words], "node", "/usr/bin/node"
+            else:
+                argv, comm, exe = words, os.path.basename(words[0]), "/usr/bin/" + words[0]
+            with open("@CONFIG@") as stream:
+                config = json.load(stream)
+            spec = config["hosts"][host]
+            for _ in range(2 if outcome == "double" else 1):
+                pid = spec.get("next_pid", 3980000 if host == "titan" else 3981000)
+                start = spec.get("next_start", 1000)
+                spec["rows"].append({"pid": pid, "start_time": start, "comm": comm, "exe": exe,
+                                     "argv": argv})
+                spec["next_pid"], spec["next_start"] = pid + 1, start + 1
+            with open("@CONFIG@.spawn", "w") as stream:
+                json.dump(config, stream, indent=2)
+            os.replace("@CONFIG@.spawn", "@CONFIG@")
+        sys.exit(0)
     if behavior["niri"] != "ok" or args != ["msg", "--json", "version"]:
         sys.exit(1)
     print(json.dumps({"cli": "25.08", "compositor": "25.08"}))
@@ -710,6 +773,9 @@ def _digest(path):
 
 
 CLAUDE_KEYS = ("model", "modelSettings", "effortLevel")
+# Surface restart waits, short in the fixture, in this process and in every helper.
+SURFACE_TIMING = {"STOP_SECONDS": 2.0, "APPEAR_SECONDS": 3.0, "SETTLE_SECONDS": 0.1,
+                  "POLL_SECONDS": 0.02}
 FIXTURE_FILTER = '''"""Fixture clean filter: the cutover reads only its Claude pick keys."""
 import sys
 
@@ -993,7 +1059,7 @@ class World:
             "probes": str(tmp_path / "probes.log"),
             "pins": {key: PINS[key] for key in inputs.PINS},
             "sync": {"budget": 20.0, "poll": 0.05}, "npm_tree": NPM_TREE,
-            "service": {"budget": 20.0, "poll": 0.05},
+            "service": {"budget": 20.0, "poll": 0.05}, "surfaces": dict(SURFACE_TIMING),
         }
         self.monkeypatch, self.pins, self.dropbox = monkeypatch, dict(PINS), None
         for host, remote in (("titan", False), ("europa", True)):
@@ -1013,6 +1079,8 @@ class World:
             monkeypatch.setattr(module, "SYNC_POLL_SECONDS", self.config["sync"]["poll"])
         monkeypatch.setattr(restoration, "SERVICE_SECONDS", self.config["service"]["budget"])
         monkeypatch.setattr(restoration, "SERVICE_POLL_SECONDS", self.config["service"]["poll"])
+        for name, value in SURFACE_TIMING.items():
+            monkeypatch.setattr(surfaces, name, value)
         monkeypatch.setitem(hosts.TOOLS, "ssh", str(self.ssh))
         for name in ("fixture-step", "fixture-short"):
             monkeypatch.setitem(operations.OPERATIONS, name, hosts.Operation(
@@ -1081,6 +1149,31 @@ class World:
             lines += ['spawn-sh-at-startup "~/d/familiar/bin/familiar-niri watch"',
                       'spawn-sh-at-startup "qs -d -p ~/d/familiar/integrations/niri-desktop"']
         _write(Path(home) / ".config/niri/config.kdl", "\n".join(lines) + "\n")
+
+    def on_disk(self, host):
+        """This host's fixture spec as the helpers last wrote it; self.config is not replaced."""
+        return json.loads(self.config_path.read_text())["hosts"][host]
+
+    def desktop(self, host):
+        """This host's desktop as inventory records it and a window keeps it."""
+        home, spec = self.home(host), self.on_disk(host)
+        commands = {"familiar-niri-watch": "~/d/familiar/bin/familiar-niri watch",
+                    "niri-desktop": "qs -d -p ~/d/familiar/integrations/niri-desktop"}
+        niri = next(row["pid"] for row in spec["rows"] if row["comm"] == "niri")
+        return {"state": "present", "absence_reason": None,
+                "socket": f"{spec['runtime']}/niri.wayland-1.{niri}.sock",
+                "surfaces": [{"name": name, "configured": [commands[name]],
+                              "processes": [{key: row[key] for key in ("pid", "start_time",
+                                                                       "argv")}
+                                            for row in spec["rows"]
+                                            if inventory._is_surface(name, row, home)]}
+                             for name in inventory.SURFACES]}
+
+    def surface_rows(self, host):
+        """The fixture process table's surface rows on host, as the helpers left it."""
+        home = self.home(host)
+        return [row for row in self.on_disk(host)["rows"] if any(
+            inventory._is_surface(name, row, home) for name in inventory.SURFACES)]
 
     def desktop_rows(self, home, niri):
         return [
@@ -1323,6 +1416,18 @@ class World:
             link.symlink_to(binary)
             self.spec(host)["behavior"]["claude_version"] = f"{version} (Claude Code)"
         self.save()
+
+    def move_codex(self, release="0.164.0-x86_64-unknown-linux-musl"):
+        """Codex updated on Titan after preparation: a new release installed and linked."""
+        home = self.home("titan")
+        binary = self._tool(home / ".codex/packages/standalone/releases" / release / "bin/codex",
+                            "codex")
+        with binary.open("a") as stream:
+            stream.write(f"# release {release}\n")  # its own bytes, so its own digest
+        link = home / ".local/bin/codex"
+        link.unlink()
+        link.symlink_to(binary)
+        return binary
 
     def start_dropbox(self, hold=None):
         self.dropbox = Dropbox(self, hold)
@@ -2033,7 +2138,7 @@ def test_quiesce_operations_are_fixed(world):
         "codex-daemon-stop", "timer-record", "timer-stop", "timer-restore", "snapshot-refresh",
         "snapshot-abort", "target-dry", "target-apply", "familiar-merge", "familiar-install",
         "timer-requiesce", "target-restore", "familiar-restore", "dependency-restore",
-        "service-run"}
+        "service-run", "surface-restart", "surface-probe"}
     assert {"no-live", "timer-wait", "pending-operations", "inputs-check"} <= set(table)
     assert table["timer-wait"].deadline > hosts.TIMER_WAIT_SECONDS
     for host, operation, payload in (
@@ -2886,3 +2991,381 @@ def test_recovery_operations_are_fixed(world):
     assert world.lines("ssh_log") == []
     pilot = world.request("titan", "recovery-no-live", {"window_id": WINDOW}, mode="pilot")
     assert pilot["status"] == "failed" and "live" in pilot["error"]
+
+
+# --- familiar's surfaces: restart, retry and the pilot's fixed spawn --------------------------
+
+
+def _restart_surface(world, host, name, recorded, phase="forward", window_id=WINDOW, **options):
+    return world.request(host, "surface-restart", {
+        "window_id": window_id, "phase": phase, "name": name, "recorded": recorded}, **options)
+
+
+def _preview_surfaces(world, host, recorded, phase="forward", window_id=WINDOW):
+    response = world.request(host, "surface-preview", {
+        "window_id": window_id, "phase": phase, "recorded": recorded})
+    assert response["status"] == "completed", response["error"]
+    return response["result"]
+
+
+def _term_signals(world, since=0):
+    return [(call["host"], int(call["args"][1])) for call in world.lines("observed")[since:]
+            if call["tool"] == "signal"]
+
+
+def _niri_spawns(world, since=0):
+    return [(call["host"], call["args"][4], call["socket"])
+            for call in world.lines("observed")[since:]
+            if call["tool"] == "niri" and call["args"][:3] == ["msg", "action", "spawn-sh"]]
+
+
+def _surface_journal(world, host, window_id=WINDOW):
+    return json.loads((world.root(host) / "surfaces" / f"{window_id}.json").read_text())
+
+
+def _process_of(recorded, name):
+    return next(surface for surface in recorded["surfaces"]
+                if surface["name"] == name)["processes"][0]
+
+
+def _with_process(recorded, name, process):
+    return {**recorded, "surfaces": [
+        {**surface, "processes": [process] if process else []} if surface["name"] == name
+        else surface for surface in recorded["surfaces"]]}
+
+
+def test_surface_operations_are_fixed(world):
+    table = operations.OPERATIONS
+    assert {name: (spec.mutation, set(spec.hosts)) for name, spec in table.items()
+            if name.startswith("surface-")} == {
+        "surface-preview": (False, {"titan", "europa"}),
+        "surface-restart": (True, {"titan", "europa"}),
+        "surface-probe": (True, {"titan", "europa"})}
+    recorded = world.desktop("titan")
+    watcher, panel = recorded["surfaces"]
+    for host, operation, payload in (
+            # No arbitrary probe command: the pilot's spawn takes only its socket.
+            ("titan", "surface-probe", {"window_id": WINDOW, "socket": recorded["socket"],
+                                        "command": "id"}),
+            ("titan", "surface-probe", {"window_id": WINDOW, "socket": "niri.sock"}),
+            ("titan", "surface-restart", {"window_id": WINDOW, "phase": "forward",
+                                          "name": "panel", "recorded": recorded}),
+            ("titan", "surface-restart", {"window_id": WINDOW, "phase": "sideways",
+                                          "name": "niri-desktop", "recorded": recorded}),
+            ("europa", "surface-restart", {"window_id": WINDOW, "phase": "forward",
+                                           "name": "niri-desktop", "recorded": {
+                                               **recorded, "state": "explained-absent"}}),
+            ("europa", "surface-preview", {"window_id": WINDOW, "phase": "forward",
+                                           "recorded": {**recorded, "surfaces": [watcher]}}),
+            ("europa", "surface-preview", {"window_id": WINDOW, "phase": "forward",
+                                           "recorded": {**recorded, "surfaces": [
+                                               {**watcher, "configured": ["a", "b"]}, panel]}}),
+            ("europa", "surface-preview", {"window_id": WINDOW, "phase": "forward",
+                                           "recorded": {**recorded, "socket": "niri.sock"}})):
+        with pytest.raises(hosts.Refused):
+            world.request(host, operation, payload)
+    assert world.lines("ssh_log") == []
+    # Surfaces restart only live; the fixed true spawn runs only in a pilot.
+    pilot = _restart_surface(world, "titan", "niri-desktop", recorded, mode="pilot")
+    assert pilot["status"] == "failed" and "live only" in pilot["error"]
+    live = world.request("titan", "surface-probe", {"window_id": WINDOW,
+                                                    "socket": recorded["socket"]})
+    assert live["status"] == "failed" and "pilot only" in live["error"]
+    assert _niri_spawns(world) == [] and _term_signals(world) == []
+
+
+def test_surface_restart_terms_only_the_recorded_process(world):
+    home = world.home("titan")
+    # Another qs shell of this user's session runs too; it is never a surface.
+    world.spec("titan")["rows"].append({
+        "pid": 3900010, "start_time": 20, "comm": "qs", "exe": "/usr/bin/qs",
+        "argv": ["qs", "-p", f"{home}/d/software/ohai/ohai/shell.qml"]})
+    world.save()
+    recorded = world.desktop("titan")
+    watcher = _process_of(recorded, "familiar-niri-watch")
+    panel = _process_of(recorded, "niri-desktop")
+    mark = len(world.lines("observed"))
+    response = _restart_surface(world, "titan", "familiar-niri-watch", recorded)
+    assert response["status"] == "completed", response["error"]
+    result = response["result"]
+    replacement = result["replacement"]
+    assert (result["stopped"], result["exited"], result["adopted"]) == (watcher, False, False)
+    assert replacement["argv"] == ["node", f"{home}/d/familiar/bin/familiar-niri", "watch"]
+    assert replacement["pid"] != watcher["pid"]
+    # TERM went to the recorded watcher alone; its exact startup command started through
+    # niri's spawn on the recorded socket.
+    assert _term_signals(world, mark) == [("titan", watcher["pid"])]
+    assert _niri_spawns(world, mark) == [
+        ("titan", "~/d/familiar/bin/familiar-niri watch", recorded["socket"])]
+    rows = world.on_disk("titan")["rows"]
+    assert {row["pid"] for row in rows} >= {panel["pid"], 3900010, replacement["pid"]}
+    assert watcher["pid"] not in {row["pid"] for row in rows}
+    # The replacement was journaled on the host before the reply.
+    journal = world.root("titan") / "surfaces" / f"{WINDOW}.json"
+    assert _private(journal) and stat.S_IMODE(journal.parent.stat().st_mode) == 0o700
+    entry = _surface_journal(world, "titan")["entries"]["forward:familiar-niri-watch"]
+    assert (entry["state"], entry["from"], entry["stopped"], entry["replacement"]) == (
+        "started", watcher, watcher, replacement)
+
+    # A retry from the same recording, whose earlier reply never reached the window, adopts the
+    # replacement this phase already started: nothing is signalled or spawned again.
+    mark = len(world.lines("observed"))
+    again = _restart_surface(world, "titan", "familiar-niri-watch", recorded)
+    assert again["status"] == "completed", again["error"]
+    assert (again["result"]["adopted"], again["result"]["replacement"]) == (True, replacement)
+    updated = _with_process(recorded, "familiar-niri-watch", replacement)
+    assert _restart_surface(world, "titan", "familiar-niri-watch", updated)["result"][
+        "adopted"] is True
+    assert _term_signals(world, mark) == [] and _niri_spawns(world, mark) == []
+    # Recovery is its own phase: it restarts the forward replacement from its recording.
+    recovered = _restart_surface(world, "titan", "familiar-niri-watch", updated,
+                                 phase="recovery")
+    assert recovered["status"] == "completed", recovered["error"]
+    assert recovered["result"]["stopped"] == replacement
+    assert recovered["result"]["replacement"] not in (replacement, watcher)
+    assert _term_signals(world, mark) == [("titan", replacement["pid"])]
+
+
+def _reused_pid(world, recorded):
+    watcher = _process_of(recorded, "familiar-niri-watch")
+    spec = world.spec("titan")
+    spec["rows"] = [row for row in spec["rows"] if row["pid"] != watcher["pid"]] + [
+        {"pid": watcher["pid"], "start_time": 99, "comm": "bash", "exe": "/usr/bin/bash",
+         "argv": ["bash"]}]
+
+
+def _restarted_niri(world, recorded):
+    spec = world.spec("titan")
+    runtime = Path(spec["runtime"])
+    (runtime / "niri.wayland-1.3900001.sock").unlink()
+    for row in spec["rows"]:
+        if row["comm"] == "niri":
+            row.update(pid=3900900, start_time=90)
+    os.mknod(runtime / "niri.wayland-1.3900900.sock", 0o600 | stat.S_IFSOCK)
+
+
+def _changed_command(world, recorded):
+    path = world.home("titan") / ".config/niri/config.kdl"
+    path.write_text(path.read_text().replace("familiar-niri watch", "familiar-niri watch --all"))
+
+
+def _unrecorded_replacement(world, recorded):
+    watcher = _process_of(recorded, "familiar-niri-watch")
+    spec = world.spec("titan")
+    spec["rows"] = [{**row, "pid": 3900077, "start_time": 77} if row["pid"] == watcher["pid"]
+                    else row for row in spec["rows"]]
+
+
+def _second_watcher(world, recorded):
+    watcher = _process_of(recorded, "familiar-niri-watch")
+    world.spec("titan")["rows"].append({"pid": 3900078, "start_time": 78, "comm": "node",
+                                        "exe": "/usr/bin/node", "argv": watcher["argv"]})
+
+
+def _second_socket(world, recorded):
+    _ambiguous_socket(world, None)
+
+
+def _failing_ipc(world, recorded):
+    world.spec("titan")["behavior"]["niri"] = "fail"
+
+
+CHANGED_CONTEXT = {
+    # case: (arrange, what the host names, whether a new inventory can be offered)
+    "pid-reused": (_reused_pid, "now belongs to another process", True),
+    "socket-changed": (_restarted_niri, "socket is not the recorded one", True),
+    "unrecorded-process": (_unrecorded_replacement, "was never recorded", True),
+    "command-changed": (_changed_command, "startup command is not the recorded one", False),
+    "second-process": (_second_watcher, "2 processes run it", False),
+    "ambiguous-socket": (_second_socket, "ambiguous", False),
+    "failed-ipc": (_failing_ipc, "IPC on the trusted socket failed", False),
+}
+
+
+@pytest.mark.parametrize("case", sorted(CHANGED_CONTEXT))
+def test_changed_context_refuses(world, case):
+    """Between the recording and the restart, the desktop changed. The restart stops before any
+    signal or spawn, naming the change for inspection; the preview offers a new inventory for a
+    new decision only where one can be recorded unambiguously."""
+    arrange, fragment, adoptable = CHANGED_CONTEXT[case]
+    recorded = world.desktop("titan")
+    arrange(world, recorded)
+    world.save()
+    rows = world.on_disk("titan")["rows"]
+    mark = len(world.lines("observed"))
+    response = _restart_surface(world, "titan", "familiar-niri-watch", recorded)
+    assert response["status"] == "failed"
+    assert response["error"].startswith("changed context: ") and fragment in response["error"]
+    assert "nothing was signalled or started" in response["error"]
+    assert OUTPUT_SECRET not in response["error"]
+    assert _term_signals(world, mark) == [] and _niri_spawns(world, mark) == []
+    assert world.on_disk("titan")["rows"] == rows
+    assert not (world.root("titan") / "surfaces" / f"{WINDOW}.json").exists()
+    found = _preview_surfaces(world, "titan", recorded)
+    assert any(fragment in problem for problem in found["changes"] + found["blockers"])
+    if not adoptable:
+        assert found["blockers"] and found["inventory"] is None
+        return
+    assert found["blockers"] == [] and found["changes"]
+    inventory_now = found["inventory"]
+    assert inventory_now != recorded and inventory_now["state"] == "present"
+    assert inventory_now["socket"] == found["socket"]
+    # The new inventory is what the desktop holds now, ready to be recorded and approved.
+    if case == "pid-reused":
+        assert _with_process(recorded, "familiar-niri-watch", None) == inventory_now
+    elif case == "unrecorded-process":
+        assert _process_of(inventory_now, "familiar-niri-watch")["pid"] == 3900077
+    else:
+        assert inventory_now == {**recorded, "socket": inventory_now["socket"]}
+        assert inventory_now["socket"].endswith("niri.wayland-1.3900900.sock")
+    # Recorded and approved, it restarts as any recording does.
+    adopted = _restart_surface(world, "titan", "familiar-niri-watch", inventory_now)
+    assert adopted["status"] == "completed", adopted["error"]
+    assert adopted["result"]["exited"] is (case == "pid-reused")
+    assert _niri_spawns(world, mark)[0][2] == inventory_now["socket"]
+
+
+def test_surface_restart_failures_are_journaled(world):
+    numbers = itertools.count(1)
+
+    def window_id():
+        return f"20261020T120000Z-0badf0{next(numbers):02x}"
+
+    # A recorded process that ignores TERM is waited for, never killed or followed by a spawn.
+    recorded = world.desktop("titan")
+    watcher = _process_of(recorded, "familiar-niri-watch")
+    world.behave("titan", term="ignore")
+    first, mark = window_id(), len(world.lines("observed"))
+    response = _restart_surface(world, "titan", "familiar-niri-watch", recorded, window_id=first)
+    assert response["status"] == "failed" and "did not exit within" in response["error"]
+    assert _term_signals(world, mark) == [("titan", watcher["pid"])]
+    assert _niri_spawns(world, mark) == []
+    assert _surface_journal(world, "titan", first)["entries"]["forward:familiar-niri-watch"][
+        "state"] == "stopping"
+    # A spawn niri refuses leaves the surface stopped and journaled as spawning; the retry
+    # finds the recorded process exited and only starts it.
+    world.reload()
+    world.behave("titan", term="ok", spawn={"niri-desktop": "fail"})
+    panel = _process_of(recorded, "niri-desktop")
+    second, mark = window_id(), len(world.lines("observed"))
+    response = _restart_surface(world, "titan", "niri-desktop", recorded, window_id=second)
+    assert response["status"] == "failed" and "spawn-sh exited 1" in response["error"]
+    assert OUTPUT_SECRET not in response["error"]
+    assert _surface_journal(world, "titan", second)["entries"]["forward:niri-desktop"][
+        "state"] == "spawning"
+    world.reload()
+    world.behave("titan", spawn={})
+    retried = _restart_surface(world, "titan", "niri-desktop", recorded, window_id=second)
+    assert retried["status"] == "completed", retried["error"]
+    assert (retried["result"]["stopped"], retried["result"]["exited"]) == (None, True)
+    assert _term_signals(world, mark) == [("titan", panel["pid"])]
+    assert len(_niri_spawns(world, mark)) == 2
+    # Niri accepting a spawn proves nothing on its own: no replacement, or two, fails.
+    for outcome, fragment in (("silent", "no replacement appeared"),
+                              ("double", "2 new processes run it")):
+        world.reload()
+        world.behave("titan", spawn={"familiar-niri": outcome})
+        current = world.desktop("titan")
+        response = _restart_surface(world, "titan", "familiar-niri-watch", current,
+                                    window_id=window_id())
+        assert response["status"] == "failed" and fragment in response["error"]
+
+
+def test_surface_restart_completes_through_a_cancel(world):
+    """A cancel that lands while a restart starts its surface waits for the replacement to be
+    journaled: the operation completes and nothing it started goes unrecorded."""
+    recorded = world.desktop("titan")
+    world.behave("titan", spawn={"familiar-niri": "latch"})
+    mark = len(world.lines("observed"))
+    operation_id, client = hosts.start_request("titan", "live", "surface-restart", {
+        "window_id": WINDOW, "phase": "forward", "name": "familiar-niri-watch",
+        "recorded": recorded}, timeout=60)
+    directory = world.root("titan") / "operations" / operation_id
+    cancelled = {}
+    try:
+        _until(lambda: _niri_spawns(world, mark))
+        sender = threading.Thread(target=lambda: cancelled.update(hosts._control(
+            "titan", "live", "operation-cancel", operation_id)))
+        sender.start()
+        _until(lambda: (directory / "cancel.json").exists())
+        Path(world.config["latch"]).touch()
+        sender.join(timeout=60)
+    finally:
+        Path(world.config["latch"]).touch()
+        hosts._abandon(client)
+    assert cancelled["state"] == "completed"
+    response = state.load_record(directory / "done.json")["response"]
+    assert response["status"] == "completed", response["error"]
+    replacement = response["result"]["replacement"]
+    assert _surface_journal(world, "titan")["entries"]["forward:familiar-niri-watch"][
+        "replacement"] == replacement
+    assert replacement in [{key: row[key] for key in ("pid", "start_time", "argv")}
+                           for row in world.surface_rows("titan")]
+
+
+def test_surface_restart_lost_reply_is_reconciled(world):
+    """Europa's restart completes after its SSH connection dropped: the reply is reconciled from
+    the durable record, never rerun, and the surface started once."""
+    recorded = world.desktop("europa")
+    exit_path = world.drop(wait=True)
+    mark = len(world.lines("observed"))
+    response = _restart_surface(world, "europa", "niri-desktop", recorded, timeout=60)
+    assert response["status"] == "completed", response["error"]
+    assert exit_path.read_text() == "0"
+    assert len(_niri_spawns(world, mark)) == 1
+    assert _term_signals(world, mark) == [
+        ("europa", _process_of(recorded, "niri-desktop")["pid"])]
+    assert _surface_journal(world, "europa")["entries"]["forward:niri-desktop"][
+        "replacement"] == response["result"]["replacement"]
+
+
+def test_pilot_true_spawn_is_fixed(world):
+    recorded = world.desktop("titan")
+    rows = world.on_disk("titan")["rows"]
+    mark = len(world.lines("observed"))
+    response = world.request("titan", "surface-probe", {
+        "window_id": WINDOW, "socket": recorded["socket"]}, mode="pilot")
+    assert response["status"] == "completed", response["error"]
+    assert response["result"] == {"command": "true", "socket": recorded["socket"],
+                                  "acknowledged": True}
+    assert _niri_spawns(world, mark) == [("titan", "true", recorded["socket"])]
+    assert world.on_disk("titan")["rows"] == rows and _term_signals(world, mark) == []
+    # Only the session's one trusted socket, answering read-only IPC, takes the spawn.
+    other = world.desktop("europa")["socket"]
+    refused = world.request("titan", "surface-probe", {"window_id": WINDOW, "socket": other},
+                            mode="pilot")
+    assert refused["status"] == "failed" and "trusted socket" in refused["error"]
+    world.behave("titan", niri="fail")
+    failing = world.request("titan", "surface-probe", {
+        "window_id": WINDOW, "socket": recorded["socket"]}, mode="pilot")
+    assert failing["status"] == "failed" and "IPC" in failing["error"]
+    assert len(_niri_spawns(world, mark)) == 1
+
+
+def test_recovery_daemon_stop_uses_installed_codex(world):
+    """Drift blocks forward progress, never restoration: after a Codex update, the forward stop
+    refuses, while recovery's runs the release installed at the recorded path and reports it."""
+    home = world.home("titan")
+    prepared = _digest(os.path.realpath(home / ".local/bin/codex"))
+    payload = {"window_id": WINDOW, "codex_sha256": prepared}
+    forward = world.request("titan", "codex-daemon-stop", payload)
+    assert forward["status"] == "completed", forward["error"]
+    assert forward["result"]["executable"]["prepared"] is True
+    moved = world.move_codex()
+    mark = len(world.lines("observed"))
+    refused = world.request("titan", "codex-daemon-stop", payload)
+    assert refused["status"] == "failed" and "recorded at preparation" in refused["error"]
+    recovery = world.request("titan", "codex-daemon-stop", {**payload, "recovery": True})
+    assert recovery["status"] == "completed", recovery["error"]
+    assert recovery["result"]["executable"] == {
+        "path": str(home / ".local/bin/codex"), "real": str(moved), "sha256": _digest(moved),
+        "prepared": False}
+    calls = [call for call in world.lines("observed")[mark:] if call["tool"] == "codex"]
+    assert [(call["args"], call["binary"], call["hold"]) for call in calls] == [
+        (["app-server", "daemon", "stop"], str(moved), "1")] * 2
+    # Something that is no standalone Codex release is never run, in recovery either.
+    link = home / ".local/bin/codex"
+    link.unlink()
+    link.symlink_to("/usr/bin/true")
+    stray = world.request("titan", "codex-daemon-stop", {**payload, "recovery": True})
+    assert stray["status"] == "failed" and "standalone Codex release" in stray["error"]

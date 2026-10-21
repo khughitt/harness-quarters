@@ -21,27 +21,35 @@ unfinished window is restored in the runbook's order:
    verified pre-merge snapshot, and checks familiar native.
 
 It returns with native targets, source and dependencies verified, timers still paused and the
-window `recovering`: familiar's surfaces (with fresh consent) and the original timers are the
-remaining stages of the full recover. Bytes matching no recorded image and unexpected Git history
-stop as `inspection-required`, with nothing force-copied, reset or reverted blindly; any other
-stop or signal leaves `recovering`, and the next call repeats from reconciliation, skipping what
-actual state shows done. Recovery never runs the forward check, preflight or inventory, nor any
-Claude executable, so stale Claude evidence never blocks it.
+window `recovering`. `recover_window` is the full recover: this restoration core, then familiar's
+surfaces restarted with this invocation's fresh consent (`surfaces.py`), then each host's original
+timers restored and its service run to success before the window is `recovered`. Bytes matching
+no recorded image and unexpected Git history stop as `inspection-required`, with nothing
+force-copied, reset or reverted blindly; any other stop or signal leaves `recovering`, and the
+next call repeats from reconciliation, skipping what actual state shows done. Recovery never
+runs the forward check, preflight or inventory, nor any Claude executable, so stale Claude
+evidence never blocks it.
 
 `reconcile_window` reads actual state for the next command and cancels nothing. A run that
 stopped past familiar's mark without recording its outcome becomes `migrated-surfaces-pending`
 only when no operation on either host is unsettled (this window's dead-owner ones included, whose
 children may still be writing) and actual state passes the run's own verified-checkpoint gate
 (`window.verified_migration`) with Titan's four targets holding this window's applied artifacts;
-otherwise it becomes `recovery-required`, which blocks fresh sessions and names recover.
+otherwise it becomes `recovery-required`, which blocks fresh sessions. When only running or
+unreadable operations stopped it, that window stays reconcilable: once they settle,
+restart-surfaces (or run) reconciles it again; otherwise it names recover. `recover` itself is
+always the full rollback.
 
 Keys this module adds to the window record: `recovery` {started_at, attempted_at, cancelled,
-timers, check, targets, originals, familiar, dependencies, actions, restored, failure, failures},
-where `actions` lists each destructive action once, as it is taken. Recovery also sets `state`
-and `owner`; reconciliation sets `failure`, or `familiar` and `verified` when it promotes."""
+codex, timers, check, targets, originals, familiar, dependencies, actions, restored, surfaces,
+original_timers, services, completed, failure, failures}, where `actions` lists each destructive
+action once, as it is taken, and `codex` is the executable the daemon stop ran. Recovery also
+sets `state` and `owner`; reconciliation sets `failure`, or `familiar` and `verified` when it
+promotes, keeping a superseded reconciliation failure in `reconciled`."""
+import signal
 from pathlib import Path
 
-from . import hosts, inputs, state
+from . import hosts, inputs, state, surfaces
 from . import window as lifecycle
 from .state import Stop
 from .window import (HOST_ORDER, Failed, _Interrupt, _as_failed, _call, _me, _now, _root, _save,
@@ -82,10 +90,11 @@ def _prepared(window):
 
 
 def _settle(window, *, cancel):
-    """Each host's unfinished operations, as (blockers, dead): any operation still running,
-    unknown or another window's, and a host that cannot be read, is a blocker for every mutation.
-    This window's operations whose owner died are cancelled and recorded with `cancel` (only
-    recovery does that); without it they are returned in `dead`, untouched."""
+    """Each host's unfinished operations, as (blockers, cancelled, dead): any operation still
+    running, unknown or another window's, and a host that cannot be read, is a blocker for every
+    mutation. This window's operations whose owner died are cancelled and recorded where
+    `cancel(entry)` holds (recovery cancels them all; a surface retry only its own reads and
+    surface operations; reconciliation none); the rest are returned in `dead`, untouched."""
     mode, identity = window["mode"], window["id"]
     blockers, cancelled, dead = [], [], []
     for host in HOST_ORDER:
@@ -101,7 +110,7 @@ def _settle(window, *, cancel):
         for entry in found["operations"]:
             name = f"operation {entry['operation_id']} ({entry['operation']})"
             if entry["window_id"] == identity and entry["state"] == "owner-lost":
-                if not cancel:
+                if not cancel(entry):
                     dead.append(f"{host}: {name} is owner-lost; its recorded children may still "
                                 "run until recover cancels them")
                     continue
@@ -117,7 +126,7 @@ def _settle(window, *, cancel):
             owner = "this window's" if entry["window_id"] == identity else "not this window's"
             blockers.append(f"{host}: {name} is {entry['state']} and {owner}; let it finish or "
                             "reconcile it with operation-status or operation-cancel")
-    return blockers, cancelled if cancel else dead
+    return blockers, cancelled, dead
 
 
 def _closed(host, mode, identity):
@@ -159,23 +168,27 @@ def _restore(window, prepared, seen, progress):
         window = _step(window, seen, progress, name, host)
 
     progress.update(step="reconcile", host="titan")
-    blockers, cancelled = _settle(window, cancel=True)
+    blockers, cancelled, _ = _settle(window, cancel=lambda entry: True)
     if blockers:
         raise Failed("reconcile", blockers[0].split(":", 1)[0], "unsettled",
                      "unfinished host operations block every recovery mutation; nothing was "
                      "changed", blockers=blockers, next_command=["status"])
-    # Each attempt starts from actual state; an earlier outcome stays only in `failures`.
+    # Each attempt starts from actual state; an earlier outcome stays only in `failures`, and
+    # the timers re-quiesced below undo an earlier attempt's restore of them.
     earlier = {key: value for key, value in (window.get("recovery") or {}).items()
-               if key not in ("restored", "failure")}
+               if key not in ("restored", "failure", "surfaces", "original_timers", "services")}
     window = _save(window, state="recovering", owner=_me(), recovery={
         **earlier, "started_at": earlier.get("started_at", _now()), "attempted_at": _now(),
         "actions": earlier.get("actions", []),
         "cancelled": [*earlier.get("cancelled", []), *cancelled]})
 
+    # Drift blocks forward progress, never restoration: the supported stop runs the Codex
+    # installed at the recorded path even if it changed since preparation, recording what ran.
     step("codex-daemon-stop", "titan")
     result, log = _call("titan", mode, "codex-daemon-stop", {
-        "window_id": identity, "codex_sha256": prepared["hosts"]["titan"]["codex"]["sha256"]},
-        "codex-daemon-stop")
+        "window_id": identity, "codex_sha256": prepared["hosts"]["titan"]["codex"]["sha256"],
+        "recovery": True}, "codex-daemon-stop")
+    window = _recorded(window, codex=result["executable"])
     if result["survivors"]:
         raise Failed("codex-daemon-stop", "titan", "blocked", "Codex processes remain after the "
                      "supported daemon stop; close their clients; nothing was killed", log=log,
@@ -294,6 +307,10 @@ def _summary(window):
         done.append(f"familiar is at {familiar['revert'][:12]} on titan")
     if recovery.get("dependencies"):
         done.append("dependencies are native on " + ", ".join(recovery["dependencies"]))
+    if "surfaces" in recovery:
+        done.append("familiar's surfaces were restarted from it")
+    if recovery.get("original_timers"):
+        done.append("original timers are restored on " + ", ".join(recovery["original_timers"]))
     return "; ".join(done) or "nothing has been restored yet"
 
 
@@ -361,6 +378,93 @@ def restore_window(window: dict) -> dict:
     raise _stopped(failed)
 
 
+def _original_timers(window, seen, progress):
+    """Stage 6: each host's timers back to this window's original record, then its service run
+    once and required to succeed. Only then is the window `recovered`."""
+    mode, identity = window["mode"], window["id"]
+
+    def step(name, host):
+        nonlocal window
+        window = _step(window, seen, progress, name, host)
+
+    stopped = lifecycle._stopped(window)
+    for host in HOST_ORDER:
+        step("timer-restore", host)
+        result, _ = _call(host, mode, "timer-restore", {
+            "window_id": identity, "record_sha256": window["timers"][host]["sha256"],
+            "stopped": host in stopped}, "timer-restore")
+        window = _recorded(window, original_timers={
+            **window["recovery"].get("original_timers", {}), host: result})
+    for host in HOST_ORDER:
+        step("service-run", host)
+        result, _ = _call(host, mode, "service-run", {
+            "window_id": identity, "record_sha256": window["timers"][host]["sha256"]},
+            "service-run")
+        window = _recorded(window, services={**window["recovery"].get("services", {}),
+                                             host: result})
+    if seen:
+        raise _Interrupt(seen[-1])
+    return _save(window, state="recovered", recovery={**window["recovery"],
+                                                      "completed": {"at": _now()}})
+
+
+def recover_window(window: dict, decision: dict | None) -> dict:
+    """The full recover. A window that never reached familiar's mark takes the pre-merge abort
+    only, with no decision. Any other runs the six stages in order, every attempt from the first:
+
+    1-4. `restore_window`: strict no-live, both hosts' timers stopped again from their original
+       records, every touched target restored and verified, familiar's source reverted and its
+       dependencies restored offline;
+    5. familiar's recorded surfaces restarted from the native source with this invocation's
+       consumed `recover` decision (the run's or any earlier consent never covers it); an
+       explained absence stays absent, and surfaces this recovery already restarted are not
+       restarted again;
+    6. each host's original timer state restored and its service run to success.
+
+    Until stage 6 passes the window stays `recovering` and every report says not to open Claude
+    or Codex; a stop at any stage records it and names `recover` again."""
+    _active(window)
+    if pre_merge(window):
+        return restore_window(window)
+    todo = surfaces.pending(window, surfaces.RECOVERY)
+    if decision is None:
+        if any(todo.values()):
+            raise Failed("decision", "titan", "refused", "recover restarts familiar's surfaces "
+                         "only with this invocation's own desktop decision; ask the operator at "
+                         "their terminal", observed="nothing was changed",
+                         next_command=["recover"])
+    else:
+        if decision.get("action") != surfaces.RECOVER_ACTION:
+            raise Failed("decision", "titan", "refused", "only a decision for this recovery "
+                         "authorizes its restarts; an earlier run's or retry's consent does not",
+                         observed="nothing was changed", next_command=["recover"])
+        surfaces.authorized(window, decision)
+    window = restore_window(window)["window"]
+    if decision is not None:
+        try:
+            window = surfaces.restart_surfaces(window, decision)["window"]
+        except Failed as failed:
+            raise _stopped(failed) from None
+    window = _recorded(window, surfaces={"at": _now(),
+                                         "attempt": (decision or {}).get("attempt_id")})
+    progress = {"step": "timer-restore", "host": "titan"}
+    with _signals() as seen:
+        try:
+            window = _original_timers(window, seen, progress)
+        except (Exception, _Interrupt) as error:
+            failed = _as_failed(error, progress)
+        else:
+            return {"class": "recovered", "state": window["state"], "window": window,
+                    "stages": {stage: "passed" for stage in (
+                        "no-live", "timers-requiesced", "targets", "source", "dependencies",
+                        "native-surfaces", "original-timers")},
+                    "observed": (f"window {window['id']} is recovered: {_summary(window)} on "
+                                 "both hosts; familiar-reap.service succeeded; fresh native "
+                                 "sessions may start"),
+                    "next": lifecycle.status()["next"]}
+    raise _stopped(failed)
+
+
 # --- reconciliation -------------------------------------------------------------------------
 
 
@@ -389,9 +493,39 @@ def _verify_migration(window, found):
     return {"at": _now(), "hosts": hosts_verified, "reconciled": True}, None
 
 
+def reconcilable(window: dict) -> bool:
+    """Whether reconciliation may still promote the window to its verified migration: it is past
+    familiar's mark with nothing recovered, and either the run never recorded its outcome or
+    reconciliation itself stopped beside unsettled operations, which took no mutation. A window
+    stopped by any other failure needs recover."""
+    if "recovery" in window or pre_merge(window):
+        return False
+    failure = window.get("failure")
+    if window["state"] == "applying":
+        return failure is None
+    return (window["state"] == "recovery-required" and isinstance(failure, dict)
+            and failure.get("step") == "reconcile" and failure.get("status") == "unsettled")
+
+
+def _promote(window, **changes):
+    """Save the promoted window; a reconciliation failure it supersedes moves to `reconciled`."""
+    state._current(window)
+    updated = {key: value for key, value in window.items() if key != "failure"}
+    if "failure" in window:
+        updated["reconciled"] = [*window.get("reconciled", []), window["failure"]]
+    updated.update(changes)
+    mask = signal.pthread_sigmask(signal.SIG_BLOCK, hosts.INTERRUPTS)
+    try:
+        state.save_record(Path(window["directory"]) / "window.json", updated)
+    finally:
+        signal.pthread_sigmask(signal.SIG_SETMASK, mask)
+    return updated
+
+
 def reconcile_window(window: dict) -> dict:
     """Classify the active window against actual host state and name its one next command. Only a
-    run that stopped past familiar's mark without recording its outcome changes state here."""
+    run that stopped past familiar's mark without recording its outcome, or one reconciliation
+    already stopped beside unsettled operations (`reconcilable`), changes state here."""
     _active(window)
     report = {"window_id": window["id"], "state": window["state"], "class": None,
               "blockers": [], "familiar": None, "observed": None, "next": None}
@@ -405,21 +539,28 @@ def reconcile_window(window: dict) -> dict:
         return {**report, "class": "abort", "next": ["recover"],
                 "observed": ("familiar and settings were never changed: recover completes the "
                              "pre-merge timer and snapshot abort only")}
-    blockers, dead = _settle(window, cancel=False)
-    if window["state"] == "applying" and (blockers or dead):
+    blockers, _, dead = _settle(window, cancel=lambda entry: False)
+    if reconcilable(window) and (blockers or dead):
         # Unsettled work may still be writing: never promote beside it. Reconciliation cancels
-        # nothing; recover cancels this window's dead-owner operations before it acts.
+        # nothing; recover cancels this window's dead-owner operations before it acts. Work
+        # that is only running or unreadable may settle, and then restart-surfaces reconciles
+        # this window again; a dead owner's never settles by itself.
         from .cli import command_line  # the operator's complete command, as cli prints it
         unsettled = [*blockers, *dead]
+        following = ["recover"] if dead else ["restart-surfaces"]
         window = _save(window, state="recovery-required", failure={
             "step": "reconcile", "host": unsettled[0].split(":", 1)[0], "status": "unsettled",
             "error": "the run stopped past familiar's mark beside unsettled operations: "
-                     + "; ".join(unsettled), "log": None, "at": _now()})
+                     + "; ".join(unsettled), "log": None, "at": _now(), "next": following})
+        then = (f"run {command_line(['recover'])}: it cancels this window's dead-owner "
+                "operations and rolls the window back" if dead else
+                f"once they settle, {command_line(['restart-surfaces'])} reconciles it again, "
+                f"or {command_line(['recover'])} rolls it back")
         return {**report, "state": window["state"], "class": "recovery-required",
-                "blockers": unsettled, "next": ["recover"],
+                "blockers": unsettled, "next": following,
                 "observed": (f"window {window['id']} is recovery-required: its migration is not "
                              "verified beside unsettled operations (" + "; ".join(unsettled)
-                             + f"); run {command_line(['recover'])} once they settle. {STOP}")}
+                             + f"); {then}. {STOP}")}
     if blockers:
         return {**report, "class": "unsettled", "blockers": blockers, "next": ["status"],
                 "observed": ("unfinished host operations block every retry and recovery "
@@ -432,16 +573,16 @@ def reconcile_window(window: dict) -> dict:
                                        or {}), "reconcile")
     report["familiar"] = {key: found[key] for key in ("class", "merge", "revert", "discovered",
                                                       "reason")}
-    if window["state"] == "applying":
-        if "failure" in window or "recovery" in window:
-            verified, reason = None, "recovery was already requested for it"
-        else:
+    if window["state"] == "applying" or reconcilable(window):
+        if reconcilable(window):
             verified, reason = _verify_migration(window, found)
+        else:
+            verified, reason = None, "recovery was already requested for it"
         if verified is not None:
             merged = {**window["familiar"], "merge": found["merge"],
                       "parents": [inputs.PINS["familiar_pre"], inputs.PINS["familiar_feature_tip"]]}
-            window = _save(window, state="migrated-surfaces-pending", familiar=merged,
-                           verified=verified)
+            window = _promote(window, state="migrated-surfaces-pending", familiar=merged,
+                              verified=verified)
             return {**report, "state": window["state"], "class": "verified",
                     "next": ["restart-surfaces"],
                     "observed": (f"window {window['id']} verified its migration from actual "
