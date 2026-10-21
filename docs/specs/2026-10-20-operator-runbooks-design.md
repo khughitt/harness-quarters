@@ -681,7 +681,7 @@ Approved direction: Keith, 2026-10-21, after the real-host `prepare` refused bec
 had moved two task-record commits past PRE (adding only `tasks/fam-ff5351.md`). Familiar's
 own task tracker commits into the same repository, from any checkout and during smokes, so
 no exact familiar commit can be held through a window. Revised after design review rounds 7
-to 11. Familiar's runtime does not read `tasks/`.
+to 12. Familiar's runtime does not read `tasks/`.
 
 **Tasks-only descendant.** Y is a tasks-only descendant of X when X is an ancestor of Y and
 every commit in `X..Y` has exactly one parent and, against that parent, changes only raw
@@ -739,7 +739,11 @@ under the same object environment. "Equal outside `tasks/`" means `diff-tree -r 
   record with no recorded base is refused for inspection, never assumed to be PRE.
 - **Recovery classes.** `at-base`: no MERGE_HEAD or REVERT_HEAD and HEAD a tasks-only
   descendant of the recorded B; it records the restoration point as the recorded B.
-  `merge-in-progress`: HEAD = B and MERGE_HEAD = tip. `merged`: HEAD = P, a tasks-only
+  `merge-in-progress`: HEAD = B and MERGE_HEAD = tip; before `git merge --abort` the
+  restore refuses while `.git/index.lock` exists and rebuilds the live index from the working
+  tree's proven state (judged outside `tasks/` with a temporary index): equal to `merge-tree
+  --write-tree B tip` → `read-tree` of that tree and `update-index -q --refresh`; equal to B →
+  `read-tree B` and refresh; anything else refused for inspection. `merged`: HEAD = P, a tasks-only
   descendant of M, M's parents exactly `[recorded B, tip]` and M equal to T0 outside `tasks/`
   (also required before reconciliation promotes a discovered merge). `reverted`: HEAD a
   tasks-only descendant of R, R with one parent P that is a tasks-only descendant of M and R's
@@ -758,7 +762,10 @@ under the same object environment. "Equal outside `tasks/`" means `diff-tree -r 
   branch choice, its final proof and every after-the-mark clean-tree proof, equality is judged
   outside `tasks/`: tracked changes under `tasks/` (a tracker write deferred because the index
   held foreign staged changes) are carried, never evidence; P, R and R′ share HEAD's `tasks`
-  entry, so the two-way `read-tree -m -u` keeps them. The restore refuses
+  entry, so the two-way `read-tree -m -u` keeps them. That equality filters the `-z` name
+  output of `diff --name-only T` and `ls-files --others` by the byte prefixes `tasks/` (and
+  `node_modules/`), never by pathspec exclusion, with `GIT_ICASE_PATHSPECS` and
+  `GIT_GLOB_PATHSPECS` unset. The restore refuses
   for inspection while `.git/index.lock` exists and never deletes the lock. With HEAD = P (R's
   recorded parent):
   - working tree equals P: rebuild the index (`read-tree P`, then `update-index -q
