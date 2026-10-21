@@ -1008,7 +1008,7 @@ before a new window. No in-window re-probe/continuation path is added.
 
 ## Amendment 2026-10-21: familiar task-record drift (after Task 9 Step 7)
 
-Implements the spec amendment of the same date (revised after design review rounds 7–11;
+Implements the spec amendment of the same date (revised after design review rounds 7–12;
 rulings R61–R64). One corrective change on the delivered tool, then redelivery:
 
 1. Pins (as the spec's amendment defines, including `core.hooksPath=/dev/null` on every
@@ -1026,7 +1026,8 @@ rulings R61–R64). One corrective change on the delivered tool, then redelivery
    before either `snapshot-refresh`; `snapshot-refresh` checks HEAD = B without waiting; the
    pre-merge gate rechecks; the mark records B; `familiar-merge` takes B, rechecks, merges with
    the fixed options and proves M (parents, tree, T0).
-5. After the mark: tasks-only-descendant source proofs (install sync, `familiar-verify` in run,
+5. After the mark (with a clean tree judged outside `tasks/` by byte prefix, as the spec
+   defines): tasks-only-descendant source proofs (install sync, `familiar-verify` in run,
    restart-surfaces and finish, dependency-restore sync), Europa not ahead of or diverged from
    Titan's observed HEAD; finish records the observed HEAD.
 6. Restoration/recovery (as the spec's amendment defines: temporary-index working-tree
@@ -1049,7 +1050,10 @@ rulings R61–R64). One corrective change on the delivered tool, then redelivery
    `index.lock` during the restore; an abandoned R after a tolerated Titan tasks commit, and a crash after `read-tree`
    followed by a Titan tasks commit both by pathspec and through the live index; a crash after
    `read-tree`, then a tracker write that defers (modified tracked record, HEAD = P), and
-   recovery completes carrying the record; two outside-`tasks/` entries above M refused;
+   recovery completes carrying the record; two outside-`tasks/` entries above M refused; `finish` and Europa's install sync wait pass
+   with a modified tracked `tasks/` record and refuse a modified file outside `tasks/`;
+   `Tasks/z` and a root `tasks` file detected under `GIT_ICASE_PATHSPECS=1`; a merge in progress
+   with an index holding B recovers clean at B;
    hooks (`post-merge`, `reference-transaction`) not run; `tasks/` absent in B or P; an
    octopus merge in the tip's history; a Europa-local commit after the mark detected; `at-base` recovery does not
    end the cutover; the unchanged B = PRE fixtures as the baseline.
