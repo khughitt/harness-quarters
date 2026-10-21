@@ -65,7 +65,13 @@ class Sandbox:
             "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "test@example.invalid",
             "GIT_COMMITTER_NAME": "test", "GIT_COMMITTER_EMAIL": "test@example.invalid",
         }
-        monkeypatch.setattr(os, "environ", self.env)
+        # The helper, called in this process, starts its children with this process's
+        # environment, so that environment is replaced whole, key by key, for the test.
+        for key in list(os.environ):
+            if key not in self.env:
+                monkeypatch.delenv(key)
+        for key, value in self.env.items():
+            monkeypatch.setenv(key, value)
         self._module = None
         self.target, self.backup = tmp / "settings.json", tmp / "backup"
         write_json(self.target, CLAUDE)
@@ -84,6 +90,11 @@ class Sandbox:
             self.real_process_rows = self._module.process_rows
             self.patch.setattr(self._module, "process_rows", lambda: [])
         return self._module
+
+    def setenv(self, key, value):
+        """One more variable, in the box's environment and this process's alike."""
+        self.env[key] = value
+        self.patch.setenv(key, value)
 
     def call(self, *args):
         code = self.module.main([str(a) for a in args])
@@ -148,7 +159,7 @@ for change in artifact['changes']:
     assert target.read_text() == change['after']
     target.write_text(change['before'])
 """)
-        self.env["RELAY_CUTOVER_RELAY"] = str(launcher)
+        self.setenv("RELAY_CUTOVER_RELAY", str(launcher))
         return path
 
     def familiar_repo(self):
@@ -339,7 +350,7 @@ def test_familiar_checks_use_explicit_root_without_changing_home(box):
     box.run("git", "-C", scratch, "commit", "-qm", "scratch")
     head = box.run("git", "-C", scratch, "rev-parse", "HEAD")
     agent = str(box.tmp / "agent.sock")
-    box.env["SSH_AUTH_SOCK"] = agent
+    box.setenv("SSH_AUTH_SOCK", agent)
     home = box.env["HOME"]
 
     def helper(*args):
