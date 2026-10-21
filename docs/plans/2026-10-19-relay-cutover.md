@@ -20,6 +20,13 @@ npm lockfile pinning, systemd user timers, Codex hook trust.
 **Status:** approved by the user on 2026-10-19 after three review rounds (codex/gpt-6-astra);
 execution is subagent-driven, in a fresh session. Execution in progress; operator window not run.
 
+**Execution status (2026-10-21):** Tasks 1–7 ran as recorded below. The manual Task 8 window
+stopped after Titan's §1 on 2026-10-20; it was aborted and restored, and no cutover is live.
+Its arrangement is replaced by the closed-harness bootstrap of
+`docs/plans/2026-10-20-relay-cutover-bootstrap.md` (hq-c6c847) and the rewritten
+`docs/runbooks/relay-cutover.md`; see Task 8. The inventory and Tasks 1–7 below stay as
+written on 2026-10-19. They are dated records, not current facts.
+
 **Spec:** ops `docs/specs/2026-09-16-relay-design.md` §8 (approved after `d7e2c33`);
 brief "A" in ops `docs/plans/2026-09-16-relay-bootstrap.md` (approved after
 `bc53c51`); relay `docs/runbooks/hook-install-rollback.md`; familiar
@@ -535,6 +542,25 @@ by reverting the revert.
 - [ ] **Step 5: Commit** `docs(runbooks): relay operator cutover`.
 
 ### Task 8: Operator window (gate: the user runs it)
+
+**Arrangement replaced (2026-10-21).** Do not run the manual window that Steps 1–2 below
+describe: it was interrupted after Titan's §1 on 2026-10-20 and aborted. The window now
+follows `docs/plans/2026-10-20-relay-cutover-bootstrap.md` and the rewritten
+`docs/runbooks/relay-cutover.md`.
+
+- Preparation, the pilot and the final held version check before each closure request are
+  agent work (bootstrap plan Task 9 Steps 4–9).
+- The operator then closes every Claude and Codex session on both hosts and runs
+  `~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap run` from Zsh. That one
+  command applies familiar and all four targets with both harnesses closed.
+- Agents then resume only through the printed held commands. The controller proves its own
+  row first. Agents run the smokes with the operator's attestations, retry surfaces with
+  consent, and run `finish`.
+- `recover` stays an operator-run, closed-harness command.
+
+The window task is hq-f27918; bootstrap plan Task 9 Step 9 parks it for the operator. Task 9
+below keeps the final checks. Steps 1–2 are the original 2026-10-19 arrangement, kept as
+written.
 
 - [ ] **Step 1:** `tasks park hq-539508 "operator runs docs/runbooks/relay-cutover.md §1–5 from a plain shell" --waiting-on user --reason approval`,
   naming the expected duration (about 45 minutes) and that it ends every Claude and

@@ -1,30 +1,912 @@
 # Relay operator cutover
 
-Prepared 2026-10-19. This is the Task 8 operator window; preparation and rehearsals
-have **not** activated relay. Run the numbered sections in order, from ordinary
-shells on Titan and Europa, with an observer shell for the smoke checks. Any failed
-check stops the window: use the §1 abort below before §2, and full rollback from §2
-onward. Do not run the live commands inside Claude or Codex. Desktop restarts below need the operator's permission at that moment.
+Rewritten 2026-10-21 for the closed-harness bootstrap: plan
+`docs/plans/2026-10-20-relay-cutover-bootstrap.md`, spec
+`docs/specs/2026-10-20-operator-runbooks-design.md`. **Relay is not live.** The manual window
+of 2026-10-19 stopped after Titan's §1 on 2026-10-20 and was aborted and restored. Its
+sourced-Bash procedure is superseded; the parts still worth reading are in the
+[Reference](#reference-not-for-pasting) at the end, which is not for pasting.
 
-Claude's personal and work homes run on both hosts. Codex's two homes run only on
-Titan. The four settings targets and familiar source are shared through Dropbox:
-**edit each settings target once on Titan**, then wait for and verify Europa's copy.
-Dependencies, registries, backups, and private expected images are host-local.
-Nothing here repoints a home, launcher, service, or config include into a worktree.
-Keep `.worktrees/relay-cutover/` until Task 9 is complete.
+The cutover replaces familiar's native hook entries and the native ops guard with relay
+v0.1.1 in four shared settings targets: Claude's personal and work homes on Titan and Europa,
+and Codex's personal and work homes on Titan only. One tool, `tools/relay-cutover-bootstrap`,
+carries every phase, with its separate rehearsal entry `tools/relay-cutover-rehearse`. It
+loads its own protected records under `~/.local/state/hq/relay-cutover/`, so no command here
+needs `source`, a saved environment, an interactive `set -e` or a Bash shell. Each command
+below is one Zsh line. A stopped
+command returns 1 to the same Zsh prompt and prints its step, host, status, private log path,
+observed state and one complete next command. It never prints settings, plans, environments,
+credentials or child output.
 
-## Pins, targets, and writers
+The commands below use the reviewed worktree's copy, by explicit path:
 
-Use these immutable familiar commits, never the moving feature branch:
-
-```bash
-PRE_FAMILIAR=00f4899ae523d613d21f44bfc2c456aac67f8e5f
-FEATURE_TIP=a16f4daa59b04e32f1010764d6f94401ca4eed8b
+```zsh
+~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap status
 ```
 
-The relay dependency is `git+https://github.com/khughitt/relay.git#v0.1.1`, release
-commit `4ceec5d2ad22b136b37ee360e7a4ed00949f28d9`. Hook commands use `/usr/bin/node`.
-Every writer must use v0.1.1 before hooks activate worker rows:
+The tool reaches its hosts through hq main's fixed entry, `~/d/hq/tools/relay-cutover-host`:
+directly on Titan, and through `ssh -4 -o BatchMode=yes europa` on Europa. Nothing works
+until the reviewed tool has been delivered to hq main and has reached Europa byte for byte
+(bootstrap plan Task 9 Step 4). A checkout or host whose helper bytes differ from the prepared
+manifest blocks `prepare`, `check` and `run`. Each report prints its next command with the
+resolved absolute path of the checkout it ran from. Nothing here repoints a home, launcher,
+service or config include into a worktree. Keep `.worktrees/relay-cutover/` until the
+original plan's Task 9 is complete. The independent Bash (dots-55f537) and instruction
+(lore-4c1787) changes do not gate this window.
+
+## Who does what
+
+| Phase | Who runs it | Claude and Codex sessions | Commands | Result |
+| --- | --- | --- | --- | --- |
+| Prepare | agent | ordinary use continues, including `cl` and `clw` | `prepare`, `check`, `status`, `relay-cutover-rehearse` | prepared record; pilot verdict |
+| Final pre-closure step | agent | ordinary use continues | held version checks, then `check` | unchanged versions: ask for closure |
+| Bootstrap | operator, in an ordinary Zsh on Titan | every session closed on both hosts, the controller's included | `run` | migration verified; familiar's surfaces restarted |
+| Resume | operator | only the printed held commands | the controller's resume; the Codex homes' hook reviews | the controller proves its own row |
+| Validate | agent with the operator | only the printed held commands | `record-smoke`, `restart-surfaces` | six smoke receipts |
+| Finish | agent | only the printed held commands | `finish` | original timers restored; reconciliation verified; hold released |
+| Recover | operator, by choice or when a report says so | every session closed on both hosts | `recover` | native settings, familiar, surfaces and timers |
+
+## Evidence: what is proven and what is not
+
+- **Fixture-tested.** Implementation Tasks 1–8 test the orchestration against fake hosts and
+  owned scratch homes through the real request protocol
+  (`tools/test_relay_cutover_bootstrap.py`, `tools/test_relay_cutover_transport.py`). The
+  tests cover:
+  - decisions and their refusals: missing, declined, stale, replayed or mismatched;
+  - lost SSH replies and explicit cancellation;
+  - interruption at each durability gap: timer records, snapshot moves, the merge and its
+    record, and each target's guard, plan and apply;
+  - pick drift, non-pick drift, and all six dry-run verdicts before the merge;
+  - the pre-merge abort on every recorded host;
+  - full offline recovery, including after a hold breach and after a partial finish;
+  - surface restarts with exited, reused and unrecorded PIDs, a partial restart and a
+    consented retry;
+  - smoke receipt binding, and finish's gates;
+  - pilot/live mode confusion and scratch-root escape.
+
+  Fixtures are not the real hosts. That suite runs in the worktree, which carries the hook
+  after-images. Delivery (bootstrap plan Task 9 Step 4) runs `just test` again on the
+  delivered main tree, which lacks them; the worktree run does not prove that combination.
+- **Historical (2026-10-19).** The original Task 7 rehearsed the manual procedure on both
+  hosts: settings copies at three stop points, and familiar's throwaway merge, install and
+  offline rollback ([Reference](#disposable-rehearsal-evidence-2026-10-19)). That shows
+  feasibility. It does not prove this tool or its transport.
+- **Pilot-proven: pending** (bootstrap plan Task 9 Step 8; not run yet). The real-host pilot,
+  `relay-cutover-rehearse`, is what proves:
+  - the runner's real SSH transport and fixed remote entry;
+  - batch Git access to familiar-theme's SSH pin;
+  - user-bus unit queries;
+  - read-only niri IPC, and the consented no-window `true` spawn;
+  - the real relay v0.1.1 installer's plans on frozen copies with interleaved picks;
+  - a real `npm ci` in scratch with the prepared caches;
+  - one real SSH disconnect during a scratch install, reconciled to its recorded result;
+  - offline restoration of the copies, clones and dependencies, then cleanup.
+
+  The runner is not ready for the window until a pilot verdict of `passed` is recorded.
+- **Current readiness** (bootstrap plan Task 9 Steps 5–7, then the
+  [final pre-closure step](#2-final-pre-closure-step-agent) before every closure request).
+  These are dated observations, not a continuous hold: both hosts' versions and digests from
+  held commands, each home's `claude doctor` hold diagnostic, the transport checks, and
+  `prepare`. On 2026-10-20 the implementation controller made some read-only observations:
+  - Titan's personal-home `DISABLE_UPDATES=1 claude doctor` printed
+    `Auto-updates: disabled (set by env: DISABLE_UPDATES)` on 2.1.304;
+  - both hosts run niri 26.04, with `niri msg action spawn-sh`;
+  - logind has `KillUserProcesses=false` on both hosts.
+
+  Steps 5–7 repeat such checks for every host and home.
+- **Still unrun live:** none of the following has run on the real hosts:
+  - `run` on the real targets, the real merge and installs, and the surface restarts,
+    including whether `qs -d` settles to one process;
+  - relay v0.1.1's real `list --json` rows, familiar's real intent shape, and a running Codex
+    process's executable path;
+  - the controller's fresh row, every smoke and hook-trust review, finish's timers and
+    scheduled reconciliation, and recovery on the real hosts.
+
+  Nothing in this runbook implies a live result.
+
+## Commands, consent and what each may change
+
+| Command | Run by | Human decision | May change |
+| --- | --- | --- | --- |
+| `prepare --controller-session ID` | agent | none | the prepared record and private operation records |
+| `check` | agent | none | private operation records only |
+| `status` | anyone | none | nothing (local records only) |
+| `relay-cutover-rehearse --controller-session ID --preview` | agent | none; prints the consent subject | allocates the pilot window and contacts no host |
+| `relay-cutover-rehearse --controller-session ID` (with `--decision-file FILE` or a terminal answer) | agent | desktop: the no-window `true` spawn; without approval the spawn gate stays pending | owned scratch roots on both hosts, the prepared cache prefixes |
+| `run` | operator, from an ordinary terminal | desktop: the operator's `/dev/tty` answer only; no decision file | timers, familiar snapshots, familiar, dependencies, all four targets, familiar's surfaces |
+| `restart-surfaces` (`--preview`, or `--decision-file FILE`) | agent or operator | desktop: the operator's terminal answer, or a session decision file after the controller's proof | familiar's recorded surfaces only |
+| `record-smoke --observe HOST` (optionally `--cwd DIR`) | agent | none | private smoke evidence |
+| `record-smoke --receipt FILE` (`--preview`, or `--decision-file FILE`) | agent or operator | smoke attestation: the operator's terminal answer or a session decision file | the window's receipt record |
+| `finish` | agent | none | timers, a run of `familiar-reap.service` |
+| `recover` | operator, from an ordinary terminal | desktop: the operator's `/dev/tty` answer for recovery's restarts; no decision file | everything back to native |
+
+`prepare`, `check` and `status` never change targets, familiar source, dependencies, timers,
+services, the desktop or window state. `prepare` writes only `prepared.json`. The private
+operation and transport records under the cutover root are the only writes `prepare` and
+`check` add (ruling R16).
+
+### Human decisions
+
+- **At a terminal.** An operator who runs a command directly answers its bounded prompt on
+  `/dev/tty`: a preview of the subject, then `Type yes to approve`. The tool takes `yes` or
+  `y`, in any case, as approval; any other answer stops before any change. `run` and
+  `recover` accept nothing else (rulings R24 and R35).
+- **From an agent.** An agent never answers a terminal prompt, even when its tool shell has a
+  terminal; it always passes `--decision-file`. The sequence is:
+  1. Preview the subject read-only: `restart-surfaces --preview`,
+     `record-smoke --preview --receipt FILE`, or `relay-cutover-rehearse … --preview`.
+  2. Ask the user in the session, naming the subject:
+     - a surface restart: the hosts, the surfaces, the impact and the duration;
+     - a smoke attestation: the receipt's host, home, session, cases and human verdicts;
+     - the pilot: its hosts, the fixed `true` spawn, that no window opens, and at most
+       five minutes.
+  3. Wait for the explicit reply.
+  4. Write the record below and pass it to the command.
+- **The record.** It is one JSON object, schema 1. Take `window_id`, `attempt_id` and
+  `subject_sha256` from the preview. `kind` is `desktop` for `restart-surfaces` and the pilot
+  (action `restart-surfaces` or `pilot-spawn`), and `smoke-attestation` for `record-smoke`
+  (action `record-smoke`). `answered_at` is ISO 8601 with a timezone.
+
+  ```json
+  {
+    "schema": 1,
+    "kind": "desktop",
+    "action": "restart-surfaces",
+    "window_id": "<window_id from the preview>",
+    "attempt_id": "<attempt_id from the preview>",
+    "subject_sha256": "<subject_sha256 from the preview>",
+    "verdict": "approved",
+    "source": {
+      "type": "session",
+      "session_id": "<the asking agent's native session ID>",
+      "ask": "<the exact question asked in the session>",
+      "reply": "<the human's exact reply>",
+      "answered_at": "2026-10-21T14:03:00+00:00"
+    }
+  }
+  ```
+
+- **Where to keep it.** Write it as your own regular file, mode 0600, at most 64 KiB, in a
+  private directory outside the cutover root (a `mktemp -d` directory, for example). An
+  unexplained entry at the top level of `~/.local/state/hq/relay-cutover/` blocks every
+  command.
+- **Consumption.** A decision is consumed once, before its first authorized action, and kept
+  in the window's `decisions/`. Each of these refuses, and the agent must ask again:
+  - a reused attempt or reply;
+  - another window;
+  - a changed subject;
+  - a reply answered before the window existed.
+
+  A declined verdict authorizes nothing; that step stays pending. For a surface restart that
+  means the surfaces stay pending, with no rollback.
+- **What a record is.** It is an auditable record of an actual ask and reply, not proof of
+  who typed it. Syntactically valid fabricated data is never authorization.
+
+## 1. Preparation (agent)
+
+Ordinary Claude and Codex use, `cl` and `clw` included, stays allowed during preparation and
+any parked wait.
+
+**Prerequisites.**
+- The reviewed tool is delivered to hq main on both hosts.
+- A reviewed input generation is staged on both hosts:
+  - `inputs/designated.json` under the cutover root names `inputs/<generation>/manifest.json`;
+  - the manifest's schema is documented in `tools/relay_cutover_bootstrap/inputs.py`;
+  - it holds the pins, the helper digests (`.githooks/harness-state-clean` included), each
+    host's toolchain identities, each host's explained desktop absence if it has one, and
+    each target's reviewed before-image, after-image and installer artifact with provenance;
+  - the toolchain identities are `/usr/bin/npm` 12.2.1, `/usr/bin/node`, system Git and
+    `/usr/bin/python3`.
+- The controller session ID is the native session ID, a lowercase UUID, of the Codex
+  controller in Titan's personal home. `run` later prints that session's resume command.
+
+```zsh
+~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap prepare --controller-session '<controller-session-id>'
+~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap check
+~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap status
+```
+
+**What `prepare` reads.** It reads each host through the fixed entry and records:
+- the manifest and its pins, the clean filter's Claude pick keys, and the helper digests;
+- each host's toolchain, install PATH (`/usr/bin:/bin:` plus the validated remainder) and
+  cache prefixes;
+- Claude's identity and per-home versions from held `claude --version` and `claude doctor`
+  probes, and Codex's on Titan;
+- the desktop inventory: the trusted niri socket and each familiar surface's startup command
+  and process;
+- each target's resolved path, digest and pick values.
+
+It refuses beside any open window, pilot included. Running Claude and Codex sessions are
+listed as future `run` blockers; they never make preparation fail. `check` repeats every read
+and names any drift since `prepare`. It prints `next: … run` only when everything still
+matches.
+
+**Picks and structural drift.** Claude's pick keys are the `CLAUDE_JSON_KEYS` of the
+manifest-verified `.githooks/harness-state-clean`. Their values, or their absence, may differ
+from the reviewed before-image; `prepare` records them as found. Any other difference,
+hooks and statusLine included, refuses with `input-review-required`. Codex targets compare as
+whole objects.
+
+### When prepare refuses: input-review-required
+
+The refusal names the original plan's Task 6 image review
+(`docs/plans/2026-10-19-relay-cutover.md`, "Task 6: Prepare the reviewed settings images").
+The agent:
+
+1. Regenerates the before-images, after-images, guard snapshots and installer plans and
+   artifacts on copies, never on live files:
+   - `tools/relay-cutover retire-native-guard --target COPY --backup DIR` for the Claude
+     copies;
+   - then `relay/bin/relay install --harness HARNESS --subscribers
+     ~/.config/relay/subscribers.json --target COPY --retire familiar --evidence
+     ~/d/ops/docs/runbooks/relay-guard-evidence-HARNESS.json --node /usr/bin/node --apply
+     --artifact ARTIFACT`;
+   - a Codex copy keeps the basename `hooks.json`.
+2. Reads every diff. The only changes may be the removed familiar and native-guard entries
+   and the appended relay entries.
+3. Obtains an independent review and records its standard review note and full report.
+4. Stages a new protected input generation and its manifest on both hosts. Previous
+   generations and any window's rollback originals stay untouched.
+5. Reruns `prepare`, then `check`. All six closed-harness dry runs happen again in `run`.
+
+The tool checks the designated manifest's paths, member digests, pins and provenance. It
+never creates approval, reads task notes or reports, or adopts current bytes by recomputing a
+digest.
+
+### The pilot (rehearsal)
+
+```zsh
+~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-rehearse --controller-session '<controller-session-id>' --preview
+~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-rehearse --controller-session '<controller-session-id>' --decision-file '<decision-file>'
+```
+
+`--preview` allocates the pilot window and prints the consent subject and decision fields
+(`kind desktop`, `action pilot-spawn`, `attempt_id probe-N`). It contacts no host. A second
+preview for the same preparation reuses the open window. After the user's explicit reply, the
+second command runs one end-to-end case. Run it in the foreground, with a timeout that covers
+its operation deadlines. The five-minute figure in the subject is the expectation; the tool
+does not enforce it.
+
+The case runs in this order:
+1. held inventory on both hosts: Git access, bus, desktop IPC, toolchain;
+2. the spawn gate;
+3. owned scratch roots, and the six dry runs on frozen scratch copies;
+4. each host's scratch merge and real install;
+5. Titan's four copies applied under one touched record, and Europa's expectations verified;
+6. one real SSH disconnect during a Europa scratch install, reconciled through its recorded
+   result;
+7. offline restoration, then cleanup.
+
+**The verdict.** It is written privately to the pilot window's `pilot-verdict.json`.
+- `passed` exits 0.
+- `pending` means the spawn was declined or absent, or the disconnect stayed unexercised.
+- `failed` names its step.
+
+The verdict lists the permitted writes outside scratch:
+- the prepared cache prefixes;
+- existing authentication and SSH runtime bookkeeping;
+- held Claude probe home-state bookkeeping;
+- the consented spawn.
+
+It never claims the whole host stayed byte-equal. If the user refuses the spawn, record that
+reply as a decision with verdict `declined` and pass it. The rehearsal then runs every part
+but the spawn, whose gate stays pending. Window readiness must not be claimed. Analyze any
+completed parts before a retry; a retry needs a fresh preview and a fresh ask. Rerun the
+pilot only when its helper or toolchain bytes change.
+
+## 2. Final pre-closure step (agent)
+
+Do this immediately before every request to close sessions, including after a parked wait.
+No closure request comes before it (ruling R28).
+
+```zsh
+env -u CLAUDE_CONFIG_DIR DISABLE_UPDATES=1 ~/.local/bin/claude --version
+env DISABLE_UPDATES=1 CLAUDE_CONFIG_DIR="$HOME/.claude-work" ~/.local/bin/claude --version
+env DISABLE_UPDATES=1 ~/.local/bin/codex --version
+ssh -4 -o BatchMode=yes europa 'env -u CLAUDE_CONFIG_DIR DISABLE_UPDATES=1 ~/.local/bin/claude --version'
+ssh -4 -o BatchMode=yes europa 'env DISABLE_UPDATES=1 CLAUDE_CONFIG_DIR="$HOME/.claude-work" ~/.local/bin/claude --version'
+~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap check
+```
+
+`check` repeats the held `claude --version` and `claude doctor` probes in every home on both
+hosts, with the doctor's hold diagnostic, and compares everything with the prepared record.
+
+- **Versions unchanged and `check` eligible:** nothing repeats. Ask the operator to close
+  every session and run the bootstrap.
+- **`check` reports only desktop (surface) drift:** run `prepare` again, then `check`. A
+  restarted panel or watcher has new PIDs.
+- **Claude or Codex moved on either host:** the operator aligns both hosts to one selected
+  version; never update or downgrade automatically. Then repeat only Task 9 Steps 5–7:
+  1. held version and doctor checks on both hosts and homes;
+  2. original Task 3's isolated held ops probe, under these conditions:
+     - locked, hydrated ops and a detached exact-v0.1.1 relay worktree;
+     - isolated Europa probe homes, with credential cleanup;
+     - `env DISABLE_UPDATES=1` on the probe process;
+     - the required allow, context and deny proof;
+     - version checks before and after, on both hosts;
+  3. an independent evidence review, with its review note and full report, then the
+     reviewed proof landed on ops main;
+  4. installer acceptance on both hosts' copies;
+  5. original Task 6's image review, if new capabilities change the images;
+  6. the private manifest refreshed after review, then `prepare`.
+
+  Then do this step again. Unchanged Codex evidence is not re-probed. Codex stays exactly
+  `codex-cli 0.163.0` unless it is separately re-probed and reviewed. Rerun the pilot only
+  if helper or toolchain bytes changed from its recorded identities. A version refresh alone
+  never reruns it.
+- **Anything else:** follow the blocker's text. The agent performs and reviews any refresh;
+  the tool runs no refresh or retry loop.
+
+## 3. Bootstrap: `run` (operator)
+
+This is the only step that applies familiar and the four hook targets. Agents never apply
+hooks or familiar; `restart-surfaces` and `finish` never edit hooks or source. Close
+**every** Claude and Codex session on Titan and Europa: the controller, reviewer sessions,
+and IDE or desktop clients that reconnect to Codex. Then, in an ordinary Zsh on Titan:
+
+```zsh
+~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap run
+```
+
+`run` opens a window. Before any mutation it shows this invocation's desktop consent subject
+on the terminal: for each host, the niri socket and each familiar surface, with its PID and
+command line, or the explained absence; the impact; and about 30 s per host. It then asks
+`Restart these familiar surfaces during run <id>? Type yes to approve:`. Any answer but `yes`
+(or `y`), or no terminal, aborts the window before any change. A refusal is a stop before mutation,
+not a failure. Earlier consent, from design approval, preparation or an old run, never
+covers it.
+
+With that answer it runs, in order:
+
+1. **Held probes.** The eligibility gate repeats preparation's checks on both hosts. Its
+   inventory runs held `claude --version` and `claude doctor` in every home on both hosts,
+   with `DISABLE_UPDATES=1`, and waits for every probe to exit. Exact versions and the
+   doctor's hold diagnostic are required. A Claude process still running afterwards blocks.
+2. **Strict no-live.** Titan's two Codex app-server daemons stop through their supported
+   CLI. A survivor blocks; nothing is killed. Then strict no-live runs on both hosts, with
+   no exemption for any process, the tool's own probes included.
+3. **Quiesce.** Each host's `familiar-reap.timer` state is recorded and the timer stopped.
+   `familiar-reap.service` is waited for (up to an hour, never killed). Strict no-live runs
+   again, then familiar's state and dependency snapshots are refreshed. Preparation
+   snapshots are kept.
+4. **All six dry runs, before the merge.** The current synchronized targets are frozen as
+   copies and dry-run: Titan's four, then Europa's two Claude copies, each with its own
+   host's pinned installer, runtime and evidence. Claude copies retire the native guard
+   first; Codex copies keep the basename `hooks.json`. The installer's planned `after` is
+   applied to the copy, and the expected bytes are those dry-applied bytes; the tool never
+   assembles them. Each copy passes only when:
+   - its non-pick JSON equals the reviewed after-image;
+   - its picks and their absence equal the frozen input (a Codex copy compares as a whole
+     object);
+   - both hosts agree byte for byte on each shared Claude target.
+
+   The window then seals its effective inputs (`effective_inputs_sha256`).
+5. **Merge.** The frozen targets must be unchanged and both hosts closed. The window records
+   `familiar`, and the immutable tip is merged once on Titan. Then, for each host in turn,
+   both hosts are checked closed, and that host:
+   - waits for the merge to synchronize into its checkout (up to 10 min);
+   - is checked closed again;
+   - runs `/usr/bin/npm ci --allow-git=root` with `/usr/bin` first on PATH and every
+     prepared cache prefix pinned;
+   - proves the relay pin.
+6. **Ordered target apply.** For `claude`, `claude-work`, `codex` and `codex-work` in that
+   order:
+   - both hosts are checked closed;
+   - the target's original is registered in `touched.tsv` before its first write, guard
+     removal included;
+   - it is applied once on Titan, and the live plan's `after` must equal the sealed dry
+     output.
+7. **Verified migration.** Every target on each host holds the sealed bytes, Europa's after
+   synchronization, with hooks, statusLine, installer and evidence verified. Familiar is the
+   merge with its pinned relay. The window becomes `migrated-surfaces-pending`.
+8. **Surface restart.** Familiar's recorded surfaces restart under the same answer, and the
+   window becomes `ready-for-smokes`.
+
+Non-pick drift found at step 1 refuses with `input-review-required` and names the original
+Task 6 image review, as `prepare` does. The window is aborted, and the agent follows
+[that procedure](#when-prepare-refuses-input-review-required).
+
+### How `run` ends
+
+| Outcome | Exit | Window | What it means and what to do |
+| --- | --- | --- | --- |
+| Success | 0 | `ready-for-smokes` | Prints the merge, the four applied targets, each replacement surface PID and the [handoff](#4-from-bootstrap-until-finish). Resume the controller ([§5](#5-resume-and-the-controllers-proof)). |
+| Stopped before any change: no terminal, declined, live sessions, eligibility or hold | 1 | `aborted` | Familiar, settings and timers are unchanged; Titan's Codex daemons may already be stopped. Sessions may reopen. Close any listed PIDs (inspect only those PIDs with `ps -p '<pids>' -o pid,ppid,comm,args`; never `pkill`) and run again, or hand the output to the agent for other blockers. |
+| Pre-merge failure, or INT, TERM or HUP before the familiar record | 1 | `aborted` or `abort-incomplete` | Every touched host's timers are restored and its snapshots returned; familiar and settings were never changed. `aborted` permits a fresh `run` once the cause is fixed. `abort-incomplete` names `recover`, which completes the pre-merge abort and asks nothing. |
+| Failure or interruption after the familiar record, before the verified migration | 1 | `recovery-required` | Prints "Do not open Claude or Codex until recover completes": `run` is blocked and timers stay paused. Run `recover` with every session still closed. |
+| Surface-only failure after the verified migration | 1 | `migrated-surfaces-pending` | Prints "migrated, surfaces pending", the paused timers, the handoff and `restart-surfaces`. Claude and Codex may resume, only through the printed held commands. No rollback is needed. |
+| Killed after the familiar record (SIGKILL, power loss), with no outcome recorded, for example while saving the verified checkpoint | none | `applying` | `status` names `restart-surfaces`. With sessions still closed, the operator runs `run` or `restart-surfaces` from the terminal. Either reconciles actual state first and promotes the window only from a fully verified migration (ruling R30). Otherwise the window becomes `recovery-required` and needs `recover`, which the operator may also choose directly. |
+
+A pre-merge window is never resumed forward: it is aborted, and a fresh `run` opens a new
+window. A second interruption, or an unreachable host, can leave cleanup incomplete. The
+record is kept and the next command reconciles it first.
+
+Every host operation runs under its own deadline, with owned, reaped child processes. A lost
+SSH reply never cancels it: the operation finishes or reaches its deadline, records its
+result, and the next command reconciles that result before any further mutation. An
+interrupted `run` asks the host to cancel explicitly, then reconciles. The tool leaves no
+detached monitor.
+
+## 4. From bootstrap until finish
+
+From `run` until `finish` reports complete:
+
+- Launch Claude and Codex **only** with the printed held commands, which carry
+  `DISABLE_UPDATES=1`.
+- Avoid `cl`, `clw`, unheld Claude or IDE clients, and update or install commands and
+  external installers.
+- **Do not change or save Claude model or effort defaults in either home on either host**;
+  no `/model` or `/effort` saves. Finish tolerates a saved pick, but a pick changes the
+  target's bytes:
+  - a `restart-surfaces` recheck then finds the migration changed and needs inspection;
+  - `recover`'s byte-gated restore stops for inspection.
+
+  Neither is rewritten automatically.
+- Timers stay paused on both hosts until `finish` completes.
+
+Every report from the verified migration until finish (`run`, `status`, `restart-surfaces`,
+`record-smoke`, a stopped `finish`) prints this handoff:
+- the controller's proof as the first step, until it is recorded;
+- both hosts and homes: Titan (Claude personal and work, Codex personal and work) and
+  Europa (Claude personal and work);
+- the paused timers;
+- the held-launch rule, naming `cl` and `clw`;
+- the pick freeze;
+- twelve concrete, Zsh-quoted held commands.
+
+The commands have these shapes; the tool prints them with real paths and the captured
+session:
+
+| Label | Shape |
+| --- | --- |
+| titan Codex personal: resume the controller | `env DISABLE_UPDATES=1 CODEX_HOME=<resolved ~/.codex> <codex> --no-daemon resume <controller session>` |
+| titan Codex work: its own hook review | `env DISABLE_UPDATES=1 CODEX_HOME=<resolved ~/.codex-work> <codex> --no-daemon` |
+| HOST Claude personal | `env -u CLAUDE_CONFIG_DIR DISABLE_UPDATES=1 <host's claude>` |
+| HOST Claude work | `env DISABLE_UPDATES=1 CLAUDE_CONFIG_DIR=<home>/.claude-work <host's claude>` |
+| HOST Claude personal or work smoke | the Claude line plus `--permission-mode manual` |
+| titan Codex personal or work smoke | `env DISABLE_UPDATES=1 CODEX_HOME=… <codex> --no-daemon --sandbox workspace-write --ask-for-approval on-request` |
+
+The controller's commands use each home's own sandbox and approval defaults. None carries
+`cor`, `co`, a bypass flag or a hook-trust bypass. Already-held sessions stay held until
+they exit.
+
+**Hold breach.** Any observation, by `record-smoke --observe` or by finish's checks, that
+finds Claude or Codex moved since preparation is a hold breach:
+- new smokes stop;
+- the window becomes `recovery-required`, with timers still paused;
+- the report says to close every session and run `recover` from an ordinary shell.
+
+Stale Claude evidence never blocks `recover`. Recovery's Codex daemon stop runs the Codex
+installed at the recorded path even if its identity changed (ruling R31). After recovery,
+repeat Task 9 Steps 5–7 and the final pre-closure step before a new window. No in-window
+re-probe exists.
+
+## 5. Resume and the controller's proof
+
+1. The operator launches the printed "titan Codex personal: resume the controller" command
+   in a terminal on Titan. When Codex shows the changed hooks, the operator reviews and
+   approves them in its TUI (`/hooks` if prompted). Codex writes its own trust; nobody
+   edits trust hashes or uses `--dangerously-bypass-hook-trust`.
+2. The controller's first operation, before any other rollout work, proves its own fresh
+   row:
+
+   ```zsh
+   ~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap record-smoke --observe titan
+   ```
+
+   This passes only for the root Codex row of the captured session. The row must be alive on
+   Titan, run by the prepared Codex executable at the row's PID and start time, and be
+   updated since the verified migration. This runs in `migrated-surfaces-pending` too
+   (ruling R40). A missing or stale row proves nothing: report it as the controller's trust
+   or startup blocker, and resume only through the printed command. Never edit configuration
+   from that session. A row proves event delivery, not the smokes.
+3. The operator launches the printed "titan Codex work: its own hook review" command and
+   reviews that home's hooks the same way. A work home that is not trusted leaves its smoke
+   incomplete, even when the personal home passes.
+
+## 6. Surfaces pending: `restart-surfaces`
+
+`restart-surfaces` is accepted from these states (rulings R39 and R41):
+- `migrated-surfaces-pending`;
+- `ready-for-smokes` and `finishing`, retrying only the surfaces no longer running as
+  restarted;
+- a window whose migration reconciliation can still verify.
+
+It never applies hooks or source, and never restores timers.
+
+```zsh
+~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap restart-surfaces --preview
+~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap restart-surfaces --decision-file '<decision-file>'
+```
+
+- **Agent route.** The preview is read-only. It prints each host's surfaces, any change
+  since the recording, the impact and duration, and the decision fields
+  (`action restart-surfaces`, `attempt_id restart-N`). The agent asks in the session,
+  records the reply and passes the file. This session route requires the controller's proof
+  first (ruling R40); without it, the command refuses and names
+  `record-smoke --observe titan`.
+- **Operator route.** The operator may instead run `restart-surfaces` with no flag at a
+  terminal and answer there. No proof is needed.
+- **What a restart does.** Before touching the desktop it settles this window's own
+  operations and rechecks the verified migration. A recorded process still running gets
+  TERM; one that already exited is expected, and its startup command simply runs through
+  niri's spawn on the recorded socket. Each replacement is recorded before the next
+  surface.
+- **What stops it.** Each of these stops for inspection, and a new inventory needs a new
+  decision:
+  - a changed socket or startup command;
+  - a recorded PID now held by another process;
+  - a surface process nobody recorded.
+- **Declining** leaves the surfaces pending, with no rollback.
+- **Receipts.** A retry from `ready-for-smokes` or `finishing` keeps the recorded smoke
+  receipts and returns the window to `ready-for-smokes`.
+- **Interrupted checkpoint.** After a run was killed past familiar's mark with no outcome
+  recorded, this command reconciles first: it promotes only a fully verified migration
+  (ruling R30). Before
+  promotion the controller cannot prove its row, so only the operator's terminal answer
+  works there; `run` from the terminal reconciles too.
+- **Unsettled operations.** A reconciliation that met unfinished or unreadable host
+  operations leaves `recovery-required` with failure status `unsettled`. Once those
+  operations settle, `restart-surfaces` or `run` reconciles it again (ruling R33). A dead
+  owner's operation names `recover`.
+
+## 7. Smokes and receipts
+
+| Host | Harness | Home | Matrix | Cases | Human verdicts |
+| --- | --- | --- | --- | --- | --- |
+| titan | claude-code | personal | full | start-idle, allow-working, attribution-denial, needs-approval, turn-done, idle-needs-input, projection-recovery, normal-exit, abrupt-death | trust, permission |
+| titan | codex | personal | full | the same, without idle-needs-input | trust, permission |
+| titan | claude-code | work | short | start-idle, attribution-denial, normal-exit | trust |
+| titan | codex | work | short | start-idle, attribution-denial, normal-exit | trust |
+| europa | claude-code | personal | short | start-idle, attribution-denial, normal-exit | trust |
+| europa | claude-code | work | short | start-idle, attribution-denial, normal-exit | trust |
+
+Each smoke runs in a fresh scratch Git repo on the tested host, created with its own
+identity. A full smoke's second session, for abrupt death, uses the same repo. Use a path
+under `/tmp`, because `--cwd` must be the repo's resolved path on that host:
+
+```zsh
+smoke=$(mktemp -d /tmp/relay-smoke.XXXXXX)
+git -C "$smoke" init -q
+git -C "$smoke" config user.name 'Relay smoke'
+git -C "$smoke" config user.email 'relay-smoke@example.invalid'
+cd "$smoke"
+print -r -- "$smoke"
+```
+
+In that directory the operator launches the printed held smoke command for the home. The
+agent observes each step from Titan; for a Europa smoke the tool reaches Europa over SSH:
+
+```zsh
+~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap record-smoke --observe titan --cwd '<scratch-repo>'
+~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap record-smoke --observe europa --cwd '<scratch-repo>'
+```
+
+**Observations.** Each observation is kept as private evidence under the window
+(`smokes/observations/<operation-id>.json`). The command prints its path and digest, the
+rows in that repo, the intent state, the markers, the commit count and whether Git has an
+identity there. It warns about unheld Claude PIDs. A declined or failed observation records
+nothing, and that case stays pending. The literal prompts, the operator's actions and each
+case's pass condition are in the
+[Reference](#smoke-prompts-and-verdicts-type-these-into-the-smoke-session). The observer
+steps for the two two-observation cases follow.
+
+**Projection recovery** (full smokes on Titan), during the live session and without sending
+another prompt:
+
+```zsh
+mkdir -p ~/.local/state/hq/relay-smoke
+chmod 700 ~/.local/state/hq/relay-smoke
+mv ~/.local/state/familiar/intent.json ~/.local/state/hq/relay-smoke/intent.$(date -u +%Y%m%dT%H%M%SZ).before-recovery.json
+```
+
+1. Run the three commands above.
+2. Observe the session with `record-smoke --observe titan --cwd`.
+3. Run `~/d/familiar/bin/familiar reap`.
+4. Observe again.
+
+Keep the moved file; never put it back over the recovered projection. Never keep anything at
+the cutover root's top level.
+
+**Abrupt death** (full smokes): the operator opens a second held smoke session in the same
+repo. The agent then:
+1. observes and records that session's row PID and session ID;
+2. kills only that PID: `kill -9 '<recorded-row-pid>'`;
+3. observes the dead row;
+4. reaps on Titan:
+
+   ```zsh
+   ~/d/hq/relay/bin/relay reap
+   ~/d/familiar/bin/familiar reap
+   ```
+
+5. observes the row and its intent entry gone.
+
+**The receipt.** The agent writes one receipt per home. It is a private JSON file, outside
+the cutover root, with exactly these keys:
+
+```json
+{
+  "schema": 1,
+  "window_id": "<window id, as status prints it>",
+  "prepared_sha256": "<the window's prepared sha256, as status prints it>",
+  "host": "titan",
+  "harness": "claude-code",
+  "home": "work",
+  "session_id": "<the tested session's native ID>",
+  "row_id": "claude-code:<the tested session's native ID>",
+  "pid": 12345,
+  "cwd": "/tmp/relay-smoke.Ab12Cd",
+  "versions": {"installed": "<prepared version>", "evidence": "<prepared version>"},
+  "matrix": "short",
+  "cases": {
+    "start-idle": {"verdict": "passed", "evidence": [{"path": "<observation path>", "sha256": "<its digest>"}]},
+    "attribution-denial": {"verdict": "passed", "evidence": [{"path": "<observation path>", "sha256": "<its digest>"}],
+                           "outcome": "refused", "refusal": "<the quoted native result>"},
+    "normal-exit": {"verdict": "passed", "evidence": [{"path": "<observation path>", "sha256": "<its digest>"}]}
+  },
+  "human": {"trust": "approved"}
+}
+```
+
+**The receipt's fields.**
+- `harness` is `claude-code` or `codex`, and `row_id` is `<harness>:<session_id>`.
+- `pid` is the tested session's PID as relay recorded it.
+- Both `versions` must equal the prepared version string. The preview's refusal names it.
+- A full receipt adds the rest of its cases; `human` is then
+  `{"trust": "approved", "permission": "approved"}`.
+- `projection-recovery` and `abrupt-death` each cite two observations, in order.
+  `abrupt-death` also names its second session's `session_id` and `pid`.
+- Every other case cites one observation.
+
+**How the tool checks a receipt.** It binds every case to this window's recorded
+observations of that very session, by content, digest and order, never by file name. It
+refuses:
+- another window's or a pilot's receipt;
+- the controller's own session;
+- a session already used by another receipt;
+- a stale row;
+- any observation made after a hold drift;
+- a human verdict that is not exactly `approved`.
+
+```zsh
+~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap record-smoke --preview --receipt '<receipt-file>'
+~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap record-smoke --receipt '<receipt-file>' --decision-file '<decision-file>'
+```
+
+**Recording.**
+1. The preview validates the receipt read-only and prints the attestation subject and its
+   decision fields (`kind smoke-attestation`, `action record-smoke`, `attempt_id smoke-N`).
+2. The agent asks the user whether they themselves gave the trust and permission answers
+   named there.
+3. The agent records the reply and passes it.
+
+An operator at a terminal may instead run `record-smoke --receipt` without a decision file
+and answer there. The agent gathers observations; only the operator supplies the human
+verdicts. Event delivery alone never passes `needs-approval`.
+
+**Permission prompts.** The harness's permission prompts for SSH and `systemctl` from the
+agent's shell remain human. A declined permission leaves that check pending; it never
+justifies a bypass flag or a passed verdict.
+
+## 8. Finish (agent)
+
+```zsh
+~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap finish
+```
+
+`finish` runs from `ready-for-smokes`, or again from `finishing`. It never edits hooks or
+source, and never replaces an original timer record.
+
+**Before any timer changes,** it stops in each of these cases, with nothing changed:
+- in `migrated-surfaces-pending`;
+- in a pilot window;
+- while any of the six receipts is missing or no longer validates against its recorded
+  observations and consumed attestation;
+- while a host's operations are unsettled.
+
+It then checks each host fresh:
+- the hold: Claude and Codex are still the prepared executables. A breach goes to
+  `recover`.
+- each target holds its sealed bytes, apart from Claude's pick keys, with hooks,
+  statusLine, installer and evidence verified. Drift beyond picks becomes
+  `inspection-required`, then `recover`.
+- familiar is the merge with its pinned relay.
+- familiar's recorded surfaces still run as restarted (ruling R39). A surface that exited or
+  was replaced, or a desktop blocker, stops finish for a consented `restart-surfaces`; the
+  receipts are kept.
+
+**Then** the window becomes `finishing`. Each host's `familiar-reap.timer` returns to the
+window's original record. Each host then runs `familiar-reap.service` and waits for
+`Result=success` and `ExecMainStatus=0`. Closure follows:
+- each recorded abruptly killed session's row and intent entry must be gone;
+- the live controller must keep its row and intent entry.
+
+The window is then `complete`. The report says the hold is released: ordinary launches use
+their prior update policy again, and `cl`, `clw` and Claude model or effort changes are
+allowed. Held sessions keep `DISABLE_UPDATES=1` until they exit.
+
+A stop after `finishing` names the timers already restored and those still paused, and
+`finish` repeats from actual state. Timers stay paused until `finish` reports complete, and
+every handoff says so; the agent never parks the rollout leaving them paused silently.
+After `complete`, the agent verifies the original plan's Task 8 live evidence, and the
+original plan's Task 9 runs its final checks. Keep backups and the worktree until then.
+
+## 9. Recovery: `recover` (operator)
+
+`recover` is the full rollback. It preserves evidence, never force-copies, resets or reverts
+blindly, and never launches Claude or requires its version to equal obsolete evidence. With
+every Claude and Codex session closed on both hosts, in an ordinary Zsh on Titan:
+
+```zsh
+~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap recover
+```
+
+- **Before familiar's mark.** A window that never reached familiar's mark or registered a
+  target takes only the pre-merge abort: timers and snapshots. It asks nothing.
+- **Past familiar's mark.** `recover` needs the operator's terminal. At entry it previews
+  the desktop and asks this invocation's consent for recovery's surface restarts; the run's
+  or any earlier consent never covers them. It asks nothing when nothing is left to
+  restart. It then runs six stages, each attempt from actual state:
+  1. reconciles this window's unfinished operations, cancelling those whose owner died. An
+     operation still running, or an unreachable host, stops recovery before any mutation.
+     It then stops the two Titan Codex daemons through their CLI and passes strict no-live on
+     both hosts, using the process table only.
+  2. re-quiesces both hosts' timers from the window's original records, even where finish
+     already restored them, and waits for both services.
+  3. checks every target against the window's images, then restores the registered ones in
+     reverse ledger order through the byte gate, guard-only changes included. All four must
+     hold native bytes on Titan, and Europa's two after synchronization.
+  4. reconciles familiar's actual Git state:
+     - a merge committed before its record is recorded from its parents;
+     - then exactly one action is taken: abort the attempted merge, do nothing, or revert
+       once.
+
+     Each host waits for the recovered source, then restores its dependencies offline from
+     the window's verified pre-merge snapshot. No npm, fetch or network is used.
+  5. restarts familiar's recorded surfaces from the native source, with this invocation's
+     consent. An explained absence stays absent.
+  6. restores each host's original timer state and requires `familiar-reap.service` to
+     succeed. Only then is the window `recovered`, and fresh native sessions may start.
+- **A stop.** Any stop leaves `recovering` and prints "Do not open Claude or Codex until
+  recover completes", with timers paused; rerun `recover`. Bytes that match no recorded
+  image, and unexpected Git history, become `inspection-required`. Inspect, then rerun
+  `recover`.
+- **Desktop blocked.** If the entry preview finds the desktop blocked, `recover` currently
+  stops before any change and names the blocker:
+  - no trusted niri socket, or failed IPC;
+  - a changed startup command;
+  - two processes for one surface.
+
+  Inspect the desktop, then rerun it.
+- **Afterwards.** A later attempt re-merges by reverting the recorded revert, never by
+  merging the tip again. Prepare a new reviewed window first.
+
+## 10. Status and next commands
+
+`status` reads local records only and prints the prepared record, the window and its state,
+an observed line and one next command. From the verified migration until finish it also
+prints the handoff.
+
+| State | Next | Meaning |
+| --- | --- | --- |
+| no prepared record | `prepare --controller-session <native-session-id>` | nothing prepared |
+| prepared; no open window, or the last one `aborted`, `recovered` or `complete` | `check` | prints the preparation guidance: ordinary use allowed, and the final pre-closure step |
+| pilot window open | `relay-cutover-rehearse --controller-session <native-session-id>` | live commands and `prepare` refuse until the rehearsal runs or reconciles it |
+| any window whose invocation is still running | `status` | wait, or interrupt that invocation |
+| `prepared`, `quiescing` or `applying` before familiar's mark; `aborting`; `abort-incomplete` | `recover` | completes the pre-merge abort only |
+| `applying` past familiar's mark, no outcome recorded | `restart-surfaces` | reconcile (R30); or `recover` to roll back |
+| `recovery-required`, reconciliation `unsettled` | `restart-surfaces` once settled; `recover` when a dead owner's operation remains | R33 |
+| `recovery-required` (any other cause, hold breach included) | `recover` | Do not open Claude or Codex |
+| `inspection-required` | `recover`, after inspection | nothing was forced |
+| `recovering` | `recover` | repeats from actual state |
+| `migrated-surfaces-pending` | `restart-surfaces` | sessions may resume through the held commands only |
+| `ready-for-smokes`, controller not proven | `record-smoke --observe titan` | the first step after resuming |
+| `ready-for-smokes`, receipts missing | `record-smoke --preview --receipt <receipt-file>` | names the recorded and missing receipts |
+| `ready-for-smokes`, all six recorded | `finish` | |
+| `finishing` | `finish` | names restored and still-paused timers |
+
+## 11. Fail-closed facts and inspections (agent)
+
+These are inspections, never bypasses. Note on the task what you inspected and what you
+moved. Anything that does not match the description below: stop and report it.
+
+**Relay's row and intent shapes.** The tool reads relay v0.1.1's `relay list --json` as
+`{snapshot: {agents: {ROW: {harness, sessionId, scope, state, cwd, updatedAt, process: {pid,
+start, host}}}}, liveness: {ROW: {status}}}`. It reads familiar's `intent.json` as one
+top-level object keyed by session ID. Both shapes come from relay v0.1.1's source and test
+fixtures; the real hosts have not confirmed them. A mismatch fails closed at the controller's
+first row check: `record-smoke --observe titan` reports "printed no registry" or no row, and
+proves nothing. Read the private operation log it names, without copying output into
+reports. If the shape really differs, the rollout cannot proceed in this window: the
+operator runs `recover`, and the tool change needs its own review and delivery before a new
+window.
+
+**A decision temp file under `decisions/`.** Consumption writes
+`windows/<window-id>/decisions/.<attempt-id>.json.<random>`, links it to `<attempt-id>.json`,
+then removes the temporary name. A crash in between leaves that temporary name, and every
+later consumption in the window refuses with `unexplained entry … reconcile it`. Inspect it:
+
+```zsh
+ls -la ~/.local/state/hq/relay-cutover/windows/'<window-id>'/decisions
+stat -c '%i %h %a %n' ~/.local/state/hq/relay-cutover/windows/'<window-id>'/decisions/*(D)
+```
+
+- **Same inode, link count 2.** If `<attempt-id>.json` exists with the temporary name's
+  inode, the consumption completed. The temporary name is a second name of that consumed
+  record.
+- **No `<attempt-id>.json`.** The decision was never consumed and authorized nothing; ask
+  again for that step.
+
+In both cases, move only the temporary name out of `decisions/`. Never touch an
+`<attempt-id>.json`.
+
+```zsh
+(umask 077; mkdir -p ~/.local/state/hq/relay-cutover-retained/'<window-id>')
+mv ~/.local/state/hq/relay-cutover/windows/'<window-id>'/decisions/'<temporary-name>' ~/.local/state/hq/relay-cutover-retained/'<window-id>'/
+```
+
+**An orphan pilot scratch root without `scratch.json`.** An interrupted `pilot-create` can
+leave `pilot/<16-hex>/` on a host without its owner record. `pilot-cleanup` then refuses
+`unexplained entries`, the pilot window cannot close, and every live command and `prepare`
+refuse beside it. On the host the error names (Europa through
+`ssh -4 -o BatchMode=yes europa`), inspect:
+
+```zsh
+ls -la ~/.local/state/hq/relay-cutover/pilot
+find -P ~/.local/state/hq/relay-cutover/pilot/'<entry>' -maxdepth 2 -printf '%y %m %u %p\n'
+```
+
+Move the entry only when all of the following hold:
+- it is your own 0700 directory with a 16-hex name and no `scratch.json`;
+- it holds only scratch parts (`home`, `state`, `tmp` and a partial `familiar` clone or
+  copied dependencies), and no link leads out of it;
+- this pilot window's attempts show a `pilot-create` on that host whose root was never
+  recorded in the window.
+
+Then move it out of the cutover root, keeping it private, because it may hold copies of live
+settings:
+
+```zsh
+(umask 077; mkdir -p ~/.local/state/hq/relay-cutover-retained)
+mv ~/.local/state/hq/relay-cutover/pilot/'<entry>' ~/.local/state/hq/relay-cutover-retained/
+```
+
+Then run `relay-cutover-rehearse --controller-session …` again: it settles the window's
+operations and cleans up its recorded roots.
+
+**An unrun pilot preview.** A pilot window left at `prepared` by `--preview` blocks `run`,
+`recover`, `restart-surfaces`, `record-smoke`, `finish` and `prepare`. It can only be closed
+by running the rehearsal: `relay-cutover-rehearse --controller-session …`, with a decision
+or without one. Without one, the spawn gate stays pending. No other command closes it.
+
+**Other crash leftovers.** Each of these blocks commands:
+- **An interrupted atomic write** leaves `.NAME.<random>` beside `NAME`. At the cutover
+  root's top level it blocks every command, and `status` reports it as unexplained cutover
+  state. `NAME` is the authoritative record; the temporary name holds an unwritten next
+  version. Move only the temporary name out to `~/.local/state/hq/relay-cutover-retained/`.
+- **An operation directory without `start.json`** (`operations/<operation-id>/`) is reported
+  as `unrecorded` and blocks every mutation on that host. If it is empty, or holds only a
+  `.start.json.<random>`, no child was started under it: move it aside the same way.
+  Anything else in it: stop and report.
+
+## Reference (not for pasting)
+
+> **Do not paste anything from this section into a shell.** The Bash blocks below are the
+> superseded 2026-10-19 manual procedure, kept because its fixes shaped the tool's recovery.
+> Their variables came from a sourced environment that no longer exists. The complete
+> superseded runbook is in git history at commit `34487c4`. The smoke prompts are typed into
+> the smoke session, not a shell.
+
+### Pins, targets and writers
+
+These hold unchanged in the tool. The relay dependency is
+`git+https://github.com/khughitt/relay.git#v0.1.1`, release commit
+`4ceec5d2ad22b136b37ee360e7a4ed00949f28d9`. Hook commands use `/usr/bin/node`. Familiar PRE
+is `00f4899ae523d613d21f44bfc2c456aac67f8e5f`, and the approved feature tip
+`a16f4daa59b04e32f1010764d6f94401ca4eed8b` is merged as that immutable commit, never as a
+moving branch. Familiar-theme keeps its existing SSH pin and Git configuration. Every writer
+uses v0.1.1 before hooks activate worker rows:
 
 | Writer on each host | Runtime |
 | --- | --- |
@@ -32,12 +914,10 @@ Every writer must use v0.1.1 before hooks activate worker rows:
 | `familiar observe` | That host's `$HOME/d/familiar/node_modules/relay` |
 | `familiar reap` | That host's `$HOME/d/familiar/node_modules/relay` |
 
-Tasks' relay identity is off on both hosts (no per-user identity config at writing).
-Do not enable it during this window. The subscriber file is
-`$HOME/.config/relay/subscribers.json` (0600, containing directory 0700).
-`ops-guard` subscribes to `before-tool` on `Bash` only and fails closed.
-`--retire familiar` removes the old hooks in the same install that adds relay;
-there is no dual writing, registry import, or registry merge.
+The subscriber file is `$HOME/.config/relay/subscribers.json` (0600, its directory 0700).
+`ops-guard` subscribes to `before-tool` on `Bash` only and fails closed. `--retire familiar`
+removes the old hooks in the same install that adds relay: there is no dual writing,
+registry import or registry merge.
 
 | Harness/event | outer H | subscriber budget | matching worst case |
 | --- | --- | --- | --- |
@@ -46,228 +926,96 @@ there is no dual writing, registry import, or registry merge.
 | Claude SessionEnd | 60 s | 37000 ms | familiar-teardown 200 |
 | Codex SessionEnd | 3 s | 800 ms | familiar-teardown 200 |
 
-`relay install` revalidates these budgets. No `--with ask` route is installed.
-Awaiting separate work: OpenCode (`relay-d0a8df`), Darwin (`relay-848c0f`), and Codex
-nested code-mode routes (`ops-daf2cd`). The smoke below uses the evidenced Bash route.
+`relay install` revalidates these budgets. No `--with ask` route is installed. These are
+excluded and await separate work:
+- OpenCode (`relay-d0a8df`);
+- Darwin (`relay-848c0f`);
+- Codex nested code-mode routes (`ops-daf2cd`).
 
-All target arguments must be absolute, resolved once with `realpath`. The resolved
-values, rather than home symlinks or subsequent resolutions, are used by install,
-verify, guard snapshots, and restore. The exact staged files are:
+The shared targets are `~/d/hq/claude/settings.json`, `~/d/hq/local/claude/settings.work.json`,
+`~/d/hq/codex/hooks.json` and `~/d/hq/codex/work/hooks.json`. Each is resolved once to its
+absolute real path. On 2026-10-19 their native SHA256s were the following:
 
-| Variable / shared target | Before SHA256 at writing (both hosts) | Expected image |
+| Target | Before SHA256 |
+| --- | --- |
+| `claude/settings.json` | `ecea0cdbd6214797fb96d32237e15cd0c5a1d26dcbef1246fd551bcdb577e656` |
+| `local/claude/settings.work.json` | `c2420fb82c37506ead6f4e9d213d6cf56f268632a60a0ac14960014b419888a8` |
+| `codex/hooks.json` | `15ba003d9831e9dd69c96741783a15e5594d12eb0654b40c6ed164012824c5f7` |
+| `codex/work/hooks.json` | `a4ec2044d13abd18fd81fe1bc6448f3c484b461677adb090beb28d2ad5a82786` |
+
+Their reviewed after-images then had these SHA256s, in the same order:
+- `c7eb65f32e03dde0ae67d709012fbc1748bb69167a99b129bcda7e6bc2c3b775`
+- `d7340e1afa0c4e5007179444b8ed4aea6dd6cc8de0063a16da980aeb9ac797ca`
+- `84164406e7e36979c1ada0f1ea41ee6d5521d6a37da5df7a730934e668bc9213`
+- `3fce9c99c553a32b5d71f6380aaf0c5b2ced1d8c872de81cf3c3bbb78eefe45f`
+
+These are dated records. The live window uses the installer-produced dry-run bytes sealed in
+its own record, not these hashes.
+
+### Smoke prompts and verdicts (type these into the smoke session)
+
+Use only the printed held smoke commands. Never use `cl`, `clw`, `cor`, `cowor`,
+`--approve-for-me`, bypass flags or a `never` approval policy. Claude's explicit `manual`
+overrides its personal `auto` setting. Codex's explicit `on-request` and workspace sandbox
+allow a real approval request, and `--no-daemon` keeps the tested PID owned by its terminal.
+Do not use nested code-mode to issue the denial command.
+
+| Case | Operator action, with literal prompt | Passes when |
 | --- | --- | --- |
-| `C`, `~/d/hq/claude/settings.json` | `ecea0cdbd6214797fb96d32237e15cd0c5a1d26dcbef1246fd551bcdb577e656` | `.worktrees/relay-cutover/claude/settings.json` |
-| `CW`, `~/d/hq/local/claude/settings.work.json` | `c2420fb82c37506ead6f4e9d213d6cf56f268632a60a0ac14960014b419888a8` | `$CUTOVER/claude-work.after.json` (private) |
-| `X`, `~/d/hq/codex/hooks.json` | `15ba003d9831e9dd69c96741783a15e5594d12eb0654b40c6ed164012824c5f7` | `.worktrees/relay-cutover/codex/hooks.json` |
-| `XW`, `~/d/hq/codex/work/hooks.json` | `a4ec2044d13abd18fd81fe1bc6448f3c484b461677adb090beb28d2ad5a82786` | `.worktrees/relay-cutover/codex/work/hooks.json` |
+| start-idle | Launch, then complete the initial trust review yourself (Codex: its hook review); send no prompt yet | One root row for the session, `idle`, alive, fresh, its process the held prepared executable |
+| allow-working | Ask: `Use the shell tool once to run touch allowed.marker; sleep 10, then stop.` Approve if prompted; observe during the sleep | Row `working`; `allowed.marker` exists in the repo |
+| attribution-denial | Ask: `Use Bash once to run exactly git commit --allow-empty -m 'probe' -m 'Co-Authored-By: Claude <noreply@anthropic.com>' && touch denied.marker. If refused, stop and quote the refusal; do not retry or rewrite it.` | The native result quotes ops's `relay-guard: refusing` attribution reason (receipt `outcome: refused`, the quote in `refusal`); 0 commits; no `denied.marker`; a Git identity set in the repo; row alive |
+| needs-approval | Claude: ask it to run `sleep 7` via Bash in manual mode and leave the permission dialog unanswered. Codex: explicitly ask it to request `require_escalated` permission for `touch "$HOME/.local/state/hq/relay-smoke/approval.marker"` outside the workspace; leave the dialog unanswered. Observe, then answer the prompt yourself | Row `needs-approval` while the **human** prompt is open; human `permission: approved` |
+| turn-done | Let that turn finish | Row `done` |
+| idle-needs-input (Claude only) | Leave the completed session idle for at least 60 s | Row `needs-input`, updated at least 60 s after turn-done |
+| projection-recovery | No prompt; the agent moves intent aside, observes, runs `familiar reap`, observes | The session is absent from intent, then back, with the row alive throughout |
+| normal-exit | `/exit` | Root row removed; the session absent from familiar's intent; observed after every other case of the session |
+| abrupt-death | Open a second held smoke session in the same repo; the agent records its row PID and session ID, sends `kill -9` to that PID, observes, reaps relay then familiar, observes | Dead row before reaping; row and intent entry gone after |
 
-Expected-image SHA256s in that order: `c7eb65f32e03dde0ae67d709012fbc1748bb69167a99b129bcda7e6bc2c3b775`,
-`d7340e1afa0c4e5007179444b8ed4aea6dd6cc8de0063a16da980aeb9ac797ca`,
-`84164406e7e36979c1ada0f1ea41ee6d5521d6a37da5df7a730934e668bc9213`, and
-`3fce9c99c553a32b5d71f6380aaf0c5b2ced1d8c872de81cf3c3bbb78eefe45f`.
-A changed before hash requires agent inspection and refreshed images before the window;
-never overwrite live picks or trust to make a hash match. `verify` compares hooks and
-statusLine; it intentionally does not replace unrelated settings.
+The rules for a valid smoke:
+- A denial that succeeds, merely meets a Git identity error, or is never attempted is a
+  failed smoke.
+- A prompt answered by an agent or by auto-review is not human approval coverage.
+- If an existing permission allow rule prevents the Claude `sleep` dialog, stop and inspect
+  the effective rule. Do not claim `needs-approval` was tested.
+- The short smoke needs only start, the same denial, and `/exit`.
 
-## 0. Agent preparation, before the window
+The 2026-10-19 Codex approval prompt named `~/.local/state/hq/relay-cutover/approval.marker`.
+An approved run would leave an unexplained entry at the cutover root, which now blocks every
+bootstrap command, so the marker moved to `~/.local/state/hq/relay-smoke/`. The old
+projection-recovery copy under `$CUTOVER` moved there for the same reason.
 
-On **each host**, start Bash and resolve paths. Preparation preflights intentionally
-return nonzero while sessions run; inspect all their checks. From §1 onward, use
-`set -euo pipefail` so a failed command stops the shell. For rollback, open a fresh
-plain Bash shell, source its saved environment, and enable those same shell options. `type -P` bypasses shell aliases,
-including aliases that bypass permissions. These saved variables contain paths and pins,
-not credentials. Keep installer plans, complete diffs, artifacts, settings copies,
-and state under the private root; never paste their contents into a public report.
+### Earlier rollback fixes
 
-```bash
-bash
-umask 077
-HQ=$(realpath "$HOME/d/hq")
-HQT="$HQ/tools/relay-cutover"
-R=$(realpath "$HQ/relay/bin/relay")
-F=$(realpath "$HOME/d/familiar/bin/familiar")
-CUTOVER="$HOME/.local/state/hq/relay-cutover"
-IMAGE="$CUTOVER/images"
-mkdir -p "$CUTOVER"
-chmod 700 "$CUTOVER"
-C=$(realpath "$HQ/claude/settings.json")
-CW=$(realpath "$HQ/local/claude/settings.work.json")
-X=$(realpath "$HQ/codex/hooks.json")
-XW=$(realpath "$HQ/codex/work/hooks.json")
-CLAUDE=$(type -P claude)
-PRE_FAMILIAR=00f4899ae523d613d21f44bfc2c456aac67f8e5f
-FEATURE_TIP=a16f4daa59b04e32f1010764d6f94401ca4eed8b
-SUBSCRIBERS="$HOME/.config/relay/subscribers.json"
-ECLAUDE="$HOME/d/ops/docs/runbooks/relay-guard-evidence-claude-code.json"
-ECODEX="$HOME/d/ops/docs/runbooks/relay-guard-evidence-codex.json"
-declare -p HQ IMAGE HQT R F CUTOVER C CW X XW CLAUDE PRE_FAMILIAR FEATURE_TIP \
-  SUBSCRIBERS ECLAUDE ECODEX > "$CUTOVER/operator-env.sh"
-chmod 600 "$CUTOVER/operator-env.sh"
-printf '%s\n' "$C" "$CW" "$X" "$XW" > "$CUTOVER/targets.txt"
-sha256sum "$C" "$CW" "$X" "$XW" > "$CUTOVER/live-before.sha256"
-printf 'relay=%s\nfamiliar=%s\n' "$R" "$F"
-"$R" --version
-"$HQT" familiar-source --head "$PRE_FAMILIAR"
-"$HQT" familiar-check --expect native
-"$HQT" preflight --harness claude-code
-```
+The manual procedure's reviewed fixes, and where the tool carries them:
 
-On Titan also resolve `CODEX=$(type -P codex)`, append `declare -p CODEX` to
-`"$CUTOVER/operator-env.sh"`, and run `"$HQT" preflight --harness codex`.
-Expected: relay resolves to main's launcher, familiar to main's `bin/familiar`,
-`relay 0.1.1`, and familiar source/native checks print `ok`. All preflight checks
-pass except `no-live` while agents run. An absent familiar on remote PATH is harmless
-here because `F` names its resolved main executable explicitly; never invoke an
-unexamined PATH copy instead. Validate the four saved hashes against the table.
+- **`d93f4ff` (abort during §1).** Abort on every host whose timer record succeeded in the
+  window, including a first-host success followed by a second-host failure, and leave no
+  host quiesced. Refuse to start while a `.preparation` snapshot name exists. Restore
+  timers first, then return the preparation snapshots, keeping partial copies in a fresh
+  abort directory. Never use an older window's `timers.json`. **In the tool:** the pre-merge
+  abort, `aborting → aborted | abort-incomplete`, on every touched host, with per-window
+  records under `quiesce/<window-id>/`.
+- **`7050a01` (rollback entry and merge state).**
+  - Rollback re-quiesces both hosts from their original records, even after §5 restored
+    timers, never records again, and waits for both services before restoring anything.
+  - Familiar's rollback classifies actual Git state: it aborts only the attempted immutable
+    merge, leaves PRE when the merge never started, and reverts a committed merge once after
+    verifying its parents, even when its record is missing.
+  - Any unexpected HEAD, parent or record stops for inspection.
 
-Initially at preparation, Titan failed only `no-live`; Europa passed `no-live`,
-runtime and subscribers but failed evidence: installed Claude 2.1.280, evidence
-2.1.302. After the operator's updates, both actual CLIs were verified as
-`2.1.304 (Claude Code)` on 2026-10-19. Fresh Europa attempt `20261019T214341` at
-relay v0.1.1 passed allow/context (12.5 s) and native relay denial (11.1 s);
-Claude's optional nested check exercised no tool and proves no nested route.
-Both hosts accepted the refreshed Claude evidence in installer plans against
-native `settings.json` before-image copies; the copies stayed byte-identical.
-Only exact evidenced `2.1.304 (Claude Code)` passes the version gate. Rerun
-preflight before the window; if an operator update yields another version, stop
-and hand back to the agent to rerun Task 3's ops probe. Do not update from this
-agent or weaken the version check. Titan's evidenced Codex remains
-`codex-cli 0.163.0`.
+  **In the tool:** recovery stages 2 and 4.
+- **Target restore and dependencies.**
+  - Targets are restored in reverse `touched.tsv` order, guard-only changes included.
+  - A byte-gated restore refuses unknown bytes, and artifacts are passed only when present.
+  - Dependencies are restored offline from the verified snapshot.
 
-The preparation retained on **both hosts**:
+  **In the tool:** recovery stages 3 and 4.
+
+Abort during §1 (superseded; do not paste):
 
 ```bash
-# Already done during Task 7; do not overwrite these snapshots.
-# For an initial preparation only, with neither destination present:
-cp -a "$HOME/.local/state/familiar" "$CUTOVER/familiar-state"
-cp -a "$HOME/d/familiar/node_modules" "$CUTOVER/familiar-node_modules.pre"
-```
-
-Both dependency copies contain 3865 entries, digest
-`96e39f1b4abbfdc65e1e27a641f52398fb7227ef006f05bbbd4d2022c638e4db`;
-source and copied tree digests matched on each host. State snapshots matched their
-sources too, but are preliminary while native sessions run. Refresh them in §1.
-The retained dependencies run the reverted source without any fetch.
-
-The private expected image was copied over SSH to Europa during preparation;
-both hosts have SHA256 `d7340e1afa0c4e5007179444b8ed4aea6dd6cc8de0063a16da980aeb9ac797ca`,
-file mode 0600 under a 0700 root. Check on **each host**:
-
-```bash
-stat -c '%a %n' "$CUTOVER" "$CUTOVER/claude-work.after.json"
-sha256sum "$CUTOVER/claude-work.after.json"
-```
-
-Expected modes `700`, `600`, and the hash above. If the image must be refreshed,
-the agent transfers it from Titan with the following commands, then checks both hashes:
-
-```bash
-scp -4 -q -o BatchMode=yes "$CUTOVER/claude-work.after.json" \
-  europa:.local/state/hq/relay-cutover/claude-work.after.json
-ssh -4 -o BatchMode=yes europa \
-  'chmod 600 ~/.local/state/hq/relay-cutover/claude-work.after.json; sha256sum ~/.local/state/hq/relay-cutover/claude-work.after.json'
-```
-
-Expected: hashes equal; never publish the private image or its full diff.
-
-Worktrees are host-local: Europa does **not** have Titan's reviewed worktree.
-During preparation the agent also copied the three public images into
-`$CUTOVER/images/` on **each host**. The worktree paths in the table are provenance,
-not Europa dependencies. To refresh these snapshots, on Titan only:
-
-```bash
-mkdir -p "$IMAGE/claude" "$IMAGE/codex/work"
-cp -p "$HQ/.worktrees/relay-cutover/claude/settings.json" "$IMAGE/claude/settings.json"
-cp -p "$HQ/.worktrees/relay-cutover/codex/hooks.json" "$IMAGE/codex/hooks.json"
-cp -p "$HQ/.worktrees/relay-cutover/codex/work/hooks.json" "$IMAGE/codex/work/hooks.json"
-chmod 600 "$IMAGE/claude/settings.json" "$IMAGE/codex/hooks.json" "$IMAGE/codex/work/hooks.json"
-ssh -4 -o BatchMode=yes europa 'umask 077; mkdir -p ~/.local/state/hq/relay-cutover/images/claude ~/.local/state/hq/relay-cutover/images/codex/work'
-scp -4 -q -o BatchMode=yes "$IMAGE/claude/settings.json" europa:.local/state/hq/relay-cutover/images/claude/settings.json
-scp -4 -q -o BatchMode=yes "$IMAGE/codex/hooks.json" europa:.local/state/hq/relay-cutover/images/codex/hooks.json
-scp -4 -q -o BatchMode=yes "$IMAGE/codex/work/hooks.json" europa:.local/state/hq/relay-cutover/images/codex/work/hooks.json
-```
-
-The agent retained `$CUTOVER/expected-images.sha256` on each host, with the four
-reviewed image hashes above (paths relative to CUTOVER). On **each host**, after
-preparation and again immediately before the live window:
-
-```bash
-(cd "$CUTOVER" && sha256sum -c expected-images.sha256)
-```
-
-Expected: all four images `OK`. All operator commands below consume these local
-snapshots or main's synced tools, never Europa worktree files. Refreshing images
-requires agent review; do not regenerate them during the live window.
-
-## 1. Operator: quiesce both hosts and refresh snapshots
-
-End **every Claude and Codex session** on Titan and Europa. Close IDE/desktop clients
-that reconnect to Codex. In a plain shell on Titan, stop each home’s Codex daemon:
-
-```bash
-source "$HOME/.local/state/hq/relay-cutover/operator-env.sh"
-set -euo pipefail
-env -u CODEX_HOME "$CODEX" app-server daemon stop
-CODEX_HOME="$HOME/.codex-work" "$CODEX" app-server daemon stop
-"$HQT" preflight --harness claude-code
-"$HQT" preflight --harness codex
-```
-
-Expected: daemon stopped/already stopped; `no-live: ok` for both. If preflight lists
-PIDs, inspect **only those PIDs** with `ps -p <comma-separated-PIDs> -o pid,ppid,comm,args`
-and `readlink /proc/<PID>/exe`. Record each identified target PID before stopping it;
-close its owning client, or send `kill -TERM <recorded-target-PID>` from this plain
-shell if it is a confirmed remaining daemon/app-server. Wait for exit, inspect any
-survivor, and rerun strict preflight. Do not kill unrelated node processes or use
-`pkill` patterns. No privilege escalation is needed. The scanner always checks comm
-and readable exe links; unreadable exe plus nonmatching comm is a visibility limit.
-
-On **each host**, using its own shell and saved environment. Record which hosts
-successfully complete `record` in this window. If any §1 command fails after the
-first host is recorded, including on the second host, perform **Abort during §1** on every recorded host
-before proceeding or retrying; do not leave the first host quiesced.
-
-```bash
-source "$HOME/.local/state/hq/relay-cutover/operator-env.sh"
-set -euo pipefail
-test ! -e "$CUTOVER/familiar-state.preparation"
-test ! -e "$CUTOVER/familiar-node_modules.preparation"
-"$HQ/tools/quiesce-timers" record --state "$CUTOVER/timers.json" familiar-reap.timer
-"$HQ/tools/quiesce-timers" stop --state "$CUTOVER/timers.json"
-"$HQ/tools/quiesce-timers" wait --state "$CUTOVER/timers.json" --timeout 3600 --poll 30
-"$HQT" preflight --harness claude-code
-"$HQT" familiar-source --head "$PRE_FAMILIAR"
-"$HQT" familiar-check --expect native
-sha256sum -c "$CUTOVER/live-before.sha256"
-(cd "$CUTOVER" && sha256sum -c expected-images.sha256)
-# Preserve preparation snapshots; refresh after all native writers are quiescent.
-mv "$CUTOVER/familiar-state" "$CUTOVER/familiar-state.preparation"
-mv "$CUTOVER/familiar-node_modules.pre" "$CUTOVER/familiar-node_modules.preparation"
-cp -a "$HOME/.local/state/familiar" "$CUTOVER/familiar-state"
-cp -a "$HOME/d/familiar/node_modules" "$CUTOVER/familiar-node_modules.pre"
-chmod 700 "$CUTOVER/familiar-state" "$CUTOVER/familiar-node_modules.pre"
-diff -qr "$HOME/.local/state/familiar" "$CUTOVER/familiar-state"
-diff -qr "$HOME/d/familiar/node_modules" "$CUTOVER/familiar-node_modules.pre"
-```
-
-Titan additionally reruns Codex preflight. To perform Europa's block over SSH use
-`ssh -4 -o BatchMode=yes europa 'bash -s'` and pass that exact block on stdin; variable
-expansion must happen on Europa, not Titan. Expected: timer's original enablement,
-activity and service recorded; `stopped familiar-reap.timer`; `every service is
-inactive`; **every** applicable preflight check green; hashes all `OK`; both diffs
-empty. A state file already present means an earlier window needs reconciliation,
-not overwrite. A running service is allowed to finish; `wait` never kills it.
-
-### Abort during §1
-
-Before §2 has started, open a fresh plain Bash shell on **each host whose timer
-record succeeded in this window**, source its saved environment, and run this block.
-Do both hosts even if one reports a recovery error. Never use an older window's
-`timers.json`. Restore timers first, then return any moved preparation snapshot to
-its original name; retain new or incomplete copies in a fresh abort directory.
-Do not enter the familiar/settings rollback: neither has been changed yet.
-
-```bash
+# REFERENCE ONLY: superseded by relay-cutover-bootstrap's pre-merge abort; do not paste.
 source "$HOME/.local/state/hq/relay-cutover/operator-env.sh" || exit 1
 set +e
 set -uo pipefail
@@ -292,294 +1040,10 @@ printf 'Section 1 aborted; timer restore exit=%s; retained evidence: %s\n' "$tim
 exit 1
 ```
 
-Expected: `every timer matches its record` on every recorded host; original
-preparation backups again named `familiar-state` and `familiar-node_modules.pre`.
-Any partial refreshed copies remain under the printed abort directory. The final
-exit1 deliberately stops the window. If timer restore fails its record stays in
-place for retry; inspect every reported error and finish recovery on **both hosts**
-before preparing a new window. No familiar source, live dependency, or settings
-restoration runs in this abort path.
-
-## 2. Familiar source once, dependencies and surfaces on each host
-
-On Titan only, after §1 is green on both hosts:
+Rollback re-quiesce, target restore and familiar reconciliation (superseded; do not paste):
 
 ```bash
-"$HQT" familiar-source --head "$PRE_FAMILIAR"
-touch "$CUTOVER/familiar-step2.started"
-git -C "$HOME/d/familiar" merge --no-ff --no-edit "$FEATURE_TIP"
-MERGE=$(git -C "$HOME/d/familiar" rev-parse HEAD)
-printf '%s\n' "$MERGE" > "$CUTOVER/familiar-merge.sha"
-ssh -4 -o BatchMode=yes europa \
-  "umask 077; printf '%s\\n' '$MERGE' > ~/.local/state/hq/relay-cutover/familiar-merge.sha"
-```
-
-Expected: clean two-parent merge; MERGE is the newly recorded full SHA. Never merge
-the moving branch name. On **each host**, wait for source synchronization:
-
-```bash
-MERGE=$(cat "$CUTOVER/familiar-merge.sha")
-"$HQT" familiar-source --head "$MERGE"
-# If source is still syncing, wait and rerun the preceding check until it passes.
-# Do not run familiar or install dependencies before it passes on this host.
-(cd "$HOME/d/familiar" && npm ci --allow-git=root) > "$CUTOVER/familiar-install.log" 2>&1
-"$HQT" familiar-check --expect relay
-/usr/bin/node -e 'const fs=require("fs"); const root=process.argv[1]; const p=JSON.parse(fs.readFileSync(root+"/node_modules/relay/package.json")); const l=JSON.parse(fs.readFileSync(root+"/package-lock.json")); if(p.version!=="0.1.1" || !l.packages["node_modules/relay"].resolved.endsWith("#4ceec5d2ad22b136b37ee360e7a4ed00949f28d9")) process.exit(1); console.log("familiar relay 0.1.1 at approved commit")' "$HOME/d/familiar"
-```
-
-Expected: source `ok`, npm exit 0, `familiar-check: relay ok`, approved dependency
-message. `--allow-git=root` is per command: Europa's npm 12 defaults to no Git
-installs; never relax global policy. Familiar-theme retains its existing SSH pin,
-so working Git credentials are also required. Complete install logs stay private.
-
-The operator now authorizes the brief desktop restart on **each host**. Identify
-and record only the two current surface PIDs:
-
-```bash
-pgrep -af '[f]amiliar-niri watch|[q]s .*familiar/integrations/niri-desktop'
-```
-
-Expected: one watcher and one `qs` niri-desktop process, or a specifically explained
-absence. Inspect the recorded command lines, then `kill -TERM <watcher-PID> <qs-PID>`
-using only the confirmed PIDs and wait for them to exit. Start the exact two
-`spawn-sh-at-startup` commands from the host's niri config via niri's tracked spawn:
-
-```bash
-niri msg action spawn-sh -- "$HOME/d/familiar/bin/familiar-niri watch"
-niri msg action spawn-sh -- "qs -d -p $HOME/d/familiar/integrations/niri-desktop"
-pgrep -af '[f]amiliar-niri watch|[q]s .*familiar/integrations/niri-desktop'
-```
-
-Expected: two replacements using the merged source. These are the normal persistent
-host surfaces, not detached rehearsal jobs. Record their new PIDs in the window log.
-If the local config's two startup commands differ, stop for agent inspection.
-
-## 3. Claude: dry run on both hosts, then apply each shared target once
-
-Define these functions in the operator shells on both hosts with `set -euo pipefail` active. They keep full plans
-private, extract the actual installer after-image, and compare it with the reviewed
-image before any live apply. A nonzero return stops the sequence.
-
-```bash
-plan_target() {
-  local target=$1 harness=$2 expected=$3 stem=$4 evidence
-  if [[ $harness == claude-code ]]; then evidence=$ECLAUDE; else evidence=$ECODEX; fi
-  "$R" install --harness "$harness" --subscribers "$SUBSCRIBERS" \
-    --target "$target" --retire familiar --evidence "$evidence" --node /usr/bin/node \
-    > "$stem.plan.json" 2> "$stem.plan.stderr" || return
-  jq -er '.changes[0].after' "$stem.plan.json" > "$stem.after.json" || return
-  "$HQT" verify --target "$stem.after.json" --expect "$expected" \
-    > "$stem.verify.log" 2>&1
-}
-dry_target() {
-  local id=$1 target=$2 harness=$3 expected=$4 copy evidence dir
-  dir="$CUTOVER/dry/$id"
-  mkdir -p "$dir" || return
-  if [[ $harness == codex ]]; then copy="$dir/hooks.json"; evidence=$ECODEX
-  else copy="$dir/settings.json"; evidence=$ECLAUDE; fi
-  cp -p "$target" "$copy" || return
-  chmod 600 "$copy" || return
-  copy=$(realpath "$copy") || return
-  if [[ $harness == claude-code ]]; then
-    "$HQT" retire-native-guard --target "$copy" --backup "$dir" || return
-  fi
-  plan_target "$copy" "$harness" "$expected" "$dir/install" || return
-  "$R" install --harness "$harness" --subscribers "$SUBSCRIBERS" \
-    --target "$copy" --retire familiar --evidence "$evidence" --node /usr/bin/node \
-    --apply --artifact "$dir/artifact.json" > "$dir/apply.log" 2>&1 || return
-  "$HQT" verify --target "$copy" --expect "$expected" > "$dir/applied-verify.log" 2>&1
-}
-apply_target() {
-  local id=$1 target=$2 harness=$3 expected=$4 evidence artifact
-  if [[ $harness == claude-code ]]; then evidence=$ECLAUDE; else evidence=$ECODEX; fi
-  mkdir -p "$CUTOVER/live" || return
-  artifact="$CUTOVER/live/$id.json"
-  test ! -e "$CUTOVER/live/$id.original" || return
-  cp -p "$target" "$CUTOVER/live/$id.original" || return
-  chmod 600 "$CUTOVER/live/$id.original" || return
-  # Register before the first write, including an interrupted guard-only change.
-  printf '%s\t%s\t%s\n' "$id" "$target" "$artifact" >> "$CUTOVER/live/touched.tsv"
-  if [[ $harness == claude-code ]]; then
-    "$HQT" retire-native-guard --target "$target" --backup "$CUTOVER/live" || return
-  fi
-  plan_target "$target" "$harness" "$expected" "$CUTOVER/live/$id" || return
-  "$R" install --harness "$harness" --subscribers "$SUBSCRIBERS" \
-    --target "$target" --retire familiar --evidence "$evidence" --node /usr/bin/node \
-    --apply --artifact "$artifact" > "$CUTOVER/live/$id.apply.log" 2>&1 || return
-  "$HQT" verify --target "$target" --expect "$expected" \
-    > "$CUTOVER/live/$id.applied-verify.log" 2>&1
-}
-```
-
-On **both hosts**, with their local expected images available:
-
-```bash
-dry_target claude "$C" claude-code "$IMAGE/claude/settings.json"
-dry_target claude-work "$CW" claude-code "$CUTOVER/claude-work.after.json"
-```
-
-Expected: all commands exit 0, both plan and applied verification logs empty. If a
-verify fails, inspect locally; do not print the private settings or complete plan.
-Only then, on **Titan**, after rechecking both hosts have no live Claude:
-
-```bash
-"$HQT" preflight --harness claude-code
-"$HQT" preflight --harness claude-code --host europa
-sha256sum -c "$CUTOVER/live-before.sha256"
-apply_target claude "$C" claude-code "$IMAGE/claude/settings.json"
-apply_target claude-work "$CW" claude-code "$CUTOVER/claude-work.after.json"
-```
-
-Expected: all checks green, live guard before/after snapshots and `claude.json` /
-`claude-work.json` artifacts retained, verification empty. The artifacts' `path`
-fields equal the resolved target values exactly. Do not repeat apply on Europa:
-wait for Dropbox, then in Europa's shell rerun until both verifications exit 0:
-
-```bash
-"$HQT" verify --target "$C" --expect "$IMAGE/claude/settings.json" > "$CUTOVER/claude-live-verify.log" 2>&1
-"$HQT" verify --target "$CW" --expect "$CUTOVER/claude-work.after.json" > "$CUTOVER/claude-work-live-verify.log" 2>&1
-```
-
-Run the full Claude smoke below on Titan personal, then short work-home smoke
-(start, denial, exit). On Europa the operator opens one personal session, performs
-the denial, and exits, repeats for the work home, and the agent later reads that
-host's registry over SSH. Do not open smoke sessions until both shared targets verify.
-
-## 4. Codex: Titan's two homes
-
-No Codex invocation or install is required on Europa. On Titan, define the same
-functions if this is a new shell, then:
-
-```bash
-dry_target codex "$X" codex "$IMAGE/codex/hooks.json"
-dry_target codex-work "$XW" codex "$IMAGE/codex/work/hooks.json"
-"$HQT" preflight --harness codex
-apply_target codex "$X" codex "$IMAGE/codex/hooks.json"
-apply_target codex-work "$XW" codex "$IMAGE/codex/work/hooks.json"
-```
-
-Expected: dry, plan, apply and verify exit 0; `codex.json` / `codex-work.json` artifacts
-retained. On each first Codex launch, inspect and approve that home's hook review
-(`/hooks` if prompted there). Codex writes its own trust hashes; never hand-edit them
-or use `--dangerously-bypass-hook-trust`. Run the full personal smoke and short
-work-home smoke (start, denial, exit). If the work home is not trusted, this step is
-incomplete even when the personal home passes.
-
-## Smoke: operator input and observer checks
-
-This section is a **live operator test**, not a Task 7 rehearsal result. Use a fresh
-scratch repo per harness/home on the host being tested. In its operator terminal:
-
-```bash
-SMOKE=$(mktemp -d)
-git -C "$SMOKE" init -q
-git -C "$SMOKE" config user.name 'Relay smoke'
-git -C "$SMOKE" config user.email 'relay-smoke@example.invalid'
-printf '%s\n' "$SMOKE" > "$CUTOVER/smoke-cwd.txt"
-cd "$SMOKE"
-# Claude personal (both hosts):
-env -u CLAUDE_CONFIG_DIR "$CLAUDE" --permission-mode manual
-# For Claude work, use this instead, in a new scratch repo:
-# CLAUDE_CONFIG_DIR="$HOME/.claude-work" "$CLAUDE" --permission-mode manual
-# Codex personal (Titan):
-# env -u CODEX_HOME "$CODEX" --no-daemon --sandbox workspace-write --ask-for-approval on-request
-# Codex work (Titan), in a new scratch repo:
-# CODEX_HOME="$HOME/.codex-work" "$CODEX" --no-daemon --sandbox workspace-write --ask-for-approval on-request
-```
-
-Use the actual executable paths saved in §0, never `cl`, `clw`, `cor`, `cowor`,
-`--approve-for-me`, bypass flags, or a `never` approval policy. Claude's explicit
-`manual` overrides its personal `auto` setting. Codex's explicit `on-request` and
-workspace sandbox allow a real approval request; `--no-daemon` keeps the tested PID
-owned by this terminal. Do not use nested code-mode to issue the denial command.
-
-In the observer shell, on that **same host**, load the saved environment. Read the
-JSON without inferring status from familiar's picture:
-
-```bash
-SMOKE=$(cat "$CUTOVER/smoke-cwd.txt")
-"$R" list --json > "$CUTOVER/smoke-list.json"
-jq '.snapshot.agents // {} | to_entries[] | {id:.key,state:.value.state,sessionId:.value.sessionId,pid:.value.process.pid,cwd:.value.cwd}' "$CUTOVER/smoke-list.json"
-```
-
-Match `cwd` to the scratch repo and record its ID, sessionId and non-null process PID.
-On Europa the observer can run this through `ssh -4 -o BatchMode=yes europa 'bash -s'`
-with the same block after sourcing its local environment. Persist each step's JSON
-under a distinct private filename. Expected transitions and literal inputs:
-
-| Step | Operator action / prompt | Expected evidence |
-| --- | --- | --- |
-| Start | Launch and complete initial trust, without a prompt yet | One matching root row, `idle` |
-| Allow / working | Ask: `Use the shell tool once to run touch allowed.marker; sleep 10, then stop.` Approve if prompted; observe during the sleep | Row `working`; `test -f "$SMOKE/allowed.marker"` succeeds |
-| Deny | Ask: `Use Bash once to run exactly git commit --allow-empty -m 'probe' -m 'Co-Authored-By: Claude <noreply@anthropic.com>' && touch denied.marker. If refused, stop and quote the refusal; do not retry or rewrite it.` | Ops `relay-guard: refusing` attribution reason in native result; `git -C "$SMOKE" rev-list --all --count` prints `0`; denied.marker absent |
-| Approval | Claude: ask it to run `sleep 7` via Bash in manual mode and leave the permission dialog unanswered. Codex: explicitly ask it to request `require_escalated` permission for `touch "$HOME/.local/state/hq/relay-cutover/approval.marker"` outside the workspace; leave the dialog unanswered | Row `needs-approval` while the **human** prompt remains open; then answer it |
-| Turn end | Let that turn finish | Row `done` |
-| Claude idle | Leave the completed Claude session idle for at least 60 s | Claude idle prompt produces `needs-input`; Codex has no such requirement |
-| Recovery | During the live session, run the recovery commands below, without sending another prompt | Live sessionId reappears in intent.json after familiar reap |
-| Exit | `/exit` | Root row removed; that sessionId absent from familiar intent.json |
-| Abrupt death | Open a second session; record its row PID, ID and sessionId; `kill -9 <that-recorded-harness-PID>` from the observer | Dead row remains before reconciliation; `"$R" reap` removes it; `"$R" list --json` confirms absence |
-
-A denial that succeeds, merely encounters a Git identity error, or is never attempted
-is a failed smoke. A prompt answered by an agent/auto-review is not human approval
-coverage. If an existing permission allow rule prevents the Claude `sleep` dialog,
-stop and inspect the effective rule rather than claiming `needs-approval` was tested.
-The short home/Europa smoke requires only start, the same denial, and `/exit`.
-
-Projection recovery, in the observer shell on the tested host, with `SID` set to
-that row's literal sessionId:
-
-```bash
-SID='<recorded-sessionId>'
-RECOVERY="$CUTOVER/intent.$(date -u +%Y%m%dT%H%M%SZ).before-recovery.json"
-mv "$HOME/.local/state/familiar/intent.json" "$RECOVERY"
-"$F" reap > "$CUTOVER/projection-recovery.log" 2>&1
-jq -e --arg sid "$SID" 'has($sid)' "$HOME/.local/state/familiar/intent.json"
-```
-
-Expected: exit 0 and `true`, without another harness event. Retain the moved file;
-do not replace the recovered projection with the stale one. After normal exit, the following must print `true`:
-
-```bash
-jq -e --arg sid "$SID" 'has($sid) | not' "$HOME/.local/state/familiar/intent.json"
-```
-After abrupt death and `relay reap`, run `"$F" reap` to clear familiar's stale intent,
-and verify both row and intent entry absent. No registry is imported into familiar.
-
-## 5. Restore timers and check scheduled reconciliation
-
-End smoke sessions on both hosts. On **each host**, in a plain shell:
-
-```bash
-"$HQ/tools/quiesce-timers" restore --state "$CUTOVER/timers.json"
-systemctl --user start familiar-reap.service
-systemctl --user show -p Result -p ExecMainStatus familiar-reap.service
-journalctl --user -u familiar-reap.service -n 20 --no-pager
-"$R" list --json > "$CUTOVER/final-list.json"
-```
-
-Expected: `every timer matches its record`; service `Result=success`,
-`ExecMainStatus=0`; journal successful. Each recorded abrupt-death row is absent from
-`final-list.json` and its intent entry is absent. If a service is still running, wait
-for its completion and recheck its result. Restoring returns a previously inactive
-timer to inactive, too; do not unconditionally enable it.
-
-## 6. Hand back to the agent
-
-Return the window log, MERGE, per-home smoke verdicts, retained artifact paths,
-timer/service results, both hosts' final registry summaries, and replacement surface
-PIDs. Task 9 validates final diffs, trust and links, and records outcomes. Keep all
-backups and `.worktrees/relay-cutover/`; do not merge or clean up hq as part of this
-runbook. No live success is implied by the rehearsal results below.
-
-## Rollback: any failure from §2 onward
-
-End every new Claude/Codex session on both hosts, stop both Codex home daemons as in
-§1, and verify `no-live` on both hosts. Section 5 may already have restored one or
-both timers. In a fresh plain **Titan** Bash shell, re-quiesce both hosts using their
-original records. Never run `record` again or replace `timers.json` during rollback.
-Stopping a timer does not finish a running service; wait for it on each host:
-
-```bash
+# REFERENCE ONLY: superseded by relay-cutover-bootstrap recover; do not paste.
 source "$HOME/.local/state/hq/relay-cutover/operator-env.sh"
 set -euo pipefail
 "$HQ/tools/quiesce-timers" stop --state "$CUTOVER/timers.json"
@@ -591,18 +1055,7 @@ set -euo pipefail
 QUIESCE
 "$HQ/tools/quiesce-timers" wait --state "$CUTOVER/timers.json" --timeout 3600 --poll 30
 printf 'Both hosts quiescent for rollback\n'
-```
 
-Expected: both timers stopped, both services inactive, and the final confirmation.
-A stop, SSH or wait failure stops rollback **before any settings, source or dependency
-restoration**. Inspect the error and retry this entry block; leave both timers stopped
-until recovery completes. Do not continue without confirmation from both hosts.
-
-Then in the **same Titan shell**, restore **every shared settings target touched**,
-in reverse order; a guard removed without relay apply is covered. The log is
-registered before the first write:
-
-```bash
 if [[ -f "$CUTOVER/live/touched.tsv" ]]; then
   while IFS=$'\t' read -r id target artifact; do
     args=(restore --target "$target" --backup "$CUTOVER/live")
@@ -617,17 +1070,7 @@ if [[ -f "$CUTOVER/live/touched.tsv" ]]; then
   done < <(tac "$CUTOVER/live/touched.tsv")
 fi
 sha256sum -c "$CUTOVER/live-before.sha256"
-```
 
-Expected: every touched target byte-equal to its original; all four hashes `OK`.
-Artifacts are passed only when present. A restore refusal means current bytes do
-not match a recorded image: stop for agent inspection, never force-copy over them.
-Retain all artifacts. On Europa, wait until `sha256sum -c
-"$CUTOVER/live-before.sha256"` also reports every target `OK`.
-
-If familiar §2 ran, on Titan:
-
-```bash
 CURRENT=$(git -C "$HOME/d/familiar" rev-parse HEAD)
 if git -C "$HOME/d/familiar" rev-parse --verify -q MERGE_HEAD > /dev/null; then
   # Only the attempted immutable merge may be aborted.
@@ -660,17 +1103,12 @@ ssh -4 -o BatchMode=yes europa \
   "umask 077; printf '%s\\n' '$REVERT' > ~/.local/state/hq/relay-cutover/familiar-revert.sha"
 ```
 
-Expected: one merge-revert commit recorded as REVERT (recovering a missing MERGE
-record from its verified parents), the in-progress merge aborted, or unchanged
-PRE_FAMILIAR when the merge never started. Any unexpected HEAD, merge parent,
-record mismatch or tracked source drift stops recovery for agent inspection; do not
-force a reset or overwrite the record. An interrupted rollback also needs inspection
-before retrying this source block. On **each host**, only after source has fully synced:
+Offline dependency restore on each host (superseded; do not paste):
 
 ```bash
+# REFERENCE ONLY: superseded by relay-cutover-bootstrap recover stage 4; do not paste.
 REVERT=$(cat "$CUTOVER/familiar-revert.sha")
 "$HQT" familiar-source --head "$REVERT"
-# If still syncing, wait and rerun the source check before the following commands.
 test -d "$CUTOVER/familiar-node_modules.pre"
 rm -rf "$HOME/d/familiar/node_modules"
 cp -a "$CUTOVER/familiar-node_modules.pre" "$HOME/d/familiar/node_modules"
@@ -679,47 +1117,44 @@ diff -qr "$HOME/d/familiar/node_modules" "$CUTOVER/familiar-node_modules.pre"
 git -C "$HOME/d/familiar" diff --quiet "$PRE_FAMILIAR" HEAD
 ```
 
-Expected: source `ok`, `familiar-check: native ok`, dependency comparison empty and
-Git tree equal to PRE_FAMILIAR. **No npm, fetch, or network dependency recovery.**
-Restart each host's two familiar surfaces by the recorded PID procedure in §2,
-restore timers on both hosts, check service success, and start fresh native sessions.
-The saved familiar state stays untouched as evidence; no old state or registry is
-merged. Leave `$HOME/.local/state/relay` in place, unused. A later retry re-merges by
-reverting REVERT, not by merging FEATURE_TIP again; prepare a new reviewed window
-and fresh snapshots/artifacts before doing so.
+### Disposable rehearsal evidence (2026-10-19)
 
-## Disposable rehearsal evidence (2026-10-19)
+These are historical results of the original Task 7. They are evidence, not proof of this
+runner. None of these rehearsals changed live hooks, installed harnesses, main familiar's
+revision, live timers, desktop surfaces, home links or trust.
 
-No live hooks, installed harnesses, main familiar revision, live timers, desktop
-surfaces, home links, or trust were changed by these rehearsals.
+**Settings copies.** On Titan, a one-Claude pilot exercised retire, plan, verify, apply,
+verify and restore. All four settings copies were then rehearsed at three stop points:
+- after native guard retirement;
+- after plan verification;
+- after all applies and final verifies.
 
-On Titan, a one-Claude pilot exercised retire → plan → verify → apply → verify →
-restore successfully. Then all four settings copies were rehearsed at three stop
-points: (a) after native guard retirement, (b) after plan verification, and (c) after
-all applies and final verifies. After each case **all four copies were byte-equal**
-to their captured originals. Full artifacts and private logs remain below
-`$CUTOVER/rehearsal/`. Codex copies used the required basename `hooks.json`.
-An initial plan stopped on a different basename; its partial changes were restored
-and every copy compared equal before the corrected run. No JSONC target is in scope.
+After each case **all four copies were byte-equal** to their captured originals. Codex
+copies used the required basename `hooks.json`. An initial plan stopped on a different
+basename; its partial changes were restored and every copy compared equal before the
+corrected run. No JSONC target is in scope.
 
-On **each host**, a throwaway clone detached at PRE_FAMILIAR cleanly merged
-FEATURE_TIP, ran actual `npm ci --allow-git=root` with `/usr/bin/npm` **12.2.1**, and
-`bin/familiar observe --help` exited 0. The installed relay lock resolution was the
-approved `4ceec5d2ad22b136b37ee360e7a4ed00949f28d9`. Each clone then reverted its merge,
-restored its copied pre-merge dependencies inside `unshare -rn` (network isolated),
-and `bin/familiar hook --help` exited 0. `git diff --quiet "$PRE_FAMILIAR" HEAD` and
-the dependency tree digest comparison passed on both hosts. This exercised Europa's
-actual npm12 policy **and** credentials, not only Titan's interactive npm11.
-The controlled Titan rehearsal also selected installed npm12 through its explicit
-minimal PATH. Its first merge was correctly refused because that PATH omitted tasks;
-the retry included the installed tasks directory and passed the normal identity hook.
+**Familiar on each host.** A throwaway clone detached at PRE cleanly merged the tip and
+ran actual `npm ci --allow-git=root` with `/usr/bin/npm` **12.2.1**;
+`bin/familiar observe --help` exited 0. The installed relay lock resolution was the approved
+commit. Each clone then:
+- reverted its merge;
+- restored its copied pre-merge dependencies inside `unshare -rn`, with no network;
+- ran `bin/familiar hook --help`, which exited 0.
 
-Retained evidence: `$CUTOVER/familiar-rehearsal-v2/` on each host, containing the
-clone, old dependencies, command logs, and safe `result.json`; preliminary old state
-and dependencies at `$CUTOVER/familiar-state` / `familiar-node_modules.pre` on each
-host; Titan settings results at `$CUTOVER/task7/settings-results.json`. All are under
-0700 host-local roots; private artifacts and expected images are 0600. Dependency
-backup executable modes are preserved. Refresh mutable state during §1.
-Preflight still requires the operator's live-session quiescence. The later Claude
-2.1.304 evidence refresh is recorded in §0; real interactive smokes remain unrun
-until the operator window.
+`git diff --quiet` against PRE and the dependency tree digest comparison passed on both
+hosts. This exercised Europa's actual npm 12 policy and credentials. Both dependency copies
+held 3865 entries, digest
+`96e39f1b4abbfdc65e1e27a641f52398fb7227ef006f05bbbd4d2022c638e4db`.
+
+**Claude evidence.** Both CLIs were verified as `2.1.304 (Claude Code)` on 2026-10-19.
+Europa attempt `20261019T214341` at relay v0.1.1 passed allow/context (12.5 s) and native
+relay denial (11.1 s). Both hosts' installers accepted the refreshed evidence against native
+`settings.json` before-image copies, which stayed byte-identical. Titan's evidenced Codex was
+`codex-cli 0.163.0`. 2.1.304 is the reviewed baseline, not a permanent pin.
+
+Retained evidence stays under each host's cutover root, in the explained entries that
+`RETAINED` in `tools/relay_cutover_bootstrap/state.py` lists, such as `prep/`, `task7/`,
+`rehearsal/`, `familiar-rehearsal-v2/`, `images/`, `familiar-state/` and
+`familiar-node_modules.pre/`. Titan's `section1-abort.l0b7qF/` holds the interrupted window's
+abort evidence. All are 0700 host-local directories; private artifacts and images are 0600.
