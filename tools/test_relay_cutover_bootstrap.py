@@ -4592,12 +4592,13 @@ def _denial(ref):
 
 
 def _short(world, registry, record, host, harness, home, session, pid, start, *, name=None,
-           argv=None):
-    """A short smoke (start, the attribution denial, exit) in its own scratch repo; `argv` is
-    the session process's command line, its bare executable by default."""
+           argv=None, environ=None):
+    """A short smoke (start, the attribution denial, exit) in its own scratch repo, its process
+    launched in `home`; `argv` is the session process's command line, its bare executable by
+    default, and `environ` replaces its home key."""
     cwd = world.scratch(name or f"{harness}-{home}", host)
     row_harness = "claude" if harness == "claude-code" else "codex"
-    world.harness_row(host, row_harness, pid, start, argv=argv)
+    world.harness_row(host, row_harness, pid, start, argv=argv, home=home, environ=environ)
     registry.put(host, harness, session, pid, start, cwd, "idle")
     started = _seen(world, host, cwd)
     registry.put(host, harness, session, pid, start, cwd, "done")
@@ -4933,6 +4934,15 @@ def test_bypassed_resume_fails_the_controller_proof(desktop, monkeypatch):
         assert not set(flags) & set(held) and all(word not in shlex.join(held)
                                                   for word in flags)
 
+    # A held resume in the work home proves nothing about the personal home's session.
+    desktop.drop_row("titan", CONTROLLER_PID)
+    desktop.harness_row("titan", "codex", CONTROLLER_PID, CONTROLLER_START, argv=held,
+                        home="work")
+    seen = smoke.observe(state.current_window(root), "titan")
+    with pytest.raises(window.Failed) as raised:
+        smoke.check_controller(seen["window"], seen["observation"])
+    assert raised.value.step == "controller-check"
+    assert "runs in the work Codex home, not the personal home" in raised.value.error
     desktop.drop_row("titan", CONTROLLER_PID)
     desktop.harness_row("titan", "codex", CONTROLLER_PID, CONTROLLER_START, argv=held)
     proven = _cli(desktop, monkeypatch, ["record-smoke", "--observe", "titan"])
@@ -5105,6 +5115,44 @@ def test_short_receipts_cover_each_home(desktop):
         assert slot in raised.value.error
     assert "europa Claude personal" not in raised.value.error
     assert "titan Codex work" not in raised.value.error
+
+
+def test_receipt_home_is_the_observed_home(desktop):
+    """A receipt's home must be the home its session's process was observed in, which the host
+    resolves from that process's own home key: changing only a receipt's home, with every
+    observation unchanged, is refused, and a session in another home than either is refused
+    too; the observed home passes, on both hosts and for both harnesses."""
+    record, prepared = _ready_window(desktop)
+    registry = Registry(desktop)
+    _controller_up(desktop, registry)
+
+    def current():
+        return state.current_window(desktop.root("titan"))
+
+    personal = _short(desktop, registry, record, "europa", "claude-code", "personal",
+                      SESSIONS["europa"], 3998001, 900)
+    assert smoke.check_receipt(current(), personal) == sha(personal)
+    _refused(desktop, {**personal, "home": "work"},
+             "start-idle: pid 3998001 runs in the personal Claude home, not the receipt's work")
+    work = _short(desktop, registry, record, "europa", "claude-code", "work",
+                  SESSIONS["europa-work"], 3998002, 901)
+    assert smoke.check_receipt(current(), work) == sha(work)
+    _refused(desktop, {**work, "home": "personal"},
+             "start-idle: pid 3998002 runs in the work Claude home, not the receipt's personal")
+    codex = _short(desktop, registry, record, "titan", "codex", "work", SESSIONS["codex-work"],
+                   3998101, 910)
+    assert smoke.check_receipt(current(), codex) == sha(codex)
+    # CLAUDE_CONFIG_DIR set to ~/.claude is no home the cutover tests: it moves ~/.claude.json.
+    moved = _short(desktop, registry, record, "europa", "claude-code", "personal",
+                   SESSIONS["other"], 3998201, 920, name="claude-code-moved", environ={
+                       "CLAUDE_CONFIG_DIR": str(desktop.home("europa") / ".claude")})
+    _refused(desktop, moved, "start-idle: pid 3998201 runs in the other Claude home")
+    # Observations carry only the resolved home, never the variable or its value.
+    for entry in smoke._smokes(state.current_window(desktop.root("titan")))[
+            "observations"].values():
+        text = Path(entry["path"]).read_text()
+        assert "CLAUDE_CONFIG_DIR" not in text and "CODEX_HOME" not in text
+        assert ".claude-work" not in text
 
 
 def test_human_attestation_is_required(desktop, monkeypatch):
