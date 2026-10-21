@@ -57,6 +57,9 @@ TOOLS = {"python3": "/usr/bin/python3", "ssh": "/usr/bin/ssh", "npm": "/usr/bin/
          "node": "/usr/bin/node", "git": "/usr/bin/git", "systemctl": "/usr/bin/systemctl",
          "niri": "/usr/bin/niri"}
 SYSTEM_PATH = ("/usr/bin", "/bin")
+# The relay runtime root under HOME, whose runtime's identity the cutover hashes. relay/bin/relay
+# takes its root from RELAY_INSTALL_ROOT, so every child gets this one (`_child_env`).
+RELAY_RUNTIME_ROOT = ".local/share/relay"
 MAX_REQUEST = 16384  # below one pipe buffer, so writing a request never blocks
 MAX_RESPONSE = 1 << 20
 MAX_OUTPUT = 4 << 20
@@ -185,6 +188,37 @@ def _brief(error):
 
 def _launch(argv, **options):
     return subprocess.Popen(argv, **options)
+
+
+class _Held:
+    """Signals held from a process's launch until its caller owns it.
+
+    The kernel signal mask cannot hold them: a child inherits it across fork and exec, so every
+    child would start with these signals blocked and ignore the TERM that stops its group.
+    Instead, on the main thread, which runs every Python signal handler, these signals' handlers
+    only note an arrival while held. `release` restores the handlers and raises the first noted
+    signal again, so the restored handler acts on it inside the caller's cleanup scope, where
+    the process is already owned. Releasing twice does nothing; off the main thread nothing is
+    held, as no handler runs there."""
+
+    def __init__(self, signums):
+        self.noted, self.previous = [], {}
+        if threading.current_thread() is threading.main_thread():
+            for signum in signums:
+                # A handler installed outside Python cannot be restored, so it is not replaced.
+                if signal.getsignal(signum) is not None:
+                    self.previous[signum] = signal.signal(signum, self._note)
+
+    def _note(self, signum, frame):
+        self.noted.append(signum)
+
+    def release(self):
+        previous, self.previous = self.previous, {}
+        for signum, handler in previous.items():
+            signal.signal(signum, handler)
+        noted, self.noted = self.noted, []
+        if noted:
+            signal.raise_signal(noted[0])
 
 
 def helper_digest(package=None) -> str:
@@ -395,10 +429,23 @@ def _check_response(response, host, mode, operation, operation_id):
             raise Stop(f"{host}: the reply names another operation")
 
 
+def _start_held(host, mode, operation, payload, timeout):
+    """start_request with INT, TERM and HUP held until the caller owns the client: call
+    `held.release()` first inside the scope whose cleanup abandons it."""
+    held = _Held(INTERRUPTS)
+    try:
+        operation_id, process = start_request(host, mode, operation, payload, timeout=timeout)
+    except BaseException:
+        held.release()
+        raise
+    return operation_id, process, held
+
+
 def _exchange(host, mode, operation, payload, seconds):
     deadline = time.monotonic() + seconds
-    operation_id, process = start_request(host, mode, operation, payload, timeout=seconds)
+    operation_id, process, held = _start_held(host, mode, operation, payload, seconds)
     try:
+        held.release()
         response = _await_reply(process, deadline)
     finally:
         _abandon(process)
@@ -518,10 +565,11 @@ def request(host: str, mode: str, operation: str, payload: dict, *, timeout: flo
     with _raising_signals():
         operation_id = None
         try:
-            operation_id, process = start_request(host, mode, operation, payload,
-                                                  timeout=timeout)
+            operation_id, process, held = _start_held(host, mode, operation, payload, timeout)
             started = time.monotonic()
             try:
+                # A signal since the client launched lands here, where it is owned: cancel.
+                held.release()
                 response = _await_reply(process, deadline)
                 _abandon(process)
                 if response is None:
@@ -703,11 +751,17 @@ def _child_path(value):
 
 def _child_env(context):
     """The helper's startup environment with the system PATH first and no bytecode; in a
-    pilot, TMPDIR is its scratch root's own. HOME and authentication stay the host's."""
+    pilot, TMPDIR is its scratch root's own. HOME and authentication stay the host's.
+
+    RELAY_INSTALL_ROOT is pinned to this host's recorded relay runtime root, whatever the
+    helper inherited, so the launcher runs only the runtime whose identity was checked: the
+    installer's dry runs, apply and rollback, relay list, and a pilot's, which use the same
+    runtime as live."""
     env = dict(os.environ)
     remainder, _ = _child_path(env.get("PATH", ""))
     env["PATH"] = ":".join((*SYSTEM_PATH, *remainder))
     env["PYTHONDONTWRITEBYTECODE"] = "1"
+    env["RELAY_INSTALL_ROOT"] = str(Path(context["home"]) / RELAY_RUNTIME_ROOT)
     if context.get("tmp"):
         env["TMPDIR"] = context["tmp"]
     return env
@@ -725,9 +779,17 @@ def _run_child(context, label, argv, *, env, timeout, cwd=None):
         raise _Deadline()
     limit = min(timeout, remaining)
     argv = [str(arg) for arg in argv]
-    process = _launch(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                      stderr=subprocess.PIPE, env=env, start_new_session=True, close_fds=True,
-                      **({"cwd": str(cwd)} if cwd is not None else {}))
+    # A signal or the deadline alarm between the launch and the record would cancel with the
+    # child running unrecorded: both wait until it is recorded, then act inside the scope that
+    # stops it.
+    held = _Held(WATCHED)
+    try:
+        process = _launch(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, env=env, start_new_session=True,
+                          close_fds=True, **({"cwd": str(cwd)} if cwd is not None else {}))
+    except BaseException:
+        held.release()
+        raise
     child = {"label": label, "pid": process.pid, "start_time": None, "started_at": _now(),
              "exit": None}
     owned.live[process.pid] = (process, child)
@@ -735,10 +797,14 @@ def _run_child(context, label, argv, *, env, timeout, cwd=None):
         child["start_time"] = _start_time(process.pid)
         owned.children.append(child)
         owned.save()
+        held.release()
         out, err, exited = _collect(process, time.monotonic() + limit)
     finally:
-        owned.stop(process, child)
-    child["exit"] = process.returncode
+        try:
+            owned.stop(process, child)
+            child["exit"] = process.returncode
+        finally:
+            held.release()  # when recording failed first
     owned.save()
     note = "" if exited else f" (stopped after {limit:g} s)"
     _append(Path(context["operation_dir"]) / "log",

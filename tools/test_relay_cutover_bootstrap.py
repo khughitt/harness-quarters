@@ -1271,7 +1271,8 @@ def test_system_toolchain_wins_over_nvm(cutover, monkeypatch):
         assert all(call["env_node"] == system_node for call in calls)
     # Production values: the fixed system npm, and PATH rebuilt with /usr/bin first.
     assert (hosts.TOOLS["npm"], hosts.TOOLS["node"]) == ("/usr/bin/npm", "/usr/bin/node")
-    assert hosts._child_env({})["PATH"].split(":")[0] == "/usr/bin"
+    assert hosts._child_env({"home": str(cutover.home("titan"))})["PATH"].split(":")[0] == \
+        "/usr/bin"
 
 
 def _touch_tool(name):
