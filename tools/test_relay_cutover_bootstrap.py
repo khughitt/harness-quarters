@@ -6,6 +6,7 @@ import contextlib
 import errno
 import fcntl
 import fnmatch
+import functools
 import hashlib
 import io
 import itertools
@@ -27,8 +28,8 @@ from types import SimpleNamespace
 import pytest
 
 import test_relay_cutover_transport as transport
-from relay_cutover_bootstrap import (cli, hosts, inputs, recovery, restoration, state, surfaces,
-                                     window)
+from relay_cutover_bootstrap import (cli, finish, hosts, inputs, inventory, recovery,
+                                     restoration, smoke, state, surfaces, window)
 from relay_cutover_bootstrap import prepare as preparation
 from relay_cutover_bootstrap.state import Stop
 
@@ -1895,7 +1896,9 @@ class TestRun:
                 assert f"{name} pid {process['pid']}" in out
         assert "do not change or save Claude model or effort defaults" in out
         assert "avoid cl, clw" in out
-        assert out.splitlines()[-1] == f"  next: {cli.command_line(['record-smoke'])}"
+        assert out.splitlines()[-1] == "  next: " + cli.command_line(
+            ["record-smoke", "--observe", "titan"])
+        assert shlex.join(smoke.resume_argv(migrated.prepared, "personal")) in out
         for secret in SECRETS + (PICK_TEXT, "höch"):
             assert secret not in out + migrated.err + migrated.terminal
 
@@ -3198,8 +3201,11 @@ def _pending_window(world, *, absent=()):
                "hosts": {host: ABSENT if host in absent else world.desktop(host)
                          for host in HOSTS},
                "impact": window.IMPACT, "duration_seconds": window.DURATION_SECONDS}
-    opened = state.new_window(world.root("titan"), PREPARED)
+    prepared = _fixture_prepared(world)
+    opened = state.new_window(world.root("titan"), window.prepared_sha256(prepared))
+    state.save_record(Path(opened["directory"]) / window.PREPARED, prepared)
     record = {**opened, "state": "migrated-surfaces-pending", "owner": window._me(),
+              "attempts": [{"host": host, "step": "timer-stop", "at": _now()} for host in HOSTS],
               "surfaces": subject, "familiar": {"merge": "1" * 40}}
     state.save_record(window_file(record), record)
     consumed = state.consume_decision(
@@ -3314,8 +3320,8 @@ def test_exited_pid_is_expected(desktop):
         surfaces.restart_surfaces(current, consumed)
     assert raised.value.status == "refused" and "verified migration" in raised.value.error
     report = window.status()
-    assert report["next"] == ["record-smoke"] and "restarted familiar's surfaces" in report[
-        "detail"]
+    assert report["next"] == ["record-smoke", "--observe", "titan"]
+    assert "restarted familiar's surfaces" in report["detail"]
 
 
 def test_explained_absence_is_never_started(desktop):
@@ -3384,7 +3390,7 @@ def test_partial_restart_retry(desktop, monkeypatch):
     assert [(entry["attempt_id"], entry["outcome"]) for entry in final["desktop"]["attempts"]] \
         == [(window.RUN_ATTEMPT, "stopped"), ("restart-1", "complete")]
     assert final["desktop"]["phases"]["forward"]["europa"]["niri-desktop"]["exited"] is True
-    assert window.status()["next"] == ["record-smoke"]
+    assert window.status()["next"] == ["record-smoke", "--observe", "titan"]
 
 
 def test_restart_signal_keeps_surfaces_pending(desktop, monkeypatch):
@@ -3646,7 +3652,10 @@ def test_surface_failure_is_pending(cutover, monkeypatch):
     assert "run stopped" in out and "step: surface-restart" in out and "host: europa" in out
     assert "migrated, surfaces pending" in out and "pending: europa niri-desktop" in out
     assert "familiar-reap.timer stays paused on titan and europa until finish" in out
-    assert "may resume through the held trust and resume path" in out
+    assert "may resume, only with the held commands printed here" in out
+    prepared = recovery._prepared(record)
+    assert shlex.join(smoke.resume_argv(prepared, "personal")) in out
+    assert shlex.join(smoke.resume_argv(prepared, "work")) in out
     assert "do not change or save Claude model or effort defaults" in out
     assert out.splitlines()[-1] == f"  next: {cli.command_line(['restart-surfaces'])}"
     for secret in SECRETS + (transport.OUTPUT_SECRET,):
@@ -3689,7 +3698,8 @@ def test_surface_failure_is_pending(cutover, monkeypatch):
     assert {host: {target_id: transport._digest(cutover.target(host, target_id))
                    for target_id in inputs.relevant(host)} for host in HOSTS} == \
         verified_live_hooks_before
-    assert retried.stdout.splitlines()[-1] == f"  next: {cli.command_line(['record-smoke'])}"
+    assert retried.stdout.splitlines()[-1] == "  next: " + cli.command_line(
+        ["record-smoke", "--observe", "titan"])
 
 
 @needs_zsh
@@ -3850,3 +3860,986 @@ def test_recheck_drift_needs_inspection(desktop, monkeypatch):
     report = window.status()
     assert report["next"] == ["recover"]
     assert "stopped pending inspection at target-verify on europa (blocked)" in report["detail"]
+
+
+# --- safe resume, the controller's fresh row, smoke receipts and finish ----------------------
+
+CLAUDE_PIN = transport.PINS["claude_version"]
+CODEX_PIN = transport.PINS["codex_version"]
+CONTROLLER_PID, CONTROLLER_START = 3996001, 400
+BYPASS = ("--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust",
+          "--dangerously-skip-permissions", "--yolo", "--full-auto", "never",
+          "bypassPermissions", "--approve-for-me")
+ALIASES = ("cl", "clw", "co", "cor", "cowor")
+FULL_CLAUDE = ("start-idle", "allow-working", "attribution-denial", "needs-approval",
+               "turn-done", "idle-needs-input", "projection-recovery", "normal-exit",
+               "abrupt-death")
+SHORT = ("start-idle", "attribution-denial", "normal-exit")
+REFUSAL = ("relay-guard: refusing: the commit message names an AI co-author (Co-Authored-By: "
+           "Claude); remove the attribution")
+
+
+def _identity(world, host, harness):
+    home = world.home(host)
+    found = (inventory._resolve(home / ".local/bin/claude", home / ".local/share/claude/versions",
+                                inventory.CLAUDE_FAMILY) if harness == "claude" else
+             inventory._resolve(home / ".local/bin/codex",
+                                home / ".codex/packages/standalone/releases",
+                                inventory.CODEX_FAMILY))
+    return {key: found[key] for key in ("path", "real", "sha256")}
+
+
+def _fixture_prepared(world, claude=CLAUDE_PIN):
+    """The prepared fields resume commands and receipts read, from the fixture hosts' own
+    executables: each host's home and Claude identity, Titan's Codex, the controller's
+    native session and the reviewed pins."""
+    record = {host: {"home": str(world.home(host)), "claude": {
+        **_identity(world, host, "claude"), "versions": {"personal": claude, "work": claude}}}
+        for host in HOSTS}
+    codex = {**_identity(world, "titan", "codex"), "version": CODEX_PIN}
+    record["titan"]["codex"] = codex
+    return {"schema": 1, "prepared_at": _now(),
+            "controller": {"session_id": SESSION, "checkout": str(window.CHECKOUT),
+                           "codex": codex},
+            "pins": {**transport.PINS, "claude_version": claude}, "hosts": record}
+
+
+def _ready_window(world, *, mode="live", prepared=None):
+    """A window whose migration verified five seconds ago and whose surfaces restarted, built
+    from fixture records: timers recorded and stopped on both hosts, no smoke recorded yet."""
+    prepared = prepared or _fixture_prepared(world)
+    opened = state.new_window(world.root("titan"), window.prepared_sha256(prepared), mode=mode)
+    state.save_record(Path(opened["directory"]) / window.PREPARED, prepared)
+    at = (datetime.now(timezone.utc) - timedelta(seconds=5)).isoformat(timespec="seconds")
+    desktops = {host: world.desktop(host) for host in HOSTS}
+    record = {**opened, "state": "ready-for-smokes",
+              "attempts": [{"host": host, "step": "timer-stop", "at": at} for host in HOSTS],
+              "timers": {host: {"sha256": "0" * 64, "recorded_at": at} for host in HOSTS},
+              "surfaces": {"action": window.RUN_ACTION, "hosts": desktops,
+                           "impact": window.IMPACT, "duration_seconds": window.DURATION_SECONDS},
+              "familiar": {"merge": "1" * 40}, "verified": {"at": at, "hosts": {}},
+              "desktop": {"hosts": desktops, "phases": {"forward": {
+                  host: {surface["name"]: {"replacement": surface["processes"][0]}
+                         for surface in desktops[host]["surfaces"]} for host in HOSTS}},
+                  "attempts": [], "completed": {"forward": at}}}
+    state.save_record(window_file(record), record)
+    return record, prepared
+
+
+class Registry:
+    """One test's relay registry and familiar intent on the fixture hosts."""
+
+    def __init__(self, world):
+        self.world = world
+        self.rows = {host: {} for host in HOSTS}
+        self.dead = {host: set() for host in HOSTS}
+        self.intent = {host: set() for host in HOSTS}
+        for host in HOSTS:  # an empty registry and intent until a session starts
+            self.flush(host)
+
+    def put(self, host, harness, session, pid, start, cwd, state_name="idle", *,
+            updated=None, dead=False, intent=True, **fields):
+        row = transport.agent(harness, session, host=host, pid=pid, start=start, cwd=cwd,
+                              state=state_name, updated=updated, **fields)
+        self.rows[host][row["id"]] = row
+        (self.dead[host].add if dead else self.dead[host].discard)(row["id"])
+        (self.intent[host].add if intent else self.intent[host].discard)(session)
+        self.flush(host)
+        return row
+
+    def drop(self, host, harness, session):
+        self.rows[host].pop(f"{harness}:{session}", None)
+        self.intent[host].discard(session)
+        self.flush(host)
+
+    def flush(self, host):
+        self.world.relay(host, list(self.rows[host].values()), self.dead[host])
+        self.world.intent(host, sorted(self.intent[host]))
+
+
+def _controller_up(world, registry, **fields):
+    """The resumed controller: a held Codex process in the personal home and its fresh row."""
+    world.harness_row("titan", "codex", CONTROLLER_PID, CONTROLLER_START)
+    return registry.put("titan", "codex", SESSION, CONTROLLER_PID, CONTROLLER_START,
+                        str(world.home("titan")), **fields)
+
+
+def _seen(world, host, cwd=None):
+    """One recorded observation through record-smoke's own route; its evidence reference."""
+    return smoke.observe_step(state.current_window(world.root("titan")), host, cwd)["ref"]
+
+
+def _ms(at, seconds=0):
+    return int((datetime.fromisoformat(at) + timedelta(seconds=seconds)).timestamp() * 1000)
+
+
+def _receipt(record, host, harness, home, session, pid, cwd, cases, *, matrix="short",
+             version=CLAUDE_PIN, human=None):
+    return {"schema": 1, "window_id": record["id"], "prepared_sha256": record["prepared_sha256"],
+            "host": host, "harness": harness, "home": home, "session_id": session,
+            "row_id": f"{harness}:{session}", "pid": pid, "cwd": cwd,
+            "versions": {"installed": version, "evidence": version}, "matrix": matrix,
+            "cases": cases, "human": human or ({"trust": "approved", "permission": "approved"}
+                                               if matrix == "full" else {"trust": "approved"})}
+
+
+def _passed(*refs, **fields):
+    return {"verdict": "passed", "evidence": list(refs), **fields}
+
+
+def _denial(ref):
+    return _passed(ref, outcome="refused", refusal=REFUSAL)
+
+
+def _short(world, registry, record, host, harness, home, session, pid, start, *, name=None):
+    """A short smoke (start, the attribution denial, exit) in its own scratch repo."""
+    cwd = world.scratch(name or f"{harness}-{home}", host)
+    row_harness = "claude" if harness == "claude-code" else "codex"
+    world.harness_row(host, row_harness, pid, start)
+    registry.put(host, harness, session, pid, start, cwd, "idle")
+    started = _seen(world, host, cwd)
+    registry.put(host, harness, session, pid, start, cwd, "done")
+    denied = _seen(world, host, cwd)
+    registry.drop(host, harness, session)
+    world.drop_row(host, pid)
+    exited = _seen(world, host, cwd)
+    version = CLAUDE_PIN if harness == "claude-code" else CODEX_PIN
+    return _receipt(record, host, harness, home, session, pid, cwd, {
+        "start-idle": _passed(started), "attribution-denial": _denial(denied),
+        "normal-exit": _passed(exited)}, version=version)
+
+
+SESSIONS = {name: f"0199f5a1-{index:04x}-7000-8000-00000000{index:04x}"
+            for index, name in enumerate(("claude", "abrupt", "work", "europa", "europa-work",
+                                          "codex", "codex-work", "codex-abrupt", "other"), 1)}
+
+
+def _full_claude(world, registry, record):
+    """Titan's personal Claude full smoke, observed step by step as the runbook runs it."""
+    cwd, sid, abrupt = world.scratch("claude-personal"), SESSIONS["claude"], SESSIONS["abrupt"]
+    pid, start, second = 3997001, 800, 3997002
+    world.harness_row("titan", "claude", pid, start)
+    base = _ms(record["verified"]["at"], 10)
+    put = functools.partial(registry.put, "titan", "claude-code", sid, pid, start, cwd)
+    put("idle", updated=base)
+    started = _seen(world, "titan", cwd)
+    Path(cwd, "allowed.marker").touch()
+    put("working", updated=base + 1000)
+    working = _seen(world, "titan", cwd)
+    put("done", updated=base + 2000)
+    denied = _seen(world, "titan", cwd)
+    put("needs-approval", updated=base + 3000)
+    approval = _seen(world, "titan", cwd)
+    put("done", updated=base + 4000)
+    done = _seen(world, "titan", cwd)
+    put("needs-input", updated=base + 4000 + 61000)
+    idle = _seen(world, "titan", cwd)
+    put("needs-input", updated=base + 65000, intent=False)  # intent.json moved aside
+    moved = _seen(world, "titan", cwd)
+    put("needs-input", updated=base + 65000)  # familiar reap recovered the projection
+    recovered = _seen(world, "titan", cwd)
+    registry.drop("titan", "claude-code", sid)
+    world.drop_row("titan", pid)
+    exited = _seen(world, "titan", cwd)
+    registry.put("titan", "claude-code", abrupt, second, 802, cwd, "idle", updated=base + 70000,
+                 dead=True)  # kill -9 of the second session's recorded PID
+    dead = _seen(world, "titan", cwd)
+    registry.drop("titan", "claude-code", abrupt)  # relay reap, then familiar reap
+    gone = _seen(world, "titan", cwd)
+    return _receipt(record, "titan", "claude-code", "personal", sid, pid, cwd, {
+        "start-idle": _passed(started), "allow-working": _passed(working),
+        "attribution-denial": _denial(denied), "needs-approval": _passed(approval),
+        "turn-done": _passed(done), "idle-needs-input": _passed(idle),
+        "projection-recovery": _passed(moved, recovered), "normal-exit": _passed(exited),
+        "abrupt-death": _passed(dead, gone, session_id=abrupt, pid=second)}, matrix="full")
+
+
+def _attestation(record, attempt, digest, reply="yes, I gave those answers myself",
+                 verdict="approved", kind=None):
+    """An agent's record of the actual session ask about a receipt's human verdicts and the
+    human's reply."""
+    return {"schema": 1, "kind": kind or smoke.KIND, "action": smoke.ACTION,
+            "window_id": record["id"], "attempt_id": attempt, "subject_sha256": digest,
+            "verdict": verdict, "source": {
+                "type": "session", "session_id": SESSION, "reply": reply, "answered_at": _now(),
+                "ask": f"Did you yourself approve this home's trust review and answer its "
+                       f"permission prompt ({attempt})?"}}
+
+
+def _record_receipt(world, receipt):
+    current = state.current_window(world.root("titan"))
+    attempt = smoke.next_attempt(current)
+    consumed = state.consume_decision(current, _attestation(current, attempt, sha(receipt)),
+                                      kind=smoke.KIND, action=smoke.ACTION, attempt_id=attempt,
+                                      subject_sha256=sha(receipt))
+    smoke.record_smoke(state.current_window(world.root("titan")), receipt, consumed)
+    return consumed
+
+
+def _refused(world, receipt, fragment):
+    with pytest.raises(window.Failed) as raised:
+        smoke.check_receipt(state.current_window(world.root("titan")), receipt)
+    failed = raised.value
+    assert (failed.step, failed.status) == ("receipt", "refused"), failed
+    assert fragment in failed.error, (fragment, failed.error)
+    return failed
+
+
+def _private_file(world, name, value):
+    return str(transport._stage(world.tmp, name, json.dumps(value).encode()))
+
+
+def test_resume_has_no_bypass_flags(tmp_path):
+    """The printed commands are concrete held argv, Zsh-quoted: the controller's Codex resume
+    with its captured session, the work home's own launch for its hook review, held Claude
+    launches for every home on both hosts and the smoke sessions' runbook flags. None is an
+    alias, a placeholder or a bypass."""
+    homes = {host: tmp_path / f"{host} home's" for host in HOSTS}
+    release = homes["titan"] / ".codex/packages/standalone/releases/0.163.0-x/bin/codex"
+    release.parent.mkdir(parents=True)
+    release.write_text("#!/bin/sh\n")
+    (homes["titan"] / ".codex-work").mkdir()
+    (homes["titan"] / ".codex").mkdir(exist_ok=True)
+    (homes["titan"] / ".codex-link").symlink_to(homes["titan"] / ".codex")
+    claude = {host: str(homes[host] / ".local/share/claude/versions/2.1.304") for host in HOSTS}
+    codex = {"path": str(homes["titan"] / ".local/bin/codex"), "real": str(release),
+             "sha256": "a" * 64, "version": CODEX_PIN}
+    prepared = {"controller": {"session_id": SESSION, "codex": codex},
+                "pins": dict(transport.PINS),
+                "hosts": {host: {"home": str(homes[host]), "claude": {
+                    "path": str(homes[host] / ".local/bin/claude"), "real": claude[host],
+                    "sha256": "b" * 64, "versions": {"personal": CLAUDE_PIN, "work": CLAUDE_PIN}}}
+                    for host in HOSTS}}
+    prepared["hosts"]["titan"]["codex"] = codex
+    resume_args = smoke.resume_argv(prepared, "personal")
+    assert resume_args == [
+        "env", "DISABLE_UPDATES=1", f"CODEX_HOME={os.path.realpath(homes['titan'] / '.codex')}",
+        str(release), "--no-daemon", "resume", SESSION]
+    assert "--dangerously-bypass-approvals-and-sandbox" not in resume_args
+    assert "DISABLE_UPDATES=1" in resume_args
+    assert smoke.resume_argv(prepared, "work") == [
+        "env", "DISABLE_UPDATES=1",
+        f"CODEX_HOME={os.path.realpath(homes['titan'] / '.codex-work')}", str(release),
+        "--no-daemon"]
+    with pytest.raises(Stop):
+        smoke.resume_argv(prepared, "europa")
+    commands = smoke.commands(prepared)
+    labels = [label for label, _ in commands]
+    assert len(labels) == len(set(labels)) == 12
+    for label, argv in commands:
+        assert argv[0] == "env" and "DISABLE_UPDATES=1" in argv, label
+        assert not set(argv) & set(BYPASS) and not any("<" in word for word in argv), label
+        assert not set(argv) & set(ALIASES), label
+        executable = next(word for word in argv[1:] if word.startswith("/"))
+        assert executable in (str(release), claude["titan"], claude["europa"]), label
+    by_label = dict(commands)
+    assert by_label["titan Codex personal: resume the controller"] == resume_args
+    for host in HOSTS:
+        assert by_label[f"{host} Claude personal"] == [
+            "env", "-u", "CLAUDE_CONFIG_DIR", "DISABLE_UPDATES=1", claude[host]]
+        assert by_label[f"{host} Claude work"] == [
+            "env", "DISABLE_UPDATES=1", f"CLAUDE_CONFIG_DIR={homes[host] / '.claude-work'}",
+            claude[host]]
+        for home in ("personal", "work"):
+            assert by_label[f"{host} Claude {home} smoke"] == [
+                *by_label[f"{host} Claude {home}"], "--permission-mode", "manual"]
+    for home in ("personal", "work"):
+        assert by_label[f"titan Codex {home} smoke"] == [
+            *smoke.resume_argv(prepared, home)[:4], "--no-daemon", "--sandbox",
+            "workspace-write", "--ask-for-approval", "on-request"]
+    # Each printed line is one Zsh word list: Zsh reads back exactly the argv.
+    lines = smoke.command_lines(prepared)
+    printed = [line.strip() for line in lines if line.startswith("      ")]
+    assert printed == [shlex.join(argv) for _, argv in commands]
+    for text, (_, argv) in zip(printed, commands):
+        echoed = subprocess.run([str(transport.ZSH), "-f", "-c", "print -rl -- " + text],
+                                capture_output=True, text=True, check=True).stdout
+        assert echoed.splitlines() == argv
+
+
+def test_current_row_is_fresh(desktop, monkeypatch):
+    """The first smoke step proves the controller's own row before anything else: its native
+    session's root Codex row, live on Titan, held by the prepared Codex executable and updated
+    since the verified migration. A missing, stale, dead, foreign or unknown row stops with the
+    safe resume path and records nothing."""
+    record, prepared = _ready_window(desktop)
+    registry = Registry(desktop)
+    missing = _cli(desktop, monkeypatch, ["record-smoke", "--observe", "titan"])
+    assert missing.code == 1 and "step: controller-check" in missing.stdout
+    assert "codex:" + SESSION in missing.stdout and "no row" in missing.stdout
+    assert "trust or startup blocker" in missing.stdout
+    assert "not configuration edits" in missing.stdout
+    assert shlex.join(smoke.resume_argv(prepared, "personal")) in missing.stdout
+    assert missing.stdout.splitlines()[-1] == "  next: " + cli.command_line(
+        ["record-smoke", "--observe", "titan"])
+    current = state.current_window(desktop.root("titan"))
+    assert "controller" not in current.get("smokes", {})
+    assert current["state"] == "ready-for-smokes" and window_file(record).read_bytes() != b""
+
+    row = _controller_up(desktop, registry)
+    seen = smoke.observe(current, "titan")
+    observation = seen["observation"]
+    assert observation == state.load_record(Path(seen["ref"]["path"]))
+    smoke.check_controller(seen["window"], observation)
+    verified = _ms(record["verified"]["at"])
+
+    def stale(value):
+        value["agents"][row["id"]]["updated_at"] = verified - 1000
+
+    def dead(value):
+        value["agents"][row["id"]]["liveness"] = "dead"
+
+    def foreign(value):
+        value["agents"][row["id"]]["process"]["host"] = "europa"
+
+    def unknown(value):
+        for entry in value["processes"]:
+            if entry["pid"] == CONTROLLER_PID:
+                entry.update(known=False, exe="/usr/bin/codex")
+
+    def replaced(value):
+        value["agents"][row["id"]]["process"]["start"] = str(CONTROLLER_START + 1)
+
+    def worker(value):
+        value["agents"][row["id"]]["scope"] = "worker"
+
+    def other_session(value):
+        value["agents"][f"codex:{SESSIONS['other']}"] = value["agents"].pop(row["id"])
+
+    def pilot(value):
+        value["mode"] = "pilot"
+
+    for change, fragment in ((stale, "predates"), (dead, "not live"), (foreign, "europa"),
+                             (unknown, "prepared Codex"), (replaced, "prepared Codex"),
+                             (worker, "root"), (other_session, "no row"), (pilot, "mode")):
+        changed = json.loads(json.dumps(observation))
+        change(changed)
+        with pytest.raises(window.Failed) as raised:
+            smoke.check_controller(state.current_window(desktop.root("titan")), changed)
+        assert raised.value.step == "controller-check" and fragment in raised.value.error, (
+            change.__name__, raised.value.error)
+
+    # The CLI's first observation proves it once; later observations read only their host.
+    registry.put("titan", "codex", SESSION, CONTROLLER_PID, CONTROLLER_START,
+                 str(desktop.home("titan")), updated=verified - 1000)
+    old = _cli(desktop, monkeypatch, ["record-smoke", "--observe", "titan"])
+    assert old.code == 1 and "predates" in old.stdout
+    registry.put("titan", "codex", SESSION, CONTROLLER_PID, CONTROLLER_START,
+                 str(desktop.home("titan")))
+    proven = _cli(desktop, monkeypatch, ["record-smoke", "--observe", "europa"])
+    assert proven.code == 0, proven.stdout
+    assert f"controller: codex:{SESSION} pid {CONTROLLER_PID} on titan" in proven.stdout
+    proof = state.current_window(desktop.root("titan"))["smokes"]["controller"]
+    assert (proof["row_id"], proof["pid"], proof["start"]) == (
+        f"codex:{SESSION}", CONTROLLER_PID, str(CONTROLLER_START))
+    hosts_seen = [entry["host"] for entry in sorted(
+        state.current_window(desktop.root("titan"))["smokes"]["observations"].values(),
+        key=lambda entry: entry["seq"])]
+    assert hosts_seen[-2:] == ["titan", "europa"]
+    again = _cli(desktop, monkeypatch, ["record-smoke", "--observe", "europa"])
+    assert again.code == 0 and "controller:" not in again.stdout
+    # The SSH route to Europa is declined: that observer check stays pending, nothing passes.
+    desktop.reload()
+    desktop.config["unreachable"] = True
+    desktop.save()
+    seen = state.current_window(desktop.root("titan"))["smokes"]["observations"]
+    declined = _cli(desktop, monkeypatch, ["record-smoke", "--observe", "europa"])
+    assert declined.code == 1 and "host: europa" in declined.stdout
+    assert "stays pending" in declined.stdout
+    assert declined.stdout.splitlines()[-1] == "  next: " + cli.command_line(
+        ["record-smoke", "--observe", "europa"])
+    assert state.current_window(desktop.root("titan"))["smokes"]["observations"] == seen
+
+
+@needs_zsh
+def test_receipt_is_bound_to_real_cases(desktop):
+    """A receipt passes only on observations this window recorded for that very session:
+    every required case, each case's own state, row, process, scratch repo and order, the
+    prepared versions and the human's own verdicts. Each binding below refuses on its own."""
+    record, prepared = _ready_window(desktop)
+    registry = Registry(desktop)
+    _controller_up(desktop, registry)
+    receipt = _full_claude(desktop, registry, record)
+    digest = smoke.check_receipt(state.current_window(desktop.root("titan")), receipt)
+    assert digest == sha(receipt)
+
+    def variant(**changes):
+        changed = json.loads(json.dumps(receipt))
+        for path, value in changes.items():
+            keys = path.split("__")
+            target = changed
+            for key in keys[:-1]:
+                target = target[key]
+            if value is KeyError:
+                del target[keys[-1]]
+            else:
+                target[keys[-1]] = value
+        return changed
+
+    cases = receipt["cases"]
+    other = SESSIONS["other"]
+    for changed, fragment in (
+            (variant(window_id="20261019T000000Z-deadbeef"), "not this live window"),
+            (variant(prepared_sha256="f" * 64), "another preparation"),
+            (variant(home="work"), "short"),
+            (variant(host="europa", harness="codex"), "not a smoke this cutover requires"),
+            (variant(session_id=other, row_id=f"claude-code:{other}"), "no row"),
+            (variant(row_id=f"codex:{receipt['session_id']}"), "root row"),
+            (variant(versions__installed="2.1.305 (Claude Code)"),
+             "installed and evidence version"),
+            (variant(cwd=desktop.scratch("elsewhere")), "cwd"),
+            (variant(pid=receipt["pid"] + 9), "pid"),
+            (variant(session_id=SESSION, row_id=f"claude-code:{SESSION}"), "live controller"),
+            (variant(**{"cases__abrupt-death__pid": CONTROLLER_PID}), "live controller"),
+            (variant(**{"cases__abrupt-death__session_id": SESSION}), "live controller"),
+            (variant(**{"cases__turn-done": KeyError}), "missing: turn-done"),
+            (variant(**{"cases__surprise": _passed()}), "unexpected: surprise"),
+            (variant(**{"cases__needs-approval__verdict": "failed"}), "failed"),
+            (variant(**{"cases__allow-working": cases["start-idle"]}), "working"),
+            (variant(**{"cases__projection-recovery__evidence":
+                        cases["projection-recovery"]["evidence"][::-1]}), "after"),
+            (variant(**{"cases__abrupt-death__evidence":
+                        cases["abrupt-death"]["evidence"][::-1]}), "dead"),
+            (variant(**{"cases__normal-exit": cases["start-idle"]}), "still has its row"),
+            (variant(**{"cases__attribution-denial__outcome": "not-attempted"}),
+             "never attempted"),
+            (variant(**{"cases__attribution-denial__outcome": "git-identity-error"}),
+             "Git identity"),
+            (variant(**{"cases__attribution-denial__refusal": "error: commit failed"}),
+             "relay-guard: refusing"),
+            (variant(human={"trust": "approved"}), "trust and permission"),
+            (variant(human__permission="declined"), "declined"),
+            (variant(human__permission="unanswered"), "unanswered"),
+            (variant(human__permission="auto-review"), "automatic"),
+            (variant(human__trust=KeyError), "trust and permission"),
+            (variant(**{"cases__start-idle__evidence": [{
+                "path": cases["start-idle"]["evidence"][0]["path"], "sha256": "0" * 64}]}),
+             "another digest")):
+        _refused(desktop, changed, fragment)
+
+    # Evidence counts only by its recorded content, never by its name or place.
+    first = cases["start-idle"]["evidence"][0]
+    copy = Path(desktop.tmp, Path(first["path"]).name)
+    shutil.copy2(first["path"], copy)
+    _refused(desktop, variant(**{"cases__start-idle__evidence": [
+        {"path": str(copy), "sha256": first["sha256"]}]}), "not an observation this window")
+    original = Path(first["path"]).read_bytes()
+    Path(first["path"]).write_bytes(original.replace(b'"idle"', b'"idle" '))
+    _refused(desktop, receipt, "changed since it was recorded")
+    Path(first["path"]).unlink()
+    _refused(desktop, receipt, "missing or unreadable")
+    transport._stage(Path(first["path"]).parent, Path(first["path"]).name, original)
+
+    # A row from before the verified migration is stale; under 60 s idle is no idle prompt.
+    sid, pid, cwd = receipt["session_id"], receipt["pid"], receipt["cwd"]
+    desktop.harness_row("titan", "claude", pid, 800)
+    put = functools.partial(registry.put, "titan", "claude-code", sid, pid, 800, cwd)
+    put("idle", updated=_ms(record["verified"]["at"], -30))
+    _refused(desktop, variant(**{"cases__start-idle": _passed(_seen(desktop, "titan", cwd))}),
+             "predates")
+    put("needs-input", updated=_ms(record["verified"]["at"], 10) + 4000 + 30000)
+    _refused(desktop, variant(**{"cases__idle-needs-input":
+                                 _passed(_seen(desktop, "titan", cwd))}), "60 s")
+    # An unheld process is no held smoke.
+    desktop.drop_row("titan", pid)
+    desktop.harness_row("titan", "claude", pid, 800, held=False)
+    put("idle", updated=_ms(record["verified"]["at"], 10))
+    _refused(desktop, variant(**{"cases__start-idle": _passed(_seen(desktop, "titan", cwd))}),
+             "held")
+    desktop.drop_row("titan", pid)
+    registry.drop("titan", "claude-code", sid)
+    # A denial that met a Git identity error or committed cannot pass.
+    for args in (("config", "--unset", "user.name"), ("config", "--unset", "user.email")):
+        subprocess.run(["/usr/bin/git", "-C", cwd, *args], check=True)
+    _refused(desktop, variant(**{"cases__attribution-denial": _denial(
+        _seen(desktop, "titan", cwd))}), "Git identity")
+    subprocess.run(["/usr/bin/git", "-C", cwd, "-c", "user.name=x", "-c", "user.email=x@x",
+                    "commit", "-q", "--allow-empty", "-m", "probe"], check=True)
+    _refused(desktop, variant(**{"cases__attribution-denial": _denial(
+        _seen(desktop, "titan", cwd))}), "commit")
+
+    # The receipt itself records once, with the decision that attested it.
+    consumed = _record_receipt(desktop, receipt)
+    stored = state.current_window(desktop.root("titan"))["smokes"]["receipts"][
+        "titan/claude-code/personal"]
+    assert stored["receipt"] == receipt and stored["attempt_id"] == consumed["attempt_id"]
+    assert stored["decision_sha256"] == consumed["decision_sha256"]
+    with pytest.raises(window.Failed, match="already recorded"):
+        _record_receipt(desktop, receipt)
+
+
+@needs_zsh
+def test_short_receipts_cover_each_home(desktop):
+    """Each work home and both Europa homes need their own short receipt: Europa's are bound to
+    Europa's own observations, both Codex homes need their own human trust review, and no
+    session serves two homes."""
+    record, prepared = _ready_window(desktop)
+    registry = Registry(desktop)
+    _controller_up(desktop, registry)
+    europa = _short(desktop, registry, record, "europa", "claude-code", "personal",
+                    SESSIONS["europa"], 3998001, 900)
+    assert smoke.check_receipt(state.current_window(desktop.root("titan")), europa)
+    _record_receipt(desktop, europa)
+    titan_refs = _short(desktop, registry, record, "titan", "codex", "work",
+                        SESSIONS["codex-work"], 3998101, 910)
+    # Titan's observations are no evidence for Europa's other home.
+    moved = {**titan_refs, "host": "europa", "harness": "claude-code",
+             "row_id": f"claude-code:{SESSIONS['codex-work']}",
+             "versions": {"installed": CLAUDE_PIN, "evidence": CLAUDE_PIN}}
+    _refused(desktop, moved, "observed on titan")
+    _refused(desktop, {**titan_refs, "versions": {"installed": CLAUDE_PIN,
+                                                  "evidence": CLAUDE_PIN}},
+             "installed and evidence version")
+    _refused(desktop, {**titan_refs, "human": {}}, "trust")
+    _refused(desktop, {**titan_refs, "human": {"trust": "approved", "permission": "approved"}},
+             "trust")
+    _refused(desktop, {**titan_refs, "matrix": "full"}, "short")
+    _record_receipt(desktop, titan_refs)
+    # The personal Codex home is not covered by the work home's review or session.
+    reused = {**titan_refs, "home": "personal", "matrix": "full"}
+    _refused(desktop, reused, "already used")
+    with pytest.raises(window.Failed) as raised:
+        smoke.validate_smokes(state.current_window(desktop.root("titan")))
+    assert raised.value.status == "blocked"
+    for slot in ("titan Claude personal (full)", "titan Codex personal (full)",
+                 "titan Claude work (short)", "europa Claude work (short)"):
+        assert slot in raised.value.error
+    assert "europa Claude personal" not in raised.value.error
+    assert "titan Codex work" not in raised.value.error
+
+
+def test_human_attestation_is_required(desktop, monkeypatch):
+    """record-smoke records a receipt only with the human's own answer about its trust and
+    permission verdicts: an actual session ask and reply in a decision file, or the operator's
+    terminal answer. Without either it stops with instructions; declined, unanswered, altered,
+    replayed or mis-kinded answers and human fields that are not approved record nothing."""
+    record, _ = _ready_window(desktop)
+    registry = Registry(desktop)
+    _controller_up(desktop, registry)
+    receipt = _short(desktop, registry, record, "titan", "claude-code", "work",
+                     SESSIONS["work"], 3999001, 950)
+    path = _private_file(desktop, "receipt.json", receipt)
+    root = desktop.root("titan")
+
+    def recorded_now():
+        return state.current_window(root).get("smokes", {}).get("receipts", {})
+
+    stopped = _cli(desktop, monkeypatch, ["record-smoke", "--receipt", path])
+    assert stopped.code == 1 and "record-smoke stopped" in stopped.stdout
+    assert "--preview" in stopped.stdout and "--decision-file" in stopped.stdout
+    assert "ask the user in the session" in stopped.stdout
+    assert recorded_now() == {}
+    assert not list((Path(record["directory"]) / "decisions").glob("smoke-*"))
+
+    before = window_file(record).read_bytes()
+    preview = _cli(desktop, monkeypatch, ["record-smoke", "--preview", "--receipt", path])
+    assert preview.code == 0, preview.stdout
+    assert window_file(record).read_bytes() == before
+    attempt, digest = PREVIEWED.search(preview.stdout).groups()
+    assert (attempt, digest) == ("smoke-1", sha(receipt))
+    assert f"kind {smoke.KIND}, action {smoke.ACTION}" in preview.stdout
+    assert "trust approved" in preview.stdout and "yourself" in preview.stdout
+    assert preview.stdout.splitlines()[-1] == "  next: " + cli.command_line(
+        ["record-smoke", "--receipt", path, "--decision-file", cli.DECISION_PLACEHOLDER])
+
+    for name, decision, fragment in (
+            ("declined.json", _attestation(record, attempt, digest, reply="no, an agent did it",
+                                           verdict="declined"), "declined"),
+            ("empty.json", _attestation(record, attempt, digest, reply="  "), "reply is empty"),
+            ("desktop.json", _attestation(record, attempt, digest, kind="desktop"),
+             "kind does not match"),
+            ("other.json", _attestation(record, attempt, "e" * 64), "subject_sha256")):
+        result = _cli(desktop, monkeypatch, ["record-smoke", "--receipt", path,
+                                             "--decision-file", _private_file(desktop, name,
+                                                                              decision)])
+        assert result.code == 1 and fragment in result.stdout, (name, result.stdout)
+        assert recorded_now() == {}
+    with pytest.raises(SystemExit) as raised:
+        _cli(desktop, monkeypatch, ["record-smoke", "--receipt", path, "--yes"])
+    assert raised.value.code == 2
+    with pytest.raises(SystemExit):
+        _cli(desktop, monkeypatch, ["record-smoke", "--receipt", path, "--approved"])
+
+    # Human fields that are not approved never pass, whatever the decision says.
+    unanswered = {**receipt, "human": {"trust": "unanswered"}}
+    other_path = _private_file(desktop, "unanswered.json", unanswered)
+    result = _cli(desktop, monkeypatch, ["record-smoke", "--receipt", other_path,
+                                         "--decision-file", _private_file(
+                                             desktop, "approve-unanswered.json", _attestation(
+                                                 record, attempt, sha(unanswered)))])
+    assert result.code == 1 and "unanswered" in result.stdout and recorded_now() == {}
+
+    session = _private_file(desktop, "session.json", _attestation(record, attempt, digest))
+    done = _cli(desktop, monkeypatch, ["record-smoke", "--receipt", path, "--decision-file",
+                                       session])
+    assert done.code == 0, done.stdout
+    assert "recorded titan Claude work (short)" in done.stdout
+    assert "avoid cl, clw" in done.stdout
+    stored = recorded_now()["titan/claude-code/work"]
+    consumed = state.load_record(Path(record["directory"]) / "decisions" / "smoke-1.json")
+    assert (consumed["kind"], consumed["action"], consumed["subject_sha256"]) == (
+        smoke.KIND, smoke.ACTION, sha(receipt))
+    assert consumed["decision"]["source"]["type"] == "session"
+    assert stored["attempt_id"] == "smoke-1" and stored["receipt"] == receipt
+    replayed = _cli(desktop, monkeypatch, ["record-smoke", "--receipt", path, "--decision-file",
+                                           session])
+    assert replayed.code == 1 and "already recorded" in replayed.stdout
+
+    # The operator's own terminal: "no" declines; "yes" attests once.
+    europa = _short(desktop, registry, record, "europa", "claude-code", "work",
+                    SESSIONS["europa-work"], 3999101, 960)
+    europa_path = _private_file(desktop, "europa.json", europa)
+    declined = _cli(desktop, monkeypatch, ["record-smoke", "--receipt", europa_path],
+                    answer=b"no\n")
+    assert declined.code == 1 and "declined" in declined.stdout
+    answered = _cli(desktop, monkeypatch, ["record-smoke", "--receipt", europa_path],
+                    answer=b"yes\n")
+    assert answered.code == 0, answered.stdout
+    assert "trust approved" in answered.terminal and "yourself" in answered.terminal
+    assert SESSIONS["europa-work"] in answered.terminal
+    tty = state.load_record(Path(record["directory"]) / "decisions" / "smoke-2.json")
+    assert tty["decision"]["source"]["type"] == "tty" and tty["kind"] == smoke.KIND
+    assert set(recorded_now()) == {"titan/claude-code/work", "europa/claude-code/work"}
+
+
+def test_handoff_freezes_claude_picks(desktop, monkeypatch):
+    """From the verified migration until finish, every handoff names both hosts and both
+    homes, freezes Claude's model and effort defaults, and allows only the printed held
+    launches, naming cl and clw. Preparation and a parked wait carry no such restriction."""
+    root = desktop.root("titan")
+    prepared = _fixture_prepared(desktop)
+
+    def frozen(text, current):
+        assert "titan (Claude personal and work, Codex personal and work)" in text
+        assert "europa (Claude personal and work)" in text
+        assert "do not change or save Claude model or effort defaults" in text
+        assert "/model or /effort" in text
+        assert "avoid cl, clw" in text and "unheld Claude or IDE clients" in text
+        assert "update or install commands" in text
+        assert "familiar-reap.timer stays paused on titan and europa until finish" in text
+        for _, argv in smoke.commands(recovery._prepared(current)):
+            assert shlex.join(argv) in text
+
+    record, _ = _pending_window(desktop)
+    status = _cli(desktop, monkeypatch, ["status"])
+    assert status.code == 0, status.stdout
+    frozen(status.stdout, record)
+    assert "Do not open Claude or Codex" not in status.stdout
+    assert status.stdout.splitlines()[-1] == "  next: " + cli.command_line(["restart-surfaces"])
+    again = _cli(desktop, monkeypatch, ["run"])
+    assert again.code == 0, again.stdout
+    assert "already verified its migration" in again.stdout
+    frozen(again.stdout, record)
+    # Smokes and finish wait for the surfaces.
+    early = _cli(desktop, monkeypatch, ["record-smoke", "--observe", "titan"])
+    assert early.code == 1 and "surfaces" in early.stdout
+    frozen(early.stdout, record)
+    assert early.stdout.splitlines()[-1] == "  next: " + cli.command_line(["restart-surfaces"])
+    unfinished = _cli(desktop, monkeypatch, ["finish"])
+    assert unfinished.code == 1 and "surfaces" in unfinished.stdout
+    assert unfinished.stdout.splitlines()[-1] == "  next: " + cli.command_line(
+        ["restart-surfaces"])
+    with_state(state.current_window(root), "recovered")
+
+    ready, _ = _ready_window(desktop)
+    status = _cli(desktop, monkeypatch, ["status"])
+    frozen(status.stdout, ready)
+    assert status.stdout.splitlines()[-1] == "  next: " + cli.command_line(
+        ["record-smoke", "--observe", "titan"])
+    # The window's end releases it; a parked preparation never had it.
+    with_state(state.current_window(root), "complete")
+    state.save_record(root / window.PREPARED, prepared)
+    parked = _cli(desktop, monkeypatch, ["status"])
+    assert parked.code == 0, parked.stdout
+    assert "avoid cl" not in parked.stdout and "model or effort" not in parked.stdout
+    assert "ordinary Claude and Codex use stays allowed, including cl, clw" in parked.stdout
+
+
+def test_finish_refuses_incomplete_receipts(desktop, monkeypatch):
+    """finish needs every required receipt before it contacts any host; a pilot window's
+    receipts never finish anything, and an unproven hold sends finish to full recovery."""
+    record, _ = _ready_window(desktop)
+    requests = _requests(monkeypatch, desktop)
+    before = window_file(record).read_bytes()
+    result = _cli(desktop, monkeypatch, ["finish"])
+    finish_called_with_incomplete_receipts = any(
+        entry["operation"] in ("timer-restore", "service-run") for _, entry in _sends(requests))
+    assert not finish_called_with_incomplete_receipts
+    assert requests == [] and window_file(record).read_bytes() == before
+    assert result.code == 1 and "6 required smoke receipt(s) are missing" in result.stdout
+    assert "familiar-reap.timer stays paused on titan and europa" in result.stdout
+    assert result.stdout.splitlines()[-1] == "  next: " + cli.command_line(
+        ["record-smoke", "--observe", "titan"])
+    with_state(state.current_window(desktop.root("titan")), "recovered")
+
+    pilot, _ = _ready_window(desktop, mode="pilot")
+    with pytest.raises(window.Failed, match="pilot"):
+        finish.finish_window(pilot)
+    with_state(state.current_window(desktop.root("titan")), "recovered")
+
+    # Claude moved after the bootstrap: finish stops before any timer, for full recovery.
+    ready, _ = _ready_window(desktop)
+    registry = Registry(desktop)
+    _controller_up(desktop, registry)
+    checked = []
+    monkeypatch.setattr(smoke, "validate_smokes", lambda current: checked.append(current["id"]))
+    desktop.move_claude()
+    with pytest.raises(window.Failed) as raised:
+        finish.finish_window(state.current_window(desktop.root("titan")))
+    failed = raised.value
+    assert (failed.step, failed.status) == ("hold", "breach") and checked == [ready["id"]]
+    assert failed.next_command == ["recover"]
+    assert not any(entry["operation"] in ("timer-restore", "service-run", "target-verify")
+                   for _, entry in _sends(requests))
+    current = state.current_window(desktop.root("titan"))
+    assert current["state"] == "recovery-required" and not recovery.reconcilable(current)
+
+
+def test_smoke_hold_breach_stops_new_smokes(desktop, monkeypatch):
+    """Claude moved on a host after the bootstrap: the first observation that sees it stops new
+    smokes, reports the paused timers and names ordinary-shell full recovery. Nothing forward
+    runs from there; recovery itself never needs the obsolete evidence."""
+    record, _ = _ready_window(desktop)
+    registry = Registry(desktop)
+    _controller_up(desktop, registry)
+    receipt = _short(desktop, registry, record, "titan", "claude-code", "work",
+                     SESSIONS["work"], 3999201, 970)
+    desktop.move_claude()
+    breach = _cli(desktop, monkeypatch, ["record-smoke", "--observe", "europa"])
+    assert breach.code == 1 and "step: hold" in breach.stdout and "host: europa" in breach.stdout
+    for fragment in ("stop new smokes", "familiar-reap.timer stays paused on titan and europa",
+                     "ordinary shell", "every Claude and Codex session"):
+        assert fragment in breach.stdout, fragment
+    assert breach.stdout.splitlines()[-1] == "  next: " + cli.command_line(["recover"])
+    current = state.current_window(desktop.root("titan"))
+    assert current["state"] == "recovery-required" and current["failure"]["step"] == "hold"
+    assert not recovery.reconcilable(current)
+    report = window.status()
+    assert report["next"] == ["recover"] and "stop new smokes" in report["detail"]
+    assert "paused on titan, europa" in report["detail"]
+    path = _private_file(desktop, "late.json", receipt)
+    late = _cli(desktop, monkeypatch, ["record-smoke", "--preview", "--receipt", path])
+    assert late.code == 1 and late.stdout.splitlines()[-1] == "  next: " + cli.command_line(
+        ["recover"])
+    refused = _cli(desktop, monkeypatch, ["finish"])
+    assert refused.code == 1 and refused.stdout.splitlines()[-1] == "  next: " + \
+        cli.command_line(["recover"])
+    assert current.get("smokes", {}).get("receipts", {}) == {}
+
+
+@needs_zsh
+def test_selected_evidenced_version_can_advance_before_window(cutover):
+    """Claude moved before the window. Stale proof never passes: preparation refuses until the
+    reviewed evidence for the newly selected version is staged, then accepts that version with
+    no code pinned to 2.1.304, and a window's receipts must name the version it prepared."""
+    cutover.move_claude("2.1.305")
+    with pytest.raises(window.Failed) as raised:
+        preparation.prepare(SESSION)
+    assert any("2.1.305" in blocker and "2.1.304" in blocker
+               for blocker in raised.value.blockers)
+    assert not (cutover_root(cutover) / window.PREPARED).exists()
+    for host in HOSTS:
+        transport._write(cutover.home(host) /
+                         "d/ops/docs/runbooks/relay-guard-evidence-claude-code.json",
+                         json.dumps({"harness": "claude-code", "version": "2.1.305"}) + "\n")
+    cutover.pins["claude_version"] = "2.1.305 (Claude Code)"
+    cutover.write_manifest(generation="g2")
+    prepared = preparation.prepare(SESSION)
+    assert prepared["pins"]["claude_version"] == "2.1.305 (Claude Code)"
+    for host in HOSTS:
+        claude = prepared["hosts"][host]["claude"]
+        assert claude["versions"] == {"personal": "2.1.305 (Claude Code)",
+                                      "work": "2.1.305 (Claude Code)"}
+        assert claude["real"].endswith("/versions/2.1.305")
+    assert all(any(word.endswith("/versions/2.1.305") for word in argv)
+               for label, argv in smoke.commands(prepared) if "Claude" in label)
+    record, _ = _ready_window(cutover, prepared=prepared)
+    stale = _receipt(record, "europa", "claude-code", "work", SESSIONS["europa-work"], 4000001,
+                     "/nonexistent", {name: _passed() for name in SHORT})
+    _refused(cutover, stale, "installed and evidence version 2.1.305 (Claude Code)")
+    fresh = {**stale, "versions": {"installed": "2.1.305 (Claude Code)",
+                                   "evidence": "2.1.305 (Claude Code)"}}
+    failed = _refused(cutover, fresh, "evidence")
+    assert "installed and evidence version" not in failed.error
+    _refused(cutover, {**fresh, "window_id": "20261019T000000Z-0ldw1nd0"}, "not this live window")
+
+
+@needs_zsh
+def test_final_check_names_bounded_refresh(cutover, monkeypatch):
+    """Before each request to close sessions, check is the fresh held check on both hosts. Its
+    instructions keep ordinary use allowed while parked, reuse the proof for unchanged
+    versions, name only Task 9 Steps 5–7 when Claude moved and a new pilot only for changed
+    helper or toolchain bytes. The agent refreshes and reviews; the tool runs no loop."""
+    prepared = _cli(cutover, monkeypatch, ["prepare", "--controller-session", SESSION])
+    assert prepared.code == 0, prepared.stdout
+
+    def bounded(text):
+        assert "ordinary Claude and Codex use stays allowed, including cl, clw" in text
+        assert "immediately before each request to close every Claude and Codex session" in text
+        assert "held version and doctor probes" in text and "titan and europa" in text
+        assert "unchanged versions keep the existing proof" in text
+        assert "repeat only Task 9 Steps 5–7" in text and "Steps 1" not in text
+        assert "rerun the pilot only if helper or toolchain bytes changed" in text
+        assert "surface" in text and "run prepare again" in text
+        assert "the agent performs and reviews any refresh" in text
+        assert "this tool runs no refresh or retry loop" in text
+        assert "avoid cl" not in text and "model or effort" not in text
+
+    bounded(prepared.stdout)
+    before = _operations(cutover)
+    checked = _cli(cutover, monkeypatch, ["check"])
+    assert checked.code == 0, checked.stdout
+    bounded(checked.stdout)
+    ran = [_operations(cutover)[name] for name in set(_operations(cutover)) - set(before)]
+    assert sorted(ran) == ["inputs-check", "inputs-check", "inventory", "inventory"]
+    status = _cli(cutover, monkeypatch, ["status"])
+    bounded(status.stdout)
+
+    record = (cutover_root(cutover) / window.PREPARED).read_bytes()
+    cutover.move_claude("2.1.305")
+    before = _operations(cutover)
+    moved = _cli(cutover, monkeypatch, ["check"])
+    assert moved.code == 1 and "check stopped" in moved.stdout
+    assert "2.1.305" in moved.stdout
+    bounded(moved.stdout)
+    ran = [_operations(cutover)[name] for name in set(_operations(cutover)) - set(before)]
+    assert sorted(ran) == ["inputs-check", "inputs-check", "inventory", "inventory"]
+    assert (cutover_root(cutover) / window.PREPARED).read_bytes() == record
+
+
+def record_finished(root):
+    return (state.current_window(root).get("finish") or {}).get("completed")
+
+
+@needs_zsh
+def test_partial_finish_keeps_original_timers(cutover, monkeypatch):
+    """finish after every receipt: with a resumed session's model pick changed, the fresh checks
+    still verify hooks and statusLine. A declined SSH route stops before any change; Europa's
+    timer restore failing after Titan's, a service still running and a failed service each
+    stop with the timers named. Every retry reconciles actual timers and services and never
+    replaces the original timer records, rewrites rollback originals or touches hooks or
+    source. The last one verifies closure and releases the hold."""
+    cutover.start_dropbox()
+    prepared = preparation.prepare(SESSION)
+    opened = window.open_window(prepared)
+    migrated = window.run_window(prepared, run_decision(prepared, opened))
+    assert migrated["state"] == "ready-for-smokes"
+    root = cutover_root(cutover)
+    registry = Registry(cutover)
+    _controller_up(cutover, registry)
+    proof = smoke.observe_step(state.current_window(root), "titan")
+    assert proof["controller"] is not None
+    # The receipts themselves are the unit tests' concern: here they are taken as validated,
+    # with the two full smokes' abruptly killed sessions recorded for the closure check.
+    checked = []
+    monkeypatch.setattr(smoke, "validate_smokes", lambda current: checked.append(current["id"]))
+    current = state.current_window(root)
+    receipts = {f"titan/{harness}/personal": {"receipt": {
+        "host": "titan", "harness": harness, "cases": {"abrupt-death": {
+            "session_id": SESSIONS[name]}}}} for harness, name in (
+        ("claude-code", "abrupt"), ("codex", "codex-abrupt"))}
+    window._save(current, smokes={**current["smokes"], "receipts": receipts})
+    registry.put("titan", "claude-code", SESSIONS["abrupt"], 4100001, 5, "/tmp", dead=True)
+
+    value = json.loads(cutover.target("titan", "claude").read_bytes())
+    value["model"] = "sonnet"  # a resumed session saved a pick despite the handoff
+    cutover.write_target("claude", json.dumps(value, indent="\t").encode() + b"\n")
+    directory = Path(migrated["directory"])
+
+    def rollback():
+        return {path.name: path.read_bytes() for path in sorted(directory.glob("*.original"))
+                + sorted((directory / "live").iterdir())}
+
+    def timer_records():
+        found = {str(path): path.read_bytes() for host in HOSTS for path in [
+            cutover.root(host) / "quiesce" / migrated["id"] / "timers.json",
+            directory / "hosts" / host / "timers.json"]}
+        assert len(found) == 4
+        return found
+
+    timer_records_before, originals = timer_records(), rollback()
+    targets_now = _targets(cutover)
+    mark = len(cutover.lines("observed"))
+
+    def attempt():
+        result = _cli(cutover, monkeypatch, ["finish"])
+        cutover.reload()
+        return result
+
+    # 1. The SSH route to Europa is declined: nothing changes anywhere.
+    cutover.config["unreachable"] = True
+    cutover.save()
+    declined = attempt()
+    assert declined.code == 1 and "host: europa" in declined.stdout
+    assert state.current_window(root)["state"] == "ready-for-smokes"
+    assert timers_active(cutover) == {"titan": "inactive", "europa": "inactive"}
+    assert declined.stdout.splitlines()[-1] == "  next: " + cli.command_line(["finish"])
+    # 2. Titan's timer restores, then Europa's restore fails.
+    cutover.config["unreachable"] = False
+    cutover.behave("europa", timers={"restore": "fail"})
+    partial = attempt()
+    assert partial.code == 1 and "step: timer-restore" in partial.stdout
+    assert "host: europa" in partial.stdout
+    assert "restored on titan" in partial.stdout and "still paused on europa" in partial.stdout
+    assert state.current_window(root)["state"] == "finishing"
+    assert timers_active(cutover) == {"titan": "active", "europa": "inactive"}
+    timer_records_after = timer_records()
+    assert timer_records_after == timer_records_before
+    report = window.status()
+    assert report["next"] == ["finish"] and "still paused on europa" in report["detail"]
+    # 3. Europa's service is still running past its bound; 4. it then fails.
+    cutover.behave("europa", timers={}, service={"polls": 10_000})
+    cutover.config["service"]["budget"] = 0.3
+    cutover.save()
+    running = attempt()
+    assert running.code == 1 and "step: service-run" in running.stdout
+    assert "still activating" in running.stdout and "nothing was killed" in running.stdout
+    cutover.behave("europa", service={"result": "exit-code", "status": 1})
+    cutover.config["service"]["budget"] = 20.0
+    cutover.save()
+    failing = attempt()
+    assert failing.code == 1 and "Result=exit-code" in failing.stdout
+    assert state.current_window(root)["state"] == "finishing"
+    assert timer_records() == timer_records_before
+    # 5. A recorded dead row still present stops closure; once reaped, finish completes.
+    # A declined user-systemd start on Europa leaves the service, and finish, pending.
+    cutover.behave("europa", service={"start": "fail"})
+    refused = attempt()
+    assert refused.code == 1 and "step: service-run" in refused.stdout
+    assert "exited 1" in refused.stdout and refused.stdout.splitlines()[-1] == "  next: " + \
+        cli.command_line(["finish"])
+    assert record_finished(root) is None
+    cutover.behave("europa", service={})
+    blocked = attempt()
+    assert blocked.code == 1 and "step: closure" in blocked.stdout
+    assert SESSIONS["abrupt"] in blocked.stdout
+    registry.drop("titan", "claude-code", SESSIONS["abrupt"])
+    done = attempt()
+    assert done.code == 0, done.stdout
+    record = state.current_window(root)
+    assert record["state"] == "complete" and checked
+    assert timers_active(cutover) == {"titan": "active", "europa": "active"}
+    for host in HOSTS:
+        service = record["finish"]["services"][host]
+        assert (service["result"], service["exec_main_status"]) == ("success", "0")
+        assert record["finish"]["timers"][host]["restored"] is True
+    assert record["finish"]["closure"]["controller"] == "kept"
+    assert timer_records() == timer_records_before and rollback() == originals
+    assert _targets(cutover) == targets_now  # the changed pick stays; no hook was rewritten
+    events = _recovery_events(cutover, mark)
+    assert not any(event.startswith(("restore:", "rollback:", "live:", "dry:"))
+                   or ":git-" in event or ":launched-" in event or "surface-" in event
+                   for event in events), events
+    # Each attempt past the declined one restored both hosts again from the same records.
+    assert [event for event in events if event.endswith(":timer-restored")] == [
+        "titan:timer-restored", "europa:timer-restored"] * 6
+    for fragment in ("finish", "complete", "Result=success ExecMainStatus=0",
+                     "held sessions keep DISABLE_UPDATES=1 until they exit",
+                     "cl, clw and Claude model or effort changes are allowed again"):
+        assert fragment in done.stdout, fragment
+    assert "avoid cl" not in done.stdout and "warning:" not in done.stdout
+    for host in HOSTS:
+        assert f"{host}: familiar's surfaces: familiar-niri-watch restarted, niri-desktop " \
+            "restarted" in done.stdout
+    assert "changed nothing" in declined.stdout
+    assert window.status()["window"]["state"] == "complete"

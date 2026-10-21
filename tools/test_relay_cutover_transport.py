@@ -633,6 +633,21 @@ def ledger(window):
         name[:-len(".original")] for name in os.listdir(window) if name.endswith(".original"))}
 
 
+if args == ["list", "--json"]:
+    # relay list --json: this host's fixture registry and liveness, as relay prints them.
+    with open(config["observed"], "a") as stream:
+        stream.write(json.dumps({"host": host, "tool": "relay", "args": args,
+                                 "hold": os.environ.get("DISABLE_UPDATES")}) + "\n")
+    if config["hosts"][host]["behavior"].get("relay") == "fail":
+        print("relay: error: fixture registry failure @SECRET@", file=sys.stderr)
+        sys.exit(1)
+    path = config["hosts"][host].get("registry")
+    if path and os.path.exists(path):
+        with open(path) as stream:
+            sys.stdout.write(stream.read())
+    else:
+        print(json.dumps({"snapshot": None, "liveness": {}}))
+    sys.exit(0)
 if args[:1] == ["rollback"]:
     # relay rollback --artifact A: each change returns to its before text when the target
     # still holds its after text.
@@ -823,6 +838,21 @@ GUARD = {"type": "command", "command": "~/d/ops/hooks/claude-pretooluse"}
 RELAY_HOOK = "/usr/bin/node ~/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js hook"
 STATUS_LINE = {"type": "command", "command": "~/d/familiar/bin/familiar statusline",
                "refreshInterval": 2}
+
+
+REGISTRY_GENERATION = "0199f5a1-0000-7000-8000-00000000c0de"
+BOOT = "0199f5a1-0000-7000-8000-00000000b007"
+
+
+def agent(harness, session, *, host, pid, start, cwd, state="idle", updated=None,
+          scope="session"):
+    """One relay registry row as relay v0.1.1's `list --json` prints it."""
+    return {"id": f"{harness}:{session}", "harness": harness, "sessionId": session,
+            "scope": scope, "process": {"platform": "linux", "host": host, "bootId": BOOT,
+                                        "pid": pid, "start": str(start)},
+            "cwd": cwd, "repoRoot": cwd, "remote": None, "projectKey": f"path:{cwd}",
+            "project": Path(cwd).name, "state": state,
+            "updatedAt": updated if updated is not None else int(time.time() * 1000)}
 
 
 def _command(text):
@@ -1071,8 +1101,8 @@ class World:
         monkeypatch.setenv("SSH_AUTH_SOCK", str(tmp_path / "agent.sock"))
         for key in ("DISABLE_UPDATES", "CLAUDE_CONFIG_DIR", "CODEX_HOME", "NIRI_SOCKET",
                     "DBUS_SESSION_BUS_ADDRESS", "PYTHONPYCACHEPREFIX", "CACHE_DIR",
-                    "npm_config_cache", "XDG_CACHE_HOME", "GIT_SSH_COMMAND", "GIT_DIR",
-                    "GIT_WORK_TREE", "GIT_INDEX_FILE"):
+                    "npm_config_cache", "XDG_CACHE_HOME", "XDG_CONFIG_HOME",
+                    "GIT_SSH_COMMAND", "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"):
             monkeypatch.delenv(key, raising=False)
         for module in (targets, familiar, restoration):
             monkeypatch.setattr(module, "SYNC_BUDGET_SECONDS", self.config["sync"]["budget"])
@@ -1432,6 +1462,64 @@ class World:
     def start_dropbox(self, hold=None):
         self.dropbox = Dropbox(self, hold)
         return self.dropbox
+
+    # --- smokes: the relay registry, familiar's intent, harness processes, scratch repos -----
+
+    def relay(self, host, agents, dead=()):
+        """This host's relay registry as `relay list --json` prints it: each agent row by its
+        ID, alive unless its ID is in `dead`. The fixture installer answers for relay."""
+        launcher = self.home(host) / "d/hq/relay/bin/relay"
+        fixture = self._fill(FIXTURE_INSTALLER, RELAY=RELAY_HOOK,
+                             TARGETS=json.dumps(TARGET_PATHS))
+        if launcher.read_text() != fixture:
+            _write(launcher, fixture, 0o755)
+        path = self.tmp / host / "registry.json"
+        if self.on_disk(host).get("registry") != str(path):
+            self.reload()
+            self.spec(host)["registry"] = str(path)
+            self.save()
+        revision = getattr(self, "revisions", {}).get(host, 0) + 1
+        self.revisions = {**getattr(self, "revisions", {}), host: revision}
+        snapshot = {"schema": 2, "generation": REGISTRY_GENERATION, "revision": revision,
+                    "agents": {agent["id"]: agent for agent in agents}}
+        liveness = {agent["id"]: {"status": "dead" if agent["id"] in dead else "alive",
+                                  "reason": "fixture"} for agent in agents}
+        path.write_text(json.dumps({"snapshot": snapshot, "liveness": liveness}))
+
+    def intent(self, host, sessions):
+        """familiar's intent projection on host, keyed by session ID; None moves it away."""
+        path = self.home(host) / ".local/state/familiar/intent.json"
+        if sessions is None:
+            path.unlink(missing_ok=True)
+            return
+        _write(path, json.dumps({session: {"state": "idle"} for session in sessions}))
+
+    def harness_row(self, host, harness, pid, start, held=True, exe=None):
+        """One live Claude or Codex process in host's process table, launched held."""
+        self.reload()
+        home = self.home(host)
+        link = home / (".local/bin/claude" if harness == "claude" else ".local/bin/codex")
+        real = exe or os.path.realpath(link)
+        row = {"pid": pid, "start_time": start, "comm": Path(real).name, "exe": real,
+               "argv": [real], **({"held": held} if harness == "claude" else {})}
+        self.spec(host)["rows"].append(row)
+        self.save()
+        return row
+
+    def drop_row(self, host, pid):
+        self.reload()
+        self.spec(host)["rows"] = [row for row in self.spec(host)["rows"] if row["pid"] != pid]
+        self.save()
+
+    def scratch(self, name, host="titan"):
+        """A fresh scratch Git repo on host with its own local identity, as the smoke sets up."""
+        path = self.tmp / host / "scratch" / name
+        path.mkdir(parents=True)
+        for args in (("init", "-q"), ("config", "user.name", "Relay smoke"),
+                     ("config", "user.email", "relay-smoke@example.invalid")):
+            subprocess.run(["/usr/bin/git", "-C", str(path), *args], check=True,
+                           env={"PATH": "/usr/bin:/bin", "HOME": str(path)})
+        return str(path)
 
     def close(self):
         if self.dropbox is not None:
@@ -3369,3 +3457,137 @@ def test_recovery_daemon_stop_uses_installed_codex(world):
     link.symlink_to("/usr/bin/true")
     stray = world.request("titan", "codex-daemon-stop", {**payload, "recovery": True})
     assert stray["status"] == "failed" and "standalone Codex release" in stray["error"]
+
+
+# --- smokes: the read-only observation and finish's pick-tolerant target check ----------------
+
+
+def test_smoke_observe_is_read_only(world):
+    """smoke-observe reads one host for a window's smokes: relay's own registry rows and their
+    liveness, the session IDs in familiar's intent, this user's Claude and Codex processes
+    with only their hold key, the installed executables' identity and, for a scratch repo,
+    its markers, commit count and Git identity. It writes nothing outside its operation
+    record, launches no Claude or Codex, and runs in either mode."""
+    table = operations.OPERATIONS
+    spec = table["smoke-observe"]
+    assert not spec.mutation and set(spec.hosts) == {"titan", "europa"}
+    for payload in ({"window_id": WINDOW, "cwd": "relative/scratch"},
+                    {"window_id": WINDOW, "command": "true"}, {"window_id": "../x"}, {}):
+        with pytest.raises(hosts.Refused):
+            world.request("europa", "smoke-observe", payload)
+    assert world.lines("ssh_log") == []
+
+    scratch = world.scratch("observe", "europa")
+    Path(scratch, "allowed.marker").touch()
+    row = world.harness_row("europa", "claude", 3995001, 700)
+    session = "0199f5a1-1111-7000-8000-000000000001"
+    world.relay("europa", [agent("claude-code", session, host="europa", pid=row["pid"],
+                                 start=row["start_time"], cwd=scratch, state="working",
+                                 updated=1_700_000_000_123)])
+    world.intent("europa", [session])
+
+    def outside():
+        return {name: entry for name, entry in world.snapshot("europa").items()
+                if not name.startswith(".local/state/hq")}
+
+    before, mark = outside(), len(world.lines("observed"))
+    response = world.request("europa", "smoke-observe", {"window_id": WINDOW, "cwd": scratch})
+    assert response["status"] == "completed", response["error"]
+    result = response["result"]
+    assert (result["host"], result["nodename"], result["mode"], result["window_id"]) == (
+        "europa", "europa", "live", WINDOW)
+    assert result["operation_id"] == response["operation_id"]
+    assert result["agents"] == {f"claude-code:{session}": {
+        "harness": "claude-code", "session_id": session, "scope": "session",
+        "state": "working", "cwd": scratch, "updated_at": 1_700_000_000_123,
+        "process": {"pid": row["pid"], "start": str(row["start_time"]), "host": "europa"},
+        "liveness": "alive"}}
+    assert result["intent"] == {"present": True, "sessions": [session]}
+    claude = os.path.realpath(world.home("europa") / ".local/bin/claude")
+    assert result["harnesses"] == {"claude": {
+        "path": str(world.home("europa") / ".local/bin/claude"), "real": claude,
+        "sha256": _digest(claude), "familiar": True}}
+    assert [entry for entry in result["processes"] if entry["pid"] == row["pid"]] == [{
+        "pid": row["pid"], "start_time": row["start_time"], "harness": "claude",
+        "exe": claude, "held": True, "known": True}]
+    assert result["scratch"] == {"cwd": scratch, "allowed_marker": True,
+                                 "denied_marker": False, "commits": 0, "identity": True}
+    calls = world.lines("observed")[mark:]
+    # Only relay ran among the observed tools; the fixture Git records only history changes.
+    assert [call["tool"] for call in calls] == ["relay"] and calls[0]["args"] == [
+        "list", "--json"]
+    assert outside() == before and os.listdir(world.root("europa")) == ["operations"]
+    text = json.dumps(response)
+    assert ENV_SECRET not in text and OUTPUT_SECRET not in text
+
+    # Read-only, so a pilot observes too; without a scratch repo it reads only the host.
+    world.intent("europa", None)
+    pilot = world.request("europa", "smoke-observe", {"window_id": WINDOW}, mode="pilot")
+    assert pilot["status"] == "completed", pilot["error"]
+    assert pilot["result"]["mode"] == "pilot" and pilot["result"]["scratch"] is None
+    assert pilot["result"]["intent"] == {"present": False, "sessions": []}
+    # A scratch path that is no directory, and a registry relay cannot print, stop the read.
+    missing = world.request("europa", "smoke-observe",
+                            {"window_id": WINDOW, "cwd": scratch + "-absent"})
+    assert missing["status"] == "failed" and "scratch" in missing["error"]
+    world.reload()
+    world.behave("europa", relay="fail")
+    failed = world.request("europa", "smoke-observe", {"window_id": WINDOW})
+    assert failed["status"] == "failed" and "relay list --json" in failed["error"]
+    assert OUTPUT_SECRET not in failed["error"]
+
+
+def test_finish_verify_accepts_only_pick_drift(world):
+    """finish's fresh check (`picks`) accepts a Claude target whose bytes differ from the sealed
+    dry output only in the clean filter's pick keys, as a resumed session's model change leaves
+    it, and still verifies its hooks, statusLine, installer and evidence. Any other change, a
+    Codex byte change and a changed sealed output refuse. The run's own gate stays exact."""
+    world.stage_cutover()
+    results = {}
+    for number, target_id in enumerate(("claude", "codex"), 1):
+        response = _dry(world, target_id, number)
+        assert response["status"] == "completed", response["error"]
+        results[target_id] = response["result"]
+        world.target("titan", target_id).write_bytes(
+            Path(response["result"]["copy"]).read_bytes())
+    expected = {target_id: result["expected"]["sha256"] for target_id, result in results.items()}
+    numbers = itertools.count(10)
+
+    def verify(**flags):
+        response = _execute("titan", "target-verify", {
+            "window_id": WINDOW, "targets": expected, "wait": False, "verify": True,
+            "manifest_sha256": _manifest_sha256(world), **flags}, next(numbers))
+        assert response["status"] in ("completed", "failed"), response
+        return response
+
+    exact = verify(picks=True)
+    assert exact["status"] == "completed", exact["error"]
+    assert exact["result"]["verified"] is True and exact["result"]["picks"] == []
+    live = world.target("titan", "claude")
+    sealed = live.read_bytes()
+    value = json.loads(sealed)
+    value["model"] = "sonnet"
+    live.write_bytes(json.dumps(value, indent="\t").encode() + b"\n")
+    mark = len(world.lines("observed"))
+    picked = verify(picks=True)
+    assert picked["status"] == "completed", picked["error"]
+    assert picked["result"]["verified"] is True and picked["result"]["picks"] == ["claude"]
+    assert picked["result"]["targets"]["claude"]["matches"] is False
+    verifies = [call for call in world.lines("observed")[mark:]
+                if call["tool"] == "relay-cutover" and call["args"][:1] == ["verify"]]
+    assert len(verifies) == 2  # hooks and statusLine are still checked for both targets
+    assert verify()["result"]["verified"] is False  # the run's gate: exact bytes only
+    value["env"] = {"FIXTURE": "1"}
+    live.write_bytes(json.dumps(value, indent="\t").encode() + b"\n")
+    assert verify(picks=True)["result"]["verified"] is False
+    live.write_bytes(sealed)
+    codex = world.target("titan", "codex")
+    codex.write_bytes(json.dumps(json.loads(codex.read_bytes()), indent=4).encode())
+    refused = verify(picks=True)
+    assert refused["result"]["verified"] is False and refused["result"]["picks"] == []
+    codex.write_bytes(Path(results["codex"]["copy"]).read_bytes())
+    live.write_bytes(json.dumps(value, indent="\t").encode() + b"\n")
+    Path(results["claude"]["copy"]).chmod(0o600)
+    Path(results["claude"]["copy"]).write_bytes(b"{}\n")
+    changed = verify(picks=True)
+    assert changed["status"] == "failed" and "sealed" in changed["error"]

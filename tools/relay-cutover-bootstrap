@@ -1,6 +1,6 @@
 #!/usr/bin/python3 -B
 """The cutover bootstrap for hq's closed-harness relay cutover: prepare, check, run,
-restart-surfaces, recover and status.
+restart-surfaces, record-smoke, finish, recover and status.
 
 Run it by explicit path, for example
 `~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap status`, from Zsh or any
