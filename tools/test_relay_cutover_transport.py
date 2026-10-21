@@ -11,12 +11,14 @@ import hashlib
 import itertools
 import json
 import os
+import pwd
 import re
 import shutil
 import signal
 import stat
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -180,7 +182,8 @@ def start(pid):
 
 
 pids, latch, seconds = sys.argv[1], sys.argv[2], float(sys.argv[3])
-grandchild = subprocess.Popen([sys.executable, "-S", "-c", "import time; time.sleep(600)"])
+grandchild = subprocess.Popen([sys.executable, "-S", "-c", "import time; time.sleep(600)"],
+                              env={"PATH": "/usr/bin:/bin", "HOME": os.environ["HOME"]})
 with open(pids, "a") as stream:
     stream.write(json.dumps({"child": [os.getpid(), start(os.getpid())],
                              "grandchild": [grandchild.pid, start(grandchild.pid)]}) + "\n")
@@ -263,6 +266,8 @@ def observe(**fields):
 
 
 def grandchild_hold():
+    # The one inherited environment: whether a real harness's own child keeps the hold that
+    # the helper set on the harness is exactly what this observes.
     probe = subprocess.run(
         [sys.executable, "-S", "-c", "import os; print(os.environ.get('DISABLE_UPDATES'))"],
         capture_output=True, text=True)
@@ -279,7 +284,8 @@ def linger(mode):
     ("linger"), or one that escapes the group and survives collection ("survive")."""
     probe = subprocess.Popen([sys.executable, "-S", "-c", "import time; time.sleep(600)"],
                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                             stderr=subprocess.DEVNULL, start_new_session=mode == "survive")
+                             stderr=subprocess.DEVNULL, start_new_session=mode == "survive",
+                             env={"PATH": "/usr/bin:/bin", "HOME": os.environ["HOME"]})
     with open(config["probes"], "a") as stream:
         stream.write(json.dumps({"host": host, "pid": probe.pid, "start_time": start(probe.pid),
                                  "args": args, "mode": mode}) + "\n")
@@ -527,7 +533,11 @@ if args[:1] != ["preflight"]:
         observe(exit=1)
         print(f"relay-cutover: {args[0]}: fixture failure @SECRET@", file=sys.stderr)
         sys.exit(1)
-    code = subprocess.run([sys.executable, "-B", "@TOOLS@/relay-cutover", *args]).returncode
+    # The real helper, with what it and its Git read from the environment its caller built.
+    env = {key: os.environ[key] for key in ("PATH", "HOME", "USER", "LANG", "TMPDIR",
+                                            "RELAY_CUTOVER_RELAY") if key in os.environ}
+    code = subprocess.run([sys.executable, "-B", "@TOOLS@/relay-cutover", *args],
+                          env=env).returncode
     observe(exit=code)
     sys.exit(code)
 observe()
@@ -1089,10 +1099,23 @@ class Dropbox:
         self.thread.join(timeout=10)
 
 
+SYSTEM_PATH = "/usr/bin:/bin"
+USER = pwd.getpwuid(os.getuid()).pw_name
+
+
+def explicit_env(home, **variables):
+    """The environment of a process a test starts, built key by key (ruling R56): the system
+    PATH, HOME at a directory the test owns, this account's USER, a fixed LANG and the named
+    variables. Nothing is inherited from the test process."""
+    return {"PATH": SYSTEM_PATH, "HOME": str(home), "USER": USER, "LANG": "C.UTF-8",
+            **{key: str(value) for key, value in variables.items()}}
+
+
 @functools.cache
 def _python_version():
-    return subprocess.run(["/usr/bin/python3", "--version"], capture_output=True,
-                          text=True, check=True).stdout.strip()
+    with tempfile.TemporaryDirectory() as home:
+        return subprocess.run(["/usr/bin/python3", "--version"], capture_output=True,
+                              text=True, check=True, env=explicit_env(home)).stdout.strip()
 
 
 class World:
@@ -1156,16 +1179,16 @@ class World:
         """This process's view of the world: HOME and the runtime directory are Titan's, the
         fixture's timing and tools replace the module constants, and the approved familiar
         pins are this world's own history once it is staged."""
-        monkeypatch, tmp_path = self.monkeypatch, self.tmp
-        monkeypatch.setenv("HOME", self.config["hosts"]["titan"]["home"])
-        monkeypatch.setenv("XDG_RUNTIME_DIR", self.config["hosts"]["titan"]["runtime"])
-        monkeypatch.setenv("FIXTURE_ENV_SECRET", ENV_SECRET)
-        monkeypatch.setenv("SSH_AUTH_SOCK", str(tmp_path / "agent.sock"))
-        for key in ("DISABLE_UPDATES", "CLAUDE_CONFIG_DIR", "CODEX_HOME", "NIRI_SOCKET",
-                    "DBUS_SESSION_BUS_ADDRESS", "PYTHONPYCACHEPREFIX", "CACHE_DIR",
-                    "npm_config_cache", "XDG_CACHE_HOME", "XDG_CONFIG_HOME",
-                    "GIT_SSH_COMMAND", "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"):
-            monkeypatch.delenv(key, raising=False)
+        monkeypatch = self.monkeypatch
+        # The controller hands its own environment to every helper it starts (hosts.py:
+        # start_request), so this process's environment is the one each test controls: it is
+        # replaced whole, key by key, for the test (ruling R56).
+        environment = self.environment()
+        for key in list(os.environ):
+            if key not in environment:
+                monkeypatch.delenv(key)
+        for key, value in environment.items():
+            monkeypatch.setenv(key, value)
         for module in (targets, familiar, restoration):
             monkeypatch.setattr(module, "SYNC_BUDGET_SECONDS", self.config["sync"]["budget"])
             monkeypatch.setattr(module, "SYNC_POLL_SECONDS", self.config["sync"]["poll"])
@@ -1183,6 +1206,14 @@ class World:
                 required=frozenset({"latch", "seconds"})))
         for key, value in self.config["pins"].items():
             monkeypatch.setitem(inputs.PINS, key, value)
+
+    def environment(self, **variables):
+        """This world's process environment, key by key: Titan's HOME and runtime directory, a
+        fake SSH agent socket and the fixture's secret, which must never be printed."""
+        titan = self.config["hosts"]["titan"]
+        return explicit_env(titan["home"], XDG_RUNTIME_DIR=titan["runtime"],
+                            SSH_AUTH_SOCK=self.tmp / "agent.sock",
+                            FIXTURE_ENV_SECRET=ENV_SECRET, **variables)
 
     def _fill(self, text, **extra):
         values = {"CONFIG": str(self.fixture / "config.json"), "SECRET": OUTPUT_SECRET,
@@ -1318,7 +1349,8 @@ class World:
     def raw(self, data):
         """Send bytes through the fake ssh with the fixed command, bypassing the controller."""
         result = subprocess.run([str(self.ssh), "-4", "-o", "BatchMode=yes", "europa", FIXED],
-                                input=data, capture_output=True, timeout=60)
+                                input=data, capture_output=True, timeout=60,
+                                env=self.environment())
         return json.loads(result.stdout)
 
     def owned_pids(self):
@@ -1870,7 +1902,7 @@ def test_lost_owner_is_unsettled_and_names_cancel(world):
 def _driver(world):
     driver = _write(world.fixture / "driver.py", world._fill(DRIVER, LATCH="-"))
     return subprocess.Popen([sys.executable, "-B", str(driver)], stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE, env=dict(os.environ))
+                            stderr=subprocess.PIPE, env=world.environment())
 
 
 def _requests(world):
@@ -2191,8 +2223,8 @@ def test_operation_records_are_private_and_explained(world):
     assert state.current_window(root) == window
 
 
-def test_process_table_reads_only_the_hold_key():
-    env = {"PATH": os.environ["PATH"], "FIXTURE_ENV_SECRET": ENV_SECRET}
+def test_process_table_reads_only_the_hold_key(tmp_path):
+    env = explicit_env(tmp_path, FIXTURE_ENV_SECRET=ENV_SECRET)
     held = subprocess.Popen(["/usr/bin/sleep", "30"], env={**env, "DISABLE_UPDATES": "1"})
     plain = subprocess.Popen(["/usr/bin/sleep", "30"], env=env)
     try:

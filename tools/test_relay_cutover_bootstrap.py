@@ -20,6 +20,7 @@ import signal
 import stat
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -784,7 +785,8 @@ def cutover(tmp_path, monkeypatch):
 
 def _cp(source, destination):
     """`cp -a`: modes, times, links and the fixture's socket nodes, as they were."""
-    subprocess.run(["/usr/bin/cp", "-a", "--", str(source), str(destination)], check=True)
+    subprocess.run(["/usr/bin/cp", "-a", "--", str(source), str(destination)], check=True,
+                   env=transport.explicit_env(Path(destination).parent))
 
 
 class Worlds:
@@ -1674,7 +1676,7 @@ def test_abort_after_sigkill_reconciles_first(prepared_cutover):
     script = transport._write(cutover.fixture / "quiesce_driver.py", QUIESCE_DRIVER.replace(
         "@TOOLS@", repr(str(TOOLS))).replace("@SSH@", repr(str(cutover.ssh))))
     driver = subprocess.Popen([sys.executable, "-B", str(script)], stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE, env=dict(os.environ))
+                              stderr=subprocess.PIPE, env=cutover.environment())
     try:
         transport._until(lambda: ("europa", "wait") in timer_calls(cutover), seconds=60)
         driver.kill()
@@ -1702,7 +1704,8 @@ def test_abort_after_sigkill_reconciles_first(prepared_cutover):
 
 
 def _dead_identity():
-    process = subprocess.Popen(["/usr/bin/sleep", "30"])
+    with tempfile.TemporaryDirectory() as home:
+        process = subprocess.Popen(["/usr/bin/sleep", "30"], env=transport.explicit_env(home))
     identity = {"pid": process.pid, "start_time": hosts._start_time(process.pid)}
     process.kill()
     process.wait()
@@ -1720,7 +1723,7 @@ def test_abort_prepared_window_after_crash(tmp_path, monkeypatch):
     assert state.load_record(Path(opened["directory"]) / "prepared.json") == prepared
 
     # A live invocation's window is never aborted from another one.
-    sleeper = subprocess.Popen(["/usr/bin/sleep", "30"])
+    sleeper = subprocess.Popen(["/usr/bin/sleep", "30"], env=transport.explicit_env(tmp_path))
     try:
         alive = with_state({**opened, "owner": {"pid": sleeper.pid, "start_time":
                                                 hosts._start_time(sleeper.pid)}}, "prepared")
@@ -1782,8 +1785,7 @@ def _zsh(command, env):
 
 @needs_zsh
 def test_failure_returns_to_zsh(cutover):
-    env = {key: os.environ[key] for key in ("USER", "HOME", "PATH", "LANG", "XDG_RUNTIME_DIR",
-                                            "FIXTURE_ENV_SECRET") if key in os.environ}
+    env = cutover.environment()
     assert os.access(BOOTSTRAP, os.X_OK)
     assert BOOTSTRAP.read_text().startswith("#!/usr/bin/python3 -B\n")
 
@@ -4792,7 +4794,8 @@ def test_resume_has_no_bypass_flags(tmp_path):
     assert printed == [shlex.join(argv) for _, argv in commands]
     for text, (_, argv) in zip(printed, commands):
         echoed = subprocess.run([str(transport.ZSH), "-f", "-c", "print -rl -- " + text],
-                                capture_output=True, text=True, check=True).stdout
+                                capture_output=True, text=True, check=True,
+                                env=transport.explicit_env(tmp_path)).stdout
         assert echoed.splitlines() == argv
 
 
@@ -5043,12 +5046,13 @@ def test_receipt_is_bound_to_real_cases(desktop):
     desktop.drop_row("titan", pid)
     registry.drop("titan", "claude-code", sid)
     # A denial that met a Git identity error or committed cannot pass.
+    git_env = transport.explicit_env(cwd)
     for args in (("config", "--unset", "user.name"), ("config", "--unset", "user.email")):
-        subprocess.run(["/usr/bin/git", "-C", cwd, *args], check=True)
+        subprocess.run(["/usr/bin/git", "-C", cwd, *args], check=True, env=git_env)
     _refused(desktop, variant(**{"cases__attribution-denial": _denial(
         _seen(desktop, "titan", cwd))}), "Git identity")
     subprocess.run(["/usr/bin/git", "-C", cwd, "-c", "user.name=x", "-c", "user.email=x@x",
-                    "commit", "-q", "--allow-empty", "-m", "probe"], check=True)
+                    "commit", "-q", "--allow-empty", "-m", "probe"], check=True, env=git_env)
     _refused(desktop, variant(**{"cases__attribution-denial": _denial(
         _seen(desktop, "titan", cwd))}), "commit")
 
@@ -5319,9 +5323,13 @@ def test_smoke_hold_breach_stops_new_smokes(desktop, monkeypatch):
     desktop.move_claude()
     breach = _cli(desktop, monkeypatch, ["record-smoke", "--observe", "europa"])
     assert breach.code == 1 and "step: hold" in breach.stdout and "host: europa" in breach.stdout
+    assert "stop new smokes" in breach.stdout
+    # The report shows the error's first 500 characters, and two executable paths under this
+    # test's home come first; the whole text is the one the window recorded.
+    recorded = state.current_window(desktop.root("titan"))["failure"]["error"]
     for fragment in ("stop new smokes", "familiar-reap.timer stays paused on titan and europa",
                      "ordinary shell", "every Claude and Codex session"):
-        assert fragment in breach.stdout, fragment
+        assert fragment in recorded, fragment
     assert breach.stdout.splitlines()[-1] == "  next: " + cli.command_line(["recover"])
     current = state.current_window(desktop.root("titan"))
     assert current["state"] == "recovery-required" and current["failure"]["step"] == "hold"
@@ -5338,7 +5346,6 @@ def test_smoke_hold_breach_stops_new_smokes(desktop, monkeypatch):
         cli.command_line(["recover"])
     assert current.get("smokes", {}).get("receipts", {}) == {}
     # A recovered merge ends this window; nothing promises a fresh pass in it.
-    recorded = current["failure"]["error"]
     assert "A recovered merge ends this window" in recorded
     assert "newly reviewed pins and inputs" in recorded
     assert "Task 9" not in recorded and "fresh window" not in recorded
