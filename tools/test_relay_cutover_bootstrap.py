@@ -3,6 +3,7 @@ and the pre-merge abort, run against throwaway roots and the transport tests' fi
 Decision dictionaries here are fixtures standing in for a recorded reply; nothing in these
 tests authenticates a human or answers a prompt for a live call."""
 import contextlib
+import copy
 import errno
 import fcntl
 import fnmatch
@@ -771,6 +772,77 @@ def cutover(tmp_path, monkeypatch):
     world.close()
 
 
+def _cp(source, destination):
+    """`cp -a`: modes, times, links and the fixture's socket nodes, as they were."""
+    subprocess.run(["/usr/bin/cp", "-a", "--", str(source), str(destination)], check=True)
+
+
+class Worlds:
+    """Fixture worlds whose setup runs whole cutover steps, built once per session and given to
+    each test as its own fresh copy. Records hold absolute paths, so every shared world lives at
+    one fixed path: each is kept pristine beside it and restored to it before each test, and no
+    test sees another's changes. `BUILDS[name]` is (the world its build starts from, or None,
+    and `build(world, patch, base)`), which runs the world and returns what tests read beside it,
+    such as results, marks and captured requests, on top of its base's; each test gets a copy."""
+
+    def __init__(self, base):
+        self.base, self.built = base, {}
+        self.live = base / "world"
+
+    def _restored(self, name, monkeypatch):
+        shutil.rmtree(self.live, ignore_errors=True)
+        _cp(self.base / f"{name}.pristine", self.live)
+        world = transport.World.attach(self.live, monkeypatch)
+        monkeypatch.setattr(window, "CHECKOUT", world.home("titan") / "d/hq")
+        return world
+
+    def _build(self, name):
+        start, build = BUILDS[name]
+        with pytest.MonkeyPatch.context() as patch:
+            if start is None:
+                shutil.rmtree(self.live, ignore_errors=True)
+                self.live.mkdir()
+                world, base = transport.World(self.live, patch), {}
+            else:
+                self._built(start)
+                world, base = self._restored(start, patch), self.built[start]
+            try:
+                built = {**base, **build(world, patch, copy.deepcopy(base))}
+            finally:
+                world.close()
+        _cp(self.live, self.base / f"{name}.pristine")
+        self.built[name] = built
+
+    def _built(self, name):
+        if name not in self.built:
+            self._build(name)
+
+    def restore(self, name, monkeypatch):
+        """The shared world `name`, restored for this test: (world, what its builds returned)."""
+        self._built(name)
+        return self._restored(name, monkeypatch), copy.deepcopy(self.built[name])
+
+
+@pytest.fixture(scope="session")
+def worlds(tmp_path_factory):
+    return Worlds(tmp_path_factory.mktemp("worlds"))
+
+
+def _prepared_world(world, patch, base):
+    """The staged cutover after prepare, which no run has used."""
+    world.stage_cutover()
+    patch.setattr(window, "CHECKOUT", world.home("titan") / "d/hq")
+    return {"prepared": preparation.prepare(SESSION)}
+
+
+@pytest.fixture
+def prepared_cutover(worlds, monkeypatch):
+    """The cutover world after prepare, restored for this test: (world, prepared record)."""
+    world, built = worlds.restore("prepared", monkeypatch)
+    yield world, built["prepared"]
+    world.close()
+
+
 def cutover_root(world, host="titan"):
     return world.root(host)
 
@@ -821,8 +893,9 @@ def decision_for(opened, attempt="run-1"):
                                   attempt_id=attempt, subject_sha256=sha(subject))
 
 
-def opened_with_decision(world):
-    prepared = preparation.prepare(SESSION)
+def opened_with_decision(world, prepared=None):
+    """A window opened for `prepared` (prepared now when none is given), with its decision."""
+    prepared = prepared or preparation.prepare(SESSION)
     opened = window.open_window(prepared)
     return prepared, opened, decision_for(opened)
 
@@ -1119,8 +1192,8 @@ def test_manifest_provenance_refusals(cutover, case):
 
 
 @needs_zsh
-def test_run_input_recheck_accepts_pick_only_drift(cutover):
-    prepared = preparation.prepare(SESSION)
+def test_run_input_recheck_accepts_pick_only_drift(prepared_cutover):
+    cutover, prepared = prepared_cutover
     recorded = (cutover_root(cutover) / "prepared.json").read_bytes()
     keys = transport.CLAUDE_KEYS
     personal = json.loads(cutover.target("titan", "claude").read_bytes())
@@ -1218,8 +1291,8 @@ def test_toolchain_drift_refuses_prepare(cutover, case):
 
 
 @needs_zsh
-def test_toolchain_drift_after_prepare_blocks_check(cutover):
-    prepared = preparation.prepare(SESSION)
+def test_toolchain_drift_after_prepare_blocks_check(prepared_cutover):
+    cutover, prepared = prepared_cutover
     assert preparation.check(prepared)["eligible"]
     _touch_tool("git")(cutover)
     result = preparation.check(prepared)
@@ -1275,8 +1348,8 @@ def test_prepare_allows_ordinary_claude_sessions(cutover):
 
 
 @needs_zsh
-def test_prepare_check_is_read_only(cutover):
-    prepared = preparation.prepare(SESSION)
+def test_prepare_check_is_read_only(prepared_cutover):
+    cutover, prepared = prepared_cutover
     root = cutover_root(cutover)
     before = {host: cutover.snapshot(host) for host in HOSTS}
     units = {host: cutover.units(host) for host in HOSTS}
@@ -1356,13 +1429,14 @@ def test_quiesce_stops_daemons_and_refreshes_snapshots(cutover):
 
 
 @needs_zsh
-def test_quiesce_daemon_survivors_block(cutover):
+def test_quiesce_daemon_survivors_block(prepared_cutover):
+    cutover, prepared = prepared_cutover
     codex = os.path.realpath(cutover.home("titan") / ".local/bin/codex")
     cutover.spec("titan")["rows"].append(
         {"pid": 3900501, "start_time": 61, "comm": "codex", "exe": codex,
          "argv": ["codex", "app-server"], "daemon": "personal"})
     cutover.behave("titan", daemon="survive")
-    prepared, opened, consumed = opened_with_decision(cutover)
+    prepared, opened, consumed = opened_with_decision(cutover, prepared)
     mark = len(cutover.lines("observed"))
     with pytest.raises(window.Failed) as raised:
         window.quiesce_window(prepared, consumed)
@@ -1377,9 +1451,10 @@ def test_quiesce_daemon_survivors_block(cutover):
 
 
 @needs_zsh
-def test_second_host_failure_aborts_both(cutover):
+def test_second_host_failure_aborts_both(prepared_cutover):
+    cutover, prepared = prepared_cutover
     cutover.behave("europa", timers={"record": "fail"})
-    prepared, opened, consumed = opened_with_decision(cutover)
+    prepared, opened, consumed = opened_with_decision(cutover, prepared)
     snapshots = {host: transport._tree_of(cutover.root(host) / "familiar-state") for host in HOSTS}
     mark = len(cutover.lines("observed"))
     with pytest.raises(window.Failed) as raised:
@@ -1406,10 +1481,11 @@ def test_second_host_failure_aborts_both(cutover):
 
 @needs_zsh
 @pytest.mark.parametrize("fault", ["fail-after", "partial"])
-def test_abort_completes_after_an_interrupted_timer_record(cutover, fault):
+def test_abort_completes_after_an_interrupted_timer_record(prepared_cutover, fault):
+    cutover, prepared = prepared_cutover
     # Europa's helper leaves a loose record (whole or torn) and fails before its reply.
     cutover.behave("europa", timers={"record": fault})
-    prepared, opened, consumed = opened_with_decision(cutover)
+    prepared, opened, consumed = opened_with_decision(cutover, prepared)
     with pytest.raises(window.Failed) as raised:
         window.quiesce_window(prepared, consumed)
     assert (raised.value.step, raised.value.host) == ("timer-record", "europa")
@@ -1433,9 +1509,10 @@ def test_abort_completes_after_an_interrupted_timer_record(cutover, fault):
 
 @needs_zsh
 @pytest.mark.parametrize("name", ["SIGTERM", "SIGINT", "SIGHUP"])
-def test_quiesce_signal_aborts_every_recorded_host(cutover, name):
+def test_quiesce_signal_aborts_every_recorded_host(prepared_cutover, name):
+    cutover, prepared = prepared_cutover
     cutover.behave("europa", timers={"wait": "signal"}, signal=name)
-    prepared, opened, consumed = opened_with_decision(cutover)
+    prepared, opened, consumed = opened_with_decision(cutover, prepared)
     handlers = {signum: signal.getsignal(signum) for signum in hosts.INTERRUPTS}
     with pytest.raises(window.Failed) as raised:
         window.quiesce_window(prepared, consumed)
@@ -1455,10 +1532,11 @@ def test_quiesce_signal_aborts_every_recorded_host(cutover, name):
 
 
 @needs_zsh
-def test_quiesce_second_signal_leaves_abort_incomplete(cutover):
+def test_quiesce_second_signal_leaves_abort_incomplete(prepared_cutover):
+    cutover, prepared = prepared_cutover
     cutover.behave("europa", timers={"wait": "signal"})
     cutover.behave("titan", timers={"restore": "signal"})
-    prepared, opened, consumed = opened_with_decision(cutover)
+    prepared, opened, consumed = opened_with_decision(cutover, prepared)
     with pytest.raises(window.Failed) as raised:
         window.quiesce_window(prepared, consumed)
     failed = raised.value
@@ -1481,9 +1559,10 @@ def test_quiesce_second_signal_leaves_abort_incomplete(cutover):
 
 
 @needs_zsh
-def test_abort_incomplete_requires_reconciliation(cutover):
+def test_abort_incomplete_requires_reconciliation(prepared_cutover):
+    cutover, prepared = prepared_cutover
     cutover.behave("europa", timers={"stop": "fail-after", "restore": "fail"})
-    prepared, opened, consumed = opened_with_decision(cutover)
+    prepared, opened, consumed = opened_with_decision(cutover, prepared)
     with pytest.raises(window.Failed) as raised:
         window.quiesce_window(prepared, consumed)
     failed = raised.value
@@ -1532,8 +1611,8 @@ window.quiesce_window(prepared, consumed)
 
 
 @needs_zsh
-def test_abort_after_sigkill_reconciles_first(cutover):
-    prepared = preparation.prepare(SESSION)
+def test_abort_after_sigkill_reconciles_first(prepared_cutover):
+    cutover, prepared = prepared_cutover
     cutover.behave("europa", timers={"wait": "latch"})
     script = transport._write(cutover.fixture / "quiesce_driver.py", QUIESCE_DRIVER.replace(
         "@TOOLS@", repr(str(TOOLS))).replace("@SSH@", repr(str(cutover.ssh))))
@@ -1817,44 +1896,48 @@ def run_decision(prepared, opened, attempt=None):
                                   attempt_id=attempt, subject_sha256=sha(subject))
 
 
-@pytest.fixture(scope="class")
-def migrated(tmp_path_factory):
-    """One whole run through the CLI, answered on a terminal, whose evidence the class's tests
-    read: interleaved live picks, a Dropbox that delivers familiar's merge to Europa only
-    after Europa first checked for it, and every request with the window as it stood."""
-    with pytest.MonkeyPatch.context() as patch:
-        world = transport.World(tmp_path_factory.mktemp("migrated"), patch)
-        try:
-            world.stage_cutover()
-            live = _interleaved()
-            for target_id, data in live.items():
-                world.write_target(target_id, data)
-            patch.setattr(window, "CHECKOUT", world.home("titan") / "d/hq")
-            # Titan's shell routes a build cache at preparation and elsewhere at the run.
-            patch.setenv("CACHE_DIR", str(world.tmp / "prepared-cache"))
-            prepared = preparation.prepare(SESSION)
-            patch.setenv("CACHE_DIR", str(world.tmp / "unprepared-cache"))
-            marks = {"observed": len(world.lines("observed")),
-                     "probes": len(world.lines("probes"))}
-            requests = _requests(patch, world)
-            world.start_dropbox(hold=_europa_polled(world, world.pins["familiar_pre"]))
-            master, slave = os.openpty()
-            patch.setattr(cli, "TTY", os.ttyname(slave))
-            os.write(master, b"yes\n")
-            out, err = io.StringIO(), io.StringIO()
-            try:
-                with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-                    code = cli.main(["run"])
-                terminal = _drain(master)
-            finally:
-                os.close(master)
-                os.close(slave)
-            yield SimpleNamespace(world=world, prepared=prepared, live=live, marks=marks,
-                                  requests=requests, code=code, out=out.getvalue(),
-                                  err=err.getvalue(), terminal=terminal,
-                                  window=state.current_window(cutover_root(world)))
-        finally:
-            world.close()
+def _cli_run_world(world, patch, base):
+    """One whole run through the CLI, answered on a terminal: interleaved live picks, a Dropbox
+    that delivers familiar's merge to Europa only after Europa first checked for it, and every
+    request with the window as it stood."""
+    world.stage_cutover()
+    live = _interleaved()
+    for target_id, data in live.items():
+        world.write_target(target_id, data)
+    patch.setattr(window, "CHECKOUT", world.home("titan") / "d/hq")
+    # Titan's shell routes a build cache at preparation and elsewhere at the run.
+    patch.setenv("CACHE_DIR", str(world.tmp / "prepared-cache"))
+    prepared = preparation.prepare(SESSION)
+    patch.setenv("CACHE_DIR", str(world.tmp / "unprepared-cache"))
+    marks = {"observed": len(world.lines("observed")), "probes": len(world.lines("probes"))}
+    requests = _requests(patch, world)
+    world.start_dropbox(hold=_europa_polled(world, world.pins["familiar_pre"]))
+    master, slave = os.openpty()
+    patch.setattr(cli, "TTY", os.ttyname(slave))
+    os.write(master, b"yes\n")
+    out, err = io.StringIO(), io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = cli.main(["run"])
+        terminal = _drain(master)
+    finally:
+        os.close(master)
+        os.close(slave)
+    # Read before the world is closed, which stops whatever it left running.
+    lingering = [entry for entry in world.lines("probes")[marks["probes"]:]
+                 if not transport._gone(entry["pid"], entry["start_time"])]
+    return {"prepared": prepared, "live": live, "marks": marks, "requests": requests,
+            "code": code, "out": out.getvalue(), "err": err.getvalue(), "terminal": terminal,
+            "window": state.current_window(cutover_root(world)), "lingering": lingering}
+
+
+@pytest.fixture
+def migrated(worlds, monkeypatch):
+    """The CLI run's world and evidence, restored for each test, so a test that changes the
+    world changes only its own copy."""
+    world, built = worlds.restore("cli-run", monkeypatch)
+    yield SimpleNamespace(world=world, **built)
+    world.close()
 
 
 @needs_zsh
@@ -2168,7 +2251,7 @@ class TestRun:
         final = [call for call in calls[quiesce:recorded] if call["tool"] == "preflight"]
         assert [call["host"] for call in final] == ["titan", "titan", "europa"]
         assert all(call["probes"] == [] for call in final)
-        assert all(transport._gone(entry["pid"], entry["start_time"]) for entry in lingered)
+        assert migrated.lingering == []  # none was left running when the run returned
         # Timers stop only after that check.
         assert recorded < stopped
 
@@ -2176,8 +2259,7 @@ class TestRun:
     def test_post_resume_pick_drift_refuses_restore(self, migrated):
         """After the verified migration the operator resumed Claude and changed a model pick,
         which the handoff forbids until finish. Choosing rollback then stops for inspection
-        before any write: no target, source or dependency changes and nothing is force-copied.
-        It runs last in this class because it changes the class's world."""
+        before any write: no target, source or dependency changes and nothing is force-copied."""
         world = migrated.world
         assert "do not change or save Claude model or effort defaults" in migrated.out
         root = cutover_root(world)
@@ -2212,8 +2294,8 @@ class TestRun:
 
 
 @needs_zsh
-def test_bootstrap_surviving_probe_refuses_before_mutation(cutover):
-    prepared = preparation.prepare(SESSION)
+def test_bootstrap_surviving_probe_refuses_before_mutation(prepared_cutover):
+    cutover, prepared = prepared_cutover
     cutover.behave("europa", probe="survive")
     opened = window.open_window(prepared)
     consumed = run_decision(prepared, opened)
@@ -2280,12 +2362,12 @@ MISMATCH = {
 
 @needs_zsh
 @pytest.mark.parametrize("case", sorted(MISMATCH))
-def test_dry_mismatch_aborts_before_merge(cutover, monkeypatch, case):
+def test_dry_mismatch_aborts_before_merge(prepared_cutover, monkeypatch, case):
+    cutover, prepared = prepared_cutover
     behavior, arrange, where, fragment = MISMATCH[case]
     cutover.behave("europa", **behavior)
     if arrange is not None:
         arrange(cutover, monkeypatch)
-    prepared = preparation.prepare(SESSION)
     log = _requests(monkeypatch, cutover)
     snapshots = {host: transport._tree_of(cutover.root(host) / "familiar-state") for host in HOSTS}
     opened = window.open_window(prepared)
@@ -2325,10 +2407,10 @@ def test_dry_mismatch_aborts_before_merge(cutover, monkeypatch, case):
 
 
 @needs_zsh
-def test_sync_timeout_requires_recovery(cutover):
+def test_sync_timeout_requires_recovery(prepared_cutover):
+    cutover, prepared = prepared_cutover
     cutover.config["sync"]["budget"] = 1.0  # familiar's merge never reaches Europa here
     cutover.save()
-    prepared = preparation.prepare(SESSION)
     opened = window.open_window(prepared)
     consumed = run_decision(prepared, opened)
     with pytest.raises(window.Failed) as raised:
@@ -2358,9 +2440,10 @@ def test_sync_timeout_requires_recovery(cutover):
 
 
 @needs_zsh
-def test_sync_wait_rechecks_closure_before_install(cutover):
+def test_sync_wait_rechecks_closure_before_install(prepared_cutover):
     """A Claude session opened on Europa while its install waits for the merge to arrive stops
     the install: closure is checked again after the wait, right before npm ci."""
+    cutover, prepared = prepared_cutover
     polled, opened = _europa_polled(cutover, cutover.pins["familiar_pre"]), []
     claude = os.path.realpath(cutover.home("europa") / ".local/bin/claude")
 
@@ -2376,7 +2459,6 @@ def test_sync_wait_rechecks_closure_before_install(cutover):
             opened.append(True)
         return bool(opened)
 
-    prepared = preparation.prepare(SESSION)
     cutover.start_dropbox(hold=hold)
     opened_window = window.open_window(prepared)
     consumed = run_decision(prepared, opened_window)
@@ -2396,15 +2478,15 @@ def test_sync_wait_rechecks_closure_before_install(cutover):
 
 
 @needs_zsh
-def test_dry_precondition_after_quiesce_aborts(cutover, monkeypatch):
+def test_dry_precondition_after_quiesce_aborts(prepared_cutover, monkeypatch):
     """dry_targets refuses a window whose prepared record it cannot read; in a run, that
     refusal after quiescence still takes the pre-merge abort on every recorded host."""
+    cutover, prepared = prepared_cutover
     def corrupt(world):
         current = state.current_window(cutover_root(world))
         (Path(current["directory"]) / "prepared.json").write_bytes(b"{not json")
 
     _after("quiesce_window", corrupt)(cutover, monkeypatch)
-    prepared = preparation.prepare(SESSION)
     opened = window.open_window(prepared)
     consumed = run_decision(prepared, opened)
     with pytest.raises(window.Failed) as raised:
@@ -2425,8 +2507,8 @@ def test_dry_precondition_after_quiesce_aborts(cutover, monkeypatch):
 
 
 @needs_zsh
-def test_bootstrap_run_needs_the_operator_decision(cutover, monkeypatch, capsys):
-    prepared = preparation.prepare(SESSION)
+def test_bootstrap_run_needs_the_operator_decision(prepared_cutover, monkeypatch, capsys):
+    cutover, prepared = prepared_cutover
     mark, root = len(cutover.lines("observed")), cutover_root(cutover)
 
     def run(*argv):
@@ -2515,9 +2597,10 @@ def _killed_at(monkeypatch, when):
     monkeypatch.setattr(window, "_save", _dies_once(window._save, when))
 
 
-def _failed_run(world, monkeypatch=None, kill=None):
-    """A whole run that stops past familiar's mark, by a fault or by `kill`."""
-    prepared = preparation.prepare(SESSION)
+def _failed_run(world, monkeypatch=None, kill=None, prepared=None):
+    """A whole run that stops past familiar's mark, by a fault or by `kill`, for `prepared`
+    (prepared now when none is given)."""
+    prepared = prepared or preparation.prepare(SESSION)
     opened = window.open_window(prepared)
     consumed = run_decision(prepared, opened)
     if kill is not None:
@@ -2525,6 +2608,77 @@ def _failed_run(world, monkeypatch=None, kill=None):
     with pytest.raises((window.Failed, Killed)) as raised:
         window.run_window(prepared, consumed)
     return raised.value, state.current_window(cutover_root(world))
+
+
+def _stopped_run(fault=None, kill=None):
+    """A build on the prepared world: Dropbox running, then one whole run stopped past
+    familiar's mark by `fault` ({host: fixture behavior}) or killed where `kill` names. It keeps
+    the native targets and dependencies from before the run, the stop as the run raised it, and
+    the window as the run left it."""
+    def build(world, patch, base):
+        for host, behavior in (fault or {}).items():
+            world.behave(host, **behavior)
+        world.start_dropbox()
+        native = (_targets(world), _modules(world))
+        failed, record = _failed_run(world, patch, kill=kill, prepared=base["prepared"])
+        stop = (SimpleNamespace(step=failed.step, host=failed.host, status=failed.status)
+                if isinstance(failed, window.Failed) else None)
+        return {"native": native, "failed": stop, "record": record}
+    return build
+
+
+def _ready_run(world, patch, base):
+    """A build on the prepared world: Dropbox running, then one whole run through its verified
+    migration and surface restart (`ready-for-smokes`), with the native targets and
+    dependencies from before it."""
+    world.start_dropbox()
+    native = (_targets(world), _modules(world))
+    prepared = base["prepared"]
+    opened = window.open_window(prepared)
+    migrated = window.run_window(prepared, run_decision(prepared, opened))
+    return {"native": native, "migrated": migrated}
+
+
+def _restored(worlds, monkeypatch, name):
+    """A shared world restored for this test, with Dropbox running as during its run."""
+    world, built = worlds.restore(name, monkeypatch)
+    world.start_dropbox()
+    return world, SimpleNamespace(**built)
+
+
+# Each shared world: the world its build starts from, and the build.
+BUILDS = {
+    "prepared": (None, _prepared_world),
+    "verify-failed": ("prepared", _stopped_run(fault={"europa": {"fail": ["verify"]}})),
+    "checkpoint-killed": ("prepared", _stopped_run(
+        kill=lambda changes: changes.get("state") == "migrated-surfaces-pending")),
+    "ready-run": ("prepared", _ready_run),
+    "cli-run": (None, _cli_run_world),
+}
+
+
+@pytest.fixture
+def verify_failed(worlds, monkeypatch):
+    """A run that applied all four targets, then failed Europa's verification."""
+    world, built = _restored(worlds, monkeypatch, "verify-failed")
+    yield world, built
+    world.close()
+
+
+@pytest.fixture
+def checkpoint_killed(worlds, monkeypatch):
+    """A run killed while it saved its verified checkpoint, its outcome unrecorded."""
+    world, built = _restored(worlds, monkeypatch, "checkpoint-killed")
+    yield world, built
+    world.close()
+
+
+@pytest.fixture
+def ready_run(worlds, monkeypatch):
+    """A run whose migration verified and whose surfaces restarted: `ready-for-smokes`."""
+    world, built = _restored(worlds, monkeypatch, "ready-run")
+    yield world, built
+    world.close()
 
 
 def _targets(world):
@@ -2598,15 +2752,13 @@ def _operations(world):
 
 
 @needs_zsh
-def test_recovery_requiesces_before_restore(cutover):
+def test_recovery_requiesces_before_restore(verify_failed):
     """All four targets were applied, then Europa's verification failed, and a failed finish had
     already restored both hosts' timers. Recovery stops both timers again from their original
     records and waits for both services before any restore, then returns every target, familiar's
     source and both hosts' dependencies to native, offline, with timers left paused."""
-    cutover.behave("europa", fail=["verify"])
-    cutover.start_dropbox()
-    native = (_targets(cutover), _modules(cutover))
-    failed, record = _failed_run(cutover)
+    cutover, run = verify_failed
+    native, failed, record = run.native, run.failed, run.record
     assert (failed.step, failed.host) == ("target-verify", "europa")
     assert record["state"] == "recovery-required"
     assert sorted(record["applied"]) == sorted(transport.TARGET_PATHS)
@@ -2668,17 +2820,18 @@ def test_recovery_requiesces_before_restore(cutover):
 
 
 @needs_zsh
-def test_missing_merge_record_uses_actual_parents(cutover, monkeypatch):
+def test_missing_merge_record_uses_actual_parents(prepared_cutover, monkeypatch):
     """The run died after git committed the merge but before the window recorded it.
     Reconciliation finds the merge from its actual parents and blocks fresh sessions; recovery
     records it before reverting it once, stops while Europa's source has not synchronized, and
     then completes from actual state with no second revert."""
+    cutover, prepared = prepared_cutover
     cutover.config["sync"]["budget"] = 1.0  # nothing delivers Titan's source to Europa yet
     cutover.save()
     native = (_targets(cutover), _modules(cutover))
     root = cutover_root(cutover)
     pre, tip = cutover.pins["familiar_pre"], cutover.pins["familiar_feature_tip"]
-    _, record = _failed_run(cutover, monkeypatch,
+    _, record = _failed_run(cutover, monkeypatch, prepared=prepared,
                             kill=lambda changes: "merge" in changes.get("familiar", {}))
     assert record["state"] == "applying" and "merge" not in record["familiar"]
     head = transport.familiar_head(cutover.home("titan"))
@@ -2761,16 +2914,17 @@ def _recover_decision(world, record, response="yes"):
 
 
 @needs_zsh
-def test_recovery_works_after_version_hold_breach(cutover):
+def test_recovery_works_after_version_hold_breach(prepared_cutover):
     """Claude moved past its reviewed evidence on both hosts after the live plan for claude
     refused, leaving only its guard retired, and Codex updated on Titan. The full recover reads
     neither that evidence nor the new version, launches no Claude, stops the Codex daemons with
     the release now installed, restores everything by its byte, Git and dependency proofs,
     restarts the surfaces from a desktop-only preview and restores the original timers."""
+    cutover, prepared = prepared_cutover
     cutover.behave("titan", installer={"live:claude": "plan-fail"})
     cutover.start_dropbox()
     native = (_targets(cutover), _modules(cutover))
-    failed, record = _failed_run(cutover)
+    failed, record = _failed_run(cutover, prepared=prepared)
     assert (failed.step, failed.host) == ("target-apply", "titan")
     assert [entry["target_id"] for entry in state.read_ledger(record)] == ["claude"]
     assert "applied" not in record
@@ -2844,15 +2998,16 @@ def _signal_when(condition, signum, seconds=60.0):
 
 
 @needs_zsh
-def test_recovery_signal_is_retried_by_reconciliation(cutover):
+def test_recovery_signal_is_retried_by_reconciliation(prepared_cutover):
     """A SIGTERM while Europa's dependency restore waits for its source cancels that operation
     explicitly. Reconciliation then finds nothing running, and the retry completes from actual
     state, repeating no guard restore, rollback, revert or dependency replacement."""
+    cutover, prepared = prepared_cutover
     cutover.behave("titan", installer={"live:claude-work": "apply-fail"})
     sync = {"allowed": True}
     cutover.start_dropbox(hold=lambda: sync["allowed"])
     native = (_targets(cutover), _modules(cutover))
-    failed, record = _failed_run(cutover)
+    failed, record = _failed_run(cutover, prepared=prepared)
     assert (failed.step, failed.host) == ("target-apply", "titan")
     assert [entry["target_id"] for entry in state.read_ledger(record)] == ["claude",
                                                                             "claude-work"]
@@ -2942,14 +3097,14 @@ def _settle_wait(world, directory, killed):
 
 @needs_zsh
 @pytest.mark.parametrize("unsettled", [None, "running", "owner-lost"])
-def test_reconcile_promotes_only_a_verified_migration(cutover, monkeypatch, unsettled):
+def test_reconcile_promotes_only_a_verified_migration(checkpoint_killed, monkeypatch,
+                                                      unsettled):
     """The run died writing its verified checkpoint. Reconciliation proves the migration from
     actual state on both hosts, reading only, and only then names the surface retry. Beside one
     of this window's own operations still running, or whose owner died while its child runs, it
     never promotes: it cancels nothing, requires recovery and names the complete command."""
-    cutover.start_dropbox()
-    _, record = _failed_run(cutover, monkeypatch, kill=lambda changes: changes.get(
-        "state") == "migrated-surfaces-pending")
+    cutover, run = checkpoint_killed
+    record = run.record
     assert record["state"] == "applying" and "verified" not in record
     assert "failure" not in record and len(record["applied"]) == 4
     # Status alone never promotes: it names restart-surfaces, which reconciles first, and
@@ -3019,16 +3174,17 @@ def test_reconcile_promotes_only_a_verified_migration(cutover, monkeypatch, unse
 
 
 @needs_zsh
-def test_reconcile_unverified_run_blocks_fresh_sessions(cutover, monkeypatch, capsys):
+def test_reconcile_unverified_run_blocks_fresh_sessions(prepared_cutover, monkeypatch, capsys):
     """The run died after Titan applied codex but before the window recorded it. With Europa
     unreachable its operations are unknown, so reconciliation cannot verify the migration: it
     requires recovery, blocks fresh sessions and names the complete recover command. A remote
     operation still running blocks every recovery mutation; once it finishes, recovery restores
     codex from its unrecorded apply."""
+    cutover, prepared = prepared_cutover
     cutover.start_dropbox()
     native = (_targets(cutover), _modules(cutover))
     root = cutover_root(cutover)
-    _, record = _failed_run(cutover, monkeypatch,
+    _, record = _failed_run(cutover, monkeypatch, prepared=prepared,
                             kill=lambda changes: "codex" in changes.get("applied", {}))
     assert record["state"] == "applying" and sorted(record["applied"]) == ["claude",
                                                                            "claude-work"]
@@ -3089,9 +3245,10 @@ def test_reconcile_unverified_run_blocks_fresh_sessions(cutover, monkeypatch, ca
 
 
 @needs_zsh
-def test_recover_pre_merge_incomplete_abort_follows_abort_only(cutover):
+def test_recover_pre_merge_incomplete_abort_follows_abort_only(prepared_cutover):
+    cutover, prepared = prepared_cutover
     cutover.behave("europa", timers={"stop": "fail-after", "restore": "fail"})
-    prepared, opened, consumed = opened_with_decision(cutover)
+    prepared, opened, consumed = opened_with_decision(cutover, prepared)
     with pytest.raises(window.Failed):
         window.quiesce_window(prepared, consumed)
     root = cutover_root(cutover)
@@ -3640,15 +3797,15 @@ def test_pilot_true_spawn_needs_its_consent(desktop):
 
 
 @needs_zsh
-def test_surface_failure_is_pending(cutover, monkeypatch):
+def test_surface_failure_is_pending(prepared_cutover, monkeypatch):
     """A whole run whose migration verified, then Europa's panel failed to start. Only the
     surfaces are pending: live hooks stay the verified ones, the handoff names the paused timers,
     the retry and safe resume rather than the mixed-hooks ban, a second run repeats nothing, and
     restart-surfaces with the agent's session decision rechecks the migration and starts only
     the missing surface."""
+    cutover, _ = prepared_cutover
     cutover.start_dropbox()
     cutover.behave("europa", spawn={"niri-desktop": "fail"})
-    preparation.prepare(SESSION)
     root = cutover_root(cutover)
     failed_surface_result = _cli(cutover, monkeypatch, ["run"], answer=b"yes\n")
     assert failed_surface_result.code == 1, failed_surface_result.stdout
@@ -3733,17 +3890,15 @@ def test_surface_failure_is_pending(cutover, monkeypatch):
 
 
 @needs_zsh
-def test_recover_six_stages_and_partial_timer_retry(cutover, monkeypatch):
+def test_recover_six_stages_and_partial_timer_retry(verify_failed, monkeypatch):
     """All four targets were applied, then Europa's verification failed. recover, answered on the
     operator's terminal at its start, runs its six stages in order: Codex daemons and no-live,
     timers stopped again, targets, source and dependencies, the surfaces restarted with this
     recovery's own consent, then the original timers and their service. Europa's timer restore
     fails once after Titan's succeeded; the next recover stops Titan's timer again before
     anything else and completes without restarting any surface again."""
-    cutover.behave("europa", fail=["verify"])
-    cutover.start_dropbox()
-    native = (_targets(cutover), _modules(cutover))
-    failed, record = _failed_run(cutover)
+    cutover, run = verify_failed
+    native, failed, record = run.native, run.failed, run.record
     assert (failed.step, failed.host) == ("target-verify", "europa")
     root = cutover_root(cutover)
     cutover.reload()
@@ -4811,17 +4966,15 @@ def record_finished(root):
 
 
 @needs_zsh
-def test_partial_finish_keeps_original_timers(cutover, monkeypatch):
+def test_partial_finish_keeps_original_timers(ready_run, monkeypatch):
     """finish after every receipt: with a resumed session's model pick changed, the fresh checks
     still verify hooks and statusLine. A declined SSH route stops before any change; Europa's
     timer restore failing after Titan's, a service still running and a failed service each
     stop with the timers named. Every retry reconciles actual timers and services and never
     replaces the original timer records, rewrites rollback originals or touches hooks or
     source. The last one verifies closure and releases the hold."""
-    cutover.start_dropbox()
-    prepared = preparation.prepare(SESSION)
-    opened = window.open_window(prepared)
-    migrated = window.run_window(prepared, run_decision(prepared, opened))
+    cutover, run = ready_run
+    migrated = run.migrated
     assert migrated["state"] == "ready-for-smokes"
     root = cutover_root(cutover)
     registry = Registry(cutover)
@@ -5076,17 +5229,14 @@ def test_finish_surface_retry_from_ready_for_smokes(desktop, monkeypatch):
 
 
 @needs_zsh
-def test_smoke_hold_breach_recovers_to_native(cutover, monkeypatch):
+def test_smoke_hold_breach_recovers_to_native(ready_run, monkeypatch):
     """Claude moved during the smokes of a migrated window whose surfaces restarted and whose
     smokes are recorded. Full recover, answered on the operator's terminal, still reaches
     native: targets, source and dependencies restored, familiar's surfaces restarted from them,
     the original timers and their service back, and no Claude launched despite the obsolete
     evidence."""
-    cutover.start_dropbox()
-    native = (_targets(cutover), _modules(cutover))
-    prepared = preparation.prepare(SESSION)
-    opened = window.open_window(prepared)
-    migrated = window.run_window(prepared, run_decision(prepared, opened))
+    cutover, run = ready_run
+    native, migrated = run.native, run.migrated
     assert migrated["state"] == "ready-for-smokes"
     root = cutover_root(cutover)
     registry = Registry(cutover)
@@ -5383,15 +5533,15 @@ def sha256_file(path):
 
 @needs_zsh
 @pytest.mark.parametrize("case", ["dry", "frozen", "merge"])
-def test_rehearsal_failure_cleans_scratch(cutover, monkeypatch, case):
+def test_rehearsal_failure_cleans_scratch(prepared_cutover, monkeypatch, case):
     """A rehearsal that stops removes every scratch root and records a failed verdict naming the
     step. Before the seal (Europa's dry run refuses) nothing needs restoring. A copy changed
     after its freeze is caught by live's own frozen gate before any merge; restoration then
     refuses its unknown bytes rather than force-copying. With Titan's clone merged and Europa's
     merge failed, restoration reverts Titan's clone and finds Europa's at PRE. With no answer to
     the spawn ask, the spawn gate is pending, never passed, and nothing is spawned."""
-    world, root = cutover, cutover_root(cutover)
-    preparation.prepare(SESSION)
+    world, _ = prepared_cutover
+    root = cutover_root(world)
     preview = _rehearse(world, monkeypatch, "--preview")
     assert preview.code == 0, preview.stdout
     host, behavior, step = {"dry": ("europa", {"installer": {"dry:claude": "refuse"}},
@@ -5446,12 +5596,12 @@ def test_rehearsal_failure_cleans_scratch(cutover, monkeypatch, case):
 
 
 @needs_zsh
-def test_rehearse_resumes_an_interrupted_pilot(cutover, monkeypatch):
+def test_rehearse_resumes_an_interrupted_pilot(prepared_cutover, monkeypatch):
     """A rehearsal killed after creating its scratch roots leaves its pilot window open, which
     blocks a live run; rehearse then reconciles it, removes every scratch root and closes it
     with an interrupted verdict, never a pass."""
-    world, root = cutover, cutover_root(cutover)
-    prepared = preparation.prepare(SESSION)
+    world, prepared = prepared_cutover
+    root = cutover_root(world)
     preview = _rehearse(world, monkeypatch, "--preview")
     record = state.current_window(root)
     roots = {host: transport._create(world, host, window_id=record["id"])["root"]
