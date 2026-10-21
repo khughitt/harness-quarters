@@ -145,6 +145,8 @@ def install(hosts, inventory, operations):
     restoration.SERVICE_POLL_SECONDS = CONFIG["service"]["poll"]
     for name, value in CONFIG["surfaces"].items():
         setattr(surfaces, name, value)
+    for name, value in CONFIG["timing"].items():
+        setattr(hosts, name, value)
     surfaces._terminate = lambda identity: _terminate(host, identity)
     inventory._process_rows = lambda: [
         {key: value for key, value in row.items() if key not in ("held", "daemon")}
@@ -157,6 +159,12 @@ FIXTURE_ENTRY = r'''#!/usr/bin/python3 -B
 import sys
 sys.path.insert(0, "@FIXTURE@")
 import fixture_remote
+# The standard library the helpers import, from its own bytecode; then the fixture's bytecode
+# cache, outside every home, so that a world compiles the helper package once, not per request.
+import argparse, contextlib, copy, dataclasses, datetime, errno, fcntl, hashlib, json  # noqa
+import pathlib, pwd, re, runpy, secrets, select, shlex, shutil, signal, stat  # noqa
+import subprocess, tempfile, threading, time, traceback  # noqa
+sys.pycache_prefix, sys.dont_write_bytecode = "@PYCACHE@", False
 from relay_cutover_bootstrap import hosts, inventory, operations
 fixture_remote.install(hosts, inventory, operations)
 sys.exit(hosts.serve())
@@ -814,6 +822,9 @@ CLAUDE_KEYS = ("model", "modelSettings", "effortLevel")
 # Surface restart waits, short in the fixture, in this process and in every helper.
 SURFACE_TIMING = {"STOP_SECONDS": 2.0, "APPEAR_SECONDS": 3.0, "SETTLE_SECONDS": 0.1,
                   "POLL_SECONDS": 0.02}
+# Transport waits no test asserts, short in the fixture, in this process and in every helper:
+# the lost-reply status poll and the drain after a child exits while descendants hold its pipes.
+HOST_TIMING = {"POLL_SECONDS": 0.05, "DRAIN_SECONDS": 0.1}
 FIXTURE_FILTER = '''"""Fixture clean filter: the cutover reads only its Claude pick keys."""
 import sys
 
@@ -1085,14 +1096,16 @@ def _python_version():
 
 
 class World:
-    """Two fixture hosts, their fake tools and the fake ssh, configured through one file."""
+    """Two fixture hosts, their fake tools and the fake ssh, configured through one file.
+
+    `attach` takes over a world another World built and a test restored at the same path (its
+    records hold absolute paths): the files are the world, and the patches are applied again.
+    Each helper keeps its compiled bytecode under the world's own `fixture/pycache`, outside
+    every home, so a world's later requests skip recompiling the helper package."""
 
     def __init__(self, tmp_path, monkeypatch):
-        self.tmp = tmp_path
-        self.fixture = tmp_path / "fixture"
+        self._paths(tmp_path)
         self.fixture.mkdir()
-        self.config_path = self.fixture / "config.json"
-        self.marker = tmp_path / "injected"
         tools = {}
         for name in ("node", "git", "systemctl", "niri"):
             tools[name] = str(self._tool(self.fixture / "usr/bin" / name, name))
@@ -1113,11 +1126,37 @@ class World:
             "pins": {key: PINS[key] for key in inputs.PINS},
             "sync": {"budget": 20.0, "poll": 0.05}, "npm_tree": NPM_TREE,
             "service": {"budget": 20.0, "poll": 0.05}, "surfaces": dict(SURFACE_TIMING),
+            "timing": dict(HOST_TIMING),
         }
         self.monkeypatch, self.pins, self.dropbox = monkeypatch, dict(PINS), None
         for host, remote in (("titan", False), ("europa", True)):
             self._host(host, remote)
         self.save()
+        self._patch()
+
+    @classmethod
+    def attach(cls, tmp_path, monkeypatch):
+        """The world built at tmp_path and restored there, with this test's patches."""
+        world = cls.__new__(cls)
+        world._paths(tmp_path)
+        world.ssh = world.fixture / "ssh"
+        world.config = json.loads(world.config_path.read_text())
+        world.monkeypatch, world.dropbox = monkeypatch, None
+        world.pins = {**PINS, **world.config["pins"]}
+        world._patch()
+        return world
+
+    def _paths(self, tmp_path):
+        self.tmp = tmp_path
+        self.fixture = tmp_path / "fixture"
+        self.config_path = self.fixture / "config.json"
+        self.marker = tmp_path / "injected"
+
+    def _patch(self):
+        """This process's view of the world: HOME and the runtime directory are Titan's, the
+        fixture's timing and tools replace the module constants, and the approved familiar
+        pins are this world's own history once it is staged."""
+        monkeypatch, tmp_path = self.monkeypatch, self.tmp
         monkeypatch.setenv("HOME", self.config["hosts"]["titan"]["home"])
         monkeypatch.setenv("XDG_RUNTIME_DIR", self.config["hosts"]["titan"]["runtime"])
         monkeypatch.setenv("FIXTURE_ENV_SECRET", ENV_SECRET)
@@ -1134,17 +1173,22 @@ class World:
         monkeypatch.setattr(restoration, "SERVICE_POLL_SECONDS", self.config["service"]["poll"])
         for name, value in SURFACE_TIMING.items():
             monkeypatch.setattr(surfaces, name, value)
+        for name, value in self.config["timing"].items():
+            monkeypatch.setattr(hosts, name, value)
         monkeypatch.setitem(hosts.TOOLS, "ssh", str(self.ssh))
         for name in ("fixture-step", "fixture-short"):
             monkeypatch.setitem(operations.OPERATIONS, name, hosts.Operation(
                 run=_never, deadline=60, mutation=True,
                 payload={"latch": _latch, "seconds": _seconds, "timeout": _seconds},
                 required=frozenset({"latch", "seconds"})))
+        for key, value in self.config["pins"].items():
+            monkeypatch.setitem(inputs.PINS, key, value)
 
     def _fill(self, text, **extra):
         values = {"CONFIG": str(self.fixture / "config.json"), "SECRET": OUTPUT_SECRET,
                   "PIN": THEME_PIN, "FIXTURE": str(self.fixture), "TOOLS": str(TOOLS_DIR),
-                  "SSH": str(getattr(self, "ssh", "")), "ZSH": str(ZSH), **extra}
+                  "SSH": str(getattr(self, "ssh", "")), "ZSH": str(ZSH),
+                  "PYCACHE": str(self.fixture / "pycache"), **extra}
         for key, value in values.items():
             text = text.replace(f"@{key}@", value)
         return text
