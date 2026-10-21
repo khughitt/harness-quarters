@@ -10,8 +10,10 @@ repeats, from actual state:
    executable is still the prepared one, or the hold is breached and the window needs full
    recovery; each target holds the window's sealed bytes apart from Claude's pick keys, which a
    resumed session may have saved, with hooks, statusLine, installer and evidence verified;
-   familiar is the merge with its pinned relay dependency; familiar's surfaces are read back
-   and reported. Drift beyond picks stops for inspection and recover;
+   familiar is the merge with its pinned relay dependency; familiar's recorded surfaces still
+   run as restarted. Drift beyond picks stops for inspection and recover; a surface that exited,
+   was replaced or sits behind a desktop blocker stops finish with nothing changed, for a
+   consented `restart-surfaces` retry;
 3. the window becomes `finishing`; each host's timers return to the window's original record
    (quiesce's `timer-restore`, `stopped` true), which is never rewritten;
 4. each host runs `familiar-reap.service` once its timers are restored and waits for it,
@@ -131,6 +133,16 @@ def _fresh(window, prepared, step):
         checks[host]["surfaces"] = {
             "blockers": found["blockers"], "changes": found["changes"],
             "verdicts": {name: entry["verdict"] for name, entry in found["surfaces"].items()}}
+        retry = surfaces.unwell(found, recorded[host])
+        if found["blockers"] or retry:
+            problems = [*found["blockers"], *found["changes"]] + [
+                f"{name} is {found['surfaces'][name]['verdict']}, not running as restarted"
+                for name in retry if found["surfaces"][name]["verdict"] not in surfaces.HEALTHY]
+            raise lifecycle.Failed(
+                "surface-check", host, "blocked", "familiar's surfaces need a consented retry "
+                "before finish: " + "; ".join(problems) + "; nothing was changed",
+                blockers=[f"{host}: surface: {problem}" for problem in problems],
+                next_command=["restart-surfaces"])
     return _recorded(state.current_window(lifecycle._root()), checks={
         "at": lifecycle._now(), "hosts": checks})
 
@@ -240,6 +252,12 @@ def _stopped(failed, window):
                            f"since the verified migration; {_summary(current)}. Do not open "
                            "Claude or Codex until recover completes")
         failed.next_command = ["recover"]
+    elif failed.step == "surface-check":
+        failed.observed = (f"window {current['id']} is {current['state']}: {_summary(current)}; "
+                           "no timer changed. restart-surfaces retries only the surfaces not "
+                           "running as restarted, with fresh consent, and keeps the smoke "
+                           "receipts; then run finish again")
+        failed.next_command = ["restart-surfaces"]
     else:
         failed.observed = (f"window {current['id']} is {current['state']}: {_summary(current)}; "
                            "finish repeats from actual state, and the hold stays until it "

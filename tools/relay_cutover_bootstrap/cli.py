@@ -61,6 +61,11 @@ NO_ATTESTATION = ("record-smoke needs the human's own attestation of this receip
                   "record-smoke --preview --receipt FILE, ask the user in the session naming its "
                   "host, home, session, cases and human verdicts, record the actual ask and "
                   "reply in a private decision file and pass it with --decision-file")
+NO_PROOF = ("an agent's session decision for restart-surfaces needs the controller's fresh row "
+            "proven first: resume the controller with its printed held command and run "
+            "record-smoke --observe titan; a window whose migration is not yet verified is "
+            "reconciled by run first. The operator may instead answer restart-surfaces at the "
+            "terminal")
 HOLD_STATES = ("migrated-surfaces-pending", "ready-for-smokes", "finishing")
 # Before run, and in every parked wait: ordinary use stays allowed, and the agent's bounded
 # refresh before each request to close sessions.
@@ -330,10 +335,10 @@ def _surface_window(current):
         raise window.Failed("restart-surfaces", "titan", "refused", f"window {current['id']} "
                             f"belongs to a running invocation (pid {owner['pid']})",
                             observed=report["detail"], next_command=["status"])
-    if current["state"] == "migrated-surfaces-pending" or recovery.reconcilable(current):
+    if (current["state"] in ("migrated-surfaces-pending", *surfaces.RECHECKED)
+            or recovery.reconcilable(current)):
         return current
-    reason = ("its surfaces were already restarted" if current["state"] == "ready-for-smokes"
-              else "familiar's surfaces restart only after a verified migration")
+    reason = "familiar's surfaces restart only after a verified migration"
     raise window.Failed("restart-surfaces", "titan", "blocked", f"window {current['id']} is "
                         f"{current['state']}; {reason}", observed=report["detail"],
                         next_command=report["next"])
@@ -345,7 +350,7 @@ def _surface_preview(current):
     changes = {host: found["changes"] for host, found in offered["observed"].items()}
     print(_preview(current, offered["subject"], f"{PROG}: restart-surfaces preview for window "
                    f"{current['id']} (read-only)", changes), end="")
-    if current["state"] != "migrated-surfaces-pending":
+    if current["state"] not in ("migrated-surfaces-pending", *surfaces.RECHECKED):
         print("  migration: not yet verified from actual state; restart-surfaces verifies it "
               "first and restarts nothing unless it holds")
     print(f"  decision: kind desktop, action {surfaces.RESTART_ACTION}, window_id "
@@ -368,7 +373,11 @@ def _restart_surfaces(preview_only, decision_file):
         raise window.Failed("decision", "titan", "refused", NO_DECISION,
                             observed="nothing was changed",
                             next_command=["restart-surfaces", "--preview"])
-    if current["state"] != "migrated-surfaces-pending":
+    if decision_file is not None and "controller" not in (current.get("smokes") or {}):
+        raise window.Failed("controller-check", "titan", "refused", NO_PROOF,
+                            observed="nothing was changed",
+                            next_command=["record-smoke", "--observe", "titan"])
+    if current["state"] not in ("migrated-surfaces-pending", *surfaces.RECHECKED):
         report = recovery.reconcile_window(current)
         if report["class"] != "verified":
             raise window.Failed("reconcile", "titan", "blocked", f"window {current['id']}'s "
@@ -626,12 +635,6 @@ def _finish():
             continue
         verdicts = ", ".join(f"{name} {verdict}" for name, verdict in checked["verdicts"].items())
         print(f"  {host}: familiar's surfaces: {verdicts}")
-        unwell = [name for name, verdict in checked["verdicts"].items()
-                  if verdict not in ("restarted", "running")]
-        for problem in [*checked["blockers"], *checked["changes"]] + [
-                f"{name} is not running as restarted" for name in unwell]:
-            print(f"  warning: {host}: {_clean(problem)}; finish does not restart surfaces: "
-                  "inspect it and start it from its niri startup command")
     closure = record["closure"]
     print(f"  closure: recorded dead rows and their intent entries absent; the controller "
           f"{'kept its row' if closure['controller'] == 'kept' else 'had exited'}")

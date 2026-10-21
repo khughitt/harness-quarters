@@ -2986,12 +2986,17 @@ def test_reconcile_promotes_only_a_verified_migration(cutover, monkeypatch, unse
             assert state.current_window(cutover_root(cutover))["failure"]["status"] == "unsettled"
             return
         # Settled, the same window reconciles again from restart-surfaces, which promotes the
-        # verified migration and restarts the surfaces under its own session decision.
+        # verified migration and restarts the surfaces under the operator's terminal answer.
+        # No controller could prove its row before the promotion, so no agent's session decision
+        # is taken for it.
         preview = _cli(cutover, monkeypatch, ["restart-surfaces", "--preview"])
         assert preview.code == 0, preview.stdout
         assert "not yet verified from actual state" in preview.stdout
         decision = _decision_from_preview(cutover, record, preview, "restart.json")
-        result = _cli(cutover, monkeypatch, ["restart-surfaces", "--decision-file", decision])
+        refused = _cli(cutover, monkeypatch, ["restart-surfaces", "--decision-file", decision])
+        assert refused.code == 1 and "step: controller-check" in refused.stdout
+        assert state.current_window(cutover_root(cutover))["state"] == "recovery-required"
+        result = _cli(cutover, monkeypatch, ["restart-surfaces"], answer=b"yes\n")
         assert result.code == 0, result.stdout
         record = state.current_window(cutover_root(cutover))
         assert record["state"] == "ready-for-smokes" and record["verified"]["reconciled"]
@@ -3206,7 +3211,9 @@ def _pending_window(world, *, absent=()):
     state.save_record(Path(opened["directory"]) / window.PREPARED, prepared)
     record = {**opened, "state": "migrated-surfaces-pending", "owner": window._me(),
               "attempts": [{"host": host, "step": "timer-stop", "at": _now()} for host in HOSTS],
-              "surfaces": subject, "familiar": {"merge": "1" * 40}}
+              "surfaces": subject, "familiar": {"merge": "1" * 40},
+              "verified": {"at": (datetime.now(timezone.utc) - timedelta(seconds=5)).isoformat(
+                  timespec="seconds"), "hosts": {}}}
     state.save_record(window_file(record), record)
     consumed = state.consume_decision(
         record, _tty(record, window.RUN_ACTION, window.RUN_ATTEMPT, subject), kind="desktop",
@@ -3460,6 +3467,9 @@ def test_session_decision_required_without_tty(desktop, monkeypatch):
     record, _ = _pending_window(desktop)
     root = desktop.root("titan")
     _rechecks(monkeypatch)
+    _prove(desktop)  # the resumed controller's first step: its session decisions need it
+    record = state.current_window(root)
+    operations = sorted(os.listdir(root / "operations"))
 
     def unchanged():
         return (window_file(record).read_bytes(),
@@ -3472,7 +3482,7 @@ def test_session_decision_required_without_tty(desktop, monkeypatch):
     assert "--decision-file" in stopped.stdout and "restart-surfaces --preview" in stopped.stdout
     assert "observed: nothing was changed" in stopped.stdout
     assert unchanged() == before and desktop.lines("observed")[mark:] == []
-    assert not (desktop.root("titan") / "operations").exists()
+    assert sorted(os.listdir(root / "operations")) == operations
 
     preview = _cli(desktop, monkeypatch, ["restart-surfaces", "--preview"])
     assert preview.code == 0, preview.stdout
@@ -3671,9 +3681,23 @@ def test_surface_failure_is_pending(cutover, monkeypatch):
     assert again.stdout.splitlines()[-1] == f"  next: {cli.command_line(['restart-surfaces'])}"
     assert _mutations(cutover) == mutations and state.current_window(root) == record
 
-    # The agent previews, asks in the session and passes the recorded reply.
+    # The agent's session decision needs the resumed controller's proof first; with it, the
+    # agent previews, asks in the session and passes the recorded reply.
     cutover.reload()
     cutover.behave("europa", spawn={})
+    unproven = _cli(cutover, monkeypatch, ["restart-surfaces", "--decision-file",
+                                           str(cutover.tmp / "absent.json")])
+    assert unproven.code == 1 and "step: controller-check" in unproven.stdout
+    assert unproven.stdout.splitlines()[-1] == "  next: " + cli.command_line(
+        ["record-smoke", "--observe", "titan"])
+    first = _cli(cutover, monkeypatch, ["status"]).stdout
+    assert "first: resume the controller" in first and cli.command_line(
+        ["record-smoke", "--observe", "titan"]) in first
+    proving = _cli(cutover, monkeypatch, ["record-smoke", "--observe", "titan"])
+    # A failed proof attempt first: the resumed controller has no row yet.
+    assert proving.code == 1 and "step: controller-check" in proving.stdout
+    _prove(cutover)
+    record = state.current_window(root)
     preview = _cli(cutover, monkeypatch, ["restart-surfaces", "--preview"])
     assert preview.code == 0, preview.stdout
     assert "titan: nothing restarts" in preview.stdout and "    niri-desktop (" in preview.stdout
@@ -3698,8 +3722,9 @@ def test_surface_failure_is_pending(cutover, monkeypatch):
     assert {host: {target_id: transport._digest(cutover.target(host, target_id))
                    for target_id in inputs.relevant(host)} for host in HOSTS} == \
         verified_live_hooks_before
+    # The controller is proven, so the smokes' receipts come next.
     assert retried.stdout.splitlines()[-1] == "  next: " + cli.command_line(
-        ["record-smoke", "--observe", "titan"])
+        ["record-smoke", "--preview", "--receipt", smoke.RECEIPT_PLACEHOLDER])
 
 
 @needs_zsh
@@ -3964,6 +3989,15 @@ def _controller_up(world, registry, **fields):
                         str(world.home("titan")), **fields)
 
 
+def _prove(world, registry=None):
+    """The resumed controller up and its fresh row proven through record-smoke's own route."""
+    registry = registry or Registry(world)
+    _controller_up(world, registry)
+    result = smoke.observe_step(state.current_window(world.root("titan")), "titan")
+    assert result["controller"] is not None
+    return registry
+
+
 def _seen(world, host, cwd=None):
     """One recorded observation through record-smoke's own route; its evidence reference."""
     return smoke.observe_step(state.current_window(world.root("titan")), host, cwd)["ref"]
@@ -4052,6 +4086,46 @@ def _full_claude(world, registry, record):
         "turn-done": _passed(done), "idle-needs-input": _passed(idle),
         "projection-recovery": _passed(moved, recovered), "normal-exit": _passed(exited),
         "abrupt-death": _passed(dead, gone, session_id=abrupt, pid=second)}, matrix="full")
+
+
+def _full_codex(world, registry, record):
+    """Titan's personal Codex full smoke: Claude's cases but the idle prompt, on Codex rows."""
+    cwd, sid, abrupt = (world.scratch("codex-personal"), SESSIONS["codex"],
+                        SESSIONS["codex-abrupt"])
+    pid, start, second = 3997101, 820, 3997102
+    world.harness_row("titan", "codex", pid, start)
+    base = _ms(record["verified"]["at"], 10)
+    put = functools.partial(registry.put, "titan", "codex", sid, pid, start, cwd)
+    put("idle", updated=base)
+    started = _seen(world, "titan", cwd)
+    Path(cwd, "allowed.marker").touch()
+    put("working", updated=base + 1000)
+    working = _seen(world, "titan", cwd)
+    put("done", updated=base + 2000)
+    denied = _seen(world, "titan", cwd)
+    put("needs-approval", updated=base + 3000)
+    approval = _seen(world, "titan", cwd)
+    put("done", updated=base + 4000)
+    done = _seen(world, "titan", cwd)
+    put("done", updated=base + 5000, intent=False)
+    moved = _seen(world, "titan", cwd)
+    put("done", updated=base + 5000)
+    recovered = _seen(world, "titan", cwd)
+    registry.drop("titan", "codex", sid)
+    world.drop_row("titan", pid)
+    exited = _seen(world, "titan", cwd)
+    registry.put("titan", "codex", abrupt, second, 822, cwd, "idle", updated=base + 7000,
+                 dead=True)
+    dead = _seen(world, "titan", cwd)
+    registry.drop("titan", "codex", abrupt)
+    gone = _seen(world, "titan", cwd)
+    return _receipt(record, "titan", "codex", "personal", sid, pid, cwd, {
+        "start-idle": _passed(started), "allow-working": _passed(working),
+        "attribution-denial": _denial(denied), "needs-approval": _passed(approval),
+        "turn-done": _passed(done), "projection-recovery": _passed(moved, recovered),
+        "normal-exit": _passed(exited),
+        "abrupt-death": _passed(dead, gone, session_id=abrupt, pid=second)},
+        matrix="full", version=CODEX_PIN)
 
 
 def _attestation(record, attempt, digest, reply="yes, I gave those answers myself",
@@ -4236,8 +4310,12 @@ def test_current_row_is_fresh(desktop, monkeypatch):
         state.current_window(desktop.root("titan"))["smokes"]["observations"].values(),
         key=lambda entry: entry["seq"])]
     assert hosts_seen[-2:] == ["titan", "europa"]
+    count = len(state.current_window(desktop.root("titan"))["smokes"]["observations"])
     again = _cli(desktop, monkeypatch, ["record-smoke", "--observe", "europa"])
-    assert again.code == 0 and "controller:" not in again.stdout
+    assert again.code == 0 and "on titan, live and updated" not in again.stdout
+    assert f"controller: codex:{SESSION} pid {CONTROLLER_PID} is proven" in again.stdout
+    assert len(state.current_window(desktop.root("titan"))["smokes"]["observations"]) == \
+        count + 1  # Europa's alone: the proof is not made again
     # The SSH route to Europa is declined: that observer check stays pending, nothing passes.
     desktop.reload()
     desktop.config["unreachable"] = True
@@ -4531,10 +4609,26 @@ def test_handoff_freezes_claude_picks(desktop, monkeypatch):
     assert "already verified its migration" in again.stdout
     frozen(again.stdout, record)
     # Smokes and finish wait for the surfaces.
-    early = _cli(desktop, monkeypatch, ["record-smoke", "--observe", "titan"])
+    # The handoff's first step is the controller's proof, which alone runs before the surfaces.
+    lines = status.stdout.splitlines()
+    assert lines[lines.index(next(line for line in lines if line.startswith("  observed:"))) + 1] \
+        .startswith("  first: resume the controller with its held command below, then prove its "
+                    "fresh row with " + cli.command_line(["record-smoke", "--observe", "titan"]))
+    assert "restart-surfaces --decision-file" in status.stdout
+    early = _cli(desktop, monkeypatch, ["record-smoke", "--observe", "europa"])
     assert early.code == 1 and "surfaces" in early.stdout
     frozen(early.stdout, record)
     assert early.stdout.splitlines()[-1] == "  next: " + cli.command_line(["restart-surfaces"])
+    scratch = _cli(desktop, monkeypatch, ["record-smoke", "--observe", "titan", "--cwd",
+                                          str(desktop.tmp)])
+    assert scratch.code == 1 and "only the controller's proof" in scratch.stdout
+    registry = Registry(desktop)
+    _controller_up(desktop, registry)
+    proven = _cli(desktop, monkeypatch, ["record-smoke", "--observe", "titan"])
+    assert proven.code == 0 and f"controller: codex:{SESSION}" in proven.stdout
+    assert state.current_window(root)["state"] == "migrated-surfaces-pending"
+    assert f"controller: codex:{SESSION} pid {CONTROLLER_PID} is proven" in _cli(
+        desktop, monkeypatch, ["status"]).stdout
     unfinished = _cli(desktop, monkeypatch, ["finish"])
     assert unfinished.code == 1 and "surfaces" in unfinished.stdout
     assert unfinished.stdout.splitlines()[-1] == "  next: " + cli.command_line(
@@ -4741,6 +4835,28 @@ def test_partial_finish_keeps_original_timers(cutover, monkeypatch):
     window._save(current, smokes={**current["smokes"], "receipts": receipts})
     registry.put("titan", "claude-code", SESSIONS["abrupt"], 4100001, 5, "/tmp", dead=True)
 
+    # 0. Europa's panel died during the smokes: finish stops before any timer for a consented
+    # retry, which restarts only that panel and keeps the receipts.
+    panel = transport._process_of(state.current_window(root)["desktop"]["hosts"]["europa"],
+                                  "niri-desktop")
+    cutover.drop_row("europa", panel["pid"])
+    dead = _cli(cutover, monkeypatch, ["finish"])
+    assert dead.code == 1 and "step: surface-check" in dead.stdout
+    assert "host: europa" in dead.stdout and "niri-desktop is exited" in dead.stdout
+    assert dead.stdout.splitlines()[-1] == "  next: " + cli.command_line(["restart-surfaces"])
+    assert state.current_window(root)["state"] == "ready-for-smokes"
+    assert timers_active(cutover) == {"titan": "inactive", "europa": "inactive"}
+    assert [call for call in observed(cutover, "quiesce-timers")
+            if call["args"][0] == "restore"] == []
+    preview = _cli(cutover, monkeypatch, ["restart-surfaces", "--preview"])
+    decision = _decision_from_preview(cutover, state.current_window(root), preview,
+                                      "panel.json")
+    retried = _cli(cutover, monkeypatch, ["restart-surfaces", "--decision-file", decision])
+    assert retried.code == 0, retried.stdout
+    cutover.reload()
+    assert state.current_window(root)["state"] == "ready-for-smokes"
+    assert state.current_window(root)["smokes"]["receipts"] == receipts
+
     value = json.loads(cutover.target("titan", "claude").read_bytes())
     value["model"] = "sonnet"  # a resumed session saved a pick despite the handoff
     cutover.write_target("claude", json.dumps(value, indent="\t").encode() + b"\n")
@@ -4843,3 +4959,160 @@ def test_partial_finish_keeps_original_timers(cutover, monkeypatch):
             "restarted" in done.stdout
     assert "changed nothing" in declined.stdout
     assert window.status()["window"]["state"] == "complete"
+
+
+@needs_zsh
+def test_finish_gate_revalidates_every_recorded_receipt(desktop):
+    """finish's receipt gate passes on the six real receipts, and re-validates each one it
+    holds: an observation altered after recording, or an edited attestation record, blocks it."""
+    record, _ = _ready_window(desktop)
+    registry = Registry(desktop)
+    _controller_up(desktop, registry)
+    receipts = [_full_claude(desktop, registry, record), _full_codex(desktop, registry, record),
+                _short(desktop, registry, record, "titan", "claude-code", "work",
+                       SESSIONS["work"], 3998201, 930),
+                _short(desktop, registry, record, "titan", "codex", "work",
+                       SESSIONS["codex-work"], 3998301, 940),
+                _short(desktop, registry, record, "europa", "claude-code", "personal",
+                       SESSIONS["europa"], 3998401, 950),
+                _short(desktop, registry, record, "europa", "claude-code", "work",
+                       SESSIONS["europa-work"], 3998501, 960)]
+    for receipt in receipts:
+        _record_receipt(desktop, receipt)
+    current = state.current_window(desktop.root("titan"))
+    assert set(current["smokes"]["receipts"]) == {f"{host}/{harness}/{home}" for host, harness,
+                                                  home in smoke.REQUIRED}
+    smoke.validate_smokes(current)  # all six pass, each against its recorded observations
+    assert window.status()["next"] == ["finish"]
+
+    evidence = Path(receipts[1]["cases"]["turn-done"]["evidence"][0]["path"])
+    original = evidence.read_bytes()
+    evidence.write_bytes(original.replace(b'"done"', b'"done" '))
+    with pytest.raises(window.Failed) as raised:
+        smoke.validate_smokes(current)
+    assert raised.value.step == "receipt" and "changed since it was recorded" in \
+        raised.value.error
+    evidence.write_bytes(original)
+    smoke.validate_smokes(current)
+
+    stored = current["smokes"]["receipts"]["europa/claude-code/work"]
+    attestation = Path(current["directory"]) / "decisions" / f"{stored['attempt_id']}.json"
+    consumed = json.loads(attestation.read_bytes())
+    consumed["decision"]["source"]["reply"] = "yes (an agent answered for me)"
+    attestation.write_bytes(json.dumps(consumed, indent=2).encode() + b"\n")
+    with pytest.raises(window.Failed) as raised:
+        smoke.validate_smokes(current)
+    assert (raised.value.step, raised.value.status) == ("receipts", "blocked")
+    assert "europa/claude-code/work" in raised.value.error
+    assert "attestation decision is missing or changed" in raised.value.error
+
+
+def test_finish_surface_retry_from_ready_for_smokes(desktop, monkeypatch):
+    """After the surfaces restarted, a dead panel is retried by restart-surfaces with fresh
+    consent: only the surface not running as restarted, the smoke receipts kept, the window
+    ready for smokes again. The operator's terminal needs no controller proof; an agent's
+    session decision does. Healthy surfaces leave nothing to retry."""
+    record, _ = _ready_window(desktop)
+    root = desktop.root("titan")
+    checks = _rechecks(monkeypatch)
+    recorded = record["desktop"]["hosts"]
+    watcher = transport._process_of(recorded["titan"], "familiar-niri-watch")
+    smokes = {"receipts": {"titan/claude-code/work": {"receipt": {"session_id": "kept"},
+                                                      "attempt_id": "smoke-1"}},
+              "observations": {}}
+    record = window._save(record, smokes=smokes)
+    desktop.drop_row("titan", watcher["pid"])
+    mark = len(desktop.lines("observed"))
+
+    preview = _cli(desktop, monkeypatch, ["restart-surfaces", "--preview"])
+    assert preview.code == 0, preview.stdout
+    assert "    familiar-niri-watch (" in preview.stdout and "niri-desktop (" not in preview.stdout
+    assert "europa: nothing restarts" in preview.stdout
+    assert "not yet verified" not in preview.stdout
+    decision = _decision_from_preview(desktop, record, preview, "retry.json")
+    unproven = _cli(desktop, monkeypatch, ["restart-surfaces", "--decision-file", decision])
+    assert unproven.code == 1 and "step: controller-check" in unproven.stdout
+    assert transport._niri_spawns(desktop, mark) == []
+    # The operator's own terminal answer needs no proof.
+    answered = _cli(desktop, monkeypatch, ["restart-surfaces"], answer=b"yes\n")
+    assert answered.code == 0, answered.stdout
+    assert checks == ["1" * 40]  # the verified migration, rechecked first
+    assert _spawned(desktop, mark) == [("titan", COMMANDS["familiar-niri-watch"])]
+    assert transport._term_signals(desktop, mark) == []
+    current = state.current_window(root)
+    assert current["state"] == "ready-for-smokes" and current["smokes"] == smokes
+    replacement = current["desktop"]["phases"]["forward"]["titan"]["familiar-niri-watch"]
+    assert (replacement["exited"], replacement["attempt"]) == (True, "restart-1")
+    assert current["desktop"]["phases"]["forward"]["europa"] == record["desktop"]["phases"][
+        "forward"]["europa"]
+    assert answered.stdout.splitlines()[-1] == "  next: " + cli.command_line(
+        ["record-smoke", "--observe", "titan"])
+
+    # Healthy, nothing is retried and nothing is asked.
+    healthy = _cli(desktop, monkeypatch, ["restart-surfaces"], answer=b"yes\n")
+    assert healthy.code == 1 and "nothing to retry" in healthy.stdout
+    assert "desktop consent" not in healthy.terminal
+    # Europa's panel dies next: the agent proves its controller, and its session decision
+    # restarts only that panel.
+    desktop.drop_row("europa", transport._process_of(
+        current["desktop"]["hosts"]["europa"], "niri-desktop")["pid"])
+    _prove(desktop)
+    preview = _cli(desktop, monkeypatch, ["restart-surfaces", "--preview"])
+    decision = _decision_from_preview(desktop, state.current_window(root), preview, "agent.json")
+    mark = len(desktop.lines("observed"))
+    retried = _cli(desktop, monkeypatch, ["restart-surfaces", "--decision-file", decision])
+    assert retried.code == 0, retried.stdout
+    assert _spawned(desktop, mark) == [("europa", COMMANDS["niri-desktop"])]
+    final = state.current_window(root)
+    assert final["state"] == "ready-for-smokes"
+    assert final["smokes"]["receipts"] == smokes["receipts"]
+    assert [(entry["attempt_id"], entry["outcome"]) for entry in final["desktop"]["attempts"]] \
+        == [("restart-1", "complete"), ("restart-2", "complete")]
+
+
+@needs_zsh
+def test_smoke_hold_breach_recovers_to_native(cutover, monkeypatch):
+    """Claude moved during the smokes of a migrated window whose surfaces restarted and whose
+    smokes are recorded. Full recover, answered on the operator's terminal, still reaches
+    native: targets, source and dependencies restored, familiar's surfaces restarted from them,
+    the original timers and their service back, and no Claude launched despite the obsolete
+    evidence."""
+    cutover.start_dropbox()
+    native = (_targets(cutover), _modules(cutover))
+    prepared = preparation.prepare(SESSION)
+    opened = window.open_window(prepared)
+    migrated = window.run_window(prepared, run_decision(prepared, opened))
+    assert migrated["state"] == "ready-for-smokes"
+    root = cutover_root(cutover)
+    registry = Registry(cutover)
+    _controller_up(cutover, registry)
+    _record_receipt(cutover, _short(cutover, registry, migrated, "titan", "claude-code",
+                                    "work", SESSIONS["work"], 3999301, 980))
+    cutover.move_claude()
+    breach = _cli(cutover, monkeypatch, ["record-smoke", "--observe", "europa"])
+    assert breach.code == 1 and "step: hold" in breach.stdout
+    record = state.current_window(root)
+    assert record["state"] == "recovery-required" and record["smokes"]["receipts"]
+    assert record["desktop"]["completed"]["forward"]
+    # The operator closes every session, then recovers from an ordinary terminal.
+    cutover.drop_row("titan", CONTROLLER_PID)
+    cutover.reload()
+    mark = len(cutover.lines("observed"))
+    recovered = _cli(cutover, monkeypatch, ["recover"], answer=b"yes\n")
+    assert recovered.code == 0, recovered.stdout
+    assert surfaces.RECOVERY_IMPACT in recovered.terminal
+    record = state.current_window(root)
+    assert record["state"] == "recovered"
+    assert {host: sorted(names) for host, names in
+            record["desktop"]["phases"]["recovery"].items()} == {
+        host: sorted(surfaces.SURFACES) for host in HOSTS}
+    assert timers_active(cutover) == {"titan": "active", "europa": "active"}
+    assert {host: cutover.units(host)["familiar-reap.service"]["runs"] for host in HOSTS} == {
+        "titan": 1, "europa": 1}
+    assert (_targets(cutover), _modules(cutover)) == native
+    head = transport.familiar_head(cutover.home("titan"))
+    assert _tree(cutover, head) == _tree(cutover, cutover.pins["familiar_pre"])
+    events = _recovery_events(cutover, mark)
+    assert not any(":launched-" in event for event in events), events
+    assert observed(cutover, "claude", mark) == [] and observed(cutover, "preflight", mark) == []
+    assert "native recovery complete" in recovered.stdout

@@ -19,6 +19,11 @@ recover) restarts every present surface once:
 Each replacement is journaled on its host before the operation replies (`surfaces/<window-id>.json`
 in the cutover root) and persisted in the window before the next surface. A retry asks again,
 adopts a replacement a partial attempt already started and starts only the surfaces still missing.
+Once the surfaces restarted (`ready-for-smokes`, or `finishing` after a finish attempt restored some
+timers), `restart-surfaces` reads every present host again and retries only the surfaces that are
+not running as restarted, under the same identity rules and with fresh consent: the window returns
+to `migrated-surfaces-pending` for the retry, keeps its smoke receipts, and is `ready-for-smokes`
+again once every retried surface runs.
 
 Host side, the fixed operations in `OPERATIONS`:
 
@@ -47,6 +52,9 @@ SURFACES = tuple(inventory.SURFACES)
 FORWARD, RECOVERY = "forward", "recovery"
 RESTART_ACTION, RECOVER_ACTION, PROBE_ACTION = "restart-surfaces", "recover", "pilot-spawn"
 RUN_ACTION = "run"  # window.RUN_ACTION, the run's own decision
+# Windows whose forward restart completed; a restart-surfaces retry reads their surfaces again.
+RECHECKED = ("ready-for-smokes", "finishing")
+HEALTHY = ("running", "restarted")
 ACTIONS = {RUN_ACTION: FORWARD, RESTART_ACTION: FORWARD, RECOVER_ACTION: RECOVERY}
 PREFIXES = {RESTART_ACTION: "restart", RECOVER_ACTION: "recover", PROBE_ACTION: "probe"}
 JOURNAL = "surfaces"
@@ -389,9 +397,24 @@ def _summary(window, phase):
         "pending: " + ", ".join(missing) if missing else "") if part) or "nothing to restart"
 
 
+def _paused(window):
+    from . import smoke  # smoke imports this module for the surfaces-pending status
+    return ", ".join(smoke.paused(window)) or "no host"
+
+
+def unwell(found: dict, recorded: dict) -> list:
+    """A host's recorded surfaces that a surface-preview reading shows not running as restarted:
+    exited or replaced ones, and every one where the niri socket itself changed."""
+    names = [surface["name"] for surface in recorded["surfaces"]]
+    if any(change.split(":", 1)[0] not in names for change in found["changes"]):
+        return names
+    return [name for name in names if found["surfaces"][name]["verdict"] not in HEALTHY
+            or any(change.startswith(f"{name}:") for change in found["changes"])]
+
+
 def status(window: dict) -> dict:
     """The read-only status detail and next command of a window whose surfaces are pending."""
-    stopped = ", ".join(lifecycle._stopped(window)) or "no host"
+    stopped = _paused(window)
     failure = _record(window).get("failure")
     last = (f"; the last attempt stopped at {failure['step']} on {failure['host']} "
             f"({failure['status']})" if failure else "")
@@ -404,12 +427,7 @@ def status(window: dict) -> dict:
 
 def next_attempt(window: dict, action: str) -> str:
     """The attempt ID this window's next decision for action names."""
-    prefix = PREFIXES[action] + "-"
-    directory = Path(window["directory"]) / "decisions"
-    numbers = [int(name[len(prefix):-5]) for name in (
-        os.listdir(directory) if os.path.isdir(directory) else ())
-        if name.startswith(prefix) and name.endswith(".json") and name[len(prefix):-5].isdigit()]
-    return f"{prefix}{max(numbers, default=0) + 1}"
+    return state.next_attempt(window, PREFIXES[action])
 
 
 def _subject(window, action, inventory_hosts, restart):
@@ -432,6 +450,11 @@ def preview(window: dict, action: str) -> dict:
     socket, failed IPC or two processes for one surface stop for inspection."""
     phase = ACTIONS[action]
     record, todo = _record(window), pending(window, phase)
+    recheck = action == RESTART_ACTION and window["state"] in RECHECKED
+    if recheck:  # every present host is read again; only its unwell surfaces are retried
+        todo = {host: [surface["name"] for surface in record["hosts"][host]["surfaces"]]
+                if record["hosts"][host]["state"] == "present" else []
+                for host in lifecycle.HOST_ORDER}
     inventory_hosts, observed = {}, {}
     for host in lifecycle.HOST_ORDER:
         inventory_hosts[host] = record["hosts"][host]
@@ -449,6 +472,13 @@ def preview(window: dict, action: str) -> dict:
                 observed="nothing was changed", next_command=[action])
         if found["changes"]:
             inventory_hosts[host] = found["inventory"]
+        if recheck:
+            todo[host] = unwell(found, record["hosts"][host])
+    if recheck and not any(todo.values()):
+        raise lifecycle.Failed("surface-preview", "titan", "refused", "every recorded familiar "
+                               "surface runs as restarted; there is nothing to retry",
+                               observed="nothing was changed",
+                               next_command=lifecycle.status()["next"])
     subject = _subject(window, action, inventory_hosts,
                        {host: todo[host] for host in lifecycle.HOST_ORDER})
     return {"subject": subject, "sha256": state._digest(subject),
@@ -529,7 +559,8 @@ def _gate(window, action):
         if window["state"] != "recovering" or "restored" not in (window.get("recovery") or {}):
             raise refuse("; recovery restarts surfaces only once it restored native settings, "
                          "source and dependencies", ["recover"])
-    elif window["state"] != "migrated-surfaces-pending":
+    elif window["state"] != "migrated-surfaces-pending" and (
+            action != RESTART_ACTION or window["state"] not in RECHECKED):
         raise refuse("; familiar's surfaces restart only from the verified migration",
                      lifecycle.status()["next"])
     owner = window.get("owner")
@@ -564,13 +595,21 @@ def _start(window, decision, subject, phase):
     record = copy.deepcopy(_record(window))
     record["hosts"] = copy.deepcopy(subject["hosts"])
     now = lifecycle._now()
+    changes = {}
+    if decision["action"] == RESTART_ACTION and window["state"] in RECHECKED:
+        # Only the retried surfaces are pending again; the smoke receipts stay recorded.
+        for host, names in subject["restart"].items():
+            for name in names:
+                record["phases"].get(phase, {}).get(host, {}).pop(name, None)
+        record.get("completed", {}).pop(phase, None)
+        changes["state"] = "migrated-surfaces-pending"
     if decision["action"] == RUN_ACTION:
         record["attempts"].append({"attempt_id": decision["attempt_id"], "action": RUN_ACTION,
                                    "subject": subject, "bound_at": now})
     for entry in record["attempts"]:
         if entry["attempt_id"] == decision["attempt_id"]:
             entry.update(phase=phase, started_at=now)
-    return lifecycle._save(window, owner=lifecycle._me(), desktop=record)
+    return lifecycle._save(window, owner=lifecycle._me(), desktop=record, **changes)
 
 
 def _attempt(record, attempt, **changes):
@@ -656,7 +695,7 @@ def pending_failure(failed, phase: str, attempt: str):
                            "run status")
         failed.next_command = ["status"]
         return failed
-    stopped = ", ".join(lifecycle._stopped(window)) or "no host"
+    stopped = _paused(window)
     if inspect:
         failed.observed = (f"window {window['id']} is inspection-required: the verified "
                            "migration no longer holds and no surface was restarted. Do not open "
