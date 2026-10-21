@@ -12,26 +12,29 @@ the Claude model and effort freeze and the held-launch rule, naming `cl` and `cl
 Host side, the fixed read-only operation `smoke-observe` (both hosts, either mode) reads relay's
 own registry through `relay list --json` (each row's harness, session, scope, state, cwd,
 update time, process and liveness), the session IDs in familiar's intent, this user's Claude
-and Codex processes with only their hold key, the installed executables' identity and, for a
-scratch repo, its two markers, its commit count and whether Git has an identity there.
+and Codex processes with only their hold key and the home each runs in (`session_home`: the id
+resolved from that process's own CLAUDE_CONFIG_DIR or CODEX_HOME alone, never the value), the
+installed executables' identity and, for a scratch repo, its two markers, its commit count and
+whether Git has an identity there.
 
 Controller side, every observation is kept as private evidence under the window directory
 (`smokes/observations/<operation-id>.json`) with its digest and order in the window record
 (`observe`). The first observation proves the controller's own row (`check_controller`): its
-native session's root Codex row on Titan, alive, held by the prepared executable and updated
-since the verified migration. An observation that finds Claude or Codex moved since preparation
-is a hold breach: new smokes stop, the window needs full recovery (`recovery-required`) and
-timers stay paused until it completes.
+native session's root Codex row on Titan, alive, held by the prepared executable in the
+personal home and updated since the verified migration. An observation that finds Claude or
+Codex moved since preparation is a hold breach: new smokes stop, the window needs full recovery
+(`recovery-required`) and timers stay paused until it completes.
 
 A receipt (schema 1) names the window, its preparation, host, harness, home, native session,
 root row, PID, scratch cwd, the installed and evidence versions, its matrix, each required
 case's verdict with its observations and the human's own trust (and, in a full smoke,
 permission) verdicts. `check_receipt` binds every case to this window's recorded observations
-of that very session: their content, digests, order and the prepared identities; never a file
-name. `record_smoke` stores it with the consumed `smoke-attestation` decision, the actual
-session ask and human reply or the operator's terminal answer, that attested its human
-verdicts; `validate_smokes` is finish's gate on all six. Keys this module adds to the window
-record: `smokes` {observations, controller, receipts}."""
+of that very session: their content, digests, order, the prepared identities and the home
+its process was observed in; never a file name. `record_smoke` stores it with the consumed
+`smoke-attestation` decision, the actual session ask and human reply or the operator's
+terminal answer, that attested its human verdicts; `validate_smokes` is finish's gate on all
+six. Keys this module adds to the window record: `smokes` {observations, controller,
+receipts}."""
 import hashlib
 import json
 import os
@@ -52,6 +55,10 @@ REFUSAL = "relay-guard: refusing"
 IDLE_MS = 60_000
 CODEX_HOMES = {"personal": ".codex", "work": ".codex-work"}
 CLAUDE_HOMES = ("personal", "work")
+# Each harness's home key, and the home directories it may name under HOME. Claude's personal
+# home is the key unset: setting it, even to ~/.claude, moves ~/.claude.json (ruling R59).
+HOME_KEYS = {"claude": "CLAUDE_CONFIG_DIR", "codex": "CODEX_HOME"}
+HOME_DIRS = {"claude": {"work": ".claude-work"}, "codex": CODEX_HOMES}
 CLAUDE_SMOKE = ("--permission-mode", "manual")
 CODEX_SMOKE = ("--no-daemon", "--sandbox", "workspace-write", "--ask-for-approval", "on-request")
 HARNESS = {"claude-code": "claude", "codex": "codex"}  # relay's harness → the process family
@@ -305,10 +312,32 @@ def bypassed(argv: list) -> bool:
     return False
 
 
+def session_home(context, harness, pid):
+    """The home one Claude or Codex process runs in, from its own environment's home key alone
+    (`HOME_KEYS`): unset is the personal home; a value naming one of the harness's home
+    directories under HOME (resolved) is that home; any other value is "other". None when the
+    process's environment cannot be read. Only this id leaves the host, never the value."""
+    key = HOME_KEYS[harness]
+    found = inventory._environ_key(pid, key)
+    if found is None:
+        return None
+    if key not in found:
+        return "personal"
+    value = found[key]
+    if not os.path.isabs(value):
+        return "other"
+    real = os.path.realpath(value)
+    for home, directory in HOME_DIRS[harness].items():
+        if real == os.path.realpath(Path(context["home"]) / directory):
+            return home
+    return "other"
+
+
 def smoke_observe(context):
     """Read-only: this host's registry, intent, harness processes and executables, and the
     named scratch repo, for one window's smokes. Each harness process carries `bypass`, whether
-    its command line bypasses review (`bypassed`); its argv is never sent."""
+    its command line bypasses review (`bypassed`), and `home`, the home it runs in
+    (`session_home`); neither its argv nor its environment is sent."""
     payload = context["payload"]
     harnesses = _identities(context)
     observed_at = hosts._now()
@@ -321,7 +350,8 @@ def smoke_observe(context):
             "harnesses": {name: {key: found[key] for key in ("path", "real", "sha256",
                                                               "familiar")}
                           for name, found in harnesses.items()},
-            "processes": sorted([{**entry, "known": known, "bypass": bypassed(argv[entry["pid"]])}
+            "processes": sorted([{**entry, "known": known, "bypass": bypassed(argv[entry["pid"]]),
+                                  "home": session_home(context, entry["harness"], entry["pid"])}
                                  for known, entries in ((True, processes["known"]),
                                                         (False, processes["unknown"]))
                                  for entry in entries], key=lambda entry: entry["pid"]),
@@ -430,7 +460,8 @@ def _controller_failed(message):
 def check_controller(window: dict, observation: dict) -> None:
     """The controller's own fresh row in a Titan observation, or Failed: its native session's
     root Codex row, alive on Titan, its process the prepared Codex executable at the row's PID
-    and start time, launched with no bypass flag, and updated since the verified migration."""
+    and start time, launched with no bypass flag in the personal home its captured session
+    belongs to, and updated since the verified migration."""
     prepared = _prepared(window)
     session = prepared["controller"]["session_id"]
     row_id = f"codex:{session}"
@@ -463,6 +494,12 @@ def check_controller(window: dict, observation: dict) -> None:
         raise _controller_failed(f"{row_id}'s process (pid {process.get('pid')}) {BYPASSED}: "
                                  "its row proves nothing about the trust review; exit it and "
                                  "resume the controller only with its printed held command")
+    homes = sorted({entry.get("home") or "unknown" for entry in held})
+    if homes != ["personal"]:
+        raise _controller_failed(f"{row_id}'s process (pid {process.get('pid')}) runs in the "
+                                 f"{' and '.join(homes)} Codex home, not the personal home its "
+                                 "captured session belongs to; exit it and resume the "
+                                 "controller only with its printed held command")
 
 
 def _proof(window, observation, ref):
@@ -774,6 +811,12 @@ class _Receipt:
                         f"{expected}")
         if any(entry.get("bypass") is not False for entry in held):
             self.refuse(f"start-idle: pid {receipt['pid']} {BYPASSED}: a smoke runs only "
+                        "through its printed held smoke command")
+        homes = sorted({entry.get("home") or "unknown" for entry in held})
+        if homes != [receipt["home"]]:
+            self.refuse(f"start-idle: pid {receipt['pid']} runs in the {' and '.join(homes)} "
+                        f"{NAMES[receipt['harness']]} home, not the receipt's {receipt['home']} "
+                        "home: each home's receipt needs a session launched in that home "
                         "through its printed held smoke command")
         seqs = [start["seq"]]
         if "allow-working" in names:

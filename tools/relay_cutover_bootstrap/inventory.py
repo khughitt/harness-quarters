@@ -106,6 +106,22 @@ def _hold(pid):
         return None
 
 
+def _environ_key(pid, key):
+    """One owned process's environment restricted to `key`: {key: value} when it is set, {}
+    when it is not, or None when the environment cannot be read. No other variable is kept,
+    and callers report only what they derive from it, never the value."""
+    try:
+        with open(f"/proc/{pid}/environ", "rb") as stream:
+            entries = stream.read().split(b"\0")
+    except (FileNotFoundError, ProcessLookupError, PermissionError):
+        return None
+    prefix = key.encode() + b"="
+    for entry in entries:
+        if entry.startswith(prefix):
+            return {key: os.fsdecode(entry[len(prefix):])}
+    return {}
+
+
 def _runtime_dir():
     runtime = os.environ.get("XDG_RUNTIME_DIR")
     if not runtime or not os.path.isabs(runtime):

@@ -526,8 +526,10 @@ pre-closure step come after that procedure, never as a way to reopen this window
    `--permission-mode bypassPermissions`. Each observation reports a per-process `bypass`
    flag that its host computes; the command line never leaves the host. A bypassed resume,
    such as `cor`, still writes a fresh row, but proves nothing about the trust review: exit
-   that session and resume through the printed command. This runs in
-   `migrated-surfaces-pending` too (ruling R40). A missing or stale row proves nothing:
+   that session and resume through the printed command. The process must also run in the
+   personal Codex home (ruling R59). Its host reads only that process's `CODEX_HOME`, unset or
+   `~/.codex` being the personal home, and reports the resolved home, never the value. This
+   runs in `migrated-surfaces-pending` too (ruling R40). A missing or stale row proves nothing:
    report it as the controller's trust or startup blocker, and resume only through the
    printed command. Never edit configuration from that session. A row proves event delivery,
    not the smokes.
@@ -707,6 +709,10 @@ refuses:
 - another window's or a pilot's receipt;
 - the controller's own session;
 - a session launched with a bypass flag (start-idle);
+- a session whose process runs in another home than the receipt's `home` (start-idle). The
+  host reads only that process's `CLAUDE_CONFIG_DIR` or `CODEX_HOME`. Unset is the personal
+  home; the work home's directory is the work home; anything else, `CLAUDE_CONFIG_DIR=~/.claude`
+  included, is no tested home. Launch each smoke with its printed held command;
 - a session already used by another receipt;
 - a stale row;
 - any observation made after a hold drift;

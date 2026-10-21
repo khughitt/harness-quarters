@@ -26,7 +26,7 @@ from pathlib import Path
 import pytest
 
 from relay_cutover_bootstrap import (familiar, hosts, inputs, inventory, operations, pilot,
-                                     quiesce, restoration, state, surfaces, targets)
+                                     quiesce, restoration, smoke, state, surfaces, targets)
 from relay_cutover_bootstrap.state import Stop
 
 TOOLS_DIR = Path(__file__).resolve().parent
@@ -157,6 +157,15 @@ def _terminate(host, identity):
     return True
 
 
+def _environ_key(host, pid, key):
+    """A fixture row's environment restricted to key, as inventory._environ_key reads it."""
+    row = next((row for row in _rows(host) if row["pid"] == pid), None)
+    if row is None:
+        return None
+    environ = row.get("environ") or {}
+    return {key: environ[key]} if key in environ else {}
+
+
 def install(hosts, inventory, operations):
     from relay_cutover_bootstrap import familiar, inputs, restoration, surfaces, targets
     host = CONFIG["by_home"][os.environ["HOME"]]
@@ -174,9 +183,10 @@ def install(hosts, inventory, operations):
         setattr(hosts, name, value)
     surfaces._terminate = lambda identity: _terminate(host, identity)
     inventory._process_rows = lambda: [
-        {key: value for key, value in row.items() if key not in ("held", "daemon")}
+        {key: value for key, value in row.items() if key not in ("held", "daemon", "environ")}
         for row in _rows(host)]
     inventory._hold = lambda pid: {row["pid"]: row.get("held") for row in _rows(host)}.get(pid)
+    inventory._environ_key = lambda pid, key: _environ_key(host, pid, key)
     register(hosts, operations)
 '''
 
@@ -1620,15 +1630,26 @@ class World:
             return
         _write(path, json.dumps({session: {"state": "idle"} for session in sessions}))
 
-    def harness_row(self, host, harness, pid, start, held=True, exe=None, argv=None):
-        """One live Claude or Codex process in host's process table, launched held; `argv`
-        replaces its bare command line."""
+    def harness_row(self, host, harness, pid, start, held=True, exe=None, argv=None,
+                    home="personal", environ=None):
+        """One live Claude or Codex process in host's process table, launched held in `home` as
+        its printed command launches it (Claude's personal home with CLAUDE_CONFIG_DIR unset,
+        every other home with its directory in the home key); `argv` replaces its bare command
+        line and `environ` its home key."""
         self.reload()
-        home = self.home(host)
-        link = home / (".local/bin/claude" if harness == "claude" else ".local/bin/codex")
+        user = self.home(host)
+        link = user / (".local/bin/claude" if harness == "claude" else ".local/bin/codex")
         real = exe or os.path.realpath(link)
+        if environ is None:
+            if harness == "codex":
+                environ = {"CODEX_HOME": os.path.realpath(
+                    user / {"personal": ".codex", "work": ".codex-work"}[home])}
+            else:
+                environ = ({} if home == "personal"
+                           else {"CLAUDE_CONFIG_DIR": str(user / ".claude-work")})
         row = {"pid": pid, "start_time": start, "comm": Path(real).name, "exe": real,
-               "argv": argv or [real], **({"held": held} if harness == "claude" else {})}
+               "argv": argv or [real], "environ": environ,
+               **({"held": held} if harness == "claude" else {})}
         self.spec(host)["rows"].append(row)
         self.save()
         return row
@@ -2267,6 +2288,38 @@ def test_process_table_reads_only_the_hold_key(tmp_path):
             process.wait()
 
 
+def test_session_home_reads_only_the_home_key(world, tmp_path):
+    """Each process's home is resolved on its host from its own CLAUDE_CONFIG_DIR or CODEX_HOME
+    alone: unset is the personal home, a home's directory (resolved) is that home, anything
+    else is "other"; only the id is returned, never the value or another variable."""
+    home = world.home("titan")
+    (home / ".codex-link").symlink_to(home / ".codex-work")
+    env = explicit_env(tmp_path, FIXTURE_ENV_SECRET=ENV_SECRET)
+    cases = [("claude", {}, "personal"),
+             ("claude", {"CLAUDE_CONFIG_DIR": str(home / ".claude-work")}, "work"),
+             ("claude", {"CLAUDE_CONFIG_DIR": str(home / ".claude")}, "other"),
+             ("claude", {"CLAUDE_CONFIG_DIR": ".claude-work"}, "other"),
+             ("codex", {}, "personal"),
+             ("codex", {"CODEX_HOME": str(home / ".codex")}, "personal"),
+             ("codex", {"CODEX_HOME": str(home / ".codex-link")}, "work"),
+             ("codex", {"CODEX_HOME": str(tmp_path / ".codex-work")}, "other")]
+    processes = [subprocess.Popen(["/usr/bin/sleep", "30"], env={**env, **variables})
+                 for _, variables, _ in cases]
+    try:
+        context = {"home": str(home)}
+        found = [smoke.session_home(context, harness, process.pid)
+                 for (harness, _, _), process in zip(cases, processes)]
+        assert found == [expected for _, _, expected in cases]
+        assert inventory._environ_key(processes[1].pid, "CLAUDE_CONFIG_DIR") == {
+            "CLAUDE_CONFIG_DIR": str(home / ".claude-work")}
+        assert inventory._environ_key(processes[0].pid, "CLAUDE_CONFIG_DIR") == {}
+    finally:
+        for process in processes:
+            process.kill()
+            process.wait()
+    assert smoke.session_home(context, "claude", processes[0].pid) is None
+
+
 def test_signal_while_recording_start_cancels(world, monkeypatch):
     begin = hosts._begin
 
@@ -2777,7 +2830,7 @@ def test_apply_refuses_unregistered_target(world, monkeypatch):
     world.stage_cutover()
     # In this process, as in the fixture helpers, the process table is Titan's fixture rows.
     monkeypatch.setattr(inventory, "_process_rows", lambda: [
-        {key: value for key, value in row.items() if key not in ("held", "daemon")}
+        {key: value for key, value in row.items() if key not in ("held", "daemon", "environ")}
         for row in json.loads(world.config_path.read_text())["hosts"]["titan"]["rows"]])
     root, live = world.root("titan"), world.target("titan", "claude")
     window = state.new_window(root, hashlib.sha256(b"prepared").hexdigest())
@@ -3766,7 +3819,7 @@ def test_smoke_observe_is_read_only(world):
         "sha256": _digest(claude), "familiar": True}}
     assert [entry for entry in result["processes"] if entry["pid"] == row["pid"]] == [{
         "pid": row["pid"], "start_time": row["start_time"], "harness": "claude",
-        "exe": claude, "held": True, "known": True, "bypass": False}]
+        "exe": claude, "held": True, "known": True, "bypass": False, "home": "personal"}]
     assert result["scratch"] == {"cwd": scratch, "allowed_marker": True,
                                  "denied_marker": False, "commits": 0, "identity": True}
     calls = world.lines("observed")[mark:]
