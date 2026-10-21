@@ -30,8 +30,8 @@ from types import SimpleNamespace
 import pytest
 
 import test_relay_cutover_transport as transport
-from relay_cutover_bootstrap import (cli, finish, hosts, inputs, inventory, operations, pilot,
-                                     recovery, restoration, smoke, state, surfaces, window)
+from relay_cutover_bootstrap import (cli, familiar, finish, hosts, inputs, inventory, operations,
+                                     pilot, recovery, restoration, smoke, state, surfaces, window)
 from relay_cutover_bootstrap import prepare as preparation
 from relay_cutover_bootstrap.state import Stop
 
@@ -6757,3 +6757,114 @@ def test_finish_refuses_source_drift(ready_run, monkeypatch, drift):
     record = state.current_window(cutover_root(cutover))
     assert record["state"] == "inspection-required"
     assert timers_active(cutover) == {"titan": "inactive", "europa": "inactive"}
+
+
+# --- Europa judged against a fresh Titan read (fix round 1, I1; ruling R68) -------------------
+
+
+def _ahead(head="e" * 40):
+    return window.Failed("familiar-verify", "europa", "failed",
+                         f"familiar's source here: HEAD {head[:12]} here {familiar.AHEAD} "
+                         f"{'a' * 12}", cause="operation")
+
+
+@pytest.mark.parametrize("case", ["titan-unchanged", "titan-moved", "other-failure",
+                                  "titan-keeps-moving"])
+def test_europa_ahead_is_judged_against_a_fresh_titan_read(monkeypatch, case):
+    """Europa's final "ahead" counts as a Europa commit only against a Titan HEAD read after
+    Europa's own: the controller rereads Titan and, if it moved, asks Europa again with the
+    fresh HEAD, within the sync budget. Any other failure is raised as it is."""
+    monkeypatch.setattr(familiar, "SYNC_BUDGET_SECONDS", 0.5)
+    observed, moved = "a" * 40, "b" * 40
+    asked, reads = [], []
+
+    def call(host, mode, operation, payload, step):
+        assert (host, operation, payload) == ("titan", "familiar-head", {"window_id": "w"})
+        reads.append(step)
+        head = {"titan-unchanged": observed, "titan-moved": moved}.get(
+            case, f"{len(reads):040x}")
+        return {"head": head}, None
+
+    def ask(head):
+        asked.append(head)
+        if case == "other-failure":
+            raise window.Failed("familiar-verify", "europa", "failed", "src/observe.js differs",
+                                cause="operation")
+        if case == "titan-moved" and head == moved:
+            return {"head": moved}, None
+        time.sleep(0.05)
+        raise _ahead()
+
+    monkeypatch.setattr(window, "_call", call)
+    if case == "titan-moved":
+        assert window.europa_after_titan("live", "w", observed, ask, "familiar-verify") == (
+            {"head": moved}, None)
+        assert asked == [observed, moved] and reads == ["familiar-verify"]
+        return
+    with pytest.raises(window.Failed) as raised:
+        window.europa_after_titan("live", "w", observed, ask, "familiar-verify")
+    if case == "other-failure":
+        assert asked == [observed] and reads == []
+        assert "src/observe.js differs" in raised.value.error
+    elif case == "titan-unchanged":
+        assert asked == [observed] and reads == ["familiar-verify"]
+        assert familiar.AHEAD in raised.value.error
+    else:  # Titan moves on every read: the retries stop at the sync budget
+        assert familiar.AHEAD in raised.value.error and 2 <= len(asked) < 40
+
+
+def _commit_between_reads(monkeypatch, cutover, after, deliver):
+    """Right after Titan's `after` reply, familiar's tracker commits on Titan and `deliver`
+    brings that commit to Europa before Europa's own read. Returns the commits made."""
+    real, made = window._call, []
+
+    def call(host, mode, operation, payload, step):
+        result = real(host, mode, operation, payload, step)
+        if (host, operation) == ("titan", after) and not made:
+            made.append(transport._tracker(_familiar(cutover), "between.md",
+                                           "a record committed between the reads\n"))
+            assert made[0] is not None
+            deliver(made[0])
+        return result
+
+    monkeypatch.setattr(window, "_call", call)
+    return made
+
+
+@needs_zsh
+def test_finish_rereads_titan_before_blaming_europa(ready_run, monkeypatch):
+    """A tolerated Titan task-record commit lands after finish read Titan's HEAD, and reaches
+    Europa before Europa's read: Europa is then ahead of the stale observation, so the
+    controller rereads Titan, asks Europa again, and finish completes."""
+    cutover, run = ready_run
+    cutover.dropbox.close()
+    cutover.dropbox = None
+    _finishable(cutover, monkeypatch)
+    made = _commit_between_reads(monkeypatch, cutover, "familiar-verify",
+                                 lambda head: transport._mirror(cutover))
+    result = _cli(cutover, monkeypatch, ["finish"])
+    assert result.code == 0, result.stdout
+    record = state.current_window(cutover_root(cutover))
+    assert record["state"] == "complete"
+    checks = record["finish"]["checks"]["hosts"]
+    assert checks["titan"]["familiar"]["head"] == record["familiar"]["merge"]
+    assert checks["europa"]["familiar"]["head"] == made[0]
+
+
+@needs_zsh
+@pytest.mark.parametrize("after", ["familiar-install", "familiar-verify"])
+def test_run_rereads_titan_before_blaming_europa(prepared_cutover, monkeypatch, after):
+    """The same commit between the reads during run: after Titan's install (Europa's install
+    sync wait) or after Titan's checkpoint verify (the verified migration that restart-surfaces
+    shares). The run completes, with Europa's proof at the commit."""
+    cutover, prepared = prepared_cutover
+    cutover.start_dropbox()
+    europa = cutover.home("europa")
+    made = _commit_between_reads(monkeypatch, cutover, after, lambda head: _wait_for(
+        lambda: transport.familiar_head(europa) == head))
+    opened = window.open_window(prepared)
+    migrated = window.run_window(prepared, run_decision(prepared, opened))
+    assert migrated["state"] == "ready-for-smokes" and made
+    if after == "familiar-install":
+        assert migrated["dependencies"]["europa"]["head"] == made[0]
+    assert migrated["verified"]["hosts"]["europa"]["familiar"]["head"] == made[0]

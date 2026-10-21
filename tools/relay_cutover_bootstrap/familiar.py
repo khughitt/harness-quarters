@@ -30,6 +30,8 @@ These are fixed host operations run by `hosts.execute`; `window.py` orders them:
 
 - `familiar-base` (read-only, Titan): the base rule on this checkout's HEAD; the run derives B
   with it after its final strict no-live check and again at the pre-merge gate.
+- `familiar-head` (read-only, Titan): this checkout's HEAD, reread by the controller before a
+  Europa HEAD found past an older Titan observation counts as a Europa commit (ruling R68).
 - `familiar-sync` (read-only, Europa): waits, one child per poll, for this checkout's HEAD to be
   B; a timeout, or this HEAD ahead of or diverged from B, refuses.
 - `familiar-merge` (Titan only): with every harness closed, HEAD = B and the base rule again,
@@ -88,6 +90,9 @@ UNSET = ("GIT_ICASE_PATHSPECS", "GIT_GLOB_PATHSPECS", "GIT_DIR", "GIT_WORK_TREE"
          "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
          "GIT_ALTERNATE_OBJECT_DIRECTORIES")
 FREEZE = ("no familiar commit may be made on europa during the window")
+# The words of a final Europa refusal: HEAD past the Titan HEAD it was given. The controller
+# rereads Titan before it takes one as a Europa commit (ruling R68).
+AHEAD = "is ahead of or diverged from titan's HEAD"
 
 
 def root_args(context):
@@ -377,6 +382,15 @@ def familiar_base(context):
     return eligible_base(context)
 
 
+def familiar_head(context):
+    """Read-only: this checkout's HEAD, which the controller rereads on Titan before it takes
+    Europa's HEAD past an older Titan observation for a Europa commit."""
+    head = commit(context, "familiar-head", "HEAD")
+    if head is None:
+        raise Stop("familiar has no HEAD commit")
+    return {"head": head}
+
+
 def familiar_sync(context):
     """Read-only: wait, one child per poll, for this checkout's HEAD to be the window's base B.
     HEAD ahead of or diverged from B refuses at once; B not reached in time refuses."""
@@ -434,8 +448,7 @@ def source_proof(context, expected, observed_titan):
         if related is None:
             return head, f"titan's HEAD {observed_titan[:12]} has not reached this host", False
         if not related:
-            return head, (f"HEAD {head[:12]} here is ahead of or diverged from titan's HEAD "
-                          f"{observed_titan[:12]}: {FREEZE}"), True
+            return head, f"HEAD {head[:12]} here {AHEAD} {observed_titan[:12]}: {FREEZE}", True
     return head, None, False
 
 
@@ -598,6 +611,9 @@ _SYNC_DEADLINE = hosts.SYNC_SECONDS + PROOF_CHILDREN * CHILD_SECONDS
 
 OPERATIONS = {
     "familiar-base": hosts.Operation(run=familiar_base, deadline=PROOF_CHILDREN * CHILD_SECONDS,
+                                     mutation=False, payload=_WINDOW,
+                                     required=frozenset(_WINDOW), hosts=("titan",)),
+    "familiar-head": hosts.Operation(run=familiar_head, deadline=CHILD_SECONDS + 60,
                                      mutation=False, payload=_WINDOW,
                                      required=frozenset(_WINDOW), hosts=("titan",)),
     "familiar-sync": hosts.Operation(run=familiar_sync,

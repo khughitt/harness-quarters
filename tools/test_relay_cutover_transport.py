@@ -4898,3 +4898,122 @@ def test_octopus_merge_in_the_tips_history(world, monkeypatch):
     assert restored["status"] == "completed", restored["error"]
     _is_restore(root, restored["result"]["revert"], head, base)
     _clean_at(root, restored["result"]["revert"])
+
+
+# --- the restore's refusal branches, each pinned by the rule that fires (fix round 1, I2) ---
+
+
+def _restore_record(world, **fields):
+    """This window's durable restore record on Titan, as a crashed restore leaves it."""
+    path = world.root("titan") / "quiesce" / WINDOW / "familiar-restore.json"
+    state._make_dirs(path.parent)
+    state.save_record(path, {"schema": 1, "window_id": WINDOW, "revert": None, "parent": None,
+                             "abandoned": [], **fields})
+
+
+def test_restore_refuses_a_working_tree_neither_head_nor_restore(world, monkeypatch):
+    """HEAD is the merge, but the working tree is neither it nor its restore outside tasks/:
+    R is built and recorded, and HEAD is not moved."""
+    world.stage_cutover()
+    _quiet(world, monkeypatch)
+    root, numbers = _familiar(world), itertools.count(1)
+    base = _tracker(root, "fam-ff5351.md", "# a record\n")
+    merge = _merged_at(world, numbers, base)
+    _write(root / "src/observe.js", "// changed after the merge\n")
+    found, restored = _recovered(world, numbers, base=base, merge=merge)
+    assert found["class"] == "merged"
+    assert restored["status"] == "failed"
+    assert "neither HEAD nor its restore outside tasks/" in restored["error"]
+    assert _git(root, "rev-parse", "HEAD") == merge
+
+
+@pytest.mark.parametrize("tree", ["base", "neither"])
+def test_merge_in_progress_rebuilds_from_the_base_or_refuses(world, monkeypatch, tree):
+    """A merge in progress whose working tree is back at B rebuilds the live index from B
+    before git merge --abort; one whose working tree is neither the merge nor B refuses, and
+    the merge stays in progress."""
+    world.stage_cutover()
+    _quiet(world, monkeypatch)
+    root, numbers = _familiar(world), itertools.count(1)
+    base = _tracker(root, "fam-ff5351.md", "# a record\n")
+    _git(root, "merge", "--no-ff", "--no-commit", world.pins["familiar_feature_tip"])
+    if tree == "base":
+        _git(root, "read-tree", "-u", "--reset", base)
+    else:
+        _write(root / "src/observe.js", "// neither the merge nor the base\n")
+    found, restored = _recovered(world, numbers, base=base)
+    assert found["class"] == "merge-in-progress"
+    if tree == "neither":
+        assert restored["status"] == "failed"
+        assert "neither the attempted merge nor the window's base" in restored["error"]
+        assert (root / ".git/MERGE_HEAD").exists()
+        return
+    assert restored["status"] == "completed", restored["error"]
+    assert (restored["result"]["action"], restored["result"]["rebuilt"]) == ("merge-aborted",
+                                                                             "base")
+    assert not (root / ".git/MERGE_HEAD").exists()
+    _clean_at(root, base)
+
+
+def test_merge_in_progress_rebuild_names_the_merge(world, monkeypatch):
+    """The working tree at the attempted merge rebuilds the live index from the merge's tree."""
+    world.stage_cutover()
+    _quiet(world, monkeypatch)
+    root, numbers = _familiar(world), itertools.count(1)
+    base = _tracker(root, "fam-ff5351.md", "# a record\n")
+    _git(root, "merge", "--no-ff", "--no-commit", world.pins["familiar_feature_tip"])
+    _, restored = _recovered(world, numbers, base=base)
+    assert restored["status"] == "completed", restored["error"]
+    assert restored["result"]["rebuilt"] == "merge"
+
+
+def test_a_source_commit_above_the_merge_is_not_a_restore(world, monkeypatch):
+    """One commit above the merge changes source outside tasks/ but does not return familiar to
+    B: it is no restore, and the stop names that its tree is not B's outside tasks/."""
+    world.stage_cutover()
+    _quiet(world, monkeypatch)
+    root, numbers = _familiar(world), itertools.count(1)
+    base = _tracker(root, "fam-ff5351.md", "# a record\n")
+    merge = _merged_at(world, numbers, base)
+    _write(root / "src/later.js", "// a source change after the merge\n")
+    head = _commit_paths(root, "a source change")
+    payload = _familiar_payload(world, base=base, merge=merge)
+    found = _execute("titan", "familiar-reconcile", payload, next(numbers))["result"]
+    assert found["class"] == "unexpected"
+    assert "is not the window's base outside tasks/" in found["reason"]
+    assert _git(root, "rev-parse", "HEAD") == head
+
+
+def test_a_restore_with_a_symlinked_record_is_refused(world, monkeypatch):
+    """A commit above the merge that returns familiar to B outside tasks/ but adds a symlink
+    under tasks/ is no restore: its tasks/ changes must be regular files."""
+    world.stage_cutover()
+    _quiet(world, monkeypatch)
+    root, numbers = _familiar(world), itertools.count(1)
+    base = _tracker(root, "fam-ff5351.md", "# a record\n")
+    merge = _merged_at(world, numbers, base)
+    _git(root, "read-tree", "-u", "--reset", base)
+    os.symlink("../package.json", root / "tasks/link")
+    head = _commit_paths(root, "a restore with a symlinked record")
+    assert _git(root, "diff", "--name-only", base, head).split() == ["tasks/link"]
+    payload = _familiar_payload(world, base=base, merge=merge)
+    found = _execute("titan", "familiar-reconcile", payload, next(numbers))["result"]
+    assert found["class"] == "unexpected"
+    assert "not a regular file" in found["reason"]
+
+
+def test_a_recorded_restore_with_the_wrong_tree_is_refused(world, monkeypatch):
+    """The restore record names an R whose parent is HEAD but whose tree is not B's with HEAD's
+    task records: nothing is changed and HEAD is not moved onto it."""
+    world.stage_cutover()
+    _quiet(world, monkeypatch)
+    root, numbers = _familiar(world), itertools.count(1)
+    base = _tracker(root, "fam-ff5351.md", "# a record\n")
+    merge = _merged_at(world, numbers, base)
+    wrong = _git(root, "commit-tree", f"{merge}^{{tree}}", "-p", merge, "-m", "not a restore")
+    _restore_record(world, revert=wrong, parent=merge)
+    found, restored = _recovered(world, numbers, base=base, merge=merge)
+    assert (found["class"], found["revert"], found["abandoned"]) == ("merged", wrong, None)
+    assert restored["status"] == "failed"
+    assert "is not the base's tree with HEAD's task records" in restored["error"]
+    assert _git(root, "rev-parse", "HEAD") == merge
