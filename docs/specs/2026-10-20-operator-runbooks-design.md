@@ -707,10 +707,10 @@ under the same object environment. "Equal outside `tasks/`" means `diff-tree -r 
 --raw -z` lists only paths beginning with `tasks/`.
 
 - **Base.** B is a tasks-only descendant of PRE with a clean tree (no tracked change, no
-  untracked path outside `tasks/` and the ignored `node_modules`). `merge-tree --write-tree B
-  tip` must exit 0 and equal T0 outside `tasks/`; any conflict, the tip/base `tasks/` path
-  overlap included, refuses at `prepare`, before any closure. A fresh window keeps this
-  strict rule, so a recovered window's R is never a base (R47 holds).
+  untracked, not ignored path outside `tasks/` and the ignored `node_modules`). `merge-tree
+  --write-tree B tip` must exit 0 and equal T0 outside `tasks/`; any conflict, the tip/base
+  `tasks/` path overlap included, refuses at `prepare`, before any closure. A fresh window
+  keeps this strict rule, so a recovered window's R is never a base (R47 holds).
 - **Readiness.** `prepare` and `check` recompute T0 and compare it with the pin, apply the
   base rule to each host's own HEAD and report B with its proof. Europa's HEAD equal to, or an
   ancestor of, Titan's is ready; diverged or ahead is a `familiar-native` blocker naming the
@@ -758,14 +758,16 @@ under the same object environment. "Equal outside `tasks/`" means `diff-tree -r 
   durably on the host before any index or working-tree change. The live index is never
   evidence (Dropbox synchronizes it). "The working tree equals T" means: a temporary
   `GIT_INDEX_FILE` loaded with `read-tree T` gives `diff --quiet T` exit 0, and under that index
-  `ls-files -z --others` lists nothing outside `tasks/` and `node_modules/`. For the restore's
+  `ls-files -z --others --exclude-standard` lists nothing outside `tasks/` and
+  `node_modules/`; untracked means not ignored: the listing honours the repository's
+  `.gitignore`, `info/exclude` and `core.excludesFile` (R69). For the restore's
   branch choice, its final proof and every after-the-mark clean-tree proof, equality is judged
   outside `tasks/`: tracked changes under `tasks/` (a tracker write deferred because the index
   held foreign staged changes) are carried, never evidence; P, R and R′ share HEAD's `tasks`
   entry, so the two-way `read-tree -m -u` keeps them. That equality filters the `-z` name
-  output of `diff --name-only T` and `ls-files --others` by the byte prefixes `tasks/` (and
-  `node_modules/`), never by pathspec exclusion, with `GIT_ICASE_PATHSPECS` and
-  `GIT_GLOB_PATHSPECS` unset. The restore refuses
+  output of `diff --name-only T` and `ls-files --others --exclude-standard` by the byte
+  prefixes `tasks/` (and `node_modules/`), never by pathspec exclusion, with
+  `GIT_ICASE_PATHSPECS` and `GIT_GLOB_PATHSPECS` unset. The restore refuses
   for inspection while `.git/index.lock` exists and never deletes the lock. With HEAD = P (R's
   recorded parent):
   - working tree equals P: rebuild the index (`read-tree P`, then `update-index -q

@@ -14,8 +14,11 @@ call, and every path rule is a byte prefix, never a pathspec:
   `rev-list --min-parents=2`, `diff-tree -r --no-renames --raw -z`). Y equal to X qualifies. A
   shallow repository or one with `info/grafts` is refused.
 - **The working tree equals T** (`worktree_differs`): a temporary `GIT_INDEX_FILE` loaded with
-  `read-tree T` gives `diff --quiet T` exit 0, and under it `ls-files -z --others` lists nothing
-  outside `tasks/` and `node_modules/`. Judged outside `tasks/`, `diff --name-only -z T` lists
+  `read-tree T` gives `diff --quiet T` exit 0, and under it `ls-files -z --others
+  --exclude-standard` lists nothing outside `tasks/` and `node_modules/`: untracked means not
+  ignored, so a path the repository's `.gitignore`, `info/exclude` or the host's
+  `core.excludesFile` ignores is no evidence (ruling R69; HOME and XDG stay the host's, so Git
+  finds its own configuration). Judged outside `tasks/`, `diff --name-only -z T` lists
   only `tasks/` paths: tracked changes there (a tracker write deferred because the index held
   other staged changes) are carried, never evidence. The live index is never evidence.
 - **The base rule** (`eligible_base`): B, this checkout's HEAD, is a tasks-only descendant of
@@ -272,7 +275,7 @@ def _scratch(context):
 def worktree_differs(context, name, *, outside_tasks):
     """What keeps the working tree from equalling tree-ish `name`, judged through a temporary
     index: tracked differences (outside `tasks/` only, with `outside_tasks`), then untracked
-    paths outside `tasks/` and `node_modules/`. Empty when it is equal."""
+    paths Git does not ignore outside `tasks/` and `node_modules/`. Empty when it is equal."""
     with _scratch(context) as scratch:
         env = {"GIT_INDEX_FILE": str(scratch / "index")}
         if _git(context, "familiar-worktree-index", "read-tree", name, env=env).returncode != 0:
@@ -292,7 +295,8 @@ def worktree_differs(context, name, *, outside_tasks):
                 raise Stop("familiar's working tree cannot be compared; inspect it")
             if result.returncode == 1:
                 found.append("a tracked file differs")
-        others = _git(context, "familiar-worktree-others", "ls-files", "-z", "--others", env=env)
+        others = _git(context, "familiar-worktree-others", "ls-files", "-z", "--others",
+                      "--exclude-standard", env=env)
         if others.returncode != 0:
             raise Stop("familiar's untracked files cannot be listed; inspect it")
         found += [f"{_shown(path)} is untracked" for path in others.stdout.split(b"\0")

@@ -241,10 +241,11 @@ since PRE has one parent and changes only regular files (mode 100644 or 100755) 
 starts with `tasks/` (a rename counts as its delete and add; `tasks`, `tasks.md`, `Tasks/…`,
 `tasksx/…`, symlinks and gitlinks do not qualify; shallow or grafted history is refused). Its
 tree must be clean: no tracked change, and no untracked path outside `tasks/` and the ignored
-`node_modules`. `git merge-tree --write-tree B tip` must merge cleanly and equal T0, the pinned
-tree of the reviewed merge of PRE and the tip, outside `tasks/`. The check recomputes T0 and
-writes nothing into the checkout. familiar's runtime never reads `tasks/`. Europa's HEAD must
-equal Titan's or be an ancestor of it.
+`node_modules`; a path Git ignores (familiar's `.gitignore`, `.git/info/exclude` or your
+`core.excludesFile`) is not untracked. `git merge-tree --write-tree B tip` must merge cleanly
+and equal T0, the pinned tree of the reviewed merge of PRE and the tip, outside `tasks/`. The
+check recomputes T0 and writes nothing into the checkout. familiar's runtime never reads
+`tasks/`. Europa's HEAD must equal Titan's or be an ancestor of it.
 
 It refuses beside any open window, pilot included, and with `familiar-native` on a host whose
 familiar fails the base rule or, on Europa, is ahead of or diverged from Titan's
