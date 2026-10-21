@@ -226,11 +226,12 @@ def _summary(window):
 
 
 def _stopped(failed, window):
-    """Record a stopped finish. Drift beyond picks needs inspection and recover; a hold breach
-    already sent the window to recovery; anything else leaves the window to finish again."""
+    """Record a stopped finish. Drift beyond picks, by the stop's cause, needs inspection and
+    recover; a hold breach already sent the window to recovery; anything else, a refusal, a
+    transport failure or an unsettled request included, leaves the window to finish again."""
     if failed.step == "hold":
         return failed
-    inspect = failed.step in INSPECT and failed.status in ("blocked", "failed")
+    inspect = failed.step in INSPECT and failed.drift
     try:
         current = state.current_window(lifecycle._root())
         entry = {"step": failed.step, "host": failed.host, "status": failed.status,

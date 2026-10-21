@@ -328,15 +328,15 @@ def _read_target(path, target_id):
 
 
 def _eligible(context, target_id, keys, before, members):
+    from .targets import differing  # targets reads this module's tables as it is imported
     resolved = os.path.realpath(Path(context["home"]) / TARGETS[target_id])
     data = _read_target(resolved, target_id)
     current = _decode(data, f"{target_id} ({resolved})", "target")
     reviewed = _decode(before, f"{target_id} reviewed before-image", "input-member")
     owned = keys if target_id in CLAUDE_TARGETS else ()
-    if nonpick(current, owned) != nonpick(reviewed, owned):
-        missing = object()
-        changed = sorted(key for key in set(current) | set(reviewed) if key not in owned
-                         and current.get(key, missing) != reviewed.get(key, missing))
+    # Type-exact, as the dry runs compare: `true`, `1` and `1.0` differ (ruling R53).
+    changed = differing(nonpick(current, owned), nonpick(reviewed, owned))
+    if changed:
         what = ("settings other than the clean filter's pick keys differ" if owned
                 else "the hooks file differs")
         raise Blocked(REVIEW, f"{target_id}: {what} from the reviewed native before-image "
@@ -351,7 +351,7 @@ def inputs_check(context):
     """Read-only: this host's retained state, the designated manifest, its members and
     provenance, the manifest-verified pick keys and each relevant target's eligibility."""
     root = Path(context["root"])
-    blockers = quiesce.readiness(context)
+    blockers = quiesce.readiness(context, PINS["familiar_pre"])
     report = {"manifest": None, "filter": None, "targets": {}, "blockers": blockers}
     try:
         manifest, relative, digest = load_manifest(root)

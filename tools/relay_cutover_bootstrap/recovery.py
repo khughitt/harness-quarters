@@ -90,12 +90,15 @@ def _prepared(window):
     return prepared
 
 
-def _settle(window, *, cancel):
+def _settle(window, *, cancel, reads=True):
     """Each host's unfinished operations, as (blockers, cancelled, dead): any operation still
     running, unknown or another window's, and a host that cannot be read, is a blocker for every
     mutation. This window's operations whose owner died are cancelled and recorded where
     `cancel(entry)` holds (recovery cancels them all; a surface retry only its own reads and
-    surface operations; reconciliation none); the rest are returned in `dead`, untouched."""
+    surface operations; reconciliation none); the rest are returned in `dead`, untouched. With
+    `reads`, any operation whose owner died and that changes nothing is cancelled too, whichever
+    window or none ran it: only its bounded children could still run (ruling R48).
+    Reconciliation, which cancels nothing, passes reads=False."""
     mode, identity = window["mode"], window["id"]
     blockers, cancelled, dead = [], [], []
     for host in HOST_ORDER:
@@ -110,12 +113,14 @@ def _settle(window, *, cancel):
             continue
         for entry in found["operations"]:
             name = f"operation {entry['operation_id']} ({entry['operation']})"
-            if entry["window_id"] == identity and entry["state"] == "owner-lost":
-                if not cancel(entry):
+            own = entry["window_id"] == identity
+            read = reads and not own and lifecycle.owner_lost_read(entry)
+            if (own and entry["state"] == "owner-lost") or read:
+                if not read and not cancel(entry):
                     dead.append(f"{host}: {name} is owner-lost; its recorded children may still "
                                 "run until recover cancels them")
                     continue
-                outcome, _ = _call(host, mode, "operation-cancel",
+                outcome, _ = _call(host, entry.get("mode") or mode, "operation-cancel",
                                    {"operation_id": entry["operation_id"]}, "reconcile")
                 cancelled.append({"host": host, "operation_id": entry["operation_id"],
                                   "operation": entry["operation"], "state": outcome["state"]})
@@ -124,10 +129,43 @@ def _settle(window, *, cancel):
                 blockers.append(f"{host}: {name} is {outcome['state']} after operation-cancel; "
                                 "inspect its recorded children")
                 continue
-            owner = "this window's" if entry["window_id"] == identity else "not this window's"
-            blockers.append(f"{host}: {name} is {entry['state']} and {owner}; let it finish or "
-                            "reconcile it with operation-status or operation-cancel")
+            owner = "this window's" if own else "not this window's"
+            blockers.append(f"{host}: {name} is {entry['state']} and {owner}; "
+                            f"{lifecycle.remedy(host, entry)}")
     return blockers, cancelled, dead
+
+
+def reconcile_operations(host: str) -> dict:
+    """Every unfinished operation on host, reported (ruling R48): one whose owner died gets
+    operation-cancel, which stops its recorded children and records it interrupted, whichever
+    window or none ran it; a running one's owner is alive, so it is reported and never
+    cancelled; an operation directory without its start record is left for inspection. Returns
+    {operations: [entry with its outcome], settled, observed, next}."""
+    found, _ = _call(host, "live", "pending-operations", {}, "reconcile-operations")
+    reported, settled = [], True
+    for entry in found["operations"]:
+        if entry["state"] == "owner-lost":
+            outcome, _ = _call(host, entry.get("mode") or "live", "operation-cancel",
+                               {"operation_id": entry["operation_id"]}, "reconcile-operations")
+            if outcome["state"] in hosts.TERMINAL:
+                text = f"owner-lost: cancelled; now {outcome['state']}"
+            else:
+                settled = False
+                text = (f"owner-lost: still {outcome['state']} after operation-cancel; "
+                        f"{len(outcome.get('survivors') or [])} recorded child process(es) "
+                        "survive; inspect them")
+        elif entry["state"] == "running":
+            text = ("running: its owner is alive, so it is reported and never cancelled; let "
+                    "it finish")
+        else:
+            settled = False
+            text = (f"{entry['state']}: no start record; inspect it "
+                    "(docs/runbooks/relay-cutover.md §11)")
+        reported.append({**entry, "outcome": text})
+    observed = (f"{host}: no unfinished operation" if not reported else
+                f"{host}: every owner-lost operation is settled" if settled else
+                f"{host}: an operation still needs inspection")
+    return {"operations": reported, "settled": settled, "observed": observed, "next": ["status"]}
 
 
 def _closed(host, mode, identity):
@@ -380,9 +418,10 @@ def _summary(window):
     return "; ".join(done) or "nothing has been restored yet"
 
 
-def _stopped(failed):
-    """Record a stopped recovery: inspection for unknown bytes or history, else recovering."""
-    inspect = ((failed.step in INSPECT and failed.status in ("blocked", "failed"))
+def _stopped(failed, lead=None):
+    """Record a stopped recovery: inspection when it observed unknown bytes or history (drift,
+    by the stop's cause), else recovering. `lead` replaces the report's account of the stop."""
+    inspect = ((failed.step in INSPECT and failed.drift)
                or (failed.step == "target-originals" and failed.host == "titan"
                    and failed.status == "blocked"))
     try:
@@ -396,8 +435,9 @@ def _stopped(failed):
     except (Stop, OSError) as error:
         failed.observed = f"the window record could not be updated ({hosts._brief(error)}); {STOP}"
     else:
-        lead = ("stopped pending inspection: nothing was force-copied, reset or reverted blindly"
-                if inspect else f"recovery stopped at {failed.step} on {failed.host}")
+        lead = lead or ("stopped pending inspection: nothing was force-copied, reset or reverted "
+                        "blindly" if inspect else
+                        f"recovery stopped at {failed.step} on {failed.host}")
         failed.observed = (f"window {window['id']} is {window['state']}: {lead}; "
                            f"{_summary(window)}. {STOP}")
     failed.next_command = failed.next_command or ["recover"]
@@ -474,7 +514,7 @@ def _original_timers(window, seen, progress):
                                                       "completed": {"at": _now()}})
 
 
-def recover_window(window: dict, decision: dict | None) -> dict:
+def recover_window(window: dict, decision: dict | None, *, held=None) -> dict:
     """The full recover. A window that never reached familiar's mark takes the pre-merge abort
     only, with no decision. Any other runs the six stages in order, every attempt from the first:
 
@@ -488,10 +528,25 @@ def recover_window(window: dict, decision: dict | None) -> dict:
     6. each host's original timer state restored and its service run to success.
 
     Until stage 6 passes the window stays `recovering` and every report says not to open Claude
-    or Codex; a stop at any stage records it and names `recover` again."""
+    or Codex; a stop at any stage records it and names `recover` again.
+
+    `held` is why stage 5 cannot run in this invocation: its entry-time desktop preview was
+    blocked, or the operator declined its restarts (rulings R36 and R46). Stages 1-4 still run,
+    since they touch no desktop and are what recover was invoked for; recover then stops in
+    `recovering` before stage 5, naming `held`, and a rerun previews the desktop and asks again."""
     _active(window)
     if pre_merge(window):
         return restore_window(window)
+    if held is not None:
+        window = restore_window(window)["window"]
+        when = ("once the desktop blocker is inspected and cleared"
+                if held.step == "surface-preview" else
+                "when the operator approves recovery's surface restarts")
+        held.next_command = ["recover"]
+        raise _stopped(held, lead=(
+            "native settings, source and dependencies are restored, and familiar's surfaces and "
+            f"the original timers wait for recover again, {when}: it previews the desktop and "
+            "asks before any restart"))
     todo = surfaces.pending(window, surfaces.RECOVERY)
     if decision is None:
         if any(todo.values()):
@@ -605,7 +660,7 @@ def reconcile_window(window: dict) -> dict:
         return {**report, "class": "abort", "next": ["recover"],
                 "observed": ("familiar and settings were never changed: recover completes the "
                              "pre-merge timer and snapshot abort only")}
-    blockers, _, dead = _settle(window, cancel=lambda entry: False)
+    blockers, _, dead = _settle(window, cancel=lambda entry: False, reads=False)
     if reconcilable(window) and (blockers or dead):
         # Unsettled work may still be writing: never promote beside it. Reconciliation cancels
         # nothing; recover cancels this window's dead-owner operations before it acts. Work

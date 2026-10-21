@@ -612,12 +612,13 @@ def _attempt(record, attempt, **changes):
 
 
 def _recheck(window, attempt, seen, progress):
-    """The verified migration again, before a retry touches any desktop."""
+    """The verified migration again, before a retry touches any desktop. Like finish's checks,
+    it tolerates Claude's pick keys, which a resumed session may have saved since."""
     def step(name, host):
         nonlocal window
         window = lifecycle._step(window, seen, progress, name, host)
 
-    lifecycle.verified_migration(window, window["familiar"]["merge"], step)
+    lifecycle.verified_migration(window, window["familiar"]["merge"], step, picks=True)
     record = copy.deepcopy(window["desktop"])
     _attempt(record, attempt, rechecked_at=lifecycle._now())
     return lifecycle._save(window, desktop=record)
@@ -667,10 +668,11 @@ def restarted(window: dict, phase: str) -> dict:
 
 def pending_failure(failed, phase: str, attempt: str):
     """Record a stopped restart and say what it leaves. In the forward phase only the surfaces
-    stay pending, unless the migration recheck itself found the migration changed, which needs
+    stay pending, unless the migration recheck itself observed the migration changed (drift, by
+    the stop's cause: never a refusal, a transport failure or an unsettled request), which needs
     inspection and recover; in recovery the caller records the recovery stop."""
     inspect = (phase == FORWARD and failed.step in ("target-verify", "familiar-verify")
-               and failed.status not in ("interrupted", "unsettled"))
+               and failed.drift)
     try:
         window = state.current_window(lifecycle._root())
         record = copy.deepcopy(_record(window))

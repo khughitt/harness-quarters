@@ -74,6 +74,14 @@ HOLD = ("until finish, launch Claude and Codex only with the held commands below
         "clw, unheld Claude or IDE clients, and update or install commands")
 PICKS = ("until finish reports complete, do not change or save Claude model or effort "
          "defaults in either home on either host, including through /model or /effort")
+# A launch that bypasses approval, sandbox, permission or hook-trust review: any of these flags,
+# or a flag with this value (`--flag value` or `--flag=value`). Ruling R49.
+BYPASS_FLAGS = ("--dangerously-bypass-approvals-and-sandbox", "--dangerously-bypass-hook-trust",
+                "--dangerously-skip-permissions", "--yolo", "--full-auto", "--approve-for-me")
+BYPASS_VALUES = {"--ask-for-approval": "never", "-a": "never",
+                 "--permission-mode": "bypassPermissions"}
+BYPASSED = ("was launched with a bypass flag (approval, sandbox, permission or hook-trust "
+            "review)")
 
 
 # --- the held commands ----------------------------------------------------------------------
@@ -282,22 +290,41 @@ def _scratch(context, cwd):
             "identity": identity}
 
 
+def bypassed(argv: list) -> bool:
+    """Whether a process's argv carries a bypass flag. Computed on its host: argv never leaves
+    it."""
+    args = [str(arg) for arg in argv[1:]]
+    for index, arg in enumerate(args):
+        flag, joined, value = arg.partition("=")
+        if arg in BYPASS_FLAGS or (joined and flag in BYPASS_FLAGS):
+            return True
+        if joined and BYPASS_VALUES.get(flag) == value:
+            return True
+        if arg in BYPASS_VALUES and args[index + 1:index + 2] == [BYPASS_VALUES[arg]]:
+            return True
+    return False
+
+
 def smoke_observe(context):
     """Read-only: this host's registry, intent, harness processes and executables, and the
-    named scratch repo, for one window's smokes."""
+    named scratch repo, for one window's smokes. Each harness process carries `bypass`, whether
+    its command line bypasses review (`bypassed`); its argv is never sent."""
     payload = context["payload"]
     harnesses = _identities(context)
     observed_at = hosts._now()
-    processes = inventory._processes(context, inventory._process_rows(), harnesses)
+    rows = inventory._process_rows()
+    processes = inventory._processes(context, rows, harnesses)
+    argv = {row["pid"]: row["argv"] for row in rows}
     return {"window_id": payload["window_id"], "host": context["host"],
             "mode": context["mode"], "operation_id": context["operation_id"],
             "nodename": hosts._nodename(), "observed_at": observed_at,
             "harnesses": {name: {key: found[key] for key in ("path", "real", "sha256",
                                                               "familiar")}
                           for name, found in harnesses.items()},
-            "processes": sorted([{**entry, "known": True} for entry in processes["known"]]
-                                + [{**entry, "known": False} for entry in processes["unknown"]],
-                                key=lambda entry: entry["pid"]),
+            "processes": sorted([{**entry, "known": known, "bypass": bypassed(argv[entry["pid"]])}
+                                 for known, entries in ((True, processes["known"]),
+                                                        (False, processes["unknown"]))
+                                 for entry in entries], key=lambda entry: entry["pid"]),
             "agents": _registry(context), "intent": _intent(context),
             "scratch": _scratch(context, payload["cwd"]) if "cwd" in payload else None}
 
@@ -368,8 +395,8 @@ def hold(window: dict, prepared: dict, host: str, observation: dict) -> None:
              f"familiar-reap.timer stays paused on {' and '.join(paused(window)) or 'no host'}; "
              "close every Claude and Codex "
              "session on both hosts and run recover from an ordinary shell, which needs no "
-             "proof for the moved version. Afterwards repeat Task 9 Steps 5–7 and the final "
-             "held check before a fresh window")
+             "proof for the moved version. A recovered merge ends this window: a later attempt "
+             "needs newly reviewed pins and inputs and its own reviewed procedure")
     current = state.current_window(lifecycle._root())
     lifecycle._save(current, state="recovery-required", failure={
         "step": "hold", "host": host, "status": "breach", "error": error, "log": None,
@@ -403,7 +430,7 @@ def _controller_failed(message):
 def check_controller(window: dict, observation: dict) -> None:
     """The controller's own fresh row in a Titan observation, or Failed: its native session's
     root Codex row, alive on Titan, its process the prepared Codex executable at the row's PID
-    and start time, and updated since the verified migration."""
+    and start time, launched with no bypass flag, and updated since the verified migration."""
     prepared = _prepared(window)
     session = prepared["controller"]["session_id"]
     row_id = f"codex:{session}"
@@ -432,6 +459,10 @@ def check_controller(window: dict, observation: dict) -> None:
     if not held:
         raise _controller_failed(f"{row_id}'s process (pid {process.get('pid')}) is not the "
                                  f"prepared Codex executable {expected} as relay recorded it")
+    if any(entry.get("bypass") is not False for entry in held):
+        raise _controller_failed(f"{row_id}'s process (pid {process.get('pid')}) {BYPASSED}: "
+                                 "its row proves nothing about the trust review; exit it and "
+                                 "resume the controller only with its printed held command")
 
 
 def _proof(window, observation, ref):
@@ -741,6 +772,9 @@ class _Receipt:
             self.refuse(f"start-idle: pid {receipt['pid']} is not a held "
                         f"{NAMES[receipt['harness']]} process of the prepared executable "
                         f"{expected}")
+        if any(entry.get("bypass") is not False for entry in held):
+            self.refuse(f"start-idle: pid {receipt['pid']} {BYPASSED}: a smoke runs only "
+                        "through its printed held smoke command")
         seqs = [start["seq"]]
         if "allow-working" in names:
             [seen] = self.evidence("allow-working")

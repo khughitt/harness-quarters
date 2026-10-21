@@ -46,6 +46,16 @@ SUBJECT = {
     "impact": "the familiar panel closes and reopens",
     "duration_seconds": 10,
 }
+# The real process-ancestry check; `_operator_terminal` replaces it for every test.
+AGENT_ANCESTOR = getattr(cli, "_agent_ancestor", None)
+
+
+@pytest.fixture(autouse=True)
+def _operator_terminal(monkeypatch):
+    """Every terminal these tests answer on is a fixture pty standing in for the operator's.
+    The test runner's own ancestry is no fixture (an agent may run the suite), so the check for
+    a Claude or Codex ancestor reads a fixture process table only where a test gives it one."""
+    monkeypatch.setattr(cli, "_agent_ancestor", lambda *args, **kwargs: None, raising=False)
 
 
 class Events(list):
@@ -900,10 +910,12 @@ def opened_with_decision(world, prepared=None):
     return prepared, opened, decision_for(opened)
 
 
-def inputs_check(world, monkeypatch, number):
-    """Titan's inputs-check inside this process, with the fixture's git for provenance."""
+def inputs_check(world, monkeypatch, number, active=None):
+    """Titan's inputs-check inside this process, with the fixture's git for provenance; `active`
+    names an open window as a run's own gate does."""
     monkeypatch.setitem(hosts.TOOLS, "git", world.config["tools"]["git"])
-    response = transport._execute("titan", "inputs-check", {"commits": True}, number)
+    payload = {"commits": True, **({"active": active} if active else {})}
+    response = transport._execute("titan", "inputs-check", payload, number)
     assert response["status"] == "completed", response["error"]
     return response["result"]
 
@@ -1041,6 +1053,9 @@ NONPICK = {
     "new-key": ("claude-work", lambda value: value.update(cleanupPeriodDays=7),
                 "cleanupPeriodDays"),
     "codex-hooks": ("codex", lambda value: value["hooks"].pop("Stop"), "hooks"),
+    # Parsed JSON's `==` takes true for 1; the type-exact comparison does not (ruling R53).
+    "type": ("claude", lambda value: value.update(alwaysThinkingEnabled=1),
+             "alwaysThinkingEnabled"),
 }
 
 
@@ -1303,6 +1318,38 @@ def test_toolchain_drift_after_prepare_blocks_check(prepared_cutover):
         preparation.recheck(prepared)
 
 
+@needs_zsh
+def test_familiar_off_pre_refuses_prepare_and_check(prepared_cutover, monkeypatch):
+    """familiar's HEAD is no longer PRE (a recovered merge leaves its revert there; here a
+    commit on both hosts). check and prepare refuse on both hosts, before anyone is asked to
+    close a session, saying that this ends the cutover and a new attempt needs newly reviewed
+    pins and inputs. The read is relay-cutover's own; a run's gate, whose request names its open
+    window, leaves it to that window's quiescence."""
+    cutover, prepared = prepared_cutover
+    for host in HOSTS:
+        transport._commit_on(cutover.home(host) / "d/familiar", "after-pre.txt", "past PRE\n")
+    mark = len(cutover.lines("observed"))
+    result = preparation.check(prepared)
+    assert not result["eligible"]
+    found = [blocker for blocker in result["blockers"] if ": familiar-native: " in blocker]
+    assert {blocker.split(": ", 1)[0] for blocker in found} == {"titan", "europa"}
+    for blocker in found:
+        assert "a recovered merge ends this cutover" in blocker
+        assert "a new attempt needs newly reviewed pins and inputs" in blocker
+    assert {(call["host"], call["args"][0]) for call in observed(cutover, "relay-cutover", mark)
+            } == {(host, name) for host in HOSTS
+                  for name in ("familiar-source", "familiar-check")}
+    with pytest.raises(window.Failed) as raised:
+        preparation.prepare(SESSION)
+    assert (raised.value.step, raised.value.host) == ("inputs-check", "titan")
+    assert any(": familiar-native: " in blocker for blocker in raised.value.blockers)
+    # A request that names the open window skips the read.
+    named = inputs_check(cutover, monkeypatch, 7, active="20261021T000000Z-0a0b0c0d")
+    assert not any(blocker.startswith("familiar-native") for blocker in named["blockers"])
+    unnamed = inputs_check(cutover, monkeypatch, 8)
+    assert any(blocker.startswith("familiar-native") for blocker in unnamed["blockers"])
+
+
 def _sessions(world):
     claude = os.path.realpath(world.home("titan") / ".local/bin/claude")
     world.spec("titan")["rows"] += [
@@ -1365,7 +1412,10 @@ def test_prepare_check_is_read_only(prepared_cutover):
         "titan": [], "europa": []}
     assert {host: cutover.units(host) for host in HOSTS} == units
     tools = {call["tool"] for call in observed(cutover, since=mark)}
-    assert "quiesce-timers" not in tools and "relay-cutover" not in tools
+    assert "quiesce-timers" not in tools
+    # relay-cutover only reads familiar there: its source at PRE and its native dependencies.
+    assert {call["args"][0] for call in observed(cutover, "relay-cutover", mark)} == {
+        "familiar-source", "familiar-check"}
     assert not any(call["args"][:1] == ["app-server"] for call in observed(cutover, "codex", mark))
     assert state.current_window(root) is None
     assert not (root / "quiesce").exists()
@@ -2820,6 +2870,43 @@ def test_recovery_requiesces_before_restore(verify_failed):
 
 
 @needs_zsh
+def test_reopened_harness_leaves_recovery_recovering(verify_failed, monkeypatch):
+    """A Claude session opened on Titan after recovery's no-live checks: the first target
+    restore refuses before it writes anything. That observes no drift, so the window stays
+    `recovering`, never inspection-required, and the stop names the open session, not unknown
+    bytes; once it closes, recover's restoration completes from actual state."""
+    cutover, run = verify_failed
+    root = cutover_root(cutover)
+    cutover.reload()
+    cutover.behave("europa", fail=[])
+    real, opened = hosts.request, []
+
+    def request(host, mode, operation, payload, *, timeout):
+        if operation == "target-restore" and not opened:
+            cutover.harness_row("titan", "claude", 3900801, 91)
+            opened.append(True)
+        return real(host, mode, operation, payload, timeout=timeout)
+
+    monkeypatch.setattr(hosts, "request", request)
+    applied = _targets(cutover)
+    with pytest.raises(window.Failed) as raised:
+        recovery.restore_window(run.record)
+    failed = raised.value
+    assert (failed.step, failed.host, failed.status) == ("target-restore", "titan", "failed")
+    assert "3900801" in failed.error and "match no image" not in failed.error
+    assert failed.log is None and not failed.drift
+    assert "recovery stopped at target-restore on titan" in failed.observed
+    assert "stopped pending inspection" not in failed.observed
+    assert failed.next_command == ["recover"]
+    assert state.current_window(root)["state"] == "recovering"
+    assert _targets(cutover) == applied  # nothing was written
+    cutover.drop_row("titan", 3900801)
+    result = recovery.restore_window(state.current_window(root))
+    assert result["class"] == "restored"
+    assert (_targets(cutover), _modules(cutover)) == run.native
+
+
+@needs_zsh
 def test_missing_merge_record_uses_actual_parents(prepared_cutover, monkeypatch):
     """The run died after git committed the merge but before the window recorded it.
     Reconciliation finds the merge from its actual parents and blocks fresh sessions; recovery
@@ -2974,7 +3061,7 @@ def test_recovery_works_after_version_hold_breach(prepared_cutover):
     stages = [_stage(event) for event in events]
     assert stages == sorted(stages) and set(stages) == {1, 2, 3, 4, 5, 6}
     assert timers_active(cutover) == {"titan": "active", "europa": "active"}
-    assert result["state"] == "recovered" and window.status()["next"] == ["check"]
+    assert result["state"] == "recovered" and window.status()["next"] == ["status"]
 
 
 # The full recover's six stages, by the host effect each leaves.
@@ -3244,6 +3331,89 @@ def test_reconcile_unverified_run_blocks_fresh_sessions(prepared_cutover, monkey
     assert restored["codex"]["from"] == "relay-applied" and restored["codex"]["rollback"]
 
 
+def _owner_lost(world, host, operation, *, window_id=None, mutation=False):
+    """What an operation leaves when its owner dies before it records completion (a reboot, an
+    OOM kill, or a second signal on Titan): its start record, and no children or reply."""
+    dead, _ = _dead_identity()
+    operation_id = f"{host}-20261021T000000Z-{os.urandom(6).hex()}"
+    directory = world.root(host) / "operations" / operation_id
+    state.save_record(directory / "start.json", {
+        "schema": 1, "operation_id": operation_id, "operation": operation, "mode": "live",
+        "host": host, "mutation": mutation,
+        "payload": {"window_id": window_id} if window_id else {},
+        "deadline_seconds": 600, "started_at": _now(), "owner": dead})
+    return operation_id, directory
+
+
+@needs_zsh
+def test_foreign_owner_lost_read_is_settled_by_the_abort(prepared_cutover):
+    """An inventory from an earlier check lost its owner on Europa before it recorded
+    completion; it belongs to no window. It blocks this window's first mutation there, and the
+    pre-merge abort cancels it, since a read changes nothing and only its bounded children could
+    still run, then completes: timers restored and snapshots returned on both hosts."""
+    cutover, prepared = prepared_cutover
+    operation_id, directory = _owner_lost(cutover, "europa", "inventory")
+    prepared, opened, consumed = opened_with_decision(cutover, prepared)
+    with pytest.raises(window.Failed) as raised:
+        window.quiesce_window(prepared, consumed)
+    assert (raised.value.step, raised.value.host, raised.value.status) == (
+        "timer-record", "europa", "refused")
+    record = state.current_window(cutover_root(cutover))
+    assert record["state"] == "aborted", record["abort"]
+    assert [(entry["operation_id"], entry["state"])
+            for entry in record["abort"]["hosts"]["europa"]["cancelled"]] == [
+        (operation_id, "interrupted")]
+    assert state.load_record(directory / "done.json")["response"]["status"] == "interrupted"
+    assert timers_active(cutover) == {"titan": "active", "europa": "active"}
+
+
+@needs_zsh
+def test_reconcile_operations_cancels_only_owner_lost(verify_failed, monkeypatch):
+    """Recovery cancels an owner-lost read whichever window it served, but another window's
+    owner-lost mutation blocks it and names reconcile-operations. That command reports every
+    unfinished operation on the host and sends operation-cancel only to owner-lost ones, which
+    records them interrupted; a live owner's operation is reported, never cancelled."""
+    cutover, run = verify_failed
+    root, record = cutover_root(cutover), run.record
+    cutover.reload()
+    cutover.behave("europa", fail=[])
+    read, read_directory = _owner_lost(cutover, "titan", "inputs-check")
+    other = "20261019T000000Z-0bad0001"
+    lost, lost_directory = _owner_lost(cutover, "europa", "timer-stop", window_id=other,
+                                       mutation=True)
+    mutations = _mutations(cutover)
+    with pytest.raises(window.Failed) as raised:
+        recovery.restore_window(record)
+    failed = raised.value
+    assert (failed.step, failed.status) == ("reconcile", "unsettled")
+    assert [blocker for blocker in failed.blockers if lost in blocker] == [
+        f"europa: operation {lost} (timer-stop) is owner-lost and not this window's; reconcile "
+        "it with reconcile-operations --host europa"]
+    assert not any(read in blocker for blocker in failed.blockers)
+    assert state.load_record(read_directory / "done.json")["response"]["status"] == \
+        "interrupted"
+    assert _mutations(cutover) == mutations  # recovery started nothing
+    assert not (lost_directory / "done.json").exists()
+
+    # This window's own timer wait still runs on Europa: a live owner's, never cancelled.
+    running, directory = _unsettled_wait(cutover, record, kill_owner=False)
+    try:
+        result = _cli(cutover, monkeypatch, ["reconcile-operations", "--host", "europa"])
+        assert result.code == 0, result.stdout
+        assert f"{lost} (timer-stop, window {other}): owner-lost: cancelled; now interrupted" \
+            in result.stdout
+        assert f"{running} (timer-wait, window {record['id']}): running" in result.stdout
+        assert "never cancelled" in result.stdout
+        assert not (directory / "cancel.json").exists()
+    finally:
+        _settle_wait(cutover, directory, False)
+    cutover.behave("europa", timers={})
+    assert state.load_record(lost_directory / "done.json")["response"]["status"] == \
+        "interrupted"
+    result = recovery.restore_window(state.current_window(root))
+    assert result["class"] == "restored"
+
+
 @needs_zsh
 def test_recover_pre_merge_incomplete_abort_follows_abort_only(prepared_cutover):
     cutover, prepared = prepared_cutover
@@ -3401,8 +3571,13 @@ def _rechecks(monkeypatch):
     """A retry's recheck of the verified migration, recorded in place of the run's own gate,
     which the full-run tests exercise."""
     calls = []
-    monkeypatch.setattr(window, "verified_migration",
-                        lambda record, merge, step=None: calls.append(merge) or {})
+
+    def recheck(record, merge, step=None, *, picks=False):
+        assert picks  # a retry's recheck tolerates Claude's pick keys, as finish does
+        calls.append(merge)
+        return {}
+
+    monkeypatch.setattr(window, "verified_migration", recheck)
     return calls
 
 
@@ -3732,6 +3907,75 @@ def test_session_decision_required_without_tty(desktop, monkeypatch):
     assert raised.value.code == 2
 
 
+def _process(proc, pid, comm, ppid, exe=None):
+    """One fixture /proc entry: its stat, its comm and, when given, its exe link."""
+    directory = proc / str(pid)
+    directory.mkdir(parents=True)
+    (directory / "stat").write_text(f"{pid} ({comm}) S {ppid} {pid} {pid} 0 -1 4194304\n")
+    (directory / "comm").write_text(comm + "\n")
+    if exe is not None:
+        (directory / "exe").symlink_to(exe)
+
+
+def test_terminal_answers_refuse_under_an_agent(desktop, monkeypatch, tmp_path):
+    """A terminal reached from a Claude or Codex process is that agent's own, never the
+    operator's, even when the agent holds a pseudo-terminal there. Walking its parent chain, the
+    tool finds either harness by its comm or by an executable inside its release family, and
+    then takes no terminal answer: record-smoke and restart-surfaces name --preview and
+    --decision-file, run and recover are operator-run from an ordinary terminal, and nothing is
+    asked, allocated or recorded."""
+    proc = tmp_path / "proc"
+    claude = os.path.realpath(desktop.home("titan") / ".local/bin/claude")
+    _process(proc, 300, "zsh", 200, "/usr/bin/zsh")
+    _process(proc, 200, "2.1.304", 100, claude)  # a native version file names its comm
+    _process(proc, 100, "systemd", 1)
+    assert AGENT_ANCESTOR(300, str(proc)) == {"pid": 200, "name": "claude"}
+    _process(proc, 310, "zsh", 210, "/usr/bin/zsh")
+    _process(proc, 210, "codex", 100, str(tmp_path / "elsewhere/codex"))
+    assert AGENT_ANCESTOR(310, str(proc)) == {"pid": 210, "name": "codex"}
+    _process(proc, 320, "zsh", 220, "/usr/bin/zsh")
+    _process(proc, 220, "kitty", 100, "/usr/bin/kitty")
+    assert AGENT_ANCESTOR(320, str(proc)) is None
+
+    monkeypatch.setattr(cli, "_agent_ancestor", lambda *args, **kwargs: {"pid": 4242,
+                                                                           "name": "codex"})
+    root = desktop.root("titan")
+    state.save_record(root / window.PREPARED, _fixture_prepared(desktop))
+    mark = len(desktop.lines("observed"))
+    run = _cli(desktop, monkeypatch, ["run"], answer=b"yes\n")
+    assert run.code == 1 and "run is operator-run" in run.stdout
+    assert "codex (pid 4242)" in run.stdout and "ordinary terminal" in run.stdout
+    assert "desktop consent" not in run.terminal
+    assert state.current_window(root) is None and not (root / "windows").exists()
+    assert desktop.lines("observed")[mark:] == []
+
+    record, _ = _ready_window(desktop)
+    registry = Registry(desktop)
+    _controller_up(desktop, registry)
+    receipt = _short(desktop, registry, record, "titan", "claude-code", "work",
+                     SESSIONS["work"], 3998201, 930)
+    path = _private_file(desktop, "receipt.json", receipt)
+
+    def unchanged():
+        current = state.current_window(root)
+        decisions = Path(current["directory"]) / "decisions"
+        return (window_file(current).read_bytes(),
+                sorted(os.listdir(decisions)) if decisions.is_dir() else [])
+
+    before, mark = unchanged(), len(desktop.lines("observed"))
+    for argv, title in ((["record-smoke", "--receipt", path], "asks for the human's attestation"),
+                        (["restart-surfaces"], "desktop consent")):
+        refused = _cli(desktop, monkeypatch, argv, answer=b"yes\n")
+        assert refused.code == 1, refused.stdout
+        assert "codex (pid 4242)" in refused.stdout and "--decision-file" in refused.stdout
+        assert f"{argv[0]} --preview" in refused.stdout
+        assert title not in refused.terminal
+    recover = _cli(desktop, monkeypatch, ["recover"], answer=b"yes\n")
+    assert recover.code == 1 and "recover is operator-run" in recover.stdout
+    assert "codex (pid 4242)" in recover.stdout and "desktop consent" not in recover.terminal
+    assert unchanged() == before and desktop.lines("observed")[mark:] == []
+
+
 def test_unverified_migration_keeps_the_mixed_hooks_ban(desktop, monkeypatch):
     """A migration that failed before its verified checkpoint is no surface-only failure:
     restart-surfaces refuses before any ask or host, and the window keeps the ban on opening
@@ -3962,7 +4206,101 @@ def test_recover_six_stages_and_partial_timer_retry(verify_failed, monkeypatch):
     assert (_targets(cutover), _modules(cutover)) == native
     assert "native recovery complete" in second.stdout and "fresh native sessions may start" in \
         second.stdout
-    assert window.status()["next"] == ["check"]
+    # Recovery reverted familiar's committed merge, which ends this cutover: no check, run or
+    # preparation guidance follows.
+    report = window.status()
+    assert report["next"] == ["status"] and "ends this cutover" in report["detail"]
+    assert "a fresh run may start" not in report["detail"]
+    assert second.stdout.splitlines()[-1] == f"  next: {cli.command_line(['status'])}"
+
+
+@needs_zsh
+def test_recover_restores_while_the_desktop_is_blocked(verify_failed, monkeypatch):
+    """Europa's niri IPC fails at recover's entry preview (ruling R36). recover asks nothing,
+    still restores native settings, source and dependencies, then stops before familiar's
+    surfaces in `recovering`, naming the desktop blocker and the complete recover command, with
+    timers paused. Once the desktop answers, a rerun previews, asks and completes the surfaces
+    and the original timers."""
+    cutover, run = verify_failed
+    native, root = run.native, cutover_root(cutover)
+    cutover.reload()
+    cutover.behave("europa", fail=[], niri="fail")
+    mark = len(cutover.lines("observed"))
+    held = _cli(cutover, monkeypatch, ["recover"], answer=b"yes\n")
+    assert held.code == 1, held.stdout
+    assert "step: surface-preview" in held.stdout and "host: europa" in held.stdout
+    assert "status: blocked" in held.stdout and "niri IPC" in held.stdout
+    assert "desktop consent" not in held.terminal  # nothing was asked
+    assert "Do not open Claude or Codex" in held.stdout
+    assert held.stdout.splitlines()[-1] == f"  next: {cli.command_line(['recover'])}"
+    assert {_stage(event) for event in _recovery_events(cutover, mark)} == {1, 2, 3, 4}
+    assert (_targets(cutover), _modules(cutover)) == native
+    record = state.current_window(root)
+    assert record["state"] == "recovering" and "restored" in record["recovery"]
+    assert record["recovery"]["failure"]["step"] == "surface-preview"
+    assert "recovery" not in record.get("desktop", {}).get("phases", {})
+    assert timers_active(cutover) == {"titan": "inactive", "europa": "inactive"}
+    report = window.status()
+    assert report["next"] == ["recover"] and "Do not open Claude or Codex" in report["detail"]
+
+    cutover.behave("europa", niri="ok")
+    mark = len(cutover.lines("observed"))
+    done = _cli(cutover, monkeypatch, ["recover"], answer=b"yes\n")
+    assert done.code == 0, done.stdout
+    assert surfaces.RECOVERY_IMPACT in done.terminal
+    stages = [_stage(event) for event in _recovery_events(cutover, mark)]
+    assert stages == sorted(stages) and {5, 6} <= set(stages)
+    assert state.current_window(root)["state"] == "recovered"
+    assert timers_active(cutover) == {"titan": "active", "europa": "active"}
+    assert (_targets(cutover), _modules(cutover)) == native
+
+
+@needs_zsh
+def test_declined_recover_restores_and_its_surfaces_wait(verify_failed, monkeypatch):
+    """The operator declines recovery's surface restarts (ruling R46): recover still restores
+    native settings, source and dependencies, which touch no desktop, and stops before the
+    surfaces in `recovering`, naming the decline and the rerun; nothing is consumed. The
+    rerun's approved restart fails at Europa's panel (stage 5 inside recover): it stops there
+    with the original timers paused. The last rerun restarts only that panel and completes."""
+    cutover, run = verify_failed
+    native, root = run.native, cutover_root(cutover)
+    cutover.reload()
+    cutover.behave("europa", fail=[])
+    declined = _cli(cutover, monkeypatch, ["recover"], answer=b"no\n")
+    assert declined.code == 1, declined.stdout
+    assert "step: decision" in declined.stdout and "status: declined" in declined.stdout
+    assert "restores native settings, source and dependencies either way" in declined.terminal
+    assert declined.stdout.splitlines()[-1] == f"  next: {cli.command_line(['recover'])}"
+    record = state.current_window(root)
+    assert record["state"] == "recovering" and "restored" in record["recovery"]
+    assert record["recovery"]["failure"]["status"] == "declined"
+    assert (_targets(cutover), _modules(cutover)) == native
+    assert sorted(os.listdir(Path(record["directory"]) / "decisions")) == [
+        f"{window.RUN_ATTEMPT}.json"]
+    assert timers_active(cutover) == {"titan": "inactive", "europa": "inactive"}
+
+    cutover.behave("europa", spawn={"niri-desktop": "fail"})
+    failed = _cli(cutover, monkeypatch, ["recover"], answer=b"yes\n")
+    assert failed.code == 1, failed.stdout
+    assert "step: surface-restart" in failed.stdout and "host: europa" in failed.stdout
+    assert "Do not open Claude or Codex" in failed.stdout
+    assert failed.stdout.splitlines()[-1] == f"  next: {cli.command_line(['recover'])}"
+    record = state.current_window(root)
+    assert record["state"] == "recovering" and "original_timers" not in record["recovery"]
+    restarted = record["desktop"]["phases"]["recovery"]
+    assert {host: sorted(names) for host, names in restarted.items()} == {
+        "titan": sorted(surfaces.SURFACES), "europa": ["familiar-niri-watch"]}
+    assert timers_active(cutover) == {"titan": "inactive", "europa": "inactive"}
+
+    cutover.reload()
+    cutover.behave("europa", spawn={})
+    mark = len(cutover.lines("observed"))
+    done = _cli(cutover, monkeypatch, ["recover"], answer=b"yes\n")
+    assert done.code == 0, done.stdout
+    assert _spawned(cutover, mark) == [("europa", COMMANDS["niri-desktop"])]
+    assert state.current_window(root)["state"] == "recovered"
+    assert timers_active(cutover) == {"titan": "active", "europa": "active"}
+    assert (_targets(cutover), _modules(cutover)) == native
 
 
 def test_changed_context_needs_a_new_inventory_and_decision(desktop, monkeypatch):
@@ -4018,7 +4356,7 @@ def test_recheck_drift_needs_inspection(desktop, monkeypatch):
     record, _ = _pending_window(desktop)
     outcome = {"status": "unsettled"}
 
-    def recheck(record, merge, step=None):
+    def recheck(record, merge, step=None, *, picks=False):
         raise window.Failed("target-verify", "europa", outcome["status"],
                             "claude do not hold the sealed bytes after waiting for "
                             "synchronization")
@@ -4045,6 +4383,64 @@ def test_recheck_drift_needs_inspection(desktop, monkeypatch):
     report = window.status()
     assert report["next"] == ["recover"]
     assert "stopped pending inspection at target-verify on europa (blocked)" in report["detail"]
+
+
+def _host_stop(monkeypatch, outcome, step):
+    """A Europa request for `step` that ends as `outcome` says, through the real request path:
+    refused here (helper drift), a transport failure here, an unsettled request, or the host's
+    own reply: refused, failed before any child ran (no log), timed out, or failed with its own
+    log. `blocked` is the controller's verdict on a completed read."""
+    if outcome == "blocked":
+        return window.Failed(step, "europa", "blocked", "claude do not hold the sealed bytes")
+    replies = {"refused": ("refused", None), "precondition": ("failed", None),
+               "timed-out": ("timed-out", "/fixture/operations/log"),
+               "drift": ("failed", "/fixture/operations/log")}
+
+    def request(host, mode, operation, payload, *, timeout):
+        if outcome == "refused-here":
+            raise hosts.Refused("helper-drift: this host's helper package differs")
+        if outcome == "transport":
+            raise Stop("europa: target-verify got no reply; see operations/transport/x.log")
+        if outcome == "unsettled":
+            raise hosts.Unsettled("europa: no final reply", host=host,
+                                  operation_id="europa-20261021T000000Z-000000000001",
+                                  remote=None)
+        status, log = replies[outcome]
+        return {"schema": 1, "host": host, "mode": mode, "operation": operation,
+                "operation_id": "europa-20261021T000000Z-000000000002", "status": status,
+                "result": None, "error": "fixture stop", "log": log}
+
+    with monkeypatch.context() as patch:
+        patch.setattr(hosts, "request", request)
+        with pytest.raises(window.Failed) as raised:
+            window._call("europa", "live", "target-verify", {}, step)
+    return raised.value
+
+
+@pytest.mark.parametrize("outcome, drift", [
+    ("refused-here", False), ("refused", False), ("transport", False), ("precondition", False),
+    ("unsettled", False), ("timed-out", False), ("drift", True), ("blocked", True)])
+def test_stops_are_classified_by_cause(desktop, monkeypatch, outcome, drift):
+    """A stop needs inspection only when a host operation ran and observed drift: the
+    controller's blocked verdict, or a failed operation that kept its own log. A refusal, a
+    transport failure (no log), an unsettled or a timed-out request keep a surface retry's
+    surfaces pending, finish repeatable and recovery `recovering`, at any step: each stop carries
+    its cause, and the step alone never decides."""
+    record, _ = _ready_window(desktop)
+    root, kept = desktop.root("titan"), window_file(record).read_bytes()
+    after = "inspection-required" if drift else "ready-for-smokes"
+    for classify in (lambda: surfaces.pending_failure(
+                         _host_stop(monkeypatch, outcome, "target-verify"), surfaces.FORWARD,
+                         "restart-1"),
+                     lambda: finish._stopped(_host_stop(monkeypatch, outcome, "target-verify"),
+                                             state.current_window(root)),
+                     lambda: recovery._stopped(_host_stop(monkeypatch, outcome,
+                                                          "target-restore"))):
+        failed = classify()
+        assert failed.drift is drift
+        assert state.current_window(root)["state"] == after
+        assert ("inspection-required" in failed.observed) is drift, failed.observed
+        window_file(record).write_bytes(kept)
 
 
 # --- safe resume, the controller's fresh row, smoke receipts and finish ----------------------
@@ -4185,11 +4581,13 @@ def _denial(ref):
     return _passed(ref, outcome="refused", refusal=REFUSAL)
 
 
-def _short(world, registry, record, host, harness, home, session, pid, start, *, name=None):
-    """A short smoke (start, the attribution denial, exit) in its own scratch repo."""
+def _short(world, registry, record, host, harness, home, session, pid, start, *, name=None,
+           argv=None):
+    """A short smoke (start, the attribution denial, exit) in its own scratch repo; `argv` is
+    the session process's command line, its bare executable by default."""
     cwd = world.scratch(name or f"{harness}-{home}", host)
     row_harness = "claude" if harness == "claude-code" else "codex"
-    world.harness_row(host, row_harness, pid, start)
+    world.harness_row(host, row_harness, pid, start, argv=argv)
     registry.put(host, harness, session, pid, start, cwd, "idle")
     started = _seen(world, host, cwd)
     registry.put(host, harness, session, pid, start, cwd, "done")
@@ -4487,6 +4885,57 @@ def test_current_row_is_fresh(desktop, monkeypatch):
     assert declined.stdout.splitlines()[-1] == "  next: " + cli.command_line(
         ["record-smoke", "--observe", "europa"])
     assert state.current_window(desktop.root("titan"))["smokes"]["observations"] == seen
+
+
+BYPASSED = (["--dangerously-bypass-approvals-and-sandbox"], ["--dangerously-bypass-hook-trust"],
+            ["--ask-for-approval", "never"], ["--ask-for-approval=never"], ["-a", "never"],
+            ["--yolo"], ["--full-auto"], ["--approve-for-me"])
+
+
+def test_bypassed_resume_fails_the_controller_proof(desktop, monkeypatch):
+    """A controller resumed through a bypass (cor, or a hook-trust bypass) still writes a fresh
+    row but proves nothing about the trust review: each observation carries a host-computed
+    bypass flag per harness process, never its argv, and the controller's proof refuses a
+    bypassed process, as a smoke's start-idle does; the held resume proves it."""
+    record, prepared = _ready_window(desktop)
+    root = desktop.root("titan")
+    registry = Registry(desktop)
+    held = smoke.resume_argv(prepared, "personal")[3:]  # the held resume's own argv
+    for flags in BYPASSED:
+        desktop.drop_row("titan", CONTROLLER_PID)
+        desktop.harness_row("titan", "codex", CONTROLLER_PID, CONTROLLER_START,
+                            argv=[*held[:-2], *flags, *held[-2:]])
+        registry.put("titan", "codex", SESSION, CONTROLLER_PID, CONTROLLER_START,
+                     str(desktop.home("titan")))
+        seen = smoke.observe(state.current_window(root), "titan")
+        [entry] = [entry for entry in seen["observation"]["processes"]
+                   if entry["pid"] == CONTROLLER_PID]
+        assert entry["bypass"] is True and "argv" not in entry, flags
+        with pytest.raises(window.Failed) as raised:
+            smoke.check_controller(seen["window"], seen["observation"])
+        assert raised.value.step == "controller-check" and "bypass" in raised.value.error
+    proof = _cli(desktop, monkeypatch, ["record-smoke", "--observe", "titan"])
+    assert proof.code == 1 and "step: controller-check" in proof.stdout
+    assert "bypass flag" in proof.stdout and "printed held command" in proof.stdout
+    assert "controller" not in state.current_window(root).get("smokes", {})
+    for flags in BYPASSED:
+        assert not set(flags) & set(held) and all(word not in shlex.join(held)
+                                                  for word in flags)
+
+    desktop.drop_row("titan", CONTROLLER_PID)
+    desktop.harness_row("titan", "codex", CONTROLLER_PID, CONTROLLER_START, argv=held)
+    proven = _cli(desktop, monkeypatch, ["record-smoke", "--observe", "titan"])
+    assert proven.code == 0, proven.stdout
+    # A smoke session launched with Claude's bypass permission mode fails its start-idle.
+    claude = os.path.realpath(desktop.home("europa") / ".local/bin/claude")
+    receipt = _short(desktop, registry, record, "europa", "claude-code", "work",
+                     SESSIONS["europa-work"], 3998501, 960,
+                     argv=[claude, "--permission-mode", "bypassPermissions"])
+    _refused(desktop, receipt, "start-idle: pid 3998501 was launched with a bypass flag")
+    receipt = _short(desktop, registry, record, "europa", "claude-code", "personal",
+                     SESSIONS["europa"], 3998401, 950,
+                     argv=[claude, "--permission-mode", "manual"])
+    smoke.check_receipt(state.current_window(root), receipt)
 
 
 @needs_zsh
@@ -4800,13 +5249,15 @@ def test_handoff_freezes_claude_picks(desktop, monkeypatch):
     frozen(status.stdout, ready)
     assert status.stdout.splitlines()[-1] == "  next: " + cli.command_line(
         ["record-smoke", "--observe", "titan"])
-    # The window's end releases it; a parked preparation never had it.
+    # The window's end releases it; a complete cutover parks no preparation either.
     with_state(state.current_window(root), "complete")
     state.save_record(root / window.PREPARED, prepared)
     parked = _cli(desktop, monkeypatch, ["status"])
     assert parked.code == 0, parked.stdout
     assert "avoid cl" not in parked.stdout and "model or effort" not in parked.stdout
-    assert "ordinary Claude and Codex use stays allowed, including cl, clw" in parked.stdout
+    assert "the cutover is complete" in parked.stdout
+    assert "ordinary Claude and Codex use stays allowed" not in parked.stdout
+    assert parked.stdout.splitlines()[-1] == "  next: " + cli.command_line(["status"])
 
 
 def test_finish_refuses_incomplete_receipts(desktop, monkeypatch):
@@ -4879,6 +5330,39 @@ def test_smoke_hold_breach_stops_new_smokes(desktop, monkeypatch):
     assert refused.code == 1 and refused.stdout.splitlines()[-1] == "  next: " + \
         cli.command_line(["recover"])
     assert current.get("smokes", {}).get("receipts", {}) == {}
+    # A recovered merge ends this window; nothing promises a fresh pass in it.
+    recorded = current["failure"]["error"]
+    assert "A recovered merge ends this window" in recorded
+    assert "newly reviewed pins and inputs" in recorded
+    assert "Task 9" not in recorded and "fresh window" not in recorded
+
+
+def test_status_names_the_end_of_the_cutover(desktop, monkeypatch):
+    """A complete window, and a recovered one whose recovery reverted familiar's committed
+    merge, end this cutover: status says so and names neither check nor run, and prints no
+    preparation guidance. A recovered pilot, and a recovered window whose merge never
+    committed, end nothing: the parked preparation's check and guidance follow them."""
+    record, prepared = _ready_window(desktop)
+    root, kept = desktop.root("titan"), window_file(record).read_bytes()
+    state.save_record(root / window.PREPARED, prepared)
+    pre, merge, revert = "a" * 40, "b" * 40, "c" * 40
+    cases = (("complete", {}, ["status"], "the cutover is complete"),
+             ("recovered", {"familiar": {"pre": pre, "merge": merge},
+                            "recovery": {"familiar": {"revert": revert}}}, ["status"],
+              "ends this cutover"),
+             ("recovered", {"familiar": {"pre": pre}, "recovery": {"familiar": {"revert": pre}}},
+              ["check"], "a fresh run may start"))
+    for name, changes, following, fragment in cases:
+        window_file(record).write_bytes(kept)
+        window._save(state.current_window(root), state=name, **changes)
+        report = window.status()
+        assert report["next"] == following and fragment in report["detail"], report
+        out = _cli(desktop, monkeypatch, ["status"]).stdout
+        assert out.splitlines()[-1] == f"  next: {cli.command_line(following)}"
+        assert ("ordinary use:" in out) is (following == ["check"])
+    window_file(record).write_bytes(kept)
+    window._save(state.current_window(root), state="recovered", mode="pilot", **cases[1][1])
+    assert window.status()["next"] == ["check"]
 
 
 @needs_zsh
@@ -5226,6 +5710,42 @@ def test_finish_surface_retry_from_ready_for_smokes(desktop, monkeypatch):
     assert final["smokes"]["receipts"] == smokes["receipts"]
     assert [(entry["attempt_id"], entry["outcome"]) for entry in final["desktop"]["attempts"]] \
         == [("restart-1", "complete"), ("restart-2", "complete")]
+
+
+@needs_zsh
+def test_surface_retry_tolerates_a_saved_pick(ready_run, monkeypatch):
+    """After the surfaces restarted, a resumed session saved a Claude model pick (forbidden
+    until finish, yet expected), and then Europa's panel died. The retry's recheck tolerates the
+    pick as finish does, reading each host as it stands, and restarts only that panel. A change
+    beyond the pick keys still stops the retry for inspection."""
+    cutover, _ = ready_run
+    root = cutover_root(cutover)
+    value = json.loads(cutover.target("titan", "claude").read_bytes())
+    value["model"] = "sonnet"
+    cutover.write_target("claude", json.dumps(value, indent="\t").encode() + b"\n")
+
+    def panel_dies():
+        recorded = state.current_window(root)["desktop"]["hosts"]["europa"]
+        cutover.drop_row("europa", transport._process_of(recorded, "niri-desktop")["pid"])
+
+    panel_dies()
+    requests, mark = _requests(monkeypatch, cutover), len(cutover.lines("observed"))
+    retried = _cli(cutover, monkeypatch, ["restart-surfaces"], answer=b"yes\n")
+    assert retried.code == 0, retried.stdout
+    assert _spawned(cutover, mark) == [("europa", COMMANDS["niri-desktop"])]
+    assert state.current_window(root)["state"] == "ready-for-smokes"
+    assert {(entry["payload"]["picks"], entry["payload"]["wait"])
+            for _, entry in _sends(requests, "target-verify")} == {(True, False)}
+
+    value["statusLine"] = {"type": "command", "command": "~/elsewhere"}
+    cutover.write_target("claude", json.dumps(value, indent="\t").encode() + b"\n")
+    panel_dies()
+    mark = len(cutover.lines("observed"))
+    stopped = _cli(cutover, monkeypatch, ["restart-surfaces"], answer=b"yes\n")
+    assert stopped.code == 1 and "step: target-verify" in stopped.stdout
+    assert "beyond Claude's pick keys" in stopped.stdout
+    assert _spawned(cutover, mark) == []
+    assert state.current_window(root)["state"] == "inspection-required"
 
 
 @needs_zsh

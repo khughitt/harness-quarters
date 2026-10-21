@@ -1561,14 +1561,15 @@ class World:
             return
         _write(path, json.dumps({session: {"state": "idle"} for session in sessions}))
 
-    def harness_row(self, host, harness, pid, start, held=True, exe=None):
-        """One live Claude or Codex process in host's process table, launched held."""
+    def harness_row(self, host, harness, pid, start, held=True, exe=None, argv=None):
+        """One live Claude or Codex process in host's process table, launched held; `argv`
+        replaces its bare command line."""
         self.reload()
         home = self.home(host)
         link = home / (".local/bin/claude" if harness == "claude" else ".local/bin/codex")
         real = exe or os.path.realpath(link)
         row = {"pid": pid, "start_time": start, "comm": Path(real).name, "exe": real,
-               "argv": [real], **({"held": held} if harness == "claude" else {})}
+               "argv": argv or [real], **({"held": held} if harness == "claude" else {})}
         self.spec(host)["rows"].append(row)
         self.save()
         return row
@@ -3585,7 +3586,7 @@ def test_smoke_observe_is_read_only(world):
         "sha256": _digest(claude), "familiar": True}}
     assert [entry for entry in result["processes"] if entry["pid"] == row["pid"]] == [{
         "pid": row["pid"], "start_time": row["start_time"], "harness": "claude",
-        "exe": claude, "held": True, "known": True}]
+        "exe": claude, "held": True, "known": True, "bypass": False}]
     assert result["scratch"] == {"cwd": scratch, "allowed_marker": True,
                                  "denied_marker": False, "commits": 0, "identity": True}
     calls = world.lines("observed")[mark:]
@@ -3876,6 +3877,7 @@ def test_pilot_paths_are_contained(world):
     assert refused["status"] == "refused" and "scratch" in refused["error"]
     cleanup = _pilot(world, "titan", "pilot-cleanup", {"window_id": PILOT_WINDOW})
     assert cleanup["status"] == "failed" and "unexplained" in cleanup["error"]
+    assert "docs/runbooks/relay-cutover.md §11" in cleanup["error"]
     assert scratch["titan"].is_dir()
     planted.unlink()
 

@@ -23,7 +23,14 @@ file: the private record of an actual session ask and the human's reply, about t
 before any change. `record-smoke --receipt FILE` takes the same two sources for its smoke
 attestation, about the receipt `record-smoke --preview` shows read-only. Each invocation consumes
 its one decision before the first authorized action; no flag or default answers for the
-operator.
+operator. A terminal reached from a Claude or Codex process is that agent's own, even when the
+agent holds a pseudo-terminal there, so an invocation running under one (`_agent_ancestor`)
+takes no terminal answer at all: run refuses before it opens a window.
+
+`recover`'s entry-time desktop preview can be blocked, or the operator can decline its surface
+restarts; recover then still restores native settings, source and dependencies and stops before
+the surfaces (rulings R36 and R46). `reconcile-operations --host HOST` reports every unfinished
+operation on a host and cancels only the owner-lost ones (ruling R48).
 
 `rehearse_main` is tools/relay-cutover-rehearse, the separate pilot entry (`pilot.py`): with
 `--preview` it allocates the pilot window and shows its spawn's bounded consent subject; then an
@@ -39,10 +46,11 @@ import shlex
 import stat
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
 from . import finish as finishing
 from . import prepare as preparation
-from . import hosts, pilot, recovery, smoke, state, surfaces, window
+from . import hosts, inventory, pilot, recovery, smoke, state, surfaces, window
 from .state import Stop
 
 PROG = "relay-cutover-bootstrap"
@@ -51,26 +59,32 @@ REHEARSE = "tools/relay-cutover-rehearse"
 LIMIT = 500
 SHOWN = 40
 TTY = "/dev/tty"
+PROC = "/proc"
 ANSWER_BYTES = 200
 DECISION_BYTES = 65536
 RECEIPT_BYTES = 1 << 20
 APPROVE = ("y", "yes")
 DECISION_PLACEHOLDER = "<decision-file>"
-NO_TERMINAL = ("run is operator-run and this invocation has no terminal for the operator's "
-               "answer: the operator launches it from an ordinary terminal, with every Claude "
-               "and Codex session closed on both hosts")
-RECOVER_NO_TERMINAL = ("recover is operator-run and this invocation has no terminal for the "
-                       "operator's answer: the operator runs it from an ordinary terminal, with "
-                       "every Claude and Codex session closed on both hosts")
-NO_DECISION = ("restart-surfaces needs this invocation's human decision and has no terminal to "
-               "ask on: preview its subject with restart-surfaces --preview, ask the user in the "
-               "session naming those hosts, surfaces, impact and duration, record the actual ask "
-               "and reply in a private decision file and pass it with --decision-file")
+# Why an invocation has no operator's terminal (`_unanswerable`), and what each command does then.
+NO_TTY = "this invocation has no terminal for the operator's answer"
+NO_TERMINAL = ("run is operator-run and {reason}: the operator launches it from an ordinary "
+               "terminal, with every Claude and Codex session closed on both hosts")
+RECOVER_NO_TERMINAL = ("recover is operator-run and {reason}: the operator runs it from an "
+                       "ordinary terminal, with every Claude and Codex session closed on both "
+                       "hosts")
+NO_DECISION = ("restart-surfaces needs this invocation's human decision and {reason}: preview its "
+               "subject with restart-surfaces --preview, ask the user in the session naming those "
+               "hosts, surfaces, impact and duration, record the actual ask and reply in a "
+               "private decision file and pass it with --decision-file")
 NO_ATTESTATION = ("record-smoke needs the human's own attestation of this receipt's trust and "
-                  "permission verdicts and has no terminal to ask on: preview it with "
-                  "record-smoke --preview --receipt FILE, ask the user in the session naming its "
-                  "host, home, session, cases and human verdicts, record the actual ask and "
-                  "reply in a private decision file and pass it with --decision-file")
+                  "permission verdicts and {reason}: preview it with record-smoke --preview "
+                  "--receipt FILE, ask the user in the session naming its host, home, session, "
+                  "cases and human verdicts, record the actual ask and reply in a private "
+                  "decision file and pass it with --decision-file")
+ASK_TAIL = "nothing has changed yet; any answer but yes stops before any change"
+RECOVER_TAIL = ("recover restores native settings, source and dependencies either way; any "
+                "answer but yes restarts no surface, and recover stops before its surface "
+                "restart, for a later recover")
 NO_PROOF = ("an agent's session decision for restart-surfaces needs the controller's fresh row "
             "proven first: resume the controller with its printed held command and run "
             "record-smoke --observe titan; a window whose migration is not yet verified is "
@@ -210,19 +224,21 @@ def _preview(opened, subject, title=None, changes=None):
 
 
 def _ask(opened, action, attempt_id, subject, digest, *, title=None, prompt=None,
-         changes=None, kind="desktop", shown=None,
-         tail="nothing has changed yet; any answer but yes stops before any change"):
+         changes=None, kind="desktop", shown=None, tail=ASK_TAIL):
     """One explicit answer on the operator's terminal, as a decision record. `shown` replaces
     the desktop preview with another bounded subject, such as a smoke receipt's."""
+    agent = _agent_ancestor()
+    if agent is not None:
+        raise Stop(NO_TERMINAL.format(reason=_under(agent)))
     try:
         fd = os.open(TTY, os.O_RDWR | os.O_NOCTTY | os.O_CLOEXEC)
     except OSError:
-        raise Stop(NO_TERMINAL) from None
+        raise Stop(NO_TERMINAL.format(reason=NO_TTY)) from None
     prompt = prompt or (f"Restart these familiar surfaces during run {opened['id']}? Type yes "
                         "to approve: ")
     try:
         if not os.isatty(fd):
-            raise Stop(NO_TERMINAL)
+            raise Stop(NO_TERMINAL.format(reason=NO_TTY))
         shown = shown if shown is not None else _preview(opened, subject, title, changes)
         os.write(fd, (shown + f"  {tail}\n" + prompt).encode("utf-8"))
         try:
@@ -250,6 +266,49 @@ def _terminal():
         return os.isatty(fd)
     finally:
         os.close(fd)
+
+
+def _agent_ancestor(pid=None, proc=PROC):
+    """The nearest ancestor of this process (from `pid`'s parent chain, this process's parent by
+    default) that is a Claude or Codex process, as {pid, name}, or None. Each is known by its
+    comm or by an executable inside its release family under HOME, as inventory resolves them.
+    A terminal reached from one is that agent's own, never the operator's."""
+    home = Path.home()
+    families = (("claude", home / ".local/share/claude/versions", inventory.CLAUDE_FAMILY),
+                ("codex", home / ".codex/packages/standalone/releases", inventory.CODEX_FAMILY))
+    pid, seen = os.getppid() if pid is None else pid, set()
+    while pid > 1 and pid not in seen:
+        seen.add(pid)
+        base = Path(proc) / str(pid)
+        try:
+            comm = (base / "comm").read_text().strip()
+            parent = int((base / "stat").read_text().rsplit(")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return None  # it exited meanwhile, ending the chain this process can still read
+        try:
+            exe = os.path.realpath(os.readlink(base / "exe"))
+        except OSError:
+            exe = None  # another user's process
+        for name, family, pattern in families:
+            root = os.path.realpath(family) + "/"
+            if comm == name or (exe is not None and exe.startswith(root)
+                                and pattern.fullmatch(exe[len(root):]) is not None):
+                return {"pid": pid, "name": name}
+        pid = parent
+    return None
+
+
+def _under(agent):
+    return (f"this invocation runs under {agent['name']} (pid {agent['pid']}), whose terminal is "
+            "that agent's own, never the operator's")
+
+
+def _unanswerable():
+    """Why this invocation cannot ask the operator at a terminal, or None when it can."""
+    agent = _agent_ancestor()
+    if agent is not None:
+        return _under(agent)
+    return None if _terminal() else NO_TTY
 
 
 def _private_json(path, what, limit):
@@ -281,14 +340,15 @@ def _decision_file(path):
 def acquire_decision(opened: dict, *, action: str, attempt_id: str, subject: dict,
                      decision_file: str | None, title: str | None = None,
                      prompt: str | None = None, changes: dict | None = None,
-                     kind: str = "desktop", shown: str | None = None) -> dict:
+                     kind: str = "desktop", shown: str | None = None,
+                     tail: str = ASK_TAIL) -> dict:
     """This invocation's one human decision of `kind` for `opened`, consumed before it
     authorizes: the decision file's record, or the operator's answer to the bounded preview on
-    the terminal."""
+    the terminal. A declined verdict raises `state.Declined`."""
     digest = state._digest(subject)
     record = (_decision_file(decision_file) if decision_file is not None
               else _ask(opened, action, attempt_id, subject, digest, title=title, prompt=prompt,
-                        changes=changes, kind=kind, shown=shown))
+                        changes=changes, kind=kind, shown=shown, tail=tail))
     return state.consume_decision(opened, record, kind=kind, action=action,
                                   attempt_id=attempt_id, subject_sha256=digest)
 
@@ -322,6 +382,11 @@ def _run():
     if current is not None and current["state"] not in state.TERMINAL:
         return _existing(current)
     prepared = preparation.load_prepared()
+    agent = _agent_ancestor()
+    if agent is not None:  # before any window is allocated
+        raise window.Failed("decision", "titan", "refused",
+                            NO_TERMINAL.format(reason=_under(agent)),
+                            observed="nothing was changed", next_command=["run"])
     opened = window.open_window(prepared)
     try:
         decision = acquire_decision(opened, action=window.RUN_ACTION,
@@ -393,8 +458,9 @@ def _restart_surfaces(preview_only, decision_file):
     current = _surface_window(state.current_window(root))
     if preview_only:
         return _surface_preview(current)
-    if decision_file is None and not _terminal():
-        raise window.Failed("decision", "titan", "refused", NO_DECISION,
+    reason = _unanswerable() if decision_file is None else None
+    if reason is not None:
+        raise window.Failed("decision", "titan", "refused", NO_DECISION.format(reason=reason),
                             observed="nothing was changed",
                             next_command=["restart-surfaces", "--preview"])
     if decision_file is not None and "controller" not in (current.get("smokes") or {}):
@@ -452,12 +518,19 @@ def _recover():
         print(f"  observed: window {current['id']} is {result['state']}")
         print(f"  next: {command_line(result['next'])}")
         return 0 if result["state"] == "aborted" else 1
-    if not _terminal():
-        raise window.Failed("decision", "titan", "refused", RECOVER_NO_TERMINAL,
+    reason = _unanswerable()
+    if reason is not None:
+        raise window.Failed("decision", "titan", "refused",
+                            RECOVER_NO_TERMINAL.format(reason=reason),
                             observed="nothing was changed", next_command=["recover"])
-    offered = surfaces.preview(current, surfaces.RECOVER_ACTION)
-    consumed = None
-    if any(offered["subject"]["restart"].values()):
+    held, consumed = None, None
+    try:
+        offered = surfaces.preview(current, surfaces.RECOVER_ACTION)
+    except window.Failed as failed:
+        if (failed.step, failed.status) != ("surface-preview", "blocked"):
+            raise
+        held = failed  # restoration does not wait for the desktop (ruling R36)
+    if held is None and any(offered["subject"]["restart"].values()):
         try:
             consumed = acquire_decision(
                 current, action=surfaces.RECOVER_ACTION, attempt_id=offered["attempt_id"],
@@ -466,13 +539,19 @@ def _recover():
                 "consent, once native settings, source and dependencies are restored",
                 prompt=f"Restart these familiar surfaces while recovering window "
                 f"{current['id']}? Type yes to approve: ",
-                changes={host: found["changes"] for host, found in offered["observed"].items()})
+                changes={host: found["changes"] for host, found in offered["observed"].items()},
+                tail=RECOVER_TAIL)
+        except state.Declined:  # a decline holds back only the surfaces (ruling R46)
+            held = window.Failed("decision", "titan", "declined", "the operator declined "
+                                 "recovery's surface restarts at the terminal; nothing about "
+                                 "familiar's surfaces is authorized", next_command=["recover"])
         except Stop as stop:
             raise window.Failed("decision", "titan", "refused", str(stop), observed=(
                 f"nothing was changed; window {current['id']} is {current['state']}"),
                 next_command=["recover"]) from None
-        current = surfaces.bind(state.current_window(root), consumed, offered["subject"])
-    result = recovery.recover_window(current, consumed)
+        else:
+            current = surfaces.bind(state.current_window(root), consumed, offered["subject"])
+    result = recovery.recover_window(current, consumed, held=held)
     print(f"{PROG}: recover {current['id']}: native recovery complete")
     print("  settings: every touched target holds its native bytes on titan and, synchronized, "
           "on europa")
@@ -496,7 +575,7 @@ def _status():
                           if current else "none"))
     print(f"  observed: {_clean(report['detail'])}")
     lines = _handoff("status")
-    if not lines and prepared and (current is None or current["state"] in state.TERMINAL):
+    if not lines and report["next"] == ["check"]:
         lines = CLOSURE  # a parked preparation: ordinary use, and the refresh before closure
     if lines:
         print("\n".join(lines))
@@ -620,9 +699,10 @@ def _record_smoke(path, preview_only, decision_file):
         following = ["record-smoke", "--receipt", path, "--decision-file", DECISION_PLACEHOLDER]
         print(f"  next: {command_line(following)}")
         return 0
-    if decision_file is None and not _terminal():
-        raise window.Failed("decision", receipt["host"], "refused", NO_ATTESTATION,
-                            observed="nothing was recorded",
+    reason = _unanswerable() if decision_file is None else None
+    if reason is not None:
+        raise window.Failed("decision", receipt["host"], "refused",
+                            NO_ATTESTATION.format(reason=reason), observed="nothing was recorded",
                             next_command=["record-smoke", "--preview", "--receipt", path])
     try:
         consumed = acquire_decision(
@@ -679,6 +759,19 @@ def _finish():
     return 0
 
 
+def _reconcile_operations(host):
+    """reconcile-operations: every unfinished operation on host, the owner-lost ones cancelled."""
+    report = recovery.reconcile_operations(host)
+    print(f"{PROG}: reconcile-operations {host}: {len(report['operations'])} unfinished "
+          "operation(s)")
+    for entry in report["operations"]:
+        print(f"  {entry['operation_id']} ({entry['operation'] or 'unrecorded'}, window "
+              f"{entry['window_id'] or 'none'}): {_clean(entry['outcome'])}")
+    print(f"  observed: {_clean(report['observed'])}")
+    print(f"  next: {command_line(report['next'])}")
+    return 0 if report["settled"] else 1
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(
         prog=PROG, description="Prepare and check hq's closed-harness relay cutover.")
@@ -713,6 +806,9 @@ def main(argv: list[str]) -> int:
     sub.add_parser("recover", help="roll the window back to native (operator-run, from an "
                    "ordinary terminal)")
     sub.add_parser("status", help="report the prepared record, the window and the next command")
+    reconcile = sub.add_parser("reconcile-operations", help="report every unfinished operation "
+                               "on HOST and cancel only those whose owner died")
+    reconcile.add_argument("--host", required=True, choices=window.HOST_ORDER)
     args = parser.parse_args(argv)
     try:
         if args.command in LIVE_COMMANDS:
@@ -735,6 +831,8 @@ def main(argv: list[str]) -> int:
             return _finish()
         if args.command == "recover":
             return _recover()
+        if args.command == "reconcile-operations":
+            return _reconcile_operations(args.host)
         return _check() if args.command == "check" else _status()
     except window.Failed as failed:
         _failure(args.command, failed, _handoff(args.command))
@@ -799,7 +897,7 @@ def _rehearse_answer(current, decision_file):
     offer = current["pilot"]
     if decision_file is not None:
         record = _decision_file(decision_file)
-    elif _terminal():
+    elif _unanswerable() is None:
         record = _ask(current, surfaces.PROBE_ACTION, offer["attempt_id"], offer["subject"],
                       offer["sha256"], shown="\n".join([
                           f"{REHEARSE_PROG}: pilot {current['id']} asks for this invocation's "
