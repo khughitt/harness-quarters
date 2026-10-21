@@ -79,15 +79,27 @@ NOTHING = "nothing was changed; no window is open"
 class Failed(Stop):
     """A stopped step as the operator sees it: no settings, plans, environments or child
     output, only tool-authored text, the private log path and one next command. `aborted` is
-    true once the pre-merge abort ran for it, so no caller runs that abort again."""
+    true once the pre-merge abort ran for it, so no caller runs that abort again.
+
+    `cause` says where a stop that a host request raised came from (`_call`): `transport` (the
+    request reached no host operation, or its reply was unusable), `refused` (refused before any
+    write), `unsettled` or `interrupted`, or `operation` (the host operation ran and replied with
+    its own status). `drift` is whether the stop observed state that differs from what the window
+    recorded: the controller's `blocked` verdict on what a host read, or a `failed` operation that
+    ran children and kept its own log. Only drift needs inspection."""
 
     def __init__(self, step, host, status, error, *, log=None, blockers=(), observed=None,
-                 next_command=None):
+                 next_command=None, cause=None):
         super().__init__(f"{step} on {host}: {status}: {error}")
         self.step, self.host, self.status, self.error = step, host, status, error
         self.log, self.blockers = log, list(blockers)
         self.observed, self.next_command = observed, next_command
-        self.aborted = False
+        self.cause, self.aborted = cause, False
+
+    @property
+    def drift(self):
+        return self.status == "blocked" or (self.status == "failed" and self.cause == "operation"
+                                            and self.log is not None)
 
 
 class _Interrupt(BaseException):
@@ -126,17 +138,17 @@ def _call(host, mode, operation, payload, step):
     try:
         response = hosts.request(host, mode, operation, payload, timeout=timeout)
     except hosts.Interrupted as error:
-        raise Failed(step, host, "interrupted", str(error)) from None
+        raise Failed(step, host, "interrupted", str(error), cause="interrupted") from None
     except hosts.Unsettled as error:
-        raise Failed(step, host, "unsettled", str(error)) from None
+        raise Failed(step, host, "unsettled", str(error), cause="unsettled") from None
     except hosts.Refused as error:
-        raise Failed(step, host, "refused", str(error)) from None
+        raise Failed(step, host, "refused", str(error), cause="refused") from None
     except Stop as error:
-        raise Failed(step, host, "failed", str(error)) from None
+        raise Failed(step, host, "failed", str(error), cause="transport") from None
     log = _log(host, response["log"])
     if response["status"] != "completed":
         raise Failed(step, host, response["status"], response["error"] or "no detail recorded",
-                     log=log)
+                     log=log, cause="refused" if response["status"] == "refused" else "operation")
     return response["result"], log
 
 
@@ -343,8 +355,26 @@ def _stopped(window):
     return [host for host in HOST_ORDER if host in asked]
 
 
+def owner_lost_read(entry: dict) -> bool:
+    """Whether a pending operation lost its owner and changes nothing: whichever window ran it,
+    or none, cancelling it only stops its bounded children and records it interrupted."""
+    spec = operations.OPERATIONS.get(entry["operation"]) if isinstance(entry["operation"],
+                                                                      str) else None
+    return entry["state"] == "owner-lost" and spec is not None and not spec.mutation
+
+
+def remedy(host: str, entry: dict) -> str:
+    """What settles another invocation's unfinished operation on host."""
+    if entry["state"] == "running":
+        return "let it finish"
+    if entry["state"] == "owner-lost":
+        return f"reconcile it with reconcile-operations --host {host}"
+    return "inspect it (docs/runbooks/relay-cutover.md §11)"
+
+
 def _abort_host(window, host, seen, mark):
-    """Cancel the window's pending work on host, restore its timers, return its snapshots."""
+    """Cancel the window's pending work on host, and any operation whose owner died that changes
+    nothing, restore its timers, return its snapshots."""
     mode, identity = window["mode"], window["id"]
     result = {"complete": False, "cancelled": [], "errors": []}
 
@@ -354,11 +384,11 @@ def _abort_host(window, host, seen, mark):
             result["errors"].append(f"interrupted by {signal.Signals(seen[-1]).name}")
         return len(seen) > mark
 
-    def attempt(step, operation, payload):
+    def attempt(step, operation, payload, on=None):
         if interrupted():
             return None
         try:
-            return _call(host, mode, operation, payload, step)[0]
+            return _call(host, on or mode, operation, payload, step)[0]
         except Failed as failed:
             result["errors"].append(f"{failed.step}: {failed.status}: {failed.error}")
             if failed.status == "interrupted":
@@ -369,13 +399,13 @@ def _abort_host(window, host, seen, mark):
     if pending is None:
         return result
     for entry in pending["operations"]:
-        if entry["window_id"] != identity:
+        if entry["window_id"] != identity and not owner_lost_read(entry):
             result["errors"].append(
                 f"operation {entry['operation_id']} ({entry['operation']}) is {entry['state']} "
-                "and is not this window's; reconcile it with operation-status or "
-                "operation-cancel")
+                f"and is not this window's; {remedy(host, entry)}")
             continue
-        cancelled = attempt("abort", "operation-cancel", {"operation_id": entry["operation_id"]})
+        cancelled = attempt("abort", "operation-cancel", {"operation_id": entry["operation_id"]},
+                            entry.get("mode"))
         if cancelled is None:
             return result
         result["cancelled"].append({"operation_id": entry["operation_id"],
@@ -711,12 +741,17 @@ def apply_target(window: dict, target_id: str, seen: list, progress: dict,
     return _save(window, applied={**window.get("applied", {}), target_id: result})
 
 
-def verified_migration(window: dict, merge: str, step=None) -> dict:
+def verified_migration(window: dict, merge: str, step=None, *, picks: bool = False) -> dict:
     """The verified migration checkpoint's per-host record, or Failed naming the first host that
     differs: on each host, Titan first, every target holds the window's sealed bytes (Europa's
     after waiting for synchronization) with hooks, statusLine, installer and evidence verified,
     and familiar is the merge with its pinned relay dependency. The run and reconciliation both
-    take this one gate; `step(name, host)` is called before each request."""
+    take this one gate, with exact bytes; `step(name, host)` is called before each request.
+
+    With `picks`, the recheck of a surface retry: as in finish's checks, a Claude target that
+    differs from its sealed bytes only in the clean filter's pick keys passes, and each host is
+    read as it stands, since the checkpoint already waited for synchronization; the per-host
+    record names the targets that passed on their picks."""
     mode, identity, sealed = window["mode"], window["id"], window["sealed"]["inputs"]
     verified = {}
     for host in HOST_ORDER:
@@ -724,20 +759,23 @@ def verified_migration(window: dict, merge: str, step=None) -> dict:
             step("target-verify", host)
         expected = {target_id: result["expected"]["sha256"]
                     for target_id, result in sealed["hosts"][host].items()}
+        wait = host != "titan" and not picks
         found, log = _call(host, mode, "target-verify", {
-            "window_id": identity, "targets": expected, "wait": host != "titan", "verify": True,
-            "manifest_sha256": sealed["manifest_sha256"]}, "target-verify")
+            "window_id": identity, "targets": expected, "wait": wait, "verify": True,
+            "manifest_sha256": sealed["manifest_sha256"], **({"picks": True} if picks else {})},
+            "target-verify")
         missing = sorted(target_id for target_id, entry in found["targets"].items()
-                         if not entry["matches"])
+                         if not entry["matches"] and target_id not in found["picks"])
         if missing or not found["verified"]:
             raise Failed("target-verify", host, "blocked", f"{', '.join(missing)} do not hold the "
-                         "sealed bytes" + (" after waiting for synchronization"
-                                           if host != "titan" else ""), log=log)
+                         "sealed bytes" + (" beyond Claude's pick keys" if picks else "")
+                         + (" after waiting for synchronization" if wait else ""), log=log)
         if step is not None:
             step("familiar-verify", host)
         source, _ = _call(host, mode, "familiar-verify", {"window_id": identity, "merge": merge},
                           "familiar-verify")
-        verified[host] = {"targets": expected, "familiar": source}
+        verified[host] = {"targets": expected, "familiar": source,
+                          **({"picks": found["picks"]} if picks else {})}
     return verified
 
 
@@ -762,6 +800,26 @@ def pilot_open(current: dict) -> str:
     """What an open pilot window means for the live commands: they refuse beside it."""
     return (f"window {current['id']} is a pilot rehearsal, {current['state']}; live commands "
             "refuse until the rehearse entry runs or reconciles it and removes its scratch roots")
+
+
+def _ended(current):
+    """Why a closed live window ended this cutover, or None. A complete one released its hold. A
+    recovery that reverted familiar's committed merge leaves familiar at that revert, and this
+    tool merges only from PRE: no later window runs from there (ruling R47). A pilot ends
+    nothing, and neither does a recovery whose merge never committed."""
+    if current is None or current["mode"] != "live" or current["state"] not in state.TERMINAL:
+        return None
+    if current["state"] == "complete":
+        return (f"window {current['id']} is complete: the cutover is complete and finish released "
+                "its hold; this tool opens no further window")
+    revert = ((current.get("recovery") or {}).get("familiar") or {}).get("revert")
+    if current["state"] == "recovered" and revert not in (None, (current.get("familiar") or {})
+                                                          .get("pre")):
+        return (f"window {current['id']} is recovered: recovery reverted familiar's committed "
+                f"merge (familiar is at {revert[:12]}), which ends this cutover; this tool merges "
+                "only from PRE and opens no further window, and a new attempt needs newly "
+                "reviewed pins and inputs and its own reviewed procedure")
+    return None
 
 
 def status() -> dict:
@@ -789,6 +847,10 @@ def status() -> dict:
             state.TERMINAL:
         report.update(detail=pilot_open(current),
                       next=[REHEARSE, "--controller-session", SESSION_PLACEHOLDER])
+        return report
+    ended = _ended(current)
+    if ended is not None:
+        report.update(detail=ended, next=["status"])
         return report
     if current is None or current["state"] in state.TERMINAL:
         report["detail"] = report["detail"] or (

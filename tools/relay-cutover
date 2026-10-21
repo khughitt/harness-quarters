@@ -303,8 +303,8 @@ def remote(args):
     if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.@:-]*", args.host):
         raise Stop("invalid SSH host")
     command = [args.command]
-    for flag in ("harness", "head", "expect", "root"):
-        if getattr(args, flag, None) is not None:
+    for flag in ("harness", "head", "expect"):
+        if hasattr(args, flag):
             command.extend(("--" + flag, getattr(args, flag)))
     result = subprocess.run(
         ["ssh", "-4", "-o", "BatchMode=yes", args.host,

@@ -214,8 +214,8 @@ def target_restore(context):
                                  Path(context["hq"]) / targets.RELAY_CUTOVER, *args],
                                 env=env, timeout=2 * CHILD_SECONDS)
     if restored.returncode != 0:
-        raise Stop(f"relay-cutover restore refused {target_id}: its bytes match no image it may "
-                   "restore from; nothing was force-copied; inspect it (see the private log)")
+        raise Stop(f"relay-cutover restore refused {target_id} (exit {restored.returncode}); "
+                   "nothing was force-copied; inspect it (see the private log)")
     if targets._read(target) != images["original"]:
         raise Stop(f"after its restore {target_id} is not its registered original; inspect it")
     result.update(restored=True, rollback=verdict == "relay-applied")

@@ -58,6 +58,10 @@ class Stop(Exception):
     pass
 
 
+class Declined(Stop):
+    """A human decision whose verdict is declined: it authorizes nothing."""
+
+
 def _is_one(value):
     return type(value) is int and value == 1
 
@@ -464,7 +468,7 @@ def consume_decision(window: dict, decision: dict, *, kind: str, action: str,
         if decision[key] != value:
             raise Stop(f"decision {key} does not match this invocation; ask again")
     if decision["verdict"] == "declined":
-        raise Stop("decision declined; nothing is authorized")
+        raise Declined("decision declined; nothing is authorized")
     if decision["verdict"] != "approved":
         raise Stop("decision verdict must be approved or declined")
     _check_source(decision["source"], window)

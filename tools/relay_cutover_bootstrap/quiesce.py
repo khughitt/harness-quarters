@@ -142,7 +142,8 @@ def no_live(context):
 
 
 def pending_operations(context):
-    """Operations on this host that have not recorded completion, other than this one."""
+    """Operations on this host that have not recorded completion, other than this one, each with
+    its mode and the window it names, if any. Any window's caller, or none, may ask."""
     operations = Path(context["root"]) / "operations"
     found = []
     if not os.path.lexists(operations):
@@ -155,12 +156,12 @@ def pending_operations(context):
         if not hosts.OPERATION_ID.fullmatch(entry) or not os.path.lexists(
                 directory / "start.json"):
             found.append({"operation_id": entry, "operation": None, "state": "unrecorded",
-                          "window_id": None})
+                          "window_id": None, "mode": None})
             continue
         start = state.load_record(directory / "start.json")
         found.append({"operation_id": entry, "operation": start["operation"],
                       "state": hosts._observe(directory, start)["state"],
-                      "window_id": start["payload"].get("window_id")})
+                      "window_id": start["payload"].get("window_id"), "mode": start["mode"]})
     return {"operations": found}
 
 
@@ -331,9 +332,38 @@ def _tree(path, digest=True):
             "sha256": _sha256(json.dumps(entries).encode()) if digest else None}
 
 
-def readiness(context):
+# Why familiar off PRE blocks every fresh window, on either host (ruling R47).
+OFF_PRE = ("no window runs from here: a recovered merge ends this cutover, as a completed one "
+           "does, and a new attempt needs newly reviewed pins and inputs")
+
+
+def _familiar_native(context, pre):
+    """Blockers when familiar is not at PRE with a clean tree, or its dependencies do not check
+    native: read by relay-cutover's own familiar-source and familiar-check."""
+    relay_cutover, found = Path(context["hq"]) / "tools/relay-cutover", []
+    for label, args, what in (
+            ("familiar-source", ["--head", pre],
+             f"familiar is not at the approved PRE {pre[:12]} with a clean tree"),
+            ("familiar-check", ["--expect", "native"],
+             "familiar's dependencies do not check native")):
+        try:
+            result = hosts._run_child(context, f"readiness-{label}", [
+                hosts.TOOLS["python3"], "-B", relay_cutover, label, *args],
+                env=hosts._child_env(context), timeout=CHILD_SECONDS)
+            failed = result.returncode != 0
+        except (Stop, OSError) as error:
+            what, failed = f"relay-cutover {label} did not run ({hosts._brief(error)})", True
+        if failed:
+            found.append(f"familiar-native: {what} (relay-cutover {label}; see the private log); "
+                         f"{OFF_PRE}")
+    return found
+
+
+def readiness(context, familiar_pre):
     """Read-only blockers for a fresh window on this host: unexplained root state, timers an
-    earlier window left paused, and missing or uncopyable preparation snapshots."""
+    earlier window left paused, missing or uncopyable preparation snapshots and, unless the
+    payload names the active window (a run's own gate, whose quiescence repeats the check),
+    familiar off its approved PRE `familiar_pre`."""
     root, home, blockers = Path(context["root"]), Path(context["home"]), []
     try:
         state.current_window(root)
@@ -356,6 +386,8 @@ def readiness(context):
             _tree(home / source, digest=False)
         except (Stop, OSError) as error:
             blockers.append(f"snapshots: {hosts._brief(error)}")
+    if active is None:
+        blockers += _familiar_native(context, familiar_pre)
     return blockers
 
 
@@ -481,8 +513,7 @@ OPERATIONS = {
     "no-live": hosts.Operation(run=no_live, deadline=NO_LIVE_SECONDS, mutation=False,
                                payload=_WINDOW),
     "pending-operations": hosts.Operation(run=pending_operations, deadline=60, mutation=False,
-                                          payload=_WINDOW, required=_REQUIRED,
-                                          modes=hosts.BOTH),
+                                          payload=_WINDOW, modes=hosts.BOTH),
     "timer-record": hosts.Operation(run=timer_record, deadline=CHILD_SECONDS + 60,
                                     mutation=True, payload=_WINDOW, required=_REQUIRED),
     "timer-stop": hosts.Operation(run=timer_stop, deadline=CHILD_SECONDS + 60, mutation=True,

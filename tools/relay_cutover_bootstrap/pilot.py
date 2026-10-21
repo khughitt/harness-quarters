@@ -290,8 +290,9 @@ def pilot_cleanup(context):
         except Stop:
             unexplained.append(name)
     if unexplained:
-        raise Stop(f"{base}: unexplained entries {', '.join(unexplained)}; inspect them; nothing "
-                   "was removed")
+        raise Stop(f"{base}: unexplained entries {', '.join(unexplained)}; inspect them as "
+                   "docs/runbooks/relay-cutover.md §11 describes (an orphan pilot scratch root); "
+                   "nothing was removed")
     removed = []
     for name, owner in owners.items():
         if owner.get("window_id") == window_id:
