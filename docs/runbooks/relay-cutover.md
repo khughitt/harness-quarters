@@ -504,7 +504,9 @@ From `run` until `finish` reports complete:
 - Timers stay paused on both hosts until `finish` completes.
 - **Make no familiar commit on Europa**, task records included: concurrent ref writes are a
   Dropbox conflict, and Europa's source proofs (finish, `restart-surfaces`, recovery) refuse a
-  Europa HEAD that is not Titan's or an ancestor of it. Task-record commits on Titan are
+  Europa HEAD that is not Titan's or an ancestor of it. Before such a refusal counts, the tool
+  reads Titan's HEAD again and, if it moved, asks Europa again (ruling R68), so a Titan commit
+  that reached Europa first is not taken for a Europa one. Task-record commits on Titan are
   tolerated after the merge: every proof accepts a tasks-only descendant of the merge.
 
 Every report from the verified migration until finish (`run`, `status`, `restart-surfaces`,
@@ -809,9 +811,9 @@ It then checks each host fresh:
   `inspection-required`, then `recover`.
 - familiar is the merge or a tasks-only descendant of it, clean outside `tasks/` (a deferred
   task-record write is carried), with its pinned relay; Europa's HEAD equals or precedes the
-  HEAD observed on Titan, waiting for a tolerated Titan task-record commit to synchronize. A
-  changed file outside `tasks/`, or a familiar commit made on Europa, becomes
-  `inspection-required`. Finish records the HEAD each host observed.
+  HEAD observed on Titan, waiting for a tolerated Titan task-record commit to synchronize and
+  rereading Titan's HEAD before a Europa HEAD past it counts. A changed file outside `tasks/`,
+  or a familiar commit made on Europa, becomes `inspection-required`. Finish records the HEAD each host observed.
 - familiar's recorded surfaces still run as restarted (ruling R39). A surface that exited or
   was replaced, or a desktop blocker, stops finish for a consented `restart-surfaces`; the
   receipts are kept.

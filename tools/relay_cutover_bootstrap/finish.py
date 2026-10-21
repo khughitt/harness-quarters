@@ -10,12 +10,12 @@ repeats, from actual state:
    executable is still the prepared one, or the hold is breached and the window needs full
    recovery; each target holds the window's sealed bytes apart from Claude's pick keys, which a
    resumed session may have saved, with hooks, statusLine, installer and evidence verified;
-   familiar is the merge or a tasks-only descendant of it, clean outside `tasks/`, with its pinned
-   relay dependency, Europa's HEAD equal to or an ancestor of the HEAD observed on Titan, and
-   each host's observed HEAD recorded; familiar's recorded surfaces still
-   run as restarted. Drift beyond picks stops for inspection and recover; a surface that exited,
-   was replaced or sits behind a desktop blocker stops finish with nothing changed, for a
-   consented `restart-surfaces` retry;
+   familiar is the merge or a tasks-only descendant of it, clean outside `tasks/`, with its
+   pinned relay dependency, Europa's HEAD equal to or an ancestor of the HEAD observed on Titan
+   (reread before an "ahead" counts, ruling R68), and each host's observed HEAD recorded;
+   familiar's recorded surfaces still run as restarted. Drift beyond picks stops for inspection
+   and recover; a surface that exited, was replaced or sits behind a desktop blocker stops
+   finish with nothing changed, for a consented `restart-surfaces` retry;
 3. the window becomes `finishing`; each host's timers return to the window's original record
    (quiesce's `timer-restore`, `stopped` true), which is never rewritten;
 4. each host runs `familiar-reap.service` once its timers are restored and waits for it,
@@ -120,9 +120,13 @@ def _fresh(window, prepared, step):
                                    "differ from the window's sealed output beyond Claude's pick "
                                    "keys; nothing was restored", log=log)
         step("familiar-verify", host)
-        source, _ = lifecycle._call(host, mode, "familiar-verify", {
-            "window_id": identity, "merge": window["familiar"]["merge"],
-            **lifecycle.titan_head(host, observed)}, "familiar-verify")
+        def verify(head, host=host):
+            return lifecycle._call(host, mode, "familiar-verify", {
+                "window_id": identity, "merge": window["familiar"]["merge"],
+                **({"titan_head": head} if head else {})}, "familiar-verify")
+
+        source, _ = lifecycle.prove_source(host, mode, identity, observed, verify,
+                                           "familiar-verify", step)
         observed = observed or source["head"]
         checks[host] = {"picks": found["picks"], "familiar": source, "surfaces": None}
     from . import surfaces  # surfaces imports the window lifecycle

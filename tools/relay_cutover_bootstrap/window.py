@@ -59,11 +59,12 @@ import os
 import re
 import signal
 import threading
+import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import hosts, inputs, operations, state, targets
+from . import familiar, hosts, inputs, operations, state, targets
 from .state import Stop
 
 HOST_ORDER = ("titan", "europa")
@@ -159,15 +160,40 @@ def _call(host, mode, operation, payload, step):
     return response["result"], log
 
 
-def titan_head(host: str, observed: str | None) -> dict:
-    """The payload key a live Europa source proof compares its HEAD with: the Titan HEAD the
-    controller observed in the same step. Titan's own proof takes none."""
-    if host == "titan":
-        return {}
+def europa_after_titan(mode, identity, observed, ask, label, step=None):
+    """Europa's source proof, `ask(titan_head)`, judged against a fresh Titan read (ruling R68).
+    A final "ahead" from Europa counts as a Europa commit only against a Titan HEAD read after
+    Europa's own: on one, Titan's HEAD is reread (`familiar-head`, read-only), and if it moved
+    since `observed` (a tolerated Titan task-record commit that Dropbox already delivered),
+    Europa is asked again with the fresh HEAD, within the sync budget. `step(name, host)` is
+    called before each reread."""
+    deadline = time.monotonic() + familiar.SYNC_BUDGET_SECONDS
+    while True:
+        try:
+            return ask(observed)
+        except Failed as failed:
+            if failed.status != "failed" or familiar.AHEAD not in failed.error:
+                raise
+            if time.monotonic() >= deadline:
+                raise
+            if step is not None:
+                step("familiar-head", "titan")
+            fresh, _ = _call("titan", mode, "familiar-head", {"window_id": identity}, label)
+            if fresh["head"] == observed:
+                raise failed from None
+            observed = fresh["head"]
+
+
+def prove_source(host, mode, identity, observed, ask, label, step=None):
+    """One host's familiar source proof in a step, `ask(titan_head)`: Titan's with none; a live
+    Europa's with the Titan HEAD the controller observed in the same step, judged against a
+    fresh Titan read before any "ahead" counts (`europa_after_titan`)."""
+    if host == "titan" or mode != "live":
+        return ask(None)
     if observed is None:
-        raise Failed("familiar-verify", host, "refused", "europa's familiar proof needs titan's "
-                     "observed HEAD from the same step; nothing was checked")
-    return {"titan_head": observed}
+        raise Failed(label, host, "refused", "europa's familiar proof needs titan's observed "
+                     "HEAD from the same step; nothing was checked")
+    return europa_after_titan(mode, identity, observed, ask, label, step)
 
 
 @contextmanager
@@ -726,6 +752,10 @@ def _migrate(window, prepared, seen, progress):
     """Past the familiar record: merge, install, register and apply, then verify both hosts."""
     mode, identity = window["mode"], window["id"]
     pins = prepared["pins"]
+    def step(name, host):
+        nonlocal window
+        window = _step(window, seen, progress, name, host)
+
     window = _step(window, seen, progress, "familiar-merge", "titan")
     merged, _ = _call("titan", mode, "familiar-merge", {
         "window_id": identity, "pre": pins["familiar_pre"],
@@ -740,10 +770,16 @@ def _migrate(window, prepared, seen, progress):
             _no_live(checked, mode, identity)
         window = _step(window, seen, progress, "familiar-install", host)
         record = prepared["hosts"][host]
-        result, _ = _call(host, mode, "familiar-install", {
-            "window_id": identity, "merge": merged["merge"],
-            "caches": record["caches"]["prefixes"], "path": record["install"]["path"],
-            **titan_head(host, observed)}, "familiar-install")
+        payload = {"window_id": identity, "merge": merged["merge"],
+                   "caches": record["caches"]["prefixes"], "path": record["install"]["path"]}
+
+        def install(head, host=host, payload=payload):
+            return _call(host, mode, "familiar-install",
+                         {**payload, **({"titan_head": head} if head else {})},
+                         "familiar-install")
+
+        result, _ = prove_source(host, mode, identity, observed, install, "familiar-install",
+                                 step)
         observed = observed or result["head"]
         window = _save(window, dependencies={**window.get("dependencies", {}), host: result})
     for target_id in inputs.TARGETS:
@@ -751,10 +787,6 @@ def _migrate(window, prepared, seen, progress):
             window = _step(window, seen, progress, "no-live", host)
             _no_live(host, mode, identity)
         window = apply_target(window, target_id, seen, progress)
-
-    def step(name, host):
-        nonlocal window
-        window = _step(window, seen, progress, name, host)
 
     verified = verified_migration(window, merged["merge"], step)
     if seen:
@@ -816,9 +848,12 @@ def verified_migration(window: dict, merge: str, step=None, *, picks: bool = Fal
                          + (" after waiting for synchronization" if wait else ""), log=log)
         if step is not None:
             step("familiar-verify", host)
-        source, _ = _call(host, mode, "familiar-verify", {
-            "window_id": identity, "merge": merge, **titan_head(host, observed)},
-            "familiar-verify")
+        def verify(head, host=host):
+            return _call(host, mode, "familiar-verify", {
+                "window_id": identity, "merge": merge, **({"titan_head": head} if head else {})},
+                "familiar-verify")
+
+        source, _ = prove_source(host, mode, identity, observed, verify, "familiar-verify", step)
         observed = observed or source["head"]
         verified[host] = {"targets": expected, "familiar": source,
                           **({"picks": found["picks"]} if picks else {})}

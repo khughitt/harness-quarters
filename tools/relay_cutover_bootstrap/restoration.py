@@ -370,14 +370,20 @@ def classify(context):
                 found.update({"abandoned": revert, "revert": None})
         return found
     r, parents = touching[0]
-    if (len(parents) != 1 or not familiar.tasks_only(context, m, parents[0])
-            or _outside(context, "familiar-restore-diff", base, r)
-            or familiar.unfiled([entry for entry in familiar.changes(
-                context, "familiar-restore-tasks", parents[0], r)
-                if entry[3].startswith(familiar.TASKS)])
-            or not familiar.tasks_only(context, r, head)):
-        return unexpected("the commit above the merge that changes paths outside tasks/ is not a "
-                          "restore of the window's base")
+    candidate = "the commit above the merge that changes paths outside tasks/"
+    if len(parents) != 1:
+        return unexpected(f"{candidate} does not have exactly one parent")
+    if not familiar.tasks_only(context, m, parents[0]):
+        return unexpected(f"{candidate} does not follow the merge or a tasks-only descendant "
+                          "of it")
+    if _outside(context, "familiar-restore-diff", base, r):
+        return unexpected(f"{candidate} is not the window's base outside tasks/")
+    if familiar.unfiled([entry for entry in familiar.changes(
+            context, "familiar-restore-tasks", parents[0], r)
+            if entry[3].startswith(familiar.TASKS)]):
+        return unexpected(f"{candidate} changes a tasks/ entry that is not a regular file")
+    if not familiar.tasks_only(context, r, head):
+        return unexpected(f"HEAD is not {candidate} or a tasks-only descendant of it")
     found.update({"class": "reverted", "revert": r,
                   "discovered": merge is None or payload.get("revert") != r,
                   "abandoned": revert if revert not in (None, r) else None})
@@ -406,15 +412,17 @@ def _rebuild_index(context, name):
 
 def _abort_merge(context, base, tip):
     """The attempted merge aborted after the live index is rebuilt from the working tree's
-    proven state (judged outside `tasks/`): the merge's tree, or B."""
+    proven state (judged outside `tasks/`): the merge's tree, or B. Returns which."""
     _unlocked(context)
     # The live index may need this tree, so it is written to the real objects: recovery is
     # not read-only.
     merged = familiar.merge_tree(context, "familiar-restore-merge-tree", base, tip)
     if not familiar.worktree_differs(context, merged, outside_tasks=True):
         _rebuild_index(context, merged)
+        rebuilt = "merge"
     elif not familiar.worktree_differs(context, base, outside_tasks=True):
         _rebuild_index(context, base)
+        rebuilt = "base"
     else:
         raise Stop("familiar's working tree is neither the attempted merge nor the window's base "
                    "outside tasks/; inspect it; nothing was changed")
@@ -425,7 +433,7 @@ def _abort_merge(context, base, tip):
             or _ref(context, "familiar-head", "HEAD") != base):
         raise Stop("familiar did not return to the window's base after the merge abort; "
                    "inspect it")
-    return base
+    return rebuilt
 
 
 def _restore_tree(context, base, head):
@@ -455,7 +463,7 @@ def _restore_merge(context, found, base):
     """R on HEAD = P: the recorded R when HEAD is its parent, else a fresh one (B's tree with
     HEAD's `tasks` entry, `commit-tree -p HEAD`) recorded durably here before any index or
     working-tree change; then HEAD moved to it by compare-and-swap from the proven working
-    tree. Returns R."""
+    tree. Returns R and the tree the live index was rebuilt from: `head` or `restore`."""
     head, payload = found["head"], context["payload"]
     record = _host_record(context)
     if found["abandoned"]:
@@ -483,12 +491,14 @@ def _restore_merge(context, found, base):
     _unlocked(context)
     if not familiar.worktree_differs(context, head, outside_tasks=True):
         _rebuild_index(context, head)
+        rebuilt = "head"
         if familiar._git(context, "familiar-read-tree", "read-tree", "-m", "-u", head,
                          r).returncode != 0:
             raise Stop("git read-tree -m -u of the restore failed; inspect familiar's checkout "
                        "before any retry")
     elif not familiar.worktree_differs(context, r, outside_tasks=True):
         _rebuild_index(context, r)
+        rebuilt = "restore"
     else:
         raise Stop("familiar's working tree is neither HEAD nor its restore outside tasks/; "
                    "inspect it; HEAD was not moved")
@@ -496,7 +506,7 @@ def _restore_merge(context, found, base):
                      "relay cutover recovery", "HEAD", r, head).returncode != 0:
         raise Stop("git update-ref of HEAD to the restore failed; inspect familiar's checkout "
                    "before any retry")
-    return r
+    return r, rebuilt
 
 
 def familiar_restore(context):
@@ -512,11 +522,11 @@ def familiar_restore(context):
     if found["class"] != payload["expect"]:
         raise Stop(f"familiar's Git state is {found['class']}, not the {payload['expect']} this "
                    "recovery reconciled; nothing was changed; reconcile again")
-    action = "none"
+    action, rebuilt = "none", None
     if found["class"] == "merge-in-progress":
-        point, action = _abort_merge(context, base, tip), "merge-aborted"
+        point, action, rebuilt = base, "merge-aborted", _abort_merge(context, base, tip)
     elif found["class"] == "merged":
-        point, action = _restore_merge(context, found, base), "reverted"
+        (point, rebuilt), action = _restore_merge(context, found, base), "reverted"
     elif found["class"] == "at-base":
         point = base
     else:
@@ -537,7 +547,8 @@ def familiar_restore(context):
         raise Stop(f"familiar's recovered working tree differs from HEAD ({problems[0]}); "
                    "inspect it")
     return {"class": found["class"], "action": action, "merge": found["merge"], "revert": point,
-            "head": head, "discovered": found["discovered"], "abandoned": found["abandoned"]}
+            "head": head, "discovered": found["discovered"], "abandoned": found["abandoned"],
+            "rebuilt": rebuilt}
 
 
 # --- familiar's dependencies -------------------------------------------------------------------

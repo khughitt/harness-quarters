@@ -298,10 +298,18 @@ def restore_native(window: dict, seen: list, progress: dict, *, clones=("titan",
     observed = None  # Titan's HEAD as its own restore observed it (live: one shared checkout)
     for host in HOST_ORDER:
         clone = None if host == "titan" or host not in clones else host
-        window, result = restore_dependencies(
-            window, host, reverts.get(host, reverts["titan"]), seen, progress,
-            scope=scopes[host], base=base_of(window, clone, host),
-            titan_head=observed if window["mode"] == "live" else None)
+
+        def restore(head, host=host, clone=clone):
+            return restore_dependencies(
+                state.current_window(_root()), host, reverts.get(host, reverts["titan"]), seen,
+                progress, scope=scopes[host], base=base_of(window, clone, host),
+                titan_head=head)
+
+        def step(name, on):
+            _step(state.current_window(_root()), seen, progress, name, on)
+
+        window, result = lifecycle.prove_source(host, window["mode"], window["id"], observed,
+                                                restore, "dependency-restore", step)
         observed = observed or result["head"]
     if seen:
         raise _Interrupt(seen[-1])
