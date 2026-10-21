@@ -73,6 +73,7 @@ STEP_GATES = {"inventory": "inventory", "pilot-create": "scratch", "target-dry":
 UNEXERCISED = ("timer-mutation", "surface-restart", "registry-import", "harness-launch",
                "smoke-receipts")
 RUNTIME = "existing authentication and SSH runtime bookkeeping"
+PROBES = "held Claude probe home-state bookkeeping"  # the inventory's held version and doctor
 SPAWN = "the consented no-window niri spawn of the fixed command true"
 
 
@@ -530,24 +531,6 @@ def _create(window, seen, progress, purpose):
     return window, created
 
 
-def _frozen(window, seen, progress, scopes):
-    """Before the merge, every frozen copy still holds its frozen bytes on both hosts."""
-    sealed = window["sealed"]["inputs"]
-    for host in lifecycle.HOST_ORDER:
-        window = lifecycle._step(window, seen, progress, "target-frozen", host)
-        frozen = {target_id: result["frozen"]["sha256"]
-                  for target_id, result in sealed["hosts"][host].items()}
-        found, log = lifecycle._call(host, "pilot", "target-verify", {
-            "window_id": window["id"], "targets": frozen, "wait": False, "verify": False,
-            "manifest_sha256": sealed["manifest_sha256"], **scopes[host]}, "target-frozen")
-        drifted = sorted(target_id for target_id, entry in found["targets"].items()
-                         if not entry["matches"])
-        if drifted:
-            raise lifecycle.Failed("target-frozen", host, "blocked", f"{', '.join(drifted)} "
-                                   "changed after the freeze; nothing was merged", log=log)
-    return window
-
-
 def _merge_and_install(window, prepared, seen, progress, scopes):
     """Each host's own scratch clone merges the immutable tip, then installs: a pilot's clones
     are not joined by synchronization, so each host merges and installs its own."""
@@ -581,26 +564,6 @@ def _clone_merge(window, key, merge):
     record = window.get("familiar") or {}
     return lifecycle._save(window, familiar={**record, "clones": {**record.get("clones", {}),
                                                                   key: merge}})
-
-
-def _apply(window, seen, progress, scopes):
-    """Titan's four live-simulation copies, each registered under the one touched record before
-    its first write, then applied to the sealed bytes."""
-    sealed = window["sealed"]["inputs"]
-    for target_id in inputs.TARGETS:
-        entry = sealed["hosts"]["titan"][target_id]
-        window = lifecycle._step(window, seen, progress, "target-register", "titan")
-        state.register_target(window, target_id, Path(entry["path"]),
-                              Path(window["directory"]) / "live" / f"{target_id}.json")
-        window = lifecycle._step(window, seen, progress, "target-apply", "titan")
-        result, _ = lifecycle._call("titan", "pilot", "target-apply", {
-            "window_id": window["id"], "target_id": target_id,
-            "manifest_sha256": sealed["manifest_sha256"],
-            "frozen_sha256": entry["frozen"]["sha256"],
-            "expected_sha256": entry["expected"]["sha256"],
-            "identities": entry["identities"], **scopes["titan"]}, "target-apply")
-        window = lifecycle._save(window, applied={**window.get("applied", {}), target_id: result})
-    return window
 
 
 def _verify(window, seen, progress, scopes, merges):
@@ -908,7 +871,7 @@ def _forward(window, prepared, decision, seen, progress):
     window = _gate(window, "scratch", "passed", roots=window["pilot"]["roots"])
     scopes = _scopes(window)
     window = lifecycle.dry_runs(window, prepared, seen, progress, scopes)
-    window = _frozen(window, seen, progress, scopes)
+    window = lifecycle.frozen_gate(window, seen, progress, scopes)  # live's own gate
     window = _gate(window, "dry-runs", "passed",
                    order=[[host, target_id] for host, found in window["dry"].items()
                           for target_id in found],
@@ -917,7 +880,8 @@ def _forward(window, prepared, decision, seen, progress):
                                                "pre": inputs.PINS["familiar_pre"],
                                                "tip": inputs.PINS["familiar_feature_tip"]})
     window, merges = _merge_and_install(window, prepared, seen, progress, scopes)
-    window = _apply(window, seen, progress, scopes)
+    for target_id in inputs.TARGETS:  # live's own registration and apply step
+        window = lifecycle.apply_target(window, target_id, seen, progress, scopes["titan"])
     window = _verify(window, seen, progress, scopes, merges)
     window = disconnect_case(window, prepared, window["dependencies"]["europa"], seen,
                              progress)
@@ -983,7 +947,8 @@ def _verdict(window, prepared, failures):
                   for host in lifecycle.HOST_ORDER},
         "permitted_writes": {"caches": {host: prepared["hosts"][host]["caches"]["prefixes"]
                                         for host in lifecycle.HOST_ORDER},
-                             "runtime": RUNTIME, "spawn": SPAWN if spawned else None},
+                             "runtime": RUNTIME, "probes": PROBES,
+                             "spawn": SPAWN if spawned else None},
         "host_byte_equal": False, "unexercised": list(UNEXERCISED)}
 
 

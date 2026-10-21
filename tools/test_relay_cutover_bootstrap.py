@@ -5327,7 +5327,10 @@ class TestRehearse:
             host: "acknowledged" for host in HOSTS}
         prefixes = {host: rehearsed.prepared["hosts"][host]["caches"]["prefixes"]
                     for host in HOSTS}
-        assert verdict["permitted_writes"]["caches"] == prefixes
+        assert verdict["permitted_writes"] == {
+            "caches": prefixes, "runtime": "existing authentication and SSH runtime bookkeeping",
+            "probes": "held Claude probe home-state bookkeeping",
+            "spawn": "the consented no-window niri spawn of the fixed command true"}
         assert verdict["host_byte_equal"] is False
         assert set(verdict["unexercised"]) == set(pilot.UNEXERCISED)
         pins = verdict["gates"]["dependencies"]
@@ -5378,31 +5381,26 @@ def sha256_file(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def _frozen_drift(monkeypatch):
-    """A frozen copy found changed after the seal, before any merge."""
-    def drifted(record, seen, progress, scopes):
-        raise window.Failed("target-frozen", "europa", "blocked", "claude changed after the "
-                            "freeze; nothing was merged")
-    monkeypatch.setattr(pilot, "_frozen", drifted)
-
-
 @needs_zsh
-@pytest.mark.parametrize("case", ["dry", "frozen"])
+@pytest.mark.parametrize("case", ["dry", "frozen", "merge"])
 def test_rehearsal_failure_cleans_scratch(cutover, monkeypatch, case):
     """A rehearsal that stops removes every scratch root and records a failed verdict naming the
-    step: before the seal (Europa's dry run refuses) nothing needs restoring; after it, with no
-    clone merged yet, restoration still runs offline through the core and finds each clone at
-    PRE and its dependencies native. With no answer to the spawn ask, the spawn gate is pending,
-    never passed, and nothing is spawned."""
+    step. Before the seal (Europa's dry run refuses) nothing needs restoring. A copy changed
+    after its freeze is caught by live's own frozen gate before any merge; restoration then
+    refuses its unknown bytes rather than force-copying. With Titan's clone merged and Europa's
+    merge failed, restoration reverts Titan's clone and finds Europa's at PRE. With no answer to
+    the spawn ask, the spawn gate is pending, never passed, and nothing is spawned."""
     world, root = cutover, cutover_root(cutover)
     preparation.prepare(SESSION)
     preview = _rehearse(world, monkeypatch, "--preview")
     assert preview.code == 0, preview.stdout
-    if case == "dry":
-        world.behave("europa", installer={"dry:claude": "refuse"})
-    else:
-        _frozen_drift(monkeypatch)
-    before = {host: transport.outside(world, host) for host in HOSTS}
+    host, behavior, step = {"dry": ("europa", {"installer": {"dry:claude": "refuse"}},
+                                    "target-dry"),
+                            "frozen": ("titan", {"installer": {"dry:claude": "after-freeze"}},
+                                       "target-frozen"),
+                            "merge": ("europa", {"merge": "fail"}, "familiar-merge")}[case]
+    world.behave(host, **behavior)
+    before = {name: transport.outside(world, name) for name in HOSTS}
     mark = len(world.lines("observed"))
     run = _rehearse(world, monkeypatch)  # no terminal and no decision file: absent
     assert run.code == 1, run.stdout
@@ -5410,21 +5408,34 @@ def test_rehearsal_failure_cleans_scratch(cutover, monkeypatch, case):
     assert (record["mode"], record["state"]) == ("pilot", "recovered")
     _, verdict = _verdict(record)
     assert verdict["verdict"] == "failed"
-    step = "target-dry" if case == "dry" else "target-frozen"
-    assert (verdict["failure"]["step"], verdict["failure"]["host"]) == (step, "europa")
+    assert (verdict["failure"]["step"], verdict["failure"]["host"]) == (step, host)
     assert verdict["gates"]["spawn"]["verdict"] == "pending"
     assert verdict["gates"]["spawn"]["reason"] == "absent"
-    assert verdict["gates"]["dry-runs"]["verdict"] == "failed"
+    assert verdict["gates"]["dry-runs"]["verdict"] == ("passed" if case == "merge" else "failed")
+    merges = [call for call in observed(world, "git", mark) if "merge" in call]
+    assert _npm_installs(world, mark) == []  # nothing was installed
     if case == "dry":
         assert "recovery" not in record and verdict["gates"]["restore"]["verdict"] == "not-run"
+        assert merges == []
+    elif case == "frozen":
+        assert "claude changed after the freeze" in verdict["failure"]["error"]
+        assert merges == []  # the drift stopped the rehearsal before any merge
+        restore = verdict["gates"]["restore"]
+        assert (restore["verdict"], restore["step"]) == ("failed", "target-check")
+        assert observed(world, "installer", mark) and not any(
+            call["phase"] == "live" for call in observed(world, "installer", mark))
     else:
+        assert [call["host"] for call in merges] == ["titan", "europa"]
         assert verdict["gates"]["restore"]["verdict"] == "passed"
         recovered = record["recovery"]
-        assert {recovered["familiar"]["class"], recovered["clones"]["europa"]["class"]} == {
-            "at-pre"}
-        assert recovered["actions"] == []  # nothing had changed: nothing was undone
-        assert {host: entry["replaced"] for host, entry in recovered["dependencies"].items()} \
-            == {host: False for host in HOSTS}
+        assert (recovered["familiar"]["class"], recovered["familiar"]["action"]) == (
+            "merged", "reverted")
+        assert (recovered["clones"]["europa"]["class"],
+                recovered["clones"]["europa"]["action"]) == ("at-pre", "none")
+        assert [(action["host"], action["action"]) for action in recovered["actions"]] == [
+            ("titan", "reverted")]
+        assert {name: entry["replaced"] for name, entry in recovered["dependencies"].items()} \
+            == {name: False for name in HOSTS}
     assert transport._niri_spawns(world, mark) == []
     assert all(os.listdir(transport.pilot_roots(world, host)) == [] for host in HOSTS)
     assert {host: transport.outside(world, host) for host in HOSTS} == before
