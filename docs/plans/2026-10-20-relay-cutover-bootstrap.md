@@ -1008,7 +1008,7 @@ before a new window. No in-window re-probe/continuation path is added.
 
 ## Amendment 2026-10-21: familiar task-record drift (after Task 9 Step 7)
 
-Implements the spec amendment of the same date (revised after design review rounds 7–10;
+Implements the spec amendment of the same date (revised after design review rounds 7–11;
 rulings R61–R64). One corrective change on the delivered tool, then redelivery:
 
 1. Pins (as the spec's amendment defines, including `core.hooksPath=/dev/null` on every
@@ -1047,7 +1047,9 @@ rulings R61–R64). One corrective change on the delivered tool, then redelivery
    plumbing restore's crash points (after `commit-tree`, after `read-tree`, after
    `update-ref`); a stat-dirty live index, an index holding another tree and a stale
    `index.lock` during the restore; an abandoned R after a tolerated Titan tasks commit, and a crash after `read-tree`
-   followed by a Titan tasks commit both by pathspec and through the live index;
+   followed by a Titan tasks commit both by pathspec and through the live index; a crash after
+   `read-tree`, then a tracker write that defers (modified tracked record, HEAD = P), and
+   recovery completes carrying the record; two outside-`tasks/` entries above M refused;
    hooks (`post-merge`, `reference-transaction`) not run; `tasks/` absent in B or P; an
    octopus merge in the tip's history; a Europa-local commit after the mark detected; `at-base` recovery does not
    end the cutover; the unchanged B = PRE fixtures as the baseline.
