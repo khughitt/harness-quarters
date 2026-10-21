@@ -477,9 +477,15 @@ finds Claude or Codex moved since preparation is a hold breach:
 - the report says to close every session and run `recover` from an ordinary shell.
 
 Stale Claude evidence never blocks `recover`. Recovery's Codex daemon stop runs the Codex
-installed at the recorded path even if its identity changed (ruling R31). After recovery,
-repeat Task 9 Steps 5–7 and the final pre-closure step before a new window. No in-window
+installed at the recorded path even if its identity changed (ruling R31). No in-window
 re-probe exists.
+
+A hold breach can only follow the verified migration, so familiar's merge is committed, and
+`recover` reverts it. That recovery ends this cutover window: the current tool merges only
+from PRE and cannot run another window while familiar's HEAD is the recovery revert
+([§9](#9-recovery-recover-operator)). The next attempt needs its own reviewed procedure,
+outside this runbook. Task 9 Steps 5–7 and the final pre-closure step come after that
+procedure, never as a way to reopen this window.
 
 ## 5. Resume and the controller's proof
 
@@ -779,8 +785,22 @@ every Claude and Codex session closed on both hosts, in an ordinary Zsh on Titan
   - two processes for one surface.
 
   Inspect the desktop, then rerun it.
-- **Afterwards.** A later attempt re-merges by reverting the recorded revert, never by
-  merging the tip again. Prepare a new reviewed window first.
+- **Afterwards: a recovered merge ends this cutover.** `recover` reports where familiar ended
+  up (`familiar is at <commit> on titan`); `git -C ~/d/familiar rev-parse HEAD` shows the
+  same.
+  - **Any commit other than PRE (`00f4899ae523…`).** Recovery reverted a committed merge, so
+    HEAD is the recovery revert, and that ends this cutover window. The current tool cannot
+    run another window from here, because it merges only from PRE: its snapshot refresh and
+    its merge both require familiar's HEAD to be exactly PRE. `prepare` and `check` do not
+    look at familiar's HEAD, so they still pass. A new `run` would therefore quiesce both
+    hosts and then take the pre-merge abort, after the operator had closed every session.
+    Do not ask for closure. Do not reset familiar to PRE, revert the revert, or merge the tip
+    again by hand. The next attempt needs its own reviewed procedure and inputs, outside this
+    runbook.
+  - **PRE.** The merge never committed: recovery aborted it, or it never started. The
+    merge-from-PRE precondition no longer stands in the way. No test covers a new window
+    after a recovered one, however, so the agent reports this state rather than asking for
+    closure on its own.
 
 ## 10. Status and next commands
 
@@ -791,7 +811,7 @@ prints the handoff.
 | State | Next | Meaning |
 | --- | --- | --- |
 | no prepared record | `prepare --controller-session <native-session-id>` | nothing prepared |
-| prepared; no open window, or the last one `aborted`, `recovered` or `complete` | `check` | prints the preparation guidance: ordinary use allowed, and the final pre-closure step |
+| prepared; no open window, or the last one `aborted`, `recovered` or `complete` | `check` | prints the preparation guidance: ordinary use allowed, and the final pre-closure step. After a `recovered` window it still says a fresh run may start; if familiar is at the recovery revert, the cutover has ended instead ([§9](#9-recovery-recover-operator)) |
 | pilot window open | `relay-cutover-rehearse --controller-session <native-session-id>` | live commands and `prepare` refuse until the rehearsal runs or reconciles it |
 | any window whose invocation is still running | `status` | wait, or interrupt that invocation |
 | `prepared`, `quiescing` or `applying` before familiar's mark; `aborting`; `abort-incomplete` | `recover` | completes the pre-merge abort only |
