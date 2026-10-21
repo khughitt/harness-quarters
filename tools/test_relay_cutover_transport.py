@@ -4413,6 +4413,45 @@ def _base_untracked(path):
     return arrange
 
 
+# An untracked path the host's Git ignores is not part of the working tree (ruling R69): the
+# listing honours the repository's `.gitignore`, `info/exclude` and `core.excludesFile`. The
+# global excludes file is named the way the host names it, `~/.gitignore_global` from the
+# fixture HOME's own `.gitconfig`, so it is found only when HOME reaches Git.
+EXCLUDED = ".codex/config.toml"
+
+
+def _global_excludes(world, patterns, host="titan"):
+    home = world.home(host)
+    with (home / ".gitconfig").open("a") as config:
+        config.write("[core]\n\texcludesFile = ~/.gitignore_global\n")
+    _write(home / ".gitignore_global", "".join(f"{pattern}\n" for pattern in patterns))
+
+
+def _ignore(how, path=EXCLUDED):
+    """Leave untracked `path` in familiar's checkout, ignored `how`: by the host's global excludes
+    file, a per-directory `.gitignore` that ignores itself too, `info/exclude`, or not at all
+    (the global excludes file then names something else)."""
+    def arrange(world, root):
+        _write(root / path, "untracked\n")
+        if how == "global":
+            _global_excludes(world, [path])
+        elif how == "gitignore":
+            _write(root / Path(path).parent / ".gitignore", "*\n")
+        elif how == "info-exclude":
+            _write(root / ".git/info/exclude", f"/{path}\n")
+        else:
+            _global_excludes(world, ["*.swp"])
+    return arrange
+
+
+def _base_ignored(how):
+    def arrange(world, root):
+        head = _tracker(root, "a.md", "a\n")
+        _ignore(how)(world, root)
+        return head
+    return arrange
+
+
 def _base_modified_record(world, root):
     head = _tracker(root, "a.md", "a\n")
     (root / "tasks/a.md").write_text("a deferred write\n")
@@ -4446,6 +4485,10 @@ BASE_RULE = {
     "grafts": (_base_grafts, "info/grafts"),
     "replace-object": (_base_replaced, "'src/later.js' outside tasks/"),
     "untracked-outside": (_base_untracked("notes.txt"), "notes.txt is untracked"),
+    "ignored-global": (_base_ignored("global"), None),
+    "ignored-gitignore": (_base_ignored("gitignore"), None),
+    "ignored-info-exclude": (_base_ignored("info-exclude"), None),
+    "not-ignored": (_base_ignored("none"), f"{EXCLUDED} is untracked"),
     "modified-record": (_base_modified_record, "a tracked file differs"),
     "conflict": (_base_conflict, "does not merge cleanly"),
     "t0-pin": (_base_t0, "not the pinned T0"),
@@ -4953,6 +4996,30 @@ def test_merge_in_progress_rebuilds_from_the_base_or_refuses(world, monkeypatch,
                                                                              "base")
     assert not (root / ".git/MERGE_HEAD").exists()
     _clean_at(root, base)
+
+
+@pytest.mark.parametrize("how", ["global", "gitignore", "none"])
+def test_restore_branch_ignores_excluded_files(world, monkeypatch, how):
+    """An untracked file the host's Git ignores leaves the restore's choice unchanged: the
+    working tree at the attempted merge still rebuilds from the merge's tree. One it does not
+    ignore is still refused for inspection, and the merge stays in progress."""
+    world.stage_cutover()
+    _quiet(world, monkeypatch)
+    root, numbers = _familiar(world), itertools.count(1)
+    base = _tracker(root, "fam-ff5351.md", "# a record\n")
+    _git(root, "merge", "--no-ff", "--no-commit", world.pins["familiar_feature_tip"])
+    _ignore(how)(world, root)
+    found, restored = _recovered(world, numbers, base=base)
+    assert found["class"] == "merge-in-progress"
+    if how == "none":
+        assert restored["status"] == "failed"
+        assert "neither the attempted merge nor the window's base" in restored["error"]
+        assert (root / ".git/MERGE_HEAD").exists()
+        return
+    assert restored["status"] == "completed", restored["error"]
+    assert (restored["result"]["action"], restored["result"]["rebuilt"]) == ("merge-aborted",
+                                                                             "merge")
+    assert not (root / ".git/MERGE_HEAD").exists() and (root / EXCLUDED).exists()
 
 
 def test_merge_in_progress_rebuild_names_the_merge(world, monkeypatch):
