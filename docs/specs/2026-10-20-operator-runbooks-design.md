@@ -1,9 +1,8 @@
 # Operator runbooks that preserve the operator's shell
 
-Status: approved for planning by Keith after spec round 6, 2026-10-20.
-The round-6 consent clarification is carried into the plan. Preparation/toolchain/
-pilot/update-hold refinements were accepted in plan round 5 and approved by Keith;
-the accepted Minor probe-order clarification is included. Execution awaits a fresh session.
+Status: implemented and delivered to hq main (`3fe1d4c`), 2026-10-21; real-host pilot passed.
+Approved by Keith after spec round 6 (2026-10-20) and amended for familiar task-record drift
+(2026-10-21, design rounds 7–12, below). The live window remains original Task 8 (hq-f27918).
 Bootstrap/runbook: hq-c6c847. Independent Bash work: dots-55f537.
 Independent instruction work: lore-4c1787.
 This amends the execution arrangement of the approved relay cutover, not its
