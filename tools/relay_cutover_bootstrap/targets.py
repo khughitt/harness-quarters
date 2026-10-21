@@ -30,7 +30,10 @@ dry run. It then retires a Claude target's guard into the window's `live/`, requ
 plan's own after bytes to equal the sealed dry output, applies, and checks the applied bytes,
 the artifact and hooks and statusLine. `target-verify` (both hosts) compares targets with
 expected digests, waiting a bounded time for synchronization, and with `verify` also runs the
-existing hooks and statusLine check and the exact evidence and installer identity.
+existing hooks and statusLine check and the exact evidence and installer identity. With `picks`
+(finish's fresh check, after sessions resumed) a Claude target whose parsed content differs from
+this window's sealed dry output only in the clean filter's pick keys passes too; a Codex target
+still needs its exact bytes, and nothing here rewrites a target or a rollback original.
 
 Parsed JSON compares canonically, by `json.dumps(value, sort_keys=True, ensure_ascii=False)`,
 so `true`, `1` and `1.0` differ, unlike Python's `==`. Messages name keys and paths, never
@@ -422,9 +425,29 @@ def target_apply(context):
             "artifact": {"path": str(artifact), "sha256": _sha256(_read(artifact))}}
 
 
+def _pick_only(context, target_id, path, expected):
+    """Whether a Claude target differs from this window's sealed dry output, kept on this host,
+    only in the clean filter's pick keys."""
+    if HARNESS[target_id] != "claude-code":
+        return False
+    sealed = (Path(context["root"]) / DRY / context["payload"]["window_id"] / target_id
+              / COPY["claude-code"])
+    data = _read(sealed)
+    if data is None or _sha256(data) != expected:
+        raise Stop(f"{target_id}: this window's sealed dry output on this host is missing or "
+                   "changed; inspect it")
+    current = _read(path)
+    if current is None:
+        return False
+    keys = _reviewed(context, target_id)["keys"]
+    return canonical(inputs.nonpick(_parse(current, f"{target_id} live target"), keys)) == \
+        canonical(inputs.nonpick(_parse(data, f"{target_id} sealed output"), keys))
+
+
 def target_verify(context):
     """Each named target's digest against its expectation, waiting a bounded time for
-    synchronization; with `verify`, also hooks, statusLine and the exact evidence."""
+    synchronization; with `verify`, also hooks, statusLine and the exact evidence; with
+    `picks`, a Claude target's pick-only difference from its sealed output passes."""
     _live_only(context)
     payload = context["payload"]
     wanted = payload["targets"]
@@ -446,12 +469,16 @@ def target_verify(context):
     report = {target_id: {"path": paths[target_id], "sha256": current[target_id],
                           "matches": current[target_id] == wanted[target_id]}
               for target_id in wanted}
-    if payload["verify"] and matched:
+    picked = sorted(target_id for target_id in wanted if payload.get("picks")
+                    and not report[target_id]["matches"]
+                    and _pick_only(context, target_id, paths[target_id], wanted[target_id]))
+    accepted = all(entry["matches"] or target_id in picked for target_id, entry in report.items())
+    if payload["verify"] and accepted:
         for target_id, path in paths.items():
             reviewed = _reviewed(context, target_id)
             identities(context, reviewed["manifest"], HARNESS[target_id])
             _verify(context, target_id, path, reviewed["after_path"])
-    return {"targets": report, "verified": payload["verify"] and matched,
+    return {"targets": report, "verified": payload["verify"] and accepted, "picks": picked,
             "waited_seconds": round(time.monotonic() - started, 3)}
 
 
@@ -506,6 +533,7 @@ _DRY = {"window_id": quiesce._window_id, "target_id": _target_id, "manifest_sha2
 _APPLY = {**_DRY, "frozen_sha256": _sha, "expected_sha256": _sha, "identities": _identity_map}
 _VERIFY = {"window_id": quiesce._window_id, "targets": _expectations, "wait": _flag,
            "verify": _flag, "manifest_sha256": _sha}
+_VERIFY_REQUIRED = frozenset(_VERIFY)
 
 OPERATIONS = {
     "target-dry": hosts.Operation(run=target_dry, deadline=5 * CHILD_SECONDS + 60,
@@ -515,5 +543,5 @@ OPERATIONS = {
                                     hosts=("titan",)),
     "target-verify": hosts.Operation(
         run=target_verify, deadline=hosts.SYNC_SECONDS + len(inputs.TARGETS) * CHILD_SECONDS + 60,
-        mutation=False, payload=_VERIFY, required=frozenset(_VERIFY)),
+        mutation=False, payload={**_VERIFY, "picks": _flag}, required=_VERIFY_REQUIRED),
 }

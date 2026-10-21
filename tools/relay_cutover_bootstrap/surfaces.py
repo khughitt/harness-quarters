@@ -390,20 +390,15 @@ def _summary(window, phase):
 
 
 def status(window: dict) -> dict:
-    """The read-only status detail and next command of a window past its verified migration."""
+    """The read-only status detail and next command of a window whose surfaces are pending."""
     stopped = ", ".join(lifecycle._stopped(window)) or "no host"
-    if window["state"] == "ready-for-smokes":
-        return {"detail": (f"window {window['id']} verified the migration and restarted "
-                           f"familiar's surfaces ({_summary(window, FORWARD)}); timers stay "
-                           f"paused on {stopped} until finish; the trust and smoke handoff is "
-                           "next"), "next": ["record-smoke"]}
     failure = _record(window).get("failure")
     last = (f"; the last attempt stopped at {failure['step']} on {failure['host']} "
             f"({failure['status']})" if failure else "")
     return {"detail": (f"window {window['id']} verified the migration on both hosts; familiar's "
                        f"surfaces are pending ({_summary(window, FORWARD)}){last}; migrated, "
                        f"surfaces pending: timers stay paused on {stopped}; Claude and Codex "
-                       "may resume through the held trust and resume path"),
+                       "may resume, only with the held commands printed here"),
             "next": ["restart-surfaces"]}
 
 
@@ -671,8 +666,8 @@ def pending_failure(failed, phase: str, attempt: str):
     elif phase == FORWARD:
         failed.observed = (f"window {window['id']} is {window['state']}: migrated, surfaces "
                            f"pending ({_summary(window, FORWARD)}); timers stay paused on "
-                           f"{stopped} until finish; Claude and Codex may resume through the "
-                           "held trust and resume path")
+                           f"{stopped} until finish; Claude and Codex may resume, only with "
+                           "the held commands printed here")
         failed.next_command = (["status"] if failed.status == "unsettled"
                                else ["restart-surfaces"])
     else:

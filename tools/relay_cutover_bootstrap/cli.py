@@ -4,10 +4,15 @@
 compares both hosts with that record without changing them; `run` opens a window, takes this
 invocation's desktop decision, runs through the verified migration and restarts familiar's
 surfaces with that same decision; `restart-surfaces` retries surfaces still pending after a
-verified migration; `recover` rolls a window back to native; `status` reads the local records and
-names the one next command. A stopped command prints its step, host, status, private log,
-observed state and one next command, then returns 1 to the calling shell. It never prints
-settings, plans, environments, credentials or child output.
+verified migration; `record-smoke` observes the smokes (`--observe HOST`) and records each home's
+receipt with the human's attestation; `finish` restores the original timers, runs the scheduled
+reconciliation and verifies closure; `recover` rolls a window back to native; `status` reads the
+local records and names the one next command. From the verified migration until finish every
+report prints the held commands and the hold (`smoke.handoff`); before that, check and status
+print the bounded refresh a closure request needs, with ordinary use allowed. A stopped command
+prints its step, host, status, private log, observed state and one next command, then returns 1
+to the calling shell. It never prints settings, plans, environments, credentials or child
+output.
 
 `run` and `recover` are operator-run: their desktop decision comes only from the operator's
 terminal (`/dev/tty`: a bounded preview of its subject, then an explicit answer recorded as a
@@ -15,8 +20,10 @@ terminal (`/dev/tty`: a bounded preview of its subject, then an explicit answer 
 before any change. `restart-surfaces` takes the operator's terminal answer too, or a decision
 file: the private record of an actual session ask and the human's reply, about the subject that
 `restart-surfaces --preview` shows read-only. Without either it stops with those instructions
-before any change. Each invocation consumes its one decision before the first authorized action;
-no flag or default answers for the operator."""
+before any change. `record-smoke --receipt FILE` takes the same two sources for its smoke
+attestation, about the receipt `record-smoke --preview` shows read-only. Each invocation consumes
+its one decision before the first authorized action; no flag or default answers for the
+operator."""
 import argparse
 import json
 import os
@@ -25,8 +32,9 @@ import stat
 import sys
 from datetime import datetime, timezone
 
+from . import finish as finishing
 from . import prepare as preparation
-from . import hosts, recovery, state, surfaces, window
+from . import hosts, recovery, smoke, state, surfaces, window
 from .state import Stop
 
 PROG = "relay-cutover-bootstrap"
@@ -35,6 +43,7 @@ SHOWN = 40
 TTY = "/dev/tty"
 ANSWER_BYTES = 200
 DECISION_BYTES = 65536
+RECEIPT_BYTES = 1 << 20
 APPROVE = ("y", "yes")
 DECISION_PLACEHOLDER = "<decision-file>"
 NO_TERMINAL = ("run is operator-run and this invocation has no terminal for the operator's "
@@ -47,6 +56,29 @@ NO_DECISION = ("restart-surfaces needs this invocation's human decision and has 
                "ask on: preview its subject with restart-surfaces --preview, ask the user in the "
                "session naming those hosts, surfaces, impact and duration, record the actual ask "
                "and reply in a private decision file and pass it with --decision-file")
+NO_ATTESTATION = ("record-smoke needs the human's own attestation of this receipt's trust and "
+                  "permission verdicts and has no terminal to ask on: preview it with "
+                  "record-smoke --preview --receipt FILE, ask the user in the session naming its "
+                  "host, home, session, cases and human verdicts, record the actual ask and "
+                  "reply in a private decision file and pass it with --decision-file")
+HOLD_STATES = ("migrated-surfaces-pending", "ready-for-smokes", "finishing")
+# Before run, and in every parked wait: ordinary use stays allowed, and the agent's bounded
+# refresh before each request to close sessions.
+CLOSURE = (
+    "  ordinary use: until run opens the window, ordinary Claude and Codex use stays allowed, "
+    "including cl, clw and review sessions, while this preparation waits",
+    "  before closure: immediately before each request to close every Claude and Codex session, "
+    "run check again; its held version and doctor probes are the fresh held check on titan and "
+    "europa, and unchanged versions keep the existing proof with no preparation repeated",
+    "  surface drift: if check reports only the desktop (surface) drift, run prepare again, then "
+    "check",
+    "  version moved: if Claude moved on either host, repeat only Task 9 Steps 5–7 (the held "
+    "re-probe and its independent review, the reviewed proof's delivery and both hosts' "
+    "installer acceptance, refreshed inputs and prepare), then run check again before asking; "
+    "rerun the pilot only if helper or toolchain bytes changed from its recorded identities",
+    "  refresh: the agent performs and reviews any refresh; this tool runs no refresh or retry "
+    "loop",
+)
 
 
 def _clean(text):
@@ -94,6 +126,7 @@ def _prepare(session):
         print(f"  {host}: {_sessions(prepared['hosts'][host]['sessions'])}")
     print("  observed: no window is open; only the prepared record and private operation "
           "records were written")
+    print("\n".join(CLOSURE))
     print(f"  next: {command_line(['check'])}")
     return 0
 
@@ -113,6 +146,7 @@ def _check():
     for host in window.HOST_ORDER:
         print(f"  {host}: {_sessions(result['sessions'][host])}")
     print("  observed: nothing was changed")
+    print("\n".join(CLOSURE))
     print(f"  next: {command_line(['run'])}")
     return 0
 
@@ -147,8 +181,9 @@ def _preview(opened, subject, title=None, changes=None):
 
 
 def _ask(opened, action, attempt_id, subject, digest, *, title=None, prompt=None,
-         changes=None):
-    """One explicit answer on the operator's terminal, as a decision record."""
+         changes=None, kind="desktop", shown=None):
+    """One explicit answer on the operator's terminal, as a decision record. `shown` replaces
+    the desktop preview with another bounded subject, such as a smoke receipt's."""
     try:
         fd = os.open(TTY, os.O_RDWR | os.O_NOCTTY | os.O_CLOEXEC)
     except OSError:
@@ -158,7 +193,7 @@ def _ask(opened, action, attempt_id, subject, digest, *, title=None, prompt=None
     try:
         if not os.isatty(fd):
             raise Stop(NO_TERMINAL)
-        shown = _preview(opened, subject, title, changes)
+        shown = shown if shown is not None else _preview(opened, subject, title, changes)
         os.write(fd, (shown + "  nothing has changed yet; any answer but yes stops before any "
                       "change\n" + prompt).encode("utf-8"))
         try:
@@ -169,7 +204,7 @@ def _ask(opened, action, attempt_id, subject, digest, *, title=None, prompt=None
         os.close(fd)
     if not answer:
         raise Stop("no answer was given; nothing is authorized")
-    return {"schema": 1, "kind": "desktop", "action": action, "window_id": opened["id"],
+    return {"schema": 1, "kind": kind, "action": action, "window_id": opened["id"],
             "attempt_id": attempt_id, "subject_sha256": digest,
             "verdict": "approved" if answer.lower() in APPROVE else "declined",
             "source": {"type": "tty", "prompt": prompt.strip(), "response": answer,
@@ -188,48 +223,45 @@ def _terminal():
         os.close(fd)
 
 
-def _decision_file(path):
-    """A private decision record: this user's regular file, closed to writes by others."""
+def _private_json(path, what, limit):
+    """One private JSON record: this user's regular file, closed to writes by others."""
     try:
         fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
     except OSError as error:
-        raise Stop(f"the decision file cannot be opened ({error.strerror})") from None
+        raise Stop(f"the {what} file cannot be opened ({error.strerror})") from None
     with os.fdopen(fd, "rb") as stream:
         info = os.fstat(stream.fileno())
         if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid()
                 or stat.S_IMODE(info.st_mode) & 0o022):
-            raise Stop("the decision file must be this user's regular file, closed to writes "
+            raise Stop(f"the {what} file must be this user's regular file, closed to writes "
                        "by others")
-        data = stream.read(DECISION_BYTES + 1)
-    if len(data) > DECISION_BYTES:
-        raise Stop("the decision file is too large to be one decision record")
+        data = stream.read(limit + 1)
+    if len(data) > limit:
+        raise Stop(f"the {what} file is too large to be one {what} record")
     try:
         return json.loads(data, object_pairs_hook=state._unique,
                           parse_constant=state._constant)
     except (UnicodeDecodeError, ValueError, RecursionError):
-        raise Stop("the decision file is not one JSON decision record") from None
+        raise Stop(f"the {what} file is not one JSON {what} record") from None
+
+
+def _decision_file(path):
+    return _private_json(path, "decision", DECISION_BYTES)
 
 
 def acquire_decision(opened: dict, *, action: str, attempt_id: str, subject: dict,
                      decision_file: str | None, title: str | None = None,
-                     prompt: str | None = None, changes: dict | None = None) -> dict:
-    """This invocation's one desktop decision for `opened`, consumed before it authorizes: the
-    decision file's record, or the operator's answer to the bounded preview on the terminal."""
+                     prompt: str | None = None, changes: dict | None = None,
+                     kind: str = "desktop", shown: str | None = None) -> dict:
+    """This invocation's one human decision of `kind` for `opened`, consumed before it
+    authorizes: the decision file's record, or the operator's answer to the bounded preview on
+    the terminal."""
     digest = state._digest(subject)
     record = (_decision_file(decision_file) if decision_file is not None
               else _ask(opened, action, attempt_id, subject, digest, title=title, prompt=prompt,
-                        changes=changes))
-    return state.consume_decision(opened, record, kind="desktop", action=action,
+                        changes=changes, kind=kind, shown=shown))
+    return state.consume_decision(opened, record, kind=kind, action=action,
                                   attempt_id=attempt_id, subject_sha256=digest)
-
-
-HANDOFF = (
-    "  timers: familiar-reap.timer stays paused on titan and europa until finish",
-    "  hold: until finish, use only the bootstrap's printed held commands; avoid cl, clw, "
-    "unheld Claude or IDE clients, and update or install commands",
-    "  picks: until finish reports complete, do not change or save Claude model or effort "
-    "defaults in either home on either host, including through /model or /effort",
-)
 
 
 def _restarted(restarted):
@@ -246,7 +278,7 @@ def _existing(current):
     if report["class"] in ("verified", "migrated"):
         print(f"{PROG}: run: window {current['id']} already verified its migration; nothing "
               "was repeated")
-        print("\n".join(HANDOFF))
+        print("\n".join(smoke.handoff(state.current_window(window._root()))))
         print(f"  observed: {_clean(report['observed'])}")
         print(f"  next: {command_line(report['next'])}")
         return 0
@@ -280,7 +312,7 @@ def _run():
           "sealed dry-run bytes; europa's Claude copies verified after synchronization")
     print("  surfaces: restarted with this run's consent, each replacement recorded:")
     _restarted(surfaces.restarted(migrated, surfaces.FORWARD))
-    print("\n".join(HANDOFF))
+    print("\n".join(smoke.handoff(migrated)))
     print(f"  observed: window {migrated['id']} is {migrated['state']}")
     print(f"  next: {command_line(window.status()['next'])}")
     return 0
@@ -363,7 +395,7 @@ def _restart_surfaces(preview_only, decision_file):
     print(f"{PROG}: restart-surfaces {current['id']}: familiar's surfaces restarted, each "
           "replacement recorded:")
     _restarted(result["restarted"])
-    print("\n".join(HANDOFF))
+    print("\n".join(smoke.handoff(result["window"])))
     print(f"  observed: {_clean(result['observed'])}")
     print(f"  next: {command_line(result['next'])}")
     return 0
@@ -430,21 +462,183 @@ def _status():
     print("  window: " + (f"{current['id']} {current['state']} ({current['mode']})"
                           if current else "none"))
     print(f"  observed: {_clean(report['detail'])}")
+    lines = _handoff("status")
+    if not lines and prepared and (current is None or current["state"] in state.TERMINAL):
+        lines = CLOSURE  # a parked preparation: ordinary use, and the refresh before closure
+    if lines:
+        print("\n".join(lines))
     print(f"  next: {command_line(report['next'])}")
     return 0
 
 
 def _handoff(command):
-    """The handoff a stopped run or restart-surfaces prints while only surfaces are pending."""
-    if command not in ("run", "restart-surfaces"):
-        return ()
+    """What a report adds from the verified migration until finish: the hold, the pick freeze
+    and the held commands; for check, the bounded refresh before a closure request."""
+    if command == "check":
+        return CLOSURE
     try:
         current = state.current_window(window._root())
     except Stop:
         return ()
-    if current is None or current["state"] != "migrated-surfaces-pending":
+    if current is None or current["state"] not in HOLD_STATES:
         return ()
-    return HANDOFF
+    return smoke.handoff(current)
+
+
+def _shown(current, receipt):
+    """The bounded smoke attestation an operator or user answers: the receipt's binding, its
+    case verdicts and the human verdicts it claims, asked as the human's own."""
+    key = (receipt["host"], receipt["harness"], receipt["home"])
+    cases = receipt["cases"]
+    lines = [f"{PROG}: record-smoke {current['id']} asks for the human's attestation of "
+             f"{smoke.label(*key, receipt['matrix'])}",
+             f"  session: {receipt['session_id']} (row {receipt['row_id']}, pid "
+             f"{receipt['pid']}) in {_clean(receipt['cwd'])}",
+             f"  versions: installed {receipt['versions']['installed']}; evidence "
+             f"{receipt['versions']['evidence']}",
+             "  cases: " + ", ".join(f"{name} {cases[name]['verdict']} "
+                                     f"({len(cases[name]['evidence'])} recorded observation(s))"
+                                     for name in cases)]
+    denial = cases.get("attribution-denial") or {}
+    lines.append(f"  denial: {denial.get('outcome')}: {_clean(denial.get('refusal'))}")
+    if "abrupt-death" in cases:
+        lines.append(f"  abrupt death: session {cases['abrupt-death']['session_id']}, pid "
+                     f"{cases['abrupt-death']['pid']}")
+    lines.append("  human: trust approved: you, the operator, completed this home's trust "
+                 "review yourself (Codex: its hook review)")
+    if "permission" in receipt["human"]:
+        lines.append("  human: permission approved: you answered the needs-approval permission "
+                     "prompt yourself; no agent or auto-review answered it")
+    return "\n".join(lines) + "\n"
+
+
+def _smoke_window():
+    current = state.current_window(window._root())
+    if current is None or current["state"] in state.TERMINAL:
+        report = window.status()
+        raise window.Failed("record-smoke", "titan", "refused", "no window takes smokes",
+                            observed=report["detail"], next_command=report["next"])
+    return current
+
+
+def _observe(host, cwd):
+    """record-smoke --observe: one recorded observation, the controller proven first."""
+    current = _smoke_window()
+    if cwd is not None:
+        cwd = os.path.realpath(cwd)
+    result = smoke.observe_step(current, host, cwd)
+    seen, proof = result["observation"], result["controller"]
+    print(f"{PROG}: record-smoke {current['id']}: observed {host}")
+    if proof is not None:
+        print(f"  controller: {proof['row_id']} pid {proof['pid']} on titan, live and updated "
+              "since the verified migration")
+    print(f"  evidence: {result['ref']['path']} (sha256 {result['ref']['sha256']})")
+    rows = sorted(seen["agents"].items())
+    if cwd is not None:
+        rows = [(row_id, row) for row_id, row in rows if row["cwd"] == cwd]
+    for row_id, row in rows:
+        print(f"  row: {row_id} {row['state']} pid {(row['process'] or {}).get('pid')} "
+              f"{row['liveness']}")
+    intent = seen["intent"]
+    print("  intent: " + (f"{len(intent['sessions'])} session(s)" if intent["present"]
+                          else "absent (moved aside)"))
+    scratch = seen["scratch"]
+    if scratch is not None:
+        print(f"  scratch: allowed.marker {'present' if scratch['allowed_marker'] else 'absent'}"
+              f"; denied.marker {'present' if scratch['denied_marker'] else 'absent'}; "
+              f"{scratch['commits']} commit(s); Git identity "
+              f"{'set' if scratch['identity'] else 'missing'}")
+    if result["unheld"]:
+        print(f"  warning: unheld Claude pid(s) {', '.join(map(str, result['unheld']))} on "
+              f"{host}: close them; until finish use only the held commands")
+    print("\n".join(smoke.handoff(result["window"])))
+    print(f"  observed: {_clean(window.status()['detail'])}")
+    print(f"  next: {command_line(window.status()['next'])}")
+    return 0
+
+
+def _record_smoke(path, preview_only, decision_file):
+    current = _smoke_window()
+    receipt = _private_json(path, "receipt", RECEIPT_BYTES)
+    digest = smoke.check_receipt(current, receipt)
+    attempt = smoke.next_attempt(current)
+    shown = _shown(current, receipt)
+    path = os.path.realpath(path)
+    if preview_only:
+        print(shown.replace("asks for", "previews").rstrip("\n") + " (read-only)")
+        print(f"  decision: kind {smoke.KIND}, action {smoke.ACTION}, window_id {current['id']}, "
+              f"attempt_id {attempt}, subject_sha256 {digest}")
+        print("  ask: the user, in the session, whether they themselves gave these human "
+              "verdicts, naming the host, home, session, cases and verdicts; record the actual "
+              "ask and the human's reply (schema 1, verdict, and a session source with "
+              "session_id, ask, reply and answered_at) in a private decision file")
+        print("  observed: nothing was changed")
+        following = ["record-smoke", "--receipt", path, "--decision-file", DECISION_PLACEHOLDER]
+        print(f"  next: {command_line(following)}")
+        return 0
+    if decision_file is None and not _terminal():
+        raise window.Failed("decision", receipt["host"], "refused", NO_ATTESTATION,
+                            observed="nothing was recorded",
+                            next_command=["record-smoke", "--preview", "--receipt", path])
+    try:
+        consumed = acquire_decision(
+            current, action=smoke.ACTION, attempt_id=attempt, subject=receipt,
+            decision_file=decision_file, kind=smoke.KIND, shown=shown,
+            prompt=f"Do you attest that you yourself gave these trust and permission answers "
+            f"for {receipt['session_id']}? Type yes to attest: ")
+    except Stop as stop:
+        raise window.Failed("decision", receipt["host"], "refused", str(stop),
+                            observed="nothing was recorded",
+                            next_command=["record-smoke", "--preview", "--receipt", path]) \
+            from None
+    smoke.record_smoke(state.current_window(window._root()), receipt, consumed)
+    key = (receipt["host"], receipt["harness"], receipt["home"])
+    print(f"{PROG}: record-smoke {current['id']}: recorded {smoke.label(*key, receipt['matrix'])}"
+          f" with attestation {attempt} ({consumed['decision']['source']['type']})")
+    print("\n".join(smoke.handoff(state.current_window(window._root()))))
+    print(f"  observed: {_clean(window.status()['detail'])}")
+    print(f"  next: {command_line(window.status()['next'])}")
+    return 0
+
+
+def _finish():
+    current = state.current_window(window._root())
+    if current is None or current["state"] in state.TERMINAL:
+        report = window.status()
+        raise window.Failed("finish", "titan", "refused", "no window is open to finish",
+                            observed=report["detail"], next_command=report["next"])
+    result = finishing.finish_window(current)
+    record = result["window"]["finish"]
+    print(f"{PROG}: finish {current['id']}: complete")
+    print(f"  receipts: {len(smoke.REQUIRED)} smoke receipts validated: "
+          + ", ".join(smoke.label(*key, matrix) for key, matrix in smoke.REQUIRED.items()))
+    print("  checks: hooks, statusLine, installer and evidence verified on titan and europa "
+          "(Claude pick keys may differ); familiar is the merge with its pinned relay")
+    for host in window.HOST_ORDER:
+        service = record["services"][host]
+        print(f"  {host}: familiar-reap.timer restored to its original record; "
+              f"{service['service']} Result={service['result']} "
+              f"ExecMainStatus={service['exec_main_status']}")
+    for host in window.HOST_ORDER:
+        checked = record["checks"]["hosts"][host]["surfaces"]
+        if checked is None:
+            print(f"  {host}: familiar's surfaces: none (an explained absence)")
+            continue
+        verdicts = ", ".join(f"{name} {verdict}" for name, verdict in checked["verdicts"].items())
+        print(f"  {host}: familiar's surfaces: {verdicts}")
+        unwell = [name for name, verdict in checked["verdicts"].items()
+                  if verdict not in ("restarted", "running")]
+        for problem in [*checked["blockers"], *checked["changes"]] + [
+                f"{name} is not running as restarted" for name in unwell]:
+            print(f"  warning: {host}: {_clean(problem)}; finish does not restart surfaces: "
+                  "inspect it and start it from its niri startup command")
+    closure = record["closure"]
+    print(f"  closure: recorded dead rows and their intent entries absent; the controller "
+          f"{'kept its row' if closure['controller'] == 'kept' else 'had exited'}")
+    print(f"  hold: {finishing.RELEASE}")
+    print(f"  observed: {_clean(result['observed'])}")
+    print(f"  next: {command_line(result['next'])}")
+    return 0
 
 
 def main(argv: list[str]) -> int:
@@ -464,6 +658,20 @@ def main(argv: list[str]) -> int:
                         help="show the decision subject and its digest, changing nothing")
     chosen.add_argument("--decision-file", metavar="FILE",
                         help="the private record of the session ask and the human's reply")
+    smoked = sub.add_parser("record-smoke", help="observe a smoke step, or record one home's "
+                            "smoke receipt with the human's attestation")
+    source = smoked.add_mutually_exclusive_group(required=True)
+    source.add_argument("--observe", choices=window.HOST_ORDER, metavar="HOST",
+                        help="record one read-only observation of HOST as smoke evidence")
+    source.add_argument("--receipt", metavar="FILE", help="the private smoke receipt")
+    smoked.add_argument("--cwd", metavar="DIR", help="the scratch repo an observation reads")
+    answer = smoked.add_mutually_exclusive_group()
+    answer.add_argument("--preview", action="store_true",
+                        help="validate the receipt and show its attestation, changing nothing")
+    answer.add_argument("--decision-file", metavar="FILE",
+                        help="the private record of the session ask and the human's reply")
+    sub.add_parser("finish", help="restore the original timers, run the scheduled "
+                   "reconciliation and verify closure, once every smoke is recorded")
     sub.add_parser("recover", help="roll the window back to native (operator-run, from an "
                    "ordinary terminal)")
     sub.add_parser("status", help="report the prepared record, the window and the next command")
@@ -475,6 +683,16 @@ def main(argv: list[str]) -> int:
             return _run()
         if args.command == "restart-surfaces":
             return _restart_surfaces(args.preview, args.decision_file)
+        if args.command == "record-smoke":
+            if args.observe is not None:
+                if args.preview or args.decision_file is not None:
+                    parser.error("--preview and --decision-file take --receipt")
+                return _observe(args.observe, args.cwd)
+            if args.cwd is not None:
+                parser.error("--cwd takes --observe")
+            return _record_smoke(args.receipt, args.preview, args.decision_file)
+        if args.command == "finish":
+            return _finish()
         if args.command == "recover":
             return _recover()
         return _check() if args.command == "check" else _status()

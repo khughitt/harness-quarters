@@ -766,9 +766,9 @@ def status() -> dict:
                       f"(pid {owner['pid']}) is still running", next=["status"])
         return report
     attempted, stopped = _attempted(current), _stopped(current)
-    if current["state"] in ("migrated-surfaces-pending", "ready-for-smokes"):
-        from . import surfaces  # surfaces imports this module for its step helpers
-        report.update(surfaces.status(current))
+    if current["state"] in ("migrated-surfaces-pending", "ready-for-smokes", "finishing"):
+        from . import smoke  # smoke imports this module for its step helpers
+        report.update(smoke.status(current))
         return report
     paused = (f"timers may be paused on {', '.join(stopped)}" if stopped else
               f"its hosts ({', '.join(attempted)}) have no paused timer" if attempted
@@ -810,6 +810,8 @@ def status() -> dict:
                 if report["next"] == ["restart-surfaces"] else f"{cause}; recover cancels this "
                 "window's dead-owner operations and rolls the window back")
         until = "its migration is verified or recover completes: run starts no new window"
+    elif failure.get("step") == "hold":  # a hold breach during smokes or finish
+        lead = failure["error"]
     else:
         lead = (f"familiar or settings may have changed; the run stopped at {stopped_at}"
                 if failure else "the run stopped past familiar's mark without recording its "
