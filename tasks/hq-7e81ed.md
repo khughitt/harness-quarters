@@ -4,7 +4,7 @@ title: "Relay cutover tool and runbook: defects the live window exposed"
 status: todo
 priority: 3
 created: 2026-10-22T11:53:35Z
-updated: 2026-10-22T11:53:35Z
+updated: 2026-10-22T11:53:44Z
 depends: []
 tags: []
 agent: claude-code
@@ -18,3 +18,7 @@ Found during window 20261022T014303Z-a1e7bd47 (hq-f27918); each was worked aroun
 4. niri accepts IPC spawn-sh while the session is locked and runs nothing; restart-surfaces failed on a locked europa. Detect a locked session before consent, and make the pilot's spawn probe prove the spawned command ran, not only niri's exit status.
 5. The handoff's controller line resumes an old Codex session with no explanation; say what the controller is and that its role is the hook review plus one record-smoke --observe.
 6. The operator found the per-home smoke matrix far too long; verify one host and profile deeply per harness and assume identically configured homes (lore-bb82ac).
+
+## Notes
+
+- 2026-10-22T11:53:44Z (main): concerns: hq-c6c847 defect — the bootstrap tool's printed held Claude commands break familiar registration, its Claude needs-approval prompt cannot raise a dialog, and its surface restart cannot see a locked niri session
