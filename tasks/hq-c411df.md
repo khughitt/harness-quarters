@@ -1,22 +1,42 @@
 ---
 id: hq-c411df
-title: "session-episodes reads only the default Claude projects store and Codex sessions store, so a scoping or audit agent cannot reach a report's origin session in a second harness home, Codex archived sessions, the backup archive or another host"
-status: idea
+title: Design the session evidence reader and usage skill from completed studies
+status: todo
 priority: 2
+size: m
+complexity: high
+process: planned
 created: 2026-10-20T11:19:18Z
-updated: 2026-10-20T19:31:48Z
+updated: 2026-10-22T17:41:56Z
 depends: [hq-a1c591, hq-de3e4c]
 parent: hq-cff824
 tags: [feedback, gap, "from:lore"]
 agent: claude-code
 ---
 
+Why: Agents need evidence outside the baseline reader's two default roots, including historical tool outputs, parent context and explicit unavailable results. The user proposed a session-log CLI and usage skill; the existing record owns its design.
+
+Established: hq-de3e4c completed a 183-episode / 1,093-call survey; 64 episodes require historical outputs, eight require child-to-parent and twelve parent-to-child links (two both). hq-a1c591 located 20 sampled origins and six child links to five parents using existing obs metadata. Replay-copy retrieval and general cross-host retrieval were not qualified. obs-b99310 fixed the phantom parent rows (54ce9e187b825dc7ace6ff23ba9820e172b1f89c); alternate files and per-file availability still require an explicit candidate contract. hq-6e5d88 delivered ten portable acceptance cases; hq-c1fecb owns their remaining fidelity corrections.
+
+Done:
+- Produce a design spec and implementation plan, each reviewed before the next phase. This task scopes the design and handoff; implementation tasks follow the reviewed plan.
+- Specify a bounded search + show reader and usage skill: home/harness/date/session/role selection, normalized and raw record inspection, paired calls/results, block-level source references, recorded parent relationships, per-turn runtime model and coverage/unavailable results.
+- Define the supported obs consumer interface and its owner. Reuse existing location metadata without treating the research SQL as an approved API. Respect ops-630a87 / obs-f5710b: obs owns content parsing and session-logs; hq owns location/lifecycle and harness-version samples. State the flow-trial-1 readout gate and assess effects on enrolled sessions and measurement before any rollout.
+- Map the design to the existing acceptance cases and location counterexamples, explicitly distinguishing synthetic coverage, fixture limitations and unobserved replay/remote cases. Settle local-first lookup versus explicit remote/archive operations in the design. Keep interactive resume selection separate.
+- Use the brief's supported search/show recommendation. A second picker, a new transcript index, specialized aggregate verbs and automated trace precision claims are not established requirements. Later trace composition must retain typed evidence instead of treating mentions as work ownership. Leave hq-a60cf5, hq-7b131a, hq-c1fecb and hq-edf5de as their existing work.
+
+Where: [ref:brief] consolidates the current lean, ownership constraints and remaining decisions; [ref:survey] provides the measured questions and limits; [ref:location-probe] provides candidate/read-path evidence; [ref:cases] supplies portable semantic acceptance. Relevant existing surfaces: agents/bin/session-episodes (_roots and store parsing), tools/hq_cli/sessions.py (resume discovery/selection), tools/session_archive/config.py (capture sources), and the session-logs skill.
+
+## Original captured report
+
 Found while checking whether stamped friction reports can be traced to their origin sessions: the reader's default roots are the primary Claude projects store and the primary Codex sessions store, each overridable by one environment variable, so one run covers one store per harness. A report whose origin is in another home, an archived rollout or the post-prune archive, or on the other host, gives no result and no explicit unavailable status. Acceptance for the friction-context work needs retrieval from a live transcript, its archived copy and another host, or an explicit unavailable result.
 
 ## References
 
-- brief (input, kind=brief): docs/notes/2026-10-20-session-store-reach-brief.md — context and questions for this work
+- brief (input, required, kind=brief): docs/notes/2026-10-20-session-store-reach-brief.md — completed findings, design direction and remaining decisions
 - survey (input, required, kind=report): docs/notes/2026-10-20-session-log-survey.md — completed question and evidence survey
+- location-probe (input, required, kind=report): docs/notes/2026-10-20-session-index-reach.md — file candidates, archive coverage and limits
+- cases (input, required, kind=report): docs/notes/session-log-acceptance-cases.md — portable semantic acceptance and fixture limits
 
 ## Notes
 
