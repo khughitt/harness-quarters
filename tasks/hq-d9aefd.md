@@ -5,7 +5,7 @@ status: doing
 priority: 3
 owner: main
 created: 2026-10-22T15:45:24Z
-updated: 2026-10-22T15:55:36Z
+updated: 2026-10-22T15:55:46Z
 started: 2026-10-22T15:55:36Z
 depends: []
 tags: []
@@ -18,3 +18,4 @@ The user approved deleting the cutover state on 2026-10-22; titan's was archived
 
 - 2026-10-22T15:55:36Z (main): started
   provenance: {"harness_session":"claude-code:0835d699-ead2-4a3a-a9f3-1bf52da12939","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-22T15:55:46Z (main): trial: flow-trial-1 — enrolled — flow on
