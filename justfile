@@ -39,7 +39,9 @@ pi-install:
     cp pi/package.json pi/package-lock.json "$dest/"
     npm ci --prefix "$dest" --ignore-scripts --no-fund --no-audit
 
-# Install the pinned relay outside the synced checkout; relay/bin/relay runs it.
+# Install the pinned relay outside the synced checkout; relay/bin/relay runs it. The system
+# npm installs it, as the system node runs it: a version manager's npm on PATH may predate
+# npm's fix for --allow-git=root under npm ci (npm 11.9 refuses the direct Git dependency).
 relay-install:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -47,7 +49,7 @@ relay-install:
     dest="${RELAY_INSTALL_ROOT:-$HOME/.local/share/relay}/$version"
     mkdir -p "$dest"
     cp relay/package.json relay/package-lock.json "$dest/"
-    npm ci --prefix "$dest" --ignore-scripts --allow-git=root --no-fund --no-audit
+    "${RELAY_NPM:-/usr/bin/npm}" ci --prefix "$dest" --ignore-scripts --allow-git=root --no-fund --no-audit
 
 # Render the host subscriber config; FORCE=1 permits replacing different content.
 relay-subscribers:
