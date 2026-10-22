@@ -1,6 +1,6 @@
 # Operator runbooks that preserve the operator's shell
 
-Status: implemented and delivered to hq main (`3fe1d4c`), 2026-10-21; real-host pilot passed.
+Status: complete, 2026-10-22 (live window finished, merged `d04b6eb`); implemented and delivered to hq main (`3fe1d4c`), 2026-10-21; real-host pilot passed.
 Approved by Keith after spec round 6 (2026-10-20) and amended for familiar task-record drift
 (2026-10-21, design rounds 7–12, below). The live window remains original Task 8 (hq-f27918).
 Bootstrap/runbook: hq-c6c847. Independent Bash work: dots-55f537.

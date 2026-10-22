@@ -18,7 +18,7 @@ existing relay v0.1.1, Git/npm, systemd user bus and niri IPC. No new dependency
 **Spec:** `.worktrees/relay-cutover/docs/specs/2026-10-20-operator-runbooks-design.md`
 (approved for planning after round 6; frozen predecessor `07acc26`).
 **Task:** hq-c6c847; parent hq-539508; blocked original window hq-f27918.
-**Status:** implemented and delivered, 2026-10-21. Tasks 1–9 ran under subagent-driven
+**Status:** complete, 2026-10-22: the operator window (hq-f27918) finished and the branch merged to main (`d04b6eb`); see the runbook's header. Implemented and delivered, 2026-10-21. Tasks 1–9 ran under subagent-driven
 execution with task reviews, a final whole-branch review (two corrective rounds), an external
 codex review (one round) and the familiar-drift amendment (design rounds 7–12, one fix round).
 The reviewed inert tool reached hq main at `3fe1d4c` (hook after-images excluded); both hosts'

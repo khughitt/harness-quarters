@@ -1,8 +1,10 @@
 # Relay operator cutover
 
+**Completed 2026-10-22.** Window `20261022T014303Z-a1e7bd47` ran and `finish` completed: relay is live in all four targets on titan and europa, six smoke receipts validated, timers restored, hold released; merged to main (`d04b6eb`). Mid-window: Codex start-idle is observed after a fixed first prompt (`9b5ae86`), held Claude launches went through `~/.local/bin/claude`, and europa's surfaces needed an unlocked screen; follow-ups in hq-7e81ed. The cutover worktree is removed: the tool is on main as `tools/relay-cutover-bootstrap`, and the `.worktrees/relay-cutover` paths below are historical.
+
 Rewritten 2026-10-21 for the closed-harness bootstrap: plan
 `docs/plans/2026-10-20-relay-cutover-bootstrap.md`, spec
-`docs/specs/2026-10-20-operator-runbooks-design.md`. **Relay is not live.** The manual window
+`docs/specs/2026-10-20-operator-runbooks-design.md`. Before that window relay was not live: the manual window
 of 2026-10-19 stopped after Titan's §1 on 2026-10-20 and was aborted and restored. Its
 sourced-Bash procedure is superseded; the parts still worth reading are in the
 [Reference](#reference-not-for-pasting) at the end, which is not for pasting.

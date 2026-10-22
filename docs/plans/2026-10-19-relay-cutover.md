@@ -20,6 +20,8 @@ npm lockfile pinning, systemd user timers, Codex hook trust.
 **Status:** approved by the user on 2026-10-19 after three review rounds (codex/gpt-6-astra);
 execution is subagent-driven, in a fresh session. Execution in progress; operator window not run.
 
+**Completed 2026-10-22** through the bootstrap plan (`docs/plans/2026-10-20-relay-cutover-bootstrap.md`): window `20261022T014303Z-a1e7bd47` finished; Task 9 close-out landed (`eeb7e24`, merge `d04b6eb`).
+
 **Execution status (2026-10-21):** Tasks 1–7 ran as recorded below. The manual Task 8 window
 stopped after Titan's §1 on 2026-10-20; it was aborted and restored, and no cutover is live.
 Its arrangement is replaced by the closed-harness bootstrap of
