@@ -54,6 +54,11 @@ INTENT = ".local/state/familiar/intent.json"
 MARKERS = {"allowed_marker": "allowed.marker", "denied_marker": "denied.marker"}
 REFUSAL = "relay-guard: refusing"
 IDLE_MS = 60_000
+# The levels a start-idle row may hold. Codex 0.163 fires SessionStart only at its first model
+# turn (neither `/status` nor a `!` shell command starts it), so its start is observed after the
+# fixed first prompt's turn has ended, at done; idle stays accepted should a later Codex fire
+# SessionStart at launch. Claude fires SessionStart at launch.
+START_STATES = {"claude-code": ("idle",), "codex": ("idle", "done")}
 CODEX_HOMES = {"personal": ".codex", "work": ".codex-work"}
 CLAUDE_HOMES = ("personal", "work")
 # Each harness's home key, and the home directories it may name under HOME. Claude's personal
@@ -796,7 +801,11 @@ class _Receipt:
     def cases(self, names):
         receipt, cases = self.receipt, self.receipt["cases"]
         [start] = self.evidence("start-idle")
-        row = self.row("start-idle", start, "idle")
+        row = self.row("start-idle", start)
+        wanted = START_STATES[receipt["harness"]]
+        if row["state"] not in wanted:
+            self.refuse(f"start-idle: {receipt['row_id']} is {row['state']}, not "
+                        f"{' or '.join(wanted)}")
         if row["liveness"] != "alive":
             self.refuse(f"start-idle: {row['session_id']}'s row is {row['liveness']}, not alive")
         self.start = row["process"]["start"]
