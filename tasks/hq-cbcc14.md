@@ -1,13 +1,15 @@
 ---
 id: hq-cbcc14
 title: Establish safe retention for Claude units referenced by successor links
-status: todo
+status: doing
 priority: 2
 size: s
 complexity: high
 process: direct
+owner: main
 created: 2026-10-22T17:51:08Z
-updated: 2026-10-22T17:51:08Z
+updated: 2026-10-22T23:17:06Z
+started: 2026-10-22T23:17:06Z
 depends: []
 parent: hq-401088
 tags: []
@@ -29,3 +31,8 @@ Ideas it wakes: On completion, run `tasks note hq-1639fd --no-reviewed "<finding
 
 - brief (input, required, kind=brief): docs/notes/2026-10-22-claude-prune-links-brief.md — retention question, evidence and alternatives
 - archive-spec (input, required, kind=spec): docs/specs/2026-09-30-session-archive-design.md — no-follow, capture and quarantine invariants
+
+## Notes
+
+- 2026-10-22T23:17:06Z (main): started
+  provenance: {"harness_session":"claude-code:321ed526-7fc0-454a-a1d3-78653b539c96","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
