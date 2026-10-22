@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-10-22T15:45:24Z
-updated: 2026-10-22T16:02:31Z
+updated: 2026-10-22T16:02:40Z
 started: 2026-10-22T15:55:36Z
 depends: []
 tags: []
@@ -30,3 +30,4 @@ The user approved deleting the cutover state on 2026-10-22; titan's was archived
   provenance: {"harness_session":"claude-code:0835d699-ead2-4a3a-a9f3-1bf52da12939","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-22T16:02:31Z (main): gate: verified tree:3c3c6bdebc9fb2c75dbad4b1de502b1dd2f19193 — checks: sha256sum of both archives recorded, tar listing shows no node_modules or nm.pre paths, 33 of 33 receipt evidence hashes match archived observations, 46 europa window operation dirs archived, both hosts lack relay-cutover and relay-smoke; review: minor addressed fam.nm.pre dependency copies repacked out of both archives, minor addressed titan archive postdates deletion because it was repacked from the earlier archive, minor deferred 19 git tree objects written into the europa rehearsal clone at 11:54 before archiving are harmless; reviewer: claude-code/claude-opus-5-5
   provenance: {"harness_session":"claude-code:0835d699-ead2-4a3a-a9f3-1bf52da12939","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-22T16:02:40Z (main): retro: Streaming the tar from europa into titan's WORK_ROOT avoided inventing a location on a host without one. Exclude patterns written from memory missed two of three dependency-copy names (familiar-node_modules.pre nested in snapshots, fam.nm.pre in rehearsal clones); listing directory names before choosing patterns would have saved two repacks, and the fresh verifier caught the second.
