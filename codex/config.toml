@@ -89,28 +89,28 @@ approval_mode = "approve"
 [hooks.state]
 
 [hooks.state."/home/keith/.codex/hooks.json:pre_tool_use:0:0"]
-trusted_hash = "sha256:7f6b225e37eb145ccd5f8b31553620c7926f57f90ef07691baab1dfca585ba92"
+trusted_hash = "sha256:54490c25c94ca2591ff50a4030984d9ab00659855a0a93afeedbb05262745580"
 
 [hooks.state."/home/keith/.codex/hooks.json:permission_request:0:0"]
-trusted_hash = "sha256:bccb7c64c06f097999fa16814c17bbb5568bc692ed1d9a12013b31a2610d886f"
+trusted_hash = "sha256:56591cbde51bab7fc835b4a363b2473deee1a32d135f6e90eb9ce2990e298e8e"
 
 [hooks.state."/home/keith/.codex/hooks.json:session_start:0:0"]
-trusted_hash = "sha256:bae5f37a1b0fadd52f685a55ee38c2b2a136f96584c546d20d7cf531f3e4c926"
+trusted_hash = "sha256:589e521c4e97756cff31ed61c7a46da0f3254b18ae491e997213bc865204b63a"
 
 [hooks.state."/home/keith/.codex/hooks.json:user_prompt_submit:0:0"]
-trusted_hash = "sha256:a6555e48b5638508aff7df9affa5b84abac398e5a15f1f15a624d256080b856c"
+trusted_hash = "sha256:f06c3cbf6885148755e6bfacb036dfd37880e5f9cd225f36532b0dc8a76c1afe"
 
 [hooks.state."/home/keith/.codex/hooks.json:stop:0:0"]
-trusted_hash = "sha256:b88c003a21c220fac0ced66adb28ee2e011db2c31be5d441ef4627ea44593e26"
+trusted_hash = "sha256:19c30d87a87c005ad66dce25343b7f71289c03ed6a659ba8cdb03adbfb4a51fe"
 
 [hooks.state."ponytail@ponytail:hooks/claude-codex-hooks.json:session_start:0:0"]
-trusted_hash = "sha256:55a39116e94ed8399271043701d3e9b8859aee77c30ef85529e7eab067d8acd9"
+trusted_hash = "sha256:defea43402fc8edba23234c694a1117cf80efc2da38968a40a1004cd9d63f725"
 
 [hooks.state."ponytail@ponytail:hooks/claude-codex-hooks.json:user_prompt_submit:0:0"]
-trusted_hash = "sha256:29dcb3bf3cd3d77af301058521d2fd4e414c523345f8fe70942f7f30027acc94"
+trusted_hash = "sha256:5aa5ec474e0bb546f207794993b37fdf7507e54a64e09216be164c5b7b42a197"
 
 [hooks.state."ponytail@ponytail:hooks/claude-codex-hooks.json:subagent_start:0:0"]
-trusted_hash = "sha256:6e210f506560ddd14e490c7dd80623572d504b8f0cfcf8c64c4d4c2ab4d23ae1"
+trusted_hash = "sha256:5b2c1dfa8c7ecc5e8881c8e69479f65d46ed727e0bc5b8e7b4553cee9e5c3daf"
 
 [hooks.state."/mnt/ssd/Dropbox/mindful/v6/.codex/hooks.json:post_tool_use:0:0"]
 trusted_hash = "sha256:f217fbcf8ebe41da3413e01f17f17afcb1cae89c2b995feccd9ebbc4b2297fb6"
@@ -119,19 +119,28 @@ trusted_hash = "sha256:f217fbcf8ebe41da3413e01f17f17afcb1cae89c2b995feccd9ebbc4b
 trusted_hash = "sha256:6eb46df3fb741be24b7d49bd375f6a1b24257fa297b6f0f886c1e34a32ef4dfb"
 
 [hooks.state."/home/keith/.codex/hooks.json:session_start:1:0"]
-trusted_hash = "sha256:589e521c4e97756cff31ed61c7a46da0f3254b18ae491e997213bc865204b63a"
+trusted_hash = "sha256:93d58788b52b6aa7c5fa7bdaa8e38f893595b1e6dbd4b754f605220e9727578b"
 
 [hooks.state."/home/keith/.codex/hooks.json:stop:1:0"]
-trusted_hash = "sha256:19c30d87a87c005ad66dce25343b7f71289c03ed6a659ba8cdb03adbfb4a51fe"
+trusted_hash = "sha256:1af4d7b0db7828de49e3ee977c46c56581f393ab882e179db44eb24716951c3a"
 
 [hooks.state."/home/keith/.codex/hooks.json:stop:2:0"]
-trusted_hash = "sha256:1af4d7b0db7828de49e3ee977c46c56581f393ab882e179db44eb24716951c3a"
+trusted_hash = "sha256:b15cde4ece21c43d445f04a351d2b8e9ddd6344fc2feee7b59835c89ab212a12"
 
 [hooks.state."/home/keith/.codex/hooks.json:subagent_stop:0:0"]
 trusted_hash = "sha256:79d4fb5fd6806169a482ae5ea2e69d902506ea9dfe03db2501ca7b2610b5e250"
 
 [hooks.state."/home/keith/.codex/hooks.json:session_start:2:0"]
-trusted_hash = "sha256:93d58788b52b6aa7c5fa7bdaa8e38f893595b1e6dbd4b754f605220e9727578b"
+trusted_hash = "sha256:96bbddd9527c87edff73910ef148fcbc32c554a829136e9303594ec7766080bf"
+
+[hooks.state."/home/keith/.codex/hooks.json:session_end:0:0"]
+trusted_hash = "sha256:5a74bfe5e71b287ff315aff728e9a5b0e54c1904a86dd57ec9add623ab96c05a"
+
+[hooks.state."/home/keith/.codex/hooks.json:subagent_start:0:0"]
+trusted_hash = "sha256:d191f49fbb9d3ce39bf887166e7237faebc5b242fdae6763184bd6a29f33067e"
+
+[hooks.state."/home/keith/.codex/hooks.json:subagent_stop:1:0"]
+trusted_hash = "sha256:04861e9bad639071b7d4e3b8ba746a388c4c292218333b854ded697361e48a85"
 
 [marketplaces.ponytail]
 source_type = "git"

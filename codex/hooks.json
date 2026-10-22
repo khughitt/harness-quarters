@@ -1,26 +1,133 @@
 {
   "hooks": {
     "SessionStart": [
-      { "hooks": [{ "type": "command", "command": "~/d/familiar/bin/familiar hook --agent codex SessionStart" }] },
-      { "hooks": [{ "type": "command", "command": "~/d/lore/hooks/claude-profile" }] },
-      { "hooks": [{ "type": "command", "command": "~/d/ops/hooks/capture-notice" }] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/lore/hooks/claude-profile"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/ops/hooks/capture-notice"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' SessionStart",
+            "timeout": 600
+          }
+        ]
+      }
     ],
     "UserPromptSubmit": [
-      { "hooks": [{ "type": "command", "command": "~/d/familiar/bin/familiar hook --agent codex UserPromptSubmit" }] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' UserPromptSubmit",
+            "timeout": 600
+          }
+        ]
+      }
     ],
     "PreToolUse": [
-      { "matcher": "*", "hooks": [{ "type": "command", "command": "~/d/familiar/bin/familiar hook --agent codex PreToolUse" }] }
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' PreToolUse",
+            "timeout": 600
+          }
+        ]
+      }
     ],
     "PermissionRequest": [
-      { "hooks": [{ "type": "command", "command": "~/d/familiar/bin/familiar hook --agent codex PermissionRequest" }] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' PermissionRequest",
+            "timeout": 600
+          }
+        ]
+      }
     ],
     "SubagentStop": [
-      { "hooks": [{ "type": "command", "command": "~/d/ops/hooks/claim-guard --harness codex" }] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/ops/hooks/claim-guard --harness codex"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' SubagentStop",
+            "timeout": 600
+          }
+        ]
+      }
     ],
     "Stop": [
-      { "hooks": [{ "type": "command", "command": "~/d/familiar/bin/familiar hook --agent codex Stop" }] },
-      { "hooks": [{ "type": "command", "command": "~/d/ops/hooks/claim-guard --harness codex" }] },
-      { "hooks": [{ "type": "command", "command": "~/.local/bin/harness-state-refresh" }] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/ops/hooks/claim-guard --harness codex"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.local/bin/harness-state-refresh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' Stop",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' SubagentStart",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 3000 --subscribers '/home/keith/.config/relay/subscribers.json' SessionEnd",
+            "timeout": 3
+          }
+        ]
+      }
     ]
   }
 }
