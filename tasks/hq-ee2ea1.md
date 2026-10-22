@@ -1,0 +1,37 @@
+---
+id: hq-ee2ea1
+title: "Prepare reviewed inputs, quiesce and abort before merge"
+status: done
+priority: 1
+size: m
+complexity: high
+process: direct
+owner: feat/relay-cutover
+created: 2026-10-20T11:17:18Z
+updated: 2026-10-20T18:29:36Z
+started: 2026-10-20T16:39:40Z
+completed: 2026-10-20T18:29:35Z
+closed: 2026-10-20T18:29:35Z
+depends: [hq-df06cc]
+parent: hq-c6c847
+tags: []
+source: operator-bootstrap-plan-2026-10-20
+agent: codex
+spec: docs/specs/2026-10-20-operator-runbooks-design.md
+plan: docs/plans/2026-10-20-relay-cutover-bootstrap.md
+step: "Task 3: Prepare reviewed inputs, quiesce and abort before merge"
+---
+
+Plan step only: human implementation-plan review is pending; do not start code, live host work or rehearsal before approval. Execute this step under parent hq-c6c847 using its approved plan, preserved subagent-driven method and trial arm. Keep actual human consent and live-window gates distinct from plan approval.
+
+## Notes
+
+- 2026-10-20T16:39:40Z (feat/relay-cutover): started
+  provenance: {"harness_session":"claude-code:393db06d-9424-4fd1-a855-8adaa7768b36","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-20T16:39:49Z (feat/relay-cutover): arm: flow-trial-1 — unit tack-539508 — flow off
+- 2026-10-20T18:05:35Z (feat/relay-cutover): review: impl round 1 — verdict: revise; findings: Important 2, Minor 8; reviewer: claude-code/claude-opus-5-5
+- 2026-10-20T18:29:35Z (feat/relay-cutover): review: impl round 2 — verdict: accept; findings: none; reviewer: claude-code/claude-sonnet-5-5
+- 2026-10-20T18:29:35Z (feat/relay-cutover): done
+  provenance: {"harness_session":"claude-code:393db06d-9424-4fd1-a855-8adaa7768b36","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-20T18:29:35Z (feat/relay-cutover): Task 3 landed at 4c42e0b+ac0a129: pick-safe prepare/check/recheck (prepare.py, inputs.py), quiesce host operations (quiesce.py), window open/quiesce/abort (window.py), CLI prepare/check/status and tools/relay-cutover-bootstrap; review accept after 1 fix round, Minor 10 deferred.
+  provenance: {"harness_session":"claude-code:393db06d-9424-4fd1-a855-8adaa7768b36","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

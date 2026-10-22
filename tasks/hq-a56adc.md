@@ -1,15 +1,17 @@
 ---
 id: hq-a56adc
 title: Codex work home hooks.json target; land inert prefix and prepare both hosts
-status: doing
+status: done
 priority: 1
 size: s
 complexity: mid
 process: direct
 owner: feat/relay-cutover
 created: 2026-10-19T21:21:24Z
-updated: 2026-10-19T23:21:55Z
+updated: 2026-10-19T23:23:03Z
 started: 2026-10-19T23:00:46Z
+completed: 2026-10-19T23:23:03Z
+closed: 2026-10-19T23:23:03Z
 depends: [hq-1e9103]
 parent: hq-539508
 tags: []
@@ -40,3 +42,7 @@ step: "Task 5: Give the Codex work home a target the installer accepts, and prep
 - 2026-10-19T23:21:47Z (feat/relay-cutover): resumed
   provenance: {"harness_session":"codex:01a15627-8959-7223-98d3-1c5a0cf587a9","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-19T23:21:55Z (feat/relay-cutover): review: impl round 2 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
+- 2026-10-19T23:23:03Z (feat/relay-cutover): done
+  provenance: {"harness_session":"codex:01a15627-8959-7223-98d3-1c5a0cf587a9","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-19T23:23:03Z (feat/relay-cutover): Content-identical Codex work hooks rename reviewed and landed in inert main prefix. npm12 root-only Git/HTTPS-lock correction reviewed and merged; both host runtime/config installs pass, links converge, native settings and trust preserved. Actual preflight: Titan only no-live failures; Europa only expected Claude2.1.280 versus evidence2.1.302 mismatch. Full suite228+956 passed on identical source.
+  provenance: {"harness_session":"codex:01a15627-8959-7223-98d3-1c5a0cf587a9","harness_session_source":"CODEX_THREAD_ID"}
