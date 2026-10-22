@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-10-22T20:55:57Z
-updated: 2026-10-22T20:58:16Z
+updated: 2026-10-22T20:58:18Z
 depends: [tasks-211e28]
 tags: []
 source: tasks-dc16eb
@@ -15,3 +15,7 @@ agent: claude-code/claude-fable-5-1
 ---
 
 tasks:docs/specs/2026-10-22-records-home-design.md §4, §7.4. session-episodes lists worktrees of root and reads <wt>/tasks/<id>.md, requiring root/tasks; read the one copy under records (trial measurement: land kind-aware, a no-op for in-tree, before any project detaches). rename-cutover takes records for the record and tasks/files paths.
+
+## Notes
+
+- 2026-10-22T20:58:18Z (main): hq-5a3e12 was closed with the ruling on 2026-10-22 by the design session; this piece is the two reader changes only.
