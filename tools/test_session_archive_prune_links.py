@@ -1,7 +1,8 @@
 """Claude successor links into an older unit under prune (spec §3.2-3.4).
 
 Claude Code hands a running background agent to its successor session as a symlink,
-<new>/subagents/agent-<id>.jsonl -> <old>/subagents/agent-<id>.jsonl. These cases pin
+<new>/subagents/agent-<id>.jsonl -> <old>/subagents/agent-<id>.jsonl (relative or
+absolute: which one Claude writes is unrecorded). These cases pin
 what the current protocol does with such a pair: where the link breaks, what happens to
 the linking unit itself, and which link changes a retention check could still miss.
 Assertions marked "current" record behaviour the retention rule is expected to change."""

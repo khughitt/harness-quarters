@@ -195,5 +195,8 @@ archived), §3.4's conditions, §3.4.1 and §3.4.2. They also need a revision of
 That revision can share hq-3b9c4c's, which also amends §3.4.
 
 Check: `just test` in the task worktree at 4f40c52 (all four segments): 228, 1002,
-389 and 1 passed. After the review, the fixture file passes all 14 cases, and
-`just test` was rerun before merging (see the task notes).
+389 and 1 passed. After the review, the fixture file passes all 14 cases. The rerun of
+`just test` before merging is recorded as a note on hq-cbcc14. Round 2's minors (a
+non-regular `<sid>.jsonl` or `<sid>/` sibling, lexical-only matching in rule 3,
+where rule 3 sits against `before_delete`, inventory error handling, and the obs
+reader's wording and fix) are carried to hq-1639fd for the spec revision.
