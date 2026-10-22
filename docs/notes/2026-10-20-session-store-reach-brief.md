@@ -1,207 +1,127 @@
 # Session store reach — brief
 
-Ideas: hq-c411df (origin sessions outside the default stores), hq-7b131a (a Codex
-subagent's runtime model), hq-be3f69 (positive: recovering an earlier human turn).
-Goal: hq-cff824. Scoped 2026-10-20.
+Goal: hq-cff824. Reader design: hq-c411df. Scoped 2026-10-20; updated 2026-10-22
+with completed studies, acceptance cases and the obs root-location fix.
 
 ## 1. Problem
 
-Scope and audit agents read session logs to recover evidence: the session a feedback
-report came from, the human turn behind a requirement, the model that ran a review.
-The session-logs skill and its reader, `session-episodes`, reach part of what is stored.
-When the evidence lives elsewhere, the agent gets no result and no explicit
-"unavailable", or records the wrong model.
+Agents need to recover a report's origin, an earlier human turn, a reviewer's runtime
+model, or the calls and results behind a claim. The current session-logs skill and
+`session-episodes` reader cover only part of the retained evidence. Missing matches
+need coverage and availability information so an agent can distinguish an unsuccessful
+search from an unavailable source.
 
 ## 2. Current behaviour and evidence
 
-- **Store lists differ by reader.** Each tool keeps its own list:
+| Reader | Discovery today |
+|---|---|
+| `agents/bin/session-episodes` `_roots` | Default Claude projects and Codex sessions; one override per harness |
+| `tools/hq_cli/sessions.py` `homes()` | Four personal/work harness homes; selection suited to interactive resume |
+| `tools/session_archive/config.py` `sources()` | Five fixed capture roots; no Codex-work native archive |
+| obs `stores.py` `store_roots` | Six personal/work live and native-archive roots |
 
-  | Reader | Roots |
-  |---|---|
-  | `agents/bin/session-episodes` `_roots` | `~/.claude/projects`, `~/.codex/sessions`; one path per `SESSION_LOGS_CLAUDE` / `SESSION_LOGS_CODEX` |
-  | `tools/hq_cli/sessions.py` `homes()` | the four homes (`.claude`, `.claude-work`, `.codex`, `.codex-work`), from metadata (`history.jsonl`, `state_5.sqlite`) |
-  | `tools/session_archive/config.py` `sources()` | five: both Claude `projects`, `.codex/sessions`, `.codex/archived_sessions`, `.codex-work/sessions` |
-  | obs `stores.py` `store_roots` | six: both Claude `projects`, `sessions` and `archived_sessions` under both Codex homes (obs-0d1d99, done) |
+The local code still has these separate discovery lists. No reader design or
+implementation plan is attached to hq-c411df.
 
-  On this host, `~/.codex/archived_sessions` holds 594 rollouts and
-  `~/.codex-work/archived_sessions` does not exist.
-- **obs already holds most of a locate route.** Its index keeps `sessions.session_id`,
-  `sessions.parent_session`, `files.path`, `files.read_path` (an unpacked archive,
-  obs-de84cb, done) and `files.missing_since_ms`. No obs command exposes "where is
-  session X", and the index is per host.
-- **Location probe (hq-a1c591, completed 2026-10-20).** A read-only snapshot located
-  all 20 sampled audited origins, including the work Codex origin, and all six native
-  Codex parents. One Claude session ID returned a root plus three child files: retain
-  file identity and ambiguity. All four matching rows have `subagent = 0`; native
-  records and the child files' separate agent rows reveal the distinction, so that
-  query's flags alone cannot identify the root (obs-b99310). Separate controls located a readable native Codex
-  archive and an absent Claude file with an explicit missing mark; that session ID
-  also has a readable alternate, so availability must stay per file. The snapshot has
-  739 missing files and zero populated `read_path` values, so replayed-copy retrieval
-  was not observed. Europa had no index at its configured state path. See the
-  [probe report](2026-10-20-session-index-reach.md) for queries, hashes and limits.
-- **The audit (hq-c411df note, 2026-10-20).** Locating the origins of 72 feedback reports
-  needed: anchoring on a CLI call's output when the command text differs from the stored
-  record (9 of 72); following a Codex subagent to its parent thread, whose dispatch brief
-  is `encrypted_content` (6 of 72); and searching the work homes and `archived_sessions`.
-  Every origin found was on this host; europa held none.
-- **Child to parent is in the rollout.** A Codex child's `session_meta.payload.source`
-  is `{"subagent": {"thread_spawn": {"parent_thread_id": …}}}`.
-- **Codex model fields diverge.** `session_meta`'s `base_instructions.provenance.model` is
-  the model at creation, which for a child is the parent's. The last
-  `turn_context.payload.model` is the model that ran; children cannot switch model
-  (hq-1bd166; lore `docs/notes/2026-10-02-codex-model-identity-brief.md` §5–§6). Of the
-  400 most recent October rollouts on this host, 176 had the two differ (for example
-  child `01a140a1…`: created under gpt-6.1-sol, ran gpt-6-luna).
-  `relay model --harness codex` resolves only the calling session's own thread
-  (relay `docs/api.md`, "Codex model resolution").
-- **What already works (hq-be3f69).** Origin: Codex session `01a153c4…` (a learn-rust
-  plan execution, 2026-10-19), filing call at rollout line 589. Task 1 asked for "eight
-  prior review findings" that the plan did not include. The controller read this skill,
-  listed that day's Codex rollouts whose `session_meta.cwd` matched, printed their human
-  turns, and copied the user's revision report (session `01a1535d…`, line 184) into its
-  plan workspace. It took under a minute and no question to the user. The skill's turn
-  recipe is Claude-only, so all three reads were hand-written Codex scripts. That did not
-  slow it here, but a Codex turn recipe would make the same route shorter.
+- **Completed survey, hq-de3e4c (686e160).** The
+  [survey](2026-10-20-session-log-survey.md) and its
+  [episode ledger](data/2026-10-20-session-log-survey.jsonl) cover 183 investigation
+  episodes and 1,093 calls: 129 Claude personal, 14 Claude work and 40 Codex personal.
+  Formats (64 episodes), behavior (49), identity (21), inventory (17), recovery (16),
+  aggregates (15) and one batch trace motivate search + show. Historical outputs were
+  required in 64 episodes; 18 needed relationships: eight child-to-parent, twelve
+  parent-to-child, with two using both. Formats, behavior and aggregates cost most
+  in recorded tool time. At least 51 scratch scripts and 377 inline parsers were
+  observed. Outcomes were 177 found, three bounded not-found and three unknown.
+  These describe a bounded retained sample, not prevalence or a tool success rate.
+- **Completed location probe, hq-a1c591 (228f751).** The
+  [report](2026-10-20-session-index-reach.md) and
+  [case ledger](data/2026-10-20-session-index-reach.jsonl) locate 20 sampled origins
+  and six Codex child links to five parents using existing obs metadata. Output
+  anchoring still needs transcript content. The snapshot had 739 missing files and
+  no populated `read_path`: replayed-copy retrieval was unobserved. Native archive
+  A01 and missing-file M01 were separate controls, not audited-origin successes.
+  M01 also has a readable alternate for the same session ID. Europa had no index at
+  its configured path; this does not establish cross-host absence.
+- **Root-row defect resolved, hq-1adbfe / obs-b99310.** Probe case O10 historically
+  returned a root and three child files with phantom parent-ID rows. obs fix
+  `54ce9e187b825dc7ace6ff23ba9820e172b1f89c` routes child `agentId` request records
+  without `isSidechain` to the child. Its 2026-10-20 completion records renewal of
+  6,432 Claude files and zero non-subagent rows in child paths, previously 150.
+  This resolves that defect; alternate files and per-file availability still matter.
+- **Portable checks exist, hq-6e5d88 (03af2f4).** Ten
+  [acceptance cases](session-log-acceptance-cases.md), fixtures under
+  `tools/fixtures/session-logs/` and `tools/test_session_log_cases.py` cover all seven
+  question types. Fidelity corrections remain open in hq-c1fecb.
+- The original 72-report audit needed output anchoring for nine reports and parent
+  context for six. Codex native spawn metadata records the parent; creation-model
+  provenance can differ from the runtime model in `turn_context`. The model-route
+  addition remains hq-7b131a. hq-be3f69 already demonstrated recovery of an earlier
+  human turn through the skill, using a handwritten Codex parser.
 
 ## 3. Constraints
 
-- Session stores are read-only inputs; tests and probes use temporary stores (AGENTS.md).
-- tasks-516ab4 (idea) would stamp feedback with the reporting session, as lifecycle notes
-  already are. Once it lands, new reports need id lookup, not text anchoring.
-- obs-c5c599 (idea) proposes a report-to-session-to-task trace over obs's index.
-- The session-search lane (hq-65f661) rules out a new transcript index.
-- hq-fce47e and lore-f71994 cover a Codex session's *own* model stamp and reviewer
-  identity, not a controller naming its child's model.
+Stores remain read-only; checks use temporary or sanitized fixtures. Keep interactive
+resume selection separate from investigation selection, which must include children
+and non-interactive sessions. The session-search lane hq-65f661 rules out another
+transcript index. hq-a60cf5 independently aligns baseline extraction roots.
+
+Accepted boundary work ops-630a87 / obs-f5710b assigns content parsing and
+session-logs to obs, and location/lifecycle plus harness-version samples to hq.
+Its transfer waits until after flow-trial-1 readout; assess effects on enrolled
+sessions and measurement explicitly. Planning does not authorize that transfer.
+The probe's SQL is research evidence, not an approved consumer API.
+
+Keep deferred annotation/wording corrections in hq-edf5de and fixture corrections in
+hq-c1fecb. tasks-516ab4 may add reporting-session stamps; older reports still require
+content/output anchoring. obs-c5c599 covers report-to-session tracing, hq-ea0975
+measures search cost, and hq-fce47e / lore-f71994 address a session's own model stamp.
 
 ## 4. Alternatives
 
-1. **hq's reader grows a locate command.** `session-episodes` (or `hq sessions`) gains
-   `locate <session-id>` over all six roots plus the session-archive mirror, with child
-   to parent and an explicit `unavailable` listing the stores it searched. This adds a
-   fifth store list unless it imports one.
-2. **obs answers locate queries.** A read-only obs query (session id to path or
-   `read_path`, parent, missing state) serves both the scope agent and obs-c5c599's
-   trace. The session-logs skill documents that query. hq keeps `session-episodes` as
-   the baseline extractor and only aligns its roots.
-3. **Document only.** The skill lists every store and the child-to-parent field, and
-   agents search by hand. This costs nothing, but it gives no explicit unavailable
-   result and repeats the audit's manual work.
+- **Location only (original alternatives 1–2):** grow an hq locator or expose obs
+  lookup metadata and document it. This can resolve IDs and parents but leaves the
+  survey's content, output-pairing and format questions to handwritten parsers.
+- **Guidance only (original alternative 3):** document every store and parent/model
+  field. Small, but repeats the manual parsing and cannot itself report coverage.
+- **Search + show and a usage skill (original alternative 4, the user's proposal):**
+  use existing location metadata and the accepted shared parsing boundary. Lean here;
+  reject another picker or index. Keep trace as a later typed-evidence composition.
 
-4. **An `hq logs` reader and usage skill (the user's proposal, 2026-10-20).** One CLI
-   over every store answers the common questions, for example `hq logs --harness codex
-   --profile work --start-date 2026-10-14 <text>` and `hq trace --task-id <id>`, and the
-   skill teaches question-to-command recipes in place of the hand-written parsers.
-   A pilot found about 1,470 store-reading tool calls since September, 472 of them
-   Python parsers written on the spot (hq-de3e4c). Design inputs from review, which the
-   survey confirms or overturns:
-   - **Release order.** First release `grep` and `show` plus the metadata filters they
-     need. Add `find` only if it differs from `hq sessions`; add `trace` once the
-     survey settles its evidence rules.
-   - **`trace` names its evidence.** A task id in a session does not mean the session
-     worked on it. Each link carries its kind and reference: provenance stamp,
-     successful task command, tool-output match, or textual mention. It searches
-     tool outputs as well as inputs. Child-to-parent links come from recorded metadata
-     (Codex `session_meta.payload.source.subagent.thread_spawn.parent_thread_id`).
-   - **Share discovery and parsing, not selection.** `tools/hq_cli/sessions.py` lists
-     only Codex threads with a preview and excludes non-interactive sessions, which is
-     right for resuming and would hide the subagents an investigation needs. Each
-     consumer applies its own selection. "No new index" does not rule out the existing
-     obs index (hq-a1c591).
-   - **Result contract before verbs.** JSONL with `--pretty`. Each hit carries a
-     reference to its content block, not only its line, because one Claude record can
-     hold several tool calls (275 of 24,919 recent records). It also carries the tool
-     name and call id, so `show` pairs a call with its output, and the runtime model of
-     its turn. Every run reports coverage and truncation (stores searched, unavailable,
-     unreadable), so "nothing found" can be interpreted.
-
-Recommendation after hq-a1c591: 4, using 2's existing local location metadata. The
-index covers the 20 known-origin ID lookups and six parent links, but feedback-output
-anchoring still needs transcript content. No new index follows. A supported read
-interface must preserve file candidates, subagents, missing state and coverage; the
-research SQL is not an approved API. The accepted boundary work (ops-630a87,
-obs-f5710b) assigns content parsing to obs and location/lifecycle plus harness-version
-store samples to hq. The CLI design must respect that boundary and the transfer's
-trial gate rather than create another parser.
-hq-a60cf5 stays independent: it fixes a silent coverage gap in obs's baseline input now,
-and when the shared reader lands, it replaces `session-episodes`' root list with an
-import. The model route stays a skill addition (hq-7b131a), later a field of `show`.
+First-release design inputs: metadata and role filters; bounded normalized/raw records;
+call/result pairing by ID; line and content-block references; recorded parent links
+and per-turn runtime model; and per-run searched, missing, unreadable, malformed and
+truncated coverage. A mention is weaker than a successful task command or provenance
+stamp. JSONL with a pretty renderer is a recommendation, not a surveyed preference.
 
 ## 5. Unanswered questions
 
-- **Answered locally by hq-a1c591:** known-origin and parent location are covered in
-  the bounded sample; content/output anchoring remains a reader operation. Missing
-  state is observable, but no replayed-copy locator was populated in this snapshot.
-  The audit had no archived/pruned origin; separate controls do not establish those
-  cases as audited-origin successes.
-- Should locate span hosts (run on each host over ssh), or report "not on this host"?
-  Recommend local lookup with explicit unavailable/not-indexed state first: the audit
-  found no origin on europa and no index exists there at its configured state path.
-  Automatic remote access and backup materialization remain decisions for the design.
-- Will tasks-516ab4 land? If so, CLI-output anchoring matters only for older reports.
-  The tasks owner decides.
-- Should relay offer `relay model --thread <id>` for controllers, as a verified
-  alternative to the skill's recipe? relay's owner decides; this is not filed.
+- **hq-c411df's design:** what supported obs interface exposes candidate identity,
+  read paths, parents and missing state while preserving the ownership boundary?
+- **hq-c411df's design:** settle command/output contracts and the staged rollout
+  around the trial gate. Automatic remote access and backup materialization remain
+  explicit decisions; lean toward local lookup with explicit unavailable/not-indexed
+  results first. The studies did not qualify general replay or remote retrieval.
+- **Reader acceptance work:** incorporate hq-c1fecb's fidelity corrections and the
+  location controls. Automated trace precision and production search costs remain
+  unmeasured; no precision claim follows from this sample.
+- **Other owners:** tasks decides tasks-516ab4. A potential relay thread-model query
+  remains an unfiled option; relay's own-session resolver is not that interface.
 
 ## 6. Proposed decomposition
 
-- hq-cff824: goal for this cluster.
-- hq-a1c591 (research, completed): [index coverage probe](2026-10-20-session-index-reach.md),
-  20 readable origins and six matching parent links; separate archive/missing controls
-  and an explicit replay-coverage limit. hq-c411df can incorporate both research results.
-- hq-de3e4c (research, added 2026-10-20): survey what agents look for in session logs,
-  to set the verbs of a proposed `hq logs` / `hq trace` CLI and its usage skill (the
-  user's proposal, §4 alternative 4). hq-c411df waits on it too, and its locate-owner
-  choice becomes part of that CLI's design.
-- hq-a60cf5: `session-episodes extract` reads every store obs indexes. Kept
-  independent (§4); the shared reader later replaces its root list.
-- hq-7b131a (scoped): the session-logs skill names the route to a Codex session's or
-  subagent's runtime model.
-- hq-be3f69: dropped 2026-10-20 after checking its origin session; recorded in §2 as what
-  already works.
+- **hq-c411df:** scope the existing idea as the high-complexity, planned design task.
+  Both research inputs are complete. Produce reviewed design and implementation plan
+  with acceptance mapping and rollout gates before implementation; reuse this record,
+  not another design task. Keep it under hq-cff824.
+- **hq-1adbfe:** propose drop as a delivered positive result of obs-b99310; preserve
+  its source body and dated verification. No new research waits on it.
+- **hq-a60cf5 / hq-7b131a:** existing independent root-alignment and model-route work;
+  the shared reader can later replace duplicated discovery through the chosen interface.
+- **hq-c1fecb / hq-edf5de:** existing fixture and annotation corrections; retain them.
+- **hq-a1c591 / hq-de3e4c / hq-6e5d88:** completed evidence and acceptance inputs,
+  not new research. hq-be3f69 remains the previously dropped positive example.
 
-## 7. Session-log question survey — hq-de3e4c, 2026-10-20
-
-The [completed survey](2026-10-20-session-log-survey.md) classifies **183 episodes**
-from both harnesses and both home profiles: 129 Claude personal, 14 Claude work,
-40 Codex personal; no matching Codex-work investigation was observed. Europa was
-reachable but yielded only memory-file operations. The unit is a question, including
-its repeated parser attempts; batch audits remain one episode. These are sample
-counts, not population prevalence.
-
-| Question | Episodes | Investigation calls |
-|---|---:|---:|
-| Record formats/parser fidelity | 64 | 372 |
-| Reconstruct/verify behavior | 49 | 345 |
-| Runtime identity/model | 21 | 59 |
-| Store coverage/retention | 17 | 51 |
-| Recover earlier content/recipe | 16 | 58 |
-| Aggregate patterns | 15 | 193 |
-| Trace report/task origins | 1 batch | 15 |
-
-Historical tool **outputs were required in 64 episodes**. Required parent
-relationships appear in 18: six child→parent only, ten parent→child only, two both.
-Eight episodes therefore need reverse child→parent binding, twelve forward
-parent→child binding; six need both outputs and reverse binding (fourteen outputs
-and either direction). Field-shape inspection and background shell activity do not
-count as relationship traversal. Provenance and successful task commands remain distinct from
-mere mentions. Outcomes: 177 found, three bounded not-found, three unknown.
-The cost ranking by recorded tool time is formats, behavior, aggregates, inventory,
-recovery, trace, identity. At least 51 scratch scripts and 377 inline parser
-invocations were observed; unknown counts and timing limits remain explicit.
-
-This supports §4 alternative 4's **search + show first**, including metadata filters,
-all record roles, paired tool results, block-level references and per-run coverage.
-A bounded normalized/raw-record stream is needed for the 64 format and 15 aggregate
-questions. It does not justify a new `find` command beside the existing session
-picker. `trace` should compose typed evidence links over the reader and the location
-metadata whose ownership hq-a1c591 still investigates. Its automated precision and
-production search costs remain unmeasured. JSONL/pretty output is a design
-recommendation, not an observed preference. No tool code changed.
-
-Two Minor annotation corrections (one scratch script and three failure tags) are
-deferred to hq-edf5de; script and obstacle counts remain lower bounds.
-
-The [episode ledger](data/2026-10-20-session-log-survey.jsonl) preserves paraphrases,
-line/block/call references, line hashes, costs and conservative outcome labels.
-hq-a1c591 now supplies the other research input; hq-c411df can incorporate both results.
+hq-1639fd concerns retention of linked Claude units, rather than reader behavior.
+It was considered as related context in this pass and remains untouched for retention
+scoping under the archive effort.
