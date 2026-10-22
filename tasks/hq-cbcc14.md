@@ -6,9 +6,9 @@ priority: 2
 size: s
 complexity: high
 process: direct
-owner: main
+owner: cbcc14-prune-links
 created: 2026-10-22T17:51:08Z
-updated: 2026-10-22T23:17:17Z
+updated: 2026-10-22T23:17:23Z
 started: 2026-10-22T23:17:06Z
 depends: []
 parent: hq-401088
@@ -37,3 +37,5 @@ Ideas it wakes: On completion, run `tasks note hq-1639fd --no-reviewed "<finding
 - 2026-10-22T23:17:06Z (main): started
   provenance: {"harness_session":"claude-code:321ed526-7fc0-454a-a1d3-78653b539c96","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-22T23:17:17Z (main): arm: flow-trial-1 — unit tack-401088 — not enrolled
+- 2026-10-22T23:17:23Z (cbcc14-prune-links): resumed
+  provenance: {"harness_session":"claude-code:321ed526-7fc0-454a-a1d3-78653b539c96","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
