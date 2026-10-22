@@ -1,13 +1,13 @@
 ---
 id: hq-d05d5c
-title: session-episodes and rename-cutover read records from the records field; close hq-5a3e12 with the records-home ruling
+title: session-episodes and rename-cutover read records from the records field of tasks projects
 status: todo
 priority: 2
 size: s
 complexity: mid
 process: direct
 created: 2026-10-22T20:55:57Z
-updated: 2026-10-22T20:58:01Z
+updated: 2026-10-22T20:58:16Z
 depends: [tasks-211e28]
 tags: []
 source: tasks-dc16eb
