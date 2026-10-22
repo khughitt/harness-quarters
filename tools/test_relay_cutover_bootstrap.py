@@ -4606,14 +4606,15 @@ def _denial(ref):
 
 
 def _short(world, registry, record, host, harness, home, session, pid, start, *, name=None,
-           argv=None, environ=None):
+           argv=None, environ=None, started_state="idle"):
     """A short smoke (start, the attribution denial, exit) in its own scratch repo, its process
     launched in `home`; `argv` is the session process's command line, its bare executable by
-    default, and `environ` replaces its home key."""
+    default, `environ` replaces its home key and `started_state` is the row's level at the
+    start-idle observation."""
     cwd = world.scratch(name or f"{harness}-{home}", host)
     row_harness = "claude" if harness == "claude-code" else "codex"
     world.harness_row(host, row_harness, pid, start, argv=argv, home=home, environ=environ)
-    registry.put(host, harness, session, pid, start, cwd, "idle")
+    registry.put(host, harness, session, pid, start, cwd, started_state)
     started = _seen(world, host, cwd)
     registry.put(host, harness, session, pid, start, cwd, "done")
     denied = _seen(world, host, cwd)
@@ -4672,14 +4673,16 @@ def _full_claude(world, registry, record):
 
 
 def _full_codex(world, registry, record):
-    """Titan's personal Codex full smoke: Claude's cases but the idle prompt, on Codex rows."""
+    """Titan's personal Codex full smoke: Claude's cases but the idle prompt, on Codex rows.
+    Codex writes its first row only at its first model turn, so start-idle is observed after
+    the fixed first prompt's turn has ended, with the row done."""
     cwd, sid, abrupt = (world.scratch("codex-personal"), SESSIONS["codex"],
                         SESSIONS["codex-abrupt"])
     pid, start, second = 3997101, 820, 3997102
     world.harness_row("titan", "codex", pid, start)
     base = _ms(record["verified"]["at"], 10)
     put = functools.partial(registry.put, "titan", "codex", sid, pid, start, cwd)
-    put("idle", updated=base)
+    put("done", updated=base)
     started = _seen(world, "titan", cwd)
     Path(cwd, "allowed.marker").touch()
     put("working", updated=base + 1000)
@@ -5129,6 +5132,37 @@ def test_short_receipts_cover_each_home(desktop):
         assert slot in raised.value.error
     assert "europa Claude personal" not in raised.value.error
     assert "titan Codex work" not in raised.value.error
+
+
+def test_codex_start_idle_follows_its_first_turn(desktop):
+    """Codex fires no SessionStart until its first model turn, so a Codex start-idle is
+    observed after the fixed first prompt's turn has ended: its row is done, or idle should a
+    later Codex fire SessionStart at launch. A turn still running is no start, and Claude,
+    which fires SessionStart at launch, still needs idle exactly."""
+    record, prepared = _ready_window(desktop)
+    registry = Registry(desktop)
+    _controller_up(desktop, registry)
+
+    def current():
+        return state.current_window(desktop.root("titan"))
+
+    done = _short(desktop, registry, record, "titan", "codex", "work", SESSIONS["codex-work"],
+                  3998101, 910, started_state="done")
+    assert smoke.check_receipt(current(), done) == sha(done)
+    idle = _short(desktop, registry, record, "titan", "codex", "work", SESSIONS["codex-work"],
+                  3998102, 911, name="codex-work-idle")
+    assert smoke.check_receipt(current(), idle) == sha(idle)
+    working = _short(desktop, registry, record, "titan", "codex", "work",
+                     SESSIONS["codex-work"], 3998103, 912, name="codex-work-working",
+                     started_state="working")
+    _refused(desktop, working, f"start-idle: codex:{SESSIONS['codex-work']} is working, not "
+                               "idle or done")
+    claude = _short(desktop, registry, record, "europa", "claude-code", "work",
+                    SESSIONS["europa-work"], 3998201, 920, started_state="done")
+    _refused(desktop, claude, f"start-idle: claude-code:{SESSIONS['europa-work']} is done, not "
+                              "idle")
+    full = _full_codex(desktop, registry, record)
+    assert smoke.check_receipt(current(), full) == sha(full)
 
 
 def test_receipt_home_is_the_observed_home(desktop):
