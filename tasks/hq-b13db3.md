@@ -7,7 +7,7 @@ size: m
 complexity: high
 process: planned
 created: 2026-10-22T20:35:06Z
-updated: 2026-10-22T20:36:53Z
+updated: 2026-10-22T20:36:54Z
 depends: [ops-e4d678, tasks-d8823c, lore-a071ae, flows-47f205]
 tags: []
 source: ops-e4d678
@@ -32,7 +32,7 @@ Done: retained sanitized evidence and independent per-route verdicts, credential
 
 ## References
 
-- design (input, required, kind=spec): ops:docs/specs/2026-10-22-interactive-walkthrough-design.md — accepted frozen ops e21ea75
+- design (input, required, kind=spec): files:walkthrough-design-e21ea75.md — accepted frozen ops e21ea75
 
 ## Notes
 
