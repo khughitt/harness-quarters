@@ -81,7 +81,10 @@ prune, timer change, or mutation of another session's links. The session-reader 
 Evidence: `tools/test_session_archive_prune_links.py`, synthetic stores only. Each
 fixture is an older unit O holding `subagents/agent-1.jsonl`, and a younger unit N
 whose `subagents/agent-1.jsonl` is a symlink to it, relative or absolute. Assertions
-marked `current` pin today's behaviour, which the retention rule is meant to change.
+marked `current` pin today's behaviour, which a retention rule is meant to change.
+Fixtures always visit O before N; no outcome below depends on the order. hq-1639fd's
+report does not say whether Claude writes these links relative or absolute, so both
+forms are covered.
 
 | Case | Outcome | N's link | Notes |
 |---|---|---|---|
@@ -89,62 +92,108 @@ marked `current` pin today's behaviour, which the retention rule is meant to cha
 | Apply, O eligible, N active | O `pruned` | breaks at quarantine (step 1), stays broken | The hooks read resolves / broken / broken; the archive keeps O's bytes. Relative and absolute links behave the same |
 | O held open at settle | O `kept:open` | broken while quarantined, whole after restore | A restore repairs the link |
 | O path recreated after quarantine | O `failed:recreated` | broken until a person merges | The leftover quarantine refuses the next run |
-| N inactive (O retained, pruned in the same run, or already gone) | dry run: N `eligible`; apply: N `failed:release` | stranded in quarantine | N's regular files are released first, so its live transcript is gone. The link stays under `run1/-p/N/N/`, and every later prune refuses with `LeftoverQuarantine`. A retained O is never followed |
-| Link into O created at `after_precheck` | O `pruned` | resolves at creation, then breaks | A pre-check inventory misses it |
+| N inactive (O retained, pruned in the same run, or already gone) | dry run: N `eligible`; apply: N `failed:release` | stranded in quarantine | Detail follows the table. With O retained, an absolute link still reaches O from quarantine; O is intact and never followed |
+| Link into O created at `after_precheck` | O `pruned` | resolves at creation, then breaks | No current check sees it |
 | Link into O created at `after_quarantine` or `before_delete` | O `pruned` | dangling from creation | The target is gone from its live path before the link exists |
+
+The N-inactive row in detail:
+
+- N's regular files are archived and released under rule (b), which is the intended
+  prune.
+- The link is never released, because `present` comes from `walk_files`
+  (`prune.py`, `delete_claude_unit`), which skips links. The link stays under
+  `run1/-p/N/N/`, the unit's directory cannot be emptied, and the unit ends
+  `failed:release`.
+- The current run goes on. Every later run refuses with `LeftoverQuarantine`.
 
 What the current protocol does:
 
 - **Pruning O breaks a live link.** The link breaks at quarantine, not at removal.
   Eligibility never considers incoming links.
-- **N can never prune cleanly.** Capture and unit discovery skip symlinks, so N's
-  eligibility ignores the link. Release rule (b) can never hold for a link: the archive
-  does not record links.
-- **One failed N stops every later prune.** The apply removes N's regular files, ends
-  in `failed:release`, and leaves a quarantine that refuses every later run.
-- **The dry run hides the problem.** It reports N `eligible`, so the rollout's dry-run
-  review (spec §4) would not reveal it.
+- **N's link halts later runs.** Capture and unit discovery skip symlinks, so N's
+  eligibility ignores the link. An apply ends in `failed:release` and leaves a
+  quarantine that halts every later run, until a person clears it.
+- **The dry run shows nothing.** It reports N `eligible`, so the rollout's dry-run
+  review (spec §4) would not reveal the problem from this cause.
+- **A second, run-wide halt sits in the obs reader.**
+  - **Mechanism:** `inputs.py` `load_obs_state` keys rows by `os.path.realpath`. A row
+    obs still holds for a link path folds onto its target's key whenever the link
+    resolves. The two rows differ at least in `missing_since_ms`, which raises
+    `ObsUnavailable`, and that stops dry runs and applies alike.
+  - **Evidence:** reproduced by the reviewer with a stub runner. That obs keeps such
+    rows is taken from obs-396637's record; the live index was not checked.
+  - **Scope:** rules 1–3 below do not fix this halt. It belongs to hq-3b9c4c's reader
+    rewrite: key rows by exact path or by obs's device and inode, and ignore link-path
+    rows.
+- **Claude's own cleanup breaks the link too.** It removes files by mtime
+  (`cleanupPeriodDays`, 90 here), and it left a successor's link dangling on
+  2026-09-19. Retaining the target therefore defers the break to Claude's horizon; it
+  does not prevent it.
 
 Recommendation, the minimum change. It keeps no-follow traversal and the quarantine
-rules unchanged:
+rules:
 
-1. **Keep a unit that holds a link** (`kept:has-link`), decided at pre-check before
-   anything moves. This removes the `failed:release` and leftover outcome. It needs only
-   `lstat` and `readlink`, and follows nothing.
+1. **Keep a unit that holds a non-regular entry** (`kept:has-link`), decided at
+   pre-check before anything moves. Discovery reads entries with `lstat`, so this
+   follows nothing.
+   - Pre-check sees only entries present at pre-check. An entry that appears later
+     must be caught again, under rule 3.
 2. **Keep a unit that another unit's link points into** (`kept:linked`).
-   - Build an inventory of links in every Claude source on the filesystem during phase
-     one.
-   - Resolve each link lexically: an absolute target as written, a relative target
-     against the link's directory, both with `normpath` and never with `realpath`.
-   - Match the result against each unit's live `<sid>.jsonl` and `<sid>/` paths. Match
-     under both the configured root and the root's own resolved path, because a link may
-     name either.
-   - Together with rule 1, a linked pair is never pruned by hq. Claude's own cleanup
-     (`cleanupPeriodDays`) eventually removes such a pair.
-3. **Repeat the inventory after quarantine.** Run it again at settle, for links resolving
-   into the quarantined unit's original paths, and restore the unit as `kept:linked` when
-   one appears. This closes the pre-check-to-quarantine window (the `after_precheck`
-   case). It can be limited to `subagents/` directories, which is the only place links
-   have been observed, to bound its cost.
+   - **Inventory:** during phase one, list the links in both Claude sources (`claude`
+     and `claude-work`) at every level, and match each against the units of both
+     sources.
+   - **Match:** a link targets a unit when its target is `<sid>.jsonl`, or is `<sid>/`
+     or lies beneath it.
+   - **Resolving links that work:** compare `os.stat(link)`'s device and inode with the
+     no-follow inode set that `quarantine.inodes()` gathers for each unit. The stat
+     reads metadata only, follows nothing that is deleted, and catches a link written
+     through an aliased path (a symlinked prefix, a bind mount), which lexical
+     matching misses.
+   - **Dangling links:** match lexically with `normpath` (an absolute target as
+     written, a relative one against the link's directory). Such a link protects
+     nothing today, but matching it keeps the rule stable.
+   - **Out of scope:** links from outside the Claude sources.
+3. **Repeat the checks just before release.** After re-verify, and before the
+   recreation check and release, scan the quarantined tree for non-regular entries
+   (rule 1). Then rerun rule 2's inventory lexically against the unit's original live
+   paths: the targets are now in quarantine, so device and inode matching cannot see
+   them. On either hit, restore the unit (`kept:has-link`, `kept:linked`).
+   - This closes the windows from pre-check to quarantine and from quarantine to
+     release (the `after_precheck`, `after_quarantine` and `before_delete` rows).
+   - It rescans whole sources for every unit deleted. The cost is unmeasured; limiting
+     the scan to `subagents/` would cut it, but fails open, and needs a measurement
+     first.
+   - Section 3.4.1's "a quarantined file or link is removed only when…" should say
+     that links are never released.
 
-The race no rule closes: a link created after the last inventory, and before or after
-removal, points at a path that is already gone from the live store. The link is dangling
-from creation, and no snapshot excludes such a writer. Claude creates these links when it
-hands a *running* agent to a successor. A running agent writes its transcript, so its
-target should not be 30 days inactive. This is an argument from the observed mechanism.
-It does not exclude the race, and it has not been probed.
+What no rule closes: a link created between the last scan and the removal, or after
+the removal. It names a path that is already gone from the live store, so it is
+dangling from creation, and no snapshot excludes such a writer. Claude creates these
+links when it hands a *running* agent to a successor. A running agent writes its
+transcript, so its target should not be 30 days inactive. This is an argument from the
+observed mechanism. It does not exclude the race, and it has not been probed.
 
 Rejected for the minimum change:
 
 - **Pruning a pair together.** It would require archiving link targets so that rule (b)
-  can hold for a link, plus a group rollback that does not exist.
+  could hold for a link, plus a group rollback that does not exist.
 - **Removing or rewriting a surviving unit's link.** It changes a live session.
 
-hq-624351 needs an additional gate. Rules 1 and 2 must be live before any `--apply`
-prune, because the current code turns the first inactive linking unit into a run-wide
-halt and the dry run does not show it. Pairs exist in the live store's history: two live
-examples (2026-09-06 and 2026-10-21) and four pairs in obs's index. This pass did not
-survey the live store. The change needs a reviewed revision of the archive spec (§3.4
-conditions, §3.4.2 settle step, and a §3.3 note that links are not archived) and of its
-plan. That revision can share hq-3b9c4c's revision, which also amends the §3.4
-conditions.
+Gates for hq-624351:
+
+- **Rule 1 is a hard gate before any `--apply`.** Without it, the first inactive
+  linking unit halts every later run, and the dry run does not show it coming. Pairs
+  exist in the live store's history: two live examples (2026-09-06 and 2026-10-21) and
+  four pairs in obs's index. This pass did not survey the live store.
+- **The obs-reader halt is a hard gate**, owned by hq-3b9c4c.
+- **Rule 2, with rule 3, is a policy gate.** Whether a resumed successor reads the
+  linked transcript is unknown, so hq should not break the link sooner (about 30 days)
+  than Claude's cleanup would (about 90).
+
+All three need a reviewed revision of the archive spec, covering §3.3 (links are not
+archived), §3.4's conditions, §3.4.1 and §3.4.2. They also need a revision of the plan.
+That revision can share hq-3b9c4c's, which also amends §3.4.
+
+Check: `just test` in the task worktree at 4f40c52 (all four segments): 228, 1002,
+389 and 1 passed. After the review, the fixture file passes all 14 cases, and
+`just test` was rerun before merging (see the task notes).

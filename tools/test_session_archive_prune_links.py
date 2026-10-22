@@ -116,11 +116,14 @@ def test_recreated_target_keeps_link_broken_until_a_person_merges(src, archive, 
         prune_run(context(src, archive, manifest), [src], apply=False, codex_probed=False, report={})
 
 
+@pytest.mark.parametrize("absolute", [False, True], ids=["relative", "absolute"])
 @pytest.mark.parametrize("target", ["retained", "pruned-same-run", "already-dangling"])
-def test_linking_unit_strands_its_link_in_quarantine(src, archive, manifest, target):
-    """The linking unit's own prune: eligibility ignores the link, release cannot remove it."""
+def test_linking_unit_strands_its_link_in_quarantine(src, archive, manifest, target, absolute):
+    """The linking unit's own prune: eligibility ignores the link, and the link never reaches
+    release, so the unit's directory cannot be emptied."""
     old_age = 1 if target == "retained" else 40
-    link = make_pair(src, old_age=old_age, new_age=40)
+    link = make_pair(src, old_age=old_age, new_age=40, absolute=absolute)
+    written = os.readlink(link)
     if target == "already-dangling":  # Claude's own cleanup took the older unit first
         for path in (src.root / "-p" / f"{OLD}.jsonl", src.root / "-p" / OLD):
             os.rename(path, src.home / path.name)
@@ -135,11 +138,13 @@ def test_linking_unit_strands_its_link_in_quarantine(src, archive, manifest, tar
         expected[f"-p/{OLD}"] = "pruned"
     assert not ok and outcomes(report) == expected  # current
     stranded = quarantined(src, NEW) / AGENT
-    assert stranded.is_symlink() and os.readlink(stranded) == f"../../{OLD}/{AGENT}"
+    assert stranded.is_symlink() and os.readlink(stranded) == written
     assert not (src.root / "-p" / f"{NEW}.jsonl").exists()  # current: regular files released first
     assert not link.is_symlink()
     if target == "retained":
-        assert target_path(src).read_bytes() == b'{"sub":1}\n'  # never followed
+        # Never followed: the absolute link still reaches O from quarantine, and O is intact.
+        assert stranded.exists() == absolute
+        assert target_path(src).read_bytes() == b'{"sub":1}\n'
     with pytest.raises(LeftoverQuarantine):  # current: one linking unit stops every later prune
         prune_run(context(src, archive, manifest), [src], apply=False, codex_probed=False, report={})
 
