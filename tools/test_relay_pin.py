@@ -45,9 +45,14 @@ def test_launcher_refuses_a_missing_install(tmp_path):
 
 
 def test_install_recipe_allows_only_root_git_and_keeps_frozen_inputs(tmp_path):
+    # The npm on PATH is whatever a version manager put first; an nvm npm 11.9 refuses
+    # the direct Git dependency under --allow-git=root. The recipe must never call it.
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    npm = bin_dir / "npm"
+    path_npm = bin_dir / "npm"
+    path_npm.write_text("#!/bin/sh\necho 'the npm on PATH was used' >&2\nexit 1\n")
+    path_npm.chmod(0o755)
+    npm = tmp_path / "system-npm"
     npm.write_text("""#!/usr/bin/python3
 import sys
 from pathlib import Path
@@ -68,7 +73,7 @@ assert (prefix / "package-lock.json").is_file()
         ["/usr/bin/just", "relay-install"],
         cwd=CHECKOUT,
         env={"PATH": f"{bin_dir}:{os.defpath}", "HOME": str(tmp_path),
-             "RELAY_INSTALL_ROOT": str(install_root)},
+             "RELAY_INSTALL_ROOT": str(install_root), "RELAY_NPM": str(npm)},
         capture_output=True,
         text=True,
     )
