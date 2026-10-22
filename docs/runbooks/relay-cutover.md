@@ -676,6 +676,15 @@ agent observes each step from Titan; for a Europa smoke the tool reaches Europa 
 ~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap record-smoke --observe europa --cwd '<scratch-repo>'
 ```
 
+**Start-idle.** A Claude smoke is observed right after the trust review, before any prompt:
+its row is `idle`. A Codex smoke is observed after its first turn. Once the hook review is
+done, the operator sends the fixed first prompt
+`Reply with the single word ready and do nothing else.` and lets that turn end; the row is
+then `done`. Codex 0.163 fires SessionStart only at the session's first model turn, and
+neither `/status` nor a `!` shell command starts one, so before that prompt Codex has no row
+to observe. The tool still accepts `idle` for Codex, should a later Codex write its row at
+launch. Claude must be `idle`.
+
 **Observations.** Each observation is kept as private evidence under the window
 (`smokes/observations/<operation-id>.json`). The command prints its path and digest, the
 rows in that repo, the intent state, the markers, the commit count and whether Git has an
@@ -1162,7 +1171,7 @@ Do not use nested code-mode to issue the denial command.
 
 | Case | Operator action, with literal prompt | Passes when |
 | --- | --- | --- |
-| start-idle | Launch, then complete the initial trust review yourself (Codex: its hook review); send no prompt yet | One root row for the session, `idle`, alive, fresh, its process the held prepared executable |
+| start-idle | Launch, then complete the initial trust review yourself (Codex: its hook review). Claude: send no prompt yet. Codex: ask `Reply with the single word ready and do nothing else.` and let that turn end; Codex 0.163 fires SessionStart only at the first model turn (`/status` and `!` shell commands do not start one), so it has no row before it | One root row for the session, alive, fresh, its process the held prepared executable; Claude `idle`, Codex `done` (or `idle`) |
 | allow-working | Ask: `Use the shell tool once to run touch allowed.marker; sleep 10, then stop.` Approve if prompted; observe during the sleep | Row `working`; `allowed.marker` exists in the repo |
 | attribution-denial | Ask: `Use Bash once to run exactly git commit --allow-empty -m 'probe' -m 'Co-Authored-By: Claude <noreply@anthropic.com>' && touch denied.marker. If refused, stop and quote the refusal; do not retry or rewrite it.` | The native result quotes ops's `relay-guard: refusing` attribution reason (receipt `outcome: refused`, the quote in `refusal`); 0 commits; no `denied.marker`; a Git identity set in the repo; row alive |
 | needs-approval | Claude: ask it to run `sleep 7` via Bash in manual mode and leave the permission dialog unanswered. Codex: explicitly ask it to request `require_escalated` permission for `touch "$HOME/.local/state/hq/relay-smoke/approval.marker"` outside the workspace; leave the dialog unanswered. Observe, then answer the prompt yourself | Row `needs-approval` while the **human** prompt is open; human `permission: approved` |
@@ -1178,7 +1187,8 @@ The rules for a valid smoke:
 - A prompt answered by an agent or by auto-review is not human approval coverage.
 - If an existing permission allow rule prevents the Claude `sleep` dialog, stop and inspect
   the effective rule. Do not claim `needs-approval` was tested.
-- The short smoke needs only start, the same denial, and `/exit`.
+- The short smoke needs only start (for Codex, with its fixed first prompt), the same
+  denial, and `/exit`.
 
 The 2026-10-19 Codex approval prompt named `~/.local/state/hq/relay-cutover/approval.marker`.
 An approved run would leave an unexplained entry at the cutover root, which now blocks every
