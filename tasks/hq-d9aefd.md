@@ -3,9 +3,12 @@ id: hq-d9aefd
 title: Clean up europa's relay cutover state
 status: doing
 priority: 3
+size: xs
+complexity: low
+process: direct
 owner: main
 created: 2026-10-22T15:45:24Z
-updated: 2026-10-22T15:55:47Z
+updated: 2026-10-22T15:56:20Z
 started: 2026-10-22T15:55:36Z
 depends: []
 tags: []
