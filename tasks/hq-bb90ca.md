@@ -1,15 +1,17 @@
 ---
 id: hq-bb90ca
 title: "SL11 fixtures for turn-final messages, task evidence, forks and escapes"
-status: doing
+status: done
 priority: 2
 size: s
 complexity: mid
 process: direct
 owner: session-evidence-reader
 created: 2026-10-23T16:11:45Z
-updated: 2026-10-23T17:29:47Z
+updated: 2026-10-23T17:29:57Z
 started: 2026-10-23T16:28:09Z
+completed: 2026-10-23T17:29:57Z
+closed: 2026-10-23T17:29:57Z
 depends: []
 parent: hq-c411df
 tags: []
@@ -46,3 +48,7 @@ Verification: the SL11 self-checks fail before the fixtures exist, then pass; ju
   provenance: {"harness_session":"claude-code:f7f539e5-48f4-4265-a16a-be9f26e40276","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-23T17:29:46Z (session-evidence-reader): deviations from plan Task 1, each ruled for live fidelity: TD harness_session_source is the real CLI value CLAUDE_CODE_SESSION_ID (plan wrote native) because TD is real tasks show output, CM:18 queued human attachment follows the tool result (plan put it before) because every live human queued attachment does, CM:59 has no stop_hook_summary before its turn_duration (plan rule said every one does) because live writes none after a synthetic message, XE te7 adds the spawn output as live spawns and XP do, XK carries subagent_history_start_ordinal 7 (past its last record) because live forks from Codex 0.150 carry the key and its value must agree with the all-copied range. Spec 8.3 fork-boundary question carried to obs-d98663.
 - 2026-10-23T17:29:47Z (session-evidence-reader): retro: probing live key layouts before writing fixtures paid off, but a keys-only probe missed what a key's value means (subagent_history_start_ordinal), which only a reviewer comparing values to behaviour caught. Generating fixtures from a scratch script made three fix rounds cheap, since line refs could be re-derived. Writing fixtures before the RED tests cost a move-aside step: write the tests first.
+- 2026-10-23T17:29:57Z (session-evidence-reader): done
+  provenance: {"harness_session":"claude-code:f7f539e5-48f4-4265-a16a-be9f26e40276","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T17:29:57Z (session-evidence-reader): SL11 fixtures, cases section and self-checks landed (4ea2d2f and the review-fix commit); verified tree d6057f6, three review rounds, two minors deferred
+  provenance: {"harness_session":"claude-code:f7f539e5-48f4-4265-a16a-be9f26e40276","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
