@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: session-evidence-reader
 created: 2026-10-20T11:19:18Z
-updated: 2026-10-23T14:42:18Z
+updated: 2026-10-23T14:45:11Z
 started: 2026-10-23T12:40:18Z
 depends: [hq-a1c591, hq-de3e4c]
 parent: hq-cff824
@@ -64,3 +64,4 @@ Found while checking whether stamped friction reports can be traced to their ori
 - 2026-10-23T13:35:18Z (session-evidence-reader): review: spec round 1 — verdict: revise; findings: critical 1, important 12, minor 14; reviewer: claude-code/claude-opus-5-5
 - 2026-10-23T14:13:12Z (session-evidence-reader): review: spec round 2 — verdict: revise; findings: important 5, minor 12; reviewer: claude-code/claude-opus-5-5
 - 2026-10-23T14:42:18Z (session-evidence-reader): review: spec round 3 — verdict: revise; findings: important 5, minor 10; reviewer: claude-code/claude-opus-5-5
+- 2026-10-23T14:45:11Z (session-evidence-reader): Spec revision 4 at 87b7fcb (sha256 c9f40e908bccac1cdf36a7d10772b91909c0b51f29b3dfb1e1f0841f406abc02) addresses agent review rounds 1-3 (round 3 findings fixed per the reviewer's suggested fixes; no agent re-review of revision 4). Handed to the user for the designed gate.
