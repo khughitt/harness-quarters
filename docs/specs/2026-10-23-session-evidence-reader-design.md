@@ -1,6 +1,6 @@
 # Session evidence reader: `session-logs search` and `show`
 
-Status: draft for review, revision 4, 2026-10-23.
+Status: draft for review, revision 5, 2026-10-23.
 - **Revision 1** (ce66d61) went through a fresh-context agent review: one critical finding,
   12 important and 14 minor.
 - **Revision 2** (c21021e) addressed them. Its largest change is D6: the task is no longer
@@ -9,12 +9,21 @@ Status: draft for review, revision 4, 2026-10-23.
   records. Codex inter-agent reports are no longer dispatches. `not_found` is bounded by
   the index's coverage start. The obs README waits for Stage B. Its re-review found 5
   important findings and 10 minor.
-- **Revision 4** addresses those:
+- **Revision 4** (87b7fcb) addressed those:
   - mid-turn `isMeta` records no longer split Claude turns;
   - failed task commands require a command chain whose failure is certain;
   - the coverage start's live values and drift are stated;
   - scoped `not_found` needs a candidate and the task's start;
   - Codex fork history ends by `turn_id`.
+
+  The user's review of it (round 4, reviewer `codex/gpt-6.1-sol`) found 4 important
+  findings.
+- **Revision 5** addresses those:
+  - the raw-byte prefilter is gone, and unparsed lines are matched through their escapes;
+  - only a single `tasks` segment's error is evidence that the command did not succeed;
+  - a fork whose parent is unavailable is ambiguous to its end, and ambiguous turns have no
+    final;
+  - a Codex turn needs its `task_complete` to be `completed`.
 Task: hq-c411df (goal hq-cff824)
 Inputs: the store-reach brief (`docs/notes/2026-10-20-session-store-reach-brief.md`), the
 session-log survey (`docs/notes/2026-10-20-session-log-survey.md`, hq-de3e4c), the index
@@ -285,8 +294,13 @@ blocks yields one object.
 ### 4.5 `unparsed`
 
 A line that is not a JSON object, or a final line with no newline. Its fields are `ref`,
-`reason` (`malformed` or `truncated`), `raw_match` (whether its bytes contain the pattern)
-and, with `--raw`, its bytes. It is never a record and never has a role (SL10).
+`reason` (`malformed` or `truncated`), `raw_match` and, with `--raw`, its bytes. It is
+never a record and never has a role (SL10).
+
+**`raw_match`.** The line cannot be decoded, so the reader first undoes JSON string escapes
+leniently (`\uXXXX`, `\/`, `\"`, `\\`, `\n` and the rest), leaving anything malformed
+as it is. `raw_match` is then whether the pattern matches either the bytes or that text,
+with the case rule of §6.2. An escape therefore cannot hide a match in an unparsed line.
 
 ### 4.6 `coverage`: the last object of every run
 
@@ -297,7 +311,7 @@ and, with `--raw`, its bytes. It is never a record and never has a role (SL10).
 | `roots` | per root: home, store, state (`searched`, `absent` or `unreadable`), files, bytes |
 | `index` | `{state, schema, last_complete_run, age_minutes, coverage_start}`; state `used`, `stale`, `absent`, `unsupported_schema` or `unreadable`, with the reason; `coverage_start` per root (§5.3) |
 | `window` | `since` and `until`, and whether `since` is the default |
-| `files` | scanned, skipped by prefilter, unreadable (refs), vanished during the run (refs), and missing in scope (refs, with read path and its state); a list longer than 20 is cut and its count kept |
+| `files` | scanned, skipped by mtime (§6.1), unreadable (refs), vanished during the run (refs), and missing in scope (refs, with read path and its state); a list longer than 20 is cut and its count kept |
 | `lines` | malformed and truncated refs, each marked `raw_match` |
 | `copies` | collapsed copies by kind; whether detection was limited to the files read (§8.3) |
 | `limits` | the object limit and whether it was hit; the text and raw byte limits |
@@ -484,8 +498,11 @@ second host had no index on 2026-10-20, so its empty answers are `unknown`.
 
 **Default time window.** Without `--session`, `--task`, `--file`, `--since` or
 `--all-time`, the window is the 30 days that end at `--until`, or today when `--until` is
-absent. Coverage marks it as the default. It bounds the scan cost of an unqualified search:
-the pre-flow extractor needed about 2 minutes for 23 GB.
+absent. Coverage marks it as the default.
+
+It bounds the scan cost of an unqualified search, which parses every file in scope (§6.2).
+For comparison, the pre-flow extractor needed about 2 minutes for 23 GB while skipping
+most files by a byte test. The live-store run (§14.4) measures the reader's own cost.
 - `--since` skips files whose mtime is older, which is exact because no record in a file
   is newer than the file's mtime. Inside the files it reads, it skips records older than
   the window.
@@ -506,12 +523,16 @@ The searchable text of a record is the first of these that applies:
 - an execution's command and output;
 - the compact JSON of a metadata or `unknown` record.
 
-**Raw prefilter.** A file is parsed only if its raw bytes contain the pattern.
-- **Which patterns use it.** Only an ASCII literal free of characters JSON escapes: a
-  quote, a backslash, control characters. Any other pattern parses every file in scope, so
-  the prefilter never hides a match.
-- **Case.** Under the default case-insensitive match, the bytes and the pattern are
-  compared in ASCII lower case.
+**Every file in scope is parsed.** There is no raw-byte prefilter. Valid JSON may spell any
+character as an escape: `"\u006eeedle"` decodes to `needle`, but its bytes do not contain
+`needle`. So a byte test can reject a file that holds a match, and coverage would then
+present a false negative as conclusive.
+
+The default window bounds the cost (§6.1). A prefilter may return later only together with:
+- a stated proof that it handles every JSON escape and the case folding of §6.2;
+- this counterexample as a test.
+
+**Case.** The default match compares `casefold()` of the pattern and of the searchable text.
 
 ### 6.3 Output modes and bounds
 
@@ -752,7 +773,7 @@ This is the rule obs's adapter uses.
 | `compaction_history` | the messages inside a Codex `compacted` record's `replacement_history`, which repeat earlier messages | collapsed |
 | `event_mirror` | the Codex events of §8.2 | collapsed; also outside a pattern search's default roles |
 | `duplicate_file` | a line that repeats, at the same line number, a line of an earlier-root `own` file of the same identity (`sessions/` comes before `archived_sessions/`) | collapsed into the earlier-root file |
-| `ambiguous` | a shared run whose copy cannot be told from its original (below) | not collapsed |
+| `ambiguous` | a shared run whose copy cannot be told from its original, or a fork's range whose parent is unavailable (below) | not collapsed; a turn built from it has no `final` |
 
 **`resume_history`.** Two Claude files in one project directory share record `uuid`s. The
 shared records need not be contiguous in either file. Which file holds the copy is decided
@@ -786,9 +807,15 @@ thread's id.
 - **The rule.** The records after the second `session_meta` are `fork_history` until the
   first `task_started` whose `turn_id` does not occur in the inherited thread's own
   rollout. That rollout is found by the inherited id (§5.2).
-- **Parent unavailable.** If the inherited rollout is not readable, the range up to the
-  fork's last `task_started` is `ambiguous`.
+- **Parent unavailable.** If the inherited rollout is not readable, nothing in the fork
+  marks where the copy ends. Copies are restamped at fork time, and a fork can stop after
+  copying before it starts a turn of its own. So everything after the second
+  `session_meta` is `ambiguous`, to the end of the file.
 - **Turn detection.** Copied turns are not turns of the fork; turn detection skips them.
+- **Ambiguous turns.** A turn built from an ambiguous range carries `copy: ambiguous` and
+  never has a `final`. Its last assistant text appears only as `last_assistant`, so a
+  parent's final answer is never attributed to the fork. That holds until an independent
+  boundary settles ownership, such as the inherited rollout becoming readable.
 - **Coverage.** No fixture has a fork yet (hq-c1fecb), so this rule is covered only by the
   live-store run's fork check (§14.4) until that fixture lands.
 
@@ -929,9 +956,20 @@ The first row that applies decides a turn's status.
 |---|---|---|
 | `interrupted` | `turn_aborted` (with its `reason`) | the interrupt marker after the turn's response; a prompt interrupted before any response (§9.1); or an interrupted tool result |
 | `waiting` | the turn's last call is an unanswered `request_user_input` | the last message's pending call is `AskUserQuestion`, `EnterPlanMode` or `ExitPlanMode` with no result |
-| `completed` | a final message (§9.2) | a final message (§9.2) |
+| `completed` | `task_complete` and a final message (§9.2) | a final message (§9.2) |
 | `no_final` | `task_complete` with no final message | the turn closed, by a `turn_duration` or by the next input, without a final message: its last message stopped for `end_turn` with no text, or for `tool_use` with every result present, or only synthetic messages ended it |
 | `incomplete` | `task_started` with no end before end of file or before the next `task_started` | end of file with no final message and no closing message; a live session can still append |
+
+**Codex turns need their closing event.** `completed` and `no_final` both require the
+turn's `task_complete`. A turn that ends without one is `incomplete`, even when it holds a
+`final_answer` message. That covers a turn that runs to the end of the file and one cut
+short by the next `task_started` (§9.1). Its `final_answer` message then appears as
+`last_assistant`, not as `final`.
+
+**A Claude turn at the end of a file.** A Claude turn's final `end_turn` message closes it,
+so it is `completed` even when no `turn_duration` follows yet. Its `status_basis` is
+`no_end_marker_eof`. A live session can still append a Stop-hook continuation, and a later
+run then reads that message as commentary.
 
 **Which message is final.** Only a `completed` turn has one. For every other status, the
 turn object carries `last_assistant`, the last thing the assistant said, which is never
@@ -965,24 +1003,37 @@ It gathers evidence of these kinds, strongest first:
    names the session. The ref is the task id with the note's `at`.
 2. **`successful_task_command`.** A `task_commands` row with `status` `ok`. The verb is the
    one obs records: `start`, `park`, `done`, `drop`, `review`, `concerns`, and so on.
-3. **`failed_task_command`.** A row with `status` `failed`. It is an attempt, not
-   ownership. It also covers a Claude row with `status` `unknown` when both of these hold:
-   - its paired result is marked `is_error` (basis `result_is_error`);
-   - the call's command is one `tasks` segment, or an all-`&&` chain ending with the
-     `tasks` command.
+3. **`unsuccessful_task_command`.** The task command was attempted and did not succeed.
+   Both of these must hold:
+   - the call's command is exactly one segment, the `tasks` command itself, by obs's
+     `shell_clear.chain`, imported unchanged;
+   - its result is an error: a Claude result marked `is_error` (basis `result_is_error`),
+     or an indexed `failed` row (basis `index_status`).
 
-   The chain shape comes from obs's `shell_clear.chain`, imported unchanged. It is the
-   certainty obs itself requires before it records a Codex `failed`. SL2's `CA:4`/`CA:7`
-   is the single-segment case.
-4. **`task_command`.** Any other row with `status` `unknown`, with the paired result's error
-   flag recorded.
+   It does not say whether `tasks` refused the command or something stopped it first, such
+   as a hook denial. SL2's `CA:4`/`CA:7` is the hook case. It is an attempt, not
+   ownership.
+4. **`task_command`.** Every other row, with the index status and the paired result's error
+   flag recorded. That includes:
+   - an `unknown` row;
+   - an error in a chain;
+   - an indexed `failed` row whose command is a chain.
+
+**Why a chain's error is uncertain.** A chain's result belongs to the whole chain, and no
+store records the `tasks` segment's own result.
+- `false && tasks start <id>` fails without running `tasks`.
+- `tasks start <id> && false` fails after `tasks` succeeded.
+
+obs marks a row certain for any all-`&&` chain and gives it the call's status
+(`call_evidence.py:220`, `:256`). Its `ok` is therefore sound, because every segment ran
+and succeeded. Its `failed` on a chain is not, so the reader trusts `failed` only for a
+single segment.
 
 **Why Claude rows are mostly `unknown`.** On 2026-10-23 live Claude rows were 1,223 `ok`
 and 3,478 `unknown`, with none `failed` (review).
-- **Chains.** Most `unknown` rows (2,827 calls) are successful commands in chains that
-  are not all `&&`, which obs cannot attribute (`call_evidence.py`).
-- **Errors.** 92 calls returned errors, and the chain test above admits 20 of them as
-  failures.
+- **Chains.** Most `unknown` rows (2,827 calls) are successful commands in chains that are
+  not all `&&`, which obs cannot attribute.
+- **Errors.** 92 calls returned errors; 10 of them were single `tasks` segments.
 - **Consequence.** Most Claude lifecycle commands are tier 4, so Claude ownership evidence
   rests mainly on stamps.
 
@@ -1223,7 +1274,7 @@ exercised (cases doc).
 | Case | What the reader must return | Command shape | Basis |
 |---|---|---|---|
 | SL1 | Five calls, each paired by id with its result, including the reversed pair `CA:6`/`CA:7`. One message, `msg_fx_m1`, spans blocks 0–2. Runtime model `claude-model-a`. `CA:10`'s blocks are `request_blob` copies, collapsed and counted (shown with `--copies`). `CA:16` is `unknown` in the unfiltered stream. `CA:13` is `metadata`. | `search --session CA --no-limit` | observed; the blob and the unknown kind are synthetic |
-| SL2 | `show CA:4#0` gives the call paired with the `tool_output` `CA:7#0` (`is_error`). `CA:8#0` is paired with `CA:9#0`. `CA:2` is `injected`, `CA:10` a collapsed copy, and `CA:14` `injected`. Human records are `CA:1` and `CA:15` (basis `origin`). `--task zz-000001` gives `CA:8` as `successful_task_command` (the index row is `ok`) and `CA:4` as `failed_task_command` (the index row is `unknown`; basis `result_is_error` from `CA:7`). | `search zz-000001 --session CA`; `show CA:4#0`; `search --session CA --role human`; `search --task zz-000001 --sessions` | observed shape |
+| SL2 | `show CA:4#0` gives the call paired with the `tool_output` `CA:7#0` (`is_error`). `CA:8#0` is paired with `CA:9#0`. `CA:2` is `injected`, `CA:10` a collapsed copy, and `CA:14` `injected`. Human records are `CA:1` and `CA:15` (basis `origin`). `--task zz-000001` gives `CA:8` as `successful_task_command` (the index row is `ok`) and `CA:4` as `unsuccessful_task_command` (a single `tasks` segment; the index row is `unknown`; basis `result_is_error` from `CA:7`). | `search zz-000001 --session CA`; `show CA:4#0`; `search --session CA --role human`; `search --task zz-000001 --sessions` | observed shape |
 | SL3 | XC: runtime `codex-model-b` (`XC:3`, turn `turn-c1`), creation `codex-model-a` (`XC:1`), requested `codex-model-b` (`XP:7`). Controller XP by `child_to_parent` from `XC:1`. Identity from `payload.id`. AG: runtime `claude-model-b`; `sonnet` requested; `resolvedModel` resolved, from CA's binding records. | `show XC --links`; `show agent-a0000000000000b01 --links` | observed, depth 1 |
 | SL4 | `/w/beta`: CW and CW2 in `claude-work` (work), XW in `codex-work` (work). XA has `store: archived`. Coverage: five roots searched, `codex-work` archive absent. | `search --sessions --cwd /w/beta`; `show XA` | observed; the Codex-work session is synthetic |
 | SL5 | `XA:5` is `human`, and `XA:4` appears only under `--role injected`. `CW:1` is human. `CW2:1` is a `resume_history` copy of `CW:1`, collapsed. `CW2:4` is a distinct human turn. | `search '<phrase>' --role human`; `search '<phrase>' --role injected` | observed; archived placement synthetic |
@@ -1247,6 +1298,7 @@ the live data did and did not show.
 | M01: missing file with a readable alternate | A rollout is copied into `archived_sessions/` and indexed, then the live copy is deleted. The reader reports two candidates: one `missing`, one `readable`. It reads the alternate. | Observed once (M01) |
 | A01: native archive | XA is read from `codex:archived_sessions/…` with `store: archived`. | Observed (A01) |
 | Replayed copy | A file is indexed, deleted, and replayed with `obs --state-dir <tmp> index --replay <archive copy> <root>`. The reader reads `read_path` with `store: replayed`. When the copy is then made unreadable, it reports `missing`, names the copy, and gives `unknown`. | **Unobserved live**: zero `read_path` rows on 2026-10-20 |
+| Escaped text | An explicit file whose record holds `"\u006eeedle"` gives `found` for `needle`. A malformed line holding the same escape is an `unparsed` object with `raw_match` true, and the outcome is `unknown`. | the reviewer reproduced the decoding mismatch (round 4) |
 | `not_found` | A fresh index over the home, and a term in no record, gives `not_found` when the search is scoped to a home with nothing unreadable or missing and run with `--since 2026-10-01`. The test sets the temporary index's file stamps to 2026-09-01, so the window lies inside its coverage; the test owns that index. The same term over an explicit file also gives `not_found`. | none needed |
 | Stale index | The same query, with the temporary index's last complete run aged past 2 hours, gives `unknown` with basis `stale_index`. | none needed |
 | Before the index's coverage | The same query with `--all-time`, or with a `--since` earlier than the root's coverage start, gives `unknown` with basis `before_index_coverage`. | the live coverage starts: 2026-09-18 for the Claude roots, 2026-10-20 for the Codex roots (review) |
@@ -1299,12 +1351,24 @@ The existing CA fixture covers the derived rule for files without markers.
 - a `task_started` followed by another with no end between them (`incomplete`);
 - a `task_started` at end of file (`incomplete`);
 - in the parent, a child's report `agent_message` (`injected`); in the child, its
-  controller's `agent_message` (`dispatch`).
+  controller's `agent_message` (`dispatch`);
+- a final `final_answer` message followed by another `task_started` with no
+  `task_complete` between them: `incomplete`, with no `final` and the message as
+  `last_assistant`.
+
+**Codex, a fork whose parent rollout is absent and which holds only copied history:**
+- every record after its second `session_meta` is `copy: ambiguous`;
+- its turns carry `copy: ambiguous` and no `final`;
+- the copied parent's final answer appears only as `last_assistant`.
 
 **Task evidence:**
 - One session's stamped note names it, giving `provenance_stamp` for the turn holding the
   note's time.
 - A second session only mentions the task id. It is selected only under `--mentions`.
+- Three failing calls in a third session:
+  - `tasks start <id>` alone with an error result: `unsuccessful_task_command`;
+  - `false && tasks start <id>` with an error result: `task_command`;
+  - `tasks start <id> && false` with an error result: `task_command`.
 - The task record reaches the reader as a `tasks show --json` document captured from the
   real CLI over a scratch project, served by the wrapper of §14.5. The field path is
   therefore the live one, not this spec's. hq keeps the captured document with the
@@ -1337,7 +1401,8 @@ It also checks four live cases:
   task's stamped notes name. This checks the `notes[]` field path against the real CLI.
 - **Forks.** For a sample of live forks whose parent rollout is present, the copied range
   must end where the parent's turn ids end, and the fork's own turns must keep their own
-  finals.
+  finals. Then each sampled fork is copied alone into a scratch home, without its parent.
+  There, its whole range must come out `ambiguous`, with no finals.
 
 ### 14.5 How the tests run
 
