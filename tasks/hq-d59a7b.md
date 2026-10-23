@@ -1,13 +1,15 @@
 ---
 id: hq-d59a7b
 title: "Survey live Claude stores and obs's index for successor links: count, form, age, and link-path rows"
-status: todo
+status: doing
 priority: 2
 size: xs
 complexity: low
 process: direct
+owner: main
 created: 2026-10-23T00:09:52Z
-updated: 2026-10-23T00:32:23Z
+updated: 2026-10-23T01:19:12Z
+started: 2026-10-23T01:19:12Z
 depends: []
 parent: hq-401088
 tags: []
@@ -27,3 +29,8 @@ Ideas it wakes: On completion, run `tasks note hq-1639fd --no-reviewed "<survey 
 ## References
 
 - brief (input, required, kind=brief): docs/notes/2026-10-22-claude-prune-links-brief.md — findings, rules 1-3 and the open questions
+
+## Notes
+
+- 2026-10-23T01:19:12Z (main): started
+  provenance: {"harness_session":"claude-code:38f3b682-ef1d-4f4a-a80b-80579e770420","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
