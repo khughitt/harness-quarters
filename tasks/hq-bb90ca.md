@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: session-evidence-reader
 created: 2026-10-23T16:11:45Z
-updated: 2026-10-23T17:41:31Z
+updated: 2026-10-23T17:41:32Z
 started: 2026-10-23T16:28:09Z
 completed: 2026-10-23T17:29:57Z
 closed: 2026-10-23T17:29:57Z
@@ -55,3 +55,4 @@ Verification: the SL11 self-checks fail before the fixtures exist, then pass; ju
 - 2026-10-23T17:41:29Z (main): attached: gen_sl11.py (36738 bytes): generator that writes the SL11 fixtures (python3 -I gen_sl11.py <fixtures-dir> <tasks-show-json>)
 - 2026-10-23T17:41:30Z (main): attached: capture-task.sh (1522 bytes): captures tasks show zz-000021 --json from the real CLI over an isolated scratch registry
 - 2026-10-23T17:41:30Z (main): attached: breaks.py (6227 bytes): break check: 20 targeted fixture changes, each must fail its SL11 test and pass when reverted
+- 2026-10-23T17:41:31Z (main): attached: keys.py (2201 bytes): keys-only probe of live Claude record kinds (prints no values)
