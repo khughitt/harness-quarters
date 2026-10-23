@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: hq-d05d5c-records-readers
 created: 2026-10-22T20:55:57Z
-updated: 2026-10-23T12:09:16Z
+updated: 2026-10-23T12:10:53Z
 started: 2026-10-23T11:42:30Z
 depends: [tasks-211e28]
 tags: []
@@ -30,3 +30,4 @@ tasks:docs/specs/2026-10-22-records-home-design.md §4, §7.4. session-episodes 
 - 2026-10-23T11:56:40Z (hq-d05d5c-records-readers): baseline: just test in .worktrees/hq-d05d5c-records-readers exit 0 (stages: 1024 passed, 389 passed, 1 passed)
 - 2026-10-23T11:56:40Z (hq-d05d5c-records-readers): probe (sandbox, tasks 0.4.0): tasks rename on a detached project moves <records>/<old> to <records>/<new> uncommitted in the records repo; after the checkout moves, tasks init --prefix <new> --force --records refuses (init does not relink an existing project). So rename-cutover cannot re-point a detached checkout; ruling: it reads prefix and records through tasks projects, save refuses a snapshot repository whose records lie outside it, and the CLI gap goes to tasks as feedback
 - 2026-10-23T12:09:16Z (hq-d05d5c-records-readers): review: impl round 1 — verdict: accept; findings: Critical 0, Important 0, Minor 9; reviewer: claude-code/claude-opus-5-5
+- 2026-10-23T12:10:53Z (hq-d05d5c-records-readers): ruling: rename-cutover refuses a snapshot repository whose records lie outside it instead of supporting a detached rename (design §4/§5.4 expected support). Why: rollback resets only saved repositories and tasks init cannot re-point a moved detached checkout (tasks-e9ce63). Cost if wrong: a detached project cannot use the cutover until hq-5300fd lands. Minors fixed: verify runs tasks projects at the root (RED->GREEN), precondition label. Deferred minors: hq-7255db
