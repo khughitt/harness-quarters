@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-10-23T16:11:45Z
-updated: 2026-10-23T16:11:45Z
+updated: 2026-10-23T16:11:46Z
 depends: []
 parent: hq-c411df
 tags: []
@@ -27,3 +27,8 @@ Contract: the plan section "Task 1" is the contract, including its fixture list,
 - Widening test_every_fixture_file_is_listed_by_the_cases_document to turns/: the listing test otherwise fails (plan round 1).
 
 Verification: the SL11 self-checks fail before the fixtures exist, then pass; just test passes; each new assertion fails under its targeted break (step 6). No private text in fixtures.
+
+## Notes
+
+- 2026-10-23T16:11:45Z (session-evidence-reader): gate: scoped — step of hq-c411df plan
+  provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
