@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: session-evidence-reader
 created: 2026-10-20T11:19:18Z
-updated: 2026-10-23T17:40:32Z
+updated: 2026-10-23T17:40:44Z
 started: 2026-10-23T12:40:18Z
 depends: [hq-a1c591, hq-de3e4c]
 parent: hq-cff824
@@ -105,3 +105,4 @@ Found while checking whether stamped friction reports can be traced to their ori
 - 2026-10-23T17:40:08Z (session-evidence-reader): review: impl round 2 — verdict: accept; findings: minor 4; reviewer: claude-code/claude-opus-5-5
 - 2026-10-23T17:40:32Z (session-evidence-reader): gate: verified tree:d6057f6ef57c62e0bb915d5e861ba5e5462cf946 — checks: whole branch main...HEAD (spec ae0f8ee and plan 1fea7bf unchanged at HEAD and SL11 fixtures) and just test passed on this tree (agents/bin 231 and tools 1037 and relay cutover 389 + 1) and the SL11 self-check 34 passed and git merge-tree against main merges cleanly; review: important addressed hq-b95324 reviewed-contract note written before merge, important addressed obs step 4 fork range corrected to spec 8.3 by a note on obs-d98663, minor addressed SL11 ref source and fixture deviations noted for obs, minor addressed ref_of lacks TD ESC and ESM noted for obs, minor addressed vacuous CT1 session-label assertion noted and hq-a45dd8 filed, minor addressed vendor test should compare against git ls-tree noted, minor addressed fork key version ranges restated, minor deferred spec 8.3 says no fixture forks yet pending the fork-boundary amendment, minor addressed hq-b95324 note tier wording clarified, minor addressed dot-directory wording corrected, minor deferred cited shas need a true merge which the local merge keeps; reviewer: claude-code/claude-opus-5-5
   provenance: {"harness_session":"claude-code:f7f539e5-48f4-4265-a16a-be9f26e40276","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T17:40:44Z (session-evidence-reader): retro: the long spec and plan review cycle paid off at execution, since one child carried the whole hq side and only fixture-fidelity findings surfaced. Two weaknesses: the plan hard-coded line positions and an off-by-one range (obs step 4) that only a whole-branch review cross-checking plan against spec caught, and a frozen plan cannot absorb execution-time deviations, so the handoff to obs travels as task notes. Next time, have the plan cite the cases document for refs instead of restating them.
