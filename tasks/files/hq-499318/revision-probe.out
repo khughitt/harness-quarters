@@ -1,0 +1,12 @@
+plain-git                  | git rm --cached --no-cached -f -- f                                                             | rc=0 | index: UU c; | f=MISSING | c=<<<<<<< HEAD ours ==
+plain-git                  | git rm --cached -- f                                                                            | rc=1 | index: UU c;AM f; | f=staged uncommitted  | c=<<<<<<< HEAD ours ==
+plain-git                  | git rm --cached -- --no-cached -f f                                                             | rc=128 | index: UU c;AM f; | f=staged uncommitted  | c=<<<<<<< HEAD ours ==
+plain-git                  | git show MERGE_HEAD:missing > c                                                                 | rc=128 | index: UU c;AM f; | f=staged uncommitted  | c=
+plain-git                  | tmp=$(mktemp) && git show MERGE_HEAD:c > "$tmp" && cp "$tmp" c && rm "$tmp"                     | rc=0 | index: UU c;AM f; | f=staged uncommitted  | c=theirs 
+plain-git                  | tmp=$(mktemp) && git show MERGE_HEAD:missing > "$tmp" && cp "$tmp" c && rm "$tmp"               | rc=128 | index: UU c;AM f; | f=staged uncommitted  | c=<<<<<<< HEAD ours ==
+sandbox-wt TMPDIR=unset    | tmp=$(mktemp) && git show MERGE_HEAD:c > "$tmp" && cp "$tmp" c && rm "$tmp"                     | rc=0 | index: UU c;AM f; | f=staged uncommitted  | c=theirs 
+    
+sandbox-wt TMPDIR=/mnt/ssd3/tmp | tmp=$(mktemp) && git show MERGE_HEAD:c > "$tmp" && cp "$tmp" c && rm "$tmp"                     | rc=0 | index: UU c;AM f; | f=staged uncommitted  | c=theirs 
+    
+sandbox-wt TMPDIR=/mnt/ssd3/tmp | tmp=$(mktemp) && git show MERGE_HEAD:missing > "$tmp" && cp "$tmp" c && rm "$tmp"               | rc=128 | index: UU c;AM f; | f=staged uncommitted  | c=<<<<<<< HEAD ours ==
+    fatal: path 'missing' does not exist in 'MERGE_HEAD'
