@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: main
 created: 2026-10-20T11:19:18Z
-updated: 2026-10-23T12:40:29Z
+updated: 2026-10-23T12:40:30Z
 started: 2026-10-23T12:40:18Z
 depends: [hq-a1c591, hq-de3e4c]
 parent: hq-cff824
@@ -55,3 +55,4 @@ Found while checking whether stamped friction reports can be traced to their ori
 - 2026-10-23T12:40:18Z (main): started
   provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-23T12:40:29Z (main): trial: flow-trial-1 — enrolled — flow on
+- 2026-10-23T12:40:29Z (main): arm: flow-trial-1 — unit tack-c411df — flow on
