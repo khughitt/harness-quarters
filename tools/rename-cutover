@@ -105,8 +105,28 @@ def link_report(tool):
     return result.stdout
 
 
-def project_prefix(root):
-    return tomllib.loads((Path(root) / "tasks" / ".config.toml").read_text())["prefix"]
+def project_row(root, command):
+    """The `tasks projects` row registered at `root`: its prefix, and `records`, where its
+    task records live (tasks docs/specs/2026-10-22-records-home-design.md §3.1)."""
+    root = Path(root).resolve()
+    # Run where the root is: tasks reads the working directory, which a moved checkout
+    # may have left behind in the caller's shell.
+    for row in json.loads(run("tasks", "projects", "--json", cwd=root))["projects"]:
+        if Path(row["root"]).resolve() == root:
+            return row
+    raise Stop(f"{command}: no registered project has its root at {root}")
+
+
+def project_prefix(root, command):
+    """The prefix of a snapshot repository, which must hold its own records. A detached
+    project keeps them in a records repository the snapshot does not save: rollback could
+    not reset it, and a rename there moves its records directory, which tasks cannot yet
+    re-point the moved checkout at."""
+    row = project_row(root, command)
+    if Path(row["records"]).resolve() != Path(root).resolve():
+        raise Stop(f"{command}: {root} keeps its records in {row['records']}, outside it; "
+                   f"this cutover saves and resets only the repositories it names")
+    return row["prefix"]
 
 
 def unmerged_branches(root):
@@ -120,7 +140,7 @@ def unmerged_branches(root):
 
 def preconditions(checkout, repos, tool):
     claims = json.loads(run("tasks", "claims"))["claims"]
-    retargeted = {project_prefix(root) for root in repos}
+    retargeted = {project_prefix(root, "preconditions") for root in repos}
     # A `tasks dep` write prunes dead claims from the project it writes in, and the guard
     # compares every other project's claims file byte for byte: a repository the cutover
     # retargets in must hold no claim at all, live or dead.
@@ -196,13 +216,9 @@ def save(args):
         if path.is_symlink() or not path.is_dir():
             raise Stop(f"save: {path} must be a real directory: rollback replaces it whole")
     # `tasks rename` acts on whatever project --old names; it must be this checkout.
-    prefix = project_prefix(checkout)
+    prefix = project_prefix(checkout, "save")
     if prefix != args.old:
         raise Stop(f"save: {checkout} has the prefix {prefix!r}, not --old {args.old!r}")
-    registry = config / "projects.toml"
-    registered = (tomllib.loads(registry.read_text()) if registry.exists() else {}).get("projects", {}).get(args.old)
-    if registered is None or Path(registered).resolve() != checkout:
-        raise Stop(f"save: the registry maps {args.old!r} to {registered!r}, not {checkout}")
     worktrees = checkout / ".worktrees"
     link_text = os.readlink(worktrees) if worktrees.is_symlink() else None
     storage_old = (checkout / link_text).resolve() if link_text else None
@@ -680,11 +696,11 @@ def link(args):
     print(f"linked from {new_root}")
 
 
-def sample_task(new_root, new):
+def sample_task(records, new):
     """One task under the new prefix, whose old-prefix id verify resolves through the alias."""
-    found = next((p.stem for p in (Path(new_root) / "tasks").glob(f"{new}-*.md")), None)
+    found = next((p.stem for p in (Path(records) / "tasks").glob(f"{new}-*.md")), None)
     if found is None:
-        raise Stop(f"verify: no {new}-*.md task under {Path(new_root) / 'tasks'} to resolve through the alias")
+        raise Stop(f"verify: no {new}-*.md task under {Path(records) / 'tasks'} to resolve through the alias")
     return found.split("-", 1)[1]
 
 
@@ -698,7 +714,7 @@ def verify(args):
     for root in (new_root, *(Path(r["root"]) for r in meta["repos"])):
         if run("tasks", "check", cwd=root).strip():
             raise Stop(f"verify: tasks check reports findings in {root}")
-    hex_ = sample_task(new_root, new)
+    hex_ = sample_task(project_row(new_root, "verify")["records"], new)
     run("tasks", "show", f"{old}-{hex_}", cwd=new_root)
     # The registry's location history: the old id, the old root and a path under the old
     # storage all answer the new prefix (tasks docs/specs/2026-10-06-project-resolution-design.md §4).

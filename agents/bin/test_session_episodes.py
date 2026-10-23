@@ -409,6 +409,30 @@ def test_task_copies_lists_root_and_worktrees_and_flags_unreadable(tmp_path):
     assert unreadable == [gone]
 
 
+def test_task_copies_of_a_detached_project_is_its_one_records_copy(tmp_path):
+    """The code checkout's worktrees hold no records of a detached project, even when an
+    old branch still carries a tasks/ directory; the records repository keeps no worktrees."""
+    code = git_repo(tmp_path / "ai")
+    (code / "tasks").mkdir()
+    old = tmp_path / "ai-old"
+    subprocess.run(["git", "-C", str(code), "worktree", "add", "-q", str(old), "-b", "old"], check=True)
+    (old / "tasks").mkdir()
+    records = git_repo(tmp_path / "records") / "ai"
+    (records / "tasks").mkdir(parents=True)
+    assert se.task_copies(records) == ([records / "tasks"], [])
+
+
+def test_task_copies_reads_each_records_worktree_at_the_projects_offset(tmp_path):
+    repo = git_repo(tmp_path / "records")
+    (repo / "ai" / "tasks").mkdir(parents=True)
+    wt = tmp_path / "records-wt"
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", str(wt), "-b", "wt"], check=True)
+    (wt / "ai" / "tasks").mkdir(parents=True)
+    readable, unreadable = se.task_copies(repo / "ai")
+    assert sorted(readable) == sorted([repo / "ai" / "tasks", wt / "ai" / "tasks"])
+    assert unreadable == []
+
+
 def test_read_task_unions_notes_across_copies_and_parses_provenance(tmp_path):
     root = git_repo(tmp_path / "ai")
     wt = tmp_path / "ai-wt"
@@ -1103,12 +1127,14 @@ def run_cli(argv, env):
     return code, out.getvalue(), err.getvalue()
 
 
-def cli_env(tmp_path, roots, aliases=None):
+def cli_env(tmp_path, roots, aliases=None, records=None):
     cfg = tmp_path / "cfg" / "tasks"
     cfg.mkdir(parents=True, exist_ok=True)
     text = "[projects]\n" + "".join(f'{k} = "{v}"\n' for k, v in roots.items())
     if aliases:
         text += "[aliases]\n" + "".join(f'{k} = "{v}"\n' for k, v in aliases.items())
+    if records:
+        text += "[records]\n" + "".join(f'{k} = "{v}"\n' for k, v in records.items())
     (cfg / "projects.toml").write_text(text)
     return {"XDG_CONFIG_HOME": str(tmp_path / "cfg"), "SESSION_LOGS_CLAUDE": str(tmp_path / "claude"),
             "SESSION_LOGS_CODEX": str(tmp_path / "codex"), "HOME": str(tmp_path)}
@@ -1125,6 +1151,20 @@ def test_extract_writes_episodes_candidates_and_summary(tmp_path):
     rows = [json.loads(l) for l in out.read_text().splitlines()]
     assert rows[0]["task_id"] == "ai-000001" and "text" not in rows[0]
     assert (tmp_path / "ep" / "episodes.candidates.jsonl").read_text() == ""
+
+
+def test_extract_reads_a_detached_projects_record_under_its_records(tmp_path):
+    """The registry pairs the prefix with a records directory outside the code checkout,
+    which has no tasks/ at all; the closing note lives only in the records copy."""
+    codex_story(tmp_path)
+    code = git_repo(tmp_path / "proj-ai")
+    records = git_repo(tmp_path / "records") / "ai"
+    task_file(records, ["- 2026-09-17T12:30:00Z (main): done"], status="done", completed="2026-09-17T12:30:00Z")
+    out = tmp_path / "episodes.jsonl"
+    code_rc, _, stderr = run_cli(["extract", "--out", str(out)], cli_env(tmp_path, {"ai": code}, records={"ai": records}))
+    assert code_rc == 0, stderr
+    row = json.loads(out.read_text().splitlines()[0])
+    assert row["task_id"] == "ai-000001" and row["closed_at"] == ms(1800)
 
 
 def test_show_confirm_label_round_trip(tmp_path):

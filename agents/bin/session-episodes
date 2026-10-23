@@ -563,8 +563,10 @@ class TaskRecord:
 
 
 def resolve_ids(names: list[str], env: dict) -> tuple[dict[str, Path], dict[str, str]]:
-    """Ask `tasks resolve` once about every id and prefix: the root of each project they
-    resolve to, by live prefix, and each name's canonical form (an id, or a live prefix).
+    """Ask `tasks resolve` once about every id and prefix: the records directory of each
+    project they resolve to, by live prefix, and each name's canonical form (an id, or a
+    live prefix). Records sit in the code checkout only for an in-tree project (tasks
+    docs/specs/2026-10-22-records-home-design.md §3.1).
     An id written under a retired prefix follows its alias (tasks
     docs/specs/2026-10-06-project-resolution-design.md §3). A name that does not resolve
     is left out, so its anchor counts as unregistered."""
@@ -577,25 +579,33 @@ def resolve_ids(names: list[str], env: dict) -> tuple[dict[str, Path], dict[str,
         raise SystemExit("session-episodes: the tasks CLI is not on PATH")
     if result.returncode != 0:
         raise SystemExit(f"session-episodes: tasks resolve failed: {(result.stderr or result.stdout).strip()}")
-    roots: dict[str, Path] = {}
+    records: dict[str, Path] = {}
     canonical: dict[str, str] = {}
     for row in json.loads(result.stdout)["results"]:
         if row["status"] == "resolved":
-            roots[row["prefix"]] = Path(row["root"])
+            records[row["prefix"]] = Path(row["records"])
             canonical[row["input"]] = row.get("id", row["prefix"])
-    return roots, canonical
+    return records, canonical
 
 
-def task_copies(root: Path) -> tuple[list[Path], list[Path]]:
-    """Every tasks/ directory holding this project's records: the root and each worktree."""
-    listed = subprocess.run(["git", "-C", str(root), "worktree", "list", "--porcelain"],
-                            capture_output=True, text=True)
-    if listed.returncode != 0:
-        raise SystemExit(f"session-episodes: git worktree list failed under {root}: {listed.stderr.strip()}")
-    listing = listed.stdout
-    paths = [Path(line[len("worktree "):]) for line in listing.splitlines() if line.startswith("worktree ")]
-    if root.resolve() not in [p.resolve() if p.exists() else p for p in paths]:
-        paths.insert(0, root)
+def _git(records: Path, *args: str) -> str:
+    result = subprocess.run(["git", "-C", str(records), *args], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise SystemExit(f"session-episodes: git {args[0]} {args[1]} failed under {records}: {result.stderr.strip()}")
+    return result.stdout
+
+
+def task_copies(records: Path) -> tuple[list[Path], list[Path]]:
+    """Every tasks/ directory holding this project's records: each worktree of the
+    repository holding `records`, at the records directory's place in it, as tasks
+    enumerates sibling copies (records-home design §3.1). In-tree, that is the root and
+    each of its worktrees; a detached project's records repository keeps no worktrees,
+    so it is the one copy under `records`."""
+    listing = _git(records, "worktree", "list", "--porcelain")
+    offset = _git(records, "rev-parse", "--show-prefix").strip()
+    paths = [Path(line[len("worktree "):]) / offset for line in listing.splitlines() if line.startswith("worktree ")]
+    if records.resolve() not in [p.resolve() if p.exists() else p for p in paths]:
+        paths.insert(0, records)
     readable, unreadable = [], []
     for p in paths:
         tasks_dir = p / "tasks"
@@ -638,9 +648,9 @@ def _parse_task_file(path: Path) -> tuple[dict, list[Note]]:
     return fields, notes
 
 
-def read_task(root: Path, task_id: str, copies: tuple[list[Path], list[Path]] | None = None) -> TaskRecord | None:
-    """The task's record across every copy; `copies` is a cached task_copies(root)."""
-    readable, unreadable = copies if copies is not None else task_copies(root)
+def read_task(records: Path, task_id: str, copies: tuple[list[Path], list[Path]] | None = None) -> TaskRecord | None:
+    """The task's record across every copy; `copies` is a cached task_copies(records)."""
+    readable, unreadable = copies if copies is not None else task_copies(records)
     record = None
     seen: dict[tuple[int, str], Note] = {}
     copies = []
@@ -825,7 +835,7 @@ def session_key(session: Session) -> str:
 @dataclass
 class Inputs:
     sessions: list[Session]
-    roots: dict[str, Path]
+    records: dict[str, Path]
     labels: dict[str, dict]
     anchors: dict[str, dict]
     now_ms: int
@@ -1020,13 +1030,13 @@ def build_episodes(inputs: Inputs) -> tuple[list[dict], list[dict], dict]:
         if len({s.path for s, _ in anchor.holders}) > 1:
             summary["anchors_multi_file"] += 1
         prefix = task_id.rsplit("-", 1)[0]
-        if prefix not in inputs.roots or (inputs.project and prefix != inputs.project):
-            summary["unregistered"] += prefix not in inputs.roots
+        if prefix not in inputs.records or (inputs.project and prefix != inputs.project):
+            summary["unregistered"] += prefix not in inputs.records
             continue
         if prefix not in copies:
-            copies[prefix] = task_copies(inputs.roots[prefix])
+            copies[prefix] = task_copies(inputs.records[prefix])
         if task_id not in records:
-            records[task_id] = read_task(inputs.roots[prefix], task_id, copies[prefix])
+            records[task_id] = read_task(inputs.records[prefix], task_id, copies[prefix])
         record = records[task_id]
         chosen = continuation(anchor.holders)
         if chosen is None:
@@ -1224,16 +1234,16 @@ def cmd_extract(args, env: dict) -> int:
     now = int(dt.datetime.now(dt.timezone.utc).timestamp() * 1000)
     since = now - args.since * 86_400_000 if args.since is not None else None
     sessions = scan_stores(claude_root, codex_root, since)
-    roots, canonical = resolve_ids(anchor_ids(sessions) + ([args.project] if args.project else []), env)
+    records, canonical = resolve_ids(anchor_ids(sessions) + ([args.project] if args.project else []), env)
     project = canonical.get(args.project) if args.project else None
-    if args.project and project not in roots:
+    if args.project and project not in records:
         raise SystemExit(f"session-episodes: --project {args.project} is not a registered prefix")
-    for prefix, root in roots.items():
+    for prefix, directory in records.items():
         if project and prefix != project:
             continue
-        if not (root / "tasks").is_dir():
-            raise SystemExit(f"session-episodes: registered project {prefix} has no tasks/ under {root}")
-    inputs = Inputs(sessions, roots, read_jsonl_map(labels_path), read_jsonl_map(anchors_path),
+        if not (directory / "tasks").is_dir():
+            raise SystemExit(f"session-episodes: registered project {prefix} has no tasks/ under {directory}")
+    inputs = Inputs(sessions, records, read_jsonl_map(labels_path), read_jsonl_map(anchors_path),
                     now, args.window_minutes * 60_000, since, project, canonical)
     episodes, candidates, summary = build_episodes(inputs)
     summary["roots"] = {"claude": str(claude_root), "codex": str(codex_root)}
