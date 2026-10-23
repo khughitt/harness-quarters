@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: hq-d05d5c-records-readers
 created: 2026-10-22T20:55:57Z
-updated: 2026-10-23T11:43:23Z
+updated: 2026-10-23T11:56:40Z
 started: 2026-10-23T11:42:30Z
 depends: [tasks-211e28]
 tags: []
@@ -27,3 +27,4 @@ tasks:docs/specs/2026-10-22-records-home-design.md §4, §7.4. session-episodes 
 - 2026-10-23T11:43:09Z (main): arm: flow-trial-1 — unit tack-d05d5c — flow off
 - 2026-10-23T11:43:23Z (hq-d05d5c-records-readers): resumed
   provenance: {"harness_session":"claude-code:f7a1ba88-e38e-4353-b879-b62ae0b89719","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T11:56:40Z (hq-d05d5c-records-readers): baseline: just test in .worktrees/hq-d05d5c-records-readers exit 0 (stages: 1024 passed, 389 passed, 1 passed)
