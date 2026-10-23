@@ -2,7 +2,7 @@
 
 2026-10-22. Idea: hq-1639fd. Existing retention goal: hq-401088.
 Updated after hq-cbcc14's completed investigation and follow-up scoping, and after
-hq-d59a7b's live survey.
+hq-d59a7b's live survey and hq-0b8f2c's resume probe.
 
 ## Problem
 
@@ -143,9 +143,10 @@ Gates for hq-624351:
   exist in the live store now: hq-d59a7b found two, and one of them is already past
   30 days on both sides.
 - **The obs-reader halt is a hard gate**, owned by hq-3b9c4c.
-- **Rule 2, with rule 3, is a policy gate.** Whether a resumed successor reads the
-  linked transcript is unknown, so hq should not break the link sooner (about 30 days)
-  than Claude's cleanup would (about 90).
+- **Rule 2, with rule 3, was a policy gate.** It rested on not knowing whether a
+  resumed successor reads the linked transcript. hq-0b8f2c found that it does not
+  (below), which removes the case for keeping a target only because a link points
+  into it.
 
 All three need a reviewed revision of the archive spec, covering §3.3 (links are not
 archived), §3.4's conditions, §3.4.1 and §3.4.2. They also need a revision of the plan.
@@ -193,6 +194,60 @@ Answers:
   `beliefs` target), so every dry run and apply on this host halts before any unit
   is evaluated. This is hq-3b9c4c's hard gate, now observed live.
 
+### Resume probe (hq-0b8f2c, 2026-10-22)
+
+`claude/probes/successor-link-probe.py` records the result as the capability fact
+`resume-reads-linked-subagent` (claude-code 2.1.304: `false`). It runs in a scratch
+`CLAUDE_CONFIG_DIR`, with no live store involved.
+
+How the live pairs arise. In both, N's rows carry `sessionKind: "bg"`: N is a
+background session that took over O's running background agent. In the `hq` pair this
+happened at a `session_cron_carry` attachment (2026-10-21 07:46Z). N's process then
+finished the agent's transcript through the link, and wrote `finished: true` into its
+own regular `.meta.json`. So Claude does write through the link, but only while the
+agent runs, when the target cannot be 30 days inactive.
+
+What was driven:
+
+- **Harness-made pairs: not reproduced.** `claude --bg --resume O` while O was
+  running started a copy that did not take the agent. `/background` offered to stop
+  the agent ("1 local agent will be stopped") rather than hand it over.
+- **The probe used a hand-made pair instead.** O ran one background agent to
+  completion, and N was a `--fork-session` copy of O. N's `subagents/` got an absolute
+  link to O's transcript, beside a regular copy of its `.meta.json`, which is the live
+  shape.
+- **Four resumes per run, under `strace -ff -y`.** N was resumed headless
+  (`claude -p --resume`) and in the terminal interface (`claude --resume` in a private
+  tmux server), each with the link resolving and with O's whole unit moved aside, as
+  quarantine would. The trace covered file syscalls, reads and `getdents64`.
+
+Result, the same in three runs:
+
+- **No reads.** No call named anything under N's `subagents/`, and no io_uring ring was
+  set up. The trace did see N's own transcript being read, which is the control.
+- **A dangling link is harmless to resume.** Every resume exited 0 and replied, and
+  the link was left as it was.
+- **No other reader was found.** Claude's session listing (static read of 2.1.304)
+  filters `subagents/` entries with `Dirent.isFile()`, which skips links. obs skips
+  transcript links since obs-396637.
+
+Limits:
+
+- **Opening the agent's transcript from the agent view** was not driven.
+- **Hard links may come later.** 2.1.304 already has a takeover path that hard-links
+  the transcript (copying when it cannot), and a relink sweep. On resume, the sweep
+  opens a linked target, checks it, and replaces the link with a hard link or copy.
+  Both sit behind a storage-v5 gate that was off here, and the 2.1.304 pair on this
+  host is a symbolic link. If the gate turns on, links become hard links, and two
+  units share an inode: that changes what capture, quarantine and the open-file check
+  see, and needs its own look before it lands.
+
+Recommendation: drop rule 2 and rule 3's link inventory. Resume does not justify
+keeping a target, and Claude's own cleanup already leaves such links dangling. Keep
+rule 1 (`kept:has-link`, with its re-check before release): it prevents the
+`failed:release` quarantine halt, which does not depend on whether anyone reads the
+link.
+
 ## Constraints
 
 The accepted archive design is `docs/specs/2026-09-30-session-archive-design.md`,
@@ -220,9 +275,9 @@ prune, timer change, or mutation of another session's links. The session-reader 
 
 ## Unanswered questions
 
-- **hq-0b8f2c, isolated harness probe:** does resuming a successor read its linked
-  transcript, and what happens when that link dangles? This determines the case for
-  target retention, separate from the demonstrated quarantine-release failure.
+- **hq-0b8f2c, isolated harness probe:** answered for 2.1.304 with a hand-made pair;
+  see "Resume probe" above. A harness-made pair, the agent view, and storage-v5 hard
+  links remain open.
 - **hq-d59a7b, read-only survey:** answered; see "Live survey" above. The second
   host's stores were not surveyed.
 - **Later reviewed design:** after those results, settle the retention policy and

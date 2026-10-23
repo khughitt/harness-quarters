@@ -438,3 +438,16 @@ version = "1.1.0"
 date = 2026-10-15
 evidence = "hq-24416e"
 note = "P2 unchanged: file A/medium, CLI B/high. Save current thinking high first, then current model B: zero picker refreshes, settings B/high, one shutdown refresh reading B/high. Model-first would reapply saved medium and emit a thinking change."
+
+[facts.resume-reads-linked-subagent]
+type = "boolean"
+description = "Resuming a session reads a subagent transcript that the session's subagents directory holds as a symbolic link into another session."
+probe = "claude/probes/successor-link-probe.py"
+
+[facts.resume-reads-linked-subagent.harness.claude-code]
+status = "probed"
+value = false
+version = "2.1.304"
+date = 2026-10-22
+evidence = "hq-0b8f2c"
+note = "Hand-made pair in the live shape: O with a finished background agent, N a --fork-session copy of O, N/subagents/agent-<id>.jsonl an absolute link to O's transcript beside a regular .meta.json copy. Headless (-p --resume) and terminal-interface (--resume) resumes of N, with the link resolving and with O's whole unit moved aside, under strace -ff -y over file syscalls, reads and getdents64: no call named anything under N/subagents, no io_uring ring was set up, every resume exited 0 and replied, and the link was left as it was. Three runs agreed. Not shown: a pair Claude Code makes itself (claude --bg --resume of a running session started a copy that did not take the agent; /background offered to stop it), opening the agent's transcript from the agent view, or the relink sweep, which turns symlinked agent-* names into hard links or copies on resume only behind a storage-v5 gate that was off here."
