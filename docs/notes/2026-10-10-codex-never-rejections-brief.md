@@ -125,8 +125,11 @@ throwaway repositories under a temporary `CODEX_HOME` that holds a copy of the
 
 ## 3. Constraints
 
-- `local/` stays untracked (AGENTS.md); a rules change is a host-local edit, and the
-  second host needs the same edit by hand.
+- `local/` stays untracked (AGENTS.md); a rules change is a host-local edit. The main
+  checkout's `local/` syncs between titan and europa through Dropbox: europa's
+  `~/.codex/rules` resolves to the same `local/codex/rules/default.rules`, which held
+  titan's edit byte for byte on 2026-10-23 (matching sha256), so one edit serves both.
+  A host whose `local/` does not sync this way needs the edit by hand.
 - Codex's built-in safety checks and their messages are upstream code: an upstream
   search precedes any report or workaround (global Feedback rules).
 - `git restore <path>` without `--staged` discards uncommitted work irreversibly; the
@@ -136,8 +139,10 @@ throwaway repositories under a temporary `CODEX_HOME` that holds a copy of the
 
 ## 4. Alternatives
 
-1. **Keep the rule, add a justification** (superseded by 4; the forms listed here are
-   unsafe as written, see 4) naming the permitted forms
+1. **Keep the rule, add a justification** (superseded by 4: of the forms listed here,
+   `git reset -q -- <path>` carries into 4; `git rm --cached` needs `--` and suits new
+   files only; `git checkout MERGE_HEAD -- <path>` is safe but fails the sandbox in a
+   worktree; the `MERGE_HEAD` redirect truncates the file) naming the permitted forms
    (`git restore --staged` is not among them; use `git reset -q -- <path>` or
    `git rm --cached` to unstage, and `git checkout MERGE_HEAD -- <path>` or
    `git show MERGE_HEAD:<path> > <path>` plus `git add` to take a conflict side), if
@@ -180,7 +185,8 @@ throwaway repositories under a temporary `CODEX_HOME` that holds a copy of the
      a same-named top-level file (reproduced). `:3:` (the incoming side: theirs in a
      merge, the commit being replayed in a rebase or cherry-pick) and `:2:` (the
      current side) read the conflicted index entry, and `./` makes the path relative
-     to the current directory, which is how `git status` prints it there.
+     to the current directory, which is how `git status` (default or `--short`) prints
+     it there; `git status --porcelain` prints paths from the repository root.
    - The temporary file: `git show … > <path>` truncates the destination before git
      runs, so a wrong or missing source leaves it empty (reproduced). Written to a
      temporary file first, a failed `git show` stops the chain and leaves the file
@@ -193,9 +199,15 @@ throwaway repositories under a temporary `CODEX_HOME` that holds a copy of the
      worktree's read-only index.
    - Limits of the conflict form: it suits regular files. `cp` writes through a
      symlink at `<path>`; `git show` writes the repository form, so an `eol` or LFS
-     filter leaves the working copy in that form (the staged content is still right);
-     and a file deleted on the taken side fails safely without saying that `git rm`
-     is the way to take the deletion.
+     filter leaves the working copy in that form (the staged content is still right),
+     and a `working-tree-encoding` attribute makes the separate `git add` fail after
+     the `cp` (a safe failure, from review round 2 of hq-499318; not probed). A file
+     deleted on the taken side fails safely (`git show` finds no stage); the
+     justification as extended by hq-48c5c6 names the deletion form below.
+   - No pathspec: `git reset -q --` alone also matches its `allow` and resets the whole
+     index (during a merge it drops every conflict stage; working files are untouched).
+     A prefix rule cannot require a token after `--`, so the justification as extended
+     by hq-48c5c6 says to always name the path.
 
    `execpolicy check` on that set (Codex 0.164.0): every `git restore` form resolves to
    `forbidden` and carries the text; `git reset -q -- <path>`, `git rm --cached -- <path>`
@@ -211,8 +223,8 @@ throwaway repositories under a temporary `CODEX_HOME` that holds a copy of the
    (`exec_policy.rs`, `bash.rs`, `is_dangerous_command.rs`) changed only in PowerShell
    handling and refactors that keep the Linux bash path's behaviour.
 
-   **Applied 2026-10-23 on titan** (the first host; the second host still has
-   line 45 as `prompt`). Line 45 of the live rules was replaced by the lines below.
+   **Applied 2026-10-23 on titan** (recorded then as the first host only; the file
+   syncs to europa, see §3). Line 45 of the live rules was replaced by the lines below.
    They differ from the reviewed text above only in two deferred minors of review
    round 2, folded in at application: the justification says that in a rebase `:3:`
    is your own commit being replayed, and it quotes every path and uses `cp --`.
@@ -229,14 +241,50 @@ throwaway repositories under a temporary `CODEX_HOME` that holds a copy of the
    prefix_rule(pattern=["git", "rm", "--cached", "--"], decision="allow")
    ```
 
+   **Extended 2026-10-23 by hq-48c5c6** (current text; lines 46 and 47 unchanged). The
+   justification gained three things: the restore-from-commit shape hq-ca4cb5 hit
+   (`git restore --source=<rev> --worktree -- <path>`), through the same temporary-file
+   form with `git show "<rev>:./<path>"`; the deletion side of a conflict,
+   `git rm --cached -- <path>` (an `allow`, so it skips the sandbox) then `rm -- <path>`
+   (no rule matches; sandboxed, and the worktree file is writable); and "always name
+   the path" for `git reset -q --`.
+
+   ```
+   prefix_rule(pattern=["git", "restore"], decision="forbidden", justification="git restore can overwrite uncommitted work. To unstage, run git reset -q -- <path> (always name the path: with none it resets the whole index); for a newly added file, git rm --cached -- <path> also works. To take a file's content from a conflict side or a commit, write it to a temporary file and, only if that succeeds, copy it over the file: tmp=$(mktemp) && git show \"<src>\" > \"$tmp\" && cp -- \"$tmp\" \"<path>\" && rm \"$tmp\", where <src> is :3:./<path> for theirs (:2:./<path> for ours; in a rebase :3: is your own commit being replayed) or <rev>:./<path> for a commit's version. Then run git add -- \"<path>\" as its own command. To take a side that deleted the file, run git rm --cached -- <path>, then rm -- <path>.")
+   ```
+
+   Checked:
+   - Fixture probe (plain git, and `codex sandbox -P workspace-local` in a linked
+     worktree whose admin directory is outside the writable roots). Run from a
+     subdirectory, `git show "v1:./c"` restored `sub/c` to v1 and left a same-named
+     top-level `c` alone, and `git add -- "c"` there staged `sub/c`. An executable file
+     kept mode 755. A missing source exited 128 and left the file unchanged. On a
+     modify/delete conflict, `git rm --cached -- d` then `rm -- d` turned `UD d` into
+     `D  d`, and the merge commit dropped `d`; in the worktree, the `rm` ran sandboxed.
+     Run sandboxed in the worktree, `git add` failed on the read-only index, which is
+     why it must be its own command.
+   - `codex execpolicy check` on the edited file, on titan (Codex 0.164.0) and europa
+     (0.163.0): every `git restore` form, `--source=<rev>` included, is `forbidden`
+     with the text; `git reset -q -- <path>`, `git rm --cached -- <path>` and
+     `git add -- <path>` are `allow`; `git rm --cached --no-cached -f -- <path>`,
+     `git reset --hard` and `rm -- <path>` match nothing.
+   - One live Codex turn (titan, `codex exec`, Codex 0.164.0, thread
+     `01a16896-c584-7d41-9556-80bf7313fa28`) in a linked-worktree fixture with a staged
+     new file and a merge conflict, told to try `git restore --staged -- f` and then
+     follow the refusal. The refusal showed the full text. The agent then ran
+     `git reset -q -- f` (exit 0; `f` untracked with its edit intact), the temporary-file
+     form with `:3:./c` (exit 0) and `git add -- c` (exit 0), ending at `M  c`, `?? f`.
+     The worktree's index is outside the sandbox's writable roots, so the two index
+     writes succeeding shows both `allow` rules skipped the sandbox.
+
 Probe verdict (hq-748431): 1 fails, because the justification is dropped under `never`,
 and the forms it names fail in the sandbox in a worktree; 2 is inexpressible, because
 strictest wins; 3 leaves `git restore <path>` unguarded in main checkouts and still
 fails in worktrees. Recommendation: 4. The brief's fallback (documenting
 `git reset -q -- <path>` in global guidance) fails in worktrees without the `allow`
-rule. The runtime path of 4 rests on the source read and the sandbox probe, not on a
-live model turn: the refusal text an agent sees and the sandbox skip of the new allows
-are still to be observed in one Codex session after the edit.
+rule. The runtime path of 4, first resting on the source read and the sandbox probe, was
+observed in a live Codex turn by hq-48c5c6 (above): the refusal text reached the agent
+and the new allows skipped the sandbox.
 
 ## 5. Unanswered questions
 
@@ -244,21 +292,20 @@ are still to be observed in one Codex session after the edit.
   `prompt` rule's justification does not reach the agent under `never`, while a
   `forbidden` rule's does; the unstaging and conflict-side forms pass the built-in
   checks but fail the sandbox in a linked worktree unless an `allow` rule matches them.
-- Does the alternative-4 edit read as intended in a live Codex turn (the refusal text
-  shown, `git reset -q -- <path>` succeeding in a worktree, the temporary-file conflict
-  stage form followed by a separate `git add`)? — hq-48c5c6, scoped 2026-10-23, with
-  the second-host apply, the restore-from-commit form (hq-ca4cb5) and the deferred
-  minors in goal hq-62c3b1's 2026-10-23T09:19Z note.
+- Answered by hq-48c5c6 (§4, extended rule): the alternative-4 edit reads as intended
+  in a live Codex turn; the restore-from-commit and deletion forms are named and probed;
+  europa shares the file through Dropbox. Of the deferred minors in goal hq-62c3b1's
+  2026-10-23T09:19Z note, (2) and (6) were folded in at the first apply; (1), (3), (5)
+  are corrected or recorded in this brief; (4) and (7) are handled in the justification.
 - Which layer refuses forced `rm`, and is a harness report warranted? — ops-278533.
 
 ## 6. Proposed decomposition
 
 - hq-748431 (research, under goal hq-62c3b1) — done 2026-10-22; woke hq-48c5c6 and
   hq-5b8413. hq-499318 (done) revised its rule recommendation; applied on titan.
-- hq-48c5c6 — scoped 2026-10-23 (todo, s/mid/direct): name the restore-from-commit
-  form, apply on the second host, observe one live Codex turn, weigh deferred minors.
-- hq-5b8413 — proposed as a drop: fix applied on titan; its live check is in hq-48c5c6.
-- hq-ca4cb5 — proposed as a drop: same rule as hq-48c5c6, refused before the apply;
-  its restore-from-commit form is in hq-48c5c6.
-- hq-52e1d9 — proposed as a drop: same command shape and rule as hq-48c5c6.
-- ops-278533 (existing research) — covers hq-982164, proposed as a drop.
+- hq-48c5c6 — scoped 2026-10-23 and done the same day: restore-from-commit and
+  deletion forms named, the shared file checked on both hosts, one live Codex turn
+  observed, deferred minors settled.
+- hq-5b8413 and hq-ca4cb5 — dropped 2026-10-23, covered by the fix and hq-48c5c6.
+- hq-52e1d9 — dropped 2026-10-17 as a duplicate of hq-48c5c6.
+- ops-278533 (existing research) — covers hq-982164 (dropped).
