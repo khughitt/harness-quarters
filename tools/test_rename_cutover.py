@@ -350,7 +350,49 @@ def test_save_refuses_a_checkout_the_registry_does_not_map(box, tmp_path):
     registry.write_text(registry.read_text().replace(f'ai = "{box.checkout}"', f'ai = "{copy}"'))
     result = box.save(check=False)
     assert result.returncode == 1
-    assert "the registry maps 'ai'" in result.stderr
+    assert f"save: no registered project has its root at {box.checkout}" in result.stderr
+    assert not box.snapshot.exists()
+
+
+def detached(box, name):
+    """A project `name` whose records live in the records repository beside the checkouts,
+    committed there; its code checkout holds no tasks/."""
+    records = box.sync / "records"
+    if not records.exists():
+        records.mkdir()
+        box.run("git", "init", "-q", "-b", "main", records)
+        box.run("git", "commit", "-q", "--allow-empty", "-m", "init", cwd=records)
+    code = box.sync / name
+    code.mkdir()
+    box.run("git", "init", "-q", "-b", "main", code)
+    (code / "README").write_text("x\n")
+    box.commit(code, "init")
+    box.run("tasks", "init", "--prefix", name, "--records", records, cwd=code)
+    box.commit(records, f"{name} records")
+    return code, records / name
+
+
+def test_save_refuses_a_repository_whose_records_live_in_another(box):
+    """Rollback resets only the snapshot's repositories; a retarget in a detached project
+    commits in its records repository, which it would leave renamed."""
+    code, records = detached(box, "lore")
+    box.repos.append(code)
+    result = box.save(check=False)
+    assert result.returncode == 1
+    assert f"preconditions: {code} keeps its records in {records}, outside it" in result.stderr
+    assert not box.snapshot.exists()
+
+
+def test_save_refuses_a_detached_checkout(box):
+    code, records = detached(box, "lore")
+    (code / "tools").mkdir()
+    for name in ("harness-links", "rename-cutover"):
+        shutil.copy2(TOOLS / name, code / "tools" / name)
+    box.commit(code, "the tools")
+    box.checkout, box.old, box.new, box.new_root = code, "lore", "lore2", box.sync / "lore2"
+    result = box.save(check=False)
+    assert result.returncode == 1
+    assert f"save: {code} keeps its records in {records}, outside it" in result.stderr
     assert not box.snapshot.exists()
 
 
@@ -1171,6 +1213,18 @@ def test_verify_asks_the_resolver_about_the_old_id_root_and_storage(box):
                               str(box.sync.parent / ".dropbox-work" / "ai" / ".worktrees" / "x")).stdout)["results"]
     assert [(r["status"], r["prefix"], r["via"]) for r in rows] == [
         ("resolved", "tack", "former_root"), ("resolved", "tack", "former_storage")]
+
+
+def test_verify_runs_from_a_working_directory_the_move_removed(box):
+    """An operator's shell can still stand in the old checkout path that apply moved."""
+    box.save()
+    box.forward()
+    gone = box.tmp / "gone"
+    gone.mkdir()
+    result = subprocess.run(f'cd {gone} && rmdir {gone} && {box.snapshot / "rename-cutover"} verify --snapshot {box.snapshot}',
+                            shell=True, env=box.env, text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    assert "verified" in result.stdout
 
 
 def test_verify_refuses_when_the_old_root_no_longer_resolves(box):
