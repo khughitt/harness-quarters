@@ -128,8 +128,9 @@ throwaway repositories under a temporary `CODEX_HOME` that holds a copy of the
 - `local/` stays untracked (AGENTS.md); a rules change is a host-local edit. The main
   checkout's `local/` syncs between titan and europa through Dropbox: europa's
   `~/.codex/rules` resolves to the same `local/codex/rules/default.rules`, which held
-  titan's edit byte for byte on 2026-10-23 (matching sha256), so one edit serves both.
-  A host whose `local/` does not sync this way needs the edit by hand.
+  titan's edit byte for byte on 2026-10-23 (matching sha256), so one edit serves both
+  while Dropbox runs on europa (it did then; it is not a systemd unit there). A host
+  whose `local/` does not sync this way needs the edit by hand.
 - Codex's built-in safety checks and their messages are upstream code: an upstream
   search precedes any report or workaround (global Feedback rules).
 - `git restore <path>` without `--staged` discards uncommitted work irreversibly; the
@@ -241,41 +242,77 @@ throwaway repositories under a temporary `CODEX_HOME` that holds a copy of the
    prefix_rule(pattern=["git", "rm", "--cached", "--"], decision="allow")
    ```
 
-   **Extended 2026-10-23 by hq-48c5c6** (current text; lines 46 and 47 unchanged). The
-   justification gained three things: the restore-from-commit shape hq-ca4cb5 hit
-   (`git restore --source=<rev> --worktree -- <path>`), through the same temporary-file
-   form with `git show "<rev>:./<path>"`; the deletion side of a conflict,
-   `git rm --cached -- <path>` (an `allow`, so it skips the sandbox) then `rm -- <path>`
-   (no rule matches; sandboxed, and the worktree file is writable); and "always name
-   the path" for `git reset -q --`.
+   **Extended 2026-10-23 by hq-48c5c6** (current text below; lines 46 and 47
+   unchanged). The justification gained:
+   - the restore-from-commit shape hq-ca4cb5 hit
+     (`git restore --source=<rev> --worktree -- <path>`), through the same
+     temporary-file form with `"<rev>:./<path>"` as the source;
+   - the deletion side of a conflict: `git rm --cached -- "<path>"` (an `allow`, so by
+     the rule mechanics in §2 it skips the sandbox) then `rm -- "<path>"` (no rule
+     matches; sandboxed, and the worktree file is writable), as two separate commands;
+   - "always name the path" for `git reset -q --`;
+   - after review round 1 of hq-48c5c6: a lead clause that the content and deletion
+     forms overwrite or remove the file too and serve only when that was asked (with
+     `HEAD` as the rev, the content form does what `git restore <path>` does); a guard
+     that stops the chain unless the source is a blob and `<path>` is not a symlink
+     (unguarded, a directory source exited 0, left a stray temporary file in the
+     directory and the following `git add` staged it, and a symlink at `<path>`
+     overwrote its target's uncommitted edits); the mode-600 note; that `git add`
+     replaces any staged version; that the deletion form outside a conflict deletes
+     the file and its uncommitted edits; and quoted paths throughout.
 
    ```
-   prefix_rule(pattern=["git", "restore"], decision="forbidden", justification="git restore can overwrite uncommitted work. To unstage, run git reset -q -- <path> (always name the path: with none it resets the whole index); for a newly added file, git rm --cached -- <path> also works. To take a file's content from a conflict side or a commit, write it to a temporary file and, only if that succeeds, copy it over the file: tmp=$(mktemp) && git show \"<src>\" > \"$tmp\" && cp -- \"$tmp\" \"<path>\" && rm \"$tmp\", where <src> is :3:./<path> for theirs (:2:./<path> for ours; in a rebase :3: is your own commit being replayed) or <rev>:./<path> for a commit's version. Then run git add -- \"<path>\" as its own command. To take a side that deleted the file, run git rm --cached -- <path>, then rm -- <path>.")
+   prefix_rule(pattern=["git", "restore"], decision="forbidden", justification="git restore can overwrite uncommitted work, and so can the content and deletion forms below: use them only when replacing or removing the file is what was asked. To unstage, run git reset -q -- \"<path>\" (always name the path: with none it resets the whole index); for a newly added file, git rm --cached -- \"<path>\" also works. To set one regular file (not a directory or symlink) to a conflict side or a commit's version, write it to a temporary file and copy it over only if that succeeds: src=\"<src>\" && [ \"$(git cat-file -t \"$src\")\" = blob ] && [ ! -L \"<path>\" ] && tmp=$(mktemp) && git show \"$src\" > \"$tmp\" && cp -- \"$tmp\" \"<path>\" && rm \"$tmp\", where <src> is :3:./<path> for theirs (:2:./<path> for ours; in a rebase :3: is your own commit being replayed) or <rev>:./<path> for a commit's version; a file the copy creates gets mode 600, so add back an executable bit with chmod +x. Then run git add -- \"<path>\" as its own command; it replaces any staged version. To take a conflict side that deleted the file, run git rm --cached -- \"<path>\", then rm -- \"<path>\", as two separate commands; outside a conflict this deletes the file and any uncommitted edits.")
    ```
+
+   Ruling on the trade-off (review round 1, I1): the content form is a sanctioned way to
+   overwrite a file, so the guard rests on the agent reading the lead clause.
+   Why: an agent that needs a file's content from a commit or a conflict side has no
+   other route that works in a worktree under `never`, and without one it improvises
+   (hq-ca4cb5's session did). Cost if wrong: an agent overwrites edits it was not asked
+   to discard, which the forbidden rule alone would have stopped.
+
+   Limits of the content form beyond the conflict-form limits above: a file the copy
+   creates (absent from the working tree) gets mode 600, so an executable bit is lost
+   unless restored (probed); a source that is a symlink in the repository (mode 120000)
+   is a blob, so the copy writes the link text as a regular file (not probed); and with
+   a staged version that differs from both, `git add` replaces it, which
+   `git restore --worktree` would not.
 
    Checked:
-   - Fixture probe (plain git, and `codex sandbox -P workspace-local` in a linked
-     worktree whose admin directory is outside the writable roots). Run from a
-     subdirectory, `git show "v1:./c"` restored `sub/c` to v1 and left a same-named
-     top-level `c` alone, and `git add -- "c"` there staged `sub/c`. An executable file
-     kept mode 755. A missing source exited 128 and left the file unchanged. On a
-     modify/delete conflict, `git rm --cached -- d` then `rm -- d` turned `UD d` into
-     `D  d`, and the merge commit dropped `d`; in the worktree, the `rm` ran sandboxed.
-     Run sandboxed in the worktree, `git add` failed on the read-only index, which is
-     why it must be its own command.
-   - `codex execpolicy check` on the edited file, on titan (Codex 0.164.0) and europa
-     (0.163.0): every `git restore` form, `--source=<rev>` included, is `forbidden`
-     with the text; `git reset -q -- <path>`, `git rm --cached -- <path>` and
-     `git add -- <path>` are `allow`; `git rm --cached --no-cached -f -- <path>`,
-     `git reset --hard` and `rm -- <path>` match nothing.
+   - Fixture probe of the first extension (plain git, and `codex sandbox -P
+     workspace-local` in a linked worktree whose admin directory is outside the writable
+     roots). Run from a subdirectory, `git show "v1:./c"` restored `sub/c` to v1 and
+     left a same-named top-level `c` alone, and `git add -- "c"` there staged `sub/c`.
+     An existing executable file kept mode 755. A missing source exited 128 and left the
+     file unchanged. On a modify/delete conflict (`UD`), `git rm --cached -- d` then
+     `rm -- d` turned `UD d` into `D  d`, and the merge commit dropped `d`; in the
+     worktree, the `rm` ran sandboxed and `git rm --cached` ran unsandboxed (plain git,
+     standing in for the allow's sandbox skip). Run sandboxed in the worktree, `git add`
+     failed on the read-only index, which is why it must be its own command.
+   - Fixture probe of the guarded form (current text): a regular file from a
+     subdirectory and the `:3:./c` conflict side were restored, plain and sandboxed in
+     the worktree; a directory source, a symlink at `<path>` and a missing source each
+     stopped with exit 1, changed nothing and left no temporary file; a recreated file
+     came out mode 600.
+   - `codex execpolicy check` on the current file, on titan (Codex 0.164.0) and europa
+     (0.163.0; `~/.codex/rules` resolves to the synced `local/codex/rules`, the loaded
+     file's sha256 matches titan's, and Dropbox is running): every `git restore` form,
+     `--source=<rev>` included, is `forbidden` with the text; `git reset -q -- <path>`,
+     `git rm --cached -- <path>` and `git add -- <path>` are `allow`;
+     `git rm --cached --no-cached -f -- <path>`, `git reset --hard` and `rm -- <path>`
+     match nothing. The round-1 edit reached europa within about a minute.
    - One live Codex turn (titan, `codex exec`, Codex 0.164.0, thread
-     `01a16896-c584-7d41-9556-80bf7313fa28`) in a linked-worktree fixture with a staged
-     new file and a merge conflict, told to try `git restore --staged -- f` and then
-     follow the refusal. The refusal showed the full text. The agent then ran
-     `git reset -q -- f` (exit 0; `f` untracked with its edit intact), the temporary-file
-     form with `:3:./c` (exit 0) and `git add -- c` (exit 0), ending at `M  c`, `?? f`.
-     The worktree's index is outside the sandbox's writable roots, so the two index
-     writes succeeding shows both `allow` rules skipped the sandbox.
+     `01a16896-c584-7d41-9556-80bf7313fa28`), against the first extension's text
+     (before review round 1), in a linked-worktree fixture with a staged new file and a
+     merge conflict, told to try `git restore --staged -- f` and then follow the
+     refusal. The refusal showed the full text. The agent then ran `git reset -q -- f`
+     (exit 0; read afterwards, `f` was untracked with its edit intact), the
+     temporary-file form with `:3:./c` (exit 0) and `git add -- c` (exit 0), ending at
+     `M  c`, `?? f`. The worktree's index is outside the sandbox's writable roots, so
+     those two index writes succeeding shows that `git reset -q --` (new) and `git add`
+     (existing) skipped the sandbox. `git rm --cached --` was not run live, and the
+     round-1 text was checked by the probes and `execpolicy check` only.
 
 Probe verdict (hq-748431): 1 fails, because the justification is dropped under `never`,
 and the forms it names fail in the sandbox in a worktree; 2 is inexpressible, because
@@ -284,7 +321,7 @@ fails in worktrees. Recommendation: 4. The brief's fallback (documenting
 `git reset -q -- <path>` in global guidance) fails in worktrees without the `allow`
 rule. The runtime path of 4, first resting on the source read and the sandbox probe, was
 observed in a live Codex turn by hq-48c5c6 (above): the refusal text reached the agent
-and the new allows skipped the sandbox.
+and the `git reset -q --` allow skipped the sandbox.
 
 ## 5. Unanswered questions
 
@@ -293,10 +330,14 @@ and the new allows skipped the sandbox.
   `forbidden` rule's does; the unstaging and conflict-side forms pass the built-in
   checks but fail the sandbox in a linked worktree unless an `allow` rule matches them.
 - Answered by hq-48c5c6 (§4, extended rule): the alternative-4 edit reads as intended
-  in a live Codex turn; the restore-from-commit and deletion forms are named and probed;
-  europa shares the file through Dropbox. Of the deferred minors in goal hq-62c3b1's
-  2026-10-23T09:19Z note, (2) and (6) were folded in at the first apply; (1), (3), (5)
-  are corrected or recorded in this brief; (4) and (7) are handled in the justification.
+  in a live Codex turn (unstaging and the conflict side; the later text was checked by
+  fixture probes and `execpolicy check`, not live); the restore-from-commit and
+  deletion forms are named and fixture-probed (the deletion form on a `UD` conflict
+  only); europa shares the file through Dropbox. Of the deferred minors in goal
+  hq-62c3b1's 2026-10-23T09:19Z note, (2) was folded in at the first apply and (6) there
+  and in review round 1 of hq-48c5c6, which quoted the remaining paths; (1), (3), (5)
+  are corrected or recorded in this brief; (4) and (7) are handled in the
+  justification.
 - Which layer refuses forced `rm`, and is a harness report warranted? — ops-278533.
 
 ## 6. Proposed decomposition
