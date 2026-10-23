@@ -1,7 +1,8 @@
 # Claude transcript links and archive pruning — brief
 
 2026-10-22. Idea: hq-1639fd. Existing retention goal: hq-401088.
-Updated after hq-cbcc14's completed investigation and follow-up scoping.
+Updated after hq-cbcc14's completed investigation and follow-up scoping, and after
+hq-d59a7b's live survey.
 
 ## Problem
 
@@ -76,8 +77,8 @@ What the current protocol does:
     obs still holds for a link path folds onto its target's key whenever the link
     resolves. The two rows differ at least in `missing_since_ms`, which raises
     `ObsUnavailable`, and that stops dry runs and applies alike.
-  - **Evidence:** reproduced by the reviewer with a stub runner. That obs keeps such
-    rows is taken from obs-396637's record; the live index was not checked.
+  - **Evidence:** reproduced by the reviewer with a stub runner, and confirmed against
+    the live index by hq-d59a7b (below): it fires today.
   - **Scope:** rules 1–3 below do not fix this halt. It belongs to hq-3b9c4c's reader
     rewrite: key rows by exact path or by obs's device and inode, and ignore link-path
     rows.
@@ -139,8 +140,8 @@ Gates for hq-624351:
 
 - **Rule 1 is a hard gate before any `--apply`.** Without it, the first inactive
   linking unit halts every later run, and the dry run does not show it coming. Pairs
-  exist in the live store's history: two live examples (2026-09-06 and 2026-10-21) and
-  four pairs in obs's index. This pass did not survey the live store.
+  exist in the live store now: hq-d59a7b found two, and one of them is already past
+  30 days on both sides.
 - **The obs-reader halt is a hard gate**, owned by hq-3b9c4c.
 - **Rule 2, with rule 3, is a policy gate.** Whether a resumed successor reads the
   linked transcript is unknown, so hq should not break the link sooner (about 30 days)
@@ -156,6 +157,41 @@ Check: `just test` in the task worktree at 4f40c52 (all four segments): 228, 100
 non-regular `<sid>.jsonl` or `<sid>/` sibling, lexical-only matching in rule 3,
 where rule 3 sits against `before_delete`, inventory error handling, and the obs
 reader's wording and fix) are carried to hq-1639fd for the spec revision.
+
+### Live survey (hq-d59a7b, 2026-10-22)
+
+Read-only, on the primary host only. `find -type l` under `~/.claude/projects` and
+`~/.claude-work/projects`, with `readlink` and `stat`; then one `obs --json
+index-state` snapshot (contract 2, schema 15, 25,475 rows) passed to
+`inputs.load_obs_state` through a stub runner. Nothing was pruned or written.
+
+| Store | Links | N (linking unit) | O (target unit) | Form | Resolves | Unit ages |
+|---|---|---|---|---|---|---|
+| `claude` | 2 | `beliefs` `753f8b81` | `f9e4fdf9` | absolute | yes | both 46 days |
+| | | `hq` `0835d699` | `393db06d` | absolute | yes | both under 1 day |
+| `claude-work` | 0 | | | | | |
+
+Both stores were readable; `claude-work` (24 projects, 915 transcripts) holds no
+link, which is an observed zero. There are no dangling links in either store: the
+2026-09-19 one is gone. Each link is a subagent transcript,
+`<N>/subagents/agent-<id>.jsonl`, pointing to the same name under `<O>`. In both
+pairs the target kept growing after the link was written (link 03:46, target 07:58
+on 2026-10-21; 04:53 and 04:56 on 2026-09-06), which fits a running agent handed to
+a successor.
+
+Answers:
+
+- **Form:** Claude writes absolute links, in the two observed. The relative fixtures
+  remain useful but do not describe a form seen live.
+- **Age:** the `beliefs` pair is already past the 30-day horizon on both sides. A
+  first apply would prune O and break N's link, then strand N in quarantine
+  (`failed:release`), halting every later run. Rule 1 is a gate on real data, not a
+  hypothetical.
+- **obs reader:** obs still holds a row for each link path, marked missing since
+  2026-10-21 06:00, beside the target's row with `missing_since_ms` null. Today
+  `load_obs_state` raises `ObsUnavailable` (`conflicting index-state rows` for the
+  `beliefs` target), so every dry run and apply on this host halts before any unit
+  is evaluated. This is hq-3b9c4c's hard gate, now observed live.
 
 ## Constraints
 
@@ -187,9 +223,8 @@ prune, timer change, or mutation of another session's links. The session-reader 
 - **hq-0b8f2c, isolated harness probe:** does resuming a successor read its linked
   transcript, and what happens when that link dangles? This determines the case for
   target retention, separate from the demonstrated quarantine-release failure.
-- **hq-d59a7b, read-only survey:** how many successor links exist now, in what form
-  and age range, and do current obs rows trigger the realpath conflict? The fixture
-  results do not answer live-store prevalence or current index state.
+- **hq-d59a7b, read-only survey:** answered; see "Live survey" above. The second
+  host's stores were not surveyed.
 - **Later reviewed design:** after those results, settle the retention policy and
   revise archive §§3.3–3.4.2 and the implementation plan. Coordinate with
   hq-3b9c4c's readiness revision. The last-scan race and the carried review minors
