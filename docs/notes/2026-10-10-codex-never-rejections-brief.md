@@ -96,14 +96,16 @@ throwaway repositories under a temporary `CODEX_HOME` that holds a copy of the
   `Unable to create '…/index.lock': Read-only file system`: `git reset -q -- <path>`,
   `git rm --cached`, `git checkout MERGE_HEAD -- <path>`, and
   `git show MERGE_HEAD:<path> > <path> && git add <path>`. Only the file write,
-  `git show MERGE_HEAD:<path> > <path>` on its own, succeeds. In a main checkout every
+  `git show MERGE_HEAD:<path> > <path>` on its own, succeeds (but truncates `<path>`
+  first, so it is not a safe form; see §4). In a main checkout every
   form passes. On this host, 563 Codex rollout files contain that `index.lock` error
   (from `git rm`, `git apply --cached` and chained `git -C … commit && …`, among
   others), so worktree sessions hit it routinely.
 - **A redirection keeps a script from being split.** `bash.rs` rejects redirections,
   so `git show X:p > p && git add p` is judged as one unmatched `bash -lc` script and
   runs entirely in the sandbox. Issued as two calls, `git add p` matches its allow
-  rule and skips the sandbox.
+  rule and skips the sandbox. (Review of hq-748431 found the redirect form unsafe;
+  §4 gives the temporary-file form.)
 - **Upstream.** openai/codex#41068 (open, 2026-08-27) reports the same dead end
   (`prompt` rules hard-rejected under `never`, a message naming neither the rule nor an
   action) and asks, among other remedies, for the matched rule and guidance. It covers
@@ -125,7 +127,8 @@ throwaway repositories under a temporary `CODEX_HOME` that holds a copy of the
 
 ## 4. Alternatives
 
-1. **Keep the rule, add a justification** naming the permitted forms
+1. **Keep the rule, add a justification** (superseded by 4; the forms listed here are
+   unsafe as written, see 4) naming the permitted forms
    (`git restore --staged` is not among them; use `git reset -q -- <path>` or
    `git rm --cached` to unstage, and `git checkout MERGE_HEAD -- <path>` or
    `git show MERGE_HEAD:<path> > <path>` plus `git add` to take a conflict side), if
@@ -138,24 +141,66 @@ throwaway repositories under a temporary `CODEX_HOME` that holds a copy of the
    Rejected for now: it removes the only mechanical guard on an irreversible command.
 
 4. **Forbid with a justification, and allow the index-only forms** (added after the
-   hq-748431 probe). Change line 45 to `decision="forbidden"` with a justification
-   that names the permitted forms, and add `allow` rules for
-   `["git", "reset", "-q", "--"]` and `["git", "rm", "--cached"]` so those forms skip
-   the sandbox and can write a worktree's index:
+   hq-748431 probe, revised by hq-499318 after two review rounds). Change line 45 to
+   `decision="forbidden"` with a justification that names the permitted forms, and add
+   `allow` rules, each ending in the option terminator `--`, so those forms skip the
+   sandbox and can write a worktree's index:
 
    ```
-   prefix_rule(pattern=["git", "restore"], decision="forbidden", justification="git restore can overwrite uncommitted work. To unstage, run git reset -q -- <path> (or git rm --cached <path> for a new file). To take one side of a conflict, run git show MERGE_HEAD:<path> > <path> as its own command, then git add <path>.")
+   prefix_rule(pattern=["git", "restore"], decision="forbidden", justification="git restore can overwrite uncommitted work. To unstage, run git reset -q -- <path>; for a newly added file, git rm --cached -- <path> also works. To take one side of a conflict, write git show :3:./<path> (theirs; :2:./<path> for ours) to a temporary file and, only if that succeeds, copy it over the file: tmp=$(mktemp) && git show :3:./<path> > \"$tmp\" && cp \"$tmp\" \"<path>\" && rm \"$tmp\". Then run git add <path> as its own command.")
    prefix_rule(pattern=["git", "reset", "-q", "--"], decision="allow")
-   prefix_rule(pattern=["git", "rm", "--cached"], decision="allow")
+   prefix_rule(pattern=["git", "rm", "--cached", "--"], decision="allow")
    ```
 
-   `execpolicy check` on that set: every `git restore` form resolves to `forbidden`
-   with the text; `git reset -q -- <path>` and `git rm --cached -r -f .` resolve to
-   `allow`; `git reset --hard` and `git reset -q --hard` match nothing (a `--hard`
-   after `--` is a pathspec). Both allowed forms only touch the index. Under `never`,
+   Why each detail is there:
+   - The terminator in both allows: a prefix rule matches leading tokens and ignores
+     what follows, so an unterminated `["git", "rm", "--cached"]` also allows
+     `git rm --cached --no-cached -f -- <path>`, which deletes the working file,
+     uncommitted content included (reproduced by review round 1 of hq-748431 and by
+     hq-499318). After `--`, git reads everything as a pathspec, so no later option
+     can widen either command. A wide pathspec still can (`git rm --cached -- ':(top)*'`
+     stages the deletion of every file), but only in the index.
+   - `git reset -q -- <path>` is the unstaging form: it unstages a tracked file and a
+     new file alike, with or without a first commit, and leaves the working file
+     intact. `git rm --cached -- <path>` is offered for new files only: on a tracked
+     file it stages a deletion rather than an unstage (`D` plus `??`, whether or not the
+     edit was staged), which a following `git commit` would land; on a new file with
+     edits on top of what is staged it refuses (exit 1, nothing lost).
+   - The stage path `:3:./<path>`: `MERGE_HEAD:<path>` is read from the repository
+     root and exists only during a merge, so run from a subdirectory it silently copied
+     a same-named top-level file (reproduced). `:3:` (the incoming side: theirs in a
+     merge, the commit being replayed in a rebase or cherry-pick) and `:2:` (the
+     current side) read the conflicted index entry, and `./` makes the path relative
+     to the current directory, which is how `git status` prints it there.
+   - The temporary file: `git show … > <path>` truncates the destination before git
+     runs, so a wrong or missing source leaves it empty (reproduced). Written to a
+     temporary file first, a failed `git show` stops the chain and leaves the file
+     untouched (the temporary file is left behind). `cp` onto an existing file keeps
+     its mode (probed with an executable file). The chain has a redirection, so Codex
+     runs it whole in the sandbox, where both the temporary file and the worktree file
+     are writable (probed with `TMPDIR` unset and set).
+   - `git add <path>` as its own command: alone it matches its `allow` rule and skips
+     the sandbox; chained after a redirection it would run sandboxed and fail on a
+     worktree's read-only index.
+   - Limits of the conflict form: it suits regular files. `cp` writes through a
+     symlink at `<path>`; `git show` writes the repository form, so an `eol` or LFS
+     filter leaves the working copy in that form (the staged content is still right);
+     and a file deleted on the taken side fails safely without saying that `git rm`
+     is the way to take the deletion.
+
+   `execpolicy check` on that set (Codex 0.164.0): every `git restore` form resolves to
+   `forbidden` and carries the text; `git reset -q -- <path>`, `git rm --cached -- <path>`
+   and `git rm --cached -- --no-cached -f <path>` (pathspecs only) resolve to `allow`;
+   `git rm --cached --no-cached -f -- <path>`, `git rm --cached -f -- <path>`,
+   `git rm --cached <path>`, `git reset --hard` and `git reset -q --hard` match
+   nothing, so they keep today's behaviour (sandboxed under `never`). `execpolicy
+   check` does not split a `bash -lc` script, so it says nothing about the chained
+   conflict form; that rests on `bash.rs` and the sandbox probe. Under `never`,
    `forbidden` and `prompt` refuse alike, so nothing is lost while the global policy
    stays `never`; a session run under `on-request` would no longer be offered the
-   prompt.
+   prompt. Between `rust-v0.163.0` and `rust-v0.164.0`, the source §2 relies on
+   (`exec_policy.rs`, `bash.rs`, `is_dangerous_command.rs`) changed only in PowerShell
+   handling and refactors that keep the Linux bash path's behaviour.
 
 Probe verdict (hq-748431): 1 fails, because the justification is dropped under `never`,
 and the forms it names fail in the sandbox in a worktree; 2 is inexpressible, because
@@ -173,7 +218,8 @@ are still to be observed in one Codex session after the edit.
   `forbidden` rule's does; the unstaging and conflict-side forms pass the built-in
   checks but fail the sandbox in a linked worktree unless an `allow` rule matches them.
 - Does the alternative-4 edit read as intended in a live Codex turn (the refusal text
-  shown, `git reset -q -- <path>` succeeding in a worktree)? — the first session
+  shown, `git reset -q -- <path>` succeeding in a worktree, the temporary-file conflict
+  stage form followed by a separate `git add`)? — the first session
   after the edit; hq-48c5c6 and hq-5b8413 carry it.
 - Which layer refuses forced `rm`, and is a harness report warranted? — ops-278533.
 
