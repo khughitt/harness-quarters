@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: probe-successor-link
 created: 2026-10-23T00:09:51Z
-updated: 2026-10-23T02:07:02Z
+updated: 2026-10-23T02:14:13Z
 started: 2026-10-23T01:33:10Z
 depends: []
 parent: hq-401088
@@ -40,3 +40,4 @@ Ideas it wakes: On completion, run `tasks note hq-1639fd --no-reviewed "<finding
 - 2026-10-23T01:38:27Z (probe-successor-link): static read of Claude Code 2.1.304 (also 2.1.296/2.1.302): an [adopt] handoff hard-links agent-<id>.jsonl/.meta.json into the successor (copy fallback), and a 'relink sweep' on resume converts symlinked agent-* names in the session's subagents/ to hard links or copies, gated on storageV5 (z() && storageV5). The live hq pair was linked under 2.1.304 yet is a symlink, so the sweep/adopt path is not what ran here. Session listing filters subagents/ entries with Dirent.isFile(), skipping symlinks.
 - 2026-10-23T02:06:55Z (probe-successor-link): attached: successor-link-probe-2026-10-22.jsonl (3345 bytes): Final successor-link-probe run on Claude Code 2.1.304 at 7107937: four resumes (headless and interactive, link resolving and dangling), outcome false
 - 2026-10-23T02:07:02Z (probe-successor-link): probe at 7107937: hand-made pair (O finished background agent, N --fork-session copy, absolute link + regular meta in N/subagents), 4 resumes per run (headless -p --resume and TUI --resume in private tmux; link resolving and O's unit moved aside) under strace -ff -y: no syscall named anything under N/subagents, no io_uring ring, all exited 0 and replied, link unchanged; 3 runs agreed, outcome false. Harness-made pair not reproduced: claude --bg --resume of a running O started a copy without the agent; /background offered to stop it. Live pairs are bg-session takeovers (sessionKind bg, session_cron_carry). just test: 228, 1017, 389, 1 passed. Review dispatched.
+- 2026-10-23T02:14:13Z (probe-successor-link): review: impl round 1 — verdict: revise; findings: Critical 1, Important 3, Minor 13; reviewer: claude-code/claude-opus-5-5
