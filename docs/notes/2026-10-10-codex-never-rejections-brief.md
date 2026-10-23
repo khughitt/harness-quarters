@@ -2,7 +2,8 @@
 
 Ideas: hq-48c5c6 (git-index unstaging rejected), hq-982164 (forced-remove cleanup
 rejected), hq-5b8413 (conflict-resolution restore rejected). Scoped 2026-10-10;
-hq-5b8413 added 2026-10-11; hq-52e1d9 (a third unstaging refusal) added 2026-10-17.
+hq-5b8413 added 2026-10-11; hq-52e1d9 (a third unstaging refusal) added 2026-10-17;
+hq-ca4cb5 (a restore-from-commit refusal) added 2026-10-23.
 
 ## 1. Problem
 
@@ -46,6 +47,14 @@ it is an upstream behaviour recorded and worked around once.
   `prompt` on `["git", "restore"]` (confirmed by the probe below). The binary
   shows `prefix_rule` accepts a `justification`; under `never` the probe found that a
   `prompt` rule's text never reaches the agent, while a `forbidden` rule's does.
+- hq-ca4cb5 (ops, 2026-10-23, Codex 0.163.0) is a fourth instance, a new shape:
+  `git restore --source=0fe87a6 --worktree -- identity-mirror.toml
+  instructions/fragments/projects.md` in an ops worktree, refused at 01:19Z (chained
+  with `git commit`) and 01:34Z (alone) with the same message, matching line 45. The
+  user had authorized the restore; under `never` no route exists to act on that
+  (upstream openai/codex#41068). Both refusals predate the titan apply (§4); the
+  applied justification names unstaging and conflict sides but not restoring a path
+  from a commit, which the temporary-file form covers with `git show "<rev>:./<path>"`.
 - hq-982164 is the forced-`rm` refusal already reported three times in ops
   (ops-75b29a canonical, ops-7933db, ops-97a39d) and once in lore (lore-304804, which
   attributes it to Codex's built-in exec policy refusing any forced `rm` under
@@ -237,13 +246,19 @@ are still to be observed in one Codex session after the edit.
   checks but fail the sandbox in a linked worktree unless an `allow` rule matches them.
 - Does the alternative-4 edit read as intended in a live Codex turn (the refusal text
   shown, `git reset -q -- <path>` succeeding in a worktree, the temporary-file conflict
-  stage form followed by a separate `git add`)? — the first session
-  after the edit; hq-48c5c6 and hq-5b8413 carry it.
+  stage form followed by a separate `git add`)? — hq-48c5c6, scoped 2026-10-23, with
+  the second-host apply, the restore-from-commit form (hq-ca4cb5) and the deferred
+  minors in goal hq-62c3b1's 2026-10-23T09:19Z note.
 - Which layer refuses forced `rm`, and is a harness report warranted? — ops-278533.
 
 ## 6. Proposed decomposition
 
-- hq-748431 (research, under goal hq-62c3b1) — wakes hq-48c5c6 and hq-5b8413, each
-  holding a `depends` edge on it since 2026-10-17.
+- hq-748431 (research, under goal hq-62c3b1) — done 2026-10-22; woke hq-48c5c6 and
+  hq-5b8413. hq-499318 (done) revised its rule recommendation; applied on titan.
+- hq-48c5c6 — scoped 2026-10-23 (todo, s/mid/direct): name the restore-from-commit
+  form, apply on the second host, observe one live Codex turn, weigh deferred minors.
+- hq-5b8413 — proposed as a drop: fix applied on titan; its live check is in hq-48c5c6.
+- hq-ca4cb5 — proposed as a drop: same rule as hq-48c5c6, refused before the apply;
+  its restore-from-commit form is in hq-48c5c6.
 - hq-52e1d9 — proposed as a drop: same command shape and rule as hq-48c5c6.
 - ops-278533 (existing research) — covers hq-982164, proposed as a drop.
