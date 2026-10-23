@@ -1,8 +1,13 @@
 # Session evidence reader: `session-logs search` and `show`
 
-Status: draft for review, revision 2, 2026-10-23. Revision 1 (ce66d61) went through a
-fresh-context agent review: one critical finding, 12 important and 14 minor. Revision 2
-addresses them all. The largest change is D6: the task is no longer moved to obs.
+Status: draft for review, revision 3, 2026-10-23.
+- **Revision 1** (ce66d61) went through a fresh-context agent review: one critical finding,
+  12 important and 14 minor.
+- **Revision 2** (c21021e) addressed them. Its largest change is D6: the task is no longer
+  moved to obs. Its re-review found 5 important findings and 12 minor.
+- **Revision 3** addresses those. Claude turns now end at Claude's own turn-end records.
+  Codex inter-agent reports are no longer dispatches. `not_found` is bounded by the index's
+  coverage start. The obs README waits for Stage B.
 Task: hq-c411df (goal hq-cff824)
 Inputs: the store-reach brief (`docs/notes/2026-10-20-session-store-reach-brief.md`), the
 session-log survey (`docs/notes/2026-10-20-session-log-survey.md`, hq-de3e4c), the index
@@ -74,11 +79,17 @@ is a new obs entry point, `session_logs.py`. It is installed later as `session-l
   they apply:
   - help on stdout;
   - exit codes 0, 1 and 2, with the error object on stderr (§6.6);
-  - the vocabulary's option names and value grammars (`--limit/-n`, `--sort`/`--reverse`,
-    `--since`/`--until` taking `when`).
+  - the vocabulary's option names and value grammars: `--limit/-n` takes a positive
+    integer, `--sort`/`--reverse` set order, and `--since`/`--until` take `when`.
 
-  When it becomes a command of the obs CLI, it joins the table as a protocol row naming
-  `session-logs/1`.
+  Three options are the reader's own, outside the vocabulary: `--no-limit`, `--all-time`
+  and `--state-dir`.
+
+  There is no `--json`. Its vocabulary meaning is exactly one JSON value, and the reader
+  always writes the stream.
+
+  When the reader becomes a command of the obs CLI, it joins the table as a protocol row
+  naming `session-logs/1`.
 
 **D3. Local-first, with explicit unavailability.** The reader reads only these sources:
 - this host's six store roots;
@@ -124,12 +135,25 @@ root. Its body says it "scopes the design and handoff; implementation tasks foll
 reviewed plan."
 
 When the plan is approved:
-- **hq's steps.** The plan's hq steps (§14.3: the SL11 and control fixtures) are filed as
-  this task's children. They share its unit and its worktree.
-- **The obs build.** One new obs task carries Stage A's obs steps. It cites this spec and
-  the plan at their frozen hq commits, it is `--process direct` because the reviewed plan
-  settles the work, and it depends on hq's fixture step. It is a separate unit with its own
-  arm.
+- **hq's steps.** The plan's hq steps carry `Task N:` headings and are filed as this task's
+  children. They share its unit and its worktree. Today there is one: the SL11 fixtures
+  (§14.3).
+- **The obs build: its plan.** The plan gives the obs build's steps headings of the form
+  `obs step N:`. `tasks check` treats only `Task N:` headings as steps, so these raise no
+  `unlinked_step` warning in hq.
+- **The obs build: its task.** One new obs task carries those steps.
+  - It cites this spec and the plan by hq commit and path.
+  - It is `--process direct`, because the reviewed plan settles the work.
+  - It has no parent. Under obs-f5710b, whose process is set, trial-arm would place it in
+    that unit.
+  - It depends on this task, and vendors the fixtures from hq's main checkout after this
+    branch merges. That way it takes the fixtures as reviewed in this task's integration
+    review.
+  - It is a separate unit with its own arm. Whichever arm it draws, its design and plan
+    were made under flow on.
+- **obs's planned-work rule.** obs's `AGENTS.md` requires a reviewed spec and plan before
+  planned implementation. That is met in substance: both pass flow's human-judged gates
+  here, and the obs task cites them by commit and path.
 - **Stage B.** Recorded as notes on the existing deferred tasks (obs-f5710b, obs-081ded,
   hq-19580c), not as new tasks.
 - **hq-b95324.** Before this branch merges, `tasks note hq-b95324 --no-reviewed` records
@@ -203,12 +227,12 @@ blocks yields one object.
 | `at` | the record's timestamp, or `null` (a request blob has none) |
 | `turn` | the turn's ref (§9.1) |
 | `role` | one of `human`, `assistant`, `tool_call`, `tool_output`, `injected`, `dispatch`, `metadata`, `unknown` (§8) |
-| `role_basis` | `origin`, `local_command`, `prefix_rule`, `structure` (the record's type or path decides) or `kind` |
+| `role_basis` | `origin`, `local_command`, `prefix_rule`, `agent_path` (§8.2), `structure` (the record's type or path decides) or `kind` |
 | `kind`, `block_type` | the native record kind (`assistant`, `attachment/queued_command`, `api-request-blob`, `response_item/message`, `event_msg/item_completed/AgentMessage`, …) and block type (`text`, `tool_use`, `tool_result`, `thinking`, `input_text`, `encrypted_content`, …) |
 | `origin_kind`, `prompt_source`, `phase`, `stop_reason`, `message_id` | the native values when recorded: Claude `origin.kind`, `promptSource`, `message.stop_reason`, `message.id`; Codex `phase` |
 | `queued` | true for a Claude human message delivered mid-turn as a `queued_command` attachment |
 | `synthetic` | true for a Claude assistant record whose model is `<synthetic>` |
-| `copy` | `request_blob`, `resume_history`, `fork_history`, `event_mirror`, `duplicate_file` or `ambiguous` (§8.3), with `original` when the original's ref is known |
+| `copy` | `request_blob`, `resume_history`, `fork_history`, `compaction_history`, `event_mirror`, `duplicate_file` or `ambiguous` (§8.3), with `original` when the original's ref is known |
 | `call` | `{id, tool, peer, is_error, command, status}`: the call id; the tool name; the paired call or result ref; whether the result is an error (results only); the shell command, when the input is one; and a call with no result is `status: pending` |
 | `dispatch` | `{kind: "sdk_dispatch", call}` from `parent_tool_use_id`; it names a call, never a session (SL9) |
 | `execution` | for a Codex `CommandExecution` item: `{command, exit_code, cwd, status}` |
@@ -240,7 +264,8 @@ blocks yields one object.
 | `inputs` | the turn's input records, plus any in-turn human records (a queued human message), each `{ref, role}` |
 | `trigger` | `{ref, role, origin_kind}` (§9.1) |
 | `end` | the ref of the turn's last record |
-| `status`, `status_basis` | §9.3 |
+| `status`, `status_basis` | §9.3; `status_basis` also says which turn rule applied (§9.1) |
+| `asks_user` | true when a Codex final message carries `questions` (§9.3) |
 | `final` | `{ref, text, basis}`, present only when `status` is `completed` |
 | `last_assistant` | the ref of the turn's last assistant text, present when the turn has no final; it is never labelled final |
 | `commentary` | the refs of the turn's non-final assistant text |
@@ -261,7 +286,7 @@ and, with `--raw`, its bytes. It is never a record and never has a role (SL10).
 | `format` | `session-logs/1` |
 | `host`, `query` | the host name and the parsed arguments, defaults marked |
 | `roots` | per root: home, store, state (`searched`, `absent` or `unreadable`), files, bytes |
-| `index` | `{state, schema, last_complete_run, age_minutes}`; state `used`, `stale`, `absent`, `unsupported_schema` or `unreadable`, with the reason |
+| `index` | `{state, schema, last_complete_run, age_minutes, coverage_start}`; state `used`, `stale`, `absent`, `unsupported_schema` or `unreadable`, with the reason; `coverage_start` per root (§5.3) |
 | `window` | `since` and `until`, and whether `since` is the default |
 | `files` | scanned, skipped by prefilter, unreadable (refs), vanished during the run (refs), and missing in scope (refs, with read path and its state); a list longer than 20 is cut and its count kept |
 | `lines` | malformed and truncated refs, each marked `raw_match` |
@@ -288,7 +313,10 @@ and, with `--raw`, its bytes. It is never a record and never has a role (SL10).
 - **Unreadable roots.** A root that cannot be listed is `unreadable`.
 - **Index location.** The reader finds the index the way obs does: `--state-dir`, else
   `$XDG_STATE_HOME/obs`, else `~/.local/state/obs`. It imports obs's `_state_dir` from
-  `obs.py`, whose `main` runs only under `__main__`, rather than restating the rule.
+  `obs.py`, whose `main` runs only under `__main__`, rather than restating the rule. That
+  function's `ValueError` (a relative `XDG_STATE_HOME`) is a failure, `bad_state_dir`
+  (§6.6).
+- **Explicit files.** A `--file` input has no home, so its `profile` is `null`.
 
 ### 5.2 Candidates and identity
 
@@ -359,6 +387,16 @@ before the walk, so no read transaction stays open during a scan.
 **Staleness.** The index is `stale` when its last complete run ended more than 2 hours
 before the reader started: twice the period of the hourly timer.
 
+**Coverage start.** The index knows only files that existed when it ran. A file pruned or
+deleted before the index first saw it is in neither the native walk nor the index.
+- **Definition.** Each root's coverage start is the earliest `indexed_at_ms` among its file
+  rows.
+- **Why it errs late.** Re-indexing a file moves its stamp later, so this start can be
+  later than the true one. Erring late errs toward `unknown`.
+- **A root with no rows** has no coverage start.
+- **On 2026-10-23** the earliest stamp in the live index was 2026-09-18, and the earliest
+  indexed Claude sessions started in 2026-08 (review).
+
 **A row whose path no longer exists is missing,** even before the index marks it.
 
 **The native walk is always the primary source.** The index adds what the walk cannot see:
@@ -367,8 +405,8 @@ before the reader started: twice the period of the hourly timer.
 - children recorded by parent;
 - recorded task commands.
 
-Without a usable index the reader still runs. Coverage says so, and an empty answer cannot
-be `not_found` (§6.5).
+Without a usable index the reader still runs. Coverage says so, and an empty answer over
+the stores cannot be `not_found` (§6.5).
 
 ### 5.4 Availability, replayed copies and remote hosts
 
@@ -411,7 +449,7 @@ second host had no index on 2026-10-20, so its empty answers are `unknown`.
 |---|---|
 | `PATTERN` (optional) | records whose searchable text contains it; case-insensitive literal; `--regex` for a Python regular expression, `--case` for case-sensitive |
 | `--harness`, `--home`, `--profile`, `--store` | files by place (each repeatable) |
-| `--session ID` | the candidates of an id (§5.2); repeatable |
+| `--session ID` | the `own` files of an id (§5.2); a child is selected by its own id; repeatable |
 | `--task ID` | sessions with evidence for the task (§9.4); `--mentions` adds sessions that only mention it, labelled as such |
 | `--file PATH` | an explicit file outside the stores (§6.7); repeatable |
 | `--cwd PATH` | sessions whose recorded cwd is the path or inside it; this also narrows the missing files in scope |
@@ -422,9 +460,9 @@ second host had no index on 2026-10-20, so its empty answers are `unknown`.
 | `--state-dir PATH` | the obs state directory (§5.1) |
 
 **Default time window.** Without `--session`, `--task`, `--file`, `--since` or
-`--all-time`, the window is the last 30 days. Coverage marks it as the default. It bounds
-the scan cost of an unqualified search: the pre-flow extractor needed about 2 minutes for
-23 GB.
+`--all-time`, the window is the 30 days that end at `--until`, or today when `--until` is
+absent. Coverage marks it as the default. It bounds the scan cost of an unqualified search:
+the pre-flow extractor needed about 2 minutes for 23 GB.
 - `--since` skips files whose mtime is older, which is exact because no record in a file
   is newer than the file's mtime. Inside the files it reads, it skips records older than
   the window.
@@ -443,7 +481,7 @@ The searchable text of a record is the first of these that applies:
 - a tool call's input, as compact JSON, plus its extracted shell command;
 - a tool output's text;
 - an execution's command and output;
-- a metadata record's compact JSON.
+- the compact JSON of a metadata or `unknown` record.
 
 **Raw prefilter.** A file is parsed only if its raw bytes contain the pattern.
 - **Which patterns use it.** Only an ASCII literal free of characters JSON escapes: a
@@ -460,7 +498,8 @@ The searchable text of a record is the first of these that applies:
 - **`--final`** emits turn objects (§9). With a pattern, it emits the turns whose final
   text matches it.
 - **Bounds.**
-  - `--limit/-n N` caps emitted objects; the default is 50, and `0` removes the cap.
+  - `--limit/-n N` caps emitted objects; the default is 50, and `--no-limit` removes the
+    cap.
   - `--text-bytes` defaults to 2,000 and `--raw-bytes` to 16,384.
   - A hit limit is recorded in coverage.
 
@@ -474,12 +513,20 @@ The searchable text of a record is the first of these that applies:
 ### 6.5 Outcomes
 
 - **`found`:** at least one parsed match.
-- **`not_found`:** zero parsed matches, and every one of these holds:
-  - the index was `used` (present, the expected schema, and not stale);
+- **`not_found`:** zero parsed matches. Every search needs these four:
   - no selected root was unreadable;
   - no file in scope was unreadable or vanished;
   - no missing file in scope lacked a readable copy;
   - no unparsed line in scope had a raw match.
+
+  Then it depends on the search's scope:
+  - **Only explicit files:** nothing more.
+  - **A session or task:** the index was `used` (present, the expected schema, and not
+    stale). Every selected session's first record must also fall after its root's coverage
+    start (§5.3).
+  - **Store-wide:** the index was `used`, and the window starts no earlier than every
+    selected root's coverage start. An `--all-time` store-wide search never answers
+    `not_found`.
 - **`unknown`:** any other zero-match result. `outcome_basis` names the first failed
   condition.
 
@@ -490,10 +537,17 @@ indexed time span must also overlap the window.
 **Absent roots** hold nothing and do not by themselves make an answer `unknown`.
 
 **Why the index is required for `not_found`.** It is the only record of files that are
-gone. Even a fresh index cannot see a file created and deleted between two of its runs,
-which is why staleness is bounded. A host without an index never answers `not_found`, and
-a pruned file without a replayed copy keeps a search that reaches it `unknown`. That is
-the explicit unavailable result the original report lacked.
+gone. Even a fresh index has two blind spots:
+- a file created and deleted between two of its runs, which is why staleness is bounded;
+- a file gone before it first ran, which is why the window must start inside its coverage.
+
+**What that means for answers.**
+- A host without an index never answers `not_found`.
+- A pruned file without a replayed copy keeps a search that reaches it `unknown`.
+- A window reaching before the index's coverage is `unknown`, with basis
+  `before_index_coverage`.
+
+That is the explicit unavailable result the original report lacked.
 
 **On this host today.** The live index on 2026-10-23 held 102 Claude files that were
 missing, had no replayed copy, and ended within the last 30 days (the review's count). So
@@ -508,19 +562,22 @@ those files have replayed copies or the selection excludes them (`--cwd`, `--hom
   with nothing more on stdout. The kinds are:
   - `tasks_failed`: `tasks show` failed or printed something other than a task;
   - `unknown_format`: a `--file` that is neither a transcript, a rollout nor an SDK stream;
-  - `unreadable_input`: a `--file` that cannot be read.
+  - `unreadable_input`: a `--file` that cannot be read;
+  - `bad_state_dir`: obs's state-directory rule refused the environment (§5.1).
 - **2:** a usage error, printed on one line to stderr with the usage line. A malformed ref
   or `when` value is a usage error.
 
 ### 6.7 Explicit files
 
-- **Format.** A `--file` input's format is decided by its first parseable record:
+- **Format.** A `--file` input's format is decided by the first record that matches one of
+  these signatures:
   - a `session_meta` record makes it a Codex rollout;
-  - a record with `sessionId` and a Claude record `type` makes it a Claude transcript;
-  - an object with `session_id` and the `stream-json` event keys (`type`, `message`,
-    `parent_tool_use_id`) makes it a Claude SDK stream.
+  - a record with `sessionId`, or a Claude kind that comes without one (such as
+    `fork-context-ref`), makes it a Claude transcript;
+  - an event with `session_id` whose `type` is `system`, `user`, `assistant` or `result`
+    makes it a Claude SDK stream. That includes the stream's opening `system`/`init` event.
 
-  Anything else is `unknown_format`.
+  A file in which no record matches is `unknown_format`.
 - **Identity and place.** The file's identity comes from its records as in §5.2. Its store
   is `explicit`, and its home is `file`.
 
@@ -533,7 +590,8 @@ those files have replayed copies or the selection excludes them (`--cwd`, `--hom
 | a session id (§5.2) | the session view: a session object for every candidate, `own` first, then `child`, `inherited` and `alias`; then a turn object for each turn of each readable `own` candidate |
 | a file ref (`<home>:<path>`) | the session view of that file |
 | a record or block ref | the turn view: the turn object of the turn holding the record, then every record of that turn, each call followed by its paired result |
-| `--file PATH` with `--lines` | the line view of an explicit file |
+| `--file PATH` | the session view of an explicit file; with `--lines`, its line view |
+| an explicit file's record ref (`file:<path>#L<n>`) | the turn view inside that file |
 
 ### 7.2 Options and bounds
 
@@ -544,7 +602,7 @@ those files have replayed copies or the selection excludes them (`--cwd`, `--hom
 | `--links` | follows recorded links one hop (§10.1) and adds the linked sessions' session objects and the binding records: Claude's launch call and result, Codex's spawn call and `SubAgentActivity` item |
 | `--copies`, `--raw`, `--text-bytes`, `--raw-bytes`, `--state-dir` | as for `search` |
 | `--expect-sha256 H` | with a record ref: compare the line's hash with a previously captured one (§7.4) |
-| `--limit/-n N` | caps emitted objects: 200 turns in the session view, 500 records in the turn and line views; `0` removes the cap |
+| `--limit/-n N` | caps emitted objects: 200 turns in the session view, 500 records in the turn and line views; `--no-limit` removes the cap |
 
 `show` emits every role, metadata included, because it shows a whole span.
 
@@ -562,11 +620,16 @@ read, in root order:
 
 ### 7.4 Outcomes and exit codes
 
+`show` answers `found` or `unknown`, never `not_found`.
 - **`found`:** the target resolved to at least one readable record or file.
-- **`not_found`:** no candidate in any source, and the §6.5 conditions on the index and the
-  roots hold.
-- **`unknown`:** anything else. That includes every candidate being missing without a copy,
-  and an id looked up without a usable index (SL10B).
+- **`unknown`:** anything else, including:
+  - every candidate missing without a copy;
+  - an id looked up without a usable index (SL10B);
+  - an id with no candidate in any source.
+
+**Why there is no `not_found`.** An id carries no time the reader can check against the
+index's coverage start (§5.3). An id with no candidate may be a session pruned before the
+index first ran.
 
 Exit codes and errors are those of §6.6.
 
@@ -579,8 +642,8 @@ Exit codes and errors are those of §6.6.
 | `user` with `origin.kind` `human` (a typed prompt, or a slash command beginning `<command-message>`) | `human`; in a subagent file, `dispatch` |
 | `user` with any other `origin.kind` (`task-notification`, `peer`, …) | `injected` |
 | `user` with `isMeta` or `isCompactSummary` (including `isMeta` peer records) | `injected` |
-| `user` without `origin` beginning `<command-name>` or `<bash-input>` | `human`, basis `local_command`: the person's local command, which reaches no model |
-| `user` without `origin` beginning `<local-command-stdout>`, `<local-command-stderr>`, `<bash-stdout>` or `<bash-stderr>` | `injected`, basis `local_command`: that command's output |
+| `user` without `origin`, or `system` with subtype `local_command`, whose text begins `<command-name>` or `<bash-input>` | `human`, basis `local_command`: the person's local command, which reaches no model |
+| `user` without `origin`, or `system` with subtype `local_command`, whose text begins `<local-command-stdout>`, `<local-command-stderr>`, `<bash-stdout>` or `<bash-stderr>` | `injected`, basis `local_command`: that command's output |
 | `user` that is the interrupt marker (`[Request interrupted by user…`) | `injected`; it ends the preceding turn (§9.1) |
 | other `user` without `origin` (records older than the field) | the prefix rule: `human` unless the text begins with `<` (but not `<pasted_content`), else `injected` |
 | `user` tool-result blocks | `tool_output`, one object per block |
@@ -589,15 +652,20 @@ Exit codes and errors are those of §6.6.
 | `assistant` text and thinking blocks | `assistant`; a `<synthetic>` model marks it `synthetic` |
 | `assistant` `tool_use` blocks | `tool_call` |
 | `api-request-blob` blocks | the role of their request message (system → `injected`, user → the `user` rules, assistant → `assistant` or `tool_call`), each with `copy: request_blob` (SL1) |
-| `system`, `queue-operation`, `mode`, `permission-mode`, `ai-title`, `custom-title`, `last-prompt`, `agent-name`, `pr-link`, `file-history-*`, `cost-state`, `api-request`, `api-request-shape`, `continued-in`, `atis-latch` | `metadata` |
+| `system` with subtype `turn_duration` or `stop_hook_summary` | `metadata`; they mark turn ends (§9.1) |
+| other `system`; `queue-operation`, `mode`, `permission-mode`, `ai-title`, `custom-title`, `last-prompt`, `agent-name`, `agent-setting`, `agent-color`, `pr-link`, `file-history-*`, `cost-state`, `api-request`, `api-request-shape`, `continued-in`, `atis-latch`, `isolation-latch`, `bridge-session`, `fork-context-ref`, `summary`, `relocated`, `worktree-state` | `metadata`; `continued-in` is also a link (§8.3) |
 | anything else | `unknown`, kept in the stream with its ref (SL1 `CA:16`) |
 
 **Subagent files.** In a subagent file every prompt record is `dispatch`, never `human`.
 That includes `AG:1`, a `user` record holding the dispatch brief (SL8).
 
-**Local commands.** The two local-command rules match what the current 2.1.304 writes
-without `origin`, as the review observed in 200 recent files. A slash command that reaches
-the model carries `origin.kind` `human` and follows the first row.
+**Forked subagents.** A forked subagent file begins with `fork-context-ref`. Its first
+assistant response copies the parent's message holding the launching call, so that
+response is `fork_history`. obs's adapter handles it the same way.
+
+**Local commands.** The two local-command rules match what versions 2.1.292 to 2.1.304
+write, in both record shapes, as the review observed in 600 recent files. A slash command
+that reaches the model carries `origin.kind` `human` and follows the first row.
 
 ### 8.2 Codex
 
@@ -612,7 +680,10 @@ the model carries `origin.kind` `human` and follows the first row.
 | `response_item` message, role `user`, in a child thread | `injected` under the same prefix rule, else `dispatch` |
 | `response_item` message, role `developer` | `injected` |
 | `response_item` message, role `assistant` | `assistant`, with `phase` |
-| `response_item` `agent_message` | `dispatch`; encrypted blocks are `encrypted` (SL7 `XC:4`) |
+| `response_item` `agent_message` from the thread's controller | `dispatch`, basis `agent_path`; encrypted blocks are `encrypted` (SL7 `XC:4`) |
+| `response_item` `agent_message` from anyone else (a child's report, a sibling) | `injected`, basis `agent_path` |
+| `inter_agent_communication_metadata`, `token_usage_record`, `world_state` | `metadata` |
+| `compacted` | `metadata`; its `replacement_history` messages are `compaction_history` copies (§8.3) |
 | `response_item` function, custom, local-shell or web-search call | `tool_call` |
 | their `*_output` records | `tool_output` |
 | `response_item` `reasoning` | `assistant`, `block_type: reasoning`; encrypted content is `encrypted` |
@@ -624,26 +695,47 @@ A rollout is a child thread when its first `session_meta` records either of thes
 
 This is the rule obs's adapter uses.
 
+**Agent paths and direction.**
+- **A thread's own agent path** is `source.subagent.thread_spawn.agent_path` in its first
+  `session_meta`. A root thread's path is `/root`.
+- **Its controller** is that path with its last segment removed.
+- **Dispatch or report.** An `agent_message` whose `author` is the thread's controller is a
+  dispatch. One from any other author is a report or peer message, so `injected`. In a root
+  thread every `agent_message` is therefore `injected`.
+
+  The review found 126 such messages in 80 recent root rollouts, all addressed to `/root`
+  from a child, and 69 in child threads addressed from the controller.
+- **No recorded agent path.** If a child thread records no agent path, its `agent_message`
+  records are `unknown`. Direction is never guessed.
+
 ### 8.3 Copies
 
 | Copy | How it is recognized | Default |
 |---|---|---|
 | `request_blob` | every block of a Claude `api-request-blob` record | collapsed |
 | `resume_history` | below | collapsed |
-| `fork_history` | Codex records after a second, inherited `session_meta`, up to the fork's first own `turn_context` | collapsed |
+| `fork_history` | Codex records after a second, inherited `session_meta`, up to the fork's first own `turn_context`; a Claude forked subagent's first assistant response (§8.1) | collapsed |
+| `compaction_history` | the messages inside a Codex `compacted` record's `replacement_history`, which repeat earlier messages | collapsed |
 | `event_mirror` | the Codex events of §8.2 | collapsed; also outside a pattern search's default roles |
 | `duplicate_file` | a line that repeats, at the same line number, a line of an earlier-root `own` file of the same identity (`sessions/` comes before `archived_sessions/`) | collapsed into the earlier-root file |
 | `ambiguous` | a shared run whose copy cannot be told from its original (below) | not collapsed |
 
-**`resume_history`.** Two Claude files in one project directory share a run of record
-`uuid`s.
-- **Which file holds the copy.** The copy is the file whose first record after the shared
-  run is later than every record of the other file. A resume continues a session after the
-  original stopped. In the fixtures, `CW2:4` (10:00:00) is later than all of CW (last at
-  09:06:05), and `CW:4` is not later than all of CW2. So CW2's lines 1–3 are copies of CW's
-  (SL5, SL6).
-- **Ties.** When neither file or both files meet that test, the shared records of both are
-  `ambiguous`, and neither collapses.
+**`resume_history`.** Two Claude files in one project directory share record `uuid`s. The
+shared records need not be contiguous in either file. Which file holds the copy is decided
+in this order:
+1. **Native link.** A `continued-in` record in one file whose `continuedInSessionId` names
+   the other file's session makes the named file the copy. The pair is also reported as a
+   `continued_in` link.
+2. **Timing.** Otherwise, the copy is the file whose first unshared user or assistant
+   record is later than every user or assistant record of the other file. A resume
+   continues a session after the original stopped.
+   - In the fixtures, `CW2:4` (10:00:00) is later than all of CW (last at 09:06:05), while
+     `CW:4` is not later than all of CW2. So CW2's lines 1–3 are copies of CW's (SL5, SL6).
+   - On live files, the review found the rule agreed with `continued-in` in all 18 pairs
+     that rule decided.
+3. **Ties.** When neither file or both files meet the timing test, or a file has no
+   unshared record, the shared records of both are `ambiguous`, and neither collapses. A
+   forked live session falls here.
 
 **Rules that hold for every kind:**
 - **Scope.** Copy detection covers only the files the run reads. A resume copy whose
@@ -667,49 +759,81 @@ local-command shapes.
 
 ### 9.1 Turn boundaries
 
-**Codex.** A turn runs from `event_msg` `task_started` to `task_complete` or
-`turn_aborted`, keyed by `turn_id`. Its inputs are the user, developer and `agent_message`
-records before its first assistant or tool record.
+**Codex.**
+- **Span.** A turn runs from `event_msg` `task_started` to `task_complete` or
+  `turn_aborted`, keyed by `turn_id`.
+- **Unended turns.** A `task_started` followed by another `task_started` with no end
+  between them ends where the next begins (status `incomplete`, §9.3). The review saw this
+  6 times in 600 rollouts.
+- **Inputs.** The user, developer and `agent_message` records before the turn's first
+  assistant or tool record.
 
-**Claude Code** records no turn boundaries. The reader derives them from three kinds of
-record:
-- **Input records:** `user` records that are neither only tool-result blocks nor `isMeta`
-  nor `isCompactSummary`. These are human, injected and dispatch prompts, local commands
-  and their output, and the interrupt marker.
-- **Response records:** assistant records and tool outputs.
-- **Everything else** (attachments, including queued messages; `isMeta` records; metadata;
-  copies) belongs to the turn it falls in and never starts one.
+**Claude Code** has two rules. A file that holds any `system` `turn_duration` record uses
+the marker rule; any other file, written by versions older than the marker, uses the
+derived rule. Every `turn_duration` in 200 recent files followed a `stop_hook_summary`
+whose `hookErrors` was empty. The 34 summaries with `hookErrors` were never followed by
+one: the blocking Stop hook made the model continue.
 
-**How a Claude turn runs:**
+Both rules sort records into three kinds:
+- **Input records.** `user` records that are neither only tool-result blocks nor
+  `isCompactSummary`, and `system` `local_command` records. These are human, injected and
+  dispatch prompts, local commands and their output, and the interrupt marker.
+- **Response records.** Assistant records and tool outputs.
+- **Everything else.** Attachments (including queued messages), `system` markers,
+  metadata and copies. These belong to the turn they fall in.
+
+**The marker rule:**
+- **End.** A turn ends at a `turn_duration` record or at an interrupt marker that follows
+  its response.
+- **Start.** The next turn begins right after that end. Its inputs are the input records
+  between the end and its first response record. `isMeta` `user` records count as inputs
+  under this rule, so a scheduled task's reminder, an `isMeta` peer message or a reminder
+  after a local command can each trigger a turn. The review found 52 such turns in 39
+  recent files.
+- **No end marker.** Where a response is followed by an input record with no end marker
+  between them, the turn ends there, with `status_basis` `no_end_marker`.
+- **Stop-hook continuation.** A `stop_hook_summary` with `hookErrors`, and no
+  `turn_duration` after it, does not end the turn.
+
+**The derived rule:**
 - **Start.** A turn starts at the first input record after a response record, or at the
-  file's first input record.
-- **Inputs.** Its inputs are the consecutive input records there, plus any queued human
-  attachment inside it.
+  file's first input record. An `isMeta` record is not an input under this rule.
 - **End.** It ends before the next input record that follows a response record.
-- **Interrupt marker.** A marker right after a response belongs to that turn and makes it
-  `interrupted` (§9.3). It is not an input of the next turn.
+- **Interrupt marker.** A marker right after a response belongs to that turn and ends it.
 
-**Message grouping.** Claude writes one record per content block, so a message is the set
-of assistant records sharing a `message.id`, and `stop_reason` is read per message.
+**In both rules:**
+- **Queued messages.** A queued human attachment inside the turn is listed in `inputs`. It
+  never becomes the trigger.
+- **Interrupt markers.** The next turn starts at the first input after an interrupt marker.
+- **Interrupted before any response.** A prompt followed by a marker with no response
+  forms a turn of its own: `interrupted`, with no final.
+- **Message grouping.** Claude writes one record per content block. A message is the set of
+  assistant records sharing a `message.id`, and `stop_reason` is read per message. In
+  42,303 live messages, no two records of one message disagreed on it (review).
 
-**The trigger,** for both harnesses, is the first of these that exists:
+**The trigger,** for both harnesses, is chosen from the turn's opening inputs, the run
+before its first response record. It is the first of these that exists:
 1. the last `human` or `dispatch` input that is not a local-command record;
 2. else the last `injected` input that is not a local command's output;
 3. else the last local-command input.
 
-**When a run of inputs is not a turn.** A run of inputs with no response is a turn only
-when it ends the file and its trigger comes from 1 or 2. Such a turn is `incomplete`. A
-local command followed by nothing is not a turn.
+**When a run of inputs is not a turn.** A run of inputs with no response is a turn only in
+two cases:
+- it ends the file and its trigger comes from 1 or 2. Such a turn is `incomplete`;
+- it is the interrupted case above.
 
-**What the fixture gives.** On CA, a task notification and a slash command with no
-response between them (`CA:14`, `CA:15`) form one turn, triggered by the human `CA:15`.
+A local command followed by nothing is not a turn.
+
+**What the fixture gives.** CA has no markers, so it uses the derived rule. A task
+notification and a slash command with no response between them (`CA:14`, `CA:15`) form one
+turn, triggered by the human `CA:15`.
 
 ### 9.2 Final versus commentary
 
 | | Codex | Claude Code |
 |---|---|---|
 | Final | the assistant message with `phase` `final_answer` (basis `phase`); else the last assistant message whose text equals `task_complete.last_agent_message` (basis `last_agent_message`); else that event's text itself, with the event's ref (basis `last_agent_message_event`) | the text blocks of the turn's last non-synthetic message whose `stop_reason` is `end_turn` or `stop_sequence` (basis `stop_reason`); in a turn with no `stop_reason` on any record, the last text-only assistant record (basis `position`, weaker) |
-| Commentary | every other assistant message of the turn | every other assistant text of the turn: text in messages that stopped for `tool_use`, and an `end_turn` message followed by more activity (a Stop hook's continuation) |
+| Commentary | every other assistant message of the turn | every other assistant text of the turn: text in messages that stopped for `tool_use`, and an `end_turn` message followed by more activity in the same turn (a Stop-hook continuation, §9.1) |
 
 **Absent fields.** An absent `last_agent_message` is treated as null. That is the shape of
 XA and XW.
@@ -740,8 +864,8 @@ The first row that applies decides a turn's status.
 | `interrupted` | `turn_aborted` (with its `reason`) | the interrupt marker after the turn's response, or an interrupted tool result |
 | `waiting` | the turn's last call is an unanswered `request_user_input` | the last message's pending call is `AskUserQuestion`, `EnterPlanMode` or `ExitPlanMode` with no result |
 | `completed` | a final message (§9.2) | a final message (§9.2) |
-| `no_final` | `task_complete` with no final message | the turn closed without a final message: the next input followed first, or the turn's last message stopped for `end_turn` with no text, or only synthetic messages ended it |
-| `incomplete` | `task_started` with no end before end of file | end of file with no final message and no closing message; a live session can still append |
+| `no_final` | `task_complete` with no final message | the turn closed, by a `turn_duration` or by the next input, without a final message: its last message stopped for `end_turn` with no text, or for `tool_use` with every result present, or only synthetic messages ended it |
+| `incomplete` | `task_started` with no end before end of file or before the next `task_started` | end of file with no final message and no closing message; a live session can still append |
 
 **Which message is final.** Only a `completed` turn has one. For every other status, the
 turn object carries `last_assistant`, the last thing the assistant said, which is never
@@ -751,12 +875,15 @@ labelled final.
 starts is listed with `trigger.role` showing that, so a final message in such a turn is
 never attributed to a human request.
 
-**Unverified wait rules:**
-- **Codex.** No recent rollout had a `request_user_input` call. Nine `AgentMessage` items
-  carried `questions`. So the Codex `waiting` rule is unobserved. The plan's first step
-  decides whether those items mark a wait.
-- **Claude.** The wait tools are the set `session-episodes` uses. The live-store run
-  reports each one's pending-at-turn-end count.
+**Questions and waits.**
+- **Codex questions.** A final message whose `AgentMessage` item carries `questions` is
+  asking the user. Its turn is still `completed`, with `asks_user: true`. Of 9 such turns in
+  80 recent rollouts, 8 ended in `task_complete` with the message, and 1 was aborted.
+- **Codex `waiting`.** It applies only to the older `request_user_input` call, which no
+  recent rollout used, so it is unobserved.
+- **Claude `waiting`.** The wait tools are the set `session-episodes` uses. A pending one at
+  the end of a turn is rare: 1 of 93 `AskUserQuestion` calls in 600 files (review). The
+  live-store run reports each tool's count.
 
 ### 9.4 Selection by task
 
@@ -772,9 +899,13 @@ It gathers evidence of these kinds, strongest first:
    names the session. The ref is the task id with the note's `at`.
 2. **`successful_task_command`.** A `task_commands` row with `status` `ok`. The verb is the
    one obs records: `start`, `park`, `done`, `drop`, `review`, `concerns`, and so on.
-3. **`failed_task_command`.** A row with `status` `failed`. It is an attempt, not
-   ownership (SL2 `CA:4`/`CA:7`).
-4. **`task_command`.** A row with `status` `unknown`.
+3. **`failed_task_command`.** A row with `status` `failed`, or a Claude row with `status`
+   `unknown` whose paired result the reader finds marked `is_error` (basis
+   `result_is_error`). It is an attempt, not ownership (SL2 `CA:4`/`CA:7`). The second form
+   exists because obs's Claude adapter maps every error or missing result to `unknown`:
+   live Claude rows on 2026-10-23 were 1,223 `ok`, 3,478 `unknown` and none `failed`
+   (review).
+4. **`task_command`.** Any other row with `status` `unknown`.
 
 **What counts as ownership.** Only 1 and 2 are ownership evidence; 3 and 4 select the
 session and are labelled.
@@ -868,14 +999,26 @@ leaves it unchanged before readout and does not settle that dispute.
 ### 11.2 Stage A: before readout, neither treatment nor measurement
 
 **What Stage A adds:**
-- **The reader in obs.** New files only: the `session_logs.py` entry point, its modules,
-  their tests and the vendored fixture copy.
+- **The reader in obs.** New files: the `session_logs.py` entry point, its modules, their
+  tests and the vendored fixture copy.
 - **hq's fixture step (§14.3).** Test data only.
 
 **What Stage A edits.** Files no index, report or timer runs:
-- obs's `README.md`, for a section on the reader;
-- the justfile's list of modules its `check` recipe compiles;
-- `.gitignore`, to re-include the vendored fixtures' dot-directories, as hq already does.
+- the justfile: the list of modules its `check` recipe compiles, and a recipe that
+  re-vendors the fixtures (§14.5);
+- `.gitignore`, to re-include the vendored fixtures' dot-directories, as hq already does;
+- the obs task's own record under `tasks/`.
+
+**Module names.** Every new module is named `session_logs*.py`. The systemd unit runs
+`obs.py` with the checkout first on the import path, so a new name must not shadow a
+standard-library or existing obs module. This prefix guarantees it does not.
+
+**Treatment, edit by edit.** Each edit above was also judged for treatment:
+- The tests, fixtures, compile list, vendoring recipe and ignore rule say how to test the
+  reader. None tells a session to use it.
+- The new files can be found in obs's tree, as any file can, in either arm.
+- A README section on the reader would be a general aid, the thing the brief rule below
+  forbids. It waits for Stage B1.
 
 **What Stage A must not modify:**
 - any existing `.py` module in obs, including `obs.py`, which the systemd index unit runs
@@ -910,7 +1053,8 @@ added to other briefs as a general aid. The review noted why: flow-on controller
 otherwise be the ones naming it.
 
 **Gate evidence before the obs task merges:**
-- `git diff --stat` against its base lists only added files and the three edits above;
+- `git diff --stat` against its base lists only added `session_logs*` modules, tests and
+  vendored fixtures, plus the edits above;
 - obs's `just gate` passes;
 - hq's `just test` passes on the fixture step.
 
@@ -920,10 +1064,12 @@ With no executed module changed, the index and the reports run the same code.
 
 Each step re-checks the gate on its date.
 
-- **B1. The skill and link.** The session-logs skill is rewritten around the reader (§12).
-  `~/.agents/bin/session-logs` is declared in hq's `links.toml`. The skill moves to obs with
-  obs-f5710b. The reader joins the shared CLI table as a protocol row when the obs CLI takes
-  it.
+- **B1. The skill, link and README.**
+  - The session-logs skill is rewritten around the reader (§12).
+  - `~/.agents/bin/session-logs` is declared in hq's `links.toml`.
+  - obs's README gains its section on the reader.
+  - The skill moves to obs with obs-f5710b.
+  - The reader joins the shared CLI table as a protocol row when the obs CLI takes it.
 - **B2. One classifier.**
   - The adapters and `session-episodes`, moved to obs by obs-f5710b, use the reader's
     normalizer.
@@ -991,12 +1137,12 @@ exercised (cases doc).
 
 | Case | What the reader must return | Command shape | Basis |
 |---|---|---|---|
-| SL1 | Five calls, each paired by id with its result, including the reversed pair `CA:6`/`CA:7`. One message, `msg_fx_m1`, spans blocks 0–2. Runtime model `claude-model-a`. `CA:10`'s blocks are `request_blob` copies, collapsed and counted (shown with `--copies`). `CA:16` is `unknown` in the unfiltered stream. `CA:13` is `metadata`. | `search --session CA -n 0` | observed; the blob and the unknown kind are synthetic |
-| SL2 | `show CA:4#0` gives the call paired with the `tool_output` `CA:7#0` (`is_error`). `CA:8#0` is paired with `CA:9#0`. `CA:2` is `injected`, `CA:10` a collapsed copy, and `CA:14` `injected`. Human records are `CA:1` and `CA:15` (basis `origin`). `--task zz-000001` gives `CA:8` as `successful_task_command` and `CA:4` as `failed_task_command`, provided obs's adapter extracts those rows from the fixture; the test records whether it does. | `search zz-000001 --session CA`; `show CA:4#0`; `search --session CA --role human`; `search --task zz-000001 --sessions` | observed shape |
+| SL1 | Five calls, each paired by id with its result, including the reversed pair `CA:6`/`CA:7`. One message, `msg_fx_m1`, spans blocks 0–2. Runtime model `claude-model-a`. `CA:10`'s blocks are `request_blob` copies, collapsed and counted (shown with `--copies`). `CA:16` is `unknown` in the unfiltered stream. `CA:13` is `metadata`. | `search --session CA --no-limit` | observed; the blob and the unknown kind are synthetic |
+| SL2 | `show CA:4#0` gives the call paired with the `tool_output` `CA:7#0` (`is_error`). `CA:8#0` is paired with `CA:9#0`. `CA:2` is `injected`, `CA:10` a collapsed copy, and `CA:14` `injected`. Human records are `CA:1` and `CA:15` (basis `origin`). `--task zz-000001` gives `CA:8` as `successful_task_command` (the index row is `ok`) and `CA:4` as `failed_task_command` (the index row is `unknown`; basis `result_is_error` from `CA:7`). | `search zz-000001 --session CA`; `show CA:4#0`; `search --session CA --role human`; `search --task zz-000001 --sessions` | observed shape |
 | SL3 | XC: runtime `codex-model-b` (`XC:3`, turn `turn-c1`), creation `codex-model-a` (`XC:1`), requested `codex-model-b` (`XP:7`). Controller XP by `child_to_parent` from `XC:1`. Identity from `payload.id`. AG: runtime `claude-model-b`; `sonnet` requested; `resolvedModel` resolved, from CA's binding records. | `show XC --links`; `show agent-a0000000000000b01 --links` | observed, depth 1 |
 | SL4 | `/w/beta`: CW and CW2 in `claude-work` (work), XW in `codex-work` (work). XA has `store: archived`. Coverage: five roots searched, `codex-work` archive absent. | `search --sessions --cwd /w/beta`; `show XA` | observed; the Codex-work session is synthetic |
 | SL5 | `XA:5` is `human`, and `XA:4` appears only under `--role injected`. `CW:1` is human. `CW2:1` is a `resume_history` copy of `CW:1`, collapsed. `CW2:4` is a distinct human turn. | `search '<phrase>' --role human`; `search '<phrase>' --role injected` | observed; archived placement synthetic |
-| SL6 | Three outputs, `CW:3#0`, `CW:6#0` (`is_error`) and `CW2:6#0`. `CW:7#0` (blob) and `CW2:3#0` (resume) are collapsed copies. `CW:4` is `injected`, not output. | `search test-fast --profile work --role tool_output -n 0`, then `jq` | observed |
+| SL6 | Three outputs, `CW:3#0`, `CW:6#0` (`is_error`) and `CW2:6#0`. `CW:7#0` (blob) and `CW2:3#0` (resume) are collapsed copies. `CW:4` is `injected`, not output. | `search test-fast --profile work --role tool_output --no-limit`, then `jq` | observed |
 | SL7 | The filing output `XC:6` for call `XC:5`. Controller XP (`XC:1`). Human trigger `XP:6`, with `XP:4` and `XP:5` as injected inputs. Dispatch bound by `XP:7` and `XP:8`. `XC:4` is an encrypted dispatch. `XP:13` is `assistant`; `CA:17#0` and `CA:18#0` are a call and its output; `CA:15` is human. | `search zz-0000f1`; `show XC --links`; `show XP:6` | observed; the parent's plain brief is synthetic. The verdict "XC filed it" is the trace composition's (§13): the reader supplies each link with its basis |
 | SL8 | `parent_to_child` from `CA:12` to AG; `.meta.json` `toolUseId`. AG's `last_at` 12:02:40Z, `CA:13` at 12:02:41Z, `CA:14` at 12:03:00Z. `AG:1` is `dispatch`. AG's identity is `agent-a0000000000000b01`. No link from `parentUuid`, `XC:2` or XP. | `show CA --links`; `show agent-a0000000000000b01` | observed; the human-origin command synthetic |
 | SL9 | Child calls `SDK:4` and `SDK:5` carry `sdk_dispatch` to `toolu_fx_dA` and `toolu_fx_dB`. Results are `SDK:7#0` and `SDK:6#0` (`is_error`). `SDK:8` and `SDK:9` are root events. No session link. | `search --file <capture> --role tool_call --role tool_output` | observed |
@@ -1016,10 +1162,11 @@ the live data did and did not show.
 | M01: missing file with a readable alternate | A rollout is copied into `archived_sessions/` and indexed, then the live copy is deleted. The reader reports two candidates: one `missing`, one `readable`. It reads the alternate. | Observed once (M01) |
 | A01: native archive | XA is read from `codex:archived_sessions/…` with `store: archived`. | Observed (A01) |
 | Replayed copy | A file is indexed, deleted, and replayed with `obs --state-dir <tmp> index --replay <archive copy> <root>`. The reader reads `read_path` with `store: replayed`. When the copy is then made unreadable, it reports `missing`, names the copy, and gives `unknown`. | **Unobserved live**: zero `read_path` rows on 2026-10-20 |
-| `not_found` | A fresh index over the home, and a term in no record, scoped to a home with nothing unreadable or missing, gives `not_found`. | none needed |
+| `not_found` | A fresh index over the home, and a term in no record, scoped to a home with nothing unreadable or missing, gives `not_found`. The test sets the temporary index's file stamps before the fixtures' dates, so the window lies inside its coverage; the test owns that index. The same term over an explicit file also gives `not_found`. | none needed |
 | Stale index | The same query, with the temporary index's last complete run aged past 2 hours, gives `unknown` with basis `stale_index`. | none needed |
+| Before the index's coverage | The same query with `--all-time`, or with a `--since` earlier than the root's coverage start, gives `unknown` with basis `before_index_coverage`. | the live coverage start, 2026-09-18 (review) |
 | A host without an index | No state directory: index `absent`, the native walk proceeds, a zero match gives `unknown`. | Observed (the second host, 2026-10-20); cross-host retrieval itself was not qualified and stays an explicit run |
-| Change during a run | A file deleted between listing and reading is `vanished`. A rollout moved to `archived_sessions/` in between is found there. A file whose indexed prefix is rewritten is `changed`. | none |
+| Change during a run | A file deleted between listing and reading is `vanished`. A rollout moved to `archived_sessions/` in between is found there. A file whose indexed prefix is rewritten is `changed`. The reader takes a test hook between listing and reading so the test can make these changes. | none |
 
 ### 14.3 New case SL11: turn-final messages and task evidence
 
@@ -1029,34 +1176,50 @@ the existing style. The fixtures use live shapes:
   attachments and local commands;
 - Codex: `phase`, and `item_completed` mirrors.
 
-**Claude, one session:**
+**Claude, one session with `turn_duration` markers (the marker rule):**
 1. A typed human turn: commentary text, then a tool call, then a final message whose
-   thinking and text blocks are separate records of one message (`completed`).
-2. A local command (`<command-name>`), its `<local-command-stdout>`, then a typed prompt.
-   They form one turn, triggered by the prompt.
-3. A turn with a queued human attachment mid-response, listed in `inputs`.
-4. A turn ended by the interrupt marker (`interrupted`, with `last_assistant`).
-5. A turn whose last call is `AskUserQuestion` with no answer (`waiting`).
-6. A Stop-hook continuation: an `end_turn` message, then more activity, then a final
-   `end_turn` message. The first is commentary.
-7. A turn whose only end is a `<synthetic>` `stop_sequence` message (`no_final`).
-8. A task-notification turn with its own final: trigger `injected`, `completed`.
-9. A final turn cut at end of file with a call pending (`incomplete`).
+   thinking and text blocks are separate records of one message, then
+   `stop_hook_summary` and `turn_duration` (`completed`).
+2. A local command written as a `system` `local_command` record, its output, then a typed
+   prompt. They form one turn, triggered by the prompt.
+3. A turn with a queued human attachment mid-response. It is listed in `inputs` and is not
+   the trigger.
+4. A Stop-hook continuation: an `end_turn` message, a `stop_hook_summary` with
+   `hookErrors` and no `turn_duration`, more activity, then a final `end_turn` message and
+   `turn_duration`. The first message is commentary.
+5. After a `turn_duration`, an `isMeta` scheduled-task reminder that gets a response: a
+   turn of its own, with trigger `injected` and its own final. The preceding human turn
+   keeps its final.
+6. The same with an `isMeta` peer message.
+7. A turn ended by the interrupt marker (`interrupted`, with `last_assistant`).
+8. A prompt interrupted before any response: a turn of its own, `interrupted`, with no
+   final.
+9. A turn whose last call is `AskUserQuestion` with no answer (`waiting`).
+10. A turn whose only end is a `<synthetic>` `stop_sequence` message (`no_final`).
+11. A task-notification turn with its own final: trigger `injected`, `completed`.
+12. A final turn cut at end of file with a call pending (`incomplete`).
 
-**Codex, one rollout:**
+The existing CA fixture covers the derived rule for files without markers.
+
+**Codex, a parent rollout and its child:**
 - a turn with `commentary` and `final_answer` messages and their `AgentMessage` mirrors;
+- a final message with `questions` (`completed`, `asks_user`);
 - an aborted turn;
 - a turn whose `task_complete` has a null `last_agent_message` (`no_final`);
 - a phaseless turn whose final is found by `last_agent_message`;
-- a `task_started` at end of file (`incomplete`).
+- a `task_started` followed by another with no end between them (`incomplete`);
+- a `task_started` at end of file (`incomplete`);
+- in the parent, a child's report `agent_message` (`injected`); in the child, its
+  controller's `agent_message` (`dispatch`).
 
 **Task evidence:**
 - One session's stamped note names it, giving `provenance_stamp` for the turn holding the
   note's time.
 - A second session only mentions the task id. It is selected only under `--mentions`.
-- The task record reaches the reader through a stub `tasks` executable. The stub prints a
-  `tasks show --json` document captured from the real CLI over a scratch project, so the
-  field path is the live one, not this spec's.
+- The task record reaches the reader as a `tasks show --json` document captured from the
+  real CLI over a scratch project, served by the wrapper of §14.5. The field path is
+  therefore the live one, not this spec's. hq keeps the captured document with the
+  fixtures.
 
 **Expected:** each turn's status, final ref and basis; commentary never final; the
 injected trigger labelled; the mirrors collapsed; and the selection and labels of the two
@@ -1088,9 +1251,16 @@ It also checks three live cases:
   fixtures. A source file names the hq commit and each file's sha256, a test checks the
   copy against it, and a justfile recipe re-vendors. The corpus stays hq's, as the boundary
   assigns.
-- **Environment.** Each subprocess test builds its environment key by key: `PATH`, `HOME`
-  (the scratch fixture copy), `XDG_STATE_HOME` (a scratch state directory) and the stub
-  `tasks`. It never inherits the caller's environment.
+- **Environment.** Each subprocess test builds its environment key by key and never
+  inherits the caller's:
+  - `PATH`;
+  - `HOME`, the scratch fixture copy;
+  - `XDG_STATE_HOME` and `XDG_CONFIG_HOME`, scratch directories.
+- **A real `tasks`, isolated.** `obs index` calls `tasks list`, `tasks projects` and
+  `tasks resolve`; a stub answering only `show` would leave its run incomplete. So the
+  tests use the real `tasks` CLI over a scratch registry holding a `zz` project. A wrapper
+  first on `PATH` answers `tasks show` for the fixture's task ids from the captured
+  document (§14.3) and passes every other call to the real CLI.
 - **Test first.** Tests precede the code they cover. Each new test is seen to fail against
   a targeted break of what it checks.
 
