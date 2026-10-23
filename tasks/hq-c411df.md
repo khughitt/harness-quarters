@@ -7,7 +7,7 @@ size: m
 complexity: high
 process: planned
 created: 2026-10-20T11:19:18Z
-updated: 2026-10-22T17:41:57Z
+updated: 2026-10-23T00:32:46Z
 depends: [hq-a1c591, hq-de3e4c]
 parent: hq-cff824
 tags: [feedback, gap, "from:lore"]
@@ -22,6 +22,7 @@ Done:
 - Produce a design spec and implementation plan, each reviewed before the next phase. This task scopes the design and handoff; implementation tasks follow the reviewed plan.
 - Specify a bounded search + show reader and usage skill: home/harness/date/session/role selection, normalized and raw record inspection, paired calls/results, block-level source references, recorded parent relationships, per-turn runtime model and coverage/unavailable results.
 - Define the supported obs consumer interface and its owner. Reuse existing location metadata without treating the research SQL as an approved API. Respect ops-630a87 / obs-f5710b: obs owns content parsing and session-logs; hq owns location/lifecycle and harness-version samples. State the flow-trial-1 readout gate and assess effects on enrolled sessions and measurement before any rollout.
+- Incorporate hq-b95324's final-message retrieval requirement through the same search/show surface: listing and printing by session, task or time window; final versus commentary across harnesses; injected records; interrupted/incomplete turns and absent final responses; source references; and task attribution that distinguishes ownership evidence from mentions. Map a focused acceptance case. On completion, run `tasks note hq-b95324 --no-reviewed "<reviewed contract and remaining work>"` before this result's branch merges so that idea is re-scoped against the reviewed design/plan.
 - Map the design to the existing acceptance cases and location counterexamples, explicitly distinguishing synthetic coverage, fixture limitations and unobserved replay/remote cases. Settle local-first lookup versus explicit remote/archive operations in the design. Keep interactive resume selection separate.
 - Use the brief's supported search/show recommendation. A second picker, a new transcript index, specialized aggregate verbs and automated trace precision claims are not established requirements. Later trace composition must retain typed evidence instead of treating mentions as work ownership. Leave hq-a60cf5, hq-7b131a, hq-c1fecb and hq-edf5de as their existing work.
 
