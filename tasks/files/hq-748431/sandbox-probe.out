@@ -1,0 +1,21 @@
+main-in-workroot | git restore --staged -- f                               | rc=0 | index: UU c;?? f; | c=<<<<<<< HEAD ours == | 
+main-in-workroot | git reset -q -- f                                       | rc=0 | index: UU c;?? f; | c=<<<<<<< HEAD ours == | c: needs merge 
+main-in-workroot | git rm --cached -q f                                    | rc=0 | index: UU c;?? f; | c=<<<<<<< HEAD ours == | 
+main-in-workroot | git checkout MERGE_HEAD -- c                            | rc=0 | index: M  c;A  f; | c=theirs  | 
+main-in-workroot | git show MERGE_HEAD:c > c && git add c                  | rc=0 | index: M  c;A  f; | c=theirs  | 
+main-in-workroot | git show MERGE_HEAD:c > c                               | rc=0 | index: UU c;A  f; | c=theirs  | 
+main-in-workroot | git restore --source=MERGE_HEAD --staged --worktree c   | rc=0 | index: M  c;A  f; | c=theirs  | 
+main-outside-roots | git restore --staged -- f                               | rc=0 | index: UU c;?? f; | c=<<<<<<< HEAD ours == | 
+main-outside-roots | git reset -q -- f                                       | rc=0 | index: UU c;?? f; | c=<<<<<<< HEAD ours == | c: needs merge 
+main-outside-roots | git rm --cached -q f                                    | rc=0 | index: UU c;?? f; | c=<<<<<<< HEAD ours == | 
+main-outside-roots | git checkout MERGE_HEAD -- c                            | rc=0 | index: M  c;A  f; | c=theirs  | 
+main-outside-roots | git show MERGE_HEAD:c > c && git add c                  | rc=0 | index: M  c;A  f; | c=theirs  | 
+main-outside-roots | git show MERGE_HEAD:c > c                               | rc=0 | index: UU c;A  f; | c=theirs  | 
+main-outside-roots | git restore --source=MERGE_HEAD --staged --worktree c   | rc=0 | index: M  c;A  f; | c=theirs  | 
+worktree-admin-outside | git restore --staged -- f                               | rc=128 | index: UU c;A  f; | c=<<<<<<< HEAD ours == | fatal: Unable to create '~/.cache/hq-748431.h4Qo/main1/.git/worktrees/wt1/index.lock': Read-only file system 
+worktree-admin-outside | git reset -q -- f                                       | rc=128 | index: UU c;A  f; | c=<<<<<<< HEAD ours == | fatal: Unable to create '~/.cache/hq-748431.h4Qo/main2/.git/worktrees/wt2/index.lock': Read-only file system 
+worktree-admin-outside | git rm --cached -q f                                    | rc=128 | index: UU c;A  f; | c=<<<<<<< HEAD ours == | fatal: Unable to create '~/.cache/hq-748431.h4Qo/main3/.git/worktrees/wt3/index.lock': Read-only file system 
+worktree-admin-outside | git checkout MERGE_HEAD -- c                            | rc=128 | index: UU c;A  f; | c=<<<<<<< HEAD ours == | fatal: Unable to create '~/.cache/hq-748431.h4Qo/main4/.git/worktrees/wt4/index.lock': Read-only file system 
+worktree-admin-outside | git show MERGE_HEAD:c > c && git add c                  | rc=128 | index: UU c;A  f; | c=theirs  | fatal: Unable to create '~/.cache/hq-748431.h4Qo/main5/.git/worktrees/wt5/index.lock': Read-only file system 
+worktree-admin-outside | git show MERGE_HEAD:c > c                               | rc=0 | index: UU c;A  f; | c=theirs  | 
+worktree-admin-outside | git restore --source=MERGE_HEAD --staged --worktree c   | rc=128 | index: UU c;A  f; | c=<<<<<<< HEAD ours == | fatal: Unable to create '~/.cache/hq-748431.h4Qo/main7/.git/worktrees/wt7/index.lock': Read-only file system 
