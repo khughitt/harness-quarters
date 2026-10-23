@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: probe-successor-link
 created: 2026-10-23T00:09:51Z
-updated: 2026-10-23T01:38:27Z
+updated: 2026-10-23T01:38:28Z
 started: 2026-10-23T01:33:10Z
 depends: []
 parent: hq-401088
@@ -37,3 +37,4 @@ Ideas it wakes: On completion, run `tasks note hq-1639fd --no-reviewed "<finding
 - 2026-10-23T01:33:20Z (main): arm: flow-trial-1 — unit tack-401088 — not enrolled
 - 2026-10-23T01:38:27Z (probe-successor-link): resumed
   provenance: {"harness_session":"claude-code:38f3b682-ef1d-4f4a-a80b-80579e770420","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T01:38:27Z (probe-successor-link): static read of Claude Code 2.1.304 (also 2.1.296/2.1.302): an [adopt] handoff hard-links agent-<id>.jsonl/.meta.json into the successor (copy fallback), and a 'relink sweep' on resume converts symlinked agent-* names in the session's subagents/ to hard links or copies, gated on storageV5 (z() && storageV5). The live hq pair was linked under 2.1.304 yet is a symlink, so the sweep/adopt path is not what ran here. Session listing filters subagents/ entries with Dirent.isFile(), skipping symlinks.
