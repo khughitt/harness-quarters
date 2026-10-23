@@ -8,12 +8,13 @@ complexity: high
 process: planned
 owner: session-evidence-reader
 created: 2026-10-20T11:19:18Z
-updated: 2026-10-23T15:15:42Z
+updated: 2026-10-23T15:15:49Z
 started: 2026-10-23T12:40:18Z
 depends: [hq-a1c591, hq-de3e4c]
 parent: hq-cff824
 tags: [feedback, gap, "from:lore"]
 agent: claude-code
+spec: docs/specs/2026-10-23-session-evidence-reader-design.md
 ---
 
 Why: Agents need evidence outside the baseline reader's two default roots, including historical tool outputs, parent context and explicit unavailable results. The user proposed a session-log CLI and usage skill; the existing record owns its design.
