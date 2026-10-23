@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: probe-successor-link
 created: 2026-10-23T00:09:51Z
-updated: 2026-10-23T02:41:37Z
+updated: 2026-10-23T02:42:25Z
 started: 2026-10-23T01:33:10Z
 depends: []
 parent: hq-401088
@@ -45,3 +45,4 @@ Ideas it wakes: On completion, run `tasks note hq-1639fd --no-reviewed "<finding
 - 2026-10-23T02:27:13Z (probe-successor-link): attached: successor-link-probe-a942426.jsonl (3610 bytes): successor-link-probe run on Claude Code 2.1.304 with the probe at a942426: four resumes (headless and interactive, link resolving and dangling), outcome false
 - 2026-10-23T02:32:29Z (probe-successor-link): review: impl round 2 — verdict: revise; findings: Important 1, Minor 4; reviewer: claude-code/claude-opus-5-5
 - 2026-10-23T02:41:37Z (probe-successor-link): review: impl round 3 — verdict: accept; findings: Minor 3; reviewer: claude-code/claude-opus-5-5
+- 2026-10-23T02:42:25Z (probe-successor-link): deferred minors filed as hq-e5410b (untraced-claude exe match, target mutation, signal edges, reply check, traces on false); background-session path filed as hq-9e64f4. just test at 0d815fe: 228, 1024, 389, 1 passed; 9d1884a is docs-only.
