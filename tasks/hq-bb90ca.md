@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: session-evidence-reader
 created: 2026-10-23T16:11:45Z
-updated: 2026-10-23T17:41:33Z
+updated: 2026-10-23T17:41:34Z
 started: 2026-10-23T16:28:09Z
 completed: 2026-10-23T17:29:57Z
 closed: 2026-10-23T17:29:57Z
@@ -57,3 +57,4 @@ Verification: the SL11 self-checks fail before the fixtures exist, then pass; ju
 - 2026-10-23T17:41:30Z (main): attached: breaks.py (6227 bytes): break check: 20 targeted fixture changes, each must fail its SL11 test and pass when reverted
 - 2026-10-23T17:41:31Z (main): attached: keys.py (2201 bytes): keys-only probe of live Claude record kinds (prints no values)
 - 2026-10-23T17:41:31Z (main): attached: codexkeys.py (1390 bytes): keys-only probe of live Codex record kinds (prints no values)
+- 2026-10-23T17:41:32Z (main): attached: ctx.py (1459 bytes): probe of live Claude record order around an anchor kind (kinds only)
