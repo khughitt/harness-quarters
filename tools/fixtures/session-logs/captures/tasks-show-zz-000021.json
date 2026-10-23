@@ -1,0 +1,25 @@
+{
+  "task": {
+    "id": "zz-000021",
+    "title": "Synthetic fixture task",
+    "status": "todo",
+    "priority": 2,
+    "parallel": false,
+    "lane": false,
+    "reviewed": false,
+    "awaiting_user": false,
+    "created": "2026-10-12T11:30:00Z",
+    "updated": "2026-10-12T12:00:30Z",
+    "body": "",
+    "notes": [
+      {
+        "at": "2026-10-12T12:00:30Z",
+        "by": "fixture",
+        "text": "started",
+        "harness_session": "claude-code:c0000000-0000-4000-8000-000000000022",
+        "harness_session_source": "CLAUDE_CODE_SESSION_ID"
+      }
+    ]
+  },
+  "warnings": []
+}

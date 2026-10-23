@@ -1,0 +1,2 @@
+{"parentUuid":null,"isSidechain":false,"promptId":"p-x01","type":"user","message":{"role":"user","content":"hello"},"uuid":"u-x02","timestamp":"2026-10-12T13:00:00.000Z","permissionMode":"default","origin":{"kind":"human"},"promptSource":"typed","turnOrigin":"human","turnPosition":{"promptIndex":1,"turnIndex":0},"userType":"external","entrypoint":"cli","cwd":"/w/gamma","sessionId":"c0000000-0000-4000-8000-000000000026","version":"2.1.304","gitBranch":"main"}
+{"type":"user","message":{"content":"\u006eeedle"

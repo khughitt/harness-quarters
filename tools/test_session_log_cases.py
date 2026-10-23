@@ -18,6 +18,7 @@ import pytest
 FIXTURES = Path(__file__).with_name("fixtures") / "session-logs"
 HOME = FIXTURES / "home"
 DEGRADED = FIXTURES / "degraded"
+TURNS = FIXTURES / "turns"
 SDK = FIXTURES / "captures" / "sdk-stream.jsonl"
 
 CA = "c0000000-0000-4000-8000-00000000000a"
@@ -417,6 +418,82 @@ def test_sl10_missing_session_is_only_mentioned():
     assert CF in mention["message"]["content"][0]["text"] and "clipped" in mention["message"]["content"][0]["text"]
 
 
+# --- SL11: turn-final messages, task evidence, forks and escapes ---------------------------------
+
+def test_sl11_marker_session_turn_ends_and_markers():
+    cm = one(TURNS, ".claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000021.jsonl")
+    rs = records(cm)
+    assert sum(1 for r in rs if r.get("type") == "system" and r.get("subtype") == "turn_duration") == 9
+    blocked = [r for r in rs if r.get("subtype") == "stop_hook_summary" and r.get("hookErrors")]
+    assert len(blocked) == 1
+    # Stop-hook continuation in live order: end_turn, isMeta feedback, blocking attachment, summary
+    i = rs.index(blocked[0])
+    assert rs[i - 1]["type"] == "attachment" and rs[i - 1]["attachment"]["type"] == "hook_blocking_error"
+    assert rs[i - 2]["type"] == "user" and rs[i - 2]["isMeta"] is True
+    assert rs[i - 3]["message"]["stop_reason"] == "end_turn"
+
+
+def test_sl11_skill_load_record_shares_the_turn_prompt():
+    rs = records(one(TURNS, ".claude/projects/-w-gamma/*000021.jsonl"))
+    skill = next(r for r in rs if r.get("isMeta") and r.get("sourceToolUseID"))
+    call = next(b for r in rs for b in blocks(r) if b.get("type") == "tool_use" and b["id"] == skill["sourceToolUseID"])
+    assert call["name"] == "Skill"
+
+
+def test_sl11_local_commands_and_queued_human_attachment():
+    rs = records(one(TURNS, ".claude/projects/-w-gamma/*000021.jsonl"))
+    local = [r for r in rs if r.get("type") == "system" and r.get("subtype") == "local_command"]
+    assert [r["content"].split(">")[0] for r in local] == ["<command-name", "<local-command-stdout"]  # the live field
+    queued = next(r for r in rs if r.get("type") == "attachment" and r["attachment"]["type"] == "queued_command")
+    assert queued["attachment"]["origin"]["kind"] == "human"
+
+
+def test_sl11_codex_statuses_by_closing_event():
+    xe = records(codex(TURNS, "01900000-0000-7000-8000-0000000000e1"))
+    starts = [r["payload"]["turn_id"] for r in xe if r["type"] == "event_msg" and r["payload"]["type"] == "task_started"]
+    ends = {r["payload"]["turn_id"]: r["payload"]["type"] for r in xe
+            if r["type"] == "event_msg" and r["payload"]["type"] in ("task_complete", "turn_aborted")}
+    assert starts == ["te1", "te2", "te3", "te4", "te5", "te6", "te7"]
+    assert ends == {"te1": "task_complete", "te2": "task_complete", "te3": "turn_aborted",
+                    "te4": "task_complete", "te5": "task_complete"}
+
+
+def test_sl11_agent_message_direction():
+    xe = records(codex(TURNS, "01900000-0000-7000-8000-0000000000e1"))
+    xf = records(codex(TURNS, "01900000-0000-7000-8000-0000000000f1"))
+    report = next(r["payload"] for r in xe if r["payload"].get("type") == "agent_message")
+    dispatch = next(r["payload"] for r in xf if r["payload"].get("type") == "agent_message")
+    assert (report["author"], report["recipient"]) == ("/root/worker", "/root")
+    assert (dispatch["author"], dispatch["recipient"]) == ("/root", "/root/worker")
+    assert xf[0]["payload"]["source"]["subagent"]["thread_spawn"]["agent_path"] == "/root/worker"
+
+
+def test_sl11_fork_without_parent_holds_only_copied_history():
+    xk = records(codex(TURNS, "01900000-0000-7000-8000-0000000000f2"))
+    metas = [r["payload"]["id"] for r in xk if r["type"] == "session_meta"]
+    assert metas == ["01900000-0000-7000-8000-0000000000f2", "01900000-0000-7000-8000-0000000000f9"]
+    assert not list(FIXTURES.glob("**/rollout-*-01900000-0000-7000-8000-0000000000f9.jsonl"))
+
+
+def test_sl11_task_document_and_evidence_sessions():
+    doc = json.loads((FIXTURES / "captures" / "tasks-show-zz-000021.json").read_text())
+    note = doc["task"]["notes"][0]
+    assert note["harness_session"] == "claude-code:c0000000-0000-4000-8000-000000000022"
+    ct3 = records(one(TURNS, ".claude/projects/-w-gamma/*000024.jsonl"))
+    commands = [b["input"]["command"] for r in ct3 for b in blocks(r) if b.get("type") == "tool_use"]
+    assert commands == ["tasks start zz-000021", "false && tasks start zz-000021",
+                        "tasks start zz-000021 && false"]
+    assert all(b.get("is_error") for r in ct3 for b in blocks(r) if b.get("type") == "tool_result")
+
+
+def test_sl11_escaped_needle_is_absent_from_the_bytes():
+    raw = (FIXTURES / "captures" / "escaped.jsonl").read_bytes()
+    assert b"needle" not in raw and b"\\u006eeedle" in raw
+    assert json.loads(raw)["message"]["content"] == "needle"
+    bad = (FIXTURES / "captures" / "escaped-malformed.jsonl").read_bytes().splitlines()
+    assert len(bad) == 2 and b"\\u006eeedle" in bad[1]
+
+
 # --- the corpus itself ---------------------------------------------------------------------------
 
 PRIVATE = re.compile(r"/home/|/mnt/|/Users/|Dropbox|keith|titan|europa|@[a-z]+\.(com|org)|toolu_01"
@@ -433,7 +510,7 @@ def test_fixtures_hold_no_private_paths_or_identifiers():
 
 def test_every_fixture_file_is_listed_by_the_cases_document():
     doc = (Path(__file__).parents[1] / "docs/notes/session-log-acceptance-cases.md").read_text()
-    listed = set(re.findall(r"`((?:home|degraded|captures)/[^`]+)`", doc))
+    listed = set(re.findall(r"`((?:home|degraded|captures|turns)/[^`]+)`", doc))
     on_disk = {str(p.relative_to(FIXTURES)) for p in every_file(FIXTURES)}
     assert on_disk == listed
     assert CF in doc

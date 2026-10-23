@@ -9,7 +9,9 @@ evidence-labelled tracing. These are cases and fixtures only: they add no reader
 eval runner or eval record schema. Shared eval records stay with obs-abfcf9, and the
 harness-version store samples stay with obs-f5710b. Ten cases cover all seven surveyed
 question types. Passing them says nothing about population prevalence or automated trace
-precision.
+precision. SL11, added by hq-bb90ca for the session evidence reader's design (its §14.3),
+covers turn-final messages and task evidence. hq-b95324 required it; no surveyed episode
+did.
 
 The set is small because each case answers one surveyed question and carries several
 distinctions. Three cases share the reconstruct type because they need three different
@@ -44,6 +46,16 @@ Every identifier, path, task id, model name and text in them is synthetic.
 | CU | `degraded/.claude-work/projects/-w-delta/c0000000-0000-4000-8000-00000000000e.jsonl` | Claude, work | readable in git; replay makes it unreadable |
 | XD | `degraded/.codex/sessions/2026/10/11/rollout-2026-10-11T10-00-00-01900000-0000-7000-8000-0000000000d1.jsonl` | Codex, personal | ends in a partial line 3 with no newline, as a live append leaves it |
 | SDK | `captures/sdk-stream.jsonl` | Claude SDK `stream-json` capture | two Agent dispatches whose child events carry `parent_tool_use_id` |
+| CM | `turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000021.jsonl` | Claude, personal | thirteen turns under the `turn_duration` marker rule (SL11) |
+| CT1 | `turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000022.jsonl` | Claude, personal | the session the task document's stamped note names |
+| CT2 | `turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000023.jsonl` | Claude, personal | a prompt that only mentions zz-000021 |
+| CT3 | `turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000024.jsonl` | Claude, personal | three failing `tasks start zz-000021` calls, one alone and two in `&&` chains |
+| XE | `turns/.codex/sessions/2026/10/12/rollout-2026-10-12T10-00-00-01900000-0000-7000-8000-0000000000e1.jsonl` | Codex, personal | seven turns: phases, mirrors, questions, an abort, a null and a phaseless final, two unended turns, a child's report |
+| XF | `turns/.codex/sessions/2026/10/12/rollout-2026-10-12T10-05-00-01900000-0000-7000-8000-0000000000f1.jsonl` | Codex, personal | XE's unforked child: its controller's dispatch and its own final |
+| XK | `turns/.codex/sessions/2026/10/12/rollout-2026-10-12T11-00-00-01900000-0000-7000-8000-0000000000f2.jsonl` | Codex, personal | a forked child whose inherited thread `01900000-0000-7000-8000-0000000000f9` has no rollout: one copied turn |
+| TD | `captures/tasks-show-zz-000021.json` | `tasks show zz-000021 --json` capture | task zz-000021 with one stamped note naming CT1 |
+| ESC | `captures/escaped.jsonl` | Claude, explicit file | one prompt whose text `needle` is written `\u006eeedle` in the bytes |
+| ESM | `captures/escaped-malformed.jsonl` | Claude, explicit file | a valid `hello` prompt, then an unclosed record holding the same escape |
 
 `home/` has five of the six roots, the shape of the surveyed host. There is no
 `.codex-work/archived_sessions`. `degraded/` has only `.claude/projects`,
@@ -51,6 +63,18 @@ Every identifier, path, task id, model name and text in them is synthetic.
 receives it as an explicit file. The repository's `.gitignore` re-includes the fixture
 homes' dot-directories, which a global ignore of `.claude` or `.codex` would otherwise
 hide from git.
+
+`turns/` is a third home, with `.claude/projects` and `.codex/sessions` only. Its records
+follow Claude Code 2.1.304 and Codex CLI 0.164.0 as written on this host on 2026-10-23:
+each record kind copies the keys of a live record of that kind, keys only, with synthetic
+values. That covers the `system` `local_command`, `stop_hook_summary`, `turn_duration` and
+`scheduled_task_fire` records and the `queued_command` and `hook_blocking_error`
+attachments. Every `turn_duration` follows a `stop_hook_summary` with empty `hookErrors`,
+as in live files. TD is the output of the real `tasks` CLI (`tasks 0.4.0`) over a scratch
+registry holding a `zz` project, with the task's id and times then set to the fixture's.
+Its field paths are therefore the CLI's own, `harness_session_source` included, which the
+CLI writes as `CLAUDE_CODE_SESSION_ID`. The two escape files are explicit files, not a
+home.
 
 The records follow the formats observed on this host on 2026-10-20 (Claude Code 2.1.x,
 Codex CLI 0.163):
@@ -64,7 +88,8 @@ Codex CLI 0.163):
 - A Codex root's `session_meta` has `session_id` equal to its `id`. An unforked child
   (`fork_turns` `none`) has a single `session_meta` whose `session_id` is the parent's.
   A forked child also has a second, inherited `session_meta` whose `payload.id` is the
-  parent's (E069); no fixture forks.
+  parent's (E069). XK is the only fixture that forks. As in live forked children, its first
+  `session_meta` carries `forked_from_id` and `parent_thread_id` equal to the inherited id.
 
 The project's other tests build their homes under `tmp_path`. These fixtures are static
 files instead, so that a reader in any language can replay them and anyone can inspect
@@ -119,6 +144,7 @@ Each case states the question in the abstract, independent of CLI spelling.
 | SL8 | Reconstruct (parent→child), incidental parent fields | E072, E085, E142 | CA, AG, XC | observed; the human-origin command record is synthetic |
 | SL9 | Reconstruct (SDK dispatch) | E107 | SDK | observed |
 | SL10 | Coverage of empty matches; unrecoverable content | E104, E142, E001, E036 | degraded | observed failures; unreadable file synthetic |
+| SL11 | Turn-final messages and task evidence | none (hq-b95324) | turns, TD, ESC, ESM | live record shapes; synthetic content and turn sequences |
 
 "Observed" means a surveyed episode needed the distinction, against records of this
 shape. "Synthetic" means the fixture covers a shape that no cited episode exercised.
@@ -374,21 +400,123 @@ as parsed matches of a role.
 - The answer must not present `rm -rf build/cache` as the recovered command. This is
   E104's outcome.
 
+### SL11 — turn-final messages and task evidence
+
+**Question A.** List CM's turns, each with its trigger, status, final message and the
+basis for each.
+
+**Expected.** CM holds `turn_duration` records, so it follows the marker rule. Each turn
+is listed with its trigger, inputs, status and final or `last_assistant`:
+
+| Turn | Lines | Trigger | Status | Final (basis) or last assistant |
+|---|---|---|---|---|
+| 1 | `CM:1`–`CM:8` | `CM:1`, human | `completed` | final `CM:6#0` (`stop_reason`); `CM:2#0` is commentary; `CM:5` is the same message's thinking |
+| 2 | `CM:9`–`CM:14` | `CM:11`, human; inputs `CM:9`, `CM:10` (local command and its output) | `completed` | final `CM:12#0` |
+| 3 | `CM:15`–`CM:21` | `CM:15`, human; inputs also list `CM:17` (queued human) | `completed` | final `CM:19#0` |
+| 4 | `CM:22`–`CM:31` | `CM:22`, human | `completed` | final `CM:29#0`; `CM:23#0` is commentary |
+| 5 | `CM:32`–`CM:38` | `CM:32`, human | `completed` | final `CM:36#0` |
+| 6 | `CM:39`–`CM:43` | `CM:40`, injected (`isMeta` scheduled reminder) | `completed` | final `CM:41#0` |
+| 7 | `CM:44`–`CM:47` | `CM:44`, injected (`isMeta`, `origin.kind` `peer`) | `completed` | final `CM:45#0` |
+| 8 | `CM:48`–`CM:52` | `CM:48`, human | `interrupted` | last assistant `CM:49#0` |
+| 9 | `CM:53`–`CM:54` | `CM:53`, human | `interrupted` | none: no response |
+| 10 | `CM:55`–`CM:56` | `CM:55`, human | `waiting` | none; `AskUserQuestion` at `CM:56#0` has no result |
+| 11 | `CM:57`–`CM:60` | `CM:57`, human | `no_final` | none; `CM:58` is `<synthetic>`, `stop_sequence` |
+| 12 | `CM:61`–`CM:64` | `CM:61`, injected (`origin.kind` `task-notification`) | `completed` | final `CM:62#0` |
+| 13 | `CM:65`–`CM:66` | `CM:65`, human | `incomplete` | none; the call at `CM:66#0` has no result at end of file |
+
+Nine turns end at a `turn_duration`: 1–7, 11 and 12. Turn 10 ends where turn 11's prompt
+begins (`no_end_marker`).
+
+**Hard negatives.**
+- `CM:23` stopped for `end_turn` but is commentary. The `isMeta` Stop-hook feedback at
+  `CM:24`, the `hook_blocking_error` attachment at `CM:25` and the `stop_hook_summary`
+  with `hookErrors` at `CM:26` neither end turn 4 nor start a turn. This is the live order.
+- The Skill-load `isMeta` record at `CM:35` carries `sourceToolUseID` `toolu_fx_cm5` and
+  turn 5's `promptId`. It does not split turn 5.
+- `CM:17` is a queued human message, listed in turn 3's inputs and never its trigger.
+- `CM:39` (`scheduled_task_fire`) is metadata, not turn 6's trigger.
+- `CM:52` and `CM:54` are interrupt markers: injected, never human.
+- `CM:58` is never final and never a runtime model.
+- The triggers of turns 6, 7 and 12 are injected, so their finals answer no human request.
+
+**Question B.** List XE's, XF's and XK's turns with their status and final.
+
+**Expected.**
+
+| Turn | Status | Final (basis) or last assistant | Also |
+|---|---|---|---|
+| XE `te1` | `completed` | final `XE:7#0` (`phase`) | `XE:5` is commentary; the mirrors `XE:6` and `XE:8` collapse (`event_mirror`) |
+| XE `te2` | `completed`, `asks_user` | final `XE:13#0` (`phase`) | the mirror `XE:14` carries `questions` |
+| XE `te3` | `interrupted` (`turn_aborted`, reason `interrupted`) | last assistant `XE:19#0` | |
+| XE `te4` | `no_final` | none: `last_agent_message` is null | call `XE:24` paired with output `XE:25` |
+| XE `te5` | `completed` | final `XE:30#0` (`last_agent_message`) | `XE:30` has no `phase` |
+| XE `te6` | `incomplete` | last assistant `XE:35#0`, never final | `te7` starts at `XE:36` with no `task_complete` between |
+| XE `te7` | `incomplete` | none | the spawn `XE:39` binds to XF through `XE:40`; `XE:42` is XF's report, `injected` (author `/root/worker`) |
+| XF `tf1` | `completed` | final `XF:5#0` (`phase`) | trigger `XF:4`, `dispatch` from `/root`, with an `encrypted` block `XF:4#1` |
+| XK `tk-copied` | not `completed`: it has no final | last assistant `XK:6#0`, never final | `XK:3`–`XK:7` are `copy: ambiguous` |
+
+XK's inherited thread `01900000-0000-7000-8000-0000000000f9` has no rollout in any fixture
+home. So nothing marks where its copied range ends, and every record after its second
+`session_meta` (`XK:2`) is `ambiguous`. A turn built from that range carries
+`copy: ambiguous` and no `final`.
+
+**Hard negatives.**
+- `XE:35` is a `final_answer` message but not `te6`'s final: the turn has no
+  `task_complete`.
+- `XK:6` is the absent parent's final answer. It is never XK's final.
+- The mirrors repeat their messages. A count of assistant messages that includes them is
+  wrong.
+
+**Question C.** Which sessions hold evidence for task zz-000021, and of what kind?
+
+**Expected.** The task record is TD, the document `tasks show zz-000021 --json` returns.
+Its note at `2026-10-12T12:00:30Z` is stamped with `harness_session`
+`claude-code:c0000000-0000-4000-8000-000000000022`.
+
+| Session | Evidence | Turn | Ownership |
+|---|---|---|---|
+| CT1 | `provenance_stamp`, ref zz-000021 with the note's `at` | `CT1:1`–`CT1:7`, whose span holds 12:00:30 | yes |
+| CT3 | `unsuccessful_task_command` at `CT3:2#0`: one segment, result `CT3:3#0` `is_error` (basis `result_is_error`) | `CT3:1`–`CT3:10` | no: an attempt |
+| CT3 | `task_command` at `CT3:4#0` (`false && tasks start zz-000021`) and `CT3:6#0` (`tasks start zz-000021 && false`), results `is_error` | `CT3:1`–`CT3:10` | no |
+| CT2 | `textual_mention` at `CT2:1`, selected only when mentions are asked for | `CT2:1`–`CT2:4` | no |
+
+CT1's records never name zz-000021: the stamp is its only evidence. Without obs's index
+only the stamp is found, and coverage says so.
+
+**Hard negatives.**
+- A chain's error result belongs to the whole chain. `false && tasks start zz-000021`
+  failed before `tasks` ran, and `tasks start zz-000021 && false` failed after it
+  succeeded. Neither is `unsuccessful_task_command`.
+- CT2's mention is never ownership evidence, and without mentions it selects nothing.
+
+**Question D.** Search ESC and ESM, as explicit files, for `needle`.
+
+**Expected.**
+- ESC: `found` at `ESC:1`, whose text `"\u006eeedle"` decodes to `needle`. The byte string
+  `needle` occurs nowhere in the file, so a byte prefilter would skip the file and miss
+  the match.
+- ESM: `ESM:2` is an `unparsed` object with `raw_match` true, and the outcome is
+  `unknown`. `ESM:1` does not match.
+
 ## Required distinctions
 
 | Distinction | Cases |
 |---|---|
 | Both harnesses; home routing (personal/work, archived) | SL3, SL4, SL5, SL6, SL7 |
 | Historical outputs versus inputs | SL2, SL6, SL7 |
-| Call/result pairing, split records and content-block references | SL1, SL6, SL7, SL9 |
-| Human versus injected or copied history (by origin, not by a leading `<`) | SL1, SL2, SL5, SL6, SL7, SL8 |
+| Call/result pairing, split records and content-block references | SL1, SL6, SL7, SL9, SL11 |
+| Human versus injected or copied history (by origin, not by a leading `<`) | SL1, SL2, SL5, SL6, SL7, SL8, SL11 |
 | Runtime versus creation (and requested) model | SL1, SL3 |
 | Child→parent, parent→child, SDK dispatch links | SL3, SL7, SL8, SL9 |
 | Incidental and inherited parent fields | SL3 (and its forked limit), SL8 |
-| Mention versus work ownership | SL2, SL7 |
+| Mention versus work ownership | SL2, SL7, SL11 |
 | Empty match with missing, unreadable, malformed, truncated coverage | SL4, SL10 |
-| Unknown outcomes preserved | SL7 (unavailable brief without binding), SL10 |
+| Unknown outcomes preserved | SL7 (unavailable brief without binding), SL10, SL11 (escaped text in a malformed line) |
 | Aggregates through ordinary JSON processing | SL6 |
+| Turn boundaries, final versus commentary, and turn status in both harnesses | SL11 |
+| Fork history whose inherited thread is absent | SL11 |
+| Task evidence: stamp, single-segment attempt, chain error and mention | SL11 |
+| Escaped text in parsed and malformed lines | SL11 |
 
 ## Checking the cases against their sources
 
