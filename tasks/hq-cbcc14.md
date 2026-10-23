@@ -1,15 +1,17 @@
 ---
 id: hq-cbcc14
 title: Establish safe retention for Claude units referenced by successor links
-status: doing
+status: done
 priority: 2
 size: s
 complexity: high
 process: direct
-owner: main
+owner: cbcc14-prune-links
 created: 2026-10-22T17:51:08Z
-updated: 2026-10-22T23:17:17Z
+updated: 2026-10-23T00:01:19Z
 started: 2026-10-22T23:17:06Z
+completed: 2026-10-23T00:01:19Z
+closed: 2026-10-23T00:01:19Z
 depends: []
 parent: hq-401088
 tags: []
@@ -37,3 +39,12 @@ Ideas it wakes: On completion, run `tasks note hq-1639fd --no-reviewed "<finding
 - 2026-10-22T23:17:06Z (main): started
   provenance: {"harness_session":"claude-code:321ed526-7fc0-454a-a1d3-78653b539c96","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-22T23:17:17Z (main): arm: flow-trial-1 — unit tack-401088 — not enrolled
+- 2026-10-22T23:17:23Z (cbcc14-prune-links): resumed
+  provenance: {"harness_session":"claude-code:321ed526-7fc0-454a-a1d3-78653b539c96","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-22T23:49:48Z (cbcc14-prune-links): review: impl round 1 — verdict: revise; findings: Important 3, Minor 7; reviewer: claude-code/claude-opus-5-5
+- 2026-10-22T23:55:49Z (cbcc14-prune-links): review: impl round 2 — verdict: accept; findings: Minor 7; reviewer: claude-code/claude-opus-5-5
+- 2026-10-23T00:01:18Z (cbcc14-prune-links): just test at fbd2052 (docstring-only change after): 228 + 1005 + 389 + 1 passed, exit 0. Baseline at f7fe35a: 1 relay-cutover timing flake under load average ~35 (test_service_run_wait_and_result, 0.2 s service-start), passed alone in 1.9 s.
+- 2026-10-23T00:01:19Z (cbcc14-prune-links): done
+  provenance: {"harness_session":"claude-code:321ed526-7fc0-454a-a1d3-78653b539c96","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T00:01:19Z (cbcc14-prune-links): Fixtures (14 cases) and brief findings: pruning the older unit breaks the successor's link at quarantine; the linking unit's own prune strands its link and halts later runs, unseen by the dry run. Recommended rules 1-3 with gates recorded on hq-624351 (dep on hq-1639fd) and the obs-reader halt on hq-3b9c4c; hq-1639fd re-opened for scoping. Reviews: round 1 revise, round 2 accept (7 minors carried to hq-1639fd).
+  provenance: {"harness_session":"claude-code:321ed526-7fc0-454a-a1d3-78653b539c96","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
