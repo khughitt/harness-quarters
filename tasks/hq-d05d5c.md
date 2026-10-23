@@ -1,15 +1,17 @@
 ---
 id: hq-d05d5c
 title: session-episodes and rename-cutover read records from the records field of tasks projects
-status: doing
+status: done
 priority: 2
 size: s
 complexity: mid
 process: direct
 owner: hq-d05d5c-records-readers
 created: 2026-10-22T20:55:57Z
-updated: 2026-10-23T12:10:53Z
+updated: 2026-10-23T12:25:09Z
 started: 2026-10-23T11:42:30Z
+completed: 2026-10-23T12:25:09Z
+closed: 2026-10-23T12:25:09Z
 depends: [tasks-211e28]
 tags: []
 source: tasks-dc16eb
@@ -31,3 +33,7 @@ tasks:docs/specs/2026-10-22-records-home-design.md §4, §7.4. session-episodes 
 - 2026-10-23T11:56:40Z (hq-d05d5c-records-readers): probe (sandbox, tasks 0.4.0): tasks rename on a detached project moves <records>/<old> to <records>/<new> uncommitted in the records repo; after the checkout moves, tasks init --prefix <new> --force --records refuses (init does not relink an existing project). So rename-cutover cannot re-point a detached checkout; ruling: it reads prefix and records through tasks projects, save refuses a snapshot repository whose records lie outside it, and the CLI gap goes to tasks as feedback
 - 2026-10-23T12:09:16Z (hq-d05d5c-records-readers): review: impl round 1 — verdict: accept; findings: Critical 0, Important 0, Minor 9; reviewer: claude-code/claude-opus-5-5
 - 2026-10-23T12:10:53Z (hq-d05d5c-records-readers): ruling: rename-cutover refuses a snapshot repository whose records lie outside it instead of supporting a detached rename (design §4/§5.4 expected support). Why: rollback resets only saved repositories and tasks init cannot re-point a moved detached checkout (tasks-e9ce63). Cost if wrong: a detached project cannot use the cutover until hq-5300fd lands. Minors fixed: verify runs tasks projects at the root (RED->GREEN), precondition label. Deferred minors: hq-7255db
+- 2026-10-23T12:25:09Z (hq-d05d5c-records-readers): done
+  provenance: {"harness_session":"claude-code:f7a1ba88-e38e-4353-b879-b62ae0b89719","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T12:25:09Z (hq-d05d5c-records-readers): session-episodes reads records from tasks resolve's records field and enumerates the records repository's worktrees at the project's offset (no-op for in-tree, verified identical on 3 days of live stores; one copy for detached). rename-cutover reads prefix and records through tasks projects and refuses a snapshot repository whose records lie outside it (ruling noted; detached support is hq-5300fd, blocked on tasks-e9ce63). Minors deferred to hq-7255db. just test: 231, 1027, 389, 1 passed.
+  provenance: {"harness_session":"claude-code:f7a1ba88-e38e-4353-b879-b62ae0b89719","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
