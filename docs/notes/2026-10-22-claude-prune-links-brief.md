@@ -254,14 +254,13 @@ Limits:
   units share an inode: that changes what capture, quarantine and the open-file check
   see, and needs its own look before it lands.
 
-Recommendation: drop rule 2 and rule 3's link inventory. For an ordinary session's
-`--resume`, resume does not justify keeping a target, and Claude's own cleanup already
-leaves such links dangling. The reviewed design should confirm the background-session
-path (attach or resume through the daemon) before relying on this for every
-successor. Keep
-rule 1 (`kept:has-link`, with its re-check before release): it prevents the
-`failed:release` quarantine halt, which does not depend on whether anyone reads the
-link.
+Recommendation: once the background-session path (attach or resume through the
+daemon) is shown not to read the link either, drop rule 2 and rule 3's link inventory.
+Every live link comes from a background successor, so until then rule 2 stands. For an
+ordinary session's `--resume`, resume gives no reason to keep a target, and Claude's
+own cleanup already leaves such links dangling. Keep rule 1 (`kept:has-link`, with its
+re-check before release) in any case: it prevents the `failed:release` quarantine
+halt, which does not depend on whether anyone reads the link.
 
 ## Constraints
 
@@ -279,8 +278,9 @@ prune, timer change, or mutation of another session's links. The session-reader 
 
 - **Retain referenced targets.** Keep an older unit while a surviving unit links to
   it. Lean here: it preserves the existing live relationship without rewriting the
-  surviving session. Settle the policy and remaining concurrency limits in the
-  reviewed revision, using the completed fixture evidence and pending probe.
+  surviving session. It holds until the background-session path is probed (see the
+  Recommendation under "Resume probe"); settle the policy and remaining concurrency
+  limits in the reviewed revision.
 - **Prune linked units together, in a safe order.** Potentially reclaims more space,
   but requires every affected unit to qualify and complicates partial failure and
   quarantine rollback. No atomic group operation exists today.
