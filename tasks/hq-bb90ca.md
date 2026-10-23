@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: session-evidence-reader
 created: 2026-10-23T16:11:45Z
-updated: 2026-10-23T16:28:09Z
+updated: 2026-10-23T16:28:20Z
 started: 2026-10-23T16:28:09Z
 depends: []
 parent: hq-c411df
@@ -36,3 +36,4 @@ Verification: the SL11 self-checks fail before the fixtures exist, then pass; ju
   provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-23T16:28:09Z (session-evidence-reader): started
   provenance: {"harness_session":"claude-code:f7f539e5-48f4-4265-a16a-be9f26e40276","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T16:28:20Z (session-evidence-reader): arm: flow-trial-1 — unit tack-c411df — flow on
