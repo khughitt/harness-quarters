@@ -4,8 +4,9 @@ title: Tool runner requires unavailable approval after explicit user authorizati
 status: idea
 priority: 2
 created: 2026-10-23T01:34:33Z
-updated: 2026-10-23T01:34:33Z
+updated: 2026-10-23T11:21:23Z
 depends: []
+parent: hq-62c3b1
 tags: [feedback, friction, "from:ops"]
 agent: codex
 ---
