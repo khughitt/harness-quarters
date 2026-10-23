@@ -202,6 +202,24 @@ throwaway repositories under a temporary `CODEX_HOME` that holds a copy of the
    (`exec_policy.rs`, `bash.rs`, `is_dangerous_command.rs`) changed only in PowerShell
    handling and refactors that keep the Linux bash path's behaviour.
 
+   **Applied 2026-10-23 on titan** (the first host; the second host still has
+   line 45 as `prompt`). Line 45 of the live rules was replaced by the lines below.
+   They differ from the reviewed text above only in two deferred minors of review
+   round 2, folded in at application: the justification says that in a rebase `:3:`
+   is your own commit being replayed, and it quotes every path and uses `cp --`.
+   Checked: the quoted form on a path with a space, run from a
+   subdirectory, took theirs and `git add -- "<path>"` staged it; `codex execpolicy
+   check` on the edited live file gives `forbidden` with this text for `git restore`,
+   `allow` for both new forms and for `git add -- <path>`, and no match for
+   `git rm --cached --no-cached -f -- <path>`. Whether a Codex session already running
+   reloads the rules was not checked; a new session reads the edited file.
+
+   ```
+   prefix_rule(pattern=["git", "restore"], decision="forbidden", justification="git restore can overwrite uncommitted work. To unstage, run git reset -q -- <path>; for a newly added file, git rm --cached -- <path> also works. To take one side of a conflict, write git show :3:./<path> (theirs; :2:./<path> for ours; in a rebase :3: is your own commit being replayed) to a temporary file and, only if that succeeds, copy it over the file: tmp=$(mktemp) && git show \":3:./<path>\" > \"$tmp\" && cp -- \"$tmp\" \"<path>\" && rm \"$tmp\". Then run git add -- \"<path>\" as its own command.")
+   prefix_rule(pattern=["git", "reset", "-q", "--"], decision="allow")
+   prefix_rule(pattern=["git", "rm", "--cached", "--"], decision="allow")
+   ```
+
 Probe verdict (hq-748431): 1 fails, because the justification is dropped under `never`,
 and the forms it names fail in the sandbox in a worktree; 2 is inexpressible, because
 strictest wins; 3 leaves `git restore <path>` unguarded in main checkouts and still
