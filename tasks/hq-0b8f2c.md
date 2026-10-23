@@ -1,15 +1,17 @@
 ---
 id: hq-0b8f2c
 title: Probe whether a resumed Claude successor session reads its linked subagent transcript
-status: doing
+status: done
 priority: 2
 size: s
 complexity: mid
 process: direct
-owner: main
+owner: probe-successor-link
 created: 2026-10-23T00:09:51Z
-updated: 2026-10-23T01:33:20Z
+updated: 2026-10-23T02:42:26Z
 started: 2026-10-23T01:33:10Z
+completed: 2026-10-23T02:42:26Z
+closed: 2026-10-23T02:42:26Z
 depends: []
 parent: hq-401088
 tags: []
@@ -35,3 +37,18 @@ Ideas it wakes: On completion, run `tasks note hq-1639fd --no-reviewed "<finding
 - 2026-10-23T01:33:10Z (main): started
   provenance: {"harness_session":"claude-code:38f3b682-ef1d-4f4a-a80b-80579e770420","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-23T01:33:20Z (main): arm: flow-trial-1 — unit tack-401088 — not enrolled
+- 2026-10-23T01:38:27Z (probe-successor-link): resumed
+  provenance: {"harness_session":"claude-code:38f3b682-ef1d-4f4a-a80b-80579e770420","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T01:38:27Z (probe-successor-link): static read of Claude Code 2.1.304 (also 2.1.296/2.1.302): an [adopt] handoff hard-links agent-<id>.jsonl/.meta.json into the successor (copy fallback), and a 'relink sweep' on resume converts symlinked agent-* names in the session's subagents/ to hard links or copies, gated on storageV5 (z() && storageV5). The live hq pair was linked under 2.1.304 yet is a symlink, so the sweep/adopt path is not what ran here. Session listing filters subagents/ entries with Dirent.isFile(), skipping symlinks.
+- 2026-10-23T02:06:55Z (probe-successor-link): attached: successor-link-probe-2026-10-22.jsonl (3345 bytes): Final successor-link-probe run on Claude Code 2.1.304 at 7107937: four resumes (headless and interactive, link resolving and dangling), outcome false
+- 2026-10-23T02:07:02Z (probe-successor-link): probe at 7107937: hand-made pair (O finished background agent, N --fork-session copy, absolute link + regular meta in N/subagents), 4 resumes per run (headless -p --resume and TUI --resume in private tmux; link resolving and O's unit moved aside) under strace -ff -y: no syscall named anything under N/subagents, no io_uring ring, all exited 0 and replied, link unchanged; 3 runs agreed, outcome false. Harness-made pair not reproduced: claude --bg --resume of a running O started a copy without the agent; /background offered to stop it. Live pairs are bg-session takeovers (sessionKind bg, session_cron_carry). just test: 228, 1017, 389, 1 passed. Review dispatched.
+- 2026-10-23T02:14:13Z (probe-successor-link): review: impl round 1 — verdict: revise; findings: Critical 1, Important 3, Minor 13; reviewer: claude-code/claude-opus-5-5
+- 2026-10-23T02:27:13Z (probe-successor-link): detached: successor-link-probe-2026-10-22.jsonl: superseded: that run was of a draft revision (7107937); the recorded run is now the one at a942426
+- 2026-10-23T02:27:13Z (probe-successor-link): attached: successor-link-probe-a942426.jsonl (3610 bytes): successor-link-probe run on Claude Code 2.1.304 with the probe at a942426: four resumes (headless and interactive, link resolving and dangling), outcome false
+- 2026-10-23T02:32:29Z (probe-successor-link): review: impl round 2 — verdict: revise; findings: Important 1, Minor 4; reviewer: claude-code/claude-opus-5-5
+- 2026-10-23T02:41:37Z (probe-successor-link): review: impl round 3 — verdict: accept; findings: Minor 3; reviewer: claude-code/claude-opus-5-5
+- 2026-10-23T02:42:25Z (probe-successor-link): deferred minors filed as hq-e5410b (untraced-claude exe match, target mutation, signal edges, reply check, traces on false); background-session path filed as hq-9e64f4. just test at 0d815fe: 228, 1024, 389, 1 passed; 9d1884a is docs-only.
+- 2026-10-23T02:42:26Z (probe-successor-link): done
+  provenance: {"harness_session":"claude-code:38f3b682-ef1d-4f4a-a80b-80579e770420","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T02:42:26Z (probe-successor-link): Probe and fact resume-reads-linked-subagent (claude-code 2.1.304: false): resuming an ordinary session never touches a successor's linked subagent transcript, resolving or dangling. Harness-made pair not reproduced; background-session path filed as hq-9e64f4. Brief updated; rule 2 stays a gate, rule 1 stays. Three review rounds, last accept; minors in hq-e5410b.
+  provenance: {"harness_session":"claude-code:38f3b682-ef1d-4f4a-a80b-80579e770420","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

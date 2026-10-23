@@ -438,3 +438,16 @@ version = "1.1.0"
 date = 2026-10-15
 evidence = "hq-24416e"
 note = "P2 unchanged: file A/medium, CLI B/high. Save current thinking high first, then current model B: zero picker refreshes, settings B/high, one shutdown refresh reading B/high. Model-first would reapply saved medium and emit a thinking change."
+
+[facts.resume-reads-linked-subagent]
+type = "boolean"
+description = "Resuming a session reads a subagent transcript that the session's subagents directory holds as a symbolic link into another session."
+probe = "claude/probes/successor-link-probe.py"
+
+[facts.resume-reads-linked-subagent.harness.claude-code]
+status = "probed"
+value = false
+version = "2.1.304"
+date = 2026-10-22
+evidence = "hq-0b8f2c"
+note = "Hand-made pair of ordinary sessions: O ran one background agent to completion, N is a --fork-session copy of O, and N/subagents/agent-<id>.jsonl is an absolute link to O's transcript beside a regular .meta.json copy, the shape of the live links. Live successors are background sessions (sessionKind bg) that took over a running agent; that path was not driven. N was resumed headless (-p --resume) and in the terminal interface (--resume), with the link resolving and with O's whole unit moved aside, under strace -ff -y over file syscalls, content syscalls (read, pread, preadv, mmap, sendfile, copy_file_range, splice) and getdents64. No call opened, read or changed the link or its target, or named anything under N/subagents; no unparsed trace line named them; no io_uring ring was set up and no untraced claude process was seen before or after a resume; every resume exited 0 and replied, and the link was left as it was. One recorded run at the probe's committed revision (attached to hq-0b8f2c); three earlier runs of draft revisions agreed under weaker checks (one attached at 565b286). Not shown: a pair Claude Code makes itself (claude --bg --resume of a running session started a copy that did not take the agent; /background offered to stop it), resuming or reattaching a background session through its daemon, opening the agent's transcript from the agent view, or the relink sweep, which turns symlinked agent-* names into hard links or copies on resume only behind a storage-v5 gate that was off here."
