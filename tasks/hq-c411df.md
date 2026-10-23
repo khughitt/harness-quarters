@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: session-evidence-reader
 created: 2026-10-20T11:19:18Z
-updated: 2026-10-23T15:35:38Z
+updated: 2026-10-23T15:36:50Z
 started: 2026-10-23T12:40:18Z
 depends: [hq-a1c591, hq-de3e4c]
 parent: hq-cff824
@@ -87,3 +87,4 @@ Found while checking whether stamped friction reports can be traced to their ori
 - 2026-10-23T15:35:37Z (session-evidence-reader): resumed
   provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-23T15:35:37Z (session-evidence-reader): review: plan round 1 — verdict: revise; findings: important 4, minor 1; reviewer: codex/gpt-6.1-sol
+- 2026-10-23T15:36:50Z (session-evidence-reader): Plan revision 2 at 1fea7bf (sha256 3127dcfb9b83c603f3b0d9620809843ff9838d135a4a6ee449ea8100c0c0529d) addresses plan round 1: listing validator widened to turns/, harness TASKS_STUB answers every show form (INGEST_STUB kept for list/projects/resolve), private _flags/_prompt_id/_source_tool_use_id carried to the turn parser and never emitted, inherited_turn_ids returns every physical turn id with a nested-fork test, absent term in the missing-file test.
