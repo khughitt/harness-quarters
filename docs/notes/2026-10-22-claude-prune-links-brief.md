@@ -143,10 +143,11 @@ Gates for hq-624351:
   exist in the live store now: hq-d59a7b found two, and one of them is already past
   30 days on both sides.
 - **The obs-reader halt is a hard gate**, owned by hq-3b9c4c.
-- **Rule 2, with rule 3, was a policy gate.** It rested on not knowing whether a
-  resumed successor reads the linked transcript. hq-0b8f2c found that it does not
-  (below), which removes the case for keeping a target only because a link points
-  into it.
+- **Rule 2, with rule 3, is still a policy gate.** It rests on whether a resumed
+  successor reads the linked transcript. hq-0b8f2c found that an ordinary session's
+  `--resume` does not (below). Live successors are background sessions, though, and
+  resuming or reattaching one through the daemon was not checked. The gate stays until
+  that path is.
 
 All three need a reviewed revision of the archive spec, covering §3.3 (links are not
 archived), §3.4's conditions, §3.4.1 and §3.4.2. They also need a revision of the plan.
@@ -225,12 +226,13 @@ What was driven:
   `getdents64`.
 
 Result: one recorded run at the probe's committed revision, attached to hq-0b8f2c.
-Three earlier runs of draft revisions agreed.
+Three earlier runs of draft revisions agreed under weaker checks; the one attached
+then is in git history at 565b286.
 
 - **No reads.** No call opened, read or changed the link or its target, or named
   anything under N's `subagents/`, and no unparsed trace line named them. No io_uring
-  ring was set up and no untraced claude process ran. The trace did see N's own
-  transcript being read, which is the control.
+  ring was set up, and no untraced claude process was seen before or after a resume.
+  The trace did see N's own transcript being read, which is the control.
 - **A dangling link is harmless to resume.** Every resume exited 0 and replied, and
   the link was left as it was.
 - **Two other readers checked.** Claude's session listing (static read of 2.1.304)
@@ -289,8 +291,8 @@ prune, timer change, or mutation of another session's links. The session-reader 
 ## Unanswered questions
 
 - **hq-0b8f2c, isolated harness probe:** answered for 2.1.304 with a hand-made pair;
-  see "Resume probe" above. A harness-made pair, the agent view, and storage-v5 hard
-  links remain open.
+  see "Resume probe" above. Still open: a harness-made pair, resuming or reattaching a
+  background session through the daemon, the agent view, and storage-v5 hard links.
 - **hq-d59a7b, read-only survey:** answered; see "Live survey" above. The second
   host's stores were not surveyed.
 - **Later reviewed design:** after those results, settle the retention policy and
