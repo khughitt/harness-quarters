@@ -1,13 +1,15 @@
 ---
 id: hq-0b8f2c
 title: Probe whether a resumed Claude successor session reads its linked subagent transcript
-status: todo
+status: doing
 priority: 2
 size: s
 complexity: mid
 process: direct
+owner: main
 created: 2026-10-23T00:09:51Z
-updated: 2026-10-23T00:32:22Z
+updated: 2026-10-23T01:33:10Z
+started: 2026-10-23T01:33:10Z
 depends: []
 parent: hq-401088
 tags: []
@@ -27,3 +29,8 @@ Ideas it wakes: On completion, run `tasks note hq-1639fd --no-reviewed "<finding
 ## References
 
 - brief (input, required, kind=brief): docs/notes/2026-10-22-claude-prune-links-brief.md — findings, rules 1-3 and the open questions
+
+## Notes
+
+- 2026-10-23T01:33:10Z (main): started
+  provenance: {"harness_session":"claude-code:38f3b682-ef1d-4f4a-a80b-80579e770420","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
