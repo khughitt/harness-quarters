@@ -100,9 +100,14 @@ def test_an_io_uring_ring_is_recorded():
     assert probe.scan(trace(), LINK, TARGET, MAIN)["uring"] is False
 
 
-def run(case, *, read=False, main=True, code=0, replied=True, uring=False):
-    return {"case": case, "exit": code, "replied": replied,
-            "seen": {"target_read": read, "link_opened": read, "main_read": main, "uring": uring}}
+SYMLINK = {"kind": "symlink", "target": TARGET, "resolves": True}
+
+
+def run(case, *, read=False, main=True, code=0, replied=True, uring=False, **seen):
+    base = {"target_read": read, "target_opened": read, "link_opened": read, "link_mutated": [],
+            "main_read": main, "uring": uring, "unparsed": []}
+    return {"case": case, "exit": code, "replied": replied, "untraced": seen.pop("untraced", []),
+            "link_before": SYMLINK, "link_after": seen.pop("after", SYMLINK), "seen": {**base, **seen}}
 
 
 def test_verdict_true_when_a_resolving_resume_reads_the_target():
@@ -120,3 +125,52 @@ def test_verdict_inconclusive_without_the_control_or_a_clean_resolving_run():
     # A ring can open and read files without a syscall strace sees, so a negative needs none.
     assert probe.verdict([run("resolves", uring=True), run("dangling")]) == "inconclusive"
     assert probe.verdict([run("dangling")]) == "inconclusive"
+
+
+def test_verdict_inconclusive_when_the_link_or_target_was_opened_changed_or_hidden():
+    # An open without a traced read can still be a read (mmap, a copy), so it is no negative.
+    assert probe.verdict([run("resolves", link_opened=True)]) == "inconclusive"
+    assert probe.verdict([run("resolves", target_opened=True)]) == "inconclusive"
+    assert probe.verdict([run("resolves", link_mutated=["renameat2"])]) == "inconclusive"
+    assert probe.verdict([run("resolves", after={"kind": "file", "inode": 7, "links": 2})]) == "inconclusive"
+    assert probe.verdict([run("resolves", unparsed=['openat(3</p>, "N/subagents/agent-a1.jsonl" <unfinished ...>'])]) == "inconclusive"
+    assert probe.verdict([run("resolves", untraced=[4242])]) == "inconclusive"
+
+
+def test_an_open_of_the_target_by_its_own_path_or_through_the_link_counts_as_opened():
+    assert probe.scan(trace(f'openat(AT_FDCWD</s>, "{TARGET}", O_RDONLY) = 6<{TARGET}>'), LINK, TARGET, MAIN)["target_opened"] is True
+    assert probe.scan(trace(f'openat(AT_FDCWD</s>, "{LINK}", O_RDONLY) = 6<{TARGET}>'), LINK, TARGET, MAIN)["target_opened"] is True
+
+
+def test_content_reached_by_mmap_or_a_copy_counts_as_read():
+    for line in (f"mmap(NULL, 4096, PROT_READ, MAP_PRIVATE, 6<{TARGET}>, 0) = 0x7f0000000000",
+                 f"copy_file_range(6<{TARGET}>, NULL, 7</x>, NULL, 4096, 0) = 812",
+                 f"preadv2(6<{TARGET}>, [{{iov_base=\"{{\"..., iov_len=812}}], 1, 0, 0) = 812",
+                 f"sendfile(7</x>, 6<{TARGET}>, NULL, 4096) = 812"):
+        assert probe.scan(trace(line), LINK, TARGET, MAIN)["target_read"] is True, line
+
+
+def test_a_read_whose_data_holds_a_closing_bracket_still_names_its_descriptor():
+    seen = probe.scan(trace(f'read(6<{TARGET}>, ">"..., 4096) = 812'), LINK, TARGET, MAIN)
+    assert seen["target_read"] is True
+
+
+def test_an_unparsed_line_naming_the_link_or_target_is_kept():
+    seen = probe.scan(trace(f'openat(AT_FDCWD</s>, "{LINK}", O_RDONLY <unfinished ...>',
+                            '<... openat resumed>) = 6</x>'), LINK, TARGET, MAIN)
+    assert len(seen["unparsed"]) == 1
+
+
+def test_traced_reads_only_strace_output_files(tmp_path):
+    prefix = tmp_path / "resolves-headless"
+    (tmp_path / "resolves-headless.1234").write_text("one\n")
+    (tmp_path / "resolves-headless.debug").write_text("debug\n")
+    (tmp_path / "resolves-headless.out").write_text("out\n")
+    assert probe.traced(prefix) == ["one"]
+
+
+def test_environment_is_built_key_by_key(tmp_path):
+    env = probe.environment(tmp_path, "token")
+    assert set(env) == {"PATH", "HOME", "CLAUDE_CONFIG_DIR", "TMPDIR", "USER", "TERM", "SUCC_PROBE",
+                        "CLAUDE_CODE_OAUTH_TOKEN", "DISABLE_AUTOUPDATER"}
+    assert env["HOME"].startswith(str(tmp_path)) and env["CLAUDE_CONFIG_DIR"].startswith(str(tmp_path))

@@ -190,13 +190,14 @@ MIT licensed; see `LICENSE`.
   subagent per file name try a Write, and prints each name's prediction and outcome
   (`subagent-write-refused`). Rerun it after a Claude Code upgrade: `true` refreshes the
   entry's version and date, `false` means the rule changed, and `inconclusive` changes
-  nothing in the file. `successor-link-probe.py` builds a successor whose subagent
-  transcript is a symbolic link into an older session, in a scratch `CLAUDE_CONFIG_DIR`
-  with only the live access token in its environment, and resumes it headless and in a
-  private tmux server under strace, with the link resolving and dangling
-  (`resume-reads-linked-subagent`). It needs `strace` and `tmux`, and at least 15 minutes
-  of token life. Rerun it after a Claude Code upgrade: `true` or `false` is the entry's
-  value for that version, and `inconclusive` changes nothing in the file.
+  nothing in the file. `successor-link-probe.py` builds a hand-made successor
+  (an ordinary session, not a background one) whose subagent transcript is a symbolic
+  link into an older session, in a scratch `CLAUDE_CONFIG_DIR` with only the live access
+  token in its environment, and resumes it headless and in a private tmux server under
+  strace, with the link resolving and dangling (`resume-reads-linked-subagent`). It
+  needs `strace` and `tmux`, and at least 15 minutes of token life. Rerun it after a
+  Claude Code upgrade: `true` or `false` is the entry's value for that version, and
+  `inconclusive` changes nothing in the file.
 - `pi/`: the pinned pi install. `package.json` and its lock pin the CLI and the
   pi-durable SDK to one version; `just pi-install` installs it under
   `~/.local/share/pi/<version>`, outside the synced checkout, and `pi/bin/pi`, linked as

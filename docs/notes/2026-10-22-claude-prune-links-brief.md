@@ -214,25 +214,35 @@ What was driven:
   the agent ("1 local agent will be stopped") rather than hand it over.
 - **The probe used a hand-made pair instead.** O ran one background agent to
   completion, and N was a `--fork-session` copy of O. N's `subagents/` got an absolute
-  link to O's transcript, beside a regular copy of its `.meta.json`, which is the live
-  shape.
+  link to O's transcript, beside a regular copy of its `.meta.json`. Only the
+  `subagents/` directory has the live shape: both sessions are ordinary, while a live
+  N is a background session.
 - **Four resumes per run, under `strace -ff -y`.** N was resumed headless
   (`claude -p --resume`) and in the terminal interface (`claude --resume` in a private
   tmux server), each with the link resolving and with O's whole unit moved aside, as
-  quarantine would. The trace covered file syscalls, reads and `getdents64`.
+  quarantine would. The trace covered file syscalls, content syscalls (`read`,
+  `pread`, `preadv`, `mmap`, `sendfile`, `copy_file_range`, `splice`) and
+  `getdents64`.
 
-Result, the same in three runs:
+Result: one recorded run at the probe's committed revision, attached to hq-0b8f2c.
+Three earlier runs of draft revisions agreed.
 
-- **No reads.** No call named anything under N's `subagents/`, and no io_uring ring was
-  set up. The trace did see N's own transcript being read, which is the control.
+- **No reads.** No call opened, read or changed the link or its target, or named
+  anything under N's `subagents/`, and no unparsed trace line named them. No io_uring
+  ring was set up and no untraced claude process ran. The trace did see N's own
+  transcript being read, which is the control.
 - **A dangling link is harmless to resume.** Every resume exited 0 and replied, and
   the link was left as it was.
-- **No other reader was found.** Claude's session listing (static read of 2.1.304)
+- **Two other readers checked.** Claude's session listing (static read of 2.1.304)
   filters `subagents/` entries with `Dirent.isFile()`, which skips links. obs skips
-  transcript links since obs-396637.
+  transcript links since obs-396637. No wider search for readers was made.
 
 Limits:
 
+- **A background successor was not resumed.** Live successors are background
+  sessions (`sessionKind: "bg"`). 2.1.304 handles them apart: the resume list skips
+  them, and a daemon serves `claude attach` and `claude agents`. Resuming or
+  reattaching one through that path was not driven.
 - **Opening the agent's transcript from the agent view** was not driven.
 - **Hard links may come later.** 2.1.304 already has a takeover path that hard-links
   the transcript (copying when it cannot), and a relink sweep. On resume, the sweep
@@ -242,8 +252,11 @@ Limits:
   units share an inode: that changes what capture, quarantine and the open-file check
   see, and needs its own look before it lands.
 
-Recommendation: drop rule 2 and rule 3's link inventory. Resume does not justify
-keeping a target, and Claude's own cleanup already leaves such links dangling. Keep
+Recommendation: drop rule 2 and rule 3's link inventory. For an ordinary session's
+`--resume`, resume does not justify keeping a target, and Claude's own cleanup already
+leaves such links dangling. The reviewed design should confirm the background-session
+path (attach or resume through the daemon) before relying on this for every
+successor. Keep
 rule 1 (`kept:has-link`, with its re-check before release): it prevents the
 `failed:release` quarantine halt, which does not depend on whether anyone reads the
 link.
