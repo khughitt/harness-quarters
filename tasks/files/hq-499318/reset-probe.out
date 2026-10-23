@@ -1,0 +1,7 @@
+with-head | git reset -q -- f        | rc=0 | index: ?? f;    | f=staged uncommitted 
+with-head | git rm --cached -- f     | rc=1 | index: AM f;    | f=staged uncommitted 
+with-head | git rm --cached -f -- f  | rc=0 | index: ?? f;    | f=staged uncommitted 
+unborn    | git reset -q -- f        | rc=0 | index: ?? f;    | f=staged uncommitted 
+unborn    | git rm --cached -- f     | rc=1 | index: AM f;    | f=staged uncommitted 
+unborn    | git rm --cached -f -- f  | rc=0 | index: ?? f;    | f=staged uncommitted 
+git version 2.56.0
