@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: hq-d05d5c-records-readers
 created: 2026-10-22T20:55:57Z
-updated: 2026-10-23T12:25:09Z
+updated: 2026-10-23T12:41:49Z
 started: 2026-10-23T11:42:30Z
 completed: 2026-10-23T12:25:09Z
 closed: 2026-10-23T12:25:09Z
@@ -37,3 +37,4 @@ tasks:docs/specs/2026-10-22-records-home-design.md §4, §7.4. session-episodes 
   provenance: {"harness_session":"claude-code:f7a1ba88-e38e-4353-b879-b62ae0b89719","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-23T12:25:09Z (hq-d05d5c-records-readers): session-episodes reads records from tasks resolve's records field and enumerates the records repository's worktrees at the project's offset (no-op for in-tree, verified identical on 3 days of live stores; one copy for detached). rename-cutover reads prefix and records through tasks projects and refuses a snapshot repository whose records lie outside it (ruling noted; detached support is hq-5300fd, blocked on tasks-e9ce63). Minors deferred to hq-7255db. just test: 231, 1027, 389, 1 passed.
   provenance: {"harness_session":"claude-code:f7a1ba88-e38e-4353-b879-b62ae0b89719","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T12:41:49Z (main): scratch: probe-rename.sh attached to hq-5300fd (its trap removed: it could unregister ai from the live registry on an early failure); live-comparison outputs discarded, result recorded in the done message; /mnt/ssd3/work/hq/hq-d05d5c removed
