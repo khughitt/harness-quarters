@@ -1,15 +1,17 @@
 ---
 id: hq-d59a7b
 title: "Survey live Claude stores and obs's index for successor links: count, form, age, and link-path rows"
-status: doing
+status: done
 priority: 2
 size: xs
 complexity: low
 process: direct
 owner: survey-successor-links
 created: 2026-10-23T00:09:52Z
-updated: 2026-10-23T01:20:38Z
+updated: 2026-10-23T01:30:19Z
 started: 2026-10-23T01:19:12Z
+completed: 2026-10-23T01:30:19Z
+closed: 2026-10-23T01:30:19Z
 depends: []
 parent: hq-401088
 tags: []
@@ -36,4 +38,8 @@ Ideas it wakes: On completion, run `tasks note hq-1639fd --no-reviewed "<survey 
   provenance: {"harness_session":"claude-code:38f3b682-ef1d-4f4a-a80b-80579e770420","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-23T01:19:22Z (main): arm: flow-trial-1 — unit tack-401088 — not enrolled
 - 2026-10-23T01:20:38Z (survey-successor-links): resumed
+  provenance: {"harness_session":"claude-code:38f3b682-ef1d-4f4a-a80b-80579e770420","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T01:30:19Z (survey-successor-links): done
+  provenance: {"harness_session":"claude-code:38f3b682-ef1d-4f4a-a80b-80579e770420","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T01:30:19Z (survey-successor-links): Surveyed both Claude stores and obs index-state: 2 absolute, resolving successor links (beliefs pair 46 days old, past the 30-day horizon; hq pair fresh), none in claude-work; the realpath conflict fires against today's index. Brief updated (Live survey); findings noted on hq-1639fd and hq-3b9c4c.
   provenance: {"harness_session":"claude-code:38f3b682-ef1d-4f4a-a80b-80579e770420","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
