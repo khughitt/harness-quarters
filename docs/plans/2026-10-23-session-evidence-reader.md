@@ -120,7 +120,11 @@ Spec §14.3 and §14.2 (escaped text). This is hq-c411df's only child. It runs i
 - **Modify** `docs/notes/session-log-acceptance-cases.md`: add the files to the fixture
   table, give `turns/` its own paragraph after `degraded/`, and add an SL11 section and
   rows to the case and distinction tables.
-- **Modify** `tools/test_session_log_cases.py`: SL11 self-check tests.
+- **Modify** `tools/test_session_log_cases.py`:
+  - add the SL11 self-check tests;
+  - extend `test_every_fixture_file_is_listed_by_the_cases_document`, whose regex
+    recognizes only `home/`, `degraded/` and `captures/`, so that it also recognizes
+    `turns/`. Its pattern becomes `` `((?:home|degraded|captures|turns)/[^`]+)` ``.
 
 **Interfaces:**
 - **Consumes:** nothing. The fixtures are native-format JSONL, as for SL1–SL10.
@@ -313,8 +317,9 @@ def test_sl11_escaped_needle_is_absent_from_the_bytes():
 
 - [ ] **Step 2: Run them and see them fail**
 
-Run: `uv run -q --with pytest pytest tools/test_session_log_cases.py -q -k sl11`
-Expected: FAIL (fixture files missing).
+Run: `uv run -q --with pytest pytest tools/test_session_log_cases.py -q -k "sl11 or every_fixture"`
+Expected: the SL11 tests FAIL (fixture files missing). The listing test still passes, with
+its widened pattern.
 
 - [ ] **Step 3: Write the fixture files** listed above, following the record rules.
 
@@ -392,18 +397,31 @@ These steps run in an obs worktree under the obs task (see "Handoff"). They are 
 - **How `build_index` builds its environment:**
   1. it calls `test_names.scratch(test, {"zz": "/w/alpha"})`;
   2. it sets `env["HOME"]` to the fixture home, so `store_roots` reads that home;
-  3. it writes `INGEST_STUB` to the scratch root's `bin/tasks`, first on `PATH`;
+  3. it writes `test_stores.INGEST_STUB` to the scratch root's `bin/tasks-ingest`, and the
+     harness's own `TASKS_STUB` to `bin/tasks`, first on `PATH`;
   4. it sets `TASK_FIXTURE` (`{"list": [], "show": {...}}`) and `TASK_LOG`.
 
   `scratch` keeps the inherited `PATH` value, the only inherited key.
+- **`TASKS_STUB`,** a constant in the harness. For `show`, it finds the task id as the
+  argument matching `[a-z][a-z0-9]{1,7}-[0-9a-f]{6}`, wherever it sits.
+  - It ignores `-C <dir>` and `--json`.
+  - It prints `{"task": TASK_FIXTURE.show[id], "children": [], "warnings": []}`.
+  - It exits 1 with one stderr line for an id in `TASK_FIXTURE.fail` or absent from
+    `show`.
+  - Every other command it hands to `bin/tasks-ingest` unchanged.
+
+  It replaces `INGEST_STUB`'s `show` because that stub takes the last argument as the id,
+  so `tasks show zz-000021 --json` looks up `--json` (round-1 plan review).
 - **`SOURCE.json`:** `{"hq_commit": "<sha>", "files": {"<relative path>": "<sha256>"}}`.
 
 **Deviation from spec §14.5, ruled here.** The spec names the real `tasks` CLI over a
 scratch registry. obs's tests already run `stores.run` with the established fakes
-(`scratch` and `INGEST_STUB`), and those make the run complete.
-- **What answers `tasks show`.** `INGEST_STUB` answers it from `TASK_FIXTURE`, whose `show`
-  map holds the captured document's `task` object. That gives the reader and the index the
-  same record, as §14.5 requires.
+(`scratch`, with `INGEST_STUB` for `list`, `projects` and `resolve`), and those make the
+run complete.
+- **What answers `tasks show`.** `TASKS_STUB` answers it from `TASK_FIXTURE`, whose `show`
+  map holds the captured document's `task` object. It does so in every argument form the
+  reader and the index use. That gives the reader and the index the same record, as §14.5
+  requires.
 - **Why the field path is still live.** It comes from the live capture (Task 1) and from
   the live check in obs step 12.
 - **Why:** it reuses the harness obs already trusts.
@@ -416,6 +434,12 @@ scratch registry. obs's tests already run `stores.run` with the established fake
     exists;
   - `test_materialize_makes_cu_unreadable`, skipped when run as root: after `materialize`
     of `degraded`, opening CU raises `PermissionError`.
+  - `test_tasks_stub_answers_the_reader_and_the_index`. With the harness environment:
+    - `tasks show zz-000021 --json`, `tasks show --json zz-000021` and
+      `tasks -C /w/alpha show zz-000021` each print the same `task` object (the document's
+      `task`) and exit 0;
+    - `tasks show zz-999999 --json` exits 1;
+    - `build_index` over `turns` completes, with a complete `index_runs` row.
 - [ ] **Step 2:** `just test-one test_session_logs_vendor`. Expected: FAIL (no fixtures).
 - [ ] **Step 3: Write the `vendor-session-logs hq` recipe.** Given an hq checkout path, it:
   1. refuses a dirty hq tree;
@@ -499,6 +523,14 @@ Spec §8.1, §8.3 (`request_blob` and the Claude fork copy), §4.2, §10.3 (Clau
   - `@dataclass class FileRead: place: Place; records: list[dict]; unparsed: list[dict];
     header: dict`.
     - `records` are §4.2 objects, without `turn`, which obs step 7 sets.
+    - **Private keys.** Each record also carries `_flags: frozenset[str]` and, when
+      recorded, `_prompt_id` and `_source_tool_use_id`. These are the native facts the turn
+      parser needs, which the public §4.2 fields do not keep. The members of `_flags` are
+      `isMeta`, `isCompactSummary`, `prompt` (a `user` record that is not only tool
+      results), `tool_result`, `local_input`, `local_output`, `interrupt_marker`, `queued`,
+      `turn_duration`, `stop_hook_ok` and `stop_hook_blocked`.
+    - **Never emitted.** Any key beginning `_` is private: the stream writer (obs step 9)
+      drops it.
     - `unparsed` are §4.5 objects that keep their raw text in a private key `_raw`.
     - `header` keys: `session`, `agent`, `identity_basis`, `cwd`, `entrypoint`,
       `first_at`, `last_at`, `lines`, `subagent: bool`, `forked: bool`, `uuids:
@@ -550,6 +582,14 @@ Spec §8.1, §8.3 (`request_blob` and the Claude fork copy), §4.2, §10.3 (Clau
     `truncated` True, `len(text.encode()) <= 2000`, and `text_bytes == 5_000_000`.
   - `test_malformed_and_truncated_lines_are_unparsed`: the degraded CD:2 is `unparsed`
     with `reason "malformed"`. A file ending in a partial line gives `reason "truncated"`.
+  - `test_native_flags_reach_the_turn_parser`. On CA and CM:
+    - `"isMeta" in` CA:2's `_flags`;
+    - CM's Stop-feedback record has `isMeta` and `prompt`;
+    - CM's blocked summary has `stop_hook_blocked`, and the others have `stop_hook_ok`;
+    - CM's Skill record has `_source_tool_use_id` equal to its call's id, and the turn's
+      `_prompt_id`;
+    - CM's two local-command records have `local_input` and `local_output`;
+    - CM's queued attachment has `queued`.
 - [ ] **Step 2:** `just test-one test_session_logs_claude`. Expected: FAIL.
 - [ ] **Step 3: Implement** `claude_read`, `pair_calls` and `cut`, following §8.1's table
   row by row and §10.3's Claude bases.
@@ -572,7 +612,13 @@ Spec §8.2, §8.3 (`event_mirror`, `compaction_history`, Codex `fork_history`), 
 - **Produces:**
   - `codex_read(place: Place, size: int, inherited_turn_ids: Callable[[str], set[str] |
     None]) -> FileRead`. Its `header` adds `parent`, `agent_path`, `depth`,
-    `inherited_id`, `child: bool`, plus `turn_ids` in order;
+    `inherited_id` and `child: bool`.
+    - `turn_ids` is every physical `task_started` turn id in file order, copied ones
+      included.
+    - `own_turn_ids` is the ones that are not copies.
+    - `inherited_turn_ids(id)` returns the inherited rollout's full `turn_ids`, copied
+      history included, or None when that rollout is unreadable. A fork of a fork therefore
+      recognizes its grandparent's turns as copies too;
   - `sdk_read(place: Place, size: int) -> FileRead`. Records carry
     `dispatch: {"kind": "sdk_dispatch", "call": <id>}`.
 
@@ -602,6 +648,14 @@ Spec §8.2, §8.3 (`event_mirror`, `compaction_history`, Codex `fork_history`), 
     - `own1`'s records carry no `copy`.
   - `test_fork_without_parent_is_ambiguous_to_the_end`: XK, with `inherited_turn_ids`
     returning None, gives every object after line 1 `copy == "ambiguous"`.
+  - `test_nested_fork_copies_grandparent_turns`, on inline rollouts:
+    - P is a fork of G: it holds a copied turn `g1`, then its own turn `p1`;
+    - C is a fork of P: it copies `g1` and `p1`, then starts its own `c1`.
+
+    Reading P gives `turn_ids == ["g1", "p1"]` and `own_turn_ids == ["p1"]`. With
+    `inherited_turn_ids("P")` returning P's `turn_ids`, C's `g1` and `p1` records are
+    `fork_history`, and only `c1`'s carry no `copy`. With the owned ids `{"p1"}` instead,
+    `g1` would be taken as C's own: the test asserts it is not.
   - `test_child_without_agent_path_leaves_agent_messages_unknown`: an inline child thread
     with no `agent_path` gives its `agent_message` the role `unknown`.
   - `test_sdk_dispatch_links`: on the SDK capture, SDK:4 and SDK:5 carry `sdk_dispatch` to
@@ -609,7 +663,6 @@ Spec §8.2, §8.3 (`event_mirror`, `compaction_history`, Codex `fork_history`), 
 - [ ] **Step 2:** `just test-one test_session_logs_codex`. Expected: FAIL.
 - [ ] **Step 3: Implement** `codex_read` and `sdk_read` per §8.2's table, the
   agent-path rule and the child rule.
-  - Ignore copies when collecting `turn_ids`.
 - [ ] **Step 4:** `just test-one test_session_logs_codex`. Expected: PASS.
 - [ ] **Step 5:** `just gate`, then commit: `feat(session-logs): Codex and SDK record
   classifiers`.
@@ -764,7 +817,9 @@ Spec §9.1–§9.3, §4.4.
 - **Create:** `session_logs_turns.py`, `tests/test_session_logs_turns.py`.
 
 **Interfaces:**
-- **Consumes:** `FileRead`, with copies already marked by obs steps 4 and 6.
+- **Consumes:** `FileRead`, with copies already marked by obs steps 4 and 6. It
+  classifies turn boundaries from each record's role and its private `_flags`,
+  `_prompt_id` and `_source_tool_use_id` (obs step 3), never from text.
 - **Produces:** `turns(read: FileRead) -> list[dict]`, the §4.4 objects. It sets each
   record's `turn`.
   - **Rule.** Claude files use the marker rule when `header["markers"]`, else the derived
@@ -805,6 +860,12 @@ Spec §9.1–§9.3, §4.4.
   - `test_xk_ambiguous_turn_has_no_final`: XK's turn has `copy == "ambiguous"`, no
     `final`, and the copied `final_answer` as `last_assistant`.
   - `test_ca_models_per_turn`: every CA turn has `models == ["claude-model-a"]`.
+  - `test_turn_rules_read_flags_not_text`: on records built directly, with a marker
+    present:
+    - an `injected` record with `_flags {"prompt", "isMeta"}` right after `turn_duration`
+      opens a turn;
+    - the same record after a response, with no marker between, joins the open turn;
+    - a record with `isCompactSummary` never opens one.
 - [ ] **Step 2:** `just test-one test_session_logs_turns`. Expected: FAIL.
 - [ ] **Step 3: Implement** `turns`. Order the status checks exactly as §9.3's table, with
   the Codex closing-event requirement.
@@ -927,7 +988,7 @@ Spec §6, §4.6, §2 D2.
   - `test_missing_without_copy_names_routes_and_cwd_narrows`:
     1. build the index over `home`;
     2. delete CA;
-    3. search with `--since 2026-10-01`.
+    3. run `search zzz-absent --since 2026-10-01`. The term is in no record.
 
     Coverage lists CA under `files.missing` with `routes == ["file", "replay"]`, and the
     outcome is `unknown`. With `--cwd /w/beta`, CA is out of scope, and it is not listed.
@@ -954,6 +1015,8 @@ Spec §6, §4.6, §2 D2.
   - `test_coverage_fields`: a run's last object has `type "coverage"`, `format
     "session-logs/1"` and `rules.classifier == "session-logs-classifier/1"`. Lists longer
     than 20 are cut, with their counts kept.
+  - `test_private_keys_are_never_emitted`: in every object of `search --session CA
+    --all-time --no-limit` and of `show CA`, no key at any depth begins with `_`.
 - [ ] **Step 2:** `just test-one test_session_logs_search`. Expected: FAIL.
 - [ ] **Step 3: Implement** the two modules.
   - Record selection follows §6.1. `--sort` takes `activity` (the default) or `path`.
