@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: session-evidence-reader
 created: 2026-10-20T11:19:18Z
-updated: 2026-10-23T16:11:29Z
+updated: 2026-10-23T16:12:31Z
 started: 2026-10-23T12:40:18Z
 depends: [hq-a1c591, hq-de3e4c]
 parent: hq-cff824
@@ -94,3 +94,5 @@ Found while checking whether stamped friction reports can be traced to their ori
   provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-23T16:11:27Z (session-evidence-reader): review: plan round 2 — verdict: accept; findings: minor 1; reviewer: codex/gpt-6.1-sol
 - 2026-10-23T16:11:28Z (session-evidence-reader): minor (deferred): plan round 2 — move the show CA part of test_private_keys_are_never_emitted from obs step 9 to obs step 10, where show is implemented, and require exit 0 in both checks; carried in the obs build task's brief. Deviation ruling accepted: the harness TASKS_STUB at 1fea7bf replaces the real tasks CLI of spec 14.5; the live --task check in obs step 12 remains required.
+- 2026-10-23T16:12:31Z (session-evidence-reader): gate: planned docs/plans/2026-10-23-session-evidence-reader.md — user approved revision 2 at 1fea7bf after plan round 2 accept; child hq-bb90ca filed for Task 1; obs steps carried by obs-d98663 (no parent, depends on hq-c411df); Stage B noted on obs-f5710b, obs-081ded, hq-19580c
+  provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
