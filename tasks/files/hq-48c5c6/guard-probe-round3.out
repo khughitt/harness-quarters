@@ -1,0 +1,10 @@
+plain-git   | v1:./c from sub/                   | rc=0   | sub/c=sub-v1 c=ours |  M sub/c; strays=0
+plain-git   | v1:./dir (a directory)             | rc=1   | dir/f1=edit |  M dir/f1; strays=0
+plain-git   | v1:./link (symlink at path)        | rc=1   | c=edit link=c |  M c; strays=0
+plain-git   | v1:./missing (no such path)        | rc=1   | c=edit |  M c; strays=0
+plain-git   | v1:./x (file deleted, was 755)     | rc=0   | mode=600 |  M x;
+plain-git   | v1:./c (directory at path)         | rc=1   | c/=x  |  D c; strays=0
+plain-git   | :3:./c (merge conflict)            | rc=0   | c=theirs | UU c; strays=0
+sandbox-wt  | v1:./c from sub/                   | rc=0   | sub/c=sub-v1 |  M sub/c; 
+sandbox-wt  | :3:./c (merge conflict)            | rc=0   | c=theirs | UU c; 
+sandbox-wt  | v1:./dir (a directory)             | rc=1   | UU c; strays=0 
