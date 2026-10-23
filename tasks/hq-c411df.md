@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: session-evidence-reader
 created: 2026-10-20T11:19:18Z
-updated: 2026-10-23T12:41:03Z
+updated: 2026-10-23T13:05:46Z
 started: 2026-10-23T12:40:18Z
 depends: [hq-a1c591, hq-de3e4c]
 parent: hq-cff824
@@ -60,3 +60,4 @@ Found while checking whether stamped friction reports can be traced to their ori
   provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-23T12:41:03Z (session-evidence-reader): resumed
   provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T13:05:46Z (session-evidence-reader): Draft spec committed ce66d61 (docs/specs/2026-10-23-session-evidence-reader-design.md): obs hosts a new read-only session-logs entry point (search/show, typed JSONL, coverage outcome found/not_found/unknown) over obs store_roots and a read-only index; Stage A adds files only before readout, skill and link after readout (D5); proposes moving this task to obs after approval so its plan steps live with the code (D6). Fresh-context agent review dispatched before the human review.
