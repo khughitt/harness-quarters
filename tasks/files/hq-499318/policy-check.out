@@ -1,0 +1,16 @@
+git restore --staged -- f              {"d":"forbidden","m":["git restore"]}
+git restore f                          {"d":"forbidden","m":["git restore"]}
+git reset -q -- f                      {"d":"allow","m":["git reset -q --"]}
+git reset -q --hard                    {"d":null,"m":[]}
+git reset --hard                       {"d":null,"m":[]}
+git reset -q -- --hard                 {"d":"allow","m":["git reset -q --"]}
+git rm --cached -- f                   {"d":"allow","m":["git rm --cached --"]}
+git rm --cached --no-cached -f -- f    {"d":null,"m":[]}
+git rm --cached -f -- f                {"d":null,"m":[]}
+git rm --cached f                      {"d":null,"m":[]}
+git rm --cached -- --no-cached -f f    {"d":"allow","m":["git rm --cached --"]}
+git show MERGE_HEAD:c                  {"d":"allow","m":["git show"]}
+git add c                              {"d":"allow","m":["git add"]}
+bash -lc tmp-form                      {"d":null}
+git restore can overwrite uncommitted work. To unstage, run git reset -q -- <path> (new files included; git rm --cached -- <path> also works). To take one side of a conflict, write git show MERGE_HEAD:<path> to a temporary file and, only if that succeeds, copy it over <path>, for example tmp=$(mktemp) && git show MERGE_HEAD:<path> > "$tmp" && cp "$tmp" <path> && rm "$tmp"; then run git add <path> as its own command.
+codex-cli 0.164.0
