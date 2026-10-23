@@ -1,0 +1,16 @@
+host europa
+~/.codex/rules -> /mnt/ssd/Dropbox/hq/local/codex/rules
+loaded file: /mnt/ssd/Dropbox/hq/local/codex/rules/default.rules
+sha256 8a735cfa7fd7fc96994b7ff2fc57e16084d41f1b79a255ce7fc6bfa9a99faed8
+dropbox: 518 /usr/bin/dropbox
+codex codex-cli 0.163.0
+git restore --source=v1 -- c             {"d":"forbidden","m":["git restore"]}
+git restore --staged -- f                {"d":"forbidden","m":["git restore"]}
+git reset -q -- f                        {"d":"allow","m":["git reset -q --"]}
+git rm --cached -- f                     {"d":"allow","m":["git rm --cached --"]}
+git rm --cached --no-cached -f -- f      {"d":null,"m":[]}
+git reset --hard                         {"d":null,"m":[]}
+rm -- d                                  {"d":null,"m":[]}
+git add -- c                             {"d":"allow","m":["git add"]}
+justification as parsed:
+git restore can overwrite uncommitted work, and so can the content and deletion forms below: use them only when replacing or removing the file is what was asked. To unstage, run git reset -q -- "<path>" (always name the path: with none it resets the whole index); for a newly added file, git rm --cached -- "<path>" also works. To set one regular file (not a directory or symlink) to a conflict side or a commit's version, write it to a temporary file and copy it over only if that succeeds: src="<src>" && [ "$(git cat-file -t "$src")" = blob ] && [ ! -L "<path>" ] && tmp=$(mktemp) && git show "$src" > "$tmp" && cp -- "$tmp" "<path>" && rm "$tmp", where <src> is :3:./<path> for theirs (:2:./<path> for ours; in a rebase :3: is your own commit being replayed) or <rev>:./<path> for a commit's version; a file the copy creates gets mode 600, so add back an executable bit with chmod +x. Then run git add -- "<path>" as its own command; it replaces any staged version. To take a conflict side that deleted the file, run git rm --cached -- "<path>", then rm -- "<path>", as two separate commands; outside a conflict this deletes the file and any uncommitted edits.

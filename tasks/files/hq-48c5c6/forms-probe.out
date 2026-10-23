@@ -1,0 +1,9 @@
+plain-git              | (in sub/) tmp=$(mktemp) && git show "v1:./c" > "$tmp" && cp -- "$tmp" "c" && rm "$tmp" | rc=0 | sub/c=sub-v1 c=uncommitted |  M c; M sub/c;
+plain-git              | (in sub/) git add -- "c"                                                           | rc=0 |  M c;M  sub/c;
+plain-git              | (in sub/) tmp=$(mktemp) && git show "v1:./x" > "$tmp" && cp -- "$tmp" "x" && rm "$tmp" | rc=0 | x=#!/bin/sh  mode=755 |  M sub/x;
+plain-git              | (in sub/) tmp=$(mktemp) && git show "v1:./missing" > "$tmp" && cp -- "$tmp" "c" && rm "$tmp" | rc=128 | sub/c=uncommitted leftover-tmp=n/a |  M sub/c;
+plain-git              | git rm --cached -- d; rm -- d   (modify/delete conflict)                           | rc=0/0 | before: UD d; after: D  d; d=gone
+plain-git              | git commit                                                                         | rc=0 | d in HEAD: k 
+sandbox-wt             | (in sub/) tmp=$(mktemp) && git show "v1:./c" > "$tmp" && cp -- "$tmp" "c" && rm "$tmp" | rc=0 | sub/c=sub-v1 c=uncommitted |  M c; M sub/c; 
+sandbox-wt             | (in sub/) git add -- "c" sandboxed (an allow rule skips this)                      | rc=128 | fatal: Unable to create '/home/keith/.cache/hq-48c5c6.N6Gu/m5/.git/worktrees/w5/index.lock': Read-only file system
+sandbox-wt             | git rm --cached -- d (unsandboxed); rm -- d (sandboxed)                            | rc=0/0 | before: UD d; after: D  d; d=gone 
