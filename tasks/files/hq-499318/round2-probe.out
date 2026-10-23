@@ -1,0 +1,15 @@
+## git rm --cached -- on a tracked file
+staged-edit    | git rm --cached -- t | rc=0 | index: D  t;?? t;
+staged-edit    | git reset -q -- t    | rc=0 | index:  M t;
+unstaged-edit  | git rm --cached -- t | rc=0 | index: D  t;?? t;
+unstaged-edit  | git reset -q -- t    | rc=0 | index:  M t;
+## conflict side from a subdirectory (conflict on sub/c; top-level c also exists)
+tmp=$(mktemp) && git show MERGE_HEAD:c > "$tmp" && cp "$tmp" c && rm "$tmp"      | rc=0 | sub/c=topTHEIRS  | sub/m=<<<<<<< HEAD ours ======= theirs >>>>>>> other  mode=755
+tmp=$(mktemp) && git show MERGE_HEAD:./c > "$tmp" && cp "$tmp" c && rm "$tmp"    | rc=0 | sub/c=subTHEIRS  | sub/m=<<<<<<< HEAD ours ======= theirs >>>>>>> other  mode=755
+tmp=$(mktemp) && git show :3:./c > "$tmp" && cp "$tmp" "c" && rm "$tmp"          | rc=0 | sub/c=subTHEIRS  | sub/m=<<<<<<< HEAD ours ======= theirs >>>>>>> other  mode=755
+tmp=$(mktemp) && git show :2:./c > "$tmp" && cp "$tmp" "c" && rm "$tmp"          | rc=0 | sub/c=subOURS  | sub/m=<<<<<<< HEAD ours ======= theirs >>>>>>> other  mode=755
+tmp=$(mktemp) && git show :3:./missing > "$tmp" && cp "$tmp" "c" && rm "$tmp"    | rc=128 | sub/c=<<<<<<< HEAD subOURS === | sub/m=<<<<<<< HEAD ours ======= theirs >>>>>>> other  mode=755
+tmp=$(mktemp) && git show :3:./m > "$tmp" && cp "$tmp" "m" && rm "$tmp"          | rc=0 | sub/c=<<<<<<< HEAD subOURS === | sub/m=theirs  mode=755
+## stage form during a rebase conflict
+rebase other onto main, :3:./c from sub | rc=0 | sub/c=subTHEIRS 
+git version 2.56.0
