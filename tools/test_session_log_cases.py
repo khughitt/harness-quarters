@@ -438,6 +438,20 @@ def test_sl11_skill_load_record_shares_the_turn_prompt():
     skill = next(r for r in rs if r.get("isMeta") and r.get("sourceToolUseID"))
     call = next(b for r in rs for b in blocks(r) if b.get("type") == "tool_use" and b["id"] == skill["sourceToolUseID"])
     assert call["name"] == "Skill"
+    prompt = rs[31]  # CM:32, turn 5's typed prompt
+    assert prompt["origin"]["kind"] == "human" and skill["promptId"] == prompt["promptId"]
+
+
+def test_sl11_claude_triggers_markers_and_synthetic_end():
+    cm = one(TURNS, ".claude/projects/-w-gamma/*000021.jsonl")
+    assert rec(cm, 44)["isMeta"] is True and rec(cm, 44)["origin"]["kind"] == "peer"
+    assert rec(cm, 60)["origin"]["kind"] == "task-notification"
+    assert rec(cm, 40)["isMeta"] is True and rec(cm, 40)["turnOrigin"] == "scheduled"
+    for n in (52, 54):
+        assert blocks(rec(cm, n))[0]["text"] == "[Request interrupted by user]" and "origin" not in rec(cm, n)
+    synthetic = rec(cm, 58)["message"]
+    assert (synthetic["model"], synthetic["stop_reason"]) == ("<synthetic>", "stop_sequence")
+    assert rec(cm, 59)["subtype"] == "turn_duration"
 
 
 def test_sl11_local_commands_and_queued_human_attachment():
@@ -446,6 +460,8 @@ def test_sl11_local_commands_and_queued_human_attachment():
     assert [r["content"].split(">")[0] for r in local] == ["<command-name", "<local-command-stdout"]  # the live field
     queued = next(r for r in rs if r.get("type") == "attachment" and r["attachment"]["type"] == "queued_command")
     assert queued["attachment"]["origin"]["kind"] == "human"
+    # live placement: after a tool result (CM:17), not between a call and its result
+    assert rs.index(queued) == 17 and blocks(rs[16])[0]["type"] == "tool_result"
 
 
 def test_sl11_codex_statuses_by_closing_event():
@@ -454,8 +470,19 @@ def test_sl11_codex_statuses_by_closing_event():
     ends = {r["payload"]["turn_id"]: r["payload"]["type"] for r in xe
             if r["type"] == "event_msg" and r["payload"]["type"] in ("task_complete", "turn_aborted")}
     assert starts == ["te1", "te2", "te3", "te4", "te5", "te6", "te7"]
+    for path in TURNS.glob(".codex/sessions/**/rollout-*.jsonl"):  # live ordinals count from 0
+        assert [r["ordinal"] for r in records(path)] == list(range(len(lines(path))))
     assert ends == {"te1": "task_complete", "te2": "task_complete", "te3": "turn_aborted",
                     "te4": "task_complete", "te5": "task_complete"}
+
+
+def test_sl11_codex_finals_questions_and_phases():
+    path = codex(TURNS, "01900000-0000-7000-8000-0000000000e1")
+    assert rec(path, 14)["payload"]["item"]["questions"]
+    assert rec(path, 26)["payload"]["last_agent_message"] is None
+    phaseless = rec(path, 30)["payload"]
+    assert "phase" not in phaseless and rec(path, 31)["payload"]["last_agent_message"] == phaseless["content"][0]["text"]
+    assert rec(path, 35)["payload"]["phase"] == "final_answer" and rec(path, 36)["payload"]["type"] == "task_started"
 
 
 def test_sl11_agent_message_direction():
@@ -472,6 +499,9 @@ def test_sl11_fork_without_parent_holds_only_copied_history():
     xk = records(codex(TURNS, "01900000-0000-7000-8000-0000000000f2"))
     metas = [r["payload"]["id"] for r in xk if r["type"] == "session_meta"]
     assert metas == ["01900000-0000-7000-8000-0000000000f2", "01900000-0000-7000-8000-0000000000f9"]
+    assert xk[5]["payload"]["phase"] == "final_answer"  # XK:6, the absent parent's final
+    # the native copy boundary lies past the last record: everything after XK:2 is copied history
+    assert xk[0]["payload"]["subagent_history_start_ordinal"] > max(r["ordinal"] for r in xk)
     assert not list(FIXTURES.glob("**/rollout-*-01900000-0000-7000-8000-0000000000f9.jsonl"))
 
 
@@ -479,6 +509,9 @@ def test_sl11_task_document_and_evidence_sessions():
     doc = json.loads((FIXTURES / "captures" / "tasks-show-zz-000021.json").read_text())
     note = doc["task"]["notes"][0]
     assert note["harness_session"] == "claude-code:c0000000-0000-4000-8000-000000000022"
+    ct1 = records(one(TURNS, ".claude/projects/-w-gamma/*000022.jsonl"))
+    assert ct1[0]["timestamp"] <= note["at"].replace("Z", ".000Z") <= ct1[-1]["timestamp"]
+    assert not any("zz-000021" in json.dumps(r) for r in ct1)
     ct3 = records(one(TURNS, ".claude/projects/-w-gamma/*000024.jsonl"))
     commands = [b["input"]["command"] for r in ct3 for b in blocks(r) if b.get("type") == "tool_use"]
     assert commands == ["tasks start zz-000021", "false && tasks start zz-000021",
@@ -492,6 +525,9 @@ def test_sl11_escaped_needle_is_absent_from_the_bytes():
     assert json.loads(raw)["message"]["content"] == "needle"
     bad = (FIXTURES / "captures" / "escaped-malformed.jsonl").read_bytes().splitlines()
     assert len(bad) == 2 and b"\\u006eeedle" in bad[1]
+    assert json.loads(bad[0])["message"]["content"] == "hello"
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(bad[1])
 
 
 # --- the corpus itself ---------------------------------------------------------------------------

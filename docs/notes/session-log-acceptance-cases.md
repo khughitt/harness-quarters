@@ -70,8 +70,10 @@ each record kind copies the keys of a live record of that kind, keys only, with 
 values. That covers the `system` `local_command`, `stop_hook_summary`, `turn_duration` and
 `scheduled_task_fire` records and the `queued_command` and `hook_blocking_error`
 attachments. Every `turn_duration` follows a `stop_hook_summary` with empty `hookErrors`,
-as in live files. TD is the output of the real `tasks` CLI (`tasks 0.4.0`) over a scratch
-registry holding a `zz` project, with the task's id and times then set to the fixture's.
+as in live files, except `CM:59`: live files write none between a `<synthetic>` message
+and its `turn_duration`. Codex `ordinal`s count from 0, as live ones do. TD is the output
+of the real `tasks` CLI (`tasks 0.4.0`) over a scratch registry holding a `zz` project,
+with the task's id and times then set to the fixture's.
 Its field paths are therefore the CLI's own, `harness_session_source` included, which the
 CLI writes as `CLAUDE_CODE_SESSION_ID`. The two escape files are explicit files, not a
 home.
@@ -412,7 +414,7 @@ is listed with its trigger, inputs, status and final or `last_assistant`:
 |---|---|---|---|---|
 | 1 | `CM:1`–`CM:8` | `CM:1`, human | `completed` | final `CM:6#0` (`stop_reason`); `CM:2#0` is commentary; `CM:5` is the same message's thinking |
 | 2 | `CM:9`–`CM:14` | `CM:11`, human; inputs `CM:9`, `CM:10` (local command and its output) | `completed` | final `CM:12#0` |
-| 3 | `CM:15`–`CM:21` | `CM:15`, human; inputs also list `CM:17` (queued human) | `completed` | final `CM:19#0` |
+| 3 | `CM:15`–`CM:21` | `CM:15`, human; inputs also list `CM:18` (queued human) | `completed` | final `CM:19#0` |
 | 4 | `CM:22`–`CM:31` | `CM:22`, human | `completed` | final `CM:29#0`; `CM:23#0` is commentary |
 | 5 | `CM:32`–`CM:38` | `CM:32`, human | `completed` | final `CM:36#0` |
 | 6 | `CM:39`–`CM:43` | `CM:40`, injected (`isMeta` scheduled reminder) | `completed` | final `CM:41#0` |
@@ -420,9 +422,9 @@ is listed with its trigger, inputs, status and final or `last_assistant`:
 | 8 | `CM:48`–`CM:52` | `CM:48`, human | `interrupted` | last assistant `CM:49#0` |
 | 9 | `CM:53`–`CM:54` | `CM:53`, human | `interrupted` | none: no response |
 | 10 | `CM:55`–`CM:56` | `CM:55`, human | `waiting` | none; `AskUserQuestion` at `CM:56#0` has no result |
-| 11 | `CM:57`–`CM:60` | `CM:57`, human | `no_final` | none; `CM:58` is `<synthetic>`, `stop_sequence` |
-| 12 | `CM:61`–`CM:64` | `CM:61`, injected (`origin.kind` `task-notification`) | `completed` | final `CM:62#0` |
-| 13 | `CM:65`–`CM:66` | `CM:65`, human | `incomplete` | none; the call at `CM:66#0` has no result at end of file |
+| 11 | `CM:57`–`CM:59` | `CM:57`, human | `no_final` | none; `CM:58` is `<synthetic>`, `stop_sequence` |
+| 12 | `CM:60`–`CM:63` | `CM:60`, injected (`origin.kind` `task-notification`) | `completed` | final `CM:61#0` |
+| 13 | `CM:64`–`CM:65` | `CM:64`, human | `incomplete` | none; the call at `CM:65#0` has no result at end of file |
 
 Nine turns end at a `turn_duration`: 1–7, 11 and 12. Turn 10 ends where turn 11's prompt
 begins (`no_end_marker`).
@@ -433,7 +435,8 @@ begins (`no_end_marker`).
   with `hookErrors` at `CM:26` neither end turn 4 nor start a turn. This is the live order.
 - The Skill-load `isMeta` record at `CM:35` carries `sourceToolUseID` `toolu_fx_cm5` and
   turn 5's `promptId`. It does not split turn 5.
-- `CM:17` is a queued human message, listed in turn 3's inputs and never its trigger.
+- `CM:18` is a queued human message, listed in turn 3's inputs and never its trigger. As
+  in live files, it follows a tool result (`CM:17`), not a pending call.
 - `CM:39` (`scheduled_task_fire`) is metadata, not turn 6's trigger.
 - `CM:52` and `CM:54` are interrupt markers: injected, never human.
 - `CM:58` is never final and never a runtime model.
@@ -456,9 +459,23 @@ begins (`no_end_marker`).
 | XK `tk-copied` | not `completed`: it has no final | last assistant `XK:6#0`, never final | `XK:3`–`XK:7` are `copy: ambiguous` |
 
 XK's inherited thread `01900000-0000-7000-8000-0000000000f9` has no rollout in any fixture
-home. So nothing marks where its copied range ends, and every record after its second
-`session_meta` (`XK:2`) is `ambiguous`. A turn built from that range carries
-`copy: ambiguous` and no `final`.
+home. Under spec §8.3 every record after its second `session_meta` (`XK:2`) is therefore
+`ambiguous`, and a turn built from that range carries `copy: ambiguous` and no `final`.
+The case asserts only that the turn is not `completed`. Read literally, §9.3 would give
+`no_final`, since `XK:7` is a `task_complete`. But §8.3 does not say whether a copied
+`task_complete` in an ambiguous range counts as the fork turn's closing event, so the
+case leaves that open.
+
+`XK:1` carries `subagent_history_start_ordinal` 7, one past the last record's ordinal (6).
+Live forks from Codex 0.150 on all carry this key. The review of this fixture found that,
+in the forks it checked whose parent was present, the key named the record just before
+the fork's first own `task_started`. That makes it a native copy boundary, which spec
+§8.3 does not use. The value here says the whole file is copied history. A reader that
+follows the spec and one that honours the key agree that `XK:6` is never XK's final.
+They differ on the copy label: a reader that honours the key would label `XK:3`–`XK:7`
+`fork_history` instead of `copy: ambiguous`. This case follows spec §8.3. Whether the
+reader honours the key is open with the obs implementation task. Older forks mostly lack
+the key: none from 0.110 to 0.139 and about 40% from 0.140 to 0.149 carry it.
 
 **Hard negatives.**
 - `XE:35` is a `final_answer` message but not `te6`'s final: the turn has no
