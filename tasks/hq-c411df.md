@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: session-evidence-reader
 created: 2026-10-20T11:19:18Z
-updated: 2026-10-23T15:24:26Z
+updated: 2026-10-23T15:24:46Z
 started: 2026-10-23T12:40:18Z
 depends: [hq-a1c591, hq-de3e4c]
 parent: hq-cff824
@@ -81,3 +81,4 @@ Found while checking whether stamped friction reports can be traced to their ori
 - 2026-10-23T15:15:41Z (session-evidence-reader): Deferred to the plan (spec round 5 minor): casefold() applies to literal matching only; --regex uses Python re flags (IGNORECASE unless --case) and never folds the expression, since folding \S+ gives \s+.
 - 2026-10-23T15:15:50Z (session-evidence-reader): gate: designed docs/specs/2026-10-23-session-evidence-reader-design.md — user approved revision 5 at ae0f8ee after five review rounds (round 5 accept, one minor deferred to the plan)
   provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T15:24:46Z (session-evidence-reader): Plan committed 525dff8 (docs/plans/2026-10-23-session-evidence-reader.md, sha256 09ef5dbdcb22534949f4d1037a9dee45a3b082caf3f945dbb269e5039a76df3b): hq Task 1 (SL11 fixtures, child) and obs steps 1-12 for one new obs task; deviation ruled in obs step 1 (obs's scratch and INGEST_STUB harness instead of the real tasks CLI of spec 14.5). Children and the obs task are filed after plan approval, then gate: planned.
