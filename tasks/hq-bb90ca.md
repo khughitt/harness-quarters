@@ -1,13 +1,15 @@
 ---
 id: hq-bb90ca
 title: "SL11 fixtures for turn-final messages, task evidence, forks and escapes"
-status: todo
+status: doing
 priority: 2
 size: s
 complexity: mid
 process: direct
+owner: session-evidence-reader
 created: 2026-10-23T16:11:45Z
-updated: 2026-10-23T16:11:46Z
+updated: 2026-10-23T16:28:09Z
+started: 2026-10-23T16:28:09Z
 depends: []
 parent: hq-c411df
 tags: []
@@ -32,3 +34,5 @@ Verification: the SL11 self-checks fail before the fixtures exist, then pass; ju
 
 - 2026-10-23T16:11:45Z (session-evidence-reader): gate: scoped — step of hq-c411df plan
   provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T16:28:09Z (session-evidence-reader): started
+  provenance: {"harness_session":"claude-code:f7f539e5-48f4-4265-a16a-be9f26e40276","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
