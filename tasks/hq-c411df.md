@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: main
 created: 2026-10-20T11:19:18Z
-updated: 2026-10-23T12:40:18Z
+updated: 2026-10-23T12:40:29Z
 started: 2026-10-23T12:40:18Z
 depends: [hq-a1c591, hq-de3e4c]
 parent: hq-cff824
@@ -54,3 +54,4 @@ Found while checking whether stamped friction reports can be traced to their ori
 - 2026-10-22T17:41:57Z (main): scope: scoped; both studies and the ten-case corpus are complete (686e160, 228f751, 03af2f4); obs-b99310 resolved the phantom-parent defect in 54ce9e187b825dc7ace6ff23ba9820e172b1f89c. Promoted this existing idea to the design-and-plan handoff, P2/m/high/planned, with required evidence refs, explicit parsing/location ownership and trial rollout gates; original captured body preserved. No new research or duplicate design task; brief: docs/notes/2026-10-20-session-store-reach-brief.md
 - 2026-10-23T12:40:18Z (main): started
   provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T12:40:29Z (main): trial: flow-trial-1 — enrolled — flow on
