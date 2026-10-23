@@ -1,19 +1,23 @@
 ---
 id: hq-c411df
 title: Design the session evidence reader and usage skill from completed studies
-status: doing
+status: done
 priority: 2
 size: m
 complexity: high
 process: planned
-owner: main
+owner: session-evidence-reader
 created: 2026-10-20T11:19:18Z
-updated: 2026-10-23T12:40:49Z
+updated: 2026-10-23T17:40:45Z
 started: 2026-10-23T12:40:18Z
+completed: 2026-10-23T17:40:44Z
+closed: 2026-10-23T17:40:44Z
 depends: [hq-a1c591, hq-de3e4c]
 parent: hq-cff824
 tags: [feedback, gap, "from:lore"]
 agent: claude-code
+spec: docs/specs/2026-10-23-session-evidence-reader-design.md
+plan: docs/plans/2026-10-23-session-evidence-reader.md
 ---
 
 Why: Agents need evidence outside the baseline reader's two default roots, including historical tool outputs, parent context and explicit unavailable results. The user proposed a session-log CLI and usage skill; the existing record owns its design.
@@ -58,3 +62,53 @@ Found while checking whether stamped friction reports can be traced to their ori
 - 2026-10-23T12:40:29Z (main): arm: flow-trial-1 — unit tack-c411df — flow on
 - 2026-10-23T12:40:49Z (main): gate: scoped — adopted
   provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T12:41:03Z (session-evidence-reader): resumed
+  provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T13:05:46Z (session-evidence-reader): Draft spec committed ce66d61 (docs/specs/2026-10-23-session-evidence-reader-design.md): obs hosts a new read-only session-logs entry point (search/show, typed JSONL, coverage outcome found/not_found/unknown) over obs store_roots and a read-only index; Stage A adds files only before readout, skill and link after readout (D5); proposes moving this task to obs after approval so its plan steps live with the code (D6). Fresh-context agent review dispatched before the human review.
+- 2026-10-23T13:35:18Z (session-evidence-reader): review: spec round 1 — verdict: revise; findings: critical 1, important 12, minor 14; reviewer: claude-code/claude-opus-5-5
+- 2026-10-23T14:13:12Z (session-evidence-reader): review: spec round 2 — verdict: revise; findings: important 5, minor 12; reviewer: claude-code/claude-opus-5-5
+- 2026-10-23T14:42:18Z (session-evidence-reader): review: spec round 3 — verdict: revise; findings: important 5, minor 10; reviewer: claude-code/claude-opus-5-5
+- 2026-10-23T14:45:11Z (session-evidence-reader): Spec revision 4 at 87b7fcb (sha256 c9f40e908bccac1cdf36a7d10772b91909c0b51f29b3dfb1e1f0841f406abc02) addresses agent review rounds 1-3 (round 3 findings fixed per the reviewer's suggested fixes; no agent re-review of revision 4). Handed to the user for the designed gate.
+- 2026-10-23T14:45:12Z (session-evidence-reader): parked (waiting on user, review): User reviews docs/specs/2026-10-23-session-evidence-reader-design.md at hq 87b7fcb (worktree .worktrees/session-evidence-reader), chiefly D1 obs hosts the reader, D5 skill after readout, D6 no task move and a separate obs build task; then the agent records gate: designed and writes the plan
+  provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T15:03:29Z (session-evidence-reader): resumed
+  provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T15:03:30Z (session-evidence-reader): review: spec round 4 — verdict: revise; findings: important 4; reviewer: codex/gpt-6.1-sol
+- 2026-10-23T15:05:48Z (session-evidence-reader): Spec revision 5 at ae0f8ee (sha256 93e10418abbce4db8a5e7e29e608ae91de4dd0ccfb59a371a348f408f6b074f9) addresses round 4's four findings: prefilter removed with the escape counterexample as a test, single-segment rule for unsuccessful task commands, missing-parent fork range wholly ambiguous with no finals, Codex completed requires task_complete. Not re-reviewed by an agent.
+- 2026-10-23T15:05:48Z (session-evidence-reader): parked (waiting on user, review): User reviews docs/specs/2026-10-23-session-evidence-reader-design.md at hq ae0f8ee (worktree .worktrees/session-evidence-reader), round 4's four fixes first; then the agent records gate: designed and writes the plan
+  provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T15:15:40Z (session-evidence-reader): resumed
+  provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T15:15:40Z (session-evidence-reader): review: spec round 5 — verdict: accept; findings: minor 1; reviewer: human
+- 2026-10-23T15:15:41Z (session-evidence-reader): Deferred to the plan (spec round 5 minor): casefold() applies to literal matching only; --regex uses Python re flags (IGNORECASE unless --case) and never folds the expression, since folding \S+ gives \s+.
+- 2026-10-23T15:15:50Z (session-evidence-reader): gate: designed docs/specs/2026-10-23-session-evidence-reader-design.md — user approved revision 5 at ae0f8ee after five review rounds (round 5 accept, one minor deferred to the plan)
+  provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T15:24:46Z (session-evidence-reader): Plan committed 525dff8 (docs/plans/2026-10-23-session-evidence-reader.md, sha256 09ef5dbdcb22534949f4d1037a9dee45a3b082caf3f945dbb269e5039a76df3b): hq Task 1 (SL11 fixtures, child) and obs steps 1-12 for one new obs task; deviation ruled in obs step 1 (obs's scratch and INGEST_STUB harness instead of the real tasks CLI of spec 14.5). Children and the obs task are filed after plan approval, then gate: planned.
+- 2026-10-23T15:24:47Z (session-evidence-reader): parked (waiting on user, review): User reviews docs/plans/2026-10-23-session-evidence-reader.md at hq 525dff8 (worktree .worktrees/session-evidence-reader) and picks Task 1's execution method; then the agent files the Task 1 child and the obs build task, writes the Stage B and hq-b95324 notes, records gate: planned, and runs Task 1
+  provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T15:35:37Z (session-evidence-reader): resumed
+  provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T15:35:37Z (session-evidence-reader): review: plan round 1 — verdict: revise; findings: important 4, minor 1; reviewer: codex/gpt-6.1-sol
+- 2026-10-23T15:36:50Z (session-evidence-reader): Plan revision 2 at 1fea7bf (sha256 3127dcfb9b83c603f3b0d9620809843ff9838d135a4a6ee449ea8100c0c0529d) addresses plan round 1: listing validator widened to turns/, harness TASKS_STUB answers every show form (INGEST_STUB kept for list/projects/resolve), private _flags/_prompt_id/_source_tool_use_id carried to the turn parser and never emitted, inherited_turn_ids returns every physical turn id with a nested-fork test, absent term in the missing-file test.
+- 2026-10-23T15:36:51Z (session-evidence-reader): parked (waiting on user, review): User reviews docs/plans/2026-10-23-session-evidence-reader.md at hq 1fea7bf (worktree .worktrees/session-evidence-reader) and picks Task 1's execution method; then the agent files the Task 1 child and the obs build task, writes the Stage B notes, records gate: planned, and runs Task 1
+  provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T16:11:27Z (session-evidence-reader): resumed
+  provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T16:11:27Z (session-evidence-reader): review: plan round 2 — verdict: accept; findings: minor 1; reviewer: codex/gpt-6.1-sol
+- 2026-10-23T16:11:28Z (session-evidence-reader): minor (deferred): plan round 2 — move the show CA part of test_private_keys_are_never_emitted from obs step 9 to obs step 10, where show is implemented, and require exit 0 in both checks; carried in the obs build task's brief. Deviation ruling accepted: the harness TASKS_STUB at 1fea7bf replaces the real tasks CLI of spec 14.5; the live --task check in obs step 12 remains required.
+- 2026-10-23T16:12:31Z (session-evidence-reader): gate: planned docs/plans/2026-10-23-session-evidence-reader.md — user approved revision 2 at 1fea7bf after plan round 2 accept; child hq-bb90ca filed for Task 1; obs steps carried by obs-d98663 (no parent, depends on hq-c411df); Stage B noted on obs-f5710b, obs-081ded, hq-19580c
+  provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T16:12:45Z (session-evidence-reader): parked (waiting on agent, session): A fresh session executes the plan natively in .worktrees/session-evidence-reader: run the baseline just test there first (deferred from planning), then tasks start hq-bb90ca and do plan Task 1 steps 1-7 under flow (implementing, verified with a fresh-context review, closed). Then the parent's integration verification (whole branch spec+plan+fixtures, just test, one fresh review of the combined diff), tasks note hq-b95324 --no-reviewed with the reviewed contract (spec 9 and 14.3) and remaining work, retro, tasks done and local merge; obs-d98663 then becomes ready.
+  provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T16:17:44Z (session-evidence-reader): resumed
+  provenance: {"harness_session":"claude-code:f7f539e5-48f4-4265-a16a-be9f26e40276","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T16:28:09Z (session-evidence-reader): baseline: just test in .worktrees/session-evidence-reader passed (tools 1027, relay cutover 389 + 1, agents/bin count not captured) before Task 1
+- 2026-10-23T17:36:30Z (session-evidence-reader): review: impl round 1 — verdict: revise; findings: important 2, minor 6; reviewer: claude-code/claude-opus-5-5
+- 2026-10-23T17:40:08Z (session-evidence-reader): review: impl round 2 — verdict: accept; findings: minor 4; reviewer: claude-code/claude-opus-5-5
+- 2026-10-23T17:40:32Z (session-evidence-reader): gate: verified tree:d6057f6ef57c62e0bb915d5e861ba5e5462cf946 — checks: whole branch main...HEAD (spec ae0f8ee and plan 1fea7bf unchanged at HEAD and SL11 fixtures) and just test passed on this tree (agents/bin 231 and tools 1037 and relay cutover 389 + 1) and the SL11 self-check 34 passed and git merge-tree against main merges cleanly; review: important addressed hq-b95324 reviewed-contract note written before merge, important addressed obs step 4 fork range corrected to spec 8.3 by a note on obs-d98663, minor addressed SL11 ref source and fixture deviations noted for obs, minor addressed ref_of lacks TD ESC and ESM noted for obs, minor addressed vacuous CT1 session-label assertion noted and hq-a45dd8 filed, minor addressed vendor test should compare against git ls-tree noted, minor addressed fork key version ranges restated, minor deferred spec 8.3 says no fixture forks yet pending the fork-boundary amendment, minor addressed hq-b95324 note tier wording clarified, minor addressed dot-directory wording corrected, minor deferred cited shas need a true merge which the local merge keeps; reviewer: claude-code/claude-opus-5-5
+  provenance: {"harness_session":"claude-code:f7f539e5-48f4-4265-a16a-be9f26e40276","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T17:40:44Z (session-evidence-reader): retro: the long spec and plan review cycle paid off at execution, since one child carried the whole hq side and only fixture-fidelity findings surfaced. Two weaknesses: the plan hard-coded line positions and an off-by-one range (obs step 4) that only a whole-branch review cross-checking plan against spec caught, and a frozen plan cannot absorb execution-time deviations, so the handoff to obs travels as task notes. Next time, have the plan cite the cases document for refs instead of restating them.
+- 2026-10-23T17:40:44Z (session-evidence-reader): done
+  provenance: {"harness_session":"claude-code:f7f539e5-48f4-4265-a16a-be9f26e40276","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T17:40:44Z (session-evidence-reader): design spec (ae0f8ee) and plan (1fea7bf) reviewed, Task 1 SL11 fixtures landed (hq-bb90ca), integration verified on tree d6057f6, obs-d98663 carries the reader build with handoff notes, hq-b95324 noted for re-scope
+  provenance: {"harness_session":"claude-code:f7f539e5-48f4-4265-a16a-be9f26e40276","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
