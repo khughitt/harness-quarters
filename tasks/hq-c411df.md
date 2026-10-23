@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: session-evidence-reader
 created: 2026-10-20T11:19:18Z
-updated: 2026-10-23T14:45:11Z
+updated: 2026-10-23T14:45:12Z
 started: 2026-10-23T12:40:18Z
 depends: [hq-a1c591, hq-de3e4c]
 parent: hq-cff824
@@ -65,3 +65,5 @@ Found while checking whether stamped friction reports can be traced to their ori
 - 2026-10-23T14:13:12Z (session-evidence-reader): review: spec round 2 — verdict: revise; findings: important 5, minor 12; reviewer: claude-code/claude-opus-5-5
 - 2026-10-23T14:42:18Z (session-evidence-reader): review: spec round 3 — verdict: revise; findings: important 5, minor 10; reviewer: claude-code/claude-opus-5-5
 - 2026-10-23T14:45:11Z (session-evidence-reader): Spec revision 4 at 87b7fcb (sha256 c9f40e908bccac1cdf36a7d10772b91909c0b51f29b3dfb1e1f0841f406abc02) addresses agent review rounds 1-3 (round 3 findings fixed per the reviewer's suggested fixes; no agent re-review of revision 4). Handed to the user for the designed gate.
+- 2026-10-23T14:45:12Z (session-evidence-reader): parked (waiting on user, review): User reviews docs/specs/2026-10-23-session-evidence-reader-design.md at hq 87b7fcb (worktree .worktrees/session-evidence-reader), chiefly D1 obs hosts the reader, D5 skill after readout, D6 no task move and a separate obs build task; then the agent records gate: designed and writes the plan
+  provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
