@@ -1,13 +1,15 @@
 ---
 id: hq-c411df
 title: Design the session evidence reader and usage skill from completed studies
-status: todo
+status: doing
 priority: 2
 size: m
 complexity: high
 process: planned
+owner: main
 created: 2026-10-20T11:19:18Z
-updated: 2026-10-23T00:32:46Z
+updated: 2026-10-23T12:40:18Z
+started: 2026-10-23T12:40:18Z
 depends: [hq-a1c591, hq-de3e4c]
 parent: hq-cff824
 tags: [feedback, gap, "from:lore"]
@@ -50,3 +52,5 @@ Found while checking whether stamped friction reports can be traced to their ori
 - 2026-10-20T18:09:23Z (main): Follow-up review: hq-6e5d88 now derives portable semantic acceptance cases from the completed survey; use them for search/show and evidence-link requirements. Avoid a duplicate CLI design task: this idea already owns that design after hq-a1c591. Reconcile it with the accepted boundary work ops-630a87 and obs-f5710b: obs is to own content parsing and session-logs, hq location/lifecycle and harness-version store samples. The transfer is deferred to 2027-02-17 after flow-trial-1 readout; parser ownership, the consumer interface and any effect on enrolled sessions or measurement are explicit design checks. The new corpus is data-only and does not execute that transfer. Automated trace precision still needs evaluation before a precision claim; a single surveyed batch is insufficient.
 - 2026-10-20T19:31:48Z (docs/index-reach): hq-a1c591 research input: docs/notes/2026-10-20-session-index-reach.md and brief sections2/4–6. Existing obs index resolves20 sampled origin files and6 child-parent links to5 parents; content/output anchoring still requires a reader. Preserve per-file candidates and actual readability: O10 root-ID query returns root plus3 child files whose empty parent-ID rows all have subagent=0, while separate agent rows are correctly classified; gap obs-b99310. M01 missing file has a readable alternate under the same ID. Native archive/missing controls pass, but zero read_path rows means replayed-copy retrieval unobserved. Europa has no index at configured path. Recommend search+show using existing local metadata and accepted obs parsing ownership; no new index. Both research inputs are now available; fresh corrective review and final task closure precede branch integration.
 - 2026-10-22T17:41:57Z (main): scope: scoped; both studies and the ten-case corpus are complete (686e160, 228f751, 03af2f4); obs-b99310 resolved the phantom-parent defect in 54ce9e187b825dc7ace6ff23ba9820e172b1f89c. Promoted this existing idea to the design-and-plan handoff, P2/m/high/planned, with required evidence refs, explicit parsing/location ownership and trial rollout gates; original captured body preserved. No new research or duplicate design task; brief: docs/notes/2026-10-20-session-store-reach-brief.md
+- 2026-10-23T12:40:18Z (main): started
+  provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
