@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-10-23T00:09:52Z
-updated: 2026-10-23T01:19:12Z
+updated: 2026-10-23T01:19:22Z
 started: 2026-10-23T01:19:12Z
 depends: []
 parent: hq-401088
@@ -34,3 +34,4 @@ Ideas it wakes: On completion, run `tasks note hq-1639fd --no-reviewed "<survey 
 
 - 2026-10-23T01:19:12Z (main): started
   provenance: {"harness_session":"claude-code:38f3b682-ef1d-4f4a-a80b-80579e770420","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T01:19:22Z (main): arm: flow-trial-1 — unit tack-401088 — not enrolled
