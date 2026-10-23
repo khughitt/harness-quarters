@@ -254,15 +254,16 @@ throwaway repositories under a temporary `CODEX_HOME` that holds a copy of the
    - after review round 1 of hq-48c5c6: a lead clause that the content and deletion
      forms overwrite or remove the file too and serve only when that was asked (with
      `HEAD` as the rev, the content form does what `git restore <path>` does); a guard
-     that stops the chain unless the source is a blob and `<path>` is not a symlink
-     (unguarded, a directory source exited 0, left a stray temporary file in the
-     directory and the following `git add` staged it, and a symlink at `<path>`
-     overwrote its target's uncommitted edits); the mode-600 note; that `git add`
+     that stops the chain unless the source is a blob and `<path>` is neither a
+     symlink nor a directory (unguarded, a directory source or a directory at `<path>`
+     exited 0, left a stray temporary file in the directory and the following
+     `git add` staged it, and a symlink at `<path>` overwrote its target's uncommitted
+     edits; the directory-at-`<path>` check came from review round 2); the mode-600 note; that `git add`
      replaces any staged version; that the deletion form outside a conflict deletes
      the file and its uncommitted edits; and quoted paths throughout.
 
    ```
-   prefix_rule(pattern=["git", "restore"], decision="forbidden", justification="git restore can overwrite uncommitted work, and so can the content and deletion forms below: use them only when replacing or removing the file is what was asked. To unstage, run git reset -q -- \"<path>\" (always name the path: with none it resets the whole index); for a newly added file, git rm --cached -- \"<path>\" also works. To set one regular file (not a directory or symlink) to a conflict side or a commit's version, write it to a temporary file and copy it over only if that succeeds: src=\"<src>\" && [ \"$(git cat-file -t \"$src\")\" = blob ] && [ ! -L \"<path>\" ] && tmp=$(mktemp) && git show \"$src\" > \"$tmp\" && cp -- \"$tmp\" \"<path>\" && rm \"$tmp\", where <src> is :3:./<path> for theirs (:2:./<path> for ours; in a rebase :3: is your own commit being replayed) or <rev>:./<path> for a commit's version; a file the copy creates gets mode 600, so add back an executable bit with chmod +x. Then run git add -- \"<path>\" as its own command; it replaces any staged version. To take a conflict side that deleted the file, run git rm --cached -- \"<path>\", then rm -- \"<path>\", as two separate commands; outside a conflict this deletes the file and any uncommitted edits.")
+   prefix_rule(pattern=["git", "restore"], decision="forbidden", justification="git restore can overwrite uncommitted work, and so can the content and deletion forms below: use them only when replacing or removing the file is what was asked. To unstage, run git reset -q -- \"<path>\" (always name the path: with none it resets the whole index); for a newly added file, git rm --cached -- \"<path>\" also works. To set one regular file (not a directory or symlink) to a conflict side or a commit's version, write it to a temporary file and copy it over only if that succeeds: src=\"<src>\" && [ \"$(git cat-file -t \"$src\")\" = blob ] && [ ! -L \"<path>\" ] && [ ! -d \"<path>\" ] && tmp=$(mktemp) && git show \"$src\" > \"$tmp\" && cp -- \"$tmp\" \"<path>\" && rm \"$tmp\", where <src> is :3:./<path> for theirs (:2:./<path> for ours; in a rebase :3: is your own commit being replayed) or <rev>:./<path> for a commit's version; a file the copy creates gets mode 600, so add back an executable bit with chmod +x. Then run git add -- \"<path>\" as its own command; it replaces any staged version. To take a conflict side that deleted the file, run git rm --cached -- \"<path>\", then rm -- \"<path>\", as two separate commands; outside a conflict this deletes the file and any uncommitted edits.")
    ```
 
    Ruling on the trade-off (review round 1, I1): the content form is a sanctioned way to
@@ -275,7 +276,11 @@ throwaway repositories under a temporary `CODEX_HOME` that holds a copy of the
    Limits of the content form beyond the conflict-form limits above: a file the copy
    creates (absent from the working tree) gets mode 600, so an executable bit is lost
    unless restored (probed); a source that is a symlink in the repository (mode 120000)
-   is a blob, so the copy writes the link text as a regular file (not probed); and with
+   is a blob, so the copy writes the link text as a regular file (probed by review
+   round 2: exit 0, status ` T`); a symlinked parent directory of `<path>` is written
+   through, so the copy can overwrite a file outside the repository within the
+   sandbox's writable roots (review round 2); when the parent of `<path>` is missing,
+   `cp` fails and the temporary file stays behind; and with
    a staged version that differs from both, `git add` replaces it, which
    `git restore --worktree` would not.
 
@@ -292,9 +297,9 @@ throwaway repositories under a temporary `CODEX_HOME` that holds a copy of the
      failed on the read-only index, which is why it must be its own command.
    - Fixture probe of the guarded form (current text): a regular file from a
      subdirectory and the `:3:./c` conflict side were restored, plain and sandboxed in
-     the worktree; a directory source, a symlink at `<path>` and a missing source each
-     stopped with exit 1, changed nothing and left no temporary file; a recreated file
-     came out mode 600.
+     the worktree; a directory source, a directory at `<path>`, a symlink at `<path>`
+     and a missing source each stopped with exit 1, changed nothing and left no
+     temporary file; a recreated file came out mode 600.
    - `codex execpolicy check` on the current file, on titan (Codex 0.164.0) and europa
      (0.163.0; `~/.codex/rules` resolves to the synced `local/codex/rules`, the loaded
      file's sha256 matches titan's, and Dropbox is running): every `git restore` form,
