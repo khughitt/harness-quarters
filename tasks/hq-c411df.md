@@ -8,7 +8,7 @@ complexity: high
 process: planned
 owner: session-evidence-reader
 created: 2026-10-20T11:19:18Z
-updated: 2026-10-23T15:24:47Z
+updated: 2026-10-23T15:35:37Z
 started: 2026-10-23T12:40:18Z
 depends: [hq-a1c591, hq-de3e4c]
 parent: hq-cff824
@@ -83,4 +83,6 @@ Found while checking whether stamped friction reports can be traced to their ori
   provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-23T15:24:46Z (session-evidence-reader): Plan committed 525dff8 (docs/plans/2026-10-23-session-evidence-reader.md, sha256 09ef5dbdcb22534949f4d1037a9dee45a3b082caf3f945dbb269e5039a76df3b): hq Task 1 (SL11 fixtures, child) and obs steps 1-12 for one new obs task; deviation ruled in obs step 1 (obs's scratch and INGEST_STUB harness instead of the real tasks CLI of spec 14.5). Children and the obs task are filed after plan approval, then gate: planned.
 - 2026-10-23T15:24:47Z (session-evidence-reader): parked (waiting on user, review): User reviews docs/plans/2026-10-23-session-evidence-reader.md at hq 525dff8 (worktree .worktrees/session-evidence-reader) and picks Task 1's execution method; then the agent files the Task 1 child and the obs build task, writes the Stage B and hq-b95324 notes, records gate: planned, and runs Task 1
+  provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-23T15:35:37Z (session-evidence-reader): resumed
   provenance: {"harness_session":"claude-code:2d4a0242-c612-4fd2-86ef-f40cb8d35dc4","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
