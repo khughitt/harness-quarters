@@ -1,6 +1,7 @@
 # Claude transcript links and archive pruning — brief
 
 2026-10-22. Idea: hq-1639fd. Existing retention goal: hq-401088.
+Updated after hq-cbcc14's completed investigation and follow-up scoping.
 
 ## Problem
 
@@ -21,62 +22,17 @@ so a reference can break at quarantine time, before the bytes are released.
 hq-1639fd records Claude successor-to-predecessor transcript links observed on
 2026-10-21 and 2026-09-06, and an earlier dangling link after Claude's own cleanup.
 Those observations are source evidence, not a fresh live-store survey in this pass.
-The code confirms the missing incoming-link check; a two-session reproduction of
-hq's prune remains to be run.
+The code confirms the missing incoming-link check. hq-cbcc14 completed the
+two-session reproduction in `4f40c52`, with reviewed findings revised through
+`596b706`; the evidence table below records its synthetic-store results.
 
 obs-396637 is now done: obs skips transcript symlinks and tolerates vanished paths.
 That removes the reported indexer crash, but does not preserve a live link's target.
 Existing `tools/test_session_archive_prune_claude.py` tests retain nonregular entries
-inside quarantine; they do not cover a link from a surviving session into a pruned
-unit. The linking unit's own quarantine behaviour also needs checking.
+inside quarantine. The new `tools/test_session_archive_prune_links.py` covers a
+surviving session's link and the linking unit's own quarantine failure.
 
-## Constraints
-
-The accepted archive design is `docs/specs/2026-09-30-session-archive-design.md`,
-especially §§3.2–3.4; its plan is `docs/plans/2026-09-30-session-archive.md`.
-Preserve no-follow traversal, exact archive verification, inactivity and open-file
-checks, and quarantine recovery. Never follow an arbitrary link to delete its target.
-
-hq-3b9c4c separately owns strict obs-readiness consumption; hq-624351 owns prune
-rollout. Neither currently resolves incoming links. This brief authorizes no live
-prune, timer change, or mutation of another session's links. The session-reader brief
-`docs/notes/2026-10-20-session-store-reach-brief.md` treats this as retention work.
-
-## Alternatives
-
-- **Retain referenced targets.** Keep an older unit while a surviving unit links to
-  it. Lean here: it preserves the existing live relationship without rewriting the
-  surviving session. Establish how discovery and quarantine handle concurrent links.
-- **Prune linked units together, in a safe order.** Potentially reclaims more space,
-  but requires every affected unit to qualify and complicates partial failure and
-  quarantine rollback. No atomic group operation exists today.
-- **Allow and report dangling links, or remove them.** Reporting may be acceptable
-  if live readers no longer need them, but that has not been established. Removing
-  links changes a surviving session; obs's fix alone does not justify it.
-
-## Unanswered questions
-
-- **Bounded investigation:** reproduce an eligible older target and an ineligible
-  younger linking unit; locate the first break and the younger unit's later outcome.
-- **Bounded investigation:** can retaining referenced targets fit the existing
-  no-follow and quarantine protocols? Check link creation/change around the existing
-  test hooks, target resolution, already dangling links and partial failure. Record
-  any remaining race explicitly rather than claiming a snapshot prevents it.
-- **Later design, if needed:** what contract change and rollout gate does the
-  evidence require? Return to hq-1639fd with the recommendation before implementation.
-
-## Proposed decomposition
-
-- Reuse hq-401088 as the retention goal. hq-1639fd stays an idea, briefed and waiting
-  on hq-cbcc14, **Establish safe retention for Claude units referenced by successor
-  links** (P2 / small / high complexity / direct). Both belong under the existing goal.
-  The investigation records its finding with tasks note --no-reviewed on hq-1639fd
-  before merging, so scoping can resume with evidence rather than a guessed policy.
-- Keep hq-3b9c4c's readiness work and hq-624351's rollout ownership. The investigation
-  must identify whether the latter needs an additional gate; this pass does not
-  incidentally rewrite either task or add a duplicate design task.
-
-## Findings (hq-cbcc14, 2026-10-22)
+### Findings (hq-cbcc14, 2026-10-22)
 
 Evidence: `tools/test_session_archive_prune_links.py`, synthetic stores only. Each
 fixture is an older unit O holding `subagents/agent-1.jsonl`, and a younger unit N
@@ -200,3 +156,53 @@ Check: `just test` in the task worktree at 4f40c52 (all four segments): 228, 100
 non-regular `<sid>.jsonl` or `<sid>/` sibling, lexical-only matching in rule 3,
 where rule 3 sits against `before_delete`, inventory error handling, and the obs
 reader's wording and fix) are carried to hq-1639fd for the spec revision.
+
+## Constraints
+
+The accepted archive design is `docs/specs/2026-09-30-session-archive-design.md`,
+especially §§3.2–3.4; its plan is `docs/plans/2026-09-30-session-archive.md`.
+Preserve no-follow traversal, exact archive verification, inactivity and open-file
+checks, and quarantine recovery. Never follow an arbitrary link to delete its target.
+
+hq-3b9c4c separately owns strict obs-readiness consumption; hq-624351 owns prune
+rollout. Neither currently resolves incoming links. This brief authorizes no live
+prune, timer change, or mutation of another session's links. The session-reader brief
+`docs/notes/2026-10-20-session-store-reach-brief.md` treats this as retention work.
+
+## Alternatives
+
+- **Retain referenced targets.** Keep an older unit while a surviving unit links to
+  it. Lean here: it preserves the existing live relationship without rewriting the
+  surviving session. Settle the policy and remaining concurrency limits in the
+  reviewed revision, using the completed fixture evidence and pending probe.
+- **Prune linked units together, in a safe order.** Potentially reclaims more space,
+  but requires every affected unit to qualify and complicates partial failure and
+  quarantine rollback. No atomic group operation exists today.
+- **Allow and report dangling links, or remove them.** Reporting may be acceptable
+  if live readers no longer need them, but that has not been established. Removing
+  links changes a surviving session; obs's fix alone does not justify it.
+
+## Unanswered questions
+
+- **hq-0b8f2c, isolated harness probe:** does resuming a successor read its linked
+  transcript, and what happens when that link dangles? This determines the case for
+  target retention, separate from the demonstrated quarantine-release failure.
+- **hq-d59a7b, read-only survey:** how many successor links exist now, in what form
+  and age range, and do current obs rows trigger the realpath conflict? The fixture
+  results do not answer live-store prevalence or current index state.
+- **Later reviewed design:** after those results, settle the retention policy and
+  revise archive §§3.3–3.4.2 and the implementation plan. Coordinate with
+  hq-3b9c4c's readiness revision. The last-scan race and the carried review minors
+  in the findings remain explicit limits to resolve, not guarantees established by a fixture.
+
+## Proposed decomposition
+
+- Reuse hq-401088 as the retention goal. hq-1639fd stays an idea, briefed and waiting
+  on existing hq-0b8f2c (P2 / small / mid complexity / direct) and hq-d59a7b
+  (P2 / extra small / low complexity / direct). Each records its finding with
+  `tasks note hq-1639fd --no-reviewed` before its result's branch merges. The
+  completed hq-cbcc14 remains evidence, not an open wait. Reuse these records;
+  do not duplicate their research or create an implementation task before re-scoping.
+- Keep hq-3b9c4c's readiness work and hq-624351's rollout ownership. The investigation
+  must identify whether the latter needs an additional gate; this pass does not
+  incidentally rewrite either task or add a duplicate design task.

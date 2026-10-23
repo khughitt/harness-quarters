@@ -58,6 +58,13 @@ implementation plan is attached to hq-c411df.
   provenance can differ from the runtime model in `turn_context`. The model-route
   addition remains hq-7b131a. hq-be3f69 already demonstrated recovery of an earlier
   human turn through the skill, using a handwritten Codex parser.
+- **Final-message retrieval gap, hq-b95324 (code checked at b5cacb9).**
+  `session-episodes show` prints a "last assistant" message only after looking up an
+  extracted episode/candidate ID. Its CLI has extract/show/confirm/label, with no
+  query for turn-final messages by session, task or time window. `_evidence` already
+  uses `turn_after` and the shared parser, so reuse the reader's turn/role evidence
+  rather than introducing another handwritten JSONL scan. Existing episode evidence
+  is narrower than general final-message retrieval; this gap is not already delivered.
 
 ## 3. Constraints
 
@@ -93,6 +100,10 @@ call/result pairing by ID; line and content-block references; recorded parent li
 and per-turn runtime model; and per-run searched, missing, unreadable, malformed and
 truncated coverage. A mention is weaker than a successful task command or provenance
 stamp. JSONL with a pretty renderer is a recommendation, not a surveyed preference.
+For hq-b95324, express listing and printing turn-final assistant messages through
+the same search/show design, with session, task and time-window selection. Prefer
+that to a separate final-message verb or another parser; command syntax remains a
+design decision.
 
 ## 5. Unanswered questions
 
@@ -105,6 +116,12 @@ stamp. JSONL with a pretty renderer is a recommendation, not a surveyed preferen
 - **Reader acceptance work:** incorporate hq-c1fecb's fidelity corrections and the
   location controls. Automated trace precision and production search costs remain
   unmeasured; no precision claim follows from this sample.
+- **hq-c411df's design, from hq-b95324:** define a final message across Claude and
+  Codex, including commentary, injected records, interrupted/incomplete turns and
+  turns with no final response. Define task selection's evidence (recorded ownership
+  versus textual mentions), preserve source references, and map a focused acceptance
+  case to the chosen contract. Existing "last assistant" output alone does not settle
+  those semantics. No new research is justified before the design traces this code.
 - **Other owners:** tasks decides tasks-516ab4. A potential relay thread-model query
   remains an unfiled option; relay's own-session resolver is not that interface.
 
@@ -114,6 +131,11 @@ stamp. JSONL with a pretty renderer is a recommendation, not a surveyed preferen
   Both research inputs are complete. Produce reviewed design and implementation plan
   with acceptance mapping and rollout gates before implementation; reuse this record,
   not another design task. Keep it under hq-cff824.
+- **hq-b95324:** keep this idea briefed under hq-cff824, depending on hq-c411df's
+  reviewed design and plan. Its design handoff includes final-message selection and
+  the acceptance question above. On completion, hq-c411df records the result with
+  `tasks note hq-b95324 --no-reviewed` before its branch merges; then re-scope the
+  idea against the reviewed contract instead of creating a parallel CLI effort.
 - **hq-1adbfe:** propose drop as a delivered positive result of obs-b99310; preserve
   its source body and dated verification. No new research waits on it.
 - **hq-a60cf5 / hq-7b131a:** existing independent root-alignment and model-route work;
