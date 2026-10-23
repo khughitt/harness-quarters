@@ -173,7 +173,10 @@ MIT licensed; see `LICENSE`.
 - `AGENTS.md`: hq's project guide; `just docs` generates its identity region.
   Harness global-file links target lore's `./instructions/AGENTS.md`.
 - `links.toml` and `tools/harness-links`: declarations and reconciliation for real
-  harness homes and links into registered owner checkouts.
+  harness homes and links into registered owner checkouts. A link-assembled directory
+  holds one symlink per entry, so a search rooted there is empty unless the searcher
+  follows links: use `rg -L`, `fd -L` or `find -L`, or search the owner checkout the
+  entry resolves to (`readlink -f`, or its `links.toml` target).
 - `facts/capabilities.toml` and `tools/harness-facts`: capability facts. See below.
 - `agents/skills/session-logs/`: the retained skill. `agents/bin/`: session-episodes,
   wake-judge, their tests, and links to tools owned by flows. Profile fragments and
