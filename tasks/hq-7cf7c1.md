@@ -7,7 +7,7 @@ size: s
 complexity: low
 process: direct
 created: 2026-10-23T16:54:42Z
-updated: 2026-10-24T11:57:49Z
+updated: 2026-10-24T11:57:51Z
 depends: []
 tags: [feedback, friction, "from:hq"]
 ---
@@ -21,3 +21,7 @@ Where: .githooks/test_codex_trust.py git/repo/trust/clean/refresh plus test_conc
 ## Original captured report
 
 Running the repository suite from an agent session whose environment exports terminal-program variables (editor and pager overrides set to noninteractive values) produced one failure in a git-rebase-with-stop-hook test: a rebase continue that the test drives with a core.editor command-line setting failed, and the error named an editor false. Root cause: the test's git helper starts subprocesses with the inherited environment, and a GIT_EDITOR export outranks that core.editor setting, so the continue tried to open editor false and died. Expected: the suite passes whatever the calling session's terminal-program variables are. Suggested direction: the test's subprocess helper builds its environment key by key (at minimum unsetting editor and pager exports and inherited git variables) rather than passing the environment through. Verified in a fresh worktree before any change: the single test passes again with the three editor variables removed from the environment.
+
+## Notes
+
+- 2026-10-24T11:57:51Z (main): scope: scoped; checked aefbde9 and .githooks/test_codex_trust.py history (latest 71458ae): git/trust/clean/refresh and two Popen sites inherit the caller; the rebase test relies on core.editor=true. Scoped a P2/s/low/direct fix for this fixture family: explicit child environments, temporary HOME and isolated git config/routing, fixture-root assertions and synthetic contamination regression. Preserved the captured report; hq-27de48 remains separate. No production-hook or suite-wide refactor. Pre-write just test passed in an isolated environment: 231 + 1037 + 389 + 1 tests; this does not reproduce or fix the exported-editor failure.
