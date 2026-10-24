@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: fix/hq-7cf7c1
 created: 2026-10-23T16:54:42Z
-updated: 2026-10-24T12:26:40Z
+updated: 2026-10-24T12:35:17Z
 started: 2026-10-24T12:21:06Z
 depends: []
 tags: [feedback, friction, "from:hq"]
@@ -38,3 +38,4 @@ Running the repository suite from an agent session whose environment exports ter
 - 2026-10-24T12:21:57Z (fix/hq-7cf7c1): gate: implementing .worktrees/hq-7cf7c1
   provenance: {"harness_session":"codex:01a16ddb-03dc-7d82-b033-7af16f6371d3","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-24T12:26:40Z (fix/hq-7cf7c1): Reproduced safely before edits: isolated caller with synthetic GIT_EDITOR/EDITOR/VISUAL/PAGER/GIT_PAGER=false and fake credential fails only test_a_rebase_stopped_on_a_conflict_continues_after_the_stop_hook (1 failed, 47 deselected): GIT_EDITOR=false overrides core.editor=true. First full baseline attempt omitted USER and registry and produced 4 harness-link failures plus 80 rename-cutover setup errors; correcting the disposable runner inputs before proceeding.
+- 2026-10-24T12:35:17Z (fix/hq-7cf7c1): Hydrated .worktrees/hq-7cf7c1 with just setup. Corrected safe full baseline just test passed: 231 agents + 1037 hooks/tools + 389 relay parallel + 1 signal tests. Runner uses temporary HOME, copied registry, fake USER, PATH and isolated global/system git configuration. No code changes preceded this baseline.
