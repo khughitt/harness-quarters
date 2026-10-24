@@ -1,0 +1,3 @@
+older reader: pid=1222704
+PASS v0.1.1 quarantines taken detached entry on disposable copy; canonical v0.2.0 entry unchanged
+older reader: reaped pid=1222704 exit=0
