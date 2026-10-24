@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-10-24T22:15:24Z
-updated: 2026-10-24T23:34:32Z
+updated: 2026-10-24T23:34:33Z
 started: 2026-10-24T23:34:21Z
 depends: []
 tags: [docs]
@@ -23,3 +23,4 @@ Found by the curate-docs pass hq-30fd95 at 8686be3 (criterion 8). The justfile r
 - 2026-10-24T23:34:21Z (main): started
   provenance: {"harness_session":"claude-code:c2f3e76e-ba29-4176-9424-f3373a5a3562","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-24T23:34:32Z (main): trial: flow-trial-1 — enrolled — flow off
+- 2026-10-24T23:34:32Z (main): arm: flow-trial-1 — unit tack-a0cc24 — flow off
