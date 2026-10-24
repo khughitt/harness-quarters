@@ -3,6 +3,9 @@
 2026-10-22. Idea: hq-1639fd. Existing retention goal: hq-401088.
 Updated after hq-cbcc14's completed investigation and follow-up scoping, and after
 hq-d59a7b's live survey and hq-0b8f2c's resume probe.
+Scope refresh, 2026-10-24 at `aefbde9`: those investigations are completed evidence;
+the remaining background-successor question reuses open hq-9e64f4. This refresh
+checks recorded results and current code, not fresh live-store counts or a new probe.
 
 ## Problem
 
@@ -290,12 +293,14 @@ prune, timer change, or mutation of another session's links. The session-reader 
 
 ## Unanswered questions
 
-- **hq-0b8f2c, isolated harness probe:** answered for 2.1.304 with a hand-made pair;
-  see "Resume probe" above. Still open: a harness-made pair, resuming or reattaching a
-  background session through the daemon, the agent view, and storage-v5 hard links.
+- **hq-9e64f4, background-successor probe:** does daemon attach or resume read the
+  linked transcript, and does a dangling target matter? This existing open task owns
+  the remaining policy question. hq-0b8f2c answered ordinary-session resume for
+  2.1.304 with a hand-made pair; see "Resume probe" above. A harness-made pair, the
+  agent view, and storage-v5 hard links remain limits, not established behaviour.
 - **hq-d59a7b, read-only survey:** answered; see "Live survey" above. The second
   host's stores were not surveyed.
-- **Later reviewed design:** after those results, settle the retention policy and
+- **Later reviewed design:** after hq-9e64f4's result, settle the retention policy and
   revise archive §§3.3–3.4.2 and the implementation plan. Coordinate with
   hq-3b9c4c's readiness revision. The last-scan race and the carried review minors
   in the findings remain explicit limits to resolve, not guarantees established by a fixture.
@@ -303,11 +308,11 @@ prune, timer change, or mutation of another session's links. The session-reader 
 ## Proposed decomposition
 
 - Reuse hq-401088 as the retention goal. hq-1639fd stays an idea, briefed and waiting
-  on existing hq-0b8f2c (P2 / small / mid complexity / direct) and hq-d59a7b
-  (P2 / extra small / low complexity / direct). Each records its finding with
-  `tasks note hq-1639fd --no-reviewed` before its result's branch merges. The
-  completed hq-cbcc14 remains evidence, not an open wait. Reuse these records;
-  do not duplicate their research or create an implementation task before re-scoping.
+  by dependency on existing hq-9e64f4 (P2 / small / mid complexity / direct). Its
+  five-field research handoff must record its finding with
+  `tasks note hq-1639fd --no-reviewed` before its result's branch merges, then the
+  idea is re-scoped. Completed hq-cbcc14, hq-0b8f2c and hq-d59a7b stay as evidence,
+  not unanswered waits. No new research or design task is needed in this pass.
 - Keep hq-3b9c4c's readiness work and hq-624351's rollout ownership. The investigation
   must identify whether the latter needs an additional gate; this pass does not
   incidentally rewrite either task or add a duplicate design task.
