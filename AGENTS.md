@@ -42,8 +42,8 @@ The generated global Projects block is checked by lore.
 - `tools/session-archive` and `systemd/user/`: transcript capture and pruning.
 - `tools/hq` (`tools/hq_cli/`, flags in `tools/hq.toml`): `hq sessions` lists and resumes
   sessions across harness homes from their own metadata (README.md).
-- `docs/`: residue specs and plans, including frozen documents moved to lore and flows,
-  retained for closed task references. `tools/ops-docs` is vendored from ops.
+- `docs/`: specs, plans, notes and runbooks, including frozen documents moved to lore
+  and flows, retained for closed task references. `tools/ops-docs` is vendored from ops.
 
 The global instructions, profiles and general skill corpus live in lore. This root
 file is hq's project guide; home links to global instructions target lore.
