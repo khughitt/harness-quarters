@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: fix/hq-7cf7c1
 created: 2026-10-23T16:54:42Z
-updated: 2026-10-24T12:37:11Z
+updated: 2026-10-24T12:39:36Z
 started: 2026-10-24T12:21:06Z
 depends: []
 tags: [feedback, friction, "from:hq"]
@@ -40,3 +40,4 @@ Running the repository suite from an agent session whose environment exports ter
 - 2026-10-24T12:26:40Z (fix/hq-7cf7c1): Reproduced safely before edits: isolated caller with synthetic GIT_EDITOR/EDITOR/VISUAL/PAGER/GIT_PAGER=false and fake credential fails only test_a_rebase_stopped_on_a_conflict_continues_after_the_stop_hook (1 failed, 47 deselected): GIT_EDITOR=false overrides core.editor=true. First full baseline attempt omitted USER and registry and produced 4 harness-link failures plus 80 rename-cutover setup errors; correcting the disposable runner inputs before proceeding.
 - 2026-10-24T12:35:17Z (fix/hq-7cf7c1): Hydrated .worktrees/hq-7cf7c1 with just setup. Corrected safe full baseline just test passed: 231 agents + 1037 hooks/tools + 389 relay parallel + 1 signal tests. Runner uses temporary HOME, copied registry, fake USER, PATH and isolated global/system git configuration. No code changes preceded this baseline.
 - 2026-10-24T12:37:11Z (fix/hq-7cf7c1): RED: all four fabricated-caller regressions failed before helper edits; editor case reproduced false overriding core.editor, routing redirected fixture state, config probe read fixture.contaminated=true, and fake credential reached child. GREEN: explicit environment helper at all six original subprocess sites plus post-init/pre-config containment assertions; all 53 module tests pass. Covered fingerprint 61fd0cf8a07810742fa6aa08f3f31b7d58a8b305. Full just test now runs with synthetic editor/pager overrides in the disposable runner.
+- 2026-10-24T12:39:36Z (fix/hq-7cf7c1): review: impl round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
