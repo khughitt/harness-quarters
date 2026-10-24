@@ -1,13 +1,15 @@
 ---
 id: hq-7cf7c1
 title: "Test suite subprocesses inherit the calling session's editor and pager environment, so exported editor variables fail the rebase-continue test"
-status: todo
+status: doing
 priority: 2
 size: s
 complexity: low
 process: direct
+owner: main
 created: 2026-10-23T16:54:42Z
-updated: 2026-10-24T11:57:51Z
+updated: 2026-10-24T12:21:06Z
+started: 2026-10-24T12:21:06Z
 depends: []
 tags: [feedback, friction, "from:hq"]
 ---
@@ -25,3 +27,5 @@ Running the repository suite from an agent session whose environment exports ter
 ## Notes
 
 - 2026-10-24T11:57:51Z (main): scope: scoped; checked aefbde9 and .githooks/test_codex_trust.py history (latest 71458ae): git/trust/clean/refresh and two Popen sites inherit the caller; the rebase test relies on core.editor=true. Scoped a P2/s/low/direct fix for this fixture family: explicit child environments, temporary HOME and isolated git config/routing, fixture-root assertions and synthetic contamination regression. Preserved the captured report; hq-27de48 remains separate. No production-hook or suite-wide refactor. Pre-write just test passed in an isolated environment: 231 + 1037 + 389 + 1 tests; this does not reproduce or fix the exported-editor failure.
+- 2026-10-24T12:21:06Z (main): started
+  provenance: {"harness_session":"codex:01a16ddb-03dc-7d82-b033-7af16f6371d3","harness_session_source":"CODEX_THREAD_ID"}
