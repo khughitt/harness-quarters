@@ -7,7 +7,7 @@ size: xs
 complexity: low
 process: direct
 created: 2026-10-24T17:36:50Z
-updated: 2026-10-24T17:36:50Z
+updated: 2026-10-24T17:38:08Z
 depends: []
 tags: []
 source: "hq-536849:retained-evidence"
@@ -15,3 +15,7 @@ agent: codex
 ---
 
 Retained canonical raw release and pinned-runtime adoption provenance remains on Titan after completed adoption. Inspect the retained-item notes carried here from hq-536849, verify their manifests, and give each raw file a disposition: attach still-needed small evidence using normal layout checks (preserving raw copies and portable derivatives where checks require), discard regenerable or already-preserved copies, and release directories only after every needed item is preserved. This is evidence housekeeping; no runtime, service, hook or home-link change is authorized or needed. Done: each carried item is preserved under an explicit owner or released with its verified disposition. No code changes or new installer are expected.
+
+## Notes
+
+- 2026-10-24T17:38:08Z (chore/hq-536849-relay-v020): retained: {"host": "titan", "kind": "evidence", "path": "$WORK_ROOT/relay/relay-adb97d/evidence", "purpose": "Canonical raw provenance retained after completed relay v0.2.0 adoption; reconcile per-file preservation and disposition", "cleanup_trigger": "When hq-ad237e reconciles attachment and retention of each raw evidence file", "manifest": "$WORK_ROOT/relay/relay-adb97d/evidence/manifest.sha256", "sha256": "4425bd846704a1d0bab99cb179788f6ac536016d8c7e35ca52f22ca705b193c8", "state": "kept", "verification": "verified", "next_owner": "task:hq-ad237e"}
