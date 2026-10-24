@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: fix/hq-7cf7c1
 created: 2026-10-23T16:54:42Z
-updated: 2026-10-24T12:39:54Z
+updated: 2026-10-24T12:39:55Z
 started: 2026-10-24T12:21:06Z
 depends: []
 tags: [feedback, friction, "from:hq"]
@@ -43,3 +43,4 @@ Running the repository suite from an agent session whose environment exports ter
 - 2026-10-24T12:39:36Z (fix/hq-7cf7c1): review: impl round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
 - 2026-10-24T12:39:53Z (fix/hq-7cf7c1): attached: trust-fixture-review-report.md (1743 bytes): Independent implementation review by codex/gpt-6.1-sol: Ship; no findings
 - 2026-10-24T12:39:53Z (fix/hq-7cf7c1): attached: contamination-red.txt (10088 bytes): All four fabricated caller contamination regressions failed before helper isolation
+- 2026-10-24T12:39:54Z (fix/hq-7cf7c1): attached: baseline.txt (5770 bytes): Safe hydrated baseline just test: 231 + 1037 + 389 + 1 passed
