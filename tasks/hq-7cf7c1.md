@@ -1,15 +1,17 @@
 ---
 id: hq-7cf7c1
 title: "Test suite subprocesses inherit the calling session's editor and pager environment, so exported editor variables fail the rebase-continue test"
-status: doing
+status: done
 priority: 2
 size: s
 complexity: low
 process: direct
-owner: main
+owner: fix/hq-7cf7c1
 created: 2026-10-23T16:54:42Z
-updated: 2026-10-24T12:21:37Z
+updated: 2026-10-24T12:51:58Z
 started: 2026-10-24T12:21:06Z
+completed: 2026-10-24T12:51:58Z
+closed: 2026-10-24T12:51:58Z
 depends: []
 tags: [feedback, friction, "from:hq"]
 ---
@@ -32,4 +34,27 @@ Running the repository suite from an agent session whose environment exports ter
 - 2026-10-24T12:21:20Z (main): trial: flow-trial-1 — enrolled — flow on
 - 2026-10-24T12:21:21Z (main): arm: flow-trial-1 — unit tack-7cf7c1 — flow on
 - 2026-10-24T12:21:37Z (main): gate: scoped — adopted
+  provenance: {"harness_session":"codex:01a16ddb-03dc-7d82-b033-7af16f6371d3","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-24T12:21:56Z (fix/hq-7cf7c1): resumed
+  provenance: {"harness_session":"codex:01a16ddb-03dc-7d82-b033-7af16f6371d3","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-24T12:21:57Z (fix/hq-7cf7c1): gate: implementing .worktrees/hq-7cf7c1
+  provenance: {"harness_session":"codex:01a16ddb-03dc-7d82-b033-7af16f6371d3","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-24T12:26:40Z (fix/hq-7cf7c1): Reproduced safely before edits: isolated caller with synthetic GIT_EDITOR/EDITOR/VISUAL/PAGER/GIT_PAGER=false and fake credential fails only test_a_rebase_stopped_on_a_conflict_continues_after_the_stop_hook (1 failed, 47 deselected): GIT_EDITOR=false overrides core.editor=true. First full baseline attempt omitted USER and registry and produced 4 harness-link failures plus 80 rename-cutover setup errors; correcting the disposable runner inputs before proceeding.
+- 2026-10-24T12:35:17Z (fix/hq-7cf7c1): Hydrated .worktrees/hq-7cf7c1 with just setup. Corrected safe full baseline just test passed: 231 agents + 1037 hooks/tools + 389 relay parallel + 1 signal tests. Runner uses temporary HOME, copied registry, fake USER, PATH and isolated global/system git configuration. No code changes preceded this baseline.
+- 2026-10-24T12:37:11Z (fix/hq-7cf7c1): RED: all four fabricated-caller regressions failed before helper edits; editor case reproduced false overriding core.editor, routing redirected fixture state, config probe read fixture.contaminated=true, and fake credential reached child. GREEN: explicit environment helper at all six original subprocess sites plus post-init/pre-config containment assertions; all 53 module tests pass. Covered fingerprint 61fd0cf8a07810742fa6aa08f3f31b7d58a8b305. Full just test now runs with synthetic editor/pager overrides in the disposable runner.
+- 2026-10-24T12:39:36Z (fix/hq-7cf7c1): review: impl round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
+- 2026-10-24T12:39:53Z (fix/hq-7cf7c1): attached: trust-fixture-review-report.md (1743 bytes): Independent implementation review by codex/gpt-6.1-sol: Ship; no findings
+- 2026-10-24T12:39:53Z (fix/hq-7cf7c1): attached: contamination-red.txt (10088 bytes): All four fabricated caller contamination regressions failed before helper isolation
+- 2026-10-24T12:39:54Z (fix/hq-7cf7c1): attached: baseline.txt (5770 bytes): Safe hydrated baseline just test: 231 + 1037 + 389 + 1 passed
+- 2026-10-24T12:42:02Z (fix/hq-7cf7c1): Post-review rule check: replaced /dev/null with an empty .gitconfig under each fixture-owned HOME (including the synthetic caller), preserving local test identity config. Stopped the previous full run deliberately with SIGINT (231 passed; hook/tool segment had reached 82% without failures; no final verdict), confirmed its process group exited, and will rerun focused/full checks and independent review at fingerprint 6dcc3e93cb84a8464d5688be85514d2c769977bb.
+- 2026-10-24T12:43:36Z (fix/hq-7cf7c1): review: impl round 2 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
+- 2026-10-24T12:43:50Z (fix/hq-7cf7c1): attached: final-trust-fixture-review-report.md (1846 bytes): Fresh final review at 6dcc3e9 by codex/gpt-6.1-sol: no findings; independent global config isolation check passed
+- 2026-10-24T12:51:44Z (fix/hq-7cf7c1): attached: final-green.txt (5770 bytes): Final just test under fabricated editor and pager overrides: 231 + 1042 + 389 + 1 passed
+- 2026-10-24T12:51:45Z (fix/hq-7cf7c1): Final verification at 6dcc3e93cb84a8464d5688be85514d2c769977bb: just test exited 0 with 231 agents + 1042 hooks/tools + 389 relay parallel + 1 signal tests, under fabricated editor/pager=false exports and a key-built disposable runner. Focused final module: 53 passed. tasks check exits 0 with four pre-existing undefined session-logs tag warnings and no errors. Host-pointer scan found no launcher, user unit or known harness config pointing into this worktree. Cleanup disposition: discard the regenerable __pycache__ directories in .githooks, agents/bin, claude/probes, tools, tools/hq_cli, tools/relay_cutover_bootstrap and tools/session_archive, plus .pytest_cache; all needed review and test evidence is attached to this task.
+- 2026-10-24T12:51:46Z (fix/hq-7cf7c1): gate: verified tree:6dcc3e93cb84a8464d5688be85514d2c769977bb — checks: just test 231+1042+389+1 passed with fabricated editor and pager overrides and focused module 53 passed and git diff --check passed; review: none; reviewer: codex/gpt-6.1-sol session:codex:01a16dee-d9c7-7841-b3f0-0d74284bf999
+  provenance: {"harness_session":"codex:01a16ddb-03dc-7d82-b033-7af16f6371d3","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-24T12:51:52Z (fix/hq-7cf7c1): retro: A fabricated caller made RED safe while reproducing editor precedence, Git routing/config leakage and fake credential inheritance. Reusing real rebase, filter and locking assertions kept the fix inside one fixture family. Check literal isolation requirements before starting the full suite to avoid an unnecessary rerun.
+- 2026-10-24T12:51:58Z (fix/hq-7cf7c1): done
+  provenance: {"harness_session":"codex:01a16ddb-03dc-7d82-b033-7af16f6371d3","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-24T12:51:58Z (fix/hq-7cf7c1): Isolated every Codex trust fixture subprocess in a temporary HOME/global config with key-built env, guarded fixture repository paths, and proved editor/routing/config/credential regressions RED to GREEN. Final just test: 231 + 1042 + 389 + 1 passed; focused module 53 passed; two independent reviews accepted with no findings.
   provenance: {"harness_session":"codex:01a16ddb-03dc-7d82-b033-7af16f6371d3","harness_session_source":"CODEX_THREAD_ID"}
