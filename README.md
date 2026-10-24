@@ -227,6 +227,8 @@ MIT licensed; see `LICENSE`.
   `--tools 'read,grep,mcp__<server>__*'` (quoted: zsh refuses an unmatched glob). pi 1.1.0's `--help` says plain names keep MCP
   tools; track earendil-works/pi#10634. `pi/probes/` holds the probes behind the pi
   facts (see "Re-probing pi" below).
+- [Pinned relay runtime](docs/runbooks/relay-runtime.md): installing and upgrading the
+  standalone launcher, isolated rehearsals, and durable inbox recovery limits.
 - [Relay operator cutover](docs/runbooks/relay-cutover.md): the closed-harness bootstrap the
   operator runs from Zsh (`tools/relay-cutover-bootstrap run`). It covers the agent's
   preparation and pilot (`tools/relay-cutover-rehearse`), smokes and receipts, the surface

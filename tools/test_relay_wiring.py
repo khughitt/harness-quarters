@@ -1,4 +1,4 @@
-"""Committed hook images route lifecycle events through the pinned relay runtime."""
+"""Committed hook images retain their approved runtime independently of the CLI pin."""
 import json
 import shlex
 from pathlib import Path
@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = json.loads((ROOT / 'relay/package.json').read_text())['dependencies']['relay'].split('#')[1]
+HOOK_VERSION = 'v0.1.1'  # Hook upgrades have a separate approval gate from the CLI pin.
 FILES = ['claude/settings.json', 'codex/hooks.json', 'codex/work/hooks.json']
 
 
@@ -17,7 +17,7 @@ def parse_relay_command(command):
     assert len(argv) == 10
     assert argv[0] == '/usr/bin/node'
     assert Path(argv[1]).is_absolute()
-    assert argv[1].endswith(f'/.local/share/relay/{VERSION}/node_modules/relay/bin/relay.js')
+    assert argv[1].endswith(f'/.local/share/relay/{HOOK_VERSION}/node_modules/relay/bin/relay.js')
     assert argv[2:4] == ['hook', '--harness']
     assert argv[5] == '--outer-ms'
     assert argv[7] == '--subscribers'

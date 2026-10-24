@@ -2,6 +2,6 @@
   "name": "hq-relay-pin",
   "private": true,
   "dependencies": {
-    "relay": "git+https://github.com/khughitt/relay.git#v0.1.1"
+    "relay": "git+https://github.com/khughitt/relay.git#v0.2.0"
   }
 }
