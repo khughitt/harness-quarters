@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-10-23T16:54:42Z
-updated: 2026-10-24T12:21:20Z
+updated: 2026-10-24T12:21:21Z
 started: 2026-10-24T12:21:06Z
 depends: []
 tags: [feedback, friction, "from:hq"]
@@ -30,3 +30,4 @@ Running the repository suite from an agent session whose environment exports ter
 - 2026-10-24T12:21:06Z (main): started
   provenance: {"harness_session":"codex:01a16ddb-03dc-7d82-b033-7af16f6371d3","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-24T12:21:20Z (main): trial: flow-trial-1 — enrolled — flow on
+- 2026-10-24T12:21:21Z (main): arm: flow-trial-1 — unit tack-7cf7c1 — flow on
