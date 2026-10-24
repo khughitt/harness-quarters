@@ -1,0 +1,6 @@
+{
+  "version": "relay 0.2.0",
+  "nativeAnswerPreserved": true,
+  "detachedTakeReplay": true,
+  "processesReaped": true
+}
