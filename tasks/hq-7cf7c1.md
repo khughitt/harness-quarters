@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: fix/hq-7cf7c1
 created: 2026-10-23T16:54:42Z
-updated: 2026-10-24T12:39:53Z
+updated: 2026-10-24T12:39:54Z
 started: 2026-10-24T12:21:06Z
 depends: []
 tags: [feedback, friction, "from:hq"]
@@ -42,3 +42,4 @@ Running the repository suite from an agent session whose environment exports ter
 - 2026-10-24T12:37:11Z (fix/hq-7cf7c1): RED: all four fabricated-caller regressions failed before helper edits; editor case reproduced false overriding core.editor, routing redirected fixture state, config probe read fixture.contaminated=true, and fake credential reached child. GREEN: explicit environment helper at all six original subprocess sites plus post-init/pre-config containment assertions; all 53 module tests pass. Covered fingerprint 61fd0cf8a07810742fa6aa08f3f31b7d58a8b305. Full just test now runs with synthetic editor/pager overrides in the disposable runner.
 - 2026-10-24T12:39:36Z (fix/hq-7cf7c1): review: impl round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
 - 2026-10-24T12:39:53Z (fix/hq-7cf7c1): attached: trust-fixture-review-report.md (1743 bytes): Independent implementation review by codex/gpt-6.1-sol: Ship; no findings
+- 2026-10-24T12:39:53Z (fix/hq-7cf7c1): attached: contamination-red.txt (10088 bytes): All four fabricated caller contamination regressions failed before helper isolation
