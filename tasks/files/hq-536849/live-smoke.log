@@ -1,0 +1,11 @@
+old-service: pid=1797690
+old-service: reaped pid=1797690 exit=0
+upgraded-service: pid=1797735
+PASS v0.1.1 saved native answer and presence survive v0.2.0 upgrade
+upgraded-service: reaped pid=1797735 exit=0
+restarted-service: pid=1797959
+restarted-service: reaped pid=1797959 exit=0
+replay-service: pid=1798092
+PASS ask-file, terminal answer, saved-answer restart, take and replay after restart
+replay-service: reaped pid=1798092 exit=0
+PASS all services reaped and service lock released
