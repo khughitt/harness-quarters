@@ -2,6 +2,11 @@
 
 Scoping handoff, 2026-10-13. Idea: hq-1459f0. Goal and research ids are in §6.
 
+Updated 2026-10-24 from the owner's completed inspection. This is a scope handoff,
+not a design or implementation approval. The owner requests no further session
+collection. Historical evidence and the original pilot proposal remain below;
+the dated updates distinguish the supplied result from unperformed validation.
+
 ## Problem
 
 A session's first prompt says a lot about what kind of conversation follows. The
@@ -11,6 +16,12 @@ as greenfield project idea, feature idea, research idea or copied message, with
 examples of each, and to treat "copied" as a modifier that combines with the others.
 Nothing yet shows whether those kinds separate session shapes well enough to be worth
 tooling.
+
+The inspection supplies recurring opening forms and a possible consumer: reducing
+the repeated copying of review targets and context into a new session. These are two
+questions: whether motifs explain session outcomes, and whether a task-based review
+prompt saves effort. The dry-run consumer need not wait for an outcome-prediction
+study. The supplied result does not establish that motifs predict outcomes.
 
 ## Current behaviour and evidence
 
@@ -39,6 +50,65 @@ tooling.
   is a pasted Claude message is one leg of a relayed exchange (hq-ba1758,
   `docs/notes/2026-10-10-mediated-cross-harness-brief.md`).
 
+### Supplied inspection, 2026-10-24
+
+The local script imports the session-episodes readers. The supplied summary reports
+1,374 recently modified files: 376 subagents, 506 non-interactive sessions, 15 opened
+before the window, 23 without a timed record, four without human text, and 444 kept.
+It records session locator, harness/home/project, opening time, preceding slash
+commands, first human text and turn counts. Raw prompts include work-home text;
+their location and checkpoint belong in task retained-item notes, not this document.
+
+| Opening bucket | Reported sessions |
+| --- | ---: |
+| Take a task | 116 |
+| Scope | 107 |
+| Review | 76 |
+| Choose next | 45 |
+| Test/smoke, identified by cwd | 24 |
+| Execute | 22 |
+| Free-form | 20 |
+| Question/investigation | 17 |
+| Idea/file a task | 10 |
+| Copied reply | 4 |
+| Other skill | 3 |
+
+Keep intent commands such as `/scope` as motif evidence; record configuration
+commands separately, including `/clear` (42), `/model` (24) and `/effort` (18).
+Preserve both the actual opening command and the first substantive text. A copied
+approval or answer may continue an earlier conversation, while copied feature or
+research prompts can still be independent openings: copying and continuation are
+separate attributes. A one-human-turn session is not necessarily empty or useless.
+
+The launcher report separately identifies 77 non-test review prompts: 56 naming a
+docs path, 28 a task id, and 44 with a resolved task record (28 explicit ids, 16
+basename matches). Of those 44, 25 have spec/plan fields, 13 SHA-bearing notes, and
+three a worktree in a review note. Eighteen typed paths match the linked artifact;
+three reported differences include sibling documents or ledgers. These are candidate
+resolutions, not proof of the correct artifact and revision.
+
+Limits to carry forward without collecting more sessions:
+
+- The supplied narrative's harness totals, 209 + 229, equal 438 rather than 444;
+  the bucket table's harness columns total 215 + 229. Its turn-count groups,
+  186 + 142 + 97, total 425, and 186 of 444 is about 42 percent, not half.
+- The five proposed intents total 366: about 82 percent of all 444, or 87 percent
+  of 420 after removing 24 test sessions. The reported 82 percent after removing
+  tests mixes denominators.
+- The motif tally has 76 reviews and the launcher report has 77. The 25 linked
+  artifacts are not fully accounted for by 18 matches and three differences.
+  Preserve the two reports' populations and do not infer missing results.
+- This was rule-based inspection, not the original random, harness-stratified
+  75/75 frozen-taxonomy validation. The supplied summary reports no fork copies
+  excluded; that alone does not demonstrate copy detection coverage.
+- Similar median turns do not answer duration, task/spec activity or tool-error
+  questions. Four copied-reply labels do not estimate all copied prompts.
+- Fourteen identical prompts across harnesses are a reason to retain harness
+  choice, not evidence requiring automatic dual launch.
+- `hq sessions` uses Claude prompt-history display text and Codex thread names or
+  titles, with 60-character display labels and activity-based ordering. Its earlier
+  listing cannot substitute for opening-time, transcript-based evidence.
+
 ## Constraints
 
 - Read the stores through the existing readers. Never modify harness stores. Keep
@@ -48,7 +118,30 @@ tooling.
   obs's two adapters, as the skill says.
 - Motif labels are inferred, not observed.
 
+- Current scope: record and interpret the supplied inspection, with the limits above;
+  do not repeat the historical 30-day/150-session study. Its unanswered outcome
+  questions remain unproven, not prerequisites to the prompt-builder experiment.
+- The launcher experiment is dry-run only. It may inspect the existing cases and
+  task records, but launches no harness, changes no session store, and adds no
+  product CLI, shared schema, model judge or embedding pipeline.
+- A review handoff must identify review kind, target repository/artifact and the
+  corresponding frozen commit or out-of-tree hash. Multiple artifacts, stale notes,
+  basename collisions and missing revision/worktree evidence must be explicit.
+  A task id or any SHA in its notes is insufficient by itself.
+
 ## Alternatives
+
+Current lean: record the inspection's useful findings and limits in hq-83c787, then
+test one `review <task-id>` prompt builder against the existing resolved cases.
+Compare recovered context and meaning, not identical wording. Reject starting with
+a five-verb launcher or a mandatory handoff-schema project: the dry run should first
+show the concrete missing fields. Production hq integration, if supported, adopts
+ops's existing CLI vocabulary with that implementation. Crew remains a possible
+flow consumer; lore owns shared template text only when there is a second consumer.
+fzf target selection, other actions, graphical flow links, dual launch, CLI visual
+components and text/embedding indexes are preserved possibilities, not this task.
+
+Historical alternatives, retained as context rather than new work orders:
 
 1. **Hand-labelled pilot first (recommended).** Label a random sample of first
    prompts, letting the motifs emerge, freeze the taxonomy, label a second half with
@@ -62,6 +155,19 @@ tooling.
    before the pilot.
 
 ## Unanswered questions
+
+Current follow-through:
+
+- hq-83c787 records the supplied inspection, the denominator and method limits, and
+  what it supports. No additional population collection or duration/error study is
+  required by this scope pass. Predictive validity remains unknown.
+- The bounded prompt-builder follow-up determines which existing review cases yield
+  an unambiguous artifact/revision, which require edits and which lack context.
+  It recommends whether a product command is justified and identifies any actual
+  tasks/flows handoff gap. It does not assume a new schema is needed first.
+- A live launch and the final choice of supported actions remain later decisions.
+
+Original research questions, not answered by the inspection:
 
 - Which motifs recur, and does "copied" combine with the others or stand as its own
   kind? Answered by hq-83c787.
@@ -90,3 +196,18 @@ Decided by the owner, 2026-10-13:
 | hq-1459f0 | Stays an idea until the pilot shows motifs that separate session shapes | — |
 
 Goal: hq-4c1555. Not a design task: one pilot answers the open questions first.
+
+Current scope supersedes the historical pilot instruction in the table: hq-83c787
+records this result and its limits, then wakes hq-1459f0.
+
+| Task | Current next action | Ideas it wakes |
+| --- | --- | --- |
+| hq-83c787 | Record the supplied inspection and its limits without more collection | hq-1459f0 |
+| hq-1459f0 | Reconsider the motif/tooling idea after the result is recorded | — |
+| hq-268cc2 | Evaluate a local dry-run review prompt builder against the existing cases; report incomplete or ambiguous context | hq-2d8e81 |
+| hq-2d8e81 | Reconsider the launcher after the dry run; own the retained private inspection artifacts | — |
+
+The launcher idea waits on hq-268cc2, not on a new taxonomy study. Historical
+session-content search remains hq-3558a1 / hq-ea0975; this pass does not duplicate or
+re-scope those tasks. The session evidence reader remains obs-d98663, with its own
+delivery constraints, and is not a prerequisite for this local experiment.
