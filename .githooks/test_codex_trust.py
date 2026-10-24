@@ -1,8 +1,11 @@
 """codex-trust saves Codex project trust in local/ and puts back what a checkout dropped."""
 import fcntl
+import os
+import shlex
 import shutil
 import stat
 import subprocess
+import sys
 import time
 import tomllib
 from pathlib import Path
@@ -19,16 +22,28 @@ A = '[projects."/work/a"]\ntrust_level = "trusted"\n'
 B = '[projects."/work/b"]\ntrust_level = "trusted"\n'
 
 
+def child_env(repo):
+    home = repo.parent / "subprocess-home"
+    return {"PATH": os.environ["PATH"], "HOME": str(home),
+            "GIT_CONFIG_GLOBAL": str(home / ".gitconfig"), "GIT_CONFIG_NOSYSTEM": "1"}
+
+
 def git(repo, *args, check=True):
     return subprocess.run(["git", "-C", str(repo), *args], check=check, text=True,
-                          capture_output=True)
+                          capture_output=True, env=child_env(repo))
 
 
 @pytest.fixture
 def repo(tmp_path):
     """A main checkout shaped like this one: the filter, the hooks, a tracked config, local/."""
     repo = tmp_path / "tack"
-    (repo / ".githooks").mkdir(parents=True)
+    repo.mkdir()
+    (tmp_path / "subprocess-home").mkdir()
+    (tmp_path / "subprocess-home" / ".gitconfig").touch()
+    git(repo, "init", "-q", "-b", "main")
+    assert Path(git(repo, "rev-parse", "--show-toplevel").stdout.strip()) == repo.resolve()
+    assert Path(git(repo, "rev-parse", "--absolute-git-dir").stdout.strip()) == repo.resolve() / ".git"
+    (repo / ".githooks").mkdir()
     for name in HOOK_FILES:
         shutil.copy2(HOOKS / name, repo / ".githooks" / name)
     (repo / "codex").mkdir()
@@ -42,7 +57,6 @@ def repo(tmp_path):
                                          "pi/settings*.json filter=harness-state\n")
     (repo / ".gitignore").write_text("local/\n__pycache__/\n")
     (repo / CONFIG).write_text(BASE)
-    git(tmp_path, "init", "-q", "-b", "main", str(repo))
     git(repo, "config", "filter.harness-state.clean", ".githooks/harness-state-clean %f")
     git(repo, "config", "core.hooksPath", ".githooks")
     git(repo, "config", "user.email", "t@example.invalid")
@@ -67,12 +81,13 @@ def projects(path):
 def trust(repo, *args):
     """Run codex-trust as the hooks do: by path, from another directory."""
     return subprocess.run([str(repo / ".githooks" / "codex-trust"), *args], cwd=repo.parent,
-                          text=True, capture_output=True)
+                          text=True, capture_output=True, env=child_env(repo))
 
 
 def clean(repo, text):
     return subprocess.run([str(repo / ".githooks" / "harness-state-clean"), CONFIG],
-                          input=text, check=True, text=True, capture_output=True).stdout
+                          input=text, check=True, text=True, capture_output=True,
+                          env=child_env(repo)).stdout
 
 
 def test_capture_into_a_missing_saved_copy_saves_the_live_tables(repo):
@@ -284,7 +299,8 @@ def test_an_unknown_operation_prints_the_usage(repo):
 def test_concurrent_syncs_leave_one_copy_of_each_table(repo):
     saved(repo).write_text(A + "\n" + B)
     runs = [subprocess.Popen([str(repo / ".githooks" / "codex-trust"), "sync"],
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                             env=child_env(repo))
             for _ in range(8)]
 
     for run in runs:
@@ -320,7 +336,8 @@ def status(repo):
 def refresh(repo):
     """Run the Stop hook as a harness does: from another directory, payload on stdin."""
     return subprocess.run([str(repo / ".githooks" / "harness-state-refresh")], cwd=repo.parent,
-                          input='{"hook_event_name":"Stop"}', text=True, capture_output=True)
+                          input='{"hook_event_name":"Stop"}', text=True, capture_output=True,
+                          env=child_env(repo))
 
 
 def test_the_stop_hook_saves_new_trust(repo):
@@ -641,9 +658,58 @@ def test_codex_trust_waits_for_the_host_lock_live_picks_shares(repo):
     with open(repo / "local" / "harness-state.lock", "a") as held:
         fcntl.flock(held, fcntl.LOCK_EX)
         run = subprocess.Popen([str(repo / ".githooks" / "codex-trust"), "sync"],
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                               env=child_env(repo))
         time.sleep(0.5)
         assert run.poll() is None
     _, err = run.communicate(timeout=10)
 
     assert run.returncode == 0, err
+
+
+def test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials(repo):
+    probe = 'import os; assert "HQ_TEST_CREDENTIAL" not in os.environ; print(os.path.expanduser("~"))'
+    command = f"!{shlex.quote(sys.executable)} -c {shlex.quote(probe)}"
+
+    result = git(repo, "-c", f"alias.fixture-env={command}", "fixture-env")
+
+    assert git(repo, "config", "--get", "fixture.contaminated", check=False).returncode == 1
+    assert result.stdout.strip() == str(repo.parent / "subprocess-home")
+
+
+@pytest.mark.parametrize("contamination", ["editors", "routing", "config", "credential"])
+def test_callers_environment_cannot_reach_fixture_subprocesses(tmp_path, contamination):
+    home = tmp_path / "caller-home"
+    home.mkdir()
+    config = home / ".gitconfig"
+    config.write_text("[fixture]\ncontaminated = true\n")
+    empty_config = home / "empty.gitconfig"
+    empty_config.touch()
+    env = {"PATH": os.environ["PATH"], "HOME": str(home),
+           "GIT_CONFIG_GLOBAL": str(empty_config), "GIT_CONFIG_NOSYSTEM": "1"}
+    env.update({
+        "editors": {name: "false" for name in
+                    ("EDITOR", "VISUAL", "GIT_EDITOR", "GIT_SEQUENCE_EDITOR", "PAGER", "GIT_PAGER")},
+        "routing": {"GIT_DIR": str(tmp_path / "foreign.git"),
+                    "GIT_WORK_TREE": str(tmp_path), "GIT_INDEX_FILE": str(tmp_path / "foreign-index"),
+                    "GIT_COMMON_DIR": str(tmp_path / "foreign.git")},
+        "config": {"GIT_CONFIG_GLOBAL": str(config), "GIT_CONFIG_SYSTEM": str(config),
+                   "GIT_CONFIG_NOSYSTEM": "0", "GIT_CONFIG_COUNT": "1",
+                   "GIT_CONFIG_KEY_0": "fixture.contaminated", "GIT_CONFIG_VALUE_0": "true"},
+        "credential": {"HQ_TEST_CREDENTIAL": "fixture-only"},
+    }[contamination])
+    selected = " or ".join((
+        "test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials",
+        "test_a_rebase_stopped_on_a_conflict_continues_after_the_stop_hook",
+        "test_concurrent_syncs_leave_one_copy_of_each_table",
+        "test_codex_trust_waits_for_the_host_lock_live_picks_shares",
+        "test_restore_leaves_what_git_stages_unchanged",
+    ))
+
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", str(Path(__file__).resolve()), "-q", "--tb=short",
+         "-p", "no:cacheprovider", "--basetemp", str(tmp_path / "children"), "-k", selected],
+        cwd=tmp_path, env=env, text=True, capture_output=True, timeout=120)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert config.read_text() == "[fixture]\ncontaminated = true\n"
