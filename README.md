@@ -99,8 +99,9 @@ added by hand is lost. Restoring also takes group and other access off the live
 saved copy: to forget a directory, run `.githooks/codex-trust forget <path>`, which
 deletes its table from both files.
 
-After the local-layer rollout, other worktrees and branches made before it show
-`codex/config*.toml` as modified, because their blobs still carry trust tables, and a
+Since the local layer moved trust out of the index (2026-09,
+`docs/specs/2026-09-28-local-layer-design.md`), worktrees and branches made before it
+show `codex/config*.toml` as modified, because their blobs still carry trust tables, and a
 rebase there can stop on them. `git checkout -- codex/config.toml` in a worktree is
 safe, since worktree copies are not live. It drops Codex's bookkeeping the
 same way: `screen_reader_detection_done` under `[tui]`, the whole
@@ -242,11 +243,13 @@ MIT licensed; see `LICENSE`.
   (`docs/specs/2026-09-30-session-archive-design.md`). Linked on every host; the
   timers are enabled only on a host with `~/.config/session-archive/config.toml`.
   Never `systemctl --user reenable` a timer: its disable half removes the unit link
-  `just link` declares, and its enable half then finds no unit.
+  `just link` declares, and its enable half then finds no unit. If it already ran,
+  `just link --apply` and then `systemctl --user enable` the timer.
 - `tools/hq`, `tools/hq_cli/` and `tools/hq.toml`: the `hq` command, linked as
   `~/.local/bin/hq`; `hq sessions` lists and resumes agent sessions (see "Finding a
   past session" below).
-- `docs/`: hq's specs, plans, notes (briefs and contracts) and runbooks. Frozen
+- `docs/`: hq's specs, plans, notes (briefs, contracts and analyses), runbooks, and the
+  2026-10-16 commit map in `docs/rewrites/` for old SHAs cited in records. Frozen
   documents moved to lore and flows stay as references for closed tasks.
 - `tools/ops-docs`: vendored from ops; change it there.
 
