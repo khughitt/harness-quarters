@@ -99,12 +99,13 @@ added by hand is lost. Restoring also takes group and other access off the live
 saved copy: to forget a directory, run `.githooks/codex-trust forget <path>`, which
 deletes its table from both files.
 
-Since the local layer moved trust out of the index (2026-09,
-`docs/specs/2026-09-28-local-layer-design.md`), worktrees and branches made before it
-show `codex/config*.toml` as modified, because their blobs still carry trust tables, and a
-rebase there can stop on them. `git checkout -- codex/config.toml` in a worktree is
-safe, since worktree copies are not live. It drops Codex's bookkeeping the
-same way: `screen_reader_detection_done` under `[tui]`, the whole
+Since the local layer kept trust out of the index (2026-09,
+`docs/specs/2026-09-28-local-layer-design.md`), worktrees and branches made
+before it show `codex/config*.toml` as modified, because their blobs still carry
+trust tables, and a rebase there can stop on them.
+`git checkout -- codex/config.toml` in a worktree is safe, since worktree copies
+are not live. It drops Codex's bookkeeping the same way:
+`screen_reader_detection_done` under `[tui]`, the whole
 `[tui.model_availability_nux]` table, and `last_updated` / `last_revision` under
 each `[marketplaces.*]` table, so a fresh clone probes once and refetches its
 marketplaces. Everything else the harness writes — plugin toggles, marketplace
