@@ -1,9 +1,9 @@
 name = "harness-quarters"
 purpose = "Harness homes, declared links, settings, and session-state hygiene"
 abstract = """
-The harness homes and declared links that deliver instructions and skills from their
-owners, harness settings and hooks, capability facts with their evidence, session-state
-hygiene and the session archive.
+Links each agent harness's home to its instructions, skills, settings and hooks, for the
+person running agents across these hosts. It keeps model picks and trust out of git,
+records what each harness has been shown to do, pins pi and relay, and archives sessions.
 The instruction corpus and profiles live in lore; the flow system lives in flows.
 """
 authority = ["docs/specs/2026-10-06-residue-design.md"]
