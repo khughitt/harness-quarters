@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/curate-docs-hq-30fd95
 created: 2026-10-24T22:15:21Z
-updated: 2026-10-24T23:46:41Z
+updated: 2026-10-24T23:47:01Z
 started: 2026-10-24T23:33:47Z
 depends: []
 tags: [docs]
@@ -29,3 +29,5 @@ Found by the curate-docs pass hq-30fd95 at 8686be3 (criterion 2). docs/specs/202
 - 2026-10-24T23:35:15Z (docs/curate-docs-hq-30fd95): resumed
   provenance: {"harness_session":"claude-code:c2f3e76e-ba29-4176-9424-f3373a5a3562","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-24T23:46:41Z (docs/curate-docs-hq-30fd95): baseline: just test in .worktrees/docs-30fd95 at dacb4c5: 1042 + 389 + 1 passed, exit 0
+- 2026-10-24T23:47:01Z (docs/curate-docs-hq-30fd95): gate: implementing .worktrees/docs-30fd95
+  provenance: {"harness_session":"claude-code:c2f3e76e-ba29-4176-9424-f3373a5a3562","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
