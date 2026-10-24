@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-10-16T04:09:12Z
-updated: 2026-10-24T12:55:37Z
+updated: 2026-10-24T12:55:38Z
 started: 2026-10-24T12:55:07Z
 depends: []
 tags: []
@@ -26,3 +26,5 @@ flows adds bin/flow-gate and bin/flow-graph beside bin/flow-state (flows docs/sp
 - 2026-10-24T12:55:19Z (main): trial: flow-trial-1 — enrolled — flow on
 - 2026-10-24T12:55:20Z (main): arm: flow-trial-1 — unit tack-c66bee — flow on
 - 2026-10-24T12:55:37Z (main): Scope: add the required flow-gate and flow-graph links beside flow-state; verify owner targets, run just test and preview reconciliation. Relay is already declared at ~/.local/bin/relay and resolves on PATH. Apply from main only; the task explicitly asks for installation on every host.
+- 2026-10-24T12:55:38Z (main): gate: scoped — adopted
+  provenance: {"harness_session":"codex:01a16df9-ed57-76a1-967a-ef9db5371dbe","harness_session_source":"CODEX_THREAD_ID"}
