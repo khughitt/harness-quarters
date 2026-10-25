@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: direct
 created: 2026-10-25T12:27:45Z
-updated: 2026-10-25T12:27:45Z
+updated: 2026-10-25T12:28:00Z
 depends: []
 tags: [docs]
 source: hq-c6a149
@@ -21,3 +21,7 @@ Done: run the candidate checker from ops-295f8d over hq (or reproduce its rule) 
 ## References
 
 - adoption-spec (context, kind=spec): docs/specs/2026-10-24-ops-check-adoption-design.md — D3 to D6 set the allowance and placeholder rules this revisits
+
+## Notes
+
+- 2026-10-25T12:28:00Z (main): concerns: hq-c6a149 change — the stricter ops-check from ops-295f8d will flag the ~/d/<project> placeholder hq-c6a149 adopted, and other ~/d forms already in the tree
