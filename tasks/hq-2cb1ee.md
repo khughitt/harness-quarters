@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: feat/superpowers-701
 created: 2026-10-25T12:18:32Z
-updated: 2026-10-25T12:46:00Z
+updated: 2026-10-25T12:46:30Z
 started: 2026-10-25T12:18:43Z
 completed: 2026-10-25T12:46:00Z
 closed: 2026-10-25T12:46:00Z
@@ -40,3 +40,4 @@ claude-plugins-official still pins superpowers 7.0.0 (bb92a77) four days after t
   provenance: {"harness_session":"claude-code:5f570bb5-1b44-4a25-831f-f043464ca1e2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-25T12:46:00Z (feat/superpowers-701): superpowers runs from superpowers-marketplace (7.0.1) with auto-update off; official entry disabled
   provenance: {"harness_session":"claude-code:5f570bb5-1b44-4a25-831f-f043464ca1e2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-25T12:46:30Z (main): post-landing: claude plugin install superpowers@superpowers-marketplace gave 7.0.1 gitCommitSha 2ce8aa15 (upstream main = v7.0.1 at install); plugin list shows only it enabled, official 7.0.0 disabled; settings unchanged by install
