@@ -2,7 +2,8 @@
 
 Scoping handoff, 2026-10-13. Idea: hq-1459f0. Goal and research ids are in §6.
 
-Updated 2026-10-25 from the owner's completed inspection and the first dry run.
+Updated 2026-10-25 from the owner's completed inspection, the first dry run and the
+validated-draft experiment.
 This is a scope handoff, not a design or implementation approval. The owner requests no further session
 collection. Historical evidence and the original pilot proposal remain below;
 the dated updates distinguish the supplied result from unperformed validation.
@@ -160,6 +161,56 @@ idea's notes; account for these before reuse without deleting evidence or assumi
 that historical extracts are reproducible from today's live stores. The complete
 18-file dry-run bundle had no unlisted files. hq-2d8e81 retains both bundles.
 
+### Validated drafts, 2026-10-25
+
+hq-2b3929 ran the experiment. Its portable report is attached at
+`tasks/files/hq-2b3929/validated-review-draft-report.md`. Both checkpoints matched
+before use. The six-case manifest was frozen, and its hash noted on the task,
+before evaluation.
+
+- **Observed cases:** with an explicit selection, all three produced ready
+  historical drafts whose repository, commit and blob hashes were validated inside
+  the helper.
+- **Derived variants:** all three were blocked as expected. V04 had no revision,
+  V05 a commit and hash in conflict, and V06 a stale revision with later verdicts
+  when evaluated as current. All six cases matched their frozen expectations.
+- **Self-checks:** 16 fixture cases passed. Disabling each of the 11 checks in turn
+  failed the case aimed at it.
+
+The prior misbindings came from resolution. The right tasks were the ones whose
+own review-handoff notes named the artifact: fam-6e8321 for C01, not relay-fe38b1,
+and hq-c411df for C03, not hq-bb90ca. C03's handoff carried a commit and SHA-256.
+C02's request and merge notes carried a commit. C01's handoff named only a worktree
+path, so its revision was derived from commit timing and labelled as derived.
+
+Manual corrections were task identity (2 of 3), revision (1 of 3) and kind
+(1 of 3). One more surfaced at evaluation: C02's draft cites the execution ledger in
+place of the pasted closing report, which drops the final verification counts.
+
+Validated kinds:
+
+- **Spec and implementation:** validated on observed data.
+- **Plan, brief and out-of-tree hash:** exercised only by fixtures.
+- **Fixes, ledger, PR and pasted-report:** return an explicit `unsupported`.
+
+These three historical examples establish behaviour, not coverage.
+
+Recommendation: design a narrow, print-only preview that takes a task id. It shows
+the latest review handoff's selection as a candidate, runs these checks, and refuses
+to fill a missing revision. Typing the selection by hand costs more than today's
+one-line request, so the preview pays off only through that pre-fill. Whether
+handoff notes need a stable shape for the pre-fill is a design question. It is not
+an established schema prerequisite. No launcher, schema or external write is
+authorized by this result.
+
+Retention:
+
+- **The 12 later inspection files** are hashed in place and kept. They are neither
+  ruled regenerable nor assumed reproducible from live stores.
+- **The two collector scripts** were copied into the experiment's local bundle.
+- **The bundle itself** (script, manifest, inputs, results, local previews) is
+  retained under hq-2d8e81.
+
 ## Constraints
 
 - Read the stores through the existing readers. Never modify harness stores. Keep
@@ -218,11 +269,12 @@ Current follow-through:
 - hq-83c787 records the supplied inspection, the denominator and method limits, and
   what it supports. No additional population collection or duration/error study is
   required by this scope pass. Predictive validity remains unknown.
-- The next explicit-selection experiment determines whether validated editable
-  drafts preserve intended context, which corrections remain manual, and whether
-  a narrow production preview is worthwhile. The frozen case manifest and report
-  answer this; a human judges any eventual interactive preview. It does not
-  assume a new schema or establish population-wide resolver coverage.
+- Answered by hq-2b3929 for the three retained historical cases. Validated drafts
+  preserved the intended context. Task identity, revision and kind corrections
+  stayed manual. A narrow, print-only preview is recommended, provided it pre-fills
+  from the review handoff. Whether to design it is hq-2d8e81's next decision. A
+  human judges any eventual interactive preview. No population-wide resolver
+  coverage is established.
 - A live launch and the final choice of supported actions remain later decisions.
 
 Original research questions, not answered by the inspection:
@@ -263,8 +315,8 @@ records this result and its limits, then wakes hq-1459f0.
 | hq-83c787 | Record the supplied inspection and its limits without more collection | hq-1459f0 |
 | hq-1459f0 | Reconsider the motif/tooling idea after the result is recorded | — |
 | hq-268cc2 | Done: one historical match, two misbound mappings, 41 unavailable identities; separate artifact checks required | hq-2d8e81 |
-| hq-2b3929 | Test editable drafts with a frozen case manifest, explicit selection and built-in repository/artifact validation | hq-2d8e81 |
-| hq-2d8e81 | Wait on hq-2b3929; own the retained private inspection and dry-run artifacts | — |
+| hq-2b3929 | Done: 3/3 observed cases gave validated historical drafts, 3/3 derived variants blocked as frozen; recommends a narrow print-only preview pre-filled from the review handoff | hq-2d8e81 |
+| hq-2d8e81 | Decide whether to design the narrow preview; own the retained private inspection, dry-run and validated-draft artifacts | — |
 
 The completed hq-268cc2 remains evidence; the next experiment, not a new taxonomy
 study, supplies the launcher's remaining decision. Historical
