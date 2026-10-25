@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-d5ba0a-tilde-layout
 created: 2026-10-25T12:27:45Z
-updated: 2026-10-25T15:27:17Z
+updated: 2026-10-25T15:30:34Z
 started: 2026-10-25T15:07:14Z
 depends: []
 tags: [docs]
@@ -44,3 +44,4 @@ Done: run the candidate checker from ops-295f8d over hq (or reproduce its rule) 
 - 2026-10-25T15:23:10Z (fix/hq-d5ba0a-tilde-layout): Allowance control: in-process candidate layout_findings with only the five new allowances removed reports 26 findings across exactly tools/relay-cutover and the four corresponding contract test files; restoring the policy reports zero. Candidate and installed checker both exit 0, tasks check and git diff --check pass. All four derivative mappings replay exactly from their hashed raw sources. No new behavior or tests added: changes are text, documented policy and CLI-managed attachment derivatives.
 - 2026-10-25T15:27:14Z (fix/hq-d5ba0a-tilde-layout): review: impl round 1 — verdict: accept; findings: minor 1; reviewer: codex/gpt-6.1-sol
 - 2026-10-25T15:27:17Z (fix/hq-d5ba0a-tilde-layout): Review /root/tilde_review at base 257c840 through working-tree content at HEAD 95e476508dec608e70529d2da402223187f63c75 accepted with one nonblocking minor: README.md:273 renders <project-checkout> as an HTML inline tag; wrap in backticks. No Critical or Important. Reviewer independently verified candidate source hash, candidate and installed checker exit 0, tasks check, diff check, four exact raw-to-derivative mappings and attachment ledgers, all 12 retained raw hashes and manifest, executable ASTs unchanged outside docstrings, and D3 configs unchanged. Confirmed documented prefix allowances admit sibling/suffix paths but no unrelated tracked match; no delete/rename. Declined: final suite is controller-owned; live cutover, deployment and second-host execution are unchanged/out of scope; pre-existing cutover/runbook defects remain hq-7e81ed. Controller accepts all scope limits. Minor will be addressed; no deferred findings.
+- 2026-10-25T15:30:34Z (fix/hq-d5ba0a-tilde-layout): retained: {"host": "titan", "kind": "scratch", "path": "$WORK_ROOT/hq/hq-d5ba0a", "state": "released", "verification": "verified", "purpose": "Removed this task-created scratch after verifying all four derivative attachments and their task mapping notes; candidate-before output is regenerable from recorded base 257c840 and checker 79f1235. Raw hq-c5fd83 sources remain unchanged.", "next_owner": "none", "cleanup_trigger": "none"}
