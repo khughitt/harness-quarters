@@ -1,13 +1,15 @@
 ---
 id: hq-d5ba0a
 title: Resolve tilde-layout findings before the stricter ops-check reaches hq
-status: todo
+status: doing
 priority: 2
 size: m
 complexity: mid
 process: direct
+owner: main
 created: 2026-10-25T12:27:45Z
-updated: 2026-10-25T12:28:00Z
+updated: 2026-10-25T15:07:14Z
+started: 2026-10-25T15:07:14Z
 depends: []
 tags: [docs]
 source: hq-c6a149
@@ -25,3 +27,5 @@ Done: run the candidate checker from ops-295f8d over hq (or reproduce its rule) 
 ## Notes
 
 - 2026-10-25T12:28:00Z (main): concerns: hq-c6a149 change — the stricter ops-check from ops-295f8d will flag the ~/d/<project> placeholder hq-c6a149 adopted, and other ~/d forms already in the tree
+- 2026-10-25T15:07:14Z (main): started
+  provenance: {"harness_session":"codex:01a17398-cc3d-7af0-9262-eb2ff49f5236","harness_session_source":"CODEX_THREAD_ID"}
