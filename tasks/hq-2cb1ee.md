@@ -7,9 +7,9 @@ size: xs
 complexity: low
 process: direct
 created: 2026-10-25T12:18:32Z
-updated: 2026-10-25T12:18:32Z
+updated: 2026-10-25T12:18:41Z
 depends: []
-tags: [harness]
+tags: [skills]
 agent: claude-code
 ---
 
