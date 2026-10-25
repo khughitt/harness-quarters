@@ -14,12 +14,13 @@ from another configured host; setup creates directories, not private settings.
 
 ## Gates
 
-Run `just test` before committing: it runs the agent-tool suite and the hook/tool
-suite. There is no CI or pre-push suite here. The pre-commit hook refuses staged paths
-under `local/`, then runs `tools/ops-check` over the working tree (the hygiene checks
-ops projects share: guide references, conflicted copies, agent scratch, machine layout
-and adopted copies), then checks the guide identity regions with `tools/ops-docs check`.
-A record commit it refuses means a finding somewhere in the working tree, not in the
+Run `just test` before committing: it runs the agent-tool suite and the hook/tool suite.
+There is no CI or pre-push suite here. The pre-commit hook refuses staged paths under
+`local/`, then runs `tools/ops-check` over the working tree (the hygiene checks ops
+projects share: guide references, conflicted copies, agent scratch, machine layout and
+adopted copies), then checks the guide identity regions with `tools/ops-docs check`, and
+last runs the staged `tools/harness-facts check` over the staged tree. A record commit
+that the hygiene checks refuse means a finding somewhere in the working tree, not in the
 record. A new attachment that carries host values follows the attachment fallback in
 lore `skills/references/retained-item-records.md`: keep the raw bytes under WORK_ROOT
 and attach a portable derivative. Never widen `.ops-check.toml` for an attachment.
@@ -49,8 +50,8 @@ The generated global Projects block is checked by lore.
 - `tools/hq` (`tools/hq_cli/`, flags in `tools/hq.toml`): `hq sessions` lists and resumes
   sessions across harness homes from their own metadata (README.md).
 - `docs/`: specs, plans, notes, runbooks, a commit map in rewrites/, and frozen documents
-  moved to lore and flows, kept for closed tasks. `tools/ops-docs` and `tools/ops-check` are vendored
-  from ops.
+  moved to lore and flows, kept for closed tasks. `tools/ops-docs` and `tools/ops-check`
+  are vendored from ops.
 
 The global instructions, profiles and general skill corpus live in lore. This root
 file is hq's project guide; home links to global instructions target lore.

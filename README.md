@@ -131,17 +131,17 @@ including the staged copy at commit time. Change the owning project's
 just projects in ops to refresh its owned fragment, then just assemble in lore
 to regenerate the delivered instructions and provenance manifest.
 
-Right after that refusal the hook runs `tools/ops-check`, vendored from ops: the
+Right after the local/ refusal the hook runs `tools/ops-check`, vendored from ops: the
 hygiene checks ops projects share (guide references, conflicted copies, agent scratch,
-machine layout and adopted copies). It reads the tracked files in the working tree,
-not the staged blobs, so a finding in any tracked file refuses every commit, record
-commits from `tasks` included, until it is fixed, and a crash or a malformed
-`.ops-check.toml` refuses too. A new attachment that carries host values (a hostname,
-the home directory, WORK_ROOT or a checkout path) follows the attachment fallback in
-lore `skills/references/retained-item-records.md`: the raw bytes stay under WORK_ROOT,
-owned by a task, and a portable derivative is attached. `.ops-check.toml` is never
-widened for an attachment. Eleven pre-commit tests cover the local-layer refusal, the
-hygiene check and the guide check; `just test` runs them.
+machine layout and adopted copies). It reads the tracked files in the working tree, not
+the staged blobs, so a finding in any tracked file refuses every commit, record commits
+from `tasks` included, until it is fixed, and a crash or a malformed `.ops-check.toml`
+refuses too. A new attachment that carries host values (a hostname, the home directory,
+WORK_ROOT, a registered checkout or its parent directory) follows the attachment
+fallback in lore `skills/references/retained-item-records.md`: the raw bytes stay under
+WORK_ROOT, owned by a task, and a portable derivative is attached. `.ops-check.toml` is
+never widened for an attachment. Eleven pre-commit tests cover the local-layer refusal,
+the hygiene check and the guide check; `just test` runs them.
 
 The same hook runs `tools/ops-docs check`, vendored from ops: the identity regions at
 the top of this file and of `AGENTS.md` are generated from `identity.toml`, and
