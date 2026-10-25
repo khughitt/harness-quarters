@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: test/hq-a45dd8-two-turn-evidence
 created: 2026-10-20T17:38:21Z
-updated: 2026-10-25T18:20:36Z
+updated: 2026-10-25T18:24:39Z
 started: 2026-10-25T17:45:13Z
 completed: 2026-10-25T18:20:36Z
 closed: 2026-10-25T18:20:36Z
@@ -51,3 +51,4 @@ Scoped re-review of hq-a1c591 found two additional Minor wording issues in docs/
   provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-25T18:20:36Z (test/hq-a45dd8-two-turn-evidence): Corrected E037/E008 after 73 source-hash checks, recomputed 52 scripts and error counts 17/15/11 without changing 183 episodes/1093 calls or categories/outcomes, and removed stale omission/deferral prose. Final just test passed 1672 tests; independent review accepted.
   provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-25T18:24:39Z (main): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-a45dd8","state":"released","verification":"verified","purpose":"Removed after 30717ad merged locally as a569687. All 18 task-branch files retain their tested Git blobs; merge hygiene, docs, capability and task checks passed. Branch fingerprint stayed 1678d9aa568842e077760387c654237f2fa16101. No host pointer resolved into the tree, tt-report ran, clean git/submodule status checked, and the four listed regenerable cache directories were discarded. The merged topic branch was deleted.","next_owner":"none","cleanup_trigger":"none"}
