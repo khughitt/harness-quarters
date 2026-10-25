@@ -7,7 +7,7 @@ size: s
 complexity: low
 process: direct
 created: 2026-10-25T10:54:20Z
-updated: 2026-10-25T10:55:02Z
+updated: 2026-10-25T10:55:03Z
 depends: [ops-6e157a]
 tags: []
 source: hq-c6a149
@@ -28,3 +28,4 @@ Adopting the shared checker (hq-c6a149) required the attachments the layout rule
 - 2026-10-25T10:54:57Z (feat/ops-check-hq-c6a149): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/hq/hq-c5fd83/hq-7a2b95/europa-smoke-driver.py","state":"kept","verification":"verified","sha256":"5328caacdae165d1585c2d858d652c2aeaccb372121f95eb6efb117b0450a161","purpose":"Exact raw bytes of hq-7a2b95 attachment europa-smoke-driver.py, replaced on that task by a portable derivative for shared-checker adoption","next_owner":"task:hq-c5fd83","cleanup_trigger":"After the shipped layout exemption admits the original and hq adopts that checker version, restore and verify the original attachment"}
 - 2026-10-25T10:54:58Z (feat/ops-check-hq-c6a149): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/hq/hq-c5fd83/hq-7b65dc/subagent-write-probe-2026-10-12.jsonl","state":"kept","verification":"verified","sha256":"4e2cc9935229eada129f5d4f923d4bd3d02f1676561dcd54f0e35452aa1b8a54","purpose":"Exact raw bytes of hq-7b65dc attachment subagent-write-probe-2026-10-12.jsonl, replaced on that task by a portable derivative for shared-checker adoption","next_owner":"task:hq-c5fd83","cleanup_trigger":"After the shipped layout exemption admits the original and hq adopts that checker version, restore and verify the original attachment"}
 - 2026-10-25T10:54:58Z (feat/ops-check-hq-c6a149): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/hq/hq-c5fd83/hq-7cf7c1/contamination-red.txt","state":"kept","verification":"verified","sha256":"404d04b9dc940466ed26d471467569868975f5c94daed741c699c10b05d8d2a7","purpose":"Exact raw bytes of hq-7cf7c1 attachment contamination-red.txt, replaced on that task by a portable derivative for shared-checker adoption","next_owner":"task:hq-c5fd83","cleanup_trigger":"After the shipped layout exemption admits the original and hq adopts that checker version, restore and verify the original attachment"}
+- 2026-10-25T10:54:59Z (feat/ops-check-hq-c6a149): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/hq/hq-c5fd83/hq-c075d0/relay-cutover-ledger.md","state":"kept","verification":"verified","sha256":"26693422c64d5030e838a39bcb7e5b6d745b0d94ce66a0a57f9ca376bcc692b4","purpose":"Exact raw bytes of hq-c075d0 attachment relay-cutover-ledger.md, replaced on that task by a portable derivative for shared-checker adoption","next_owner":"task:hq-c5fd83","cleanup_trigger":"After the shipped layout exemption admits the original and hq adopts that checker version, restore and verify the original attachment"}
