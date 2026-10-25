@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: test/hq-a45dd8-two-turn-evidence
 created: 2026-10-20T19:10:17Z
-updated: 2026-10-25T17:45:30Z
+updated: 2026-10-25T17:45:31Z
 started: 2026-10-25T17:45:09Z
 depends: []
 parent: hq-cff824
@@ -32,4 +32,6 @@ Check: the self-check and just test pass, each new assertion fails under a targe
   provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-25T17:45:25Z (test/hq-a45dd8-two-turn-evidence): arm: flow-trial-1 — unit tack-cff824 — flow on
 - 2026-10-25T17:45:30Z (test/hq-a45dd8-two-turn-evidence): gate: scoped — adopted
+  provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-25T17:45:31Z (test/hq-a45dd8-two-turn-evidence): gate: implementing — .worktrees/hq-a45dd8 shared acceptance and research corrections for hq-cff824
   provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
