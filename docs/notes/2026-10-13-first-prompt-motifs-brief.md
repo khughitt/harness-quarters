@@ -109,6 +109,32 @@ Limits to carry forward without collecting more sessions:
   titles, with 60-character display labels and activity-based ordering. Its earlier
   listing cannot substitute for opening-time, transcript-based evidence.
 
+### Dry-run follow-through, 2026-10-24
+
+hq-268cc2 verified the six retained inputs and evaluated the saved mappings without
+collecting sessions or launching a harness. The original launcher artifact retains
+three sample mappings but no per-case inventory or resolver for the reported 44.
+All three samples have unique dataset locators: one reconstructs an implementation
+review at its explicit merge revision, while two map to the wrong task (one crosses
+repositories; the other selects a child created after the review opened).
+
+Counts against the reported 44 are **1 matched historical target, 0 incomplete,
+2 ambiguous/misbound, and 41 unavailable identities**. Within the three recovered
+mappings the counts are 1/3 matched and 2/3 ambiguous. These were differing examples,
+not a representative sample; neither denominator estimates general resolver
+coverage. No current review/worktree state is established by the closed records.
+
+The portable report is attached to hq-268cc2 at
+`tasks/files/hq-268cc2/review-dry-run-report.md`. The script, task snapshots and
+editable previews stay local under the retained-item ownership of hq-2d8e81.
+Four self-checks cover unambiguous, missing, conflicting and future-only revision
+evidence, each with a caught targeted break. Recommendation: keep the editable,
+explicit-selection experiment as the launcher milestone; do not build a production
+command from this result. Concrete candidate gaps are target identity, kind/revision
+binding and current review state, with tasks/flows ownership discussed in the
+report; no shared-schema prerequisite is established. The unavailable mappings
+remain unavailable rather than being replaced by new matches.
+
 ## Constraints
 
 - Read the stores through the existing readers. Never modify harness stores. Keep
