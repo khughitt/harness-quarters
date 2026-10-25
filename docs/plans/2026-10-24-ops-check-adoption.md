@@ -1,5 +1,20 @@
 # ops-check adoption: implementation plan
 
+Status: revision 2, 2026-10-24.
+- **Revision 1** (996f187) went through a fresh-context agent review: 5 important
+  findings and 12 minor.
+- **Revision 2** addresses all of them:
+  - byte identity is checked against the ref `vendored adopt` writes from, and
+    `vendored status` moves after the merge;
+  - the ordering test records its run in a marker file, and the clean case runs
+    against the old hook;
+  - main is merged into the branch before the hook change and before final
+    verification, and the attachments it brings in get the same fallback;
+  - each raw item's `retained:` record is written before its original is detached;
+  - the D7 script lives at a fixed path, takes the repository and checker as inputs,
+    and reads the second host fresh on every run;
+  - quoting follows the retained-item reference's heredoc form.
+
 **Goal:** vendor ops's shared hygiene checker into hq and run it in the pre-commit hook,
 with the tree clean on both hosts, as designed in
 `docs/specs/2026-10-24-ops-check-adoption-design.md` (accepted at d593f18).
@@ -8,59 +23,94 @@ with the tree clean on both hosts, as designed in
 `layout_allowed` entries cover host configuration and the relay cutover tool. Every
 other layout value is rewritten to placeholders, and refused attachments are replaced
 through the raw-plus-portable fallback. The hook change lands last, once both host runs
-are clean, so record commits during the cleanup are not blocked.
+are clean on a tree that includes main, so record commits made during the cleanup are
+not blocked.
 
 **Task:** hq-c6a149. **Worktree:** .worktrees/ops-check-c6a149, branch
-feat/ops-check-hq-c6a149. Every path below is relative to that worktree. Every command
-runs there; a failed `cd` stops the step, with no fallback to another directory.
+feat/ops-check-hq-c6a149. Every repository path below is relative to that worktree,
+and every command runs there unless a step names another directory. A failed `cd`
+stops the step, with no fallback to another directory.
 
 **Values never written into a tracked file:** the two hostnames, the home directory,
 WORK_ROOT and the sync root. This plan and every commit on the branch must pass the
-checker too. The placeholder mapping is the `mapping:` note on hq-c6a149. The second
-host's observed values are the note after it, of 2026-10-24: no WORK_ROOT, no banned
-list, and the same checkout paths.
+checker too. The placeholder mapping is the `mapping:` note on hq-c6a149. Task
+records are exempt from the checker, and `retained:` notes use the real observed
+hostname (`$(hostname)`), as the retained-item reference asks.
+
+**Where records are written:** every `tasks` write in this plan runs in the worktree,
+so the records land with the merge. That includes notes, detaches and attaches on
+other tasks (hq-48c5c6, hq-583ac7, hq-7a2b95, hq-7b65dc, hq-7cf7c1, hq-c075d0,
+hq-c6c847, hq-7e81ed, and any task Task 6's merge adds) and the new restoration task.
+Their main-checkout copies are then stale until the merge: a write to them from main
+refuses with `stale_copy`. Of these, hq-583ac7 and hq-7e81ed are open. Before writing
+to an open task, check `tasks claims` for a live claim held by another session. If one
+exists, leave that task to its holder and note the conflict on hq-c6a149 instead.
 
 ## Setup (before Task 1)
 
-- `tasks start hq-c6a149` in the worktree (the claim is already here once resumed).
+- `tasks start hq-c6a149` in the worktree.
 - Baseline: `just test` (the full-suite route AGENTS.md names). Note the command, the
   test count and the result on hq-c6a149. A run that selects no tests is not a baseline.
-- Shell values used below, set in each shell that needs them (never committed):
+- Create `$WORK_ROOT/hq/hq-c6a149/` and note it on hq-c6a149 at once: the host, the
+  path in its literal `$WORK_ROOT` form, the purpose (the D7 script, a per-run tool
+  regenerable from this plan), owner task:hq-c6a149, and that the contents are mutable
+  and not yet checkpointed. At closing, the directory is discarded and its release is
+  noted.
+- Write the D7 script below to `$WORK_ROOT/hq/hq-c6a149/d7.sh` and make it executable.
+  In every shell that runs it, set:
 
 ```sh
 OPS=$(tasks --pretty root ops-88a0fa)
-SECOND_HOST=<the host-b name from the mapping note on hq-c6a149>
+export SECOND_HOST=<the host-b name from the mapping note on hq-c6a149>
+D7=$WORK_ROOT/hq/hq-c6a149/d7.sh
 ```
 
-- The D7 pair, used in Tasks 3 to 7. Save it as a script in a temporary directory
-  outside the tree, for example `"$(mktemp -d)/d7.sh"`:
-
-```sh
+```bash
 #!/usr/bin/env bash
-# Run the vendored checker as is, then with the second host's values banned (spec D7).
+# Spec D7: run the checker in a repository as is, then with the second host's values banned.
+# Usage: SECOND_HOST=<name> d7.sh [repo]. CHECKER overrides the checker (default: the repo's tools/ops-check).
 set -uo pipefail
-: "${SECOND_HOST:?set SECOND_HOST from the mapping note}"
-python3 tools/ops-check; first=$?
-sim=$(mktemp -d)
-trap 'rm -rf "$sim"' EXIT
+: "${SECOND_HOST:?export SECOND_HOST from the mapping note on hq-c6a149}"
+repo=$(cd "${1:-.}" && pwd) || exit 2
+checker=$(realpath "${CHECKER:-$repo/tools/ops-check}") || exit 2
+config=${XDG_CONFIG_HOME:-$HOME/.config}
+sim=$(mktemp -d); trap 'rm -rf "$sim"' EXIT
 mkdir -p "$sim/tasks" "$sim/ops"
-cp "${XDG_CONFIG_HOME:-$HOME/.config}/tasks/projects.toml" "$sim/tasks/"
-python3 - "$sim" "$SECOND_HOST" <<'EOF'
-import json, os, pathlib, sys, tomllib
-sim, host = pathlib.Path(sys.argv[1]), sys.argv[2]
-own = pathlib.Path(os.environ.get("XDG_CONFIG_HOME") or pathlib.Path.home() / ".config") / "ops" / "ops-check.toml"
-banned = tomllib.loads(own.read_text())["banned"] if own.is_file() else []
-(sim / "ops" / "ops-check.toml").write_text("banned = " + json.dumps(banned + [host]) + "\n")
+cp "$config/tasks/projects.toml" "$sim/tasks/"
+# Read the second host's values now, from its login environment (spec D7).
+ssh -4 -o BatchMode=yes "$SECOND_HOST" 'zsh -lc "hostname; print -r -- \$WORK_ROOT; print -- ---registry; cat ~/.config/tasks/projects.toml; print -- ---banned; cat ~/.config/ops/ops-check.toml 2>/dev/null || true"' > "$sim/remote" || { echo "d7: cannot read $SECOND_HOST" >&2; exit 2; }
+python3 - "$sim" "$config" <<'EOF' || exit 2
+import json, pathlib, sys, tomllib
+sim, config = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
+head, rest = (sim / "remote").read_text().split("---registry\n", 1)
+registry, banned_text = rest.split("---banned\n", 1)
+host, work_root = (head.split("\n") + [""])[:2]
+roots = lambda text: {str(pathlib.Path(r)) for r in tomllib.loads(text)["projects"].values()}
+here = roots((config / "tasks" / "projects.toml").read_text())
+own = config / "ops" / "ops-check.toml"
+values = tomllib.loads(own.read_text())["banned"] if own.is_file() else []
+extra = [host] + ([work_root.rstrip("/")] if work_root else [])
+for root in sorted(roots(registry) - here):
+    extra += [root, str(pathlib.Path(root).parent)]
+if banned_text.strip():
+    extra += tomllib.loads(banned_text)["banned"]
+values += [v for v in extra if v not in values]
+(sim / "ops" / "ops-check.toml").write_text("banned = " + json.dumps(values) + "\n")
+print(f"d7: {len(extra)} second-host values banned: hostname, WORK_ROOT {'set' if work_root else 'unset'}, "
+      f"{len(roots(registry) - here)} differing checkouts, banned list {'present' if banned_text.strip() else 'absent'}",
+      file=sys.stderr)
 EOF
-XDG_CONFIG_HOME="$sim" python3 tools/ops-check; second=$?
-echo "d7: primary=$first simulated=$second"
+cd "$repo" || exit 2
+python3 "$checker"; first=$?
+XDG_CONFIG_HOME="$sim" python3 "$checker"; second=$?
+echo "d7: primary=$first simulated=$second" >&2
 [ "$first" = 0 ] && [ "$second" = 0 ]
 ```
 
-The second host has no WORK_ROOT, no banned list of its own, and the same checkout
-paths and parents as this host. Its hostname is therefore the only value it adds. If a
-fresh read over ssh shows otherwise, add the new values to the banned list in the script
-and note the change on hq-c6a149.
+This script was prototyped against the worktree on 2026-10-24. It banned one
+second-host value (the hostname): WORK_ROOT is unset there, no checkouts differ, and
+there is no banned list. Each run prints its `d7:` summary line. A summary that differs
+from that one is noted on hq-c6a149.
 
 ### Task 1: Adopt tools/ops-check
 
@@ -68,14 +118,20 @@ and note the change on hq-c6a149.
 adopt rewrites it.
 
 - [ ] **Step 1:** `python3 "$OPS/bin/vendored" adopt ops-check`.
-- [ ] **Step 2:** Verify the copy is landed bytes:
-  `git -C "$OPS" show origin/HEAD:bin/ops-check | cmp - tools/ops-check` prints nothing.
-  `head -2 tools/ops-check` shows the version line. `test -x tools/ops-check` passes.
-  Run `python3 "$OPS/bin/vendored" status` and check that hq's ops-check row is current.
+- [ ] **Step 2:** Verify that the copy holds the bytes `vendored adopt` writes from,
+  ops's local default branch (`landed_head()`, not `origin/HEAD`, which lags):
+  - `git -C "$OPS" show main:bin/ops-check | cmp - tools/ops-check` prints nothing;
+  - `git -C "$OPS" ls-tree main -- bin/ops-check` shows mode 100755, and
+    `test -x tools/ops-check` passes;
+  - `head -2 tools/ops-check` shows the version line. Note the version and the ops
+    commit on hq-c6a149.
 - [ ] **Step 3:** `python3 tools/ops-check; echo rc=$?`. Expected: rc=1, with the same
-  291-line inventory the spec records (the hook does not run it yet).
+  291-line inventory the spec records. The hook does not run the checker yet.
 - [ ] **Step 4:** Commit: `git add tools/ops-check tools/README.md` and
   `git commit -m "chore(tools): vendor ops-check from ops"`.
+
+`vendored status` judges registered roots (the main checkout), so it cannot show the
+copy before the merge. It runs at closing.
 
 ### Task 2: Fix the guide references
 
@@ -94,36 +150,37 @@ Apply these rewrites. Line numbers are as of 9738ea0; locate each line by its te
 | README 217 | `auth.json`, `trust.json`, `models-store.json`, `sessions/` | the same names without backticks |
 | README 222 | `keybindings.json`, `APPEND_SYSTEM.md`, `prompts/`, `themes/` | without backticks |
 | README 238 | `claude/settings.work.json`, `codex/config.work.toml`, `codex/rules/` (under local/) | without backticks |
-| README 271, 320 | `history.jsonl` | without backticks; on 320 `state_5.sqlite` loses its backticks too, for consistency |
+| README 271, 320 | `history.jsonl` | without backticks; `state_5.sqlite` (not a checked extension) is left as it is on both of its lines |
 | README 280, 281 | `prefix/.worktrees`, `hq/tools` | without backticks (examples) |
 | README 298 | "ops's `bin/project-colors`" | "ops `bin/project-colors`" |
 | README 470 | `.claude-plugin/types/`, `tsconfig.json` | without backticks (the mod engine writes them) |
 
-A prefix is the bare word, one space, then the backtick: no possessive, no "at".
+A prefix is the bare word, then one space, then the backtick: no possessive, no "at".
 Rewrapping can put a registered prefix word ("tasks", "ops", "hq") at the end of the line
 above a reference that opens a line, so the checker runs after every edit.
 
 - [ ] **Step 1:** Make the edits.
-- [ ] **Step 2:** `python3 tools/ops-check 2>&1 | grep -E '^(README|AGENTS)\.md'` prints
-  nothing. `python3 tools/ops-docs check` exits 0.
+- [ ] **Step 2:** Checks:
+  - `python3 tools/ops-check 2>&1 | grep -E '^(README|AGENTS)\.md'` prints nothing;
+  - `python3 tools/ops-docs check` exits 0.
 - [ ] **Step 3:** Commit: `docs: write guide references the shared checker can resolve`.
 
 ### Task 3: Layout policy for host configuration and the relay cutover tool
 
 **Files:** create .ops-check.toml.
 
-- [ ] **Step 1:** Write .ops-check.toml with exactly the D3 and D4 entries, each group
-  under a one-line comment giving its reason (the spec's D3 and D4):
+- [ ] **Step 1:** Write .ops-check.toml with exactly the D3 and D4 entries. A comment
+  above each group gives its reason, from the spec's D3 and D4:
 
 ```toml
-# Host configuration by design: harness homes read these absolute paths literally.
-# The relay cutover tool, its tests, runbook and window plan: the two host names are its
-# fleet configuration. Remove these entries with the tool if hq-7e81ed retires it.
 layout_allowed = [
+  # Host configuration by design: harness homes read these absolute paths literally.
   "claude/settings.json",
   "codex/config.toml",
   "codex/hooks.json",
   "codex/work/hooks.json",
+  # The relay cutover tool, its tests, runbook and window plan: the two host names are
+  # its fleet configuration. Remove these entries with the tool if hq-7e81ed retires it.
   "tools/relay_cutover_bootstrap/",
   "tools/relay-cutover-host",
   "tools/test_relay_cutover_bootstrap.py",
@@ -133,15 +190,13 @@ layout_allowed = [
 ]
 ```
 
-  The checker requires the file to hold only `layout_allowed`; comments are TOML and
-  allowed. Confirm with a run (a malformed file exits 2).
-- [ ] **Step 2:** Run the D7 script. Expected: both runs still exit 1, and no finding
-  names any allowed path. Check this with a grep over the output for each entry.
-- [ ] **Step 3:** `tasks note hq-7e81ed "<one line: hq .ops-check.toml allows the relay
-  cutover tool, tests, runbook and window plan by path (hq-c6a149); retiring the tool
-  removes those entries in the same change>"`. Write it in the main checkout's record,
-  since hq-7e81ed has no worktree. Write it without backticks, dollar signs or double
-  quotes inside.
+  The checker requires the file to hold only `layout_allowed`. Comments are not keys,
+  so they are allowed; a malformed file exits 2, which a run confirms.
+- [ ] **Step 2:** Run `"$D7" .`. Expected: both runs still exit 1, and no finding names
+  an allowed path. Check this with a grep over the output for each entry.
+- [ ] **Step 3:** In the worktree, after checking `tasks claims` for hq-7e81ed, run
+  `tasks note hq-7e81ed "hq .ops-check.toml allows the relay cutover tool, its tests, runbook and window plan by path (hq-c6a149); retiring the tool removes those entries in the same change"`.
+  The note lands with the merge, together with the entries it describes.
 - [ ] **Step 4:** Commit: `chore: allow host configuration and the relay cutover tool to
   carry the layout`.
 
@@ -163,83 +218,126 @@ Use the spec's D5 table. In prose, the hosts are "the primary host" and "the sec
 host". In commands, JSON and table cells they are `host-a` and `host-b`. The home
 becomes `~`, WORK_ROOT becomes `$WORK_ROOT`, and a checkout becomes `~/d/<project>`.
 Every spelling of a host name in a rewritten file is replaced, capitalized ones
-included.
+included. The review of revision 1 found that these files carry only hostnames, so the
+path grep in Step 1 is expected to find nothing.
 
 - [ ] **Step 1:** For each markdown file, list the lines with
-  `git grep -n -i -w -e "$(hostname)" -e "$SECOND_HOST" -- <file>`. Then list the path
-  values with `git grep -n -F -e "$HOME" -e "$WORK_ROOT" -e "$(dirname "$OPS")" -- <file>`.
-  Edit each line by hand, choosing the prose or literal form from the context.
+  `git grep -n -i -w -e "$(hostname)" -e "$SECOND_HOST" -- <file>` and the path values
+  with `git grep -n -F -e "$HOME" -e "$WORK_ROOT" -e "$(dirname "$OPS")" -- <file>`.
+  Edit each line by hand, choosing the prose or the literal form from its context.
 - [ ] **Step 2:** The survey data is mechanical. Run a one-off Python rewrite from a
-  temporary directory, never committed. It replaces the JSON `host` value and any path
-  values, reading the values from the environment, and writes the file back. Then
-  confirm that every line still parses as JSON:
+  temporary directory, never committed. It replaces each record's `host` value
+  (`host-a`) and any path values, reads the real values from the environment, and
+  writes the file back. Then confirm every line still parses:
   `python3 -c 'import json,sys; [json.loads(l) for l in open(sys.argv[1])]' <file>`.
   The record count stays 183.
 - [ ] **Step 3:** In docs/notes/2026-10-20-session-log-survey.md, the line saying
   `source` is a home-relative glob resolved beneath the named host's home gains: host-a
   is the primary host, and the mapping is on hq-c6a149.
-- [ ] **Step 4:** The privacy pattern moves. Create tools/session_log_private.py, which
-  holds only the `PRIVATE` compiled pattern, moved verbatim with its comment and
-  imports. In tools/test_session_log_cases.py, replace the definition with
-  `from session_log_private import PRIVATE`. Add `"tools/session_log_private.py"` to
-  .ops-check.toml with a comment: a privacy denylist that names the hosts in order to
-  forbid them.
-- [ ] **Step 5:** The fact note in facts/capabilities.toml says "across both hosts"
-  instead of the two names. The session-archive testing docstring says "on the primary
-  host".
+- [ ] **Step 4:** The privacy pattern moves. Create tools/session_log_private.py with a
+  one-line docstring (a privacy denylist the session-log fixtures must not match),
+  `import re`, and the `PRIVATE` compiled pattern, moved verbatim. In
+  tools/test_session_log_cases.py, replace the definition with
+  `from session_log_private import PRIVATE`, and drop `re` there only if nothing else in
+  the file uses it. Add `"tools/session_log_private.py"` to .ops-check.toml, under its
+  own comment: a privacy denylist that names the hosts in order to forbid them.
+- [ ] **Step 5:** facts/capabilities.toml: three notes change.
+  - Line 220's note says "across both hosts" instead of naming the two.
+  - The notes at lines 228 and 240 begin with the capitalized primary hostname; they
+    begin "The primary host's" instead.
+
+  The session-archive testing docstring says "on the primary host". Run
+  `git grep -n -i -w "$(hostname)" -- facts/capabilities.toml tools/session_archive/testing.py`
+  afterwards; it prints nothing.
 - [ ] **Step 6:** Checks:
   - `uv run -q --with pytest pytest tools/test_session_log_cases.py -q` passes, with the
     same count as on the baseline tree;
   - `tools/harness-facts check` exits 0;
-  - the D7 script shows no finding outside tasks/files.
+  - `"$D7" .` shows no finding outside tasks/files.
 - [ ] **Step 7:** Commit: `docs: replace host values with placeholders in historical
   documents and helpers`.
 
-### Task 5: Attachment fallback for the 11 refused files
+### Task 5: Attachment fallback for the refused files
 
-**Files:** none tracked by hand. `tasks` writes tasks/hq-*.md and tasks/files/, and
-commits them under `[git] commit`.
+**Files:** none tracked by hand. `tasks` writes tasks/hq-*.md and tasks/files/ in the
+worktree, and commits them under `[git] commit`.
 
-The files: hq-48c5c6 (the two policy-check outputs whose names begin with host-b's name,
-forms-probe.out, live-fixture.out), hq-583ac7 (relay-bootstrap-deferred-minors.md),
-hq-7a2b95 (the smoke driver and the rollout JSON whose names begin with host-b's name),
-hq-7b65dc (subagent-write-probe-2026-10-12.jsonl), hq-7cf7c1 (contamination-red.txt),
-hq-c075d0 (relay-cutover-ledger.md) and hq-c6c847 (bootstrap-ledger.md). Confirm the
-list against the D7 script's tasks/files findings before starting; the output is the
-authority.
+The files as of 9738ea0 (11 on 7 tasks):
+
+| Task | Files |
+| --- | --- |
+| hq-48c5c6 | the two policy-check outputs whose names begin with host-b's name, forms-probe.out, live-fixture.out |
+| hq-583ac7 | relay-bootstrap-deferred-minors.md |
+| hq-7a2b95 | the smoke driver and the rollout JSON whose names begin with host-b's name |
+| hq-7b65dc | subagent-write-probe-2026-10-12.jsonl |
+| hq-7cf7c1 | contamination-red.txt |
+| hq-c075d0 | relay-cutover-ledger.md |
+| hq-c6c847 | bootstrap-ledger.md |
+
+Before starting, confirm the list against the tasks/files findings of `"$D7" .`; the
+output is the authority. Task 6 Step 1 runs this same sequence for any file main adds.
 
 - [ ] **Step 1:** File the restoration task, modelled on obs-875105:
-  `tasks add "Restore original historical attachments after the verified layout exemption ships" -p 3 --size s --complexity low --process direct --source hq-c6a149 -b "<body adapted from obs-875105: the 11 files, their raw copies under WORK_ROOT, restore through detach/attach after the exemption ships and hq adopts it, release only after verification; design completion alone does not trigger it>"`.
-  Then `tasks dep <restore-id> --on ops-6e157a`. Note the id on hq-c6a149.
+  `tasks add "Restore original historical attachments after the verified layout exemption ships" -p 3 --size s --complexity low --process direct --source hq-c6a149 -b "<body adapted from obs-875105>"`.
+  The body says:
+  - the files it owns are those its `retained:` notes list;
+  - their raw copies are under WORK_ROOT;
+  - they are restored through detach and attach after the exemption ships and hq adopts
+    that checker version;
+  - each is released only after verification;
+  - design completion alone does not trigger it.
+
+  Then run `tasks dep <restore-id> --on ops-6e157a` and note the id on hq-c6a149.
 - [ ] **Step 2:** Create `$WORK_ROOT/hq/<restore-id>/` and note it on the restoration
   task at once: the host, the path in its literal `$WORK_ROOT` form, the purpose, the
   owner task, and that the contents are mutable and not yet checkpointed.
-- [ ] **Step 3:** For each file, `git show 9738ea0:tasks/files/<task>/<name>` into
-  `$WORK_ROOT/hq/<restore-id>/<task>/<name>`. Check that its SHA-256 equals that of the
-  blob (`git show 9738ea0:… | sha256sum`) and that of the working copy.
-- [ ] **Step 4:** For each file, make the derivative in a temporary directory, replacing
-  every layout value with the D5 literal placeholders. Then run the vendored checker
-  over it in a throwaway git repository holding only that file: it must report nothing
-  for it. Check the derivative by `diff` against the raw copy, so that only values
-  changed.
-- [ ] **Step 5:** For each file, on its original task, run three commands in this order:
-  1. `tasks note <task> "Portable attachment fallback for <name> under hq-c6a149: exact raw bytes retained by <restore-id> at \$WORK_ROOT/hq/<restore-id>/<task>/<name>, SHA-256 <hash>. Original-to-placeholder mapping: <JSON object of the values replaced>"`;
-  2. `tasks detach <task> <name> "Preserved exact raw bytes and SHA-256 under <restore-id>; replace with a labelled portable derivative for shared-checker adoption"`;
-  3. `tasks attach <task> <derivative> --name <name> --caption "Portable derivative; raw bytes, SHA-256 and mapping recorded on this task; raw item retained by <restore-id>"`.
+- [ ] **Step 3 (preserve):** For each file, write `git show 9738ea0:tasks/files/<task>/<name>`
+  to `$WORK_ROOT/hq/<restore-id>/<task>/<name>`. For a file main added after 9738ea0, use
+  the merge commit that brought it in. Check that the copy's SHA-256 equals both the
+  blob's (`git show <commit>:… | sha256sum`) and the working copy's.
+- [ ] **Step 4 (record):** For each file, before anything is detached, write its
+  evidence record on the restoration task in the reference's heredoc form:
 
-  `tasks show <task>` must list it. The real values in the mapping note are exempt:
-  task records are not scanned.
-- [ ] **Step 6:** On the restoration task, write one `retained:` note per raw file, with
-  host, kind `evidence`, path `$WORK_ROOT/hq/<restore-id>/<task>/<name>`, state `kept`,
-  verification `verified`, sha256, purpose, next_owner `task:<restore-id>`, and
-  cleanup_trigger "After the shipped layout exemption admits the original and hq adopts
-  that checker version, restore and verify the original attachment". Then write a
-  manifest (relative path and SHA-256 of every file, hidden files included, excluding
-  itself) at `$WORK_ROOT/hq/<restore-id>/manifest.json`, plus one scratch `retained:`
-  note naming it and its hash. Write each note with single quotes, as the
-  retained-item reference's example does.
-- [ ] **Step 7:** Checks:
-  - the D7 script exits 0 (both runs clean);
+```sh
+tasks note <restore-id> "$(cat <<'EOF'
+retained: {"host":"<hostname output>","kind":"evidence","path":"$WORK_ROOT/hq/<restore-id>/<task>/<name>","state":"kept","verification":"verified","sha256":"<hash>","purpose":"Exact raw bytes of <task> attachment <name>, replaced on that task by a portable derivative for shared-checker adoption","next_owner":"task:<restore-id>","cleanup_trigger":"After the shipped layout exemption admits the original and hq adopts that checker version, restore and verify the original attachment"}
+EOF
+)"
+```
+
+  The `$WORK_ROOT` stays literal: the heredoc is quoted.
+- [ ] **Step 5 (derive):** For each file, make the derivative in a temporary directory,
+  replacing every layout value with the D5 literal placeholders. `diff` it against the
+  raw copy: only values change. Then check it in a throwaway repository:
+  - make a temporary directory and `git init` it with every inherited `GIT_*` variable
+    unset, `GIT_CONFIG_GLOBAL` set to an empty temporary file, `GIT_CONFIG_NOSYSTEM=1`,
+    and `GIT_AUTHOR_*` and `GIT_COMMITTER_*` set to test values;
+  - put the derivative at its root under its own name (never under tasks/, where
+    records are exempt) and `git add` it, since the checker reads tracked files;
+  - run `CHECKER="$PWD/tools/ops-check" "$D7" <throwaway>` from the worktree. Both runs
+    exit 0.
+- [ ] **Step 6 (replace):** For each file, on its original task, in this order:
+  1. the mapping note, in the heredoc form:
+
+```sh
+tasks note <task> "$(cat <<'EOF'
+Portable attachment fallback for <name> under hq-c6a149: exact raw bytes retained by <restore-id> at $WORK_ROOT/hq/<restore-id>/<task>/<name>, SHA-256 <hash>. Original-to-placeholder mapping: <JSON object of the values replaced>
+EOF
+)"
+```
+
+  2. `tasks detach <task> <name> "Preserved exact raw bytes and SHA-256 under <restore-id>; replace with a labelled portable derivative for shared-checker adoption"`;
+  3. `tasks attach <task> <derivative> --name <name> --caption "Portable derivative; raw bytes, SHA-256 and mapping on this task; raw item retained by <restore-id> (its retained: record for <task>/<name>)"`.
+
+  `tasks show <task>` must list it. The real values in the mapping note are exempt,
+  since task records are not scanned.
+- [ ] **Step 7 (checkpoint):** Write a manifest at
+  `$WORK_ROOT/hq/<restore-id>/manifest.json`. It lists the relative path and SHA-256 of
+  every file, hidden files included, and excludes itself. Then add one scratch
+  `retained:` note on the restoration task naming the manifest and its hash, in the
+  heredoc form.
+- [ ] **Step 8:** Checks:
+  - `"$D7" .` shows no tasks/files finding;
   - `tasks check` is clean;
   - every raw copy's hash still matches its blob;
   - `git status` shows no uncommitted tasks/ change (otherwise run `tasks commit`).
@@ -248,12 +346,15 @@ authority.
 
 **Files:** modify .githooks/pre-commit and .githooks/test_pre_commit.py.
 
-Precondition: the D7 script exits 0 on the current tree. Once this task commits, every
-commit on the branch is gated.
-
-- [ ] **Step 1 (fixture):** Rework `world` as the spec's D2 says.
-  - Copy the vendored tools/ops-check into the fixture repository (from this worktree's
-    tools/, at the test's import time), executable.
+- [ ] **Step 1 (merge main):** `git merge main` into the branch and resolve any conflict.
+  Run `"$D7" .` on the result. Any new tasks/files finding (main already holds one:
+  hq-83c787's windows-refined.txt) goes through Task 5 Steps 3 to 8 on the same
+  restoration task, with the open-task claim check from the header. Any other new
+  finding is fixed by the rule its kind follows (Task 2, 3 or 4). Precondition for the
+  rest of this task: `"$D7" .` exits 0.
+- [ ] **Step 2 (fixture):** Rework `world` as the spec's D2 says.
+  - Copy the vendored tools/ops-check into the fixture repository from this
+    worktree's tools/ (the path next to the test file's parent), executable.
   - Build `env` key by key:
     - `PATH` from the parent;
     - `HOME` set to `tmp_path / "home"`, created;
@@ -262,44 +363,52 @@ commit on the branch is gated.
     - `GIT_CONFIG_NOSYSTEM=1`;
     - `GIT_AUTHOR_NAME`, `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME` and
       `GIT_COMMITTER_EMAIL` set to test values.
-  - `sh()` takes that env for every fixture git call. No other inherited variable
+  - `sh()` takes that env for every fixture git call, so no other inherited variable
     comes along.
   - Before the first write, assert that `git rev-parse --show-toplevel` is the fixture
     directory and that `git rev-parse --absolute-git-dir` lies inside it.
   - Run the existing six tests against the unchanged hook: they pass. The fixture change
-    alone does not change a verdict.
-- [ ] **Step 2 (RED):** Add three tests:
+    alone changes no verdict. test_pre_commit_facts.py has its own fixture and is not
+    touched.
+- [ ] **Step 3 (RED):** Add four tests and run
+  `uv run -q --with pytest pytest .githooks/test_pre_commit.py -q` against the
+  unchanged hook:
   - `test_a_layout_finding_refuses_before_the_docs_check`: write `notes.md` holding the
-    fake HOME path, then `git add` it. Use a docs stub that writes `DOCS RAN` to stderr
-    and exits 0. Expect exit 1, `machine layout` in stderr, and `DOCS RAN` absent.
+    fake HOME path and `git add` it. Use a docs stub that touches a marker file
+    (`tmp_path / "docs-ran"`) and exits 0. Expect exit 1, `machine layout` in stderr,
+    and the marker absent. Against the old hook it fails: exit 0, and the marker exists.
   - `test_a_missing_ops_check_refuses`: unlink tools/ops-check. Expect exit 1 and
     `tools/ops-check` in stderr.
   - `test_an_ops_check_that_cannot_run_refuses`: write `.ops-check.toml` as
     `layout_allowed = "x"`. Expect exit 1 and `ops-check:` in stderr; the checker
     itself exits 2.
+  - `test_a_clean_tree_passes_the_hygiene_check`: a clean notes.md, exit 0. This one
+    passes against the old hook, which is its point.
 
-  Run `uv run -q --with pytest pytest .githooks/test_pre_commit.py -q`. All three fail
-  against the current hook, and the failures are recorded in a note.
-- [ ] **Step 3 (GREEN):** Add `hygiene_check()` to .githooks/pre-commit, beside
+  The first three fail, and the fourth passes. Record the outcome in a note on
+  hq-f49c42.
+- [ ] **Step 4 (GREEN):** Add `hygiene_check()` to .githooks/pre-commit, beside
   `docs_check`, and update the module docstring:
   - a missing file fails, naming `vendored adopt ops-check`;
   - otherwise the hook runs `[sys.executable, "tools/ops-check"]` and captures stderr;
-  - on rc 1 it writes stderr and fails with "the shared hygiene checks found the
+  - on rc 1 it writes that stderr and fails with "the shared hygiene checks found the
     findings above in the working tree; fix them (AGENTS.md Gates)";
-  - on any other non-zero rc it writes stderr and fails with "tools/ops-check could not
-    run (exit <rc>)".
+  - on any other non-zero rc it writes that stderr and fails with "tools/ops-check could
+    not run (exit <rc>)".
 
   `main()` returns
-  `local_layer() or hygiene_check() or docs_check() or facts_check()`. Add a fourth
-  test, `test_a_clean_tree_passes_the_hygiene_check`: a clean notes.md, exit 0. The
-  whole file passes.
-- [ ] **Step 4:** `just test` passes. Note the count beside the baseline.
-- [ ] **Step 5:** Commit: `feat(hooks): run the shared hygiene checks in pre-commit`.
+  `local_layer() or hygiene_check() or docs_check() or facts_check()`. The whole file
+  passes.
+- [ ] **Step 5:** `just test` passes. Note the count beside the baseline.
+- [ ] **Step 6:** Commit: `feat(hooks): run the shared hygiene checks in pre-commit`.
   The hook runs on this commit itself, which shows it passing on a clean tree.
+
+From here on, every commit on the branch, record commits included, runs the checker.
 
 ### Task 7: Guides, final checks and the planted-commit probe
 
-**Files:** modify AGENTS.md (Gates) and README.md (its checks section and Layout).
+**Files:** modify AGENTS.md (Gates) and README.md (`## Setup`, which describes the
+hooks, and `## Layout`).
 
 - [ ] **Step 1:** Edit the guides, without spelling host values:
   - AGENTS.md Gates: the pre-commit hook runs tools/ops-check after the local/
@@ -307,34 +416,47 @@ commit on the branch is gated.
     finding somewhere in the working tree. A new attachment carrying host values
     follows the retained-item reference's fallback, and .ops-check.toml is not widened
     for it.
-  - README.md: the same in the section that describes the hooks. Layout names
-    .ops-check.toml with the D3 and D4 reasons, one line each.
-- [ ] **Step 2:** `python3 tools/ops-docs check` and `just docs` leave no diff. The D7
-  script exits 0 on the tip.
-- [ ] **Step 3:** Time the checker on the clean tree: `time python3 tools/ops-check`,
-  three runs. Note the times on hq-c6a149 (the spec's cost risk).
-- [ ] **Step 4:** Probe in a temporary clone:
-  - `git clone -q . "$probe"` with `probe=$(mktemp -d)/hq`, then `just setup` there;
-  - add a file holding `$HOME` and commit: refused, with `machine layout` in stderr;
-  - remove the file, add a clean one and commit: succeeds;
-  - `rm -rf` the clone.
-
-  Run the probe's git with the same isolated git config the tests use, so the user's
-  config is not touched.
-- [ ] **Step 5:** Commit: `docs: describe the shared hygiene gate`.
-- [ ] **Step 6:** `tasks check` is clean, and `git status` is clean apart from tasks/.
+  - README.md `## Setup`: the same. `## Layout` names .ops-check.toml with the D3 and
+    D4 reasons, one line each.
+- [ ] **Step 2:** Checks:
+  - `python3 tools/ops-docs check` passes, and `just docs` leaves no diff;
+  - `python3 tools/ops-check` exits 0.
+- [ ] **Step 3:** Commit: `docs: describe the shared hygiene gate`.
+- [ ] **Step 4:** Merge main again if it has moved since Task 6 (`git merge main`), with
+  the same handling as Task 6 Step 1. Then run `"$D7" .` on the tip; it exits 0.
+- [ ] **Step 5:** Time the checker on the clean tip: `time python3 tools/ops-check`,
+  three runs. Note the times on hq-c6a149, against the spec's cost risk.
+- [ ] **Step 6:** Probe the tip in a temporary clone:
+  - `probe=$(mktemp -d)/hq`, `git clone -q . "$probe"`, then `just setup` there;
+  - keep the real `HOME`, so the planted value is a real layout value. Unset every
+    inherited `GIT_*` variable, set `GIT_CONFIG_GLOBAL` to an empty temporary file and
+    `GIT_CONFIG_NOSYSTEM=1`, and set `GIT_AUTHOR_*` and `GIT_COMMITTER_*` to test values;
+  - before the first write, assert that `git rev-parse --show-toplevel` is the clone;
+  - add a file holding the home path and commit: refused, with `machine layout` in
+    stderr;
+  - remove that file, add a clean one and commit: succeeds;
+  - `rm -rf` the clone's parent directory.
+- [ ] **Step 7:** `tasks check` is clean, and `git status` is clean.
 
 ## Verification and closing (flow)
 
 Integration verification follows these children:
 
-- the whole-branch D7 pair;
+- the whole-branch D7 pair on the tip;
 - `just test`;
-- one fresh-context review of the combined diff `9738ea0..HEAD`, against the spec and
-  the raw evidence (the checker's code, the hook, the attachment raw copies and their
-  hashes);
+- one fresh-context review of the combined diff (`main...HEAD`), against the spec and
+  the raw evidence: the checker's code, the hook, and the raw attachment copies with
+  their hashes;
 - the `gate: verified` note.
 
-The branch then merges locally into main (personal profile). Before the merge, the D7
-pair runs again if main has moved. The worktree goes through the removal checks, and its
-`retained:` record is released.
+The branch then merges locally into main (personal profile). If main moved after the
+verified tip, merge it into the branch first and rerun the D7 pair.
+
+After the merge, in the main checkout:
+
+- `python3 "$OPS/bin/vendored" status --project hq` shows `hq ops-check current`, with
+  no `uncommitted` mark.
+- Discard `$WORK_ROOT/hq/hq-c6a149/`. It holds only the regenerable D7 script.
+- Run the worktree removal checks: ignored files, `tt-report`, and host pointers.
+- Write the `released` notes for the scratch directory and the worktree on hq-c6a149's
+  main-checkout record, as the retained-item reference says.
