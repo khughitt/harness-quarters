@@ -3,7 +3,7 @@
 Scoping handoff, 2026-10-13. Idea: hq-1459f0. Goal and research ids are in §6.
 
 Updated 2026-10-25 from the owner's completed inspection, the first dry run and the
-validated-draft experiment.
+validated-draft experiment and the preview design scoping decision.
 This is a scope handoff, not a design or implementation approval. The owner requests no further session
 collection. Historical evidence and the original pilot proposal remain below;
 the dated updates distinguish the supplied result from unperformed validation.
@@ -237,6 +237,34 @@ Retention:
 - **The bundle itself** (script, manifest, inputs, results, local previews) is
   retained under hq-2d8e81.
 
+### Preview design scoped, 2026-10-25
+
+Scope call: file hq-7be4e4, a small, high-complexity planned design task under
+hq-4c1555. hq-2d8e81 stays an idea and waits on that reviewed design. This is the
+controller's bounded next-step choice, based on the two reports; the owner's
+recorded request supplies the copying/context problem and the no-more-collection
+constraint, not an approved preview interface.
+
+At 4670fd0, `tools/hq_cli/cli.py` offers session listing/resume and
+`tools/hq_cli/launch.py` resumes an existing session. Neither builds a fresh
+review prompt. The design starts from an artifact path and treats revision/task
+matches as proposals with provenance. It settles how an explicit frozen revision
+is selected, how differing working bytes and ambiguous task matches are refused,
+and how prior verdicts and later revisions are shown. Implementation review is an
+explicit scope decision; if included, it requires a stated commit and preserves
+supplied report context and verification counts. Print text for a person to edit;
+do not claim an interactive editor or launch has been validated.
+
+The design task consumes the existing brief and both reports. It needs no new
+collection or research prerequisite. Existing refs/notes come first; a shared
+handoff schema is considered only if a concrete unmet requirement warrants it.
+The resulting frozen design needs the owner's review before implementation is
+scoped. hq-2d8e81 continues owning the three private evidence bundles through that
+gate. All three manifests and all 62 listed files matched in this pass with no
+unlisted files. Keep the original inspection in place on persistent storage;
+reassess preservation/disposition after the reviewed design or a stop decision,
+without automatic deletion.
+
 ## Constraints
 
 - Read the stores through the existing readers. Never modify harness stores. Keep
@@ -260,10 +288,14 @@ Retention:
 ## Alternatives
 
 Current lean: hq-83c787 records the inspection's useful findings and limits;
-independently, test editable drafts with explicit target selection and validation
-inside the helper, using the bounded set above. Compare context and meaning, not
-identical wording. A second option is to stop with the existing report if explicit
-selection saves no meaningful work. Reject a production launcher or mandatory
+independently, hq-7be4e4 designs the narrow print-only preview recommended by the
+completed experiments. Compare starting from the request's artifact path against
+pre-filling the task's latest handoff and stopping with today's manual requests.
+Reject the latest-handoff default: C02's was a superseded plan review. Prefer a
+reviewed design over another collection or immediate implementation because the
+path-based evidence is thin and candidate/frozen revision semantics remain open.
+Stopping remains a valid design recommendation if proposing a trustworthy target
+costs more effort than it saves. Reject a production launcher or mandatory
 handoff-schema project now: the nonrepresentative evidence does not justify either.
 Production hq integration, if supported, adopts
 ops's existing CLI vocabulary with that implementation. Crew remains a possible
@@ -299,9 +331,11 @@ Current follow-through:
   kept the request's intent. C02's implementation draft lost the closing report's
   final verification counts. Task identity, revision and kind corrections stayed
   manual. A narrow, print-only preview that starts from the artifact path is
-  recommended. Whether to design it is hq-2d8e81's next decision. A
-  human judges any eventual interactive preview. No population-wide resolver
-  coverage is established.
+  recommended. hq-7be4e4 now owns its written design: settle candidate versus
+  authoritative revision, ambiguous task matches, supported kinds and preservation
+  of supplied report context. The designer recommends the smallest contract; the
+  owner reviews the frozen design and judges any eventual interactive preview.
+  No population-wide resolver coverage is established.
 - A live launch and the final choice of supported actions remain later decisions.
 
 Original research questions, not answered by the inspection:
@@ -332,7 +366,8 @@ Decided by the owner, 2026-10-13:
 | hq-83c787 | Label 150 first prompts in two halves, freeze the taxonomy, relate motifs to session shape and tool errors, recommend option 1, 2 or 3 and its consumers | hq-1459f0 |
 | hq-1459f0 | Stays an idea until the pilot shows motifs that separate session shapes | — |
 
-Goal: hq-4c1555. Not a design task: one pilot answers the open questions first.
+Goal: hq-4c1555. The original motif work proposed one pilot before design;
+the review-preview consumer now has its own design follow-up after two experiments.
 
 Current scope supersedes the historical pilot instruction in the table: hq-83c787
 records this result and its limits, then wakes hq-1459f0.
@@ -343,10 +378,11 @@ records this result and its limits, then wakes hq-1459f0.
 | hq-1459f0 | Reconsider the motif/tooling idea after the result is recorded | — |
 | hq-268cc2 | Done: one historical match, two misbound mappings, 41 unavailable identities; separate artifact checks required | hq-2d8e81 |
 | hq-2b3929 | Done: 3/3 observed cases gave validated historical drafts, 3/3 derived variants blocked as frozen; recommends a narrow print-only preview that starts from the artifact path | hq-2d8e81 |
-| hq-2d8e81 | Decide whether to design the narrow preview; own the retained private inspection, dry-run and validated-draft artifacts | — |
+| hq-7be4e4 | Design the print-only preview from this brief; obtain review of the frozen design, record the recommendation and wake the idea | hq-2d8e81 |
+| hq-2d8e81 | Wait on hq-7be4e4's reviewed design; own the retained private inspection, dry-run and validated-draft artifacts | — |
 
-The completed hq-268cc2 remains evidence; the next experiment, not a new taxonomy
-study, supplies the launcher's remaining decision. Historical
-session-content search remains hq-3558a1 / hq-ea0975; this pass does not duplicate or
+Both completed experiments remain evidence. The next step is the bounded design;
+production implementation stays unscoped. Historical session-content search
+remains hq-3558a1 / hq-ea0975; this pass does not duplicate or
 re-scope those tasks. The session evidence reader remains obs-d98663, with its own
-delivery constraints, and is not a prerequisite for this local experiment.
+delivery constraints, and is not a prerequisite for this preview design.
