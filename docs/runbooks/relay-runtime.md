@@ -11,6 +11,10 @@ stable versioned directory before the home launcher selects it. Resolve
 `command -v relay`, inspect `readlink -f` of that path, and check `relay --version`
 after merging. Never point the home launcher at a worktree.
 
+On a new host, `just relay-subscribers` renders `relay/subscribers.template.json` into
+`~/.config/relay/subscribers.json`, the file every relay hook passes with
+`--subscribers`; it refuses to replace different content unless run with `FORCE=1`.
+
 For an isolated rehearsal, set `RELAY_INSTALL_ROOT` to a private scratch directory
 for both `just relay-install` and the worktree's explicit `relay/bin/relay` path.
 Use a private, owned mode-0700 `RELAY_STATE_DIR` for every service and CLI command.

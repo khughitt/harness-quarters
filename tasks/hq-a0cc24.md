@@ -1,15 +1,17 @@
 ---
 id: hq-a0cc24
 title: "No guide names just relay-subscribers, which renders the config every relay hook reads"
-status: doing
+status: done
 priority: 3
 size: xs
 complexity: low
 process: direct
-owner: main
+owner: docs/curate-docs-hq-30fd95
 created: 2026-10-24T22:15:24Z
-updated: 2026-10-24T23:34:33Z
+updated: 2026-10-25T00:08:52Z
 started: 2026-10-24T23:34:21Z
+completed: 2026-10-25T00:08:52Z
+closed: 2026-10-25T00:08:52Z
 depends: []
 tags: [docs]
 source: hq-30fd95
@@ -24,3 +26,10 @@ Found by the curate-docs pass hq-30fd95 at 8686be3 (criterion 8). The justfile r
   provenance: {"harness_session":"claude-code:c2f3e76e-ba29-4176-9424-f3373a5a3562","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-24T23:34:32Z (main): trial: flow-trial-1 — enrolled — flow off
 - 2026-10-24T23:34:32Z (main): arm: flow-trial-1 — unit tack-a0cc24 — flow off
+- 2026-10-24T23:35:17Z (docs/curate-docs-hq-30fd95): resumed
+  provenance: {"harness_session":"claude-code:c2f3e76e-ba29-4176-9424-f3373a5a3562","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-24T23:53:39Z (docs/curate-docs-hq-30fd95): review: impl round 1 — verdict: accept; findings: none; reviewer: claude-code
+- 2026-10-25T00:08:52Z (docs/curate-docs-hq-30fd95): done
+  provenance: {"harness_session":"claude-code:c2f3e76e-ba29-4176-9424-f3373a5a3562","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-25T00:08:52Z (docs/curate-docs-hq-30fd95): relay-runtime runbook names just relay-subscribers, what it renders, the hooks that read it and FORCE=1
+  provenance: {"harness_session":"claude-code:c2f3e76e-ba29-4176-9424-f3373a5a3562","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

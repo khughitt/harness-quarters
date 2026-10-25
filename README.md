@@ -70,11 +70,9 @@ failing the pi operation.
 
 Both records are machine-owned: an invalid record is refused independently, never
 overwritten, and deleting it starts that record over. pi's separate record lets the
-previous tool keep saving Claude and Codex picks during recovery. The pi rollout was
-applied and its live capture and checkout recovery verified on titan on 2026-10-15.
-Run `just link --apply` from main on each remaining host to install the extension
-(`hq-a8d65f` tracks europa). To recover, revert the merge, remove the
-`~/.pi/agent/extensions/harness-state.ts` link on each host and run `just link-check`.
+previous tool keep saving Claude and Codex picks during recovery. To back the extension
+out, revert its merge, remove the `~/.pi/agent/extensions/harness-state.ts` link on each
+host and run `just link-check`.
 The previous tool ignores `local/live-picks-pi.json`, which may be deleted; Claude and
 Codex preservation continues. pi then keeps defaults only until a Git rewrite drops
 them.
@@ -101,11 +99,13 @@ added by hand is lost. Restoring also takes group and other access off the live
 saved copy: to forget a directory, run `.githooks/codex-trust forget <path>`, which
 deletes its table from both files.
 
-After the local-layer rollout, other worktrees and branches made before it show
-`codex/config*.toml` as modified, because their blobs still carry trust tables, and a
-rebase there can stop on them. `git checkout -- codex/config.toml` in a worktree is
-safe, since worktree copies are not live. It drops Codex's bookkeeping the
-same way: `screen_reader_detection_done` under `[tui]`, the whole
+Since the local layer kept trust out of the index (2026-09,
+`docs/specs/2026-09-28-local-layer-design.md`), worktrees and branches made
+before it show `codex/config*.toml` as modified, because their blobs still carry
+trust tables, and a rebase there can stop on them.
+`git checkout -- codex/config.toml` in a worktree is safe, since worktree copies
+are not live. It drops Codex's bookkeeping the same way:
+`screen_reader_detection_done` under `[tui]`, the whole
 `[tui.model_availability_nux]` table, and `last_updated` / `last_revision` under
 each `[marketplaces.*]` table, so a fresh clone probes once and refetches its
 marketplaces. Everything else the harness writes — plugin toggles, marketplace
@@ -217,7 +217,7 @@ MIT licensed; see `LICENSE`.
   `auth.json`, `trust.json`, `models-store.json` and `sessions/` stay in the home. The
   checkout is shared between hosts, so they share one `deviceId` (the host id pi sends
   at an OpenAI login). The extension preserves its default model and thinking level
-  after rollout (Setup above); installation ids are not saved, so a checkout drops
+  (Setup above); installation ids are not saved, so a checkout drops
   `deviceId`, which pi makes anew at the next OpenAI login. Other home files
   (`keybindings.json`, `APPEND_SYSTEM.md`, `prompts/`, `themes/`, other extensions) get a
   `[harness.pi.links]` line once they have content. A `--tools` list of plain names
@@ -243,11 +243,15 @@ MIT licensed; see `LICENSE`.
   backup disk, and a monthly prune of what the archive and obs verifiably hold
   (`docs/specs/2026-09-30-session-archive-design.md`). Linked on every host; the
   timers are enabled only on a host with `~/.config/session-archive/config.toml`.
+  Never `systemctl --user reenable` a timer: its disable half removes the unit link
+  `just link` declares, and its enable half then finds no unit. If it already ran,
+  `just link --apply` and then `systemctl --user enable` the timer.
 - `tools/hq`, `tools/hq_cli/` and `tools/hq.toml`: the `hq` command, linked as
   `~/.local/bin/hq`; `hq sessions` lists and resumes agent sessions (see "Finding a
   past session" below).
-- `docs/`: hq's specs and plans. The two dated profiles documents are frozen
-  references for closed tasks; their maintained copies live in lore.
+- `docs/`: hq's specs, plans, notes (briefs, contracts and analyses), runbooks, and the
+  2026-10-16 commit map in `docs/rewrites/` for old SHAs cited in records. Frozen
+  documents moved to lore and flows stay as references for closed tasks.
 - `tools/ops-docs`: vendored from ops; change it there.
 
 ## Consumers
@@ -333,8 +337,7 @@ root `Stop` and once on worker `SubagentStop`. `links.toml` routes them to the
 personal and work homes respectively. The worker event uses `agent_id` to select
 its own claim; shared root metadata does not grant foreign closure authority.
 After a definition changes, inspect and trust that exact definition through
-Codex `/hooks` in each native home. Registration and trust are separate from the
-recorded live-delivery pilot; activate only after the reviewed cutover.
+Codex `/hooks` in each native home.
 
 ## Capability facts
 
@@ -473,19 +476,4 @@ then type-checks it, and `just mods` runs `claude plugin validate` and
 
 This project was `tack` until 2026-10, and `ai` before 2026-09. Old `tack-<hex>` and
 `ai-<hex>` task ids resolve through the tasks aliases, and `tasks resolve` maps the old
-directories and their worktree storage to `hq`. On a host that synced the rename, with no
-harness session open and the host's timers paused, run in this checkout:
-`tasks rename tack hq --adopt`; move `.dropbox-work/tack` to `.dropbox-work/hq`;
-`work-link --ensure .worktrees`; `tasks init --prefix hq --force`; `systemctl --user
-disable` each session-archive timer the host had enabled; `just link --apply`;
-`systemctl --user daemon-reload`; then `systemctl --user enable` each of those timers.
-Never `reenable`: its disable half also removes the unit link `just link` declares, and its
-enable half then finds no unit (2026-10-07). A one-off tool, since removed, did the tasks
-part of this on both hosts on 2026-10-07. Until then that host's harness sessions start
-without instructions, skills or hooks.
-
-## Local layer (2026-09)
-
-The work configs and Codex's rules moved from the tracked tree to `local/`. On a
-host that shares this checkout, once Dropbox has synced `local/` there, run
-`just link --apply` once, with no Codex or work-home session open.
+directories and their worktree storage to `hq`.
