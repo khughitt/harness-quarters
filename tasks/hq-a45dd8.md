@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: test/hq-a45dd8-two-turn-evidence
 created: 2026-10-23T17:40:19Z
-updated: 2026-10-25T17:43:53Z
+updated: 2026-10-25T17:53:55Z
 started: 2026-10-25T17:31:30Z
 depends: []
 parent: hq-cff824
@@ -51,3 +51,4 @@ Why: SL11's CT1 and CT3 each hold one turn, so spec section 9.4's task_evidence:
 - 2026-10-25T17:32:57Z (test/hq-a45dd8-two-turn-evidence): gate: implementing — .worktrees/hq-a45dd8
   provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-25T17:43:53Z (test/hq-a45dd8-two-turn-evidence): baseline: just test passed 1668 tests before fixture/test edits (231 agents, 1047 hooks/tools, 389 parallel relay, 1 isolated relay). Scope: CT1 JSONL, fixture self-check and cases document only; no reader, skill, links, configs or runtime exports change.
+- 2026-10-25T17:53:55Z (test/hq-a45dd8-two-turn-evidence): verification before full suite: strengthened self-check failed on original CT1 (7 != 11), then all 38 fixture checks passed on the combined acceptance corrections. CT1:1–7 is preserved byte-for-byte; appended CT1:8–11 spans 12:02:00–12:02:11 and lies outside the unchanged TD stamp at 12:00:30. Targeted breaks caught missing/overlapping turns, injected trigger, missing completion markers, unfinished finals, hook errors, stamp moved into turn 2, and missing Codex ordinal fixture. Final reader task_evidence labels remain obs-d98663 acceptance work.
