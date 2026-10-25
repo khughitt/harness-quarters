@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-d5ba0a-tilde-layout
 created: 2026-10-25T12:27:45Z
-updated: 2026-10-25T15:09:14Z
+updated: 2026-10-25T15:18:06Z
 started: 2026-10-25T15:07:14Z
 depends: []
 tags: [docs]
@@ -39,3 +39,4 @@ Done: run the candidate checker from ops-295f8d over hq (or reproduce its rule) 
   provenance: {"harness_session":"codex:01a17398-cc3d-7af0-9262-eb2ff49f5236","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-25T15:09:12Z (fix/hq-d5ba0a-tilde-layout): Scratch directory created on host titan at $WORK_ROOT/hq/hq-d5ba0a for candidate checker output, classification and regenerated attachment derivatives; owner task:hq-d5ba0a; contents mutable and not yet checkpointed.
 - 2026-10-25T15:09:14Z (fix/hq-d5ba0a-tilde-layout): Origin recovered: claude-code:6ef3b6c4-4356-473e-aa75-9402e75eb54d human turn 1755 asked whether other follow-ups should be created; this cleanup was agent-derived from the adopted checker and candidate rule. Candidate preflight finds four affected attachments, adding hq-48c5c6 europa-policy-check.out and hq-c075d0 relay-cutover-ledger.md to the two named in the body. All four raw sources already belong to hq-c5fd83. Recommendation: use <project-checkout> as the D5 placeholder; role-specific examples use <hq-checkout>, <ops-checkout>, etc. Fixed hook-contract tests and the cutover command retain literal deployment paths under narrow file allowances, since changing the strings would weaken their contract.
+- 2026-10-25T15:18:06Z (fix/hq-d5ba0a-tilde-layout): Baseline: just test in .worktrees/hq-d5ba0a passed, 1668 tests total (231 agents/bin, 1047 hook/tool, 389 parallel cutover, 1 isolated signal test; 153 deselected only in the final focused segment). No failures; existing flasgger warning. Candidate ops checker 79f1235, SHA-256 ca6fd1b272a5f25f5f001ef1fde215e1e6a3aef847df063a0d58e3bdf3a96e25: before cleanup exit 1, 113 finding lines across 27 files. Raw retention manifest 1c452f49b96337cf7064657bfe89bb2dfc14fdb80cdf0deb615b7aaecf5978af and all 12 raw file hashes verified.
