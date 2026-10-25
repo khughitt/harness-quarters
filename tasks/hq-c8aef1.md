@@ -4,8 +4,8 @@ title: "No session-logs command answers 'which session created task X, and what 
 status: idea
 priority: 2
 created: 2026-10-25T11:03:11Z
-updated: 2026-10-25T17:46:30Z
-depends: []
+updated: 2026-10-25T17:46:33Z
+depends: [obs-02e88b, obs-d98663]
 parent: hq-cff824
 tags: [feedback, gap, "from:obs"]
 agent: claude-code/claude-opus-5-5
