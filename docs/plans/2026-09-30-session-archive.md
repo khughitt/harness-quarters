@@ -1,5 +1,8 @@
 # Session Archive Implementation Plan
 
+Path placeholders name main checkouts or their parent directories. Substitute paths
+from `tasks projects --paths --pretty` before using command examples.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build `tools/session-archive`, which captures every Claude Code and Codex transcript to a backup disk daily and prunes inactive ones from the live stores only after the archive and obs verifiably hold them.
@@ -3799,8 +3802,8 @@ This task acts outside the repository: it writes to the backup disk, adds host c
 **Files:** none tracked. Host state only; each step's result goes into a task note.
 
 - [ ] **Step 1: Merge and link.** After the branch merges to main, run `just link` from the main checkout. It should report the four new links. Then run `just link --apply`, and `just link-check` (expect exit 0).
-- [ ] **Step 2: Create the archive.** Make `<backup mount>/agent-sessions` (the user confirms the path), then `touch <root>/.session-archive-root`. Write `~/.config/session-archive/config.toml` with `archive_root` and `obs_command = ["python3", "~/d/obs/obs.py"]`.
-- [ ] **Step 3: Pilot.** Before the first capture, run `~/d/tack/tools/session-archive status`: expect exit 1 and JSON with `"ok": false` and an error opening the missing manifest. Status is read-only; confirm it did not create `manifest.sqlite`. Then run `~/d/tack/tools/session-archive capture` in the foreground with a timeout covering the first copy. Record the counts per source, the wall time, and `failed == 0` in a note, in the `run:` form the tasks skill defines. The healthy post-capture status check is Step 4.
+- [ ] **Step 2: Create the archive.** Make `<backup mount>/agent-sessions` (the user confirms the path), then `touch <root>/.session-archive-root`. Write `~/.config/session-archive/config.toml` with `archive_root` and `obs_command = ["python3", "<obs-checkout>/obs.py"]`.
+- [ ] **Step 3: Pilot.** Before the first capture, run `<tack-checkout>/tools/session-archive status`: expect exit 1 and JSON with `"ok": false` and an error opening the missing manifest. Status is read-only; confirm it did not create `manifest.sqlite`. Then run `<tack-checkout>/tools/session-archive capture` in the foreground with a timeout covering the first copy. Record the counts per source, the wall time, and `failed == 0` in a note, in the `run:` form the tasks skill defines. The healthy post-capture status check is Step 4.
 - [ ] **Step 4: Verify.** Run `status` (expect exit 0). Spot-check that `sha256sum` of one Claude and one Codex mirrored file equals its live file. Run `capture` a second time and expect it to report mostly `unchanged`.
 - [ ] **Step 5: Enable.** Run `systemctl --user daemon-reload && systemctl --user enable --now session-archive-capture.timer`, then `systemctl --user list-timers session-archive-capture.timer`. Note that the prune timer stays disabled. After two scheduled runs, `status` shows them; the owner of the next session checks.
 
@@ -3814,10 +3817,10 @@ Blocked until `obs-0bc168` (index state) lands, and, for Step 3, until `obs-de84
 - Modify: `systemd/user/session-archive-prune.service` (ExecStart gains `--apply`, Description drops "dry run")
 - Test: `tools/test_session_archive_units.py` (the prune `ExecStart` expectation gains `--apply`)
 
-- [ ] **Step 1: Contract check.** Run `python3 ~/d/obs/obs.py --json index-state`. Confirm it matches the contract in Global Constraints, fed through `inputs.load_obs_state`. Any difference means fixing obs or amending the contract in both places before continuing.
-- [ ] **Step 2: Dry run.** Run `~/d/tack/tools/session-archive prune` and save the report. If it stops with `InspectionFailed`, it names the processes it could not inspect. On the primary host that is expected to be `(sd-pam)`, which is non-dumpable, and `systemd`, the user manager, whose descriptors can be listed but not followed. Whether to list a process in `uninspectable_ok` is the user's decision, never the agent's. Review it with the user: totals per source, every `kept:` reason other than `active`, and the eligible units. This is a review gate: park with `--waiting-on user --reason review`.
+- [ ] **Step 1: Contract check.** Run `python3 <obs-checkout>/obs.py --json index-state`. Confirm it matches the contract in Global Constraints, fed through `inputs.load_obs_state`. Any difference means fixing obs or amending the contract in both places before continuing.
+- [ ] **Step 2: Dry run.** Run `<tack-checkout>/tools/session-archive prune` and save the report. If it stops with `InspectionFailed`, it names the processes it could not inspect. On the primary host that is expected to be `(sd-pam)`, which is non-dumpable, and `systemd`, the user manager, whose descriptors can be listed but not followed. Whether to list a process in `uninspectable_ok` is the user's decision, never the agent's. Review it with the user: totals per source, every `kept:` reason other than `active`, and the eligible units. This is a review gate: park with `--waiting-on user --reason review`.
 - [ ] **Step 3: Gate.** Confirm `obs-de84cb` is done and its note records a re-read of this archive with no duplicate sessions and no live file marked missing. If it isn't done, stop here.
-- [ ] **Step 4: Probe and first apply.** Run `~/d/tack/tools/session-archive probe-codex` (expect exit 0), then `~/d/tack/tools/session-archive prune --apply` once by hand. Check three things:
+- [ ] **Step 4: Probe and first apply.** Run `<tack-checkout>/tools/session-archive probe-codex` (expect exit 0), then `<tack-checkout>/tools/session-archive prune --apply` once by hand. Check three things:
   - obs still lists the pruned files, as missing with their rows kept;
   - `codex resume --all` no longer lists the deleted threads;
   - `status` exits 0.

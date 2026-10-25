@@ -1,5 +1,8 @@
 # Rename ai to tack — design
 
+Path placeholders name main checkouts or their parent directories. Substitute paths
+from `tasks projects --paths --pretty` before using command examples.
+
 Status: approved at d0c0ece (ai-4b1878, goal ai-5b608f); plan docs/plans/2026-09-27-rename-to-tack.md
 
 ## 1. Goal
@@ -10,7 +13,7 @@ of it. After the rename every host that uses the checkout converges with one com
 future rename or a new host needs no hand-made links.
 
 Not in scope: the GitHub repository (ai-688cda), the sensitivity audit (ai-8062ad), and
-rewriting history. Dated specs, plans and notes that say `ai` or `~/d/ai` stay as written:
+rewriting history. Dated specs, plans and notes that say `ai` or `<ai-checkout>` stay as written:
 they record what was true, and `ai-` ids keep resolving through the tasks alias.
 
 ## 2. What names the project today
@@ -23,7 +26,7 @@ their own hand-made links):
   `~/.claude/skills/{flow,session-logs}`; `~/.claude-work/{CLAUDE.md,settings.json,
   statusline-command.sh}`; `~/.codex/{AGENTS.md,config.toml,hooks.json,rules}`;
   `~/.codex-work/{AGENTS.md,config.toml,hooks.json}`; `~/.config/AGENTS.md`;
-  `~/.config/opencode.local/AGENTS.md`. All but one go through `~/d/ai`;
+  `~/.config/opencode.local/AGENTS.md`. All but one go through `<ai-checkout>`;
   `~/.codex-work/config.toml` uses the absolute Dropbox path.
 - The tasks registry (`~/.config/tasks/projects.toml`: `ai = "<Dropbox>/ai"`), per host.
 - The worktree storage `.worktrees -> ../../.dropbox-work/ai/.worktrees`, per host
@@ -34,7 +37,7 @@ their own hand-made links):
 
 In the repository: `identity.toml` (`name = "ai"`), the task prefix in
 `tasks/.config.toml` and every `tasks/ai-*.md`, the generated project lists in
-`AGENTS.md`, the hook commands `~/d/ai/.githooks/harness-state-refresh` in
+`AGENTS.md`, the hook commands `<ai-checkout>/.githooks/harness-state-refresh` in
 `claude/settings*.json` and `codex/hooks*.json`, and prose in the flow and session-logs
 skills ("the `ai` checkout").
 
@@ -77,7 +80,7 @@ not reach them. Their tests use `ai` only as a fixture name.
    checkout from its own real path. The command string then survives any rename, so Codex
    trust is re-granted once, now, and never again for this reason.
 4. `just link --apply` runs on this host (expected: every entry `ok` except the
-   `~/.codex-work/config.toml` repoint to the `~/d` form and the new `~/.local/bin` link),
+   `~/.codex-work/config.toml` repoint to the `<checkout-parent>` form and the new `~/.local/bin` link),
    then on each other host after Dropbox syncs it. Any `refuse` is resolved by hand before
    phase 2.
 

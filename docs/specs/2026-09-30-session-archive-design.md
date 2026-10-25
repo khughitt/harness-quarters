@@ -1,5 +1,8 @@
 # Session archive: daily capture, verified prune
 
+Path placeholders name main checkouts or their parent directories. Substitute paths
+from `tasks projects --paths --pretty` before using command examples.
+
 Status: approved 2026-09-30 after review rounds 1–4 (codex, then the user). Task: `tack-401088` (goal `tack-1a3278`: keep agent session
 stores bounded without losing what obs can re-parse). Policy: the Decision section of
 `docs/notes/2026-09-29-session-store-retention-brief.md`, adopted 2026-09-30.
@@ -54,7 +57,7 @@ in no repository, and exists only on the primary host:
 
 ```toml
 archive_root = "<a directory on the backup disk>"
-obs_command = ["python3", "~/d/obs/obs.py"]   # obs is not on PATH; `--json index-state` is appended
+obs_command = ["python3", "<obs-checkout>/obs.py"]   # obs is not on PATH; `--json index-state` is appended
 uninspectable_ok = []                          # optional; see §3.4, open files
 ```
 
@@ -339,7 +342,7 @@ gives anything polling health one command to call.
 `systemd/user/session-archive-capture.{service,timer}` runs daily at 04:00, after the
 hourly obs index. `systemd/user/session-archive-prune.{service,timer}` runs on the 1st
 at 05:00. Both timers are `Persistent=true`. Both services are `Type=oneshot` and call
-the tool from `~/d/tack/tools` (the `%h/d/<checkout>` form obs-index uses). The unit
+the tool from `<tack-checkout>/tools` (the `%h/d/<checkout>` form obs-index uses). The unit
 files are linked into `~/.config/systemd/user` through `links.toml` `[required]`.
 Linking puts them on every host but enables them on none: enabling them is a
 primary-host-only rollout step (§4). A unit started on a host without the config fails on the

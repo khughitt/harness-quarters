@@ -1,5 +1,8 @@
 # Relay cutover bootstrap Implementation Plan
 
+Path placeholders name main checkouts or their parent directories. Substitute paths
+from `tasks projects --paths --pretty` before using command examples.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the interrupted manual cutover with one Zsh-invoked, closed-harness
@@ -312,7 +315,7 @@ version/path/hash drift stops for fresh preparation/proof. No host package updat
 Run installs as `/usr/bin/npm ci --allow-git=root`, with explicit
 `PATH=/usr/bin:/bin:<recorded validated remainder>` so npm's env shebang resolves
 `/usr/bin/node`, not nvm. The fixed SSH entry is
-`exec /usr/bin/python3 -B ~/d/hq/tools/relay-cutover-host`.
+`exec /usr/bin/python3 -B <hq-checkout>/tools/relay-cutover-host`.
 
 The helper retains the host's startup environment for authentication references,
 user bus and host-local cache routing; it overrides PATH as above and sets
@@ -458,12 +461,12 @@ record, outputs one final sanitized JSON response, and keeps full logs private.
 - [ ] **Step 1:** Write `test_remote_payload_is_data`, `test_operation_reply_loss`,
   `test_owned_process_cleanup` and `test_claude_hold_env_is_scoped` with a fake SSH executable and
   throwaway homes/repos. Assert the remote command is a fixed Zsh-safe entry
-  `exec /usr/bin/python3 -B ~/d/hq/tools/relay-cutover-host`, invoked with `ssh -4 -o BatchMode=yes host-b`;
+  `exec /usr/bin/python3 -B <hq-checkout>/tools/relay-cutover-host`, invoked with `ssh -4 -o BatchMode=yes host-b`;
   roots/argv never enter the shell string. Reject unknown hosts, operations, mode,
   payload keys and oversized/malformed requests. A literal path containing quotes,
   blanks, `$()` or backticks remains data and executes nothing.
   ```python
-  assert ssh_argv[-1] == "exec /usr/bin/python3 -B ~/d/hq/tools/relay-cutover-host"
+  assert ssh_argv[-1] == "exec /usr/bin/python3 -B <hq-checkout>/tools/relay-cutover-host"
   assert not injected_marker.exists()
   ```
 - [ ] **Step 2:** Run
@@ -870,7 +873,7 @@ reviewable one-command handoff. Live application remains unperformed.
 
 - [ ] **Step 1:** Replace manual sourced Bash instructions with Zsh-native prepare/
   check/status and the operator command
-  `~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap run`.
+  `<hq-checkout>/.worktrees/relay-cutover/tools/relay-cutover-bootstrap run`.
   Describe observed outcomes, consent channels, trust/smoke/permission interactions,
   surfaces-pending retry, paused timers, finish and complete recover commands.
   State that all six frozen-input dry runs precede merge and expected bytes come

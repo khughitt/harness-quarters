@@ -2,8 +2,8 @@
 """The cutover bootstrap for hq's closed-harness relay cutover: prepare, check, run,
 restart-surfaces, record-smoke, finish, recover and status.
 
-Run it by explicit path, for example
-`~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap status`, from Zsh or any
+From hq main, run it by explicit path, for example
+`.worktrees/relay-cutover/tools/relay-cutover-bootstrap status`, from Zsh or any
 shell. Its interpreter is fixed here; it sources nothing and reads no caller variable. A
 stopped command returns 1 to the calling shell (relay_cutover_bootstrap/cli.py)."""
 import sys

@@ -1,5 +1,8 @@
 Frozen after move to flows at d779758fe7c09c362f6a53159b9f063e85505473 on 2026-10-04 (flows-f8ea06); retained for closed task references.
 
+Path placeholders name main checkouts or their parent directories. Substitute paths
+from `tasks projects --paths --pretty` before using command examples.
+
 # Flow State Machine Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -28,7 +31,7 @@ Frozen after move to flows at d779758fe7c09c362f6a53159b9f063e85505473 on 2026-1
 - Create `agents/bin/test_flow_state.py` — pytest; imports the script via `importlib` (the file has no `.py` suffix). Fixture records are dicts shaped like `tasks show` JSON (`show["task"]` with `notes: [{at, by, text}]`, `show["children"]: [{id, title, status}]`).
 - Create `agents/skills/flow/SKILL.md` — the skill.
 - Modify `agents/skills/README.md` — one bullet for `flow`.
-- Symlink `~/.claude/skills/flow → ~/d/ai/agents/skills/flow` (outside the repo; Task 5).
+- Symlink `~/.claude/skills/flow → <ai-checkout>/agents/skills/flow` (outside the repo; Task 5).
 
 ---
 
@@ -1043,7 +1046,7 @@ git commit -m "feat(flow): flow-state CLI over tasks show with covered-tree comp
 **Files:**
 - Create: `agents/skills/flow/SKILL.md`
 - Modify: `agents/skills/README.md` (add one bullet after the `tasks, curate, scope, quick-add` bullet)
-- Outside the repo: `ln -s ~/d/ai/agents/skills/flow ~/.claude/skills/flow`
+- Outside the repo: `ln -s <ai-checkout>/agents/skills/flow ~/.claude/skills/flow`
 
 **Interfaces:**
 - Consumes: the `flow-state` CLI contract from Task 4.
@@ -1170,7 +1173,7 @@ In `agents/skills/README.md`, after the `tasks, curate, scope, quick-add` bullet
   `~/.claude/skills/flow` like the others.
 ```
 
-Then: `ln -s ~/d/ai/agents/skills/flow ~/.claude/skills/flow` (the worktree path is not the link target; the link points at the main checkout, which sees the skill after merge — for the trial before merge, point it at the worktree temporarily: `ln -sfn "$(pwd)/agents/skills/flow" ~/.claude/skills/flow` from `.worktrees/flow`, and repoint after merge).
+Then: `ln -s <ai-checkout>/agents/skills/flow ~/.claude/skills/flow` (the worktree path is not the link target; the link points at the main checkout, which sees the skill after merge — for the trial before merge, point it at the worktree temporarily: `ln -sfn "$(pwd)/agents/skills/flow" ~/.claude/skills/flow` from `.worktrees/flow`, and repoint after merge).
 
 - [ ] **Step 3: Check the skill loads**
 

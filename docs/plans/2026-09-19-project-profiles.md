@@ -1,5 +1,8 @@
 Frozen after move to lore at 37fb4b696f1f038c9f2d26fa1c3519deca84f1c1 on 2026-10-04 (lore-443368); retained for closed task references.
 
+Path placeholders name main checkouts or their parent directories. Substitute paths
+from `tasks projects --paths --pretty` before using command examples.
+
 # Project Profiles (ai side) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -16,7 +19,7 @@ Frozen after move to lore at 37fb4b696f1f038c9f2d26fa1c3519deca84f1c1 on 2026-10
 
 - Fragments are plain markdown, one file per profile, `agents/profiles/<name>.md`, no frontmatter, no includes (spec §5).
 - The `## Profiles` section in `AGENTS.md` is the text in spec §7.2, verbatim.
-- Hook commands in settings files are written `~/d/ops/hooks/<name>`, matching the existing entries.
+- Hook commands in settings files are written `<ops-checkout>/hooks/<name>`, matching the existing entries.
 - No path under the user's home or the Dropbox mount appears in a fragment or in `AGENTS.md` prose.
 - Task 4 removes prose only after Task 3's enforcement check has passed and `ops-profile` is callable from a directory that is no checkout.
 - No live check may be able to reach GitHub: work-home probes run with a tokenless `GH_CONFIG_DIR` and a stub `gh` (Task 3).
@@ -125,12 +128,12 @@ Then merge to `main` (fast-forward from the worktree branch) before ops Task 3 r
 - Modify: `AGENTS.md` (new `## Profiles` section after `## Git`)
 
 **Interfaces:**
-- Consumes: ops `hooks/claude-profile` (ops Task 4) and `hooks/claude-pretooluse`, both on ops `main` — the settings entries name `~/d/ops/hooks/...`, the main checkout.
+- Consumes: ops `hooks/claude-profile` (ops Task 4) and `hooks/claude-pretooluse`, both on ops `main` — the settings entries name `<ops-checkout>/hooks/...`, the main checkout.
 - Produces: a `profile:` line in every Claude Code session in either home.
 
 - [ ] **Step 1: Confirm the ops hook exists on ops main**
 
-Run: `test -x ~/d/ops/hooks/claude-profile && git -C ~/d/ops log --oneline -1 -- hooks/claude-profile`
+Run: `test -x <ops-checkout>/hooks/claude-profile && git -C <ops-checkout> log --oneline -1 -- hooks/claude-profile`
 Expected: one commit line. If the file is missing, stop: ops Task 4 has not merged.
 
 - [ ] **Step 2: Add the SessionStart entry to `claude/settings.json`**
@@ -143,7 +146,7 @@ In `hooks.SessionStart`, after the `claude-provenance` entry, add:
         "hooks": [
           {
             "type": "command",
-            "command": "~/d/ops/hooks/claude-profile"
+            "command": "<ops-checkout>/hooks/claude-profile"
           }
         ]
       }
@@ -159,7 +162,7 @@ In `hooks.SessionStart`, after the existing Familiar entry, add the same `claude
         "hooks": [
           {
             "type": "command",
-            "command": "~/d/ops/hooks/claude-pretooluse"
+            "command": "<ops-checkout>/hooks/claude-pretooluse"
           }
         ]
       }
@@ -170,9 +173,9 @@ In `hooks.SessionStart`, after the existing Familiar entry, add the same `claude
 Run:
 ```bash
 for f in claude/settings.json claude/settings.work.json; do
-  jq -e '[.hooks.SessionStart[].hooks[].command] | index("~/d/ops/hooks/claude-profile")' $f >/dev/null && echo "$f: profile hook ok"
+  jq -e '[.hooks.SessionStart[].hooks[].command] | index("<ops-checkout>/hooks/claude-profile")' $f >/dev/null && echo "$f: profile hook ok"
 done
-jq -e '[.hooks.PreToolUse[].hooks[].command] | index("~/d/ops/hooks/claude-pretooluse")' claude/settings.work.json >/dev/null && echo "work: pretooluse ok"
+jq -e '[.hooks.PreToolUse[].hooks[].command] | index("<ops-checkout>/hooks/claude-pretooluse")' claude/settings.work.json >/dev/null && echo "work: pretooluse ok"
 ```
 Expected: three `ok` lines.
 
@@ -204,11 +207,11 @@ Merge to `main`. The symlinks make it live at the next session start.
 
 - [ ] **Step 7: Live check, personal home**
 
-Start a Claude Code session in `~/d/ai` and one in `/tmp` (clone anything unregistered there first, e.g. `git clone --depth 1 https://github.com/obra/superpowers /tmp/superpowers-probe`). In each, the first turn's context must contain a line starting `profile:`. Record in the task note: the two lines verbatim (expected `profile: personal (identity.toml [ai].profiles); …` and `profile: external (profiles.toml default); …`).
+Start a Claude Code session in `<ai-checkout>` and one in `/tmp` (clone anything unregistered there first, e.g. `git clone --depth 1 https://github.com/obra/superpowers /tmp/superpowers-probe`). In each, the first turn's context must contain a line starting `profile:`. Record in the task note: the two lines verbatim (expected `profile: personal (identity.toml [ai].profiles); …` and `profile: external (profiles.toml default); …`).
 
 - [ ] **Step 8: Live check, work home — both hooks fire**
 
-Run `clw` in `~/d/<work>/<repo>`. Confirm the line `profile: work (identity.toml [rad].profiles); home: work; …`. Then, in a scratch repository (`tmp=$(mktemp -d); git -C $tmp init -q`), ask the session to run `git -C $tmp commit --allow-empty -m "probe" -m "Claude-Session: https://claude.ai/code/session_probe"`: the attribution check (hook check 3, which exists today) must refuse it with `claude-pretooluse: refusing to write an AI attribution line`. That proves `claude-pretooluse` is registered and running in the work home; profile-aware refusals are not tested here because they arrive with ops Task 5 (Task 3 below covers them). Record both observations in the task note. Nothing here contacts GitHub.
+Run `clw` in `<work-checkouts>/<repo>`. Confirm the line `profile: work (identity.toml [rad].profiles); home: work; …`. Then, in a scratch repository (`tmp=$(mktemp -d); git -C $tmp init -q`), ask the session to run `git -C $tmp commit --allow-empty -m "probe" -m "Claude-Session: https://claude.ai/code/session_probe"`: the attribution check (hook check 3, which exists today) must refuse it with `claude-pretooluse: refusing to write an AI attribution line`. That proves `claude-pretooluse` is registered and running in the work home; profile-aware refusals are not tested here because they arrive with ops Task 5 (Task 3 below covers them). Record both observations in the task note. Nothing here contacts GitHub.
 
 ---
 
@@ -218,7 +221,7 @@ Run `clw` in `~/d/<work>/<repo>`. Confirm the line `profile: work (identity.toml
 - None changed; the deliverable is the recorded observation on this task.
 
 **Interfaces:**
-- Consumes: ops Task 5 on ops `main` (`grep -c ops-profile ~/d/ops/hooks/claude-pretooluse` ≥ 1) and Task 2's note. Do not start otherwise.
+- Consumes: ops Task 5 on ops `main` (`grep -c ops-profile <ops-checkout>/hooks/claude-pretooluse` ≥ 1) and Task 2's note. Do not start otherwise.
 - Produces: the proof spec §5 asks for — the profile-aware account refusal running in the work home — without any real `gh` write being possible.
 
 - [ ] **Step 1: Build a disposable gh**
@@ -252,7 +255,7 @@ echo $probe
 ```bash
 (
   unset GH_TOKEN GITHUB_TOKEN
-  cd ~/d/<work>/<repo>
+  cd <work-checkouts>/<repo>
   GH_CONFIG_DIR="$probe/gh" PATH="$probe/bin:$PATH" clw
 )
 ```
@@ -279,8 +282,8 @@ Paste the refusal text and `ls $probe/calls.log` output (or its absence after th
 
 - [ ] **Step 1: Confirm the preconditions**
 
-Run: `tasks show <the Task 3 id> --pretty | grep -c "<work-account>"; cd /tmp && command -v ops-profile && ops-profile explain ~/d/ai | head -3`
-Expected: a count ≥ 1; then `~/.local/bin/ops-profile` (or wherever `just install` linked it) and the first lines of an explanation from a directory that is no checkout. If the command is missing, run `cd ~/d/ops && just install` and retry; if that recipe is missing, ops Task 2 is not on ops `main`: stop.
+Run: `tasks show <the Task 3 id> --pretty | grep -c "<work-account>"; cd /tmp && command -v ops-profile && ops-profile explain <ai-checkout> | head -3`
+Expected: a count ≥ 1; then `~/.local/bin/ops-profile` (or wherever `just install` linked it) and the first lines of an explanation from a directory that is no checkout. If the command is missing, run `cd <ops-checkout> && just install` and retry; if that recipe is missing, ops Task 2 is not on ops `main`: stop.
 
 - [ ] **Step 2: Rewrite the Git section**
 
@@ -332,4 +335,4 @@ git add AGENTS.md codex/config.toml README.md
 git commit -m "docs(rules): profile fragments carry the per-project rules; global prose shrinks"
 ```
 
-Merge to `main`; start one session in `~/d/ai` and confirm the profile line still appears and the Git section reads as written.
+Merge to `main`; start one session in `<ai-checkout>` and confirm the profile line still appears and the Git section reads as written.

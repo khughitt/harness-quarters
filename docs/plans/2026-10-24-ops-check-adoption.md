@@ -1,5 +1,8 @@
 # ops-check adoption: implementation plan
 
+Path placeholders name main checkouts or their parent directories. Substitute paths
+from `tasks projects --paths --pretty` before using command examples.
+
 Status: revision 4, 2026-10-24.
 - **Revision 1** (996f187) went through a fresh-context agent review: 5 important
   findings and 12 minor.
@@ -337,7 +340,7 @@ tools/session_log_private.py. Modify .ops-check.toml (one entry).
 
 Use the spec's D5 table. In prose, the hosts are "the primary host" and "the second
 host". In commands, JSON and table cells they are `host-a` and `host-b`. The home
-becomes `~`, WORK_ROOT becomes `$WORK_ROOT`, and a checkout becomes `~/d/<project>`.
+becomes `~`, WORK_ROOT becomes `$WORK_ROOT`, and a checkout becomes `<project-checkout>`.
 Every spelling of a host name in a rewritten file is replaced, capitalized ones
 included. The review of revision 1 found that these files carry only hostnames, so the
 path grep in Step 1 is expected to find nothing.

@@ -1,5 +1,8 @@
 # Declared surface drift — brief
 
+Path placeholders name main checkouts or their parent directories. Substitute paths
+from `tasks projects --paths --pretty` before using command examples.
+
 Scoped 2026-10-08 from `hq-b5595a`, `hq-ac80cb`, `hq-e18255` and `hq-fe88ef`, the
 follow-ups the residue (`hq-dcb11a`) and the rename (`hq-8b7a28`) filed and did not
 act on.
@@ -42,14 +45,14 @@ that break on a rename, and facts probed on a harness version no longer installe
   against 0.156.1. A further version change alone establishes no capability change.
 - **Hook paths (`hq-fe88ef`).** `claude/settings.json`, `codex/hooks.json`,
   `codex/hooks.work.json` and the untracked `local/claude/settings.work.json` call
-  `~/d/lore/hooks/claude-profile` and five ops hooks (`claim-guard`,
+  `<lore-checkout>/hooks/claude-profile` and five ops hooks (`claim-guard`,
   `claude-sessionstart`, `claude-provenance`, `claude-pretooluse`,
   `claude-posttooluse`) by checkout path. Codex keys hook trust by a hash of the
   command (`[hooks.state.*] trusted_hash`), so renaming lore or ops changes those strings
   and costs a re-trust in every Codex home on both hosts. `harness-state-refresh` already
   moved behind `~/.local/bin` for this reason (rename design §3); ops's `just install`
   links six of its `bin/` tools there but none of its hooks. familiar's hooks name
-  `~/d/familiar/bin/familiar` too, while an npm-installed `familiar` is already on
+  `<familiar-checkout>/bin/familiar` too, while an npm-installed `familiar` is already on
   `PATH`.
 
 ## Constraints

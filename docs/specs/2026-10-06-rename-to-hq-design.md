@@ -1,5 +1,8 @@
 # Rename tack to harness quarters (hq) — design
 
+Path placeholders name main checkouts or their parent directories. Substitute paths
+from `tasks projects --paths --pretty` before using command examples.
+
 Status: accepted 2026-10-06 after five review rounds (Claude 1 and 2; GPT 3 to 5). Phase 1 steps 1 to 3 landed 2026-10-06 by docs/plans/2026-10-06-rename-to-hq-preparation.md; steps 4 and 5 and the rehearsal's tools landed 2026-10-06 by docs/plans/2026-10-06-rename-to-hq-cutover.md (Tasks 1 to 7); the trial join landed 2026-10-07 (Task 8, by proxies until obs lists complete windows, hq-e4e58a). Cutover executed 2026-10-07 on both hosts (Tasks 9 to 11): renamed and moved on the first host, adopted on the second, relay and tasks retargeted, the GitHub repository renamed to harness-quarters. Task
 `hq-8b7a28`, under `hq-dcb11a` and ops `ops-593133`. Since 2026-10-10 (hq-170b28), `rename-cutover
 retarget --forward` selects step 9's projects itself, replacing Task 11 Step 1's loop; the runbook
@@ -58,7 +61,7 @@ Not in scope: rewriting history. Three kinds of text keep the old name:
   `local/codex/trust.toml`; Crush's project list.
 
 **Hook commands do not name it.** They call `~/.local/bin/harness-state-refresh`,
-`~/d/lore/hooks/claude-profile` and ops's hooks. So the Codex hook trust, which hashes the
+`<lore-checkout>/hooks/claude-profile` and ops's hooks. So the Codex hook trust, which hashes the
 command, is untouched.
 
 **In the repository.** `identity.toml`; the prefix in `tasks/.config.toml` and over 200
@@ -341,7 +344,7 @@ owner:
 | flows | A trial's identity survives a rename of an enrolled project (§3.4) | `flows-44890e` |
 | this project | The cutover tool takes a list of repositories, and its guard knows a rename's own registry changes (§3.1) | phase 1 |
 | this project | Nothing a host runs names this checkout (§3.1) | phase 1 |
-| this project | The same for the other checkouts hook commands name: today they call lore's and ops's hooks by `~/d/lore/…` and `~/d/ops/…`, so renaming either would cost a Codex re-trust in every home | idea `tack-fe88ef`; not needed for this rename |
+| this project | The same for the other checkouts hook commands name: today they call lore's and ops's hooks by `<lore-checkout>/…` and `<ops-checkout>/…`, so renaming either would cost a Codex re-trust in every home | idea `tack-fe88ef`; not needed for this rename |
 | ops | The cutover tool belongs with the hub once it is general, since a rename is work that spans projects; and a check that flags a unit file or hook command naming a checkout path | idea `ops-2d8813`; not needed for this rename |
 
 The first three block this cutover. The last two are for the next one.

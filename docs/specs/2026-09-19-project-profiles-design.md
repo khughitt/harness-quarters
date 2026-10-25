@@ -1,5 +1,8 @@
 Frozen after move to lore at 37fb4b696f1f038c9f2d26fa1c3519deca84f1c1 on 2026-10-04 (lore-443368); retained for closed task references.
 
+Path placeholders name main checkouts or their parent directories. Substitute paths
+from `tasks projects --paths --pretty` before using command examples.
+
 # Project profiles: composable instruction and behavior layers per checkout
 
 Status: approved — user review 2026-09-19 after two revision rounds
@@ -14,7 +17,7 @@ assembly; neither task depends on the other), ops `hooks/claude-pretooluse`
 The global instructions serve every session in every checkout, so every
 difference between kinds of project has been written as a conditional inside
 one file — "personal projects commit design docs; work and external projects
-exclude them", "`<work-account>` only under `~/d/<work>/`" — and enforced by a
+exclude them", "`<work-account>` only under `<work-checkouts>/`" — and enforced by a
 hook that re-derives the same classification from paths and directory names.
 The 2026-09-19 review found the design-doc rule had drifted to a universal
 default (ai-889237) with no personal-project justification, and that fixing the
@@ -109,7 +112,7 @@ fragment = "science"
 # Path families: an unregistered checkout under one of these resolves to the
 # named profiles. Matched by real path, longest prefix first.
 [[family]]
-path = "~/d/<work>"
+path = "<work-checkouts>"
 profiles = ["work"]
 
 # Every checkout nothing else claims.
@@ -135,7 +138,7 @@ consumer that acts on it.
 | Key | Values | Consumer | Today's mechanism it replaces |
 | --- | --- | --- | --- |
 | `design_docs` | `commit`, `exclude` | pretooluse check 4; brainstorming/writing-plans prose | the `docs/superpowers/` directory rule + universal default |
-| `gh_account` | a gh login | pretooluse check 1; the gh rule in `AGENTS.md`; Codex `developer_instructions` | the `~/d/<work>` path constant in the hook |
+| `gh_account` | a gh login | pretooluse check 1; the gh rule in `AGENTS.md`; Codex `developer_instructions` | the `<work-checkouts>` path constant in the hook |
 | `pr_draft` | `required`, `by-permission` | pretooluse check 2 | `by-permission` for everyone (live `gh repo view`) |
 | `home` | a home name (§3.4) | the session line (advisory) | nothing |
 
@@ -190,7 +193,7 @@ its source. Steps, first match wins:
    parent of the common git dir, so a linked worktree resolves to its main
    checkout, as `expected_account` in the hook already does. Both sides are
    compared as real paths (`Path.resolve()`), so a symlinked `.worktrees/` on
-   `WORK_ROOT` and a registry root written under `~/d` (itself a symlink)
+   `WORK_ROOT` and a registry root written under `<checkout-parent>` (itself a symlink)
    match. Outside any git checkout, PATH itself is the checkout. The canonical
    checkout answers only *classification* (steps 2–5); the repository layer —
    instruction files, and the docs they name — is read from the working tree
@@ -209,7 +212,7 @@ its source. Steps, first match wins:
 5. **Default**: `[default].profiles`. Source: `profiles.toml default`.
 
 The default is `external` and the design keeps it that way: a repository being
-outside the work tree, or under `~/d`, does not establish that it is personal.
+outside the work tree, or under `<checkout-parent>`, does not establish that it is personal.
 A personal project earns `personal` by being registered (and declared) or by a
 family the user writes. Registered projects **must** declare `profiles`;
 `ops-projects check` (hence `ops-check`, hence the ops pre-commit hook) fails
@@ -224,7 +227,7 @@ Provenance is carried per fact. Resolution output (`--json`):
 
 ```json
 {
-  "checkout": "~/d/ai",
+  "checkout": "<ai-checkout>",
   "path": "$WORK_ROOT/ai/.worktrees/project-profiles",
   "worktree": true,
   "project": "ai",
@@ -235,7 +238,7 @@ Provenance is carried per fact. Resolution output (`--json`):
     "gh_account": {"value": "khughitt", "source": "profile personal"},
     "pr_draft": {"value": "by-permission", "source": "profile personal"}
   },
-  "fragments": ["~/d/ai/agents/profiles/personal.md"],
+  "fragments": ["<ai-checkout>/agents/profiles/personal.md"],
   "warnings": []
 }
 ```
@@ -343,7 +346,7 @@ a runtime resolution, and `explain` is how a person inspects one.
 Check 1 (`gh` account): `expected_account(cwd)` becomes the resolver's
 `gh_account`. The refusal names the profile and its source: "cwd resolves to
 profile `work` (identity.toml [rad].profiles), whose gh account is
-`<work-account>`". The `WORK_ACCOUNT` constant and the `~/d/<work>` test leave
+`<work-account>`". The `WORK_ACCOUNT` constant and the `<work-checkouts>` test leave
 the hook; the family in `profiles.toml` carries that fact once.
 
 Check 2 (draft PRs): runs `gh repo view` only when `pr_draft` is
@@ -425,7 +428,7 @@ the hook does on `git add docs/superpowers/specs/x.md` and on a `gh pr create`.
 
 `identity.toml`: `[ai] profiles = ["personal"]`. cwd
 `$WORK_ROOT/ai/.worktrees/project-profiles`. Step 1 finds the common git
-dir under `~/d/ai`; step 3 matches the registry.
+dir under `<ai-checkout>`; step 3 matches the registry.
 Line: `profile: personal (identity.toml [ai].profiles); home: personal; design docs: commit; gh: khughitt; PRs: by-permission`.
 Hook: the stage is allowed; the PR is judged by permission (`khughitt` has
 ADMIN on `khughitt/ai`: no draft needed). The repository's own convention is
@@ -467,8 +470,8 @@ and, below it, what the registry would have said had the override been absent.
 
 ### 8.5 An unregistered work repository
 
-`~/d/<work>/<unregistered-repo>`: not in the registry; the `~/d/<work>` family claims it
-(step 4). `profile: work (profiles.toml family ~/d/<work>)`. This is today's
+`<work-checkouts>/<unregistered-repo>`: not in the registry; the `<work-checkouts>` family claims it
+(step 4). `profile: work (profiles.toml family <work-checkouts>)`. This is today's
 hook behavior, now with a stated source.
 
 ## 9. Migration
@@ -481,13 +484,13 @@ that replaces it is being delivered.
 1. **ai**: the three fragments under `agents/profiles/`, merged to `main` —
    `ops-check` reads ai through its registered root, not a worktree. Nothing
    reads them yet; the commit changes no behavior.
-2. **ops**: `profiles.toml` with the three profiles, the `~/d/<work>` family,
+2. **ops**: `profiles.toml` with the three profiles, the `<work-checkouts>` family,
    the homes, and the `external` default; `profiles` on every identity table
    (`nrp`, `rad` → `work`; every other registered project → `personal`);
    `bin/ops-profile`; `ops-projects check` extended; tests. The fragment
    check passes because step 1 landed first; `hooks/claude-profile` lands here
    too, unregistered. Merged to ops `main` before step 3, since the settings
-   files name `~/d/ops/hooks/`.
+   files name `<ops-checkout>/hooks/`.
 3. **ai**: `hooks/claude-profile` and `hooks/claude-pretooluse` registered in
    both Claude settings files (§5); the `## Profiles` section added to
    `AGENTS.md` with the old sentences still in place. The symlinks in the four
@@ -549,7 +552,7 @@ Nothing installs: each harness home links to the tracked file.
 The links target the main checkout, so a change to `AGENTS.md` or a settings
 file is live in every home at the next session start once it is on ai `main`
 — and not while it sits on a worktree branch. The same holds for ops: the
-hooks registered in the settings files are `~/d/ops/hooks/*`, the main
+hooks registered in the settings files are `<ops-checkout>/hooks/*`, the main
 checkout, so a hook change is live only once merged there. That is why
 migration steps 3 and 5 are separate commits, why each live check follows an
 integration to `main` in the repository it exercises, and why step 3 runs the

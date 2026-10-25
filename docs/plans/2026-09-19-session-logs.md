@@ -1,5 +1,8 @@
 # Session logs Implementation Plan
 
+Path placeholders name main checkouts or their parent directories. Substitute paths
+from `tasks projects --paths --pretty` before using command examples.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A `session-logs` skill that explains the four harness stores, and an `agents/bin/session-episodes` tool that turns the Claude Code and Codex stores plus task records into source-referenced pre-flow episodes for obs's proxy baseline.
@@ -2740,7 +2743,7 @@ git commit -m "feat(session-episodes): extract, show, confirm and label commands
 **Files:**
 - Create: `agents/skills/session-logs/SKILL.md`
 - Modify: `agents/skills/README.md` (one bullet after the `flow/` bullet)
-- Create (outside the repo): symlink `~/.claude/skills/session-logs` → `~/d/ai/agents/skills/session-logs`
+- Create (outside the repo): symlink `~/.claude/skills/session-logs` → `<ai-checkout>/agents/skills/session-logs`
 
 **Interfaces:**
 - Consumes: the CLI (Task 6).
@@ -2889,8 +2892,8 @@ In `agents/skills/README.md`, after the `flow/` bullet:
   obs. Linked from `~/.claude/skills/session-logs` like the others.
 ```
 
-Run: `ln -s ~/d/ai/agents/skills/session-logs ~/.claude/skills/session-logs && ls -la ~/.claude/skills/session-logs`
-Expected: the symlink resolves to the worktree-independent path under `~/d/ai` (the main checkout; the skill file exists there only after this branch merges, which is fine — `flow` is linked the same way).
+Run: `ln -s <ai-checkout>/agents/skills/session-logs ~/.claude/skills/session-logs && ls -la ~/.claude/skills/session-logs`
+Expected: the symlink resolves to the worktree-independent path under `<ai-checkout>` (the main checkout; the skill file exists there only after this branch merges, which is fine — `flow` is linked the same way).
 
 - [ ] **Step 3: Commit**
 

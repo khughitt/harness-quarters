@@ -1,5 +1,8 @@
 # Rename ai to tack Implementation Plan
 
+Path placeholders name main checkouts or their parent directories. Substitute paths
+from `tasks projects --paths --pretty` before using command examples.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Rename the `ai` project to `tack` everywhere it is a live name, with every host converging through one tracked link manifest.
@@ -504,7 +507,7 @@ run it once more here. Expected: pass.
 - [ ] **Step 1: Replace the command in the four files**
 
 ```bash
-sed -i 's|~/d/ai/.githooks/harness-state-refresh|~/.local/bin/harness-state-refresh|' \
+sed -i 's|<ai-checkout>/.githooks/harness-state-refresh|~/.local/bin/harness-state-refresh|' \
   claude/settings.json claude/settings.work.json codex/hooks.json codex/hooks.work.json
 grep -c '~/.local/bin/harness-state-refresh' claude/settings.json claude/settings.work.json codex/hooks.json codex/hooks.work.json
 ```
@@ -528,7 +531,7 @@ Merge to main the way this repository's live config requires (the live `claude/s
 - [ ] **Step 4: Converge this host from the main checkout**
 
 Run: `just link` in the main checkout.
-Expected: every entry `ok` (a link counts as ok by resolved target, so the `~/d/ai/…` and absolute Dropbox spellings both pass) except `create ~/.local/bin/harness-state-refresh`. Any `refuse`: stop and report.
+Expected: every entry `ok` (a link counts as ok by resolved target, so the `<ai-checkout>/…` and absolute Dropbox spellings both pass) except `create ~/.local/bin/harness-state-refresh`. Any `refuse`: stop and report.
 Run: `just link --apply`, then `just link-check` — Expected: exit 0.
 
 - [ ] **Step 5: Re-trust the Codex hooks and verify both harnesses**
@@ -1114,7 +1117,7 @@ runs under scratch `HOME`, `XDG_CONFIG_HOME` and `XDG_STATE_HOME`. Resolve the l
 first, then switch the environment:
 
 ```bash
-AI=$(readlink -f ~/d/ai); OPS=$(readlink -f ~/d/ops); LIVE_REG=$HOME/.config/tasks/projects.toml
+AI=$(readlink -f <ai-checkout>); OPS=$(readlink -f <ops-checkout>); LIVE_REG=$HOME/.config/tasks/projects.toml
 F=<scratchpad>/future; mkdir -p $F/home $F/cfg/tasks $F/state
 git clone -q "$AI" $F/tack && git -C $F/tack switch -qc tack-names
 git clone -q "$OPS" $F/ops && git -C $F/ops switch -qc tack-prefix
@@ -1196,7 +1199,7 @@ A complete, isolated run of Task 7 steps 2–6, twice. The sandbox shares nothin
 
 1. Layout: `R=<scratchpad>/rehearsal`; `R/home`, `R/cfg`, `R/state` for `HOME`,
    `XDG_CONFIG_HOME`, `XDG_STATE_HOME`; `R/sync/` mirrors the Dropbox root; `WORK_ROOT`
-   unset. `cp -a ~/d/ai R/sync/ai` and `cp -a ~/d/ops R/sync/ops` (full checkouts with
+   unset. `cp -a <ai-checkout> R/sync/ai` and `cp -a <ops-checkout> R/sync/ops` (full checkouts with
    their `tack-names` / `tack-prefix` branches; no worktrees, per Task 7's precondition).
 2. Storage: the copied `.worktrees` links are relative (`../../.dropbox-work/<name>/.worktrees`),
    so they resolve under `R/.dropbox-work`; create `R/.dropbox-work/ai/.worktrees` and
@@ -1226,13 +1229,13 @@ the test from Step 1; delete `R`.
 
 Run from a Claude Code session started in the ops checkout. Not a subagent task: every step is a live action on this host; stop at the first failure and run `rollback`.
 
-- [ ] **Step 1: Preconditions** — the user confirms: every other host ran Task 2's `just link --apply`; no other harness session is open on this host. Check: `tasks claims` lists no live claim (end or park any first); no ops claim, live or dead (a dead one would be pruned by apply's own ops retarget, then trip the rollback guard on a change the cutover itself made); `git -C ~/d/ai worktree list` shows one worktree; `just link-check` in ai exits 0; ai and ops clean; tasks-7f1596 is done; Task 6 passed.
-- [ ] **Step 2: Save** — `~/d/ai/tools/rename-cutover save --snapshot ~/.local/share/tack-cutover/<date> --ai ~/d/ai --ops ~/d/ops --new-root <Dropbox>/tack`. From here on run the snapshot's copy: `~/.local/share/tack-cutover/<date>/rename-cutover`. This snapshot is durable, not scratch: it must survive until every other host has adopted (Task 8), which can outlast a scratchpad's lifetime.
+- [ ] **Step 1: Preconditions** — the user confirms: every other host ran Task 2's `just link --apply`; no other harness session is open on this host. Check: `tasks claims` lists no live claim (end or park any first); no ops claim, live or dead (a dead one would be pruned by apply's own ops retarget, then trip the rollback guard on a change the cutover itself made); `git -C <ai-checkout> worktree list` shows one worktree; `just link-check` in ai exits 0; ai and ops clean; tasks-7f1596 is done; Task 6 passed.
+- [ ] **Step 2: Save** — `<ai-checkout>/tools/rename-cutover save --snapshot ~/.local/share/tack-cutover/<date> --ai <ai-checkout> --ops <ops-checkout> --new-root <Dropbox>/tack`. From here on run the snapshot's copy: `~/.local/share/tack-cutover/<date>/rename-cutover`. This snapshot is durable, not scratch: it must survive until every other host has adopted (Task 8), which can outlast a scratchpad's lifetime.
 - [ ] **Step 3: Apply** — `~/.local/share/tack-cutover/<date>/rename-cutover apply --snapshot ~/.local/share/tack-cutover/<date>`.
-- [ ] **Step 4: Name edits** — `git -C ~/d/tack merge --no-edit tack-names`; `git -C ~/d/ops merge --no-edit tack-prefix`; in ops `just projects` (regenerates the project lists, including `~/d/tack/AGENTS.md`); `just test` in ops passes.
-- [ ] **Step 5: Verify before committing** — `rename-cutover verify --snapshot …`; then a fresh `~/d/tack/tools/tack-link` report must equal `~/.local/share/tack-cutover/<date>/links.txt` (report lines name link paths, not targets, so they do not change with the root; the comparison uses a fresh report after apply, never the apply output); then the spec §5 sweep: `just link-check` clean in tack, and `find ~ -maxdepth 6 -type l` finds no link that resolves into a missing path or names `ai`. Controlled exception to the session freeze: start one fresh Claude Code session and one Codex session in `~/d/tack`, each with a no-write prompt ("Reply with the single word ok."), and confirm: the profile line and global instructions load, the flow and session-logs skills are listed, and a size-only mark on `claude/settings.json` is cleared by each session's Stop. No task writes from those sessions. Any failure: `rollback`.
+- [ ] **Step 4: Name edits** — `git -C <tack-checkout> merge --no-edit tack-names`; `git -C <ops-checkout> merge --no-edit tack-prefix`; in ops `just projects` (regenerates the project lists, including `<tack-checkout>/AGENTS.md`); `just test` in ops passes.
+- [ ] **Step 5: Verify before committing** — `rename-cutover verify --snapshot …`; then a fresh `<tack-checkout>/tools/tack-link` report must equal `~/.local/share/tack-cutover/<date>/links.txt` (report lines name link paths, not targets, so they do not change with the root; the comparison uses a fresh report after apply, never the apply output); then the spec §5 sweep: `just link-check` clean in tack, and `find ~ -maxdepth 6 -type l` finds no link that resolves into a missing path or names `ai`. Controlled exception to the session freeze: start one fresh Claude Code session and one Codex session in `<tack-checkout>`, each with a no-write prompt ("Reply with the single word ok."), and confirm: the profile line and global instructions load, the flow and session-logs skills are listed, and a size-only mark on `claude/settings.json` is cleared by each session's Stop. No task writes from those sessions. Any failure: `rollback`.
 - [ ] **Step 6: Commit** — in tack: `git add -A && git commit -m "refactor: rename the ai project to tack"` (task files, config, `AGENTS.md`); in ops: `git add -A && git commit -m "chore: regenerate project lists for tack"` if `just projects` changed files. Codex re-trust is not needed (hook command strings did not change); confirm with one more Codex turn.
-- [ ] **Step 7: Close the cutover step** — `tasks done ai-04f531 "<what landed>"` from `~/d/tack`, committed; `tasks note ai-4b1878 "renamed on <host>; other hosts adopt per README (ai-2a14e9)"`. The parent stays open until Task 8. Keep the snapshot at `~/.local/share/tack-cutover/<date>` until every other host has adopted.
+- [ ] **Step 7: Close the cutover step** — `tasks done ai-04f531 "<what landed>"` from `<tack-checkout>`, committed; `tasks note ai-4b1878 "renamed on <host>; other hosts adopt per README (ai-2a14e9)"`. The parent stays open until Task 8. Keep the snapshot at `~/.local/share/tack-cutover/<date>` until every other host has adopted.
 
 ### Task 8: Other hosts adopt
 

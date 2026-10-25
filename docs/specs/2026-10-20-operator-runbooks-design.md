@@ -1,5 +1,8 @@
 # Operator runbooks that preserve the operator's shell
 
+Path placeholders name main checkouts or their parent directories. Substitute paths
+from `tasks projects --paths --pretty` before using command examples.
+
 Status: complete, 2026-10-22 (live window finished, merged `d04b6eb`); implemented and delivered to hq main (`3fe1d4c`), 2026-10-21; real-host pilot passed.
 Approved by Keith after spec round 6 (2026-10-20) and amended for familiar task-record drift
 (2026-10-21, design rounds 7–12, below). The live window remains original Task 8 (hq-f27918).
@@ -76,7 +79,7 @@ helper commands. Its executable shebang owns its interpreter; the user's command
 is valid Zsh and does not enter Bash:
 
 ```zsh
-~/d/hq/.worktrees/relay-cutover/tools/relay-cutover-bootstrap run
+<hq-checkout>/.worktrees/relay-cutover/tools/relay-cutover-bootstrap run
 ```
 
 This command is prospective until implementation, review, and rehearsal finish.

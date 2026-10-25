@@ -266,8 +266,11 @@ MIT licensed; see `LICENSE`.
 - `tools/ops-docs` and `tools/ops-check`: vendored from ops; change them there.
 - `.ops-check.toml`: the paths the layout check lets carry host values. The four harness
   settings and hooks files hold absolute paths their homes read literally. The relay
-  cutover tool, its tests, runbook and window plan use the two host names as their fleet
-  configuration; hq-7e81ed removes those entries if it retires the tool.
+  cutover tool, its tests, runbook and window plan use fixed fleet names and deployment
+  paths; hq-7e81ed removes those entries if it retires the tool. The capture-notice,
+  claim-guard and relay wiring tests assert the exact deployed hook strings and are
+  allowed by file too. Shared document examples use checkout-role placeholders such
+  as `<project-checkout>`, rather than home-relative aliases of registered paths.
   `tools/session_log_private.py` names the hosts to forbid them in session-log fixtures.
 
 ## Consumers

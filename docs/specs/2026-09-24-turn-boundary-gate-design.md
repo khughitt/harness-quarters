@@ -1,5 +1,8 @@
 # Turn-boundary gate: a Stop guard on held claims, and the rules it enforces
 
+Path placeholders name main checkouts or their parent directories. Substitute paths
+from `tasks projects --paths --pretty` before using command examples.
+
 Tasks: ai-21ea5d (the guard), ai-c62995 (what a park must say; no parking
 between increments), ai-804671 (no waits on untracked background work),
 ops-ed76fe and tack-89a1d1 (the guard reads the Stop input's running children;
@@ -272,9 +275,9 @@ ai-804671's.
 ### 3.4 Wiring (ai-21ea5d; this repository)
 
 - `claude/settings.json`: a second `Stop` entry,
-  `~/d/ops/hooks/claim-guard --harness claude-code`, beside familiar's. No
+  `<ops-checkout>/hooks/claim-guard --harness claude-code`, beside familiar's. No
   `SubagentStop` entry: it cannot block.
-- `codex/hooks.json`: `~/d/ops/hooks/claim-guard --harness codex` under
+- `codex/hooks.json`: `<ops-checkout>/hooks/claim-guard --harness codex` under
   `Stop`. Changing the file changes its hash, so Codex asks the user to trust
   it on next start (`codex/config.toml` `[hooks.state]`); that approval is the
   user's, and `codex/config.toml` already carries unrelated uncommitted edits

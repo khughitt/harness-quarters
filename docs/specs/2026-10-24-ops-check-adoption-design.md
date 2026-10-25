@@ -1,5 +1,8 @@
 # ops-check adoption: the shared hygiene checks in hq's commit gate
 
+Path placeholders name main checkouts or their parent directories. Substitute paths
+from `tasks projects --paths --pretty` before using command examples.
+
 Status: draft for review, revision 2, 2026-10-24.
 - **Revision 1** (28ed52b) went through a fresh-context agent review: 2 important
   findings and 13 minor.
@@ -216,6 +219,14 @@ hq-7e81ed, which would tie a hygiene gate to an unrelated scope decision.
 The other relay-cutover documents (the bootstrap plan, the cutover ledger attachment)
 mention a host in passing and follow D5 and D6.
 
+Hygiene amendment hq-d5ba0a: fixed deployment paths are fleet configuration too.
+The policy also allows tools/relay-cutover and tools/test_relay_cutover.py, which
+recognize the deployed guard and invoke the fixed remote entry. The capture-notice,
+claim-guard and relay wiring test files are allowed individually because they assert
+the exact deployed hook strings. Replacing those literals would change the contracts
+under test. The tools/relay-cutover prefix also covers its sibling executables under
+the checker's prefix matching; those all belong to the same fleet tool.
+
 ### D5. Documents and helpers are rewritten to placeholders
 
 Every other tracked file that carries a layout value on either host is rewritten:
@@ -226,7 +237,11 @@ Every other tracked file that carries a layout value on either host is rewritten
 | second host's name | "the second host" | `host-b` |
 | the home directory | `~` | `~` |
 | WORK_ROOT | `$WORK_ROOT` | `$WORK_ROOT` |
-| a registered checkout or the sync root | `~/d/<project>`, "the sync root" | `~/d/<project>` |
+| a registered checkout or the sync root | `<project-checkout>`, "the sync root" | `<project-checkout>` |
+
+Hygiene amendment hq-d5ba0a: use role placeholders such as `<hq-checkout>` for a
+specific main checkout and `<checkout-parent>` for its parent. Home-relative aliases
+of registered paths are machine layout too; a bare `~` remains valid.
 
 Within a rewritten document every spelling of a host name is replaced, capitalized
 ones included, so the document reads consistently, although the checker matches only

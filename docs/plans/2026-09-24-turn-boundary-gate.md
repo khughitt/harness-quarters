@@ -1,5 +1,8 @@
 # Turn-boundary gate Implementation Plan
 
+Path placeholders name main checkouts or their parent directories. Substitute paths
+from `tasks projects --paths --pretty` before using command examples.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Refuse, once, a turn end while the session holds a live tasks claim, with a reason that carries the turn-boundary rules; and put those rules in AGENTS.md and the flow skill.
@@ -53,7 +56,7 @@
 - [ ] **Step 1: Create the tasks worktree**
 
 ```bash
-cd ~/d/tasks
+cd <tasks-checkout>
 work-link --ensure .worktrees
 git worktree add .worktrees/turn-boundary-gate -b turn-boundary-gate
 git worktree lock --reason "on WORK_ROOT storage (host: $(uname -n))" .worktrees/turn-boundary-gate
@@ -120,7 +123,7 @@ Expected: PASS; no other test changes behaviour (a registry that does not exist 
 - [ ] **Step 6: Commit**
 
 ```bash
-cd ~/d/tasks/.worktrees/turn-boundary-gate
+cd <tasks-checkout>/.worktrees/turn-boundary-gate
 tasks check
 git add src/registry.rs tests/cli.rs
 git commit -m "fix(registry): an unreadable registry is an error, not an empty one"
@@ -148,8 +151,8 @@ git commit -m "fix(registry): an unreadable registry is an error, not an empty o
 The row goes after the `quiet` command block. Start from ops main's committed file so the bytes are exactly what Task 5 will publish:
 
 ```bash
-cd ~/d/tasks/.worktrees/turn-boundary-gate
-git -C ~/d/ops show main:cli.toml > tools/cli.toml
+cd <tasks-checkout>/.worktrees/turn-boundary-gate
+git -C <ops-checkout> show main:cli.toml > tools/cli.toml
 python3 - <<'EOF'
 import pathlib
 p = pathlib.Path("tools/cli.toml")
@@ -410,8 +413,8 @@ Run: `just gate`
 Expected: PASS (format, clippy, `tasks check`, full suite).
 
 ```bash
-git -C ~/d/tasks/.worktrees/turn-boundary-gate add src tests tools/cli.toml README.md
-git -C ~/d/tasks/.worktrees/turn-boundary-gate commit -m "feat(claims): tasks claims reads every claim store without a checkout"
+git -C <tasks-checkout>/.worktrees/turn-boundary-gate add src tests tools/cli.toml README.md
+git -C <tasks-checkout>/.worktrees/turn-boundary-gate commit -m "feat(claims): tasks claims reads every claim store without a checkout"
 ```
 
 ### Task 3: claim-guard decision core (ops)
@@ -434,7 +437,7 @@ git -C ~/d/tasks/.worktrees/turn-boundary-gate commit -m "feat(claims): tasks cl
 - [ ] **Step 0: Create the ops worktree**
 
 ```bash
-cd ~/d/ops
+cd <ops-checkout>
 work-link --ensure .worktrees
 git worktree add .worktrees/turn-boundary-gate -b turn-boundary-gate
 git worktree lock --reason "on WORK_ROOT storage (host: $(uname -n))" .worktrees/turn-boundary-gate
@@ -707,7 +710,7 @@ Expected: all PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd ~/d/ops/.worktrees/turn-boundary-gate
+cd <ops-checkout>/.worktrees/turn-boundary-gate
 tasks check
 git add hooks/claim-guard tests/test_claim_guard.py
 git commit -m "feat(hooks): claim-guard decision core for Stop on held claims"
@@ -883,7 +886,7 @@ Expected: all PASS (the full ops gate: `check-vendored`, `check`, and the suite)
 - [ ] **Step 5: Commit**
 
 ```bash
-cd ~/d/ops/.worktrees/turn-boundary-gate
+cd <ops-checkout>/.worktrees/turn-boundary-gate
 git add hooks/claim-guard tests/test_claim_guard.py justfile
 git commit -m "feat(hooks): claim-guard entry reads tasks claims and replies block or nothing"
 ```
@@ -898,11 +901,11 @@ This task changes main checkouts in ops, tasks, and (through publication) every 
 
 **Interfaces:**
 - Consumes: the tasks branch (Tasks 1-2) and the ops branch (Tasks 3-4).
-- Produces: `tasks claims` installed at `~/.cargo/bin/tasks`; `~/d/ops/hooks/claim-guard` on ops main; `cli.toml` with the `claims` row committed in ops and published everywhere.
+- Produces: `tasks claims` installed at `~/.cargo/bin/tasks`; `<ops-checkout>/hooks/claim-guard` on ops main; `cli.toml` with the `claims` row committed in ops and published everywhere.
 
 - [ ] **Step 1: Gate both branches**
 
-Run `just gate` in `~/d/tasks/.worktrees/turn-boundary-gate` and in `~/d/ops/.worktrees/turn-boundary-gate`.
+Run `just gate` in `<tasks-checkout>/.worktrees/turn-boundary-gate` and in `<ops-checkout>/.worktrees/turn-boundary-gate`.
 Expected: PASS in both.
 
 - [ ] **Step 2: Preflight every publication destination**
@@ -937,7 +940,7 @@ Expected: the success line, exit 0. On exit 1: stop and ask the user, naming eac
 - [ ] **Step 3: Add the row in ops main, publish, commit**
 
 ```bash
-cd ~/d/ops
+cd <ops-checkout>
 git status --short                      # expected: empty; otherwise stop and ask
 python3 - <<'EOF'
 import pathlib
@@ -950,7 +953,7 @@ row = ('\n[[cli.tasks.commands]]\npath = ["claims"]\n'
        'options = [\n  { shared = "all_projects", value = "none" },\n]\n')
 p.write_text(s[:end] + row + s[end:])
 EOF
-cmp cli.toml ~/d/tasks/.worktrees/turn-boundary-gate/tools/cli.toml   # prints nothing: the bytes Task 2 committed
+cmp cli.toml <tasks-checkout>/.worktrees/turn-boundary-gate/tools/cli.toml   # prints nothing: the bytes Task 2 committed
 just vendor-cli
 just check
 git add cli.toml
@@ -962,7 +965,7 @@ Expected: `cmp` silent; `vendor-cli` lists each `prefix: name` it wrote; `just c
 - [ ] **Step 4: Land the ops hook branch**
 
 ```bash
-cd ~/d/ops
+cd <ops-checkout>
 git merge --ff-only turn-boundary-gate || git merge --no-edit turn-boundary-gate
 just gate
 ```
@@ -972,7 +975,7 @@ Expected: PASS.
 - [ ] **Step 5: Land tasks**
 
 ```bash
-cd ~/d/tasks
+cd <tasks-checkout>
 git status --short
 cmp tools/cli.toml .worktrees/turn-boundary-gate/tools/cli.toml
 ```
@@ -991,8 +994,8 @@ Expected: gate PASS; `jq` prints `true`.
 - [ ] **Step 6: Real guard, real registry**
 
 ```bash
-echo '{"session_id":"no-such-session","stop_hook_active":false}' | ~/d/ops/hooks/claim-guard --harness claude-code; echo "exit=$?"
-echo "{\"session_id\":\"$CLAUDE_CODE_SESSION_ID\",\"stop_hook_active\":false}" | ~/d/ops/hooks/claim-guard --harness claude-code | jq -r .reason
+echo '{"session_id":"no-such-session","stop_hook_active":false}' | <ops-checkout>/hooks/claim-guard --harness claude-code; echo "exit=$?"
+echo "{\"session_id\":\"$CLAUDE_CODE_SESSION_ID\",\"stop_hook_active\":false}" | <ops-checkout>/hooks/claim-guard --harness claude-code | jq -r .reason
 ```
 
 Expected: the first prints nothing and `exit=0`. The second prints a reason naming `ai-21ea5d` when it is started in this session (start it first if it is parked), and nothing otherwise.
@@ -1052,7 +1055,7 @@ with
 - [ ] **Step 3: Check and commit**
 
 ```bash
-cd ~/d/ai/.worktrees/turn-boundary-gate
+cd <ai-checkout>/.worktrees/turn-boundary-gate
 grep -n "never a state" AGENTS.md agents/skills/flow/SKILL.md   # two hits
 tasks done ai-c62995 "AGENTS.md Decisions and flow rule 5: a park's next step is an action with its actor; no parking between increments of unblocked work"
 tasks check
@@ -1086,7 +1089,7 @@ In `.worktrees/turn-boundary-gate/AGENTS.md`, after the "Processes" section's fi
 - [ ] **Step 2: Check and commit**
 
 ```bash
-cd ~/d/ai/.worktrees/turn-boundary-gate
+cd <ai-checkout>/.worktrees/turn-boundary-gate
 python3 tools/ops-docs check                              # identity regions untouched: prints nothing, exit 0
 git diff --stat                                          # AGENTS.md only (plus tasks/)
 tasks done ai-804671 "AGENTS.md Processes: no turn ends on untracked background work; controller waits unless CHILD_WAKES; a worker reports only when complete or blocked"
@@ -1102,19 +1105,19 @@ git commit -m "docs(rules): never end a turn on untracked background work"
 - Modify: `codex/hooks.json` (`.hooks.Stop`)
 
 **Interfaces:**
-- Consumes: `~/d/ops/hooks/claim-guard` on ops main (Task 5).
+- Consumes: `<ops-checkout>/hooks/claim-guard` on ops main (Task 5).
 
 - [ ] **Step 1: Add the entries**
 
 ```bash
-cd ~/d/ai/.worktrees/turn-boundary-gate
+cd <ai-checkout>/.worktrees/turn-boundary-gate
 python3 - <<'EOF'
 import json, pathlib
 for path, harness in (("claude/settings.json", "claude-code"), ("codex/hooks.json", "codex")):
     p = pathlib.Path(path)
     doc = json.loads(p.read_text())
     doc["hooks"]["Stop"].append({"hooks": [{"type": "command",
-        "command": f"~/d/ops/hooks/claim-guard --harness {harness}"}]})
+        "command": f"<ops-checkout>/hooks/claim-guard --harness {harness}"}]})
     p.write_text(json.dumps(doc, indent=2) + "\n")
 EOF
 git diff
@@ -1125,8 +1128,8 @@ Expected: each file gains exactly one `Stop` entry and no other change (if `json
 - [ ] **Step 2: Validate**
 
 ```bash
-jq -e '.hooks.Stop | map(.hooks[0].command) | index("~/d/ops/hooks/claim-guard --harness claude-code")' claude/settings.json
-jq -e '.hooks.Stop | map(.hooks[0].command) | index("~/d/ops/hooks/claim-guard --harness codex")' codex/hooks.json
+jq -e '.hooks.Stop | map(.hooks[0].command) | index("<ops-checkout>/hooks/claim-guard --harness claude-code")' claude/settings.json
+jq -e '.hooks.Stop | map(.hooks[0].command) | index("<ops-checkout>/hooks/claim-guard --harness codex")' codex/hooks.json
 ```
 
 Expected: both print an index and exit 0.
@@ -1157,7 +1160,7 @@ git worktree add -q "$S/tbgp-wt" -b wt; cd "$S/tbgp-wt"
 ID=$(tasks add "worktree only" | jq -r .id)
 TASKS_SESSION=tbgp-probe TASKS_SESSION_PID=$$ tasks start "$ID"
 tasks prime --all-projects | jq --arg id "$ID" '[.doing[] | select(.id==$id)] | length'   # 0: the bug
-echo '{"session_id":"tbgp-probe","stop_hook_active":false}' | ~/d/ops/hooks/claim-guard --harness claude-code | jq -r .decision
+echo '{"session_id":"tbgp-probe","stop_hook_active":false}' | <ops-checkout>/hooks/claim-guard --harness claude-code | jq -r .decision
 ```
 
 Expected: `0`, then `block`. Note: `tasks note ai-21ea5d "live: worktree-only claim $ID blocked by claim-guard; prime --all-projects did not list it"`.
@@ -1167,7 +1170,7 @@ Expected: `0`, then `block`. Note: `tasks note ai-21ea5d "live: worktree-only cl
 Write `$S/stop-settings.json`:
 
 ```json
-{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "~/d/ops/hooks/claim-guard --harness claude-code"}]}]}}
+{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "<ops-checkout>/hooks/claim-guard --harness claude-code"}]}]}}
 ```
 
 Run each case with `claude -p --settings "$S/stop-settings.json" --model claude-haiku-4-5-20251001 "<prompt>"` from `$S/tbgp`, prompts:
@@ -1184,7 +1187,7 @@ Record per case: blocked or not, and what the blocked turn did. `tasks note ai-2
 ```bash
 mkdir -p "$S/codex-home"; cp ~/.codex/auth.json "$S/codex-home/"
 cat > "$S/codex-home/hooks.json" <<'EOF'
-{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "~/d/ops/hooks/claim-guard --harness codex"}]}]}}
+{"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "<ops-checkout>/hooks/claim-guard --harness codex"}]}]}}
 EOF
 ```
 
@@ -1431,7 +1434,7 @@ def test_codex_unknown_response_item_fails_even_with_a_known_form(monkeypatch):
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `cd ~/d/ai/.worktrees/turn-boundary-gate && python3 -m pytest agents/bin/test_wake_judge.py -q`
+Run: `cd <ai-checkout>/.worktrees/turn-boundary-gate && python3 -m pytest agents/bin/test_wake_judge.py -q`
 Expected: ERROR — `agents/bin/wake-judge` does not exist.
 
 - [ ] **Step 3: Write the judge** (`agents/bin/wake-judge`; `chmod +x`)
@@ -1671,7 +1674,7 @@ Expected: 21 passed.
 - [ ] **Step 5: Commit**
 
 ```bash
-cd ~/d/ai/.worktrees/turn-boundary-gate
+cd <ai-checkout>/.worktrees/turn-boundary-gate
 tasks check
 git add agents/bin/wake-judge agents/bin/test_wake_judge.py
 git commit -m "feat(agents): wake-judge decides a controller wake from transcript order, failing closed"
@@ -1711,7 +1714,7 @@ Then find the transcript and judge it:
 T=$(ls -t ~/.claude/projects/$(echo "$S" | sed 's#[/.]#-#g')/*.jsonl | head -1)
 # codex: the newest rollout whose session_meta cwd is $S
 # T=$(grep -l "\"cwd\":\"$S\"" $(ls -t ~/.codex/sessions/*/*/*/rollout-*.jsonl | head -20) | head -1)
-~/d/ai/.worktrees/turn-boundary-gate/agents/bin/wake-judge claude-code "$T" "$N" "$S/prompt"   # or codex
+<ai-checkout>/.worktrees/turn-boundary-gate/agents/bin/wake-judge claude-code "$T" "$N" "$S/prompt"   # or codex
 tmux kill-session -t cg-wake; rm -rf "$S"
 ```
 
@@ -1738,7 +1741,7 @@ The trap kills `cg-wake`; run `host-load --section session` and confirm nothing 
 - [ ] **Step 1: File the follow-ups**
 
 ```bash
-cd ~/d/ai/.worktrees/turn-boundary-gate
+cd <ai-checkout>/.worktrees/turn-boundary-gate
 tasks add "Relay entry for claim-guard over relay's turn-end guard" -p 2 --size s --complexity low --process direct --tag hooks --parent ai-756baa --source ai-21ea5d -b "Thin adapter over ops hooks/claim-guard decide(), in the idiom of relay-guard over claude-pretooluse; replaces the native Stop entries at the cutover. Spec docs/specs/2026-09-24-turn-boundary-gate-design.md §3.4."
 tasks dep <that id> --on ai-539508
 tasks add "Rollout judgment for claim-guard: sort Stop blocks by what the blocked turn did" -p 2 --size s --complexity mid --process direct --tag flow --tag obs --parent ai-756baa --source ai-21ea5d --defer 14d -b "Spec §6: read Stop blocks from session logs (session-logs), classify each as resumed work, park with an action, vacuous park, bounded wait, report-and-end, or bare end on retry; decide whether the reason text or ai-c62995's rule needs work."
@@ -1748,7 +1751,7 @@ tasks add "prime --all-projects omits tasks that exist only in a worktree branch
 - [ ] **Step 2: Land ai**
 
 ```bash
-cd ~/d/ai
+cd <ai-checkout>
 git status --short
 ```
 
