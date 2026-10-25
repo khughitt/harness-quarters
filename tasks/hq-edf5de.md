@@ -1,13 +1,15 @@
 ---
 id: hq-edf5de
 title: Correct deferred session-log research annotations and brief wording
-status: todo
+status: doing
 priority: 3
 size: xs
 complexity: low
 process: direct
+owner: test/hq-a45dd8-two-turn-evidence
 created: 2026-10-20T17:38:21Z
-updated: 2026-10-20T19:35:03Z
+updated: 2026-10-25T17:45:13Z
+started: 2026-10-25T17:45:13Z
 depends: []
 parent: hq-cff824
 tags: []
@@ -27,3 +29,5 @@ Scoped re-review of hq-a1c591 found two additional Minor wording issues in docs/
 ## Notes
 
 - 2026-10-20T19:35:03Z (docs/index-reach): review carry-forward: hq-a1c591 impl round2 Minor2 adds brief parent-count wording and stale research status to the existing cleanup. These are pre-close review findings, not post-close concerns.
+- 2026-10-25T17:45:13Z (test/hq-a45dd8-two-turn-evidence): started
+  provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
