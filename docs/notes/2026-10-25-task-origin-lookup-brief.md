@@ -65,8 +65,8 @@ obs owns content parsing and the session reader; hq owns store location and
 lifecycle. Compose supported reader output rather than adding another parser,
 index or store-root list. The reviewed reader's Stage A/Stage B separation and
 2027-02-16 trial-readout gate remain in force; this brief authorizes no rollout.
-Preserve the original captures. The three related guidance reports receive drop
-proposals as covered work, not claims that their behavior has shipped. The current
+Preserve the original captures. The user approved the three related guidance
+reports' drops on 2026-10-25; their existing owners still owe delivery. The current
 skill and session-episodes still have the reported gaps at hq `dc51f61`.
 Missing stamps, unreadable transcripts, competing calls and unavailable stderr
 must remain explicit limitations. Creation-time proximity alone cannot prove
@@ -106,7 +106,8 @@ creation or user intent; any historical fallback must label its evidence strengt
 - obs-d98663 remains the existing reader build, without expanding its reviewed
   contract. Its dependency closure readmits this idea; re-scope against both
   outcomes before commissioning a design or implementation of the origin query.
-- hq-4d77cc and hq-34163a: propose drop as covered by obs-d98663 and obs-f5710b.
-  hq-042f9e: propose drop into obs-f5710b with the attachment/order caveat above
-  carried into that existing owner's task notes. No idea is dropped by this pass,
-  and no skill, parser, extractor or live link changes before the trial gate.
+- hq-4d77cc and hq-34163a: dropped with user approval on 2026-10-25 as covered
+  by obs-d98663 and obs-f5710b. hq-042f9e: dropped with the same approval into
+  obs-f5710b; the attachment/order caveat above is in that owner's task notes.
+  These dispositions close duplicate tracking. No skill, parser, extractor or
+  live link changes before the trial gate.
