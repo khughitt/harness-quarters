@@ -133,6 +133,7 @@ def test_a_missing_ops_check_refuses(world):
     result = run_hook(repo, env)
     assert result.returncode == 1
     assert "tools/ops-check" in result.stderr
+    assert "vendored adopt ops-check" in result.stderr
 
 
 def test_an_ops_check_that_cannot_run_refuses(world):
@@ -142,6 +143,7 @@ def test_an_ops_check_that_cannot_run_refuses(world):
     result = run_hook(repo, env)
     assert result.returncode == 1
     assert "ops-check:" in result.stderr
+    assert "could not run (exit 2)" in result.stderr
 
 
 def test_a_clean_tree_passes_the_hygiene_check(world):
@@ -149,3 +151,15 @@ def test_a_clean_tree_passes_the_hygiene_check(world):
     (repo / "notes.md").write_text("nothing host-specific here\n")
     sh(repo, env, "git", "add", "notes.md")
     assert run_hook(repo, env).returncode == 0
+
+
+def test_a_local_refusal_is_not_masked_by_a_layout_finding(world):
+    repo, env, _ = world
+    (repo / ".gitignore").write_text("local/\n")
+    (repo / "local").mkdir()
+    (repo / "local" / "settings.work.json").write_text(f'{{"home": "{env['HOME']}"}}\n')
+    sh(repo, env, "git", "add", "-f", "local/settings.work.json")
+    result = run_hook(repo, env)
+    assert result.returncode == 1
+    assert "staged paths under local/" in result.stderr
+    assert "machine layout" not in result.stderr
