@@ -4,7 +4,7 @@ title: "Relay cutover tool and runbook: defects the live window exposed"
 status: todo
 priority: 3
 created: 2026-10-22T11:53:35Z
-updated: 2026-10-25T10:35:56Z
+updated: 2026-10-25T15:19:31Z
 depends: []
 tags: []
 agent: claude-code
@@ -24,3 +24,4 @@ Found during window 20261022T014303Z-a1e7bd47 (hq-f27918); each was worked aroun
 - 2026-10-22T11:53:44Z (main): concerns: hq-c6c847 defect — the bootstrap tool's printed held Claude commands break familiar registration, its Claude needs-approval prompt cannot raise a dialog, and its surface restart cannot see a locked niri session
 - 2026-10-24T22:15:25Z (main): curate-docs: hq-30fd95 at 8686be3 confirms: docs/runbooks/relay-cutover.md still reads as a procedure to run. Its Evidence section says the pilot is pending and nothing ran live, against its own 'Completed 2026-10-22' header, and README Layout describes it as the bootstrap the operator runs. Whichever way this task decides (fix the tool or retire it), restate or move the runbook to match, and update the README bullet and the relay-runtime link.
 - 2026-10-25T10:35:56Z (feat/ops-check-hq-c6a149): hq .ops-check.toml allows the relay cutover tool, its tests, runbook and window plan by path (hq-c6a149); retiring the tool removes those entries in the same change
+- 2026-10-25T15:19:31Z (fix/hq-d5ba0a-tilde-layout): hq-d5ba0a extends the fleet-layout policy to tools/relay-cutover (a prefix covering its sibling executables) and tools/test_relay_cutover.py because their fixed deployed guard and remote entry strings are fleet configuration. Remove these with the other cutover allowances if retiring the tool. The three wiring-test allowances protect the live hook strings and remain while those contracts remain.
