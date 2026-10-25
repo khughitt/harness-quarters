@@ -1,13 +1,15 @@
 ---
 id: hq-a45dd8
 title: Add a two-turn task-evidence fixture so the session-level task_evidence label is tested
-status: todo
+status: doing
 priority: 2
 size: xs
 complexity: low
 process: direct
+owner: main
 created: 2026-10-23T17:40:19Z
-updated: 2026-10-24T11:42:14Z
+updated: 2026-10-25T17:31:30Z
+started: 2026-10-25T17:31:30Z
 depends: []
 parent: hq-cff824
 tags: []
@@ -39,3 +41,5 @@ Why: SL11's CT1 and CT3 each hold one turn, so spec section 9.4's task_evidence:
 
 - 2026-10-23T17:52:52Z (main): fold in two deferred minors from hq-bb90ca's round-3 review while touching the same files: the ordinal loop in test_sl11_codex_statuses_by_closing_event passes vacuously if its glob matches nothing (bind the paths and assert there are three, or move it into its own test), and the turns/ paragraph near line 76 of docs/notes/session-log-acceptance-cases.md is wrapped short (reflow it).
 - 2026-10-24T11:42:14Z (main): scope: scoped; checked a226bbe, SL11 fixtures/self-check/cases, reviewed spec ae0f8ee sections 9.4 and 14.3, frozen plan 1fea7bf obs step 9, and the hq-c411df/obs-d98663 handoff. Confirmed CT1 has one seven-record turn, so the session-level assertion selects no turns. Set P2/xs/low/direct for an appended second CT1 turn, bounded-span RED-to-GREEN self-check, cases updates and the two existing deferred minors; preserved original report and required obs re-vendor/nonempty reader-acceptance handoff. No implementation or new design needed.
+- 2026-10-25T17:31:30Z (main): started
+  provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
