@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: subagent-write-fact
 created: 2026-10-12T11:00:29Z
-updated: 2026-10-25T10:59:08Z
+updated: 2026-10-25T10:59:09Z
 started: 2026-10-12T11:16:05Z
 completed: 2026-10-12T11:39:57Z
 depends: []
@@ -44,3 +44,4 @@ Claude Code refuses a subagent's Write when the basename starts with `report` (`
 - 2026-10-12T11:39:57Z (subagent-write-fact): subagent-write-refused fact for claude-code 2.1.296: REPORT/SUMMARY/FINDINGS/ANALYSIS prefixes on .md, case-insensitive basename, probed by claude/probes/subagent-write-probe.py; lore follow-up lore-d91181
   provenance: {"harness_session":"claude-code:4eec061d-7482-4022-9ce4-5a232f7d9577","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-25T10:59:08Z (feat/ops-check-hq-c6a149): Portable attachment fallback for subagent-write-probe-2026-10-12.jsonl under hq-c6a149: exact raw bytes retained by hq-c5fd83 at $WORK_ROOT/hq/hq-c5fd83/hq-7b65dc/subagent-write-probe-2026-10-12.jsonl, SHA-256 4e2cc9935229eada129f5d4f923d4bd3d02f1676561dcd54f0e35452aa1b8a54. Original-to-placeholder mapping: {"/home/keith": "~"}
+- 2026-10-25T10:59:08Z (feat/ops-check-hq-c6a149): detached: subagent-write-probe-2026-10-12.jsonl: Preserved exact raw bytes and SHA-256 under hq-c5fd83; replace with a labelled portable derivative for shared-checker adoption
