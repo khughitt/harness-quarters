@@ -13,8 +13,8 @@ document says otherwise. Builds on `hq-61a47e` (merge `6b434eb`), which tracks
 `pi/settings.json`, links it into `~/.pi/agent`, and filters its defaults out of the
 index.
 
-Deployment: titan's separately approved rollout and live capture/checkout recovery
-check passed on 2026-10-15. Europa's host apply is tracked by `hq-a8d65f`.
+Deployment: the primary host's separately approved rollout and live capture/checkout recovery
+check passed on 2026-10-15. The second host's host apply is tracked by `hq-a8d65f`.
 
 ## 1. Problem
 
@@ -244,7 +244,7 @@ in the existing temporary-repository fixtures, plus:
 
 Merging into main activates the changed Git hooks and refresh (a separately approved
 step, as in the base design), and the extension link appears at the next
-`just link --apply` from main, on each host (`hq-a8d65f` covers europa). After the
+`just link --apply` from main, on each host (`hq-a8d65f` covers the second host). After the
 apply: set a default model in pi, check that `local/live-picks-pi.json` holds it, run
 `git checkout -- pi/settings.json` in main, and check that the default is back and
 `git status` is clean.

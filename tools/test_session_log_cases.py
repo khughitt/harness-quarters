@@ -15,6 +15,8 @@ from pathlib import Path
 
 import pytest
 
+from session_log_private import PRIVATE
+
 FIXTURES = Path(__file__).with_name("fixtures") / "session-logs"
 HOME = FIXTURES / "home"
 DEGRADED = FIXTURES / "degraded"
@@ -532,8 +534,6 @@ def test_sl11_escaped_needle_is_absent_from_the_bytes():
 
 # --- the corpus itself ---------------------------------------------------------------------------
 
-PRIVATE = re.compile(r"/home/|/mnt/|/Users/|Dropbox|keith|titan|europa|@[a-z]+\.(com|org)|toolu_01"
-                     r"|\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b")
 SYNTHETIC_UUID = re.compile(r"\b(c0000000-0000-4000-8000|01900000-0000-7000-8000)-[0-9a-f]{12}\b")
 
 

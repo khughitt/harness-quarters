@@ -217,7 +217,7 @@ value = true
 version = "2.1.304"
 date = 2026-10-22
 evidence = "hq-f27918"
-note = "Every Claude Code start-idle smoke of the relay cutover window (four sessions across titan and europa, personal and work homes, launched with --permission-mode manual and sent no prompt) showed the session's relay row, which its SessionStart hook writes, idle before the first prompt."
+note = "Every Claude Code start-idle smoke of the relay cutover window (four sessions across both hosts, personal and work homes, launched with --permission-mode manual and sent no prompt) showed the session's relay row, which its SessionStart hook writes, idle before the first prompt."
 
 [facts.session-start-before-first-turn.harness.codex]
 status = "probed"
@@ -225,7 +225,7 @@ value = false
 version = "0.163.0"
 date = 2026-10-22
 evidence = "hq-f27918"
-note = "Titan Codex work smoke (pid 62859) with the relay hooks installed and reviewed: no relay row after launch, after /status, or after the user shell command !true, which created the rollout and ran a task; SessionStart fired only with the first model turn. SessionStart cannot mark a Codex session before its first prompt; the cutover's start-idle check observes Codex after a fixed no-tool first prompt instead."
+note = "The primary host's Codex work smoke (pid 62859) with the relay hooks installed and reviewed: no relay row after launch, after /status, or after the user shell command !true, which created the rollout and ran a task; SessionStart fired only with the first model turn. SessionStart cannot mark a Codex session before its first prompt; the cutover's start-idle check observes Codex after a fixed no-tool first prompt instead."
 
 [facts.manual-mode-asks-for-sleep]
 type = "boolean"
@@ -237,7 +237,7 @@ value = false
 version = "2.1.304"
 date = 2026-10-22
 evidence = "hq-f27918"
-note = "Titan Claude personal smoke f169ae86 (transcript permissionMode default; no allow rule in the home's settings names sleep): Bash 'sleep 7' ran with no permission dialog, while 'touch approval.marker && sleep 7' in the same session asked. A command meant to raise a permission prompt needs more than a plain sleep; a file write did it here. Which other commands run unasked, and why, was not probed."
+note = "The primary host's Claude personal smoke f169ae86 (transcript permissionMode default; no allow rule in the home's settings names sleep): Bash 'sleep 7' ran with no permission dialog, while 'touch approval.marker && sleep 7' in the same session asked. A command meant to raise a permission prompt needs more than a plain sleep; a file write did it here. Which other commands run unasked, and why, was not probed."
 
 # pi: `pi` is the CLI and its RPC mode, `pi-durable` the SDK's durable Harness; the CLI does
 # not use pi-durable. Each harness's entries come from its own probe under pi/probes;

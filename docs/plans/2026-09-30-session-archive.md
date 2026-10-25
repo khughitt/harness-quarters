@@ -1719,7 +1719,7 @@ def codex_rollout(root: Path, age_days: float = 40, tid: str = TID,
 
 def uninspectable_comms() -> tuple[str, ...]:
     """comm names of this user's processes whose descriptors this host cannot read (on
-    titan: systemd and (sd-pam)); tests allow them so they can watch processes they start."""
+    the primary host: systemd and (sd-pam)); tests allow them so they can watch processes they start."""
     from session_archive.inputs import InspectionFailed, open_inodes
     try:
         open_inodes()
@@ -3792,7 +3792,7 @@ git commit -m "feat(session-archive): systemd units and their links"
 
 ---
 
-### Task 16: Capture rollout on titan
+### Task 16: Capture rollout on the primary host
 
 This task acts outside the repository: it writes to the backup disk, adds host config, links units and enables a timer. Ask the user for the go-ahead before Step 1, naming the archive root and the size of the first run (about 25G).
 
@@ -3815,7 +3815,7 @@ Blocked until `obs-0bc168` (index state) lands, and, for Step 3, until `obs-de84
 - Test: `tools/test_session_archive_units.py` (the prune `ExecStart` expectation gains `--apply`)
 
 - [ ] **Step 1: Contract check.** Run `python3 ~/d/obs/obs.py --json index-state`. Confirm it matches the contract in Global Constraints, fed through `inputs.load_obs_state`. Any difference means fixing obs or amending the contract in both places before continuing.
-- [ ] **Step 2: Dry run.** Run `~/d/tack/tools/session-archive prune` and save the report. If it stops with `InspectionFailed`, it names the processes it could not inspect. On titan that is expected to be `(sd-pam)`, which is non-dumpable, and `systemd`, the user manager, whose descriptors can be listed but not followed. Whether to list a process in `uninspectable_ok` is the user's decision, never the agent's. Review it with the user: totals per source, every `kept:` reason other than `active`, and the eligible units. This is a review gate: park with `--waiting-on user --reason review`.
+- [ ] **Step 2: Dry run.** Run `~/d/tack/tools/session-archive prune` and save the report. If it stops with `InspectionFailed`, it names the processes it could not inspect. On the primary host that is expected to be `(sd-pam)`, which is non-dumpable, and `systemd`, the user manager, whose descriptors can be listed but not followed. Whether to list a process in `uninspectable_ok` is the user's decision, never the agent's. Review it with the user: totals per source, every `kept:` reason other than `active`, and the eligible units. This is a review gate: park with `--waiting-on user --reason review`.
 - [ ] **Step 3: Gate.** Confirm `obs-de84cb` is done and its note records a re-read of this archive with no duplicate sessions and no live file marked missing. If it isn't done, stop here.
 - [ ] **Step 4: Probe and first apply.** Run `~/d/tack/tools/session-archive probe-codex` (expect exit 0), then `~/d/tack/tools/session-archive prune --apply` once by hand. Check three things:
   - obs still lists the pruned files, as missing with their rows kept;

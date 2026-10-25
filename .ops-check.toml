@@ -12,4 +12,6 @@ layout_allowed = [
   "tools/test_relay_cutover_transport.py",
   "docs/runbooks/relay-cutover.md",
   "docs/plans/2026-10-19-relay-cutover.md",
+  # A privacy denylist that names the hosts in order to forbid them in session-log fixtures.
+  "tools/session_log_private.py",
 ]
