@@ -1,0 +1,8 @@
+codex-cli 0.163.0
+cd4a40ec986e197462a56b65575ff7727ba7b9aaa42fb5127716ce5f92469db3  <hq-checkout>/local/codex/rules/default.rules
+git restore --source=v1 -- c             {"d":"forbidden","m":["git restore"]}
+git restore --staged -- f                {"d":"forbidden","m":["git restore"]}
+git reset -q -- f                        {"d":"allow","m":["git reset -q --"]}
+git rm --cached -- f                     {"d":"allow","m":["git rm --cached --"]}
+git rm --cached --no-cached -f -- f      {"d":null,"m":[]}
+git add -- c                             {"d":"allow","m":["git add"]}
