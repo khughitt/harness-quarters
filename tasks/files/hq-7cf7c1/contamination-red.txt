@@ -7,7 +7,7 @@ _____ test_callers_environment_cannot_reach_fixture_subprocesses[editors] ______
 E   AssertionError: ..F.F                                                                    [100%]
 E     =================================== FAILURES ===================================
 E     ______ test_a_rebase_stopped_on_a_conflict_continues_after_the_stop_hook _______
-E     /mnt/ssd3/work/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py:488: in test_a_rebase_stopped_on_a_conflict_continues_after_the_stop_hook
+E     $WORK_ROOT/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py:488: in test_a_rebase_stopped_on_a_conflict_continues_after_the_stop_hook
 E         assert result.returncode == 0, result.stderr
 E     E   AssertionError: error: there was a problem with the editor 'false'
 E     E     Please supply the message using either -m or -F option.
@@ -16,7 +16,7 @@ E     E
 E     E   assert 1 == 0
 E     E    +  where 1 = CompletedProcess(args=['git', '-C', '/tmp/pytest-of-keith/pytest-1050/test_callers_environment_canno0/children/test_a_...he editor 'false'\nPlease supply the message using either -m or -F option.\nerror: could not commit staged changes.\n").returncode
 E     __ test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials ___
-E     /mnt/ssd3/work/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py:661: in test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials
+E     $WORK_ROOT/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py:661: in test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials
 E         assert result.stdout.strip() == str(repo.parent / "subprocess-home")
 E     E   AssertionError: assert '/tmp/pytest-...0/caller-home' == '/tmp/pytest-...bprocess-home'
 E     E     
@@ -24,27 +24,27 @@ E     E     Skipping 56 identical leading characters in diff, use -v to show
 E     E     - t_canno0/children/test_children_use_a_fixture_ho0/subprocess-home
 E     E     + t_canno0/caller-home
 E     =========================== short test summary info ============================
-E     FAILED ../../../../mnt/ssd3/work/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py::test_a_rebase_stopped_on_a_conflict_continues_after_the_stop_hook
-E     FAILED ../../../../mnt/ssd3/work/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py::test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials
+E     FAILED ../../../..$WORK_ROOT/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py::test_a_rebase_stopped_on_a_conflict_continues_after_the_stop_hook
+E     FAILED ../../../..$WORK_ROOT/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py::test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials
 E     2 failed, 3 passed, 48 deselected in 3.19s
 E     [2026-10-24 08:35:25,853] WARNING in core: flasgger is not installed; serving the static landing page at / and skipping the Swagger UI and /spec.json.
 E     
 E   assert 1 == 0
-E    +  where 1 = CompletedProcess(args=['/usr/bin/python3', '-m', 'pytest', '/mnt/ssd3/work/hq/.worktrees/hq-7cf7c1/.githooks/test_code...n core: flasgger is not installed; serving the static landing page at / and skipping the Swagger UI and /spec.json.\n').returncode
+E    +  where 1 = CompletedProcess(args=['/usr/bin/python3', '-m', 'pytest', '$WORK_ROOT/hq/.worktrees/hq-7cf7c1/.githooks/test_code...n core: flasgger is not installed; serving the static landing page at / and skipping the Swagger UI and /spec.json.\n').returncode
 _____ test_callers_environment_cannot_reach_fixture_subprocesses[routing] ______
 .githooks/test_codex_trust.py:697: in test_callers_environment_cannot_reach_fixture_subprocesses
     assert result.returncode == 0, result.stdout + result.stderr
 E   AssertionError: ..F.F                                                                    [100%]
 E     =================================== FAILURES ===================================
 E     ______ test_a_rebase_stopped_on_a_conflict_continues_after_the_stop_hook _______
-E     /mnt/ssd3/work/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py:480: in test_a_rebase_stopped_on_a_conflict_continues_after_the_stop_hook
+E     $WORK_ROOT/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py:480: in test_a_rebase_stopped_on_a_conflict_continues_after_the_stop_hook
 E         assert projects(live(repo)) == []
 E     E   AssertionError: assert ['/work/a'] == []
 E     E     
 E     E     Left contains one more item: '/work/a'
 E     E     Use -v to get more diff
 E     __ test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials ___
-E     /mnt/ssd3/work/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py:661: in test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials
+E     $WORK_ROOT/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py:661: in test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials
 E         assert result.stdout.strip() == str(repo.parent / "subprocess-home")
 E     E   AssertionError: assert '/tmp/pytest-...1/caller-home' == '/tmp/pytest-...bprocess-home'
 E     E     
@@ -52,20 +52,20 @@ E     E     Skipping 56 identical leading characters in diff, use -v to show
 E     E     - t_canno1/children/test_children_use_a_fixture_ho0/subprocess-home
 E     E     + t_canno1/caller-home
 E     =========================== short test summary info ============================
-E     FAILED ../../../../mnt/ssd3/work/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py::test_a_rebase_stopped_on_a_conflict_continues_after_the_stop_hook
-E     FAILED ../../../../mnt/ssd3/work/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py::test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials
+E     FAILED ../../../..$WORK_ROOT/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py::test_a_rebase_stopped_on_a_conflict_continues_after_the_stop_hook
+E     FAILED ../../../..$WORK_ROOT/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py::test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials
 E     2 failed, 3 passed, 48 deselected in 1.66s
 E     [2026-10-24 08:35:29,889] WARNING in core: flasgger is not installed; serving the static landing page at / and skipping the Swagger UI and /spec.json.
 E     
 E   assert 1 == 0
-E    +  where 1 = CompletedProcess(args=['/usr/bin/python3', '-m', 'pytest', '/mnt/ssd3/work/hq/.worktrees/hq-7cf7c1/.githooks/test_code...n core: flasgger is not installed; serving the static landing page at / and skipping the Swagger UI and /spec.json.\n').returncode
+E    +  where 1 = CompletedProcess(args=['/usr/bin/python3', '-m', 'pytest', '$WORK_ROOT/hq/.worktrees/hq-7cf7c1/.githooks/test_code...n core: flasgger is not installed; serving the static landing page at / and skipping the Swagger UI and /spec.json.\n').returncode
 ______ test_callers_environment_cannot_reach_fixture_subprocesses[config] ______
 .githooks/test_codex_trust.py:697: in test_callers_environment_cannot_reach_fixture_subprocesses
     assert result.returncode == 0, result.stdout + result.stderr
 E   AssertionError: ....F                                                                    [100%]
 E     =================================== FAILURES ===================================
 E     __ test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials ___
-E     /mnt/ssd3/work/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py:661: in test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials
+E     $WORK_ROOT/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py:661: in test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials
 E         assert result.stdout.strip() == str(repo.parent / "subprocess-home")
 E     E   AssertionError: assert '/tmp/pytest-...2/caller-home' == '/tmp/pytest-...bprocess-home'
 E     E     
@@ -73,33 +73,33 @@ E     E     Skipping 56 identical leading characters in diff, use -v to show
 E     E     - t_canno2/children/test_children_use_a_fixture_ho0/subprocess-home
 E     E     + t_canno2/caller-home
 E     =========================== short test summary info ============================
-E     FAILED ../../../../mnt/ssd3/work/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py::test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials
+E     FAILED ../../../..$WORK_ROOT/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py::test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials
 E     1 failed, 4 passed, 48 deselected in 3.73s
 E     [2026-10-24 08:35:32,337] WARNING in core: flasgger is not installed; serving the static landing page at / and skipping the Swagger UI and /spec.json.
 E     
 E   assert 1 == 0
-E    +  where 1 = CompletedProcess(args=['/usr/bin/python3', '-m', 'pytest', '/mnt/ssd3/work/hq/.worktrees/hq-7cf7c1/.githooks/test_code...n core: flasgger is not installed; serving the static landing page at / and skipping the Swagger UI and /spec.json.\n').returncode
+E    +  where 1 = CompletedProcess(args=['/usr/bin/python3', '-m', 'pytest', '$WORK_ROOT/hq/.worktrees/hq-7cf7c1/.githooks/test_code...n core: flasgger is not installed; serving the static landing page at / and skipping the Swagger UI and /spec.json.\n').returncode
 ____ test_callers_environment_cannot_reach_fixture_subprocesses[credential] ____
 .githooks/test_codex_trust.py:697: in test_callers_environment_cannot_reach_fixture_subprocesses
     assert result.returncode == 0, result.stdout + result.stderr
 E   AssertionError: ....F                                                                    [100%]
 E     =================================== FAILURES ===================================
 E     __ test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials ___
-E     /mnt/ssd3/work/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py:659: in test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials
+E     $WORK_ROOT/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py:659: in test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials
 E         result = git(repo, "-c", f"alias.fixture-env={command}", "fixture-env")
 E                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-E     /mnt/ssd3/work/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py:26: in git
+E     $WORK_ROOT/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py:26: in git
 E         return subprocess.run(["git", "-C", str(repo), *args], check=check, text=True,
 E     /usr/lib/python3.14/subprocess.py:578: in run
 E         raise CalledProcessError(retcode, process.args,
 E     E   subprocess.CalledProcessError: Command '['git', '-C', '/tmp/pytest-of-keith/pytest-1050/test_callers_environment_canno3/children/test_children_use_a_fixture_ho0/tack', '-c', 'alias.fixture-env=!/usr/bin/python3 -c \'import os; assert "HQ_TEST_CREDENTIAL" not in os.environ; print(os.path.expanduser("~"))\'', 'fixture-env']' returned non-zero exit status 1.
 E     =========================== short test summary info ============================
-E     FAILED ../../../../mnt/ssd3/work/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py::test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials
+E     FAILED ../../../..$WORK_ROOT/hq/.worktrees/hq-7cf7c1/.githooks/test_codex_trust.py::test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials
 E     1 failed, 4 passed, 48 deselected in 3.43s
 E     [2026-10-24 08:35:36,793] WARNING in core: flasgger is not installed; serving the static landing page at / and skipping the Swagger UI and /spec.json.
 E     
 E   assert 1 == 0
-E    +  where 1 = CompletedProcess(args=['/usr/bin/python3', '-m', 'pytest', '/mnt/ssd3/work/hq/.worktrees/hq-7cf7c1/.githooks/test_code...n core: flasgger is not installed; serving the static landing page at / and skipping the Swagger UI and /spec.json.\n').returncode
+E    +  where 1 = CompletedProcess(args=['/usr/bin/python3', '-m', 'pytest', '$WORK_ROOT/hq/.worktrees/hq-7cf7c1/.githooks/test_code...n core: flasgger is not installed; serving the static landing page at / and skipping the Swagger UI and /spec.json.\n').returncode
 =========================== short test summary info ============================
 FAILED .githooks/test_codex_trust.py::test_callers_environment_cannot_reach_fixture_subprocesses[editors]
 FAILED .githooks/test_codex_trust.py::test_callers_environment_cannot_reach_fixture_subprocesses[routing]

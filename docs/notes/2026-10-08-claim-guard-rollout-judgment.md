@@ -3,7 +3,7 @@
 The judgment §6 of `docs/specs/2026-09-24-turn-boundary-gate-design.md` asks for: every
 Stop block since the guard changed, sorted by what the blocked turn did, and a verdict
 on the reason text and on ai-c62995's over-parking shape. Task `hq-a558e8`; counted
-2026-10-08 on this host (titan). The second host was offline and is not counted.
+2026-10-08 on this host (the primary host). The second host was offline and is not counted.
 
 ## Verdict
 

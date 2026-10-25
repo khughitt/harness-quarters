@@ -7,7 +7,7 @@ bootstrap and checked agent-led verification, surface retry and finalization.
 
 **Architecture:** A project-specific Python driver calls the existing
 `relay-cutover`, relay installer and `quiesce-timers` helpers through bounded local
-processes and one fixed Europa SSH entry. One protected window record and ordered
+processes and one fixed second-host SSH entry. One protected window record and ordered
 `touched.tsv` cover both hosts and all four targets. Application stays outside
 harnesses; agents resume only after verified migration, with human decisions
 carried explicitly from the session into the relevant tool invocation.
@@ -86,9 +86,9 @@ recovery again as setup. Keep the existing plan workspace and all review evidenc
   agent diagnostics/probes use it individually beforehand without restricting
   ordinary use. Codex remains exactly `codex-cli 0.163.0` unless
   separately re-probed/reviewed. Never silently update a host or relax equality.
-- Scope: Claude personal/work on Titan and Europa; Codex personal/work on Titan.
-  All four settings targets are shared: apply once on Titan, verify synchronized
-  bytes on Europa. Dependencies, registries, snapshots and worktrees are host-local.
+- Scope: Claude personal/work on the primary host and the second host; Codex personal/work on the primary host.
+  All four settings targets are shared: apply once on the primary host, verify synchronized
+  bytes on the second host. Dependencies, registries, snapshots and worktrees are host-local.
 - All four targets and familiar are applied with every Claude/Codex session closed
   on both hosts. Stop only identified Codex daemons through the supported CLI;
   strict no-live has no caller exemption. Agents never apply hooks or familiar.
@@ -197,7 +197,7 @@ It does not assemble an exact expected image by inserting picks into a template.
 
 During `run`, repeat eligibility checks, pass strict no-live and quiesce both
 hosts, then freeze the exact synchronized current files. **Before familiar merge**,
-perform all six dry runs: Titan's four targets and Europa's two Claude copies,
+perform all six dry runs: the primary host's four targets and the second host's two Claude copies,
 using each host's pinned installer/runtime/evidence. Claude copies retire the
 native guard first; Codex copies retain the required `hooks.json` basename.
 
@@ -378,8 +378,8 @@ and human trust/permission verdicts referencing the consumed decision. Required
 full cases: start-idle, allow-working/marker, attribution-denial/no-commit/no-marker,
 human needs-approval, turn-done, projection-recovery, normal-exit and abrupt-death/reap.
 Claude full additionally requires idle-needs-input after ≥60 s. Full applies to
-Titan personal Claude/Codex; short (start, same denial, exit) to work homes and
-both Europa Claude homes. Both Codex homes require their own human hook-trust review.
+the primary host's personal Claude/Codex; short (start, same denial, exit) to work homes and
+both second-host Claude homes. Both Codex homes require their own human hook-trust review.
 Bind evidence to the actual tested sessions and case operations; no pass-by-filename.
 Declined/unanswered human fields cannot pass. Pilot receipts cannot satisfy this gate.
 
@@ -458,7 +458,7 @@ record, outputs one final sanitized JSON response, and keeps full logs private.
 - [ ] **Step 1:** Write `test_remote_payload_is_data`, `test_operation_reply_loss`,
   `test_owned_process_cleanup` and `test_claude_hold_env_is_scoped` with a fake SSH executable and
   throwaway homes/repos. Assert the remote command is a fixed Zsh-safe entry
-  `exec /usr/bin/python3 -B ~/d/hq/tools/relay-cutover-host`, invoked with `ssh -4 -o BatchMode=yes europa`;
+  `exec /usr/bin/python3 -B ~/d/hq/tools/relay-cutover-host`, invoked with `ssh -4 -o BatchMode=yes host-b`;
   roots/argv never enter the shell string. Reject unknown hosts, operations, mode,
   payload keys and oversized/malformed requests. A literal path containing quotes,
   blanks, `$()` or backticks remains data and executes nothing.
@@ -548,7 +548,7 @@ this task does not generate exact expected bytes or expose a live run entry.
   manifest checks above. Capture immutable provenance/current input hashes;
   don't replace reviewed manifests with arbitrary current files. Add daemon-stop,
   no-live, timer-record/stop/wait/restore and snapshot-refresh/abort operations under
-  these tests. Supported personal/work `app-server daemon stop` on Titan only;
+  these tests. Supported personal/work `app-server daemon stop` on the primary host only;
   survivors block for inspection, no manual/broad kill. `check` remains read-only.
 - [ ] **Step 4:** Implement quiesce/abort on both hosts. Fsync timer helper output
   and parent before stopping; register snapshot moves before acting. Preserve old
@@ -587,7 +587,7 @@ Add target-dry/apply/verify and familiar-merge/install operations with these tes
   ```python
   assert expected_bytes == dry_copy.read_bytes() == planned_after.encode("utf-8")
   assert last_dry_verdict_index < merge_start_index
-  assert apply_hosts == ["titan"] * 4
+  assert apply_hosts == ["host-a"] * 4
   assert target_order == ["claude", "claude-work", "codex", "codex-work"]
   ```
 - [ ] **Step 2:** Run both new test files with
@@ -607,7 +607,7 @@ Add target-dry/apply/verify and familiar-merge/install operations with these tes
 - [ ] **Step 4:** Only after all six verdicts pass, mark familiar mutation and merge
   the immutable feature. Wait for verified source sync before each system npm
   install/pin proof. Register every original/artifact before the first target write;
-  retain frozen native bytes exactly. Apply once on Titan with existing guard
+  retain frozen native bytes exactly. Apply once on the primary host with existing guard
   retirement, relay flags and artifacts. Recheck frozen input and live plan-after
   equality to the sealed dry bytes, then applied/synchronized bytes. No second
   post-merge dry-run phase is needed. Before each write require harnesses closed.
@@ -644,7 +644,7 @@ No placeholder surface operation or live recovery entry is exposed in this task.
   stops recovery for inspection; the handoff freezes picks until finish. One/both timers already
   restored by a failed finish must be stopped/waited before any restore operation.
   ```python
-  assert events.index("europa:service-inactive") < events.index("restore:claude")
+  assert events.index("host-b:service-inactive") < events.index("restore:claude")
   assert restored_target_bytes == original_target_bytes
   ```
 - [ ] **Step 2:** Run the bootstrap test command with `-k 'recover or reconcile or merge_record or service or pick_drift or hold_breach'`:
@@ -827,7 +827,7 @@ in CLI and `tools/relay-cutover-rehearse`; private machine-readable pilot verdic
   roots stay scratch. Use `/usr/bin/npm` 12.2.1 and recorded `/usr/bin/node`.
   For one case, clone at PRE and freeze copied current targets with interleaved
   picks. Pass the same six dry-run/parsed-approval/exact-byte checks before the
-  scratch merge/install; then apply/verify Titan's four separate live-simulation
+  scratch merge/install; then apply/verify the primary host's four separate live-simulation
   target copies and remote image expectations, using those sealed expected bytes;
   use Task 5's same restoration core to restore targets and both clones/dependency
   trees offline to a verdict. Pilot surface/timer mutation stays unexercised, not
@@ -841,7 +841,7 @@ in CLI and `tools/relay-cutover-rehearse`; private machine-readable pilot verdic
   error handling. Retain private equality/pin/verdict evidence; remove any copied
   credentials if the implementation needed them and prove cleanup without secrets.
 - [ ] **Step 5:** Add `test_disconnect_closes_pipes_without_signal` and the real
-  disconnect pilot case: create a second scratch clone/install on Europa through
+  disconnect pilot case: create a second scratch clone/install on the second host through
   `start_request`, query operation-status over a second connection until its durable
   start is visible, then drop only the returned owned local SSH client
   while the install is running, then reconnect by operation ID. The helper reaches
@@ -898,12 +898,12 @@ reviewable one-command handoff. Live application remains unperformed.
   main tree: it intentionally lacks the feature branch's hook after-images, so the
   worktree suite does not prove this combination. If it fails, inspect/fix/review
   the inert delivery without activating hook images; do not claim it is ready or
-  proceed to Europa helper use. After that pass, verify tested helper-byte equality,
-  wait for matching main bytes on Europa, and create the private SHA manifest
+  proceed to second-host helper use. After that pass, verify tested helper-byte equality,
+  wait for matching main bytes on the second host, and create the private SHA manifest
   for bootstrap/package/remote/rehearsal code, existing helpers, runtime launcher,
   subscribers, clean-filter key authority, installer/evidence inputs and per-host
   npm/node/Git/helper-Python identities/versions/digests. Dropbox may copy inert
-  files earlier; main's passing suite gates Europa execution, not a claim that
+  files earlier; main's passing suite gates second-host execution, not a claim that
   automatic synchronization was paused. No home-link/service changes.
 - [ ] **Step 5:** Observe both hosts' versions/binary digests and each personal/
   work home's doctor diagnostic using individually held commands. Ordinary Claude
@@ -912,7 +912,7 @@ reviewable one-command handoff. Live application remains unperformed.
   without silently updating/downgrading. No timer/source/settings/desktop change.
 - [ ] **Step 6:** If actual Claude version differs from shared evidence, execute
   original plan Task 3 and the reviewed hq-7efef3 refresh pattern: locked/hydrated
-  ops and detached exact-v0.1.1 relay worktrees, isolated Europa probe homes with
+  ops and detached exact-v0.1.1 relay worktrees, isolated second-host probe homes with
   credential cleanup, `env DISABLE_UPDATES=1` on the probe process, required allow/
   context/deny proof, and version checks before/after on both hosts. Keep excluded/
   unproven surfaces excluded. Run ops's declared checks, obtain an independent
@@ -1024,17 +1024,17 @@ rulings R61–R64). One corrective change on the delivered tool, then redelivery
 2. One shared predicate `tasks_only(x, y)` in `familiar.py` (plumbing only, as the spec
    defines), plus base eligibility (clean tree incl. untracked outside `tasks/`, `merge-tree B
    tip` exit 0 and equal to T0 outside `tasks/`).
-3. Readiness on both hosts: recompute and compare T0, base rule per host, Europa equal to or an
-   ancestor of Titan; report B and its proof.
-4. `run`: derive B on Titan after the second strict no-live; new read-only `familiar-sync`
-   host operation (one child per poll; deadline `SYNC_SECONDS + CHILD_SECONDS + 60`) waits for Europa HEAD = B
+3. Readiness on both hosts: recompute and compare T0, base rule per host, the second host equal to or an
+   ancestor of the primary host; report B and its proof.
+4. `run`: derive B on the primary host after the second strict no-live; new read-only `familiar-sync`
+   host operation (one child per poll; deadline `SYNC_SECONDS + CHILD_SECONDS + 60`) waits for the second host's HEAD = B
    before either `snapshot-refresh`; `snapshot-refresh` checks HEAD = B without waiting; the
    pre-merge gate rechecks; the mark records B; `familiar-merge` takes B, rechecks, merges with
    the fixed options and proves M (parents, tree, T0).
 5. After the mark (with a clean tree judged outside `tasks/` by byte prefix, as the spec
    defines): tasks-only-descendant source proofs (install sync, `familiar-verify` in run,
-   restart-surfaces and finish, dependency-restore sync), Europa not ahead of or diverged from
-   Titan's observed HEAD; finish records the observed HEAD.
+   restart-surfaces and finish, dependency-restore sync), the second host not ahead of or diverged from
+   the primary host's observed HEAD; finish records the observed HEAD.
 6. Restoration/recovery (as the spec's amendment defines: temporary-index working-tree
    equality, `index.lock` refusal, index rebuild before `read-tree -m -u`/`update-ref`, the
    abandoned-R and R′ rules, tolerant final proof): first-parent walk to find M and R; classes per the spec; the plumbing
@@ -1044,7 +1044,7 @@ rulings R61–R64). One corrective change on the delivered tool, then redelivery
    site the round-7 review listed moves from PRE to the recorded B; host operations re-run the
    base rule on the payload's B.
 7. Pilot: each host's clone at its own eligible HEAD, recorded per clone.
-8. Handoffs, status and runbook: Europa familiar commits forbidden; Titan commits before the
+8. Handoffs, status and runbook: second-host familiar commits forbidden; primary-host commits before the
    merge abort, after it are tolerated.
 9. Tests, RED first: the round-7 implementer notes plus round 8's: a post-M tasks commit
    touching a path the tip changed (restore succeeds, no conflict); `pull.twohead=resolve` and
@@ -1052,16 +1052,16 @@ rulings R61–R64). One corrective change on the delivered tool, then redelivery
    `merge-tree` refuses at prepare; `familiar-sync` timeout is a clean pre-merge abort; the
    plumbing restore's crash points (after `commit-tree`, after `read-tree`, after
    `update-ref`); a stat-dirty live index, an index holding another tree and a stale
-   `index.lock` during the restore; an abandoned R after a tolerated Titan tasks commit, and a crash after `read-tree`
-   followed by a Titan tasks commit both by pathspec and through the live index; a crash after
+   `index.lock` during the restore; an abandoned R after a tolerated primary-host tasks commit, and a crash after `read-tree`
+   followed by a primary-host tasks commit both by pathspec and through the live index; a crash after
    `read-tree`, then a tracker write that defers (modified tracked record, HEAD = P), and
-   recovery completes carrying the record; two outside-`tasks/` entries above M refused; `finish` and Europa's install sync wait pass
+   recovery completes carrying the record; two outside-`tasks/` entries above M refused; `finish` and the second host's install sync wait pass
    with a modified tracked `tasks/` record and refuse a modified file outside `tasks/`;
    `Tasks/z` and a root `tasks` file detected under `GIT_ICASE_PATHSPECS=1`; a merge in progress
    with an index holding B recovers clean at B;
    hooks (`post-merge`, `reference-transaction`) not run; `tasks/` absent in B or P; an
-   octopus merge in the tip's history; a Europa-local commit after the mark detected; `at-base` recovery does not
+   octopus merge in the tip's history; a second-host-local commit after the mark detected; `at-base` recovery does not
    end the cutover; the unchanged B = PRE fixtures as the baseline.
 10. Mandatory suite, scoped review, cherry-pick redelivery with the delivered tree's
-    `just test`, Europa helper-byte check, restaged input generation (helper digests and the
+    `just test`, second-host helper-byte check, restaged input generation (helper digests and the
     T0 pin), resume Task 9 Step 7, and rerun the pilot.

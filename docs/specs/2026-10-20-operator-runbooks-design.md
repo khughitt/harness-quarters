@@ -11,7 +11,7 @@ requires approval of this design and then its implementation plan.
 
 ## Problem and requested outcome
 
-The operator stopped after Titan's section 1. A long series of pasted commands
+The operator stopped after the primary host's section 1. A long series of pasted commands
 required maintaining a private environment inside interactive Bash, despite the
 operator using Zsh. An unrelated failed command caused that Bash to exit, leaving
 the operator in Zsh without its variables. Continuing then produced misleading
@@ -29,11 +29,11 @@ remain human actions.
 
 ## Verified starting state
 
-- The interrupted window reached Titan section 1 only. Europa had no window
+- The interrupted window reached the primary host's section 1 only. The second host had no window
   record. Neither host entered section 2; familiar and all hook targets remained
   native. Original and expected-image checksums matched.
 - With explicit user approval, the exact reviewed section 1 abort restored
-  Titan's recorded timer state. Original backups again have their original names;
+  the primary host's recorded timer state. Original backups again have their original names;
   refreshed snapshots and the original timer record remain in the recorded
   `section1-abort.l0b7qF` directory. The reaper finished successfully. No cutover is live.
 - Both hosts have Claude 2.1.304 evidence. Codex evidence is 0.163.0. The installer
@@ -80,7 +80,7 @@ is valid Zsh and does not enter Bash:
 ```
 
 This command is prospective until implementation, review, and rehearsal finish.
-It runs on Titan and drives the approved Europa operations over SSH. It uses
+It runs on the primary host and drives the approved second-host operations over SSH. It uses
 explicit main-checkout executables on each host and never repoints a launcher,
 service, config include, or home into a worktree. Remote worktrees are not assumed
 to exist. The task worktree stays until cutover verification and cleanup finish.
@@ -90,7 +90,7 @@ on hq main, as Task 5 did, without merging hook after-images or activating servi
 Prepare a private manifest of the tested helper SHA256s: the bootstrap/remote
 entry, `tools/relay-cutover`, `tools/quiesce-timers`, `relay/bin/relay`, subscriber
 template and referenced installer/evidence inputs. `check` compares these bytes
-in the controller worktree, Titan main and Europa main. Record source commits;
+in the controller worktree, primary-host main and second-host main. Record source commits;
 check familiar HEAD/merge parents and tracked source separately. A commit name
 alone does not prove the executing helper bytes match. Missing/mismatched helpers
 block the window; do not rely on Dropbox having a worktree or finishing early.
@@ -111,18 +111,18 @@ The bootstrap performs the already-reviewed operations in this order:
    snapshots and refresh/verify the live backups. Recover every recorded host if
    this stage fails, including a first-host success followed by second-host failure.
 4. After quiescence/strict no-live, freeze exact synchronized current targets and
-   dry-run all four Titan copies and both Claude Europa copies before the familiar
+   dry-run all four primary-host copies and both second-host Claude copies before the familiar
    merge. Use each host's installer/runtime/evidence. Require the planned after
    string's exact UTF-8 bytes to equal the dry-applied copy; parsed non-pick content
    must equal the reviewed after-image and picks/absence the frozen current input.
    Seal those installer-produced bytes/hashes as this window's exact expectations.
    Any of the six failures takes the pre-merge abort on every recorded host.
-5. Merge the immutable familiar feature revision once on Titan; reconcile an
+5. Merge the immutable familiar feature revision once on the primary host; reconcile an
    interruption between merge and record; verify source sync before each host's
    dependency installation/pin proof. Before each target's first live mutation,
    durably register its original/artifact, including Claude guard removal. Recheck
    frozen inputs and the live installer's plan after against the sealed dry output,
-   then apply each shared target only on Titan and verify exact synchronized bytes
+   then apply each shared target only on the primary host and verify exact synchronized bytes
    on affected hosts. Both harnesses stay closed. Mark migration verified only
    after all targets, source/dependencies and exact evidence pass.
 6. Restart the previously approved familiar surfaces using their validated local
@@ -134,7 +134,7 @@ The bootstrap performs the already-reviewed operations in this order:
 
 ### SSH and desktop checks before mutation
 
-`check` probes Europa through the same noninteractive, `BatchMode` SSH entry and
+`check` probes the second host through the same noninteractive, `BatchMode` SSH entry and
 remote helper that `run` will use. The login shell is Zsh. Use a fixed, safely
 quoted helper entry and structured request data/argv; do not interpolate arbitrary
 paths, scripts or environment assignments into remote shell strings. No interactive
@@ -148,7 +148,7 @@ Bash setup or assumed shell startup file supplies prerequisites.
   one supported route, not a requirement when another configured authentication
   route works. Do not create keys, forward agents implicitly or log key material.
   Probe the actual pinned source access; a local install's credentials do not
-  establish Europa readiness.
+  establish second-host readiness.
 - Inspect both familiar surfaces on each host and record their exact expected
   startup commands and PIDs. Resolve a trusted desktop-session `NIRI_SOCKET` and
   prove read-only niri IPC using that explicit socket. An inherited socket is
@@ -170,8 +170,8 @@ Bash setup or assumed shell startup file supplies prerequisites.
   starts only missing recorded surfaces. Design approval,
   preparation probes and an old run's consent grant no desktop access.
 
-Task 7 already ran Europa's real throwaway familiar merge/install/offline rollback
-over `ssh -4 -o BatchMode=yes europa 'umask 077; python3 -'`: the retained Task 7
+Task 7 already ran the second host's real throwaway familiar merge/install/offline rollback
+over `ssh -4 -o BatchMode=yes host-b 'umask 077; python3 -'`: the retained Task 7
 report's “Familiar disposable rehearsal on both hosts” records npm12 install 9.9s,
 approved relay pin and offline dependency equality. That establishes historical
 feasibility, not the new runner's transport or today's environment. Repeat the
@@ -211,7 +211,7 @@ operations. A declined permission leaves the named check/finalization pending; i
 does not justify a bypass flag or an automatic passed verdict.
 
 Record smoke results through `record-smoke --receipt <private-file>`. The plan
-defines the receipt schema for the existing full-personal and short-work/Europa
+defines the receipt schema for the existing full-personal and short-work/second-host
 matrices: window ID, host, harness/home, native session ID, tested versions, each
 required case's verdict and private evidence paths, plus the operator's attestation
 for human trust/permission decisions. The agent gathers observations; the operator
@@ -336,7 +336,7 @@ rather than guessing whether an external operation partially succeeded. Surface-
 failures after verification follow the pending/retry path above. Full recovery
 preserves the complete runbook order:
 
-1. Require every Claude/Codex session closed on both hosts, stop both Titan Codex
+1. Require every Claude/Codex session closed on both hosts, stop both primary-host Codex
    daemons with the supported commands, and pass strict no-live checks.
 2. Re-quiesce both hosts using their original timer records, even if `finish`
    already restarted one or both timers; wait for both services before restoring
@@ -472,8 +472,8 @@ state and original timers before re-probing; no automatic in-window proof adopti
   finish. Changed versions repeat the reviewed probe loop before a new window;
   stale Claude evidence must not prevent rollback. No automatic harness updates,
   pin changes or relaxed evidence.
-- Scope stays Claude's two homes on Titan and Europa, and Codex's two homes on
-  Titan only. Shared Codex files may be checked for synchronization on Europa;
+- Scope stays Claude's two homes on the primary host and the second host, and Codex's two homes on
+  the primary host only. Shared Codex files may be checked for synchronization on the second host;
   do not install/start Codex there or treat it as an affected Codex home.
 - One writer per harness; native familiar retirement and relay addition stay in
   the same install. No registry import, merge or compatibility layer.
@@ -621,10 +621,10 @@ replacement-process liveness because `true` exits immediately. Preserve any
 explicit explained-absence exemption rather than inventing a desktop on that host.
 Clone familiar at PRE, freeze current copied targets with interleaved picks and
 pass the same six dry runs before the scratch merge/install. Use prepared system
-npm 12.2.1/node and host credentials; then apply/verify Titan's four separate target
+npm 12.2.1/node and host credentials; then apply/verify the primary host's four separate target
 copies under one touched record and verify remote shared-image expectations; then
 recover the copied targets and both clones/dependencies offline through the
-verdict. Keep Codex execution on Titan. Do not stop real timers, restart actual
+verdict. Keep Codex execution on the primary host. Do not stop real timers, restart actual
 surfaces or edit live targets in the pilot. Real unit queries plus fixture timer
 mutations cover those branches separately; the no-window spawn proves the actual
 IPC launch route, not a live surface restart or persistent-process health check.
@@ -694,7 +694,7 @@ delete and add and fails only when one side lies outside `tasks/`; symlinks, git
 **Pins and fixed merge options.** PRE (`00f4899ae523d613d21f44bfc2c456aac67f8e5f`) and the
 immutable tip (`a16f4daa59b04e32f1010764d6f94401ca4eed8b`) stay pinned, and T0 is pinned as
 the tree of the reviewed clean merge of PRE and tip: `f492e3437577c4b79db379e4cc1fb6771f35b3bb`
-(computed 2026-10-21 on Titan with git 2.56). Every `merge-tree` and `merge` call carries
+(computed 2026-10-21 on the primary host with git 2.56). Every `merge-tree` and `merge` call carries
 `-c merge.renames=true -c diff.renames=true -c merge.directoryRenames=conflict`, and every
 mutating familiar git call (`merge`, `read-tree`, `update-index`, `commit-tree`, `update-ref`)
 also carries `-c core.hooksPath=/dev/null`; the merge
@@ -711,23 +711,23 @@ under the same object environment. "Equal outside `tasks/`" means `diff-tree -r 
   `tasks/` path overlap included, refuses at `prepare`, before any closure. A fresh window
   keeps this strict rule, so a recovered window's R is never a base (R47 holds).
 - **Readiness.** `prepare` and `check` recompute T0 and compare it with the pin, apply the
-  base rule to each host's own HEAD and report B with its proof. Europa's HEAD equal to, or an
-  ancestor of, Titan's is ready; diverged or ahead is a `familiar-native` blocker naming the
+  base rule to each host's own HEAD and report B with its proof. The second host's HEAD equal to, or an
+  ancestor of, the primary host's is ready; diverged or ahead is a `familiar-native` blocker naming the
   commit. B moving between `prepare` and `run` while eligible is not drift.
-- **Run.** After the second strict no-live check, `run` derives B on Titan (base rule and
+- **Run.** After the second strict no-live check, `run` derives B on the primary host (base rule and
   merge check again) and saves it in the window. A new read-only host operation,
-  `familiar-sync` (each poll runs one child; deadline `SYNC_SECONDS + CHILD_SECONDS + 60`), then waits for Europa HEAD =
-  B; a timeout, divergence or Europa ahead is a clean pre-merge abort. Only then does either
+  `familiar-sync` (each poll runs one child; deadline `SYNC_SECONDS + CHILD_SECONDS + 60`), then waits for the second host's HEAD =
+  B; a timeout, divergence or the second host ahead is a clean pre-merge abort. Only then does either
   host's `snapshot-refresh` run (its 900 s budget unchanged), checking HEAD = B without
-  waiting. The pre-merge gate rechecks Titan HEAD = B; the mark records B; `familiar-merge`
+  waiting. The pre-merge gate rechecks the primary host's HEAD = B; the mark records B; `familiar-merge`
   receives B, rechecks HEAD = B and the base rule on the host, merges with the fixed options
   and proves M: parents exactly `[B, tip]`, tree equal to `merge-tree --write-tree B tip`, and
   equal to T0 outside `tasks/`.
 - **After the mark.** Every source proof accepts a tasks-only descendant of the expected
-  commit with a clean tree in place of exact HEAD equality: Europa's install sync wait (of
+  commit with a clean tree in place of exact HEAD equality: the second host's install sync wait (of
   M), `familiar-verify` in `run`, `restart-surfaces` and `finish` (of M), and the dependency
-  restore's sync wait (of R). Europa's proofs also require Europa HEAD equal to, or an
-  ancestor of, the Titan HEAD the controller observed in the same step. Finish records the
+  restore's sync wait (of R). The second host's proofs also require the second host's HEAD equal to, or an
+  ancestor of, the primary host's HEAD the controller observed in the same step. Finish records the
   observed HEAD.
 - **Finding M and R.** Without a record, the restore requires `merge-base --is-ancestor B HEAD`, then
   walks `rev-list --first-parent --parents B..HEAD`: exactly one entry has more than one parent; that is M, and its parents must be
@@ -773,7 +773,7 @@ under the same object environment. "Equal outside `tasks/`" means `diff-tree -r 
     --refresh`), run `read-tree -m -u P R`, then `update-ref HEAD R P` (compare-and-swap);
   - working tree equals R: rebuild the index from R the same way, then `update-ref HEAD R P`;
   - anything else is refused for inspection.
-  When HEAD is no longer R's parent and R is not an ancestor of HEAD (a tolerated Titan tasks
+  When HEAD is no longer R's parent and R is not an ancestor of HEAD (a tolerated primary-host tasks
   commit landed after a crash before `update-ref`), R is recorded as abandoned. When HEAD is
   in the `merged` class, a fresh R′ is built on HEAD (B's tree with HEAD's `tasks` entry): a
   working tree equal to HEAD proceeds as in the HEAD = P case; a working tree equal to R′
@@ -783,8 +783,8 @@ under the same object environment. "Equal outside `tasks/`" means `diff-tree -r 
   records as they stand, and cannot conflict.
 - **Ending the cutover.** `_ended` ends the cutover only when recovery's class was `merged`
   or `reverted`; an `at-base` or `merge-in-progress` recovery does not end it.
-- **Freeze.** Committing to familiar on Europa during the window is forbidden (concurrent ref
-  writes are a Dropbox conflict) and is detected after the mark. On Titan, a familiar commit
+- **Freeze.** Committing to familiar on the second host during the window is forbidden (concurrent ref
+  writes are a Dropbox conflict) and is detected after the mark. On the primary host, a familiar commit
   between B's derivation and the merge aborts the run before the merge; after the merge it is
   tolerated. Handoffs and the runbook say both, beside the Claude pick freeze.
 - **Pilot.** Each host's scratch clone is cloned at that host's own eligible HEAD, recorded

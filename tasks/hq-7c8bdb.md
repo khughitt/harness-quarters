@@ -2,13 +2,13 @@
 id: hq-7c8bdb
 title: "Session archive: Capture rollout on titan"
 status: done
-priority: "2"
+priority: 2
 size: s
 complexity: low
 process: direct
 owner: main
 created: 2026-09-30T16:53:58Z
-updated: 2026-10-01T14:14:32Z
+updated: 2026-10-25T10:49:57Z
 started: 2026-10-01T10:57:53Z
 completed: 2026-10-01T14:14:31Z
 depends: [hq-0b328c]
@@ -16,7 +16,7 @@ parent: hq-401088
 tags: [obs]
 agent: claude-code/claude-opus-5-5
 plan: docs/plans/2026-09-30-session-archive.md
-step: "Task 16: Capture rollout on titan"
+step: "Task 16: Capture rollout on the primary host"
 ---
 
 ## Notes
@@ -39,3 +39,4 @@ step: "Task 16: Capture rollout on titan"
 - 2026-10-01T14:14:31Z (main): run: capture timer enabled and active; next trigger 2026-10-02 04:00 EDT. Prune timer inactive. Manual systemd capture service invocation exited 0, Result=success, with failed 0 across all sources; status remains ok true. After scheduled runs on Oct 2 and Oct 3, the next session owner checks status and journal.
 - 2026-10-01T14:14:31Z (main): done
   provenance: {"harness_session":"codex:01a0f381-ccbb-7391-b11a-a5ffa55c6bce","harness_session_source":"CODEX_SESSION_ID"}
+- 2026-10-25T10:49:56Z (feat/ops-check-hq-c6a149): Step heading renamed in docs/plans/2026-09-30-session-archive.md by hq-c6a149 Task 4 (host names to placeholders for the shared layout check); the step link follows it.

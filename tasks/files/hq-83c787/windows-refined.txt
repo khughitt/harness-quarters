@@ -41,7 +41,7 @@ remaining other (28d), first 80 chars:
   10-03 dotfiles   Let's create a keyboard mapping in @niri/config.kdl to toggle `prism` display (`
   10-03 tack       `tack` serves as a sort of normalization + improvement layer on top of agent har
   10-03 tack       `tack` serves as a sort of normalization + improvement layer on top of agent har
-  10-04 dotfiles   Let's enable SSH access to titan from machines on the same tailscale network. If
+  10-04 dotfiles   Let's enable SSH access to host-a from machines on the same tailscale network. If
   10-05 nexcode    As I was reviewing the nexml service code (services/nexml/), I noticed a bunch o
   10-05 nexcode    As I was reviewing the nexml service code (services/nexml/), I noticed a bunch o
   10-06 nexcode    hi
@@ -73,7 +73,7 @@ remaining other (28d), first 80 chars:
   10-18 multiple-m I agreed to give a presentation on our recent efforts related to the multiple my
   10-18 tasks      I would like to get some experience working with Rust. My previous exposure, is 
   10-19 resume     I am preparing to apply for an FDE position at a company developing a cloud plat
-  10-19 ops        Europa seems to still be encountering issues relating to git/index staleness. Ca
+  10-19 ops        host-b seems to still be encountering issues relating to git/index staleness. Ca
   10-20 ops        Follow up the coverage-drop audit attached to tasks-fa3525. Its summary is at ta
   10-21 obs        We are investigating the issue reported in obs-396637.. The task's framing was o
   10-22 nexcode    We just recieved our third batch of data from HAP (/data/cainex/raw/HAP/NRP-dail

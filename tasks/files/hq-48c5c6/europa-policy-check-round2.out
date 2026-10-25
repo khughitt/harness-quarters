@@ -1,6 +1,6 @@
-host europa
-~/.codex/rules -> /mnt/ssd/Dropbox/hq/local/codex/rules
-loaded file: /mnt/ssd/Dropbox/hq/local/codex/rules/default.rules
+host host-b
+~/.codex/rules -> ~/d/hq/local/codex/rules
+loaded file: ~/d/hq/local/codex/rules/default.rules
 sha256 8a735cfa7fd7fc96994b7ff2fc57e16084d41f1b79a255ce7fc6bfa9a99faed8
 dropbox: 518 /usr/bin/dropbox
 codex codex-cli 0.163.0

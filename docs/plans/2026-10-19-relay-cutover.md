@@ -342,7 +342,7 @@ detached relay worktree at the tag, `git -C <relay> worktree add --detach
 
 relay's Codex installer accepts only a file named `hooks.json`. Move the work home's
 hooks to `codex/work/hooks.json`, a content-identical rename. Codex keys hook trust by
-the home path (`/home/keith/.codex-work/hooks.json:…`), so the move changes no trust.
+the home path (`~/.codex-work/hooks.json:…`), so the move changes no trust.
 
 **Files:**
 - Move: `codex/hooks.work.json` → `codex/work/hooks.json`

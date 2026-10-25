@@ -6,12 +6,14 @@ scope = "Harness homes and the declared links that install the agent surface, ha
 
 [tags]
 cross-project = "One piece of a goal that spans projects; its siblings live in the other projects."
+docs = "Guides and reference documents, and the checks that keep them true."
 flow = "Agent workflow experiments: distilled superpowers, explicit state machine, agent pairing."
 hooks = "Harness hooks: what runs at session start, before and after tools, and at stop."
 obs = "Observability of agent sessions: logs, stores, retention."
 question = "An open question to investigate or answer."
 quick-add = "Captured or routed through quick add."
 rules = "The instruction files: AGENTS.md and what mirrors it."
+session-logs = "Reading harness session stores: the session-logs skill and its tools."
 skills = "Skill definitions and the tooling around them."
 
 [git]

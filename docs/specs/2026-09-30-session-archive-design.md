@@ -29,7 +29,7 @@ Goals:
 
 Non-goals:
 
-- Hosts other than titan. The job is host-gated (§3.1); io is out of scope.
+- Hosts other than the primary host. The job is host-gated (§3.1); io is out of scope.
 - Restoring into a live harness directory. Restores go to scratch copies. Re-reading
   archives is obs's job (`obs-de84cb`).
 - Claude Code's other aging state (`file-history/`, `plans/`, caches). It is not
@@ -50,7 +50,7 @@ filesystem (§5).
 ### 3.1 Host gate and configuration
 
 The configuration is `~/.config/session-archive/config.toml`. It is host-local, lives
-in no repository, and exists only on titan:
+in no repository, and exists only on the primary host:
 
 ```toml
 archive_root = "<a directory on the backup disk>"
@@ -83,7 +83,7 @@ treats as a failure.
 | `codex-work` | `~/.codex-work/sessions` | the same, with `CODEX_HOME` set to `~/.codex-work` | deferred |
 
 The source list is a constant in the tool. The config cannot extend it, and a missing
-source root fails the run: every source listed here exists on titan.
+source root fails the run: every source listed here exists on the primary host.
 
 Capture covers all five sources. Prune covers only the sources obs indexes today. obs
 reads neither `archived_sessions` (594 rollouts, 1.6G) nor `~/.codex-work/sessions`
@@ -169,7 +169,7 @@ For each pruning unit (§3.2), prune decides using these inputs:
   mid-scan, or a descriptor that closes mid-scan, is skipped. A same-user process
   whose references cannot be read fails the inspection, and prune refuses to delete.
   The exceptions are processes whose `comm` the config lists in `uninspectable_ok`: a
-  person names each one. On titan these are `(sd-pam)`, which is non-dumpable, and the
+  person names each one. On the primary host these are `(sd-pam)`, which is non-dumpable, and the
   `systemd` user manager, whose descriptors can be listed but not followed. A failed
   inspection is never read as "nothing is open".
 
@@ -205,7 +205,7 @@ live root. Two rules govern everything that leaves the quarantine:
 
 - **Restore never replaces.** Moving a unit back to its live path uses
   `renameat2(RENAME_NOREPLACE)`, called through `ctypes` because Python's `os.rename`
-  replaces an existing target. This works for both files and directories, and titan is
+  replaces an existing target. This works for both files and directories, and the primary host is
   Linux. If the target exists, because a writer recreated the path meanwhile, the call
   fails with `EEXIST`. Both copies are kept, and the unit is recorded as
   `failed:recreated`.
@@ -282,7 +282,7 @@ itself excludes writers.
    left, so if no process holds the inode open, nothing can write to it.
 
    Codex writers keep their rollout open for as long as they run. This was observed on
-   titan on 2026-09-30:
+   the primary host on 2026-09-30:
    - every process holding a thread writer lock had that thread's rollout open (12 of
      12, including the app-server daemon);
    - a live `codex exec` held both the lock and the rollout in 182 of 182 and 102 of
@@ -342,7 +342,7 @@ at 05:00. Both timers are `Persistent=true`. Both services are `Type=oneshot` an
 the tool from `~/d/tack/tools` (the `%h/d/<checkout>` form obs-index uses). The unit
 files are linked into `~/.config/systemd/user` through `links.toml` `[required]`.
 Linking puts them on every host but enables them on none: enabling them is a
-titan-only rollout step (§4). A unit started on a host without the config fails on the
+primary-host-only rollout step (§4). A unit started on a host without the config fails on the
 host gate, which is the intended refusal.
 
 The prune service passes `--apply` only after the rollout's dry-run review (§4).
@@ -359,7 +359,7 @@ The prune service passes `--apply` only after the rollout's dry-run review (§4)
   not wait for it.
 - **Pruning `codex-archived` and `codex-work`** depends on `obs-914269` (§3.2).
 
-## 4. Rollout on titan
+## 4. Rollout on the primary host
 
 1. Create the archive root on the backup disk, write the marker file and the host
    config, then run `capture` by hand. The first run copies about 25G. Read its report

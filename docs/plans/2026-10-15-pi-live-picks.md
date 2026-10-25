@@ -5,7 +5,7 @@ revised after plan review round 1 (codex/gpt-6.1-sol),
 with the spec's separate pi record. Task: `hq-24416e` (goal `hq-aa9b44`). Execution
 method: subagent-driven implementation in this session, under the flow gates of the
 enrolled trial. Tasks 1–4 are implemented and independently reviewed. The user
-separately approved Task 5, and titan's live rollout passed on 2026-10-15.
+separately approved Task 5, and the primary host's live rollout passed on 2026-10-15.
 
 **Goal:** pi's default model and thinking level survive every Git command that
 rewrites `pi/settings.json`, captured by an hq-owned pi extension and restored by the
@@ -168,7 +168,7 @@ the merge (an action outside the repository).
 - [x] Spec §5 check: in pi, set a default model and thinking level, quit; check
   `local/live-picks-pi.json` holds both; `git checkout -- pi/settings.json` in main; the
   defaults are back and `git status` is clean.
-- [x] Note on `hq-a8d65f` that europa's apply now also creates the extension link.
+- [x] Note on `hq-a8d65f` that the second host's apply now also creates the extension link.
 
 Rollout evidence: merge `c48ee06` installed the reviewed implementation; the home
 extension and refresh command resolve into main. A private offline pi 1.1.0 session
@@ -177,4 +177,4 @@ three owned fields. Checkout restored those same fields with an empty filtered d
 The check then used `live-picks forget pi/settings.json` to restore the user's
 original automatic defaults; all unowned settings were unchanged and no children
 survived. Private backup and raw evidence are retained under
-`local/pi-live-picks-rollout/20261016T003823Z/`. Europa remains a separate host apply.
+`local/pi-live-picks-rollout/20261016T003823Z/`. The second host remains a separate host apply.

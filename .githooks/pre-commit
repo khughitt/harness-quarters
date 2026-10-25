@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Check the residue guide and refuse staged local/ host state.
+"""Run the shared hygiene checks, check the residue guide and refuse staged local/ host state.
 
 The generated global-instruction block is checked by lore tools/check-projects-block.
-This hook runs the vendored tools/ops-docs against the working tree, preserving the
-README/AGENTS identity contract, and rejects every staged path under local/.
+After refusing every staged path under local/, this hook runs the vendored tools/ops-check
+(guide references, layout, vendored contracts) and then the vendored tools/ops-docs, both
+against the working tree as they read it everywhere, preserving the README/AGENTS identity
+contract.
 The staged tools/harness-facts must pass its own check over the staged tree.
 Installed by git config core.hooksPath .githooks.
 """
@@ -21,6 +23,23 @@ def fail(message):
 
 
 DOCS = pathlib.Path("tools") / "ops-docs"
+HYGIENE = pathlib.Path("tools") / "ops-check"
+
+
+def hygiene_check():
+    """The shared hygiene checks, read from the working tree as ops-check reads it everywhere.
+    Exit 1 is findings; any other failure means the checker could not run, never a pass."""
+    if not HYGIENE.is_file():
+        return fail(f"{HYGIENE} not found; adopt it from ops with `bin/vendored adopt ops-check`")
+    done = subprocess.run([sys.executable, str(HYGIENE)], text=True, capture_output=True)
+    if done.returncode == 1:
+        sys.stderr.write(done.stderr)
+        return fail("the shared hygiene checks found the findings above in the working tree; "
+                    "fix them (AGENTS.md Gates)")
+    if done.returncode:
+        sys.stderr.write(done.stderr)
+        return fail(f"{HYGIENE} could not run (exit {done.returncode})")
+    return 0
 
 
 def docs_check():
@@ -91,7 +110,7 @@ def facts_check():
 def main(argv):
     if argv:
         return fail("pre-commit accepts no arguments")
-    return local_layer() or docs_check() or facts_check()
+    return local_layer() or hygiene_check() or docs_check() or facts_check()
 
 
 if __name__ == "__main__":

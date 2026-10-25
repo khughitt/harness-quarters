@@ -52,7 +52,7 @@ it is an upstream behaviour recorded and worked around once.
   instructions/fragments/projects.md` in an ops worktree, refused at 01:19Z (chained
   with `git commit`) and 01:34Z (alone) with the same message, matching line 45. The
   user had authorized the restore; under `never` no route exists to act on that
-  (upstream openai/codex#41068). Both refusals predate the titan apply (§4); the
+  (upstream openai/codex#41068). Both refusals predate the primary-host apply (§4); the
   applied justification names unstaging and conflict sides but not restoring a path
   from a commit, which the temporary-file form covers with `git show "<rev>:./<path>"`.
 - hq-982164 is the forced-`rm` refusal already reported three times in ops
@@ -126,10 +126,10 @@ throwaway repositories under a temporary `CODEX_HOME` that holds a copy of the
 ## 3. Constraints
 
 - `local/` stays untracked (AGENTS.md); a rules change is a host-local edit. The main
-  checkout's `local/` syncs between titan and europa through Dropbox: europa's
+  checkout's `local/` syncs between the primary host and the second host through Dropbox: the second host's
   `~/.codex/rules` resolves to the same `local/codex/rules/default.rules`, which held
-  titan's edit byte for byte on 2026-10-23 (matching sha256), so one edit serves both
-  while Dropbox runs on europa (it did then; it is not a systemd unit there). A host
+  the primary host's edit byte for byte on 2026-10-23 (matching sha256), so one edit serves both
+  while Dropbox runs on the second host (it did then; it is not a systemd unit there). A host
   whose `local/` does not sync this way needs the edit by hand.
 - Codex's built-in safety checks and their messages are upstream code: an upstream
   search precedes any report or workaround (global Feedback rules).
@@ -224,8 +224,8 @@ throwaway repositories under a temporary `CODEX_HOME` that holds a copy of the
    (`exec_policy.rs`, `bash.rs`, `is_dangerous_command.rs`) changed only in PowerShell
    handling and refactors that keep the Linux bash path's behaviour.
 
-   **Applied 2026-10-23 on titan** (recorded then as the first host only; the file
-   syncs to europa, see §3). Line 45 of the live rules was replaced by the lines below.
+   **Applied 2026-10-23 on the primary host** (recorded then as the first host only; the file
+   syncs to the second host, see §3). Line 45 of the live rules was replaced by the lines below.
    They differ from the reviewed text above only in two deferred minors of review
    round 2, folded in at application: the justification says that in a rebase `:3:`
    is your own commit being replayed, and it quotes every path and uses `cp --`.
@@ -300,14 +300,14 @@ throwaway repositories under a temporary `CODEX_HOME` that holds a copy of the
      the worktree; a directory source, a directory at `<path>`, a symlink at `<path>`
      and a missing source each stopped with exit 1, changed nothing and left no
      temporary file; a recreated file came out mode 600.
-   - `codex execpolicy check` on the current file, on titan (Codex 0.164.0) and europa
+   - `codex execpolicy check` on the current file, on the primary host (Codex 0.164.0) and the second host
      (0.163.0; `~/.codex/rules` resolves to the synced `local/codex/rules`, the loaded
-     file's sha256 matches titan's, and Dropbox is running): every `git restore` form,
+     file's sha256 matches the primary host's, and Dropbox is running): every `git restore` form,
      `--source=<rev>` included, is `forbidden` with the text; `git reset -q -- <path>`,
      `git rm --cached -- <path>` and `git add -- <path>` are `allow`;
      `git rm --cached --no-cached -f -- <path>`, `git reset --hard` and `rm -- <path>`
-     match nothing. The round-1 edit reached europa within about a minute.
-   - One live Codex turn (titan, `codex exec`, Codex 0.164.0, thread
+     match nothing. The round-1 edit reached the second host within about a minute.
+   - One live Codex turn (the primary host, `codex exec`, Codex 0.164.0, thread
      `01a16896-c584-7d41-9556-80bf7313fa28`), against the first extension's text
      (before review round 1), in a linked-worktree fixture with a staged new file and a
      merge conflict, told to try `git restore --staged -- f` and then follow the
@@ -338,7 +338,7 @@ and the `git reset -q --` allow skipped the sandbox.
   in a live Codex turn (unstaging and the conflict side; the later text was checked by
   fixture probes and `execpolicy check`, not live); the restore-from-commit and
   deletion forms are named and fixture-probed (the deletion form on a `UD` conflict
-  only); europa shares the file through Dropbox. Of the deferred minors in goal
+  only); the second host shares the file through Dropbox. Of the deferred minors in goal
   hq-62c3b1's 2026-10-23T09:19Z note, (2) was folded in at the first apply and (6) there
   and in review round 1 of hq-48c5c6, which quoted the remaining paths; (1), (3), (5)
   are corrected or recorded in this brief; (4) and (7) are handled in the
@@ -348,7 +348,7 @@ and the `git reset -q --` allow skipped the sandbox.
 ## 6. Proposed decomposition
 
 - hq-748431 (research, under goal hq-62c3b1) — done 2026-10-22; woke hq-48c5c6 and
-  hq-5b8413. hq-499318 (done) revised its rule recommendation; applied on titan.
+  hq-5b8413. hq-499318 (done) revised its rule recommendation; applied on the primary host.
 - hq-48c5c6 — scoped 2026-10-23 and done the same day: restore-from-commit and
   deletion forms named, the shared file checked on both hosts, one live Codex turn
   observed, deferred minors settled.

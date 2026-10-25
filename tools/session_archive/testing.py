@@ -65,7 +65,7 @@ def codex_rollout(root: Path, age_days: float = 40, tid: str = TID,
 
 def uninspectable_comms() -> tuple[str, ...]:
     """comm names of this user's processes whose descriptors this host cannot read (on
-    titan: systemd and (sd-pam)); tests allow them so they can watch processes they start."""
+    the primary host: systemd and (sd-pam)); tests allow them so they can watch processes they start."""
     from session_archive.inputs import InspectionFailed, open_inodes
     try:
         open_inodes()
