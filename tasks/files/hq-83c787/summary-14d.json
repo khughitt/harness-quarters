@@ -1,0 +1,1 @@
+{"days": 14, "kept": 928, "excluded": {"mtime_before_window": 21536, "subagent": 1616, "non-interactive": 521, "opened_before_window": 18, "no_timed_record": 36, "no_human_turn": 5, "claude_fork_copy": 0, "codex_fork": 0, "missing_root": 0}, "out": "sessions-14d.jsonl"}

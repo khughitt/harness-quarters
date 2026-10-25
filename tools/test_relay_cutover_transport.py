@@ -176,6 +176,7 @@ def install(hosts, inventory, operations):
         module.SYNC_BUDGET_SECONDS = CONFIG["sync"]["budget"]
         module.SYNC_POLL_SECONDS = CONFIG["sync"]["poll"]
     restoration.SERVICE_SECONDS = CONFIG["service"]["budget"]
+    restoration.SERVICE_START_SECONDS = CONFIG["service"]["start"]
     restoration.SERVICE_POLL_SECONDS = CONFIG["service"]["poll"]
     for name, value in CONFIG["surfaces"].items():
         setattr(surfaces, name, value)
@@ -1203,7 +1204,8 @@ class World:
             "probes": str(tmp_path / "probes.log"),
             "pins": {key: PINS[key] for key in inputs.PINS},
             "sync": {"budget": 20.0, "poll": 0.05}, "npm_tree": NPM_TREE,
-            "service": {"budget": 20.0, "poll": 0.05}, "surfaces": dict(SURFACE_TIMING),
+            "service": {"budget": 20.0, "start": 20.0, "poll": 0.05},
+            "surfaces": dict(SURFACE_TIMING),
             "timing": dict(HOST_TIMING),
         }
         self.monkeypatch, self.pins, self.dropbox = monkeypatch, dict(PINS), None
@@ -1248,6 +1250,8 @@ class World:
             monkeypatch.setattr(module, "SYNC_BUDGET_SECONDS", self.config["sync"]["budget"])
             monkeypatch.setattr(module, "SYNC_POLL_SECONDS", self.config["sync"]["poll"])
         monkeypatch.setattr(restoration, "SERVICE_SECONDS", self.config["service"]["budget"])
+        monkeypatch.setattr(restoration, "SERVICE_START_SECONDS",
+                            self.config["service"]["start"])
         monkeypatch.setattr(restoration, "SERVICE_POLL_SECONDS", self.config["service"]["poll"])
         for name, value in SURFACE_TIMING.items():
             monkeypatch.setattr(surfaces, name, value)
