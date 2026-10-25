@@ -7,8 +7,8 @@ size: m
 complexity: mid
 process: direct
 created: 2026-10-25T01:23:18Z
-updated: 2026-10-25T01:23:37Z
-depends: [hq-eff4db]
+updated: 2026-10-25T01:23:40Z
+depends: [hq-eff4db, hq-df1183]
 parent: hq-c6a149
 tags: [docs]
 agent: claude-code
