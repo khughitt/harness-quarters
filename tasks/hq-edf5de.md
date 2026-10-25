@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: test/hq-a45dd8-two-turn-evidence
 created: 2026-10-20T17:38:21Z
-updated: 2026-10-25T17:45:28Z
+updated: 2026-10-25T17:45:32Z
 started: 2026-10-25T17:45:13Z
 depends: []
 parent: hq-cff824
@@ -32,3 +32,5 @@ Scoped re-review of hq-a1c591 found two additional Minor wording issues in docs/
 - 2026-10-25T17:45:13Z (test/hq-a45dd8-two-turn-evidence): started
   provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-25T17:45:28Z (test/hq-a45dd8-two-turn-evidence): arm: flow-trial-1 — unit tack-cff824 — flow on
+- 2026-10-25T17:45:32Z (test/hq-a45dd8-two-turn-evidence): gate: scoped — adopted
+  provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
