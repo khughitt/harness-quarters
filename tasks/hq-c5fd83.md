@@ -7,7 +7,7 @@ size: s
 complexity: low
 process: direct
 created: 2026-10-25T10:54:20Z
-updated: 2026-10-25T11:09:01Z
+updated: 2026-10-25T12:28:04Z
 depends: [ops-6e157a]
 tags: []
 source: hq-c6a149
@@ -33,3 +33,4 @@ Adopting the shared checker (hq-c6a149) required the attachments the layout rule
 - 2026-10-25T10:59:27Z (feat/ops-check-hq-c6a149): retained: {"host":"titan","kind":"scratch","path":"$WORK_ROOT/hq/hq-c5fd83","state":"kept","verification":"verified","manifest":"$WORK_ROOT/hq/hq-c5fd83/manifest.json","sha256":"2d7def93b6257e8c52678144914dc6961fb8ee0c22b524532bdae0f34a2d5ac4","purpose":"Container of the eleven exact raw attachment copies hq-c6a149 replaced with portable derivatives, one subdirectory per original task, each with its own evidence record here","next_owner":"task:hq-c5fd83","cleanup_trigger":"After the shipped layout exemption admits the originals, hq adopts that checker version and every original is restored and verified"}
 - 2026-10-25T11:08:35Z (feat/ops-check-hq-c6a149): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/hq/hq-c5fd83/hq-83c787/windows-refined.txt","state":"kept","verification":"verified","sha256":"9e046127e3c40d6ec82f2470a8176dc7df79c659289fd9bd25bbe92928d3f0db","purpose":"Exact raw bytes of hq-83c787 attachment windows-refined.txt (attached on main at 091e673, brought in by merge bc6a850), replaced on that task by a portable derivative for shared-checker adoption","next_owner":"task:hq-c5fd83","cleanup_trigger":"After the shipped layout exemption admits the original and hq adopts that checker version, restore and verify the original attachment"}
 - 2026-10-25T11:09:01Z (feat/ops-check-hq-c6a149): retained: {"host":"titan","kind":"scratch","path":"$WORK_ROOT/hq/hq-c5fd83","state":"kept","verification":"verified","manifest":"$WORK_ROOT/hq/hq-c5fd83/manifest.json","sha256":"1c452f49b96337cf7064657bfe89bb2dfc14fdb80cdf0deb615b7aaecf5978af","purpose":"Container of the twelve exact raw attachment copies hq-c6a149 replaced with portable derivatives (eleven from the branch base, one merged from main), one subdirectory per original task, each with its own evidence record here","next_owner":"task:hq-c5fd83","cleanup_trigger":"After the shipped layout exemption admits the originals, hq adopts that checker version and every original is restored and verified"}
+- 2026-10-25T12:28:04Z (main): Expect a second derivative cycle: hq-d5ba0a re-derives the hq-48c5c6 europa-policy-check-round2.out and hq-83c787 windows-refined.txt derivatives, whose ~/d/<project> placeholder the stricter checker from ops-295f8d will flag. Raw copies and their records here are unaffected.
