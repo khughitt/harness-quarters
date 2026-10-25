@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: test/hq-a45dd8-two-turn-evidence
 created: 2026-10-23T17:40:19Z
-updated: 2026-10-25T17:32:57Z
+updated: 2026-10-25T17:43:53Z
 started: 2026-10-25T17:31:30Z
 depends: []
 parent: hq-cff824
@@ -50,3 +50,4 @@ Why: SL11's CT1 and CT3 each hold one turn, so spec section 9.4's task_evidence:
   provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-25T17:32:57Z (test/hq-a45dd8-two-turn-evidence): gate: implementing — .worktrees/hq-a45dd8
   provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-25T17:43:53Z (test/hq-a45dd8-two-turn-evidence): baseline: just test passed 1668 tests before fixture/test edits (231 agents, 1047 hooks/tools, 389 parallel relay, 1 isolated relay). Scope: CT1 JSONL, fixture self-check and cases document only; no reader, skill, links, configs or runtime exports change.
