@@ -7,7 +7,7 @@ size: s
 complexity: low
 process: direct
 created: 2026-10-20T16:04:22Z
-updated: 2026-10-25T17:31:45Z
+updated: 2026-10-25T18:24:41Z
 depends: [obs-d98663, obs-f5710b, hq-19580c, obs-081ded]
 tags: [session-logs]
 source: docs/notes/2026-10-20-session-store-reach-brief.md
@@ -47,3 +47,4 @@ Scope and audit agents need to reach a session's evidence: the session behind a 
   provenance: {"harness_session":"codex:01a17401-db00-7090-899a-ca387cde5be3","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-25T17:31:44Z (main): trial: flow-trial-1 — enrolled — flow on
 - 2026-10-25T17:31:45Z (main): arm: flow-trial-1 — unit tack-cff824 — flow on
+- 2026-10-25T18:24:41Z (main): delivery checkpoint: merged hq corrections 30717ad locally into main with merge a569687. hq-a45dd8, hq-c1fecb and hq-edf5de are done; hq-b95324 is dropped as covered by obs-d98663, not delivered. hq-7b131a and hq-a60cf5 are explicitly deferred to 2027-02-17 with required reader-spec gate references; the scoped root-alignment skill edit is treatment regardless of the unresolved episodes-measurement classification. No skill, runtime reader, links, roots or measurement implementation changed. Final branch just test passed 1672 tests (231 agents, 1051 hooks/tools, 389 parallel relay, 1 isolated relay), focused fixture suite passed 38, 35 targeted breaks were detected, and all 73 E008/E037 source refs matched hashes. Baseline was 1668 passed; two intermediate suites were intentionally aborted after review required corrections. Independent implementation review accepted after two corrective rounds, no deferred findings; stale brief deferral regraded Important with Why/Cost on hq-edf5de. Main had a concurrent unrelated brief and task-record update, preserved by merge; all 18 branch files match their tested blobs and merge ops-check/ops-docs/harness-facts/tasks checks passed. Exact CT1 turn refs, XG, prefix/identity changes and re-vendor/nonvacuous reader assertions were handed to obs-d98663 before merge. Its existing fork-boundary decision and live six-root acceptance remain required. At inspection obs main 1124c7d had no session_logs*.py; obs-d98663 and the three Stage B dependencies remain open. This goal is not complete: Stage B still waits for the 2027-02-16 readout and its date-specific gates. Session resources: worktree removed and released on each child, no scratch or off-tree evidence copies retained. No push or live-surface activation; concurrent harness picks and unrelated work preserved.
