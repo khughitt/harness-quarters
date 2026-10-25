@@ -7,7 +7,7 @@ size: s
 complexity: low
 process: direct
 created: 2026-10-20T16:04:22Z
-updated: 2026-10-25T17:11:19Z
+updated: 2026-10-25T17:11:29Z
 depends: [obs-d98663, obs-f5710b, hq-19580c, obs-081ded]
 tags: [session-logs]
 source: docs/notes/2026-10-20-session-store-reach-brief.md
@@ -40,3 +40,8 @@ Scope and audit agents need to reach a session's evidence: the session behind a 
 - brief (context, kind=brief): docs/notes/2026-10-20-session-store-reach-brief.md — historical studies and alternatives; design-open wording superseded by hq-c411df
 - reader-spec (input, required, kind=spec): docs/specs/2026-10-23-session-evidence-reader-design.md — reviewed contract at ae0f8ee, delivery boundaries and trial gates
 - reader-plan (input, required, kind=plan): docs/plans/2026-10-23-session-evidence-reader.md — reviewed plan at 1fea7bf; read with obs-d98663 correction notes
+
+## Notes
+
+- 2026-10-25T17:11:29Z (main): scope: rescoped; checked hq 3c73287 and obs 9fda68a, merged reviewed spec ae0f8ee and plan 1fea7bf (unchanged), completed hq-c411df/study notes, current two-root extractor and unchanged usage skill, and existing Stage A/B owners. Narrowed parent to delivery closeout, s/low/direct with P2 unchanged; recorded obs-d98663, obs-f5710b, hq-19580c and obs-081ded as dependencies, preserved original scope/source and all children, linked reviewed contract/plan, and marked the old brief historical. Local-first retrieval includes explicit unavailable/unknown evidence, not automatic remote/archive recovery; trial gates remain binding, including the model-skill treatment gate and root-alignment assessment. No duplicate research, new handoff, child edits or implementation. origin: filing event unavailable because this record has no creation occurrence note or harness_session stamp; no origin_session identifies an older request, so stage 2 is not applicable and origin remains unset (no transcript lookup failure claimed). Validation: tasks check clean before writes; just test passed 1668 tests (231 agents, 1047 hooks/tools, 389 parallel relay and 1 isolated relay).
+  provenance: {"harness_session":"codex:01a17401-db00-7090-899a-ca387cde5be3","harness_session_source":"CODEX_THREAD_ID"}
