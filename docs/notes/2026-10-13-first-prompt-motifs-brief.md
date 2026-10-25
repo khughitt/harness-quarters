@@ -177,15 +177,22 @@ before evaluation.
 - **Self-checks:** 16 fixture cases passed. Disabling each of the 11 checks in turn
   failed the case aimed at it.
 
-The prior misbindings came from resolution. The right tasks were the ones whose
-own review-handoff notes named the artifact: fam-6e8321 for C01, not relay-fe38b1,
+The prior misbindings came from resolution. The right tasks were the ones that
+linked the artifact and parked a review of it: fam-6e8321 for C01, not relay-fe38b1,
 and hq-c411df for C03, not hq-bb90ca. C03's handoff carried a commit and SHA-256.
 C02's request and merge notes carried a commit. C01's handoff named only a worktree
 path, so its revision was derived from commit timing and labelled as derived.
 
 Manual corrections were task identity (2 of 3), revision (1 of 3) and kind
-(1 of 3). One more surfaced at evaluation: C02's draft cites the execution ledger in
-place of the pasted closing report, which drops the final verification counts.
+(1 of 3). Two more surfaced at evaluation, both in C02:
+
+- its draft cites the execution ledger in place of the pasted closing report,
+  which drops the final verification counts;
+- the verdict check is keyed to commit time, so it does not report an
+  implementation accept given before the merge commit.
+
+Agreement with the frozen expectations was checked by status, reasons and
+required strings. Meaning was judged by reading the local previews.
 
 Validated kinds:
 
@@ -195,12 +202,20 @@ Validated kinds:
 
 These three historical examples establish behaviour, not coverage.
 
-Recommendation: design a narrow, print-only preview that takes a task id. It shows
-the latest review handoff's selection as a candidate, runs these checks, and refuses
-to fill a missing revision. Typing the selection by hand costs more than today's
-one-line request, so the preview pays off only through that pre-fill. Whether
-handoff notes need a stable shape for the pre-fill is a design question. It is not
-an established schema prerequisite. No launcher, schema or external write is
+Recommendation: design a narrow, print-only preview that starts from the artifact
+path a request already gives. It should:
+
+- propose the latest commit touching that path and the task linking it;
+- refuse when the working file differs from that blob;
+- show prior verdicts and later revisions;
+- print an editable draft.
+
+In a post-hoc check, this recovered the right revision and task for both spec
+cases. Pre-filling from a task's latest review handoff was rejected: it held the
+full selection only for C03, and for C02 it was a superseded plan review.
+Implementation reviews still need their commit stated. Whether handoffs should
+record the reviewed revision in a stable shape is a design question, not an
+established schema prerequisite. No launcher, schema or external write is
 authorized by this result.
 
 Retention:
@@ -269,10 +284,11 @@ Current follow-through:
 - hq-83c787 records the supplied inspection, the denominator and method limits, and
   what it supports. No additional population collection or duration/error study is
   required by this scope pass. Predictive validity remains unknown.
-- Answered by hq-2b3929 for the three retained historical cases. Validated drafts
-  preserved the intended context. Task identity, revision and kind corrections
-  stayed manual. A narrow, print-only preview is recommended, provided it pre-fills
-  from the review handoff. Whether to design it is hq-2d8e81's next decision. A
+- Answered by hq-2b3929 for the three retained historical cases. The spec drafts
+  kept the request's intent. C02's implementation draft lost the closing report's
+  final verification counts. Task identity, revision and kind corrections stayed
+  manual. A narrow, print-only preview that starts from the artifact path is
+  recommended. Whether to design it is hq-2d8e81's next decision. A
   human judges any eventual interactive preview. No population-wide resolver
   coverage is established.
 - A live launch and the final choice of supported actions remain later decisions.
@@ -315,7 +331,7 @@ records this result and its limits, then wakes hq-1459f0.
 | hq-83c787 | Record the supplied inspection and its limits without more collection | hq-1459f0 |
 | hq-1459f0 | Reconsider the motif/tooling idea after the result is recorded | — |
 | hq-268cc2 | Done: one historical match, two misbound mappings, 41 unavailable identities; separate artifact checks required | hq-2d8e81 |
-| hq-2b3929 | Done: 3/3 observed cases gave validated historical drafts, 3/3 derived variants blocked as frozen; recommends a narrow print-only preview pre-filled from the review handoff | hq-2d8e81 |
+| hq-2b3929 | Done: 3/3 observed cases gave validated historical drafts, 3/3 derived variants blocked as frozen; recommends a narrow print-only preview that starts from the artifact path | hq-2d8e81 |
 | hq-2d8e81 | Decide whether to design the narrow preview; own the retained private inspection, dry-run and validated-draft artifacts | — |
 
 The completed hq-268cc2 remains evidence; the next experiment, not a new taxonomy
