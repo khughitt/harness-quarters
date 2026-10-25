@@ -1,0 +1,25 @@
+Verification summary for hq-268cc2; observations from tracked commands, not a verbatim full-suite log.
+
+Worktree hydrated with just setup before tests or worktree commits.
+Full baseline: just test, exit 1.
+  agents/bin: 231 passed in24.50s.
+  .githooks/tools: 1042 passed in371.40s.
+  parallel relay-cutover phase: 387 passed,2 failed in524.72s.
+  Failed test_recovery_signal_is_retried_by_reconciliation: failed versus interrupted.
+  Failed test_partial_finish_keeps_original_timers: service-start failed versus still activating under0.3s budget.
+  Observed load98.32 on32CPUs; causal relationship not fully established.
+  Product/tools/tests/justfile unchanged from base2504dd3.
+
+Focused recheck (declared runner from the justfile; no test-fast front door here):
+  uv run -q --with pytest pytest tools/test_relay_cutover_bootstrap.py -q -k 'test_recovery_signal_is_retried_by_reconciliation or test_partial_finish_keeps_original_timers'
+  Exit0;2 passed,234 deselected in168.84s.
+Final serial phase, skipped by the failing recipe and run separately:
+  uv run -q --with pytest pytest tools/test_relay_cutover_transport.py -q -k test_signal_while_recording_start_cancels
+  Exit0;1 passed,153 deselected in0.11s.
+These rechecks do not make the original full-suite baseline green. Friction filed hq-a7b473; related existing service-start-bound task hq-38e479.
+
+Experiment:4 assert-based cases passed;4 independent targeted breaks caught, independently repeated by reviewer. All444 existing dataset rows read,3 saved sample mappings recovered, all3 current task snapshots examined. No replacement cohort. The one matched frozen commit and3 context blobs verified.
+Report attachment bytes equal clarified v2, sha256 cd948bad69b99180ca7ed93e4ca2c2fa89b98169d9cd435c55082b4643cb8162.
+Independent review: codex/gpt-6.1-sol,accept,0Critical,0Important,1Minor clarified in report v2. No deferred minors.
+Docs checks: git diff --check and tools/ops-docs check passed.
+Tasks check: no errors;6 pre-existing undefined-tag warnings (docs/session-logs).
