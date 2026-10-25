@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: test/hq-a45dd8-two-turn-evidence
 created: 2026-10-20T19:10:17Z
-updated: 2026-10-25T18:20:35Z
+updated: 2026-10-25T18:24:38Z
 started: 2026-10-25T17:45:09Z
 completed: 2026-10-25T18:20:35Z
 closed: 2026-10-25T18:20:35Z
@@ -50,3 +50,4 @@ Check: the self-check and just test pass, each new assertion fails under a targe
   provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-25T18:20:35Z (test/hq-a45dd8-two-turn-evidence): Added depth-2 XG and separate native Claude identity fields, compacted Codex spawn JSON and preserved native failing-Bash prefixes with unanchored duration matching; reused existing XK fork control. Final just test passed 1672 tests and independent review accepted. Reader replay remains obs-d98663.
   provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-25T18:24:38Z (main): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-a45dd8","state":"released","verification":"verified","purpose":"Removed after 30717ad merged locally as a569687. All 18 task-branch files retain their tested Git blobs; merge hygiene, docs, capability and task checks passed. Branch fingerprint stayed 1678d9aa568842e077760387c654237f2fa16101. No host pointer resolved into the tree, tt-report ran, clean git/submodule status checked, and the four listed regenerable cache directories were discarded. The merged topic branch was deleted.","next_owner":"none","cleanup_trigger":"none"}
