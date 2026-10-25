@@ -4,7 +4,7 @@ title: Root-cause test_recovery_signal_is_retried_by_reconciliation returning fa
 status: shelved
 priority: 2
 created: 2026-10-25T02:28:14Z
-updated: 2026-10-25T02:28:24Z
+updated: 2026-10-25T12:00:04Z
 depends: []
 tags: []
 source: hq-a7b473
@@ -20,3 +20,4 @@ hq-a7b473 made the test print failed.error on that assertion and stopped a late 
 ## Notes
 
 - 2026-10-25T02:28:24Z (fix/cutover-timing-a7b473): shelved: test_recovery_signal_is_retried_by_reconciliation fails again; its assertion now prints the dependency-restore error that names the path
+- 2026-10-25T12:00:04Z (feat/ops-check-hq-c6a149): Recurred 2026-10-25 in a full just test at load average about 65 on the primary host (branch feat/ops-check-hq-c6a149, no relay cutover code changed): dependency-restore returned failed with error: familiar's source did not reach 1b2fa1c75208 on this host within 20 s (HEAD 929462bdb2b9 is not 1b2fa1c75208 or a tasks-only descendant of it (1b2fa1c75208 or 929462bdb2b9 is not a commit here)); it may still be synchronizing; nothing was restored here. That is the 20 s sync budget path the body called ruled out. The test passed alone at load 18.
