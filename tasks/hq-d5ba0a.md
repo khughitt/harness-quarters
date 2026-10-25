@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-d5ba0a-tilde-layout
 created: 2026-10-25T12:27:45Z
-updated: 2026-10-25T15:31:22Z
+updated: 2026-10-25T15:32:23Z
 started: 2026-10-25T15:07:14Z
 completed: 2026-10-25T15:31:22Z
 closed: 2026-10-25T15:31:22Z
@@ -57,3 +57,4 @@ Done: run the candidate checker from ops-295f8d over hq (or reproduce its rule) 
   provenance: {"harness_session":"codex:01a17398-cc3d-7af0-9262-eb2ff49f5236","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-25T15:31:22Z (fix/hq-d5ba0a-tilde-layout): Resolved all candidate tilde-layout findings: checkout-role document placeholders, narrow fixed-contract allowances, four regenerated portable attachments with exact raw evidence retained by hq-c5fd83. Candidate and installed checkers clean, just test 1668 passed, task/docs checks clean, independent review accepted and its minor fixed. Ready for immediate local integration.
   provenance: {"harness_session":"codex:01a17398-cc3d-7af0-9262-eb2ff49f5236","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-25T15:32:23Z (main): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-d5ba0a","state":"released","verification":"verified","purpose":"Branch integrated by fast-forward into main at fea3051; ignored entries inspected and regenerable caches discarded, tt-report ran, no host pointer resolved into the tree, worktree removed without force and merged branch deleted","next_owner":"none","cleanup_trigger":"none"}
