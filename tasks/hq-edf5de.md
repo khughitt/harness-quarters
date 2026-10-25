@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: test/hq-a45dd8-two-turn-evidence
 created: 2026-10-20T17:38:21Z
-updated: 2026-10-25T17:45:34Z
+updated: 2026-10-25T17:53:58Z
 started: 2026-10-25T17:45:13Z
 depends: []
 parent: hq-cff824
@@ -36,3 +36,4 @@ Scoped re-review of hq-a1c591 found two additional Minor wording issues in docs/
   provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-25T17:45:34Z (test/hq-a45dd8-two-turn-evidence): gate: implementing — .worktrees/hq-a45dd8 shared acceptance and research corrections for hq-cff824
   provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-25T17:53:58Z (test/hq-a45dd8-two-turn-evidence): verification before full suite: all 73 recorded source refs for E008 (69) and E037 (4) match their exact physical-line SHA-256 including newline. E037 call 228 writes, runs and removes its scratch parser. E008 result 153 records JSONDecodeError and persisted-output truncation; result 164 records shell/ugrep error. Changed only E037.scripts_written 0→1 and E008.failures (+parser_error +truncation +shell_error). Recomputed 52 known scripts and shell_error/truncation/parser_error 17/15/11; 183 episodes, 1093 calls, category and outcome totals unchanged. The current brief already states six child links to five parents and completed location research (its old section 7 was rewritten); preserved those correct statements, updated its script total, and removed the obsolete report omission disclosures. Shared workspace uses the completed 1668-test baseline.
