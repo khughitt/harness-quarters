@@ -3097,10 +3097,11 @@ def _stage(event):
     return 3 if head in ("restore", "rollback") else STAGE[tail]
 
 
-def _signal_when(condition, signum, seconds=60.0):
-    """From another thread, send signum to this process once condition holds."""
+def _signal_when(condition, signum, seconds=60.0, stopped=None):
+    """From another thread, send signum to this process once condition holds, unless `stopped`
+    is set first: a signal after the call it targets returned would kill the test process."""
     end = time.monotonic() + seconds
-    while time.monotonic() < end:
+    while time.monotonic() < end and not (stopped is not None and stopped.is_set()):
         if condition():
             os.kill(os.getpid(), signum)
             return
@@ -3131,16 +3132,19 @@ def test_recovery_signal_is_retried_by_reconciliation(prepared_cutover):
         for call in observed(cutover, "git"))
     root, mark = cutover_root(cutover), len(cutover.lines("observed"))
     handlers = {signum: signal.getsignal(signum) for signum in hosts.INTERRUPTS}
-    sender = threading.Thread(target=_signal_when, args=(waiting, signal.SIGTERM))
+    stopped = threading.Event()
+    sender = threading.Thread(target=_signal_when, args=(waiting, signal.SIGTERM),
+                              kwargs={"stopped": stopped})
     sender.start()
     try:
         with pytest.raises(window.Failed) as raised:
             recovery.restore_window(record)
     finally:
+        stopped.set()
         sender.join(timeout=90)
     failed = raised.value
     assert (failed.step, failed.host, failed.status) == ("dependency-restore", "europa",
-                                                         "interrupted")
+                                                         "interrupted"), failed.error
     assert "SIGTERM" in failed.error and failed.next_command == ["recover"]
     assert {signum: signal.getsignal(signum) for signum in hosts.INTERRUPTS} == handlers
     record = state.current_window(root)
@@ -3503,7 +3507,7 @@ def test_service_run_wait_and_result(cutover, monkeypatch):
     cutover.behave("titan", service={"start": "fail"})
     refused = run("service-run", payload)
     assert refused["status"] == "failed" and "exited 1" in refused["error"]
-    monkeypatch.setattr(restoration, "SERVICE_SECONDS", 0.2)
+    monkeypatch.setattr(restoration, "SERVICE_SECONDS", 0.2)  # the wait; the start keeps its own
     cutover.behave("titan", service={"polls": 1000})
     running = run("service-run", payload)
     assert running["status"] == "failed" and "still activating" in running["error"]
@@ -5659,7 +5663,7 @@ def test_partial_finish_keeps_original_timers(ready_run, monkeypatch):
     assert report["next"] == ["finish"] and "still paused on europa" in report["detail"]
     # 3. Europa's service is still running past its bound; 4. it then fails.
     cutover.behave("europa", timers={}, service={"polls": 10_000})
-    cutover.config["service"]["budget"] = 0.3
+    cutover.config["service"]["budget"] = 0.3  # the wait only; the start keeps its own bound
     cutover.save()
     running = attempt()
     assert running.code == 1 and "step: service-run" in running.stdout

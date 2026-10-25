@@ -60,6 +60,7 @@ from .state import Stop
 
 CHILD_SECONDS = 120
 SERVICE_SECONDS = 600  # the longest wait for a running service to finish
+SERVICE_START_SECONDS = 600  # the bound on `systemctl --user start` itself, apart from that wait
 SERVICE_POLL_SECONDS = 2.0
 REQUIESCED = "requiesced"
 SNAPSHOT = "familiar-node_modules.pre"
@@ -667,7 +668,7 @@ def service_run(context):
                    f"before running {service}")
     result = hosts._run_child(context, "service-start",
                               [hosts.TOOLS["systemctl"], "--user", "start", service],
-                              env=hosts._child_env(context), timeout=SERVICE_SECONDS)
+                              env=hosts._child_env(context), timeout=SERVICE_START_SECONDS)
     if result.returncode != 0:
         raise Stop(f"systemctl --user start {service} exited {result.returncode}; see the "
                    "private log")
@@ -702,7 +703,7 @@ _FAMILIAR_REQUIRED = frozenset({"window_id", "pre", "tip", "base"})
 _DEPENDENCIES = {**_WINDOW, "pre": quiesce._commit, "base": quiesce._commit,
                  "revert": quiesce._commit}
 _SOURCE_DEADLINE = familiar.PROOF_CHILDREN * CHILD_SECONDS
-_SERVICE_DEADLINE = 2 * SERVICE_SECONDS + 4 * CHILD_SECONDS
+_SERVICE_DEADLINE = SERVICE_START_SECONDS + SERVICE_SECONDS + 4 * CHILD_SECONDS
 
 OPERATIONS = {
     "recovery-no-live": hosts.Operation(run=recovery_no_live, deadline=60, mutation=False,
