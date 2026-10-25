@@ -6,9 +6,9 @@ priority: 2
 size: xs
 complexity: low
 process: direct
-owner: main
+owner: test/hq-a45dd8-two-turn-evidence
 created: 2026-10-23T17:40:19Z
-updated: 2026-10-25T17:31:46Z
+updated: 2026-10-25T17:32:04Z
 started: 2026-10-25T17:31:30Z
 depends: []
 parent: hq-cff824
@@ -44,3 +44,5 @@ Why: SL11's CT1 and CT3 each hold one turn, so spec section 9.4's task_evidence:
 - 2026-10-25T17:31:30Z (main): started
   provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-25T17:31:46Z (main): arm: flow-trial-1 — unit tack-cff824 — flow on
+- 2026-10-25T17:32:04Z (test/hq-a45dd8-two-turn-evidence): resumed
+  provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
