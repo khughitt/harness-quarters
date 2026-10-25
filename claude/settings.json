@@ -223,7 +223,8 @@
     "typescript-lsp@claude-plugins-official": true,
     "context7@claude-plugins-official": false,
     "pyright-lsp@claude-plugins-official": true,
-    "superpowers@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": false,
+    "superpowers@superpowers-marketplace": true,
     "github@claude-plugins-official": false,
     "code-simplifier@claude-plugins-official": false,
     "frontend-design@claude-plugins-official": false,
@@ -241,7 +242,7 @@
         "source": "github",
         "repo": "obra/superpowers-marketplace"
       },
-      "autoUpdate": true
+      "autoUpdate": false
     },
     "Mixedbread-Grep": {
       "source": {
