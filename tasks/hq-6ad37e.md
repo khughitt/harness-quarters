@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/curate-docs-hq-30fd95
 created: 2026-10-24T22:15:21Z
-updated: 2026-10-24T23:56:01Z
+updated: 2026-10-25T00:08:33Z
 started: 2026-10-24T23:33:47Z
 depends: []
 tags: [docs]
@@ -33,3 +33,5 @@ Found by the curate-docs pass hq-30fd95 at 8686be3 (criterion 2). docs/specs/202
   provenance: {"harness_session":"claude-code:c2f3e76e-ba29-4176-9424-f3373a5a3562","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-24T23:53:38Z (docs/curate-docs-hq-30fd95): review: impl round 1 — verdict: revise; findings: minor 1; reviewer: claude-code
 - 2026-10-24T23:56:01Z (docs/curate-docs-hq-30fd95): review: impl round 2 — verdict: accept; findings: none; reviewer: claude-code
+- 2026-10-25T00:08:33Z (docs/curate-docs-hq-30fd95): gate: verified tree:e050910363d0bcd2fbb5d15552293db59fa845a7 — checks: just test 231 and 1042 passed and relay-cutover 388 passed with 1 failed test_service_run_wait_and_result at load 34 (known flake hq-38e479) which passed 3 of 3 rerun alone, tools/ops-docs check 0, tasks check no errors, docs-only diff since dacb4c5; review: minor addressed status line named the pre-rename id as the closing id; reviewer: claude-code
+  provenance: {"harness_session":"claude-code:c2f3e76e-ba29-4176-9424-f3373a5a3562","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
