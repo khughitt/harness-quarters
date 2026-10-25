@@ -2,8 +2,8 @@
 
 Scoping handoff, 2026-10-13. Idea: hq-1459f0. Goal and research ids are in §6.
 
-Updated 2026-10-24 from the owner's completed inspection. This is a scope handoff,
-not a design or implementation approval. The owner requests no further session
+Updated 2026-10-25 from the owner's completed inspection and the first dry run.
+This is a scope handoff, not a design or implementation approval. The owner requests no further session
 collection. Historical evidence and the original pilot proposal remain below;
 the dated updates distinguish the supplied result from unperformed validation.
 
@@ -135,6 +135,31 @@ binding and current review state, with tasks/flows ownership discussed in the
 report; no shared-schema prerequisite is established. The unavailable mappings
 remain unavailable rather than being replaced by new matches.
 
+### Next experiment scoped, 2026-10-25
+
+hq-2b3929 tests the next milestone. The merged result (7d66d22) supports using a
+deliberately selected, named set rather than trying to reconstruct the missing
+41 mappings.
+The old helper left repository and artifact checks to the investigator. The next
+experiment puts those checks inside the helper and freezes each case's provenance,
+selected kind/target/revision, historical or current state, and expected outcome
+before evaluation. Retain C01/C02/C03; add only labelled controlled variants for
+missing, conflicting and stale evidence, at most six cases total. Derived cases
+are checks, not additional observed reviews or a coverage estimate.
+
+A positive result requires repository identity and commit/blob availability, or
+an exact out-of-tree artifact hash, to pass. C02 can be a historical positive;
+it cannot establish a current review. Unsupported review kinds remain explicit.
+Keep editable previews local, record required manual corrections, and recommend
+whether a narrow production preview is worth designing. No launch or new session
+collection is part of this experiment.
+
+At scoping, both retained manifest hashes and all 24 listed files matched. The
+original six-file manifest excludes 12 later inspection files recorded in the
+idea's notes; account for these before reuse without deleting evidence or assuming
+that historical extracts are reproducible from today's live stores. The complete
+18-file dry-run bundle had no unlisted files. hq-2d8e81 retains both bundles.
+
 ## Constraints
 
 - Read the stores through the existing readers. Never modify harness stores. Keep
@@ -157,15 +182,21 @@ remain unavailable rather than being replaced by new matches.
 
 ## Alternatives
 
-Current lean: record the inspection's useful findings and limits in hq-83c787, then
-test one `review <task-id>` prompt builder against the existing resolved cases.
-Compare recovered context and meaning, not identical wording. Reject starting with
-a five-verb launcher or a mandatory handoff-schema project: the dry run should first
-show the concrete missing fields. Production hq integration, if supported, adopts
+Current lean: hq-83c787 records the inspection's useful findings and limits;
+independently, test editable drafts with explicit target selection and validation
+inside the helper, using the bounded set above. Compare context and meaning, not
+identical wording. A second option is to stop with the existing report if explicit
+selection saves no meaningful work. Reject a production launcher or mandatory
+handoff-schema project now: the nonrepresentative evidence does not justify either.
+Production hq integration, if supported, adopts
 ops's existing CLI vocabulary with that implementation. Crew remains a possible
 flow consumer; lore owns shared template text only when there is a second consumer.
 fzf target selection, other actions, graphical flow links, dual launch, CLI visual
 components and text/embedding indexes are preserved possibilities, not this task.
+The later one-turn inspection also suggests offering a preceding choose-next
+recommendation as a default target and a `--harness both` option. Preserve these as
+later candidates: a suggested next task does not identify its review revision,
+and repeated prompts across harnesses do not establish a need for automatic launch.
 
 Historical alternatives, retained as context rather than new work orders:
 
@@ -187,10 +218,11 @@ Current follow-through:
 - hq-83c787 records the supplied inspection, the denominator and method limits, and
   what it supports. No additional population collection or duration/error study is
   required by this scope pass. Predictive validity remains unknown.
-- The bounded prompt-builder follow-up determines which existing review cases yield
-  an unambiguous artifact/revision, which require edits and which lack context.
-  It recommends whether a product command is justified and identifies any actual
-  tasks/flows handoff gap. It does not assume a new schema is needed first.
+- The next explicit-selection experiment determines whether validated editable
+  drafts preserve intended context, which corrections remain manual, and whether
+  a narrow production preview is worthwhile. The frozen case manifest and report
+  answer this; a human judges any eventual interactive preview. It does not
+  assume a new schema or establish population-wide resolver coverage.
 - A live launch and the final choice of supported actions remain later decisions.
 
 Original research questions, not answered by the inspection:
@@ -230,10 +262,12 @@ records this result and its limits, then wakes hq-1459f0.
 | --- | --- | --- |
 | hq-83c787 | Record the supplied inspection and its limits without more collection | hq-1459f0 |
 | hq-1459f0 | Reconsider the motif/tooling idea after the result is recorded | — |
-| hq-268cc2 | Evaluate a local dry-run review prompt builder against the existing cases; report incomplete or ambiguous context | hq-2d8e81 |
-| hq-2d8e81 | Reconsider the launcher after the dry run; own the retained private inspection artifacts | — |
+| hq-268cc2 | Done: one historical match, two misbound mappings, 41 unavailable identities; separate artifact checks required | hq-2d8e81 |
+| hq-2b3929 | Test editable drafts with a frozen case manifest, explicit selection and built-in repository/artifact validation | hq-2d8e81 |
+| hq-2d8e81 | Wait on hq-2b3929; own the retained private inspection and dry-run artifacts | — |
 
-The launcher idea waits on hq-268cc2, not on a new taxonomy study. Historical
+The completed hq-268cc2 remains evidence; the next experiment, not a new taxonomy
+study, supplies the launcher's remaining decision. Historical
 session-content search remains hq-3558a1 / hq-ea0975; this pass does not duplicate or
 re-scope those tasks. The session evidence reader remains obs-d98663, with its own
 delivery constraints, and is not a prerequisite for this local experiment.
