@@ -1,0 +1,88 @@
+28d refined, non-test sessions 1685:
+  take             435   25.8%
+  review           429   25.5%
+  scope            297   17.6%
+  next             210   12.5%
+  execute          105    6.2%
+  question          86    5.1%
+  idea              23    1.4%
+  relayed-status    16    0.9%
+  reply              6    0.4%
+  quiet-window       8    0.5%
+  other-skill        5    0.3%
+  other             65    3.9%
+  test              86
+
+week_of        n      take  review   scope    next execute questio    idea relayed   reply quiet-w other-s   other    test
+2026-09-21    49        10       9       1       8       0       2       4       0       0       0       0       4      11
+2026-09-28   451       106     148      48      59      19      31       3       5       1       5       0      17       9
+2026-10-05   403       108     100      52      53      31      20       3       4       0       1       2      13      16
+2026-10-12   457       100      99     101      47      37      17       3       7       1       2       1      17      25
+2026-10-19   411       111      73      95      43      18      16      10       0       4       0       2      14      25
+
+remaining other (28d), first 80 chars:
+  09-27 familiar   I've recently been working on some improvements to the system aimed at supportin
+  09-27 v6         hi
+  09-27 prism      While making changes in the prism settings panel just now, prism suddently stopp
+  09-27 science    Let's reimagine ~/d/proto/projects/health/processes/cycles for science v2 / veri
+  09-28 ops        We have been collecting test + CI timing information across multiple projects fo
+  09-28 ops        We have been collecting test + CI timing information across multiple projects fo
+  09-28 lit        ~/d/lit is an attempt to reimagine and improve on earlier ~/d/r/lit-explore rela
+  09-28 tack       `tack` was recently renamed (old name: `ai`, path: ~/d/ai). We have migrated the
+  09-30 nexcode    @docs/runbooks/deploy.md describes a newly-added "web + nexml" combined deployme
+  09-30 nexcode    A medical coder is currently reviewing anesthesia records on `prod`, and flagged
+  09-30 dotfiles   I would like to create a helper alias/function like `tag` in shell/aliases.d/dev
+  09-30 niri-mater Let's explore ways of affecting terminal contexts (text, graphics) as well. For 
+  10-01 nexcode    There are currently two separate sets of Linear tickets, both aimed at the same 
+  10-01 nexcode    As Nexcode is currently designed, there is effectively only a single set of codi
+  10-01 nexcode    As Nexcode is currently designed, there is effectively only a single set of codi
+  10-02 nexcode    Let's walk through the requested `pulumi up` steps in https://github.com/CainexO
+  10-02 ops        cl
+  10-03 dotfiles   Let's create a keyboard mapping in @niri/config.kdl to toggle `prism` display (`
+  10-03 tack       `tack` serves as a sort of normalization + improvement layer on top of agent har
+  10-03 tack       `tack` serves as a sort of normalization + improvement layer on top of agent har
+  10-04 dotfiles   Let's enable SSH access to host-a from machines on the same tailscale network. If
+  10-05 nexcode    As I was reviewing the nexml service code (services/nexml/), I noticed a bunch o
+  10-05 nexcode    As I was reviewing the nexml service code (services/nexml/), I noticed a bunch o
+  10-06 nexcode    hi
+  10-06 obs        Across all projects, over the past week, where are the biggest friction points? 
+  10-06 nexcode    We got a request from a medical coder using the app to audit radiology records: 
+  10-07 nexcode    We are preparing to onboard a new client (Washington Health); they are already r
+  10-09 lore       j11
+  10-09 nexcode    We are working on designing a fix for NEX-300.. --- This is bounded: every flow 
+  10-09 nexcode    To evaluate the impact of changes to nexml workflows on downstream performance (
+  10-09 science    I would like to continue the multiple myeloma research effort that was previousl
+  10-09 science    I would like to continue the multiple myeloma research effort that was previousl
+  10-10 ops        Let's create and scope / tackle a task to address some friction related to how `
+  10-10 science    The verifiably ecosystem was designed with the intent to be generalizable and us
+  10-12 nexcode    We are working on extending support for nexml "feedback" to anesthesia, and also
+  10-13 dotfiles   I have an ethernet cable connecting directly to the router, but for some reason 
+  10-13 nexcode    We are preparing to send data back to a client (HAP). It looks like services/nex
+  10-13 v6         Let's review and process the mindful inbox proposal: .worktrees/cli-op-client/.s
+  10-14 v6         We are starting to sketch an initial harness design (related: ops-8decf3, ops-3f
+  10-14 quarry     It may be useful to explore VSO, both on its own, and through sunpy -- there is 
+  10-14 nexcode    We are preparing to send processed data back to a client (HAP) later today.. Par
+  10-14 nexcode    In the most recent batch of data that we are currently processing for HAP, Jen n
+  10-15 tasks      Let's create and scope / tackle small task: when parsing task identifiers as CLI
+  10-15 nexcode    I have a bunch of worktrees in .worktrees, some of which are associated with fea
+  10-15 crew       Is Pi's configuration managed in `hq` like codex and claude code, and if not wou
+  10-16 crew       # tasks-d263fc: judge whether each A–D change is mergeable Judge each label A, B
+  10-17 tasks      Let's investigate to see if we can find a work-around to Codex's inability to re
+  10-17 tasks      Read ~/.local/state/tasks/wait-backfill/judge-review.md. Each entry J1–J67 shows
+  10-18 niri-mater material-c5f9d0 is currently parked for review so that I can just the tilt sheet
+  10-18 multiple-m I agreed to give a presentation on our recent efforts related to the multiple my
+  10-18 tasks      I would like to get some experience working with Rust. My previous exposure, is 
+  10-19 resume     I am preparing to apply for an FDE position at a company developing a cloud plat
+  10-19 ops        host-b seems to still be encountering issues relating to git/index staleness. Ca
+  10-20 ops        Follow up the coverage-drop audit attached to tasks-fa3525. Its summary is at ta
+  10-21 obs        We are investigating the issue reported in obs-396637.. The task's framing was o
+  10-22 nexcode    We just recieved our third batch of data from HAP (/data/cainex/raw/HAP/NRP-dail
+  10-22 nexcode    Let's create a few linear tickets relating to the records view, and assign them 
+  10-23 crew       The replay is parked for your ruling: 76 replies completed, 92 slots remain, USD
+  10-23 science    beliefs-f24fe9 has been implemented; let's continue .worktrees/commons-1a/docs/p
+  10-24 beliefs    I thought we have made the causal + graphical model connection more clear, and t
+  10-24 ops        Let's decide on the three decisions in the review notes for `ops-2fe949`.
+  10-24 ops        `git push` is currently blocked: ``` ❯ gp vendored drift: cli.toml in obs: unkno
+  10-24 lore       prompt pattern ideas: 1. review session logs - select all for past 7 days (later
+  10-24 lore       prompt pattern ideas: 1. review session logs - select all for past 7 days (later
+  10-24 lore       prompt pattern ideas: 1. review session logs - select all for past 7 days (later
