@@ -1,6 +1,6 @@
 # ops-check adoption: implementation plan
 
-Status: revision 3, 2026-10-24.
+Status: revision 4, 2026-10-24.
 - **Revision 1** (996f187) went through a fresh-context agent review: 5 important
   findings and 12 minor.
 - **Revision 2** addresses all of them:
@@ -25,6 +25,18 @@ Status: revision 3, 2026-10-24.
   - every throwaway repository asserts both its top level and its git directory;
   - the tag dictionary gains `docs` and `session-logs`, so `tasks check` can be judged
     by printing nothing.
+
+  The user's review of it (round 3, reviewer `codex/gpt-6.1-sol`) found 2 important
+  findings.
+- **Revision 4** addresses those:
+  - the clone probe's isolated config holds the minimal registry the cleaned guides
+    cite (lore and ops), copied from the real one, so the clean commit can pass;
+  - the D7 merger validates every ops-check.toml against the checker's contract
+    (exactly `banned`, a list of non-empty strings) and refuses other shapes.
+
+  Both were checked in scratch runs. The merger refused a string, an empty item and an
+  extra key, and kept a valid list. In an isolated clone with Task 2's lore and ops
+  rewrites, the minimal registry left no reference finding, where an empty one left six.
 
 **Goal:** vendor ops's shared hygiene checker into hq and run it in the pre-commit hook,
 with the tree clean on both hosts, as designed in
@@ -151,6 +163,18 @@ import json, os, pathlib, sys, tomllib
 def fail(message):
     sys.exit(f"d7: {message}")
 
+
+def banned_list(text, where):
+    """The checker's contract for ops-check.toml: exactly `banned`, a list of non-empty strings."""
+    try:
+        data = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as error:
+        fail(f"{where}: {error}")
+    values = data.get("banned")
+    if set(data) != {"banned"} or not isinstance(values, list) or not all(isinstance(v, str) and v for v in values):
+        fail(f"{where}: expected exactly `banned = [...]`, a list of non-empty strings")
+    return values
+
 remote, config, out = map(pathlib.Path, sys.argv[1:4])
 head, sep, rest = remote.read_text().partition("---registry\n")
 registry, sep2, banned_part = rest.partition("---banned\n")
@@ -167,7 +191,7 @@ roots = lambda text: {str(pathlib.Path(r)) for r in tomllib.loads(text)["project
 here = roots((config / "tasks" / "projects.toml").read_text())
 there = roots(registry)
 own = config / "ops" / "ops-check.toml"
-values = tomllib.loads(own.read_text())["banned"] if own.exists() else []
+values = banned_list(own.read_text(), own) if own.exists() else []
 
 extra = [fields["host"]]
 if fields["home"].rstrip("/") != str(pathlib.Path.home()):
@@ -177,7 +201,7 @@ if fields["work_root"]:
 for root in sorted(there - here):
     extra += [root, str(pathlib.Path(root).parent)]
 if state == "present":
-    extra += tomllib.loads(banned_text)["banned"]
+    extra += banned_list(banned_text, "the second host's ops-check.toml")
 values += [v for v in extra if v not in values]
 out.write_text("banned = " + json.dumps(values) + "\n")
 print(f"d7: {len(extra)} second-host values banned (home {'differs' if fields['home'].rstrip('/') != str(pathlib.Path.home()) else 'same'}, "
@@ -527,8 +551,34 @@ hooks, and `## Layout`).
 - [ ] **Step 5:** Time the checker on the clean tip: `time python3 tools/ops-check`,
   three runs. Note the times on hq-c6a149, against the spec's cost risk.
 - [ ] **Step 6:** Probe the tip in a temporary clone, isolated before its first command.
-  - `base=$(mktemp -d)`. Create `$base/home`, `$base/config` (empty) and an empty
-    `$base/gitconfig`.
+  - `base=$(mktemp -d)`. Create `$base/home`, an empty `$base/gitconfig`, and
+    `$base/config/tasks/projects.toml` holding the minimal registry the cleaned guides
+    need. Those are the projects whose prefix comes before a backticked reference after
+    Task 2: `lore` (README's `instructions/AGENTS.md` and `profiles/` references) and
+    `ops` (`bin/project-colors`). No other reference in README.md or AGENTS.md carries a
+    registered prefix today; a scan of 3173288's guides found none.
+    Write it from the real registry:
+
+```sh
+python3 - "$base/config/tasks/projects.toml" lore ops <<'EOF'
+import os, pathlib, sys, tomllib
+out, keep = pathlib.Path(sys.argv[1]), sys.argv[2:]
+real = pathlib.Path(os.environ.get("XDG_CONFIG_HOME") or pathlib.Path.home() / ".config") / "tasks" / "projects.toml"
+projects = tomllib.loads(real.read_text())["projects"]
+missing = [p for p in keep if p not in projects]
+if missing:
+    sys.exit(f"probe: {missing} not registered")
+out.parent.mkdir(parents=True, exist_ok=True)
+out.write_text("[projects]\n" + "".join(f'{p} = "{projects[p]}"\n' for p in keep))
+EOF
+```
+
+    The checker only reads those checkouts (their file existence and `git ls-files`),
+    so they stay untouched. The registry gives it no route to anything else. No
+    `ops/ops-check.toml` goes into `$base/config`: the planted value is the hostname,
+    which needs no banned list. If the clean commit below is refused on a reference
+    finding, the finding names a prefix the list lacks. Add that prefix, rerun, and note
+    it on hq-c6a149.
   - Run every probe command (clone, `just setup`, add, commit) under
     `env -i PATH="$PATH" HOME="$base/home" XDG_CONFIG_HOME="$base/config" GIT_CONFIG_GLOBAL="$base/gitconfig" GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=probe GIT_AUTHOR_EMAIL=probe@example.invalid GIT_COMMITTER_NAME=probe GIT_COMMITTER_EMAIL=probe@example.invalid`.
     No other variable comes along: no credentials, no real HOME, and no inherited
