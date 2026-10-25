@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-d5ba0a-tilde-layout
 created: 2026-10-25T12:27:45Z
-updated: 2026-10-25T15:30:44Z
+updated: 2026-10-25T15:31:10Z
 started: 2026-10-25T15:07:14Z
 depends: []
 tags: [docs]
@@ -47,3 +47,4 @@ Done: run the candidate checker from ops-295f8d over hq (or reproduce its rule) 
 - 2026-10-25T15:30:34Z (fix/hq-d5ba0a-tilde-layout): retained: {"host": "titan", "kind": "scratch", "path": "$WORK_ROOT/hq/hq-d5ba0a", "state": "released", "verification": "verified", "purpose": "Removed this task-created scratch after verifying all four derivative attachments and their task mapping notes; candidate-before output is regenerable from recorded base 257c840 and checker 79f1235. Raw hq-c5fd83 sources remain unchanged.", "next_owner": "none", "cleanup_trigger": "none"}
 - 2026-10-25T15:30:44Z (fix/hq-d5ba0a-tilde-layout): Identify the current integration owner
   provenance: {"harness_session":"codex:01a17398-cc3d-7af0-9262-eb2ff49f5236","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-25T15:31:10Z (fix/hq-d5ba0a-tilde-layout): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-d5ba0a","state":"kept","verification":"verified","purpose":"Reviewed branch fix/hq-d5ba0a-tilde-layout ready for this session to merge locally into main and remove after checks; ignored entries .githooks/__pycache__, .pytest_cache, tools/hq_cli/__pycache__ and tools/session_archive/__pycache__ are regenerable test caches and will be discarded","next_owner":"session:codex:01a17398-cc3d-7af0-9262-eb2ff49f5236","cleanup_trigger":"This turn: local main integration followed by tt-report, ignored-file and host-pointer checks and worktree removal"}
