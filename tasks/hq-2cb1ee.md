@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: feat/superpowers-701
 created: 2026-10-25T12:18:32Z
-updated: 2026-10-25T12:45:41Z
+updated: 2026-10-25T12:45:49Z
 started: 2026-10-25T12:18:43Z
 depends: []
 tags: [skills]
@@ -33,3 +33,4 @@ claude-plugins-official still pins superpowers 7.0.0 (bb92a77) four days after t
 - 2026-10-25T12:38:21Z (feat/superpowers-701): review: impl round 1 — verdict: revise; findings: important 3, minor 3; reviewer: claude-code/claude-opus-5-5
 - 2026-10-25T12:45:41Z (feat/superpowers-701): gate: verified tree:e2dbc97f49206a1b510dabf134faeb51a3346054 — checks: just test exit 0 (231, 1042, 389 and 1 passed) and json.load of claude/settings.json and clean-filter output diffed to the three intended lines by the reviewer; review: important addressed merge then install at once before any new session, important addressed install while upstream main equals v7.0.1 and confirm gitCommitSha 2ce8aa15, important addressed lore skills README and lore-6c3e2c retargeted in lore-f12720, minor deferred disabled official 7.0.0 stays in installed_plugins.json, minor deferred known_marketplaces.json still records autoUpdate true though settings win, minor deferred work home runs 6.4.1 from the official marketplace; reviewer: claude-code/claude-opus-5-5
   provenance: {"harness_session":"claude-code:5f570bb5-1b44-4a25-831f-f043464ca1e2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-25T12:45:49Z (feat/superpowers-701): retro: the reviewer's ordering finding (merge vs install leaves no plugin loaded) was the real risk; config-only switches need their landing sequence reviewed, not just the diff. Official-marketplace lag is a recurring trigger worth a drift check (lore-6c3e2c).
