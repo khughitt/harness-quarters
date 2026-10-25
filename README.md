@@ -129,8 +129,19 @@ can stage. Lore checks the generated Projects block in its global instructions,
 including the staged copy at commit time. Change the owning project's
 `identity.toml` (or its table in ops's identity mirror, until it adopts), then run
 just projects in ops to refresh its owned fragment, then just assemble in lore
-to regenerate the delivered instructions and provenance manifest. Six pre-commit tests cover
-the local-layer refusal and the guide check; `just test` runs them.
+to regenerate the delivered instructions and provenance manifest.
+
+Right after that refusal the hook runs `tools/ops-check`, vendored from ops: the
+hygiene checks ops projects share (guide references, conflicted copies, agent scratch,
+machine layout and adopted copies). It reads the tracked files in the working tree,
+not the staged blobs, so a finding in any tracked file refuses every commit, record
+commits from `tasks` included, until it is fixed, and a crash or a malformed
+`.ops-check.toml` refuses too. A new attachment that carries host values (a hostname,
+the home directory, WORK_ROOT or a checkout path) follows the attachment fallback in
+lore `skills/references/retained-item-records.md`: the raw bytes stay under WORK_ROOT,
+owned by a task, and a portable derivative is attached. `.ops-check.toml` is never
+widened for an attachment. Eleven pre-commit tests cover the local-layer refusal, the
+hygiene check and the guide check; `just test` runs them.
 
 The same hook runs `tools/ops-docs check`, vendored from ops: the identity regions at
 the top of this file and of `AGENTS.md` are generated from `identity.toml`, and
@@ -252,7 +263,12 @@ MIT licensed; see `LICENSE`.
 - `docs/`: hq's specs, plans, notes (briefs, contracts and analyses), runbooks, and the
   2026-10-16 commit map in `docs/rewrites/` for old SHAs cited in records. Frozen
   documents moved to lore and flows stay as references for closed tasks.
-- `tools/ops-docs`: vendored from ops; change it there.
+- `tools/ops-docs` and `tools/ops-check`: vendored from ops; change them there.
+- `.ops-check.toml`: the paths the layout check lets carry host values. The four harness
+  settings and hooks files hold absolute paths their homes read literally. The relay
+  cutover tool, its tests, runbook and window plan use the two host names as their fleet
+  configuration; hq-7e81ed removes those entries if it retires the tool.
+  `tools/session_log_private.py` names the hosts to forbid them in session-log fixtures.
 
 ## Consumers
 
