@@ -1,6 +1,6 @@
 # ops-check adoption: implementation plan
 
-Status: revision 2, 2026-10-24.
+Status: revision 3, 2026-10-24.
 - **Revision 1** (996f187) went through a fresh-context agent review: 5 important
   findings and 12 minor.
 - **Revision 2** addresses all of them:
@@ -14,6 +14,17 @@ Status: revision 2, 2026-10-24.
   - the D7 script lives at a fixed path, takes the repository and checker as inputs,
     and reads the second host fresh on every run;
   - quoting follows the retained-item reference's heredoc form.
+
+  The user's review of it (round 2, reviewer `codex/gpt-6.1-sol`) found 3 important
+  findings and 1 minor.
+- **Revision 3** addresses those:
+  - D7 collects the second host's HOME and configured config directory, bans a
+    differing HOME, and fails on any read error except an absent banned file;
+  - the clone probe is isolated before its first command, under a temporary HOME and
+    config, and plants the hostname instead of the real home path;
+  - every throwaway repository asserts both its top level and its git directory;
+  - the tag dictionary gains `docs` and `session-logs`, so `tasks check` can be judged
+    by printing nothing.
 
 **Goal:** vendor ops's shared hygiene checker into hq and run it in the pre-commit hook,
 with the tree clean on both hosts, as designed in
@@ -52,12 +63,12 @@ exists, leave that task to its holder and note the conflict on hq-c6a149 instead
 - Baseline: `just test` (the full-suite route AGENTS.md names). Note the command, the
   test count and the result on hq-c6a149. A run that selects no tests is not a baseline.
 - Create `$WORK_ROOT/hq/hq-c6a149/` and note it on hq-c6a149 at once: the host, the
-  path in its literal `$WORK_ROOT` form, the purpose (the D7 script, a per-run tool
+  path in its literal `$WORK_ROOT` form, the purpose (the three D7 files, a per-run tool
   regenerable from this plan), owner task:hq-c6a149, and that the contents are mutable
   and not yet checkpointed. At closing, the directory is discarded and its release is
   noted.
-- Write the D7 script below to `$WORK_ROOT/hq/hq-c6a149/d7.sh` and make it executable.
-  In every shell that runs it, set:
+- Write the three D7 files below into `$WORK_ROOT/hq/hq-c6a149/` (d7.sh and
+  d7-remote.zsh executable). In every shell that runs them, set:
 
 ```sh
 OPS=$(tasks --pretty root ops-88a0fa)
@@ -65,41 +76,40 @@ export SECOND_HOST=<the host-b name from the mapping note on hq-c6a149>
 D7=$WORK_ROOT/hq/hq-c6a149/d7.sh
 ```
 
+- Correct the tag dictionary, so that `tasks check` can be judged by "prints nothing".
+  Today it warns on nine records tagged `docs` (hq-30fd95, hq-c6a149 and its seven
+  children) and four tagged `session-logs` (hq-7b131a, hq-a60cf5, hq-c1fecb,
+  hq-cff824), because neither tag has a dictionary entry. Add both to `[tags]` in
+  tasks/.config.toml, in alphabetical order:
+  - `docs = "Guides and reference documents, and the checks that keep them true."`
+  - `session-logs = "Reading harness session stores: the session-logs skill and its tools."`
+
+  Commit with `chore(tasks): define the docs and session-logs tags`. Then
+  `tasks check` prints nothing and exits 0. Every later "`tasks check` is clean" in this
+  plan means that. A new warning that appears later is dispositioned in a note on
+  hq-c6a149, never passed over.
+
+`d7.sh`, the entry point:
+
 ```bash
 #!/usr/bin/env bash
 # Spec D7: run the checker in a repository as is, then with the second host's values banned.
 # Usage: SECOND_HOST=<name> d7.sh [repo]. CHECKER overrides the checker (default: the repo's tools/ops-check).
+# Reads the second host fresh on every run with d7-remote.zsh and merges its values with d7_values.py.
 set -uo pipefail
+here=$(dirname "$(realpath "$0")")
 : "${SECOND_HOST:?export SECOND_HOST from the mapping note on hq-c6a149}"
-repo=$(cd "${1:-.}" && pwd) || exit 2
+while IFS= read -r name; do unset "$name"; done < <(compgen -e | grep '^GIT_')
+repo=$(cd "${1:-.}" && pwd -P) || exit 2
+[ "$(git -C "$repo" rev-parse --show-toplevel)" = "$repo" ] || { echo "d7: $repo is not a repository top level" >&2; exit 2; }
 checker=$(realpath "${CHECKER:-$repo/tools/ops-check}") || exit 2
 config=${XDG_CONFIG_HOME:-$HOME/.config}
 sim=$(mktemp -d); trap 'rm -rf "$sim"' EXIT
 mkdir -p "$sim/tasks" "$sim/ops"
-cp "$config/tasks/projects.toml" "$sim/tasks/"
-# Read the second host's values now, from its login environment (spec D7).
-ssh -4 -o BatchMode=yes "$SECOND_HOST" 'zsh -lc "hostname; print -r -- \$WORK_ROOT; print -- ---registry; cat ~/.config/tasks/projects.toml; print -- ---banned; cat ~/.config/ops/ops-check.toml 2>/dev/null || true"' > "$sim/remote" || { echo "d7: cannot read $SECOND_HOST" >&2; exit 2; }
-python3 - "$sim" "$config" <<'EOF' || exit 2
-import json, pathlib, sys, tomllib
-sim, config = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
-head, rest = (sim / "remote").read_text().split("---registry\n", 1)
-registry, banned_text = rest.split("---banned\n", 1)
-host, work_root = (head.split("\n") + [""])[:2]
-roots = lambda text: {str(pathlib.Path(r)) for r in tomllib.loads(text)["projects"].values()}
-here = roots((config / "tasks" / "projects.toml").read_text())
-own = config / "ops" / "ops-check.toml"
-values = tomllib.loads(own.read_text())["banned"] if own.is_file() else []
-extra = [host] + ([work_root.rstrip("/")] if work_root else [])
-for root in sorted(roots(registry) - here):
-    extra += [root, str(pathlib.Path(root).parent)]
-if banned_text.strip():
-    extra += tomllib.loads(banned_text)["banned"]
-values += [v for v in extra if v not in values]
-(sim / "ops" / "ops-check.toml").write_text("banned = " + json.dumps(values) + "\n")
-print(f"d7: {len(extra)} second-host values banned: hostname, WORK_ROOT {'set' if work_root else 'unset'}, "
-      f"{len(roots(registry) - here)} differing checkouts, banned list {'present' if banned_text.strip() else 'absent'}",
-      file=sys.stderr)
-EOF
+cp "$config/tasks/projects.toml" "$sim/tasks/" || exit 2
+ssh -4 -o BatchMode=yes "$SECOND_HOST" zsh -l -s < "$here/d7-remote.zsh" > "$sim/remote" \
+  || { echo "d7: reading $SECOND_HOST failed" >&2; exit 2; }
+python3 "$here/d7_values.py" "$sim/remote" "$config" "$sim/ops/ops-check.toml" || exit 2
 cd "$repo" || exit 2
 python3 "$checker"; first=$?
 XDG_CONFIG_HOME="$sim" python3 "$checker"; second=$?
@@ -107,10 +117,97 @@ echo "d7: primary=$first simulated=$second" >&2
 [ "$first" = 0 ] && [ "$second" = 0 ]
 ```
 
-This script was prototyped against the worktree on 2026-10-24. It banned one
-second-host value (the hostname): WORK_ROOT is unset there, no checkouts differ, and
-there is no banned list. Each run prints its `d7:` summary line. A summary that differs
-from that one is noted on hq-c6a149.
+`d7-remote.zsh`, run on the second host by a login zsh fed on stdin. Any read error
+fails it. Only an absent banned file counts as an absent list:
+
+```zsh
+# Read on the second host by a login zsh (ssh <host> zsh -l -s < remote.zsh). Any read error fails.
+setopt err_exit no_unset pipe_fail
+h=$(hostname)
+cfg=${XDG_CONFIG_HOME:-$HOME/.config}
+print -r -- "host=$h"
+print -r -- "home=$HOME"
+print -r -- "work_root=${WORK_ROOT-}"
+print -r -- "config=$cfg"
+print -r -- "---registry"
+cat -- "$cfg/tasks/projects.toml"
+print -r -- "---banned"
+f=$cfg/ops/ops-check.toml
+if [[ -e $f || -L $f ]]; then
+  print -r -- "present"
+  cat -- "$f"
+else
+  print -r -- "absent"
+fi
+```
+
+`d7_values.py`, which merges that host's values into the simulated banned list:
+
+```python
+"""Spec D7: merge the second host's layout values into a banned list for a simulated run.
+Usage: python3 d7_values.py <remote-output> <local-config-dir> <out-ops-check.toml>. Exits 2 on any malformed input."""
+import json, os, pathlib, sys, tomllib
+
+def fail(message):
+    sys.exit(f"d7: {message}")
+
+remote, config, out = map(pathlib.Path, sys.argv[1:4])
+head, sep, rest = remote.read_text().partition("---registry\n")
+registry, sep2, banned_part = rest.partition("---banned\n")
+if not (sep and sep2):
+    fail("remote output lacks its sections")
+fields = dict(line.split("=", 1) for line in head.splitlines())
+if set(fields) != {"host", "home", "work_root", "config"} or not fields["host"] or not fields["home"]:
+    fail(f"remote header is malformed: {sorted(fields)}")
+state, _, banned_text = banned_part.partition("\n")
+if state not in ("present", "absent"):
+    fail(f"remote banned state is {state!r}")
+
+roots = lambda text: {str(pathlib.Path(r)) for r in tomllib.loads(text)["projects"].values()}
+here = roots((config / "tasks" / "projects.toml").read_text())
+there = roots(registry)
+own = config / "ops" / "ops-check.toml"
+values = tomllib.loads(own.read_text())["banned"] if own.exists() else []
+
+extra = [fields["host"]]
+if fields["home"].rstrip("/") != str(pathlib.Path.home()):
+    extra.append(fields["home"].rstrip("/"))
+if fields["work_root"]:
+    extra.append(fields["work_root"].rstrip("/"))
+for root in sorted(there - here):
+    extra += [root, str(pathlib.Path(root).parent)]
+if state == "present":
+    extra += tomllib.loads(banned_text)["banned"]
+values += [v for v in extra if v not in values]
+out.write_text("banned = " + json.dumps(values) + "\n")
+print(f"d7: {len(extra)} second-host values banned (home {'differs' if fields['home'].rstrip('/') != str(pathlib.Path.home()) else 'same'}, "
+      f"WORK_ROOT {'set' if fields['work_root'] else 'unset'}, {len(there - here)} differing checkouts, banned list {state})", file=sys.stderr)
+```
+
+The second host's values are collected from its login environment:
+- its hostname;
+- its HOME, banned when it differs from this host's;
+- its WORK_ROOT, when set;
+- its configured config directory (`${XDG_CONFIG_HOME:-$HOME/.config}`), from which
+  the registry and the banned list are read;
+- each registered checkout that differs from this host's, with its parent;
+- its banned list.
+
+Every inherited `GIT_*` variable is unset first, and the repository must be its own top
+level.
+
+The files were prototyped on 2026-10-24:
+- live against the worktree, the second host contributed one value (the hostname): its
+  HOME is the same, its WORK_ROOT is unset, no checkouts differ, and it has no banned
+  list;
+- the collector exited non-zero when the banned path was a directory and when the
+  registry was missing;
+- the merger banned a differing HOME, WORK_ROOT, checkout and banned list from a crafted
+  remote, and failed on malformed input;
+- the run ignored an inherited `GIT_DIR`.
+
+Each run prints its `d7:` summary line. A summary that differs from the live one above
+is noted on hq-c6a149.
 
 ### Task 1: Adopt tools/ops-check
 
@@ -312,6 +409,9 @@ EOF
   - make a temporary directory and `git init` it with every inherited `GIT_*` variable
     unset, `GIT_CONFIG_GLOBAL` set to an empty temporary file, `GIT_CONFIG_NOSYSTEM=1`,
     and `GIT_AUTHOR_*` and `GIT_COMMITTER_*` set to test values;
+  - before its first write, assert both that `git -C <throwaway> rev-parse --show-toplevel`
+    is the directory (physical path, `pwd -P`) and that
+    `git -C <throwaway> rev-parse --absolute-git-dir` lies inside it;
   - put the derivative at its root under its own name (never under tasks/, where
     records are exempt) and `git add` it, since the checker reads tracked files;
   - run `CHECKER="$PWD/tools/ops-check" "$D7" <throwaway>` from the worktree. Both runs
@@ -426,16 +526,23 @@ hooks, and `## Layout`).
   the same handling as Task 6 Step 1. Then run `"$D7" .` on the tip; it exits 0.
 - [ ] **Step 5:** Time the checker on the clean tip: `time python3 tools/ops-check`,
   three runs. Note the times on hq-c6a149, against the spec's cost risk.
-- [ ] **Step 6:** Probe the tip in a temporary clone:
-  - `probe=$(mktemp -d)/hq`, `git clone -q . "$probe"`, then `just setup` there;
-  - keep the real `HOME`, so the planted value is a real layout value. Unset every
-    inherited `GIT_*` variable, set `GIT_CONFIG_GLOBAL` to an empty temporary file and
-    `GIT_CONFIG_NOSYSTEM=1`, and set `GIT_AUTHOR_*` and `GIT_COMMITTER_*` to test values;
-  - before the first write, assert that `git rev-parse --show-toplevel` is the clone;
-  - add a file holding the home path and commit: refused, with `machine layout` in
-    stderr;
-  - remove that file, add a clean one and commit: succeeds;
-  - `rm -rf` the clone's parent directory.
+- [ ] **Step 6:** Probe the tip in a temporary clone, isolated before its first command.
+  - `base=$(mktemp -d)`. Create `$base/home`, `$base/config` (empty) and an empty
+    `$base/gitconfig`.
+  - Run every probe command (clone, `just setup`, add, commit) under
+    `env -i PATH="$PATH" HOME="$base/home" XDG_CONFIG_HOME="$base/config" GIT_CONFIG_GLOBAL="$base/gitconfig" GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=probe GIT_AUTHOR_EMAIL=probe@example.invalid GIT_COMMITTER_NAME=probe GIT_COMMITTER_EMAIL=probe@example.invalid`.
+    No other variable comes along: no credentials, no real HOME, and no inherited
+    `GIT_*`.
+  - Under that env, `git clone -q --no-local <worktree> "$base/hq"`, then `just setup`
+    in the clone.
+  - Before the first write, assert in the clone both that
+    `git rev-parse --show-toplevel` is `$base/hq` (physical path) and that
+    `git rev-parse --absolute-git-dir` lies inside it.
+  - Plant this host's name. Add a file whose content is the output of `hostname`, and
+    commit: refused, with `machine layout` and `(the hostname)` in stderr. The hostname
+    is a layout value under any HOME, so the probe needs no real home path.
+  - Remove that file, add a clean one and commit: succeeds.
+  - `rm -rf "$base"`.
 - [ ] **Step 7:** `tasks check` is clean, and `git status` is clean.
 
 ## Verification and closing (flow)
