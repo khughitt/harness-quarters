@@ -35,8 +35,8 @@ effort until the first pick.
 
 The working tree keeps the harness's last pick, and a checkout of the file drops it.
 `.githooks/live-picks` puts it back. At every turn end it saves the picks from
-`claude/settings.json` and `codex/config.toml` in `local/live-picks.json`, and
-`pi/settings.json` in the separate `local/live-picks-pi.json` record. The
+`claude/settings.json` and `codex/config.toml` in local/live-picks.json, and
+`pi/settings.json` in the separate local/live-picks-pi.json record. The
 `post-checkout`, `post-merge` and `post-rewrite` hooks restore it right after a git
 command drops it, in the main checkout only, and the next turn end restores it where
 no hook runs (the commands listed below for trust). Each picker's fields are one unit:
@@ -55,7 +55,7 @@ not a capture point. The tested Codex picker actions kept both model fields; use
 `forget` to return it to its default. A Claude or Codex pick made since the last
 turn end is not saved yet; a git command in that window brings back the one before.
 
-pi's `extensions/harness-state.ts` calls the same refresh after `model_select` and
+The pi extension `pi/extensions/harness-state.ts` calls the same refresh after `model_select` and
 `thinking_level_select` (yielding for the settings write), at `agent_settled` and at
 `session_shutdown`. Setting the current model or thinking level as the default can
 emit no event: that default is saved at the next turn end or exit. A Git rewrite in
@@ -73,7 +73,7 @@ overwritten, and deleting it starts that record over. pi's separate record lets 
 previous tool keep saving Claude and Codex picks during recovery. To back the extension
 out, revert its merge, remove the `~/.pi/agent/extensions/harness-state.ts` link on each
 host and run `just link-check`.
-The previous tool ignores `local/live-picks-pi.json`, which may be deleted; Claude and
+The previous tool ignores local/live-picks-pi.json, which may be deleted; Claude and
 Codex preservation continues. pi then keeps defaults only until a Git rewrite drops
 them.
 
@@ -83,7 +83,7 @@ out of the index the same way. So any git command that writes a new blob of
 `codex/config.toml` over the live file drops the whole list, on every host at once,
 since the checkout is shared through Dropbox. `.githooks/codex-trust` puts it back. At
 every turn end the Stop hook below saves the live tables into
-`local/codex/trust.toml`, never removing one, and inserts the ones the live file lacks
+local/codex/trust.toml, never removing one, and inserts the ones the live file lacks
 before its first table header. The `post-checkout`, `post-merge` and `post-rewrite`
 hooks insert them right after a switch, a checkout of the file, a merge or a rebase,
 in the main checkout only. A hook that fails reports on stderr and exits 0, so a
@@ -93,7 +93,7 @@ switch that worked does not exit 1; the next turn end retries. Where no hook run
 fresh clone that has a saved copy), the list is back at the next turn end. A Codex session started before
 then asks again. While the main checkout is on a branch older than these hooks,
 nothing restores the list until the checkout switches back. A table Codex added since
-the last turn end is not saved yet. `local/codex/trust.toml` is machine-owned: capture rewrites it whole, so a comment
+the last turn end is not saved yet. local/codex/trust.toml is machine-owned: capture rewrites it whole, so a comment
 added by hand is lost. Restoring also takes group and other access off the live
 `codex/config.toml`, which a checkout rewrites with the umask's mode. Nothing prunes the
 saved copy: to forget a directory, run `.githooks/codex-trust forget <path>`, which
@@ -143,8 +143,8 @@ Things you can take from here without the rest:
 - `agents/skills/session-logs/` and `agents/bin/session-episodes`: read local harness
   session stores and turn transcripts into evidence. The remaining agent tools,
   including `agents/bin/wake-judge`, stay here.
-- Global instructions live in lore at `./instructions/AGENTS.md`; profile fragments
-  live in lore at `./profiles/`. General skills and their references live in lore,
+- Global instructions live in lore `instructions/AGENTS.md`; profile fragments
+  live in lore `profiles/`. General skills and their references live in lore,
   including its pinned superpowers submodule. The manifest links each skill to its
   owner: lore, flows, [tasks](https://github.com/khughitt/tasks), ops, or hq's
   session-logs skill.
@@ -171,7 +171,7 @@ MIT licensed; see `LICENSE`.
 ## Layout
 
 - `AGENTS.md`: hq's project guide; `just docs` generates its identity region.
-  Harness global-file links target lore's `./instructions/AGENTS.md`.
+  Harness global-file links target lore `instructions/AGENTS.md`.
 - `links.toml` and `tools/harness-links`: declarations and reconciliation for real
   harness homes and links into registered owner checkouts. A link-assembled directory
   holds one symlink per entry, so a search rooted there is empty unless the searcher
@@ -214,12 +214,12 @@ MIT licensed; see `LICENSE`.
   carry any configuration it holds into `pi/settings.json`, then apply. pi writes the
   settings file in place, so `/settings` changes land in `pi/settings.json`; its default
   model and thinking level and its installation ids are filtered out of the index, and
-  `auth.json`, `trust.json`, `models-store.json` and `sessions/` stay in the home. The
+  auth.json, trust.json, models-store.json and sessions/ stay in the home. The
   checkout is shared between hosts, so they share one `deviceId` (the host id pi sends
   at an OpenAI login). The extension preserves its default model and thinking level
   (Setup above); installation ids are not saved, so a checkout drops
   `deviceId`, which pi makes anew at the next OpenAI login. Other home files
-  (`keybindings.json`, `APPEND_SYSTEM.md`, `prompts/`, `themes/`, other extensions) get a
+  (keybindings.json, APPEND_SYSTEM.md, prompts/, themes/, other extensions) get a
   `[harness.pi.links]` line once they have content. A `--tools` list of plain names
   declares no MCP tool that none of its entries matches, and a server at `exposure:
   direct` then has its tools unreachable even from codemode, with no warning. A run
@@ -235,7 +235,7 @@ MIT licensed; see `LICENSE`.
   retry, finish and recovery. The superseded manual procedure and its rehearsal evidence stay
   as reference.
 - `local/`: untracked, and carried between hosts by Dropbox, not git. It holds
-  `claude/settings.work.json`, `codex/config.work.toml` and `codex/rules/`, the files
+  claude/settings.work.json, codex/config.work.toml and codex/rules/, the files
   a home links to that the repository must not publish. The `~/.claude-work`,
   `~/.codex-work` and `~/.codex/rules` links point into it
   (`docs/specs/2026-09-28-local-layer-design.md`).
@@ -257,8 +257,8 @@ MIT licensed; see `LICENSE`.
 ## Consumers
 
 Harnesses consume settings, hooks and declared owner links from hq. Their global
-instructions come from lore's `./instructions/AGENTS.md`, where ops renders the
-Projects block; ops-profile reads lore's `./profiles/`. The session archive timers
+instructions come from lore `instructions/AGENTS.md`, where ops renders the
+Projects block; ops-profile reads lore `profiles/`. The session archive timers
 consume hq's capture and prune tools. Lore owns the corpus and its block check.
 
 ## Finding a past session
@@ -268,7 +268,7 @@ consume hq's capture and prune tools. Lore owns the corpus and its block check.
 by default (`-n` changes it). `hq sessions -i` picks one, with fzf when it is on `PATH`
 and a numbered prompt otherwise, and resumes it in its own harness, home and recorded
 cwd. It reads each harness's own metadata and keeps no index
-(`docs/notes/2026-10-15-session-discovery-contract.md`): Claude's `history.jsonl` with
+(`docs/notes/2026-10-15-session-discovery-contract.md`): Claude's history.jsonl with
 the transcript found under `projects/*/<id>.jsonl`, and Codex's `state_5.sqlite`
 `threads` table.
 
@@ -277,8 +277,8 @@ the transcript found under `projects/*/<id>.jsonl`, and Codex's `state_5.sqlite`
   a label: the Codex thread's name or title, or the Claude session's first prompt.
   Recency is the Claude transcript's mtime and Codex's `recency_at_ms`.
 - **Place.** The cwd's tasks project prefix (`ops`, `mm`), `prefix@<worktree>` in one
-  of its worktrees, `prefix/.worktrees` for the worktree directory itself, and any
-  directory below them (`hq/tools`). Other cwds show their `~`-shortened path: one
+  of its worktrees, prefix/.worktrees for the worktree directory itself, and any
+  directory below them (hq/tools). Other cwds show their `~`-shortened path: one
   outside every project, one that two projects' former locations claim, and one tasks
   cannot read (permission denied, a stale mount), which the footer counts as
   `unresolved cwds`. One `tasks resolve --stdin` call names the shown rows' cwds;
@@ -295,7 +295,7 @@ the transcript found under `projects/*/<id>.jsonl`, and Codex's `state_5.sqlite`
   hue, before dimming, reads at 3:1 or better on both dark and light backgrounds. Output
   is 24-bit when `COLORTERM` is `truecolor` or `24bit`; otherwise each colour has a
   hand-picked xterm-256 stand-in that passes the same check, a project's stand-in is
-  derived as ops's `bin/project-colors` derives it (the nearest entry in OKLab among
+  derived as ops `bin/project-colors` derives it (the nearest entry in OKLab among
   those that pass), and age takes five steps that lose saturation, from teal to gray,
   rather than lightness (under about 10 minutes, 2 hours, 20 hours, 9 days, older; the
   last two grays are close). Cells are padded outside their colour codes, so the columns
@@ -317,7 +317,7 @@ the transcript found under `projects/*/<id>.jsonl`, and Codex's `state_5.sqlite`
 - **Not listed.** Personal Codex rollouts from before 2026-07-08 that have no `threads`
   row are outside the list. Whether
   `codex resume <id>` still opens them has not been tested.
-- **Errors.** A missing or unreadable `history.jsonl` or `state_5.sqlite` in an
+- **Errors.** A missing or unreadable history.jsonl or `state_5.sqlite` in an
   existing home, a `threads` table without a column the list reads, or a thread value of
   an unexpected type (a NULL or relative `cwd` or `rollout_path`, say) stops the command
   with the file named: Codex's schema is internal, and a version change must stop the
@@ -467,7 +467,7 @@ the command line itself (`/tas <id>`), because the engine keeps every slash comm
 invocation. Very long output is cut to what a pane can draw, with a line saying how
 many lines were left out.
 
-The engine writes `.claude-plugin/types/` and `tsconfig.json` into each mod folder
+The engine writes .claude-plugin/types/ and tsconfig.json into each mod folder
 when it loads one, and the mod's `.gitignore` covers them. `tsc -p claude/mods/<name>`
 then type-checks it, and `just mods` runs `claude plugin validate` and
 `claude plugin test` on every mod.

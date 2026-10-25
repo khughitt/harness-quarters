@@ -36,7 +36,7 @@ The generated global Projects block is checked by lore.
 - `agents/skills/session-logs/`: session-store guidance. `agents/bin/` keeps
   session-episodes, wake-judge and their tests.
 - `pi/`: the pinned pi install (`just pi-install`), its launcher, the `settings.json`
-  its home links to, the pick-preserving `extensions/harness-state.ts`, and the probes
+  its home links to, the pick-preserving `pi/extensions/harness-state.ts`, and the probes
   behind the `pi` and `pi-durable` facts. A version change reruns the probes (README.md).
 - `relay/`: the pinned relay runtime (`just relay-install`) and its launcher.
 - `tools/session-archive` and `systemd/user/`: transcript capture and pruning.
