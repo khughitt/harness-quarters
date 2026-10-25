@@ -172,10 +172,13 @@ before evaluation.
   historical drafts whose repository, commit and blob hashes were validated inside
   the helper.
 - **Derived variants:** all three were blocked as expected. V04 had no revision,
-  V05 a commit and hash in conflict, and V06 a stale revision with later verdicts
-  when evaluated as current. All six cases matched their frozen expectations.
+  V05 a constructed commit-and-hash conflict, and V06 a stale revision with later
+  verdicts when evaluated as current. All six cases matched their frozen
+  expectations.
 - **Self-checks:** 16 fixture cases passed. Disabling each of the 11 checks in turn
-  failed the case aimed at it.
+  failed the case aimed at it. In 5 of those the result was an unsafe ready draft,
+  so that check is the only protection. In 2 an overlapping check still blocked the
+  case, and in 4 drafting crashed on the missing data.
 
 The prior misbindings came from resolution. The right tasks were the ones that
 linked the artifact and parked a review of it: fam-6e8321 for C01, not relay-fe38b1,
@@ -205,13 +208,19 @@ These three historical examples establish behaviour, not coverage.
 Recommendation: design a narrow, print-only preview that starts from the artifact
 path a request already gives. It should:
 
-- propose the latest commit touching that path and the task linking it;
+- propose the latest commit touching that path on the HEAD of the checkout or
+  worktree it names;
+- propose the task that names the path in its spec field or notes;
 - refuse when the working file differs from that blob;
 - show prior verdicts and later revisions;
 - print an editable draft.
 
-In a post-hoc check, this recovered the right revision and task for both spec
-cases. Pre-filling from a task's latest review handoff was rejected: it held the
+A post-hoc check gave mixed support:
+
+- **Task:** the lookup found the corrected task in both spec cases. For C03 it
+  matched through notes only, because the spec field was set after the request.
+- **Revision:** independently confirmed only for C03. C01's revision was derived by
+  this same rule. Pre-filling from a task's latest review handoff was rejected: it held the
 full selection only for C03, and for C02 it was a superseded plan review.
 Implementation reviews still need their commit stated. Whether handoffs should
 record the reviewed revision in a stable shape is a design question, not an
