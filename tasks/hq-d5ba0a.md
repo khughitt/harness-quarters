@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-d5ba0a-tilde-layout
 created: 2026-10-25T12:27:45Z
-updated: 2026-10-25T15:31:10Z
+updated: 2026-10-25T15:31:11Z
 started: 2026-10-25T15:07:14Z
 depends: []
 tags: [docs]
@@ -48,3 +48,5 @@ Done: run the candidate checker from ops-295f8d over hq (or reproduce its rule) 
 - 2026-10-25T15:30:44Z (fix/hq-d5ba0a-tilde-layout): Identify the current integration owner
   provenance: {"harness_session":"codex:01a17398-cc3d-7af0-9262-eb2ff49f5236","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-25T15:31:10Z (fix/hq-d5ba0a-tilde-layout): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-d5ba0a","state":"kept","verification":"verified","purpose":"Reviewed branch fix/hq-d5ba0a-tilde-layout ready for this session to merge locally into main and remove after checks; ignored entries .githooks/__pycache__, .pytest_cache, tools/hq_cli/__pycache__ and tools/session_archive/__pycache__ are regenerable test caches and will be discarded","next_owner":"session:codex:01a17398-cc3d-7af0-9262-eb2ff49f5236","cleanup_trigger":"This turn: local main integration followed by tt-report, ignored-file and host-pointer checks and worktree removal"}
+- 2026-10-25T15:31:11Z (fix/hq-d5ba0a-tilde-layout): gate: verified tree:795d49e9d9d2d91c1058a960c552bb8fbff27fef — checks: just test 1668 passed and candidate ops-check exit 0 and installed ops-check exit 0 and ops-docs check clean and tasks check clean and four derivative mappings plus all twelve raw hashes verified; review: minor addressed README placeholder now uses backticks; reviewer: codex/gpt-6.1-sol
+  provenance: {"harness_session":"codex:01a17398-cc3d-7af0-9262-eb2ff49f5236","harness_session_source":"CODEX_THREAD_ID"}
