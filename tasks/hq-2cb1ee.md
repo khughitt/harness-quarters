@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-10-25T12:18:32Z
-updated: 2026-10-25T12:18:43Z
+updated: 2026-10-25T12:19:12Z
 started: 2026-10-25T12:18:43Z
 depends: []
 tags: [skills]
@@ -21,3 +21,4 @@ claude-plugins-official still pins superpowers 7.0.0 (bb92a77) four days after t
 
 - 2026-10-25T12:18:43Z (main): started
   provenance: {"harness_session":"claude-code:5f570bb5-1b44-4a25-831f-f043464ca1e2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-25T12:19:12Z (main): trial: flow-trial-1 — enrolled — flow on
