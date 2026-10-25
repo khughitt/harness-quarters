@@ -40,6 +40,7 @@ Every identifier, path, task id, model name and text in them is synthetic.
 | CW2 | `home/.claude-work/projects/-w-beta/c0000000-0000-4000-8000-00000000000c.jsonl` | Claude, work | a `--resume` fork of CW: lines 1–3 copied, then a third push |
 | XP | `home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-00-01900000-0000-7000-8000-0000000000a1.jsonl` | Codex, personal | the controller: injected context, the human ask, `spawn_agent`, wait |
 | XC | `home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-11-01900000-0000-7000-8000-0000000000c1.jsonl` | Codex, personal | XP's unforked child: an encrypted dispatch and a successful `tasks feedback` |
+| XG | `home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-32-01900000-0000-7000-8000-0000000000c2.jsonl` | Codex, personal | XC's depth-2 child; `session_id` names root XP, while native spawn metadata names controller XC |
 | XA | `home/.codex/archived_sessions/rollout-2026-09-20T09-00-00-01900000-0000-7000-8000-0000000000a2.jsonl` | Codex, personal, archived | a human turn listing eight review findings beside an AGENTS.md injection that names them |
 | XW | `home/.codex-work/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01900000-0000-7000-8000-0000000000b1.jsonl` | Codex, work | a one-turn session in `/w/beta` |
 | CD | `degraded/.claude/projects/-w-delta/c0000000-0000-4000-8000-00000000000d.jsonl` | Claude, personal | a malformed line 2; line 3 mentions a cleanup command clipped from absent session `c0000000-0000-4000-8000-00000000000f` (CF) |
@@ -47,7 +48,7 @@ Every identifier, path, task id, model name and text in them is synthetic.
 | XD | `degraded/.codex/sessions/2026/10/11/rollout-2026-10-11T10-00-00-01900000-0000-7000-8000-0000000000d1.jsonl` | Codex, personal | ends in a partial line 3 with no newline, as a live append leaves it |
 | SDK | `captures/sdk-stream.jsonl` | Claude SDK `stream-json` capture | two Agent dispatches whose child events carry `parent_tool_use_id` |
 | CM | `turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000021.jsonl` | Claude, personal | thirteen turns under the `turn_duration` marker rule (SL11) |
-| CT1 | `turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000022.jsonl` | Claude, personal | the session the task document's stamped note names |
+| CT1 | `turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000022.jsonl` | Claude, personal | two completed turns (`CT1:1`–`CT1:7`, `CT1:8`–`CT1:11`); the task document's stamped note falls inside only the first |
 | CT2 | `turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000023.jsonl` | Claude, personal | a prompt that only mentions zz-000021 |
 | CT3 | `turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000024.jsonl` | Claude, personal | three failing `tasks start zz-000021` calls, one alone and two in `&&` chains |
 | XE | `turns/.codex/sessions/2026/10/12/rollout-2026-10-12T10-00-00-01900000-0000-7000-8000-0000000000e1.jsonl` | Codex, personal | seven turns: phases, mirrors, questions, an abort, a null and a phaseless final, two unended turns, a child's report |
@@ -73,10 +74,9 @@ attachments. Every `turn_duration` follows a `stop_hook_summary` with empty `hoo
 as in live files, except `CM:59`: live files write none between a `<synthetic>` message
 and its `turn_duration`. Codex `ordinal`s count from 0, as live ones do. TD is the output
 of the real `tasks` CLI (`tasks 0.4.0`) over a scratch registry holding a `zz` project,
-with the task's id and times then set to the fixture's.
-Its field paths are therefore the CLI's own, `harness_session_source` included, which the
-CLI writes as `CLAUDE_CODE_SESSION_ID`. The two escape files are explicit files, not a
-home.
+with the task's id and times then set to the fixture's. Its field paths are therefore the
+CLI's own, `harness_session_source` included, which the CLI writes as
+`CLAUDE_CODE_SESSION_ID`. The two escape files are explicit files, not a home.
 
 The records follow the formats observed on this host on 2026-10-20 (Claude Code 2.1.x,
 Codex CLI 0.163):
@@ -88,10 +88,17 @@ Codex CLI 0.163):
 - Prompt records carry `origin.kind`. A typed prompt also carries `promptSource`
   `typed`; a slash-command record carries none.
 - A Codex root's `session_meta` has `session_id` equal to its `id`. An unforked child
-  (`fork_turns` `none`) has a single `session_meta` whose `session_id` is the parent's.
+  (`fork_turns` `none`) has a single `session_meta` whose `session_id` is the root's:
+  that equals XC's controller at depth 1, but differs from XG's controller at depth 2.
   A forked child also has a second, inherited `session_meta` whose `payload.id` is the
   parent's (E069). XK is the only fixture that forks. As in live forked children, its first
   `session_meta` carries `forked_from_id` and `parent_thread_id` equal to the inherited id.
+- Codex `spawn_agent` arguments and their paired JSON outputs use compact JSON strings,
+  as live records do. Failing Bash results keep their native prefixes: `CA:7` begins
+  `PreToolUse:Bash hook error:` and `CW:6` begins `Exit code 1`.
+- Native Claude records can carry both `sessionId` and a different `session_id`. `CA:3`
+  and `CA:6` reproduce that shape. The second field alone identifies neither this native
+  transcript nor an SDK stream; this case makes no claim about how it was allocated.
 
 The project's other tests build their homes under `tmp_path`. These fixtures are static
 files instead, so that a reader in any language can replay them and anyone can inspect
@@ -138,7 +145,7 @@ Each case states the question in the abstract, independent of CLI spelling.
 |---|---|---|---|---|
 | SL1 | Record formats and parser fidelity | E008 | CA | observed; the request-blob copy and the unknown record kind are synthetic |
 | SL2 | Reconstruct or verify what happened | E002 | CA | observed shape; synthetic content |
-| SL3 | Runtime identity and model attribution | E092, E160 | XP, XC, CA, AG | observed; depth 1, unforked |
+| SL3 | Runtime identity and model attribution | E092, E160 | XP, XC, XG, CA, AG | observed at depth 1; depth-2 control uses live metadata shapes |
 | SL4 | Store coverage, retention and availability | E036, E044 | home | observed; the Codex-work session is synthetic |
 | SL5 | Recover earlier content | E152, E052, E126 | XA, CW, CW2 | observed; the archived placement and the repeated AGENTS.md phrase are synthetic |
 | SL6 | Measure patterns across sessions | E175, E126 | CW, CW2 | observed |
@@ -182,6 +189,8 @@ records a reader does not recognise.
   with the same ids, and has no uuid or timestamp. It is a copy, not two more calls.
 - `CA:16` (`future-record-kind`) appears in a bounded raw or unfiltered stream with its
   line reference. It is not dropped. `CA:13` (`queue-operation`) is metadata.
+- `CA:3` and `CA:6` carry native `sessionId` CA alongside `session_id`
+  `c0000000-0000-4000-8000-00000000009a`. That second id is not CA's identity.
 
 **Hard negative.** Counting tool_use blocks per file gives seven, not five.
 
@@ -210,8 +219,8 @@ afterwards?
 
 ### SL3 — runtime model, creation model and controller
 
-**Question.** Which model ran child XC, and which thread controls it? For the Claude
-child AG, which model ran it?
+**Question.** Which models ran children XC and XG, and which threads control them?
+For the Claude child AG, which model ran it?
 
 **Expected.**
 - **XC's models.** Runtime model `codex-model-b`, from `XC:3` `turn_context`, turn
@@ -221,6 +230,11 @@ child AG, which model ran it?
   `codex-model-a` (`XP:3`).
 - **XC's controller.** XP, by `child_to_parent` from `XC:1`
   `source.subagent.thread_spawn.parent_thread_id` (`native_metadata`).
+- **XG's model and controller.** Runtime `codex-model-c` from `XG:3`, turn `turn-g1`.
+  Its controller is XC, by `child_to_parent` from `XG:1`
+  `source.subagent.thread_spawn.parent_thread_id`, with depth 2 and agent path
+  `/root/filer/reviewer`. Its `session_id` names XP, the root, which differs from
+  both its own `payload.id` and its controller.
 - **AG's models.** Runtime model `claude-model-b`, from its assistant records'
   `message.model`. Two other model values are not runtime evidence:
   - `sonnet` in the dispatch input (`CA:11#0`) and in the child's `.meta.json` is a
@@ -233,15 +247,10 @@ child AG, which model ran it?
   identify XC. XC's own id is `payload.id`.
 - XC has one `session_meta`, as an unforked child does.
 
-**Limits.**
-- At depth 1, `session_id` equals the controller. At depth 2 the two differ, so a reader
-  that takes the controller from `session_id` passes SL3 and SL7 here but fails on
-  deeper children.
-- A forked child carries a second `session_meta` with the parent's id, plus copied parent
-  history (E069). A reader that takes the last or every `session_meta` gives such a child
-  its parent's identity.
-
-No depth-2 or forked fixture is included.
+**Fork control.** SL11's existing XK fixture carries a second `session_meta` with the
+parent's id, plus copied parent history (E069). A reader that takes the last or every
+`session_meta` gives it its parent's identity. Its missing-parent and copy-boundary
+limits remain stated in SL11; no duplicate fork fixture is needed here.
 
 ### SL4 — stores, homes and coverage
 
@@ -287,7 +296,9 @@ report?
 
 Five tool_result blocks match. `CW:7#0` (request blob) and `CW2:3#0` (resume copy) repeat
 `toolu_fx_push1`. `CW:4` is an injected reminder that mentions pre-push and is no hook
-output. The personal home holds none of these.
+output. `CW:6#0` starts with `Exit code 1` before the duration, so matching the duration
+only at the start of the output misses this failure. The personal home holds none of
+these.
 
 The answer comes from ordinary JSON processing of the reader's records, for example
 filtering to tool outputs in work homes, then grouping by call id with `jq` or Python.
@@ -493,12 +504,16 @@ Its note at `2026-10-12T12:00:30Z` is stamped with `harness_session`
 | Session | Evidence | Turn | Ownership |
 |---|---|---|---|
 | CT1 | `provenance_stamp`, ref zz-000021 with the note's `at` | `CT1:1`–`CT1:7`, whose span holds 12:00:30 | yes |
+| CT1 | `task_evidence: session`, association through the session's stamp | `CT1:8`–`CT1:11`, after the note's span | session association only: no evidence inside this turn |
 | CT3 | `unsuccessful_task_command` at `CT3:2#0`: one segment, result `CT3:3#0` `is_error` (basis `result_is_error`) | `CT3:1`–`CT3:10` | no: an attempt |
 | CT3 | `task_command` at `CT3:4#0` (`false && tasks start zz-000021`) and `CT3:6#0` (`tasks start zz-000021 && false`), results `is_error` | `CT3:1`–`CT3:10` | no |
 | CT2 | `textual_mention` at `CT2:1`, selected only when mentions are asked for | `CT2:1`–`CT2:4` | no |
 
-CT1's records never name zz-000021: the stamp is its only evidence. Without obs's index
-only the stamp is found, and coverage says so.
+CT1's records never name zz-000021: the stamp is its only evidence. Its two typed-human
+turns are completed: the first spans 12:00:00–12:01:01 and the second 12:02:00–12:02:11.
+Only the first holds the note at 12:00:30. The second carries the session-level label,
+which associates it with the task without claiming evidence inside that turn. Without
+obs's index only the stamp is found, and coverage says so.
 
 **Hard negatives.**
 - A chain's error result belongs to the whole chain. `false && tasks start zz-000021`
@@ -525,7 +540,7 @@ only the stamp is found, and coverage says so.
 | Human versus injected or copied history (by origin, not by a leading `<`) | SL1, SL2, SL5, SL6, SL7, SL8, SL11 |
 | Runtime versus creation (and requested) model | SL1, SL3 |
 | Child→parent, parent→child, SDK dispatch links | SL3, SL7, SL8, SL9 |
-| Incidental and inherited parent fields | SL3 (and its forked limit), SL8 |
+| Incidental and inherited parent fields | SL3, SL8, SL11 |
 | Mention versus work ownership | SL2, SL7, SL11 |
 | Empty match with missing, unreadable, malformed, truncated coverage | SL4, SL10 |
 | Unknown outcomes preserved | SL7 (unavailable brief without binding), SL10, SL11 (escaped text in a malformed line) |

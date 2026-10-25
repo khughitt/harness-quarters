@@ -31,7 +31,7 @@ implementation plan is attached to hq-c411df.
   aggregates (15) and one batch trace motivate search + show. Historical outputs were
   required in 64 episodes; 18 needed relationships: eight child-to-parent, twelve
   parent-to-child, with two using both. Formats, behavior and aggregates cost most
-  in recorded tool time. At least 51 scratch scripts and 377 inline parsers were
+  in recorded tool time. At least 52 scratch scripts and 377 inline parsers were
   observed. Outcomes were 177 found, three bounded not-found and three unknown.
   These describe a bounded retained sample, not prevalence or a tool success rate.
 - **Completed location probe, hq-a1c591 (228f751).** The
@@ -79,7 +79,7 @@ Its transfer waits until after flow-trial-1 readout; assess effects on enrolled
 sessions and measurement explicitly. Planning does not authorize that transfer.
 The probe's SQL is research evidence, not an approved consumer API.
 
-Keep deferred annotation/wording corrections in hq-edf5de and fixture corrections in
+Annotation/wording corrections are completed in hq-edf5de and fixture corrections in
 hq-c1fecb. tasks-516ab4 may add reporting-session stamps; older reports still require
 content/output anchoring. obs-c5c599 covers report-to-session tracing, hq-ea0975
 measures search cost, and hq-fce47e / lore-f71994 address a session's own model stamp.
