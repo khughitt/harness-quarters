@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: test/hq-a45dd8-two-turn-evidence
 created: 2026-10-20T19:10:17Z
-updated: 2026-10-25T17:45:31Z
+updated: 2026-10-25T17:50:41Z
 started: 2026-10-25T17:45:09Z
 depends: []
 parent: hq-cff824
@@ -35,3 +35,4 @@ Check: the self-check and just test pass, each new assertion fails under a targe
   provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-25T17:45:31Z (test/hq-a45dd8-two-turn-evidence): gate: implementing — .worktrees/hq-a45dd8 shared acceptance and research corrections for hq-cff824
   provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-25T17:50:41Z (test/hq-a45dd8-two-turn-evidence): scope: reuse the existing XK fork fixture (SL11) for the inherited second session_meta and copied-history distinction; add only the missing depth-2 XG control. Live checks: depth-2 native metadata at codex:archived_sessions/rollout-2026-09-17T08-58-41-01a0af72-a423-7260-ad53-53a548b0330b.jsonl#L1 names root 01a0af3b-105a-7002-9860-567f02bf1862 in session_id and controller 01a0af6a-2653-70a0-ad30-8ebb8571b4bd in thread_spawn.parent_thread_id. Fork 01a16802-9f56-7e63-b5a6-49d3bad551e3 has own metadata at L1 and inherited parent metadata at L2. Claude source e5097cef-41ee-472d-b7bc-b8f42fbc01de has 663 records with session_id cd92ab9a-72bc-456d-a09a-a2805bbd58c2 while native sessionId is e5097cef-41ee-472d-b7bc-b8f42fbc01de; that other transcript has no shared uuids. The secondary field does not identify this native transcript; its allocation mechanism remains unqualified. Preserve this negative without guessing a resume or parent relationship. Workspace shares the completed 1668-test baseline for hq-a45dd8.
