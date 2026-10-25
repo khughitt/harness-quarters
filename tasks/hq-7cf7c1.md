@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: fix/hq-7cf7c1
 created: 2026-10-23T16:54:42Z
-updated: 2026-10-25T10:59:10Z
+updated: 2026-10-25T10:59:11Z
 started: 2026-10-24T12:21:06Z
 completed: 2026-10-24T12:51:58Z
 closed: 2026-10-24T12:51:58Z
@@ -60,3 +60,4 @@ Running the repository suite from an agent session whose environment exports ter
   provenance: {"harness_session":"codex:01a16ddb-03dc-7d82-b033-7af16f6371d3","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-25T10:59:09Z (feat/ops-check-hq-c6a149): Portable attachment fallback for contamination-red.txt under hq-c6a149: exact raw bytes retained by hq-c5fd83 at $WORK_ROOT/hq/hq-c5fd83/hq-7cf7c1/contamination-red.txt, SHA-256 404d04b9dc940466ed26d471467569868975f5c94daed741c699c10b05d8d2a7. Original-to-placeholder mapping: {"/mnt/ssd3/work": "$WORK_ROOT"}
 - 2026-10-25T10:59:10Z (feat/ops-check-hq-c6a149): detached: contamination-red.txt: Preserved exact raw bytes and SHA-256 under hq-c5fd83; replace with a labelled portable derivative for shared-checker adoption
+- 2026-10-25T10:59:11Z (feat/ops-check-hq-c6a149): attached: contamination-red.txt (10020 bytes): Portable derivative; raw bytes, SHA-256 and mapping on this task; raw item retained by hq-c5fd83 (its retained: record for hq-7cf7c1/contamination-red.txt)
