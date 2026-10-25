@@ -26,12 +26,34 @@ delivery of an origin query.
   supplies search/show, roles, paired calls/results, links, task evidence and
   coverage. It deliberately leaves trace composition for later. A task stamp or
   successful task command selects evidence; it does not bind a creation event or
-  establish whose ask the record holds. obs-d98663 owns implementation; no
-  `session_logs.py` exists in obs main at `9fda68a`.
-- obs-02e88b already investigates report-to-request joins in at most six cases,
-  including unstamped and unavailable sources. Reuse its evidence and existing
-  brief rather than commission another origin-join study. obs-c5c599 owns the
-  wider timeline, stage and aggregation effort.
+  establish whose ask the record holds. obs-d98663 owns implementation and is
+  live-claimed; no `session_logs*.py` exists in obs main at `707880a`.
+- obs-02e88b is complete and merged (`5b012ee`). Its attached
+  `join-study-report.md` checks six cases: two Codex filing calls bind as matched
+  from their JSON results; one Claude id-only result binds as inferred. The index
+  supplies the preceding human turn's position and byte count, not its words or
+  intent; sampled gaps were 108 seconds to 38 minutes. No `origin_session` occurred
+  in 46 stamped occurrences, so older-origin support remains unexercised by that
+  sample. Unavailable sessions remain another-host-or-pruned, without guessing a host.
+- obs-c5c599 now has existing follow-ups obs-f3c099 (preserve occurrence/session
+  joins) and obs-a19f59 (design the indexed trace). The latter explicitly leaves
+  transcript words and matched-call reading to this idea and obs-d98663. Reuse
+  those owners; another join study or trace-design task would duplicate them.
+- Related reports hq-4d77cc and hq-34163a map to the reviewed reader's sections
+  5.2, 8 and 10: Claude child files, request-blob call deduplication and Codex
+  controller links are already specified. Native spawn-result binding is stronger
+  than the captured task-name workaround. Delivery remains obs-d98663, followed by
+  obs-f5710b's deferred usage-skill and extractor integration.
+- hq-042f9e adds a concrete guidance case. Its filing call is matched in
+  `codex:01a17447-17a6-7e70-b83b-ade549ceec0a`, lines 274/279 (matching id,
+  action and occurrence time). The original Claude child `agent-a3592a6be5c21c6d1`
+  has a queued monitor notification at line 381 timestamped 13:44:10.616 UTC,
+  inserted after line 380's 15:40:42.650 UTC result on 2026-09-24, with that
+  result as its parent. The attachment's `prompt` holds the notification; this
+  record has no `rendered` field. Event time, file/parent-chain position and actual
+  processing time are different evidence. Spec sections 6.4/7.2 preserve file
+  order and 8.1 includes attachments; the explicit interpretation caveat belongs
+  in obs-f5710b's skill rewrite. Processing time remains unknown.
 - hq-c8aef1 itself has no creation occurrence stamp or `origin_session`. Stage 1
   is unavailable (no stamp) under the current retrieval procedure; stage 2 is not
   applicable. Its origin remains unknown. This does not establish that its
@@ -43,8 +65,9 @@ obs owns content parsing and the session reader; hq owns store location and
 lifecycle. Compose supported reader output rather than adding another parser,
 index or store-root list. The reviewed reader's Stage A/Stage B separation and
 2027-02-16 trial-readout gate remain in force; this brief authorizes no rollout.
-Preserve the original capture on hq-c8aef1. hq-4d77cc and hq-34163a remain related,
-unprocessed reports about Claude subagent files and Codex parent traversal.
+Preserve the original captures. The three related guidance reports receive drop
+proposals as covered work, not claims that their behavior has shipped. The current
+skill and session-episodes still have the reported gaps at hq `dc51f61`.
 Missing stamps, unreadable transcripts, competing calls and unavailable stderr
 must remain explicit limitations. Creation-time proximity alone cannot prove
 creation or user intent; any historical fallback must label its evidence strength.
@@ -53,7 +76,7 @@ creation or user intent; any historical fallback must label its evidence strengt
 
 1. **Lean: compose the supported reader with occurrence binding.** Reuse stamps,
    call/result records and parent links, applying scope's two-stage evidence
-   rules. After the reader and existing join study land, determine the smallest
+   rules. With the join study complete, after the reader lands determine the smallest
    command surface and owner through design review. This is the controller's
    recommendation, not an established user preference about syntax.
 2. Document a multi-command recipe only. Useful as an interim path, but it leaves
@@ -63,9 +86,9 @@ creation or user intent; any historical fallback must label its evidence strengt
 
 ## Unanswered questions
 
-- Which request edges can be established, inferred or only reported unavailable?
-  obs-02e88b's existing bounded study answers this; consume the shipped producer
-  semantics rather than its now-historical assumption that tasks-a58a90 is open.
+- The six-case study establishes the available joins and their limits above; it
+  does not validate older-request attribution or prove the nearest human turn is
+  the ask. No additional research is needed before the reader can be evaluated.
 - Does the implemented reader expose enough call/result and relationship evidence
   for occurrence binding, including reuse ambiguity and older requests? Evaluate
   obs-d98663's delivered interface against the manual demonstrations, then design
@@ -77,10 +100,13 @@ creation or user intent; any historical fallback must label its evidence strengt
 ## Proposed decomposition
 
 - hq-c8aef1 stays an idea with verdict `briefed`, under existing goal hq-cff824,
-  and waits on obs-02e88b and obs-d98663. Preserve priority 2 and the original body.
-- Reuse obs-02e88b's existing six-case bound and brief. Add hq-c8aef1 to its
-  `Ideas it wakes`; completion records its finding with `--no-reviewed` before
-  merging. No additional research or design task is filed in this pass.
+  and now waits only on open reader work obs-d98663. The existing obs-02e88b edge
+  is satisfied; its completion already supplied the wake finding. Preserve
+  priority 2 and the original body. No new goal, research or design task is needed.
 - obs-d98663 remains the existing reader build, without expanding its reviewed
   contract. Its dependency closure readmits this idea; re-scope against both
   outcomes before commissioning a design or implementation of the origin query.
+- hq-4d77cc and hq-34163a: propose drop as covered by obs-d98663 and obs-f5710b.
+  hq-042f9e: propose drop into obs-f5710b with the attachment/order caveat above
+  carried into that existing owner's task notes. No idea is dropped by this pass,
+  and no skill, parser, extractor or live link changes before the trial gate.
