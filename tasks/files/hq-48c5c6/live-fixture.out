@@ -1,5 +1,0 @@
-main=/home/keith/.cache/hq-48c5c6-live.7IcQ
-wt=/mnt/ssd3/work/hq/hq-48c5c6/live.q0Fz/wt
-UU c
-AM f
-after the live turn (read by the controller, not in live-turn.jsonl): f = 'staged' + 'unstaged-edit' (untracked, edit intact); c = 'theirs'; status 'M  c', '?? f'
