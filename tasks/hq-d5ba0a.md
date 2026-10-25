@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-d5ba0a-tilde-layout
 created: 2026-10-25T12:27:45Z
-updated: 2026-10-25T15:09:12Z
+updated: 2026-10-25T15:09:14Z
 started: 2026-10-25T15:07:14Z
 depends: []
 tags: [docs]
@@ -38,3 +38,4 @@ Done: run the candidate checker from ops-295f8d over hq (or reproduce its rule) 
 - 2026-10-25T15:08:01Z (fix/hq-d5ba0a-tilde-layout): gate: implementing .worktrees/hq-d5ba0a
   provenance: {"harness_session":"codex:01a17398-cc3d-7af0-9262-eb2ff49f5236","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-25T15:09:12Z (fix/hq-d5ba0a-tilde-layout): Scratch directory created on host titan at $WORK_ROOT/hq/hq-d5ba0a for candidate checker output, classification and regenerated attachment derivatives; owner task:hq-d5ba0a; contents mutable and not yet checkpointed.
+- 2026-10-25T15:09:14Z (fix/hq-d5ba0a-tilde-layout): Origin recovered: claude-code:6ef3b6c4-4356-473e-aa75-9402e75eb54d human turn 1755 asked whether other follow-ups should be created; this cleanup was agent-derived from the adopted checker and candidate rule. Candidate preflight finds four affected attachments, adding hq-48c5c6 europa-policy-check.out and hq-c075d0 relay-cutover-ledger.md to the two named in the body. All four raw sources already belong to hq-c5fd83. Recommendation: use <project-checkout> as the D5 placeholder; role-specific examples use <hq-checkout>, <ops-checkout>, etc. Fixed hook-contract tests and the cutover command retain literal deployment paths under narrow file allowances, since changing the strings would weaken their contract.
