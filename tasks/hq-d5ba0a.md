@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-d5ba0a-tilde-layout
 created: 2026-10-25T12:27:45Z
-updated: 2026-10-25T15:07:50Z
+updated: 2026-10-25T15:08:00Z
 started: 2026-10-25T15:07:14Z
 depends: []
 tags: [docs]
@@ -32,4 +32,6 @@ Done: run the candidate checker from ops-295f8d over hq (or reproduce its rule) 
 - 2026-10-25T15:07:27Z (main): trial: flow-trial-1 — enrolled — flow on
 - 2026-10-25T15:07:28Z (main): arm: flow-trial-1 — unit tack-d5ba0a — flow on
 - 2026-10-25T15:07:50Z (fix/hq-d5ba0a-tilde-layout): resumed
+  provenance: {"harness_session":"codex:01a17398-cc3d-7af0-9262-eb2ff49f5236","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-25T15:08:00Z (fix/hq-d5ba0a-tilde-layout): gate: scoped — adopted
   provenance: {"harness_session":"codex:01a17398-cc3d-7af0-9262-eb2ff49f5236","harness_session_source":"CODEX_THREAD_ID"}
