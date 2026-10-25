@@ -3097,12 +3097,12 @@ def _stage(event):
     return 3 if head in ("restore", "rollback") else STAGE[tail]
 
 
-def _signal_when(condition, signum, seconds=60.0, stopped=None):
+def _signal_when(condition, signum, stopped, seconds=60.0):
     """From another thread, send signum to this process once condition holds, unless `stopped`
     is set first: a signal after the call it targets returned would kill the test process."""
     end = time.monotonic() + seconds
-    while time.monotonic() < end and not (stopped is not None and stopped.is_set()):
-        if condition():
+    while time.monotonic() < end and not stopped.is_set():
+        if condition() and not stopped.is_set():
             os.kill(os.getpid(), signum)
             return
         time.sleep(0.02)
@@ -3133,8 +3133,7 @@ def test_recovery_signal_is_retried_by_reconciliation(prepared_cutover):
     root, mark = cutover_root(cutover), len(cutover.lines("observed"))
     handlers = {signum: signal.getsignal(signum) for signum in hosts.INTERRUPTS}
     stopped = threading.Event()
-    sender = threading.Thread(target=_signal_when, args=(waiting, signal.SIGTERM),
-                              kwargs={"stopped": stopped})
+    sender = threading.Thread(target=_signal_when, args=(waiting, signal.SIGTERM, stopped))
     sender.start()
     try:
         with pytest.raises(window.Failed) as raised:
@@ -3507,7 +3506,7 @@ def test_service_run_wait_and_result(cutover, monkeypatch):
     cutover.behave("titan", service={"start": "fail"})
     refused = run("service-run", payload)
     assert refused["status"] == "failed" and "exited 1" in refused["error"]
-    monkeypatch.setattr(restoration, "SERVICE_SECONDS", 0.2)  # the wait; the start keeps its own
+    monkeypatch.setattr(restoration, "SERVICE_SECONDS", 0.2)  # the wait; the start keeps its bound
     cutover.behave("titan", service={"polls": 1000})
     running = run("service-run", payload)
     assert running["status"] == "failed" and "still activating" in running["error"]

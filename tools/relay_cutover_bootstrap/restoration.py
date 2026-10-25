@@ -60,7 +60,7 @@ from .state import Stop
 
 CHILD_SECONDS = 120
 SERVICE_SECONDS = 600  # the longest wait for a running service to finish
-SERVICE_START_SECONDS = 600  # the bound on `systemctl --user start` itself, apart from that wait
+SERVICE_START_SECONDS = 600  # bounds `systemctl --user start`, which for a oneshot includes its run
 SERVICE_POLL_SECONDS = 2.0
 REQUIESCED = "requiesced"
 SNAPSHOT = "familiar-node_modules.pre"
