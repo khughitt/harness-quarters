@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: fix/hq-7cf7c1
 created: 2026-10-23T16:54:42Z
-updated: 2026-10-24T12:51:58Z
+updated: 2026-10-25T10:59:09Z
 started: 2026-10-24T12:21:06Z
 completed: 2026-10-24T12:51:58Z
 closed: 2026-10-24T12:51:58Z
@@ -58,3 +58,4 @@ Running the repository suite from an agent session whose environment exports ter
   provenance: {"harness_session":"codex:01a16ddb-03dc-7d82-b033-7af16f6371d3","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-24T12:51:58Z (fix/hq-7cf7c1): Isolated every Codex trust fixture subprocess in a temporary HOME/global config with key-built env, guarded fixture repository paths, and proved editor/routing/config/credential regressions RED to GREEN. Final just test: 231 + 1042 + 389 + 1 passed; focused module 53 passed; two independent reviews accepted with no findings.
   provenance: {"harness_session":"codex:01a16ddb-03dc-7d82-b033-7af16f6371d3","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-25T10:59:09Z (feat/ops-check-hq-c6a149): Portable attachment fallback for contamination-red.txt under hq-c6a149: exact raw bytes retained by hq-c5fd83 at $WORK_ROOT/hq/hq-c5fd83/hq-7cf7c1/contamination-red.txt, SHA-256 404d04b9dc940466ed26d471467569868975f5c94daed741c699c10b05d8d2a7. Original-to-placeholder mapping: {"/mnt/ssd3/work": "$WORK_ROOT"}
