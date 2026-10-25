@@ -6,9 +6,9 @@ priority: 2
 size: xs
 complexity: low
 process: direct
-owner: main
+owner: feat/superpowers-701
 created: 2026-10-25T12:18:32Z
-updated: 2026-10-25T12:19:34Z
+updated: 2026-10-25T12:19:46Z
 started: 2026-10-25T12:18:43Z
 depends: []
 tags: [skills]
@@ -24,4 +24,6 @@ claude-plugins-official still pins superpowers 7.0.0 (bb92a77) four days after t
 - 2026-10-25T12:19:12Z (main): trial: flow-trial-1 — enrolled — flow on
 - 2026-10-25T12:19:14Z (main): arm: flow-trial-1 — unit tack-2cb1ee — flow on
 - 2026-10-25T12:19:34Z (main): gate: scoped — direct: one settings change (enable superpowers@superpowers-marketplace, disable the official entry, autoUpdate false on that marketplace), verified by JSON parse, just test and a plugin list after install
+  provenance: {"harness_session":"claude-code:5f570bb5-1b44-4a25-831f-f043464ca1e2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-25T12:19:46Z (feat/superpowers-701): resumed
   provenance: {"harness_session":"claude-code:5f570bb5-1b44-4a25-831f-f043464ca1e2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
