@@ -1,15 +1,17 @@
 ---
 id: hq-a45dd8
 title: Add a two-turn task-evidence fixture so the session-level task_evidence label is tested
-status: doing
+status: done
 priority: 2
 size: xs
 complexity: low
 process: direct
 owner: test/hq-a45dd8-two-turn-evidence
 created: 2026-10-23T17:40:19Z
-updated: 2026-10-25T17:53:55Z
+updated: 2026-10-25T18:20:35Z
 started: 2026-10-25T17:31:30Z
+completed: 2026-10-25T18:20:35Z
+closed: 2026-10-25T18:20:35Z
 depends: []
 parent: hq-cff824
 tags: []
@@ -52,3 +54,19 @@ Why: SL11's CT1 and CT3 each hold one turn, so spec section 9.4's task_evidence:
   provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-25T17:43:53Z (test/hq-a45dd8-two-turn-evidence): baseline: just test passed 1668 tests before fixture/test edits (231 agents, 1047 hooks/tools, 389 parallel relay, 1 isolated relay). Scope: CT1 JSONL, fixture self-check and cases document only; no reader, skill, links, configs or runtime exports change.
 - 2026-10-25T17:53:55Z (test/hq-a45dd8-two-turn-evidence): verification before full suite: strengthened self-check failed on original CT1 (7 != 11), then all 38 fixture checks passed on the combined acceptance corrections. CT1:1–7 is preserved byte-for-byte; appended CT1:8–11 spans 12:02:00–12:02:11 and lies outside the unchanged TD stamp at 12:00:30. Targeted breaks caught missing/overlapping turns, injected trigger, missing completion markers, unfinished finals, hook errors, stamp moved into turn 2, and missing Codex ordinal fixture. Final reader task_evidence labels remain obs-d98663 acceptance work.
+- 2026-10-25T17:59:07Z (test/hq-a45dd8-two-turn-evidence): review: impl round 1 — verdict: revise; findings: Important 1, Minor 1; reviewer: codex/gpt-6.1-sol
+- 2026-10-25T18:01:45Z (test/hq-a45dd8-two-turn-evidence): corrective round 1: accepted Important 1 after independently reproducing six invalid native types that passed. An assert-based RED probe for CT1:8 type=system failed before the fix; after requiring user triggers and system summaries/duration markers, all six type mutations are rejected and the valid fixture plus all 38 self-checks pass. First final-suite attempt was deliberately interrupted (exit 130) to avoid treating already-loaded pre-correction tests as final evidence: 231 agents and 871 hooks/tools had passed, no test failures reported. Full suite restarts on the corrected fingerprint; old run process group 3657166 has no remaining processes.
+- 2026-10-25T18:05:00Z (test/hq-a45dd8-two-turn-evidence): review: impl round 2 — verdict: revise; findings: Important 1; reviewer: codex/gpt-6.1-sol
+- 2026-10-25T18:06:46Z (test/hq-a45dd8-two-turn-evidence): corrective round 2: confirmed spec 8.1/9.1 requires isMeta/isCompactSummary prompts to remain injected/excluded. The rejection assertion was RED before adding both negative guards; after the fix all four flag mutations (both prompts × both flags) are rejected, the valid fixture passes, and the fixture suite is rerun. Second superseded full-suite attempt was intentionally interrupted (exit 130) after 231 agents and 627 hooks/tools passed; no test failures were reported. Final full run is held until scoped review accepts this revision to avoid another run against superseded loaded test code. Prior corrective-round type guards and brief correction remain in place.
+- 2026-10-25T18:09:20Z (test/hq-a45dd8-two-turn-evidence): review: impl round 3 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
+- 2026-10-25T18:09:23Z (test/hq-a45dd8-two-turn-evidence): Final accepted review: covered fingerprint 1678d9aa568842e077760387c654237f2fa16101 / git tree 35762d58d30d48a158ee415b310b8b74ed13466b; final reviewer codex/gpt-6.1-sol session codex:01a1743e-af24-79e2-8638-488c89414898. Whole-branch review checked native-source metadata, all 73 E008/E037 source hashes, arithmetic, deletes/renames and exact first-seven CT1 bytes. Two corrective rounds added native record types and excluded metadata/compact-summary prompts. All findings addressed, no deferred minors; stale brief instruction regraded Important on hq-edf5de. Runtime reader labels, remote/pruned retrieval and secondary Claude session_id allocation mechanism remain unqualified. The final full suite is running, not yet a passing verdict.
+- 2026-10-25T18:14:00Z (test/hq-a45dd8-two-turn-evidence): Identify current integration owner for immediate local merge and checked worktree cleanup
+  provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-25T18:19:53Z (test/hq-a45dd8-two-turn-evidence): gate: verified tree:1678d9aa568842e077760387c654237f2fa16101 — checks: just test 1672 passed and focused fixture suite 38 passed and 35 targeted fixture breaks rejected and 73 source hashes verified; review: important addressed native record types, important addressed injected prompt flags, important addressed stale brief instruction; reviewer: codex/gpt-6.1-sol session:codex:01a1743e-af24-79e2-8638-488c89414898
+  provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-25T18:19:54Z (test/hq-a45dd8-two-turn-evidence): retro: Boundary checks made the formerly vacuous session label test meaningful. Review and mutation probes exposed missing native-type and negative role qualifiers; both corrective rounds now reject their bad inputs. Finish scoped corrective review before the long final suite to avoid verifying superseded loaded tests; scheduling lesson filed as lore-d85383.
+- 2026-10-25T18:20:33Z (test/hq-a45dd8-two-turn-evidence): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-a45dd8","state":"kept","verification":"verified","purpose":"Shared acceptance and research corrections verified; immediate local integration and cleanup in this closing session. Ignored .githooks/__pycache__, .pytest_cache, tools/hq_cli/__pycache__ and tools/session_archive/__pycache__ are regenerable caches to discard on checked removal. No retained scratch, evidence copies or plan workspace.","next_owner":"session:codex:01a1741c-4199-7e10-a98e-cef25f7966ed","cleanup_trigger":"After local merge into main, verify covered fingerprint, clean git state, host pointers and tt-report, then remove this session worktree"}
+- 2026-10-25T18:20:35Z (test/hq-a45dd8-two-turn-evidence): done
+  provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-25T18:20:35Z (test/hq-a45dd8-two-turn-evidence): Added second completed CT1 turn with nonvacuous bounded task-evidence proof; native-type and injected-flag guards, three-file ordinal check and paragraph reflow verified. Final just test passed 1672 tests; accepted after two corrective rounds. Reader labels remain obs-d98663 handoff.
+  provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}

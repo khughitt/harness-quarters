@@ -32,6 +32,7 @@ CF = "c0000000-0000-4000-8000-00000000000f"
 AG = "a0000000000000b01"
 XP = "01900000-0000-7000-8000-0000000000a1"
 XC = "01900000-0000-7000-8000-0000000000c1"
+XG = "01900000-0000-7000-8000-0000000000c2"
 XA = "01900000-0000-7000-8000-0000000000a2"
 XW = "01900000-0000-7000-8000-0000000000b1"
 XD = "01900000-0000-7000-8000-0000000000d1"
@@ -143,7 +144,40 @@ def test_sl1_unknown_record_kind_and_runtime_model():
     assert models == {("claude-model-a", "claude-model-a")}
 
 
+def test_sl1_native_claude_identity_differs_from_the_sdk_field():
+    path = claude(HOME, CA, "-w-alpha")
+    for n in (3, 6):
+        r = rec(path, n)
+        assert "session_id" in r
+        assert r["sessionId"] == CA
+        assert r["session_id"] == "c0000000-0000-4000-8000-00000000009a"
+
+
+def test_codex_spawn_arguments_and_results_use_compact_json():
+    calls = set()
+    for path in every_file(HOME) + every_file(TURNS):
+        if not {".codex", ".codex-work"}.intersection(path.parts) or path.suffix != ".jsonl":
+            continue
+        rs = records(path)
+        for r in rs:
+            p = r["payload"]
+            if p.get("type") == "function_call" and p.get("name") == "spawn_agent":
+                calls.add(p["call_id"])
+                assert p["arguments"] == json.dumps(json.loads(p["arguments"]), separators=(",", ":"))
+                result, = [s["payload"] for s in rs if s["payload"].get("type") == "function_call_output"
+                           and s["payload"]["call_id"] == p["call_id"]]
+                assert result["output"] == json.dumps(json.loads(result["output"]), separators=(",", ":"))
+    assert calls == {"call_fx_spawn", "call_fe_spawn"}
+
+
 # --- SL2: what happened, from outputs rather than inputs --------------------------------
+
+def test_sl2_failing_bash_results_keep_native_prefixes():
+    denied = blocks(rec(claude(HOME, CA, "-w-alpha"), 7))[0]
+    assert denied["content"].startswith("PreToolUse:Bash hook error:")
+    failed = blocks(rec(claude(HOME, CW, "-w-beta"), 6))[0]
+    assert failed["content"].startswith("Exit code 1\n")
+
 
 def test_sl2_park_was_denied_then_released_by_a_successful_command():
     path = claude(HOME, CA, "-w-alpha")
@@ -198,6 +232,18 @@ def test_sl3_child_controller_comes_from_thread_spawn_not_inherited_session_id()
     assert [n for n, r in enumerate(records(child), 1) if r["type"] == "session_meta"] == [1]
     root = rec(codex(HOME, XP), 1)["payload"]
     assert root["source"] == "cli" and root["session_id"] == root["id"] == XP
+
+
+def test_sl3_depth2_controller_differs_from_the_inherited_root():
+    path = codex(HOME, XG)
+    meta = rec(path, 1)["payload"]
+    spawn = meta["source"]["subagent"]["thread_spawn"]
+    assert meta["id"] == XG
+    assert meta["session_id"] == XP
+    assert meta["parent_thread_id"] == spawn["parent_thread_id"] == XC
+    assert spawn["depth"] == 2 and spawn["agent_path"] == "/root/filer/reviewer"
+    assert rec(codex(HOME, XC), 1)["payload"]["parent_thread_id"] == XP
+    assert rec(path, 3)["payload"]["model"] == "codex-model-c"
 
 
 def test_sl3_claude_child_requested_alias_differs_from_runtime_model():
@@ -261,7 +307,7 @@ def test_sl6_hook_durations_dedupe_to_three_outputs():
             for b in blocks(r):
                 if b.get("type") != "tool_result":
                     continue
-                m = re.match(r"pre-push: test-fast (passed|failed) in ([\d.]+)s", b["content"])
+                m = re.search(r"pre-push: test-fast (passed|failed) in ([\d.]+)s", b["content"])
                 if m:
                     occurrences += 1
                     seen.setdefault(b["tool_use_id"], (m.group(1), float(m.group(2))))
@@ -472,7 +518,9 @@ def test_sl11_codex_statuses_by_closing_event():
     ends = {r["payload"]["turn_id"]: r["payload"]["type"] for r in xe
             if r["type"] == "event_msg" and r["payload"]["type"] in ("task_complete", "turn_aborted")}
     assert starts == ["te1", "te2", "te3", "te4", "te5", "te6", "te7"]
-    for path in TURNS.glob(".codex/sessions/**/rollout-*.jsonl"):  # live ordinals count from 0
+    paths = list(TURNS.glob(".codex/sessions/**/rollout-*.jsonl"))
+    assert len(paths) == 3
+    for path in paths:  # live ordinals count from 0
         assert [r["ordinal"] for r in records(path)] == list(range(len(lines(path))))
     assert ends == {"te1": "task_complete", "te2": "task_complete", "te3": "turn_aborted",
                     "te4": "task_complete", "te5": "task_complete"}
@@ -512,7 +560,22 @@ def test_sl11_task_document_and_evidence_sessions():
     note = doc["task"]["notes"][0]
     assert note["harness_session"] == "claude-code:c0000000-0000-4000-8000-000000000022"
     ct1 = records(one(TURNS, ".claude/projects/-w-gamma/*000022.jsonl"))
-    assert ct1[0]["timestamp"] <= note["at"].replace("Z", ".000Z") <= ct1[-1]["timestamp"]
+    assert len(ct1) == 11
+    assert [n for n, r in enumerate(ct1, 1) if r["type"] == "user" and r.get("origin", {}).get("kind") == "human"
+            and not r.get("isMeta") and not r.get("isCompactSummary")
+            and r.get("promptSource") == "typed"] == [1, 8]
+    assert [n for n, r in enumerate(ct1, 1) if r["type"] == "system" and r.get("subtype") == "turn_duration"] == [7, 11]
+    for final, summary in ((5, 6), (9, 10)):
+        assert ct1[final - 1]["type"] == "assistant"
+        assert ct1[final - 1]["message"]["stop_reason"] == "end_turn"
+        assert ct1[summary - 1]["type"] == "system"
+        assert ct1[summary - 1]["subtype"] == "stop_hook_summary"
+        assert ct1[summary - 1]["hookErrors"] == []
+    spans = [(ct1[0]["timestamp"], ct1[6]["timestamp"]),
+             (ct1[7]["timestamp"], ct1[10]["timestamp"])]
+    assert spans[0][1] < spans[1][0] <= spans[1][1]
+    stamp = note["at"].replace("Z", ".000Z")
+    assert [start <= stamp <= end for start, end in spans] == [True, False]
     assert not any("zz-000021" in json.dumps(r) for r in ct1)
     ct3 = records(one(TURNS, ".claude/projects/-w-gamma/*000024.jsonl"))
     commands = [b["input"]["command"] for r in ct3 for b in blocks(r) if b.get("type") == "tool_use"]
