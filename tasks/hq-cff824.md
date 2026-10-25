@@ -7,7 +7,7 @@ size: s
 complexity: low
 process: direct
 created: 2026-10-20T16:04:22Z
-updated: 2026-10-25T18:26:53Z
+updated: 2026-10-25T18:26:55Z
 depends: [obs-d98663, obs-f5710b, hq-19580c, obs-081ded]
 tags: [session-logs]
 source: docs/notes/2026-10-20-session-store-reach-brief.md
@@ -51,3 +51,5 @@ Scope and audit agents need to reach a session's evidence: the session behind a 
 - 2026-10-25T18:24:42Z (main): parked (waiting on agent, dependency): Next agent resumes delivery verification in hq after obs-d98663, obs-f5710b, hq-19580c and obs-081ded deliver: record their commits, acceptance replay, fork-boundary ruling and live six-root coverage, then reconcile the deferred children and close this goal. Stage B must first pass the gate after the 2027-02-16 readout; existing obs-d98663 is the next implementation owner. The three immediate hq correction children are merged and no session worktree remains.
   provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-25T18:26:53Z (main): Concurrent-work correction: the brief added on main during this session is linked to new child hq-c8aef1 (idea), so it is related goal work, separate from the three correction children reviewed and implemented here. It and its brief were preserved without edits; this session did not scope, review or implement that new child. Parent closeout must also reconcile hq-c8aef1, alongside the deferred children and four delivery dependencies. The earlier checkpoint description of the concurrent brief as unrelated is superseded by this observation.
+- 2026-10-25T18:26:55Z (main): parked (waiting on agent, dependency): Next agent resumes delivery verification in hq after obs-d98663, obs-f5710b, hq-19580c and obs-081ded deliver: record their commits, acceptance replay, fork-boundary ruling and live six-root coverage, then reconcile deferred children plus concurrent idea hq-c8aef1 and close the goal only when all are settled. Stage B first needs the gate after the 2027-02-16 readout; existing obs-d98663 owns the next implementation. Three immediate hq corrections are merged; no session worktree or process remains.
+  provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
