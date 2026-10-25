@@ -220,8 +220,10 @@ A post-hoc check gave mixed support:
 - **Task:** the lookup found the corrected task in both spec cases. For C03 it
   matched through notes only, because the spec field was set after the request.
 - **Revision:** independently confirmed only for C03. C01's revision was derived by
-  this same rule. Pre-filling from a task's latest review handoff was rejected: it held the
-full selection only for C03, and for C02 it was a superseded plan review.
+  this same rule.
+
+Pre-filling from a task's latest review handoff was rejected: it held the full
+selection only for C03, and for C02 it was a superseded plan review.
 Implementation reviews still need their commit stated. Whether handoffs should
 record the reviewed revision in a stable shape is a design question, not an
 established schema prerequisite. No launcher, schema or external write is
