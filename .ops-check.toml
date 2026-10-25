@@ -1,0 +1,15 @@
+layout_allowed = [
+  # Host configuration by design: harness homes read these absolute paths literally.
+  "claude/settings.json",
+  "codex/config.toml",
+  "codex/hooks.json",
+  "codex/work/hooks.json",
+  # The relay cutover tool, its tests, runbook and window plan: the two host names are
+  # its fleet configuration. Remove these entries with the tool if hq-7e81ed retires it.
+  "tools/relay_cutover_bootstrap/",
+  "tools/relay-cutover-host",
+  "tools/test_relay_cutover_bootstrap.py",
+  "tools/test_relay_cutover_transport.py",
+  "docs/runbooks/relay-cutover.md",
+  "docs/plans/2026-10-19-relay-cutover.md",
+]
