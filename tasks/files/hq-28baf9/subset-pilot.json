@@ -1,0 +1,61 @@
+{
+  "aliases_not_read": 2,
+  "elapsed_s": 0.29,
+  "limits": [
+    "Only current native regular main files within each Claude project directory",
+    "Symlink aliases, archived/pruned files and subagent files excluded",
+    "Each file bounded at size on open; this is not a simultaneous snapshot",
+    "Pair shapes do not establish which session was actually opened first"
+  ],
+  "peak_rss_kib": 947732,
+  "per_root": {
+    "claude": {
+      "bytes_at_open": 174626,
+      "files": 2,
+      "main_files_compared": 2,
+      "projects": 1,
+      "unparsed_lines": 0
+    }
+  },
+  "reader_source_sha256": {
+    "session_logs_records.py": "264a3bea84caaa6ca8d0857790482570b81d76365196ccdeabda958d412717c8",
+    "session_logs_sessions.py": "c168f4fd2165a01e67e03f4c365b9e1f69751394996bc9695df63250e84eb11a"
+  },
+  "root_states": [
+    {
+      "bytes": 5032476772,
+      "files": 6184,
+      "harness": "claude-code",
+      "home": "claude",
+      "profile": "personal",
+      "state": "searched",
+      "store": "live"
+    },
+    {
+      "bytes": 862571137,
+      "files": 926,
+      "harness": "claude-code",
+      "home": "claude-work",
+      "profile": "work",
+      "state": "searched",
+      "store": "live"
+    }
+  ],
+  "scope": "one_live_project_pilot",
+  "script_sha256": "832c439912177ff5dbbafec31ffc185926fc8dfd3f3e32f4dcbd60b4de28124f",
+  "self_checks": {
+    "completed_resume": "pass",
+    "counter_categories": "pass",
+    "identical_tie": "pass",
+    "native_link": "pass",
+    "reverse_case": "pass"
+  },
+  "totals": {
+    "bytes_at_open": 174626,
+    "files": 2,
+    "main_files_compared": 2,
+    "projects": 1,
+    "unparsed_lines": 0
+  },
+  "verdict": "complete"
+}
