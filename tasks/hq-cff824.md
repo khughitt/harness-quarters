@@ -7,7 +7,7 @@ size: s
 complexity: low
 process: direct
 created: 2026-10-20T16:04:22Z
-updated: 2026-10-26T09:47:17Z
+updated: 2026-10-26T13:09:39Z
 depends: [obs-d98663, obs-f5710b, hq-19580c, obs-081ded]
 tags: [session-logs]
 source: docs/notes/2026-10-20-session-store-reach-brief.md
@@ -38,7 +38,7 @@ Scope and audit agents need to reach a session's evidence: the session behind a 
 ## References
 
 - brief (context, kind=brief): docs/notes/2026-10-20-session-store-reach-brief.md — historical studies and alternatives; design-open wording superseded by hq-c411df
-- reader-spec (input, required, kind=spec): docs/specs/2026-10-23-session-evidence-reader-design.md — reviewed contract at ae0f8ee, delivery boundaries and trial gates
+- reader-spec (input, required, kind=spec): docs/specs/2026-10-23-session-evidence-reader-design.md — approved planning contract, revision 10 e4f3d69; A1–A5 limits and Stage B gate
 - reader-plan (input, required, kind=plan): docs/plans/2026-10-23-session-evidence-reader.md — reviewed plan at 1fea7bf; read with obs-d98663 correction notes
 
 ## Notes
