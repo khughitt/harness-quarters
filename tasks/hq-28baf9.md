@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T11:19:59Z
+updated: 2026-10-26T11:21:42Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -77,3 +77,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T11:19:57Z (docs/hq-28baf9-reader-spec): User cancelled the accidental implementation-plan request. Overall design review of frozen revision 7 669b3d6 requires a spec revision: verify R26 reverse-subset attribution and count live subset pairs before choosing its treatment, qualify default-role mirror guarantees and A2 duplicate-hit cost, and address all seven listed Minor points plus the previously deferred M4. No design approval or implementation authorization was inferred; the task resumes spec amendment only.
 - 2026-10-26T11:19:59Z (docs/hq-28baf9-reader-spec): gate: implementing — reopened: overall spec review round 3 requires revision of 669b3d6
   provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-26T11:21:42Z (docs/hq-28baf9-reader-spec): scratch: titan $WORK_ROOT/hq/hq-28baf9 — persistent canonical script and counts-only results for the requested R26 live Claude subset-pair census, plus review-round-3 evidence; owner: hq-28baf9; contents mutable and not yet checkpointed.
