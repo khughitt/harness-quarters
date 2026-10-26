@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T11:46:09Z
+updated: 2026-10-26T11:46:10Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -95,3 +95,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T11:37:07Z (docs/hq-28baf9-reader-spec): Review-guidance feedback filed as lore-6b5f19: the user reported two independent reviews missing Important inference/guarantee issues; the feedback asks guidance to reverse one-sided examples and test prose guarantees against fallback classifications. This does not change the task contract or approve the spec.
 - 2026-10-26T11:46:07Z (docs/hq-28baf9-reader-spec): review: spec round 4 — verdict: revise; findings: Important 1, Minor 1; reviewer: codex/gpt-6.1-sol
 - 2026-10-26T11:46:09Z (docs/hq-28baf9-reader-spec): attached: revision-8-review-report.md (7424 bytes): Full fresh review of frozen revision 8 20c8629: original Important issues addressed, one task-grouping Important and one Claude abort_reason Minor remain
+- 2026-10-26T11:46:10Z (docs/hq-28baf9-reader-spec): corrective round 2: verified round-4 findings against obs 062b73e. Limit the single detection group to session-search candidates and task evidence-selected files; --mentions extras use separate store groups and no copy detection across that boundary. Correct the earlier round-3 Claude-null suggestion: Claude spans do not set closing, so abort_reason is omitted, while aborted Codex turns carry recorded reason or null. Both are documentation corrections; R26/A2/A4 decisions and census bytes stay unchanged.
