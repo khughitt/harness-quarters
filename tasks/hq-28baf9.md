@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T09:55:13Z
+updated: 2026-10-26T09:55:14Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -42,4 +42,6 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T09:53:38Z (docs/hq-28baf9-reader-spec): resumed
   provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-26T09:55:13Z (docs/hq-28baf9-reader-spec): gate: scoped — adopted
+  provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-26T09:55:14Z (docs/hq-28baf9-reader-spec): gate: implementing .worktrees/hq-28baf9
   provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
