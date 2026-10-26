@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T13:04:02Z
+updated: 2026-10-26T13:11:49Z
 started: 2026-10-26T09:52:41Z
 completed: 2026-10-26T13:04:02Z
 closed: 2026-10-26T13:04:02Z
@@ -145,3 +145,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
   provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-26T13:04:02Z (docs/hq-28baf9-reader-spec): Approved reader-spec amendment revision10 e4f3d69 records all eight Stage A topics, A1–A5 limits and Why/Cost, original and direction census evidence (12/12 decided agreements, one tie, zero reversals). Human revision9 approval and optional clarifications complete; fresh final review accepted without findings; just test 1672 passed and docs/task checks clean. No runtime or Stage B change. Full reports attached, raw evidence transferred to open hq-c5fd83; closing session owns only immediate local merge and checked worktree removal.
   provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-26T13:11:49Z (main): integration: fast-forwarded approved documentation branch into main through closeout commit a7f172f; committed covered tree equals the tested 431a4a64a12bdb1934887133dc3e420991d6af65 and spec bytes equal reviewed revision10 e4f3d69. Main ops-check, ops-docs, harness-facts and tasks checks passed. Existing codex/config.toml live modification preserved. Host-pointer scan checked 246 declared/launcher/unit paths and 189 text launchers/units, no pointer into this worktree. tt-report exited 0. Ignored-file disposition: .githooks/__pycache__, .pytest_cache, tools/hq_cli/__pycache__ and tools/session_archive/__pycache__ are regenerable caches to discard; all review workspaces already attached/byte-verified and removed; no submodules or other untracked files.
