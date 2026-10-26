@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T13:01:28Z
+updated: 2026-10-26T13:01:29Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -132,3 +132,5 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T12:56:26Z (docs/hq-28baf9-reader-spec): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/hq/hq-28baf9/overall-design-review.raw.md","state":"released","verification":"verified","purpose":"Transferred without moving to open hq-c5fd83 with exact hash and original-task placeholder mapping, preserving the only needed raw fallback","next_owner":"none","cleanup_trigger":"none"}
 - 2026-10-26T12:56:28Z (docs/hq-28baf9-reader-spec): retained: {"host":"titan","kind":"scratch","path":"$WORK_ROOT/hq/hq-28baf9","state":"released","verification":"verified","purpose":"Transferred without moving to open hq-c5fd83 with 10-file manifest c9e23a3b6e956333a1d99a8209933c7c8090eb4d8d028f805810c5e161c8e8f6; attached scripts/results preserved and regenerable source snapshot discarded after verification","next_owner":"none","cleanup_trigger":"none"}
 - 2026-10-26T13:01:28Z (docs/hq-28baf9-reader-spec): final verification: just test exited 0 with 1672 passed (231 agents, 1051 hooks/tools, 389 parallel relay, 1 isolated relay; the last selector deselected 153). Final documentation revision10 e4f3d69 is independently accepted with no findings, human revision9 approval and both authorized clarifications recorded, docs/task/diff checks pass, Stage B gate unchanged. No runtime code change. Earlier failed direction pilot stopped in self-check before reading stores and was rerun against frozen062b73e successfully.
+- 2026-10-26T13:01:29Z (docs/hq-28baf9-reader-spec): Identify the current integration owner
+  provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
