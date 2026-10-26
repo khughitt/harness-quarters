@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T10:04:22Z
+updated: 2026-10-26T10:09:03Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -16,6 +16,7 @@ tags: [session-logs]
 source: obs-d98663
 agent: claude-code
 origin: agent
+spec: docs/specs/2026-10-23-session-evidence-reader-design.md
 ---
 
 obs-d98663 built Stage A of the reader against spec ae0f8ee (rev 5) and plan 1fea7bf. Its controller ruled on gaps the spec leaves open and its live six-root run measured shapes the spec did not know. The spec (docs/specs/2026-10-23-session-evidence-reader-design.md) should record each, as a reviewed revision, before Stage B rewrites the skill around the reader:
