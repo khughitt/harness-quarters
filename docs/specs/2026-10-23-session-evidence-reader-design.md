@@ -1,6 +1,8 @@
 # Session evidence reader: `session-logs search` and `show`
 
-Status: draft for review, revision 9, 2026-10-26. Revision 5 was approved at ae0f8ee;
+Status: approved for planning at revision 9 (6356a82), with the two non-behavioral
+clarifications requested in its acceptance recorded as revision 10, 2026-10-26.
+Revision 5 was approved at ae0f8ee;
 Stage A was built against that revision and plan 1fea7bf, and merged into obs at 062b73e.
 This amendment records its implementation rulings and measured limits. It changes no
 reader, classifier, skill, roots, links or trial measurement; §11's gates still apply.
@@ -44,6 +46,9 @@ reader, classifier, skill, roots, links or trial measurement; §11's gates still
   The earlier M4 explicit-file shorthand is corrected too. No runtime behavior changes.
 - **Revision 9** corrects revision 8's re-review: task evidence and additional mentions
   have separate copy-detection groups, and Claude turns omit `abort_reason`.
+- **Revision 10** records the accepted design's optional direction-agreement evidence
+  and an explicit A5 Why/Cost entry for the existing evidence/mention detection limit.
+  Neither changes a decision or authorizes Stage B execution.
 
 Task: hq-28baf9 (amendment); hq-c411df (original design); goal hq-cff824.
 Inputs: the store-reach brief (`docs/notes/2026-10-20-session-store-reach-brief.md`), the
@@ -621,7 +626,7 @@ The default window bounds the cost (§6.1). A prefilter may return later only to
   Duplicate detection within a group compares files of the same harness/identity;
   resume detection still compares only Claude main files in the same home/project
   directory (§8.3). None of this turns a `child`, `inherited`, `alias` or `mismatch`
-  candidate into an `own` file.
+  candidate into an `own` file. A5 in §14.7 records this limit's Why and Cost for Stage B.
 - **Copies.** Collapsed by default and counted in coverage (§8.3).
 
 ### 6.5 Outcomes
@@ -1707,6 +1712,18 @@ in 94.72 seconds, with no unparsed lines. It found 20 shared-UUID pairs:
 - 12 were strict subsets of all UUIDs; all 12 had a decisive native link;
 - zero one-sided pairs lacked a decisive native link. These categories overlap.
 
+All 13 native links selected the side with new timed user/assistant records as the copy
+(`one_sided_copy_is_side_with_unshared_timed: 13`). That counter records the native
+choice, not an independent timing decision. A follow-up direction check against frozen
+obs 062b73e read 2,965 then-current main files and again found 20 shared-UUID pairs and
+13 one-sided linked pairs. Where timing decided, it agreed with the native link in
+12 of 12 pairs; the remaining linked pair was a timing tie. There were zero reversals.
+Like the earlier 18-of-18 comparison, this is positive agreement evidence among linked
+pairs the timing rule decided. It does not establish historical direction for unlinked
+pairs or measure the reverse-subset failure's frequency. The attached
+`subset-direction-census.json` and `subset-direction-census.py` preserve this separate
+measurement; they do not replace the original census.
+
 The run excludes subagent files, two unread symlink aliases and absent/pruned/archive
 copies; each file was bounded at size on open rather than taking a simultaneous
 snapshot. Its pair counts describe record shapes, not independent historical origins.
@@ -1733,6 +1750,17 @@ and `subset-pilot.json` preserve the counts, exclusions and source/script hashes
 - **Cost:** `not_found` does not establish that no matching answer was recorded: a
   possibly own final can be hidden by the ambiguity rule. Consumers needing that wider
   question must inspect records and copy labels rather than infer it from `--final`.
+
+**A5 — retain separate task-evidence and mention detection.**
+- **Decision:** retain the shipped detection boundary in §6.4; this amendment does not
+  join the evidence-selected files with additional mention-only files for copy detection.
+- **Why:** the reader first loads files selected through task evidence, then performs a
+  separate bounded store scan for additional mentions. This amendment records that
+  delivered contract; it does not qualify or implement a new pass joining those groups.
+- **Cost:** a mention-only file whose copied opening came from an evidence-selected file
+  can keep that opening as its own records, turn and final. Copied answers can therefore
+  be misattributed or counted again across this boundary. Stage B's usage skill must
+  carry this limit; a textual mention is never ownership evidence (§9.4).
 
 The remaining amendments specify already implemented behavior: R19/R20 (§4.3, §5),
 R26 (§8.3), R28/R30/R33 (§4.4, §9.1), the step-10 target-line correction (§7.2), and
