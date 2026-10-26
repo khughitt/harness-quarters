@@ -1,13 +1,15 @@
 ---
 id: hq-28baf9
 title: Amend the session evidence reader spec with Stage A's implementation rulings and live findings
-status: todo
+status: doing
 priority: 2
 size: s
 complexity: mid
 process: direct
+owner: main
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T03:03:15Z
+updated: 2026-10-26T09:52:41Z
+started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
 tags: [session-logs]
@@ -34,3 +36,5 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T02:53:19Z (add): created
   provenance: {"harness_session":"claude-code:ad0396b3-824c-4825-aa17-a5252221a532","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
 - 2026-10-26T03:03:15Z (main): evidence for this amendment: obs-d98663's attached sdd-ledger-portable.md (not sdd-ledger.md) and its retained scratch $WORK_ROOT/obs/obs-d98663/ on titan (live_run.py and counts), which this task now owns: decide keep or remove when closing
+- 2026-10-26T09:52:41Z (main): started
+  provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
