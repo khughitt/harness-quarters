@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T11:29:24Z
+updated: 2026-10-26T11:29:26Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -86,3 +86,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T11:27:29Z (docs/hq-28baf9-reader-spec): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/hq/hq-28baf9/overall-design-review.raw.md","state":"kept","verification":"verified","purpose":"Exact raw bytes of the supplied round-3 overall review; attached portable derivative substitutes the refused hostname with $HOST","next_owner":"task:hq-28baf9","cleanup_trigger":"When an executing layout exemption accepts the verified raw review, attach it or transfer the raw fallback to an open owner before task closure","sha256":"39e410e30418f5f278b38506f666f59726c8d32139c8138ebd2d54bf12db259f"}
 - 2026-10-26T11:29:23Z (docs/hq-28baf9-reader-spec): attached: subset-census.py (8119 bytes): Counts-only R26 census method: shipped reader predicates, five assert-based controls, pilot and full native Claude main-file scopes
 - 2026-10-26T11:29:24Z (docs/hq-28baf9-reader-spec): attached: subset-pilot.json (1677 bytes): R26 pilot completed: five synthetic controls and one live project of two main files
+- 2026-10-26T11:29:26Z (docs/hq-28baf9-reader-spec): attached: subset-census.json (2382 bytes): R26 live census: 2961 native main files, 20 shared-UUID pairs, 13 one-sided pairs all native-linked; counts do not establish historical direction

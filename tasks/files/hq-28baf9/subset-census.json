@@ -1,0 +1,81 @@
+{
+  "aliases_not_read": 2,
+  "elapsed_s": 94.72,
+  "limits": [
+    "Only current native regular main files within each Claude project directory",
+    "Symlink aliases, archived/pruned files and subagent files excluded",
+    "Each file bounded at size on open; this is not a simultaneous snapshot",
+    "Pair shapes do not establish which session was actually opened first"
+  ],
+  "peak_rss_kib": 947732,
+  "per_root": {
+    "claude": {
+      "bytes_at_open": 2655606794,
+      "files": 2679,
+      "main_files_compared": 2679,
+      "one_sided_copy_is_side_with_unshared_timed": 13,
+      "one_sided_native_link": 13,
+      "one_sided_no_unshared_timed_pairs": 13,
+      "projects": 340,
+      "shared_uuid_pairs": 18,
+      "strict_subset_native_link": 12,
+      "strict_uuid_subset_pairs": 12,
+      "unparsed_lines": 0
+    },
+    "claude-work": {
+      "bytes_at_open": 476304303,
+      "files": 282,
+      "main_files_compared": 282,
+      "projects": 20,
+      "shared_uuid_pairs": 2,
+      "unparsed_lines": 0
+    }
+  },
+  "reader_source_sha256": {
+    "session_logs_records.py": "264a3bea84caaa6ca8d0857790482570b81d76365196ccdeabda958d412717c8",
+    "session_logs_sessions.py": "c168f4fd2165a01e67e03f4c365b9e1f69751394996bc9695df63250e84eb11a"
+  },
+  "root_states": [
+    {
+      "bytes": 5032476772,
+      "files": 6184,
+      "harness": "claude-code",
+      "home": "claude",
+      "profile": "personal",
+      "state": "searched",
+      "store": "live"
+    },
+    {
+      "bytes": 862571137,
+      "files": 926,
+      "harness": "claude-code",
+      "home": "claude-work",
+      "profile": "work",
+      "state": "searched",
+      "store": "live"
+    }
+  ],
+  "scope": "all_native_claude_main_files",
+  "script_sha256": "832c439912177ff5dbbafec31ffc185926fc8dfd3f3e32f4dcbd60b4de28124f",
+  "self_checks": {
+    "completed_resume": "pass",
+    "counter_categories": "pass",
+    "identical_tie": "pass",
+    "native_link": "pass",
+    "reverse_case": "pass"
+  },
+  "totals": {
+    "bytes_at_open": 3131911097,
+    "files": 2961,
+    "main_files_compared": 2961,
+    "one_sided_copy_is_side_with_unshared_timed": 13,
+    "one_sided_native_link": 13,
+    "one_sided_no_unshared_timed_pairs": 13,
+    "projects": 360,
+    "shared_uuid_pairs": 20,
+    "strict_subset_native_link": 12,
+    "strict_uuid_subset_pairs": 12,
+    "unparsed_lines": 0
+  },
+  "verdict": "complete"
+}
