@@ -1,6 +1,6 @@
 # Session evidence reader: `session-logs search` and `show`
 
-Status: draft for review, revision 7, 2026-10-26. Revision 5 was approved at ae0f8ee;
+Status: draft for review, revision 8, 2026-10-26. Revision 5 was approved at ae0f8ee;
 Stage A was built against that revision and plan 1fea7bf, and merged into obs at 062b73e.
 This amendment records its implementation rulings and measured limits. It changes no
 reader, classifier, skill, roots, links or trial measurement; §11's gates still apply.
@@ -38,6 +38,10 @@ reader, classifier, skill, roots, links or trial measurement; §11's gates still
 - **Revision 7** corrects revision 6's independent review (e8ff370): task evidence and
   mentions share the selected file order, R19's filename/identity protection is scoped
   to Codex, and a `turn_cut` report can accompany a view with no omitted objects.
+- **Revision 8** responds to the overall review of 669b3d6: it qualifies the R26
+  heuristic and default-role mirror guarantee, specifies coverage samples and the
+  target window, and clarifies scopes, abort reasons, time bounds and ambiguous finals.
+  The earlier M4 explicit-file shorthand is corrected too. No runtime behavior changes.
 
 Task: hq-28baf9 (amendment); hq-c411df (original design); goal hq-cff824.
 Inputs: the store-reach brief (`docs/notes/2026-10-20-session-store-reach-brief.md`), the
@@ -299,7 +303,7 @@ blocks yields one object.
 | `trigger` | `{ref, role, origin_kind}`, or `null` when there is no opening input (§9.1) |
 | `end` | the ref of the turn's last record |
 | `status`, `status_basis` | §9.3; `status_basis` also says which turn rule applied (§9.1) |
-| `abort_reason` | on an interrupted turn with a closing record: the recorded Codex `turn_aborted.reason`, or `null` when no reason is recorded; omitted on other turns (R30) |
+| `abort_reason` | on an interrupted turn with a closing record, in either harness: Codex carries its recorded `turn_aborted.reason` (or `null` if absent), Claude carries `null`; omitted otherwise (R30) |
 | `asks_user` | true when a Codex final message carries `questions` (§9.3) |
 | `final` | `{ref, text, basis}`, present only when `status` is `completed` |
 | `last_assistant` | when the turn has no final: its last assistant text's ref, or `null` if it has none; it is never labelled final |
@@ -325,9 +329,9 @@ with the case rule of §6.2. An escape therefore cannot hide a match in an unpar
 |---|---|
 | `format` | `session-logs/1` |
 | `host`, `query` | the host name and the parsed arguments, defaults marked |
-| `query.sort_basis` | search only: `group_newest` or `group_path` for a store search, `file_newest` or `file_path` for other search scopes (§6.4; R46, R48) |
+| `query.sort_basis` | search only: `group_newest` or `group_path` for a store-wide search, `file_newest` or `file_path` for other search scopes (§6.4; R46, R48) |
 | `roots` | per root: home, store, state (`searched`, `absent` or `unreadable`), files, bytes |
-| `index` | `{state, schema, last_complete_run, age_minutes, coverage_start, rows_outside_roots, outside_root_paths}`; state `used`, `stale`, `absent`, `unsupported_schema` or `unreadable`, with the reason; `coverage_start` per root (§5.3); unmatched index rows are counted, with their paths (R20) |
+| `index` | `{state, schema, last_complete_run, age_minutes, coverage_start, rows_outside_roots, outside_root_paths}`; state `used`, `stale`, `absent`, `unsupported_schema` or `unreadable`, with the reason; `coverage_start` per root (§5.3); unmatched index rows have a full count and a sorted sample of at most 20 paths (R20) |
 | `window` | `since` and `until`, and whether `since` is the default |
 | `files` | scanned, skipped by mtime (§6.1), unreadable (refs), vanished during the run (refs), and missing in scope (refs, with read path and its state); a list longer than 20 is cut and its count kept |
 | `files.aliases_not_read` | `{count, items}`: in-scope transcript aliases whose resolved target was not read by this run; items are refs, capped at 20 (§6.5; R48) |
@@ -475,7 +479,8 @@ the stores cannot be `not_found` (§6.5).
 
 **Index roots mismatch (R20).** Rows under none of the currently configured roots are
 not silently discarded: coverage reports `index.rows_outside_roots` and
-`index.outside_root_paths`. A nonzero count blocks `not_found` over the stores, with basis
+`index.outside_root_paths` (the full count and at most the first 20 paths in sorted order).
+A nonzero count blocks `not_found` over the stores, with basis
 `index_roots_mismatch` when it is the first failed condition. Explicit-file searches do
 not depend on the index.
 
@@ -545,8 +550,12 @@ most files by a byte test. The live-store run (§14.4) measures the reader's own
   copies.
 
 **Default roles.** A pattern search matches every role except `metadata`, unless
-`--role` names roles. So the Codex event items that repeat response text (§8.2) never
-double a match. A search without a pattern streams every role.
+`--role` names roles. This excludes the mirrors explicitly mapped to `metadata` in
+§8.2: `event_msg/item_completed` `AgentMessage`/`UserMessage`, and older
+`event_msg/user_message`/`agent_message`. It does not guarantee that all event records
+repeating response content are excluded. The unmapped `unknown` kinds remain in the
+default role set and may duplicate that content (A2, §14.7); their mirror relationships
+are unvalidated. A search without a pattern streams every role.
 
 ### 6.2 Matching
 
@@ -586,7 +595,10 @@ The default window bounds the cost (§6.1). A prefilter may return later only to
 
 ### 6.4 Order and copies
 
-- **Order (R46).** Store searches emit each copy group contiguously, holding one group at
+- **Scope names.** A **store-wide** search has no `--session`, `--task` or `--file` scope;
+  place, cwd, time and record filters may still narrow it. These are the same scopes
+  used for outcomes in §6.5.
+- **Order (R46).** Store-wide searches emit each copy group contiguously, holding one group at
   a time. Files of one harness/identity are grouped for duplicate detection; Claude
   non-subagent files in one home/project directory are also grouped for resume detection.
   These connections can join groups across directories. `--sort activity`, the
@@ -598,6 +610,11 @@ The default window bounds the cost (§6.1). A prefilter may return later only to
   order files by the selected file sort. Task searches sort evidence and mention-only
   files together, so a newer mention can precede a stamped session; order does not rank
   evidence strength, and a limit can exclude that stamped session.
+- **Detection in scoped searches.** All selected files of a session or task search are
+  read as one detection group, including multiple `own` files across roots. Duplicate
+  detection compares files of the same harness/identity; resume detection still compares
+  only Claude main files in the same home/project directory (§8.3). This grouping does
+  not turn a `child`, `inherited`, `alias` or `mismatch` candidate into an `own` file.
 - **Copies.** Collapsed by default and counted in coverage (§8.3).
 
 ### 6.5 Outcomes
@@ -612,14 +629,28 @@ The default window bounds the cost (§6.1). A prefilter may return later only to
   - no collapsed copy in scope matched the record selection and pattern.
 
   An unread alias blocks with basis `alias_not_read`. An alias whose target's mtime is
-  before `--since` is outside the window; an alias of a file already read adds no unread
+  before the effective window's start is outside the window, including the default
+  30-day window; with no lower bound, that time exclusion does not apply. An alias of a
+  file already read adds no unread
   evidence. With `--cwd`, an unread alias stays in scope because its cwd is unknown.
 
   A matching collapsed copy blocks with basis `collapsed_copy_match`: request blobs and
   compaction history can hold text with no original in scope. `--copies` exposes those
-  records as parsed matches. Under `--final`, copies are never turns, so they do not
+  records as parsed matches. Under `--final`, known collapsed copies are never turns, so they do not
   contribute to `matches.collapsed_copies` or make an empty final answer unknown
   (R45, R48). All earlier conditions still apply to `--final`.
+
+  **Ambiguous finals are a deliberate limit.** An `ambiguous` range can form turns, but
+  their finals are suppressed (§8.3). With a pattern, `--final` matches only eligible
+  final text. If an ambiguous turn holds matching assistant text that could be its own
+  final, no eligible final matches it; the outcome may still be `not_found` when the
+  other scope conditions hold. No `ambiguous_final` basis is emitted. This means no
+  eligible final under these rules, not proof that no matching answer was recorded.
+  Without a pattern, `--final` still emits the ambiguous turn objects with no final.
+  Why retain this: it describes the shipped separation between eligible finals and
+  assistant text. Cost: a possibly own final inside ambiguous history can be missed by
+  a final-pattern search. Search records with `--role assistant` to inspect that text
+  and its copy labels; finding it does not settle ownership.
 
   Then it depends on the search's scope:
   - **Only explicit files:** nothing more.
@@ -690,7 +721,7 @@ So for now only a search confined to roots that are clear of both can answer
     makes it a Claude SDK stream. That includes the stream's opening `system`/`init` event.
 
   A file in which no record matches is `unknown_format`.
-- **Identity and place.** The file's identity comes from its records as in §5.2. Its store
+- **Identity and place.** The file's identity follows §5.2. Its store
   is `explicit`, and its home is `file`.
 
 ## 7. `show`
@@ -731,6 +762,18 @@ the target line and `--limit 1`, all three return with `limits.hit: true` and
 `turn_cut: {records: 3, shown: 3, before: 0, after: 0}`. Check `shown < records` to infer
 omission; `limits.hit` alone does not establish it. This retains the step-10 ledger's
 coverage caveat without changing the reader.
+
+**Exact retained window.** First build the ordered list of the turn's visible records
+and in-span unparsed objects, in file/block order with each call followed by its paired
+result, suppressing repeats of the same ref. The target line is exempt from copy hiding.
+Let `T` be that list's length, `N` the positive record cap, and `i` the first zero-based
+index on the target physical line (or 0 if none). When `T > N`, the nominal window starts
+at `max(0, min(i - floor(N / 2), T - N))` and contains `N` objects. Retain the union of
+that window and **all** target-line indices, in their original list order. `shown` is
+the union's size, `before` its smallest index, and `after` is `T - 1` minus its largest
+index. Paired-result placement can make the target-line indices noncontiguous, so these
+end counts need not describe every omitted object; `T - shown` does. With `--no-limit`
+or `T <= N`, keep the complete list and emit no `turn_cut`.
 
 **Order.** Objects follow file order. When an id has several readable `own` files, each is
 read, in root order:
@@ -900,10 +943,25 @@ in this order:
      `CW:4` is not later than all of CW2. So CW2's lines 1–3 are copies of CW's (SL5, SL6).
    - On live files, the review found the rule agreed with `continued-in` in all 18 pairs
      that rule decided.
-3. **Ties (R26).** A file with no unshared user or assistant record cannot meet the timing
-   test. The shared records of both files are `ambiguous` only when neither or both meet
-   it. A wholly copied original plus a resume that adds later records is therefore a
-   decided resume, not a tie. A forked live pair with neither file later falls here.
+3. **Ties (R26).** A file with no unshared timed user or assistant record cannot meet the
+   timing test. Without a decisive native link, the shared records of both files are
+   `ambiguous` only when neither or both meet it. If exactly one passes, that file is
+   classified as the copy. A wholly copied original plus a resume that adds later records
+   is therefore a decided resume under this heuristic, not a tie.
+
+**Reverse-subset limit (A3, §14.7).** Timing is not proof of historical direction.
+Suppose A writes r1–r3, B copies them and adds no user/assistant record, then A continues
+with a later r4. With no decisive native link, A passes the timing test and B cannot,
+so Stage A incorrectly classifies A's shared records as copies of B. The fixtures'
+file-local `sessionId` values do not resolve which file was opened first. A's shared
+opening turns/finals can be suppressed there and attributed to the abandoned B; A's
+unshared continuation remains its own. This revision retains that heuristic rather than
+changing the reader to tie every such pair. **Why:** it preserves the completed-resume
+interpretation where one file continues, while documenting that the same shape admits
+the reverse history. **Cost:** the fallback can reverse attribution when the subset is an
+abandoned copy; `original` from timing alone must not be treated as native ownership
+proof. The live census found no one-sided pair lacking a decisive native link and does
+not measure this failure's frequency. Native links still take precedence.
 
 **Rules that hold for every kind:**
 - **Scope.** Copy detection covers only the files the run reads. A resume copy whose
@@ -1024,8 +1082,7 @@ Both rules sort records into three kinds:
   as in an SDK capture or resumed tail. Its `trigger` is `null`, its opening `inputs` are
   empty, and its ref is its first response line, never an invented input or metadata
   line. Any queued in-turn human attachment is still listed in `inputs`. The marker or
-  derived rule decides its end and §9.3 decides its status normally; the derived rule
-  never closes on `turn_duration`.
+  derived rule decides its end and §9.3 decides its status normally.
 - **Queued messages.** A queued human attachment inside the turn is listed in `inputs`. It
   never becomes the trigger.
 - **Interrupt markers.** The next turn starts at the first input after an interrupt marker.
@@ -1626,8 +1683,49 @@ no coverage start. The same incomplete-history rules in §5.3 and §6.5 still ap
 - **Why:** the sweep identifies the coverage gap but does not validate the roles, mirror
   relationships or call/result semantics of these shapes.
 - **Cost:** roughly 2.1 million Codex records remain unknown, mostly token counts, and
-  their JSON can match default searches. Reclassification needs source-shape controls
+  their JSON can match default searches. Those hits may duplicate response content,
+  consume `--limit` and double-count raw match aggregates; duplication has not been
+  measured, and uniqueness is not promised. Reclassification needs source-shape controls
   and the classifier/version review required by §3 and §8.4.
+
+**A3 — retain R26 with its reverse-subset limit.** The round-3 review supplied the
+counterexample in §8.3. Before choosing its treatment, hq-28baf9 ran a new counts-only
+census over both current native Claude roots, using the shipped normalizer and
+`session_logs_sessions` direction predicates. A pilot exercised one live project and
+synthetic completed-resume, reverse-case, native-link, identical-tie and counter controls.
+The complete run read 2,961 main files (3,131,911,097 bytes) in 360 project directories
+in 94.72 seconds, with no unparsed lines. It found 20 shared-UUID pairs:
+- 13 had exactly one side without unshared timed user/assistant records; all 13 had a
+  decisive native `continued-in` link;
+- 12 were strict subsets of all UUIDs; all 12 had a decisive native link;
+- zero one-sided pairs lacked a decisive native link. These categories overlap.
+
+The run excludes subagent files, two unread symlink aliases and absent/pruned/archive
+copies; each file was bounded at size on open rather than taking a simultaneous
+snapshot. Its pair counts describe record shapes, not independent historical origins.
+The script's `no_native_link` counters mean no **decisive** link (including conflicting
+links), not necessarily that neither file contains a link. The attached `subset-census.json`
+and `subset-pilot.json` preserve the counts, exclusions and source/script hashes;
+`subset-census.py` preserves the self-checks and method.
+- **Decision:** retain Stage A's timing fallback with the explicit reverse-case warning;
+  reject silently changing one-sided pairs to ties within this documentation amendment.
+- **Why:** the same UUID/timing shape admits both a completed resume and an abandoned
+  copy followed by an original's continuation. The census did not qualify timing-only
+  attribution: every observed one-sided pair had the stronger native signal. Retaining
+  the fallback preserves its resume-recovery behavior, not a claim that it is sound proof.
+- **Cost:** on the reverse case, shared opening history and finals can be attributed to
+  the wrong file. Neither zero observed unlinked pairs nor the complete-resume fixture
+  bounds that risk. A conservative tie rule remains a possible later behavior change.
+
+**A4 — `--final` means eligible final text, including at the outcome boundary.**
+- **Decision:** retain the shipped `not_found` outcome for a final-pattern query when
+  only an ambiguous turn's assistant text matches and the other scope checks pass;
+  no new `ambiguous_final` basis is specified (§6.5).
+- **Why:** ambiguous turns suppress their finals, so that text is outside this query's
+  eligible final set. A record query can inspect it without asserting ownership.
+- **Cost:** `not_found` does not establish that no matching answer was recorded: a
+  possibly own final can be hidden by the ambiguity rule. Consumers needing that wider
+  question must inspect records and copy labels rather than infer it from `--final`.
 
 The remaining amendments specify already implemented behavior: R19/R20 (§4.3, §5),
 R26 (§8.3), R28/R30/R33 (§4.4, §9.1), the step-10 target-line correction (§7.2), and
