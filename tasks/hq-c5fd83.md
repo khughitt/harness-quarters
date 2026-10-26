@@ -7,7 +7,7 @@ size: s
 complexity: low
 process: direct
 created: 2026-10-25T10:54:20Z
-updated: 2026-10-25T15:21:53Z
+updated: 2026-10-26T12:56:07Z
 depends: [ops-6e157a]
 tags: []
 source: hq-c6a149
@@ -35,3 +35,4 @@ Adopting the shared checker (hq-c6a149) required the attachments the layout rule
 - 2026-10-25T11:09:01Z (feat/ops-check-hq-c6a149): retained: {"host":"titan","kind":"scratch","path":"$WORK_ROOT/hq/hq-c5fd83","state":"kept","verification":"verified","manifest":"$WORK_ROOT/hq/hq-c5fd83/manifest.json","sha256":"1c452f49b96337cf7064657bfe89bb2dfc14fdb80cdf0deb615b7aaecf5978af","purpose":"Container of the twelve exact raw attachment copies hq-c6a149 replaced with portable derivatives (eleven from the branch base, one merged from main), one subdirectory per original task, each with its own evidence record here","next_owner":"task:hq-c5fd83","cleanup_trigger":"After the shipped layout exemption admits the originals, hq adopts that checker version and every original is restored and verified"}
 - 2026-10-25T12:28:04Z (main): Expect a second derivative cycle: hq-d5ba0a re-derives the hq-48c5c6 europa-policy-check-round2.out and hq-83c787 windows-refined.txt derivatives, whose ~/d/<project> placeholder the stricter checker from ops-295f8d will flag. Raw copies and their records here are unaffected.
 - 2026-10-25T15:21:53Z (fix/hq-d5ba0a-tilde-layout): hq-d5ba0a verified manifest.json SHA-256 1c452f49b96337cf7064657bfe89bb2dfc14fdb80cdf0deb615b7aaecf5978af and all twelve listed raw file hashes on host titan; no raw bytes or retained identities changed. Four derivatives were regenerated through detach/attach (hq-48c5c6 europa-policy-check.out and europa-policy-check-round2.out, hq-83c787 windows-refined.txt, hq-c075d0 relay-cutover-ledger.md); mappings and raw SHA-256 references are on their original tasks. Restore the same originals once the executing exemption ships.
+- 2026-10-26T12:56:07Z (docs/hq-28baf9-reader-spec): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/obs/obs-d98663/sdd-ledger.raw.md","state":"kept","verification":"verified","purpose":"Transferred from hq-28baf9: exact Stage A ledger behind obs-d98663 sdd-ledger-portable.md; restore raw sdd-ledger.md through normal attachment checks after the executing exemption is adopted","next_owner":"task:hq-c5fd83","cleanup_trigger":"After the adopted executing checker accepts the raw attachment, verify attachment bytes and then release this fallback copy under normal retention rules","sha256":"4ee9e37e4643476e87b626fdb0ae978f85755590b98c1e13c48611731be0c1cd"}
