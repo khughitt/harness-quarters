@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T10:28:51Z
+updated: 2026-10-26T10:28:52Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -62,3 +62,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T10:28:49Z (docs/hq-28baf9-reader-spec): gate: verified tree:431a4a64a12bdb1934887133dc3e420991d6af65 — checks: baseline just test 1672 passed and documentation task and diff checks passed and all 23 kind counts matched and Stage B gate unchanged and frozen spec 669b3d6 sha256 d5e388d0b0c5eb7197ecf332944eff0e7fbd1dc75db64ac1341473f88052eccb; review: important addressed I1 combined task file order, important addressed I2 Codex mismatch scope, minor addressed M3 target cap coverage, minor deferred M4 explicit identity shorthand; reviewer: codex/gpt-6.1-sol session:codex:01a177bb-346d-7d91-a630-ded5e7ff4e4c
   provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-26T10:28:51Z (docs/hq-28baf9-reader-spec): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-28baf9","state":"kept","verification":"verified","purpose":"Locked branch docs/hq-28baf9-reader-spec holds frozen spec revision 7 at 669b3d6 and both full review reports plus the amendment ledger as task attachments, pending the user design review; worktree clean and only regenerable test caches ignored","next_owner":"task:hq-28baf9","cleanup_trigger":"After user approval or requested revision: agent integrates the reviewed branch locally, harvests test timings and checks ignored files and host pointers before any removal"}
+- 2026-10-26T10:28:52Z (docs/hq-28baf9-reader-spec): resources: inherited Stage A scratch and raw-ledger fallback remain at the verified paths and hashes in this task retained records; no new off-tree scratch/evidence copy was created. Both full independent reports and the decision/deferred-minor ledger are attached and their byte hashes checked; redundant .superpowers review workspace copies were removed after attachment verification. No reader, skill, roots, links, measurement or live settings changed. No live sweep or full-suite repeat after doc-only edits; baseline and source evidence are not claimed as a fresh sweep of obs merged main.
