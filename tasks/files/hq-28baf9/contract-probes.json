@@ -1,0 +1,36 @@
+{
+  "ambiguous_final": {
+    "final_basis": "explicit_files",
+    "pattern_final": "not_found",
+    "pattern_records": "found",
+    "unfiltered_turns": "found",
+    "verdict": "pass"
+  },
+  "late_target": {
+    "turn_cut": {
+      "after": 3,
+      "before": 8,
+      "records": 12,
+      "shown": 1
+    },
+    "verdict": "pass"
+  },
+  "noncontiguous_target": {
+    "turn_cut": {
+      "after": 0,
+      "before": 0,
+      "records": 3,
+      "shown": 2
+    },
+    "verdict": "pass"
+  },
+  "target_exemption_without_omission": {
+    "turn_cut": {
+      "after": 0,
+      "before": 0,
+      "records": 3,
+      "shown": 3
+    },
+    "verdict": "pass"
+  }
+}
