@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T10:10:39Z
+updated: 2026-10-26T10:20:45Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -51,3 +51,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T10:10:37Z (docs/hq-28baf9-reader-spec): retained: {"host":"titan","kind":"scratch","path":"$WORK_ROOT/obs/obs-d98663","state":"kept","verification":"verified","purpose":"Inherited Stage A live-run script and counts used to check revision 6; keep through frozen spec review and reassess disposition at closure, preserving the nested raw-ledger evidence","next_owner":"task:hq-28baf9","cleanup_trigger":"After the user reviews the frozen amendment, decide which counts/script evidence Stage B still needs and transfer or preserve it before closure","manifest":"$WORK_ROOT/obs/obs-d98663/MANIFEST.sha256","sha256":"5bf30ddd1c34123fdd2f9dec293074e9eddf55497ffbf619da9cb9b684289671"}
 - 2026-10-26T10:10:38Z (docs/hq-28baf9-reader-spec): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/obs/obs-d98663/sdd-ledger.raw.md","state":"kept","verification":"verified","purpose":"Only retained raw bytes behind obs-d98663 attached sdd-ledger-portable.md; layout fallback remains required, so a spec review or task close alone cannot discard it","next_owner":"task:hq-28baf9","cleanup_trigger":"After a shipped executing checker accepts the verified raw attachment, attach and verify preservation or transfer the evidence to an open owner before closing this amendment","sha256":"4ee9e37e4643476e87b626fdb0ae978f85755590b98c1e13c48611731be0c1cd"}
 - 2026-10-26T10:10:39Z (docs/hq-28baf9-reader-spec): frozen review: revision 6 is hq commit e8ff3707051c164a8fd522117c2e6096cd1426ea:docs/specs/2026-10-23-session-evidence-reader-design.md. Independent read-only reviewer dispatched against that commit, the Stage A ledger, hashed live counts and obs 062b73e. Do not amend or rebase while review is open. Only the spec changes; no tests were added because this is documentation. Existing full-suite baseline is 1672 passed; exact inventory/gate evidence checks, ops-check, ops-docs, tasks check and diff check pass.
+- 2026-10-26T10:20:45Z (docs/hq-28baf9-reader-spec): review: spec round 1 — verdict: revise; findings: Important 2, Minor 1; reviewer: codex/gpt-6.1-sol
