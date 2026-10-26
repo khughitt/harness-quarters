@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T12:33:26Z
+updated: 2026-10-26T12:33:27Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -115,3 +115,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T12:33:23Z (docs/hq-28baf9-reader-spec): review: spec round 6 — verdict: accept; findings: Minor 2; reviewer: claude-code/claude-opus-5-5
 - 2026-10-26T12:33:24Z (docs/hq-28baf9-reader-spec): Review numbering: the supplied acceptance labels itself round 5, which is already occupied by the independent codex acceptance of revision 9; preserved the supplied label here and recorded this arrival as the next task/artifact round 6. Optional additions: quote linked one-sided direction agreement in A3, and give the already disclosed evidence/mention detection limit a Why/Cost ruling in section 14.7. Neither requests a behavior change.
 - 2026-10-26T12:33:26Z (docs/hq-28baf9-reader-spec): review: spec round 7 — verdict: accept; findings: none; reviewer: human
+- 2026-10-26T12:33:27Z (docs/hq-28baf9-reader-spec): human approval: Keith approved frozen revision 9 (hq 6356a82549dd8235768262c9cea894f4940d6637) for planning, with two optional clarifications that change no decision. Proceed with both clarifications and local documentation closeout under the personal-profile integration default. No Stage B execution, runtime behavior change, push or live activation is authorized by this approval.
