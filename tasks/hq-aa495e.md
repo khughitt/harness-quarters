@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 defer: 2027-02-17
 created: 2026-10-26T13:21:09Z
-updated: 2026-10-26T13:21:09Z
+updated: 2026-10-26T13:23:37Z
 depends: []
 tags: []
 source: obs-f5710b plan hq handoff
@@ -22,3 +22,4 @@ Contract: tasks doc obs-f5710b --plan, Task 7, approved spec revision2 e54f9af. 
 
 - 2026-10-26T13:21:09Z (add): created
   provenance: {"harness_session":"codex:01a1780f-e78c-7582-93a0-9507ebf89699","harness_session_source":"CODEX_THREAD_ID","origin":"agent"}
+- 2026-10-26T13:23:37Z (main): Planning coordination refinement: prepare this hq branch only after the frozen Task 6 obs result (obs-55431b) is complete in its authoritative worktree. Do not add that formal dependency merely when the plan-only records become visible: it would refer to the still-open main copy while code is prepared. At Task 8, after authorized obs runtime integration publishes the completed record, add the edge in this hq worktree before integrating hq. obs-929025 accepts the prepared frozen hq commit and tests; Task 8 owns actual integration/activation. This avoids a cross-project integration cycle and preserves the observed ordering; tracker gap tasks-40b49b.
