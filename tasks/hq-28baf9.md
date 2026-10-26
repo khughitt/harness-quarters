@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T12:56:20Z
+updated: 2026-10-26T12:56:23Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -128,3 +128,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T12:54:40Z (docs/hq-28baf9-reader-spec): review: spec round 8 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
 - 2026-10-26T12:54:45Z (docs/hq-28baf9-reader-spec): attached: final-review-report.md (5347 bytes): Full final revision-10 review by codex/gpt-6.1-sol: accept, no findings; verified 12 decided agreements + 1 tie and A5 Why/Cost, fresh suite remains controller-owned
 - 2026-10-26T12:56:20Z (docs/hq-28baf9-reader-spec): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/obs/obs-d98663/sdd-ledger.raw.md","state":"released","verification":"verified","purpose":"Transferred without moving to open hq-c5fd83, whose kept record contains the verified exact hash and raw-attachment restoration action","next_owner":"none","cleanup_trigger":"none"}
+- 2026-10-26T12:56:23Z (docs/hq-28baf9-reader-spec): retained: {"host":"titan","kind":"scratch","path":"$WORK_ROOT/obs/obs-d98663","state":"released","verification":"verified","purpose":"Transferred without moving to open hq-c5fd83 with verified manifest; the receiver protects the nested raw ledger and requires preservation of cited measurements before cleanup","next_owner":"none","cleanup_trigger":"none"}
