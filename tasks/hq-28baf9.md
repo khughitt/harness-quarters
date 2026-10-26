@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T10:09:03Z
+updated: 2026-10-26T10:10:37Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -48,3 +48,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
   provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-26T09:55:15Z (docs/hq-28baf9-reader-spec): origin: read obs-d98663 body, notes, portable ledger and parent hq-cff824; the filing session claude-code:ad0396b3-824c-4825-aa17-a5252221a532 contains the user ask to take obs-d98663 at line 10 and the later question about follow-ups at line 1915. This amendment and its eight subjects were agent-derived from Stage A, not a separate user specification. Direct scope: amend the existing spec, reconcile against merged obs code and retained counts, independently review a frozen revision, then request the user review required for a design spec. No reader, skill, root, link or measurement implementation changes.
 - 2026-10-26T10:04:22Z (docs/hq-28baf9-reader-spec): baseline: just setup then just test in .worktrees/hq-28baf9 at 4f32e64 plus task lifecycle notes; 1672 tests passed (231 agents, 1051 hooks/tools, 389 parallel relay, 1 isolated relay). No repository code changes. Verified inherited evidence manifest 5bf30ddd1c34123fdd2f9dec293074e9eddf55497ffbf619da9cb9b684289671 and all 18 entries, including raw ledger 4ee9e37e4643476e87b626fdb0ae978f85755590b98c1e13c48611731be0c1cd. Decisions for revision 6: retain parent-based fork ownership, rather than enable the native ordinal from positive-only evidence; explicitly retain unmapped kinds as unknown rather than infer roles from names. Both decisions will be frozen and reviewed with the spec.
+- 2026-10-26T10:10:37Z (docs/hq-28baf9-reader-spec): retained: {"host":"titan","kind":"scratch","path":"$WORK_ROOT/obs/obs-d98663","state":"kept","verification":"verified","purpose":"Inherited Stage A live-run script and counts used to check revision 6; keep through frozen spec review and reassess disposition at closure, preserving the nested raw-ledger evidence","next_owner":"task:hq-28baf9","cleanup_trigger":"After the user reviews the frozen amendment, decide which counts/script evidence Stage B still needs and transfer or preserve it before closure","manifest":"$WORK_ROOT/obs/obs-d98663/MANIFEST.sha256","sha256":"5bf30ddd1c34123fdd2f9dec293074e9eddf55497ffbf619da9cb9b684289671"}
