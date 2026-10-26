@@ -7,7 +7,7 @@ size: s
 complexity: low
 process: direct
 created: 2026-10-20T16:04:22Z
-updated: 2026-10-26T13:09:39Z
+updated: 2026-10-26T13:09:41Z
 depends: [obs-d98663, obs-f5710b, hq-19580c, obs-081ded]
 tags: [session-logs]
 source: docs/notes/2026-10-20-session-store-reach-brief.md
@@ -54,3 +54,4 @@ Scope and audit agents need to reach a session's evidence: the session behind a 
 - 2026-10-25T18:26:55Z (main): parked (waiting on agent, dependency): Next agent resumes delivery verification in hq after obs-d98663, obs-f5710b, hq-19580c and obs-081ded deliver: record their commits, acceptance replay, fork-boundary ruling and live six-root coverage, then reconcile deferred children plus concurrent idea hq-c8aef1 and close the goal only when all are settled. Stage B first needs the gate after the 2027-02-16 readout; existing obs-d98663 owns the next implementation. Three immediate hq corrections are merged; no session worktree or process remains.
   provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-26T09:47:17Z (main): obs-d98663 delivered Stage A: merged into obs main at 062b73e (2026-10-26). Acceptance replay SL1-SL10B passes by ref (tests/test_session_logs_cases.py) and SL11 through the turn and task tests; obs gate 1614 tests OK on the merged tree. Fork-boundary ruling: spec §8.3 as reviewed (native subagent_history_start_ordinal not honoured); live it agreed on 269/269 forks carrying it, so hq-28baf9 takes the amendment. Live six-root run: 25,563 files, 33.0 GiB, 0 exceptions; coverage starts claude roots 2026-09-18, codex roots 2026-10-20; all four §14.4 live cases pass. Remaining before this goal closes: hq-28baf9, then Stage B (obs-f5710b, obs-081ded, hq-19580c) after the 2027-02-16 readout.
+- 2026-10-26T13:09:41Z (main): hq-28baf9 delivered and merged locally: approved reader-spec amendment revision10 e4f3d69, integrated by fast-forward through task closeout a7f172f. All eight Stage A topics now include reviewed implementation rulings and live evidence; A1–A5 Why/Cost limits are explicit. Optional direction check against frozen062b73e found 12/12 agreement among decided linked pairs, one timing tie and zero reversals; original 2961-file census is preserved separately from the 2965-file follow-up. Fresh final review accepted with no findings; just test 1672 passed. No runtime or Stage B execution change; the readout gate remains unchanged. Raw evidence and measurement containers transferred to open hq-c5fd83, with hashes/receiving records verified. Stage B owners still plan/deliver their existing tasks against this amended contract; the implementation plan message was cancelled, so no duplicate plan or task was created.
