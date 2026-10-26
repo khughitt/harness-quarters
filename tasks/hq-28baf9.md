@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T09:52:41Z
+updated: 2026-10-26T09:52:55Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -38,3 +38,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T03:03:15Z (main): evidence for this amendment: obs-d98663's attached sdd-ledger-portable.md (not sdd-ledger.md) and its retained scratch $WORK_ROOT/obs/obs-d98663/ on titan (live_run.py and counts), which this task now owns: decide keep or remove when closing
 - 2026-10-26T09:52:41Z (main): started
   provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-26T09:52:55Z (main): arm: flow-trial-1 — unit tack-cff824 — flow on
