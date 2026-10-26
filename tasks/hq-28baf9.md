@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T11:56:48Z
+updated: 2026-10-26T11:56:49Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -102,3 +102,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T11:53:52Z (docs/hq-28baf9-reader-spec): attached: revision-9-review-ledger.md (6542 bytes): Current A1–A4 Why/Cost rulings, all five review rounds, resolved Minor findings, census limits, verification and pending human design review
 - 2026-10-26T11:56:48Z (docs/hq-28baf9-reader-spec): gate: verified tree:431a4a64a12bdb1934887133dc3e420991d6af65 — checks: prior baseline just test 1672 passed and new two-root census complete and five predicate controls and four contract controls passed and docs task diff checks clean and frozen spec 6356a82 sha256 ddcb9065a9e55a729f0963dc583d714e6b50f1c975f94ee457174eeafe7a1ce8 and Stage B gate unchanged; review: important addressed R26 reverse-case limit, important addressed mapped mirror guarantee, important addressed task detection boundary, minor addressed outside path sample, minor addressed abort fields, minor addressed scope definition, minor addressed alias window, minor addressed derived marker clause, minor addressed target window, minor addressed ambiguous final meaning, minor addressed explicit file identity; reviewer: codex/gpt-6.1-sol session:codex:01a17809-0309-7ee3-8a5e-5fdf7ec43bdc
   provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-26T11:56:49Z (docs/hq-28baf9-reader-spec): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-28baf9","state":"kept","verification":"verified","purpose":"Locked clean branch docs/hq-28baf9-reader-spec preserves frozen revision 9 6356a82, full review reports and census/control attachments awaiting the user design review; no implementation plan or runtime change","next_owner":"task:hq-28baf9","cleanup_trigger":"After user review: agent handles requested revisions or integrates the approved branch locally, disposes or transfers retained evidence, runs tt-report and checks ignored files/host pointers before removal"}
