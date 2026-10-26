@@ -1,6 +1,6 @@
 # Session evidence reader: `session-logs search` and `show`
 
-Status: draft for review, revision 6, 2026-10-26. Revision 5 was approved at ae0f8ee;
+Status: draft for review, revision 7, 2026-10-26. Revision 5 was approved at ae0f8ee;
 Stage A was built against that revision and plan 1fea7bf, and merged into obs at 062b73e.
 This amendment records its implementation rulings and measured limits. It changes no
 reader, classifier, skill, roots, links or trial measurement; §11's gates still apply.
@@ -35,6 +35,9 @@ reader, classifier, skill, roots, links or trial measurement; §11's gates still
   - resume timing and mid-parent fork histories no longer depend on misleading wording;
   - the native fork ordinal is measured but not adopted, and the observed unmapped Codex
     kinds remain explicitly `unknown` (§8.2, §8.3, §14.7).
+- **Revision 7** corrects revision 6's independent review (e8ff370): task evidence and
+  mentions share the selected file order, R19's filename/identity protection is scoped
+  to Codex, and a `turn_cut` report can accompany a view with no omitted objects.
 
 Task: hq-28baf9 (amendment); hq-c411df (original design); goal hq-cff824.
 Inputs: the store-reach brief (`docs/notes/2026-10-20-session-store-reach-brief.md`), the
@@ -333,7 +336,7 @@ with the case rule of §6.2. An escape therefore cannot hide a match in an unpar
 | `limits` | the object limit and whether it was hit; the text and raw byte limits |
 | `matches` | `parsed`, `unparsed_raw`, and `collapsed_copies`: matching records suppressed only because they are known copies, counted separately from parsed matches (§6.5; R45, R48) |
 | `task.mentions_since` | under `--task`: the effective lower bound for mention-file listing, or `null` without `--mentions` (§9.4; R44, R48) |
-| `target.turn_cut` | for a record-ref turn view cut by `--limit`: `{records, shown, before, after}` (§7.2) |
+| `target.turn_cut` | for a record-ref turn view over the nominal `--limit`: `{records, shown, before, after}`; target-line exemptions can leave every object shown (§7.2) |
 | `outcome`, `outcome_basis` | `found`, `not_found` or `unknown` (§6.5, §7.4) |
 | `rules` | the naming rule of §5.1 and the classifier version, so a later reader knows which rules produced the roles |
 
@@ -383,8 +386,12 @@ sessions` already does (discovery contract).
 - Codex files whose `parser_state` identity `thread_id` is the id.
 
 **How each candidate's identity is read:**
-- **Claude main file:** the file name, confirmed by the `sessionId` of its main-line
-  records.
+- **Claude main file:** a UUID file name is authoritative. If main-line `sessionId`
+  values disagree with it, normalization reports `identity_basis: file_name_unconfirmed`
+  but keeps the filename identity. A transcript renamed to a different UUID therefore
+  remains an `own` candidate for that name and is read. This is a Stage A limit, not the
+  Codex mismatch protection below. For an explicit file without a UUID name, the first
+  main-line `sessionId` supplies identity when recorded.
 - **Claude child:** `agent-<agentId>`, from its `agentId` and its `subagents/` path. Its
   records' `sessionId` is the parent's, which is inherited (SL8).
 - **Codex:** the first `session_meta`'s `payload.id`, never `payload.session_id` (SL3).
@@ -397,9 +404,9 @@ sessions` already does (discovery contract).
   a fork copy;
 - `alias`: a symlinked transcript. The reader reports it with its target and does not read
   it, as `stores._paths` skips symlinks; a dangling one is `missing`.
-- `mismatch`: the native file name matches the requested id but the file's recorded
-  identity differs. It is reported after aliases and is never read as the requested
-  session (R19).
+- `mismatch`: a native **Codex** file name matches the requested id but the file's
+  recorded identity differs. It is reported after aliases and is never read as the
+  requested session (R19). Claude's UUID filename authority is the separate limit above.
 
 Only `own` files are the session. The others are listed with their relation.
 
@@ -588,7 +595,9 @@ The default window bounds the cost (§6.1). A prefilter may return later only to
   their first home/path and files by home/path inside each group. `--reverse` reverses
   the resulting file sequence, keeping groups contiguous. Records follow file order,
   and the limit applies in that order. Coverage states the basis (§4.6). Other scopes
-  order files within their selected group; task evidence files precede mention-only files.
+  order files by the selected file sort. Task searches sort evidence and mention-only
+  files together, so a newer mention can precede a stamped session; order does not rank
+  evidence strength, and a limit can exclude that stamped session.
 - **Copies.** Collapsed by default and counted in coverage (§8.3).
 
 ### 6.5 Outcomes
@@ -713,9 +722,15 @@ So for now only a search confined to roots that are clear of both can answer
 view windows its records around the target line. Every record on that physical line is
 shown, even when that exceeds `--limit`, including a changed line under
 `--expect-sha256`. The turn object is emitted separately from the record cap. If the
-view is cut, coverage records `limits.hit` and `target.turn_cut`: `records` is the full
+turn exceeds the nominal cap, coverage records `limits.hit` and `target.turn_cut`:
+`records` is the full
 turn's record/unparsed-object count, `shown` is the count emitted, and `before`/`after`
 count objects outside the retained window. These counts are objects, not physical lines.
+The flags are set before target-line objects are restored. For three objects all on
+the target line and `--limit 1`, all three return with `limits.hit: true` and
+`turn_cut: {records: 3, shown: 3, before: 0, after: 0}`. Check `shown < records` to infer
+omission; `limits.hit` alone does not establish it. This retains the step-10 ledger's
+coverage caveat without changing the reader.
 
 **Order.** Objects follow file order. When an id has several readable `own` files, each is
 read, in root order:
