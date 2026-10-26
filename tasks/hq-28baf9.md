@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T12:54:45Z
+updated: 2026-10-26T12:56:20Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -127,3 +127,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T12:48:00Z (docs/hq-28baf9-reader-spec): frozen final review: revision 10 is hq e4f3d69ca2bae73b0c6463076d35a913f2be0de6:docs/specs/2026-10-23-session-evidence-reader-design.md (sha256 0502d9c6f68d8d670e993e1b7ab5561681c3b0ded62d16bad7a2bc9231104cde). Human-approved revision9 plus two authorized clarifications, no changed decision. Fresh final read-only review and just test are tracked concurrently. Do not amend or rebase while review is open.
 - 2026-10-26T12:54:40Z (docs/hq-28baf9-reader-spec): review: spec round 8 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
 - 2026-10-26T12:54:45Z (docs/hq-28baf9-reader-spec): attached: final-review-report.md (5347 bytes): Full final revision-10 review by codex/gpt-6.1-sol: accept, no findings; verified 12 decided agreements + 1 tie and A5 Why/Cost, fresh suite remains controller-owned
+- 2026-10-26T12:56:20Z (docs/hq-28baf9-reader-spec): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/obs/obs-d98663/sdd-ledger.raw.md","state":"released","verification":"verified","purpose":"Transferred without moving to open hq-c5fd83, whose kept record contains the verified exact hash and raw-attachment restoration action","next_owner":"none","cleanup_trigger":"none"}
