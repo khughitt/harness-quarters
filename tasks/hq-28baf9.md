@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T10:20:47Z
+updated: 2026-10-26T10:20:48Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -53,3 +53,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T10:10:39Z (docs/hq-28baf9-reader-spec): frozen review: revision 6 is hq commit e8ff3707051c164a8fd522117c2e6096cd1426ea:docs/specs/2026-10-23-session-evidence-reader-design.md. Independent read-only reviewer dispatched against that commit, the Stage A ledger, hashed live counts and obs 062b73e. Do not amend or rebase while review is open. Only the spec changes; no tests were added because this is documentation. Existing full-suite baseline is 1672 passed; exact inventory/gate evidence checks, ops-check, ops-docs, tasks check and diff check pass.
 - 2026-10-26T10:20:45Z (docs/hq-28baf9-reader-spec): review: spec round 1 — verdict: revise; findings: Important 2, Minor 1; reviewer: codex/gpt-6.1-sol
 - 2026-10-26T10:20:47Z (docs/hq-28baf9-reader-spec): attached: spec-review-report.md (6214 bytes): Full independent review of frozen revision 6 e8ff370 by codex/gpt-6.1-sol: two Important contract corrections and one Minor clarification
+- 2026-10-26T10:20:48Z (docs/hq-28baf9-reader-spec): corrective round 1: accept both Important findings and the Minor clarification from spec review round 1. Correct only the spec: task evidence and mention files share the selected file sort, mismatch protection is Codex-only while Claude UUID filenames remain authoritative/unconfirmed, and target-line exemption can set limits.hit/turn_cut without any omitted objects. No implementation change or new scope. Revision 6 e8ff370 remains frozen; a new commit will carry revision 7 and receive a fresh scoped re-review.
