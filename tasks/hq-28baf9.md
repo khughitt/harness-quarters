@@ -1,15 +1,17 @@
 ---
 id: hq-28baf9
 title: Amend the session evidence reader spec with Stage A's implementation rulings and live findings
-status: doing
+status: done
 priority: 2
 size: s
 complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T13:03:58Z
+updated: 2026-10-26T13:04:02Z
 started: 2026-10-26T09:52:41Z
+completed: 2026-10-26T13:04:02Z
+closed: 2026-10-26T13:04:02Z
 depends: []
 parent: hq-cff824
 tags: [session-logs]
@@ -139,3 +141,7 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
   provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-26T13:03:55Z (docs/hq-28baf9-reader-spec): retro: Reverse the historical interpretation of one-sided evidence before calling it ownership proof, and check blanket prose guarantees against fallback categories. Native-choice counts alone did not prove timing agreement: the independent check found 12 agreements and one tie. The two missed Important cases prompted review-guidance feedback lore-6b5f19.
 - 2026-10-26T13:03:58Z (docs/hq-28baf9-reader-spec): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-28baf9","state":"kept","verification":"verified","purpose":"Closing-session integration only: approved and reviewed documentation branch with fresh 1672-test suite, attached reports/ledgers and all off-tree evidence transferred to hq-c5fd83; ignored remaining pytest/tool caches are regenerable","next_owner":"session:codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","cleanup_trigger":"This closing session fast-forwards the approved branch into main, checks host pointers and ignored files, then unlocks/removes the worktree and deletes its merged branch; tt-report already exited 0"}
+- 2026-10-26T13:04:02Z (docs/hq-28baf9-reader-spec): done
+  provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-26T13:04:02Z (docs/hq-28baf9-reader-spec): Approved reader-spec amendment revision10 e4f3d69 records all eight Stage A topics, A1–A5 limits and Why/Cost, original and direction census evidence (12/12 decided agreements, one tie, zero reversals). Human revision9 approval and optional clarifications complete; fresh final review accepted without findings; just test 1672 passed and docs/task checks clean. No runtime or Stage B change. Full reports attached, raw evidence transferred to open hq-c5fd83; closing session owns only immediate local merge and checked worktree removal.
+  provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
