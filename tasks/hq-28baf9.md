@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T12:33:27Z
+updated: 2026-10-26T12:33:29Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -116,3 +116,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T12:33:24Z (docs/hq-28baf9-reader-spec): Review numbering: the supplied acceptance labels itself round 5, which is already occupied by the independent codex acceptance of revision 9; preserved the supplied label here and recorded this arrival as the next task/artifact round 6. Optional additions: quote linked one-sided direction agreement in A3, and give the already disclosed evidence/mention detection limit a Why/Cost ruling in section 14.7. Neither requests a behavior change.
 - 2026-10-26T12:33:26Z (docs/hq-28baf9-reader-spec): review: spec round 7 — verdict: accept; findings: none; reviewer: human
 - 2026-10-26T12:33:27Z (docs/hq-28baf9-reader-spec): human approval: Keith approved frozen revision 9 (hq 6356a82549dd8235768262c9cea894f4940d6637) for planning, with two optional clarifications that change no decision. Proceed with both clarifications and local documentation closeout under the personal-profile integration default. No Stage B execution, runtime behavior change, push or live activation is authorized by this approval.
+- 2026-10-26T12:33:29Z (docs/hq-28baf9-reader-spec): scratch update: titan $WORK_ROOT/hq/hq-28baf9 — created subset_direction_census.py as a separate variant, preserving the original script and measurements. The old counter says which side the native rule selected but does not independently call the timing predicate; verify that predicate before quoting 13/13 timing agreement. Contents mutable again until the next checkpoint; owner remains hq-28baf9.
