@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T13:01:29Z
+updated: 2026-10-26T13:03:50Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -134,3 +134,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T13:01:28Z (docs/hq-28baf9-reader-spec): final verification: just test exited 0 with 1672 passed (231 agents, 1051 hooks/tools, 389 parallel relay, 1 isolated relay; the last selector deselected 153). Final documentation revision10 e4f3d69 is independently accepted with no findings, human revision9 approval and both authorized clarifications recorded, docs/task/diff checks pass, Stage B gate unchanged. No runtime code change. Earlier failed direction pilot stopped in self-check before reading stores and was rerun against frozen062b73e successfully.
 - 2026-10-26T13:01:29Z (docs/hq-28baf9-reader-spec): Identify the current integration owner
   provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-26T13:03:50Z (docs/hq-28baf9-reader-spec): attached: final-amendment-ledger.md (7927 bytes): Final revision-10 A1–A5 Why/Cost rulings, all eight review/approval rounds, fresh 1672-test suite, 12/12 decided agreement plus tie and verified raw-evidence handoff
