@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T12:56:26Z
+updated: 2026-10-26T12:56:28Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -130,3 +130,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T12:56:20Z (docs/hq-28baf9-reader-spec): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/obs/obs-d98663/sdd-ledger.raw.md","state":"released","verification":"verified","purpose":"Transferred without moving to open hq-c5fd83, whose kept record contains the verified exact hash and raw-attachment restoration action","next_owner":"none","cleanup_trigger":"none"}
 - 2026-10-26T12:56:23Z (docs/hq-28baf9-reader-spec): retained: {"host":"titan","kind":"scratch","path":"$WORK_ROOT/obs/obs-d98663","state":"released","verification":"verified","purpose":"Transferred without moving to open hq-c5fd83 with verified manifest; the receiver protects the nested raw ledger and requires preservation of cited measurements before cleanup","next_owner":"none","cleanup_trigger":"none"}
 - 2026-10-26T12:56:26Z (docs/hq-28baf9-reader-spec): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/hq/hq-28baf9/overall-design-review.raw.md","state":"released","verification":"verified","purpose":"Transferred without moving to open hq-c5fd83 with exact hash and original-task placeholder mapping, preserving the only needed raw fallback","next_owner":"none","cleanup_trigger":"none"}
+- 2026-10-26T12:56:28Z (docs/hq-28baf9-reader-spec): retained: {"host":"titan","kind":"scratch","path":"$WORK_ROOT/hq/hq-28baf9","state":"released","verification":"verified","purpose":"Transferred without moving to open hq-c5fd83 with 10-file manifest c9e23a3b6e956333a1d99a8209933c7c8090eb4d8d028f805810c5e161c8e8f6; attached scripts/results preserved and regenerable source snapshot discarded after verification","next_owner":"none","cleanup_trigger":"none"}
