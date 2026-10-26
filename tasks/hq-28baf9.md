@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T12:42:26Z
+updated: 2026-10-26T12:44:10Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -118,3 +118,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T12:33:27Z (docs/hq-28baf9-reader-spec): human approval: Keith approved frozen revision 9 (hq 6356a82549dd8235768262c9cea894f4940d6637) for planning, with two optional clarifications that change no decision. Proceed with both clarifications and local documentation closeout under the personal-profile integration default. No Stage B execution, runtime behavior change, push or live activation is authorized by this approval.
 - 2026-10-26T12:33:29Z (docs/hq-28baf9-reader-spec): scratch update: titan $WORK_ROOT/hq/hq-28baf9 — created subset_direction_census.py as a separate variant, preserving the original script and measurements. The old counter says which side the native rule selected but does not independently call the timing predicate; verify that predicate before quoting 13/13 timing agreement. Contents mutable again until the next checkpoint; owner remains hq-28baf9.
 - 2026-10-26T12:42:26Z (docs/hq-28baf9-reader-spec): scratch update: titan $WORK_ROOT/hq/hq-28baf9/obs-062b73e now preserves the exact reviewed root Python modules and SOURCE.json hashes for this measurement. The initial pilot stopped in its synthetic self-check (changed current obs helper signature) before scanning stores. The current obs checkout has since changed through other work; it was not modified. Restart against this frozen source package, with bytecode writes disabled; task scratch remains mutable pending checkpoint.
+- 2026-10-26T12:44:10Z (docs/hq-28baf9-reader-spec): attached: revision-9-acceptance-report.md (903 bytes): Full supplied revision-9 acceptance with two optional clarifications and human approval for planning; supplied reviewer labels its round 5, task records it as next round 6
