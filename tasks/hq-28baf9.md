@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T10:28:49Z
+updated: 2026-10-26T10:28:51Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -61,3 +61,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T10:27:25Z (docs/hq-28baf9-reader-spec): minor (deferred): M4 in revision 7 669b3d6 section 6.7 says explicit-file identity comes from records as in section 5.2, but section 5.2 correctly states UUID filename authority for Claude main files. Ruling: retain the accepted frozen revision for human review. Why: the referenced authoritative section gives the exact renamed-file rule, the independent reviewer accepts, and minor-only findings do not start another corrective round. Cost: section 6.7 shorthand can still mislead until a later revision; replace its phrase with follows section 5.2 when next revised. Tracked here and in attached amendment-review-ledger.md.
 - 2026-10-26T10:28:49Z (docs/hq-28baf9-reader-spec): gate: verified tree:431a4a64a12bdb1934887133dc3e420991d6af65 — checks: baseline just test 1672 passed and documentation task and diff checks passed and all 23 kind counts matched and Stage B gate unchanged and frozen spec 669b3d6 sha256 d5e388d0b0c5eb7197ecf332944eff0e7fbd1dc75db64ac1341473f88052eccb; review: important addressed I1 combined task file order, important addressed I2 Codex mismatch scope, minor addressed M3 target cap coverage, minor deferred M4 explicit identity shorthand; reviewer: codex/gpt-6.1-sol session:codex:01a177bb-346d-7d91-a630-ded5e7ff4e4c
   provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-26T10:28:51Z (docs/hq-28baf9-reader-spec): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-28baf9","state":"kept","verification":"verified","purpose":"Locked branch docs/hq-28baf9-reader-spec holds frozen spec revision 7 at 669b3d6 and both full review reports plus the amendment ledger as task attachments, pending the user design review; worktree clean and only regenerable test caches ignored","next_owner":"task:hq-28baf9","cleanup_trigger":"After user approval or requested revision: agent integrates the reviewed branch locally, harvests test timings and checks ignored files and host pointers before any removal"}
