@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T10:27:23Z
+updated: 2026-10-26T10:27:24Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -57,3 +57,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T10:22:52Z (docs/hq-28baf9-reader-spec): frozen review: revision 7 is hq commit 669b3d6b5c1be88efd583970ef2b703470047e9a:docs/specs/2026-10-23-session-evidence-reader-design.md (sha256 d5e388d0b0c5eb7197ecf332944eff0e7fbd1dc75db64ac1341473f88052eccb). Corrective diff e8ff370..669b3d6 fixes both Important findings and clarifies the Minor coverage flag. Docs/task/diff checks pass; Stage B gate remains byte-identical. A fresh read-only scoped reviewer is checking this exact commit; do not amend or rebase it while review is open.
 - 2026-10-26T10:27:21Z (docs/hq-28baf9-reader-spec): review: spec round 2 — verdict: accept; findings: Minor 1; reviewer: codex/gpt-6.1-sol
 - 2026-10-26T10:27:23Z (docs/hq-28baf9-reader-spec): attached: spec-correction-review-report.md (4770 bytes): Full fresh scoped re-review of frozen revision 7 669b3d6 by codex/gpt-6.1-sol: accepted, no Critical/Important, one Minor wording caveat
+- 2026-10-26T10:27:24Z (docs/hq-28baf9-reader-spec): attached: amendment-review-ledger.md (3685 bytes): Amendment decisions A1/A2, independent review dispositions, deferred Minor M4 with Why/Cost, frozen revision and verification limits
