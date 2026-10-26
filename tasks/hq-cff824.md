@@ -7,7 +7,7 @@ size: s
 complexity: low
 process: direct
 created: 2026-10-20T16:04:22Z
-updated: 2026-10-25T18:26:55Z
+updated: 2026-10-26T09:47:17Z
 depends: [obs-d98663, obs-f5710b, hq-19580c, obs-081ded]
 tags: [session-logs]
 source: docs/notes/2026-10-20-session-store-reach-brief.md
@@ -53,3 +53,4 @@ Scope and audit agents need to reach a session's evidence: the session behind a 
 - 2026-10-25T18:26:53Z (main): Concurrent-work correction: the brief added on main during this session is linked to new child hq-c8aef1 (idea), so it is related goal work, separate from the three correction children reviewed and implemented here. It and its brief were preserved without edits; this session did not scope, review or implement that new child. Parent closeout must also reconcile hq-c8aef1, alongside the deferred children and four delivery dependencies. The earlier checkpoint description of the concurrent brief as unrelated is superseded by this observation.
 - 2026-10-25T18:26:55Z (main): parked (waiting on agent, dependency): Next agent resumes delivery verification in hq after obs-d98663, obs-f5710b, hq-19580c and obs-081ded deliver: record their commits, acceptance replay, fork-boundary ruling and live six-root coverage, then reconcile deferred children plus concurrent idea hq-c8aef1 and close the goal only when all are settled. Stage B first needs the gate after the 2027-02-16 readout; existing obs-d98663 owns the next implementation. Three immediate hq corrections are merged; no session worktree or process remains.
   provenance: {"harness_session":"codex:01a1741c-4199-7e10-a98e-cef25f7966ed","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-26T09:47:17Z (main): obs-d98663 delivered Stage A: merged into obs main at 062b73e (2026-10-26). Acceptance replay SL1-SL10B passes by ref (tests/test_session_logs_cases.py) and SL11 through the turn and task tests; obs gate 1614 tests OK on the merged tree. Fork-boundary ruling: spec §8.3 as reviewed (native subagent_history_start_ordinal not honoured); live it agreed on 269/269 forks carrying it, so hq-28baf9 takes the amendment. Live six-root run: 25,563 files, 33.0 GiB, 0 exceptions; coverage starts claude roots 2026-09-18, codex roots 2026-10-20; all four §14.4 live cases pass. Remaining before this goal closes: hq-28baf9, then Stage B (obs-f5710b, obs-081ded, hq-19580c) after the 2027-02-16 readout.
