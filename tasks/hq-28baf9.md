@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T13:11:50Z
+updated: 2026-10-26T13:42:08Z
 started: 2026-10-26T09:52:41Z
 completed: 2026-10-26T13:04:02Z
 closed: 2026-10-26T13:04:02Z
@@ -147,3 +147,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
   provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-26T13:11:49Z (main): integration: fast-forwarded approved documentation branch into main through closeout commit a7f172f; committed covered tree equals the tested 431a4a64a12bdb1934887133dc3e420991d6af65 and spec bytes equal reviewed revision10 e4f3d69. Main ops-check, ops-docs, harness-facts and tasks checks passed. Existing codex/config.toml live modification preserved. Host-pointer scan checked 246 declared/launcher/unit paths and 189 text launchers/units, no pointer into this worktree. tt-report exited 0. Ignored-file disposition: .githooks/__pycache__, .pytest_cache, tools/hq_cli/__pycache__ and tools/session_archive/__pycache__ are regenerable caches to discard; all review workspaces already attached/byte-verified and removed; no submodules or other untracked files.
 - 2026-10-26T13:11:50Z (main): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-28baf9","state":"released","verification":"verified","purpose":"Removed after approved local fast-forward merge: fresh 1672-test suite passed, covered committed tree matched, tt-report ran, no known host pointer resolved into the tree, only four regenerable cache directories were discarded, all reports/evidence were attached or transferred to hq-c5fd83, and the merged docs/hq-28baf9-reader-spec branch was deleted","next_owner":"none","cleanup_trigger":"none"}
+- 2026-10-26T13:42:08Z (main): Follow-ups filed from accepted runtime limits, without changing this amendment or adding Stage B prerequisites: obs-4a0853 (P2 planned: unlinked Claude subset direction), obs-220e05 (P2 planned: copied history across evidence/mention groups), obs-b4456b (P3 direct: source-shape qualification of potentially mirrored unknown Codex events; no mapping change). Each has the exact approved revision10 snapshot as a required input and its own concerns note against obs-d98663. Existing obs-f5710b and obs-055532 retain migration and bounded-memory work.
