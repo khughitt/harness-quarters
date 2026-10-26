@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T13:03:50Z
+updated: 2026-10-26T13:03:52Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -135,3 +135,5 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T13:01:29Z (docs/hq-28baf9-reader-spec): Identify the current integration owner
   provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-26T13:03:50Z (docs/hq-28baf9-reader-spec): attached: final-amendment-ledger.md (7927 bytes): Final revision-10 A1–A5 Why/Cost rulings, all eight review/approval rounds, fresh 1672-test suite, 12/12 decided agreement plus tie and verified raw-evidence handoff
+- 2026-10-26T13:03:52Z (docs/hq-28baf9-reader-spec): gate: verified tree:431a4a64a12bdb1934887133dc3e420991d6af65 — checks: fresh just test 1672 passed and direction controls passed and 12 decided agreements plus 1 tie and docs task diff checks passed and frozen revision10 e4f3d69 sha256 0502d9c6f68d8d670e993e1b7ab5561681c3b0ded62d16bad7a2bc9231104cde and unchanged Stage B gate; review: none; reviewer: codex/gpt-6.1-sol session:codex:01a17840-b148-7961-afd5-a15509761881
+  provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
