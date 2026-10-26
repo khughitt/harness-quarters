@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T09:55:14Z
+updated: 2026-10-26T09:55:15Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -45,3 +45,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
   provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-26T09:55:14Z (docs/hq-28baf9-reader-spec): gate: implementing .worktrees/hq-28baf9
   provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-26T09:55:15Z (docs/hq-28baf9-reader-spec): origin: read obs-d98663 body, notes, portable ledger and parent hq-cff824; the filing session claude-code:ad0396b3-824c-4825-aa17-a5252221a532 contains the user ask to take obs-d98663 at line 10 and the later question about follow-ups at line 1915. This amendment and its eight subjects were agent-derived from Stage A, not a separate user specification. Direct scope: amend the existing spec, reconcile against merged obs code and retained counts, independently review a frozen revision, then request the user review required for a design spec. No reader, skill, root, link or measurement implementation changes.
