@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T11:33:54Z
+updated: 2026-10-26T11:33:55Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -90,3 +90,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T11:29:27Z (docs/hq-28baf9-reader-spec): R26 census completed before choice: 2961 main files / 360 project dirs / 3131911097 bytes / 94.72 s / 0 unparsed; 20 shared-UUID pairs, 13 one-sided timed-record pairs all with decisive native links, 12 strict UUID-subset pairs all linked, 0 observed one-sided pairs without decisive link. Categories overlap. Scope excludes subagents, 2 aliases and absent/archive/pruned copies; size-on-open bounds, not a simultaneous snapshot. Rule retained with explicit reverse-case Why/Cost, not qualified as historical proof. Reports and script are attached; reader code remains unchanged.
 - 2026-10-26T11:33:53Z (docs/hq-28baf9-reader-spec): attached: contract-probes.py (3322 bytes): Read-only assert controls for the exact target window and ambiguous final-pattern versus record outcomes
 - 2026-10-26T11:33:54Z (docs/hq-28baf9-reader-spec): attached: contract-probes.json (656 bytes): Four shipped-code controls passed: late target, whole-line exemption without omission, noncontiguous target indices and ambiguous final outcomes
+- 2026-10-26T11:33:55Z (docs/hq-28baf9-reader-spec): review-round-3 dispositions for revision 8: I1 addressed by the measured R26 reverse-subset limit with Why/Cost in sections 8.3 and 14.7; I2 addressed by limiting default-role uniqueness to mapped mirrors and adding possible duplicate hits/limit/count cost to A2. All seven Minor points addressed: 20-path sorted sample, Claude abort_reason null, defined store-wide scope and scoped duplicate grouping, effective-window alias bound, removed unreachable derived-marker clause, exact target-window formula and intended eligible-final not_found semantics. Earlier deferred M4 identity shorthand also corrected. Source controls reproduce the window counts and ambiguous final-pattern not_found versus record found. No runtime behavior changed.
