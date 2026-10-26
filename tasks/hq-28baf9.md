@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T11:27:08Z
+updated: 2026-10-26T11:27:09Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -81,3 +81,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T11:23:34Z (docs/hq-28baf9-reader-spec): R26 pilot: subset_census.py imported the shipped reader predicates and passed completed-resume, reverse-case, native-link, identical-tie and counter-category self-checks; one live project (2 files, 174626 bytes) completed in 0.29 s with no unparsed lines. The reverse case selects the continuing file as the copy, as reported. Proceeding to counts over both current native Claude roots, main files grouped per project; no transcript text retained and no claim that shape establishes historical direction.
 - 2026-10-26T11:25:03Z (docs/hq-28baf9-reader-spec): attached: overall-design-review-report.md (5258 bytes): Full supplied overall review of frozen revision 7 669b3d6 by claude-code/claude-opus-5-5: revise, Important 2 and Minor 7, with R26 reverse-subset counterexample
 - 2026-10-26T11:27:08Z (docs/hq-28baf9-reader-spec): detached: overall-design-review-report.md: Machine-layout refusal on hostname: exact raw bytes preserved in task scratch; replacing attachment with portable derivative
+- 2026-10-26T11:27:09Z (docs/hq-28baf9-reader-spec): attached: overall-design-review-portable.md (5258 bytes): Full review-round-3 portable derivative: hostname replaced by $HOST; exact raw review retained under the task evidence record
