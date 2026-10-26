@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T10:27:24Z
+updated: 2026-10-26T10:27:25Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -58,3 +58,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T10:27:21Z (docs/hq-28baf9-reader-spec): review: spec round 2 — verdict: accept; findings: Minor 1; reviewer: codex/gpt-6.1-sol
 - 2026-10-26T10:27:23Z (docs/hq-28baf9-reader-spec): attached: spec-correction-review-report.md (4770 bytes): Full fresh scoped re-review of frozen revision 7 669b3d6 by codex/gpt-6.1-sol: accepted, no Critical/Important, one Minor wording caveat
 - 2026-10-26T10:27:24Z (docs/hq-28baf9-reader-spec): attached: amendment-review-ledger.md (3685 bytes): Amendment decisions A1/A2, independent review dispositions, deferred Minor M4 with Why/Cost, frozen revision and verification limits
+- 2026-10-26T10:27:25Z (docs/hq-28baf9-reader-spec): minor (deferred): M4 in revision 7 669b3d6 section 6.7 says explicit-file identity comes from records as in section 5.2, but section 5.2 correctly states UUID filename authority for Claude main files. Ruling: retain the accepted frozen revision for human review. Why: the referenced authoritative section gives the exact renamed-file rule, the independent reviewer accepts, and minor-only findings do not start another corrective round. Cost: section 6.7 shorthand can still mislead until a later revision; replace its phrase with follows section 5.2 when next revised. Tracked here and in attached amendment-review-ledger.md.
