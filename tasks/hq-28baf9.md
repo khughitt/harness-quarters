@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T11:48:45Z
+updated: 2026-10-26T11:53:49Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -97,3 +97,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T11:46:09Z (docs/hq-28baf9-reader-spec): attached: revision-8-review-report.md (7424 bytes): Full fresh review of frozen revision 8 20c8629: original Important issues addressed, one task-grouping Important and one Claude abort_reason Minor remain
 - 2026-10-26T11:46:10Z (docs/hq-28baf9-reader-spec): corrective round 2: verified round-4 findings against obs 062b73e. Limit the single detection group to session-search candidates and task evidence-selected files; --mentions extras use separate store groups and no copy detection across that boundary. Correct the earlier round-3 Claude-null suggestion: Claude spans do not set closing, so abort_reason is omitted, while aborted Codex turns carry recorded reason or null. Both are documentation corrections; R26/A2/A4 decisions and census bytes stay unchanged.
 - 2026-10-26T11:48:45Z (docs/hq-28baf9-reader-spec): frozen review: revision 9 is hq commit 6356a82549dd8235768262c9cea894f4940d6637:docs/specs/2026-10-23-session-evidence-reader-design.md (sha256 ddcb9065a9e55a729f0963dc583d714e6b50f1c975f94ee457174eeafe7a1ce8). Fresh scoped reviewer checks the two corrections against the real span/copy pipelines. Revision 8 stays in history; original round-3 Important findings, A1–A4 decisions and all census/control bytes are unchanged. Human review remains pending.
+- 2026-10-26T11:53:49Z (docs/hq-28baf9-reader-spec): review: spec round 5 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
