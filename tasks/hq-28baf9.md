@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T12:46:25Z
+updated: 2026-10-26T12:46:26Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -122,3 +122,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T12:46:22Z (docs/hq-28baf9-reader-spec): attached: subset-direction-census.py (8930 bytes): Native-versus-timing direction comparison variant: independent _later checks and agree/reverse/tie controls, run against frozen obs062b73e
 - 2026-10-26T12:46:23Z (docs/hq-28baf9-reader-spec): attached: subset-direction-pilot.json (1677 bytes): Direction-comparison pilot against frozen obs062b73e passed its controls and one small live project
 - 2026-10-26T12:46:25Z (docs/hq-28baf9-reader-spec): attached: subset-direction-census.json (2556 bytes): Follow-up direction measurement: 2965 main files, 13 one-sided native-linked pairs, 12 timing agreements, 1 timing tie, 0 reversals
+- 2026-10-26T12:46:26Z (docs/hq-28baf9-reader-spec): attached: direction-reader-source.json (4954 bytes): Frozen obs062b73e source manifest: all 55 exported root Python modules and SHA-256 hashes, used to avoid the newer private helper API
