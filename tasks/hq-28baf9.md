@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T11:46:07Z
+updated: 2026-10-26T11:46:09Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -94,3 +94,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T11:35:20Z (docs/hq-28baf9-reader-spec): frozen review: revision 8 is hq commit 20c86291631e5a423d822cf5acee20f07b60fcd8:docs/specs/2026-10-23-session-evidence-reader-design.md (sha256 ae1cee2c89c1f9f8cbb9ca8c7829218cdf6b718b19c26cbda1590407c7038d5c). Fresh read-only reviewer dispatched against the complete round-3 review, actual merged reader predicates, full spec and new census/control evidence. No amendment/rebase while review is open. Stage B gate remains byte-identical and reader modules remain unchanged.
 - 2026-10-26T11:37:07Z (docs/hq-28baf9-reader-spec): Review-guidance feedback filed as lore-6b5f19: the user reported two independent reviews missing Important inference/guarantee issues; the feedback asks guidance to reverse one-sided examples and test prose guarantees against fallback classifications. This does not change the task contract or approve the spec.
 - 2026-10-26T11:46:07Z (docs/hq-28baf9-reader-spec): review: spec round 4 — verdict: revise; findings: Important 1, Minor 1; reviewer: codex/gpt-6.1-sol
+- 2026-10-26T11:46:09Z (docs/hq-28baf9-reader-spec): attached: revision-8-review-report.md (7424 bytes): Full fresh review of frozen revision 8 20c8629: original Important issues addressed, one task-grouping Important and one Claude abort_reason Minor remain
