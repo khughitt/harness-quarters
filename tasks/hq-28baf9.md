@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T02:53:19Z
+updated: 2026-10-26T03:03:15Z
 depends: []
 parent: hq-cff824
 tags: [session-logs]
@@ -33,3 +33,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 
 - 2026-10-26T02:53:19Z (add): created
   provenance: {"harness_session":"claude-code:ad0396b3-824c-4825-aa17-a5252221a532","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
+- 2026-10-26T03:03:15Z (main): evidence for this amendment: obs-d98663's attached sdd-ledger-portable.md (not sdd-ledger.md) and its retained scratch $WORK_ROOT/obs/obs-d98663/ on titan (live_run.py and counts), which this task now owns: decide keep or remove when closing
