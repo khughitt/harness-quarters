@@ -1,6 +1,9 @@
 # Session evidence reader: `session-logs search` and `show`
 
-Status: draft for review, revision 5, 2026-10-23.
+Status: draft for review, revision 6, 2026-10-26. Revision 5 was approved at ae0f8ee;
+Stage A was built against that revision and plan 1fea7bf, and merged into obs at 062b73e.
+This amendment records its implementation rulings and measured limits. It changes no
+reader, classifier, skill, roots, links or trial measurement; §11's gates still apply.
 - **Revision 1** (ce66d61) went through a fresh-context agent review: one critical finding,
   12 important and 14 minor.
 - **Revision 2** (c21021e) addressed them. Its largest change is D6: the task is no longer
@@ -24,7 +27,16 @@ Status: draft for review, revision 5, 2026-10-23.
   - a fork whose parent is unavailable is ambiguous to its end, and ambiguous turns have no
     final;
   - a Codex turn needs its `task_complete` to be `completed`.
-Task: hq-c411df (goal hq-cff824)
+- **Revision 6** (hq-28baf9) reconciles Stage A's ledger and live findings:
+  - name/identity mismatches and index rows outside the configured roots are explicit;
+  - coverage records unread aliases, matches hidden in collapsed copies, copy-group
+    sorting, bounded mention scans and cuts around a record target;
+  - response-only turns, abort reasons and bounded command fields are specified;
+  - resume timing and mid-parent fork histories no longer depend on misleading wording;
+  - the native fork ordinal is measured but not adopted, and the observed unmapped Codex
+    kinds remain explicitly `unknown` (§8.2, §8.3, §14.7).
+
+Task: hq-28baf9 (amendment); hq-c411df (original design); goal hq-cff824.
 Inputs: the store-reach brief (`docs/notes/2026-10-20-session-store-reach-brief.md`), the
 session-log survey (`docs/notes/2026-10-20-session-log-survey.md`, hq-de3e4c), the index
 reach probe (`docs/notes/2026-10-20-session-index-reach.md`, hq-a1c591), the acceptance
@@ -254,6 +266,7 @@ blocks yields one object.
 | `call` | `{id, tool, peer, is_error, command, status}`: the call id; the tool name; the paired call or result ref; whether the result is an error (results only); the shell command, when the input is one; and a call with no result is `status: pending` |
 | `dispatch` | `{kind: "sdk_dispatch", call}` from `parent_tool_use_id`; it names a call, never a session (SL9) |
 | `execution` | for a Codex `CommandExecution` item: `{command, exit_code, cwd, status}` |
+| `call.command_bytes`, `call.command_truncated`, `execution.command_bytes`, `execution.command_truncated` | only when that command is cut: its full UTF-8 byte length and `true`; commands use the same `--text-bytes` cap as `text`, after matching (§6.3; R39) |
 | `model` | `{value, basis}`; basis `runtime`, `requested`, `resolved` or `creation` (§10.3) |
 | `text`, `text_bytes`, `truncated` | the searchable text (§6.2), cut at `--text-bytes`, its full length, and whether it was cut |
 | `encrypted` | true when the block's content is encrypted and therefore unavailable |
@@ -265,7 +278,7 @@ blocks yields one object.
 |---|---|
 | `ref`, `harness`, `home`, `profile`, `store` | the file ref (no line) and its place |
 | `session`, `agent`, `identity_basis` | the file's own identity and what established it (§5.2) |
-| `relation` | for a lookup by id: `own`, `child`, `inherited` or `alias` (§5.2) |
+| `relation` | for a lookup by id: `own`, `child`, `inherited`, `alias` or `mismatch` (§5.2) |
 | `state` | `readable`, `missing`, `unreadable` or `changed` (§5.5) |
 | `missing_since`, `read_path` | from the index row (§5.3); `read_path` is home-relative when it lies under a known root, otherwise absolute |
 | `cwd`, `entrypoint`, `first_at`, `last_at`, `lines` | header values and extent |
@@ -278,14 +291,15 @@ blocks yields one object.
 
 | Field | Meaning |
 |---|---|
-| `session`, `turn`, `turn_id` | the session; the turn's ref, which is the ref of its first input record (Claude) or of `task_started` (Codex); and the Codex `turn_id` |
+| `session`, `turn`, `turn_id` | the session; the turn's ref, which is the ref of its first input record (Claude), first response when there is no opening input, or `task_started` (Codex); and the Codex `turn_id` |
 | `inputs` | the turn's input records, plus any in-turn human records (a queued human message), each `{ref, role}` |
-| `trigger` | `{ref, role, origin_kind}` (§9.1) |
+| `trigger` | `{ref, role, origin_kind}`, or `null` when there is no opening input (§9.1) |
 | `end` | the ref of the turn's last record |
 | `status`, `status_basis` | §9.3; `status_basis` also says which turn rule applied (§9.1) |
+| `abort_reason` | on an interrupted turn with a closing record: the recorded Codex `turn_aborted.reason`, or `null` when no reason is recorded; omitted on other turns (R30) |
 | `asks_user` | true when a Codex final message carries `questions` (§9.3) |
 | `final` | `{ref, text, basis}`, present only when `status` is `completed` |
-| `last_assistant` | the ref of the turn's last assistant text, present when the turn has no final; it is never labelled final |
+| `last_assistant` | when the turn has no final: its last assistant text's ref, or `null` if it has none; it is never labelled final |
 | `commentary` | the refs of the turn's non-final assistant text |
 | `models` | the runtime models of the turn's records (§10.2) |
 | `calls` | the number of tool calls |
@@ -308,14 +322,18 @@ with the case rule of §6.2. An escape therefore cannot hide a match in an unpar
 |---|---|
 | `format` | `session-logs/1` |
 | `host`, `query` | the host name and the parsed arguments, defaults marked |
+| `query.sort_basis` | search only: `group_newest` or `group_path` for a store search, `file_newest` or `file_path` for other search scopes (§6.4; R46, R48) |
 | `roots` | per root: home, store, state (`searched`, `absent` or `unreadable`), files, bytes |
-| `index` | `{state, schema, last_complete_run, age_minutes, coverage_start}`; state `used`, `stale`, `absent`, `unsupported_schema` or `unreadable`, with the reason; `coverage_start` per root (§5.3) |
+| `index` | `{state, schema, last_complete_run, age_minutes, coverage_start, rows_outside_roots, outside_root_paths}`; state `used`, `stale`, `absent`, `unsupported_schema` or `unreadable`, with the reason; `coverage_start` per root (§5.3); unmatched index rows are counted, with their paths (R20) |
 | `window` | `since` and `until`, and whether `since` is the default |
 | `files` | scanned, skipped by mtime (§6.1), unreadable (refs), vanished during the run (refs), and missing in scope (refs, with read path and its state); a list longer than 20 is cut and its count kept |
+| `files.aliases_not_read` | `{count, items}`: in-scope transcript aliases whose resolved target was not read by this run; items are refs, capped at 20 (§6.5; R48) |
 | `lines` | malformed and truncated refs, each marked `raw_match` |
 | `copies` | collapsed copies by kind; whether detection was limited to the files read (§8.3) |
 | `limits` | the object limit and whether it was hit; the text and raw byte limits |
-| `matches` | parsed matches; unparsed lines with a raw match |
+| `matches` | `parsed`, `unparsed_raw`, and `collapsed_copies`: matching records suppressed only because they are known copies, counted separately from parsed matches (§6.5; R45, R48) |
+| `task.mentions_since` | under `--task`: the effective lower bound for mention-file listing, or `null` without `--mentions` (§9.4; R44, R48) |
+| `target.turn_cut` | for a record-ref turn view cut by `--limit`: `{records, shown, before, after}` (§7.2) |
 | `outcome`, `outcome_basis` | `found`, `not_found` or `unknown` (§6.5, §7.4) |
 | `rules` | the naming rule of §5.1 and the classifier version, so a later reader knows which rules produced the roles |
 
@@ -379,6 +397,9 @@ sessions` already does (discovery contract).
   a fork copy;
 - `alias`: a symlinked transcript. The reader reports it with its target and does not read
   it, as `stores._paths` skips symlinks; a dangling one is `missing`.
+- `mismatch`: the native file name matches the requested id but the file's recorded
+  identity differs. It is reported after aliases and is never read as the requested
+  session (R19).
 
 Only `own` files are the session. The others are listed with their relation.
 
@@ -444,6 +465,12 @@ deleted before the index first saw it is in neither the native walk nor the inde
 
 Without a usable index the reader still runs. Coverage says so, and an empty answer over
 the stores cannot be `not_found` (§6.5).
+
+**Index roots mismatch (R20).** Rows under none of the currently configured roots are
+not silently discarded: coverage reports `index.rows_outside_roots` and
+`index.outside_root_paths`. A nonzero count blocks `not_found` over the stores, with basis
+`index_roots_mismatch` when it is the first failed condition. Explicit-file searches do
+not depend on the index.
 
 ### 5.4 Availability, replayed copies and remote hosts
 
@@ -545,35 +572,58 @@ The default window bounds the cost (§6.1). A prefilter may return later only to
   - `--limit/-n N` caps emitted objects; the default is 50, and `--no-limit` removes the
     cap.
   - `--text-bytes` defaults to 2,000 and `--raw-bytes` to 16,384.
+  - `call.command` and `execution.command` are cut to `--text-bytes` too; when cut, their
+    enclosing object carries `command_bytes` and `command_truncated: true` (R39).
+    Matching uses full text and commands before any output truncation.
   - A hit limit is recorded in coverage.
 
 ### 6.4 Order and copies
 
-- **Order.** `--sort activity` is the default: files newest first by mtime. `--sort path`
-  orders by home, then path. `--reverse` flips either. Records follow file order, and the
-  limit applies in that order.
+- **Order (R46).** Store searches emit each copy group contiguously, holding one group at
+  a time. Files of one harness/identity are grouped for duplicate detection; Claude
+  non-subagent files in one home/project directory are also grouped for resume detection.
+  These connections can join groups across directories. `--sort activity`, the
+  default, orders groups by their newest member's mtime and files newest first inside
+  each group. It is not a global per-file activity order. `--sort path` orders groups by
+  their first home/path and files by home/path inside each group. `--reverse` reverses
+  the resulting file sequence, keeping groups contiguous. Records follow file order,
+  and the limit applies in that order. Coverage states the basis (§4.6). Other scopes
+  order files within their selected group; task evidence files precede mention-only files.
 - **Copies.** Collapsed by default and counted in coverage (§8.3).
 
 ### 6.5 Outcomes
 
 - **`found`:** at least one parsed match.
-- **`not_found`:** zero parsed matches. Every search needs these four:
+- **`not_found`:** zero parsed matches. Every search needs these six:
   - no selected root was unreadable;
   - no file in scope was unreadable or vanished;
   - no missing file in scope lacked a readable copy;
-  - no unparsed line in scope had a raw match.
+  - no in-scope transcript alias had a resolved target that this run did not read;
+  - no unparsed line in scope had a raw match;
+  - no collapsed copy in scope matched the record selection and pattern.
+
+  An unread alias blocks with basis `alias_not_read`. An alias whose target's mtime is
+  before `--since` is outside the window; an alias of a file already read adds no unread
+  evidence. With `--cwd`, an unread alias stays in scope because its cwd is unknown.
+
+  A matching collapsed copy blocks with basis `collapsed_copy_match`: request blobs and
+  compaction history can hold text with no original in scope. `--copies` exposes those
+  records as parsed matches. Under `--final`, copies are never turns, so they do not
+  contribute to `matches.collapsed_copies` or make an empty final answer unknown
+  (R45, R48). All earlier conditions still apply to `--final`.
 
   Then it depends on the search's scope:
   - **Only explicit files:** nothing more.
   - **A session or task:** the index was `used` (present, the expected schema, and not
-    stale), and all three of these hold:
+    stale), it has no rows outside the configured roots, and all three of these hold:
     - every selected session has at least one candidate;
     - every selected session's first record falls after its root's coverage start
       (§5.3);
     - for `--task`, the task's earliest time (its `created`, or its first note's `at`)
       falls after the coverage start of every selected root. A session pruned before the
       index first ran, and never stamped, would otherwise go unseen.
-  - **Store-wide:** the index was `used`, and the window starts no earlier than every
+  - **Store-wide:** the index was `used`, it has no rows outside the configured roots,
+    and the window starts no earlier than every
     selected root's coverage start. An `--all-time` store-wide search never answers
     `not_found`.
 - **`unknown`:** any other zero-match result. `outcome_basis` names the first failed
@@ -640,7 +690,7 @@ So for now only a search confined to roots that are clear of both can answer
 
 | Target | Default view |
 |---|---|
-| a session id (§5.2) | the session view: a session object for every candidate, `own` first, then `child`, `inherited` and `alias`; then a turn object for each turn of each readable `own` candidate |
+| a session id (§5.2) | the session view: a session object for every candidate, `own` first, then `child`, `inherited`, `alias` and `mismatch`; then a turn object for each turn of each readable `own` candidate |
 | a file ref (`<home>:<path>`) | the session view of that file |
 | a record or block ref | the turn view: the turn object of the turn holding the record, then every record of that turn, each call followed by its paired result |
 | `--file PATH` | the session view of an explicit file; with `--lines`, its line view |
@@ -658,6 +708,14 @@ So for now only a search confined to roots that are clear of both can answer
 | `--limit/-n N` | caps emitted objects: 200 turns in the session view, 500 records in the turn and line views; `--no-limit` removes the cap |
 
 `show` emits every role, metadata included, because it shows a whole span.
+
+**A record target survives the limit (step 10 corrective review).** A record-ref turn
+view windows its records around the target line. Every record on that physical line is
+shown, even when that exceeds `--limit`, including a changed line under
+`--expect-sha256`. The turn object is emitted separately from the record cap. If the
+view is cut, coverage records `limits.hit` and `target.turn_cut`: `records` is the full
+turn's record/unparsed-object count, `shown` is the count emitted, and `before`/`after`
+count objects outside the retained window. These counts are objects, not physical lines.
 
 **Order.** Objects follow file order. When an id has several readable `own` files, each is
 read, in root order:
@@ -742,6 +800,45 @@ that reaches the model carries `origin.kind` `human` and follows the first row.
 | `response_item` `reasoning` | `assistant`, `block_type: reasoning`; encrypted content is `encrypted` |
 | anything else | `unknown` |
 
+**Observed kinds without another row (R15).** The following stay `unknown`, including
+their compact JSON as searchable text. This makes Stage A's fallback explicit rather
+than silently treating a familiar-looking name as metadata or a paired call. Counts are
+from the four retained sweep slices (§14.7), with copies included:
+
+| Native kind (or compacted entry type) | Records | Role |
+|---|---:|---|
+| `event_msg/token_count` | 1,817,365 | `unknown` |
+| `event_msg/exec_command_end` | 76,438 | `unknown` |
+| `event_msg/patch_apply_end` | 72,656 | `unknown` |
+| `event_msg/agent_reasoning` | 43,878 | `unknown` |
+| `event_msg/sub_agent_activity` | 33,857 | `unknown` |
+| `event_msg/thread_settings_applied` | 15,862 | `unknown` |
+| `compacted` entry `compaction` | 9,390 | `unknown`, `copy: compaction_history` |
+| `event_msg/context_compacted` | 8,129 | `unknown` |
+| `event_msg/mcp_tool_call_end` | 7,469 | `unknown` |
+| `event_msg/web_search_end` | 4,861 | `unknown` |
+| `event_msg/collab_waiting_end` | 1,705 | `unknown` |
+| `event_msg/collab_agent_spawn_end` | 1,212 | `unknown` |
+| `event_msg/collab_close_end` | 1,071 | `unknown` |
+| `response_item/tool_search_call` | 574 | `unknown` |
+| `response_item/tool_search_output` | 574 | `unknown` |
+| `event_msg/collab_agent_interaction_end` | 375 | `unknown` |
+| `response_item/additional_tools` | 335 | `unknown` |
+| `event_msg/thread_rolled_back` | 172 | `unknown` |
+| `event_msg/collab_resume_end` | 37 | `unknown` |
+| `compacted` entry `additional_tools` | 21 | `unknown`, `copy: compaction_history` |
+| `event_msg/view_image_tool_call` | 14 | `unknown` |
+| `event_msg/error` | 8 | `unknown` |
+| top-level `retained_context` | 1 | `unknown` |
+
+These are 2,096,004 Codex records, not 2,096,004 failures to parse. Unknown roles can
+produce default pattern hits, unlike `metadata`; copy suppression still applies. This
+revision retains that behavior. Reclassifying them requires checking their actual record
+shapes and the effect on matching, pairing and turns, then revising the classifier
+contract. Counts alone do not establish those meanings. The non-Codex unknown kinds in
+the same sweep were `frame-link` (55), `artifact-comment-monitor` (17) and
+`artifact-autoreact-ledger` (15); they keep §8.1's fallback too.
+
 A rollout is a child thread when its first `session_meta` records either of these:
 - a parent, in `source.subagent.thread_spawn.parent_thread_id` or `payload.parent_thread_id`;
 - a `thread_source` set to a value other than `user`.
@@ -788,9 +885,10 @@ in this order:
      `CW:4` is not later than all of CW2. So CW2's lines 1–3 are copies of CW's (SL5, SL6).
    - On live files, the review found the rule agreed with `continued-in` in all 18 pairs
      that rule decided.
-3. **Ties.** When neither file or both files meet the timing test, or a file has no
-   unshared record, the shared records of both are `ambiguous`, and neither collapses. A
-   forked live session falls here.
+3. **Ties (R26).** A file with no unshared user or assistant record cannot meet the timing
+   test. The shared records of both files are `ambiguous` only when neither or both meet
+   it. A wholly copied original plus a resume that adds later records is therefore a
+   decided resume, not a tie. A forked live pair with neither file later falls here.
 
 **Rules that hold for every kind:**
 - **Scope.** Copy detection covers only the files the run reads. A resume copy whose
@@ -799,25 +897,37 @@ in this order:
   (SL1). Aggregates over originals are deduplicated by call id (SL6).
 **Codex `fork_history`.** A forked rollout's second `session_meta` carries the inherited
 thread's id.
-- **What is copied.** Everything after it repeats that thread's history, turn by turn, with
-  the parent's `task_started`, `turn_context` and `task_complete` records. Copies are
-  restamped at fork time, so timestamps cannot mark the end. The review found 1,309 live
-  forks; in 150 of 150 sampled ones whose parent rollout was present, the copied turns
-  formed a clean prefix.
+- **What is copied.** A run after it repeats that thread's history. It may start partway
+  through the parent's turns, or copy no parent `task_started` at all. It need not be a
+  prefix of the parent's whole history. Copies are restamped at fork time, so timestamps
+  cannot mark the end. The original review's 150 prefix examples were one observed
+  shape, not a requirement. Stage A's later 20-fork sample included seven whose copied
+  turn ids were not a prefix of the parent's ids and one with no copied `task_started`;
+  the turn-id boundary held on all 20 (§14.7).
 - **The rule.** The records after the second `session_meta` are `fork_history` until the
   first `task_started` whose `turn_id` does not occur in the inherited thread's own
   rollout. That rollout is found by the inherited id (§5.2).
-- **Parent unavailable.** If the inherited rollout is not readable, nothing in the fork
-  marks where the copy ends. Copies are restamped at fork time, and a fork can stop after
-  copying before it starts a turn of its own. So everything after the second
-  `session_meta` is `ambiguous`, to the end of the file.
+- **Native ordinal: retain R11.** The first `session_meta.payload` may carry
+  `subagent_history_start_ordinal`. In all 269 measured forks carrying it, its value
+  equalled the zero-based index of the record immediately before the first own
+  `task_started` (the measured own physical line minus 2). The observed versions carrying
+  it were 0.147.0–0.164.0, not a guarantee that every version or future format carries it.
+  This revision does **not** use it as an independent boundary. The measurement validated
+  agreement with readable parents; it did not qualify invalid ordinals, conflicting
+  boundaries, malformed-line offsets or a fork stopping before any own turn. Adopting it
+  requires those controls, including parent-absent replay, in a later reviewed change.
+- **Parent unavailable.** The reader has no accepted independent boundary in that case.
+  A fork can stop after copying before it starts a turn of its own. Everything after the
+  second `session_meta` therefore remains `ambiguous` to the end, even when the native
+  ordinal is present. This is an explicit limit, not a claim that the field is absent.
 - **Turn detection.** Copied turns are not turns of the fork; turn detection skips them.
 - **Ambiguous turns.** A turn built from an ambiguous range carries `copy: ambiguous` and
   never has a `final`. Its last assistant text appears only as `last_assistant`, so a
   parent's final answer is never attributed to the fork. That holds until an independent
   boundary settles ownership, such as the inherited rollout becoming readable.
-- **Coverage.** No fixture has a fork yet (hq-c1fecb), so this rule is covered only by the
-  live-store run's fork check (§14.4) until that fixture lands.
+- **Coverage.** SL11's XF has a readable parent; XK has no parent and an ordinal past its
+  last record. XK still has no final. The live-store check adds mid-parent and
+  no-copied-start shapes (§14.4, §14.7).
 
 ### 8.4 One classifier, later
 
@@ -895,6 +1005,12 @@ Both rules sort records into three kinds:
 - **Interrupt marker.** A marker right after a response belongs to that turn and ends it.
 
 **In both rules:**
+- **Responses without opening inputs (R28, R33).** A run of responses still forms a turn,
+  as in an SDK capture or resumed tail. Its `trigger` is `null`, its opening `inputs` are
+  empty, and its ref is its first response line, never an invented input or metadata
+  line. Any queued in-turn human attachment is still listed in `inputs`. The marker or
+  derived rule decides its end and §9.3 decides its status normally; the derived rule
+  never closes on `turn_duration`.
 - **Queued messages.** A queued human attachment inside the turn is listed in `inputs`. It
   never becomes the trigger.
 - **Interrupt markers.** The next turn starts at the first input after an interrupt marker.
@@ -905,7 +1021,8 @@ Both rules sort records into three kinds:
   42,303 live messages, no two records of one message disagreed on it (review).
 
 **The trigger,** for both harnesses, is chosen from the turn's opening inputs, the run
-before its first response record. It is the first of these that exists:
+before its first response record. It is `null` when that run is empty; otherwise it is
+the first of these that exists:
 1. the last `human` or `dispatch` input that is not a local-command record;
 2. else the last `injected` input that is not a local command's output;
 3. else the last local-command input.
@@ -1042,6 +1159,14 @@ session and are labelled.
 
 **Mentions.** A `textual_mention` (the id in any text) selects a session only under
 `--mentions`. It is never ownership evidence (SL2, SL7).
+
+**Bounded mention listing (R44, R48).** Under `--task --mentions`, additional mention-only
+files are listed from the later of `--since` and the task's earliest time (`created`, or
+its earliest note). Files with older mtimes and missing files whose indexed span ends
+before that bound are skipped. Coverage reports the bound as `task.mentions_since`.
+This bounds extra file discovery, not ownership: the evidence-selected sessions are still
+read, and a mention in a selected file is still only a mention. It replaces an unbounded
+store scan that the final review identified as a roughly 25-minute invocation.
 
 **Without the index,** only stamps are found, and coverage says so.
 
@@ -1427,14 +1552,72 @@ It also checks four live cases:
 
 ### 14.6 Fixture limits
 
-Corrections owned by hq-c1fecb that the reader's rules depend on:
-- depth-2 and forked Codex children (§5.2, §8.3);
-- Claude's separate `session_id` field;
-- compact JSON spawn arguments;
-- live failure prefixes on Bash results.
+hq-c1fecb's corrections landed with hq 30717ad, merged at a569687: depth-2 child XG,
+Claude's separate `session_id`, compact spawn JSON and live Bash failure prefixes.
+Stage A vendors the resulting corpus at hq 61a9604. SL11 supplies readable-parent XF and
+parent-unavailable XK; the latter's invalid ordinal does not qualify a usable native
+boundary. Mid-parent copies and no-copied-`task_started` shapes were measured live, not
+added to this fixture corpus (§14.7).
 
-Until those land, the fork rule and depth-2 identity are covered only by the stated rules
-and the live-store run's checks (§14.4).
+### 14.7 Stage A evidence and amendment decisions (2026-10-26)
+
+**Sources.** obs-d98663's attached `sdd-ledger-portable.md` (R1–R48) and
+`live-sweep-summary.txt`; its retained `live/live_run.py`, `live/case-forks.json` and four
+`live/sweep-*.json` slices. hq-28baf9 verified their retained manifest and every entry
+before using them. The raw ledger's SHA-256 is
+`4ee9e37e4643476e87b626fdb0ae978f85755590b98c1e13c48611731be0c1cd`; the manifest's is
+`5bf30ddd1c34123fdd2f9dec293074e9eddf55497ffbf619da9cb9b684289671`.
+The portable ledger substitutes a storage-root placeholder; it is not the raw bytes.
+
+**What ran.** The full six-root sweep counted 25,563 files, 35,380,838,844 bytes
+(33.0 GiB), 10,903,272 physical lines and 11,595,151 normalized records, including
+copies. It saw zero exceptions and 27 malformed Codex lines. Counts include repeated
+history, so they are not counts of distinct conversations or errors. The four slices
+reported 1,357.5 seconds in total (the task note rounds the overall run to 1,359 seconds);
+two used reader 271864d and two 9ed18da while corrective
+edits were present. They are evidence for those runs, not a sweep of the final merged
+tree. The merged Stage A reader is obs 062b73e.
+
+All four §14.4 live cases passed: divergent model bases, 20 audited origin candidates,
+three stamped sessions for hq-c411df, and 20 sampled forks, connected and copied alone.
+The default-window search answered `found` in 326.8 seconds, with peak child RSS of
+1,796,712 KiB (about 1.71 GiB). The sweep peaked at 4,884,988 KiB (about 4.66 GiB)
+on the rollout the task note describes as 1.23 GB: Stage A still holds a file's
+normalized records in memory. Per-group ordering bounds the number of groups held, not
+an individual file's size. These are measured costs, not performance guarantees.
+
+The Claude roots' coverage started at `2026-09-18T13:33:02.387Z`; the three populated
+Codex roots at `2026-10-20T21:00:08.426Z`. `codex-work:archived_sessions` was empty with
+no coverage start. The same incomplete-history rules in §5.3 and §6.5 still apply.
+
+**A1 — retain the parent-turn-id fork rule (R11).**
+- **Decision:** do not adopt `subagent_history_start_ordinal` as a fallback in this
+  revision; reject enabling it solely from the agreement count. The first metadata
+  record carried it on 127 of 293 forks in the 0.140–0.149 bucket and all 142 in the
+  ≥0.150 bucket; none of the 877 in the 0.110–0.139 bucket carried it. The 269 carrying
+  it all agreed, and their recorded versions span 0.147.0–0.164.0. These are observed
+  files, not a version-based detection rule.
+- **Why:** the live check establishes positive agreement when a parent and an own turn
+  exist. It leaves the invalid, conflicting, malformed-line and no-own-turn cases in
+  §8.3 unqualified. Retaining the shipped rule makes this amendment's contract replayable
+  without claiming that an unimplemented fallback has shipped.
+- **Cost:** parent-unavailable forks remain ambiguous, and their own finals remain
+  unavailable even when the field could eventually settle them. A later adoption must
+  test both native-boundary and parent-derived paths, plus their disagreement.
+
+**A2 — retain explicit unknown kinds (R15).**
+- **Decision:** keep the §8.2 inventory as `unknown`; reject reclassifying those names
+  from counts alone. Unknown is a kept, searchable record, not a dropped or unparsed one.
+- **Why:** the sweep identifies the coverage gap but does not validate the roles, mirror
+  relationships or call/result semantics of these shapes.
+- **Cost:** roughly 2.1 million Codex records remain unknown, mostly token counts, and
+  their JSON can match default searches. Reclassification needs source-shape controls
+  and the classifier/version review required by §3 and §8.4.
+
+The remaining amendments specify already implemented behavior: R19/R20 (§4.3, §5),
+R26 (§8.3), R28/R30/R33 (§4.4, §9.1), the step-10 target-line correction (§7.2), and
+R39/R44–R48 (§4.2, §4.6, §6.3–6.5, §9.4). They do not authorize the deferred skill or
+discovery migration. Stage B still rechecks §11's gate after the 2027-02-16 readout.
 
 ## 15. Traceability
 
@@ -1452,3 +1635,4 @@ and the live-store run's checks (§14.4).
 | Local-first versus remote or archive | D3, §5.4 |
 | Interactive resume kept separate | §3, §13 |
 | No picker, index, aggregate verbs or precision claims | D2, §13 |
+| Stage A rulings, native-boundary decision and live-kind inventory | §4.2–4.6, §5.2–5.3, §6.3–6.5, §7.2, §8.2–8.3, §9.1, §9.4, §14.7 |
