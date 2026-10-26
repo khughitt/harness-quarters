@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T12:46:22Z
+updated: 2026-10-26T12:46:23Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -120,3 +120,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T12:42:26Z (docs/hq-28baf9-reader-spec): scratch update: titan $WORK_ROOT/hq/hq-28baf9/obs-062b73e now preserves the exact reviewed root Python modules and SOURCE.json hashes for this measurement. The initial pilot stopped in its synthetic self-check (changed current obs helper signature) before scanning stores. The current obs checkout has since changed through other work; it was not modified. Restart against this frozen source package, with bytecode writes disabled; task scratch remains mutable pending checkpoint.
 - 2026-10-26T12:44:10Z (docs/hq-28baf9-reader-spec): attached: revision-9-acceptance-report.md (903 bytes): Full supplied revision-9 acceptance with two optional clarifications and human approval for planning; supplied reviewer labels its round 5, task records it as next round 6
 - 2026-10-26T12:46:22Z (docs/hq-28baf9-reader-spec): attached: subset-direction-census.py (8930 bytes): Native-versus-timing direction comparison variant: independent _later checks and agree/reverse/tie controls, run against frozen obs062b73e
+- 2026-10-26T12:46:23Z (docs/hq-28baf9-reader-spec): attached: subset-direction-pilot.json (1677 bytes): Direction-comparison pilot against frozen obs062b73e passed its controls and one small live project
