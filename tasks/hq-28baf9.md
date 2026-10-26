@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T11:56:50Z
+updated: 2026-10-26T11:56:52Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -104,3 +104,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
   provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-26T11:56:49Z (docs/hq-28baf9-reader-spec): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-28baf9","state":"kept","verification":"verified","purpose":"Locked clean branch docs/hq-28baf9-reader-spec preserves frozen revision 9 6356a82, full review reports and census/control attachments awaiting the user design review; no implementation plan or runtime change","next_owner":"task:hq-28baf9","cleanup_trigger":"After user review: agent handles requested revisions or integrates the approved branch locally, disposes or transfers retained evidence, runs tt-report and checks ignored files/host pointers before removal"}
 - 2026-10-26T11:56:50Z (docs/hq-28baf9-reader-spec): retained: {"host":"titan","kind":"scratch","path":"$WORK_ROOT/hq/hq-28baf9","state":"kept","verification":"verified","purpose":"Canonical R26 census and contract probe scripts/results plus raw round-3 review; six manifest entries verified, matching attached portable scripts/results where applicable","next_owner":"task:hq-28baf9","cleanup_trigger":"After user review of revision 9, reassess which scripts/counts remain needed and preserve or transfer the nested raw-review fallback before task closure","manifest":"$WORK_ROOT/hq/hq-28baf9/MANIFEST.sha256","sha256":"6d6e30b3fbf18dd03707d85dc9ae1626e0cb78abcbba23a856b95bce3f58c0cd"}
+- 2026-10-26T11:56:52Z (docs/hq-28baf9-reader-spec): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/hq/hq-28baf9/overall-design-review.raw.md","state":"kept","verification":"verified","purpose":"Exact raw supplied round-3 review behind attached hostname-substituted overall-design-review-portable.md; only needed raw fallback preserved","next_owner":"task:hq-28baf9","cleanup_trigger":"When an executing layout exemption admits it, attach and verify the raw report or transfer it to an open evidence owner before closing this task","sha256":"39e410e30418f5f278b38506f666f59726c8d32139c8138ebd2d54bf12db259f"}
