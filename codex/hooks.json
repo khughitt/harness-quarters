@@ -21,7 +21,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' SessionStart",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.2.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' SessionStart",
             "timeout": 600
           }
         ]
@@ -32,7 +32,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' UserPromptSubmit",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.2.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' UserPromptSubmit",
             "timeout": 600
           }
         ]
@@ -44,7 +44,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' PreToolUse",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.2.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' PreToolUse",
             "timeout": 600
           }
         ]
@@ -55,7 +55,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' PermissionRequest",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.2.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' PermissionRequest",
             "timeout": 600
           }
         ]
@@ -74,7 +74,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' SubagentStop",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.2.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' SubagentStop",
             "timeout": 600
           }
         ]
@@ -101,7 +101,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' Stop",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.2.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' Stop",
             "timeout": 600
           }
         ]
@@ -112,7 +112,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' SubagentStart",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.2.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' SubagentStart",
             "timeout": 600
           }
         ]
@@ -123,7 +123,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 3000 --subscribers '/home/keith/.config/relay/subscribers.json' SessionEnd",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.2.1/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 3000 --subscribers '/home/keith/.config/relay/subscribers.json' SessionEnd",
             "timeout": 3
           }
         ]

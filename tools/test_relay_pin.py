@@ -21,14 +21,14 @@ def run(root, *args):
 def test_lock_pins_the_release_commit():
     package = json.loads((PIN / "package.json").read_text())
     lock = json.loads((PIN / "package-lock.json").read_text())
-    assert package["dependencies"]["relay"] == "git+https://github.com/khughitt/relay.git#v0.2.0"
+    assert package["dependencies"]["relay"] == "git+https://github.com/khughitt/relay.git#v0.2.1"
     assert lock["packages"]["node_modules/relay"]["resolved"] == (
-        "git+https://github.com/khughitt/relay.git#067c63921602e694682d47bdb2412862359c75ff"
+        "git+https://github.com/khughitt/relay.git#78a70be9b318511d88e0f8ca8d31f54807ed2540"
     )
 
 
 def test_launcher_runs_the_pinned_runtime(tmp_path):
-    runtime = tmp_path / "v0.2.0" / "node_modules" / "relay" / "bin" / "relay.js"
+    runtime = tmp_path / "v0.2.1" / "node_modules" / "relay" / "bin" / "relay.js"
     runtime.parent.mkdir(parents=True)
     runtime.write_text('console.log(process.argv.slice(2).join("\\n"));\n')
     result = run(tmp_path, "list", "--json")
@@ -40,7 +40,7 @@ def test_launcher_refuses_a_missing_install(tmp_path):
     result = run(tmp_path, "--version")
     assert result.returncode == 127
     assert result.stderr.strip() == (
-        "relay v0.2.0 is not installed: run just relay-install in the hq checkout"
+        "relay v0.2.1 is not installed: run just relay-install in the hq checkout"
     )
 
 
@@ -78,7 +78,7 @@ assert (prefix / "package-lock.json").is_file()
         text=True,
     )
     assert result.returncode == 0, result.stderr
-    dest = install_root / "v0.2.0"
+    dest = install_root / "v0.2.1"
     assert (dest / "npm-ci-finished").exists()
     for name in ("package.json", "package-lock.json"):
         assert (dest / name).read_bytes() == (PIN / name).read_bytes()

@@ -1,7 +1,7 @@
 # Pinned relay runtime
 
-`relay/package.json` selects v0.2.0; `relay/package-lock.json` fixes its commit to
-`067c63921602e694682d47bdb2412862359c75ff`. The declared home launcher resolves to
+`relay/package.json` selects v0.2.1; `relay/package-lock.json` fixes its commit to
+`78a70be9b318511d88e0f8ca8d31f54807ed2540`. The declared home launcher resolves to
 `relay/bin/relay`, which reads that pin and runs the versioned installation under
 `$HOME/.local/share/relay/`. Node and npm come from `/usr/bin`.
 
@@ -41,8 +41,25 @@ Do not downgrade a service against such a store or reset the durable sequence to
 undo an upgrade. Keep the store intact and use a release that understands it.
 
 The standalone pin does not rewrite installed hooks: those use absolute runtime
-paths. Keep their referenced installations until a separately approved hook
-cutover replaces them. The historical [operator cutover](relay-cutover.md)
+paths, and each harness's hook images move under their own approval. Codex's
+(`codex/hooks.json`, `codex/work/hooks.json`) name v0.2.1, whose SessionStart
+retires replaced Codex roots; Claude Code's (`claude/settings.json`) name v0.1.1,
+which that release does not change. `tools/test_relay_wiring.py` holds each file's
+version. Keep every installation a hook image names. Root retirement assumes one
+active Codex root per process, which holds for TUIs launched with `--no-daemon`, as
+the shell aliases for both Codex homes do. A session hosted on the shared app-server
+daemon could share its handle with others and retire their rows (relay-511e14).
+
+To move a harness's hooks to the pinned release, generate the after-image with that
+release's own installer on a copy: run its `relay install --harness codex --json
+--node /usr/bin/node --subscribers ~/.config/relay/subscribers.json --evidence FILE
+--target COPY` without `--apply`, where COPY is an absolute path ending in
+`/hooks.json` (any other name fails as `relay operation failed`). Replace the
+rehearsal runtime's path in the planned `after` text with the stable
+`$HOME/.local/share/relay/<version>` one, and confirm the result differs from the
+current image only in that directory. Install the release into the stable root
+first, then land the images with no live session of that harness; Codex asks to
+re-trust each changed hook. The historical [operator cutover](relay-cutover.md)
 describes the v0.1.1 hook rollout. Real phone-gate acceptance and home-link changes
 have their own rollout gates. Equivalent hosts and profiles using the same
 installer and launcher are covered by one end-to-end check; a distinct service or
