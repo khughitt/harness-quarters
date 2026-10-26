@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T12:46:26Z
+updated: 2026-10-26T12:46:27Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -123,3 +123,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T12:46:23Z (docs/hq-28baf9-reader-spec): attached: subset-direction-pilot.json (1677 bytes): Direction-comparison pilot against frozen obs062b73e passed its controls and one small live project
 - 2026-10-26T12:46:25Z (docs/hq-28baf9-reader-spec): attached: subset-direction-census.json (2556 bytes): Follow-up direction measurement: 2965 main files, 13 one-sided native-linked pairs, 12 timing agreements, 1 timing tie, 0 reversals
 - 2026-10-26T12:46:26Z (docs/hq-28baf9-reader-spec): attached: direction-reader-source.json (4954 bytes): Frozen obs062b73e source manifest: all 55 exported root Python modules and SHA-256 hashes, used to avoid the newer private helper API
+- 2026-10-26T12:46:27Z (docs/hq-28baf9-reader-spec): Optional direction clarification verified: original census counter showed the native link selected the side with unshared timed records in all 13 pairs, but did not independently run the timing comparison. New complete check against frozen obs062b73e: 2965 current main files, 360 dirs, 20 shared-UUID pairs, 13 one-sided linked pairs, 12 native/timing agreements, 1 timing tie, 0 reversals (67.64 s, 0 unparsed). Quote 12/12 agreement among decided pairs plus the tie, not an unverified 13/13 timing claim. Both measurements remain separate and preserve source/script hashes; no decision changed.
