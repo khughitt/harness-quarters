@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T11:29:26Z
+updated: 2026-10-26T11:29:27Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -87,3 +87,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T11:29:23Z (docs/hq-28baf9-reader-spec): attached: subset-census.py (8119 bytes): Counts-only R26 census method: shipped reader predicates, five assert-based controls, pilot and full native Claude main-file scopes
 - 2026-10-26T11:29:24Z (docs/hq-28baf9-reader-spec): attached: subset-pilot.json (1677 bytes): R26 pilot completed: five synthetic controls and one live project of two main files
 - 2026-10-26T11:29:26Z (docs/hq-28baf9-reader-spec): attached: subset-census.json (2382 bytes): R26 live census: 2961 native main files, 20 shared-UUID pairs, 13 one-sided pairs all native-linked; counts do not establish historical direction
+- 2026-10-26T11:29:27Z (docs/hq-28baf9-reader-spec): R26 census completed before choice: 2961 main files / 360 project dirs / 3131911097 bytes / 94.72 s / 0 unparsed; 20 shared-UUID pairs, 13 one-sided timed-record pairs all with decisive native links, 12 strict UUID-subset pairs all linked, 0 observed one-sided pairs without decisive link. Categories overlap. Scope excludes subagents, 2 aliases and absent/archive/pruned copies; size-on-open bounds, not a simultaneous snapshot. Rule retained with explicit reverse-case Why/Cost, not qualified as historical proof. Reports and script are attached; reader code remains unchanged.
