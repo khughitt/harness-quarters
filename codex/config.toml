@@ -72,6 +72,7 @@ notifications = ["approval-requested", "plan-mode-prompt", "async-question"]
 status_line = ["model-with-reasoning", "context-remaining", "current-dir", "project-name", "git-branch"]
 status_line_use_colors = true
 theme = "noctalia"
+show_tooltips = false
 
 [mcp_servers.ohai]
 command = "node"
