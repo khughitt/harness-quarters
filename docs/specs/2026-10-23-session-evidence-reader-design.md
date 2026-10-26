@@ -1,6 +1,6 @@
 # Session evidence reader: `session-logs search` and `show`
 
-Status: draft for review, revision 8, 2026-10-26. Revision 5 was approved at ae0f8ee;
+Status: draft for review, revision 9, 2026-10-26. Revision 5 was approved at ae0f8ee;
 Stage A was built against that revision and plan 1fea7bf, and merged into obs at 062b73e.
 This amendment records its implementation rulings and measured limits. It changes no
 reader, classifier, skill, roots, links or trial measurement; §11's gates still apply.
@@ -42,6 +42,8 @@ reader, classifier, skill, roots, links or trial measurement; §11's gates still
   heuristic and default-role mirror guarantee, specifies coverage samples and the
   target window, and clarifies scopes, abort reasons, time bounds and ambiguous finals.
   The earlier M4 explicit-file shorthand is corrected too. No runtime behavior changes.
+- **Revision 9** corrects revision 8's re-review: task evidence and additional mentions
+  have separate copy-detection groups, and Claude turns omit `abort_reason`.
 
 Task: hq-28baf9 (amendment); hq-c411df (original design); goal hq-cff824.
 Inputs: the store-reach brief (`docs/notes/2026-10-20-session-store-reach-brief.md`), the
@@ -303,7 +305,7 @@ blocks yields one object.
 | `trigger` | `{ref, role, origin_kind}`, or `null` when there is no opening input (§9.1) |
 | `end` | the ref of the turn's last record |
 | `status`, `status_basis` | §9.3; `status_basis` also says which turn rule applied (§9.1) |
-| `abort_reason` | on an interrupted turn with a closing record, in either harness: Codex carries its recorded `turn_aborted.reason` (or `null` if absent), Claude carries `null`; omitted otherwise (R30) |
+| `abort_reason` | on a Codex interrupted turn closed by `turn_aborted`: its recorded `reason`, or `null` if absent; Claude turns and other Codex turns omit the field (R30) |
 | `asks_user` | true when a Codex final message carries `questions` (§9.3) |
 | `final` | `{ref, text, basis}`, present only when `status` is `completed` |
 | `last_assistant` | when the turn has no final: its last assistant text's ref, or `null` if it has none; it is never labelled final |
@@ -610,11 +612,16 @@ The default window bounds the cost (§6.1). A prefilter may return later only to
   order files by the selected file sort. Task searches sort evidence and mention-only
   files together, so a newer mention can precede a stamped session; order does not rank
   evidence strength, and a limit can exclude that stamped session.
-- **Detection in scoped searches.** All selected files of a session or task search are
-  read as one detection group, including multiple `own` files across roots. Duplicate
-  detection compares files of the same harness/identity; resume detection still compares
-  only Claude main files in the same home/project directory (§8.3). This grouping does
-  not turn a `child`, `inherited`, `alias` or `mismatch` candidate into an `own` file.
+- **Detection in scoped searches.** A session search reads its selected files as one
+  detection group, including multiple `own` files across roots. A task search reads its
+  evidence-selected files as one group; additional `--mentions` files instead use
+  separate store-wide detection groups. Detection does not compare files across that
+  evidence/mention boundary. A mention-only file can therefore retain copied opening
+  text as its own records, turn and final when its original is in the evidence group.
+  Duplicate detection within a group compares files of the same harness/identity;
+  resume detection still compares only Claude main files in the same home/project
+  directory (§8.3). None of this turns a `child`, `inherited`, `alias` or `mismatch`
+  candidate into an `own` file.
 - **Copies.** Collapsed by default and counted in coverage (§8.3).
 
 ### 6.5 Outcomes
