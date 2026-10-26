@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T11:37:07Z
+updated: 2026-10-26T11:46:07Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -93,3 +93,4 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T11:33:55Z (docs/hq-28baf9-reader-spec): review-round-3 dispositions for revision 8: I1 addressed by the measured R26 reverse-subset limit with Why/Cost in sections 8.3 and 14.7; I2 addressed by limiting default-role uniqueness to mapped mirrors and adding possible duplicate hits/limit/count cost to A2. All seven Minor points addressed: 20-path sorted sample, Claude abort_reason null, defined store-wide scope and scoped duplicate grouping, effective-window alias bound, removed unreachable derived-marker clause, exact target-window formula and intended eligible-final not_found semantics. Earlier deferred M4 identity shorthand also corrected. Source controls reproduce the window counts and ambiguous final-pattern not_found versus record found. No runtime behavior changed.
 - 2026-10-26T11:35:20Z (docs/hq-28baf9-reader-spec): frozen review: revision 8 is hq commit 20c86291631e5a423d822cf5acee20f07b60fcd8:docs/specs/2026-10-23-session-evidence-reader-design.md (sha256 ae1cee2c89c1f9f8cbb9ca8c7829218cdf6b718b19c26cbda1590407c7038d5c). Fresh read-only reviewer dispatched against the complete round-3 review, actual merged reader predicates, full spec and new census/control evidence. No amendment/rebase while review is open. Stage B gate remains byte-identical and reader modules remain unchanged.
 - 2026-10-26T11:37:07Z (docs/hq-28baf9-reader-spec): Review-guidance feedback filed as lore-6b5f19: the user reported two independent reviews missing Important inference/guarantee issues; the feedback asks guidance to reverse one-sided examples and test prose guarantees against fallback classifications. This does not change the task contract or approve the spec.
+- 2026-10-26T11:46:07Z (docs/hq-28baf9-reader-spec): review: spec round 4 — verdict: revise; findings: Important 1, Minor 1; reviewer: codex/gpt-6.1-sol
