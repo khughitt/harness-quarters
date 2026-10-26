@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: docs/hq-28baf9-reader-spec
 created: 2026-10-26T02:53:19Z
-updated: 2026-10-26T10:28:53Z
+updated: 2026-10-26T10:52:29Z
 started: 2026-10-26T09:52:41Z
 depends: []
 parent: hq-cff824
@@ -64,4 +64,6 @@ The full ruling list with reasons and costs is in obs-d98663's attached ledger (
 - 2026-10-26T10:28:51Z (docs/hq-28baf9-reader-spec): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-28baf9","state":"kept","verification":"verified","purpose":"Locked branch docs/hq-28baf9-reader-spec holds frozen spec revision 7 at 669b3d6 and both full review reports plus the amendment ledger as task attachments, pending the user design review; worktree clean and only regenerable test caches ignored","next_owner":"task:hq-28baf9","cleanup_trigger":"After user approval or requested revision: agent integrates the reviewed branch locally, harvests test timings and checks ignored files and host pointers before any removal"}
 - 2026-10-26T10:28:52Z (docs/hq-28baf9-reader-spec): resources: inherited Stage A scratch and raw-ledger fallback remain at the verified paths and hashes in this task retained records; no new off-tree scratch/evidence copy was created. Both full independent reports and the decision/deferred-minor ledger are attached and their byte hashes checked; redundant .superpowers review workspace copies were removed after attachment verification. No reader, skill, roots, links, measurement or live settings changed. No live sweep or full-suite repeat after doc-only edits; baseline and source evidence are not claimed as a fresh sweep of obs merged main.
 - 2026-10-26T10:28:53Z (docs/hq-28baf9-reader-spec): parked (waiting on user, review): User reviews frozen hq spec revision 7 at commit 669b3d6b5c1be88efd583970ef2b703470047e9a:docs/specs/2026-10-23-session-evidence-reader-design.md in .worktrees/hq-28baf9; agent then handles requested revisions or, after approval, locally merges docs/hq-28baf9-reader-spec, disposes/transfers inherited evidence under its retention rules, closes the task and checks/removes the worktree. Agent review accepted after one corrective round; M4 identity shorthand remains minor (deferred) in the attached ledger. No check or child remains running.
+  provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-26T10:52:29Z (docs/hq-28baf9-reader-spec): resumed
   provenance: {"harness_session":"codex:01a1779f-7d64-7c43-b1f7-97d1e47cc62f","harness_session_source":"CODEX_THREAD_ID"}
