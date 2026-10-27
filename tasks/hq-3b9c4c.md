@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: fix/hq-3b9c4c-strict-readiness
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-27T23:26:18Z
+updated: 2026-10-27T23:26:20Z
 started: 2026-10-27T21:06:37Z
 depends: [obs-c7d924]
 parent: hq-401088
@@ -64,3 +64,4 @@ Done: reviewed design and plan, implementation and focused checks proving valid 
   provenance: {"harness_session":"codex:01a17f2d-dfcc-7ac3-a3d0-4496340daaf2","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-27T23:14:12Z (fix/hq-3b9c4c-strict-readiness): review: spec round 3 — verdict: accept; findings: none; reviewer: human
 - 2026-10-27T23:26:18Z (fix/hq-3b9c4c-strict-readiness): attached: spec-round-3-report.md (2160 bytes): Full relayed revision-3 verification and explicit human approval for planning at design cfaed41; recorded as spec review round 3.
+- 2026-10-27T23:26:20Z (fix/hq-3b9c4c-strict-readiness): Planning decision: inline execution recommended for shared reader/facts/fixture interfaces. Revised existing plan only; Tasks 1–16 are historical, Task 17 remains rollout-owned, new Tasks 18 (hq-886d78) and 19 (hq-b60102) cover this task. Task 18 blocked until human plan approval. Cross-project dependency creation for a new unintegrated worktree record failed with unresolvable_id; no obs task was created. Its bounded filing moves to Task 19 execution, with gap tasks-2591d3 filed to the tracker owner. Both implementation branches receive final review together before integration.
