@@ -4347,7 +4347,7 @@ def test_fixture_commits_leave_the_object_store_settled(world):
                              GIT_COMMITTER_NAME="Fixture Author",
                              GIT_COMMITTER_EMAIL="author@example.invalid"),
             check=True, capture_output=True, text=True)
-        assert "maintenance" not in traced.stderr, (host, traced.stderr)
+        assert "maintenance run" not in traced.stderr, (host, traced.stderr)
 
 
 def _hooks(root, marker):

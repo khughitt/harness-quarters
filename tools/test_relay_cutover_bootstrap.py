@@ -3143,6 +3143,10 @@ def test_recovery_signal_is_retried_by_reconciliation(prepared_cutover):
     cutover.behave("titan", installer={})
     known = {cutover.pins["familiar_pre"], record["familiar"]["merge"]}
     sync["allowed"] = False
+    # Only the signal may end Europa's wait for its source: a budget it could exhaust under
+    # load first would fail the step instead of cancelling it.
+    cutover.config["sync"]["budget"] = 300.0
+    cutover.save()
     waiting = lambda: any(  # noqa: E731
         call["host"] == "europa" and call.get("ancestor")
         and call["ancestor"][0] not in known and call["exit"] != 0
@@ -3792,19 +3796,21 @@ def test_restart_signal_keeps_surfaces_pending(desktop, monkeypatch):
     mark = len(desktop.lines("observed"))
 
     def interrupt():
-        transport._until(lambda: ("europa", COMMANDS["familiar-niri-watch"]) in _spawned(
-            desktop, mark), seconds=60)
-        os.kill(os.getpid(), signal.SIGTERM)
-        transport._until(lambda: list(operations.glob("*/cancel.json")), seconds=60)
+        _signal_when(lambda: ("europa", COMMANDS["familiar-niri-watch"]) in _spawned(
+            desktop, mark), signal.SIGTERM, stopped)
+        while not stopped.is_set() and not list(operations.glob("*/cancel.json")):
+            time.sleep(0.02)
         Path(desktop.config["latch"]).touch()
 
     handlers = {signum: signal.getsignal(signum) for signum in hosts.INTERRUPTS}
+    stopped = threading.Event()
     sender = threading.Thread(target=interrupt)
     sender.start()
     try:
         with pytest.raises(window.Failed) as raised:
             surfaces.restart_surfaces(record, consumed)
     finally:
+        stopped.set()
         Path(desktop.config["latch"]).touch()
         sender.join(timeout=90)
     failed = raised.value
