@@ -871,7 +871,8 @@ def _until(predicate, seconds=20.0):
 
 def _execed(*processes):
     """Wait until each process just started has its new image: Popen returns while exec is still
-    setting it up, and until then /proc reads its argv and environment as empty."""
+    setting it up, and until then /proc reads its argv and environment as empty and its comm as
+    the parent's. Each process must have been given a non-empty environment."""
     _until(lambda: all(Path(f"/proc/{process.pid}/{name}").read_bytes()
                        for process in processes for name in ("cmdline", "environ")))
 
