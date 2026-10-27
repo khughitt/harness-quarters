@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/hq-fa7db8-cutover-record
 created: 2026-10-27T14:17:54Z
-updated: 2026-10-27T18:25:27Z
+updated: 2026-10-27T18:27:45Z
 started: 2026-10-27T18:24:44Z
 depends: []
 parent: hq-7e81ed
@@ -37,3 +37,4 @@ Check: just test passes and the pre-commit hook's ops-docs and ops-check runs pa
   provenance: {"harness_session":"codex:01a17e9a-c533-7680-a754-59ef9d89b3f6","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-27T18:25:27Z (docs/hq-fa7db8-cutover-record): resumed
   provenance: {"harness_session":"codex:01a17e9a-c533-7680-a754-59ef9d89b3f6","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-27T18:27:45Z (docs/hq-fa7db8-cutover-record): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-fa7db8","state":"kept","verification":"verified","purpose":"Documentation correction and verification","next_owner":"task:hq-fa7db8","cleanup_trigger":"After reviewed documentation merges locally, inspect ignored files and host pointers before removal"}
