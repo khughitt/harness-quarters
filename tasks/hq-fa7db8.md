@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/hq-fa7db8-cutover-record
 created: 2026-10-27T14:17:54Z
-updated: 2026-10-27T18:49:03Z
+updated: 2026-10-27T18:49:25Z
 started: 2026-10-27T18:24:44Z
 completed: 2026-10-27T18:49:03Z
 closed: 2026-10-27T18:49:03Z
@@ -53,3 +53,4 @@ Check: just test passes and the pre-commit hook's ops-docs and ops-check runs pa
   provenance: {"harness_session":"codex:01a17e9a-c533-7680-a754-59ef9d89b3f6","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-27T18:49:03Z (docs/hq-fa7db8-cutover-record): Recorded the completed relay cutover, retired-tool status and runtime upgrade route; just test passed 1674 tests and independent review accepted without findings.
   provenance: {"harness_session":"codex:01a17e9a-c533-7680-a754-59ef9d89b3f6","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-27T18:49:25Z (main): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-fa7db8","state":"released","verification":"verified","purpose":"Merged locally into main; checked host launchers and user units for references, harvested tt-report, discarded only regenerable Python and pytest caches, removed clean worktree and merged branch","next_owner":"none","cleanup_trigger":"none"}
