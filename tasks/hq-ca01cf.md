@@ -8,8 +8,8 @@ complexity: low
 process: direct
 defer: 2026-11-30
 created: 2026-10-19T11:55:19Z
-updated: 2026-10-19T12:06:41Z
-depends: []
+updated: 2026-10-27T14:17:58Z
+depends: [hq-7e1e9c]
 tags: []
 source: ops-630a87 boundary-proposal-r3.md A1
 agent: claude-code/claude-opus-5-5
