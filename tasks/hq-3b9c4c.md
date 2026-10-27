@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: fix/hq-3b9c4c-strict-readiness
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-27T22:51:15Z
+updated: 2026-10-27T22:53:55Z
 started: 2026-10-27T21:06:37Z
 depends: [obs-c7d924]
 parent: hq-401088
@@ -55,3 +55,4 @@ Done: reviewed design and plan, implementation and focused checks proving valid 
 - 2026-10-27T22:45:07Z (fix/hq-3b9c4c-strict-readiness): attached: review-ledger.md (3178 bytes): Round 2 dispositions for all eight minor design findings; each includes Why and Cost; none deferred. Revision 3 awaits human approval.
 - 2026-10-27T22:51:13Z (fix/hq-3b9c4c-strict-readiness): retained: {"host": "titan", "kind": "evidence", "path": ".worktrees/hq-3b9c4c/.superpowers/sdd/hq-3b9c4c/spec-round-2-report.md", "state": "kept", "verification": "verified", "purpose": "Exact relayed round-2 review containing host paths; portable derivative attached as spec-round-2-portable-report.md, mapping in task note", "next_owner": "task:hq-3b9c4c", "cleanup_trigger": "After implementation integrates, verify preservation and decide whether to attach raw bytes under a shipped layout exemption before removal", "sha256": "b21b514137908a3ce234856d0a71fa910b527082e267ae2369ddf88d149e27b5"}
 - 2026-10-27T22:51:15Z (fix/hq-3b9c4c-strict-readiness): retained: {"host": "titan", "kind": "evidence", "path": ".worktrees/hq-3b9c4c/.superpowers/sdd/hq-3b9c4c", "state": "kept", "verification": "verified", "purpose": "Full builder and round-2 review reports, portable derivative and disposition ledger for design revision 3; attachments verified through tasks show", "next_owner": "task:hq-3b9c4c", "cleanup_trigger": "After implementation integrates, preserve raw review evidence and inspect ignored files before considering worktree removal", "manifest": ".worktrees/hq-3b9c4c/.superpowers/sdd/hq-3b9c4c/manifest.sha256", "sha256": "1197e831587a8e356b36143559a6a032f4e28bc9eb6c944634001c26cd74a03d"}
+- 2026-10-27T22:53:55Z (fix/hq-3b9c4c-strict-readiness): Revision-3 documentation verification: full just test passed, 231 + 1051 + 391 + 1 = 1674 tests; 154 deselected in final isolated-test segment only. harness-facts check, tasks check and git diff --check passed. All eight round-2 minors corrected; no deferred findings. This verifies the unchanged runtime suite, not future strict-consumer behavior; human design approval and separate implementation-plan review remain required.
