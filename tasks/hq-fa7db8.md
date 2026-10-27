@@ -1,13 +1,15 @@
 ---
 id: hq-fa7db8
 title: Mark the relay cutover runbook and its README entry as a completed record
-status: todo
+status: doing
 priority: 3
 size: xs
 complexity: low
 process: direct
+owner: main
 created: 2026-10-27T14:17:54Z
-updated: 2026-10-27T14:17:54Z
+updated: 2026-10-27T18:24:44Z
+started: 2026-10-27T18:24:44Z
 depends: []
 parent: hq-7e81ed
 tags: []
@@ -28,3 +30,5 @@ Check: just test passes and the pre-commit hook's ops-docs and ops-check runs pa
 
 - 2026-10-27T14:17:54Z (add): created
   provenance: {"harness_session":"claude-code:250666f1-b992-451b-81cc-31d0ea638ce6","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
+- 2026-10-27T18:24:44Z (main): started
+  provenance: {"harness_session":"codex:01a17e9a-c533-7680-a754-59ef9d89b3f6","harness_session_source":"CODEX_THREAD_ID"}
