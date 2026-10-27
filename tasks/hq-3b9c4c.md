@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: main
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-27T21:06:37Z
+updated: 2026-10-27T21:06:50Z
 started: 2026-10-27T21:06:37Z
 depends: [obs-c7d924]
 parent: hq-401088
@@ -35,3 +35,4 @@ Done: reviewed design and plan, implementation and focused checks proving valid 
 - 2026-10-23T01:30:14Z (survey-successor-links): hq-d59a7b: the obs-reader halt fires against today's index. obs index-state (schema 15, 25,475 rows) keeps rows for both live link paths (missing_since 2026-10-21 06:00) beside their targets' rows (missing_since null); load_obs_state folds them by realpath and raises ObsUnavailable on the beliefs target, so every dry run and apply on this host halts now. See the brief's 'Live survey'.
 - 2026-10-27T21:06:37Z (main): started
   provenance: {"harness_session":"codex:01a17f2d-dfcc-7ac3-a3d0-4496340daaf2","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-27T21:06:50Z (main): arm: flow-trial-1 — unit tack-401088 — not enrolled
