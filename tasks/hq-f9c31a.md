@@ -1,17 +1,20 @@
 ---
 id: hq-f9c31a
 title: "Parallel cutover tests still fail intermittently after hq-a7b473: recovery-signal retry and familiar base rule"
-status: doing
+status: done
 priority: 2
 size: s
 complexity: mid
 process: direct
 owner: fix/hq-f9c31a-parallel-cutover-flakes
 created: 2026-10-25T12:02:21Z
-updated: 2026-10-27T13:06:57Z
+updated: 2026-10-27T13:07:21Z
 started: 2026-10-27T11:50:32Z
+completed: 2026-10-27T13:07:21Z
+closed: 2026-10-27T13:07:21Z
 depends: []
 tags: []
+model: claude-opus-5-5
 agent: claude-code
 ---
 
@@ -31,3 +34,7 @@ In the parallel cutover stage of just test (pytest -n auto over tools/test_relay
 - 2026-10-27T12:38:38Z (fix/hq-f9c31a-parallel-cutover-flakes): review: impl round 1 — verdict: revise; findings: Important 1, Minor 4; reviewer: claude-code/claude-opus-5-5
 - 2026-10-27T12:52:01Z (fix/hq-f9c31a-parallel-cutover-flakes): root cause 3 (found by round-1 verification, test_session_home_reads_only_the_home_key failed once): Popen returns while exec is still setting up the new image; /proc/<pid>/environ read empty in 1859/2000 immediately-after-Popen reads (scratch probe), so session_home saw no CLAUDE_CONFIG_DIR. Same race in test_process_table_reads_only_the_hold_key (argv, comm, hold key). Fix: transport _execed() waits until cmdline and environ are non-empty (probe: 0/2000 wrong, longest wait 1.5 ms). Note: commit ec685b9 was made before that run's failure was read (a chained command); the fix follows in a new commit
 - 2026-10-27T13:06:57Z (fix/hq-f9c31a-parallel-cutover-flakes): review: impl round 2 — verdict: accept; findings: Minor 2; reviewer: claude-code/claude-opus-5-5
+- 2026-10-27T13:07:21Z (fix/hq-f9c31a-parallel-cutover-flakes): done
+  provenance: {"harness_session":"claude-code:03d08d67-a0a4-459d-a60d-b3787154304c","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-27T13:07:21Z (fix/hq-f9c31a-parallel-cutover-flakes): Three load-dependent races in the parallel cutover tests fixed, all test-side: the recovery-signal sender's fixed 60 s give-up (now deadline-free, Europa's held wait gets a 300 s budget so only the signal ends it; the surface-restart signal test uses the same sender); detached git auto-maintenance in the fixture familiar checkout racing the base rule's object snapshots (maintenance.auto=false in familiar_history); /proc argv/environ read empty right after Popen (_execed waits). Regression tests test_signal_sender_waits_out_a_slow_host and test_fixture_commits_leave_the_object_store_settled (RED then GREEN). just test 1674 passed; two concurrent parallel segments passed 391/391 each at load ~62. Reviews: round 1 revise (Important 1, Minor 4), round 2 accept (Minor 2, docstring applied). Deferred, not filed: test_abort_after_sigkill_reconciles_first waits 60 s in the main thread for Europa's timer wait (never seen failing). Tool-side maintenance during familiar's merge noted on hq-7e81ed.
+  provenance: {"harness_session":"claude-code:03d08d67-a0a4-459d-a60d-b3787154304c","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
