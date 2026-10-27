@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-10-25T12:02:21Z
-updated: 2026-10-27T11:50:50Z
+updated: 2026-10-27T11:50:52Z
 started: 2026-10-27T11:50:32Z
 depends: []
 tags: []
@@ -23,3 +23,4 @@ In the parallel cutover stage of just test (pytest -n auto over tools/test_relay
 - 2026-10-27T11:50:32Z (main): started
   provenance: {"harness_session":"claude-code:03d08d67-a0a4-459d-a60d-b3787154304c","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-27T11:50:50Z (main): trial: flow-trial-1 — enrolled — flow off
+- 2026-10-27T11:50:52Z (main): arm: flow-trial-1 — unit tack-f9c31a — flow off
