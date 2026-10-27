@@ -6,18 +6,20 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-HOOK_VERSION = 'v0.1.1'  # Hook upgrades have a separate approval gate from the CLI pin.
 FILES = ['claude/settings.json', 'codex/hooks.json', 'codex/work/hooks.json']
+# Hook upgrades have a separate approval gate from the CLI pin, per harness: Codex took
+# v0.2.1 for root retirement; Claude Code keeps v0.1.1, which that release does not change.
+HOOK_VERSIONS = {FILES[0]: 'v0.1.1', FILES[1]: 'v0.2.1', FILES[2]: 'v0.2.1'}
 
 
-def parse_relay_command(command):
+def parse_relay_command(command, version):
     argv = shlex.split(command)
     if len(argv) < 2 or not argv[1].endswith('/relay/bin/relay.js'):
         return None
     assert len(argv) == 10
     assert argv[0] == '/usr/bin/node'
     assert Path(argv[1]).is_absolute()
-    assert argv[1].endswith(f'/.local/share/relay/{HOOK_VERSION}/node_modules/relay/bin/relay.js')
+    assert argv[1].endswith(f'/.local/share/relay/{version}/node_modules/relay/bin/relay.js')
     assert argv[2:4] == ['hook', '--harness']
     assert argv[5] == '--outer-ms'
     assert argv[7] == '--subscribers'
@@ -36,7 +38,7 @@ def hook_entries(file):
 def relay_entries(file):
     return [(event, matcher, *parsed, hook['timeout'])
             for event, matcher, hook in hook_entries(file)
-            if (parsed := parse_relay_command(hook['command'])) is not None]
+            if (parsed := parse_relay_command(hook['command'], HOOK_VERSIONS[file])) is not None]
 
 
 def test_claude_relay_events():
@@ -77,7 +79,7 @@ def test_no_familiar_hook_or_native_guard(file):
 def test_native_entries_kept_in_order(file):
     native = {}
     for event, _, hook in hook_entries(file):
-        if parse_relay_command(hook['command']) is None:
+        if parse_relay_command(hook['command'], HOOK_VERSIONS[file]) is None:
             native.setdefault(event, []).append(hook['command'])
     if file == FILES[0]:
         assert native == {

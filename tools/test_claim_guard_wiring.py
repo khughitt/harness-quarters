@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from test_relay_wiring import parse_relay_command
+from test_relay_wiring import HOOK_VERSIONS, parse_relay_command
 
 ROOT = Path(__file__).resolve().parents[1]
 COMMAND = '~/d/ops/hooks/claim-guard --harness codex'
@@ -23,6 +23,6 @@ def test_both_codex_homes_guard_root_and_worker(file, home):
               if h['command'] != COMMAND]
     assert len(others) == 2
     assert others[0] == '~/.local/bin/harness-state-refresh'
-    assert parse_relay_command(others[1]) == ('codex', 600000, 'Stop')
+    assert parse_relay_command(others[1], HOOK_VERSIONS[f'codex/{file}']) == ('codex', 600000, 'Stop')
     manifest = tomllib.loads((ROOT / 'links.toml').read_text())
     assert manifest['harness'][home]['links']['hooks.json'] == f'codex/{file}'
