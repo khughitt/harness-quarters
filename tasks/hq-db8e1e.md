@@ -1,13 +1,16 @@
 ---
 id: hq-db8e1e
 title: Root-cause test_recovery_signal_is_retried_by_reconciliation returning failed under parallel load
-status: idea
+status: done
 priority: 2
 created: 2026-10-25T02:28:14Z
-updated: 2026-10-25T20:39:25Z
+updated: 2026-10-27T13:07:35Z
+completed: 2026-10-27T13:07:35Z
+closed: 2026-10-27T13:07:35Z
 depends: []
 tags: []
 source: hq-a7b473
+model: claude-opus-5-5
 agent: claude-code/claude-opus-5-5
 ---
 
@@ -24,3 +27,7 @@ hq-a7b473 made the test print failed.error on that assertion and stopped a late 
 - 2026-10-25T12:00:06Z (feat/ops-check-hq-c6a149): unshelved
 - 2026-10-25T20:39:25Z (main): Verification recurrence during a record/document-only scope pass on hq main dc51f61 (only a brief was edited; no runtime or test code changed): just test ran 231 agent tests and 1051 hook/tool tests successfully, then the parallel relay segment reported 388 passed and 1 failed in 383.02 s. test_recovery_signal_is_retried_by_reconciliation again returned ('dependency-restore', 'europa', 'failed') instead of interrupted. Retained assertion error: familiar's source did not reach 0259432ed832 on this host within 20 s (HEAD 504e50b3f0ef is not 0259432ed832 or a tasks-only descendant of it (0259432ed832 or 504e50b3f0ef is not a commit here)); it may still be synchronizing; nothing was restored here. This matches the previous recurrence's 20-second source-sync path; root cause and host contention were not investigated. Full recipe exited 1 before its final isolated segment; no retry or fix attempted. Status, priority, review state and scope are unchanged.
   provenance: {"harness_session":"codex:01a174ba-22b1-76d0-9d10-43ed3394938b","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-27T13:07:35Z (main): done
+  provenance: {"harness_session":"claude-code:03d08d67-a0a4-459d-a60d-b3787154304c","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-27T13:07:35Z (main): Root-caused and fixed under hq-f9c31a (merged 7a76557): the test's SIGTERM sender gave up after a fixed 60 s, so under load no signal came and Europa's 20 s sync budget failed the step; the sender now has no deadline and Europa's held wait gets 300 s.
+  provenance: {"harness_session":"claude-code:03d08d67-a0a4-459d-a60d-b3787154304c","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
