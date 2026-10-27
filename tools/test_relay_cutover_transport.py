@@ -869,6 +869,14 @@ def _until(predicate, seconds=20.0):
     raise AssertionError("condition not reached in time")
 
 
+def _execed(*processes):
+    """Wait until each process just started has its new image: Popen returns while exec is still
+    setting it up, and until then /proc reads its argv and environment as empty and its comm as
+    the parent's. Each process must have been given a non-empty environment."""
+    _until(lambda: all(Path(f"/proc/{process.pid}/{name}").read_bytes()
+                       for process in processes for name in ("cmdline", "environ")))
+
+
 def _digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
@@ -1065,10 +1073,13 @@ def merge_tree(root, base, tip):
 
 
 def familiar_history(root):
-    """Write familiar's PRE and feature tip as real commits in root, checked out at PRE."""
+    """Write familiar's PRE and feature tip as real commits in root, checked out at PRE. Its
+    commits start no detached auto-maintenance, whose lock in the object store would outlive
+    them and race the tests' object-store snapshots."""
     for name, (text, mode) in FAMILIAR_PRE.items():
         _write(root / name, text, mode)
     _git(root, "init", "-q", "-b", "main")
+    _git(root, "config", "maintenance.auto", "false")
     _git(root, "add", "-A")
     _git(root, "commit", "-q", "-m", "familiar before relay")
     _git(root, "checkout", "-q", "-b", "feature/relay")
@@ -2300,6 +2311,7 @@ def test_process_table_reads_only_the_hold_key(tmp_path):
     held = subprocess.Popen(["/usr/bin/sleep", "30"], env={**env, "DISABLE_UPDATES": "1"})
     plain = subprocess.Popen(["/usr/bin/sleep", "30"], env=env)
     try:
+        _execed(held, plain)
         rows = {row["pid"]: row for row in inventory._process_rows()}
         assert rows[held.pid]["argv"] == ["/usr/bin/sleep", "30"]
         assert rows[held.pid]["comm"] == "sleep"
@@ -2330,6 +2342,7 @@ def test_session_home_reads_only_the_home_key(world, tmp_path):
     processes = [subprocess.Popen(["/usr/bin/sleep", "30"], env={**env, **variables})
                  for _, variables, _ in cases]
     try:
+        _execed(*processes)
         context = {"home": str(home)}
         found = [smoke.session_home(context, harness, process.pid)
                  for (harness, _, _), process in zip(cases, processes)]
@@ -4325,6 +4338,26 @@ def _objects(root):
     """Every object file in a checkout's own store: what a read-only check must not add to."""
     return sorted(str(path.relative_to(root)) for path in (root / ".git/objects").rglob("*")
                   if path.is_file())
+
+
+def test_fixture_commits_leave_the_object_store_settled(world):
+    """A commit in either host's familiar checkout starts no detached auto-maintenance, so an
+    object-store snapshot taken after it is stable: under load such a child still held
+    `objects/maintenance.lock` at one snapshot and had released it by the next."""
+    world.stage_cutover()
+    for host in HOSTS:
+        root = _familiar(world, host)
+        _write(root / "tasks/trace.md", f"{host}\n")
+        _git(root, "add", "--", "tasks/trace.md")
+        traced = subprocess.run(
+            ["/usr/bin/git", "-C", str(root), "commit", "-q", "-m", "chore(tasks): trace"],
+            env=explicit_env(root, GIT_CONFIG_NOSYSTEM=1, GIT_CONFIG_GLOBAL=os.devnull,
+                             GIT_AUTHOR_NAME="Fixture Author", GIT_TRACE=1,
+                             GIT_AUTHOR_EMAIL="author@example.invalid",
+                             GIT_COMMITTER_NAME="Fixture Author",
+                             GIT_COMMITTER_EMAIL="author@example.invalid"),
+            check=True, capture_output=True, text=True)
+        assert "maintenance run" not in traced.stderr, (host, traced.stderr)
 
 
 def _hooks(root, marker):
