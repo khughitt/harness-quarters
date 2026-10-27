@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: fix/hq-3b9c4c-strict-readiness
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-27T21:07:06Z
+updated: 2026-10-27T21:08:19Z
 started: 2026-10-27T21:06:37Z
 depends: [obs-c7d924]
 parent: hq-401088
@@ -38,3 +38,4 @@ Done: reviewed design and plan, implementation and focused checks proving valid 
 - 2026-10-27T21:06:50Z (main): arm: flow-trial-1 — unit tack-401088 — not enrolled
 - 2026-10-27T21:07:06Z (fix/hq-3b9c4c-strict-readiness): resumed
   provenance: {"harness_session":"codex:01a17f2d-dfcc-7ac3-a3d0-4496340daaf2","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-27T21:08:19Z (fix/hq-3b9c4c-strict-readiness): Origin recovered from codex:01a140bd-8e8d-7782-8ce2-1adc69d9a580, human turn at rollout line 455: user asked whether follow-ups should be created. The assistant proposed and filed the strict consumer at lines 469/478; detailed scope is agent-derived from obs-c7d924. Producer contract 2 is implemented in obs index_state.py and revision-3 design. Current hq still permits incomplete tails and keys rows by realpath. Recommendation: extend the existing reader, facts and decision path; preserve deletion protocols and separate rollout ownership. Planned work: just setup completed; baseline deferred to execution Setup before first code change.
