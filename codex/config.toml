@@ -90,16 +90,16 @@ approval_mode = "approve"
 [hooks.state]
 
 [hooks.state."/home/keith/.codex/hooks.json:pre_tool_use:0:0"]
-trusted_hash = "sha256:54490c25c94ca2591ff50a4030984d9ab00659855a0a93afeedbb05262745580"
+trusted_hash = "sha256:e2757bab369546f5283643d110d0edd98a855ede659bebfd1dfdfe45b155545b"
 
 [hooks.state."/home/keith/.codex/hooks.json:permission_request:0:0"]
-trusted_hash = "sha256:56591cbde51bab7fc835b4a363b2473deee1a32d135f6e90eb9ce2990e298e8e"
+trusted_hash = "sha256:0e7cf5c6d8ce19c86a736eee3558b25b104ff0385baae0904f687f201df6ff30"
 
 [hooks.state."/home/keith/.codex/hooks.json:session_start:0:0"]
 trusted_hash = "sha256:589e521c4e97756cff31ed61c7a46da0f3254b18ae491e997213bc865204b63a"
 
 [hooks.state."/home/keith/.codex/hooks.json:user_prompt_submit:0:0"]
-trusted_hash = "sha256:f06c3cbf6885148755e6bfacb036dfd37880e5f9cd225f36532b0dc8a76c1afe"
+trusted_hash = "sha256:4fdd1004d3923327c92333012d8c445a5770af4bdd772523d49cff091abdac75"
 
 [hooks.state."/home/keith/.codex/hooks.json:stop:0:0"]
 trusted_hash = "sha256:19c30d87a87c005ad66dce25343b7f71289c03ed6a659ba8cdb03adbfb4a51fe"
@@ -126,22 +126,22 @@ trusted_hash = "sha256:93d58788b52b6aa7c5fa7bdaa8e38f893595b1e6dbd4b754f605220e9
 trusted_hash = "sha256:1af4d7b0db7828de49e3ee977c46c56581f393ab882e179db44eb24716951c3a"
 
 [hooks.state."/home/keith/.codex/hooks.json:stop:2:0"]
-trusted_hash = "sha256:b15cde4ece21c43d445f04a351d2b8e9ddd6344fc2feee7b59835c89ab212a12"
+trusted_hash = "sha256:1d03d04b8bc77bf5dd840f176f78ebb2e84bbbd69568484906bbb27faeccfb59"
 
 [hooks.state."/home/keith/.codex/hooks.json:subagent_stop:0:0"]
 trusted_hash = "sha256:79d4fb5fd6806169a482ae5ea2e69d902506ea9dfe03db2501ca7b2610b5e250"
 
 [hooks.state."/home/keith/.codex/hooks.json:session_start:2:0"]
-trusted_hash = "sha256:96bbddd9527c87edff73910ef148fcbc32c554a829136e9303594ec7766080bf"
+trusted_hash = "sha256:5ed93ac1b49a5aede97dbd6c7d8053e0bbfb47b9a05922954c8ca546fdeed7c9"
 
 [hooks.state."/home/keith/.codex/hooks.json:session_end:0:0"]
-trusted_hash = "sha256:5a74bfe5e71b287ff315aff728e9a5b0e54c1904a86dd57ec9add623ab96c05a"
+trusted_hash = "sha256:8e9f3b7ff0c4f139b83f0aaaf82546a789bcfc9af0dc19c378ec9ff769a2f3e3"
 
 [hooks.state."/home/keith/.codex/hooks.json:subagent_start:0:0"]
-trusted_hash = "sha256:d191f49fbb9d3ce39bf887166e7237faebc5b242fdae6763184bd6a29f33067e"
+trusted_hash = "sha256:b37420c5bdde9372f058d5609690693fa334b4520836164678207b01ea3b5590"
 
 [hooks.state."/home/keith/.codex/hooks.json:subagent_stop:1:0"]
-trusted_hash = "sha256:04861e9bad639071b7d4e3b8ba746a388c4c292218333b854ded697361e48a85"
+trusted_hash = "sha256:adc20c80e7cb99ee6ae0dcafef2666d00c4262d1bcc58fa34d686b6853e9a0d4"
 
 [marketplaces.ponytail]
 source_type = "git"
