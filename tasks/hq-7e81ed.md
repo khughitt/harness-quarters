@@ -7,7 +7,7 @@ size: s
 complexity: low
 process: direct
 created: 2026-10-22T11:53:35Z
-updated: 2026-10-27T18:24:59Z
+updated: 2026-10-27T18:25:00Z
 depends: []
 tags: []
 agent: claude-code
@@ -44,3 +44,4 @@ Done: the two children close: the docs correction now, and the deletion after it
 - 2026-10-27T14:18:01Z (main): scope: rescoped; decision retire not fix: window complete 2026-10-22 (hq-f27918 finish note), tool hard-codes titan and europa with no Darwin path (grep over tools/relay_cutover_bootstrap at 5ce77db), relay upgrades go through just relay-install at v0.2.1 (docs/runbooks/relay-runtime.md), item 1 fixed upstream in relay-cfd24b, item 6 landed as lore-bb82ac, item 3 fixed in 9b5ae86; body rewritten keeping all six defects as the record; rated s low direct as closeout; children hq-fa7db8 (docs correction, now) and hq-7e1e9c (deletion, deferred 2026-11-30 with hq-ca01cf under the flow-trial-1 gate); hq-ca01cf now depends on hq-7e1e9c since quiesce.py runs tools/quiesce-timers; hq-583ac7 becomes moot on deletion; origin: stage 1 matched, tasks add in claude-code:0835d699-ead2-4a3a-a9f3-1bf52da12939 at 2026-10-22T11:53:35Z returned created, filed by the agent at window finish with no user ask to file, items 2, 4 and 5 rest on the user's in-window reports; stage 2 not applicable, no origin_session; origin set to agent
   provenance: {"harness_session":"claude-code:250666f1-b992-451b-81cc-31d0ea638ce6","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-27T18:24:59Z (main): trial: flow-trial-1 — enrolled — flow on
+- 2026-10-27T18:25:00Z (main): arm: flow-trial-1 — unit tack-7e81ed — flow on
