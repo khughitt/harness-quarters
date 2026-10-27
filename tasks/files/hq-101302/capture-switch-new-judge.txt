@@ -1,0 +1,1 @@
+PASS: 3 worker events, registry lifecycle checked, reap left none
