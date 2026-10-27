@@ -869,6 +869,13 @@ def _until(predicate, seconds=20.0):
     raise AssertionError("condition not reached in time")
 
 
+def _execed(*processes):
+    """Wait until each process just started has its new image: Popen returns while exec is still
+    setting it up, and until then /proc reads its argv and environment as empty."""
+    _until(lambda: all(Path(f"/proc/{process.pid}/{name}").read_bytes()
+                       for process in processes for name in ("cmdline", "environ")))
+
+
 def _digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
@@ -2303,6 +2310,7 @@ def test_process_table_reads_only_the_hold_key(tmp_path):
     held = subprocess.Popen(["/usr/bin/sleep", "30"], env={**env, "DISABLE_UPDATES": "1"})
     plain = subprocess.Popen(["/usr/bin/sleep", "30"], env=env)
     try:
+        _execed(held, plain)
         rows = {row["pid"]: row for row in inventory._process_rows()}
         assert rows[held.pid]["argv"] == ["/usr/bin/sleep", "30"]
         assert rows[held.pid]["comm"] == "sleep"
@@ -2333,6 +2341,7 @@ def test_session_home_reads_only_the_home_key(world, tmp_path):
     processes = [subprocess.Popen(["/usr/bin/sleep", "30"], env={**env, **variables})
                  for _, variables, _ in cases]
     try:
+        _execed(*processes)
         context = {"home": str(home)}
         found = [smoke.session_home(context, harness, process.pid)
                  for (harness, _, _), process in zip(cases, processes)]
