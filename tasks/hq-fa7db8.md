@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-10-27T14:17:54Z
-updated: 2026-10-27T18:25:01Z
+updated: 2026-10-27T18:25:16Z
 started: 2026-10-27T18:24:44Z
 depends: []
 parent: hq-7e81ed
@@ -33,3 +33,5 @@ Check: just test passes and the pre-commit hook's ops-docs and ops-check runs pa
 - 2026-10-27T18:24:44Z (main): started
   provenance: {"harness_session":"codex:01a17e9a-c533-7680-a754-59ef9d89b3f6","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-27T18:25:01Z (main): arm: flow-trial-1 — unit tack-7e81ed — flow on
+- 2026-10-27T18:25:16Z (main): gate: scoped — adopted
+  provenance: {"harness_session":"codex:01a17e9a-c533-7680-a754-59ef9d89b3f6","harness_session_source":"CODEX_THREAD_ID"}
