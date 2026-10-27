@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: fix/hq-3b9c4c-strict-readiness
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-27T22:45:06Z
+updated: 2026-10-27T22:45:07Z
 started: 2026-10-27T21:06:37Z
 depends: [obs-c7d924]
 parent: hq-401088
@@ -52,3 +52,4 @@ Done: reviewed design and plan, implementation and focused checks proving valid 
 - 2026-10-27T22:43:05Z (fix/hq-3b9c4c-strict-readiness): review: spec round 2 — verdict: accept; findings: minor 8; reviewer: claude-code/claude-opus-5-5
 - 2026-10-27T22:45:04Z (fix/hq-3b9c4c-strict-readiness): Round-2 review received via user, reviewer claude-code/claude-opus-5-5; recommendation accept with minor 8, not human approval. Full returned text saved in .superpowers/sdd/hq-3b9c4c/spec-round-2-report.md; portable attachment substitutes <obs-checkout> for /mnt/ssd/Dropbox/obs. Raw evidence remains under the retained worktree. All eight findings accepted and corrected in design revision 3; no deferred minors. Keep diagnostic counts non-blocking with mandatory archive preservation/replay: this matches producer policy and avoids indefinite retention of deliberately skipped record kinds. No live actions or source enablement.
 - 2026-10-27T22:45:06Z (fix/hq-3b9c4c-strict-readiness): attached: spec-round-2-portable-report.md (5966 bytes): Portable derivative of full spec round 2 review (claude-code/claude-opus-5-5), accept with minor 8; <obs-checkout> mapping and retained raw report are recorded on the task.
+- 2026-10-27T22:45:07Z (fix/hq-3b9c4c-strict-readiness): attached: review-ledger.md (3178 bytes): Round 2 dispositions for all eight minor design findings; each includes Why and Cost; none deferred. Revision 3 awaits human approval.
