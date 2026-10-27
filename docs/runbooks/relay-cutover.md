@@ -79,8 +79,8 @@ original plan's Task 9 is complete. The independent Bash (dots-55f537) and instr
   hosts: settings copies at three stop points, and familiar's throwaway merge, install and
   offline rollback ([Reference](#disposable-rehearsal-evidence-2026-10-19)). That shows
   feasibility. It does not prove this tool or its transport.
-- **Pilot-proven: pending** (bootstrap plan Task 9 Step 8; not run yet). The real-host pilot,
-  `relay-cutover-rehearse`, is what proves:
+- **Pilot-proven (2026-10-21).** The real-host pilot passed (hq-c6c847,
+  bootstrap plan Task 9 Step 8). `relay-cutover-rehearse` exercised:
   - the runner's real SSH transport and fixed remote entry;
   - batch Git access to familiar-theme's SSH pin;
   - user-bus unit queries;
@@ -90,8 +90,8 @@ original plan's Task 9 is complete. The independent Bash (dots-55f537) and instr
   - one real SSH disconnect during a scratch install, reconciled to its recorded result;
   - offline restoration of the copies, clones and dependencies, then cleanup.
 
-  The runner is not ready for the window until a pilot verdict of `passed` is recorded.
-- **Current readiness** (bootstrap plan Task 9 Steps 5–7, then the
+  The pilot proved the scratch workflow; live-window evidence is recorded below.
+- **Pre-window readiness** (bootstrap plan Task 9 Steps 5–7, then the
   [final pre-closure step](#2-final-pre-closure-step-agent) before every closure request).
   These are dated observations, not a continuous hold: both hosts' versions and digests from
   held commands, each home's `claude doctor` hold diagnostic, the transport checks, and
@@ -102,15 +102,21 @@ original plan's Task 9 is complete. The independent Bash (dots-55f537) and instr
   - logind has `KillUserProcesses=false` on both hosts.
 
   Steps 5–7 repeat such checks for every host and home.
-- **Still unrun live:** none of the following has run on the real hosts:
-  - `run` on the real targets, the real merge and installs, and the surface restarts,
-    including whether `qs -d` settles to one process;
-  - relay v0.1.1's real `list --json` rows, familiar's real intent shape, and a running Codex
-    process's executable path;
-  - the controller's fresh row, every smoke and hook-trust review, finish's timers and
-    scheduled reconciliation, and recovery on the real hosts.
+- **Live window completed (2026-10-22).** Window `20261022T014303Z-a1e7bd47`
+  completed with six validated smoke receipts: Titan Claude personal and Codex personal
+  full smokes, Titan Claude work and Codex work, and Europa Claude personal and work.
+  The hq-f27918 finish note records:
+  - the four shared hook targets applied and verified across Titan and Europa (Claude
+    personal/work on both hosts, Codex personal/work on Titan), with hooks, statusLine,
+    installer and evidence verified on both hosts;
+  - familiar merged with its pinned relay, surfaces running after restart, original
+    timers restored and familiar-reap.service reporting success on both hosts;
+  - dead rows removed, the controller row kept, and the hold released.
 
-  Nothing in this runbook implies a live result.
+  Mid-window corrections and limits remain in the completed header and hq-7e81ed:
+  Europa's surfaces needed an unlocked screen, Codex start-idle needed a fixed first
+  prompt, and held Claude launches used the launcher link. The completed window does
+  not establish live recovery; offline recovery remains fixture and rehearsal evidence.
 
 ## Commands, consent and what each may change
 

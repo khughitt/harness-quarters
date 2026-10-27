@@ -1,15 +1,17 @@
 ---
 id: hq-fa7db8
 title: Mark the relay cutover runbook and its README entry as a completed record
-status: doing
+status: done
 priority: 3
 size: xs
 complexity: low
 process: direct
 owner: docs/hq-fa7db8-cutover-record
 created: 2026-10-27T14:17:54Z
-updated: 2026-10-27T18:49:01Z
+updated: 2026-10-27T18:49:03Z
 started: 2026-10-27T18:24:44Z
+completed: 2026-10-27T18:49:03Z
+closed: 2026-10-27T18:49:03Z
 depends: []
 parent: hq-7e81ed
 tags: []
@@ -47,3 +49,7 @@ Check: just test passes and the pre-commit hook's ops-docs and ops-check runs pa
   provenance: {"harness_session":"codex:01a17e9a-c533-7680-a754-59ef9d89b3f6","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-27T18:48:41Z (docs/hq-fa7db8-cutover-record): retro: The task scope and completed-window finish note settled both passages without a new design. Independent review found no issues; the explicit recovery limit avoids turning successful cutover evidence into an unsupported recovery claim.
 - 2026-10-27T18:49:01Z (docs/hq-fa7db8-cutover-record): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-fa7db8","state":"kept","verification":"verified","purpose":"Immediate local integration and checked removal; ignored entries are regenerable Python and pytest caches to discard","next_owner":"session:codex:01a17e9a-c533-7680-a754-59ef9d89b3f6","cleanup_trigger":"After local merge, inspect host pointers and remove the clean task worktree in this turn"}
+- 2026-10-27T18:49:03Z (docs/hq-fa7db8-cutover-record): done
+  provenance: {"harness_session":"codex:01a17e9a-c533-7680-a754-59ef9d89b3f6","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-27T18:49:03Z (docs/hq-fa7db8-cutover-record): Recorded the completed relay cutover, retired-tool status and runtime upgrade route; just test passed 1674 tests and independent review accepted without findings.
+  provenance: {"harness_session":"codex:01a17e9a-c533-7680-a754-59ef9d89b3f6","harness_session_source":"CODEX_THREAD_ID"}
