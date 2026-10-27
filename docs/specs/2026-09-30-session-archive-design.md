@@ -4,7 +4,8 @@ Path placeholders name main checkouts or their parent directories. Substitute pa
 from `tasks projects --paths --pretty` before using command examples.
 
 Status: original design approved 2026-09-30 after review rounds 1–4 (codex, then the user).
-Revision 2 (2026-10-27), hq-3b9c4c: strict consumer design awaiting review; changes
+Revision 3 (2026-10-27), hq-3b9c4c: strict consumer design awaiting human approval;
+addresses the eight minor findings on revision 2 (`e07e23c`). The strict revision changes
 §3.4 condition 3, adds §3.4.0, and updates rollout and verification obligations.
 Runtime enforcement and its implementation plan are not approved by the original review.
 Task: `tack-401088` (goal `tack-1a3278`: keep agent session
@@ -92,11 +93,11 @@ treats as a failure.
 The source list is a constant in the tool. The config cannot extend it, and a missing
 source root fails the run: every source listed here exists on the primary host.
 
-Capture covers all five sources. Prune covers only the sources obs indexes today. obs
-reads neither `archived_sessions` (594 rollouts, 1.6G) nor `~/.codex-work/sessions`
-(711M), so no file there can pass condition 3 of §3.4. Their pruning is deferred to
-`obs-914269`, which indexes both under each rollout's thread identity; prune skips
-those sources until the tool's source table marks them pruned. The probe for
+Capture covers all five sources. obs's `store_roots` now includes personal and work
+Codex `sessions` and `archived_sessions`, but discovery alone does not enable pruning.
+The source table still keeps `codex-archived` and `codex-work` capture-only pending
+`obs-914269`'s remaining identity and root validation and a separate change marking
+them pruned. This strict-reader revision enables no sources. The probe for
 `codex delete --force` on a thread in `archived_sessions/` has already passed (in a
 throwaway `CODEX_HOME`: it removed both the file and the row), so enabling them later
 is a table change.
@@ -204,44 +205,41 @@ and the deletion. The deletion protocols below close that window: a unit is remo
 only after its content has been frozen, meaning no writer can reach it any more, and
 verified again.
 
-#### 3.4.0 Strict obs consumer (revision 2, hq-3b9c4c)
+#### 3.4.0 Strict obs consumer (revision 3, hq-3b9c4c)
 
 **Intent and authority.** The existing condition promised the exact indexed version,
 but accepted stale extractors, replaced inodes and incomplete tails. The
 obs-c7d924 synthetic research also showed that live/archive equality alone misses a
 same-size rewrite preserving inode and mtime: both copies can agree on bytes obs
-never indexed. The human request in that session was to identify follow-ups; the
-strict consumer scope was the agent's proposed follow-up. This revision implements
-that scope against the producer that has since landed. Its field authority is obs
-`docs/specs/2026-10-16-index-state-readiness-design.md`, revision 3, §§3, 5, 6 and 9;
-the current `index_state.py` agrees with that contract. Schema numbers may advance
+never indexed. Its field authority is obs commit `4723076`,
+`docs/specs/2026-10-16-index-state-readiness-design.md`, §§3, 5, 6 and 9;
+the producer's `index_state.py` agrees with that contract. Schema numbers may advance
 within contract 2; do not pin schema 14 or 15.
 
-**Approaches and controller's call.** Extend `load_obs_state`, the plain records and
+**Approaches.** Extend `load_obs_state`, the plain records and
 `file_reason`, reusing the existing live hash and archive read-back. Reject a second
 reader or a compatibility path: every prune caller must enforce one contract.
 Reject stat-only checks or trusting `ready` alone: neither closes the preserved-stat
 rewrite gap. Extractor versions remain obs's responsibility, conveyed by readiness;
-hq does not copy obs's extractor table. These are the controller's recommendations,
-subject to this document's review, rather than previously approved implementation.
+hq does not copy obs's extractor table.
 
 **Contract boundary.** `load_obs_state` validates the complete output before a prune
 can evaluate or delete any unit. Nonzero exit, command failure, invalid JSON,
-missing/malformed required fields, an unsupported contract, or conflicting duplicate
+missing/malformed required fields, an unsupported contract, or duplicate
 rows raises `ObsUnavailable`, stopping the whole run. Contract 1 has no fallback.
 Additional object fields are ignored. Reject booleans where integers are required.
 
 | Evidence | Required shape and consistency |
 |---|---|
 | Envelope | Object; integer `contract == 2`; nonnegative integer `schema` and `observed_at_ms`; `files` list. |
-| Path and harness | Absolute NUL-free path, lexically normalized without following symlinks; harness `claude-code` or `codex`. |
+| Path and harness | Absolute NUL-free path kept exactly as emitted; reject dot/dot-dot components and repeated or trailing separators rather than normalize them. Harness is a nonempty string; only `claude-code` and `codex` can match an hq source. |
 | Recorded version | Nonnegative integer `size`, `mtime_ms`, `inode`, `byte_offset`; offset no larger than size; `device` nonnegative integer or null for legacy evidence. |
 | Completeness | Boolean `partial_tail`; `indexed_schema` and `missing_since_ms` null or nonnegative integer. |
 | Fingerprint | `indexed_span` null or object with nonnegative integer `length == byte_offset` and a lowercase 64-hex-digit `sha256`. |
 | Observation | `observed` null with nonempty string `observed_error`, or object with nonnegative integer device/inode/size/mtime_ms and null `observed_error`. |
 | Readiness | Boolean `ready`, list `not_ready` of nonempty strings; `ready` must equal the list being empty. Unknown reason codes are valid and retain the file. |
 | Diagnostics | Nonnegative integer `malformed_lines` and `unrecognized_records`. These counts alone do not prevent pruning: the verified archive preserves their raw input for replay. |
-| Identity | Null for Claude. Codex object with nullable nonempty-string `thread_id`/`filename_id` and lists of nonempty-string `ancestors`/`conflicts`. |
+| Identity | Required field: null for Claude; Codex object with nullable nonempty-string `thread_id`/`filename_id` and lists of nonempty-string `ancestors`/`conflicts`. For an unknown harness its value is opaque and cannot certify any hq source. |
 
 Well-formed non-ready rows remain normal evidence, including null fingerprints,
 legacy devices, missing paths and stale schemas. They keep their units rather than
@@ -250,11 +248,14 @@ evidence is malformed: reject missing/device/span/observation proof, stale schem
 partial or unread bytes, unequal recorded/observed versions, or invalid Codex
 identity. No readiness maximum age is invented: fresh consumer observation and
 digest checks establish the version; obs owns extractor freshness at command time.
+Unknown harness rows still receive the common field checks, but no harness-specific
+identity interpretation. They cannot match a known source even if their path does.
 
-**Exact path identity.** Key rows and lookups by the same lexical absolute path,
-without `realpath`, inode-based deduplication or following links. Identical duplicate
-records for the same lexical path may coalesce; conflicting records abort. A missing
-historical row for a symlink path and its target's present row remain distinct even
+**Exact path identity.** Key rows and lookups by the exact absolute path string,
+without lexical rewriting, `realpath`, inode-based deduplication or following links.
+Reject any repeated path, including an identical row: obs's `files.path` is unique,
+so duplicates are malformed output. A missing historical row for a symlink path
+and its target's present row remain distinct even
 when both currently resolve to one inode. A link row must never certify its target.
 Keep no-follow source discovery and reads. This fixes the reader halt documented in
 `docs/notes/2026-10-22-claude-prune-links-brief.md`; it does not authorize pruning
@@ -294,21 +295,29 @@ source root, archive alias, timer, live deletion or successor-link policy.
 test builders and all direct constructors/fixtures of the affected records, plus
 reader, eligibility, prune and CLI regressions. Preserve capture's `Stat` interface;
 prune facts can carry device/inode separately. Record details of the internal record
-shapes in the implementation plan. Update the README's prune contract and this
-plan's old global contract and affected tasks when that plan is revised for review.
+shapes in the implementation plan. Update the README's prune contract and
+`docs/plans/2026-09-30-session-archive.md`'s old global contract and affected tasks
+when that plan is revised for review.
 Before changing a capability fact, inspect it through `tools/harness-facts` and
 change only a fact whose recorded claim this implementation actually alters.
 
 **Acceptance.** Synthetic checks must cover old/unknown contracts, wrong or absent
 fields, booleans as numbers, null non-ready evidence, unknown reasons, contradictory
-ready claims, duplicate conflicts, and link/target rows. Eligibility checks must
+ready claims, identical and conflicting duplicate paths, rejected noncanonical path
+spellings, unknown harness rows, and distinct link/target rows. Eligibility checks must
 accept complete current Claude and Codex evidence and retain stale extractors,
 missing/unavailable rows, partial/unread tails, wrong harness/device/inode,
 preserved-stat rewrites, changed indexed digest, and missing/conflicting/mismatched
 Codex identity; valid ancestry and diagnostic counts remain accepted. Temporary
 integration checks must prove malformed output aborts before any deletion, a
 non-ready member keeps a whole unit, and existing capture/quarantine safeguards
-still hold. Build subprocess test environments key by key with temporary homes and
+still hold. Include an hq integration pair that uses real temporary source/archive
+files and contract-2 JSON through `load_obs_state` and the production `_facts` /
+`evaluate` path: the fully captured, complete current unit is eligible; replacing
+one transcript with a different inode while preserving its bytes, size and mtime
+keeps the unit as `index-stale` with the original indexed evidence. This must not
+construct `FileFacts` directly; the cross-repository probe alone does not verify
+that wiring. Build subprocess test environments key by key with temporary homes and
 fake credentials, including shared helpers this change reaches.
 
 At execution Setup, run and record the full `just test` baseline before code changes.
@@ -494,8 +503,8 @@ The prune service passes `--apply` only after the rollout's dry-run review (§4)
 3. Install the strict hq-3b9c4c consumer while pruning remains gated, then verify it
    against obs's contract-2 producer. The producer has already landed; its additive
    fields do not protect the old reader, which ignores them. Never enable pruning
-   with that reader. This task prepares repository changes only; installation and
-   all live runs belong to hq-624351. After both sides are verified, run `prune` as
+   with the old contract-1 reader. This task prepares repository changes only;
+   installation and all live runs belong to hq-624351. After both sides are verified, run `prune` as
    a dry run by hand under that rollout task. Review the report with the
    user: which units, how many, and the reason for each unit kept.
 4. **Gate:** hq-3b9c4c's strict-reader acceptance and the successor-link policy gates
@@ -514,6 +523,8 @@ thread that was pruned wrongly is restored from the archive into a scratch
 
 ## 5. Testing
 
+- **Strict obs consumer:** §3.4.0's Acceptance defines the contract-validation,
+  fresh-proof integration and real-producer checks in addition to the checks below.
 - **Pure core:** eligibility over constructed records, with one case per condition in
   §3.4 and per unit shape (a Claude session with subagents and tool results, a Codex
   rollout). Also the capture decisions: skip, copy, busy.
