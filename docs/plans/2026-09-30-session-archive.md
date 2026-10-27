@@ -1,21 +1,33 @@
 # Session Archive Implementation Plan
 
-Path placeholders name main checkouts or their parent directories. Substitute paths
-from `tasks projects --paths --pretty` before using command examples.
-
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build `tools/session-archive`, which captures every Claude Code and Codex transcript to a backup disk daily and prunes inactive ones from the live stores only after the archive and obs verifiably hold them.
+Revision 2, hq-3b9c4c: strict-consumer implementation plan awaiting human review.
+Execute Tasks 18–19 only for this task. Tasks 1–16 retain the original build and
+capture-rollout record; their inline code is historical, not current implementation
+guidance. In particular Tasks 18–19 supersede the record interfaces, obs contract,
+tail exception and fact-gathering examples in Tasks 7–8, 10–11 and 13. Task 17
+remains separately owned by hq-624351 and cannot run under this task's approval.
+
+Path placeholders name registered main checkouts. Resolve them with
+`tasks projects --paths --pretty`; `<hq-worktree>` is `.worktrees/hq-3b9c4c` from
+hq main. Resolve `<obs-worktree>` from its coordinated task once execution creates
+it; never use a worktree to repoint a host launcher.
+
+**Goal:** Make the existing `tools/session-archive` prune consume contract-2 proof of the exact indexed bytes, and verify it against the real producer before rollout.
 
 **Architecture:** A stdlib-only Python package, `tools/session_archive/`, behind a thin `tools/session-archive` launcher. The prune decisions live in pure functions over plain records (`decide.py`). The modules around them gather inputs (`inputs.py`), write the archive (`capture.py`, `manifest.py`) and run the deletion protocols (`quarantine.py`, `prune.py`). Two user systemd timers run `capture` daily and `prune` monthly.
 
 **Tech Stack:** Python 3.14 standard library (`sqlite3`, `tomllib`, `ctypes`, `fcntl`), pytest through `uv run --with pytest`, and systemd user units.
 
-**Spec:** `docs/specs/2026-09-30-session-archive-design.md` (approved 2026-09-30). Read it before any task. Section references below (§3.4.2 and so on) point into it.
+**Spec:** `docs/specs/2026-09-30-session-archive-design.md` at hq `cfaed41`
+(strict revision 3, approved for planning by the user; task spec review round 3).
+Read it before execution. Section references below point into it. Producer field
+authority: obs `4723076`, `docs/specs/2026-10-16-index-state-readiness-design.md`.
 
 ## Global Constraints
 
-- Standard library only. `just test` runs the tests as `uv run -q --with pytest pytest .githooks tools -q`, and nothing else may be installed.
+- Runtime dependencies stay standard-library only. Use the current justfile's complete `just test` route, including all agent, hook/tool, parallel cutover and isolated signal-test segments; do not substitute a hand-picked subset.
 - Linux only: `renameat2` through `ctypes` and `/proc/*/fd` are required, not optional.
 - Exit codes: `0` ok; `1` a failed file, unit, obs call, read-back, probe or leftover quarantine; `2` the host gate (§3.1); `75` the archive lock is held (`EX_TEMPFAIL`).
 - Config: `~/.config/session-archive/config.toml` with the keys `archive_root` (string), `obs_command` (a non-empty list of strings), and the optional `uninspectable_ok` (a list of process `comm` names, default empty). Marker file: `<archive_root>/.session-archive-root`. See spec §3.1 and §3.4.
@@ -23,13 +35,26 @@ from `tasks projects --paths --pretty` before using command examples.
 - A failure to read a source directory or file is reported and fails the run. It is never skipped silently.
 - Sources are the constant table in §3.2: `claude`, `claude-work`, `codex` are pruned; `codex-archived` and `codex-work` are captured only.
 - Inactivity is 30 days. Capture runs daily at 04:00 and prune on the 1st at 05:00. The `codex delete` timeout is 120 seconds. `status` goes stale after 48 hours.
-- The obs contract is `<obs_command> --json index-state`. It prints one JSON object, `{"schema": <int>, "files": [{"path", "size", "mtime_ms", "byte_offset", "partial_tail", "indexed_schema", "missing_since_ms"}]}`, and exits 0 (recorded on `obs-0bc168`).
+- The obs contract is `<obs_command> --json index-state`, exit 0, contract 2 with every field and consistency rule in spec §3.4.0. Require complete indexed bytes, matching harness/device/inode, and live/archive/indexed-span digest equality. No partial-tail exception or contract-1 fallback.
+- Keys are exact absolute path strings; reject dot/dot-dot components and repeated/trailing separators, never normalize or follow links. Every duplicate path aborts. Unknown harnesses receive common validation but cannot certify an hq source; unknown not-ready codes retain files without aborting.
+- Malformed evidence aborts before deletion; well-formed non-ready evidence keeps its unit. Diagnostic malformed/unrecognized counts do not block, with archive replay still a mandatory rollout gate.
 - Tests touch only `tmp_path` trees and a stub `codex`, never a live harness store, `/mnt/backup`, or the real `codex` binary.
 - No machine-specific absolute paths in code, comments or docs. Use `~`, `%h`, or a placeholder.
 - Conventional commits, with no AI attribution.
 - Run focused tests with `uv run -q --with pytest pytest <file>::<test> -q`, and `just test` before each commit.
+- Every test/probe subprocess receives an environment built key by key, with a temporary HOME, explicit PATH and fake credentials. Do not copy or filter the parent environment. Preserve existing stub controls by naming each one explicitly.
+- Execution reuses the task worktree and runs `just setup`, then records a full `just test` baseline before its first code change. Planned work has not run an implementation baseline yet. In a new obs worktree, hydrate and record that project's full-suite baseline (`just test-fast`, its full unittest suite) before code changes.
+- No live capture, prune, timer changes, home linking or source enablement. Finish repository verification and hand off to hq-624351. The strict reader must be installed before pruning is enabled; the producer is already shipped.
 
 ## Review Focus
+
+1. A missing historical link row must not collapse onto a present target row: distinct keys in Task 18's loader test.
+2. Equal bytes with a new live inode must keep the unit: Task 18's real-file `_facts` integration pair.
+3. A new producer harness or reason code must not halt known-source pruning: Task 18's unknown-value loader and decision tests.
+4. A malformed later row must prevent deletion of an otherwise eligible first unit: Task 18's CLI integration test.
+5. Acceptance must exercise hq's production facts, not obsolete positional fixtures: the coordinated obs probe in Task 19.
+
+### Original build coverage (historical)
 
 1. **Claude project directories that are not sessions**, such as the auto-memory directory `projects/<project>/memory/`, must never become prune units. Units are session-UUID-named only. Pinned in Task 8.
 2. **A transcript deleted mid-walk** by Claude's own cleanup or by `codex delete` is counted `vanished`, and the capture run still succeeds. Pinned in Task 5.
@@ -58,6 +83,9 @@ from `tasks projects --paths --pretty` before using command examples.
 | `tools/session_archive/testing.py` | Test helpers and the stub `codex` source |
 | `tools/conftest.py` | Fixtures: `home`, `archive`, `manifest`, `stub_codex` |
 | `tools/test_session_archive_*.py` | One test file per module |
+| `tools/test_session_archive_readiness.py` (new) | Loader-to-production-facts integration, with real temporary archive/source files |
+| obs `tools/retention_readiness.py` (coordinated change) | Real producer output against two committed hq readers, using each reader's production `_facts` |
+| obs `tests/test_retention_readiness.py` (new) | Probe subprocess-environment isolation, without an hq dependency |
 | `systemd/user/session-archive-{capture,prune}.{service,timer}` | Units |
 | `links.toml`, `README.md` | Unit links and the layout line |
 
@@ -1495,6 +1523,8 @@ git commit -m "feat(session-archive): promote a diverged version into the mirror
 
 ### Task 7: Pure prune eligibility
 
+Historical implementation record. Task 18 supersedes the interfaces and incomplete-tail acceptance below.
+
 **Files:**
 - Modify: `tools/session_archive/decide.py`
 - Test: `tools/test_session_archive_eligibility.py`
@@ -1680,6 +1710,8 @@ git commit -m "feat(session-archive): pure prune eligibility over file facts"
 ---
 
 ### Task 8: Prune inputs: obs state, open inodes, units
+
+Historical implementation record. Task 18 replaces the unversioned/realpath reader, its fixtures and tail helper below.
 
 **Files:**
 - Create: `tools/session_archive/inputs.py`
@@ -2214,6 +2246,8 @@ git commit -m "feat(session-archive): no-replace rename and the quarantine relea
 
 ### Task 10: Claude deletion protocol
 
+Historical implementation record. Task 18 updates `_facts` and `_read_file` callers; retain the current hardened deletion protocol rather than copying this original implementation.
+
 **Files:**
 - Create: `tools/session_archive/prune.py`
 - Test: `tools/test_session_archive_prune_claude.py`
@@ -2544,6 +2578,8 @@ git commit -m "feat(session-archive): Claude deletion protocol with no-replace r
 ---
 
 ### Task 11: Codex deletion protocol and the stub `codex`
+
+Historical implementation record. Task 18 updates changed record/read interfaces and fixtures without replacing the current writer-exclusion protocol.
 
 **Files:**
 - Modify: `tools/session_archive/prune.py` (add `run_codex_delete`, `delete_codex_unit`), `tools/session_archive/testing.py` (add `STUB_CODEX`), `tools/conftest.py` (add the `stub_codex` fixture)
@@ -3156,6 +3192,8 @@ git commit -m "feat(session-archive): probe-codex records the Codex versions tha
 ---
 
 ### Task 13: Prune run and the `prune` command
+
+Historical implementation record. Task 18 updates contract fixtures and regression tests; retain the current two-phase run and reporting behavior.
 
 **Files:**
 - Modify: `tools/session_archive/prune.py` (add `repair_archive`, `prune_run`), `tools/session_archive/cli.py` (add `cmd_prune`)
@@ -3811,17 +3849,284 @@ This task acts outside the repository: it writes to the backup disk, adds host c
 
 ### Task 17: Prune rollout (blocked on obs)
 
-Blocked until `obs-0bc168` (index state) lands, and, for Step 3, until `obs-de84cb` (archive re-read acceptance) passes. Carries spec §4 steps 3–5.
+Owned by hq-624351. Producer obs-0bc168 has landed. Remains gated on hq-3b9c4c's
+strict reader, archive replay acceptance (obs-de84cb), and the successor-link policy
+gates (hq-1639fd / hq-9e64f4). Carries spec §4 steps 3–5; Tasks 18–19 authorize no
+live step here.
 
 **Files:**
 - Modify: `systemd/user/session-archive-prune.service` (ExecStart gains `--apply`, Description drops "dry run")
 - Test: `tools/test_session_archive_units.py` (the prune `ExecStart` expectation gains `--apply`)
 
-- [ ] **Step 1: Contract check.** Run `python3 <obs-checkout>/obs.py --json index-state`. Confirm it matches the contract in Global Constraints, fed through `inputs.load_obs_state`. Any difference means fixing obs or amending the contract in both places before continuing.
+- [ ] **Step 1: Contract check.** After hq-3b9c4c lands, install its strict reader while pruning remains disabled, then run the configured obs command through `inputs.load_obs_state`. Verify contract 2 and the paired acceptance revisions recorded by Task 19. An old contract-1 reader cannot be used with the shipped producer. Installation and this live check need rollout authorization under hq-624351.
 - [ ] **Step 2: Dry run.** Run `<tack-checkout>/tools/session-archive prune` and save the report. If it stops with `InspectionFailed`, it names the processes it could not inspect. On the primary host that is expected to be `(sd-pam)`, which is non-dumpable, and `systemd`, the user manager, whose descriptors can be listed but not followed. Whether to list a process in `uninspectable_ok` is the user's decision, never the agent's. Review it with the user: totals per source, every `kept:` reason other than `active`, and the eligible units. This is a review gate: park with `--waiting-on user --reason review`.
-- [ ] **Step 3: Gate.** Confirm `obs-de84cb` is done and its note records a re-read of this archive with no duplicate sessions and no live file marked missing. If it isn't done, stop here.
+- [ ] **Step 3: Gate.** Confirm hq-3b9c4c's acceptance is recorded, successor-link policy gates are settled, and `obs-de84cb` records a re-read of this archive with no duplicate sessions and no live file marked missing. Otherwise stop here.
 - [ ] **Step 4: Probe and first apply.** Run `<tack-checkout>/tools/session-archive probe-codex` (expect exit 0), then `<tack-checkout>/tools/session-archive prune --apply` once by hand. Check three things:
   - obs still lists the pruned files, as missing with their rows kept;
   - `codex resume --all` no longer lists the deleted threads;
   - `status` exits 0.
 - [ ] **Step 5: Switch the unit.** Change the prune `ExecStart` to `... session-archive prune --apply` and update the unit test to match. Run `just test`, commit (`feat(session-archive): prune timer applies`), run `systemctl --user daemon-reload && systemctl --user enable --now session-archive-prune.timer`, then `list-timers`.
+
+---
+
+## Strict consumer execution (hq-3b9c4c)
+
+Recommended execution: inline with `superpowers:executing-plans`. The reader,
+record constructors and facts must change together to avoid intermediate commits
+that either break every prune or still ignore non-ready evidence. Task 18 is one
+reviewable hq deliverable; Task 19 verifies it against the independently maintained
+producer. A final fresh whole-branch reviewer still checks implementation, and
+Critical/Important findings enter corrective rounds under the shared rules.
+Task 18 is hq-886d78 (blocked until this plan is approved); Task 19 is hq-b60102
+and depends on it. After plan approval, unblock/start hq-886d78. Never infer plan
+approval from its task registration or the design's approval.
+
+### Task 18: Enforce contract 2 through the existing prune path
+
+**Files:**
+- Modify: `tools/session_archive/inputs.py`, `decide.py`, `prune.py`, `testing.py`
+- Modify: `tools/test_session_archive_inputs.py`, `tools/test_session_archive_eligibility.py`, `tools/test_session_archive_prune_run.py`
+- Adapt affected fixtures/callers in: `tools/test_session_archive_prune_claude.py`, `tools/test_session_archive_prune_codex.py`, `tools/test_session_archive_prune_links.py`, and any `obs_for` / `_read_file` call found by the required search
+- Modify: `README.md` (session archive paragraph only)
+- Create: `tools/test_session_archive_readiness.py` (real-file loader-to-facts integration)
+
+**Interfaces:**
+- Preserve: capture's `Stat(size: int, mtime_ns: int)`, `load_obs_state(command, runner=subprocess.run) -> dict[str, ObsFile]`, `file_reason(f: FileFacts, now_ns: int) -> str | None`, `unit_reason(files: list[FileFacts], now_ns: int) -> str | None`, `_facts(source, relpath: str, ctx: Context, held) -> FileFacts`, `evaluate(unit: Unit, ctx: Context, held) -> str | None`, and `Context`'s fields.
+- Extend frozen `ObsFile`: keep its six existing fields (`size`, `mtime_ms`, `byte_offset`, `partial_tail`, `schema_current`, `missing`); add required fields `harness: str`, `device: int | None`, `inode: int`, `ready: bool`, `not_ready: list[str]`, `span_length: int | None`, `span_sha256: str | None`, `thread_id: str | None`, `filename_id: str | None`, `identity_conflicts: list[str]`. No defaults for old callers. Only Codex populates identity fields; other harnesses have `None`, `None`, `[]` after their appropriate boundary checks. Diagnostics and `observed` are validated at the boundary, not copied into unused record fields.
+- Change `FileFacts`: remove `tail_has_newline`; retain all other fields and add required `device: int`, `inode: int`, `harness: str` (the source's expected obs harness), `thread_id: str | None` (expected filename UUID for Codex). Use keywords at changed constructors.
+- Change `_read_file(path: Path) -> tuple[os.stat_result, str]`: same held-handle, regular-file, no-follow and stability checks, returning stat and full SHA-256; remove offset/tail reading. Adapt every unpacking caller; `_read_back` continues using item 1.
+- Add test builder `testing.obs_payload(*paths: Path) -> dict`: complete contract-2 JSON from each synthetic file's stat/hash. Recognize Codex fixture names with the existing `inputs.ROLLOUT_RE`, give them matching thread/filename IDs, otherwise emit Claude evidence. It represents synthetic obs evidence, not a transcript parser. Preserve `obs_for(*paths: Path) -> dict` by passing this payload through the real loader with a stub runner. Keys remain exact strings.
+- Preserve `testing.run_tool(*args: str, home: Path)`'s signature; replace inherited-environment expansion with explicit keys. Include PATH, temporary HOME and XDG paths, USER=`test`, fake credential values, and only the stub controls the stub reads (`STUB_CODEX_MODE`, `STUB_CODEX_LOG`, `STUB_CODEX_VERSION`, `STUB_CODEX_WRITER_SECONDS`). Their values may be read individually from test fixtures; no inherited mapping/copy/filter reaches the child.
+
+- [ ] **Step 1: Execution Setup and caller inventory.** Resume the task/worktree,
+  run `just setup` and full `just test`, and note all segment counts on the task.
+  Search every `ObsFile`, `FileFacts`, `obs_for`, `tail_has_newline`, `_read_file`
+  and `load_obs_state` caller before editing. Read current versions of the listed
+  tests; preserve existing writer/restore/read-back error checks.
+
+- [ ] **Step 2: Write reader regression tests before implementation.** Add the
+  test-only `testing.obs_payload` builder from Interfaces now, so later real-file
+  tests can run against the old reader without new production record fields.
+  For decoder unit tests, use a local
+  complete literal payload builder in `test_session_archive_inputs.py` first; do
+  not rely on an unimplemented shared helper. Give every field from the approved
+  spec table a missing-field and wrong-type case, including booleans in integer
+  slots, `ready`/reason disagreement, bad digest/length, and contradictory ready
+  schema/tail/observed/identity proof. Valid non-ready null evidence must load.
+  The existing realpath/dedup tests change to these assertions:
+
+  ```python
+  # In separate named cases with fresh payloads (do not share mutated rows):
+  assert set(load(payload_with_link_and_target_rows)) == {str(link), str(target)}
+  with pytest.raises(ObsUnavailable):
+      load(payload_with_identical_duplicate_path)
+  with pytest.raises(ObsUnavailable):
+      load(payload_without_contract)
+  with pytest.raises(ObsUnavailable):
+      load(payload_with_contract_3)
+  with pytest.raises(ObsUnavailable):
+      load(payload_with_dot_or_dotdot_or_repeated_or_trailing_separator)
+  assert load(payload_with_future_harness)[path].harness == "future-harness"
+  assert load(payload_with_unknown_reason)[path].not_ready == ["future_reason"]
+  assert load(payload_with_nonready_null_span_and_device)[path].ready is False
+  ```
+
+  `load(payload)` is test-local shorthand for the current loader with
+  `fake_runner(json.dumps(payload))`, not a new runtime helper. Keep the runner
+  timeout/nonzero/invalid-JSON tests. Unknown harness identity may be an opaque
+  object; it cannot certify a known source. Add `test_run_tool_excludes_parent_secrets`
+  intercepting its subprocess runner **inside an `os.environ` patch to a small
+  synthetic mapping containing only PATH and fake sentinel credentials**. Never
+  capture the real inherited environment in an expected-failure assertion. Assert
+  that the sentinel parent credential is absent from the child's mapping,
+  HOME is the fixture home, and credential keys hold fake values. Build the safe
+  test environment before any new subprocess case, RED runs included.
+  The existing direct `Popen` in `test_child_cwd_restores_before_late_open_and_append`
+  must likewise receive an explicit environment (PATH, its test-owned HOME and
+  only values that child reads), retaining its current cleanup and assertions.
+
+- [ ] **Step 3: Run the new reader/environment cases RED.**
+  Run `uv run -q --with pytest pytest tools/test_session_archive_inputs.py -q`.
+  Confirm old-reader acceptance/realpath coalescing and leaked parent environment
+  produce assertion failures, rather than treating fixture/import errors as RED.
+  Record the failing names.
+
+- [ ] **Step 4: Write eligibility and production-wiring regressions RED.** In
+  `test_session_archive_eligibility.py`, replace the passing partial-tail test with
+  a rejecting case and add independent mutations for readiness/reasons, harness,
+  device, inode, span length/digest, and Codex thread/filename/conflicts. Keep
+  ancestry and nonzero diagnostic counts accepted through loader fixtures.
+  In the new readiness file, create aged Claude and Codex units with existing
+  builders and `capture_run`, JSON evidence from actual temporary files, the real
+  loader, a real manifest and archive, and `Context(held=lambda: set())`.
+  Parameterize both source kinds and assert:
+
+  ```python
+  assert evaluate(unit, ctx, set()) is None
+  # Replace one transcript with copy2/replace, preserving bytes, size and mtime;
+  # retain ctx.obs from before replacement and assert the inode actually changed.
+  assert replacement_info.st_ino != indexed_inode
+  assert evaluate(unit, ctx, set()) == "index-stale"
+  ```
+
+  Also name `test_preserved_stat_rewrite_is_index_stale`: build obs evidence before
+  any capture, rewrite equal-length bytes and restore mtime, then make the first
+  capture of those rewritten bytes into an empty archive. Do not first capture
+  the old bytes, which would create a divergence instead. Leave the old obs
+  evidence in place. This isolates condition 3 from condition 2.
+  Name `test_nonready_subagent_keeps_entire_claude_unit`: mark only its subagent's
+  row non-ready and assert the main transcript and subagent both remain in a
+  temporary `prune_run(apply=True)` (no real harness binary). Unknown harness at a
+  source path yields `index-stale`; a missing row yields `unindexed`.
+  Run `uv run -q --with pytest pytest tools/test_session_archive_readiness.py tools/test_session_archive_eligibility.py -q`
+  against the old reader: the real-file inode/rewrite tests and old-shape
+  partial-tail case must fail semantically, not on imports or constructors;
+  after extending types, rerun new constructor-based tests to confirm behavioral
+  failures before changing `file_reason`. Import/constructor failures alone do
+  not prove the safety regression.
+
+- [ ] **Step 5: Implement the boundary, facts and decisions together.** Validate
+  all fields/consistency in spec §3.4.0 before returning state. Reuse `_nonnegative`
+  and the existing UUID/rollout pattern; add no schema library or generic framework.
+  Check path spelling without rewriting keys. Reject every duplicate. Validate
+  common fields for unknown harnesses; interpret `identity` only for Claude/Codex.
+  Populate the extended records, update all direct fixtures, and wire `obs_for`
+  through the shared payload builder and loader. Delete the tail helper, imports, obsolete test and fact
+  field. `_facts` uses `ctx.obs.get(str(path))`; carry device/inode from its hashed
+  descriptor and expected harness from `source.kind` (`claude` → `claude-code`,
+  `codex` → `codex`), with Codex filename UUID from `ROLLOUT_RE`.
+  In `file_reason`, keep archive/inactivity ordering, then missing→`unindexed`,
+  otherwise require readiness, complete span, fresh version, harness/identity and
+  live/mirror/indexed digest equality→`index-stale` on failure. Open remains last.
+  No changes to locks, quarantine, restore, recapture, source table or host state.
+
+- [ ] **Step 6: Verify all focused cases GREEN, including CLI preflight.** Add
+  `test_malformed_later_row_prevents_all_deletion` in the prune-run tests: two
+  otherwise eligible temporary units, first evidence valid, second malformed,
+  invoke the real CLI through `run_tool` with the fake obs script. Assert exit 1,
+  `ObsUnavailable` in the report, every live file byte-identical, and no quarantine.
+  Keep a valid contract-2 CLI case exercising the existing Codex probe gate.
+  Run:
+
+  ```bash
+  uv run -q --with pytest pytest tools/test_session_archive_inputs.py tools/test_session_archive_eligibility.py tools/test_session_archive_readiness.py tools/test_session_archive_prune_run.py -q
+  uv run -q --with pytest pytest tools/test_session_archive_prune_claude.py tools/test_session_archive_prune_codex.py tools/test_session_archive_prune_links.py -q
+  ```
+
+  Expect all selected tests to pass; record actual counts. Confirm existing link
+  policy fixtures still characterize their known gaps; do not fix those policies.
+
+- [ ] **Step 7: Document, run the full gate and commit the hq deliverable.** Update
+  README's archive paragraph to name contract 2, exact indexed-byte proof and the
+  gated rollout. Inspect relevant capability claims through
+  `tools/harness-facts list`/`get`; leave probe-derived harness behavior facts alone
+  unless a claim actually changes. Run `tasks check`, `git diff --check`, and full
+  `just test`; commit only the listed implementation/test/docs files with
+  `fix(session-archive): require exact indexed-byte evidence`. Record the full
+  consumer commit and counts on the step task. Do not merge/install a partial
+  branch; Task 19 and whole-branch review remain.
+
+### Task 19: Verify the committed reader against real producer output
+
+**Files:**
+- In obs only, coordinated direct task: modify `tools/retention_readiness.py`; create `tests/test_retention_readiness.py`
+- In hq: task evidence/notes only; preserve both frozen documents and runtime code
+
+**Interfaces:**
+- Consume Task 18's committed hq revision via existing `--strict-rev`; keep pinned contract-1 baseline `889000e`.
+- Preserve the probe CLI, output case names, `hq_tools(checkout, rev, scratch, name)`, `decide(tools_dir, request_path)`, and `run_decide(tools_dir, request)` signatures.
+- Add obs probe `probe_environment(home: Path) -> dict[str, str]`, a key-by-key environment for every probe child (temporary HOME/XDG dirs, explicit PATH, USER=`test`, fake credentials, `GIT_CONFIG_GLOBAL=/dev/null`, `GIT_CONFIG_NOSYSTEM=1`). Add the two temporary obs root overrides explicitly for CLI calls; no parent environment copies or denylist. This includes hq extraction's Git/tar subprocesses and reader subprocesses.
+- In `decide`, replace positional `FileFacts` construction and realpath lookup with the reader revision's own `capture_file`, `Manifest`, `Context`, `_facts` and `file_reason`. Both hq `889000e` and the current reader already expose `_facts(source, relpath, ctx, held)`; no hq compatibility API is needed. Use temporary archive/manifest stores for each reader, real read-back and the original loaded obs snapshot.
+
+- [ ] **Step 1: File/start the coordinated obs task after Task 18, before editing obs.**
+  Create one direct P2/s/mid task in obs, titled "Exercise committed retention
+  consumers through production facts", with origin `agent` and source hq-b60102.
+  Its body binds it to Task 19 of this human-reviewed frozen plan, the exact
+  Task-18 consumer commit, the two probe files/interfaces below, safe temporary
+  environments, RED→GREEN, and no producer/live-state changes. The plan is read
+  from hq's `.worktrees/hq-3b9c4c` at its recorded frozen revision; do not invent a
+  foreign local `--plan` reference. Filing is deferred until this execution step
+  because a cross-project dependency cannot resolve hq-886d78 before its worktree
+  record integrates (tooling gap tasks-2591d3); the controller coordinates sequence.
+  Resolve the new task's root through `tasks root <obs-task-id> --pretty`; read its guide,
+  start it, follow trial-arm output, and create/lock a `.worktrees/<obs-task-id>`
+  worktree with `git worktree add` and immediate `just setup`. Record a full
+  `just test-fast` baseline there before its first code change. The task's bounded
+  instructions point back to this plan. It does not change obs's producer contract,
+  index schema or readiness policy. Return to the hq worktree for hq record writes.
+
+- [ ] **Step 2: Establish probe RED against the committed strict reader.** Before
+  executing the probe, replace its inherited child-environment construction with
+  the specified explicit environment (a prerequisite to a safe RED run). Write
+  `ProbeEnvironmentTests.test_parent_credentials_and_git_overrides_are_not_inherited`
+  in `tests/test_retention_readiness.py`: import only the probe module, set sentinel
+  parent credential/GIT_DIR values, launch a tiny Python child with the helper,
+  and assert HOME/XDG/Git config point to test-owned paths or `/dev/null`, the
+  credential is fake, and GIT_DIR is absent. No hq checkout is required by this
+  unit test. Its child output must satisfy:
+
+  ```python
+  self.assertEqual(child_env["HOME"], str(self.root))
+  self.assertEqual(child_env["GIT_CONFIG_GLOBAL"], "/dev/null")
+  self.assertEqual(child_env["GIT_CONFIG_NOSYSTEM"], "1")
+  self.assertNotIn("GIT_DIR", child_env)
+  self.assertNotIn(parent_secret, json.dumps(child_env))
+  self.assertEqual(child_env["OPENAI_API_KEY"], "test-invalid")
+  ```
+
+  Run `just test-one test_retention_readiness` and the existing probe:
+
+  ```bash
+  python3 tools/retention_readiness.py <hq-worktree> --strict-rev <task-18-commit>
+  ```
+
+  The environment test passes; the probe must fail because its old positional
+  `FileFacts` constructor no longer fits. This RED proves the adapter mismatch,
+  not the strict consumer's behavior (Task 18 proves that separately).
+
+- [ ] **Step 3: Adapt only the probe's reader orchestration.** For each existing
+  file case, create a Source with `kind=claude` for `claude_current`, otherwise
+  `codex`. For Claude use `root=path.parent.parent` and `relpath=<project>/<file>`
+  so `is_transcript` sees the real two-component shape; for Codex use
+  `root=path.parent`, `relpath=path.name`. All homes/archive paths are temporary.
+  Capture that live file into this reader's temporary manifest/mirror, create
+  `Context` with the loaded snapshot, `held=lambda: set()`, and a clock more than
+  30 days beyond every case's mtime; call `_facts` then `file_reason`.
+  Close each manifest in a `finally` block before its temporary directory exits.
+  Absent paths keep the probe's existing `absent` outcome. Do not rewrite stale
+  producer evidence to fit the new reader. Preserve baseline characterizations,
+  case matrix assertions and output keys. Remove the obsolete manual constructor
+  imports/lookups; keep the historical `readiness` section on the pinned reader.
+
+- [ ] **Step 4: Verify GREEN and commit the obs probe change.** Run
+  `just test-one test_retention_readiness test_index_state`, then `just gate`
+  (which includes the full `test-fast` suite and content checks; do not run that
+  suite twice without a new change). Run the probe with the same strict
+  revision again. Assert `loaded == true` and acceptance of only `current` and
+  `claude_current`; stale schema/extractors, partial/unread tails, changed inode,
+  preserved-stat rewrite, missing/unavailable paths and identity mismatch all
+  remain rejected. Use existing assertions rather than adding another consumer.
+  Commit with `test(retention): exercise committed consumer facts`, note the
+  actual obs and hq commits and results, then park/release the coordinated task
+  waiting on the controller's final review of both branches. Keep its worktree and
+  record its retained items; do not close or integrate unreviewed work. No pushes.
+
+- [ ] **Step 5: Attach acceptance evidence and finish review in hq.** Save the
+  successful paired probe result under the task's persistent `$WORK_ROOT`
+  directory (create and note it immediately if needed). It may contain temporary
+  absolute paths: retain hashed raw bytes and attach a portable derivative using
+  the existing attachment rule. Note strict consumer and producer/probe commits,
+  the only two accepted cases and command exit status on hq-3b9c4c, and note
+  strict-consumer-first installation on hq-624351. No live check belongs here.
+  Run hq's full `just test` only if code/review fixes changed since Task 18's
+  passing full gate; otherwise use that recorded result plus `tasks check` and
+  `git diff --check` for record-only closeout. Request a fresh final whole-branch
+  implementation review covering the hq branch and coordinated obs probe branch,
+  naming both repositories and base/head commits. Save its full report and ledger
+  and resolve findings under the shared corrective-round rules. If either reader
+  or probe changes, rerun paired acceptance and that project's affected gates.
+  Once review passes, resume/close the coordinated obs task and integrate its
+  branch using the personal-profile rules; record the actual merge revision.
+  Account for retained evidence/worktrees before done. After integration,
+  hq-624351 still owns installation and every live
+  dry-run/apply/timer gate. This task ends with repository acceptance, not rollout.
