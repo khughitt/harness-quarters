@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-f9c31a-parallel-cutover-flakes
 created: 2026-10-25T12:02:21Z
-updated: 2026-10-27T13:07:21Z
+updated: 2026-10-27T13:08:00Z
 started: 2026-10-27T11:50:32Z
 completed: 2026-10-27T13:07:21Z
 closed: 2026-10-27T13:07:21Z
@@ -38,3 +38,4 @@ In the parallel cutover stage of just test (pytest -n auto over tools/test_relay
   provenance: {"harness_session":"claude-code:03d08d67-a0a4-459d-a60d-b3787154304c","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-10-27T13:07:21Z (fix/hq-f9c31a-parallel-cutover-flakes): Three load-dependent races in the parallel cutover tests fixed, all test-side: the recovery-signal sender's fixed 60 s give-up (now deadline-free, Europa's held wait gets a 300 s budget so only the signal ends it; the surface-restart signal test uses the same sender); detached git auto-maintenance in the fixture familiar checkout racing the base rule's object snapshots (maintenance.auto=false in familiar_history); /proc argv/environ read empty right after Popen (_execed waits). Regression tests test_signal_sender_waits_out_a_slow_host and test_fixture_commits_leave_the_object_store_settled (RED then GREEN). just test 1674 passed; two concurrent parallel segments passed 391/391 each at load ~62. Reviews: round 1 revise (Important 1, Minor 4), round 2 accept (Minor 2, docstring applied). Deferred, not filed: test_abort_after_sigkill_reconciles_first waits 60 s in the main thread for Europa's timer wait (never seen failing). Tool-side maintenance during familiar's merge noted on hq-7e81ed.
   provenance: {"harness_session":"claude-code:03d08d67-a0a4-459d-a60d-b3787154304c","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-27T13:08:00Z (main): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-f9c31a","state":"released","verification":"verified","purpose":"Removed after branch fix/hq-f9c31a-parallel-cutover-flakes merged into main at 7a76557; ignored files were caches only (__pycache__, .pytest_cache), discarded; no host pointer resolved into it; tt-report ran; branch deleted","next_owner":"none","cleanup_trigger":"none"}
