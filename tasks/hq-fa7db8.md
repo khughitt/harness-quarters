@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/hq-fa7db8-cutover-record
 created: 2026-10-27T14:17:54Z
-updated: 2026-10-27T18:48:40Z
+updated: 2026-10-27T18:48:41Z
 started: 2026-10-27T18:24:44Z
 depends: []
 parent: hq-7e81ed
@@ -45,3 +45,4 @@ Check: just test passes and the pre-commit hook's ops-docs and ops-check runs pa
 - 2026-10-27T18:39:56Z (docs/hq-fa7db8-cutover-record): attached: impl-review.md (1662 bytes): Independent implementation review by codex/gpt-6.1-sol; accepted without findings
 - 2026-10-27T18:48:40Z (docs/hq-fa7db8-cutover-record): gate: verified tree:ca032e870e9e7e98e46810d9397b044741441898 — checks: just test 1674 passed and git diff --check passed and Evidence-only scope and historical link checked; review: none; reviewer: codex/gpt-6.1-sol
   provenance: {"harness_session":"codex:01a17e9a-c533-7680-a754-59ef9d89b3f6","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-27T18:48:41Z (docs/hq-fa7db8-cutover-record): retro: The task scope and completed-window finish note settled both passages without a new design. Independent review found no issues; the explicit recovery limit avoids turning successful cutover evidence into an unsupported recovery claim.
