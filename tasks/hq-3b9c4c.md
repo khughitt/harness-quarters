@@ -1,13 +1,15 @@
 ---
 id: hq-3b9c4c
 title: Require verified obs readiness before session-archive pruning
-status: todo
+status: doing
 priority: 2
 size: m
 complexity: mid
 process: planned
+owner: main
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-23T01:30:14Z
+updated: 2026-10-27T21:06:37Z
+started: 2026-10-27T21:06:37Z
 depends: [obs-c7d924]
 parent: hq-401088
 tags: [obs]
@@ -31,3 +33,5 @@ Done: reviewed design and plan, implementation and focused checks proving valid 
 - 2026-10-17T12:38:31Z (main): obs-0bc168 landed (obs c18e0cb): the field contract is obs docs/specs/2026-10-16-index-state-readiness-design.md rev 3 (§3 contract 2, §9 consumer duties: require contract == 2, ready, non-null indexed_span; compare device/inode with its own fstat; require indexed_span.length == live size; hash live file and archive copy against indexed_span.sha256; drop the partial-tail exception; block Codex identity codes; never reject an unfamiliar reason code). Acceptance: run obs tools/retention_readiness.py <hq> --strict-rev <landing commit>; it asserts the strict reader accepts only current/claude_current.
 - 2026-10-22T23:56:11Z (cbcc14-prune-links): From hq-cbcc14 review: load_obs_state keys rows by os.path.realpath, so an obs row for a link path (obs keeps them, missing_since_ms stamped) folds onto its target's key and raises a conflict -> ObsUnavailable, stopping dry runs and applies. The strict reader should key by exact path (or by device/inode only with link-path and missing rows dropped: pre-obs-396637 link rows carry the target's identity). Hard gate for hq-624351.
 - 2026-10-23T01:30:14Z (survey-successor-links): hq-d59a7b: the obs-reader halt fires against today's index. obs index-state (schema 15, 25,475 rows) keeps rows for both live link paths (missing_since 2026-10-21 06:00) beside their targets' rows (missing_since null); load_obs_state folds them by realpath and raises ObsUnavailable on the beliefs target, so every dry run and apply on this host halts now. See the brief's 'Live survey'.
+- 2026-10-27T21:06:37Z (main): started
+  provenance: {"harness_session":"codex:01a17f2d-dfcc-7ac3-a3d0-4496340daaf2","harness_session_source":"CODEX_THREAD_ID"}
