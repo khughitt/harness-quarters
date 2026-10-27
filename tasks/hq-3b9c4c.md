@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: fix/hq-3b9c4c-strict-readiness
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-27T23:28:38Z
+updated: 2026-10-27T23:29:10Z
 started: 2026-10-27T21:06:37Z
 depends: [obs-c7d924]
 parent: hq-401088
@@ -69,3 +69,4 @@ Done: reviewed design and plan, implementation and focused checks proving valid 
 - 2026-10-27T23:28:35Z (fix/hq-3b9c4c-strict-readiness): review: plan round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
 - 2026-10-27T23:28:37Z (fix/hq-3b9c4c-strict-readiness): attached: plan-self-check-report.md (2661 bytes): Full writing-plans self-check of frozen plan 50282b9; codex/gpt-6.1-sol, accept with no findings; no independent or human plan approval.
 - 2026-10-27T23:28:38Z (fix/hq-3b9c4c-strict-readiness): attached: plan-ledger.md (1457 bytes): Frozen plan 50282b9, task mapping, inline recommendation and ruled deferred filing of the coordinated probe task; Why and Cost recorded; none deferred as a minor finding.
+- 2026-10-27T23:29:10Z (fix/hq-3b9c4c-strict-readiness): retained: {"host": "titan", "kind": "evidence", "path": ".worktrees/hq-3b9c4c/.superpowers/sdd/hq-3b9c4c", "state": "kept", "verification": "verified", "purpose": "Full design reviews, approved-for-planning human report, frozen-plan self-check and ledgers; portable/full applicable reports attached. Raw round-2 report still retained with its own record.", "next_owner": "task:hq-3b9c4c", "cleanup_trigger": "After reviewed implementation integrates, preserve raw evidence and attachments before considering worktree removal", "manifest": ".worktrees/hq-3b9c4c/.superpowers/sdd/hq-3b9c4c/manifest.sha256", "sha256": "a2ef3d44f193bac049b12e78a10e74d6c401b1b093a674170830ec60335e74e3"}
