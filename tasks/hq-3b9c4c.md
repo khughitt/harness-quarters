@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: fix/hq-3b9c4c-strict-readiness
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-27T22:54:25Z
+updated: 2026-10-27T23:14:09Z
 started: 2026-10-27T21:06:37Z
 depends: [obs-c7d924]
 parent: hq-401088
@@ -58,4 +58,6 @@ Done: reviewed design and plan, implementation and focused checks proving valid 
 - 2026-10-27T22:53:55Z (fix/hq-3b9c4c-strict-readiness): Revision-3 documentation verification: full just test passed, 231 + 1051 + 391 + 1 = 1674 tests; 154 deselected in final isolated-test segment only. harness-facts check, tasks check and git diff --check passed. All eight round-2 minors corrected; no deferred findings. This verifies the unchanged runtime suite, not future strict-consumer behavior; human design approval and separate implementation-plan review remain required.
 - 2026-10-27T22:54:24Z (fix/hq-3b9c4c-strict-readiness): retained: {"host": "titan", "kind": "worktree", "path": ".worktrees/hq-3b9c4c", "state": "kept", "verification": "verified", "purpose": "Human approval of frozen design revision 3 cfaed41, followed by implementation-plan review and execution; branch fix/hq-3b9c4c-strict-readiness. Raw review reports and ledger verified against retained manifest; portable report and ledger attachments listed by tasks show. No host pointers repointed.", "next_owner": "task:hq-3b9c4c", "cleanup_trigger": "After reviewed implementation integrates, preserve raw evidence, inspect ignored files, harvest timings and check host pointers before considering removal"}
 - 2026-10-27T22:54:25Z (fix/hq-3b9c4c-strict-readiness): parked (waiting on user, review): User approves hq design revision 3 at cfaed41, docs/specs/2026-09-30-session-archive-design.md in .worktrees/hq-3b9c4c; then agent resumes here and revises docs/plans/2026-09-30-session-archive.md for separate human review before implementation. Review round 2 recorded accept/minor 8; all eight corrected, none deferred, full review and Why/Cost dispositions attached. just test passed 1674 tests. Keep diagnostic counts non-blocking with mandatory archive-replay gate. No runtime code or live state changed.
+  provenance: {"harness_session":"codex:01a17f2d-dfcc-7ac3-a3d0-4496340daaf2","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-27T23:14:09Z (fix/hq-3b9c4c-strict-readiness): resumed
   provenance: {"harness_session":"codex:01a17f2d-dfcc-7ac3-a3d0-4496340daaf2","harness_session_source":"CODEX_THREAD_ID"}
