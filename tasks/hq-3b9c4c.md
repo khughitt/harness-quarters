@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: fix/hq-3b9c4c-strict-readiness
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-27T21:19:19Z
+updated: 2026-10-27T22:43:02Z
 started: 2026-10-27T21:06:37Z
 depends: [obs-c7d924]
 parent: hq-401088
@@ -46,4 +46,6 @@ Done: reviewed design and plan, implementation and focused checks proving valid 
 - 2026-10-27T21:19:00Z (fix/hq-3b9c4c-strict-readiness): attached: builder-check-report.md (335 bytes): Full read-only builder check of frozen strict consumer design revision e07e23c; reviewer codex/gpt-6.1-sol; no findings.
 - 2026-10-27T21:19:02Z (fix/hq-3b9c4c-strict-readiness): retained: {"host": "titan", "kind": "evidence", "path": ".worktrees/hq-3b9c4c/.superpowers/sdd/hq-3b9c4c", "state": "kept", "verification": "verified", "purpose": "Full builder-check report for frozen design e07e23c, also attached as builder-check-report.md; no findings or deferred minors", "next_owner": "task:hq-3b9c4c", "cleanup_trigger": "After implementation integrates, verify attachment preservation and reassess this duplicate report with the worktree", "manifest": ".worktrees/hq-3b9c4c/.superpowers/sdd/hq-3b9c4c/manifest.sha256", "sha256": "4a0f33575b7232fee78f13340af6205b600833d284aa0225980bc5247df00794"}
 - 2026-10-27T21:19:19Z (fix/hq-3b9c4c-strict-readiness): parked (waiting on user, review): User reviews hq design revision 2 at e07e23c3a32d15ff288c0846ab6a53444dc63347, docs/specs/2026-09-30-session-archive-design.md in .worktrees/hq-3b9c4c (especially section 3.4.0 and rollout). Builder check accepted with no findings; full just test passed 1674 tests. After approval, agent resumes here and revises the existing implementation plan for separate user review, including coordinated acceptance-probe adapter changes if needed. Runtime unchanged; no host pointers repointed.
+  provenance: {"harness_session":"codex:01a17f2d-dfcc-7ac3-a3d0-4496340daaf2","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-27T22:43:02Z (fix/hq-3b9c4c-strict-readiness): resumed
   provenance: {"harness_session":"codex:01a17f2d-dfcc-7ac3-a3d0-4496340daaf2","harness_session_source":"CODEX_THREAD_ID"}
