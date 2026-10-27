@@ -1065,10 +1065,13 @@ def merge_tree(root, base, tip):
 
 
 def familiar_history(root):
-    """Write familiar's PRE and feature tip as real commits in root, checked out at PRE."""
+    """Write familiar's PRE and feature tip as real commits in root, checked out at PRE. Its
+    commits start no detached auto-maintenance, whose lock in the object store would outlive
+    them and race the tests' object-store snapshots."""
     for name, (text, mode) in FAMILIAR_PRE.items():
         _write(root / name, text, mode)
     _git(root, "init", "-q", "-b", "main")
+    _git(root, "config", "maintenance.auto", "false")
     _git(root, "add", "-A")
     _git(root, "commit", "-q", "-m", "familiar before relay")
     _git(root, "checkout", "-q", "-b", "feature/relay")
@@ -4325,6 +4328,26 @@ def _objects(root):
     """Every object file in a checkout's own store: what a read-only check must not add to."""
     return sorted(str(path.relative_to(root)) for path in (root / ".git/objects").rglob("*")
                   if path.is_file())
+
+
+def test_fixture_commits_leave_the_object_store_settled(world):
+    """A commit in either host's familiar checkout starts no detached auto-maintenance, so an
+    object-store snapshot taken after it is stable: under load such a child still held
+    `objects/maintenance.lock` at one snapshot and had released it by the next."""
+    world.stage_cutover()
+    for host in HOSTS:
+        root = _familiar(world, host)
+        _write(root / "tasks/trace.md", f"{host}\n")
+        _git(root, "add", "--", "tasks/trace.md")
+        traced = subprocess.run(
+            ["/usr/bin/git", "-C", str(root), "commit", "-q", "-m", "chore(tasks): trace"],
+            env=explicit_env(root, GIT_CONFIG_NOSYSTEM=1, GIT_CONFIG_GLOBAL=os.devnull,
+                             GIT_AUTHOR_NAME="Fixture Author", GIT_TRACE=1,
+                             GIT_AUTHOR_EMAIL="author@example.invalid",
+                             GIT_COMMITTER_NAME="Fixture Author",
+                             GIT_COMMITTER_EMAIL="author@example.invalid"),
+            check=True, capture_output=True, text=True)
+        assert "maintenance" not in traced.stderr, (host, traced.stderr)
 
 
 def _hooks(root, marker):

@@ -3097,15 +3097,32 @@ def _stage(event):
     return 3 if head in ("restore", "rollback") else STAGE[tail]
 
 
-def _signal_when(condition, signum, stopped, seconds=60.0):
+def _signal_when(condition, signum, stopped):
     """From another thread, send signum to this process once condition holds, unless `stopped`
-    is set first: a signal after the call it targets returned would kill the test process."""
-    end = time.monotonic() + seconds
-    while time.monotonic() < end and not stopped.is_set():
+    is set first: a signal after the call it targets returned would kill the test process. It
+    keeps no deadline of its own, since load decides how long the call takes to get there; the
+    caller sets `stopped` when the call returns."""
+    while not stopped.is_set():
         if condition() and not stopped.is_set():
             os.kill(os.getpid(), signum)
             return
         time.sleep(0.02)
+
+
+def test_signal_sender_waits_out_a_slow_host(monkeypatch):
+    """The sender fires however long the call takes to reach its condition: under host load the
+    recovery reaches Europa's source poll after tens of seconds, and a sender that gave up
+    first left the poll to fail its own sync budget instead of being interrupted."""
+    clock = itertools.count(step=100.0)
+    monkeypatch.setattr(time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(time, "sleep", lambda seconds: None)
+    received, checks = [], itertools.count(1)
+    previous = signal.signal(signal.SIGUSR1, lambda signum, frame: received.append(signum))
+    try:
+        _signal_when(lambda: next(checks) >= 5, signal.SIGUSR1, threading.Event())
+    finally:
+        signal.signal(signal.SIGUSR1, previous)
+    assert received == [signal.SIGUSR1]
 
 
 @needs_zsh
