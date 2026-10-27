@@ -6,9 +6,9 @@ priority: 2
 size: m
 complexity: mid
 process: planned
-owner: main
+owner: fix/hq-3b9c4c-strict-readiness
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-27T21:06:50Z
+updated: 2026-10-27T21:07:06Z
 started: 2026-10-27T21:06:37Z
 depends: [obs-c7d924]
 parent: hq-401088
@@ -36,3 +36,5 @@ Done: reviewed design and plan, implementation and focused checks proving valid 
 - 2026-10-27T21:06:37Z (main): started
   provenance: {"harness_session":"codex:01a17f2d-dfcc-7ac3-a3d0-4496340daaf2","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-27T21:06:50Z (main): arm: flow-trial-1 — unit tack-401088 — not enrolled
+- 2026-10-27T21:07:06Z (fix/hq-3b9c4c-strict-readiness): resumed
+  provenance: {"harness_session":"codex:01a17f2d-dfcc-7ac3-a3d0-4496340daaf2","harness_session_source":"CODEX_THREAD_ID"}
