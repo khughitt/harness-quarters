@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-f9c31a-parallel-cutover-flakes
 created: 2026-10-25T12:02:21Z
-updated: 2026-10-27T11:51:01Z
+updated: 2026-10-27T12:10:28Z
 started: 2026-10-27T11:50:32Z
 depends: []
 tags: []
@@ -26,3 +26,4 @@ In the parallel cutover stage of just test (pytest -n auto over tools/test_relay
 - 2026-10-27T11:50:52Z (main): arm: flow-trial-1 — unit tack-f9c31a — flow off
 - 2026-10-27T11:51:01Z (fix/hq-f9c31a-parallel-cutover-flakes): resumed
   provenance: {"harness_session":"claude-code:03d08d67-a0a4-459d-a60d-b3787154304c","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-10-27T12:10:28Z (fix/hq-f9c31a-parallel-cutover-flakes): root cause 1 (recovery-signal): the test's _signal_when sender gave up silently after a fixed 60 s from before restore_window; reaching Europa's source poll took 9.7 s serial and 23.4 s in the parallel segment at load ~6-15, so at load 65-98 no SIGTERM came and Europa's 20 s sync budget failed the step. Reproduced word for word by shrinking the window to 5 s. Fix: the sender keeps no deadline; regression test test_signal_sender_waits_out_a_slow_host (RED then GREEN)
