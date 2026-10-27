@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: fix/hq-3b9c4c-strict-readiness
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-27T23:14:12Z
+updated: 2026-10-27T23:21:41Z
 started: 2026-10-27T21:06:37Z
 depends: [obs-c7d924]
 parent: hq-401088
@@ -16,6 +16,7 @@ tags: [obs]
 source: obs-c7d924
 agent: codex
 spec: docs/specs/2026-09-30-session-archive-design.md
+plan: docs/plans/2026-09-30-session-archive.md
 ---
 
 Why: obs-c7d924 verified that the existing retention consumer accepts stale extractor evidence, inode replacement and unfinished no-newline tails, and ignores additive ready/version fields. A same-size rewrite preserving inode/mtime also passes existing checks, so live/archive hash equality does not prove equality with the bytes obs indexed. Capture remains independent; prune rollout must remain gated.
