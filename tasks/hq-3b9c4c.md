@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: fix/hq-3b9c4c-strict-readiness
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-27T23:28:37Z
+updated: 2026-10-27T23:28:38Z
 started: 2026-10-27T21:06:37Z
 depends: [obs-c7d924]
 parent: hq-401088
@@ -68,3 +68,4 @@ Done: reviewed design and plan, implementation and focused checks proving valid 
 - 2026-10-27T23:27:41Z (fix/hq-3b9c4c-strict-readiness): Plan-phase verification: just test passed all four segments, 231 + 1051 + 391 + 1 = 1674 tests, with 154 deselected only in the final isolated-test segment. tasks check and git diff --check passed. Runtime remains unchanged. Plan self-check covered approved-spec requirements, task/step scope, shared types/signatures, all five review-focus cases, RED safety and proportion; no outstanding draft gaps. Execution still requires human plan approval and its own pre-code baseline.
 - 2026-10-27T23:28:35Z (fix/hq-3b9c4c-strict-readiness): review: plan round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
 - 2026-10-27T23:28:37Z (fix/hq-3b9c4c-strict-readiness): attached: plan-self-check-report.md (2661 bytes): Full writing-plans self-check of frozen plan 50282b9; codex/gpt-6.1-sol, accept with no findings; no independent or human plan approval.
+- 2026-10-27T23:28:38Z (fix/hq-3b9c4c-strict-readiness): attached: plan-ledger.md (1457 bytes): Frozen plan 50282b9, task mapping, inline recommendation and ruled deferred filing of the coordinated probe task; Why and Cost recorded; none deferred as a minor finding.
