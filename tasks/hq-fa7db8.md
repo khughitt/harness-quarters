@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/hq-fa7db8-cutover-record
 created: 2026-10-27T14:17:54Z
-updated: 2026-10-27T18:39:56Z
+updated: 2026-10-27T18:48:40Z
 started: 2026-10-27T18:24:44Z
 depends: []
 parent: hq-7e81ed
@@ -43,3 +43,5 @@ Check: just test passes and the pre-commit hook's ops-docs and ops-check runs pa
 - 2026-10-27T18:38:06Z (docs/hq-fa7db8-cutover-record): Baseline: hydrated with just setup; just test passed 1674 tests (231 agent-tool, 1051 hook/tool, 391 cutover, 1 signal). Source cross-check: hq-f27918 finish note and runbook header agree on six receipts and completed window; hq-c6c847 completion confirms real-host pilot passed.
 - 2026-10-27T18:39:45Z (docs/hq-fa7db8-cutover-record): review: impl round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
 - 2026-10-27T18:39:56Z (docs/hq-fa7db8-cutover-record): attached: impl-review.md (1662 bytes): Independent implementation review by codex/gpt-6.1-sol; accepted without findings
+- 2026-10-27T18:48:40Z (docs/hq-fa7db8-cutover-record): gate: verified tree:ca032e870e9e7e98e46810d9397b044741441898 — checks: just test 1674 passed and git diff --check passed and Evidence-only scope and historical link checked; review: none; reviewer: codex/gpt-6.1-sol
+  provenance: {"harness_session":"codex:01a17e9a-c533-7680-a754-59ef9d89b3f6","harness_session_source":"CODEX_THREAD_ID"}
