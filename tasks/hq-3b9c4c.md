@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: fix/hq-3b9c4c-strict-readiness
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-28T02:24:33Z
+updated: 2026-10-28T02:24:35Z
 started: 2026-10-27T21:06:37Z
 completed: 2026-10-28T02:22:12Z
 closed: 2026-10-28T02:22:12Z
@@ -123,3 +123,4 @@ Done: reviewed design and plan, implementation and focused checks proving valid 
 - 2026-10-28T02:24:31Z (main): retained: {"host": "titan", "kind": "worktree", "path": ".worktrees/hq-3b9c4c", "state": "released", "verification": "verified", "purpose": "Reviewed branch merged at 755ec92; clean ignored-file/evidence/pointer checks and tt-report completed; task worktree and merged branch removed", "next_owner": "none", "cleanup_trigger": "none"}
 - 2026-10-28T02:24:32Z (main): retained: {"host": "titan", "kind": "evidence", "path": ".worktrees/hq-3b9c4c/.superpowers/sdd/hq-3b9c4c", "state": "released", "verification": "verified", "purpose": "Redundant planning workspace removed with task worktree after exact reports/ledgers were verified as attachments and raw review verified in persistent storage owned by hq-624351", "next_owner": "none", "cleanup_trigger": "none"}
 - 2026-10-28T02:24:33Z (main): retained: {"host": "titan", "kind": "evidence", "path": ".worktrees/hq-3b9c4c/.superpowers/sdd/hq-3b9c4c/spec-round-2-report.md", "state": "released", "verification": "verified", "purpose": "Redundant raw worktree copy removed; exact persistent copy verified and owned by open hq-624351", "next_owner": "none", "cleanup_trigger": "none"}
+- 2026-10-28T02:24:35Z (main): retained: {"host": "titan", "kind": "scratch", "path": ".worktrees/hq-3b9c4c/.superpowers/sdd/2026-09-30-session-archive", "state": "released", "verification": "verified", "purpose": "Execution workspace removed after reports and final ledger were byte-verified as attachments; generated briefs/packages and captured logs discarded with recorded verification verdicts preserved", "next_owner": "none", "cleanup_trigger": "none"}
