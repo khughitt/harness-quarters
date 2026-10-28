@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: fix/hq-3b9c4c-strict-readiness
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-28T02:22:12Z
+updated: 2026-10-28T02:23:38Z
 started: 2026-10-27T21:06:37Z
 completed: 2026-10-28T02:22:12Z
 closed: 2026-10-28T02:22:12Z
@@ -119,3 +119,4 @@ Done: reviewed design and plan, implementation and focused checks proving valid 
   provenance: {"harness_session":"codex:01a17f2d-dfcc-7ac3-a3d0-4496340daaf2","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-28T02:22:12Z (fix/hq-3b9c4c-strict-readiness): Strict contract-2 consumer committed 8d26e25 and paired probe 49388f6 accepted; full hq 1793 / obs 1633 gates passed; fresh codex/gpt-6-astra final review found none. Steps 18–19 closed, obs merged 60098d2. Immediate authorized hq no-ff merge and checked cleanup; hq-624351 owns all remaining rollout gates and retained raw review.
   provenance: {"harness_session":"codex:01a17f2d-dfcc-7ac3-a3d0-4496340daaf2","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-28T02:23:38Z (main): Integrated locally via no-ff merge 755ec92f3dee171ac629221c3aef17a2137269a2. Tested strict consumer 8d26e25 remains reachable; diff of tools/session_archive and every non-task path against that tested commit is empty. obs probe merged 60098d2 with unchanged covered fingerprint. Required removal checks passed: clean worktree, no submodules, exact known ignored entries only, tt-report harvested, all needed attachments and retained raw copy byte-verified, and 135 host-pointer entries clear for both task worktrees. No new suite/probe run was needed because tested bytes did not change.
