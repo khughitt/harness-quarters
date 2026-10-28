@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: fix/hq-3b9c4c-strict-readiness
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-28T00:37:03Z
+updated: 2026-10-28T00:37:05Z
 started: 2026-10-27T21:06:37Z
 depends: [obs-c7d924]
 parent: hq-401088
@@ -85,3 +85,5 @@ Done: reviewed design and plan, implementation and focused checks proving valid 
 - 2026-10-28T00:36:11Z (fix/hq-3b9c4c-strict-readiness): attached: plan-revision-3-ledger.md (2403 bytes): Plan 0154323 correction ledger: I1 fixture environment, M2 merge/acceptance identity, M3 immutable tuples; Why and Cost recorded for each; none deferred.
 - 2026-10-28T00:37:02Z (fix/hq-3b9c4c-strict-readiness): retained: {"host": "titan", "kind": "evidence", "path": ".worktrees/hq-3b9c4c/.superpowers/sdd/hq-3b9c4c", "state": "kept", "verification": "verified", "purpose": "Full design/plan reviews and correction ledgers through frozen plan revision 3 (0154323), including scoped self-review; applicable reports and ledgers attached; raw host-valued spec review still separately retained.", "next_owner": "task:hq-3b9c4c", "cleanup_trigger": "After reviewed implementation integrates, preserve raw evidence and attachments before considering worktree removal", "manifest": ".worktrees/hq-3b9c4c/.superpowers/sdd/hq-3b9c4c/manifest.sha256", "sha256": "e4f9b574c32ea95e52ddfd1c28f8ea2489e4ab5c9f9758c07826b3246cf10df6"}
 - 2026-10-28T00:37:03Z (fix/hq-3b9c4c-strict-readiness): retained: {"host": "titan", "kind": "worktree", "path": ".worktrees/hq-3b9c4c", "state": "kept", "verification": "verified", "purpose": "Human review of frozen plan 0154323 and later inline execution; branch fix/hq-3b9c4c-strict-readiness. hq-886d78 remains blocked on plan approval; hq-b60102 depends on it. No obs code worktree or host pointer change.", "next_owner": "task:hq-3b9c4c", "cleanup_trigger": "After reviewed implementation integrates, preserve evidence, inspect ignored files, harvest timings and check host pointers before considering removal"}
+- 2026-10-28T00:37:05Z (fix/hq-3b9c4c-strict-readiness): parked (waiting on user, review): User reviews/approves hq implementation plan revision 3 frozen at 0154323a7b076c62490b205a3b9c85df45a54bf7, docs/plans/2026-09-30-session-archive.md in .worktrees/hq-3b9c4c. Round-2 Important 1 and Minor 2 corrected: native fixture environment isolation including env=None, explicit no-ff hq integration preserving acceptance identity, and tuple-backed frozen records. Scoped self-review accepted; no independent re-review or human approval yet. On approval agent resumes here, unblocks/starts hq-886d78, runs execution Setup/full baseline and proceeds inline; hq-b60102 follows. Full just test passed 1674 unchanged-runtime tests. No implementation, live state or host pointers changed.
+  provenance: {"harness_session":"codex:01a17f2d-dfcc-7ac3-a3d0-4496340daaf2","harness_session_source":"CODEX_THREAD_ID"}
