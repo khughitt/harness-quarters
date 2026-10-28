@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: fix/hq-3b9c4c-strict-readiness
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-28T02:24:31Z
+updated: 2026-10-28T02:24:32Z
 started: 2026-10-27T21:06:37Z
 completed: 2026-10-28T02:22:12Z
 closed: 2026-10-28T02:22:12Z
@@ -121,3 +121,4 @@ Done: reviewed design and plan, implementation and focused checks proving valid 
   provenance: {"harness_session":"codex:01a17f2d-dfcc-7ac3-a3d0-4496340daaf2","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-28T02:23:38Z (main): Integrated locally via no-ff merge 755ec92f3dee171ac629221c3aef17a2137269a2. Tested strict consumer 8d26e25 remains reachable; diff of tools/session_archive and every non-task path against that tested commit is empty. obs probe merged 60098d2 with unchanged covered fingerprint. Required removal checks passed: clean worktree, no submodules, exact known ignored entries only, tt-report harvested, all needed attachments and retained raw copy byte-verified, and 135 host-pointer entries clear for both task worktrees. No new suite/probe run was needed because tested bytes did not change.
 - 2026-10-28T02:24:31Z (main): retained: {"host": "titan", "kind": "worktree", "path": ".worktrees/hq-3b9c4c", "state": "released", "verification": "verified", "purpose": "Reviewed branch merged at 755ec92; clean ignored-file/evidence/pointer checks and tt-report completed; task worktree and merged branch removed", "next_owner": "none", "cleanup_trigger": "none"}
+- 2026-10-28T02:24:32Z (main): retained: {"host": "titan", "kind": "evidence", "path": ".worktrees/hq-3b9c4c/.superpowers/sdd/hq-3b9c4c", "state": "released", "verification": "verified", "purpose": "Redundant planning workspace removed with task worktree after exact reports/ledgers were verified as attachments and raw review verified in persistent storage owned by hq-624351", "next_owner": "none", "cleanup_trigger": "none"}
