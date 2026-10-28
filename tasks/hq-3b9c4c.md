@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: fix/hq-3b9c4c-strict-readiness
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-28T00:36:08Z
+updated: 2026-10-28T00:36:10Z
 started: 2026-10-27T21:06:37Z
 depends: [obs-c7d924]
 parent: hq-401088
@@ -81,3 +81,4 @@ Done: reviewed design and plan, implementation and focused checks proving valid 
 - 2026-10-28T00:31:05Z (fix/hq-3b9c4c-strict-readiness): Draft correction verified a native-environment detail with an isolated child (explicit temporary HOME/PATH/USER and fake credentials): replacing os.environ with a plain dict does not synchronize libc getenv, while replacing its contents does. The plan therefore uses monkeypatch.delenv/setenv on the original mapping and explicitly tests the env=None codex_version path as well as explicit-env production children. No host environment or repository implementation was modified by the probe.
 - 2026-10-28T00:35:24Z (fix/hq-3b9c4c-strict-readiness): Plan-revision-3 verification: full just test passed 231 + 1051 + 391 + 1 = 1674 unchanged-runtime tests; 154 deselected only in the final isolated-test segment. tasks check and git diff --check passed. The isolated native-environment probe also passed. This turn changes the plan and records only; fixture isolation, tuple records and strict consumer remain unimplemented. All round-2 findings have explicit corrections and no deferrals.
 - 2026-10-28T00:36:08Z (fix/hq-3b9c4c-strict-readiness): review: plan round 3 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
+- 2026-10-28T00:36:10Z (fix/hq-3b9c4c-strict-readiness): attached: plan-round-3-self-review-report.md (1976 bytes): Scoped self-review of frozen plan revision 3 at 0154323, codex/gpt-6.1-sol; all round-2 findings corrected, no findings; no independent or human approval.
