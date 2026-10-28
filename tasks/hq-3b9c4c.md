@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: fix/hq-3b9c4c-strict-readiness
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-28T02:21:23Z
+updated: 2026-10-28T02:21:25Z
 started: 2026-10-27T21:06:37Z
 depends: [obs-c7d924]
 parent: hq-401088
@@ -109,3 +109,4 @@ Done: reviewed design and plan, implementation and focused checks proving valid 
 - 2026-10-28T02:21:21Z (fix/hq-3b9c4c-strict-readiness): retained: {"host": "titan", "kind": "scratch", "path": "$WORK_ROOT/hq/hq-3b9c4c", "state": "released", "verification": "verified", "purpose": "Preservation ownership transferred to open hq-624351 after its verified receiving records were written; contents remain at the same path", "next_owner": "none", "cleanup_trigger": "none"}
 - 2026-10-28T02:21:22Z (fix/hq-3b9c4c-strict-readiness): retained: {"host": "titan", "kind": "worktree", "path": ".worktrees/hq-3b9c4c", "state": "kept", "verification": "verified", "purpose": "Reviewed branch fix/hq-3b9c4c-strict-readiness; both steps done, obs merged and cleaned. Current closing session owns immediate hq integration and cleanup. No host pointer changes.", "next_owner": "session:codex:01a17f2d-dfcc-7ac3-a3d0-4496340daaf2", "cleanup_trigger": "Immediate authorized local no-ff merge and checked worktree cleanup during this closing turn"}
 - 2026-10-28T02:21:23Z (fix/hq-3b9c4c-strict-readiness): retained: {"host": "titan", "kind": "evidence", "path": ".worktrees/hq-3b9c4c/.superpowers/sdd/hq-3b9c4c", "state": "kept", "verification": "verified", "purpose": "All reports and ledgers byte-verified against attachments; exact host-valued raw review also verified in persistent storage owned by hq-624351. Directory copy is redundant after integration.", "next_owner": "session:codex:01a17f2d-dfcc-7ac3-a3d0-4496340daaf2", "cleanup_trigger": "Immediate authorized local no-ff merge and checked worktree cleanup during this closing turn", "manifest": ".worktrees/hq-3b9c4c/.superpowers/sdd/hq-3b9c4c/manifest.sha256", "sha256": "e4f9b574c32ea95e52ddfd1c28f8ea2489e4ab5c9f9758c07826b3246cf10df6"}
+- 2026-10-28T02:21:25Z (fix/hq-3b9c4c-strict-readiness): retained: {"host": "titan", "kind": "evidence", "path": ".worktrees/hq-3b9c4c/.superpowers/sdd/hq-3b9c4c/spec-round-2-report.md", "state": "kept", "verification": "verified", "purpose": "Redundant worktree raw-review copy; exact persistent bytes owned by open hq-624351 and portable derivative attached.", "next_owner": "session:codex:01a17f2d-dfcc-7ac3-a3d0-4496340daaf2", "cleanup_trigger": "Immediate authorized local no-ff merge and checked worktree cleanup during this closing turn", "sha256": "b21b514137908a3ce234856d0a71fa910b527082e267ae2369ddf88d149e27b5"}
