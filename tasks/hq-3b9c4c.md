@@ -1,15 +1,17 @@
 ---
 id: hq-3b9c4c
 title: Require verified obs readiness before session-archive pruning
-status: doing
+status: done
 priority: 2
 size: m
 complexity: mid
 process: planned
 owner: fix/hq-3b9c4c-strict-readiness
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-28T02:22:11Z
+updated: 2026-10-28T02:22:12Z
 started: 2026-10-27T21:06:37Z
+completed: 2026-10-28T02:22:12Z
+closed: 2026-10-28T02:22:12Z
 depends: [obs-c7d924]
 parent: hq-401088
 tags: [obs]
@@ -113,3 +115,7 @@ Done: reviewed design and plan, implementation and focused checks proving valid 
 - 2026-10-28T02:21:26Z (fix/hq-3b9c4c-strict-readiness): retained: {"host": "titan", "kind": "scratch", "path": ".worktrees/hq-3b9c4c/.superpowers/sdd/2026-09-30-session-archive", "state": "kept", "verification": "verified", "purpose": "Final execution ledger, full final review, verification report, plan approval and paired JSON attached and byte-verified. Briefs/packages/captured logs are regenerable; all verification verdicts persisted. Current session discards redundant workspace after integration.", "next_owner": "session:codex:01a17f2d-dfcc-7ac3-a3d0-4496340daaf2", "cleanup_trigger": "Immediate authorized local no-ff merge and checked worktree cleanup during this closing turn", "manifest": ".worktrees/hq-3b9c4c/.superpowers/sdd/2026-09-30-session-archive/checkpoint.sha256", "sha256": "9016b9348d72e3d3f2e110d2f5688ccf43c6004cc2d182567d686937f4408bea"}
 - 2026-10-28T02:21:27Z (fix/hq-3b9c4c-strict-readiness): retained: {"host": "titan", "kind": "evidence", "path": "$WORK_ROOT/hq/hq-3b9c4c/paired-acceptance.json", "state": "kept", "verification": "verified", "purpose": "Redundant exact JSON copy; attachment verified and reviewed. Current closing session removes it after immediate hq integration, then refreshes receiving container manifest.", "next_owner": "session:codex:01a17f2d-dfcc-7ac3-a3d0-4496340daaf2", "cleanup_trigger": "Immediate authorized local no-ff merge and checked worktree cleanup during this closing turn", "sha256": "0a59f8abb2f6d589ef00ccf4cdd44f5f009a60009163717a4f35d1fcb97f8cf9"}
 - 2026-10-28T02:22:11Z (fix/hq-3b9c4c-strict-readiness): Closeout disposition: tt-report completed. Ignored .githooks/__pycache__/, .pytest_cache/, tools/hq_cli/__pycache__/ and tools/session_archive/__pycache__/ are regenerable and discarded at checked removal. Under .superpowers/, both plan workspaces have every needed report/ledger attached and listed by tasks show; source/attachment hashes match, and the only host-valued raw review is additionally verified under open hq-624351. Generated briefs/review packages/manifests and captured verification logs are regenerable, with verdicts preserved in attached verification and ledger. No other plan workspace or unfinished work is present. Current session owns immediate no-ff merge and cleanup; no host pointers changed.
+- 2026-10-28T02:22:12Z (fix/hq-3b9c4c-strict-readiness): done
+  provenance: {"harness_session":"codex:01a17f2d-dfcc-7ac3-a3d0-4496340daaf2","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-28T02:22:12Z (fix/hq-3b9c4c-strict-readiness): Strict contract-2 consumer committed 8d26e25 and paired probe 49388f6 accepted; full hq 1793 / obs 1633 gates passed; fresh codex/gpt-6-astra final review found none. Steps 18–19 closed, obs merged 60098d2. Immediate authorized hq no-ff merge and checked cleanup; hq-624351 owns all remaining rollout gates and retained raw review.
+  provenance: {"harness_session":"codex:01a17f2d-dfcc-7ac3-a3d0-4496340daaf2","harness_session_source":"CODEX_THREAD_ID"}
