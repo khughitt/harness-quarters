@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: fix/hq-3b9c4c-strict-readiness
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-28T02:06:34Z
+updated: 2026-10-28T02:06:35Z
 started: 2026-10-27T21:06:37Z
 depends: [obs-c7d924]
 parent: hq-401088
@@ -97,3 +97,4 @@ Done: reviewed design and plan, implementation and focused checks proving valid 
 - 2026-10-28T01:57:14Z (fix/hq-3b9c4c-strict-readiness): attached: plan-round-4-approval-report.md (474 bytes): Full relayed plan acceptance and explicit human execution approval; recorded as sequential plan round 4 because round 3 was already the controller self-review.
 - 2026-10-28T02:02:56Z (fix/hq-3b9c4c-strict-readiness): retained: {"host": "titan", "kind": "evidence", "path": "$WORK_ROOT/hq/hq-3b9c4c/spec-round-2-report.md", "state": "kept", "verification": "verified", "purpose": "Exact relayed design round-2 review; portable derivative is attached. Raw host-valued text must survive worktree cleanup.", "next_owner": "task:hq-3b9c4c", "cleanup_trigger": "After implementation review and integration transfer preservation to the open rollout task before removing this task worktree", "sha256": "b21b514137908a3ce234856d0a71fa910b527082e267ae2369ddf88d149e27b5"}
 - 2026-10-28T02:06:34Z (fix/hq-3b9c4c-strict-readiness): retained: {"host": "titan", "kind": "evidence", "path": "$WORK_ROOT/hq/hq-3b9c4c/paired-acceptance.json", "state": "kept", "verification": "verified", "purpose": "Exact successful post-commit paired output: obs probe 49388f6 and strict hq 8d26e25; exit 0 with only current/claude_current eligible", "next_owner": "task:hq-3b9c4c", "cleanup_trigger": "After attachment verified and both branches integrate, dispose of this redundant off-tree copy", "sha256": "0a59f8abb2f6d589ef00ccf4cdd44f5f009a60009163717a4f35d1fcb97f8cf9"}
+- 2026-10-28T02:06:35Z (fix/hq-3b9c4c-strict-readiness): attached: paired-acceptance-8d26e25.json (5686 bytes): Exact post-commit paired evidence: obs probe 49388f6 against hq strict 8d26e25; exit 0, 11 cases, only current/claude_current eligible.
