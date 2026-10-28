@@ -316,6 +316,8 @@ with open("agent-1.jsonl", "ab") as writer:
     print(os.fstat(writer.fileno()).st_nlink, flush=True)
 '''
     child = subprocess.Popen([sys.executable, "-u", "-c", script], cwd=subagents,
+                             env={"PATH": os.defpath, "HOME": str(src.home.parent),
+                                  "USER": "test", "LC_ALL": "C.UTF-8"},
                              stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
     opened = False
 

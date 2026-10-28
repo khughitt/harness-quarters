@@ -11,7 +11,7 @@ from session_archive.capture import capture_run, hash_file, mirror_path, promote
 from session_archive.manifest import Manifest
 from session_archive.prune import Context, LeftoverQuarantine, prune_run
 from session_archive.quarantine import QUARANTINE
-from session_archive.testing import (SID, age, claude_session, codex_rollout, lenient_open_inodes, obs_for,
+from session_archive.testing import (SID, age, claude_session, codex_rollout, lenient_open_inodes, obs_for, obs_payload,
                                      run_tool, uninspectable_comms, write, write_config)
 
 OTHER = "22222222-2222-4333-8444-555555555555"
@@ -133,7 +133,7 @@ def fake_obs(tmp_path, payload=None, exit_code=0):
 
 def test_prune_command_dry_run_and_obs_failure(home, archive, tmp_path, stub_codex):
     claude_session(home / ".claude" / "projects")
-    write_config(home, archive, fake_obs(tmp_path, {"schema": 1, "files": []}), uninspectable_comms())
+    write_config(home, archive, fake_obs(tmp_path, obs_payload()), uninspectable_comms())
     assert run_tool("capture", home=home).returncode == 0
     result = run_tool("prune", home=home)
     assert result.returncode == 0, result.stderr
@@ -152,9 +152,10 @@ def test_unreadable_transcript_fails_the_run(table, archive, manifest):
     claude = src(table, "claude")
     jsonl = claude_session(claude.root)
     capture_run(archive, manifest, table)
+    ctx = ctx_for(archive, manifest, transcripts(claude.root))
     jsonl.chmod(0)
     try:
-        report, ok = run_prune(ctx_for(archive, manifest, transcripts(claude.root)), table, False)
+        report, ok = run_prune(ctx, table, False)
     finally:
         jsonl.chmod(0o600)
     assert not ok and report["claude"]["totals"] == {"failed:unreadable": 1}
@@ -180,7 +181,7 @@ def test_io_error_stops_phase_two_and_keeps_the_report(table, archive, manifest,
 @pytest.mark.skipif(os.geteuid() == 0, reason="root reads unreadable files")
 def test_filesystem_failure_records_a_failed_prune(home, archive, tmp_path):
     jsonl = claude_session(home / ".claude" / "projects")
-    write_config(home, archive, fake_obs(tmp_path, {"schema": 1, "files": []}), uninspectable_comms())
+    write_config(home, archive, fake_obs(tmp_path, obs_payload()), uninspectable_comms())
     assert run_tool("capture", home=home).returncode == 0
     assert run_tool("prune", home=home).returncode == 0
     (home / ".claude" / "projects" / "-p").chmod(0)
@@ -204,10 +205,10 @@ def test_late_readback_failure_stops_before_any_deletion(table, archive, manifes
     unreadable = mirror_path(archive, "claude", f"-p/{OTHER}.jsonl")
     read_file = prune._read_file
 
-    def read(path, offset=None):
+    def read(path):
         if path == unreadable:
             raise PermissionError("backup disk cannot be read")
-        return read_file(path, offset)
+        return read_file(path)
 
     monkeypatch.setattr(prune, "_read_file", read)
     paths = transcripts(claude.root) + transcripts(claude.root, OTHER)
@@ -248,17 +249,30 @@ def test_command_records_expected_errors_with_partial_report(home, archive, mani
 
 def test_apply_command_reports_unprobed_codex(home, archive, tmp_path, stub_codex):
     rollout = codex_rollout(home / ".codex" / "sessions")
-    info = rollout.stat()
-    entry = {"path": str(rollout), "size": info.st_size,
-             "mtime_ms": info.st_mtime_ns // 1_000_000, "byte_offset": info.st_size,
-             "partial_tail": False, "indexed_schema": 1, "missing_since_ms": None}
-    write_config(home, archive, fake_obs(tmp_path, {"schema": 1, "files": [entry]}), uninspectable_comms())
+    write_config(home, archive, fake_obs(tmp_path, obs_payload(rollout)), uninspectable_comms())
     assert run_tool("capture", home=home).returncode == 0
     result = run_tool("prune", "--apply", home=home)
     report = json.loads(result.stdout)
     assert result.returncode == 1 and report["codex"]["totals"] == {"kept:codex-unprobed": 1}
     assert "probe-codex" in report["codex_gate"]
     assert rollout.exists()
+
+
+def test_malformed_later_row_prevents_all_deletion(home, archive, tmp_path, stub_codex):
+    root = home / ".claude" / "projects"
+    claude_session(root)
+    claude_session(root, sid=OTHER)
+    paths = transcripts(root) + transcripts(root, OTHER)
+    payload = obs_payload(*paths)
+    payload["files"][-1]["ready"] = "true"
+    write_config(home, archive, fake_obs(tmp_path, payload), uninspectable_comms())
+    assert run_tool("capture", home=home).returncode == 0
+    before = {path: path.read_bytes() for path in paths}
+    result = run_tool("prune", "--apply", home=home)
+    assert result.returncode == 1
+    assert json.loads(result.stdout)["error"].startswith("ObsUnavailable:")
+    assert {path: path.read_bytes() for path in paths} == before
+    assert not (home / ".claude" / QUARANTINE).exists()
 
 
 def test_repair_failure_keeps_the_live_unit(table, archive, manifest, monkeypatch):

@@ -250,7 +250,10 @@ MIT licensed; see `LICENSE`.
   (`docs/specs/2026-09-28-local-layer-design.md`).
 - `tools/session-archive` and `systemd/user/`: daily capture of agent transcripts to a
   backup disk, and a monthly prune of what the archive and obs verifiably hold
-  (`docs/specs/2026-09-30-session-archive-design.md`). Linked on every host; the
+  (`docs/specs/2026-09-30-session-archive-design.md`). Prune requires contract-2
+  readiness, matching live device/inode, and equality of the live, archive read-back
+  and indexed-byte SHA-256 digests. Its live rollout remains gated separately.
+  Linked on every host; the
   timers are enabled only on a host with `~/.config/session-archive/config.toml`.
   Never `systemctl --user reenable` a timer: its disable half removes the unit link
   `just link` declares, and its enable half then finds no unit. If it already ran,

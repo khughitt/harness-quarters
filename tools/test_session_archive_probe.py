@@ -1,9 +1,58 @@
 """probe-codex checks the Codex behaviour the protocol relies on (spec §3.4.3, §5)."""
 import json
+import os
+import subprocess
+import sys
 
+from session_archive import prune
 from session_archive.manifest import Manifest
 from session_archive.probe import codex_version, probe_codex
 from session_archive.testing import lenient_open_inodes, run_tool, uninspectable_comms, write_config
+
+
+def test_codex_stub_children_use_minimal_environment(stub_codex, tmp_path, home, monkeypatch):
+    allowed = {"PATH", "HOME", "USER", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME",
+               "CODEX_HOME", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "STUB_CODEX_MODE",
+               "STUB_CODEX_LOG", "STUB_CODEX_VERSION", "STUB_CODEX_WRITER_SECONDS",
+               "PYTEST_CURRENT_TEST", "LC_ALL"}
+    real_run, real_popen = subprocess.run, subprocess.Popen
+    seen = []
+
+    def inspect(environment):
+        if environment is None:
+            return
+        unexpected = set(environment) - allowed
+        assert not unexpected
+        assert environment["HOME"] == str(home)
+        assert environment["USER"] == "test"
+        assert environment["OPENAI_API_KEY"] == "test-invalid"
+        assert environment["ANTHROPIC_API_KEY"] == "test-invalid"
+        assert environment["STUB_CODEX_VERSION"] == "codex-cli 9.9.9"
+        seen.append(True)
+
+    def run(*args, **kwargs):
+        inspect(kwargs.get("env"))
+        return real_run(*args, **kwargs)
+
+    def popen(*args, **kwargs):
+        inspect(kwargs.get("env"))
+        return real_popen(*args, **kwargs)
+
+    monkeypatch.setenv("STUB_CODEX_VERSION", "codex-cli 9.9.9")
+    monkeypatch.setattr(subprocess, "run", run)
+    monkeypatch.setattr(subprocess, "Popen", popen)
+    native = subprocess.run([sys.executable, "-c", (
+        "import json,os; print(json.dumps({'keys': sorted(os.environ), "
+        "'fake': os.environ.get('OPENAI_API_KEY') == 'test-invalid', "
+        "'home': os.environ.get('HOME')}))")], capture_output=True, text=True, check=True)
+    observed = json.loads(native.stdout)
+    assert not (set(observed["keys"]) - allowed)
+    assert observed["fake"] and observed["home"] == str(home)
+    assert codex_version(str(stub_codex)) == "codex-cli 9.9.9"
+    result = probe_codex(str(stub_codex), tmp_path / "work", lenient_open_inodes)
+    assert result.passed
+    assert prune.run_codex_delete(str(stub_codex), home / ".codex", "test-thread", 5)
+    assert seen
 
 
 def test_probe_passes_against_conforming_codex(stub_codex, tmp_path):

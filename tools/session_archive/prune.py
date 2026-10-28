@@ -13,7 +13,7 @@ from typing import Callable
 
 from .capture import archived_file, capture_file, fsync_dir, mirror_path, open_nofollow, stat_of, walk_files
 from .decide import INACTIVE_NS, FileFacts, ObsFile, Stat, is_transcript, unit_reason
-from .inputs import InspectionFailed, Unit, claude_units, codex_units
+from .inputs import ROLLOUT_RE, InspectionFailed, Unit, claude_units, codex_units
 from .manifest import MIRROR, Manifest
 from .quarantine import QUARANTINE, _rename_at, inodes, leftovers, quarantine_dir, release, remove_empty_dirs
 
@@ -51,17 +51,13 @@ class Context:
     hooks: Hooks = field(default_factory=Hooks)
 
 
-def _read_file(path: Path, offset: int | None = None):
+def _read_file(path: Path) -> tuple[os.stat_result, str]:
     """Read one regular inode, rejecting symlinks and changes during the read."""
     with os.fdopen(open_nofollow(path, os.O_RDONLY | os.O_NONBLOCK), "rb") as reader:
         info = os.fstat(reader.fileno())
         if not stat.S_ISREG(info.st_mode):
             raise OSError(errno.EINVAL, "not a regular file", str(path))
         sha = hashlib.file_digest(reader, "sha256").hexdigest()
-        tail = False
-        if offset is not None:
-            reader.seek(offset)
-            tail = b"\n" in reader.read()
         fd = open_nofollow(path, os.O_PATH)
         try:
             current = os.fstat(fd)
@@ -70,7 +66,7 @@ def _read_file(path: Path, offset: int | None = None):
         if (not os.path.samestat(info, current)
                 or (info.st_size, info.st_mtime_ns) != (current.st_size, current.st_mtime_ns)):
             raise OSError(errno.ESTALE, "file changed during read", str(path))
-    return info, sha, tail
+    return info, sha
 
 
 def _read_back(path: Path) -> str | None:
@@ -85,8 +81,9 @@ def _read_back(path: Path) -> str | None:
 def _facts(source, relpath: str, ctx: Context, held) -> FileFacts:
     path = source.root / relpath
     mirror = ctx.manifest.mirror(source.name, relpath)
-    obs = ctx.obs.get(os.path.realpath(path))
-    info, sha, tail = _read_file(path, obs.byte_offset if obs else None)
+    obs = ctx.obs.get(str(path))
+    info, sha = _read_file(path)
+    match = ROLLOUT_RE.fullmatch(path.name) if source.kind == "codex" else None
     return FileFacts(
         relpath=relpath,
         live=Stat(info.st_size, info.st_mtime_ns),
@@ -96,8 +93,10 @@ def _facts(source, relpath: str, ctx: Context, held) -> FileFacts:
         mirror_sha256=_read_back(mirror_path(ctx.archive_root, source.name, relpath)) if mirror else None,
         transcript=is_transcript(source.kind, relpath),
         obs=obs,
-        tail_has_newline=tail,
-        open=(info.st_dev, info.st_ino) in held)
+        open=(info.st_dev, info.st_ino) in held,
+        device=info.st_dev, inode=info.st_ino,
+        harness="claude-code" if source.kind == "claude" else "codex",
+        thread_id=match[1] if match else None)
 
 
 def evaluate(unit: Unit, ctx: Context, held) -> str | None:
@@ -176,7 +175,7 @@ def delete_claude_unit(unit: Unit, ctx: Context) -> str:
         present = {f"{project}/{p.relative_to(qdir).as_posix()}": p for p in walk_files(qdir)}
         changed = []
         for rel, path in sorted(present.items()):
-            info, sha, _ = _read_file(path)
+            info, sha = _read_file(path)
             mirror = ctx.manifest.mirror(unit.source.name, rel)
             if (mirror is None or (mirror.size, mirror.mtime_ns) != (info.st_size, info.st_mtime_ns)
                     or mirror.sha256 != sha
@@ -309,7 +308,7 @@ def delete_codex_unit(unit: Unit, ctx: Context) -> str:
         if not succeeded:
             outcome = "failed:delete"
         else:
-            info, sha, _ = _read_file(link)
+            info, sha = _read_file(link)
             mirror = ctx.manifest.mirror(unit.source.name, relpath)
             changed = (mirror is None or (info.st_size, info.st_mtime_ns) != (mirror.size, mirror.mtime_ns)
                        or sha != mirror.sha256

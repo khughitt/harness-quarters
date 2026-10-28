@@ -35,12 +35,24 @@ def manifest(archive):
 
 
 @pytest.fixture
-def stub_codex(tmp_path, monkeypatch):
+def stub_codex(tmp_path, monkeypatch, home):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     stub = bin_dir / "codex"
     stub.write_text(STUB_CODEX)
     stub.chmod(0o755)
-    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
-    monkeypatch.setenv("STUB_CODEX_LOG", str(tmp_path / "codex.log"))
+    environment = {
+        "PATH": f"{bin_dir}{os.pathsep}{os.defpath}", "HOME": str(home), "USER": "test",
+        "LC_ALL": "C.UTF-8",
+        "XDG_CONFIG_HOME": str(home / ".config"), "XDG_DATA_HOME": str(home / ".local/share"),
+        "XDG_STATE_HOME": str(home / ".local/state"), "CODEX_HOME": str(home / ".codex"),
+        "OPENAI_API_KEY": "test-invalid", "ANTHROPIC_API_KEY": "test-invalid",
+        "STUB_CODEX_MODE": "ok", "STUB_CODEX_LOG": str(tmp_path / "codex.log"),
+        "STUB_CODEX_VERSION": "codex-cli 0.0.0-stub", "STUB_CODEX_WRITER_SECONDS": "1",
+    }
+    # Keep the native environment synchronized for children launched with env=None.
+    for key in tuple(os.environ):
+        monkeypatch.delenv(key)
+    for key, value in environment.items():
+        monkeypatch.setenv(key, value)
     return stub
