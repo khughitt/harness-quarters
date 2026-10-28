@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: fix/hq-3b9c4c-strict-readiness
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-28T02:21:20Z
+updated: 2026-10-28T02:21:21Z
 started: 2026-10-27T21:06:37Z
 depends: [obs-c7d924]
 parent: hq-401088
@@ -106,3 +106,4 @@ Done: reviewed design and plan, implementation and focused checks proving valid 
 - 2026-10-28T02:21:17Z (fix/hq-3b9c4c-strict-readiness): Identify current integration owner
   provenance: {"harness_session":"codex:01a17f2d-dfcc-7ac3-a3d0-4496340daaf2","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-28T02:21:20Z (fix/hq-3b9c4c-strict-readiness): retained: {"host": "titan", "kind": "evidence", "path": "$WORK_ROOT/hq/hq-3b9c4c/spec-round-2-report.md", "state": "released", "verification": "verified", "purpose": "Preservation ownership transferred to open hq-624351 after its verified receiving records were written; contents remain at the same path", "next_owner": "none", "cleanup_trigger": "none"}
+- 2026-10-28T02:21:21Z (fix/hq-3b9c4c-strict-readiness): retained: {"host": "titan", "kind": "scratch", "path": "$WORK_ROOT/hq/hq-3b9c4c", "state": "released", "verification": "verified", "purpose": "Preservation ownership transferred to open hq-624351 after its verified receiving records were written; contents remain at the same path", "next_owner": "none", "cleanup_trigger": "none"}
