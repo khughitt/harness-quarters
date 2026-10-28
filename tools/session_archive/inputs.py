@@ -23,8 +23,76 @@ def _nonnegative(value) -> bool:
     return type(value) is int and value >= 0
 
 
+def _text(value) -> bool:
+    return isinstance(value, str) and bool(value)
+
+
+def _strings(value) -> bool:
+    return isinstance(value, list) and all(_text(item) for item in value)
+
+
+def _obs_file(entry, schema: int) -> tuple[str, ObsFile]:
+    path, harness = entry["path"], entry["harness"]
+    if (not isinstance(path, str) or not os.path.isabs(path) or "\0" in path
+            or any(part in ("", ".", "..") for part in path.split("/")[1:])):
+        raise ValueError("file path must be absolute, NUL-free and canonically spelled")
+    if not _text(harness):
+        raise ValueError("harness must be a nonempty string")
+    size, mtime, inode, offset = (entry[key] for key in ("size", "mtime_ms", "inode", "byte_offset"))
+    device, indexed, missing = (entry[key] for key in ("device", "indexed_schema", "missing_since_ms"))
+    if not all(_nonnegative(value) for value in (size, mtime, inode, offset)) or offset > size:
+        raise ValueError("file version and cursor must be nonnegative integers; cursor must fit size")
+    if any(value is not None and not _nonnegative(value) for value in (device, indexed, missing)):
+        raise ValueError("device, indexed_schema and missing_since_ms must be null or nonnegative integers")
+    partial, ready, reasons = entry["partial_tail"], entry["ready"], entry["not_ready"]
+    if type(partial) is not bool or type(ready) is not bool or not _strings(reasons):
+        raise ValueError("partial_tail/ready must be booleans; not_ready must list nonempty strings")
+    if ready != (not reasons):
+        raise ValueError("ready must agree with not_ready")
+    span = entry["indexed_span"]
+    length, sha256 = None, None
+    if span is not None:
+        length, sha256 = span["length"], span["sha256"]
+        if (not _nonnegative(length) or length != offset or not isinstance(sha256, str)
+                or re.fullmatch(r"[0-9a-f]{64}", sha256) is None):
+            raise ValueError("indexed_span must cover byte_offset with a lowercase SHA-256 digest")
+    observed, observed_error = entry["observed"], entry["observed_error"]
+    observed_version = None
+    if observed is None:
+        if not _text(observed_error):
+            raise ValueError("an unavailable observation must have an error")
+    else:
+        observed_version = tuple(observed[key] for key in ("device", "inode", "size", "mtime_ms"))
+        if observed_error is not None or not all(_nonnegative(value) for value in observed_version):
+            raise ValueError("observed version must have nonnegative integers and no error")
+    if not all(_nonnegative(entry[key]) for key in ("malformed_lines", "unrecognized_records")):
+        raise ValueError("diagnostic counts must be nonnegative integers")
+    identity = entry["identity"]
+    thread, filename, conflicts, identity_current = None, None, [], True
+    if harness == "claude-code" and identity is not None:
+        raise ValueError("Claude identity must be null")
+    if harness == "codex":
+        thread, filename = identity["thread_id"], identity["filename_id"]
+        ancestors, conflicts = identity["ancestors"], identity["conflicts"]
+        if (any(value is not None and not _text(value) for value in (thread, filename))
+                or not _strings(ancestors) or not _strings(conflicts)):
+            raise ValueError("Codex identity IDs must be nonempty strings or null; ancestry/conflicts must list IDs")
+        match = ROLLOUT_RE.fullmatch(Path(path).name)
+        identity_current = bool(match) and thread == filename == match[1] and not conflicts
+    if ready and (missing is not None or indexed != schema or device is None or partial
+                  or offset != size or span is None or observed is None or not identity_current
+                  or (device, inode, size, mtime) != observed_version):
+        raise ValueError("ready contradicts exported file evidence")
+    return path, ObsFile(
+        size=size, mtime_ms=mtime, byte_offset=offset, partial_tail=partial,
+        schema_current=indexed == schema, missing=missing is not None, harness=harness,
+        device=device, inode=inode, ready=ready, not_ready=tuple(reasons),
+        span_length=length, span_sha256=sha256, thread_id=thread, filename_id=filename,
+        identity_conflicts=tuple(conflicts))
+
+
 def load_obs_state(command, runner=subprocess.run) -> dict[str, ObsFile]:
-    """Validate obs's index-state contract and key its records by real path."""
+    """Require contract-2 evidence; preserve exact path keys without following links."""
     argv = [*command, "--json", "index-state"]
     try:
         result = runner(argv, capture_output=True, text=True, timeout=900)
@@ -34,28 +102,16 @@ def load_obs_state(command, runner=subprocess.run) -> dict[str, ObsFile]:
         raise ObsUnavailable(f"obs index-state exited {result.returncode}: {result.stderr.strip()[:500]}")
     try:
         data = json.loads(result.stdout)
-        schema, files = data["schema"], data["files"]
-        if not _nonnegative(schema) or not isinstance(files, list):
-            raise ValueError("schema must be an integer and files must be a list")
-        state, rows = {}, {}
+        contract, schema, observed_at, files = (data[key] for key in ("contract", "schema", "observed_at_ms", "files"))
+        if (type(contract) is not int or contract != 2 or not _nonnegative(schema)
+                or not _nonnegative(observed_at) or not isinstance(files, list)):
+            raise ValueError("expected contract 2, nonnegative schema/observation time and a file list")
+        state = {}
         for entry in files:
-            path = entry["path"]
-            size, mtime, offset = entry["size"], entry["mtime_ms"], entry["byte_offset"]
-            partial, indexed, missing = entry["partial_tail"], entry["indexed_schema"], entry["missing_since_ms"]
-            if not isinstance(path, str) or not os.path.isabs(path) or "\0" in path:
-                raise ValueError("file path must be an absolute path without NUL")
-            if not all(_nonnegative(value) for value in (size, mtime, offset)) or offset > size:
-                raise ValueError("file size, mtime and offset must be nonnegative integers; offset must fit size")
-            if not (type(partial) is bool or type(partial) is int and partial in (0, 1)):
-                raise ValueError("partial_tail must be boolean or 0/1")
-            if any(value is not None and not _nonnegative(value) for value in (indexed, missing)):
-                raise ValueError("indexed_schema and missing_since_ms must be null or nonnegative integers")
-            realpath = os.path.realpath(path)
-            row = (size, mtime, offset, partial, indexed, missing)
-            if realpath in rows and rows[realpath] != row:
-                raise ValueError(f"conflicting index-state rows for {realpath}")
-            rows[realpath] = row
-            state[realpath] = ObsFile(size, mtime, offset, bool(partial), indexed == schema, missing is not None)
+            path, evidence = _obs_file(entry, schema)
+            if path in state:
+                raise ValueError(f"duplicate index-state path: {path}")
+            state[path] = evidence
         return state
     except (ValueError, KeyError, TypeError, OSError) as error:
         raise ObsUnavailable(f"obs index-state output does not match the contract: {error!r}") from error
@@ -121,12 +177,6 @@ def open_inodes(allow: tuple[str, ...] = (), proc: Path = Path("/proc"),
     if blocked:
         raise InspectionFailed(blocked)
     return held
-
-
-def tail_has_newline(path: Path, offset: int) -> bool:
-    with open(path, "rb") as handle:
-        handle.seek(offset)
-        return b"\n" in handle.read()
 
 
 @dataclass(frozen=True)

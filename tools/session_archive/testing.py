@@ -1,4 +1,6 @@
 """Helpers shared by the session-archive tests."""
+import hashlib
+import json
 import os
 import subprocess
 import sys
@@ -32,7 +34,18 @@ def write_config(home: Path, archive: Path, obs_command=("true",), uninspectable
 
 
 def run_tool(*args: str, home: Path) -> subprocess.CompletedProcess:
-    return subprocess.run([sys.executable, str(TOOL), *args], env={**os.environ, "HOME": str(home)},
+    environment = {
+        "PATH": os.environ.get("PATH", os.defpath), "HOME": str(home), "USER": "test",
+        "LC_ALL": "C.UTF-8", "XDG_CONFIG_HOME": str(home / ".config"),
+        "XDG_DATA_HOME": str(home / ".local/share"), "XDG_STATE_HOME": str(home / ".local/state"),
+        "CODEX_HOME": str(home / ".codex"), "OPENAI_API_KEY": "test-invalid",
+        "ANTHROPIC_API_KEY": "test-invalid",
+        "STUB_CODEX_MODE": os.environ.get("STUB_CODEX_MODE", "ok"),
+        "STUB_CODEX_LOG": os.environ.get("STUB_CODEX_LOG", str(home / "codex.log")),
+        "STUB_CODEX_VERSION": os.environ.get("STUB_CODEX_VERSION", "codex-cli 0.0.0-stub"),
+        "STUB_CODEX_WRITER_SECONDS": os.environ.get("STUB_CODEX_WRITER_SECONDS", "1"),
+    }
+    return subprocess.run([sys.executable, str(TOOL), *args], env=environment,
                           capture_output=True, text=True)
 
 
@@ -40,15 +53,37 @@ SID = "11111111-2222-4333-8444-555555555555"
 TID = "019e0000-0000-7000-8000-000000000001"
 
 
+def obs_payload(*paths: Path) -> dict:
+    """Synthetic contract-2 evidence for fully indexed fixture files, not a parser."""
+    from session_archive.inputs import ROLLOUT_RE
+    files = []
+    for path in paths:
+        info = path.stat()
+        match = ROLLOUT_RE.fullmatch(path.name)
+        version = {"size": info.st_size, "mtime_ms": info.st_mtime_ns // 1_000_000,
+                   "device": info.st_dev, "inode": info.st_ino}
+        files.append({
+            "path": str(path), "harness": "codex" if match else "claude-code", **version,
+            "byte_offset": info.st_size, "partial_tail": False, "indexed_schema": 1,
+            "missing_since_ms": None,
+            "indexed_span": {"length": info.st_size,
+                             "sha256": hashlib.sha256(path.read_bytes()).hexdigest()},
+            "observed": version, "observed_error": None,
+            "malformed_lines": 0, "unrecognized_records": 0,
+            "identity": ({"thread_id": match[1], "filename_id": match[1],
+                          "ancestors": [], "conflicts": []} if match else None),
+            "ready": True, "not_ready": [],
+        })
+    return {"contract": 2, "schema": 1, "observed_at_ms": time.time_ns() // 1_000_000,
+            "files": files}
+
+
 def obs_for(*paths: Path) -> dict:
     """An obs index state in which each path is fully indexed at its current version."""
-    from session_archive.decide import ObsFile
-    state = {}
-    for path in paths:
-        info = os.stat(path)
-        state[os.path.realpath(path)] = ObsFile(info.st_size, info.st_mtime_ns // 1_000_000,
-                                                info.st_size, False, True, False)
-    return state
+    from session_archive.inputs import load_obs_state
+    payload = obs_payload(*paths)
+    return load_obs_state(("fixture-obs",), runner=lambda argv, **kwargs:
+                          subprocess.CompletedProcess(argv, 0, json.dumps(payload), ""))
 
 
 def claude_session(root: Path, age_days: float = 40, project: str = "-p", sid: str = SID) -> Path:

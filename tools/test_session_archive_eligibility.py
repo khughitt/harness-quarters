@@ -5,6 +5,7 @@ import pytest
 
 from session_archive.decide import FileFacts, ObsFile, Stat, file_reason, is_transcript, unit_reason
 from session_archive.manifest import MIRROR, Version
+from session_archive.testing import TID
 
 DAY = 86_400 * 10**9
 NOW = 400 * DAY
@@ -15,10 +16,14 @@ def version(location=MIRROR, size=10, sha="a"):
     return Version("claude", "p/s.jsonl", location, size, OLD, sha, "2026-01-01T00:00:00.000000Z")
 
 
+INDEXED = ObsFile(size=10, mtime_ms=OLD // 1_000_000, byte_offset=10, partial_tail=False,
+                  schema_current=True, missing=False, harness="claude-code", device=1, inode=2,
+                  ready=True, not_ready=(), span_length=10, span_sha256="a", thread_id=None,
+                  filename_id=None, identity_conflicts=())
 PASSING = FileFacts(
     relpath="p/s.jsonl", live=Stat(10, OLD), live_sha256="a", mirror=version(), latest=version(),
-    mirror_sha256="a", transcript=True, obs=ObsFile(10, OLD // 1_000_000, 10, False, True, False),
-    tail_has_newline=False, open=False)
+    mirror_sha256="a", transcript=True, obs=INDEXED, open=False,
+    device=1, inode=2, harness="claude-code", thread_id=None)
 
 
 def test_passing_file():
@@ -33,11 +38,11 @@ def test_passing_file():
     (dict(mirror_sha256="z"), "archive-damaged"),
     (dict(mirror_sha256=None), "archive-damaged"),
     (dict(obs=None), "unindexed"),
-    (dict(obs=ObsFile(10, OLD // 1_000_000, 10, False, True, True)), "unindexed"),
-    (dict(obs=ObsFile(9, OLD // 1_000_000, 9, False, True, False)), "index-stale"),
-    (dict(obs=ObsFile(10, OLD // 1_000_000, 10, False, False, False)), "index-stale"),
-    (dict(obs=ObsFile(10, OLD // 1_000_000, 8, False, True, False)), "index-stale"),
-    (dict(obs=ObsFile(10, OLD // 1_000_000, 8, True, True, False), tail_has_newline=True), "index-stale"),
+    (dict(obs=replace(INDEXED, missing=True)), "unindexed"),
+    (dict(obs=replace(INDEXED, size=9, byte_offset=9)), "index-stale"),
+    (dict(obs=replace(INDEXED, schema_current=False)), "index-stale"),
+    (dict(obs=replace(INDEXED, byte_offset=8)), "index-stale"),
+    (dict(obs=replace(INDEXED, byte_offset=8, partial_tail=True)), "index-stale"),
     (dict(open=True), "open"),
 ])
 def test_each_condition(change, reason):
@@ -49,9 +54,32 @@ def test_diverged_latest_blocks_prune_even_when_live_matches_mirror():
     assert file_reason(facts, NOW) == "diverged"
 
 
-def test_partial_tail_without_newline_passes():
-    facts = replace(PASSING, obs=ObsFile(10, OLD // 1_000_000, 8, True, True, False))
-    assert file_reason(facts, NOW) is None
+def test_partial_tail_without_newline_is_kept():
+    facts = replace(PASSING, obs=replace(INDEXED, byte_offset=8, partial_tail=True))
+    assert file_reason(facts, NOW) == "index-stale"
+
+
+@pytest.mark.parametrize("change", [
+    {"ready": False}, {"not_ready": ("future_reason",)}, {"device": 3}, {"inode": 3},
+    {"harness": "future-harness"}, {"span_length": 9}, {"span_sha256": "b"},
+])
+def test_strict_evidence_must_match_live(change):
+    assert file_reason(replace(PASSING, obs=replace(INDEXED, **change)), NOW) == "index-stale"
+
+
+@pytest.mark.parametrize("change", [
+    {"thread_id": None}, {"filename_id": None}, {"thread_id": "other"},
+    {"filename_id": "other"}, {"identity_conflicts": ("other",)},
+])
+def test_strict_codex_identity_must_match_filename(change):
+    indexed = replace(INDEXED, harness="codex", thread_id=TID, filename_id=TID)
+    facts = replace(PASSING, harness="codex", thread_id=TID, obs=replace(indexed, **change))
+    assert file_reason(facts, NOW) == "index-stale"
+
+
+def test_matching_codex_identity_passes():
+    indexed = replace(INDEXED, harness="codex", thread_id=TID, filename_id=TID)
+    assert file_reason(replace(PASSING, harness="codex", thread_id=TID, obs=indexed), NOW) is None
 
 
 def test_non_transcript_needs_no_index():

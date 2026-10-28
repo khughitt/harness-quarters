@@ -1,4 +1,5 @@
 """Prune inputs: obs's index state, open inodes and unit discovery (spec §3.2, §3.4)."""
+import copy
 import json
 import errno
 import os
@@ -9,7 +10,7 @@ import pytest
 
 from session_archive import config
 from session_archive.inputs import (InspectionFailed, ObsUnavailable, claude_units, codex_units,
-                                    load_obs_state, open_inodes, tail_has_newline)
+                                    load_obs_state, open_inodes)
 from session_archive.testing import SID, TID, claude_session, codex_rollout, lenient_open_inodes, write
 
 
@@ -25,17 +26,24 @@ def fake_runner(stdout="", returncode=0, calls=None):
     return run
 
 
-def test_obs_state_is_keyed_by_real_path(tmp_path):
+def test_obs_state_keeps_exact_link_and_target_paths(tmp_path):
     real = write(tmp_path / "real" / "a.jsonl", b"x\n")
-    (tmp_path / "alias").symlink_to(tmp_path / "real")
-    payload = {"schema": 9, "files": [
-        {"path": str(tmp_path / "alias" / "a.jsonl"), "size": 2, "mtime_ms": 5, "byte_offset": 2,
-         "partial_tail": 0, "indexed_schema": 8, "missing_since_ms": None}]}
+    link = tmp_path / "link.jsonl"
+    link.symlink_to(real)
+    payload = obs_payload()
+    entry = payload["files"][0]
+    entry["path"] = str(real)
+    linked = copy.deepcopy(entry)
+    linked.update(path=str(link), missing_since_ms=5, ready=False, not_ready=["missing"])
+    payload["files"].append(linked)
     calls = []
-    state = load_obs_state(("python3", "obs.py"), fake_runner(json.dumps(payload), calls=calls))
+    try:
+        state = load_obs_state(("python3", "obs.py"), fake_runner(json.dumps(payload), calls=calls))
+    except ObsUnavailable as error:
+        pytest.fail(f"valid distinct link and target rows were rejected: {error}")
     assert calls == [["python3", "obs.py", "--json", "index-state"]]
-    entry = state[os.path.realpath(real)]
-    assert entry.size == 2 and not entry.schema_current and not entry.missing
+    assert set(state) == {str(real), str(link)}
+    assert not state[str(real)].missing and state[str(link)].missing
 
 
 @pytest.mark.parametrize("runner", [fake_runner(returncode=1), fake_runner("not json"),
@@ -118,12 +126,6 @@ def test_process_directory_inspection_failure_refuses_unless_allowed(tmp_path, m
     assert open_inodes(allow=("claude",), proc=proc) == set()
 
 
-def test_tail_has_newline(tmp_path):
-    path = write(tmp_path / "t", b"line\npartial")
-    assert not tail_has_newline(path, 5)
-    assert tail_has_newline(path, 0)
-
-
 def test_claude_units_are_sessions_only(home):
     src = source(home, "claude")
     claude_session(src.root)
@@ -150,62 +152,206 @@ def test_codex_units_carry_thread_ids(home):
 
 
 def obs_payload():
-    return {"schema": 9, "files": [{"path": "/source/a.jsonl", "size": 2, "mtime_ms": 5,
-            "byte_offset": 2, "partial_tail": 0, "indexed_schema": 9, "missing_since_ms": None}]}
+    return {"contract": 2, "schema": 9, "observed_at_ms": 10, "files": [{
+        "path": "/source/a.jsonl", "harness": "claude-code", "size": 2, "mtime_ms": 5,
+        "device": 1, "inode": 2, "byte_offset": 2, "partial_tail": False,
+        "indexed_schema": 9, "missing_since_ms": None,
+        "indexed_span": {"length": 2, "sha256": "ab" * 32},
+        "observed": {"device": 1, "inode": 2, "size": 2, "mtime_ms": 5},
+        "observed_error": None, "malformed_lines": 0, "unrecognized_records": 0,
+        "identity": None, "ready": True, "not_ready": [],
+    }]}
+
+
+def load(payload):
+    return load_obs_state(("obs",), fake_runner(json.dumps(payload)))
+
+
+@pytest.mark.parametrize("field", ["contract", "schema", "observed_at_ms", "files"])
+def test_obs_requires_envelope_fields(field):
+    payload = obs_payload()
+    del payload[field]
+    with pytest.raises(ObsUnavailable):
+        load(payload)
+
+
+@pytest.mark.parametrize("field", tuple(obs_payload()["files"][0]))
+def test_obs_requires_every_file_field(field):
+    payload = obs_payload()
+    del payload["files"][0][field]
+    with pytest.raises(ObsUnavailable):
+        load(payload)
+
+
+@pytest.mark.parametrize("payload", [None, [], 5, {"contract": 2, "schema": 9, "observed_at_ms": 1, "files": [None]}])
+def test_obs_rejects_malformed_output_shapes(payload):
+    with pytest.raises(ObsUnavailable):
+        load(payload)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("contract", None), ("contract", True), ("contract", 2.0), ("contract", 1), ("contract", 3),
+    ("schema", "9"), ("schema", True), ("schema", -1),
+    ("observed_at_ms", False), ("observed_at_ms", -1), ("files", {}),
+])
+def test_obs_rejects_malformed_envelope(field, value):
+    payload = obs_payload()
+    payload[field] = value
+    with pytest.raises(ObsUnavailable):
+        load(payload)
 
 
 @pytest.mark.parametrize("field,value", [
     ("path", None), ("path", "relative.jsonl"), ("path", "a\x00b"),
+    ("path", "/source/./a.jsonl"), ("path", "/source/../a.jsonl"),
+    ("path", "/source//a.jsonl"), ("path", "//source/a.jsonl"), ("path", "/source/a.jsonl/"),
+    ("harness", None), ("harness", ""), ("harness", 5),
     ("size", True), ("size", -1), ("mtime_ms", "5"), ("mtime_ms", -1),
-    ("byte_offset", 3), ("byte_offset", -1), ("partial_tail", "false"),
-    ("partial_tail", 2), ("indexed_schema", "9"), ("missing_since_ms", False),
+    ("byte_offset", 3), ("byte_offset", -1), ("byte_offset", True),
+    ("device", True), ("device", -1), ("inode", None), ("inode", False), ("inode", -1),
+    ("partial_tail", "false"), ("partial_tail", 0), ("partial_tail", 1),
+    ("indexed_schema", "9"), ("indexed_schema", True), ("missing_since_ms", False),
+    ("indexed_span", []), ("indexed_span", {}),
+    ("indexed_span", {"length": 1, "sha256": "ab" * 32}),
+    ("indexed_span", {"length": True, "sha256": "ab" * 32}),
+    ("indexed_span", {"length": 2, "sha256": "AB" * 32}),
+    ("indexed_span", {"length": 2, "sha256": "ab"}),
+    ("indexed_span", {"length": 2, "sha256": None}),
+    ("observed", {}), ("observed", []), ("observed_error", "ENOENT"),
+    ("malformed_lines", True), ("malformed_lines", -1),
+    ("unrecognized_records", "0"), ("unrecognized_records", -1),
+    ("identity", {}), ("ready", 1), ("ready", "true"),
+    ("not_ready", "missing"), ("not_ready", [""]), ("not_ready", [5]),
 ])
 def test_obs_rejects_malformed_file_values(field, value):
     payload = obs_payload()
     payload["files"][0][field] = value
     with pytest.raises(ObsUnavailable):
-        load_obs_state(("obs",), fake_runner(json.dumps(payload)))
+        load(payload)
 
 
-@pytest.mark.parametrize("payload", [None, [], {"schema": "9", "files": []},
-                                    {"schema": True, "files": []},
-                                    {"schema": 9, "files": {}}, {"schema": 9, "files": [None]}])
-def test_obs_rejects_malformed_output_shapes(payload):
+@pytest.mark.parametrize("field,value", [("device", True), ("inode", -1), ("size", "2"), ("mtime_ms", False)])
+def test_obs_rejects_malformed_observed_version(field, value):
+    payload = obs_payload()
+    payload["files"][0]["observed"][field] = value
     with pytest.raises(ObsUnavailable):
-        load_obs_state(("obs",), fake_runner(json.dumps(payload)))
+        load(payload)
 
 
-def test_obs_null_indexed_schema_is_stale():
+@pytest.mark.parametrize("field,value", [
+    ("ready", False), ("not_ready", ["future_reason"]), ("device", None),
+    ("indexed_span", None), ("indexed_schema", 8), ("indexed_schema", None),
+    ("partial_tail", True), ("missing_since_ms", 5),
+])
+def test_obs_rejects_contradictory_ready_claims(field, value):
     payload = obs_payload()
-    payload["files"][0]["indexed_schema"] = None
-    state = load_obs_state(("obs",), fake_runner(json.dumps(payload)))
-    assert not state["/source/a.jsonl"].schema_current
+    payload["files"][0][field] = value
+    with pytest.raises(ObsUnavailable):
+        load(payload)
 
 
-@pytest.mark.parametrize("field,value", [("size", 3), ("mtime_ms", 6), ("byte_offset", 1),
-                                       ("partial_tail", 1), ("indexed_schema", 8),
-                                       ("missing_since_ms", 5)])
-@pytest.mark.parametrize("alias", [False, True])
-def test_obs_rejects_conflicting_canonical_path_rows(tmp_path, field, value, alias):
-    real = write(tmp_path / "real" / "a.jsonl", b"x\n")
-    (tmp_path / "alias").symlink_to(real.parent, target_is_directory=True)
+@pytest.mark.parametrize("field", ["device", "inode", "size", "mtime_ms"])
+def test_obs_ready_must_match_observed_version(field):
     payload = obs_payload()
-    entry = payload["files"][0]
-    entry["path"] = str(real)
-    duplicate = {**entry, "path": str(tmp_path / "alias" / real.name) if alias else str(real), field: value}
-    payload["files"] = [duplicate, entry]
-    with pytest.raises(ObsUnavailable, match="conflicting"):
-        load_obs_state(("obs",), fake_runner(json.dumps(payload)))
+    payload["files"][0]["observed"][field] += 1
+    with pytest.raises(ObsUnavailable):
+        load(payload)
 
 
-def test_obs_accepts_identical_canonical_path_rows(tmp_path):
-    real = write(tmp_path / "real" / "a.jsonl", b"x\n")
-    (tmp_path / "alias").symlink_to(real.parent, target_is_directory=True)
+def test_obs_ready_requires_complete_span():
     payload = obs_payload()
-    entry = payload["files"][0]
-    entry["path"] = str(real)
-    payload["files"].append({**entry, "path": str(tmp_path / "alias" / real.name)})
-    assert len(load_obs_state(("obs",), fake_runner(json.dumps(payload)))) == 1
+    payload["files"][0].update(byte_offset=1, indexed_span={"length": 1, "sha256": "ab" * 32})
+    with pytest.raises(ObsUnavailable):
+        load(payload)
+
+
+@pytest.mark.parametrize("missing", [None, 5])
+def test_obs_nonready_null_proof_is_valid(missing):
+    payload = obs_payload()
+    payload["files"][0].update(ready=False, not_ready=["future_reason"], device=None,
+                               indexed_schema=None, indexed_span=None, observed=None,
+                               observed_error="ENOENT", missing_since_ms=missing)
+    entry = load(payload)["/source/a.jsonl"]
+    assert getattr(entry, "ready", None) is False
+    assert getattr(entry, "not_ready", None) == ("future_reason",)
+    assert not entry.schema_current and entry.missing is (missing is not None)
+
+
+def test_obs_future_harness_is_opaque_and_diagnostics_do_not_block():
+    payload = obs_payload()
+    payload["files"][0].update(harness="future-harness", identity={"future": [1]},
+                               malformed_lines=3, unrecognized_records=5, extra_field=True)
+    entry = load(payload)["/source/a.jsonl"]
+    assert getattr(entry, "harness", None) == "future-harness"
+    assert getattr(entry, "ready", None) is True
+
+
+@pytest.mark.parametrize("change", [{}, {"size": 3}])
+def test_obs_rejects_any_duplicate_path(change):
+    payload = obs_payload()
+    duplicate = copy.deepcopy(payload["files"][0])
+    duplicate.update(change)
+    payload["files"].append(duplicate)
+    with pytest.raises(ObsUnavailable):
+        load(payload)
+
+
+def codex_payload():
+    payload = obs_payload()
+    payload["files"][0].update(
+        path=f"/source/rollout-2026-01-01-{TID}.jsonl", harness="codex",
+        identity={"thread_id": TID, "filename_id": TID, "ancestors": [SID], "conflicts": []})
+    return payload
+
+
+@pytest.mark.parametrize("field,value", [
+    ("thread_id", None), ("filename_id", None), ("thread_id", SID), ("filename_id", SID),
+    ("conflicts", [SID]), ("ancestors", [None]), ("conflicts", [""]),
+])
+def test_obs_rejects_codex_identity_contradictions(field, value):
+    payload = codex_payload()
+    payload["files"][0]["identity"][field] = value
+    with pytest.raises(ObsUnavailable):
+        load(payload)
+
+
+@pytest.mark.parametrize("field", ["thread_id", "filename_id", "ancestors", "conflicts"])
+def test_obs_requires_codex_identity_fields(field):
+    payload = codex_payload()
+    del payload["files"][0]["identity"][field]
+    with pytest.raises(ObsUnavailable):
+        load(payload)
+
+
+def test_obs_record_sequences_are_immutable():
+    payload = codex_payload()
+    entry = load(payload)[payload["files"][0]["path"]]
+    assert getattr(entry, "identity_conflicts", None) == ()
+    assert getattr(entry, "not_ready", None) == ()
+    assert isinstance(hash(entry), int)
+
+
+@pytest.mark.parametrize("factory", [obs_payload, codex_payload])
+def test_diagnostic_counts_do_not_block_ready_known_harnesses(factory):
+    payload = factory()
+    payload["files"][0].update(malformed_lines=3, unrecognized_records=5)
+    assert load(payload)[payload["files"][0]["path"]].ready
+
+
+def test_run_tool_excludes_parent_secrets(home, monkeypatch):
+    from session_archive import testing
+    captured = []
+    monkeypatch.setattr(testing.os, "environ", {"PATH": os.defpath,
+                        "UNRELATED_SECRET": "sentinel", "OPENAI_API_KEY": "parent-sentinel"})
+    def run(argv, **kwargs):
+        captured.append(kwargs["env"])
+        return subprocess.CompletedProcess(argv, 0, "", "")
+    monkeypatch.setattr(testing.subprocess, "run", run)
+    testing.run_tool("status", home=home)
+    environment = captured[0]
+    assert "UNRELATED_SECRET" not in environment
+    assert environment["OPENAI_API_KEY"] == "test-invalid"
+    assert environment["HOME"] == str(home)
 
 
 @pytest.mark.parametrize("error", [OSError("cannot execute"), subprocess.TimeoutExpired("obs", 900)])

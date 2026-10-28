@@ -35,6 +35,16 @@ class ObsFile:
     partial_tail: bool
     schema_current: bool
     missing: bool
+    harness: str
+    device: int | None
+    inode: int
+    ready: bool
+    not_ready: tuple[str, ...]
+    span_length: int | None
+    span_sha256: str | None
+    thread_id: str | None
+    filename_id: str | None
+    identity_conflicts: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -47,8 +57,11 @@ class FileFacts:
     mirror_sha256: str | None
     transcript: bool
     obs: ObsFile | None
-    tail_has_newline: bool
     open: bool
+    device: int
+    inode: int
+    harness: str
+    thread_id: str | None
 
 
 def is_transcript(kind: str, relpath: str) -> bool:
@@ -76,9 +89,14 @@ def file_reason(f: FileFacts, now_ns: int) -> str | None:
         o = f.obs
         if o is None or o.missing:
             return "unindexed"
-        read_all = o.byte_offset == f.live.size or (
-            o.partial_tail and o.byte_offset < f.live.size and not f.tail_has_newline)
-        if (o.size, o.mtime_ms) != (f.live.size, f.live.mtime_ns // 1_000_000) or not o.schema_current or not read_all:
+        if (not o.ready or o.not_ready or not o.schema_current or o.partial_tail
+                or o.byte_offset != f.live.size or o.span_length != f.live.size
+                or (o.size, o.mtime_ms) != (f.live.size, f.live.mtime_ns // 1_000_000)
+                or (o.device, o.inode) != (f.device, f.inode) or o.harness != f.harness
+                or o.span_sha256 != f.live_sha256 or o.span_sha256 != f.mirror_sha256):
+            return "index-stale"
+        if f.harness == "codex" and (f.thread_id is None or o.identity_conflicts
+                                     or not o.thread_id == o.filename_id == f.thread_id):
             return "index-stale"
     if f.open:
         return "open"

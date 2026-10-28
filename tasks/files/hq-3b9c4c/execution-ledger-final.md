@@ -1,0 +1,31 @@
+# SDD ledger — plan: docs/plans/2026-09-30-session-archive.md
+
+Approved plan: hq 0154323; approved design: hq cfaed41. Execute Tasks 18–19 only.
+
+Pre-flight: Task 18 produces the strict record types and _facts interface; Task 19 consumes the committed reader through _facts/Context, which are preserved. Pinned reader 889000e exposes those same functions. No shared-interface conflict.
+
+Trust boundary: obs stdout may be malformed or stale; validate before any prune. Assets: live transcript bytes, indexed evidence and test credentials. Wrong readiness/stat/digest/identity evidence must retain files; fixture/probe children must see only fake temporary environments. No live store or timer action.
+
+Task 18: active (hq-886d78); Setup full baseline running; no code changes yet.
+Task 19: pending (hq-b60102); file coordinated obs task only at its execution step.
+
+Task 18: baseline green (231 + 1051 + 391 + 1 = 1674). Reader RED: 90 failed, 53 passed; old reader ignores new proof and collapses paths. Full output task-18-reader-red.log.
+Task 18: Ruling: add LC_ALL=C.UTF-8 to explicit test and probe environments — Why: an isolated child added LC_CTYPE without an explicit locale and added nothing with C.UTF-8; the allowed-key fixture regression exposed this — Cost: test hosts need that UTF-8 locale.
+Task 18: semantic proof RED: 12 failed, 27 passed (inode replacement, same-stat rewrite, wrong digest/device/harness, nonready subagent, partial tail). Extended-record decision RED: 12 failed, 25 deselected. Reader/decision/real proof GREEN: 195 passed; protocol/probe regression GREEN: 76 passed. Three focused failures traced to fixture adaptations: construct digest evidence before chmod, one remaining contract-1 empty payload, and a renamed _read_file wrapper signature; corrected those callers without relaxing checks.
+
+Task 18: Ruling: reuse the successful full gate for task completion instead of task-done rerunning it — Why: all four just test segments passed on the exact committed code; approved plan and Tests rule forbid duplicate runs without a change; tooling feedback lore-07bd6b — Cost: the helper did not generate this completion line; output is retained for audit. Revisions 967c3b4..8d26e25.
+Task 18: complete (commits 967c3b4..8d26e25, tests: just test → 231 + 1170 + 391 + 1 = 1793 passed; task-18-full.log; focused 214 and protocol/probe 76 passed).
+
+Task 19: coordinated obs-5bd975 created and started; trial flow on followed, scoped/implementing gates recorded. Worktree obs/.worktrees/obs-5bd975 locked and hydrated; full baseline just test-fast passed 1632 tests. Environment helper RED missing API, GREEN passed; added runtime dependency assertion RED on minimal PATH.
+Task 19: Ruling: explicit PATH includes the resolved tasks executable directory plus os.defpath — Why: real obs index invokes tasks even with an empty temporary registry; os.defpath alone failed before the adapter. No inherited PATH value is passed — Cost: probe requires installed tasks and permits other executables in that one directory. Applies to approved 0154323 Task 19; LC_ALL ruling also carried.
+Task 19: safe probe RED confirmed TypeError from obsolete positional FileFacts constructor against committed strict 8d26e25 (missing inode/harness/thread_id); full details task-19-probe-red-detail.log.
+Task 19: production-facts adapter GREEN: paired probe exited 0 at strict 8d26e255ef974467c0c8102fa65ce44892eca3c0, 11 cases, only current/claude_current accepted. Focused obs tests 21 passed. Environment regression additionally failed on a targeted synthetic credential leak then passed after restoration; all children saw fake/temporary values throughout. obs just gate running.
+Task 19: obs full just gate GREEN, 1633 tests. Probe committed 49388f683f91667b0e5040279985ff12c63df30d. Post-commit paired probe exit 0; strict 8d26e255ef974467c0c8102fa65ce44892eca3c0; 11 cases, current and claude_current only eligible. Coordinated task parks for controller final review of both branches. No live actions.
+Final implementation review: codex/gpt-6-astra verified identity, accepted hq 2f293c9..9c070fc and obs 870cb7f..56fbc21 with Critical 0, Important 0, Minor 0. Full report impl-round-1-report.md. No corrective round.
+Ruling: successor-link policy remains gated by hq-1639fd and hq-9e64f4 — Why: approved design cfaed41 and plan 0154323 exclude successor-link policy, and the final reviewer did not clear it — Cost: this merge alone cannot enable affected live pruning. Review ranges 2f293c9..9c070fc and 870cb7f..56fbc21.
+Ruling: live installation, installed Codex behavior, real-store pruning and timers remain with hq-624351 — Why: approved plan 0154323 Task 19 excludes live work and separate host authorization/checks apply — Cost: repository acceptance leaves those host behaviors unverified. Same final-review ranges.
+Ruling: archive replay, aliasing, deduplication and extra source enablement remain separate gates — Why: approved design cfaed41 and unchanged historical probe characterize them without certifying readiness; obs-de84cb replay and obs-914269/source-table work remain outstanding — Cost: no replay or extra-source readiness follows from this acceptance. Same final-review ranges.
+Ruling: ancillary baseline warnings stay outside this correction — Why: full gates passed, warnings predate these changes, and final review identified no consumer/probe consequence — Cost: optional Swagger, existing task-tag and database ResourceWarnings remain undiagnosed here. Same final-review ranges.
+minor (deferred): none.
+Task 19: obs-5bd975 closed with verified tree 2516d62512de6238cae2a6b0345d52c2f788f30e and merged locally without rebasing/squashing at 60098d2fc5537a386886143d9c3696b4bea21792. Probe commit 49388f6 remains reachable; both probe-file diff and full covered fingerprint equal tested bytes. No new test run is needed for task-record-only integration.
+Task 19: complete (commits 9b19917..4fc1617, tests: paired probe exit 0 at hq 8d26e25 / obs 49388f6 with 11 cases and only current/claude_current eligible; obs just gate 1633; hq just test 1793 retained unchanged; fresh review accepted with zero findings). HQ closeout records and authorized no-ff merge remain.
