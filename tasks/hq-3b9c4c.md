@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: fix/hq-3b9c4c-strict-readiness
 created: 2026-10-15T18:47:21Z
-updated: 2026-10-28T00:28:23Z
+updated: 2026-10-28T00:31:05Z
 started: 2026-10-27T21:06:37Z
 depends: [obs-c7d924]
 parent: hq-401088
@@ -78,3 +78,4 @@ Done: reviewed design and plan, implementation and focused checks proving valid 
 - 2026-10-28T00:24:03Z (fix/hq-3b9c4c-strict-readiness): review: plan round 2 — verdict: revise; findings: important 1, minor 2; reviewer: claude-code/claude-opus-5-5
 - 2026-10-28T00:28:22Z (fix/hq-3b9c4c-strict-readiness): attached: plan-round-2-report.md (4175 bytes): Full relayed plan round 2 review of 50282b9, claude-code/claude-opus-5-5: revise, important 1 and minor 2; recorded before corrections.
 - 2026-10-28T00:28:23Z (fix/hq-3b9c4c-strict-readiness): Plan round 2 checked against production prune/probe environment copies, the stub fixture and its control-setting callers. Adopted fixture replacement rather than narrowing the subprocess rule: Task 18 adds conftest.py and child-environment regression coverage. All three findings corrected in draft revision 3; immutable tuples replace stored lists; Task 19 now specifies no-ff hq integration, ancestry/content checks, and acceptance reruns for changed reader revisions. User agreement on inline execution and deferred obs task filing is preserved; human plan approval still outstanding. No implementation changes.
+- 2026-10-28T00:31:05Z (fix/hq-3b9c4c-strict-readiness): Draft correction verified a native-environment detail with an isolated child (explicit temporary HOME/PATH/USER and fake credentials): replacing os.environ with a plain dict does not synchronize libc getenv, while replacing its contents does. The plan therefore uses monkeypatch.delenv/setenv on the original mapping and explicitly tests the env=None codex_version path as well as explicit-env production children. No host environment or repository implementation was modified by the probe.
