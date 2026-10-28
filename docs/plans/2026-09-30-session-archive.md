@@ -2,7 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-Revision 2, hq-3b9c4c: strict-consumer implementation plan awaiting human review.
+Revision 3, hq-3b9c4c: strict-consumer implementation plan awaiting human review;
+addresses plan round 2's Important 1 and Minor 2 against `50282b9`.
 Execute Tasks 18–19 only for this task. Tasks 1–16 retain the original build and
 capture-rollout record; their inline code is historical, not current implementation
 guidance. In particular Tasks 18–19 supersede the record interfaces, obs contract,
@@ -3886,17 +3887,19 @@ approval from its task registration or the design's approval.
 **Files:**
 - Modify: `tools/session_archive/inputs.py`, `decide.py`, `prune.py`, `testing.py`
 - Modify: `tools/test_session_archive_inputs.py`, `tools/test_session_archive_eligibility.py`, `tools/test_session_archive_prune_run.py`
+- Modify: `tools/conftest.py`, `tools/test_session_archive_probe.py` (stub fixture isolation and child-environment regression)
 - Adapt affected fixtures/callers in: `tools/test_session_archive_prune_claude.py`, `tools/test_session_archive_prune_codex.py`, `tools/test_session_archive_prune_links.py`, and any `obs_for` / `_read_file` call found by the required search
 - Modify: `README.md` (session archive paragraph only)
 - Create: `tools/test_session_archive_readiness.py` (real-file loader-to-facts integration)
 
 **Interfaces:**
 - Preserve: capture's `Stat(size: int, mtime_ns: int)`, `load_obs_state(command, runner=subprocess.run) -> dict[str, ObsFile]`, `file_reason(f: FileFacts, now_ns: int) -> str | None`, `unit_reason(files: list[FileFacts], now_ns: int) -> str | None`, `_facts(source, relpath: str, ctx: Context, held) -> FileFacts`, `evaluate(unit: Unit, ctx: Context, held) -> str | None`, and `Context`'s fields.
-- Extend frozen `ObsFile`: keep its six existing fields (`size`, `mtime_ms`, `byte_offset`, `partial_tail`, `schema_current`, `missing`); add required fields `harness: str`, `device: int | None`, `inode: int`, `ready: bool`, `not_ready: list[str]`, `span_length: int | None`, `span_sha256: str | None`, `thread_id: str | None`, `filename_id: str | None`, `identity_conflicts: list[str]`. No defaults for old callers. Only Codex populates identity fields; other harnesses have `None`, `None`, `[]` after their appropriate boundary checks. Diagnostics and `observed` are validated at the boundary, not copied into unused record fields.
+- Extend frozen `ObsFile`: keep its six existing fields (`size`, `mtime_ms`, `byte_offset`, `partial_tail`, `schema_current`, `missing`); add required fields `harness: str`, `device: int | None`, `inode: int`, `ready: bool`, `not_ready: tuple[str, ...]`, `span_length: int | None`, `span_sha256: str | None`, `thread_id: str | None`, `filename_id: str | None`, `identity_conflicts: tuple[str, ...]`. No defaults for old callers. Only Codex populates identity fields; other harnesses have `None`, `None`, `()` after their appropriate boundary checks. Validate JSON arrays as arrays, then convert the two stored sequences to tuples at the boundary so the frozen record stays immutable and hashable. Diagnostics and `observed` are validated at the boundary, not copied into unused record fields.
 - Change `FileFacts`: remove `tail_has_newline`; retain all other fields and add required `device: int`, `inode: int`, `harness: str` (the source's expected obs harness), `thread_id: str | None` (expected filename UUID for Codex). Use keywords at changed constructors.
 - Change `_read_file(path: Path) -> tuple[os.stat_result, str]`: same held-handle, regular-file, no-follow and stability checks, returning stat and full SHA-256; remove offset/tail reading. Adapt every unpacking caller; `_read_back` continues using item 1.
 - Add test builder `testing.obs_payload(*paths: Path) -> dict`: complete contract-2 JSON from each synthetic file's stat/hash. Recognize Codex fixture names with the existing `inputs.ROLLOUT_RE`, give them matching thread/filename IDs, otherwise emit Claude evidence. It represents synthetic obs evidence, not a transcript parser. Preserve `obs_for(*paths: Path) -> dict` by passing this payload through the real loader with a stub runner. Keys remain exact strings.
 - Preserve `testing.run_tool(*args: str, home: Path)`'s signature; replace inherited-environment expansion with explicit keys. Include PATH, temporary HOME and XDG paths, USER=`test`, fake credential values, and only the stub controls the stub reads (`STUB_CODEX_MODE`, `STUB_CODEX_LOG`, `STUB_CODEX_VERSION`, `STUB_CODEX_WRITER_SECONDS`). Their values may be read individually from test fixtures; no inherited mapping/copy/filter reaches the child.
+- Change the test fixture to `stub_codex(tmp_path, monkeypatch, home) -> Path`. After the dependent `home` fixture creates the fake roots, build `minimal_env` key by key as below, remove every existing key with `monkeypatch.delenv`, then install only the explicit keys with `monkeypatch.setenv`. Preserve the `os._Environ` object so its native process environment is synchronized: swapping only the Python attribute for a plain dict would not reliably isolate `env=None` children such as the direct `codex_version` test. This is a complete replacement of contents, not a filter or inherited-map copy. Explicit keys: PATH is the stub directory plus `os.defpath`; HOME is `home`; USER is `test`; XDG config/data/state paths and CODEX_HOME are beneath `home`; OPENAI_API_KEY and ANTHROPIC_API_KEY are `test-invalid`; STUB_CODEX_MODE is `ok`, STUB_CODEX_LOG is under `tmp_path`, STUB_CODEX_VERSION is `codex-cli 0.0.0-stub`, and STUB_CODEX_WRITER_SECONDS is `1`. The existing `monkeypatch.setenv` calls in tests then change only this minimal mapping. Fixture teardown restores the original mapping. Do not change production `run_codex_delete`/`probe_codex` environment behavior: their existing copies now copy only safe test inputs in in-process tests. Preserve all stub controls and cleanup.
 
 - [ ] **Step 1: Execution Setup and caller inventory.** Resume the task/worktree,
   run `just setup` and full `just test`, and note all segment counts on the task.
@@ -3927,9 +3930,13 @@ approval from its task registration or the design's approval.
   with pytest.raises(ObsUnavailable):
       load(payload_with_dot_or_dotdot_or_repeated_or_trailing_separator)
   assert load(payload_with_future_harness)[path].harness == "future-harness"
-  assert load(payload_with_unknown_reason)[path].not_ready == ["future_reason"]
+  assert load(payload_with_unknown_reason)[path].not_ready == ("future_reason",)
   assert load(payload_with_nonready_null_span_and_device)[path].ready is False
   ```
+
+  Add `test_obs_record_sequences_are_immutable`: the parsed reasons and conflicts
+  are tuples, empty conflicts are `()`, and `hash(entry)` succeeds for a loaded
+  valid record. Keep the wire payload's JSON lists unchanged.
 
   `load(payload)` is test-local shorthand for the current loader with
   `fake_runner(json.dumps(payload))`, not a new runtime helper. Keep the runner
@@ -3941,6 +3948,23 @@ approval from its task registration or the design's approval.
   that the sentinel parent credential is absent from the child's mapping,
   HOME is the fixture home, and credential keys hold fake values. Build the safe
   test environment before any new subprocess case, RED runs included.
+  Apply the `stub_codex` fixture isolation above before the first in-process stub
+  case as well: `run_tool` isolation alone does not cover production subprocesses
+  launched inside pytest. Add `test_codex_stub_children_use_minimal_environment`
+  in `test_session_archive_probe.py`, covering production `probe_codex` (run and
+  Popen children) and `run_codex_delete`. Observe their actual child environments
+  through spies forwarding to the original subprocess functions, after fixture
+  isolation. Assert fake HOME/XDG paths, fake credentials and `USER=test`; permit
+  only the fixture keys, the production CODEX_HOME override, and pytest's own
+  `PYTEST_CURRENT_TEST` marker. Compare key sets or boolean credential checks,
+  never dump an environment in assertion output. Also change one STUB_CODEX control
+  with `monkeypatch.setenv` and assert that exact change reaches a child. Cover the
+  direct `codex_version` call with its default `env=None` too: an `env=None` Python
+  child must report only the allowed key names and boolean fake-credential checks,
+  and the stub's version must reflect a test-local version override. This verifies
+  native-environment synchronization without printing credential values. Run this
+  fixture regression GREEN before the other new subprocess RED cases; safe test
+  setup is a prerequisite, not a change to the production retention behavior.
   The existing direct `Popen` in `test_child_cwd_restores_before_late_open_and_append`
   must likewise receive an explicit environment (PATH, its test-owned HOME and
   only values that child reads), retaining its current cleanup and assertions.
@@ -4010,7 +4034,7 @@ approval from its task registration or the design's approval.
 
   ```bash
   uv run -q --with pytest pytest tools/test_session_archive_inputs.py tools/test_session_archive_eligibility.py tools/test_session_archive_readiness.py tools/test_session_archive_prune_run.py -q
-  uv run -q --with pytest pytest tools/test_session_archive_prune_claude.py tools/test_session_archive_prune_codex.py tools/test_session_archive_prune_links.py -q
+  uv run -q --with pytest pytest tools/test_session_archive_prune_claude.py tools/test_session_archive_prune_codex.py tools/test_session_archive_prune_links.py tools/test_session_archive_probe.py -q
   ```
 
   Expect all selected tests to pass; record actual counts. Confirm existing link
@@ -4127,6 +4151,16 @@ approval from its task registration or the design's approval.
   or probe changes, rerun paired acceptance and that project's affected gates.
   Once review passes, resume/close the coordinated obs task and integrate its
   branch using the personal-profile rules; record the actual merge revision.
-  Account for retained evidence/worktrees before done. After integration,
+  For hq, account for retained evidence/worktrees, complete the step and parent
+  records on the task branch, then integrate from hq main with
+  `git merge --no-ff fix/hq-3b9c4c-strict-readiness`. Keep the tested strict-reader
+  commit reachable: no rebase, squash or amendment of commits used by acceptance.
+  After merging, verify `git merge-base --is-ancestor <tested-consumer-commit> HEAD`
+  and that `git diff <tested-consumer-commit> HEAD -- tools/session_archive` is
+  empty. If merge resolution or another integration change alters those bytes,
+  rerun the affected gates and the paired probe with `--strict-rev` naming the
+  actual landed commit, then record its new verdict. Likewise, any review fix to
+  reader code requires a new committed strict revision for the rerun; do not keep
+  probing the old Task-18 revision after changing the reader. After integration,
   hq-624351 still owns installation and every live
   dry-run/apply/timer gate. This task ends with repository acceptance, not rollout.
