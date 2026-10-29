@@ -6,8 +6,8 @@ priority: 2
 reviewed: true
 reviewed_at: 2026-10-25T20:38:39Z
 created: 2026-10-25T11:03:11Z
-updated: 2026-10-29T18:40:12Z
-depends: [obs-02e88b, obs-d98663]
+updated: 2026-10-29T18:41:21Z
+depends: [obs-02e88b, obs-d98663, hq-c4c026]
 parent: hq-cff824
 tags: [feedback, gap, "from:obs"]
 agent: claude-code/claude-opus-5-5
