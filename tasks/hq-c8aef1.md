@@ -6,7 +6,7 @@ priority: 2
 reviewed: true
 reviewed_at: 2026-10-25T20:38:39Z
 created: 2026-10-25T11:03:11Z
-updated: 2026-10-26T09:47:19Z
+updated: 2026-10-29T18:40:12Z
 depends: [obs-02e88b, obs-d98663]
 parent: hq-cff824
 tags: [feedback, gap, "from:obs"]
@@ -17,7 +17,7 @@ Action: recovering the user's original ask behind an agent-held task. Worked aro
 
 ## References
 
-- brief (input, required, kind=brief): docs/notes/2026-10-25-task-origin-lookup-brief.md — existing reader and join research, remaining origin-query decisions
+- brief (input, required, kind=brief): docs/notes/2026-10-25-task-origin-lookup-brief.md — delivered reader, filing-call binding and cited-evidence design questions
 
 ## Notes
 
