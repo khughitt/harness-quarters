@@ -2,9 +2,9 @@
 id: hq-ec379d
 title: Generate SKILL.md from a template and skill atoms with provenance metadata
 status: shelved
-priority: "2"
+priority: 2
 created: 2026-09-12T16:34:53Z
-updated: 2026-09-29T20:54:33Z
+updated: 2026-10-29T02:15:16Z
 depends: []
 tags: [quick-add, skills]
 source: "mindful:thought:d3bf47e9ec8c4932b86b363fbba790f8"
@@ -25,3 +25,4 @@ Source: mindful:thought:d3bf47e9ec8c4932b86b363fbba790f8
 - 2026-09-12T18:52:12Z (main): Granularity resolved to one recursive fragment primitive; informativeness score deferred (see body).
 - 2026-09-29T20:54:33Z (main): scope: shelved; the design in the body stands, but its payoff (attributing an eval effect to a fragment, per-model variants as filters) needs the eval chain obs-00809f → tack-026612 → tack-7d9375 that does not exist yet. tack authors only flow and session-logs of the skills it ships (tasks, scope, curate live in tasks; quick-add in ops; the rest are vendored), and tools/ops-docs already regenerates AGENTS.md's identity regions, so there is no shared text to keep in sync today.
 - 2026-09-29T20:54:33Z (main): shelved: an eval built on tack-026612 or tack-7d9375 needs to attribute an effect to part of a skill, or the same instruction text must be kept in sync across two or more skills or AGENTS.md
+- 2026-10-29T02:15:16Z (main): Proposed per-decision disposition from lore-722412 draft revision 1 (pending user spec review): carry forward atomize-on-demand, derived composite summaries without propagated authorship, and no nodes dependency without demonstrated need. Keep recursive ordered includes/cycle checking, generated SKILL.md/frontmatter, per-model variants and experiment-derived informativeness deferred in their skill scope. Global instruction finer attribution is served by rule IDs plus sidecars; this does not supersede the skill generator or require waking it. Preserve the concrete shared-text/skill-effect wake condition; closed old eval dependencies alone do not wake it. Spec: lore records docs/specs/2026-10-28-rule-provenance-design.md section 8. Reconcile to the accepted revision after user review.
