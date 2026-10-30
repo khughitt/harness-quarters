@@ -40,7 +40,7 @@ def start_under_a_dead_session(box, tid, cwd):
     assert os.stat("/proc/self/ns/pid").st_ino == INITIAL_PID_NAMESPACE and len(nspid) == 1, (
         "tasks judges an exported pid only in the initial PID namespace; this test runs in "
         "another (a container or sandbox), where a claim whose session ended stays held")
-    child = subprocess.Popen(["sleep", "60"])
+    child = subprocess.Popen(["sleep", "60"], env=box.env)
     try:
         box.run("tasks", "start", tid, cwd=cwd,
                 env={**box.env, "TASKS_SESSION": "ghost", "TASKS_SESSION_PID": str(child.pid)})
@@ -64,10 +64,12 @@ class Sandbox:
 
     def __init__(self, tmp, repos=("ops",), hq=False):
         self.tmp = tmp
-        self.env = {**os.environ, "HOME": str(tmp / "home"), "XDG_CONFIG_HOME": str(tmp / "cfg"),
-                    "XDG_STATE_HOME": str(tmp / "state"), "GIT_AUTHOR_NAME": "t",
-                    "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
-        self.env.pop("WORK_ROOT", None)
+        self.env = {"PATH": os.environ["PATH"], "HOME": str(tmp / "home"), "USER": "test",
+                    "XDG_CONFIG_HOME": str(tmp / "cfg"), "XDG_STATE_HOME": str(tmp / "state"),
+                    "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1",
+                    "GIT_CEILING_DIRECTORIES": str(tmp), "GIT_AUTHOR_NAME": "t",
+                    "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t",
+                    "TASKS_SESSION": "rename-cutover-test", "TASKS_OWNER": "fixture"}
         for d in ("home", "cfg", "state"):
             (tmp / d).mkdir()
         self.sync = tmp / "sync"
@@ -88,6 +90,8 @@ class Sandbox:
     def repo(self, path, prefix):
         path.mkdir(parents=True)
         self.run("git", "init", "-q", "-b", "main", path)
+        assert Path(self.run("git", "rev-parse", "--show-toplevel", cwd=path).stdout.strip()).resolve() == path.resolve()
+        assert Path(self.run("git", "rev-parse", "--absolute-git-dir", cwd=path).stdout.strip()).resolve().is_relative_to(path.resolve())
         self.run("tasks", "init", "--prefix", prefix, cwd=path)
 
     def commit(self, root, message):
@@ -1299,7 +1303,7 @@ def test_save_refuses_findings_from_tasks_check(box2):
     a = task_id(box2.run("tasks", "add", "parked idea", "--process", "direct", cwd=lore).stdout)
     b = task_id(box2.run("tasks", "add", "waits on it", "--process", "direct", cwd=lore).stdout)
     box2.run("tasks", "dep", b, "--on", a, cwd=lore)
-    box2.run("tasks", "shelve", a, "when it is needed", cwd=lore)
+    box2.run("tasks", "shelve", a, "when it is needed", "--defer", "30d", cwd=lore)
     box2.commit(lore, "a dependency on a shelved task")
     assert "shelved_dep" in box2.run("tasks", "check", cwd=lore).stdout
     result = box2.save(check=False)
