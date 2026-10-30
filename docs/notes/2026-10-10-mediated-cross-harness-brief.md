@@ -74,4 +74,4 @@ answers the mediated-handoff question.
 Rescoped 2026-10-13: no change in the gate. hq-83c787 (first-prompt motifs) also lists relayed-message sessions by locator, which can seed hq-ba1758's discovery.
 
 Reuse hq-67d253; no new goal, lane, bridge, or design task. Research completion
-records findings on both waiting ideas before the result's branch merges as its result.
+records findings on both waiting ideas before the result's branch merges.
