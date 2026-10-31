@@ -1,12 +1,11 @@
 ---
 id: hq-7a8a4b
 title: The executing-plans task-done helper exits 1 after a successful silent verification command because its summary grep finds no nonblank line; wrapping the command with a success line records completion.
-status: idea
+status: dropped
 priority: 2
-reviewed: true
-reviewed_at: 2026-10-31T09:11:03Z
 created: 2026-09-30T10:10:14Z
-updated: 2026-10-31T09:11:03Z
+updated: 2026-10-31T10:42:13Z
+closed: 2026-10-31T10:42:13Z
 depends: []
 tags: [feedback, friction, "from:ops"]
 agent: codex
@@ -21,4 +20,8 @@ agent: codex
 - 2026-10-30T12:02:25Z (main): shelf recovery 2026-10-30: The 2026-10-17 note explicitly records the wake condition met: the supporting release was adopted; restore review rather than postpone the acknowledged handoff. Closing remains an owner decision. Audit evidence retained on tasks-11f6d3.
   provenance: {"harness_session":"codex:01a18ca3-4bd6-7d61-8fb4-f4ce4eda96e2","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-10-31T09:11:03Z (main): scope: drop; the recorded wake condition is met and the defect is covered by completed lore-ba0236 and adoption lore-cf7783. Current lore 8788cee944e44927674bddefffff181362ac6c1a pins vendor/superpowers to v7.0.1 commit 2ce8aa15d05bd57213e6f746f953aafb7ded7a8b (pin bump 1350d23); the installed executing-plans skill resolves to that vendor tree, whose scripts/task-done:48 explicitly falls back to last="(no output)" when grep finds no nonblank line. lore-cf7783 records a successful silent-command run, exit 0, at v7.0.0; that runtime result is historical, while the v7.0.1 fix is freshly tree-verified. No patch, new research, brief, upstream post or model run is needed. origin: filing event unavailable (no creation occurrence/stamp in show); no origin_session names an older request, so older-request stage not applicable and origin remains unknown; proposal: drop this fixed duplicate, supported by lore-ba0236, lore-cf7783 and current vendor 2ce8aa15d05bd57213e6f746f953aafb7ded7a8b; status remains idea pending the owner's drop decision.
+  provenance: {"harness_session":"codex:01a19137-5d3f-75b1-937e-322a887bc176","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-31T10:42:13Z (main): dropped
+  provenance: {"harness_session":"codex:01a19137-5d3f-75b1-937e-322a887bc176","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-10-31T10:42:13Z (main): User approved dropping this fixed duplicate. Covered by completed lore-ba0236 and adoption lore-cf7783; installed superpowers v7.0.1 retains the silent-output fix, tree-verified in the scope audit.
   provenance: {"harness_session":"codex:01a19137-5d3f-75b1-937e-322a887bc176","harness_session_source":"CODEX_THREAD_ID"}
