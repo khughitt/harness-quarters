@@ -4,11 +4,12 @@ title: "Distilled superpowers: a minimal flow built from reusable blocks"
 status: idea
 priority: 2
 created: 2026-09-15T00:43:12Z
-updated: 2026-10-31T10:47:58Z
+updated: 2026-10-31T10:48:00Z
 depends: [hq-bc49ed]
 tags: [quick-add, skills, obs, flow]
 source: "mindful:thought:48e70c654fd84c6ab72d3f06b6261683"
 agent: claude-code/claude-opus-5
+origin: user
 ---
 
 Build our own sparse version of the key superpowers elements used in projects: (init?) -> brainstorming -> writing-plans -> subagent or inline implementation, plus supporting pieces (git worktrees, verification). Aimed at fable-5.1-level models: capture the core patterns and useful ideas, give the model more free rein, do not over-specify. Include a feedback mechanism where the model can suggest meta-patterns and strategies that worked across problems.
