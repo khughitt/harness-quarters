@@ -5,7 +5,7 @@ status: shelved
 priority: 2
 defer: 2026-11-30
 created: 2026-09-16T15:57:15Z
-updated: 2026-10-31T11:30:23Z
+updated: 2026-10-31T11:30:35Z
 depends: [ops-998bbb, hq-539508]
 tags: [quick-add, hooks, flow]
 source: "mindful:thought:34328bb6f74e4517bb0c5a2569ade36b"
@@ -23,3 +23,5 @@ Source: mindful:thought:34328bb6f74e4517bb0c5a2569ade36b
 - 2026-09-29T21:08:58Z (main): shelved: relay cutover tack-539508 lands and a project takes ownership of the host-request store (ops relay spec §6 assigns it to an unowned 'host broadcast feature'), or a benchmark or restart needs running agents paused and parking by hand falls short
 - 2026-09-29T21:08:58Z (main): scope: shelved; evidence 2026-09-29: no broadcast transport exists or is owned — relay has no host-state/signal code, docs or task (HEAD bfed7d7), the ops relay design spec §6 defers host requests to a 'host broadcast feature' no project owns, tasks quiet/park --reason quiet is task-side only, host-load stores nothing; turn-boundary spec §8 already defers this to relay and implies a separate Stop hook beside ops hooks/claim-guard (live since ops e402b37); added depends on tack-539508 (relay cutover); related fam-5b276b (idea: session-end park backstop)
 - 2026-10-31T11:30:23Z (main): shelved: Relay cutover hq-539508 lands and a project takes ownership of the persistent host-request store, or a benchmark or restart needs running agents paused and parking by hand falls short. Cutover is already complete; store ownership or the concrete manual-parking shortfall remains the wake condition.
+- 2026-10-31T11:30:35Z (main): scope: shelved; renewed missing checkpoint to 2026-11-30, with no wake targets because the remaining condition is external/manual. ops-998bbb and hq-539508 are done; cutover merged d04b6eb. At hq fc2c2b1 and relay b2cd798, the ops relay design section 6 still assigns persistent requests with expiry/cancellation to a separate host-broadcast feature; relay source/docs and open cross-project broadcast/host-request searches establish no owning transport task. Preserve the broader user goal of gracefully pausing agents for benchmarks/restarts; do not treat completed registry extraction or cutover as that transport. Existing body/history and dependencies retained; no new implementation or research. origin: filing event unavailable (no creation occurrence or harness-session stamp in this legacy record); older-request stage not applicable (no origin_session). Canonical mindful thought:34328bb6f74e4517bb0c5a2569ade36b read successfully: human-authored item 4 asks for pause/broadcast and task marking, while the task-side hooks/protocol split is not independently bound to a filing call. Origin field left unknown rather than inferred from authorship metadata.
+  provenance: {"harness_session":"codex:01a191b7-9e0a-7630-ab45-50bc1351c482","harness_session_source":"CODEX_THREAD_ID"}
