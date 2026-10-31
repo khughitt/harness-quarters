@@ -1,13 +1,15 @@
 ---
 id: hq-6c8a9f
 title: "Set up Antigravity CLI (agy) configuration, links, and live-state hygiene in hq"
-status: todo
+status: doing
 priority: 1
 size: m
 complexity: mid
 process: direct
+owner: main
 created: 2026-10-31T21:00:30Z
-updated: 2026-10-31T21:00:30Z
+updated: 2026-10-31T21:00:48Z
+started: 2026-10-31T21:00:48Z
 depends: []
 tags: []
 agent: agy
@@ -29,3 +31,4 @@ Where: links.toml, agy/{settings,hooks,skills}.json, .gitattributes, .githooks/{
 
 - 2026-10-31T21:00:30Z (add): created
   provenance: {"origin":"user"}
+- 2026-10-31T21:00:48Z (main): started
