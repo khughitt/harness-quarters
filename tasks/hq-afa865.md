@@ -6,7 +6,7 @@ priority: 2
 defer: 2026-11-30
 wake_on: [hq-e54d89]
 created: 2026-10-02T11:40:02Z
-updated: 2026-10-31T11:27:03Z
+updated: 2026-10-31T11:27:05Z
 depends: []
 tags: [flow]
 source: tack-7d9375
@@ -20,3 +20,5 @@ Out of scope for flow-trial-1 (docs/specs/2026-10-02-flow-trial-design.md §8); 
 - 2026-10-02T15:33:38Z (main): scope: shelved; out of scope for flow-trial-1 by its spec §8 (docs/specs/2026-10-02-flow-trial-design.md); whether a blind comparison is worth running depends on that trial's verdict, read by tack-e54d89 on or after 2027-02-16
 - 2026-10-02T15:33:38Z (main): shelved: tack-e54d89 reads the flow-trial-1 verdict (on or after 2027-02-16): reconsider if the verdict is inconclusive or leaves quality, not process cost, as the open question
 - 2026-10-31T11:27:03Z (main): shelved: hq-e54d89 reads the flow-trial-1 verdict on or after 2027-02-16: reconsider a blind two-arm comparison only if that verdict is inconclusive or leaves quality, rather than process cost, as the open question. The checkpoint is only a review date and does not permit an early outcome read.
+- 2026-10-31T11:27:05Z (main): scope: shelved; renewed missing checkpoint to 2026-11-30 and recorded open hq-e54d89 as the wake target. flows evals/trials/flow-trial-1.md at 55b28e44c271a76f7a11a51304284d15b6dbfe3f retains read_on 2027-02-16 and no recorded stop event; approved trial spec section 8 excludes blind two-arm comparison. hq-7d9375 is done, but hq-e54d89 remains todo and owns the single scheduled verdict read. Preserve the conditional quality/inconclusive-verdict trigger; no early verdict or new handoff needed. origin: filing event unavailable (no creation occurrence/session stamp); no older-origin session named. Source hq-7d9375's 2026-10-02 plan note corroborates filing this optional extension, but does not substitute for the missing occurrence stamp or establish user authorship.
+  provenance: {"harness_session":"codex:01a191b3-f965-75c0-a842-8d8d30502e30","harness_session_source":"CODEX_THREAD_ID"}
