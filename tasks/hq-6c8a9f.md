@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-10-31T21:00:30Z
-updated: 2026-10-31T21:01:07Z
+updated: 2026-10-31T21:01:58Z
 started: 2026-10-31T21:00:48Z
 depends: []
 tags: []
@@ -34,3 +34,4 @@ Where: links.toml, agy/{settings,hooks,skills}.json, .gitattributes, .githooks/{
 - 2026-10-31T21:00:48Z (main): started
 - 2026-10-31T21:01:06Z (main): trial: flow-trial-1 — enrolled — flow on
 - 2026-10-31T21:01:07Z (main): arm: flow-trial-1 — unit tack-6c8a9f — flow on
+- 2026-10-31T21:01:58Z (main): gate: scoped — adopted
