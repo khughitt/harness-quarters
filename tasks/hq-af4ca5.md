@@ -5,7 +5,7 @@ status: shelved
 priority: 2
 defer: 2026-11-30
 created: 2026-10-02T12:37:32Z
-updated: 2026-10-31T11:21:22Z
+updated: 2026-10-31T11:21:24Z
 depends: []
 tags: [feedback, friction, "from:beliefs"]
 agent: codex
@@ -27,3 +27,5 @@ Local workaround until upstream changes: pass task-done the focused test command
 - 2026-10-02T14:39:11Z (main): Reported upstream as a comment on obra/superpowers#2342 (https://github.com/obra/superpowers/issues/2342#issuecomment-5954814790), reproduced on v6.4.1 with Vitest 5.0.3 --passWithNoTests
 - 2026-10-02T14:39:11Z (main): shelved: upstream changes task-done's last-line fallback (PR #2348 or a follow-up to the #2342 comment) in a release — then bump agents/vendor/superpowers and re-check a composite check ending in Vitest
 - 2026-10-31T11:21:22Z (main): shelved: An upstream release changes task-done's last-line fallback (PR #2348 or a follow-up to #2342) — then adopt it through lore's Superpowers pin and re-check a composite command ending in Vitest
+- 2026-10-31T11:21:24Z (main): scope: shelved; renewed legacy undated shelf with a 30-day checkpoint and no wake targets. Upstream #2342 and PR #2348 remain open and the PR is unmerged (head e3d48d2145827d7d29e2aacfc52c3ebce9dc4c78). Main/dev task-done blob e5fc6a992fb41745a4113a55a5da5cbb11ddde55 still uses the last nonblank log line at line 48, as does installed vendor 2ce8aa15d05bd57213e6f746f953aafb7ded7a8b. The October 3 reply acknowledges the composite case but leaves fallback changes to a maintainer decision. lore-4e50e7 tracks the same unresolved root cause; no duplicate follow-up created. Preserve the released-fallback-fix wait and focused-command/explicit-summary workaround; the old body question was answered by the published comment. Evidence checked 2026-10-31; upstream open/closed issues and PRs, main/dev workspace/ledger code and release notes searched. origin: filing event unavailable (no creation/feedback occurrence stamp survives in this record); older request not locatable from a bound filing event; origin left unset. No brief or draft spec created.
+  provenance: {"harness_session":"codex:01a191ae-246c-7733-8215-139b32049d32","harness_session_source":"CODEX_THREAD_ID"}
