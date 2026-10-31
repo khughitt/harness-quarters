@@ -4,14 +4,19 @@ title: Shell wrapper cleanup refusal prevents bounded diagnostic capture
 status: idea
 priority: 2
 created: 2026-10-30T03:24:25Z
-updated: 2026-10-30T03:24:25Z
+updated: 2026-10-31T02:18:30Z
 depends: []
+parent: hq-40a8d0
 tags: [feedback, friction, "from:sun"]
 agent: codex
 origin: agent
 ---
 
 A bounded read-only diagnostic wrapper captured stdout and stderr in temporary files and registered cleanup on exit. The shell tool rejected the command before execution because rm -f style commands were disallowed, despite the files being created by that same wrapper. Capturing both streams in memory avoided the cleanup command and completed the authorized single invocation without a retry against the source.
+
+## References
+
+- brief (context, kind=brief): docs/notes/2026-10-15-headless-workers-brief.md — verified memory-capture workaround and wake condition
 
 ## Notes
 
