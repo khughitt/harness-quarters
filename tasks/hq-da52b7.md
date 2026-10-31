@@ -1,10 +1,10 @@
 ---
 id: hq-da52b7
 title: "Distilled superpowers: a minimal flow built from reusable blocks"
-status: shelved
-priority: "2"
+status: idea
+priority: 2
 created: 2026-09-15T00:43:12Z
-updated: 2026-09-22T02:55:34Z
+updated: 2026-10-31T10:47:58Z
 depends: [hq-bc49ed]
 tags: [quick-add, skills, obs, flow]
 source: "mindful:thought:48e70c654fd84c6ab72d3f06b6261683"
@@ -26,3 +26,4 @@ Source: mindful:thought:48e70c654fd84c6ab72d3f06b6261683
 - 2026-09-22T00:31:01Z (main): shelved: A second concrete flow exists to factor blocks against — a per-kind lifecycle (ai-b9ab40) or the self-authored baseline (ai-619958). The distilled flow itself landed as the flow skill (ai-f5da3a); the feedback mechanism is ai-bdff6f and ai-c78706; per-project opt-in (spec §4.3) is each project's own choice, none has taken it yet.
 - 2026-09-22T00:31:01Z (main): scope: shelved; of its three parts the walker landed (flow skill, ai-f5da3a), the feedback loop is scoped (ai-bdff6f, ai-c78706), and blocks wait for a second flow as this idea's own note says; brief: docs/notes/2026-09-21-flow-gates-brief.md
 - 2026-09-22T02:55:34Z (main): ai-634de8 (functional core framing, spec section 3.5) settles the block shape: a gate is {artifact, check, judge, record}; a flow is an ordered gate list plus back edges; composition is concatenation and nesting. Wake condition unchanged: factor after a second concrete flow.
+- 2026-10-31T10:47:58Z (main): unshelved
