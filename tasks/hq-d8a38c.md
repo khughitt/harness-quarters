@@ -4,8 +4,8 @@ title: Session archive guidance needs opaque tool-argument handling
 status: idea
 priority: 2
 created: 2026-10-30T11:31:52Z
-updated: 2026-10-31T08:54:06Z
-depends: []
+updated: 2026-10-31T08:54:08Z
+depends: [obs-55431b]
 parent: hq-a4ed45
 tags: [feedback, gap, "from:sci"]
 agent: codex
