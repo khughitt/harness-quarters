@@ -43,11 +43,26 @@ def test_pi_json_drops_its_defaults_and_installation_ids_and_keeps_its_configura
          "enabledModels": ["anthropic/*"]}, indent=2) + "\n"
 
 
+def test_agy_json_drops_model_effort_and_trusted_workspaces_and_keeps_configuration():
+    text = json.dumps({"allowNonWorkspaceAccess": True, "model": "Gemini 4 Argon (Medium)",
+                       "effort": "high", "effortByBase": {"Gemini 4 Argon": "high"},
+                       "permissions": {"allow": ["command(tasks)"]},
+                       "trustedWorkspaces": ["/work/repo"]}, indent=2) + "\n"
+    assert clean("agy/settings.json", text) == json.dumps(
+        {"allowNonWorkspaceAccess": True,
+         "permissions": {"allow": ["command(tasks)"]}}, indent=2) + "\n"
+
+
 def test_each_harness_keeps_the_other_harness_state_keys():
-    claude = json.dumps({"defaultModel": "x", "effortLevel": "high"}, indent=2) + "\n"
-    pi = json.dumps({"model": "x", "defaultModel": "y"}, indent=2) + "\n"
-    assert clean("claude/settings.json", claude) == json.dumps({"defaultModel": "x"}, indent=2) + "\n"
-    assert clean("pi/settings.json", pi) == json.dumps({"model": "x"}, indent=2) + "\n"
+    claude = json.dumps({"defaultModel": "x", "effort": "high", "effortLevel": "high"}, indent=2) + "\n"
+    pi = json.dumps({"model": "x", "effort": "high", "defaultModel": "y"}, indent=2) + "\n"
+    agy = json.dumps({"defaultModel": "x", "effortLevel": "high", "model": "y"}, indent=2) + "\n"
+    assert clean("claude/settings.json", claude) == json.dumps(
+        {"defaultModel": "x", "effort": "high"}, indent=2) + "\n"
+    assert clean("pi/settings.json", pi) == json.dumps(
+        {"model": "x", "effort": "high"}, indent=2) + "\n"
+    assert clean("agy/settings.json", agy) == json.dumps(
+        {"defaultModel": "x", "effortLevel": "high"}, indent=2) + "\n"
 
 
 def test_json_paths_that_are_not_a_harness_config_are_refused():

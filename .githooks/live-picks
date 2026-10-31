@@ -4,10 +4,12 @@
 The harness-state clean filter keeps the picks out of the index: `model`,
 `modelSettings` and `effortLevel` in claude/settings.json, the top-level `model` and
 `model_reasoning_effort` in codex/config.toml; `defaultProvider`, `defaultModel` and
-`defaultThinkingLevel` in pi/settings.json. A git command that writes a new blob of
+`defaultThinkingLevel` in pi/settings.json; `model`, `effort`, `effortByBase` and
+`trustedWorkspaces` in agy/settings.json. A git command that writes a new blob of
 a file over the live one drops the pick, and the harness runs on its default. This
-tool saves Claude and Codex picks in local/live-picks.json and pi picks in
-local/live-picks-pi.json, untracked and carried between hosts by Dropbox, and puts them back:
+tool saves Claude and Codex picks in local/live-picks.json, pi picks in
+local/live-picks-pi.json and agy picks in local/live-picks-agy.json, untracked and
+carried between hosts by Dropbox, and puts them back:
 
     capture               save the pick each file holds; absence never records a reset
     restore               put a saved pick into a file holding none of its fields
@@ -17,11 +19,12 @@ local/live-picks-pi.json, untracked and carried between hosts by Dropbox, and pu
 
 Each picker's owned fields are one unit: Codex's model and effort; Claude's model and
 modelSettings (/model), and its effortLevel (/effort); pi's defaultProvider and
-defaultModel, and its defaultThinkingLevel. Each separate picker writes one unit.
+defaultModel, and its defaultThinkingLevel; agy's model (/model), effort and effortByBase
+(/effort), and trustedWorkspaces. Each separate picker writes one unit.
 Git drops all of a file's fields together, so a unit holding none is the only state a
 git rewrite leaves; any other state was written by a harness or a person, and the live
 file wins. Absence alone cannot tell a rewrite from a return to
-the default, so only forget records `default`. Claude and Codex capture at Stop; pi
+the default, so only forget records `default`. Claude, Codex and agy capture at Stop; pi
 captures through its extension after picker events, at turn end and at shutdown.
 Setting the current selection as a default emits no event: it is saved at turn end
 or exit, so a git rewrite before then restores the previous saved default. restore
@@ -55,9 +58,10 @@ REPO = harness_state.REPO
 CLAUDE = "claude/settings.json"
 CODEX = "codex/config.toml"
 PI = "pi/settings.json"
-OWNED = (CLAUDE, CODEX, PI)
+AGY = "agy/settings.json"
+OWNED = (CLAUDE, CODEX, PI, AGY)
 RECORDS = {CLAUDE: "local/live-picks.json", CODEX: "local/live-picks.json",
-           PI: "local/live-picks-pi.json"}
+           PI: "local/live-picks-pi.json", AGY: "local/live-picks-agy.json"}
 USAGE = ("usage: live-picks capture | restore | sync | forget <file> | "
          "hook post-checkout|post-merge|post-rewrite (files: " + ", ".join(OWNED) + ")")
 # Every owned field must be dropped by the filter for absence to imply a rewrite.
@@ -67,20 +71,23 @@ TOML_HEADER = FILTER["TOML_HEADER"]
 TOML_KEY = FILTER["TOML_KEY"]
 # Each picker is a unit: a pick of one keeps the other picker's saved value.
 CLAUDE_GROUPS = (("model", "modelSettings"), ("effortLevel",))
+AGY_GROUPS = (("model",), ("effort", "effortByBase"), ("trustedWorkspaces",))
 JSON_GROUPS = {CLAUDE: CLAUDE_GROUPS,
-               PI: (("defaultProvider", "defaultModel"), ("defaultThinkingLevel",))}
+               PI: (("defaultProvider", "defaultModel"), ("defaultThinkingLevel",)),
+               AGY: AGY_GROUPS}
 JSON_KEYS = {name: sum(groups, ()) for name, groups in JSON_GROUPS.items()}
 for name, keys in JSON_KEYS.items():
     dropped = [keys for pattern, keys in FILTER["JSON_FILES"] if fnmatch.fnmatch(name, pattern)]
     if (len(dropped) != 1 or len(keys) != len(set(keys))
             or not set(keys) <= set(dropped[0])
-            or name == CLAUDE and set(keys) != set(dropped[0])):
+            or name in (CLAUDE, AGY) and set(keys) != set(dropped[0])):
         sys.exit(f"live-picks: {name} groups {JSON_GROUPS[name]} must be disjoint and "
-                 "within the filter's keys (equal for Claude)")
+                 "within the filter's keys (equal for Claude and agy)")
 CLEAN = {CLAUDE: functools.partial(FILTER["clean_json"], keys=FILTER["CLAUDE_JSON_KEYS"]),
          CODEX: FILTER["clean_toml"],
-         PI: functools.partial(FILTER["clean_json"], keys=FILTER["PI_JSON_KEYS"])}
-FIELD = {CLAUDE: "values", CODEX: "lines", PI: "values"}
+         PI: functools.partial(FILTER["clean_json"], keys=FILTER["PI_JSON_KEYS"]),
+         AGY: functools.partial(FILTER["clean_json"], keys=FILTER["AGY_JSON_KEYS"])}
+FIELD = {CLAUDE: "values", CODEX: "lines", PI: "values", AGY: "values"}
 
 
 class Refused(Exception):

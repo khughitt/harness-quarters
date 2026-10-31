@@ -263,6 +263,8 @@ def fresh_clone(tmp_path, home):
     shutil.copy2(TOOL, clone / "tools/harness-links")
     shutil.copytree(repo / "relay", clone / "relay", dirs_exist_ok=True)
     shutil.copytree(repo / "codex/work", clone / "codex/work", dirs_exist_ok=True)
+    if (repo / "agy").exists():
+        shutil.copytree(repo / "agy", clone / "agy", dirs_exist_ok=True)
     # A public clone needs the submodule and sibling skill checkouts. Use the local
     # sources in these fixtures so the tests require neither network nor live writes.
     main = Path(run("-C", str(repo), "worktree", "list", "--porcelain").stdout.splitlines()[0][9:])
@@ -334,6 +336,20 @@ def test_real_manifest_work_home_without_local_names_the_file(tmp_path):
     result = link(clone, home)
     assert result.returncode == 2
     assert "local/claude/settings.work.json" in result.stderr
+
+
+def test_real_manifest_links_agy_and_agy_config_when_homes_exist(tmp_path):
+    home = tmp_path / "home"
+    (home / ".gemini/antigravity-cli").mkdir(parents=True)
+    (home / ".gemini/config").mkdir(parents=True)
+    clone = fresh_clone(tmp_path, home)
+    applied = link(clone, home, "--apply")
+    assert applied.returncode == 0, applied.stderr
+    assert (home / ".gemini/antigravity-cli/settings.json").resolve() == (clone / "agy/settings.json").resolve()
+    assert (home / ".gemini/config/AGENTS.md").resolve() == (tmp_path / "lore/instructions/AGENTS.md").resolve()
+    assert (home / ".gemini/config/hooks.json").resolve() == (clone / "agy/hooks.json").resolve()
+    assert (home / ".gemini/config/skills.json").resolve() == (clone / "agy/skills.json").resolve()
+    assert link(clone, home, "--check").returncode == 0
 
 
 def test_setup_is_idempotent_and_creates_only_the_rules_directory(tmp_path):

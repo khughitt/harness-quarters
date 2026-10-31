@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """Harness refresh: clear git's size-only "modified" mark on tracked harness configs.
 
-A model or effort switch rewrites `claude/settings*.json`, `codex/config*.toml` or
-`pi/settings*.json` through the homes' symlinks. The harness-state clean filter keeps
-those keys out of the index, but git calls a file modified when its size differs from
-the index entry without running the filter, so `git status` shows `M` on a file whose
-filtered diff is empty. Staging such a file writes the blob already in the index and
+A model or effort switch rewrites `claude/settings*.json`, `codex/config*.toml`,
+`pi/settings*.json` or `agy/settings*.json` through the homes' symlinks. The harness-state
+clean filter keeps those keys out of the index, but git calls a file modified when its size
+differs from the index entry without running the filter, so `git status` shows `M` on a file
+whose filtered diff is empty. Staging such a file writes the blob already in the index and
 refreshes its stat; a file with a real change is left alone.
 
 Claude Code runs this from Stop because `/effort` fires no hook (PostModelSwitch covers
 `/model` only; ConfigChange does not fire on the harness's own writes; probed with Claude
-Code 2.1.283); Codex has no event nearer its picker than Stop. pi's extension calls
-this after picker events, at turn end and at shutdown. The refresh runs in every
+Code 2.1.283); Codex and agy have no event nearer their pickers than Stop. pi's extension
+calls this after picker events, at turn end and at shutdown. The refresh runs in every
 project, so it works on the checkout it lives in, not the cwd. The mark is cosmetic and
 must never block a turn: when another git process holds the index lock it skips, and the
 next refresh retries. Any other git failure exits non-zero, which the calling harness
@@ -20,8 +20,8 @@ reports without blocking. The hooks and pi extension call it through
 names the checkout.
 
 It first runs `live-picks capture`, which reads the live configs and writes only
-local/live-picks.json (Claude and Codex) and local/live-picks-pi.json (pi), so it runs
-even while another git process holds the index. Capture never records an absence as a
+local/live-picks.json (Claude and Codex), local/live-picks-pi.json (pi) and
+local/live-picks-agy.json (agy), so it runs even while another git process holds the index. Capture never records an absence as a
 reset; only forget records the default. Then, unless the index is locked,
 `codex-trust sync` saves and restores Codex's project trust and `live-picks restore` puts back a dropped pick; the staging below clears the mark
 their inserts leave. A failed step still lets the others run, then fails the hook with
@@ -34,7 +34,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-PATTERNS = ("claude/settings*.json", "codex/config*.toml", "pi/settings*.json")
+PATTERNS = ("claude/settings*.json", "codex/config*.toml", "pi/settings*.json", "agy/settings*.json")
 HERE = Path(__file__).resolve().parent
 TRUST = HERE / "codex-trust"
 PICKS = HERE / "live-picks"
