@@ -2,9 +2,10 @@
 id: hq-21aaa3
 title: "Agent side of the host broadcast: check for signals between turns, pause at a good point, park the task"
 status: shelved
-priority: "2"
+priority: 2
+defer: 2026-11-30
 created: 2026-09-16T15:57:15Z
-updated: 2026-09-29T21:08:58Z
+updated: 2026-10-31T11:30:23Z
 depends: [ops-998bbb, hq-539508]
 tags: [quick-add, hooks, flow]
 source: "mindful:thought:34328bb6f74e4517bb0c5a2569ade36b"
@@ -21,3 +22,4 @@ Source: mindful:thought:34328bb6f74e4517bb0c5a2569ade36b
 - 2026-09-22T01:47:14Z (main): Follow-up to ai-80b836: tasks-3190fb is done at tasks main 903f04a; tasks was reinstalled. Codex claims now use the native thread id and TTL liveness, resolving the tasks-side identity blocker in the earlier finding. Brief §5 records the remaining native-identity Stop-hook rerun and unprobed Codex subagent coverage. Inappropriate parking and rollout judgment remain open.
 - 2026-09-29T21:08:58Z (main): shelved: relay cutover tack-539508 lands and a project takes ownership of the host-request store (ops relay spec §6 assigns it to an unowned 'host broadcast feature'), or a benchmark or restart needs running agents paused and parking by hand falls short
 - 2026-09-29T21:08:58Z (main): scope: shelved; evidence 2026-09-29: no broadcast transport exists or is owned — relay has no host-state/signal code, docs or task (HEAD bfed7d7), the ops relay design spec §6 defers host requests to a 'host broadcast feature' no project owns, tasks quiet/park --reason quiet is task-side only, host-load stores nothing; turn-boundary spec §8 already defers this to relay and implies a separate Stop hook beside ops hooks/claim-guard (live since ops e402b37); added depends on tack-539508 (relay cutover); related fam-5b276b (idea: session-end park backstop)
+- 2026-10-31T11:30:23Z (main): shelved: Relay cutover hq-539508 lands and a project takes ownership of the persistent host-request store, or a benchmark or restart needs running agents paused and parking by hand falls short. Cutover is already complete; store ownership or the concrete manual-parking shortfall remains the wake condition.
