@@ -3,8 +3,10 @@ id: hq-da52b7
 title: "Distilled superpowers: a minimal flow built from reusable blocks"
 status: idea
 priority: 2
+reviewed: true
+reviewed_at: 2026-10-31T10:48:01Z
 created: 2026-09-15T00:43:12Z
-updated: 2026-10-31T10:48:00Z
+updated: 2026-10-31T10:48:01Z
 depends: [hq-bc49ed]
 tags: [quick-add, skills, obs, flow]
 source: "mindful:thought:48e70c654fd84c6ab72d3f06b6261683"
@@ -28,3 +30,5 @@ Source: mindful:thought:48e70c654fd84c6ab72d3f06b6261683
 - 2026-09-22T00:31:01Z (main): scope: shelved; of its three parts the walker landed (flow skill, ai-f5da3a), the feedback loop is scoped (ai-bdff6f, ai-c78706), and blocks wait for a second flow as this idea's own note says; brief: docs/notes/2026-09-21-flow-gates-brief.md
 - 2026-09-22T02:55:34Z (main): ai-634de8 (functional core framing, spec section 3.5) settles the block shape: a gate is {artifact, check, judge, record}; a flow is an ordered gate list plus back edges; composition is concatenation and nesting. Wake condition unchanged: factor after a second concrete flow.
 - 2026-10-31T10:47:58Z (main): unshelved
+- 2026-10-31T10:48:01Z (main): scope: drop; reviewed the second-flow condition against current intended direction rather than treating today's deterministic implementation as the whole goal. Walker already landed in hq-f5da3a; feedback listing/curation landed in hq-bdff6f/hq-c78706. Remaining native replacement and reusable blocks are held by flows-91a6b4/flows-abf80d and flows-0a19b9, with design flows-8d2f2d explicitly inventorying meaningful current obligations before implementation. Read their bodies and flows docs/notes/2026-10-28-flow-atoms-brief.md at 9f6d9de; flows main 080d86d remains the existing deterministic machine, so this is coverage of intended work, not a claim the replacement is built. Unshelved to a reviewed idea; original sparse/model-discretion goal, body and source preserved. origin: filing event unavailable (no creation occurrence/stamp in show); older request not applicable (no origin_session). Corrected field to user from resolved human-authored thought:48e70c654fd84c6ab72d3f06b6261683, which explicitly asks for sparse superpowers and reusable blocks. proposal: drop as covered by flows-91a6b4 and flows-0a19b9; when accepting, retain the original sparse prose/model-discretion and feedback requirements as input to flows-8d2f2d rather than assume a larger native flow already satisfies them.
+  provenance: {"harness_session":"codex:01a1918d-e320-7110-90dd-2422cb01520e","harness_session_source":"CODEX_THREAD_ID"}
