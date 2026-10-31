@@ -2,9 +2,10 @@
 id: hq-baf823
 title: A doc that describes a grammar carries an example parsed before review
 status: shelved
-priority: "2"
+priority: 2
+defer: 2026-11-30
 created: 2026-09-24T14:36:14Z
-updated: 2026-09-24T14:50:06Z
+updated: 2026-10-31T11:07:29Z
 depends: []
 tags: [flow]
 source: ai-c78706
@@ -17,3 +18,4 @@ Retro group (curation pass ai-c78706), 3 retros: ai-f6a3a1 (writing the grammar 
 
 - 2026-09-24T14:50:06Z (main): shelved: a retro outside the functional-core tree (ai-634de8 and its steps) credits a grammar or corpus written before its parser, or a review finds a documented shape that fails to parse
 - 2026-09-24T14:50:06Z (main): scope: shelved; all three retros come from one effort (ai-634de8, ai-f6a3a1, ai-6a599a) whose spec already required corpus-first for gate notes, so this is one practice seen once, not a recurrence; wakes on a second effort
+- 2026-10-31T11:07:29Z (main): shelved: a retro outside the functional-core tree (ai-634de8 and its steps) credits a grammar or corpus written before its parser, or a review finds a documented shape that fails to parse
