@@ -262,11 +262,13 @@ Facts below were read from this host's store on 2026-11-01 (agy 1.4.12).
        unpaired calls have no result.
   - *Turn and outcome.* A turn runs from a human `USER_INPUT` to the step before the next
     one, spanning the controller-wake `SYSTEM_MESSAGE` steps (`[Message] … sender=…`)
-    and the planner steps they trigger. Outcome, matched to the Claude and Codex
-    readers' vocabulary: `wait` when the turn's last call is `ask_question` (as
-    `WAIT_TOOLS`); `interrupted` when it ends with an unpaired call or a background task
-    with no result yet; `error` when its last step is an `ERROR_MESSAGE`; otherwise
-    `completed`. The builder maps these onto the existing outcome strings exactly.
+    and the planner steps they trigger. Outcome uses the existing vocabulary
+    (`completed`, `wait`, `interrupted`, `unknown`) with the Claude reader's rules for
+    pending calls: `wait` when the only pending calls are `ask_question` (added to
+    `WAIT_TOOLS`); `unknown` when the turn ends with other unpaired calls, a background
+    task with no result yet, or an `ERROR_MESSAGE` as its last step; otherwise
+    `completed`. agy marks no user interrupt that was seen here, so `interrupted` is
+    unused unless the builder finds one.
   - *Provenance.* `agy:<conversation-id>` (tasks-75a0fe).
 - **session-logs skill.** A Stores row and record shapes for agy, its human-or-injected
   markers, and how to find the session behind a task id, worktree or commit.
