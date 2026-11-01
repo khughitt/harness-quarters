@@ -1,17 +1,15 @@
 ---
 id: hq-6c8a9f
 title: "Set up Antigravity CLI (agy) configuration, links, and live-state hygiene in hq"
-status: done
+status: todo
 priority: 1
 size: m
 complexity: mid
 process: direct
 owner: feat/agy-setup
 created: 2026-10-31T21:00:30Z
-updated: 2026-10-31T22:00:10Z
+updated: 2026-11-01T01:28:29Z
 started: 2026-10-31T21:00:48Z
-completed: 2026-10-31T22:00:10Z
-closed: 2026-10-31T22:00:10Z
 depends: []
 tags: []
 agent: agy
