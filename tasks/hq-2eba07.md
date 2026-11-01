@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-2eba07-harness-manifest
 created: 2026-11-01T01:25:51Z
-updated: 2026-11-01T10:14:45Z
+updated: 2026-11-01T10:14:49Z
 started: 2026-11-01T09:55:45Z
 depends: []
 tags: [hooks]
@@ -36,3 +36,4 @@ Where: .githooks/{harness-state-clean,harness-state-refresh,live-picks}, facts/c
 - 2026-11-01T09:56:27Z (feat/hq-2eba07-harness-manifest): trial: flow-trial-1 — enrolled — flow off
 - 2026-11-01T09:56:28Z (feat/hq-2eba07-harness-manifest): arm: flow-trial-1 — unit tack-2eba07 — flow off
 - 2026-11-01T10:06:10Z (feat/hq-2eba07-harness-manifest): originating ask (agy session fdddf278, 2026-10-31/2026-11-01): user asked how to improve harness abstraction/compartmentalization/configuration so onboarding new harnesses minimizes ad-hoc/hardcoded logic, and asked at hq-6c8a9f closeout for follow-ups; filing agent scoped hq-2eba07 to a declarative manifest driving .githooks/{harness-state-clean,harness-state-refresh,live-picks} and facts/capabilities.toml. Selected Approach 1 (root harnesses.toml read by .githooks/harness_state.py and tools/harness-facts, removing duplicate harnesses list from facts/capabilities.toml); rejected Approach 2 (extending links.toml, which keys on home directories rather than capability slugs or tracked settings files) and Approach 3 (.githooks/harnesses.toml with duplicate harnesses kept in facts/capabilities.toml).
+- 2026-11-01T10:14:49Z (feat/hq-2eba07-harness-manifest): frozen spec: hq in-tree . (.worktrees/hq-2eba07) commit 623f6f443a024f906f9d7372a9b19fb4261303aa:docs/specs/2026-11-01-harness-manifest-design.md (sha256 b276a5afa2623591acc950054a809bf6f75d7e9a45bc32f8d82df25e83004b1e); read-only builder-check subagent (agy:2ef562bf-6ac2-4e61-ac1e-632b92a2a20f) reported nothing important left; ops-check, ops-docs check, harness-facts check, and tasks check pass; host-load --section session reports session kitty-3817258-0.scope: nothing left running; nothing pushed; branch feat/hq-2eba07-harness-manifest remains unmerged in .worktrees/hq-2eba07 (do not amend or rebase while spec review is open; final merge to main requires explicit user approval because .githooks/ is a live global hook surface).
