@@ -5,11 +5,15 @@ import re
 import sqlite3
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import unquote, urlparse
 
 from hq_cli import color
 
 from .model import Adapter, Home, Session, SourceError
+
+if TYPE_CHECKING:
+    from session_archive.config import Source
 
 AGY_COLUMNS = ("conversation_id", "title", "preview", "workspace_uris", "last_modified_time",
                "parent_conversation_id")
@@ -53,7 +57,7 @@ def workspace(path: Path, cid: str, value) -> str | None:
     return cwd
 
 
-def read_agy(home: Home, archived: bool = False) -> tuple[list[Session], dict[str, int]]:
+def read_agy(home: Home) -> tuple[list[Session], dict[str, int]]:
     """Every conversation row; subagents, vanished transcripts and rows with no workspace are
     marked excluded so they are counted, not listed."""
     path = home.path / "conversation_summaries.db"
@@ -101,8 +105,27 @@ def resume_argv(session: Session, flags: list[str]) -> list[str]:
     return ["agy", *flags, "--conversation", session.id]
 
 
-def archive_sources(user_home: Path) -> tuple:
-    return ()   # agy capture is added with the archive task
+TRANSCRIPT_RE = re.compile(r"[^/]+/\.system_generated/logs/transcript(_full)?\.jsonl")
+
+
+def descend_brain(relpath: str) -> bool:
+    """Only <id>, <id>/.system_generated and <id>/.system_generated/logs hold transcripts."""
+    parts = relpath.split("/")
+    return len(parts) == 1 or (parts[1:] in ([".system_generated"], [".system_generated", "logs"])
+                               and len(parts) in (2, 3))
+
+
+def archive_sources(user_home: Path) -> tuple["Source", ...]:
+    """Two optional, unpruned rows: the brain transcripts (append-only) and the summaries
+    database (rewritten in place, so the mirror rotates it)."""
+    from session_archive.config import Source
+    home = homes(user_home)[0].path
+    return (
+        Source("agy", "agy", home, home / "brain", None, required=False, append_only=True,
+               descend=descend_brain, select=lambda relpath: TRANSCRIPT_RE.fullmatch(relpath) is not None),
+        Source("agy-summaries", "agy", home, home, None, required=False, append_only=False,
+               descend=lambda relpath: False, select=lambda relpath: relpath == "conversation_summaries.db"),
+    )
 
 
 ADAPTER = Adapter(

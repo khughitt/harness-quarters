@@ -1,6 +1,7 @@
 """The daily run over every source, and the capture command (spec §3.3)."""
 import json
 import os
+import shutil
 
 import pytest
 
@@ -299,3 +300,70 @@ def test_capture_run_applies_select(home, archive, manifest):
                for s in table(home)]
     report, ok = capture_run(archive, manifest, sources)
     assert ok and report["claude"]["scanned"] == 1
+
+
+AGY = ".gemini/antigravity-cli"
+CID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+
+
+def agy_fixture(home):
+    root = home / AGY
+    logs = root / "brain" / CID / ".system_generated" / "logs"
+    write(logs / "transcript.jsonl", b"t\n")
+    write(logs / "transcript_full.jsonl", b"full\n")
+    write(logs / "chunks" / "transcript" / "00000000.jsonl", b"chunk\n")
+    write(root / "brain" / CID / ".system_generated" / "steps" / "1" / "output.txt", b"out")
+    write(root / "brain" / CID / "scratch" / "x", b"x")
+    write(root / "brain" / CID / "task.md", b"task")
+    write(root / "conversations" / f"{CID}.db", b"db")
+    write(root / "conversation_summaries.db", b"summaries-1")
+    return root
+
+
+def mirrored(archive, source):
+    base = archive / source
+    return sorted(p.relative_to(base).as_posix() for p in base.rglob("*") if p.is_file())
+
+
+def test_agy_capture_takes_only_transcripts_and_the_summaries_db(home, archive, manifest):
+    agy_fixture(home)
+    report, ok = capture_run(archive, manifest, table(home))
+    assert ok
+    logs = f"{CID}/.system_generated/logs"
+    assert mirrored(archive, "agy") == [f"{logs}/transcript.jsonl", f"{logs}/transcript_full.jsonl"]
+    assert mirrored(archive, "agy-summaries") == ["conversation_summaries.db"]
+    assert report["agy"]["copied"] == 2 and report["agy-summaries"]["copied"] == 1
+
+
+def test_agy_summaries_rewrite_replaces_mirror(home, archive, manifest):
+    root = agy_fixture(home)
+    capture_run(archive, manifest, table(home))
+    write(root / "conversation_summaries.db", b"summaries-2 longer")
+    report, ok = capture_run(archive, manifest, table(home))
+    assert ok and report["agy-summaries"]["copied"] == 1
+    assert mirror_path(archive, "agy-summaries", "conversation_summaries.db").read_bytes() == b"summaries-2 longer"
+    write_config(home, archive)
+    status = run_tool("status", home=home)   # exits 1: this test recorded no capture run
+    assert json.loads(status.stdout)["diverged"] == []
+
+
+def test_linked_never_run_agy_home_is_skipped(home, archive):
+    root = home / AGY
+    (root / "brain").rmdir()
+    write(root / "settings.json", b"{}")
+    write_config(home, archive)
+    result = run_tool("capture", home=home)
+    assert result.returncode == 0, result.stderr
+    report = json.loads(result.stdout)
+    assert "skipped" in report["agy"]
+    assert report["agy-summaries"]["scanned"] == 0 and report["agy-summaries"]["copied"] == 0
+
+
+def test_agy_brain_vanishing_after_capture_aborts(home, archive):
+    root = agy_fixture(home)
+    write_config(home, archive)
+    assert run_tool("capture", home=home).returncode == 0
+    shutil.rmtree(root / "brain")
+    result = run_tool("capture", home=home)
+    assert result.returncode == 2
+    assert "brain" in result.stderr
