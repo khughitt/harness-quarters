@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-2eba07-harness-manifest
 created: 2026-11-01T01:25:51Z
-updated: 2026-11-01T19:03:18Z
+updated: 2026-11-01T19:03:35Z
 started: 2026-11-01T09:55:45Z
 depends: []
 tags: [hooks]
@@ -82,4 +82,6 @@ Where: .githooks/{harness-state-clean,harness-state-refresh,live-picks}, facts/c
 - 2026-11-01T19:01:17Z (feat/hq-2eba07-harness-manifest): parked (waiting on user, approval): User: approve or decline merging feat/hq-2eba07-harness-manifest (.githooks/ and justfile live hook surface) into main. On approval, the agent runs plan Task 6 Step 4 from main: git merge --no-ff feat/hq-2eba07-harness-manifest, just test, just link-check, then tt-report, ignored-file and host-pointer checks, and worktree removal.
   provenance: {"harness_session":"claude-code:fdf3b32f-5e63-4593-bba2-4e994bcdf1eb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-01T19:03:18Z (feat/hq-2eba07-harness-manifest): resumed
+  provenance: {"harness_session":"claude-code:fdf3b32f-5e63-4593-bba2-4e994bcdf1eb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-01T19:03:35Z (feat/hq-2eba07-harness-manifest): User approved merging feat/hq-2eba07-harness-manifest into main in session (message: "Approved."). Identify the current integration owner.
   provenance: {"harness_session":"claude-code:fdf3b32f-5e63-4593-bba2-4e994bcdf1eb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
