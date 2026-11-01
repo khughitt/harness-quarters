@@ -1,8 +1,12 @@
-# Once per clone: git hooks and the harness-state filter, and the untracked local/
-# directories a public clone needs. Work configs under local/ come from another host.
+# Once per clone, and again after pulling a change to it: git hooks, the harness-state
+# filter (required, so a failing clean stops git rather than staging live picks, with the
+# identity smudge `cat` a required filter needs to check files out), and the untracked
+# local/ directories a public clone needs. Work configs under local/ come from another host.
 setup:
     git config core.hooksPath .githooks
     git config filter.harness-state.clean '.githooks/harness-state-clean %f'
+    git config filter.harness-state.required true
+    git config filter.harness-state.smudge cat
     mkdir -p local/codex/rules
 
 # Regenerate the identity regions of README.md and AGENTS.md from identity.toml.

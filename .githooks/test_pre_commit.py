@@ -9,6 +9,7 @@ import pytest
 
 HOOK = Path(__file__).with_name("pre-commit")
 OPS_CHECK = Path(__file__).resolve().parent.parent / "tools" / "ops-check"
+HARNESS_STATE = Path(__file__).resolve().parent / "harness_state.py"
 
 
 def sh(cwd, env, *args):
@@ -51,7 +52,17 @@ def world(tmp_path):
     facts.write_text("#!/usr/bin/env python3\nimport sys\nassert sys.argv[1:] == ['check']\n")
     shutil.copyfile(OPS_CHECK, repo / "tools" / "ops-check")
     (repo / "tools" / "ops-check").chmod(0o755)
-    sh(repo, env, "git", "add", "AGENTS.md", "tools/harness-facts", "tools/ops-check")
+    # The staged manifest check: the real checker over a manifest with no live-state
+    # entry, so no path is filtered, and the filter config just setup writes.
+    (repo / ".githooks").mkdir()
+    shutil.copyfile(HARNESS_STATE, repo / ".githooks" / "harness_state.py")
+    (repo / "harnesses.toml").write_text("schema = 1\n[harnesses.opencode]\n")
+    (repo / ".gitattributes").write_text("")
+    sh(repo, env, "git", "config", "filter.harness-state.clean", ".githooks/harness-state-clean %f")
+    sh(repo, env, "git", "config", "filter.harness-state.required", "true")
+    sh(repo, env, "git", "config", "filter.harness-state.smudge", "cat")
+    sh(repo, env, "git", "add", "AGENTS.md", "tools/harness-facts", "tools/ops-check",
+       ".githooks/harness_state.py", "harnesses.toml", ".gitattributes")
     sh(repo, env, "git", "commit", "-q", "-m", "init")
     return repo, env, tmp_path
 
@@ -175,3 +186,32 @@ def test_shipped_ops_check_config_allows_live_agy_trusted_workspaces(world):
     sh(repo, env, "git", "add", ".ops-check.toml", "agy/settings.json")
     result = run_hook(repo, env)
     assert result.returncode == 0, result.stderr
+
+
+def test_pre_commit_runs_from_linked_worktree_and_enforces_shared_filter_config(world):
+    repo, env, tmp_path = world
+    worktree = tmp_path / "linked"
+    sh(repo, env, "git", "worktree", "add", "-q", "-b", "side", str(worktree))
+    assert Path(sh(worktree, env, "git", "rev-parse", "--show-toplevel").strip()) == worktree.resolve()
+    docs_stub(worktree)                              # the stub is untracked; the worktree needs its own
+    (worktree / "notes.md").write_text("a clean doc change\n")
+    sh(worktree, env, "git", "add", "notes.md")
+    result = run_hook(worktree, env)
+    assert result.returncode == 0, result.stderr
+
+    sh(repo, env, "git", "config", "--unset", "filter.harness-state.required")
+    result = run_hook(worktree, env)
+    assert result.returncode == 1
+    assert "filter.harness-state.required" in result.stderr and "just setup" in result.stderr
+
+    sh(repo, env, "git", "config", "filter.harness-state.required", "true")
+    sh(repo, env, "git", "config", "--unset", "filter.harness-state.smudge")
+    result = run_hook(worktree, env)
+    assert result.returncode == 1
+    assert "filter.harness-state.smudge" in result.stderr and "just setup" in result.stderr
+
+    sh(repo, env, "git", "config", "filter.harness-state.smudge", "cat")
+    sh(repo, env, "git", "config", "filter.harness-state.clean", f"{repo}/.githooks/harness-state-clean %f")
+    result = run_hook(worktree, env)
+    assert result.returncode == 1
+    assert "filter.harness-state.clean" in result.stderr and "just setup" in result.stderr

@@ -1,9 +1,13 @@
-"""pre-commit validates a staged fact file as staged, not as it sits in the working tree."""
+"""pre-commit validates the staged fact file and harness manifest as staged, not as they sit
+in the working tree, and the filter config of the real repository."""
 import importlib.machinery
 import importlib.util
+import json
+import os
 import shutil
 import subprocess
 import tempfile
+import time
 import tomllib
 from pathlib import Path
 
@@ -21,21 +25,65 @@ def load_hook():
     return module
 
 
+CLEAN_FILTER = ".githooks/harness-state-clean %f"
+# Clean tracked configs: what the filter stages from them is their own bytes.
+TRACKED = {
+    "claude/settings.json": json.dumps({"theme": "dark-ansi"}, indent=2) + "\n",
+    "codex/config.toml": "[features]\nhooks = true\n",
+    "pi/settings.json": json.dumps({"theme": "system"}, indent=2) + "\n",
+    "agy/settings.json": json.dumps({"allowNonWorkspaceAccess": True}, indent=2) + "\n",
+}
+
+
 @pytest.fixture
 def repo(tmp_path, monkeypatch):
-    """A scratch repository holding the tool, the probes the shipped fact file names, and the file."""
+    """A scratch repository holding the fact reader, the probes the shipped fact file names,
+    the file, the manifest checker and clean filter with the shipped harnesses.toml and
+    .gitattributes, clean tracked configs, and the filter config `just setup` writes. The
+    hook runs in this process and its git children inherit the process environment, so that
+    environment is rebuilt key by key: HOME, XDG_CONFIG_HOME and the global git config under
+    tmp_path, and no inherited GIT_* variable."""
     root = tmp_path / "repo"
     facts = tomllib.loads((CHECKOUT / "facts" / "capabilities.toml").read_text())["facts"]
     probes = {fact["probe"] for fact in facts.values() if "probe" in fact}
-    for name in ("tools/harness-facts", "facts/capabilities.toml", *sorted(probes)):
+    for name in ("tools/harness-facts", "facts/capabilities.toml", "harnesses.toml", ".gitattributes",
+                 ".githooks/harness_state.py", ".githooks/harness-state-clean", *sorted(probes)):
         (root / name).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(CHECKOUT / name, root / name)
+    for name, text in TRACKED.items():
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        (root / name).write_text(text)
+    home = tmp_path / "home"
+    home.mkdir()
+    (tmp_path / "gitconfig").touch()
+    env = {"PATH": os.environ["PATH"], "HOME": str(home), "XDG_CONFIG_HOME": str(tmp_path / "config"),
+           "GIT_CONFIG_GLOBAL": str(tmp_path / "gitconfig"), "GIT_CONFIG_NOSYSTEM": "1",
+           "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid",
+           "PYTHONDONTWRITEBYTECODE": "1"}
+    for key in list(os.environ):
+        monkeypatch.delenv(key)
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
     subprocess.run(["git", "init", "-q", str(root)], check=True)
     monkeypatch.chdir(root)
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    top = subprocess.run(["git", "rev-parse", "--show-toplevel"], check=True, text=True, capture_output=True)
+    git_dir = subprocess.run(["git", "rev-parse", "--absolute-git-dir"], check=True, text=True,
+                             capture_output=True)
+    assert Path(top.stdout.strip()) == root.resolve()
+    assert Path(git_dir.stdout.strip()).is_relative_to(root.resolve())
+    subprocess.run(["git", "config", "filter.harness-state.clean", CLEAN_FILTER], check=True)
+    subprocess.run(["git", "config", "filter.harness-state.required", "true"], check=True)
+    subprocess.run(["git", "config", "filter.harness-state.smudge", "cat"], check=True)
     subprocess.run(["git", "add", "."], check=True)
-    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false",
-                    "commit", "-q", "--no-verify", "-m", "base"], check=True)
+    subprocess.run(["git", "-c", "commit.gpgsign=false", "commit", "-q", "--no-verify", "-m", "base"], check=True)
+    # Age the tracked configs so no index entry is racily clean: git rechecks a racy entry's
+    # content through the required filter at every index write, and a test that stages a
+    # broken harnesses.toml would then fail in the filter rather than reach the hook.
+    past = time.time() - 60
+    for name in TRACKED:
+        os.utime(root / name, (past, past))
+    subprocess.run(["git", "update-index", "-q", "--refresh"], check=True)
     return root
 
 
@@ -168,3 +216,94 @@ def test_a_staged_probe_deletion_is_refused(repo, capsys):
 def test_removed_mirror_command_is_refused(repo, capsys):
     assert load_hook().main(['facts-mirror']) == 1
     assert 'accepts no arguments' in capsys.readouterr().err
+
+
+
+OVERLAP = """
+[harnesses.extra.live_state]
+config = "agy/settings-x.json"
+filter_glob = "agy/settings-x*.json"
+format = "json"
+clean_keys = ["k"]
+"""
+
+
+def stage_manifest(old, new):
+    path = Path("harnesses.toml")
+    text = path.read_text()
+    assert old in text
+    path.write_text(text.replace(old, new, 1))
+    git("add", "harnesses.toml")
+
+
+def stage_attributes():
+    path = Path(".gitattributes")
+    path.write_text("".join(line for line in path.read_text().splitlines(keepends=True)
+                            if not line.startswith("pi/")))
+    git("add", ".gitattributes")
+
+
+# Each case: how it breaks the staged tree or the filter config, and what stderr names.
+STAGED_VIOLATIONS = {
+    "bad-regex": (lambda: stage_manifest("'tui\\.model_availability_nux'", "'tui\\.model_(availability'"),
+                  "not a valid regex"),
+    "partition": (lambda: stage_manifest('unrestored_keys = ["deviceId", "trackingId"]',
+                                         'unrestored_keys = ["deviceId"]'),
+                  "pick_units plus unrestored_keys"),
+    "overlap": (lambda: stage_manifest("[harnesses.opencode]", OVERLAP.lstrip() + "\n[harnesses.opencode]"),
+                "overlaps"),
+    "gitattributes-drift": (stage_attributes, ".gitattributes lacks `pi/settings*.json"),
+    "required-unset": (lambda: git("config", "--unset", "filter.harness-state.required"),
+                       "filter.harness-state.required"),
+    "smudge-unset": (lambda: git("config", "--unset", "filter.harness-state.smudge"),
+                     "filter.harness-state.smudge"),
+    "manifest-deleted": (lambda: git("rm", "-q", "--cached", "harnesses.toml"), "harnesses.toml"),
+    "checker-deleted": (lambda: git("rm", "-q", "--cached", ".githooks/harness_state.py"),
+                        ".githooks/harness_state.py is not staged"),
+    "facts-harness-undeclared": (lambda: stage_manifest("[harnesses.opencode]\n", ""), "opencode"),
+}
+
+
+@pytest.mark.parametrize("name", sorted(STAGED_VIOLATIONS))
+def test_staged_live_state_and_gitattributes_violations_are_refused(repo, capsys, name):
+    hook = load_hook()
+    assert hook.staged_checks() == 0, capsys.readouterr().err
+    capsys.readouterr()
+    breaks, named = STAGED_VIOLATIONS[name]
+    breaks()
+    if name != "facts-harness-undeclared":        # the fact reader alone refuses that one
+        assert hook.manifest_check() == 1
+        err = capsys.readouterr().err
+        assert named in err, err
+        assert "staged-tree-" not in err, err      # no temp-tree path prefix
+    assert hook.staged_checks() == 1
+    err = capsys.readouterr().err
+    assert named in err, err
+    assert "staged-tree-" not in err, err
+    assert "Traceback" not in err, err
+
+
+def test_already_leaked_staged_settings_blob_is_refused_until_renormalized(repo, capsys):
+    for key in ("required", "clean", "smudge"):
+        git("config", "--unset", f"filter.harness-state.{key}")
+    Path("pi/settings.json").write_text(json.dumps({"theme": "system", "deviceId": "leaked-id"}, indent=2) + "\n")
+    git("add", "pi/settings.json")                  # no filter ran: the raw blob is staged
+    assert "leaked-id" in subprocess.run(["git", "show", ":pi/settings.json"], check=True, text=True,
+                                         capture_output=True).stdout
+    git("config", "filter.harness-state.clean", CLEAN_FILTER)    # then just setup runs
+    git("config", "filter.harness-state.required", "true")
+    git("config", "filter.harness-state.smudge", "cat")
+    hook = load_hook()
+    assert hook.manifest_check() == 1
+    err = capsys.readouterr().err
+    assert "pi/settings.json" in err and "git add --renormalize pi/settings.json" in err, err
+    assert hook.staged_checks() == 1
+    capsys.readouterr()
+
+    git("add", "--renormalize", "pi/settings.json")
+
+    assert hook.manifest_check() == 0, capsys.readouterr().err
+    assert hook.staged_checks() == 0, capsys.readouterr().err
+    staged = subprocess.run(["git", "show", ":pi/settings.json"], check=True, text=True,
+                            capture_output=True).stdout
+    assert "leaked-id" not in staged and json.loads(staged) == {"theme": "system"}

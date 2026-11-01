@@ -71,7 +71,8 @@ done
 The second pattern catches what the first cannot without a quote or the full slug: bare
 TOML keys (`claude = "~/.claude"` in `<ops-checkout>/profiles.toml`, `[harness.claude]`
 in `links.toml`) and path-shaped constants (`"claude/settings.json"` in
-`.githooks/harness-state-refresh` and `live-picks`).
+`harnesses.toml` and the hook tests, `"codex/config.toml"` in `.githooks/codex-trust`,
+`"agy/settings.json"` in `.githooks/live-picks`).
 
 Hits run to hundreds in the larger repositories, mostly tests. Group them by file and
 classify each site before editing it:
@@ -107,7 +108,7 @@ rejects the new harness until it is extended. A hit inside a two-way branch
 ### Naming
 
 Pick a canonical lowercase slug matching `[a-z][a-z0-9-]*` for
-`facts/capabilities.toml` and cross-project `--harness` flags (`claude-code`, `codex`,
+`harnesses.toml`, `facts/capabilities.toml` and cross-project `--harness` flags (`claude-code`, `codex`,
 `opencode`, `pi`, `agy`). Where a harness has execution modes with different
 durability or capability guarantees, declare separate fact slugs (`pi` and
 `pi-durable`).
@@ -263,75 +264,126 @@ unhealed zero-turn replacement and `just link --apply` converges it via `live-pi
 (still refusing pre-existing files on an unanchored host). The live `just link-check`
 after a real save belongs to the post-apply checks (section 8).
 
-### 3.2 Route the file through `.gitattributes`
+### 3.2 Declare the harness and its live config in `harnesses.toml`
 
-Add the tracked pattern to `.gitattributes` (`just setup` configures
-`filter.harness-state.clean` to `.githooks/harness-state-clean %f`; smudge is
-identity):
+`harnesses.toml` is the one list of harnesses: `[harnesses.<name>]` declares the slug
+(capability facts read it, section 4), and `[harnesses.<name>.live_state]` declares the
+tracked config the filter cleans and `live-picks` preserves. A harness with no tracked
+live config is a bare `[harnesses.<name>]` table (`opencode`, `pi-durable`).
+
+```toml
+[harnesses.<name>.live_state]
+config = "<name>/settings.json"          # the file the home links to
+filter_glob = "<name>/settings*.json"     # every tracked variant the filter takes
+format = "json"                           # or "toml"
+clean_keys = ["model", "effort", "installId"]
+unrestored_keys = ["installId"]
+picks_record = "local/live-picks-<name>.json"
+pick_units = [["model"], ["effort"]]
+```
+
+- `config` and `filter_glob` are directory-qualified, outside `local/`, and `config`
+  matches `filter_glob`. The glob's only wildcard is `*`, at most one per `/` segment,
+  and it never crosses `/` (`claude/settings*.json` does not take
+  `claude/settings/nested.json`), as in `.gitattributes`. No two entries share a
+  `config` or `filter_glob`, and no two globs can match one path (`agy/settings*.json`
+  and `agy/settings-x*.json` are refused together).
+- `clean_keys` lists what the filter strips. For JSON, top-level keys. For TOML, a list
+  of `{ table = "<regex>", keys = [...] }` rules, where `table` is a regex the table
+  header must fully match and `""` is the top level before the first header.
+- `clean_tables` (TOML only) lists regexes of whole tables to drop, header and body
+  (`'projects\..+'` for Codex's per-directory trust).
+- `trust_table` (TOML only) names the one `clean_tables` entry whose tables a trust
+  helper saves and restores (3.6); it must appear in `clean_tables`.
+- `pick_units` groups the picker keys `live-picks` saves and restores. Each unit is one
+  picker's fields (`[["model", "modelSettings"], ["effortLevel"]]` for Claude's `/model`
+  and `/effort`), restored only when the live file holds none of them. TOML units are
+  top-level one-line keys, merged in declaration order. `picks_record` is the untracked
+  `local/<file>` that saves them; a record of its own per harness isolates parse errors,
+  refusals and migrations.
+- `unrestored_keys` lists stripped keys no picker owns, which are neither saved nor
+  restored and which `forget` leaves in the file (pi's `deviceId` and `trackingId`).
+- **Partition invariant**: the pick-unit keys and `unrestored_keys` are disjoint, and
+  together they are exactly the filterable keys: every JSON `clean_keys` entry, or every
+  top-level (`table = ""`) TOML key. A key in neither would be stripped and silently lost
+  at the next checkout; `.githooks/harness_state.py` refuses the manifest instead.
+- **Clean-only entry**: omit both `picks_record` and `pick_units` when the filter should
+  strip keys that nothing preserves. `unrestored_keys` then defaults to every filterable
+  key, `live-picks` skips the entry, and `forget` refuses it.
+
+`python3 .githooks/harness_state.py check` validates the manifest, `.gitattributes` and
+the filter config, and the pre-commit hook runs it over the staged tree (3.3).
+
+### 3.3 Route the file through `.gitattributes`
+
+Add exactly the declared `filter_glob`, once:
 
 ```gitattributes
 <name>/settings*.json filter=harness-state
 ```
 
-### 3.3 Strip runtime keys in `.githooks/harness-state-clean`
+`.gitattributes` and `harnesses.toml` must agree both ways: a declared glob without its
+line, a line no entry declares, a repeated line or a negated `filter` attribute is
+refused. `.githooks/harness-state-clean` cleans a path only when one `filter_glob`
+matches it and exits non-zero for any other path, JSON or TOML. `just setup` writes the
+filter config: `filter.harness-state.clean = .githooks/harness-state-clean %f`,
+`required = true`, so a failing clean (a broken manifest, an unparsable config) stops
+git instead of staging live picks, and `smudge = cat`, the identity, because git treats a
+required filter with no smudge as failed at every checkout of a filtered file. That
+config lives in the repository's `.git`, which the synced checkout shares between hosts;
+each host still runs `just setup` once after pulling a change to the recipe, which is
+idempotent.
 
-- **JSON configs**: define `<NAME>_JSON_KEYS` and append
-  `("<name>/settings*.json", <NAME>_JSON_KEYS)` to `JSON_FILES`. `harness-state-clean`
-  exits non-zero if `.gitattributes` sends it a JSON path matching no `JSON_FILES`
-  pattern. `clean_json` parses strict JSON and re-serializes it with
-  `json.dumps(indent=2, ensure_ascii=False)`: a JSONC file (with comments) fails the
-  filter, and the tracked file's formatting is normalized.
-- **TOML configs**: add `(table_regex, key)` pairs to `TOML_KEYS`
-  (`re.compile(r"")` matches top-level keys before the first header) and full-table
-  patterns to `TOML_TABLES`. Both apply to every `.toml` path (built for
-  `codex/config.toml`); generalize them to per-pattern routing like `JSON_FILES` before
-  onboarding a second TOML harness whose key names could collide.
+What the filter does with the declared keys: JSON configs are parsed strictly and
+re-serialized with `json.dumps(indent=2, ensure_ascii=False)`, so a JSONC file (with
+comments) fails the filter and the tracked file's formatting is normalized. TOML configs
+are cleaned line by line, keeping comments and every other table intact.
+
 - **What to strip and what to keep**: strip per-session model/effort keys, host
   workspace trust, transient fetch/UI stamps, and per-installation identifiers (`pi`'s
   `deviceId` and `trackingId`). Keep configuration that should travel through Git
   (enabled model lists, plugin toggles, hook trust hashes, version-pinned changelog
   markers such as `pi`'s `lastChangelogVersion`).
+- **Failure and recovery**: while `harnesses.toml` is broken, `git add`, `git diff` and
+  `git status` on a changed config fail; restore the manifest (`git checkout --
+  harnesses.toml`), never unset `required`. The filter also refuses, with
+  `harness-state-clean: <path>: <problem>`, a live config that is not valid JSON, and
+  `cannot load .githooks/harness_state.py` when that module will not import (conflict
+  markers); fix the file or restore the module. During a merge or rebase `git checkout --
+  harnesses.toml` fails on an unmerged path: resolve the conflict, or run `git merge
+  --abort` / `git rebase --abort`, instead. A blob staged before `just setup` holds
+  its picks; the pre-commit hook refuses it until `git add --renormalize <path>`.
 
 ### 3.4 Preserve user picks across checkouts in `.githooks/live-picks`
 
-Because smudge is identity, any Git command that rewrites the working-tree file drops
-the filtered keys. `.githooks/live-picks` saves live picks in an untracked `local/`
-record and restores them when a unit holds none of its keys:
-
-1. Add the tracked path constant to `OWNED`.
-2. Route `RECORDS[<NAME>]` to its own `"local/live-picks-<name>.json"`, which isolates
-   parse and refusal errors and migrations per harness.
-3. For JSON configs, define disjoint picker tuples in `JSON_GROUPS[<NAME>]`, one per
-   independent UI picker, so changing one picker never clobbers another's saved state
-   (`AGY_GROUPS = (("model",), ("effort", "effortByBase"), ("trustedWorkspaces",))`).
-   `live-picks` asserts at startup that a file's `JSON_GROUPS` keys are disjoint and a
-   subset of `harness-state-clean`'s `JSON_FILES` keys for that path:
-   - make the sets equal (and add `<NAME>` beside `(CLAUDE, AGY)` in the equality
-     assertion) when every stripped key should be restored;
-   - leave `JSON_GROUPS` a strict subset (as `PI` does) when the filter also strips
-     installation IDs that must not be saved or replayed.
-4. Register `<NAME>` in `CLEAN` (`functools.partial(FILTER["clean_json"], keys=...)` or
-   `FILTER["clean_toml"]`) and `FIELD` (`"values"` for JSON, `"lines"` for top-level
-   TOML key lines). The TOML path (`TOML_KEYS`, `codex_lines()`, `if name == CODEX:`
-   in `missing()`) is specialized to `CODEX`: a second TOML harness needs `missing()`
-   to branch on `name not in JSON_GROUPS` (otherwise it falls through to
-   `JSON_GROUPS[name]` and raises `KeyError`) and per-file top-level `TOML_KEYS`.
+Because the smudge is the identity, any Git command that rewrites the working-tree file
+drops the filtered keys. `.githooks/live-picks` saves the live picks of every entry with
+a `picks_record` and restores a unit that holds none of its keys; declaring the entry
+(3.2) is the whole registration. JSON records store `"values"`, TOML records the
+one-line top-level `"lines"`. A TOML pick spanning lines, or a duplicate or quoted key
+that does not round-trip, is refused rather than written.
 
 `.githooks/post-checkout`, `post-merge` and `post-rewrite` call
 `live-picks hook <hook-name>` under `local/harness-state.lock`, skipping linked
-worktrees and in-progress rebases. Because absence means a Git rewrite rather than a
-user reset, resetting a pick to the harness default uses
-`.githooks/live-picks forget <file>`.
+worktrees and in-progress rebases. A hook reports any failure, a broken
+`harnesses.toml` included, on stderr and exits 0, and the next turn end retries; the
+CLI commands exit non-zero. Because absence means a Git rewrite rather than a user
+reset, resetting a pick to the harness default uses `.githooks/live-picks forget <file>`.
+
+A harness whose saves replace the home link (3.1) also needs an adoption adapter, which
+the manifest does not describe: `agy`'s `AGY_HOME`, `AGY_LINK` and `AGY_ANCHORS` in
+`live-picks`, with `adopt` and `anchors` under `[harness.agy]` in `links.toml`.
 
 ### 3.5 Clear Git's stat-dirty marker in `.githooks/harness-state-refresh`
 
 Git marks a tracked file `M` whenever its size differs from the index entry, without
-running the clean filter first. Add `"<name>/settings*.json"` (or
-`"<name>/config*.toml"`) to `PATTERNS` in `.githooks/harness-state-refresh`, which runs
-`live-picks capture`, syncs trust and restores dropped picks when `index.lock` is free,
-and runs `git add` on files whose filtered diff is empty. By default it acts on tracked
-files only; repairing a home link the harness replaced requires an explicit anchored
-adoption contract in `live-picks` and `links.toml` (3.1).
+running the clean filter first. `.githooks/harness-state-refresh` takes its paths from
+every declared `filter_glob` (as `:(glob)` pathspecs, so they match as `.gitattributes`
+does). It runs `live-picks capture`, then checks the manifest and the filter config
+(refusing, naming `just setup`, when they are not what `just setup` writes), syncs trust
+and restores dropped picks when `index.lock` is free, and runs `git add` on files whose
+filtered diff is empty. It acts on tracked files only; repairing a home link the harness
+replaced requires the adoption adapter in `live-picks` and `links.toml` (3.1, 3.4).
 
 Trigger `~/.local/bin/harness-state-refresh` (a `[required]` link, so hook configs
 never hardcode `<hq-checkout>`) from whichever lifecycle hook the harness provides:
@@ -345,17 +397,27 @@ never hardcode `<hq-checkout>`) from whichever lifecycle hook the harness provid
 
 ### 3.6 Workspace trust preservation
 
-- **Single JSON key** (`agy/settings.json`'s `trustedWorkspaces`): preserve it as its
-  own picker tuple `("trustedWorkspaces",)` in `JSON_GROUPS`.
+- **Single JSON key** (`agy/settings.json`'s `trustedWorkspaces`): declare it in
+  `clean_keys` and as its own pick unit, `["trustedWorkspaces"]`.
 - **Dynamic TOML tables per directory** (`codex/config.toml`'s `[projects."<path>"]`):
-  strip `re.compile(r"projects\..+")` in `TOML_TABLES` and persist tables in an
-  untracked `local/<name>/trust.toml` helper modeled on `.githooks/codex-trust`
-  (acquiring `local/harness-state.lock`, enforcing `0600` on `local/` files, merging
-  newly trusted paths without pruning absent ones, exposing `forget <path>`, and
-  running from the checkout hooks and `harness-state-refresh`).
+  drop them through `clean_tables` and name that pattern as `trust_table`. Saving and
+  restoring them is a helper of its own, not a manifest entry: `.githooks/codex-trust`
+  serves `codex` alone (it reads `trust_table` from the `codex` entry), persisting tables
+  in the untracked `local/codex/trust.toml`, acquiring `local/harness-state.lock`,
+  enforcing `0600` on `local/` files, merging newly trusted paths without pruning absent
+  ones, exposing `forget <path>`, and running from the checkout hooks and
+  `harness-state-refresh`. A second harness with trust tables needs a helper modeled on
+  it.
+
+What stays outside `harnesses.toml`: home routing (`links.toml`, section 2), session
+listing (`tools/hq.toml`), the trust helper above and `agy`'s home adoption. Each
+describes a different contract, and the manifest declares only what the filter, the
+refresh and `live-picks` share.
 
 Add unit coverage for the new config's clean filter, `live-picks`
-capture/restore/forget, and `harness-state-refresh` under `.githooks/` (`just test`).
+capture/restore/forget, and `harness-state-refresh` under `.githooks/` (`just test`);
+`.githooks/test_harness_manifest.py` checks the shipped manifest against
+`.gitattributes` and `git check-attr`.
 
 ## 4. Capability facts and probes (`hq`)
 
@@ -365,11 +427,14 @@ semantics, question-routing design).
 
 ### Declaring the harness and reading facts
 
-1. In a worktree, add `<name>` to the top-level `harnesses = [...]` list (kept
-   alphabetical by convention; `check` does not enforce the order). Until it is there,
-   `lookup` of any fact for `<name>` raises `Undeclared`; afterwards every undeclared
-   entry reads `unknown`. `.githooks/pre-commit` runs the staged
-   `tools/harness-facts check`.
+1. In a worktree, declare `[harnesses.<name>]` in `harnesses.toml` (3.2; kept
+   alphabetical by convention, which no check enforces). `tools/harness-facts` reads
+   the declared names from there; `facts/capabilities.toml` holds only facts, and a
+   `harnesses` key in it is refused. Until `<name>` is declared, `lookup` of any fact for
+   it raises `Undeclared`; afterwards every undeclared entry reads `unknown`. Removing a
+   harness that a fact entry still names fails `check`. `.githooks/pre-commit` runs
+   the staged `tools/harness-facts check` and `.githooks/harness_state.py check` over
+   the same staged tree.
 2. Read facts only through `tools/harness-facts` (linked at
    `~/.agents/bin/harness-facts`), never by parsing the file:
    - CLI: `tools/harness-facts check`, `list [--pretty]`, `get <fact> <harness>`
@@ -719,7 +784,7 @@ transcript does not name its own working directory).
 ### The adapter (`hq`)
 
 1. **`tools/harness_stores/<name>.py`**: define the `Adapter` fields: `slug` (the key in
-   `facts/capabilities.toml`), `alias` (the `hq sessions --harness` value),
+   `harnesses.toml`, `[harnesses.<slug>]`), `alias` (the `hq sessions --harness` value),
    `colour`, `home_variable` (the environment variable naming a work home, or `None`),
    `homes(user_home)` returning `Home` entries, `list_sessions(home, archived)` returning
    `(list[Session], counts)`, `notes_segment` for the footer, `exclusion_reasons`,
@@ -817,7 +882,7 @@ transcript does not name its own working directory).
    (Subscribers) and step 4 give (pin, then hook images, then the subscriber template),
    never as one merge. Each project verifies by its own test policy and gates (in
    `hq`: `just test`, which the pre-commit hook complements with `tools/ops-check`,
-   `tools/ops-docs check` and `tools/harness-facts check`). A green suite does not replace the selected-layer
+   `tools/ops-docs check`, `tools/harness-facts check` and `.githooks/harness_state.py check`). A green suite does not replace the selected-layer
    evidence in section 0. Every target named in `links.toml` exists on its owner's main
    branch before links are applied. A runtime pin is installed on this host
    (`just relay-install`, `just <name>-install`) before it merges.
@@ -849,8 +914,8 @@ transcript does not name its own working directory).
 | --- | --- | --- | --- |
 | Discovery | all | section 1 search | every hit classified on the onboarding task |
 | Home routing and instructions | `hq` (`lore` upstream for Superpowers notes) | `links.toml`, `justfile`, `.ops-check.toml`, `AGENTS.md`, `README.md` | `tools/ops-check`, `just link`, `just link-check` on main after apply |
-| Live-state hygiene | `hq` | `.gitattributes`, `.githooks/harness-state-clean`, `live-picks`, `harness-state-refresh`, optional trust helper | `just test`; link survives a harness save; clean `git status` after a turn |
-| Capability facts and probes | `hq` | `facts/capabilities.toml`, `agents/bin/wake-judge` `JUDGES`, `<name>/probes/`, `README.md` | `tools/harness-facts check`, `list --pretty` |
+| Live-state hygiene | `hq` | `harnesses.toml`, `.gitattributes`, optional trust helper or adoption adapter, `just setup` on every host | `just test`, `.githooks/harness_state.py check`; link survives a harness save; clean `git status` after a turn |
+| Capability facts and probes | `hq` | `harnesses.toml`, `facts/capabilities.toml`, `agents/bin/wake-judge` `JUDGES`, `<name>/probes/`, `README.md` | `tools/harness-facts check`, `list --pretty` |
 | Profile, command guard, claim guard | `lore`, `ops`, `relay`, `hq` | `<name>/hooks.json` or adapter hook, `<ops-checkout>/bin/ops-profile`, `profiles.toml`, `hooks/relay-guard`, `hooks/claim-guard`, `bin/relay-guard-probe`, `relay/subscribers.template.json`, `tools/test_*_wiring.py` | owners' tests; three-case guard evidence; held-once Stop |
 | CLI vocabulary, relay, ancestry, provenance | `ops`, `relay`, `tasks`, `obs`, `familiar`, `hq` | `<ops-checkout>/cli.toml`, `bin/tt`, `bin/tt-report`, `keys.toml`; `<relay-checkout>/src/`, `bin/relay.js`; `<tasks-checkout>/src/relay/`, `src/provenance.rs`, `src/claims.rs`, fixture copy; `<obs-checkout>/{record,join,tt_runs}.py`; `<fam-checkout>/src/` if selected; `relay/package*.json` | owners' tests including conformance; distinct identities for concurrent sessions; stamped notes join |
 | Sessions, archive, `obs` | `hq`, `obs` | `tools/hq_cli/`, `tools/hq.toml`, `tools/session_archive/`, `agents/skills/session-logs/SKILL.md`, `agents/bin/session-episodes`, `<obs-checkout>/<name>_adapter.py`, `stores.py` and the registries discovery finds | `just test`, `hq sessions`, obs tests, live `obs index` |

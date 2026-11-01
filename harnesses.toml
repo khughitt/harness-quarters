@@ -1,0 +1,47 @@
+# Declarative harness manifest: canonical harness slugs and tracked live-state configs.
+# Capability facts (tools/harness-facts) read [harnesses]; Git live-state hooks
+# (.githooks/harness_state.py) read [harnesses.<name>.live_state].
+schema = 1
+
+[harnesses.agy.live_state]
+config = "agy/settings.json"
+filter_glob = "agy/settings*.json"
+format = "json"
+clean_keys = ["model", "effort", "effortByBase", "trustedWorkspaces"]
+picks_record = "local/live-picks-agy.json"
+pick_units = [["model"], ["effort", "effortByBase"], ["trustedWorkspaces"]]
+
+[harnesses.claude-code.live_state]
+config = "claude/settings.json"
+filter_glob = "claude/settings*.json"
+format = "json"
+clean_keys = ["model", "modelSettings", "effortLevel"]
+picks_record = "local/live-picks.json"
+pick_units = [["model", "modelSettings"], ["effortLevel"]]
+
+[harnesses.codex.live_state]
+config = "codex/config.toml"
+filter_glob = "codex/config*.toml"
+format = "toml"
+clean_keys = [
+  { table = "", keys = ["model", "model_reasoning_effort"] },
+  { table = "tui", keys = ["screen_reader_detection_done"] },
+  { table = 'marketplaces\.(?:"[^"]*"|[^."]+)', keys = ["last_updated", "last_revision"] },
+]
+clean_tables = ['tui\.model_availability_nux', 'projects\..+']
+trust_table = 'projects\..+'
+picks_record = "local/live-picks.json"
+pick_units = [["model", "model_reasoning_effort"]]
+
+[harnesses.opencode]
+
+[harnesses.pi.live_state]
+config = "pi/settings.json"
+filter_glob = "pi/settings*.json"
+format = "json"
+clean_keys = ["defaultProvider", "defaultModel", "defaultThinkingLevel", "deviceId", "trackingId"]
+unrestored_keys = ["deviceId", "trackingId"]
+picks_record = "local/live-picks-pi.json"
+pick_units = [["defaultProvider", "defaultModel"], ["defaultThinkingLevel"]]
+
+[harnesses.pi-durable]

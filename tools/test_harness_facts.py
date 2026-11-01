@@ -2,8 +2,10 @@
 import importlib.machinery
 import importlib.util
 import json
+import os
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -13,7 +15,6 @@ ROOT = TOOL.parent.parent
 
 GOOD = '''
 schema = 1
-harnesses = ["claude-code", "codex", "opencode"]
 
 [facts.controller-wake]
 type = "boolean"
@@ -58,6 +59,17 @@ status = "unknown"
 note = "Never probed."
 '''
 
+GOOD_MANIFEST = '''
+schema = 1
+
+[harnesses.claude-code]
+
+[harnesses.codex.live_state]
+config = "codex/config.toml"
+
+[harnesses.opencode]
+'''
+
 
 def load():
     """Import tools/harness-facts as a module; it has no .py suffix."""
@@ -71,19 +83,45 @@ def load():
 facts = load()
 
 
-def write(tmp_path, text):
+def write(tmp_path, text, manifest_text=GOOD_MANIFEST):
     path = tmp_path / "capabilities.toml"
     path.write_text(text)
+    (tmp_path / "harnesses.toml").write_text(manifest_text)
     return path
 
 
+HOME = []   # the current test's own temporary HOME, set by the autouse fixture
+
+
+@pytest.fixture(autouse=True)
+def _own_home(tmp_path_factory):
+    HOME[:] = [tmp_path_factory.mktemp("home")]
+    yield
+    HOME.clear()
+
+
+def tool_env():
+    """Built key by key, never from os.environ's contents beyond PATH."""
+    return {"PATH": os.environ["PATH"], "HOME": str(HOME[0]), "PYTHONDONTWRITEBYTECODE": "1"}
+
+
 def run(*args, cwd=None):
-    return subprocess.run([sys.executable, str(TOOL), *map(str, args)], text=True, capture_output=True, cwd=cwd)
+    """Run the tool; a --file next to a harnesses.toml gets --manifest for it too."""
+    args = list(map(str, args))
+    if "--file" in args and "--manifest" not in args:
+        manifest = Path(args[args.index("--file") + 1]).with_name("harnesses.toml")
+        if manifest.exists():
+            args += ["--manifest", str(manifest)]
+    return subprocess.run([sys.executable, str(TOOL), *args], text=True, capture_output=True, cwd=cwd, env=tool_env())
+
+
+def manifest_of(path):
+    return path.with_name("harnesses.toml")
 
 
 def test_a_good_file_passes(tmp_path):
     path = write(tmp_path, GOOD)
-    assert facts.validate(path, ROOT)["schema"] == 1
+    assert facts.validate(path, ROOT, manifest_of(path))["schema"] == 1
     done = run("check", "--file", path)
     assert (done.returncode, done.stdout, done.stderr) == (0, "", "")
 
@@ -92,9 +130,6 @@ REFUSALS = [
     ("schema = 1", "schema = 2", "schema must be 1"),
     ("schema = 1", "schema = true", "schema must be 1"),
     ("schema = 1", "schema = 1.0", "schema must be 1"),
-    ('harnesses = ["claude-code", "codex", "opencode"]', 'harnesses = []', "harnesses must be a non-empty list of names"),
-    ('harnesses = ["claude-code", "codex", "opencode"]', 'harnesses = ["claude-code", "codex", "codex"]', "harnesses must be unique"),
-    ('harnesses = ["claude-code", "codex", "opencode"]', 'harnesses = ["Claude", "codex", "opencode"]', "harnesses: Claude is not a valid name"),
     ('type = "boolean"', 'type = "number"', "facts.controller-wake: type must be boolean or set"),
     ('description = "The harness wakes its controller when a child finishes."\n', '', "facts.controller-wake: description must be a non-empty string"),
     ('probe = "agents/bin/wake-judge"', 'probe = "agents/bin/no-such-tool"', "facts.controller-wake: probe agents/bin/no-such-tool is not a file in this checkout"),
@@ -115,6 +150,7 @@ REFUSALS = [
     ('status = "unknown"\nnote = "Never probed."', 'status = "unknown"\nvalue = []', "facts.kinds.harness.opencode: an unknown entry carries only status and note, not value"),
     ('status = "unknown"', 'status = "unsupported"', "facts.kinds.harness.opencode: status must be probed or unknown"),
     ('note = "Never probed."', 'notes = "Never probed."', "facts.kinds.harness.opencode: an unknown entry carries only status and note, not notes"),
+    ("schema = 1\n", 'schema = 1\nharnesses = ["claude-code"]\n', "unknown key harnesses"),
     ("[facts.kinds]", "[facts.Kinds]", "facts.Kinds: Kinds is not a valid name"),
 ]
 
@@ -124,23 +160,69 @@ def test_each_refusal_names_its_table(tmp_path, old, new, problem):
     assert GOOD.count(old) == 1, old                      # each row changes exactly one thing
     path = write(tmp_path, GOOD.replace(old, new))
     with pytest.raises(facts.Invalid) as caught:
-        facts.validate(path, ROOT)
+        facts.validate(path, ROOT, manifest_of(path))
     assert problem in caught.value.problems
     done = run("check", "--file", path)
     assert done.returncode == 2 and f"harness-facts: {problem}" in done.stderr.splitlines()
 
 
+MANIFEST_REFUSALS = [
+    ("missing", None, "harnesses.toml: No such file or directory"),
+    ("invalid-toml", "schema = [", "not valid TOML: harnesses.toml: "),
+    ("non-utf8", b"schema = 1\n\xff\xfe", "not valid TOML: harnesses.toml: "),
+    ("schema-2", GOOD_MANIFEST.replace("schema = 1", "schema = 2"), "manifest: schema must be 1"),
+    ("schema-true", GOOD_MANIFEST.replace("schema = 1", "schema = true"), "manifest: schema must be 1"),
+    ("schema-float", GOOD_MANIFEST.replace("schema = 1", "schema = 1.0"), "manifest: schema must be 1"),
+    ("unknown-key", GOOD_MANIFEST.replace("schema = 1", "schema = 1\nextra = 1"), "manifest: unknown key extra"),
+    ("empty-harnesses", "schema = 1\n[harnesses]\n", "manifest: harnesses must be a non-empty table"),
+    ("bad-slug", GOOD_MANIFEST.replace("[harnesses.opencode]", "[harnesses.Claude]"), "manifest: harnesses.Claude: Claude is not a valid name"),
+    ("non-table", "schema = 1\n[harnesses]\ncodex = 1\n", "manifest: harnesses.codex: must be a table"),
+    ("unknown-harness-key", GOOD_MANIFEST.replace("[harnesses.opencode]", "[harnesses.opencode]\nconfig = 1"), "manifest: harnesses.opencode: unknown key config"),
+    ("live-state-not-table", "schema = 1\n[harnesses.codex]\nlive_state = 1\n", "manifest: harnesses.codex.live_state: must be a table"),
+]
+
+
+@pytest.mark.parametrize("name, text, problem", MANIFEST_REFUSALS, ids=[r[0] for r in MANIFEST_REFUSALS])
+def test_manifest_refusals(tmp_path, name, text, problem):
+    path = write(tmp_path, GOOD)
+    manifest = manifest_of(path)
+    if text is None:
+        manifest.unlink()
+    elif isinstance(text, bytes):
+        manifest.write_bytes(text)
+    else:
+        manifest.write_text(text)
+    with pytest.raises(facts.Invalid) as caught:
+        facts.validate(path, ROOT, manifest)
+    assert any(problem in line for line in caught.value.problems), caught.value.problems
+    done = run("check", "--file", path, "--manifest", manifest)
+    assert done.returncode == 2 and "Traceback" not in done.stderr and problem in done.stderr
+
+
+def test_positional_validate_and_lookup_use_root_or_default_manifest():
+    assert facts.validate()["harnesses"][0] == "agy"
+    assert "claude-code" in facts.validate(ROOT / "facts/capabilities.toml", ROOT)["harnesses"]
+    assert facts.lookup("controller-wake", "agy")["value"] is True
+    assert facts.lookup("controller-wake", "agy", ROOT / "facts/capabilities.toml")["value"] is True
+
+
+def test_the_shipped_fact_file_declares_no_harness_list():
+    assert "harnesses" not in tomllib.loads((ROOT / "facts/capabilities.toml").read_text())
+    shipped = tomllib.loads((ROOT / "harnesses.toml").read_text())
+    assert facts.validate()["harnesses"] == list(shipped["harnesses"])
+
+
 def test_every_problem_is_reported_not_only_the_first(tmp_path):
     path = write(tmp_path, GOOD.replace("schema = 1", "schema = 2").replace('type = "boolean"', 'type = "number"'))
     with pytest.raises(facts.Invalid) as caught:
-        facts.validate(path, ROOT)
+        facts.validate(path, ROOT, manifest_of(path))
     assert {"schema must be 1", "facts.controller-wake: type must be boolean or set"} <= set(caught.value.problems)
 
 
 def test_a_truncated_file_is_refused_whole(tmp_path):
     path = write(tmp_path, GOOD[: GOOD.index('evidence = "tack-00ccb6"') + 12])
     with pytest.raises(facts.Invalid) as caught:
-        facts.validate(path, ROOT)
+        facts.validate(path, ROOT, manifest_of(path))
     assert caught.value.problems[0].startswith("not valid TOML: ")
     assert run("check", "--file", path).returncode == 2
 
@@ -153,16 +235,16 @@ def test_a_missing_file_is_refused(tmp_path):
 def test_an_unknown_top_level_key_is_refused(tmp_path):
     path = write(tmp_path, GOOD + '\n[fact]\nx = 1\n')
     with pytest.raises(facts.Invalid) as caught:
-        facts.validate(path, ROOT)
+        facts.validate(path, ROOT, manifest_of(path))
     assert "unknown key fact" in caught.value.problems
 
 
 def test_a_file_that_is_not_utf8_is_refused(tmp_path):
     """A cut inside a multi-byte character, or any other bad byte: a refusal, not a traceback."""
-    path = tmp_path / "capabilities.toml"
+    path = write(tmp_path, GOOD)
     path.write_bytes(GOOD.encode()[:200] + b"\xff\xfe")
     with pytest.raises(facts.Invalid) as caught:
-        facts.validate(path, ROOT)
+        facts.validate(path, ROOT, manifest_of(path))
     assert caught.value.problems[0].startswith("not valid TOML: ")
     done = run("check", "--file", path)
     assert done.returncode == 2 and "Traceback" not in done.stderr
@@ -173,7 +255,7 @@ def test_a_cut_between_tables_is_a_valid_shorter_file(tmp_path):
     The entries it lost read as unknown (Task 2 pins that), which a consumer treats as
     permitting nothing; the claim guard's mirror check covers the three shipped facts."""
     path = write(tmp_path, GOOD[: GOOD.index("[facts.controller-wake.harness.codex]")])
-    assert facts.validate(path, ROOT)["schema"] == 1
+    assert facts.validate(path, ROOT, manifest_of(path))["schema"] == 1
 
 
 def test_list_fills_unknown_for_every_declared_harness(tmp_path):
@@ -216,14 +298,14 @@ def test_get_exit_codes(tmp_path):
 
 def test_lookup_refuses_what_get_refuses(tmp_path):
     path = write(tmp_path, GOOD)
-    assert facts.lookup("controller-wake", "codex", path)["value"] is False
-    assert facts.lookup("controller-wake", "opencode", path)["status"] == "unknown"
+    assert facts.lookup("controller-wake", "codex", path, manifest_of(path))["value"] is False
+    assert facts.lookup("controller-wake", "opencode", path, manifest_of(path))["status"] == "unknown"
     with pytest.raises(LookupError):
-        facts.lookup("controller-wake", "claude_code", path)
+        facts.lookup("controller-wake", "claude_code", path, manifest_of(path))
     with pytest.raises(LookupError):
-        facts.lookup("controler-wake", "codex", path)
+        facts.lookup("controler-wake", "codex", path, manifest_of(path))
     with pytest.raises(facts.Invalid):
-        facts.lookup("controller-wake", "codex", write(tmp_path, GOOD.replace("value = false", 'value = "false"')))
+        facts.lookup("controller-wake", "codex", write(tmp_path, GOOD.replace("value = false", 'value = "false"')), tmp_path / "harnesses.toml")
 
 
 def test_an_absolute_probe_inside_the_checkout_is_refused(tmp_path):
@@ -232,7 +314,7 @@ def test_an_absolute_probe_inside_the_checkout_is_refused(tmp_path):
     path = write(tmp_path, GOOD.replace('probe = "agents/bin/wake-judge"', f'probe = "{absolute}"'))
     problem = f"facts.controller-wake: probe {absolute} is not a file in this checkout"
     with pytest.raises(facts.Invalid) as caught:
-        facts.validate(path, ROOT)
+        facts.validate(path, ROOT, manifest_of(path))
     assert problem in caught.value.problems
     done = run("check", "--file", path)
     assert done.returncode == 2 and f"harness-facts: {problem}" in done.stderr.splitlines()
@@ -243,7 +325,7 @@ def test_two_unknown_keys_are_two_problem_lines(tmp_path):
         'version = "0.156.1"\ndate = 2026-09-24\nevidence = "tack-00ccb6"\n\n[facts.kinds.harness.opencode]',
         'versio = "0.156.1"\ndate = 2026-09-24\nevidenc = "tack-00ccb6"\n\n[facts.kinds.harness.opencode]'))
     with pytest.raises(facts.Invalid) as caught:
-        facts.validate(path, ROOT)
+        facts.validate(path, ROOT, manifest_of(path))
     assert {"facts.kinds.harness.codex: unknown key versio",
             "facts.kinds.harness.codex: unknown key evidenc"} <= set(caught.value.problems)
     done = run("check", "--file", path)
@@ -257,7 +339,7 @@ def test_two_unknown_keys_in_an_unknown_entry_are_two_problem_lines(tmp_path):
         'status = "unknown"\nnote = "Never probed."',
         'status = "unknown"\nnote = "Never probed."\nnots = "why"\nvale = []'))
     with pytest.raises(facts.Invalid) as caught:
-        facts.validate(path, ROOT)
+        facts.validate(path, ROOT, manifest_of(path))
     assert {"facts.kinds.harness.opencode: an unknown entry carries only status and note, not nots",
             "facts.kinds.harness.opencode: an unknown entry carries only status and note, not vale"} <= set(caught.value.problems)
 
@@ -265,10 +347,10 @@ def test_two_unknown_keys_in_an_unknown_entry_are_two_problem_lines(tmp_path):
 def test_an_undeclared_lookup_raises_undeclared_a_lookuperror(tmp_path):
     path = write(tmp_path, GOOD)
     with pytest.raises(facts.Undeclared) as caught:
-        facts.lookup("controler-wake", "codex", path)
+        facts.lookup("controler-wake", "codex", path, manifest_of(path))
     assert isinstance(caught.value, LookupError)
     with pytest.raises(facts.Undeclared):
-        facts.lookup("controller-wake", "claude_code", path)
+        facts.lookup("controller-wake", "claude_code", path, manifest_of(path))
 
 
 def test_a_keyerror_inside_view_is_not_swallowed_as_a_refusal(tmp_path, monkeypatch):
@@ -284,8 +366,8 @@ def test_a_keyerror_inside_view_is_not_swallowed_as_a_refusal(tmp_path, monkeypa
 def test_a_lost_entry_reads_as_unknown_never_as_a_value(tmp_path):
     """A file cut cleanly before codex's entry: the answer for codex is unknown, not false."""
     path = write(tmp_path, GOOD[: GOOD.index("[facts.controller-wake.harness.codex]")])
-    assert facts.lookup("controller-wake", "codex", path) == {"fact": "controller-wake", "harness": "codex", "type": "boolean", "status": "unknown"}
-    assert facts.lookup("controller-wake", "claude-code", path)["value"] is True
+    assert facts.lookup("controller-wake", "codex", path, manifest_of(path)) == {"fact": "controller-wake", "harness": "codex", "type": "boolean", "status": "unknown"}
+    assert facts.lookup("controller-wake", "claude-code", path, manifest_of(path))["value"] is True
 
 
 def test_pretty_list_is_one_line_per_entry(tmp_path):
@@ -300,6 +382,7 @@ def test_the_file_is_only_read(tmp_path):
     path = write(tmp_path, GOOD)
     before = (path.read_bytes(), path.stat().st_mtime_ns)
     path.chmod(0o444)
+    manifest_of(path).chmod(0o444)
     tmp_path.chmod(0o555)
     try:
         for args in (("check",), ("list",), ("get", "kinds", "codex")):
@@ -307,7 +390,7 @@ def test_the_file_is_only_read(tmp_path):
     finally:
         tmp_path.chmod(0o755)
     assert (path.read_bytes(), path.stat().st_mtime_ns) == before
-    assert sorted(p.name for p in tmp_path.iterdir()) == ["capabilities.toml"]
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["capabilities.toml", "harnesses.toml"]
 
 
 def test_the_default_file_is_found_through_a_link(tmp_path):
@@ -319,12 +402,13 @@ def test_the_default_file_is_found_through_a_link(tmp_path):
     (checkout / "agents" / "bin" / "wake-judge").write_text("")
     (checkout / "tools" / "harness-facts").write_bytes(TOOL.read_bytes())
     (checkout / "facts" / "capabilities.toml").write_text(GOOD)
+    (checkout / "harnesses.toml").write_text(GOOD_MANIFEST)
     link = tmp_path / "bin" / "harness-facts"
     link.parent.mkdir()
     link.symlink_to(checkout / "tools" / "harness-facts")
     elsewhere = tmp_path / "elsewhere"
     elsewhere.mkdir()
-    done = subprocess.run([sys.executable, str(link), "get", "controller-wake", "claude-code"], text=True, capture_output=True, cwd=elsewhere)
+    done = subprocess.run([sys.executable, str(link), "get", "controller-wake", "claude-code"], text=True, capture_output=True, cwd=elsewhere, env=tool_env())
     assert done.returncode == 0 and json.loads(done.stdout)["value"] is True
 
 

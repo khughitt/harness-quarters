@@ -1,6 +1,10 @@
 """The harness-state clean filter strips model and effort keys and nothing else."""
 import json
+import os
+import shutil
 import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -8,9 +12,25 @@ import pytest
 FILTER = Path(__file__).with_name("harness-state-clean")
 
 
+def child_env(home):
+    return {"PATH": os.environ["PATH"], "HOME": str(home), "XDG_CONFIG_HOME": str(home / ".config"),
+            "GIT_CONFIG_GLOBAL": str(home / ".gitconfig"), "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid",
+            "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid",
+            "PYTHONDONTWRITEBYTECODE": "1"}
+
+
+def run_clean(path, text):
+    with tempfile.TemporaryDirectory() as home:
+        return subprocess.run([str(FILTER), path], input=text, text=True, capture_output=True,
+                              env=child_env(Path(home)))
+
+
 def clean(path, text):
-    return subprocess.run([str(FILTER), path], input=text, check=True, text=True,
-                          capture_output=True).stdout
+    result = run_clean(path, text)
+    if result.returncode != 0:
+        raise subprocess.CalledProcessError(result.returncode, FILTER, result.stdout, result.stderr)
+    return result.stdout
 
 
 def test_json_drops_model_and_model_settings_and_keeps_the_rest():
@@ -196,3 +216,83 @@ def test_toml_keeps_tables_that_only_mention_projects():
             "[mcp_servers.projects]\n"
             "command = \"x\"\n")
     assert clean("codex/config.toml", text) == text
+
+
+@pytest.mark.parametrize("path, text", [("harnesses.toml", "schema = 1\n"), ("links.toml", "[required]\n"),
+                                        ("claude/settings/nested.json", "{}\n")])
+def test_unconfigured_toml_and_nested_slash_paths_are_refused(path, text):
+    result = run_clean(path, text)
+
+    assert result.returncode != 0
+    assert "is not a harness config" in result.stderr
+
+
+RUNPY = ("import json, runpy, sys\n"
+         "ns = runpy.run_path(sys.argv[1])\n"
+         "print(json.dumps({'keys': ns.get('CLAUDE_JSON_KEYS'), 'bound': 'CLAUDE_JSON_KEYS' in ns,\n"
+         "                  'names': [n for n in ('clean_json', 'clean_toml', 'TOML_HEADER', 'TOML_KEY') if n in ns]}))\n")
+
+
+def namespace(script, home):
+    result = subprocess.run([sys.executable, "-c", RUNPY, str(script)], text=True, capture_output=True,
+                            env=child_env(home), cwd=home)
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
+def test_runpy_exposes_cleaners_and_binds_claude_json_keys_without_silent_fallback(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    found = namespace(FILTER, home)
+    assert found["keys"] == ["model", "modelSettings", "effortLevel"]
+    assert found["names"] == ["clean_json", "clean_toml", "TOML_HEADER", "TOML_KEY"]
+
+    scratch = tmp_path / "scratch"
+    (scratch / ".githooks").mkdir(parents=True)
+    for name in ("harness-state-clean", "harness_state.py"):
+        shutil.copy2(FILTER.parent / name, scratch / ".githooks" / name)
+    manifest = (FILTER.parent.parent / "harnesses.toml").read_text()
+    assert "[harnesses.claude-code.live_state]" in manifest
+    head, rest = manifest.split("[harnesses.claude-code.live_state]")
+    tail = rest.split("\n[harnesses.", 1)[1]
+    (scratch / "harnesses.toml").write_text(head + "[harnesses.claude-code]\n\n[harnesses." + tail)
+    found = namespace(scratch / ".githooks" / "harness-state-clean", home)
+    assert found["bound"] is False
+
+
+@pytest.mark.parametrize("text", ['{"model": "x",}\n', "// jsonc\n{}\n", "", "[1, 2]\n", "null\n"])
+def test_unusable_json_input_exits_with_a_named_message_not_a_traceback(text):
+    result = run_clean("claude/settings.json", text)
+
+    assert result.returncode != 0
+    assert result.stdout == ""
+    assert result.stderr.startswith("harness-state-clean: claude/settings.json: ")
+    assert "fix the file, then retry" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+@pytest.mark.parametrize("damage", ["conflict", "syntax", "missing"])
+def test_unimportable_harness_state_module_exits_with_a_named_message(tmp_path, damage):
+    hooks = tmp_path / ".githooks"
+    hooks.mkdir()
+    shutil.copy2(FILTER, hooks / "harness-state-clean")
+    shutil.copy2(FILTER.with_name("harness_state.py"), hooks / "harness_state.py")
+    shutil.copy2(FILTER.parent.parent / "harnesses.toml", tmp_path / "harnesses.toml")
+    module = hooks / "harness_state.py"
+    if damage == "conflict":
+        module.write_text("<<<<<<< ours\nx = 1\n=======\nx = 2\n>>>>>>> theirs\n")
+    elif damage == "syntax":
+        module.write_text("def (:\n")
+    else:
+        module.write_text("import module_that_does_not_exist\n")
+    home = tmp_path / "home"
+    home.mkdir()
+
+    result = subprocess.run([str(hooks / "harness-state-clean"), "claude/settings.json"],
+                            input="{}\n", text=True, capture_output=True, cwd=tmp_path,
+                            env=child_env(home))
+
+    assert result.returncode != 0
+    assert result.stderr.startswith("harness-state-clean: cannot load .githooks/harness_state.py: ")
+    assert "resolve or restore it" in result.stderr
+    assert "Traceback" not in result.stderr
