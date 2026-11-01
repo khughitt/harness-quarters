@@ -1,5 +1,4 @@
 """live-picks saves the model and effort picks in local/ and puts back what a git command dropped."""
-import ast
 import contextlib
 import fcntl
 import json
@@ -62,6 +61,7 @@ def repo(tmp_path):
     (repo / ".githooks").mkdir(parents=True)
     for name in HOOK_FILES:
         shutil.copy2(HOOKS / name, repo / ".githooks" / name)
+    shutil.copy2(HOOKS.parent / "harnesses.toml", repo / "harnesses.toml")
     (repo / "claude").mkdir()
     (repo / "codex").mkdir()
     (repo / "pi").mkdir()
@@ -1181,44 +1181,277 @@ def test_pi_ids_are_neither_captured_nor_restored_and_other_settings_survive(rep
     assert clean(repo, PI, (repo / PI).read_text()) == before
 
 
-@pytest.mark.parametrize("groups", [
-    {CLAUDE: (("model", "modelSettings"), ("effortLevel",)),
-     PI: (("defaultProvider", "defaultModel"), ("defaultModel",)),
-     AGY: (("model",), ("effort", "effortByBase"), ("trustedWorkspaces",))},
-    {CLAUDE: (("model", "modelSettings"), ("effortLevel",)), PI: (("theme",),),
-     AGY: (("model",), ("effort", "effortByBase"), ("trustedWorkspaces",))},
-    {CLAUDE: (("model", "modelSettings"), ("effortLevel", "effortLevel")),
-     PI: (("defaultProvider", "defaultModel"), ("defaultThinkingLevel",)),
-     AGY: (("model",), ("effort", "effortByBase"), ("trustedWorkspaces",))},
-    {CLAUDE: (("model", "modelSettings"),),
-     PI: (("defaultProvider", "defaultModel"), ("defaultThinkingLevel",)),
-     AGY: (("model",), ("effort", "effortByBase"), ("trustedWorkspaces",))},
-    {CLAUDE: (("model", "modelSettings"), ("effortLevel",)),
-     PI: (("defaultProvider", "defaultModel"), ("defaultThinkingLevel",)),
-     AGY: (("model",), ("effort", "effortByBase"))},
-])
-def test_json_groups_refuse_overlap_unfiltered_keys_and_missing_claude_keys(repo, groups):
-    tool = repo / ".githooks/live-picks"
-    source = tool.read_text()
-    assignment = next((node for node in ast.parse(source).body if isinstance(node, ast.Assign)
-                       and any(isinstance(target, ast.Name) and target.id == "JSON_GROUPS"
-                               for target in node.targets)), None)
-    if assignment:
-        lines = source.splitlines(keepends=True)
-        lines[assignment.lineno - 1:assignment.end_lineno] = [f"JSON_GROUPS = {groups!r}\n"]
-        source = "".join(lines)
-    else:
-        source = source.replace("if sorted(sum(CLAUDE_GROUPS", f"JSON_GROUPS = {groups!r}\nif sorted(sum(CLAUDE_GROUPS")
-    tool.write_text(source)
+def isolated_home(repo, tmp_path):
+    """A HOME the test owns, after checking git resolves the scratch repo and not another."""
+    home = tmp_path / "isolated-home"
+    home.mkdir(exist_ok=True)
+    top = isolated_git(repo, home, "rev-parse", "--show-toplevel").stdout.strip()
+    git_dir = isolated_git(repo, home, "rev-parse", "--absolute-git-dir").stdout.strip()
+    assert Path(top).resolve() == repo.resolve()
+    assert repo.resolve() in Path(git_dir).resolve().parents
+    return home
 
-    result = picks(repo, "capture")
+
+def edit_manifest(repo, old, new):
+    path = repo / "harnesses.toml"
+    text = path.read_text()
+    assert text.count(old) == 1, old
+    path.write_text(text.replace(old, new))
+
+
+CLAUDE_UNITS = 'pick_units = [["model", "modelSettings"], ["effortLevel"]]'
+PI_UNITS = 'pick_units = [["defaultProvider", "defaultModel"], ["defaultThinkingLevel"]]'
+AGY_UNITS = 'pick_units = [["model"], ["effort", "effortByBase"], ["trustedWorkspaces"]]'
+CODEX_UNITS = 'pick_units = [["model", "model_reasoning_effort"]]'
+
+
+@pytest.mark.parametrize("old, new", [
+    (PI_UNITS, 'pick_units = [["defaultProvider", "defaultModel"], ["defaultModel", "defaultThinkingLevel"]]'),
+    (PI_UNITS, 'pick_units = [["defaultProvider", "defaultModel"], ["defaultThinkingLevel"], ["theme"]]'),
+    (CLAUDE_UNITS, 'pick_units = [["model", "modelSettings"]]'),
+    (AGY_UNITS, 'pick_units = [["model"], ["effort", "effortByBase"]]'),
+    (CODEX_UNITS, 'pick_units = [["model"]]'),
+], ids=["pi-overlap", "pi-unfiltered", "claude-missing", "agy-missing", "codex-missing"])
+def test_manifest_partition_and_overlap_violations_are_refused(repo, tmp_path, old, new):
+    home = isolated_home(repo, tmp_path)
+    write_claude(repo, model="opus")
+    (repo / CODEX).write_text(PICK + BASE)
+    write_pi(repo, **PI_VALUES)
+    write_agy(repo, **AGY_VALUES)
+    edit_manifest(repo, old, new)
+
+    result = isolated_picks(repo, home, "capture")
 
     assert result.returncode != 0
-    assert "groups" in result.stderr.lower()
-    assert "filter" in result.stderr.lower()
-    assert not record_path(repo).exists()
-    assert not pi_record_path(repo).exists()
-    assert not agy_record_path(repo).exists()
+    assert "live-picks: " in result.stderr
+    assert "pick_units" in result.stderr
+    assert "Traceback" not in result.stderr
+    assert sorted((repo / "local").glob("live-picks*.json")) == []
+
+
+def damage_manifest(path, damage):
+    if damage == "missing":
+        path.unlink()
+    elif damage == "truncated":
+        path.write_text(path.read_text()[:path.read_text().index("[harnesses.agy.live_state]") + 18])
+    else:
+        path.write_bytes(b"schema = 1\n\xff\xfe\n")
+
+
+@pytest.mark.parametrize("damage", ["truncated", "non-utf8", "missing"])
+def test_broken_manifest_hook_exits_zero_with_retry_while_cli_fails_and_bad_args_print_usage(
+        repo, tmp_path, damage):
+    home = isolated_home(repo, tmp_path)
+    isolated_git(repo, home, "switch", "-q", "-c", "side")
+    (repo / "u").write_text("side\n")
+    isolated_git(repo, home, "add", "u")
+    isolated_git(repo, home, "commit", "-q", "-m", "side")
+    isolated_git(repo, home, "switch", "-q", "main")
+    other = tmp_path / "other"
+    isolated_git(repo, home, "worktree", "add", "-q", "-b", "mine", str(other), "main")
+    # Age every tracked file and refresh the index while the manifest is valid, so the
+    # switch below finds each filtered config stat-clean and only the hooks read the
+    # broken manifest, never the clean filter.
+    past = time.time() - 60
+    for name in isolated_git(repo, home, "ls-files").stdout.split():
+        os.utime(repo / name, (past, past))
+    isolated_git(repo, home, "update-index", "-q", "--really-refresh")
+    assert isolated_git(repo, home, "diff-files", "--name-only").stdout == ""
+    damage_manifest(repo / "harnesses.toml", damage)
+    damage_manifest(other / "harnesses.toml", damage)
+
+    hook = isolated_picks(repo, home, "hook", "post-merge")
+    switched = isolated_git(repo, home, "switch", "-q", "side", check=False)
+    linked = isolated_picks(other, home, "hook", "post-merge")
+    cli = {args: isolated_picks(repo, home, *args)
+           for args in (("capture",), ("sync",), ("forget", CLAUDE))}
+    bogus = isolated_picks(repo, home, "bogus")
+
+    for result in (hook, switched):
+        assert result.returncode == 0, result.stderr
+        assert "live-picks: " in result.stderr
+        assert "the next turn end retries" in result.stderr
+        assert "Traceback" not in result.stderr
+    assert isolated_git(repo, home, "branch", "--show-current").stdout.strip() == "side"
+    assert (linked.returncode, linked.stderr) == (0, "")
+    for args, result in cli.items():
+        assert result.returncode != 0, args
+        assert "live-picks: " in result.stderr
+        assert "Traceback" not in result.stderr
+    assert bogus.returncode != 0
+    assert "usage: live-picks" in bogus.stderr
+    assert "Traceback" not in bogus.stderr
+    assert sorted((repo / "local").glob("live-picks*.json")) == []
+
+
+EXTRA = "extra/config.toml"
+EXTRA_RECORD = "local/live-picks-extra.json"
+EXTRA_SPEC = """
+[harnesses.extra.live_state]
+config = "extra/config.toml"
+filter_glob = "extra/config*.toml"
+format = "toml"
+clean_keys = [{ table = "", keys = ["model", "effort", "tier", "install_id"] }]
+unrestored_keys = ["install_id"]
+picks_record = "local/live-picks-extra.json"
+pick_units = [["model"], ["effort", "tier"]]
+"""
+EXTRA_BASE = '# tracked comment\nname = "x"\n\n[tables]\nk = 1  # kept\n'
+
+
+def add_extra_harness(repo, home):
+    """A second TOML harness with two picker units and an installation id it never restores."""
+    with (repo / "harnesses.toml").open("a") as manifest:
+        manifest.write(EXTRA_SPEC)
+    with (repo / ".gitattributes").open("a") as attributes:
+        attributes.write("extra/config*.toml filter=harness-state\n")
+    (repo / "extra").mkdir()
+    (repo / EXTRA).write_text(EXTRA_BASE)
+    isolated_git(repo, home, "add", "harnesses.toml", ".gitattributes", EXTRA)
+    isolated_git(repo, home, "commit", "-q", "-m", "extra harness")
+
+
+def extra_record(repo):
+    path = repo / EXTRA_RECORD
+    return json.loads(path.read_text()) if path.exists() else None
+
+
+def save_extra(repo, lines):
+    (repo / EXTRA_RECORD).write_text(json.dumps({EXTRA: {"state": "set", "lines": lines}}) + "\n")
+
+
+def test_multi_unit_toml_merges_units_in_declaration_order_and_preserves_unrestored_keys_on_forget(
+        repo, tmp_path):
+    home = isolated_home(repo, tmp_path)
+    add_extra_harness(repo, home)
+    save_extra(repo, ['model = "m1"\n', 'effort = "low"\n', 'tier = "t1"\n'])
+
+    # A pick of the second unit keeps the first unit's saved value, in declaration order.
+    (repo / EXTRA).write_text('effort = "high"\ntier = "t2"\n' + EXTRA_BASE)
+    result = isolated_picks(repo, home, "capture")
+    assert result.returncode == 0, result.stderr
+    assert extra_record(repo) == {EXTRA: {"state": "set", "lines": [
+        'model = "m1"\n', 'effort = "high"\n', 'tier = "t2"\n']}}
+
+    # Units held in reverse order in the live file are still saved in declaration order.
+    (repo / EXTRA).write_text('effort = "e3"\ntier = "t3"\nmodel = "m3"\ninstall_id = "abc"\n'
+                              + EXTRA_BASE)
+    result = isolated_picks(repo, home, "capture")
+    assert result.returncode == 0, result.stderr
+    assert extra_record(repo) == {EXTRA: {"state": "set", "lines": [
+        'model = "m3"\n', 'effort = "e3"\n', 'tier = "t3"\n']}}
+    assert record(repo) is None
+
+    # restore fills only the unit the file holds none of, keeping comments and tables.
+    held = 'tier = "t9"\n' + EXTRA_BASE
+    (repo / EXTRA).write_text(held)
+    result = isolated_picks(repo, home, "restore")
+    assert result.returncode == 0, result.stderr
+    assert (repo / EXTRA).read_text() == 'model = "m3"\n' + held
+    held = 'model = "m9"\n' + EXTRA_BASE
+    (repo / EXTRA).write_text(held)
+    result = isolated_picks(repo, home, "restore")
+    assert result.returncode == 0, result.stderr
+    assert (repo / EXTRA).read_text() == 'effort = "e3"\ntier = "t3"\n' + held
+
+    # forget removes every pick unit and keeps the installation id it never restores.
+    (repo / EXTRA).write_text('model = "m3"\ninstall_id = "abc"\neffort = "e3"\ntier = "t3"\n'
+                              + EXTRA_BASE)
+    result = isolated_picks(repo, home, "forget", EXTRA)
+    assert result.returncode == 0, result.stderr
+    assert (repo / EXTRA).read_text() == 'install_id = "abc"\n' + EXTRA_BASE
+    assert extra_record(repo) == {EXTRA: {"state": "default"}}
+    result = isolated_picks(repo, home, "restore")
+    assert result.returncode == 0, result.stderr
+    assert (repo / EXTRA).read_text() == 'install_id = "abc"\n' + EXTRA_BASE
+
+
+@pytest.mark.parametrize("name", [CODEX, EXTRA])
+@pytest.mark.parametrize("bad, refusal", [
+    ('model = "a"\nmodel = "b"\n', "does not parse"),
+    ('"model" = "x"\n', "one-line keys"),
+], ids=["duplicate", "quoted"])
+def test_toml_duplicate_or_quoted_key_mismatch_is_refused(repo, tmp_path, name, bad, refusal):
+    home = isolated_home(repo, tmp_path)
+    add_extra_harness(repo, home)
+    saved_both(repo)
+    save_extra(repo, ['model = "m1"\n', 'effort = "low"\n', 'tier = "t1"\n'])
+    before_records = {path: path.read_bytes() for path in (record_path(repo), repo / EXTRA_RECORD)}
+    write_claude(repo, model="sonnet")
+    write_pi(repo, **PI_VALUES)
+    base = BASE if name == CODEX else EXTRA_BASE
+    (repo / name).write_text(bad + base)
+    other = EXTRA if name == CODEX else CODEX
+    (repo / other).write_text(BASE if other == CODEX else EXTRA_BASE)
+
+    captured = isolated_picks(repo, home, "capture")
+    restored = isolated_picks(repo, home, "restore")
+
+    for result in (captured, restored):
+        assert result.returncode != 0
+        assert f"{name}" in result.stderr and refusal in result.stderr
+        assert "Traceback" not in result.stderr
+    assert (repo / name).read_text() == bad + base
+    assert record(repo)[CLAUDE] == {"state": "set", "values": {"model": "sonnet"}}
+    assert json.loads(pi_record_path(repo).read_text()) == {PI: PI_SET}
+    own = record_path(repo) if name == CODEX else repo / EXTRA_RECORD
+    assert json.loads(own.read_text())[name] == json.loads(before_records[own])[name]
+    if other == CODEX:
+        assert codex(repo)["model"] == "gpt-6.1-sol"
+    else:
+        assert (repo / EXTRA).read_text().startswith('model = "m1"\n')
+
+
+@pytest.mark.parametrize("lines", [
+    ['model = "a"\n', 'model = "b"\n'],
+    ['"model" = "x"\n'],
+    ['install_id = "abc"\n'],
+], ids=["duplicate", "quoted", "unrestored"])
+def test_a_multi_unit_toml_record_with_bad_lines_is_refused_and_left_alone(repo, tmp_path, lines):
+    home = isolated_home(repo, tmp_path)
+    add_extra_harness(repo, home)
+    save_extra(repo, lines)
+    text = (repo / EXTRA_RECORD).read_text()
+
+    result = isolated_picks(repo, home, "sync")
+
+    assert result.returncode != 0
+    assert f"live-picks: {EXTRA_RECORD}" in result.stderr
+    assert (repo / EXTRA_RECORD).read_text() == text
+    assert (repo / EXTRA).read_text() == EXTRA_BASE
+
+
+CLEAN_ONLY = "cleanonly/settings.json"
+CLEAN_ONLY_SPEC = """
+[harnesses.cleanonly.live_state]
+config = "cleanonly/settings.json"
+filter_glob = "cleanonly/settings*.json"
+format = "json"
+clean_keys = ["token"]
+"""
+
+
+def test_clean_only_live_state_is_skipped_by_live_picks_sync_and_refused_by_forget(repo, tmp_path):
+    home = isolated_home(repo, tmp_path)
+    with (repo / "harnesses.toml").open("a") as manifest:
+        manifest.write(CLEAN_ONLY_SPEC)
+    (repo / "cleanonly").mkdir()
+    (repo / CLEAN_ONLY).write_text('{"token": "t", "theme": "x"}\n')
+    write_claude(repo, model="opus")
+
+    synced = isolated_picks(repo, home, "sync")
+    forgot = isolated_picks(repo, home, "forget", CLEAN_ONLY)
+    usage = isolated_picks(repo, home, "bogus")
+
+    assert synced.returncode == 0, synced.stderr
+    assert record(repo) == {CLAUDE: CLAUDE_SET}
+    assert sorted(path.name for path in (repo / "local").glob("live-picks*.json")) == ["live-picks.json"]
+    assert forgot.returncode != 0
+    assert "not a file live-picks owns" in forgot.stderr
+    assert "Traceback" not in forgot.stderr
+    assert (repo / CLEAN_ONLY).read_text() == '{"token": "t", "theme": "x"}\n'
+    assert CLEAN_ONLY not in usage.stderr
+    assert CLAUDE in usage.stderr
 
 
 @pytest.mark.parametrize("rewrite", ["merge", "switch", "checkout", "rebase"])
@@ -1432,6 +1665,37 @@ tool["main"](["live-picks", "capture"])
         assert result.returncode == 0, err
     assert record(repo) == {CLAUDE: CLAUDE_SET, CODEX: CODEX_SET}
     assert PI not in record(repo)
+
+
+def test_single_unit_codex_record_bytes_match_pinned_6b434eb_and_rollback_works_without_manifest(
+        repo, tmp_path, pre_pi_hooks):
+    home = isolated_home(repo, tmp_path)
+    write_claude(repo, model="opus", effortLevel="high")
+    (repo / CODEX).write_text(PICK + BASE)
+    captured = isolated_picks(repo, home, "capture")
+    assert captured.returncode == 0, captured.stderr
+    current = record_path(repo).read_bytes()
+    assert current == (json.dumps({CLAUDE: {"state": "set", "values": {
+        "model": "opus", "effortLevel": "high"}}, CODEX: CODEX_SET}, indent=2) + "\n").encode()
+    (repo / "harnesses.toml").unlink()
+    install_pre_pi_hooks(repo, pre_pi_hooks)
+
+    # The pinned hooks keep the current record as it is and write the same bytes afresh.
+    kept = isolated_picks(repo, home, "capture")
+    assert kept.returncode == 0, kept.stderr
+    assert record_path(repo).read_bytes() == current
+    record_path(repo).unlink()
+    rewritten = isolated_picks(repo, home, "capture")
+    assert rewritten.returncode == 0, rewritten.stderr
+    assert record_path(repo).read_bytes() == current
+    write_claude(repo)
+    (repo / CODEX).write_text(BASE)
+    restored = isolated_picks(repo, home, "restore")
+
+    assert restored.returncode == 0, restored.stderr
+    assert record_path(repo).read_bytes() == current
+    assert claude(repo) == {"theme": "dark-ansi", "model": "opus", "effortLevel": "high"}
+    assert (repo / CODEX).read_text() == PICK + BASE
 
 
 def agy_record_path(repo):

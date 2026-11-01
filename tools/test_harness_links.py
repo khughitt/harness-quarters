@@ -262,6 +262,7 @@ def fresh_clone(tmp_path, home, repo=None):
     stage_project_targets(repo / "links.toml", tmp_path, home)
     # Exercise the working manifest and tool, including changes not committed yet.
     shutil.copy2(repo / "links.toml", clone / "links.toml")
+    shutil.copy2(repo / "harnesses.toml", clone / "harnesses.toml")
     shutil.copy2(TOOL, clone / "tools/harness-links")
     shutil.copytree(repo / ".githooks", clone / ".githooks", dirs_exist_ok=True)
     shutil.copytree(repo / "relay", clone / "relay", dirs_exist_ok=True)
@@ -814,6 +815,7 @@ def test_fresh_clone_strips_live_agy_picks_from_dirty_source_checkout(tmp_path):
     dirty_source = tmp_path / "dirty-source"
     run("clone", "-q", str(checkout), str(dirty_source))
     shutil.copy2(checkout / "links.toml", dirty_source / "links.toml")
+    shutil.copy2(checkout / "harnesses.toml", dirty_source / "harnesses.toml")
     shutil.copytree(checkout / ".githooks", dirty_source / ".githooks", dirs_exist_ok=True)
     shutil.copytree(checkout / "relay", dirty_source / "relay", dirs_exist_ok=True)
     shutil.copytree(checkout / "codex/work", dirty_source / "codex/work", dirs_exist_ok=True)

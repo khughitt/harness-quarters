@@ -35,6 +35,7 @@ def repo(tmp_path):
     for name in ("harness-state-clean", "harness-state-refresh", "codex-trust",
                  "harness_state.py", "live-picks"):
         shutil.copy2(HOOKS / name, repo / ".githooks" / name)
+    shutil.copy2(HOOKS.parent / "harnesses.toml", repo / "harnesses.toml")
     (repo / ".gitattributes").write_text("claude/settings*.json filter=harness-state\n"
                                          "codex/config*.toml filter=harness-state\n"
                                          "pi/settings*.json filter=harness-state\n"

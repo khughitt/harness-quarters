@@ -46,6 +46,7 @@ def repo(tmp_path):
     (repo / ".githooks").mkdir()
     for name in HOOK_FILES:
         shutil.copy2(HOOKS / name, repo / ".githooks" / name)
+    shutil.copy2(HOOKS.parent / "harnesses.toml", repo / "harnesses.toml")
     (repo / "codex").mkdir()
     (repo / "claude").mkdir()
     (repo / "pi").mkdir()

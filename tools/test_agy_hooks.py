@@ -686,6 +686,7 @@ def make_agy_checkout(tmp_path: Path):
     (repo / ".githooks").mkdir(parents=True)
     for name in ("harness-state-clean", "harness_state.py", "codex-trust", "live-picks", "harness-state-refresh"):
         shutil.copy2(ROOT / ".githooks" / name, repo / ".githooks" / name)
+    shutil.copy2(ROOT / "harnesses.toml", repo / "harnesses.toml")
     (repo / "agy").mkdir()
     shutil.copy2(HOOK, repo / "agy" / "hook")
     for folder in ("claude", "codex", "pi"):
