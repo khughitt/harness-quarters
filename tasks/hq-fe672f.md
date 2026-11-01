@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-9aa713-pause-past-range
 created: 2026-11-01T10:29:21Z
-updated: 2026-11-01T14:34:34Z
+updated: 2026-11-01T14:34:36Z
 started: 2026-11-01T11:56:46Z
 depends: []
 parent: hq-9aa713
@@ -64,3 +64,4 @@ Implements Task 1 of the turn-pause plan in .worktrees/hq-9aa713 (branch feat/hq
   provenance: {"harness_session":"claude-code:536b5ebf-5753-4a8b-ac83-61dde5ef4c79","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-01T14:34:33Z (feat/hq-9aa713-pause-past-range): retained: {"host":"titan","kind":"scratch","path":"$WORK_ROOT/hq/hq-fe672f","state":"kept","verification":"verified","purpose":"raw probe logs and isolated harness homes behind the Task 1 capability facts (rounds 1 to 3), raw source of the portable attachments and fixtures; Tasks 8 and 9 use its rollouts as reference","next_owner":"task:hq-9aa713","cleanup_trigger":"hq-9aa713 closes with the turn-pause branch integrated","manifest":"$WORK_ROOT/hq/hq-fe672f.manifest-2026-11-01T1408Z.txt","sha256":"c0fac5b1a67c7033b01ae52c227d21456cbf3713d2d560c5f6c5e23c2ec49f76"}
 - 2026-11-01T14:34:34Z (feat/hq-9aa713-pause-past-range): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/hq/hq-fe672f.manifest-2026-11-01T1408Z.txt","state":"kept","verification":"verified","purpose":"immutable manifest version for the scratch checkpoint after probe round 3 (5370 entries, 2 symlinks)","next_owner":"task:hq-9aa713","cleanup_trigger":"the scratch directory is released","sha256":"c0fac5b1a67c7033b01ae52c227d21456cbf3713d2d560c5f6c5e23c2ec49f76"}
+- 2026-11-01T14:34:36Z (feat/hq-9aa713-pause-past-range): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/hq/hq-fe672f.manifest-2026-11-01T1305Z.txt","state":"kept","verification":"verified","purpose":"immutable manifest version for the first scratch checkpoint (2894 entries, 1 symlink)","next_owner":"task:hq-9aa713","cleanup_trigger":"the scratch directory is released","sha256":"c568917e0e1545d85356133b745a026d030e28e38f9b3a39cd5f59d70d8d9ee1"}
