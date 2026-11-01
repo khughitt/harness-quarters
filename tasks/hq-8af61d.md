@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-11-01T08:44:46Z
-updated: 2026-11-01T08:44:47Z
+updated: 2026-11-01T10:25:54Z
 depends: []
 tags: [hooks, cross-project]
 source: hq-e72097
@@ -28,3 +28,4 @@ Where: relay/, agy/hooks.json, agy/hook, tools/test_agy_hooks.py, tools/test_cla
 - 2026-11-01T08:44:46Z (add): created
   provenance: {"origin":"mixed"}
 - 2026-11-01T08:44:47Z (main): concerns: hq-e72097 extension — migrate agy/hooks.json from the local agy/hook shim to pinned relay and native ops hooks after relay-7b8340 and ops-33cef9 land
+- 2026-11-01T10:25:54Z (main): relay-7b8340's spec (records ea04df242:relay/docs/specs/2026-11-01-agy-hook-adapter.md, section 'Rollout prerequisites') lists four gates for routing agy through relay: tasks must accept agy rows in its relay snapshot reader on every relay-identity host first; every relay runtime before the subscriber file names agy; familiar before it subscribes to agy; and agy handler timeout 60 paired with --outer-ms 60000.
