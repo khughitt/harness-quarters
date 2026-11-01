@@ -4,6 +4,7 @@ import importlib.util
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -249,12 +250,13 @@ def test_local_target_resolves_like_any_other(world):
     assert (home / ".work" / "settings.json").resolve() == (root / "local" / "work.json").resolve()
 
 
-def fresh_clone(tmp_path, home):
+def fresh_clone(tmp_path, home, repo=None):
     """A clone of this checkout with the working manifest and tool. Every `<project>:`
     target the manifest names gets a sibling under tmp_path holding those targets, copied
     from the live project's registered root, and registered in `home`'s isolated registry:
     the real manifest then resolves there as it does on a host."""
-    repo = Path(__file__).resolve().parent.parent
+    checkout = Path(__file__).resolve().parent.parent
+    repo = repo or checkout
     clone = tmp_path / "clone"
     run("clone", "-q", str(repo), str(clone))
     stage_project_targets(repo / "links.toml", tmp_path, home)
@@ -266,9 +268,20 @@ def fresh_clone(tmp_path, home):
     shutil.copytree(repo / "codex/work", clone / "codex/work", dirs_exist_ok=True)
     if (repo / "agy").exists():
         shutil.copytree(repo / "agy", clone / "agy", dirs_exist_ok=True)
+        agy_settings = clone / "agy/settings.json"
+        if agy_settings.exists():
+            cleaned = subprocess.run(
+                [sys.executable, "-B", str(clone / ".githooks/harness-state-clean"), "agy/settings.json"],
+                input=agy_settings.read_text(),
+                env=isolated_env(home),
+                text=True,
+                capture_output=True,
+                check=True,
+            )
+            agy_settings.write_text(cleaned.stdout)
     # A public clone needs the submodule and sibling skill checkouts. Use the local
     # sources in these fixtures so the tests require neither network nor live writes.
-    main = Path(run("-C", str(repo), "worktree", "list", "--porcelain").stdout.splitlines()[0][9:])
+    main = Path(run("-C", str(checkout), "worktree", "list", "--porcelain").stdout.splitlines()[0][9:])
     for path in (clone / "agents/skills").iterdir():
         if path.is_symlink():
             shutil.copytree((main / "agents/skills" / path.name).resolve(), path.resolve(),
@@ -792,3 +805,41 @@ def test_adopt_manifest_validation_and_apply_refusal_on_corrupt_or_directory(wor
     assert corrupt_apply.returncode == 1
     assert "does not parse" in corrupt_apply.stderr
     assert not settings_link.is_symlink() and settings_link.read_text() == "{corrupt\n"
+
+
+def test_fresh_clone_strips_live_agy_picks_from_dirty_source_checkout(tmp_path):
+    import json
+
+    checkout = Path(__file__).resolve().parent.parent
+    dirty_source = tmp_path / "dirty-source"
+    run("clone", "-q", str(checkout), str(dirty_source))
+    shutil.copy2(checkout / "links.toml", dirty_source / "links.toml")
+    shutil.copytree(checkout / ".githooks", dirty_source / ".githooks", dirs_exist_ok=True)
+    shutil.copytree(checkout / "relay", dirty_source / "relay", dirs_exist_ok=True)
+    shutil.copytree(checkout / "codex/work", dirty_source / "codex/work", dirs_exist_ok=True)
+    shutil.copytree(checkout / "agy", dirty_source / "agy", dirs_exist_ok=True)
+    source_settings = json.loads((dirty_source / "agy/settings.json").read_text())
+    (dirty_source / "agy/settings.json").write_text(
+        json.dumps(
+            {
+                **source_settings,
+                "model": "Gemini 3.1 Pro (Medium)",
+                "effort": "medium",
+                "effortByBase": {"Gemini 3.1 Pro": "medium"},
+                "trustedWorkspaces": ["/host/live"],
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+
+    home = tmp_path / "home"
+    (home / ".gemini/antigravity-cli").mkdir(parents=True)
+    (home / ".gemini/config").mkdir(parents=True)
+    case_dir = tmp_path / "case"
+    case_dir.mkdir()
+    clone = fresh_clone(case_dir, home, repo=dirty_source)
+
+    cloned_settings = json.loads((clone / "agy/settings.json").read_text())
+    assert not (set(cloned_settings) & {"model", "effort", "effortByBase", "trustedWorkspaces"})
+    assert isolated_git(clone, home, "status", "--porcelain", "--", "agy/settings.json").stdout == ""

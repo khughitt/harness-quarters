@@ -1728,6 +1728,75 @@ def test_agy_git_rewrites_adopt_detached_picks_onto_checked_out_settings_and_rel
     assert isolated_git(repo, home, "status", "--porcelain").stdout == ""
 
 
+def test_agy_git_hooks_not_rewriting_agy_preserve_detached_non_pick_edits(repo, tmp_path):
+    home, link = anchor_agy_home(repo, tmp_path)
+    isolated_git(repo, home, "switch", "-q", "-c", "other-only")
+    (repo / "other.txt").write_text("other\n")
+    isolated_git(repo, home, "add", "other.txt")
+    isolated_git(repo, home, "commit", "-q", "-m", "touch other file only")
+    isolated_git(repo, home, "switch", "-q", "main")
+
+    save_agy(repo)
+    assert isolated_refresh(repo, home).returncode == 0
+    atomic_agy_save(link, {
+        **AGY_BASE,
+        "queuedMessages": "send-immediately",
+        **AGY_VALUES,
+        "model": "Gemini 4 Argon (High)",
+    })
+
+    switched = isolated_git(repo, home, "switch", "-q", "-c", "feature")
+
+    assert switched.returncode == 0, switched.stderr
+    assert link.is_symlink() and link.resolve() == (repo / AGY).resolve()
+    assert agy_settings(repo) == {
+        **AGY_BASE,
+        "queuedMessages": "send-immediately",
+        **AGY_VALUES,
+        "model": "Gemini 4 Argon (High)",
+    }
+    assert isolated_git(repo, home, "status", "--porcelain", "--", AGY).stdout == f" M {AGY}\n"
+
+    isolated_git(repo, home, "checkout", "--", AGY)
+    isolated_git(repo, home, "switch", "-q", "main")
+    atomic_agy_save(link, {
+        **AGY_BASE,
+        "permissions": {"allow": ["Bash(just test)"], "deny": []},
+        **AGY_VALUES,
+    })
+
+    merged = isolated_git(repo, home, "merge", "-q", "--no-ff", "other-only", "-m", "merge other")
+
+    assert merged.returncode == 0, merged.stderr
+    assert link.is_symlink() and link.resolve() == (repo / AGY).resolve()
+    assert agy_settings(repo) == {
+        **AGY_BASE,
+        "permissions": {"allow": ["Bash(just test)"], "deny": []},
+        **AGY_VALUES,
+    }
+    assert isolated_git(repo, home, "status", "--porcelain", "--", AGY).stdout == f" M {AGY}\n"
+
+    isolated_git(repo, home, "checkout", "--", AGY)
+    assert isolated_picks(repo, home, "forget", AGY).returncode == 0
+    assert isolated_refresh(repo, home).returncode == 0
+    old_ns = (repo / AGY).stat().st_mtime_ns - 1_000_000_000
+    os.utime(repo / AGY, ns=(old_ns, old_ns))
+    atomic_agy_save(link, {
+        **AGY_BASE,
+        "queuedMessages": "send-immediately",
+    })
+
+    switched_empty = isolated_git(repo, home, "switch", "-q", "-c", "no-picks-feature")
+
+    assert switched_empty.returncode == 0, switched_empty.stderr
+    assert link.is_symlink() and link.resolve() == (repo / AGY).resolve()
+    assert agy_settings(repo) == {
+        **AGY_BASE,
+        "queuedMessages": "send-immediately",
+    }
+    assert isolated_git(repo, home, "status", "--porcelain", "--", AGY).stdout == f" M {AGY}\n"
+
+
 def test_agy_forget_adopts_non_pick_settings_clears_picks_and_relinks(repo, tmp_path):
     home, link = anchor_agy_home(repo, tmp_path)
     save_agy(repo)

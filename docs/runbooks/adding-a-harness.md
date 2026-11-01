@@ -44,9 +44,10 @@ limits:
   subscribers for it).
 - `pi`, `pi-durable`: a pinned runtime and launcher, live-state hygiene through an
   in-process extension, and probes.
-- `agy`: split homes, a skills manifest, workspace trust in `live-picks`, and an
-  adapter hook (`agy/hook`) for profile, command guard and a one-shot Stop claim
-  check. Its settings link does not survive the harness's own saves (hq-b24c39).
+- `agy`: split homes, a skills manifest, workspace trust and anchored atomic-save
+  settings adoption in `live-picks` and `links.toml` (3.1), and an adapter hook
+  (`agy/hook`) for profile, command guard and a one-shot Stop claim check (no relay
+  observer or native `claim-guard` support yet; ops-33cef9).
 - `claude-code`, `codex`: every layer, through relay.
 
 ## 1. Discover every enumeration
@@ -326,8 +327,9 @@ Git marks a tracked file `M` whenever its size differs from the index entry, wit
 running the clean filter first. Add `"<name>/settings*.json"` (or
 `"<name>/config*.toml"`) to `PATTERNS` in `.githooks/harness-state-refresh`, which runs
 `live-picks capture`, syncs trust and restores dropped picks when `index.lock` is free,
-and runs `git add` on files whose filtered diff is empty. It acts on the tracked files
-only; it does not repair a home link the harness replaced (3.1).
+and runs `git add` on files whose filtered diff is empty. By default it acts on tracked
+files only; repairing a home link the harness replaced requires an explicit anchored
+adoption contract in `live-picks` and `links.toml` (3.1).
 
 Trigger `~/.local/bin/harness-state-refresh` (a `[required]` link, so hook configs
 never hardcode `<hq-checkout>`) from whichever lifecycle hook the harness provides:

@@ -372,8 +372,10 @@ def adopt_detached(name, detached, records, from_hook):
     r_picks = pick(name, r_text)
     saved = records[record_name].get(name)
     merged = merged_values(name, saved, h_picks)
-    git_rewrote_r = from_hook or (
-        not r_picks and (REPO / name).stat().st_mtime_ns > detached.stat().st_mtime_ns
+    repo_mtime = (REPO / name).stat().st_mtime_ns
+    detached_mtime = detached.stat().st_mtime_ns
+    git_rewrote_r = not r_picks and (
+        repo_mtime >= detached_mtime if from_hook else repo_mtime > detached_mtime
     )
     base_text = r_text if git_rewrote_r else h_text
     clean_base = without_pick(name, base_text)
