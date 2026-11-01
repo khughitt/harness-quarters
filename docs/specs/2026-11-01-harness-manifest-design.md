@@ -1,6 +1,6 @@
 # Declarative harness manifest: one source of truth for live-state hooks and capability facts
 
-Status: draft for user review (round 2), 2026-11-01 (`hq-2eba07`, source `hq-6c8a9f`).
+Status: draft for user review (round 3), 2026-11-01 (`hq-2eba07`, source `hq-6c8a9f`).
 Extends `docs/specs/2026-10-06-residue-design.md` §4 (capability facts) and
 `docs/specs/2026-10-10-live-model-preservation-design.md` /
 `docs/specs/2026-10-15-pi-live-picks-design.md` (clean filter, refresh, and live-picks
@@ -57,10 +57,17 @@ across five tracked files in `hq`, and a sixth file (`.githooks/codex-trust`) is
   cleaner from `harnesses.toml` through `.githooks/harness_state.py`, eliminating parallel
   per-harness constant tables and `runpy.run_path` hook imports across those scripts.
 - Make the clean filter fail closed (`git config filter.harness-state.required true` in
-  `just setup`) and validate `harnesses.toml` (`live_state` rules included) plus
-  `.gitattributes` parity on the staged tree in `.githooks/pre-commit`, so a broken
-  manifest can neither be committed through the hook nor leak live picks or installation
-  IDs into the Git index.
+  `just setup`), actively verify that `filter.harness-state.required == true` against the
+  real repository's Git config in `.githooks/pre-commit` and
+  `.githooks/harness-state-refresh` (so an existing clone that has not re-run `just setup`
+  is caught automatically rather than relying on memory), and validate `harnesses.toml`
+  (`live_state` rules included) plus `.gitattributes` parity on the staged tree in
+  `.githooks/pre-commit`.
+- Preserve Git lifecycle hook resilience: on a missing or invalid `harnesses.toml`,
+  `harness-state-clean` and `pre-commit` fail hard, whereas `live-picks hook` and
+  `codex-trust hook` (`post-checkout`, `post-merge`, `post-rewrite`) report the failure on
+  stderr with their retry notice and exit `0` so completed Git operations do not report
+  false failure.
 - Generalize TOML handling so a second TOML harness requires only a `harnesses.toml`
   entry (and `.gitattributes` line): segment-bounded per-`filter_glob` routing in
   `harness-state-clean` and format-based (`"json"` vs `"toml"`) multi-unit handling in
@@ -103,14 +110,18 @@ across five tracked files in `hq`, and a sixth file (`.githooks/codex-trust`) is
 
 ## 3. Constraints
 
-1. **Fail-closed clean filter, `REPO` resolution, rollback, and in-flight lock safety**:
+1. **Fail-closed clean filter with active config verification, `REPO` resolution, rollback, and in-flight lock safety**:
    - `just setup` sets `git config filter.harness-state.required true` alongside
      `filter.harness-state.clean '.githooks/harness-state-clean %f'`. Without
      `required = true`, Git ignores a non-zero exit from `harness-state-clean` and stages
      the raw working-tree file, which would leak `model`, `effortLevel`, `deviceId`,
      `trackingId`, `trustedWorkspaces`, or Codex `[projects.*]` trust tables if
-     `harnesses.toml` failed to load. Existing checkouts run `just setup` once after
-     pulling this change.
+     `harnesses.toml` failed to load. Because local `.git/config` is not updated by
+     `git pull` on an existing clone, both `.githooks/pre-commit` (reading the real
+     repository's `--git-dir`, not the exported staged tree) and
+     `.githooks/harness-state-refresh` verify `filter.harness-state.clean` and
+     `filter.harness-state.required == true` via `harness_state.check_filter_config()`,
+     refusing with `run 'just setup'` whenever `required` is unset or `false`.
    - Every `.githooks/` tool resolves `HERE = Path(__file__).resolve().parent`,
      `REPO = HERE.parent`, and `MANIFEST_PATH = REPO / "harnesses.toml"`. Because
      `core.hooksPath` (`.githooks`) and `filter.harness-state.clean`
@@ -118,35 +129,41 @@ across five tracked files in `hq`, and a sixth file (`.githooks/codex-trust`) is
      the script inside whichever checkout or linked worktree invoked Git; `REPO` therefore
      resolves to that invoking tree's root and reads `<invoking-tree>/harnesses.toml`.
      `live-picks` and `codex-trust` continue skipping (`hook`) or refusing (CLI) linked
-     worktrees via `CHECKOUT.linked_worktree()`, while `harness-state-clean` filters files
-     in both the main checkout and linked worktrees using each tree's own `harnesses.toml`.
+     worktrees via `CHECKOUT.linked_worktree()` **before** loading `harnesses.toml`, while
+     `harness-state-clean` filters files in both the main checkout and linked worktrees
+     using each tree's own `harnesses.toml`.
    - `local/` record paths and payloads stay byte-compatible with existing hooks and the
-     `6b434eb` rollback suite in `.githooks/test_live_picks.py`. Loading `harnesses.toml`
-     once at module import time before acquiring `local/harness-state.lock` protects an
-     **already-spawned** waiter process across a concurrent checkout rollback
-     (`test_inflight_pi_capture_remains_safe_after_rollback`). After rolling back to a
-     pre-manifest commit (or inside a linked worktree checked out at a pre-manifest
-     commit), newly spawned hook processes execute that commit's older `.githooks/*`
-     scripts, which ignore `harnesses.toml` and read the unchanged `local/` records.
+     `6b434eb` rollback suite in `.githooks/test_live_picks.py`. `live-picks` and
+     `codex-trust` load `harnesses.toml` inside `main()` **before** acquiring
+     `local/harness-state.lock` (and inside `hook` mode's `try ... except SystemExit`
+     guard), protecting an **already-spawned** waiter process across a concurrent checkout
+     rollback (`test_inflight_pi_capture_remains_safe_after_rollback`) without crashing at
+     import time before `hook` error handling runs. After rolling back to a pre-manifest
+     commit (or inside a linked worktree checked out at a pre-manifest commit), newly
+     spawned hook processes execute that commit's older `.githooks/*` scripts, which
+     ignore `harnesses.toml` and read the unchanged `local/` records.
 2. **Clean-filter availability and staged-tree commit gating**:
-   - Git invokes `.githooks/harness-state-clean %f` whenever staging or diffing filtered
-     paths. `harnesses.toml` and `.githooks/harness_state.py` must land before or in the
-     same commit that switches `.githooks/harness-state-clean` to read them, so every
-     commit on the branch has a working clean filter during `git rebase` or `git bisect`.
+   - Git invokes `.githooks/harness-state-clean %f` whenever staging, diffing, or
+     stat-checking dirty filtered paths. `harnesses.toml` and `.githooks/harness_state.py`
+     must land before or in the same commit that switches `.githooks/harness-state-clean`
+     to read them, so every commit on the branch has a working clean filter during
+     `git rebase` or `git bisect`.
    - Because there is no CI and `pre-commit` is the only automatic commit gate,
      `.githooks/pre-commit` runs both `tools/harness-facts check` and
-     `.githooks/harness_state.py check` against the exported staged tree, refusing any
-     commit whose staged `harnesses.toml`, `facts/capabilities.toml`, probes, or
-     `.gitattributes` violate `live_state` or capability-fact invariants.
+     `.githooks/harness_state.py check --git-dir <real-git-dir>`, refusing any commit
+     whose real repository lacks `filter.harness-state.required = true` or whose staged
+     `harnesses.toml`, `facts/capabilities.toml`, probes, or `.gitattributes` violate
+     `live_state` or capability-fact invariants.
 3. **In-process `CLAUDE_JSON_KEYS` reader (`hq-7e1e9c` retirement boundary)**:
    - `tools/relay_cutover_bootstrap/inputs.py` (`claude_keys()`) loads
      `.githooks/harness-state-clean` via `runpy.run_path` and requires `CLAUDE_JSON_KEYS`
      in the module globals as a non-empty `tuple[str, ...]`. Until `hq-7e1e9c` retires
      `relay_cutover_bootstrap`, `.githooks/harness-state-clean` binds `CLAUDE_JSON_KEYS`
-     from `MANIFEST.by_harness["claude-code"].json_clean_keys`. Removing `claude-code`
-     from `harnesses.toml`, changing its `live_state.format` from `"json"`, or emptying
-     its `clean_keys` will break `relay_cutover_bootstrap/inputs.py` until `hq-7e1e9c`
-     lands.
+     from `MANIFEST.by_harness["claude-code"].json_clean_keys` when `claude-code` has JSON
+     `live_state` (and leaves `CLAUDE_JSON_KEYS` unbound otherwise, with no silent empty-
+     tuple fallback). Removing `claude-code` from `harnesses.toml`, changing its
+     `live_state.format` from `"json"`, or emptying its `clean_keys` will break
+     `relay_cutover_bootstrap/inputs.py` until `hq-7e1e9c` lands.
 4. **Self-contained `tools/harness-facts` and backward-compatible `SourceFileLoader` API**:
    - `tools/harness-facts` is linked at `~/.agents/bin/harness-facts`, loaded via
      `SourceFileLoader` by external consumers (`agy/hook`, `ops` `claim-guard`), and
@@ -181,19 +198,19 @@ Place a schema-1 declarative manifest at `<hq-checkout>/harnesses.toml` declarin
 six `hq` harnesses under `[harnesses.<slug>]`, with optional
 `[harnesses.<slug>.live_state]` subtables for harnesses with tracked settings.
 `.githooks/harness_state.py` houses the shared JSON/TOML cleaners and validates
-`live_state` entries and `.gitattributes` parity (both at hook startup and in
-`.githooks/pre-commit`); `tools/harness-facts` reads `[harnesses]` keys from
-`harnesses.toml` (with `--manifest` override for standalone fixture tests), and
-`facts/capabilities.toml` drops its top-level `harnesses = [...]`.
+`live_state` entries, `.gitattributes` parity, and `filter.harness-state.required` Git
+config (at hook execution and in `.githooks/pre-commit`); `tools/harness-facts` reads
+`[harnesses]` keys from `harnesses.toml` (with `--manifest` override for standalone
+fixture tests), and `facts/capabilities.toml` drops its top-level `harnesses = [...]`.
 
 - **Pros**: True single source of truth for both capability facts and live-state hooks;
   `.githooks/pre-commit`'s staged-tree export enforces cross-file consistency across
-  `harnesses.toml`, `facts/capabilities.toml`, and `.gitattributes`; keeps
-  `tools/harness-facts` free of `.githooks/` imports and keeps `links.toml` focused on
-  home-symlink routing.
+  `harnesses.toml`, `facts/capabilities.toml`, and `.gitattributes` while checking the
+  real repository's fail-closed filter config; keeps `tools/harness-facts` free of
+  `.githooks/` imports and keeps `links.toml` focused on home-symlink routing.
 - **Cons**: Requires updating scratch-checkout fixtures in `.githooks/test_*.py`,
   `tools/test_harness_facts.py`, `tools/test_agy_hooks.py`, and
-  `tools/test_harness_links.py` to include `harnesses.toml`.
+  `tools/test_harness_links.py` to include `harnesses.toml` and `required = true`.
 
 ### Approach 2 (rejected): Extend `links.toml` with live-state and capability-fact metadata
 
@@ -291,16 +308,21 @@ pick_units = [["defaultProvider", "defaultModel"], ["defaultThinkingLevel"]]
    - `filter_glob` is a required non-empty directory-qualified relative POSIX glob (at
      least one `/`, no leading or trailing `/`, no empty segments, `.`, or `..`, outside
      `local/`). In `schema = 1`, `*` is the only permitted wildcard (`?`, `[`, `]`, and
-     `**` are refused). Each `/` segment compiles `*` to `[^/]*` (never crossing `/`),
-     matching Git's `FNM_PATHNAME` `.gitattributes` rules for slash-containing patterns
-     and `:(glob)<filter_glob>` pathspecs in `git diff-files`.
+     `**` are refused), and **each `/` segment contains at most one `*`**. Each segment
+     compiles `*` to `[^/]*` (never crossing `/`), matching Git's `FNM_PATHNAME`
+     `.gitattributes` rules for slash-containing patterns and `:(glob)<filter_glob>`
+     pathspecs in `git diff-files`.
    - Each entry's compiled `filter_re` must full-match its own `config`.
    - Across all `live_state` entries, `config` values are unique, `filter_glob` values are
-     unique, and **no two `filter_glob` patterns may overlap on any path**: for every pair
-     of entries with equal segment counts, product-automaton reachability over each
-     segment pair `(seg_a, seg_b)` verifies `L(glob_a) ∩ L(glob_b) == ∅`. Overlapping
-     patterns such as `agy/settings*.json` and `agy/settings-x*.json` are refused at load
-     time (and in `pre-commit`), never deferred until a matching file appears at runtime.
+     unique, and **no two `filter_glob` patterns may overlap on any path**: two patterns
+     with the same number of `/` segments overlap iff every corresponding segment pair
+     `(seg_a, seg_b)` overlaps, decided by a direct prefix/suffix comparison (`seg_a == seg_b`
+     when neither has `*`; `len(lit) >= len(p) + len(s) and lit.startswith(p) and lit.endswith(s)`
+     when one is `p*s` and the other is literal `lit`; and
+     `(p1.startswith(p2) or p2.startswith(p1)) and (s1.endswith(s2) or s2.endswith(s1))`
+     when both are `p1*s1` and `p2*s2`). Overlapping patterns such as
+     `agy/settings*.json` and `agy/settings-x*.json` are refused at load time (and in
+     `pre-commit`), never deferred until a matching file appears at runtime.
    - `format` is `"json"` or `"toml"`.
 3. **Clean-filter fields (`live_state`)**:
    - When `format = "json"`:
@@ -332,7 +354,12 @@ pick_units = [["defaultProvider", "defaultModel"], ["defaultThinkingLevel"]]
      `"json"` and the set of top-level keys (`table == ""` in `clean_keys`) for
      `"toml"`. Then `set(picked) | set(unrestored_keys) == filterable_pick_keys` and
      `set(picked) & set(unrestored_keys) == ∅`. Every key dropped by the filter at the
-     pickable level belongs to either one `pick_unit` or `unrestored_keys`.
+     pickable level belongs to either one `pick_unit` or `unrestored_keys`. Nested TOML
+     `clean_keys` (such as Codex's `tui.screen_reader_detection_done` and
+     `marketplaces.*.last_*`) and non-trust `clean_tables` (`tui.model_availability_nux`)
+     are ephemeral harness bookkeeping dropped by the clean filter and intentionally
+     never restored by `live-picks` (`trust_table` is persisted separately by
+     `codex-trust`).
 
 #### Partition invariant across shipped `live_state` entries
 
@@ -354,35 +381,45 @@ format, or glob wildcard syntax requires bumping `schema` (e.g. `schema = 2`) an
 both `tools/harness-facts` and `.githooks/harness_state.py` in the same commit, which
 `.githooks/pre-commit` enforces atomically on the staged tree.
 
-### 5.2 Shared loader and cleaners in `.githooks/harness_state.py`
+### 5.2 Shared loader, config checks, and cleaners in `.githooks/harness_state.py`
 
-`.githooks/harness_state.py` owns both the manifest loader/validator and the pure
-JSON/TOML clean-filter functions so `.githooks/harness-state-clean`,
+`.githooks/harness_state.py` owns the manifest loader/validator, `.gitattributes` parity
+check, real-repository filter-config check, and pure JSON/TOML clean-filter functions so
+`.githooks/harness-state-clean`, `.githooks/harness-state-refresh`,
 `.githooks/live-picks`, `.githooks/codex-trust`, and `.githooks/pre-commit` share one
 import path with no `runpy` cycles:
 
 - Constants: `HERE`, `REPO`, `MANIFEST_PATH = REPO / "harnesses.toml"`,
-  `GITATTRIBUTES_PATH = REPO / ".gitattributes"`, `TOML_HEADER`, `TOML_KEY`.
+  `GITATTRIBUTES_PATH = REPO / ".gitattributes"`,
+  `EXPECTED_CLEAN_FILTER = ".githooks/harness-state-clean %f"`, `TOML_HEADER`, `TOML_KEY`.
 - Exception: `ManifestError(ValueError)` carrying `problems: list[str]`.
 - Immutable dataclasses:
   - `TomlKeyRule(table_pattern: str, table_re: re.Pattern[str], keys: tuple[str, ...])`
   - `LiveStateSpec(harness: str, config: str, filter_glob: str, filter_re: re.Pattern[str], format: str, json_clean_keys: tuple[str, ...], toml_clean_keys: tuple[TomlKeyRule, ...], toml_clean_tables: tuple[re.Pattern[str], ...], trust_table: re.Pattern[str] | None, unrestored_keys: tuple[str, ...], picks_record: str | None, pick_units: tuple[tuple[str, ...], ...])`
     with derived `pick_keys: tuple[str, ...]` (`sum(pick_units, ())`).
   - `HarnessManifest(schema: int, harnesses: tuple[str, ...], by_harness: dict[str, LiveStateSpec | None], live_state: tuple[LiveStateSpec, ...])`
-- Loader and `.gitattributes` parity checker:
+- Loader, `.gitattributes` parity checker, and real-repository filter-config checker:
   - `load_manifest(path: Path | None = None) -> HarnessManifest`: reads and validates
     `path or MANIFEST_PATH`, raising `ManifestError` on any violation of §5.1.
   - `load_manifest_or_exit(tool: str, path: Path | None = None) -> HarnessManifest`:
-    exits with `f"{tool}: {error}"` and no traceback.
+    calls `load_manifest(path)` and raises `SystemExit(f"{tool}: {error}")` on
+    `ManifestError` (no traceback).
   - `check_gitattributes(manifest: HarnessManifest, path: Path | None = None) -> None`:
     parses non-blank, non-comment lines of `path or GITATTRIBUTES_PATH`, refuses duplicate
     or negated/malformed `harness-state` filter attributes, and raises `ManifestError`
     unless the set of patterns carrying `filter=harness-state` equals
     `{spec.filter_glob for spec in manifest.live_state}`.
-  - CLI entrypoint (`python3 .githooks/harness_state.py check`): runs
-    `manifest = load_manifest(MANIFEST_PATH)` and
-    `check_gitattributes(manifest, GITATTRIBUTES_PATH)`, printing
-    `harness-state: <problem>` lines to stderr and exiting `2` on `ManifestError`.
+  - `check_filter_config(git_dir: Path | None = None) -> None`: checks the **real
+    repository's** Git config (using `git --git-dir=<git_dir> config ...` when `git_dir`
+    is supplied, or `git -C REPO config ...` otherwise) and raises `ManifestError` unless
+    `filter.harness-state.clean == EXPECTED_CLEAN_FILTER` and
+    `git config --bool --get filter.harness-state.required == "true"`, naming
+    `run 'just setup'` in the error message.
+  - CLI entrypoint (`python3 .githooks/harness_state.py check [--git-dir <path>]`): runs
+    `manifest = load_manifest(MANIFEST_PATH)`,
+    `check_gitattributes(manifest, GITATTRIBUTES_PATH)`, and
+    `check_filter_config(git_dir)`, printing `harness-state: <problem>` lines to stderr
+    and exiting `2` on `ManifestError`.
 - Pure cleaners (moved from `harness-state-clean`):
   - `clean_json(text: str, keys: Iterable[str]) -> str`: parses JSON, removes `keys`,
     and serializes with `json.dumps(data, indent=2, ensure_ascii=False) + "\n"`.
@@ -392,7 +429,7 @@ import path with no `runpy` cycles:
   - `clean_for_spec(spec: LiveStateSpec, text: str) -> str`: dispatches `clean_json` or
     `clean_toml` using `spec`'s rules.
 
-### 5.3 Hook wiring, live-state adapters, and `pre-commit`
+### 5.3 Hook wiring, live-state adapters, `pre-commit`, and failure-mode matrix
 
 1. **`justfile` (`just setup`)**:
    - Adds `git config filter.harness-state.required true` immediately after
@@ -400,33 +437,55 @@ import path with no `runpy` cycles:
 2. **`.githooks/harness-state-clean`**:
    - Prepends `str(Path(__file__).resolve().parent)` to `sys.path` if missing (so
      `runpy.run_path` callers outside `.githooks/` resolve `import harness_state`), then
-     loads `MANIFEST = harness_state.load_manifest_or_exit("harness-state-clean")`.
+     loads `MANIFEST = harness_state.load_manifest_or_exit("harness-state-clean")` at
+     module load time (the clean filter must always fail hard on a bad manifest).
    - Re-exports `TOML_HEADER = harness_state.TOML_HEADER`,
      `TOML_KEY = harness_state.TOML_KEY`, `clean_json = harness_state.clean_json`, and
      `clean_toml = harness_state.clean_toml` (3-argument signature
-     `(text, key_rules, table_patterns)`), and binds `CLAUDE_JSON_KEYS` from
-     `MANIFEST.by_harness["claude-code"].json_clean_keys` (or `()` if absent/non-JSON,
-     which `relay_cutover_bootstrap` then refuses cleanly).
+     `(text, key_rules, table_patterns)`). Binds `CLAUDE_JSON_KEYS` from
+     `MANIFEST.by_harness["claude-code"].json_clean_keys` **only** when `claude-code` has
+     JSON `live_state` (leaving `CLAUDE_JSON_KEYS` unbound otherwise, with no silent `()`
+     fallback, so `relay_cutover_bootstrap` fails immediately on a missing global).
    - Routes `argv[1]` by `[spec for spec in MANIFEST.live_state if spec.filter_re.fullmatch(path)]`
      (guaranteed `<= 1` match by §5.1 pairwise disjointness): if `len(matches) != 1`,
      exits non-zero with
      `harness-state-clean: <path> is not a harness config; check .gitattributes`;
      otherwise writes `harness_state.clean_for_spec(matches[0], text)`.
 3. **`.githooks/harness-state-refresh`**:
-   - Loads `MANIFEST = harness_state.load_manifest_or_exit("harness-state-refresh")` and
-     derives `PATTERNS = tuple(f":(glob){spec.filter_glob}" for spec in MANIFEST.live_state)`
+   - Does **not** load `harnesses.toml` at import time. Inside `main()`, it drains
+     `sys.stdin.read()` first (avoiding `EPIPE` in the calling harness), runs
+     `live-picks capture`, and inside its `try ... except SystemExit` block loads
+     `MANIFEST = harness_state.load_manifest_or_exit("harness-state-refresh")` and calls
+     `harness_state.check_filter_config()` (failing cleanly with `run 'just setup'` and
+     skipping `git add` if either the manifest or `filter.harness-state.required` is
+     invalid).
+   - Derives `PATTERNS = tuple(f":(glob){spec.filter_glob}" for spec in MANIFEST.live_state)`
      so `git diff-files` uses segment-bounded glob matching identical to `.gitattributes`
-     and `harness_state.py`.
-   - Keeps its `live-picks capture`, `codex-trust sync`, `live-picks restore`, and
-     `index.lock`-guarded restaging pipeline unchanged.
+     and `harness_state.py`, then runs `codex-trust sync`, `live-picks restore`, and
+     `index.lock`-guarded restaging when `index.lock` is free, exiting non-zero with all
+     collected step failures on stderr (which calling harnesses surface as a non-blocking
+     `Stop`-hook warning and `agy/hook` logs best-effort without failing `SessionStart` or
+     `PreToolUse`).
 4. **`.githooks/live-picks`**:
-   - Loads `MANIFEST = harness_state.load_manifest_or_exit("live-picks")` before taking
-     `local/harness-state.lock`, deriving
-     `SPECS = {spec.config: spec for spec in MANIFEST.live_state if spec.picks_record is not None}`,
-     `OWNED = tuple(SPECS)`, and
-     `RECORDS = {name: spec.picks_record for name, spec in SPECS.items()}`.
    - Imports `TOML_HEADER`, `TOML_KEY`, and `clean_for_spec` directly from `harness_state`
      (removing `runpy.run_path` on `harness-state-clean`).
+   - Does **not** load `harnesses.toml` at import time. Inside `main(argv)`:
+     1. Validates CLI argument shape (`capture`, `restore`, `sync`, `forget <file>`, or
+        `hook post-checkout|post-merge|post-rewrite`) first.
+     2. Checks `CHECKOUT.linked_worktree()` (returning `0` silently for `hook` and
+        failing for CLI commands) and, for `hook post-checkout`, `CHECKOUT.rebasing()`
+        (returning `0` silently).
+     3. Loads `MANIFEST = harness_state.load_manifest_or_exit("live-picks")` **inside**
+        `hook` mode's `try ... except SystemExit` block (and for CLI commands, directly in
+        `main()`), in both cases **before** entering `CHECKOUT.locked()` on
+        `local/harness-state.lock`. On a broken manifest, `live-picks hook <event>` prints
+        `live-picks: <problem>` and
+        `live-picks: a pick was not restored; the next turn end retries` to stderr and
+        **exits `0`**; CLI commands exit non-zero.
+   - Derives `SPECS = {spec.config: spec for spec in MANIFEST.live_state if spec.picks_record is not None}`,
+     `OWNED = tuple(SPECS)`, and
+     `RECORDS = {name: spec.picks_record for name, spec in SPECS.items()}` (validating
+     `forget <file>` against `OWNED` once `SPECS` is loaded).
    - Dispatches by `spec.format` (`"json"` -> record field `"values"`, `"toml"` -> record
      field `"lines"`) and `spec.pick_units`:
      - **TOML extraction and duplicate-key refusal**: `parse(spec, text)` runs
@@ -434,8 +493,9 @@ import path with no `runpy` cycles:
        `toml_lines(spec, text)` extracts one-line top-level assignments before the first
        `TOML_HEADER` whose key is in `spec.pick_keys`, in file order. Both `pick()` and
        `invalid()` require duplicate-free keys (`len(keys) == len(set(keys))`), valid
-       `tomllib.loads("".join(lines))`, and exact round-trip equality (`toml_lines(spec, "".join(lines)) == lines`
-       and, in `pick()`, equality with `{k: data[k] for k in spec.pick_keys if k in data}`).
+       `tomllib.loads("".join(lines))`, and exact round-trip equality
+       (`toml_lines(spec, "".join(lines)) == lines` and, in `pick()`, equality with
+       `{k: data[k] for k in spec.pick_keys if k in data}`).
      - **Byte-stable `merged_lines(spec, saved, held)` across TOML units**: iterates
        `unit` in `spec.pick_units` **in manifest declaration order**. For each `unit`, if
        `held` contains at least one line whose parsed key is in `unit`, emits
@@ -467,20 +527,44 @@ import path with no `runpy` cycles:
        `adopt_detached` to dispatch through `spec` (`merge_picks(spec, saved, h_picks)`
        and `spec_field(spec)`).
 5. **`.githooks/codex-trust`**:
-   - Loads `MANIFEST = harness_state.load_manifest_or_exit("codex-trust")` before taking
-     `local/harness-state.lock`, resolves `CODEX_SPEC = MANIFEST.by_harness.get("codex")`
-     (failing cleanly if `codex` is absent, not `"toml"`, or has `trust_table is None`),
-     and uses `harness_state.TOML_HEADER`, `CODEX_SPEC.trust_table`, and
+   - Does **not** load `harnesses.toml` at import time. Inside `main(argv)`, after
+     validating CLI arguments and `linked_worktree()` (and `rebasing()` on
+     `hook post-checkout`), loads
+     `MANIFEST = harness_state.load_manifest_or_exit("codex-trust")` and resolves
+     `CODEX_SPEC = MANIFEST.by_harness.get("codex")` (failing cleanly if `codex` is
+     absent, not `"toml"`, or has `trust_table is None`) **inside** `hook` mode's
+     `try ... except SystemExit` block and **before** `locked()`. On a broken manifest,
+     `codex-trust hook <event>` prints `codex-trust: <problem>` and
+     `codex-trust: trust not restored; the next turn end retries` to stderr and **exits
+     `0`**; CLI commands exit non-zero.
+   - Uses `harness_state.TOML_HEADER`, `CODEX_SPEC.trust_table`, and
      `harness_state.clean_for_spec(CODEX_SPEC, ...)` instead of `runpy.run_path`.
 6. **`.githooks/pre-commit`**:
-   - Exports `staged_tree` once during `main()` and runs both `facts_check(tree)`
-     (`tools/harness-facts check`) and `manifest_check(tree)`
-     (`.githooks/harness_state.py check`).
-   - `manifest_check(tree=None)` (exporting its own staged tree when called directly in
-     tests with `tree=None`, matching `facts_check(tree=None)`) refuses if
-     `.githooks/harness_state.py` is unstaged/missing in `tree` or if
-     `python3 <tree>/.githooks/harness_state.py check` exits non-zero, rewriting
-     `<tree>/` prefixes out of stderr just as `facts_check` does.
+   - Resolves the real repository's absolute Git directory first
+     (`real_git_dir = os.path.abspath(git("rev-parse", "--git-dir"))`), exports
+     `staged_tree` once during `main()`, and runs both `facts_check(tree)`
+     (`tools/harness-facts check`) and
+     `manifest_check(tree, git_dir=real_git_dir)`
+     (`python3 <tree>/.githooks/harness_state.py check --git-dir <real_git_dir>`).
+   - Because `staged_tree` is a plain directory checkout without `.git`, passing
+     `--git-dir <real_git_dir>` checks `harnesses.toml` and `.gitattributes` from the
+     **staged tree** while checking `filter.harness-state.clean` and
+     `filter.harness-state.required == true` from the **real repository's** Git config.
+   - `manifest_check(tree=None, git_dir=None)` (resolving `git_dir` and exporting its own
+     staged tree when called directly in tests with `tree=None`, matching
+     `facts_check(tree=None)`) refuses if `.githooks/harness_state.py` is unstaged/missing
+     in `tree` or if `harness_state.py check` exits non-zero, rewriting `<tree>/` prefixes
+     out of stderr.
+
+#### Summary of failure handling when `harnesses.toml` or filter config is invalid
+
+| Entrypoint | Trigger | Exit code and behavior on invalid/missing `harnesses.toml` or missing `required = true` |
+| --- | --- | --- |
+| `harness-state-clean <path>` | `git add` / `diff` / `status` (`filter=harness-state`, `required = true`) | Prints `harness-state-clean: ...` on stderr and **exits non-zero**; Git fails closed without staging unfiltered bytes. |
+| `pre-commit` (`facts_check` + `manifest_check`) | `git commit` | Prints `harness-facts: ...` / `harness-state: ...` on stderr and **exits `1`**, blocking the commit. |
+| `live-picks hook <event>` & `codex-trust hook <event>` | Git `post-checkout`, `post-merge`, `post-rewrite` | Skips silently (`0`) in linked worktrees and mid-rebase `post-checkout`; in main checkout, prints `<tool>: ...` + retry notice on stderr and **exits `0`** so the completed Git command succeeds. |
+| `live-picks` & `codex-trust` CLI (`capture`, `restore`, `sync`, `forget`) | Direct CLI or child of `harness-state-refresh` | Prints `<tool>: ...` on stderr and **exits non-zero** before taking `local/harness-state.lock`. |
+| `harness-state-refresh` | Harness `Stop` hook / `pi` extension / `agy/hook` | Drains stdin first, prints `harness-state-refresh: ...` on stderr without running `git add`, and **exits non-zero** (non-blocking `Stop`-hook warning in harnesses; logged best-effort by `agy/hook`). |
 
 ### 5.4 Capability facts (`facts/capabilities.toml` and `tools/harness-facts`)
 
@@ -511,10 +595,16 @@ import path with no `runpy` cycles:
 
 ### 5.5 Behavior changes and compatibility notes
 
-1. **Clean filter fails closed (`filter.harness-state.required = true`)**: `git add`,
-   `git diff`, and `git checkout` on filtered paths now abort if `harness-state-clean`
-   exits non-zero instead of silently staging unfiltered files. Existing checkouts must
-   run `just setup` once after pulling so `.git/config` records `required = true`.
+1. **Clean filter fails closed (`filter.harness-state.required = true`) with active enforcement**:
+   `harness-state` defines a `clean` filter (no `smudge` filter). While `harnesses.toml`
+   is broken and `required = true`, `git add`, `git diff`, and `git status` (when a
+   filtered settings file's working-tree stat differs from the index) fail closed instead
+   of staging or diffing unfiltered picks. Recovery requires only fixing `harnesses.toml`
+   (e.g. `git checkout -- harnesses.toml`); never unset `filter.harness-state.required`.
+   If an existing clone has not re-run `just setup` after pulling, both
+   `harness-state-refresh` (at the next turn end) and `pre-commit` (at the next commit)
+   detect the missing `filter.harness-state.required = true` in the real repository's Git
+   config and refuse with `run 'just setup'`.
 2. **Unconfigured `.toml` paths are refused by `harness-state-clean`**: previously, any
    `.toml` path passed to `harness-state-clean` fell through `elif path.endswith(".toml")`
    and had Codex's TOML rules applied; now only paths matching a declared
@@ -535,11 +625,13 @@ import path with no `runpy` cycles:
   - New `.githooks/test_harness_manifest.py`:
     - `harness_state.load_manifest` validation for every §5.1 rule (schema type/value,
       slug regex, partition invariant for JSON/TOML/clean-only entries, bad regexes,
-      `trust_table` not in `clean_tables`, `picks_record` outside `local/`).
+      `trust_table` not in `clean_tables`, `picks_record` outside `local/`, multi-`*`
+      segment refusal).
     - Segment-bounded glob matching (`claude/settings/nested.json` rejected), load-time
-      refusal of overlapping `filter_glob` patterns (`agy/settings*.json` vs
+      prefix/suffix refusal of overlapping `filter_glob` patterns (`agy/settings*.json` vs
       `agy/settings-x*.json`), `check_gitattributes` parity against shipped
-      `.gitattributes`, and `git check-attr filter` agreement across sample paths.
+      `.gitattributes`, `check_filter_config` refusal when `required` is unset or `false`,
+      and `git check-attr filter` agreement across sample paths.
     - Direct Python unit tests for `harness_state.clean_json` and 3-argument
       `harness_state.clean_toml(text, key_rules, table_patterns)`.
     - End-to-end fail-closed Git filter test: with `just setup` (`required = true`),
@@ -547,11 +639,18 @@ import path with no `runpy` cycles:
       through `filter=harness-state`) causes `git add` on a dirty `pi/settings.json` /
       `claude/settings.json` to exit non-zero without staging `deviceId`, `trackingId`, or
       `model`.
+    - Cross-boundary branch-switch test with `filter.harness-state.required = true`: in a
+      scratch repository holding a pre-manifest branch (pre-manifest hooks, no
+      `harnesses.toml`) and a post-manifest branch (`harnesses.toml` + manifest-driven
+      hooks) with dirty live picks in `claude/settings.json` and `codex/config.toml`,
+      verify `git switch` in both directions succeeds cleanly, preserves live picks, and
+      leaves `git status` clean.
   - `.githooks/test_harness_state_clean.py`: subprocess CLI tests for unconfigured
     `.toml` refusal (`harnesses.toml`, `links.toml`) and `runpy.run_path` exposure of
-    `CLAUDE_JSON_KEYS`, `clean_json`, and 3-argument `clean_toml` (existing subprocess
-    tests in `test_harness_state_clean.py` and `test_codex_trust.py` invoke the CLI binary
-    and keep their call sites).
+    `CLAUDE_JSON_KEYS` (including absence when `claude-code` has no JSON `live_state`),
+    `clean_json`, and 3-argument `clean_toml` (existing subprocess tests in
+    `test_harness_state_clean.py` and `test_codex_trust.py` invoke the CLI binary and keep
+    their call sites).
   - `.githooks/test_live_picks.py`:
     - Copy `harnesses.toml` into `repo` and set `filter.harness-state.required = true`;
       keep `HOOK_FILES` pinned to `6b434eb`'s filenames so `install_pre_pi_hooks`
@@ -559,19 +658,33 @@ import path with no `runpy` cycles:
       `6b434eb` hooks succeed when `harnesses.toml` is absent and that single-unit `codex`
       `local/live-picks.json` bytes are byte-identical across current and `6b434eb`
       hooks).
+    - Test broken/missing `harnesses.toml` in both modes: `live-picks hook post-merge`
+      (and `git switch` triggering `post-checkout`) reports the manifest error + retry
+      notice on stderr and exits `0` (and exits `0` silently in a linked worktree), while
+      `live-picks capture` / `sync` / `forget` exit non-zero.
     - Replace `test_json_groups_refuse_overlap_unfiltered_keys_and_missing_claude_keys`
       with manifest-mutation refusal tests, and add multi-unit TOML capture/restore/forget
       tests covering unit declaration-order stability, duplicate-key refusal, and
       `unrestored_keys` preservation on `forget`.
-  - `.githooks/test_codex_trust.py` and `.githooks/test_harness_state_refresh.py`: copy
-    `harnesses.toml` into `repo` and set `filter.harness-state.required = true`.
-  - `.githooks/test_pre_commit.py` and `.githooks/test_pre_commit_facts.py`: add stub
-    `.githooks/harness_state.py` to `test_pre_commit.py`'s `world` fixture; add
-    `harnesses.toml`, `.githooks/harness_state.py`, and `.gitattributes` to
-    `test_pre_commit_facts.py` with tests proving `pre-commit` refuses staged `live_state`
-    violations (bad regex, partition violation, overlapping `filter_glob`), staged
-    `.gitattributes` drift, staged deletion of `harnesses.toml` or
-    `.githooks/harness_state.py`, and undeclared harnesses in `facts/capabilities.toml`.
+  - `.githooks/test_codex_trust.py` and `.githooks/test_harness_state_refresh.py`:
+    - Copy `harnesses.toml` into `repo` and set `filter.harness-state.required = true`.
+    - Add broken-manifest hook-mode test in `test_codex_trust.py` (`codex-trust hook`
+      reports retry notice and exits `0`, CLI exits non-zero).
+    - Add tests in `test_harness_state_refresh.py` verifying `harness-state-refresh`
+      drains stdin and exits non-zero without staging when `harnesses.toml` is broken or
+      `filter.harness-state.required` is unset/`false`.
+  - `.githooks/test_pre_commit.py` and `.githooks/test_pre_commit_facts.py`:
+    - Add stub `.githooks/harness_state.py` and `filter.harness-state.{clean,required}`
+      to `test_pre_commit.py`'s `world` fixture, plus a test verifying `pre-commit`
+      refuses when `filter.harness-state.required` is unset or `false` in the real
+      repository.
+    - Add `harnesses.toml`, `.githooks/harness_state.py`, `.gitattributes`, and
+      `filter.harness-state.{clean,required}` to `test_pre_commit_facts.py` with tests
+      proving `pre-commit` refuses staged `live_state` violations (bad regex, partition
+      violation, overlapping `filter_glob`), staged `.gitattributes` drift, missing
+      `filter.harness-state.required = true` in the real repo, staged deletion of
+      `harnesses.toml` or `.githooks/harness_state.py`, and undeclared harnesses in
+      `facts/capabilities.toml`.
   - `tools/test_harness_facts.py`, `tools/test_agy_hooks.py`, and
     `tools/test_harness_links.py`:
     - Update `tools/test_harness_facts.py` fixtures for `harnesses.toml` / `--manifest`
@@ -586,8 +699,9 @@ import path with no `runpy` cycles:
 - **Reference docs**:
   - `AGENTS.md` (Layout and Gates), `README.md`, and
     `docs/runbooks/adding-a-harness.md` (§3.2–3.5 and §4): document `harnesses.toml`,
-    `filter.harness-state.required = true` (`just setup`), and staged
-    `harness_state.py check` validation in `pre-commit`.
+    `filter.harness-state.required = true` (`just setup`), recovery from a broken
+    manifest (`git checkout -- harnesses.toml`), and staged `harness_state.py check`
+    validation in `pre-commit`.
 
 ## 6. Agent calls and builder latitude
 
@@ -598,10 +712,13 @@ import path with no `runpy` cycles:
    symlinks and `agy` anchored home-adoption declarations) and `tools/hq.toml` (per-home
    resume flags) separate because their entity key is a home rather than a harness slug
    or tracked settings file.
-2. **Fail-closed filter and staged-tree `live_state` commit gate**: added
-   `filter.harness-state.required = true` to `just setup` and `.githooks/harness_state.py check`
-   (`live_state` + `.gitattributes` parity) to `.githooks/pre-commit` so manifest defects
-   are caught at commit time and cannot stage unfiltered live picks.
+2. **Fail-closed filter, active config verification, and staged-tree `live_state` commit gate**:
+   added `filter.harness-state.required = true` to `just setup`, verified it against the
+   real repository's Git config in both `harness-state-refresh` and `pre-commit`
+   (`harness_state.py check --git-dir`), and gated `live_state` + `.gitattributes` parity
+   in `pre-commit`, while keeping Git `post-*` hooks (`live-picks hook`,
+   `codex-trust hook`) exit-`0` on manifest errors via deferred pre-lock loading in
+   `main()`.
 3. **True single source for capability facts**: removed `harnesses = [...]` from
    `facts/capabilities.toml`, adding trailing `manifest=None` / `--manifest` to
    `tools/harness-facts` while preserving positional `SourceFileLoader` compatibility and
@@ -610,14 +727,15 @@ import path with no `runpy` cycles:
    `live-picks`'s hardcoded `name in (CLAUDE, AGY)` check with `unrestored_keys` and
    kept `forget` (`without_pick`) scoped to `spec.pick_keys` in both JSON and TOML so
    resetting picker defaults never wipes live installation IDs.
-5. **Segment-bounded, pairwise-disjoint `filter_glob` and multi-unit TOML picks**:
+5. **Segment-bounded, single-`*` pairwise-disjoint `filter_glob` and multi-unit TOML picks**:
    matched `.gitattributes` segment-bounded `*` semantics across `harness_state.py` and
    `harness-state-refresh` (`:(glob)`), refused overlapping `filter_glob` patterns at
-   load time, and generalized unit-ordered TOML `live-picks` without `if name == CODEX:`.
+   load time via per-segment prefix/suffix comparison, and generalized unit-ordered TOML
+   `live-picks` without `if name == CODEX:`.
 6. **Shared cleaners in `harness_state.py` with `codex-trust` kept as store adapter**:
    moved `clean_json` and 3-argument `clean_toml` into `.githooks/harness_state.py`
-   (re-exported by `harness-state-clean` alongside `CLAUDE_JSON_KEYS`), eliminating
-   `runpy.run_path` from `live-picks` and `codex-trust` while keeping dynamic
+   (re-exported by `harness-state-clean` alongside fail-early `CLAUDE_JSON_KEYS`),
+   eliminating `runpy.run_path` from `live-picks` and `codex-trust` while keeping dynamic
    `[projects."<path>"]` persistence in `.githooks/codex-trust`.
 
 ### Left to the builder
@@ -626,6 +744,17 @@ import path with no `runpy` cycles:
   `.githooks/harness_state.py` (subject to existing CLI prefix conventions:
   `<tool>: <problem>` and existing test assertions in `.githooks/test_*.py` and
   `tools/test_harness_facts.py`).
-- Ordering of commits in the implementation plan, provided `harnesses.toml` and
-  `harness_state.py` land before or alongside `.githooks/harness-state-clean` and
-  `.githooks/pre-commit`.
+- Staged commit structure in the implementation plan, split into at least three ordered
+  lands so each slice is independently reviewable and leaves every commit with a working
+  clean filter:
+  1. `harnesses.toml`, `.githooks/harness_state.py` (manifest loader, cleaners,
+     `.gitattributes` parity and `check_filter_config`), and `tools/harness-facts` +
+     `facts/capabilities.toml` (with unit tests).
+  2. Live-state hook migration to `harnesses.toml` (`.githooks/harness-state-clean`,
+     `.githooks/harness-state-refresh` pattern derivation, `.githooks/live-picks`,
+     `.githooks/codex-trust` and their test suites, including rollback tests).
+  3. Fail-closed `required = true` setup and enforcement (`justfile`,
+     `check_filter_config` enforcement in `.githooks/harness-state-refresh` and
+     `.githooks/pre-commit`, fail-closed and cross-boundary branch-switch tests,
+     `test_pre_commit*` / `test_harness_links.py`, and reference docs `AGENTS.md`,
+     `README.md`, `docs/runbooks/adding-a-harness.md`).
