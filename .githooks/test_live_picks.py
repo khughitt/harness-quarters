@@ -1435,6 +1435,8 @@ def test_clean_only_live_state_is_skipped_by_live_picks_sync_and_refused_by_forg
     home = isolated_home(repo, tmp_path)
     with (repo / "harnesses.toml").open("a") as manifest:
         manifest.write(CLEAN_ONLY_SPEC)
+    with (repo / ".gitattributes").open("a") as attributes:
+        attributes.write("cleanonly/settings*.json filter=harness-state\n")
     (repo / "cleanonly").mkdir()
     (repo / CLEAN_ONLY).write_text('{"token": "t", "theme": "x"}\n')
     write_claude(repo, model="opus")
@@ -1645,7 +1647,10 @@ tool["main"](["live-picks", "capture"])
             assert ready, "capture did not reach the host lock"
             assert run.stdout.readline() == "loaded and blocked\n"
             assert run.poll() is None
+            # A checkout of the pre-manifest commit replaces the hooks and deletes
+            # harnesses.toml: the waiter must have read the manifest before the lock.
             install_pre_pi_hooks(repo, pre_pi_hooks)
+            (repo / "harnesses.toml").unlink()
             fcntl.flock(held, fcntl.LOCK_UN)
             _, err = run.communicate("", timeout=10)
             assert run.returncode == 0, err
