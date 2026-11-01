@@ -1,0 +1,5 @@
+# Turn limits for tools/turn-pause-lifecycle: six root calls pause the turn.
+active_seconds = 3600
+calls = 6
+spawns = 3
+compactions = 2
