@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-9aa713-pause-past-range
 created: 2026-11-01T10:29:21Z
-updated: 2026-11-01T14:34:39Z
+updated: 2026-11-01T14:34:40Z
 started: 2026-11-01T11:56:46Z
 depends: []
 parent: hq-9aa713
@@ -67,3 +67,4 @@ Implements Task 1 of the turn-pause plan in .worktrees/hq-9aa713 (branch feat/hq
 - 2026-11-01T14:34:36Z (feat/hq-9aa713-pause-past-range): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/hq/hq-fe672f.manifest-2026-11-01T1305Z.txt","state":"kept","verification":"verified","purpose":"immutable manifest version for the first scratch checkpoint (2894 entries, 1 symlink)","next_owner":"task:hq-9aa713","cleanup_trigger":"the scratch directory is released","sha256":"c568917e0e1545d85356133b745a026d030e28e38f9b3a39cd5f59d70d8d9ee1"}
 - 2026-11-01T14:34:39Z (feat/hq-9aa713-pause-past-range): retention checkpoint: observed 2026-11-01T14:34Z on titan; basis hq in-tree . c6cb0490d1f35afdfdfb52b59a7f026c6e9b743b:tasks/hq-fe672f.md; retained by feat/hq-9aa713-pause-past-range; this host: kept verified 3, kept unknown 0, released 3; changed 3. Rechecked all kept/verified items on this host (scratch remanifested identical, both manifest files rehashed); unknown items none. Other hosts hold no items. Next owner of all kept items: task:hq-9aa713
   provenance: {"harness_session":"claude-code:536b5ebf-5753-4a8b-ac83-61dde5ef4c79","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-01T14:34:40Z (feat/hq-9aa713-pause-past-range): retro: probing before coding paid off — Task 1 overturned a mandatory assumption (unhooked Codex exec) and two later rounds found unhooked write_stdin and wait, no PostToolUse at a yield, and worker names as targets; a fresh-context pre-review of the revised spec before the human gate caught a zsh bypass and the wrong worker identifier that the probes alone did not. Hurt: one implementer carried three probe rounds and reached about 380k tokens, and one round recorded a wrong yield claim that the next round corrected
