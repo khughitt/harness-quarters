@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-9aa713-pause-past-range
 created: 2026-11-01T10:29:21Z
-updated: 2026-11-01T12:49:46Z
+updated: 2026-11-01T12:49:47Z
 started: 2026-11-01T11:56:46Z
 depends: []
 parent: hq-9aa713
@@ -39,3 +39,4 @@ Implements Task 1 of the turn-pause plan in .worktrees/hq-9aa713 (branch feat/hq
 - 2026-11-01T12:47:55Z (feat/hq-9aa713-pause-past-range): review: impl round 2 — verdict: accept; findings: minor 2; reviewer: claude-code/claude-sonnet-5-5
 - 2026-11-01T12:49:44Z (feat/hq-9aa713-pause-past-range): retained: {"host":"titan","kind":"scratch","path":"$WORK_ROOT/hq/hq-fe672f","state":"kept","verification":"verified","purpose":"raw probe logs and isolated harness homes behind the Task 1 capability facts, raw source of the portable attachments","next_owner":"task:hq-fe672f","cleanup_trigger":"hq-fe672f closes with its facts merged to main","manifest":"$WORK_ROOT/hq/hq-fe672f.manifest-2026-11-01T1305Z.txt","sha256":"c568917e0e1545d85356133b745a026d030e28e38f9b3a39cd5f59d70d8d9ee1"}
 - 2026-11-01T12:49:46Z (feat/hq-9aa713-pause-past-range): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/hq/hq-fe672f.manifest-2026-11-01T1305Z.txt","state":"kept","verification":"verified","purpose":"immutable manifest version for the scratch checkpoint (2894 entries, 1 symlink)","next_owner":"task:hq-fe672f","cleanup_trigger":"the scratch directory is released","sha256":"c568917e0e1545d85356133b745a026d030e28e38f9b3a39cd5f59d70d8d9ee1"}
+- 2026-11-01T12:49:47Z (feat/hq-9aa713-pause-past-range): retained: {"host":"titan","kind":"evidence","path":"/tmp/claude-1000/-mnt-ssd3-work-hq-hq-fe672f-claude-main-1-work","state":"released","verification":"verified","purpose":"probe session background task outputs copied byte for byte into $WORK_ROOT/hq/hq-fe672f/claude-main-1/tmp-task-outputs, then the tmpfs copy removed","next_owner":"none","cleanup_trigger":"none"}
