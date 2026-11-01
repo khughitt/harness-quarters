@@ -1,15 +1,17 @@
 ---
 id: hq-8af61d
 title: Route agy/hooks.json through pinned relay v0.3.0 and slim agy/hook PreToolUse
-status: doing
+status: done
 priority: 3
 size: s
 complexity: mid
 process: direct
 owner: feat/hq-8af61d-agy-relay
 created: 2026-11-01T08:44:46Z
-updated: 2026-11-01T19:55:55Z
+updated: 2026-11-01T19:57:06Z
 started: 2026-11-01T16:09:11Z
+completed: 2026-11-01T19:57:06Z
+closed: 2026-11-01T19:57:06Z
 depends: [tasks-ba29d3, fam-55f1af]
 tags: [hooks, cross-project]
 source: hq-e72097
@@ -59,3 +61,5 @@ Where: relay/, claude/settings.json, codex/hooks.json, codex/work/hooks.json, ag
 - 2026-11-01T19:55:37Z (feat/hq-8af61d-agy-relay): retention checkpoint: observed 2026-11-01T19:55:37Z on titan; basis hq (in-tree, .) 4baac026c2b23bdbc61952da54a5fceda41307dd:tasks/hq-8af61d.md; retained by refs/heads/feat/hq-8af61d-agy-relay; this host: kept verified 1, kept unknown 0, released 0; changed 1. Rechecked all kept/verified items on this host; unknown items remain unverified with actions in basis. Other hosts retain their own dated observations. Next: record gate: verified, retro, and tasks done on feat/hq-8af61d-agy-relay, merge into main during a zero-Codex-process window, render subscribers.json on titan and europa, and release .worktrees/hq-8af61d.
 - 2026-11-01T19:55:38Z (feat/hq-8af61d-agy-relay): gate: verified tree:a0c48e959f646b1e60b92cfde46c66eb1de474a1 — checks: just test 2068 passed (agents/bin 268 and .githooks+tools 1408 and relay-cutover 391 and signal cancel 1) and harness-facts check exit 0 and harness_state.py check exit 0 and ops-check exit 0 and ops-docs check exit 0 and tasks check exit 0 and git diff --check exit 0 and stable relay install codex plan match and isolated live agy 1.4.12 smoke 5/5 verdicts passed (files:agy-relay-smoke.json); review: important addressed adding-a-harness.md Section 0 agy capability summary updated for relay v0.3.0 and hq-c59809, minor addressed adding-a-harness.md Section 6 adapter surface and hook-version note updated for relay v0.3.0, minor addressed test_relay_subscribers.py budget subprocess env sets HOME to tmp_path, minor addressed adding-a-harness.md Section 6 item 3 updated to adapter.nativeFields(data nativeEvent) on parsed JSON object; reviewer: agy session:agy:9896caed-49a7-4bb0-93c3-397939cd0c41
 - 2026-11-01T19:55:55Z (feat/hq-8af61d-agy-relay): retro: Running an isolated live agy 1.4.12 PTY smoke check in a sandbox HOME caught familiar's ~/.config/familiar/scheme.json requirement before touching live hooks, and preflighting europa over ssh caught its stale Dropbox-ignored ~/d/familiar/node_modules/relay@0.1.1 before rendering familiar-agy into subscribers.json. Merging updated main (hq-2eba07 and hq-dd5230) instead of rebasing preserved retention checkpoint basis ancestry while picking up harnesses.toml cleanly.
+- 2026-11-01T19:57:06Z (feat/hq-8af61d-agy-relay): done
+- 2026-11-01T19:57:06Z (feat/hq-8af61d-agy-relay): Pinned relay v0.3.0, upgraded claude/codex/agy hooks and subscribers.template.json (ops-guard + familiar-agy), and slimmed agy/hook PreToolUse to detached settings.json healing
