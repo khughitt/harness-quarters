@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 import os
 
-from .events import Event
+from .events import USER_WAIT_TOOLS, Event
 from .record import Frozen
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -105,6 +105,15 @@ def is_summarizer(harness: str, event: str, payload: dict) -> bool:
     return harness == 'claude-code' and event == 'SubagentStop' and payload.get('agent_type') == ''
 
 
+def user_wait_close(harness: str, now: float, agent: str | None, tool: str) -> list[Event]:
+    """The close before a call that waits on the user: this agent's open calls are ones
+    another hook refused (no PostToolUse), except a Codex nested exec_command (hook name
+    Bash), which may stay open with none after a yield."""
+    if tool not in USER_WAIT_TOOLS:
+        return []
+    return [Event(now, agent, 'agent_close', tool='Bash' if harness == 'codex' else None)]
+
+
 def normalize(harness: str, event: str, payload: dict, now: float, facts: Facts) -> tuple[str, list[Event]]:
     """The root session id and the events of one hook call, in order. Workers and
     subagents report under their root's session_id with their own agent_id."""
@@ -132,7 +141,8 @@ def normalize(harness: str, event: str, payload: dict, now: float, facts: Facts)
     close = [] if facts.posttooluse.get(harness) is True else [Event(now, agent, 'agent_stop')]
     if event == 'PreToolUse':
         call, tool = _text(payload, 'tool_use_id'), _text(payload, 'tool_name')
-        events = close + [Event(now, agent, 'tool_start', call_id=call, tool=tool)]
+        events = close + user_wait_close(harness, now, agent, tool)
+        events.append(Event(now, agent, 'tool_start', call_id=call, tool=tool))
         if tool in SPAWN_TOOLS[harness]:
             events.append(Event(now, agent, 'spawn', key=call))
         return root, events

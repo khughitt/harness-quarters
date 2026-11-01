@@ -536,6 +536,46 @@ def test_codex_yielded_bash_stays_in_flight_until_stop_and_late_post_adds_nothin
     assert st.turn.active == 0 and st.turn.calls == 0 and st.turn.in_flight == {}
 
 
+def test_claude_call_without_a_post_is_closed_when_the_agent_starts_a_user_wait(tmp_path):
+    """A call another hook refused gets no PostToolUse; the question after it is not work."""
+    d = Driver(tmp_path, 'claude-code')
+    d.prompt('work')
+    out, _ = d.pre('Bash', {'command': 'ls'}, dt=10)
+    assert out is None
+    out, ask = d.pre('AskUserQuestion', {'questions': []}, dt=3)
+    assert out is None and d.state().turn.in_flight == {}
+    d('PostToolUse', post(ask), dt=5 * 3600)
+    assert d.state().turn.active == 13
+
+
+def test_codex_user_wait_keeps_a_yielded_bash_open_and_the_wait_counts(tmp_path):
+    d = Driver(tmp_path, 'codex')
+    d.prompt('run the server')
+    out, bash = d.pre('Bash', {'command': 'sleep 30'}, dt=10)
+    assert out is None
+    out, ask = d.pre('request_user_input', {'questions': []}, dt=3)
+    assert out is None and list(d.state().turn.in_flight) == [bash['tool_use_id']]
+    d('PostToolUse', post(ask), dt=2 * 3600)
+    assert d.state().turn.active == 13 + 2 * 3600
+
+
+def test_codex_user_wait_closes_an_open_call_that_is_not_bash(tmp_path):
+    d = Driver(tmp_path, 'codex')
+    d.prompt('work')
+    d.pre('apply_patch', {'input': 'x'}, dt=10)
+    out, _ = d.pre('request_user_input', {'questions': []}, dt=3)
+    assert out is None and d.state().turn.in_flight == {}
+
+
+def test_a_user_wait_leaves_another_agents_open_call_open(tmp_path):
+    d = Driver(tmp_path, 'claude-code')
+    d.prompt('work')
+    _, sub = d.pre('Bash', {'command': 'make long'}, agent='sub1', dt=10)
+    d.pre('Bash', {'command': 'ls'}, dt=1)
+    d.pre('AskUserQuestion', {'questions': []}, dt=1)
+    assert list(d.state().turn.in_flight) == [sub['tool_use_id']]
+
+
 def test_codex_paused_update_goal_passes_only_as_status_paused(tmp_path, notices):
     d = Driver(tmp_path, 'codex')
     d.pause_on_calls()

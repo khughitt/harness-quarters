@@ -91,6 +91,10 @@ def _turn_from_dict(t: dict) -> TurnState:
     for k, v in in_flight.items():
         _check(k, str, 'turn.in_flight key')
         _opt(v, str, 'turn.in_flight value')
+    tools = _check(t['tools'], dict, 'turn.tools')
+    for k, v in tools.items():
+        _check(k, str, 'turn.tools key')
+        _opt(v, str, 'turn.tools value')
     return TurnState(
         started=_num(t['started'], 'turn.started'),
         limits=limits,
@@ -101,6 +105,7 @@ def _turn_from_dict(t: dict) -> TurnState:
         compactions=_check(t['compactions'], int, 'turn.compactions'),
         last_t=None if t['last_t'] is None else _num(t['last_t'], 'turn.last_t'),
         in_flight=dict(in_flight),
+        tools=dict(tools),
         spawn_keys=set(_strs(t['spawn_keys'], 'turn.spawn_keys')),
         warned=set(_strs(t['warned'], 'turn.warned')),
     )

@@ -186,3 +186,14 @@ def test_out_of_order_event_does_not_double_count_in_flight_time():
     counters.apply(s, ev(112, 'tick'))
     assert s.active == 12
     assert s.last_t == 112
+
+
+def test_agent_close_closes_only_that_agents_calls_and_keeps_the_named_tool():
+    s = new()
+    call(s, 1, 'a', tool='Read')
+    call(s, 2, 'b', tool='Bash')
+    call(s, 3, 'c', agent='w', tool='Read')
+    counters.apply(s, ev(4, 'agent_close', tool='Bash'))
+    assert set(s.in_flight) == {'b', 'c'} and set(s.tools) == {'b', 'c'}
+    counters.apply(s, ev(5, 'agent_close'))
+    assert set(s.in_flight) == {'c'}

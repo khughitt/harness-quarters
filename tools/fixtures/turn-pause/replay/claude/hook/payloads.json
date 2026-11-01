@@ -420,6 +420,89 @@
     "hook_event_name": "Stop",
     "stop_hook_active": false
    }
+  },
+  {
+   "t": 1791653600.0,
+   "event": "UserPromptSubmit",
+   "payload": {
+    "session_id": "5d1e7a52-0c3b-4f7e-9a61-2b8c4d0e9f13",
+    "transcript_path": "/tmp/home/.claude/projects/-tmp-replay/5d1e7a52-0c3b-4f7e-9a61-2b8c4d0e9f13.jsonl",
+    "cwd": "/tmp/replay",
+    "permission_mode": "bypassPermissions",
+    "hook_event_name": "UserPromptSubmit",
+    "prompt": "Check the guard"
+   }
+  },
+  {
+   "t": 1791653602.0,
+   "event": "PreToolUse",
+   "payload": {
+    "session_id": "5d1e7a52-0c3b-4f7e-9a61-2b8c4d0e9f13",
+    "transcript_path": "/tmp/home/.claude/projects/-tmp-replay/5d1e7a52-0c3b-4f7e-9a61-2b8c4d0e9f13.jsonl",
+    "cwd": "/tmp/replay",
+    "permission_mode": "bypassPermissions",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_input": {
+     "command": "touch x"
+    },
+    "tool_use_id": "toolu_07"
+   }
+  },
+  {
+   "t": 1791653605.0,
+   "event": "PreToolUse",
+   "payload": {
+    "session_id": "5d1e7a52-0c3b-4f7e-9a61-2b8c4d0e9f13",
+    "transcript_path": "/tmp/home/.claude/projects/-tmp-replay/5d1e7a52-0c3b-4f7e-9a61-2b8c4d0e9f13.jsonl",
+    "cwd": "/tmp/replay",
+    "permission_mode": "bypassPermissions",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "AskUserQuestion",
+    "tool_input": {
+     "questions": [
+      {
+       "question": "Ready?",
+       "options": []
+      }
+     ]
+    },
+    "tool_use_id": "toolu_08"
+   }
+  },
+  {
+   "t": 1791671605.0,
+   "event": "PostToolUse",
+   "payload": {
+    "session_id": "5d1e7a52-0c3b-4f7e-9a61-2b8c4d0e9f13",
+    "transcript_path": "/tmp/home/.claude/projects/-tmp-replay/5d1e7a52-0c3b-4f7e-9a61-2b8c4d0e9f13.jsonl",
+    "cwd": "/tmp/replay",
+    "permission_mode": "bypassPermissions",
+    "hook_event_name": "PostToolUse",
+    "tool_name": "AskUserQuestion",
+    "tool_input": {
+     "questions": [
+      {
+       "question": "Ready?",
+       "options": []
+      }
+     ]
+    },
+    "tool_use_id": "toolu_08",
+    "tool_response": "yes"
+   }
+  },
+  {
+   "t": 1791671606.0,
+   "event": "Stop",
+   "payload": {
+    "session_id": "5d1e7a52-0c3b-4f7e-9a61-2b8c4d0e9f13",
+    "transcript_path": "/tmp/home/.claude/projects/-tmp-replay/5d1e7a52-0c3b-4f7e-9a61-2b8c4d0e9f13.jsonl",
+    "cwd": "/tmp/replay",
+    "permission_mode": "bypassPermissions",
+    "hook_event_name": "Stop",
+    "stop_hook_active": false
+   }
   }
  ]
 }

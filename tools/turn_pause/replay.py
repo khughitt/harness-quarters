@@ -18,7 +18,9 @@ What the hook sees, and so what the converter emits:
   command line; a scheduled wake (a meta record with turnOrigin scheduled) is a prompt
   too, which the hook reads as a wake through the same pending-prompt records
   (ScheduleWakeup, CronCreate and CronDelete are recorded with hook._record). A tool_use
-  is a PreToolUse (Agent and Task also a spawn), a tool_result its PostToolUse, a
+  is a PreToolUse (Agent and Task also a spawn; a user-wait call first closes its agent's
+  open calls), a tool_result its PostToolUse (none for a call another hook refused, whose
+  result reads `PreToolUse:<tool> hook error`; it stays open to the next user wait or Stop), a
   compaction summary the counted PostCompact, an assistant record ending its message
   (stop_reason other than tool_use) the agent's Stop or SubagentStop, and a subagent's
   first record its SubagentStart.
@@ -147,6 +149,15 @@ def claude_prompt(r: dict, text: str) -> str | None:
     return text
 
 
+def hook_refused(block: dict) -> bool:
+    """A tool_result Claude Code wrote for a call a PreToolUse hook refused."""
+    content = block.get('content')
+    if isinstance(content, list):
+        content = ''.join(b.get('text', '') for b in content if isinstance(b, dict))
+    return bool(block.get('is_error')) and isinstance(content, str) \
+        and content.startswith('PreToolUse:') and ' hook error' in content
+
+
 def claude_steps(path, agent: str | None = None) -> list[Step]:
     root = agent is None
     steps: list[Step] = []
@@ -175,7 +186,8 @@ def claude_steps(path, agent: str | None = None) -> list[Step]:
                     if b.get('type') != 'tool_result':
                         continue
                     call = b.get('tool_use_id')
-                    steps.append(Step(t, agent, (Event(t, agent, 'tool_end', call_id=call),)))
+                    if not hook_refused(b):  # a call another hook refused gets no PostToolUse
+                        steps.append(Step(t, agent, (Event(t, agent, 'tool_end', call_id=call),)))
                     if call in wake_calls:
                         name, tool_input = wake_calls.pop(call)
                         event = 'PostToolUseFailure' if b.get('is_error') else 'PostToolUse'
@@ -195,7 +207,8 @@ def claude_steps(path, agent: str | None = None) -> list[Step]:
             if not isinstance(b, dict) or b.get('type') != 'tool_use':
                 continue
             call, name = b.get('id'), b.get('name')
-            events = [Event(t, agent, 'tool_start', call_id=call, tool=name)]
+            events = adapters.user_wait_close('claude-code', t, agent, name)
+            events.append(Event(t, agent, 'tool_start', call_id=call, tool=name))
             if name in CLAUDE_SPAWN:
                 events.append(Event(t, agent, 'spawn', key=call))
             steps.append(Step(t, agent, tuple(events)))
@@ -369,7 +382,9 @@ def codex_steps(path, agent: str | None, unhooked: frozenset[str],
                 continue
             tool = CODEX_HOOK_NAMES.get(name) or (p.get('namespace') or '') + name
             hooked.add(call)
-            steps.append(Step(t, agent, (Event(t, agent, 'tool_start', call_id=call, tool=tool),)))
+            events = adapters.user_wait_close('codex', t, agent, tool)
+            events.append(Event(t, agent, 'tool_start', call_id=call, tool=tool))
+            steps.append(Step(t, agent, tuple(events)))
             stats['function calls'] += 1
         elif ptype in ('function_call_output', 'custom_tool_call_output'):
             if call in cell_of:

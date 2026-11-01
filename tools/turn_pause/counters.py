@@ -12,14 +12,15 @@ COUNTS = ('active', 'calls', 'spawns', 'compactions')
 
 class TurnState(Record):
     __slots__ = _fields = ('started', 'limits', 'limits_sha', 'active', 'calls', 'spawns', 'compactions',
-                           'last_t', 'in_flight', 'spawn_keys', 'warned')
+                           'last_t', 'in_flight', 'tools', 'spawn_keys', 'warned')
     _defaults = {'active': 0.0, 'calls': 0, 'spawns': 0, 'compactions': 0, 'last_t': None}
-    _factories = {'in_flight': dict, 'spawn_keys': set, 'warned': set}
+    _factories = {'in_flight': dict, 'tools': dict, 'spawn_keys': set, 'warned': set}
 
     def to_json(self) -> str:
         data = self._asdict()
         data['limits'] = self.limits._asdict()
         data['in_flight'] = dict(self.in_flight)
+        data['tools'] = dict(self.tools)
         data['spawn_keys'] = sorted(self.spawn_keys)
         data['warned'] = sorted(self.warned)
         return json.dumps(data)
@@ -57,6 +58,13 @@ def started(state: TurnState, ev: Event) -> None:
     if ev.call_id is None:
         raise ValueError('an allowed tool_start needs a call_id')
     state.in_flight[ev.call_id] = ev.agent
+    state.tools[ev.call_id] = ev.tool
+
+
+def _close(state: TurnState, closing) -> None:
+    """Drop the open calls `closing(call_id, agent)` selects."""
+    state.in_flight = {c: a for c, a in state.in_flight.items() if not closing(c, a)}
+    state.tools = {c: t for c, t in state.tools.items() if c in state.in_flight}
 
 
 def apply(state: TurnState, ev: Event) -> None:
@@ -65,9 +73,12 @@ def apply(state: TurnState, ev: Event) -> None:
         raise ValueError(f'{ev.kind} is not applied')
     _advance(state, ev.t)
     if ev.kind == 'tool_end':
-        state.in_flight.pop(ev.call_id, None)
+        _close(state, lambda c, a: c == ev.call_id)
     elif ev.kind == 'agent_stop':
-        state.in_flight = {c: a for c, a in state.in_flight.items() if a != ev.agent}
+        _close(state, lambda c, a: a == ev.agent)
+    elif ev.kind == 'agent_close':
+        # ev.tool names the one tool whose open calls stay open (None: none do).
+        _close(state, lambda c, a: a == ev.agent and (ev.tool is None or state.tools.get(c) != ev.tool))
     elif ev.kind == 'compact':
         if ev.agent is None:
             state.compactions += 1

@@ -63,13 +63,13 @@ def counts(turn):
 def test_claude_turns_start_only_at_genuine_prompts():
     """A task notification, an interrupt marker and a scheduled wake start no turn."""
     turns = run('claude-code')
-    assert [t.start - T for t in turns] == [0.0, 9100.0]
+    assert [t.start - T for t in turns] == [0.0, 9100.0, 20000.0]
     assert all(t.root == CLAUDE_ID for t in turns)
 
 
 def test_claude_counts_root_calls_tree_spawns_and_root_compactions():
     """Root calls only (the subagent's Read is not one), one Agent spawn, one compaction."""
-    one, two = run('claude-code')
+    one, two, _ = run('claude-code')
     assert counts(one)[1:] == (4, 1, 1)
     assert counts(two)[1:] == (2, 0, 0)
 
@@ -78,9 +78,23 @@ def test_claude_active_time_follows_calls_in_flight_and_the_idle_gap():
     """Turn 1: 1500 s of `just test` in flight counts in full; the 2 h AskUserQuestion wait
     counts nothing; the 87 s gap before the task notification counts (under 10 minutes).
     Turn 2: the 1199 s quiet gap before the scheduled wake counts nothing."""
-    one, two = run('claude-code')
+    one, two, three = run('claude-code')
     assert one.state.active == pytest.approx(2 + 1 + 1 + 0.5 + 0.5 + 1 + 1 + 1 + 1 + 1500 + 1.5 + 1.5 + 0 + 1 + 87 + 1)
     assert two.state.active == pytest.approx(2 + 1 + 1 + 0 + 2 + 1 + 1)
+    assert three.state.active == pytest.approx(2 + 3 + 0 + 1)
+
+
+def test_claude_call_refused_by_another_hook_closes_at_the_next_user_wait():
+    """Turn 3: a Bash a relay hook refused gets no PostToolUse, so it stays open until
+    the AskUserQuestion starts; the 5 h wait after it is not active time."""
+    _, steps = tree('claude-code')
+    refused = [s for s in steps if any(e.kind == 'tool_end' and e.call_id == 'toolu_07'
+                                       for e in s.events)]
+    assert refused == []
+    cut = run('claude-code', t1=T + 20004.0)[2]
+    assert cut.state.in_flight == {'toolu_07': None}
+    cut = run('claude-code', t1=T + 20006.0)[2]
+    assert cut.state.in_flight == {}
 
 
 # --- Codex ----------------------------------------------------------------------------
@@ -140,7 +154,7 @@ def test_first_pause_point_is_the_first_call_after_a_limit_is_crossed(tmp_path, 
 
 
 def test_default_limits_pause_neither_fixture():
-    assert [t.pause for h in ('claude-code', 'codex') for t in run(h)] == [None] * 4
+    assert [t.pause for h in ('claude-code', 'codex') for t in run(h)] == [None] * 5
 
 
 # --- the hook path --------------------------------------------------------------------
@@ -181,7 +195,7 @@ def test_replay_matches_hook_path(tmp_path, monkeypatch, harness, over):
     defaults = write_limits(tmp_path / 'defaults.toml')
     hooked, _ = hook_path(harness, defaults, tmp_path / 'a', monkeypatch)
     replayed = run(harness, defaults)
-    assert len(hooked) == len(replayed) == 2
+    assert len(hooked) == len(replayed) == (3 if harness == 'claude-code' else 2)
     for h, r in zip(hooked, replayed):
         assert abs(h.started - r.start) <= 1.0
         assert abs(h.active - r.state.active) <= 1.0
@@ -237,7 +251,7 @@ def test_cli_reports_turns_pauses_and_the_controller_over_a_window(tmp_path):
     env, index = stores(tmp_path)
     before = index.read_bytes()
     text = cli(['2026-10-02T00:00:00Z', '2026-11-01T00:00:00Z'], env)
-    assert 'turns: 4 (claude-code 2, codex 2)' in text
+    assert 'turns: 5 (claude-code 3, codex 2)' in text
     assert 'paused: 0 (0.00 a day over 30 days)' in text
     low = write_limits(tmp_path / 'low.toml', calls=2)
     text = cli(['2026-10-02T00:00:00Z', '2026-11-01T00:00:00Z', '--limits', str(low)], env)
@@ -258,4 +272,4 @@ def test_cli_window_drops_turns_outside_it(tmp_path):
 def test_cli_all_reads_every_record(tmp_path):
     env, _ = stores(tmp_path)
     text = cli(['--all'], env)
-    assert 'turns: 4 (claude-code 2, codex 2)' in text
+    assert 'turns: 5 (claude-code 3, codex 2)' in text
