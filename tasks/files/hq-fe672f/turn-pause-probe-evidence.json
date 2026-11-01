@@ -1,0 +1,3121 @@
+{
+ "note": "Portable derivative of the turn-pause probe raw logs (hq-fe672f). Paths are placeholders; long fields truncated; raw bytes stay in the task scratch directory on the probing host.",
+ "runs": [
+  {
+   "dir": "claude-surface-2",
+   "run": {
+    "case": "surface",
+    "version": "2.1.316 (Claude Code)",
+    "runs": [
+     {
+      "label": "main",
+      "command": [
+       "claude",
+       "-p",
+       "<prompt>",
+       "--model",
+       "claude-haiku-5-5",
+       "--output-format",
+       "stream-json",
+       "--verbose",
+       "--setting-sources",
+       "project",
+       "--strict-mcp-config",
+       "--settings",
+       "<scratch>/claude-surface-2/settings.json",
+       "--permission-mode",
+       "bypassPermissions",
+       "--disable-slash-commands",
+       "--max-turns",
+       "1"
+      ],
+      "exit": 0,
+      "wall_s": 12.9
+     },
+     {
+      "label": "-search",
+      "command": [
+       "claude",
+       "-p",
+       "<prompt>",
+       "--model",
+       "claude-haiku-5-5",
+       "--output-format",
+       "stream-json",
+       "--verbose",
+       "--setting-sources",
+       "project",
+       "--strict-mcp-config",
+       "--settings",
+       "<scratch>/claude-surface-2/settings.json",
+       "--permission-mode",
+       "bypassPermissions",
+       "--disable-slash-commands",
+       "--max-turns",
+       "2"
+      ],
+      "exit": 0,
+      "wall_s": 12.3
+     }
+    ]
+   },
+   "hook_events": [
+    {
+     "s": 0.0,
+     "event": "SessionStart",
+     "session_id": "3d509a66-9603-4ff0-a335-f636db518af5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "session_id",
+      "source",
+      "transcript_path"
+     ],
+     "source": "startup"
+    },
+    {
+     "s": 2.0,
+     "event": "UserPromptSubmit",
+     "session_id": "3d509a66-9603-4ff0-a335-f636db518af5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "permission_mode",
+      "prompt",
+      "prompt_id",
+      "session_id",
+      "transcript_path"
+     ],
+     "prompt": "Reply with the single word OK. Use no tools."
+    },
+    {
+     "s": 6.0,
+     "event": "Stop",
+     "session_id": "3d509a66-9603-4ff0-a335-f636db518af5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "background_tasks",
+      "cwd",
+      "effort",
+      "hook_event_name",
+      "last_assistant_message",
+      "permission_mode",
+      "prompt_id",
+      "session_crons",
+      "session_id",
+      "stop_hook_active",
+      "transcript_path"
+     ],
+     "background_tasks": "[]",
+     "last_assistant_message": "OK"
+    },
+    {
+     "s": 6.4,
+     "event": "SessionEnd",
+     "session_id": "3d509a66-9603-4ff0-a335-f636db518af5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "prompt_id",
+      "reason",
+      "session_id",
+      "transcript_path"
+     ]
+    },
+    {
+     "s": 11.3,
+     "event": "SessionStart",
+     "session_id": "476aa76c-7100-434d-9d91-7aa2adebb225",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "session_id",
+      "source",
+      "transcript_path"
+     ],
+     "source": "startup"
+    },
+    {
+     "s": 11.8,
+     "event": "UserPromptSubmit",
+     "session_id": "476aa76c-7100-434d-9d91-7aa2adebb225",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "permission_mode",
+      "prompt",
+      "prompt_id",
+      "session_id",
+      "transcript_path"
+     ],
+     "prompt": "Call the ToolSearch tool once with query \"select:CronCreate,CronDelete,CronList,DesignSync,EnterWorktree,ExitWorktree,Monitor,NotebookEdit,PushNotification,SendMessage,TaskStop,WebFetch,WebSearch\" and max_results 13. Then reply with the single word OK."
+    },
+    {
+     "s": 15.1,
+     "event": "PreToolUse",
+     "session_id": "476aa76c-7100-434d-9d91-7aa2adebb225",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "ToolSearch",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "effort",
+      "hook_event_name",
+      "permission_mode",
+      "prompt_id",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path"
+     ],
+     "tool_input": "{\"query\": \"select:CronCreate,CronDelete,CronList,DesignSync,EnterWorktree,ExitWorktree,Monitor,NotebookEdit,PushNotification,SendMessage,TaskStop,WebFetch,WebSearch\", \"max_results\": 13}"
+    },
+    {
+     "s": 15.4,
+     "event": "PostToolUse",
+     "session_id": "476aa76c-7100-434d-9d91-7aa2adebb225",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "ToolSearch",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "duration_ms",
+      "effort",
+      "hook_event_name",
+      "permission_mode",
+      "prompt_id",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_response",
+      "tool_use_id",
+      "transcript_path"
+     ],
+     "tool_input": "{\"query\": \"select:CronCreate,CronDelete,CronList,DesignSync,EnterWorktree,ExitWorktree,Monitor,NotebookEdit,PushNotification,SendMessage,TaskStop,WebFetch,WebSearch\", \"max_results\": 13}",
+     "tool_response": "{\"matches\": [\"CronCreate\", \"CronDelete\", \"CronList\", \"DesignSync\", \"EnterWorktree\", \"ExitWorktree\", \"Monitor\", \"NotebookEdit\", \"PushNotification\", \"SendMessage\", \"TaskStop\", \"WebFetch\", \"WebSearch\"], \"query\": \"select:CronCreate,CronDelete,CronList,DesignSync,EnterWorktree,ExitWorktree,Monitor,NotebookEdit,PushNotification,SendMessage,TaskStop,WebFetch,WebSearch\", \"total_deferred_tools\": 13}"
+    },
+    {
+     "s": 18.4,
+     "event": "Stop",
+     "session_id": "476aa76c-7100-434d-9d91-7aa2adebb225",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "background_tasks",
+      "cwd",
+      "effort",
+      "hook_event_name",
+      "last_assistant_message",
+      "permission_mode",
+      "prompt_id",
+      "session_crons",
+      "session_id",
+      "stop_hook_active",
+      "transcript_path"
+     ],
+     "background_tasks": "[]",
+     "last_assistant_message": "OK"
+    },
+    {
+     "s": 18.6,
+     "event": "SessionEnd",
+     "session_id": "476aa76c-7100-434d-9d91-7aa2adebb225",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "prompt_id",
+      "reason",
+      "session_id",
+      "transcript_path"
+     ]
+    }
+   ],
+   "codex_rollout_calls": [],
+   "claude_stream_tool_items": [
+    {
+     "file": "stream-search.jsonl",
+     "parent_tool_use_id": null,
+     "type": "tool_use",
+     "name": "ToolSearch",
+     "is_error": null,
+     "body": "{\"query\": \"select:CronCreate,CronDelete,CronList,DesignSync,EnterWorktree,ExitWorktree,Monitor,NotebookEdit,PushNotification,SendMessage,TaskStop,WebFetch,WebSearch\", \"max_results\": 13}"
+    },
+    {
+     "file": "stream-search.jsonl",
+     "parent_tool_use_id": null,
+     "type": "tool_result",
+     "name": null,
+     "is_error": null,
+     "body": "[{\"type\": \"tool_reference\", \"tool_name\": \"CronCreate\"}, {\"type\": \"tool_reference\", \"tool_name\": \"CronDelete\"}, {\"type\": \"tool_reference\", \"tool_name\": \"CronList\"}, {\"type\": \"tool_reference\", \"tool_name\": \"DesignSync\"}, {\"type\": \"tool_reference\", \"tool_name\": \"EnterWorktree\"}, {\"type\": \"tool_reference\", \"tool_name\": \"ExitWorktree\"}, {\"type\": \"tool_reference\", \"tool_name\": \"Monitor\"}, {\"type\": \"tool\u2026"
+    }
+   ]
+  },
+  {
+   "dir": "claude-main-1",
+   "run": {
+    "case": "main",
+    "version": "2.1.316 (Claude Code)",
+    "runs": [
+     {
+      "label": "main",
+      "command": [
+       "claude",
+       "-p",
+       "<prompt>",
+       "--model",
+       "claude-haiku-5-5",
+       "--output-format",
+       "stream-json",
+       "--verbose",
+       "--setting-sources",
+       "project",
+       "--strict-mcp-config",
+       "--settings",
+       "<scratch>/claude-main-1/settings.json",
+       "--permission-mode",
+       "bypassPermissions",
+       "--disable-slash-commands"
+      ],
+      "exit": 0,
+      "wall_s": 30.9
+     }
+    ]
+   },
+   "hook_events": [
+    {
+     "s": 0.0,
+     "event": "SessionStart",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "session_id",
+      "source",
+      "transcript_path"
+     ],
+     "source": "startup"
+    },
+    {
+     "s": 1.7,
+     "event": "UserPromptSubmit",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "permission_mode",
+      "prompt",
+      "prompt_id",
+      "session_id",
+      "transcript_path"
+     ],
+     "prompt": "This is a scripted hook probe in a scratch directory. Do exactly these steps, in order, one tool call at a time. A hook refuses some calls the first time on purpose: when a call is refused, retry the identical call once, then go on.\n1. Use the Bash tool to run: echo probe-shell\n2. Use the Write tool to create the file probe-write.txt in the current directory with the content probe.\n3. Use the Agen\u2026"
+    },
+    {
+     "s": 4.6,
+     "event": "PreToolUse",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "Bash",
+     "denied": true,
+     "keys": [
+      "cwd",
+      "effort",
+      "hook_event_name",
+      "permission_mode",
+      "prompt_id",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path"
+     ],
+     "tool_input": "{\"command\": \"echo probe-shell\", \"description\": \"Echo probe-shell marker\"}"
+    },
+    {
+     "s": 6.1,
+     "event": "PreToolUse",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "Bash",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "effort",
+      "hook_event_name",
+      "permission_mode",
+      "prompt_id",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path"
+     ],
+     "tool_input": "{\"command\": \"echo probe-shell\", \"description\": \"Echo probe-shell marker\"}"
+    },
+    {
+     "s": 6.5,
+     "event": "PostToolUse",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "Bash",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "duration_ms",
+      "effort",
+      "hook_event_name",
+      "permission_mode",
+      "prompt_id",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_response",
+      "tool_use_id",
+      "transcript_path"
+     ],
+     "tool_input": "{\"command\": \"echo probe-shell\", \"description\": \"Echo probe-shell marker\"}",
+     "tool_response": "{\"stdout\": \"probe-shell\", \"stderr\": \"\", \"interrupted\": false, \"isImage\": false, \"noOutputExpected\": false}"
+    },
+    {
+     "s": 8.4,
+     "event": "PreToolUse",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "Write",
+     "denied": true,
+     "keys": [
+      "cwd",
+      "effort",
+      "hook_event_name",
+      "permission_mode",
+      "prompt_id",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path"
+     ],
+     "tool_input": "{\"file_path\": \"<scratch>/claude-main-1/work/probe-write.txt\", \"content\": \"probe\"}"
+    },
+    {
+     "s": 10.2,
+     "event": "PreToolUse",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "Write",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "effort",
+      "hook_event_name",
+      "permission_mode",
+      "prompt_id",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path"
+     ],
+     "tool_input": "{\"file_path\": \"<scratch>/claude-main-1/work/probe-write.txt\", \"content\": \"probe\"}"
+    },
+    {
+     "s": 10.5,
+     "event": "PostToolUse",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "Write",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "duration_ms",
+      "effort",
+      "hook_event_name",
+      "permission_mode",
+      "prompt_id",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_response",
+      "tool_use_id",
+      "transcript_path"
+     ],
+     "tool_input": "{\"file_path\": \"<scratch>/claude-main-1/work/probe-write.txt\", \"content\": \"probe\"}",
+     "tool_response": "{\"type\": \"create\", \"filePath\": \"<scratch>/claude-main-1/work/probe-write.txt\", \"content\": \"probe\", \"structuredPatch\": [], \"originalFile\": null, \"userModified\": false}"
+    },
+    {
+     "s": 12.3,
+     "event": "PreToolUse",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "Agent",
+     "denied": true,
+     "keys": [
+      "cwd",
+      "effort",
+      "hook_event_name",
+      "permission_mode",
+      "prompt_id",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path"
+     ],
+     "tool_input": "{\"description\": \"probe child\", \"prompt\": \"Use the Bash tool to run echo child-shell, then reply with its output.\", \"subagent_type\": \"general-purpose\", \"run_in_background\": true}"
+    },
+    {
+     "s": 14.1,
+     "event": "PreToolUse",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "Agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "effort",
+      "hook_event_name",
+      "permission_mode",
+      "prompt_id",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path"
+     ],
+     "tool_input": "{\"description\": \"probe child\", \"prompt\": \"Use the Bash tool to run echo child-shell, then reply with its output.\", \"subagent_type\": \"general-purpose\", \"run_in_background\": true}"
+    },
+    {
+     "s": 14.3,
+     "event": "SubagentStart",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": "a1dcefde924075f89",
+     "agent_type": "general-purpose",
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "agent_id",
+      "agent_type",
+      "cwd",
+      "hook_event_name",
+      "prompt_id",
+      "session_id",
+      "transcript_path"
+     ]
+    },
+    {
+     "s": 14.3,
+     "event": "PostToolUse",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "Agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "duration_ms",
+      "effort",
+      "hook_event_name",
+      "permission_mode",
+      "prompt_id",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_response",
+      "tool_use_id",
+      "transcript_path"
+     ],
+     "tool_input": "{\"description\": \"probe child\", \"prompt\": \"Use the Bash tool to run echo child-shell, then reply with its output.\", \"subagent_type\": \"general-purpose\", \"run_in_background\": true}",
+     "tool_response": "{\"isAsync\": true, \"status\": \"async_launched\", \"agentId\": \"a1dcefde924075f89\", \"description\": \"probe child\", \"resolvedModel\": \"claude-haiku-5-5\", \"prompt\": \"Use the Bash tool to run echo child-shell, then reply with its output.\", \"outputFile\": \"<tmp>/<scratch-slug>-claude-main-1-work/c61610a9-425b-40cf-b06b-0df43ef0a5c5/tasks/a1dcefde924075f89.output\", \"canReadOutputFile\": t\u2026"
+    },
+    {
+     "s": 16.8,
+     "event": "PreToolUse",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": "a1dcefde924075f89",
+     "agent_type": "general-purpose",
+     "tool_name": "Bash",
+     "denied": false,
+     "keys": [
+      "agent_id",
+      "agent_type",
+      "cwd",
+      "effort",
+      "hook_event_name",
+      "permission_mode",
+      "prompt_id",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path"
+     ],
+     "tool_input": "{\"command\": \"echo child-shell\", \"description\": \"Print child-shell string\"}"
+    },
+    {
+     "s": 16.8,
+     "event": "PreToolUse",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "Bash",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "effort",
+      "hook_event_name",
+      "permission_mode",
+      "prompt_id",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path"
+     ],
+     "tool_input": "{\"command\": \"sleep 5; echo bg-done\", \"description\": \"Wait 5 seconds then echo bg-done\", \"run_in_background\": true}"
+    },
+    {
+     "s": 17.1,
+     "event": "PostToolUse",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "Bash",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "duration_ms",
+      "effort",
+      "hook_event_name",
+      "permission_mode",
+      "prompt_id",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_response",
+      "tool_use_id",
+      "transcript_path"
+     ],
+     "tool_input": "{\"command\": \"sleep 5; echo bg-done\", \"description\": \"Wait 5 seconds then echo bg-done\", \"run_in_background\": true}",
+     "tool_response": "{\"stdout\": \"\", \"stderr\": \"\", \"interrupted\": false, \"isImage\": false, \"noOutputExpected\": false, \"backgroundTaskId\": \"bd4dac0ye\"}"
+    },
+    {
+     "s": 17.1,
+     "event": "PostToolUse",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": "a1dcefde924075f89",
+     "agent_type": "general-purpose",
+     "tool_name": "Bash",
+     "denied": false,
+     "keys": [
+      "agent_id",
+      "agent_type",
+      "cwd",
+      "duration_ms",
+      "effort",
+      "hook_event_name",
+      "permission_mode",
+      "prompt_id",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_response",
+      "tool_use_id",
+      "transcript_path"
+     ],
+     "tool_input": "{\"command\": \"echo child-shell\", \"description\": \"Print child-shell string\"}",
+     "tool_response": "{\"stdout\": \"child-shell\", \"stderr\": \"\", \"interrupted\": false, \"isImage\": false, \"noOutputExpected\": false}"
+    },
+    {
+     "s": 18.5,
+     "event": "Stop",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "background_tasks",
+      "cwd",
+      "effort",
+      "hook_event_name",
+      "last_assistant_message",
+      "permission_mode",
+      "prompt_id",
+      "session_crons",
+      "session_id",
+      "stop_hook_active",
+      "transcript_path"
+     ],
+     "background_tasks": "[{\"id\": \"a1dcefde924075f89\", \"type\": \"subagent\", \"status\": \"running\", \"description\": \"probe child\", \"agent_type\": \"general-purpose\"}, {\"id\": \"bd4dac0ye\", \"type\": \"shell\", \"status\": \"running\", \"description\": \"Wait 5 seconds then echo bg-done\", \"command\": \"sleep 5; echo bg-done\"}]",
+     "last_assistant_message": "WAITING"
+    },
+    {
+     "s": 18.6,
+     "event": "SubagentStop",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": "a1dcefde924075f89",
+     "agent_type": "general-purpose",
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "agent_id",
+      "agent_transcript_path",
+      "agent_type",
+      "background_tasks",
+      "cwd",
+      "effort",
+      "hook_event_name",
+      "last_assistant_message",
+      "permission_mode",
+      "prompt_id",
+      "session_crons",
+      "session_id",
+      "stop_hook_active",
+      "transcript_path"
+     ],
+     "background_tasks": "[{\"id\": \"a1dcefde924075f89\", \"type\": \"subagent\", \"status\": \"running\", \"description\": \"probe child\", \"agent_type\": \"general-purpose\"}, {\"id\": \"bd4dac0ye\", \"type\": \"shell\", \"status\": \"running\", \"description\": \"Wait 5 seconds then echo bg-done\", \"command\": \"sleep 5; echo bg-done\"}]",
+     "last_assistant_message": "The command output was:\n\n```\nchild-shell\n```"
+    },
+    {
+     "s": 19.0,
+     "event": "UserPromptSubmit",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "permission_mode",
+      "prompt",
+      "prompt_id",
+      "session_id",
+      "transcript_path"
+     ],
+     "prompt": "<task-notification>\n<task-id>a1dcefde924075f89</task-id>\n<tool-use-id>toolu_01MCxWKWko6g1murBz3MCRys</tool-use-id>\n<output-file><tmp>/<scratch-slug>-claude-main-1-work/c61610a9-425b-40cf-b06b-0df43ef0a5c5/tasks/a1dcefde924075f89.output</output-file>\n<status>completed</status>\n<summary>Agent \"probe child\" finished</summary>\n<note>A task-notification fires each time this agen\u2026"
+    },
+    {
+     "s": 21.5,
+     "event": "Stop",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "background_tasks",
+      "cwd",
+      "effort",
+      "hook_event_name",
+      "last_assistant_message",
+      "permission_mode",
+      "prompt_id",
+      "session_crons",
+      "session_id",
+      "stop_hook_active",
+      "transcript_path"
+     ],
+     "background_tasks": "[{\"id\": \"bd4dac0ye\", \"type\": \"shell\", \"status\": \"running\", \"description\": \"Wait 5 seconds then echo bg-done\", \"command\": \"sleep 5; echo bg-done\"}]",
+     "last_assistant_message": "The agent has finished, but the background command (`bg-done`) hasn't reported yet, so I'm still waiting on it."
+    },
+    {
+     "s": 22.3,
+     "event": "UserPromptSubmit",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "permission_mode",
+      "prompt",
+      "prompt_id",
+      "session_id",
+      "transcript_path"
+     ],
+     "prompt": "<task-notification>\n<task-id>bd4dac0ye</task-id>\n<tool-use-id>toolu_01VC28qoYcU7XmGzfEF3YQAS</tool-use-id>\n<output-file><tmp>/<scratch-slug>-claude-main-1-work/c61610a9-425b-40cf-b06b-0df43ef0a5c5/tasks/bd4dac0ye.output</output-file>\n<status>completed</status>\n<summary>Background command \"Wait 5 seconds then echo bg-done\" completed (exit code 0)</summary>\n</task-notificatio\u2026"
+    },
+    {
+     "s": 23.7,
+     "event": "Stop",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "background_tasks",
+      "cwd",
+      "effort",
+      "hook_event_name",
+      "last_assistant_message",
+      "permission_mode",
+      "prompt_id",
+      "session_crons",
+      "session_id",
+      "stop_hook_active",
+      "transcript_path"
+     ],
+     "background_tasks": "[]",
+     "last_assistant_message": "DONE"
+    },
+    {
+     "s": 25.9,
+     "event": "SessionEnd",
+     "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "prompt_id",
+      "reason",
+      "session_id",
+      "transcript_path"
+     ]
+    }
+   ],
+   "codex_rollout_calls": [],
+   "claude_stream_tool_items": [
+    {
+     "file": "stream.jsonl",
+     "parent_tool_use_id": null,
+     "type": "tool_use",
+     "name": "Bash",
+     "is_error": null,
+     "body": "{\"command\": \"echo probe-shell\", \"description\": \"Echo probe-shell marker\"}"
+    },
+    {
+     "file": "stream.jsonl",
+     "parent_tool_use_id": null,
+     "type": "tool_result",
+     "name": null,
+     "is_error": true,
+     "body": "PreToolUse:Bash hook error: turn-pause-probe refused this Bash call on purpose (nonce TPP-DENY-0). Retry the identical call once; it will be allowed."
+    },
+    {
+     "file": "stream.jsonl",
+     "parent_tool_use_id": null,
+     "type": "tool_use",
+     "name": "Bash",
+     "is_error": null,
+     "body": "{\"command\": \"echo probe-shell\", \"description\": \"Echo probe-shell marker\"}"
+    },
+    {
+     "file": "stream.jsonl",
+     "parent_tool_use_id": null,
+     "type": "tool_result",
+     "name": null,
+     "is_error": false,
+     "body": "probe-shell"
+    },
+    {
+     "file": "stream.jsonl",
+     "parent_tool_use_id": null,
+     "type": "tool_use",
+     "name": "Write",
+     "is_error": null,
+     "body": "{\"file_path\": \"<scratch>/claude-main-1/work/probe-write.txt\", \"content\": \"probe\"}"
+    },
+    {
+     "file": "stream.jsonl",
+     "parent_tool_use_id": null,
+     "type": "tool_result",
+     "name": null,
+     "is_error": true,
+     "body": "PreToolUse:Write hook error: turn-pause-probe refused this Write call on purpose (nonce TPP-DENY-1). Retry the identical call once; it will be allowed."
+    },
+    {
+     "file": "stream.jsonl",
+     "parent_tool_use_id": null,
+     "type": "tool_use",
+     "name": "Write",
+     "is_error": null,
+     "body": "{\"file_path\": \"<scratch>/claude-main-1/work/probe-write.txt\", \"content\": \"probe\"}"
+    },
+    {
+     "file": "stream.jsonl",
+     "parent_tool_use_id": null,
+     "type": "tool_result",
+     "name": null,
+     "is_error": null,
+     "body": "File created successfully at: <scratch>/claude-main-1/work/probe-write.txt (file state is current in your context \u2014 no need to Read it back)"
+    },
+    {
+     "file": "stream.jsonl",
+     "parent_tool_use_id": null,
+     "type": "tool_use",
+     "name": "Agent",
+     "is_error": null,
+     "body": "{\"description\": \"probe child\", \"subagent_type\": \"general-purpose\", \"run_in_background\": true, \"prompt\": \"Use the Bash tool to run echo child-shell, then reply with its output.\"}"
+    },
+    {
+     "file": "stream.jsonl",
+     "parent_tool_use_id": null,
+     "type": "tool_result",
+     "name": null,
+     "is_error": true,
+     "body": "PreToolUse:Agent hook error: turn-pause-probe refused this Agent call on purpose (nonce TPP-DENY-2). Retry the identical call once; it will be allowed."
+    },
+    {
+     "file": "stream.jsonl",
+     "parent_tool_use_id": null,
+     "type": "tool_use",
+     "name": "Agent",
+     "is_error": null,
+     "body": "{\"description\": \"probe child\", \"subagent_type\": \"general-purpose\", \"run_in_background\": true, \"prompt\": \"Use the Bash tool to run echo child-shell, then reply with its output.\"}"
+    },
+    {
+     "file": "stream.jsonl",
+     "parent_tool_use_id": null,
+     "type": "tool_result",
+     "name": null,
+     "is_error": null,
+     "body": "[{\"type\": \"text\", \"text\": \"Async agent launched successfully. (This tool result is internal metadata \\u2014 never quote or paste any part of it, including the agentId below, into a user-facing reply.)\\nagentId: a1dcefde924075f89 (internal ID - do not mention to user. Use SendMessage with to: 'a1dcefde924075f89', summary: '<5-10 word recap>' to continue this agent.)\\nThe agent is working in the bac\u2026"
+    },
+    {
+     "file": "stream.jsonl",
+     "parent_tool_use_id": null,
+     "type": "tool_use",
+     "name": "Bash",
+     "is_error": null,
+     "body": "{\"command\": \"sleep 5; echo bg-done\", \"description\": \"Wait 5 seconds then echo bg-done\", \"run_in_background\": true}"
+    },
+    {
+     "file": "stream.jsonl",
+     "parent_tool_use_id": "toolu_01MCxWKWko6g1murBz3MCRys",
+     "type": "tool_use",
+     "name": "Bash",
+     "is_error": null,
+     "body": "{\"command\": \"echo child-shell\", \"description\": \"Print child-shell string\"}"
+    },
+    {
+     "file": "stream.jsonl",
+     "parent_tool_use_id": null,
+     "type": "tool_result",
+     "name": null,
+     "is_error": false,
+     "body": "Command running in background with ID: bd4dac0ye. Output is being written to: <tmp>/<scratch-slug>-claude-main-1-work/c61610a9-425b-40cf-b06b-0df43ef0a5c5/tasks/bd4dac0ye.output. You will be notified when it completes. To check interim output, use Read on that file path."
+    },
+    {
+     "file": "stream.jsonl",
+     "parent_tool_use_id": "toolu_01MCxWKWko6g1murBz3MCRys",
+     "type": "tool_result",
+     "name": null,
+     "is_error": false,
+     "body": "child-shell"
+    }
+   ]
+  },
+  {
+   "dir": "claude-compact-1",
+   "run": {
+    "case": "compact",
+    "version": "2.1.316 (Claude Code)",
+    "runs": [
+     {
+      "label": "-1",
+      "command": [
+       "claude",
+       "-p",
+       "<prompt>",
+       "--model",
+       "claude-haiku-5-5",
+       "--output-format",
+       "stream-json",
+       "--verbose",
+       "--setting-sources",
+       "project",
+       "--strict-mcp-config",
+       "--settings",
+       "<scratch>/claude-compact-1/settings.json",
+       "--permission-mode",
+       "bypassPermissions",
+       "--disable-slash-commands"
+      ],
+      "exit": 0,
+      "wall_s": 11.4
+     },
+     {
+      "label": "-2",
+      "command": [
+       "claude",
+       "-p",
+       "<prompt>",
+       "--model",
+       "claude-haiku-5-5",
+       "--output-format",
+       "stream-json",
+       "--verbose",
+       "--setting-sources",
+       "project",
+       "--strict-mcp-config",
+       "--settings",
+       "<scratch>/claude-compact-1/settings.json",
+       "--permission-mode",
+       "bypassPermissions",
+       "--resume",
+       "85b9fb8c-1efc-4ed1-9587-fefc395fede7"
+      ],
+      "exit": 0,
+      "wall_s": 11.6
+     }
+    ]
+   },
+   "hook_events": [
+    {
+     "s": 0.0,
+     "event": "SessionStart",
+     "session_id": "85b9fb8c-1efc-4ed1-9587-fefc395fede7",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "session_id",
+      "source",
+      "transcript_path"
+     ],
+     "source": "startup"
+    },
+    {
+     "s": 1.6,
+     "event": "UserPromptSubmit",
+     "session_id": "85b9fb8c-1efc-4ed1-9587-fefc395fede7",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "permission_mode",
+      "prompt",
+      "prompt_id",
+      "session_id",
+      "transcript_path"
+     ],
+     "prompt": "Reply with the single word ready. Use no tools."
+    },
+    {
+     "s": 4.7,
+     "event": "Stop",
+     "session_id": "85b9fb8c-1efc-4ed1-9587-fefc395fede7",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "background_tasks",
+      "cwd",
+      "effort",
+      "hook_event_name",
+      "last_assistant_message",
+      "permission_mode",
+      "prompt_id",
+      "session_crons",
+      "session_id",
+      "stop_hook_active",
+      "transcript_path"
+     ],
+     "background_tasks": "[]",
+     "last_assistant_message": "ready"
+    },
+    {
+     "s": 6.5,
+     "event": "SessionEnd",
+     "session_id": "85b9fb8c-1efc-4ed1-9587-fefc395fede7",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "prompt_id",
+      "reason",
+      "session_id",
+      "transcript_path"
+     ]
+    },
+    {
+     "s": 9.0,
+     "event": "SessionStart",
+     "session_id": "85b9fb8c-1efc-4ed1-9587-fefc395fede7",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "context_tokens",
+      "cwd",
+      "estimated_cache_write_usd",
+      "hook_event_name",
+      "prompt_cache_likely_expired",
+      "seconds_since_last_response",
+      "session_id",
+      "source",
+      "transcript_path"
+     ],
+     "source": "resume"
+    },
+    {
+     "s": 9.2,
+     "event": "PreCompact",
+     "session_id": "85b9fb8c-1efc-4ed1-9587-fefc395fede7",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "custom_instructions",
+      "cwd",
+      "hook_event_name",
+      "prompt_id",
+      "session_id",
+      "transcript_path",
+      "trigger"
+     ],
+     "trigger": "manual"
+    },
+    {
+     "s": 16.0,
+     "event": "SubagentStop",
+     "session_id": "85b9fb8c-1efc-4ed1-9587-fefc395fede7",
+     "agent_id": "af9a844781e1df4ba",
+     "agent_type": "",
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "agent_id",
+      "agent_transcript_path",
+      "agent_type",
+      "background_tasks",
+      "cwd",
+      "effort",
+      "hook_event_name",
+      "last_assistant_message",
+      "permission_mode",
+      "prompt_id",
+      "session_crons",
+      "session_id",
+      "stop_hook_active",
+      "transcript_path"
+     ],
+     "background_tasks": "[]",
+     "last_assistant_message": "<analysis>\nThe conversation is very short. The system provided environment info, a git status snapshot (clean, branch HEAD, main branch \"main\", no commits listed), and attribution rules for commits and PRs. The user's only message asked me to reply with the single word \"ready\" and use no tools. I replied \"ready\". No files were read or edited, no commands run, and no tools were used.\n\nThe current r\u2026"
+    },
+    {
+     "s": 16.1,
+     "event": "SessionStart",
+     "session_id": "85b9fb8c-1efc-4ed1-9587-fefc395fede7",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "prompt_id",
+      "session_id",
+      "source",
+      "transcript_path"
+     ],
+     "source": "compact"
+    },
+    {
+     "s": 16.1,
+     "event": "PostCompact",
+     "session_id": "85b9fb8c-1efc-4ed1-9587-fefc395fede7",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "compact_summary",
+      "cwd",
+      "hook_event_name",
+      "prompt_id",
+      "session_id",
+      "transcript_path",
+      "trigger"
+     ],
+     "trigger": "manual"
+    },
+    {
+     "s": 18.1,
+     "event": "SessionEnd",
+     "session_id": "85b9fb8c-1efc-4ed1-9587-fefc395fede7",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "prompt_id",
+      "reason",
+      "session_id",
+      "transcript_path"
+     ]
+    }
+   ],
+   "codex_rollout_calls": [],
+   "claude_stream_tool_items": []
+  },
+  {
+   "dir": "codex-surface-1",
+   "run": {
+    "case": "surface",
+    "version": "codex-cli 0.166.0",
+    "command": [
+     "codex",
+     "exec",
+     "--json",
+     "--skip-git-repo-check",
+     "--dangerously-bypass-hook-trust",
+     "-C",
+     "<scratch>/codex-surface-1/work",
+     "<prompt>"
+    ],
+    "exit": 0,
+    "wall_s": 24.0,
+    "auth": "symlink intact",
+    "auth_age_before": "6 days, 12:55:48.018146",
+    "compact_limit": null
+   },
+   "hook_events": [
+    {
+     "s": 0.0,
+     "event": "SessionStart",
+     "session_id": "01a19704-7d7a-7061-8052-d2a9991b1f17",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "source",
+      "transcript_path"
+     ],
+     "source": "startup"
+    },
+    {
+     "s": 0.0,
+     "event": "UserPromptSubmit",
+     "session_id": "01a19704-7d7a-7061-8052-d2a9991b1f17",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "prompt",
+      "session_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "prompt": "Reply with the single word OK. Use no tools."
+    },
+    {
+     "s": 2.1,
+     "event": "Stop",
+     "session_id": "01a19704-7d7a-7061-8052-d2a9991b1f17",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "last_assistant_message",
+      "model",
+      "permission_mode",
+      "session_id",
+      "stop_hook_active",
+      "transcript_path",
+      "turn_id"
+     ],
+     "last_assistant_message": "OK"
+    },
+    {
+     "s": 2.2,
+     "event": "SessionEnd",
+     "session_id": "01a19704-7d7a-7061-8052-d2a9991b1f17",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "reason",
+      "session_id",
+      "transcript_path"
+     ]
+    }
+   ],
+   "codex_rollout_calls": [],
+   "claude_stream_tool_items": []
+  },
+  {
+   "dir": "codex-main-1",
+   "run": {
+    "case": "main",
+    "version": "codex-cli 0.166.0",
+    "command": [
+     "codex",
+     "exec",
+     "--json",
+     "--skip-git-repo-check",
+     "--dangerously-bypass-hook-trust",
+     "-C",
+     "<scratch>/codex-main-1/work",
+     "<prompt>"
+    ],
+    "exit": 0,
+    "wall_s": 65.1,
+    "auth": "symlink intact",
+    "auth_age_before": "6 days, 12:56:44.616849",
+    "compact_limit": null
+   },
+   "hook_events": [
+    {
+     "s": 0.0,
+     "event": "SessionStart",
+     "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "source",
+      "transcript_path"
+     ],
+     "source": "startup"
+    },
+    {
+     "s": 0.1,
+     "event": "UserPromptSubmit",
+     "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "prompt",
+      "session_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "prompt": "This is a scripted hook probe in a scratch directory. Do exactly these steps, in order, one tool call at a time. A hook refuses some calls the first time on purpose: when a call is refused (as a tool result, or as an error inside an exec result), retry the identical call once, then go on.\n1. Run the shell command `echo probe-shell` with exec_command.\n2. Create the file probe-write.txt in the curre\u2026"
+    },
+    {
+     "s": 5.2,
+     "event": "PreToolUse",
+     "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "Bash",
+     "denied": true,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"command\": \"echo probe-shell\"}"
+    },
+    {
+     "s": 8.6,
+     "event": "PreToolUse",
+     "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "Bash",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"command\": \"echo probe-shell\"}"
+    },
+    {
+     "s": 8.8,
+     "event": "PostToolUse",
+     "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "Bash",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_response",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"command\": \"echo probe-shell\"}",
+     "tool_response": "probe-shell\n"
+    },
+    {
+     "s": 11.2,
+     "event": "PreToolUse",
+     "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "apply_patch",
+     "denied": true,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"command\": \"*** Begin Patch\\n*** Add File: <scratch>/codex-main-1/work/probe-write.txt\\n+probe\\n*** End Patch\"}"
+    },
+    {
+     "s": 13.6,
+     "event": "PreToolUse",
+     "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "apply_patch",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"command\": \"*** Begin Patch\\n*** Add File: <scratch>/codex-main-1/work/probe-write.txt\\n+probe\\n*** End Patch\"}"
+    },
+    {
+     "s": 13.7,
+     "event": "PostToolUse",
+     "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "apply_patch",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_response",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"command\": \"*** Begin Patch\\n*** Add File: <scratch>/codex-main-1/work/probe-write.txt\\n+probe\\n*** End Patch\"}",
+     "tool_response": "Exit code: 0\nWall time: 0.1 seconds\nOutput:\nSuccess. Updated the following files:\nA <scratch>/codex-main-1/work/probe-write.txt\n"
+    },
+    {
+     "s": 16.6,
+     "event": "PreToolUse",
+     "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationspawn_agent",
+     "denied": true,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"task_name\": \"probe_worker\", \"fork_turns\": \"none\", \"message\": \"<encrypted>\"}"
+    },
+    {
+     "s": 19.1,
+     "event": "PreToolUse",
+     "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationspawn_agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"task_name\": \"probe_worker\", \"fork_turns\": \"none\", \"message\": \"<encrypted>\"}"
+    },
+    {
+     "s": 19.1,
+     "event": "PostToolUse",
+     "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationspawn_agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_response",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"task_name\": \"probe_worker\", \"fork_turns\": \"none\", \"message\": \"<encrypted>\"}",
+     "tool_response": "{\"task_name\":\"/root/probe_worker\"}"
+    },
+    {
+     "s": 21.5,
+     "event": "PreToolUse",
+     "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationwait_agent",
+     "denied": true,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"timeout_ms\": 60000}"
+    },
+    {
+     "s": 23.9,
+     "event": "PreToolUse",
+     "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationwait_agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"timeout_ms\": 60000}"
+    },
+    {
+     "s": 24.0,
+     "event": "SubagentStart",
+     "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+     "agent_id": "01a19705-c95f-75f0-8825-f91e61654554",
+     "agent_type": "default",
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "agent_id",
+      "agent_type",
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "transcript_path",
+      "turn_id"
+     ]
+    },
+    {
+     "s": 26.4,
+     "event": "PreToolUse",
+     "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+     "agent_id": "01a19705-c95f-75f0-8825-f91e61654554",
+     "agent_type": "default",
+     "tool_name": "Bash",
+     "denied": false,
+     "keys": [
+      "agent_id",
+      "agent_type",
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"command\": \"echo worker-shell\"}"
+    },
+    {
+     "s": 26.6,
+     "event": "PostToolUse",
+     "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+     "agent_id": "01a19705-c95f-75f0-8825-f91e61654554",
+     "agent_type": "default",
+     "tool_name": "Bash",
+     "denied": false,
+     "keys": [
+      "agent_id",
+      "agent_type",
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_response",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"command\": \"echo worker-shell\"}",
+     "tool_response": "worker-shell\n"
+    },
+    {
+     "s": 29.4,
+     "event": "SubagentStop",
+     "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+     "agent_id": "01a19705-c95f-75f0-8825-f91e61654554",
+     "agent_type": "default",
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "agent_id",
+      "agent_transcript_path",
+      "agent_type",
+      "cwd",
+      "hook_event_name",
+      "last_assistant_message",
+      "model",
+      "permission_mode",
+      "session_id",
+      "stop_hook_active",
+      "transcript_path",
+      "turn_id"
+     ],
+     "last_assistant_message": "worker-shell"
+    },
+    {
+     "s": 29.5,
+     "event": "PostToolUse",
+     "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationwait_agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_response",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"timeout_ms\": 60000}",
+     "tool_response": "{\"message\":\"Wait completed.\",\"timed_out\":false}"
+    },
+    {
+     "s": 35.8,
+     "event": "Stop",
+     "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "last_assistant_message",
+      "model",
+      "permission_mode",
+      "session_id",
+      "stop_hook_active",
+      "transcript_path",
+      "turn_id"
+     ],
+     "last_assistant_message": "DONE\nCommand blocked by PreToolUse hook: turn-pause-probe refused this Bash call on purpose (nonce TPP-DENY-1). Retry the identical call once; it will be allowed.. Command: echo probe-shell\nCommand blocked by PreToolUse hook: turn-pause-probe refused this apply_patch call on purpose (nonce TPP-DENY-3). Retry the identical call once; it will be allowed.. Command: *** Begin Patch\n*** Add File: <path>\u2026"
+    },
+    {
+     "s": 35.9,
+     "event": "SessionEnd",
+     "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "reason",
+      "session_id",
+      "transcript_path"
+     ]
+    }
+   ],
+   "codex_rollout_calls": [
+    {
+     "rollout": "rollout-2026-11-01T07-11-15-01a19705-5abb-7043-9543-6eabfd49bd79.jsonl",
+     "call": "exec",
+     "input": "text(await tools.exec_command({cmd:\"echo probe-shell\"}));\n"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-11-15-01a19705-5abb-7043-9543-6eabfd49bd79.jsonl",
+     "output": "[{\"type\": \"input_text\", \"text\": \"Script failed\\nWall time 0.1 seconds\\nOutput:\\n\"}, {\"type\": \"input_text\", \"text\": \"Script error:\\nCommand blocked by PreToolUse hook: turn-pause-probe refused this Bash call on purpose (nonce TPP-DENY-1). Retry the identical call once; it will be allowed.. Command: echo probe-shell\"}]"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-11-15-01a19705-5abb-7043-9543-6eabfd49bd79.jsonl",
+     "call": "exec",
+     "input": "text(await tools.exec_command({cmd:\"echo probe-shell\"}));\n"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-11-15-01a19705-5abb-7043-9543-6eabfd49bd79.jsonl",
+     "output": "[{\"type\": \"input_text\", \"text\": \"Script completed\\nWall time 0.2 seconds\\nOutput:\\n\"}, {\"type\": \"input_text\", \"text\": \"{\\\"chunk_id\\\":\\\"1872cd\\\",\\\"wall_time_seconds\\\":0.000006322,\\\"exit_code\\\":0,\\\"original_token_count\\\":3,\\\"output\\\":\\\"probe-shell\\\\n\\\"}\"}]"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-11-15-01a19705-5abb-7043-9543-6eabfd49bd79.jsonl",
+     "call": "exec",
+     "input": "text(await tools.apply_patch(\"*** Begin Patch\\n*** Add File: <scratch>/codex-main-1/work/probe-write.txt\\n+probe\\n*** End Patch\"));\n"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-11-15-01a19705-5abb-7043-9543-6eabfd49bd79.jsonl",
+     "output": "[{\"type\": \"input_text\", \"text\": \"Script failed\\nWall time 0.1 seconds\\nOutput:\\n\"}, {\"type\": \"input_text\", \"text\": \"Script error:\\nCommand blocked by PreToolUse hook: turn-pause-probe refused this apply_patch call on purpose (nonce TPP-DENY-3). Retry the identical call once; it will be allowed.. Command: *** Begin Patch\\n*** Add File: <scratch>/codex-main-1/work/probe-write.txt\\n\u2026"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-11-15-01a19705-5abb-7043-9543-6eabfd49bd79.jsonl",
+     "call": "exec",
+     "input": "text(await tools.apply_patch(\"*** Begin Patch\\n*** Add File: <scratch>/codex-main-1/work/probe-write.txt\\n+probe\\n*** End Patch\"));\n"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-11-15-01a19705-5abb-7043-9543-6eabfd49bd79.jsonl",
+     "output": "[{\"type\": \"input_text\", \"text\": \"Script completed\\nWall time 0.2 seconds\\nOutput:\\n\"}, {\"type\": \"input_text\", \"text\": \"{}\"}]"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-11-15-01a19705-5abb-7043-9543-6eabfd49bd79.jsonl",
+     "call": "spawn_agent",
+     "input": "{\"task_name\":\"probe_worker\",\"fork_turns\":\"none\",\"message\":\"<encrypted>\"}"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-11-15-01a19705-5abb-7043-9543-6eabfd49bd79.jsonl",
+     "output": "Tool call blocked by PreToolUse hook: turn-pause-probe refused this collaborationspawn_agent call on purpose (nonce TPP-DENY-6). Retry the identical call once; it will be allowed.. Tool: collaborationspawn_agent"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-11-15-01a19705-5abb-7043-9543-6eabfd49bd79.jsonl",
+     "call": "spawn_agent",
+     "input": "{\"task_name\":\"probe_worker\",\"fork_turns\":\"none\",\"message\":\"<encrypted>\"}"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-11-15-01a19705-5abb-7043-9543-6eabfd49bd79.jsonl",
+     "output": "{\"task_name\":\"/root/probe_worker\"}"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-11-15-01a19705-5abb-7043-9543-6eabfd49bd79.jsonl",
+     "call": "wait_agent",
+     "input": "{\"timeout_ms\":60000}"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-11-15-01a19705-5abb-7043-9543-6eabfd49bd79.jsonl",
+     "output": "Tool call blocked by PreToolUse hook: turn-pause-probe refused this collaborationwait_agent call on purpose (nonce TPP-DENY-7). Retry the identical call once; it will be allowed.. Tool: collaborationwait_agent"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-11-15-01a19705-5abb-7043-9543-6eabfd49bd79.jsonl",
+     "call": "wait_agent",
+     "input": "{\"timeout_ms\":60000}"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-11-15-01a19705-5abb-7043-9543-6eabfd49bd79.jsonl",
+     "output": "{\"message\":\"Wait completed.\",\"timed_out\":false}"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-11-41-01a19705-c95f-75f0-8825-f91e61654554.jsonl",
+     "call": "exec",
+     "input": "const r = await tools.exec_command({cmd:\"echo worker-shell\"}); text(r.output);\n"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-11-41-01a19705-c95f-75f0-8825-f91e61654554.jsonl",
+     "output": "[{\"type\": \"input_text\", \"text\": \"Script completed\\nWall time 0.2 seconds\\nOutput:\\n\"}, {\"type\": \"input_text\", \"text\": \"worker-shell\\n\"}]"
+    }
+   ],
+   "claude_stream_tool_items": []
+  },
+  {
+   "dir": "codex-spawn-1",
+   "run": {
+    "case": "spawn",
+    "version": "codex-cli 0.166.0",
+    "command": [
+     "codex",
+     "exec",
+     "--json",
+     "--skip-git-repo-check",
+     "--dangerously-bypass-hook-trust",
+     "-C",
+     "<scratch>/codex-spawn-1/work",
+     "<prompt>"
+    ],
+    "exit": 0,
+    "wall_s": 44.9,
+    "auth": "symlink intact",
+    "auth_age_before": "6 days, 12:58:23.987053",
+    "compact_limit": null
+   },
+   "hook_events": [
+    {
+     "s": 0.0,
+     "event": "SessionStart",
+     "session_id": "01a19706-ded7-7e93-a221-093fc5602e94",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "source",
+      "transcript_path"
+     ],
+     "source": "startup"
+    },
+    {
+     "s": 0.0,
+     "event": "UserPromptSubmit",
+     "session_id": "01a19706-ded7-7e93-a221-093fc5602e94",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "prompt",
+      "session_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "prompt": "This is a scripted hook probe. Make exactly these calls, in order, and no others.\n1. One exec call whose JavaScript source is exactly the following, unchanged:\nconst n = 3;\nfor (let i = 0; i < n; i++) {\n  await tools.spawn_agent({task_name: `w${i}`, fork_turns: \"none\", message: `Reply with the single word ok${i}. Use no tools.`});\n}\nif (n > 100) {\n  await tools.spawn_agent({task_name: \"never\", for\u2026"
+    },
+    {
+     "s": 7.7,
+     "event": "PreToolUse",
+     "session_id": "01a19706-ded7-7e93-a221-093fc5602e94",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationspawn_agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"task_name\": \"w3\", \"fork_turns\": \"none\", \"message\": \"<encrypted>\"}"
+    },
+    {
+     "s": 7.7,
+     "event": "PostToolUse",
+     "session_id": "01a19706-ded7-7e93-a221-093fc5602e94",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationspawn_agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_response",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"task_name\": \"w3\", \"fork_turns\": \"none\", \"message\": \"<encrypted>\"}",
+     "tool_response": "{\"task_name\":\"/root/w3\"}"
+    },
+    {
+     "s": 10.4,
+     "event": "PreToolUse",
+     "session_id": "01a19706-ded7-7e93-a221-093fc5602e94",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationwait_agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"timeout_ms\": 10000}"
+    },
+    {
+     "s": 11.5,
+     "event": "SubagentStart",
+     "session_id": "01a19706-ded7-7e93-a221-093fc5602e94",
+     "agent_id": "01a19707-205b-7e83-926b-e4f0dff62925",
+     "agent_type": "default",
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "agent_id",
+      "agent_type",
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "transcript_path",
+      "turn_id"
+     ]
+    },
+    {
+     "s": 14.8,
+     "event": "SubagentStop",
+     "session_id": "01a19706-ded7-7e93-a221-093fc5602e94",
+     "agent_id": "01a19707-205b-7e83-926b-e4f0dff62925",
+     "agent_type": "default",
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "agent_id",
+      "agent_transcript_path",
+      "agent_type",
+      "cwd",
+      "hook_event_name",
+      "last_assistant_message",
+      "model",
+      "permission_mode",
+      "session_id",
+      "stop_hook_active",
+      "transcript_path",
+      "turn_id"
+     ],
+     "last_assistant_message": "ok3"
+    },
+    {
+     "s": 14.8,
+     "event": "PostToolUse",
+     "session_id": "01a19706-ded7-7e93-a221-093fc5602e94",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationwait_agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_response",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"timeout_ms\": 10000}",
+     "tool_response": "{\"message\":\"Wait completed.\",\"timed_out\":false}"
+    },
+    {
+     "s": 17.5,
+     "event": "Stop",
+     "session_id": "01a19706-ded7-7e93-a221-093fc5602e94",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "last_assistant_message",
+      "model",
+      "permission_mode",
+      "session_id",
+      "stop_hook_active",
+      "transcript_path",
+      "turn_id"
+     ],
+     "last_assistant_message": "DONE\n\nTypeError: tools.spawn_agent is not a function\n    at exec_main.mjs:3:15"
+    },
+    {
+     "s": 17.6,
+     "event": "SessionEnd",
+     "session_id": "01a19706-ded7-7e93-a221-093fc5602e94",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "reason",
+      "session_id",
+      "transcript_path"
+     ]
+    }
+   ],
+   "codex_rollout_calls": [
+    {
+     "rollout": "rollout-2026-11-01T07-12-54-01a19706-ded7-7e93-a221-093fc5602e94.jsonl",
+     "call": "exec",
+     "input": "const n = 3;\nfor (let i = 0; i < n; i++) {\n  await tools.spawn_agent({task_name: `w${i}`, fork_turns: \"none\", message: `Reply with the single word ok${i}. Use no tools.`});\n}\nif (n > 100) {\n  await tools.spawn_agent({task_name: \"never\", fork_turns: \"none\", message: \"never runs\"});\n}\ntext(\"spawned\");\n"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-12-54-01a19706-ded7-7e93-a221-093fc5602e94.jsonl",
+     "output": "[{\"type\": \"input_text\", \"text\": \"Script failed\\nWall time 0.0 seconds\\nOutput:\\n\"}, {\"type\": \"input_text\", \"text\": \"Script error:\\nTypeError: tools.spawn_agent is not a function\\n    at exec_main.mjs:3:15\"}]"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-12-54-01a19706-ded7-7e93-a221-093fc5602e94.jsonl",
+     "call": "spawn_agent",
+     "input": "{\"task_name\":\"w3\",\"fork_turns\":\"none\",\"message\":\"<encrypted>\"}"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-12-54-01a19706-ded7-7e93-a221-093fc5602e94.jsonl",
+     "output": "{\"task_name\":\"/root/w3\"}"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-12-54-01a19706-ded7-7e93-a221-093fc5602e94.jsonl",
+     "call": "wait_agent",
+     "input": "{\"timeout_ms\":10000}"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-12-54-01a19706-ded7-7e93-a221-093fc5602e94.jsonl",
+     "output": "{\"message\":\"Wait completed.\",\"timed_out\":false}"
+    }
+   ],
+   "claude_stream_tool_items": []
+  },
+  {
+   "dir": "codex-spawn-direct-1",
+   "run": {
+    "case": "spawn-direct",
+    "version": "codex-cli 0.166.0",
+    "command": [
+     "codex",
+     "exec",
+     "--json",
+     "--skip-git-repo-check",
+     "--dangerously-bypass-hook-trust",
+     "-C",
+     "<scratch>/codex-spawn-direct-1/work",
+     "<prompt>"
+    ],
+    "exit": 0,
+    "wall_s": 65.8,
+    "auth": "symlink intact",
+    "auth_age_before": "6 days, 12:59:38.707523",
+    "compact_limit": null
+   },
+   "hook_events": [
+    {
+     "s": 0.0,
+     "event": "SessionStart",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "source",
+      "transcript_path"
+     ],
+     "source": "startup"
+    },
+    {
+     "s": 0.0,
+     "event": "UserPromptSubmit",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "prompt",
+      "session_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "prompt": "This is a scripted hook probe. Make exactly these calls and no others.\n1. Four direct spawn_agent function calls, with task_name w0, w1, w2 and w3, fork_turns none, and for each the message: Reply with the single word ok. Use no tools.\n2. Call wait_agent until all four workers have finished.\nThen reply with the single word DONE."
+    },
+    {
+     "s": 3.1,
+     "event": "PreToolUse",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationspawn_agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"task_name\": \"w0\", \"fork_turns\": \"none\", \"message\": \"<encrypted>\"}"
+    },
+    {
+     "s": 3.2,
+     "event": "PostToolUse",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationspawn_agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_response",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"task_name\": \"w0\", \"fork_turns\": \"none\", \"message\": \"<encrypted>\"}",
+     "tool_response": "{\"task_name\":\"/root/w0\"}"
+    },
+    {
+     "s": 7.0,
+     "event": "PreToolUse",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationspawn_agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"task_name\": \"w1\", \"fork_turns\": \"none\", \"message\": \"<encrypted>\"}"
+    },
+    {
+     "s": 7.0,
+     "event": "PostToolUse",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationspawn_agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_response",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"task_name\": \"w1\", \"fork_turns\": \"none\", \"message\": \"<encrypted>\"}",
+     "tool_response": "{\"task_name\":\"/root/w1\"}"
+    },
+    {
+     "s": 7.1,
+     "event": "SubagentStart",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": "01a19708-33c7-7081-8565-d4e918bd4284",
+     "agent_type": "default",
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "agent_id",
+      "agent_type",
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "transcript_path",
+      "turn_id"
+     ]
+    },
+    {
+     "s": 10.1,
+     "event": "SubagentStop",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": "01a19708-33c7-7081-8565-d4e918bd4284",
+     "agent_type": "default",
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "agent_id",
+      "agent_transcript_path",
+      "agent_type",
+      "cwd",
+      "hook_event_name",
+      "last_assistant_message",
+      "model",
+      "permission_mode",
+      "session_id",
+      "stop_hook_active",
+      "transcript_path",
+      "turn_id"
+     ],
+     "last_assistant_message": "ok"
+    },
+    {
+     "s": 10.6,
+     "event": "PreToolUse",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationspawn_agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"task_name\": \"w2\", \"fork_turns\": \"none\", \"message\": \"<encrypted>\"}"
+    },
+    {
+     "s": 10.7,
+     "event": "PostToolUse",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationspawn_agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_response",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"task_name\": \"w2\", \"fork_turns\": \"none\", \"message\": \"<encrypted>\"}",
+     "tool_response": "{\"task_name\":\"/root/w2\"}"
+    },
+    {
+     "s": 10.9,
+     "event": "SubagentStart",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": "01a19708-42aa-7fd2-9d8a-b2ed9b6809ca",
+     "agent_type": "default",
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "agent_id",
+      "agent_type",
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "transcript_path",
+      "turn_id"
+     ]
+    },
+    {
+     "s": 13.0,
+     "event": "PreToolUse",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationspawn_agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"task_name\": \"w3\", \"fork_turns\": \"none\", \"message\": \"<encrypted>\"}"
+    },
+    {
+     "s": 13.1,
+     "event": "PostToolUse",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationspawn_agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_response",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"task_name\": \"w3\", \"fork_turns\": \"none\", \"message\": \"<encrypted>\"}",
+     "tool_response": "{\"task_name\":\"/root/w3\"}"
+    },
+    {
+     "s": 15.4,
+     "event": "SubagentStop",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": "01a19708-42aa-7fd2-9d8a-b2ed9b6809ca",
+     "agent_type": "default",
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "agent_id",
+      "agent_transcript_path",
+      "agent_type",
+      "cwd",
+      "hook_event_name",
+      "last_assistant_message",
+      "model",
+      "permission_mode",
+      "session_id",
+      "stop_hook_active",
+      "transcript_path",
+      "turn_id"
+     ],
+     "last_assistant_message": "ok"
+    },
+    {
+     "s": 16.0,
+     "event": "PreToolUse",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationwait_agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"timeout_ms\": 30000}"
+    },
+    {
+     "s": 16.0,
+     "event": "PostToolUse",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationwait_agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_response",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"timeout_ms\": 30000}",
+     "tool_response": "{\"message\":\"Wait completed.\",\"timed_out\":false}"
+    },
+    {
+     "s": 16.0,
+     "event": "SubagentStart",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": "01a19708-5100-7c53-84fc-29391d0e5da9",
+     "agent_type": "default",
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "agent_id",
+      "agent_type",
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "transcript_path",
+      "turn_id"
+     ]
+    },
+    {
+     "s": 17.1,
+     "event": "SubagentStart",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": "01a19708-5a45-7983-87dc-bb2c63563092",
+     "agent_type": "default",
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "agent_id",
+      "agent_type",
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "transcript_path",
+      "turn_id"
+     ]
+    },
+    {
+     "s": 18.5,
+     "event": "PreToolUse",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationwait_agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"timeout_ms\": 30000}"
+    },
+    {
+     "s": 20.0,
+     "event": "SubagentStop",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": "01a19708-5100-7c53-84fc-29391d0e5da9",
+     "agent_type": "default",
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "agent_id",
+      "agent_transcript_path",
+      "agent_type",
+      "cwd",
+      "hook_event_name",
+      "last_assistant_message",
+      "model",
+      "permission_mode",
+      "session_id",
+      "stop_hook_active",
+      "transcript_path",
+      "turn_id"
+     ],
+     "last_assistant_message": "ok"
+    },
+    {
+     "s": 20.0,
+     "event": "PostToolUse",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationwait_agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_response",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"timeout_ms\": 30000}",
+     "tool_response": "{\"message\":\"Wait completed.\",\"timed_out\":false}"
+    },
+    {
+     "s": 21.0,
+     "event": "SubagentStop",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": "01a19708-5a45-7983-87dc-bb2c63563092",
+     "agent_type": "default",
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "agent_id",
+      "agent_transcript_path",
+      "agent_type",
+      "cwd",
+      "hook_event_name",
+      "last_assistant_message",
+      "model",
+      "permission_mode",
+      "session_id",
+      "stop_hook_active",
+      "transcript_path",
+      "turn_id"
+     ],
+     "last_assistant_message": "ok"
+    },
+    {
+     "s": 22.4,
+     "event": "PreToolUse",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationwait_agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"timeout_ms\": 30000}"
+    },
+    {
+     "s": 22.4,
+     "event": "PostToolUse",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "collaborationwait_agent",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_response",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"timeout_ms\": 30000}",
+     "tool_response": "{\"message\":\"Wait completed.\",\"timed_out\":false}"
+    },
+    {
+     "s": 24.2,
+     "event": "Stop",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "last_assistant_message",
+      "model",
+      "permission_mode",
+      "session_id",
+      "stop_hook_active",
+      "transcript_path",
+      "turn_id"
+     ],
+     "last_assistant_message": "DONE"
+    },
+    {
+     "s": 24.3,
+     "event": "SessionEnd",
+     "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "reason",
+      "session_id",
+      "transcript_path"
+     ]
+    }
+   ],
+   "codex_rollout_calls": [
+    {
+     "rollout": "rollout-2026-11-01T07-14-10-01a19708-02c1-7123-9e7e-60bfe03ac629.jsonl",
+     "call": "spawn_agent",
+     "input": "{\"task_name\":\"w0\",\"fork_turns\":\"none\",\"message\":\"<encrypted>\"}"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-14-10-01a19708-02c1-7123-9e7e-60bfe03ac629.jsonl",
+     "output": "{\"task_name\":\"/root/w0\"}"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-14-10-01a19708-02c1-7123-9e7e-60bfe03ac629.jsonl",
+     "call": "spawn_agent",
+     "input": "{\"task_name\":\"w1\",\"fork_turns\":\"none\",\"message\":\"<encrypted>\"}"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-14-10-01a19708-02c1-7123-9e7e-60bfe03ac629.jsonl",
+     "output": "{\"task_name\":\"/root/w1\"}"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-14-10-01a19708-02c1-7123-9e7e-60bfe03ac629.jsonl",
+     "call": "spawn_agent",
+     "input": "{\"task_name\":\"w2\",\"fork_turns\":\"none\",\"message\":\"<encrypted>\"}"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-14-10-01a19708-02c1-7123-9e7e-60bfe03ac629.jsonl",
+     "output": "{\"task_name\":\"/root/w2\"}"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-14-10-01a19708-02c1-7123-9e7e-60bfe03ac629.jsonl",
+     "call": "spawn_agent",
+     "input": "{\"task_name\":\"w3\",\"fork_turns\":\"none\",\"message\":\"<encrypted>\"}"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-14-10-01a19708-02c1-7123-9e7e-60bfe03ac629.jsonl",
+     "output": "{\"task_name\":\"/root/w3\"}"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-14-10-01a19708-02c1-7123-9e7e-60bfe03ac629.jsonl",
+     "call": "wait_agent",
+     "input": "{\"timeout_ms\":30000}"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-14-10-01a19708-02c1-7123-9e7e-60bfe03ac629.jsonl",
+     "output": "{\"message\":\"Wait completed.\",\"timed_out\":false}"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-14-10-01a19708-02c1-7123-9e7e-60bfe03ac629.jsonl",
+     "call": "wait_agent",
+     "input": "{\"timeout_ms\":30000}"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-14-10-01a19708-02c1-7123-9e7e-60bfe03ac629.jsonl",
+     "output": "{\"message\":\"Wait completed.\",\"timed_out\":false}"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-14-10-01a19708-02c1-7123-9e7e-60bfe03ac629.jsonl",
+     "call": "wait_agent",
+     "input": "{\"timeout_ms\":30000}"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-14-10-01a19708-02c1-7123-9e7e-60bfe03ac629.jsonl",
+     "output": "{\"message\":\"Wait completed.\",\"timed_out\":false}"
+    }
+   ],
+   "claude_stream_tool_items": []
+  },
+  {
+   "dir": "codex-compact-1",
+   "run": {
+    "case": "compact",
+    "version": "codex-cli 0.166.0",
+    "command": [
+     "codex",
+     "exec",
+     "--json",
+     "--skip-git-repo-check",
+     "--dangerously-bypass-hook-trust",
+     "-C",
+     "<scratch>/codex-compact-1/work",
+     "<prompt>"
+    ],
+    "exit": 0,
+    "wall_s": 31.1,
+    "auth": "symlink intact",
+    "auth_age_before": "6 days, 13:01:16.322547",
+    "compact_limit": "20000"
+   },
+   "hook_events": [
+    {
+     "s": 0.0,
+     "event": "SessionStart",
+     "session_id": "01a19709-82e5-7eb1-aa18-f84874f47e6e",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "source",
+      "transcript_path"
+     ],
+     "source": "startup"
+    },
+    {
+     "s": 0.2,
+     "event": "UserPromptSubmit",
+     "session_id": "01a19709-82e5-7eb1-aa18-f84874f47e6e",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "prompt",
+      "session_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "prompt": "Run the shell command `seq 1 4000` once with exec_command, then reply with the single word DONE."
+    },
+    {
+     "s": 3.6,
+     "event": "PreToolUse",
+     "session_id": "01a19709-82e5-7eb1-aa18-f84874f47e6e",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "Bash",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"command\": \"seq 1 4000\"}"
+    },
+    {
+     "s": 4.0,
+     "event": "PostToolUse",
+     "session_id": "01a19709-82e5-7eb1-aa18-f84874f47e6e",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "Bash",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_response",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"command\": \"seq 1 4000\"}",
+     "tool_response": "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n20\n21\n22\n23\n24\n25\n26\n27\n28\n29\n30\n31\n32\n33\n34\n35\n36\n37\n38\n39\n40\n41\n42\n43\n44\n45\n46\n47\n48\n49\n50\n51\n52\n53\n54\n55\n56\n57\n58\n59\n60\n61\n62\n63\n64\n65\n66\n67\n68\n69\n70\n71\n72\n73\n74\n75\n76\n77\n78\n79\n80\n81\n82\n83\n84\n85\n86\n87\n88\n89\n90\n91\n92\n93\n94\n95\n96\n97\n98\n99\n100\n101\n102\n103\n104\n105\n106\n107\n108\n109\n110\n111\n112\n113\n114\n115\n116\n117\n118\n119\n120\n121\n122\n123\n124\n125\n126\n127\n\u2026"
+    },
+    {
+     "s": 7.0,
+     "event": "Stop",
+     "session_id": "01a19709-82e5-7eb1-aa18-f84874f47e6e",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "last_assistant_message",
+      "model",
+      "permission_mode",
+      "session_id",
+      "stop_hook_active",
+      "transcript_path",
+      "turn_id"
+     ],
+     "last_assistant_message": "DONE"
+    },
+    {
+     "s": 7.2,
+     "event": "SessionEnd",
+     "session_id": "01a19709-82e5-7eb1-aa18-f84874f47e6e",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "reason",
+      "session_id",
+      "transcript_path"
+     ]
+    }
+   ],
+   "codex_rollout_calls": [
+    {
+     "rollout": "rollout-2026-11-01T07-15-47-01a19709-82e5-7eb1-aa18-f84874f47e6e.jsonl",
+     "call": "exec",
+     "input": "await tools.exec_command({cmd:\"seq 1 4000\",max_output_tokens:12000});\n"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-15-47-01a19709-82e5-7eb1-aa18-f84874f47e6e.jsonl",
+     "output": "Script completed\nWall time 0.6 seconds\nOutput:\n"
+    }
+   ],
+   "claude_stream_tool_items": []
+  },
+  {
+   "dir": "codex-compact-2",
+   "run": {
+    "case": "compact",
+    "version": "codex-cli 0.166.0",
+    "command": [
+     "codex",
+     "exec",
+     "--json",
+     "--skip-git-repo-check",
+     "--dangerously-bypass-hook-trust",
+     "-C",
+     "<scratch>/codex-compact-2/work",
+     "<prompt>"
+    ],
+    "exit": 0,
+    "wall_s": 30.8,
+    "auth": "symlink intact",
+    "auth_age_before": "6 days, 13:02:12.326813",
+    "compact_limit": "20000"
+   },
+   "hook_events": [
+    {
+     "s": 0.0,
+     "event": "SessionStart",
+     "session_id": "01a1970a-5d93-71b1-8975-af31b50d778d",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "source",
+      "transcript_path"
+     ],
+     "source": "startup"
+    },
+    {
+     "s": 0.1,
+     "event": "UserPromptSubmit",
+     "session_id": "01a1970a-5d93-71b1-8975-af31b50d778d",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "prompt",
+      "session_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "prompt": "Make one exec call whose JavaScript source is exactly `text((await tools.exec_command({cmd: \"seq 1 4000\", max_output_tokens: 12000})).output);` and then reply with the single word DONE."
+    },
+    {
+     "s": 3.8,
+     "event": "PreToolUse",
+     "session_id": "01a1970a-5d93-71b1-8975-af31b50d778d",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "Bash",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"command\": \"seq 1 4000\"}"
+    },
+    {
+     "s": 4.1,
+     "event": "PostToolUse",
+     "session_id": "01a1970a-5d93-71b1-8975-af31b50d778d",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": "Bash",
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "model",
+      "permission_mode",
+      "session_id",
+      "tool_input",
+      "tool_name",
+      "tool_response",
+      "tool_use_id",
+      "transcript_path",
+      "turn_id"
+     ],
+     "tool_input": "{\"command\": \"seq 1 4000\"}",
+     "tool_response": "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n20\n21\n22\n23\n24\n25\n26\n27\n28\n29\n30\n31\n32\n33\n34\n35\n36\n37\n38\n39\n40\n41\n42\n43\n44\n45\n46\n47\n48\n49\n50\n51\n52\n53\n54\n55\n56\n57\n58\n59\n60\n61\n62\n63\n64\n65\n66\n67\n68\n69\n70\n71\n72\n73\n74\n75\n76\n77\n78\n79\n80\n81\n82\n83\n84\n85\n86\n87\n88\n89\n90\n91\n92\n93\n94\n95\n96\n97\n98\n99\n100\n101\n102\n103\n104\n105\n106\n107\n108\n109\n110\n111\n112\n113\n114\n115\n116\n117\n118\n119\n120\n121\n122\n123\n124\n125\n126\n127\n\u2026"
+    },
+    {
+     "s": 7.3,
+     "event": "Stop",
+     "session_id": "01a1970a-5d93-71b1-8975-af31b50d778d",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "last_assistant_message",
+      "model",
+      "permission_mode",
+      "session_id",
+      "stop_hook_active",
+      "transcript_path",
+      "turn_id"
+     ],
+     "last_assistant_message": "DONE"
+    },
+    {
+     "s": 7.5,
+     "event": "SessionEnd",
+     "session_id": "01a1970a-5d93-71b1-8975-af31b50d778d",
+     "agent_id": null,
+     "agent_type": null,
+     "tool_name": null,
+     "denied": false,
+     "keys": [
+      "cwd",
+      "hook_event_name",
+      "reason",
+      "session_id",
+      "transcript_path"
+     ]
+    }
+   ],
+   "codex_rollout_calls": [
+    {
+     "rollout": "rollout-2026-11-01T07-16-45-01a1970a-5d93-71b1-8975-af31b50d778d.jsonl",
+     "call": "exec",
+     "input": "text((await tools.exec_command({cmd: \"seq 1 4000\", max_output_tokens: 12000})).output);\n"
+    },
+    {
+     "rollout": "rollout-2026-11-01T07-16-45-01a1970a-5d93-71b1-8975-af31b50d778d.jsonl",
+     "output": "[{\"type\": \"input_text\", \"text\": \"Script completed\\nWall time 0.5 seconds\\nOutput:\\n\"}, {\"type\": \"input_text\", \"text\": \"1\\n2\\n3\\n4\\n5\\n6\\n7\\n8\\n9\\n10\\n11\\n12\\n13\\n14\\n15\\n16\\n17\\n18\\n19\\n20\\n21\\n22\\n23\\n24\\n25\\n26\\n27\\n28\\n29\\n30\\n31\\n32\\n33\\n34\\n35\\n36\\n37\\n38\\n39\\n40\\n41\\n42\\n43\\n44\\n45\\n46\\n47\\n48\\n49\\n50\\n51\\n52\\n53\\n54\\n55\\n56\\n57\\n58\\n59\\n60\\n61\\n62\\n63\\n64\\n65\\n66\\n67\\n68\\n69\\n70\\n71\\n72\\n73\u2026"
+    }
+   ],
+   "claude_stream_tool_items": []
+  }
+ ]
+}

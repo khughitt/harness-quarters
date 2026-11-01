@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-9aa713-pause-past-range
 created: 2026-11-01T10:29:21Z
-updated: 2026-11-01T11:58:10Z
+updated: 2026-11-01T12:20:57Z
 started: 2026-11-01T11:56:46Z
 depends: []
 parent: hq-9aa713
@@ -32,3 +32,4 @@ Implements Task 1 of the turn-pause plan in .worktrees/hq-9aa713 (branch feat/hq
 - 2026-11-01T11:56:49Z (feat/hq-9aa713-pause-past-range): gate: implementing .worktrees/hq-9aa713
   provenance: {"harness_session":"claude-code:536b5ebf-5753-4a8b-ac83-61dde5ef4c79","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-01T11:58:10Z (feat/hq-9aa713-pause-past-range): scratch created: host titan, /mnt/ssd3/work/hq/hq-fe672f, raw probe logs and temporary harness homes for Task 1; owner hq-fe672f; contents mutable
+- 2026-11-01T12:20:57Z (feat/hq-9aa713-pause-past-range): attached: turn-pause-probe-evidence.json (87917 bytes): Portable derivative of the turn-pause probe runs (Claude Code 2.1.316, Codex 0.166.0): per run the command shape, exit, wall time, every hook event's identity fields and truncated payload, and the tool calls; paths are placeholders
