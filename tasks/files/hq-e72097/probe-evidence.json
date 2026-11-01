@@ -1,0 +1,749 @@
+{
+  "date": "2026-10-31",
+  "versions": {
+    "agy": "1.4.12"
+  },
+  "format": "Normalized probe excerpts from hq-e72097; machine paths and host identifiers replaced with angle-bracket tokens. Raw transcripts and logs are retained in task scratch storage.",
+  "runs": [
+    {
+      "id": "agy-wake-shell",
+      "mode": "interactive terminal session (private tmux server)",
+      "conversation_id": "1e9adf4a-ae3b-4261-896c-648dd48c3388",
+      "nonce": "f3f4fb60045ec8d4",
+      "prompt": "Run \"sleep 20; cat <probe-root>/probe_w1_wake_shell/nonce\" in the background using run_command with WaitMsBeforeAsync 500. Do not read that file yourself. Then end your turn at once with the single word WAITING. When it finishes, reply with exactly what it printed. This is a bounded capability experiment, not project work. Do not wait or poll a running child.",
+      "wake_judge_compact": "PASS",
+      "wake_judge_full": "PASS",
+      "stop_events": [
+        {
+          "time": 1793499573.763575,
+          "payload": {
+            "artifactDirectoryPath": "<probe-root>/probe_w1_wake_shell/home/.gemini/antigravity-cli/brain/1e9adf4a-ae3b-4261-896c-648dd48c3388",
+            "conversationId": "1e9adf4a-ae3b-4261-896c-648dd48c3388",
+            "error": "",
+            "executionNum": 0,
+            "fullyIdle": false,
+            "lastUserInput": "Run \"sleep 20; cat <probe-root>/probe_w1_wake_shell/nonce\" in the background using run_command with WaitMsBeforeAsync 500. Do not read that file yourself. Then end your turn at once with the single word WAITING. When it finishes, reply with exactly what it printed. This is a bounded capability experiment, not project work. Do not wait or poll a running child.",
+            "modelName": "gemini-3.8-flash-low",
+            "terminationReason": "NO_TOOL_CALL",
+            "transcriptPath": "<probe-root>/probe_w1_wake_shell/home/.gemini/antigravity-cli/brain/1e9adf4a-ae3b-4261-896c-648dd48c3388/.system_generated/logs/transcript_full.jsonl",
+            "workspacePaths": [
+              "<probe-root>/probe_w1_wake_shell/workspace"
+            ]
+          }
+        },
+        {
+          "time": 1793499594.4357164,
+          "payload": {
+            "artifactDirectoryPath": "<probe-root>/probe_w1_wake_shell/home/.gemini/antigravity-cli/brain/1e9adf4a-ae3b-4261-896c-648dd48c3388",
+            "conversationId": "1e9adf4a-ae3b-4261-896c-648dd48c3388",
+            "error": "",
+            "executionNum": 0,
+            "fullyIdle": true,
+            "lastUserInput": "Run \"sleep 20; cat <probe-root>/probe_w1_wake_shell/nonce\" in the background using run_command with WaitMsBeforeAsync 500. Do not read that file yourself. Then end your turn at once with the single word WAITING. When it finishes, reply with exactly what it printed. This is a bounded capability experiment, not project work. Do not wait or poll a running child.",
+            "modelName": "gemini-3.8-flash-low",
+            "terminationReason": "NO_TOOL_CALL",
+            "transcriptPath": "<probe-root>/probe_w1_wake_shell/home/.gemini/antigravity-cli/brain/1e9adf4a-ae3b-4261-896c-648dd48c3388/.system_generated/logs/transcript_full.jsonl",
+            "workspacePaths": [
+              "<probe-root>/probe_w1_wake_shell/workspace"
+            ]
+          }
+        }
+      ],
+      "transcript_full": [
+        {
+          "step_index": 0,
+          "source": "USER_EXPLICIT",
+          "type": "USER_INPUT",
+          "status": "DONE",
+          "created_at": "2026-11-01T02:19:25Z",
+          "content": "<USER_REQUEST>\nRun \"sleep 20; cat <probe-root>/probe_w1_wake_shell/nonce\" in the background using run_command with WaitMsBeforeAsync 500. Do not read that file yourself. Then end your turn at once with the single word WAITING. When it finishes, reply with exactly what it printed. This is a bounded capability experiment, not project work. Do not wait or poll a running child.\n</USER_REQUEST>\n<ADDITIONAL_METADATA>\nThe current local time is: 2026-10-31T22:19:25-04:00.\n</ADDITIONAL_METADATA>\n<USER_SETTINGS_CHANGE>\nThe user changed setting `Model Selection` from None to Gemini 3.8 Flash (Low). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.\n</USER_SETTINGS_CHANGE>"
+        },
+        {
+          "step_index": 1,
+          "source": "MODEL",
+          "type": "PLANNER_RESPONSE",
+          "status": "DONE",
+          "created_at": "2026-11-01T02:19:25Z",
+          "input_tokens": 7022,
+          "cache_read_tokens": 0,
+          "output_tokens": 75,
+          "tool_calls": [
+            {
+              "name": "run_command",
+              "args": {
+                "CommandLine": "sleep 20; cat <probe-root>/probe_w1_wake_shell/nonce",
+                "IsDaemon": false,
+                "WaitMsBeforeAsync": 500,
+                "toolSummary": "Run sleep and print nonce"
+              }
+            }
+          ]
+        },
+        {
+          "step_index": 2,
+          "source": "MODEL",
+          "type": "GENERIC",
+          "status": "RUNNING",
+          "created_at": "2026-11-01T02:19:31Z",
+          "content": "Created At: 2026-10-31T22:19:31-04:00\nTool is running as a background task with task id: 1e9adf4a-ae3b-4261-896c-648dd48c3388/task-2\nTask Description: sleep 20; cat <probe-root>/probe_w1_wake_shell/nonce\nTask logs are available at: file://<probe-root>/probe_w1_wake_shell/home/.gemini/antigravity-cli/brain/1e9adf4a-ae3b-4261-896c-648dd48c3388/.system_generated/tasks/task-2.log\nYOU MUST TAKE ONE OF THE FOLLOWING TWO ACTIONS: A) either proceed to other relevant work (if any) or, B) simply update the user with a short message (that you have launched the command and will wait for it to finish) and end the turn.\n DO NOTHING ELSE."
+        },
+        {
+          "step_index": 3,
+          "source": "MODEL",
+          "type": "PLANNER_RESPONSE",
+          "status": "DONE",
+          "created_at": "2026-11-01T02:19:31Z",
+          "input_tokens": 7341,
+          "cache_read_tokens": 0,
+          "output_tokens": 2,
+          "content": "WAITING"
+        },
+        {
+          "step_index": 4,
+          "source": "SYSTEM",
+          "type": "SYSTEM_MESSAGE",
+          "status": "DONE",
+          "created_at": "2026-11-01T02:19:51Z",
+          "content": "The following is a <SYSTEM_MESSAGE> not actually sent by the user. It is provided by the system as important information to pay attention to.\n\n<SYSTEM_MESSAGE>\n[Message] timestamp=2026-11-01T02:19:51Z sender=1e9adf4a-ae3b-4261-896c-648dd48c3388/task-2 priority=MESSAGE_PRIORITY_HIGH content=Task id \"1e9adf4a-ae3b-4261-896c-648dd48c3388/task-2\" finished with result:\nCommand exited with code 0.\n\nCommand output:\nf3f4fb60045ec8d4\r\n\nLog: file://<probe-root>/probe_w1_wake_shell/home/.gemini/antigravity-cli/brain/1e9adf4a-ae3b-4261-896c-648dd48c3388/.system_generated/tasks/task-2.log\n</SYSTEM_MESSAGE>"
+        },
+        {
+          "step_index": 5,
+          "source": "MODEL",
+          "type": "PLANNER_RESPONSE",
+          "status": "DONE",
+          "created_at": "2026-11-01T02:19:51Z",
+          "input_tokens": 7622,
+          "cache_read_tokens": 0,
+          "output_tokens": 14,
+          "content": "f3f4fb60045ec8d4"
+        }
+      ]
+    },
+    {
+      "id": "agy-wake-subagent",
+      "mode": "interactive terminal session (private tmux server)",
+      "conversation_id": "1f82d71f-ddba-48e4-a55d-02a5e547523b",
+      "child_conversation_id": "abb9b545-1003-45c7-9ddf-07a269c1ff5c",
+      "nonce": "92c1a625a58f3b52",
+      "prompt": "Launch a subagent using invoke_subagent with TypeName \"self\" whose only job is to run \"sleep 20; cat <probe-root>/probe_w2_wake_subagent/nonce\" with run_command and reply with only what it printed. Do not read that file yourself. Then end your turn at once with the single word WAITING. When the subagent finishes, reply with exactly what it returned. This is a bounded capability experiment, not project work. Do not wait or poll a running child.",
+      "wake_judge_compact": "PASS",
+      "wake_judge_full": "PASS",
+      "stop_events": [
+        {
+          "time": 1793499573.327509,
+          "payload": {
+            "artifactDirectoryPath": "<probe-root>/probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/1f82d71f-ddba-48e4-a55d-02a5e547523b",
+            "conversationId": "1f82d71f-ddba-48e4-a55d-02a5e547523b",
+            "error": "",
+            "executionNum": 0,
+            "fullyIdle": false,
+            "lastUserInput": "Launch a subagent using invoke_subagent with TypeName \"self\" whose only job is to run \"sleep 20; cat <probe-root>/probe_w2_wake_subagent/nonce\" with run_command and reply with only what it printed. Do not read that file yourself. Then end your turn at once with the single word WAITING. When the subagent finishes, reply with exactly what it returned. This is a bounded capability experiment, not project work. Do not wait or poll a running child.",
+            "modelName": "gemini-3.8-flash-low",
+            "terminationReason": "NO_TOOL_CALL",
+            "transcriptPath": "<probe-root>/probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/1f82d71f-ddba-48e4-a55d-02a5e547523b/.system_generated/logs/transcript_full.jsonl",
+            "workspacePaths": [
+              "<probe-root>/probe_w2_wake_subagent/workspace"
+            ]
+          }
+        },
+        {
+          "time": 1793499586.6129847,
+          "payload": {
+            "artifactDirectoryPath": "<probe-root>/probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/abb9b545-1003-45c7-9ddf-07a269c1ff5c",
+            "conversationId": "abb9b545-1003-45c7-9ddf-07a269c1ff5c",
+            "error": "",
+            "executionNum": 0,
+            "fullyIdle": false,
+            "lastUserInput": "",
+            "modelName": "gemini-3.8-flash-low",
+            "terminationReason": "NO_TOOL_CALL",
+            "transcriptPath": "<probe-root>/probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/abb9b545-1003-45c7-9ddf-07a269c1ff5c/.system_generated/logs/transcript_full.jsonl",
+            "workspacePaths": [
+              "<probe-root>/probe_w2_wake_subagent/workspace"
+            ]
+          }
+        },
+        {
+          "time": 1793499599.5687318,
+          "payload": {
+            "artifactDirectoryPath": "<probe-root>/probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/abb9b545-1003-45c7-9ddf-07a269c1ff5c",
+            "conversationId": "abb9b545-1003-45c7-9ddf-07a269c1ff5c",
+            "error": "",
+            "executionNum": 0,
+            "fullyIdle": true,
+            "lastUserInput": "",
+            "modelName": "gemini-3.8-flash-low",
+            "terminationReason": "NO_TOOL_CALL",
+            "transcriptPath": "<probe-root>/probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/abb9b545-1003-45c7-9ddf-07a269c1ff5c/.system_generated/logs/transcript_full.jsonl",
+            "workspacePaths": [
+              "<probe-root>/probe_w2_wake_subagent/workspace"
+            ]
+          }
+        },
+        {
+          "time": 1793499601.6606152,
+          "payload": {
+            "artifactDirectoryPath": "<probe-root>/probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/1f82d71f-ddba-48e4-a55d-02a5e547523b",
+            "conversationId": "1f82d71f-ddba-48e4-a55d-02a5e547523b",
+            "error": "",
+            "executionNum": 0,
+            "fullyIdle": true,
+            "lastUserInput": "Launch a subagent using invoke_subagent with TypeName \"self\" whose only job is to run \"sleep 20; cat <probe-root>/probe_w2_wake_subagent/nonce\" with run_command and reply with only what it printed. Do not read that file yourself. Then end your turn at once with the single word WAITING. When the subagent finishes, reply with exactly what it returned. This is a bounded capability experiment, not project work. Do not wait or poll a running child.",
+            "modelName": "gemini-3.8-flash-low",
+            "terminationReason": "NO_TOOL_CALL",
+            "transcriptPath": "<probe-root>/probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/1f82d71f-ddba-48e4-a55d-02a5e547523b/.system_generated/logs/transcript_full.jsonl",
+            "workspacePaths": [
+              "<probe-root>/probe_w2_wake_subagent/workspace"
+            ]
+          }
+        }
+      ],
+      "transcript_full": [
+        {
+          "step_index": 0,
+          "source": "USER_EXPLICIT",
+          "type": "USER_INPUT",
+          "status": "DONE",
+          "created_at": "2026-11-01T02:19:26Z",
+          "content": "<USER_REQUEST>\nLaunch a subagent using invoke_subagent with TypeName \"self\" whose only job is to run \"sleep 20; cat <probe-root>/probe_w2_wake_subagent/nonce\" with run_command and reply with only what it printed. Do not read that file yourself. Then end your turn at once with the single word WAITING. When the subagent finishes, reply with exactly what it returned. This is a bounded capability experiment, not project work. Do not wait or poll a running child.\n</USER_REQUEST>\n<ADDITIONAL_METADATA>\nThe current local time is: 2026-10-31T22:19:26-04:00.\n</ADDITIONAL_METADATA>\n<USER_SETTINGS_CHANGE>\nThe user changed setting `Model Selection` from None to Gemini 3.8 Flash (Low). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.\n</USER_SETTINGS_CHANGE>"
+        },
+        {
+          "step_index": 1,
+          "source": "MODEL",
+          "type": "PLANNER_RESPONSE",
+          "status": "DONE",
+          "created_at": "2026-11-01T02:19:26Z",
+          "input_tokens": 7050,
+          "cache_read_tokens": 0,
+          "output_tokens": 98,
+          "tool_calls": [
+            {
+              "name": "invoke_subagent",
+              "args": {
+                "Prompt": "Run the command \"sleep 20; cat <probe-root>/probe_w2_wake_subagent/nonce\" with run_command (WaitMsBeforeAsync should be at least 25000) and reply with only what it printed.",
+                "Role": "Nonce Reader",
+                "TypeName": "self"
+              }
+            }
+          ]
+        },
+        {
+          "step_index": 2,
+          "source": "MODEL",
+          "type": "GENERIC",
+          "status": "DONE",
+          "created_at": "2026-11-01T02:19:31Z",
+          "content": "Created At: 2026-10-31T22:19:31-04:00\nCompleted At: 2026-10-31T22:19:31-04:00\nCreated the following subagent:\n{\n  \"conversationId\":  \"abb9b545-1003-45c7-9ddf-07a269c1ff5c\",\n  \"logAbsoluteUri\":  \"file://<probe-root>/probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/abb9b545-1003-45c7-9ddf-07a269c1ff5c/.system_generated/logs/transcript.jsonl\",\n  \"workspaceUris\":  [\n    \"file://<probe-root>/probe_w2_wake_subagent/workspace\"\n  ]\n}\nThe subagent will send you a message when it has completed its task or requires guidance. There is no need to poll for its response."
+        },
+        {
+          "step_index": 3,
+          "source": "MODEL",
+          "type": "PLANNER_RESPONSE",
+          "status": "DONE",
+          "created_at": "2026-11-01T02:19:31Z",
+          "input_tokens": 7445,
+          "cache_read_tokens": 0,
+          "output_tokens": 2,
+          "content": "WAITING"
+        },
+        {
+          "step_index": 4,
+          "source": "SYSTEM",
+          "type": "SYSTEM_MESSAGE",
+          "status": "DONE",
+          "created_at": "2026-11-01T02:19:56Z",
+          "content": "The following is a <SYSTEM_MESSAGE> not actually sent by the user. It is provided by the system as important information to pay attention to.\n\n<SYSTEM_MESSAGE>\n[Message] timestamp=2026-11-01T02:19:56Z sender=abb9b545-1003-45c7-9ddf-07a269c1ff5c priority=MESSAGE_PRIORITY_HIGH content=92c1a625a58f3b52\n</SYSTEM_MESSAGE>"
+        },
+        {
+          "step_index": 5,
+          "source": "MODEL",
+          "type": "PLANNER_RESPONSE",
+          "status": "DONE",
+          "created_at": "2026-11-01T02:19:56Z",
+          "input_tokens": 7577,
+          "cache_read_tokens": 0,
+          "output_tokens": 16,
+          "content": "92c1a625a58f3b52"
+        }
+      ]
+    },
+    {
+      "id": "agy-daemon-stop-idle",
+      "mode": "headless agy -p",
+      "stop_events": [
+        {
+          "artifactDirectoryPath": "<probe-root>/probe_daemon_idle/home/.gemini/antigravity-cli/brain/e0f1034b-29d8-414c-a4f1-f73a94708ac1",
+          "conversationId": "e0f1034b-29d8-414c-a4f1-f73a94708ac1",
+          "error": "",
+          "executionNum": 0,
+          "fullyIdle": true,
+          "lastUserInput": "Start \"sleep 30\" with run_command using IsDaemon=true and WaitMsBeforeAsync=500, then immediately reply DONE.",
+          "modelName": "gemini-3.8-flash-low",
+          "terminationReason": "NO_TOOL_CALL",
+          "transcriptPath": "<probe-root>/probe_daemon_idle/home/.gemini/antigravity-cli/brain/e0f1034b-29d8-414c-a4f1-f73a94708ac1/.system_generated/logs/transcript_full.jsonl",
+          "workspacePaths": [
+            "<probe-root>/probe_daemon_idle/workspace"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "agy-tui-session-start-and-answer-hook",
+      "mode": "interactive terminal session (private tmux server)",
+      "summary": {
+        "hooks_before_prompt": [],
+        "pane_before_prompt_tail": "e\n  \u2584\u2580\u2580      \u2580\u2580\u2584\n \u2503 Verbosity now defaults to medium\n \u2503 Verbosity is now medium by default, so tool calls and thoughts roll up into summaries. You can change your\n \u2503 preferred verbosity anytime in /config > Verbosity.\n \u2503 esc to dismiss\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n>\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n? for shortcuts                                                                                   Gemini 3.8 Flash \u00b7 low",
+        "pretool_fired": true,
+        "pane_while_hook_blocks_tail": "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n> Call ask_question right now with question 'Pick a color' and options ['(Recommended) Blue', 'Green'], then reply with\n  what was chosen.\n\u25cf AskQuestion(Pick a color)\n\u28fe  Working...\n\u2514 Tip: Press esc to interrupt generation.\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n>\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nesc to cancel                                                                                     Gemini 3.8 Flash \u00b7 low",
+        "pane_after_hook_returns_tail": "    Antigravity CLI 1.4.12\n     \u2580\u2580\u2580\u2580\u2580\u2580       keith.hughitt@gmail.com (Google AI Ultra)\n    \u2580\u2580\u2580\u2580\u2580\u2580\u2580\u2580      Gemini 3.8 Flash (Low)\n   \u2584\u2580\u2580    \u2580\u2580\u2584     <probe-root>/probe_tui_h3_a1/workspace\n  \u2584\u2580\u2580      \u2580\u2580\u2584\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n> Call ask_question right now with question 'Pick a color' and options ['(Recommended) Blue', 'Green'], then reply with\n  what was chosen.\n? Pick a color\nQuestion\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nQuestion 1/1: Pick a color\n> 1. (Recommended) Blue\n  2. Green\n  3. Write-in...\n  \u2191/\u2193 Navigate \u00b7 enter Select \u00b7 esc Skip\nesc to cancel                                                                                     Gemini 3.8 Flash \u00b7 low",
+        "hooks_after_hook_returns": [
+          "SessionStart",
+          "PreToolUse"
+        ],
+        "pane_after_esc_tail": "itt@gmail.com (Google AI Ultra)\n    \u2580\u2580\u2580\u2580\u2580\u2580\u2580\u2580      Gemini 3.8 Flash (Low)\n   \u2584\u2580\u2580    \u2580\u2580\u2584     <probe-root>/probe_tui_h3_a1/workspace\n  \u2584\u2580\u2580      \u2580\u2580\u2584\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n> Call ask_question right now with question 'Pick a color' and options ['(Recommended) Blue', 'Green'], then reply with\n  what was chosen.\n? Pick a color\n(skipped)\n  The question was skipped (no option was chosen).\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n>\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n? for shortcuts                                                                                   Gemini 3.8 Flash \u00b7 low",
+        "hooks_final": [
+          "SessionStart",
+          "PreToolUse",
+          "Stop"
+        ],
+        "transcript_steps": [
+          {
+            "step_index": 0,
+            "source": "USER_EXPLICIT",
+            "type": "USER_INPUT",
+            "status": "DONE",
+            "created_at": "2026-11-01T02:17:42Z",
+            "content": "<USER_REQUEST>\nCall ask_question right now with question 'Pick a color' and options ['(Recommended) Blue', 'Green'], then reply with what was chosen.\n</USER_REQUEST>\n<ADDITIONAL_METADATA>\nThe current local time is: 2026-10-31T22:17:42-04:00.\n</ADDITIONAL_METADATA>\n<USER_SETTINGS_CHANGE>\nThe user changed setting `Model Selection` from None to Gemini 3.8 Flash (Low). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.\n</USER_SETTINGS_CHANGE>"
+          },
+          {
+            "step_index": 1,
+            "source": "MODEL",
+            "type": "PLANNER_RESPONSE",
+            "status": "DONE",
+            "created_at": "2026-11-01T02:17:42Z",
+            "input_tokens": 6960,
+            "cache_read_tokens": 0,
+            "output_tokens": 42,
+            "tool_calls": [
+              {
+                "name": "ask_question",
+                "args": {
+                  "questions": "[{\"is_multi_select\":false,\"options\":[\"(Recommended) Blue\",\"Green\"],\"question\":\"Pick a color\"}]"
+                }
+              }
+            ]
+          },
+          {
+            "step_index": 2,
+            "source": "MODEL",
+            "type": "GENERIC",
+            "status": "DONE",
+            "created_at": "2026-11-01T02:17:45Z",
+            "content": "Created At: 2026-10-31T22:17:45-04:00\nCompleted At: 2026-10-31T22:17:53-04:00\nA pre-tool hook changed the arguments of this tool call before it ran. Changed: answers.\n\nA1: User Skipped"
+          },
+          {
+            "step_index": 3,
+            "source": "MODEL",
+            "type": "PLANNER_RESPONSE",
+            "status": "DONE",
+            "created_at": "2026-11-01T02:17:53Z",
+            "input_tokens": 7102,
+            "cache_read_tokens": 0,
+            "output_tokens": 10,
+            "content": "The question was skipped (no option was chosen)."
+          }
+        ]
+      }
+    },
+    {
+      "id": "agy-headless-hooks-mcp-and-ask",
+      "mode": "headless agy -p",
+      "batch1": {
+        "H1_pretool_deny": {
+          "rc": 0,
+          "out": "The command was denied with the exact reason:\n\n`PROBE_DENY_REASON_99`",
+          "err": "",
+          "marker_created": false,
+          "hook_calls": 1
+        },
+        "H1b_pretool_exit2": {
+          "rc": 0,
+          "out": "DONE",
+          "err": "",
+          "marker_created": false
+        },
+        "H2_stop_continue": {
+          "rc": 0,
+          "out": "FIRST_TURN_OK.\nSECOND_TURN_OK_44",
+          "err": "",
+          "stop_execution_nums": [
+            0,
+            1
+          ],
+          "stop_reasons": [
+            "NO_TOOL_CALL",
+            "NO_TOOL_CALL"
+          ]
+        },
+        "M1_mcp_stdio": {
+          "rc": 0,
+          "out": "WORD20067A4C",
+          "err": "",
+          "nonce": "WORD20067A4C",
+          "nonce_in_out": true,
+          "mcp_methods": [
+            "server/discover",
+            "initialize",
+            "notifications/initialized",
+            "tools/list",
+            "notifications/roots/list_changed",
+            "notifications/roots/list_changed",
+            "tools/call"
+          ],
+          "initialize_params": {
+            "clientInfo": {
+              "name": "antigravity-client",
+              "version": "v1.0.0"
+            },
+            "protocolVersion": "2025-11-25",
+            "capabilities": {
+              "elicitation": {
+                "form": {},
+                "url": {}
+              },
+              "roots": {
+                "listChanged": true
+              }
+            }
+          }
+        },
+        "M2_mcp_2026_only": {
+          "rc": 0,
+          "out": "NO_TOOL",
+          "err": "",
+          "nonce": "WORDCAC28F93",
+          "nonce_in_out": false,
+          "mcp_methods": [
+            "server/discover",
+            "initialize",
+            "server/discover",
+            "initialize"
+          ]
+        },
+        "A2_headless_ask": {
+          "rc": 0,
+          "out": "The `ask_question` tool returned:\n\n```\nCreated At: 2026-10-31T22:10:23-04:00\nCompleted At: 2026-10-31T22:10:23-04:00\nA1: User Skipped\n```",
+          "err": "",
+          "hook_events": [
+            {
+              "artifactDirectoryPath": "<probe-root>/probe_a2_headless_ask/home/.gemini/antigravity-cli/brain/b620c681-0ccb-4858-a2e3-c98c5efcb4ce",
+              "conversationId": "b620c681-0ccb-4858-a2e3-c98c5efcb4ce",
+              "lastUserInput": "Call the ask_question tool right now with question 'Pick a color' and options ['(Recommended) Blue', 'Green'], then report what ask_question returned.",
+              "modelName": "gemini-3.8-flash-low",
+              "stepIdx": 2,
+              "toolCall": {
+                "args": {
+                  "questions": [
+                    {
+                      "is_multi_select": false,
+                      "options": [
+                        "(Recommended) Blue",
+                        "Green"
+                      ],
+                      "question": "Pick a color"
+                    }
+                  ]
+                },
+                "name": "ask_question"
+              },
+              "transcriptPath": "<probe-root>/probe_a2_headless_ask/home/.gemini/antigravity-cli/brain/b620c681-0ccb-4858-a2e3-c98c5efcb4ce/.system_generated/logs/transcript_full.jsonl",
+              "workspacePaths": [
+                "<probe-root>/probe_a2_headless_ask/workspace"
+              ]
+            },
+            {
+              "artifactDirectoryPath": "<probe-root>/probe_a2_headless_ask/home/.gemini/antigravity-cli/brain/b620c681-0ccb-4858-a2e3-c98c5efcb4ce",
+              "conversationId": "b620c681-0ccb-4858-a2e3-c98c5efcb4ce",
+              "error": "",
+              "lastUserInput": "Call the ask_question tool right now with question 'Pick a color' and options ['(Recommended) Blue', 'Green'], then report what ask_question returned.",
+              "modelName": "gemini-3.8-flash-low",
+              "stepIdx": 2,
+              "toolCall": {
+                "args": {
+                  "questions": [
+                    {
+                      "is_multi_select": false,
+                      "options": [
+                        "(Recommended) Blue",
+                        "Green"
+                      ],
+                      "question": "Pick a color"
+                    }
+                  ]
+                },
+                "name": "ask_question"
+              },
+              "transcriptPath": "<probe-root>/probe_a2_headless_ask/home/.gemini/antigravity-cli/brain/b620c681-0ccb-4858-a2e3-c98c5efcb4ce/.system_generated/logs/transcript_full.jsonl",
+              "workspacePaths": [
+                "<probe-root>/probe_a2_headless_ask/workspace"
+              ]
+            },
+            {
+              "artifactDirectoryPath": "<probe-root>/probe_a2_headless_ask/home/.gemini/antigravity-cli/brain/b620c681-0ccb-4858-a2e3-c98c5efcb4ce",
+              "conversationId": "b620c681-0ccb-4858-a2e3-c98c5efcb4ce",
+              "error": "",
+              "executionNum": 0,
+              "fullyIdle": true,
+              "lastUserInput": "Call the ask_question tool right now with question 'Pick a color' and options ['(Recommended) Blue', 'Green'], then report what ask_question returned.",
+              "modelName": "gemini-3.8-flash-low",
+              "terminationReason": "NO_TOOL_CALL",
+              "transcriptPath": "<probe-root>/probe_a2_headless_ask/home/.gemini/antigravity-cli/brain/b620c681-0ccb-4858-a2e3-c98c5efcb4ce/.system_generated/logs/transcript_full.jsonl",
+              "workspacePaths": [
+                "<probe-root>/probe_a2_headless_ask/workspace"
+              ]
+            }
+          ],
+          "transcript_steps": [
+            {
+              "step_index": 0,
+              "type": "USER_INPUT",
+              "status": "DONE",
+              "content": "<USER_REQUEST>\nCall the ask_question tool right now with question 'Pick a color' and options ['(Recommended) Blue', 'Green'], then report what ask_question returned.\n</USER_REQUEST>\n<ADDITIONAL_METADATA>\nThe current local time is: 2026-10-31T22:10:20-04:00.\n</ADDITIONAL_METADATA>\n<USER_SETTINGS_CHANGE>\nThe user changed setting `Model Selection` from None to Gemini 3.8 Flash (Low). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.\n</USER_SETTINGS_CHANGE>",
+              "tool_calls": null
+            },
+            {
+              "step_index": 1,
+              "type": "PLANNER_RESPONSE",
+              "status": "DONE",
+              "content": null,
+              "tool_calls": [
+                {
+                  "name": "ask_question",
+                  "args": {
+                    "questions": "[{\"is_multi_select\":false,\"options\":[\"(Recommended) Blue\",\"Green\"],\"question\":\"Pick a color\"}]"
+                  }
+                }
+              ]
+            },
+            {
+              "step_index": 2,
+              "type": "GENERIC",
+              "status": "DONE",
+              "content": "Created At: 2026-10-31T22:10:23-04:00\nCompleted At: 2026-10-31T22:10:23-04:00\nA1: User Skipped",
+              "tool_calls": null
+            },
+            {
+              "step_index": 3,
+              "type": "PLANNER_RESPONSE",
+              "status": "DONE",
+              "content": "The `ask_question` tool returned:\n\n```\nCreated At: 2026-10-31T22:10:23-04:00\nCompleted At: 2026-10-31T22:10:23-04:00\nA1: User Skipped\n```",
+              "tool_calls": null
+            }
+          ]
+        }
+      },
+      "batch2a": {
+        "M2b_mcp_2026": {
+          "rc": 0,
+          "out": "WORD1F98C97D",
+          "err": "",
+          "nonce": "WORD1F98C97D",
+          "nonce_in_out": true,
+          "messages": [
+            {
+              "jsonrpc": "2.0",
+              "id": 1,
+              "method": "server/discover",
+              "params": {
+                "_meta": {
+                  "io.modelcontextprotocol/clientCapabilities": {
+                    "elicitation": {
+                      "form": {},
+                      "url": {}
+                    },
+                    "roots": {
+                      "listChanged": true
+                    }
+                  },
+                  "io.modelcontextprotocol/clientInfo": {
+                    "name": "antigravity-client",
+                    "version": "v1.0.0"
+                  },
+                  "io.modelcontextprotocol/protocolVersion": "2026-07-28"
+                }
+              }
+            },
+            {
+              "jsonrpc": "2.0",
+              "id": 2,
+              "method": "tools/list",
+              "params": {
+                "_meta": {
+                  "io.modelcontextprotocol/clientCapabilities": {
+                    "elicitation": {
+                      "form": {},
+                      "url": {}
+                    },
+                    "roots": {
+                      "listChanged": true
+                    }
+                  },
+                  "io.modelcontextprotocol/clientInfo": {
+                    "name": "antigravity-client",
+                    "version": "v1.0.0"
+                  },
+                  "io.modelcontextprotocol/protocolVersion": "2026-07-28"
+                }
+              }
+            },
+            {
+              "jsonrpc": "2.0",
+              "method": "notifications/roots/list_changed",
+              "params": {}
+            },
+            {
+              "jsonrpc": "2.0",
+              "method": "notifications/roots/list_changed",
+              "params": {}
+            },
+            {
+              "jsonrpc": "2.0",
+              "id": 3,
+              "method": "tools/call",
+              "params": {
+                "_meta": {
+                  "antigravity.google/artifacts_dir": "<probe-root>/probe_m2b_2026/home/.gemini/antigravity-cli/brain/31be05d2-cf34-4bd3-98c0-2781b577bfea",
+                  "antigravity.google/conversation_id": "31be05d2-cf34-4bd3-98c0-2781b577bfea",
+                  "antigravity.google/root_conversation_id": "31be05d2-cf34-4bd3-98c0-2781b577bfea",
+                  "io.modelcontextprotocol/clientCapabilities": {
+                    "elicitation": {
+                      "form": {},
+                      "url": {}
+                    },
+                    "roots": {
+                      "listChanged": true
+                    }
+                  },
+                  "io.modelcontextprotocol/clientInfo": {
+                    "name": "antigravity-client",
+                    "version": "v1.0.0"
+                  },
+                  "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                  "progressToken": "2f7a403e-f837-4523-8080-e2dc55550000:4"
+                },
+                "name": "secret_word_26",
+                "arguments": {}
+              }
+            }
+          ]
+        },
+        "A2b_default_perms": {
+          "rc": 0,
+          "out": "The exact tool output from `ask_question` is:\n\n```text\nCreated At: 2026-10-31T22:13:00-04:00\nCompleted At: 2026-10-31T22:13:00-04:00\nA1: User Skipped\n```",
+          "err": ""
+        },
+        "A2b_defer_decision": {
+          "rc": 0,
+          "out": "Calling `ask_question` resulted in an error during execution:\n\n**Error details:**\n```\nunsupported hook decision: defer\n```\n\nThe tool failed because a hook returned an unsupported decision (`defer`).",
+          "err": "",
+          "log_lines": [
+            "I1031 22:13:04.842405      84 auth_store.go:199] Using file-based secret storage at <probe-root>/probe_a2b_defer_hook/home/.config/antigravity/plugin-secrets.json",
+            "I1031 22:13:04.842419      84 auth_store.go:199] Using file-based secret storage at <probe-root>/probe_a2b_defer_hook/home/.config/antigravity/plugin-secrets.json",
+            "I1031 22:13:04.842850     151 migrate.go:49] Migration marker <probe-root>/probe_a2b_defer_hook/home/.gemini/config/.migrated does not exist. Attempting migration from AppDataDir <probe-root>/probe_a2b_defer_hook/home/.gemini/antigravity-cli.",
+            "I1031 22:13:04.843389     151 migrate.go:157] Migration complete, marked with <probe-root>/probe_a2b_defer_hook/home/.gemini/config/.migrated",
+            "I1031 22:13:04.908119       1 common.go:194] CLI app data directory: <probe-root>/probe_a2b_defer_hook/home/.gemini/antigravity-cli",
+            "I1031 22:13:04.908145       1 server.go:315] Creating CLI server backend: product=antigravity workspaceDirs=[<probe-root>/probe_a2b_defer_hook/workspace] appDataDir=<probe-root>/probe_a2b_defer_hook/home/.gemini/antigravity-cli languageServer=true codeAssist=true",
+            "E1031 22:13:04.909590     249 server.go:3161] Failed to read conversations directory <probe-root>/probe_a2b_defer_hook/home/.gemini/antigravity/conversations: open <probe-root>/probe_a2b_defer_hook/home/.gemini/antigravity/conversations: no such file or directory",
+            "I1031 22:13:04.909975       1 project.go:78] project: created project \"CLI Project\" (id=default-cli-project) at <probe-root>/probe_a2b_defer_hook/home/.gemini/config/projects/default-cli-project.json",
+            "I1031 22:13:04.910049       1 manager.go:499] Initializing CLI store manager for workspace <probe-root>/probe_a2b_defer_hook/workspace",
+            "I1031 22:13:04.910707       1 cli_setting_manager.go:81] config.json not found or unreadable, using CLI settings only: open <probe-root>/probe_a2b_defer_hook/home/.gemini/config/config.json: no such file or directory",
+            "I1031 22:13:04.913533       1 hooks_manager.go:53] loaded 1 named hooks from 1 hooks.json file(s)"
+          ]
+        }
+      },
+      "stream_json_tool_inventory": {
+        "rc": 1,
+        "stdout_tail": "k_permission\",\"ask_question\",\"browser_click_element\",\"browser_drag_pixel_to_pixel\",\"browser_get_dom\",\"browser_get_network_request\",\"browser_input\",\"browser_list_network_requests\",\"browser_mouse_down\",\"browser_mouse_up\",\"browser_move_mouse\",\"browser_press_key\",\"browser_refresh_page\",\"browser_resize_window\",\"browser_scroll\",\"browser_scroll_dom\",\"browser_select_option\",\"browser_subagent\",\"call_mcp_tool\",\"capture_browser_console_logs\",\"capture_browser_screenshot\",\"click_browser_pixel\",\"command_status\",\"define_subagent\",\"delete_knowledge\",\"execute_browser_javascript\",\"find_by_name\",\"finish\",\"generate_image\",\"grep_search\",\"invoke_subagent\",\"list_browser_pages\",\"list_dir\",\"list_permissions\",\"list_plugin_accounts\",\"list_resources\",\"manage_inbox\",\"manage_subagents\",\"manage_task\",\"multi_replace_file_content\",\"notebook_edit\",\"notebook_execution\",\"open_browser_url\",\"read_browser_page\",\"read_resource\",\"read_url_content\",\"replace_file_content\",\"run_command\",\"run_workflow\",\"schedule\",\"search_marketplace\",\"search_web\",\"sed_file\",\"send_command_input\",\"send_message\",\"view_file\",\"wait\",\"wait_5_seconds\",\"write_to_file\"],\"permission_mode\":\"request-review\"}}\n{\"event\":\"result\",\"result\":{\"conversation_id\":\"005069d3-b72b-4cac-96b6-c26f4fa47ff6\",\"status\":\"ERROR\",\"response\":\"\",\"error\":\"stream input message is missing the \\\"event\\\" field\",\"duration_seconds\":0,\"num_turns\":0,\"usage\":{\"input_tokens\":0,\"output_tokens\":0,\"thinking_tokens\":0,\"cache_read_tokens\":0,\"total_tokens\":0},\"finished_reason\":\"error\"}}\n",
+        "stderr_head": "error: stream input message is missing the \"event\" field\n"
+      }
+    },
+    {
+      "id": "agy-wired-hooks-smoke",
+      "mode": "headless agy -p with verbatim agy/hooks.json",
+      "session_start_and_pretooluse": {
+        "rc": 0,
+        "stdout": "profile: personal (identity-mirror.toml [hq].profiles); home: unknown; design docs: in the tree until this project's records move to the records root; gh: <gh-account>; PRs: by-permission \u2014 later layers win: core < profile < this repository's instructions < you. `ops-profile explain` shows every source. | first command succeeded: yes | second command denied by hook: yes",
+        "refresh_ran": true,
+        "step_types": [
+          [
+            "USER_EXPLICIT",
+            "USER_INPUT",
+            "<USER_REQUEST>\nFirst call run_command with CommandLine `echo wired_smoke_ok`. Second call run_command with CommandLine `git commit -m \"x\" --trailer \"Co-Authored"
+          ],
+          [
+            "SYSTEM_SDK",
+            "SYSTEM_MESSAGE",
+            "The following is a <SYSTEM_MESSAGE> not actually sent by the user. It is provided by the system as important information to pay attention to.\n\n<SYSTEM_MESSAGE>\n"
+          ],
+          [
+            "MODEL",
+            "PLANNER_RESPONSE",
+            "None"
+          ],
+          [
+            "MODEL",
+            "GENERIC",
+            "Created At: 2026-10-31T22:41:28-04:00\nCompleted At: 2026-10-31T22:41:28-04:00\nCommand exited with code 0.\n\nCommand output:\nwired_smoke_ok\r\n"
+          ],
+          [
+            "MODEL",
+            "PLANNER_RESPONSE",
+            "None"
+          ],
+          [
+            "MODEL",
+            "GENERIC",
+            "Created At: 2026-10-31T22:41:31-04:00\nCompleted At: 2026-10-31T22:41:31-04:00\nEncountered error in step execution: tool call denied by pre-tool hook: relay-guar"
+          ],
+          [
+            "MODEL",
+            "PLANNER_RESPONSE",
+            "profile: personal (identity-mirror.toml [hq].profiles); home: unknown; design docs: in the tree until this project's records move to the records root; gh: khugh"
+          ]
+        ]
+      },
+      "stop_claim_guard_and_refresh": {
+        "rc": 0,
+        "stdout": "TURN_ONE_DONE\nCLAIM_GUARD_SEEN",
+        "refresh_ran": true,
+        "steps": [
+          [
+            "USER_EXPLICIT",
+            "USER_INPUT",
+            "<USER_REQUEST>\nReply with TURN_ONE_DONE only. If a Stop hook blocks you because of a simulated claim in this bounded hook test, do not run any tools; simply reply CLAIM_GUARD_SEEN "
+          ],
+          [
+            "SYSTEM_SDK",
+            "SYSTEM_MESSAGE",
+            "The following is a <SYSTEM_MESSAGE> not actually sent by the user. It is provided by the system as important information to pay attention to.\n\n<SYSTEM_MESSAGE>\nThe following system"
+          ],
+          [
+            "MODEL",
+            "PLANNER_RESPONSE",
+            "TURN_ONE_DONE"
+          ],
+          [
+            "SYSTEM",
+            "SYSTEM_MESSAGE",
+            "The following is a <SYSTEM_MESSAGE> not actually sent by the user. It is provided by the system as important information to pay attention to.\n\n<SYSTEM_MESSAGE>\nStop hook blocked te"
+          ],
+          [
+            "MODEL",
+            "PLANNER_RESPONSE",
+            "CLAIM_GUARD_SEEN"
+          ]
+        ]
+      }
+    }
+  ]
+}
