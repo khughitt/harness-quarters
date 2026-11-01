@@ -58,7 +58,8 @@ across five tracked files in `hq`, and a sixth file (`.githooks/codex-trust`) is
   cleaner from `harnesses.toml` through `.githooks/harness_state.py`, eliminating parallel
   per-harness constant tables and `runpy.run_path` hook imports across those scripts.
 - Make the clean filter fail closed (`git config filter.harness-state.required true` in
-  `just setup`), actively verify that `filter.harness-state.required == true` against the
+  `just setup`, with the identity `smudge = cat` a required filter needs to check files
+  out (amended during implementation: Ruling 2)), actively verify that `filter.harness-state.required == true` and the smudge against the
   real repository's Git config in `.githooks/pre-commit` and
   `.githooks/harness-state-refresh` (so an existing clone that has not re-run `just setup`
   is caught automatically rather than relying on memory), and validate `harnesses.toml`
@@ -113,7 +114,9 @@ across five tracked files in `hq`, and a sixth file (`.githooks/codex-trust`) is
 
 1. **Fail-closed clean filter with active config verification, `REPO` resolution, rollback, and in-flight lock safety**:
    - `just setup` sets `git config filter.harness-state.required true` alongside
-     `filter.harness-state.clean '.githooks/harness-state-clean %f'`. Without
+     `filter.harness-state.clean '.githooks/harness-state-clean %f'` and
+     `git config filter.harness-state.smudge cat` (amended during implementation: Ruling 2): git treats a required filter
+     with no smudge as fatal on every checkout, and `cat` changes no content. Without
      `required = true`, Git ignores a non-zero exit from `harness-state-clean` and stages
      the raw working-tree file, which would leak `model`, `effortLevel`, `deviceId`,
      `trackingId`, `trustedWorkspaces`, or Codex `[projects.*]` trust tables if
@@ -121,8 +124,10 @@ across five tracked files in `hq`, and a sixth file (`.githooks/codex-trust`) is
      `git pull` on an existing clone, both `.githooks/pre-commit` (reading the real
      repository's `--git-dir`, not the exported staged tree) and
      `.githooks/harness-state-refresh` verify `filter.harness-state.clean` and
-     `filter.harness-state.required == true` via `harness_state.check_filter_config()`,
-     refusing with `run 'just setup'` whenever `required` is unset or `false`.
+     `filter.harness-state.required == true` (and `filter.harness-state.smudge ==
+     EXPECTED_SMUDGE_FILTER`, `cat` (amended during implementation: Ruling 2)) via `harness_state.check_filter_config()`,
+     refusing with `run 'just setup'` whenever `required` is unset or `false` or the
+     smudge differs.
    - Every `.githooks/` tool resolves `HERE = Path(__file__).resolve().parent`,
      `REPO = HERE.parent`, and `MANIFEST_PATH = REPO / "harnesses.toml"`. Because
      `core.hooksPath` (`.githooks`) and `filter.harness-state.clean`
@@ -392,7 +397,8 @@ import path with no `runpy` cycles:
 
 - Constants: `HERE`, `REPO`, `MANIFEST_PATH = REPO / "harnesses.toml"`,
   `GITATTRIBUTES_PATH = REPO / ".gitattributes"`,
-  `EXPECTED_CLEAN_FILTER = ".githooks/harness-state-clean %f"`, `TOML_HEADER`, `TOML_KEY`.
+  `EXPECTED_CLEAN_FILTER = ".githooks/harness-state-clean %f"`,
+  `EXPECTED_SMUDGE_FILTER = "cat"` (amended during implementation: Ruling 2), `TREE_SKIP`, `TOML_HEADER`, `TOML_KEY`.
 - Exception: `ManifestError(ValueError)` carrying `problems: list[str]`.
 - Immutable dataclasses:
   - `TomlKeyRule(table_pattern: str, table_re: re.Pattern[str], keys: tuple[str, ...])`
@@ -415,10 +421,12 @@ import path with no `runpy` cycles:
     is supplied, or `git -C REPO config ...` otherwise; in a linked worktree, Git resolves
     the shared repository config through `commondir`) and raises `ManifestError` unless
     `filter.harness-state.clean == EXPECTED_CLEAN_FILTER` and
-    `git config --bool --get filter.harness-state.required == "true"`, naming
+    `git config --bool --get filter.harness-state.required == "true"` and
+    `filter.harness-state.smudge == EXPECTED_SMUDGE_FILTER` (amended during implementation: Ruling 2), naming
     `run 'just setup'` in the error message.
   - `check_clean_tree(manifest: HarnessManifest, root: Path | None = None) -> None`: walks
-    `root or REPO` (excluding `.git`) and, for every file whose relative POSIX path
+    `root or REPO` (skipping every directory named in `TREE_SKIP`: `.git`, `.worktrees`,
+    `.venv`, `node_modules` and `local`, at any depth (amended during implementation: final review)) and, for every file whose relative POSIX path
     full-matches a `spec.filter_re`, verifies the file is valid UTF-8, parses under
     `clean_for_spec(spec, text)`, and satisfies `clean_for_spec(spec, text) == text`,
     raising `ManifestError` naming `git add --renormalize <path>` on any already-leaked
@@ -442,7 +450,8 @@ import path with no `runpy` cycles:
 
 1. **`justfile` (`just setup`)**:
    - Adds `git config filter.harness-state.required true` immediately after
-     `git config filter.harness-state.clean '.githooks/harness-state-clean %f'`.
+     `git config filter.harness-state.clean '.githooks/harness-state-clean %f'`, and
+     `git config filter.harness-state.smudge cat` (amended during implementation: Ruling 2).
 2. **`.githooks/harness-state-clean`**:
    - Prepends `str(Path(__file__).resolve().parent)` to `sys.path` if missing (so
      `runpy.run_path` callers outside `.githooks/` resolve `import harness_state`), then
@@ -460,6 +469,18 @@ import path with no `runpy` cycles:
      exits non-zero with
      `harness-state-clean: <path> is not a harness config; check .gitattributes`;
      otherwise writes `harness_state.clean_for_spec(matches[0], text)`.
+   - Error contract (amended during implementation: final review): under `required = true` an uncaught exception is fatal to git and
+     prints a traceback, so `main` catches `ValueError` from `clean_for_spec` (invalid
+     JSON, a non-object top level) and exits non-zero with
+     `harness-state-clean: <path>: <error>; fix the file, then retry`; a
+     `harness_state.py` that will not import (`ImportError`, `SyntaxError`, e.g. conflict
+     markers) exits with `harness-state-clean: cannot load .githooks/harness_state.py:
+     <error>; resolve or restore it`. `live-picks`, `codex-trust` and
+     `harness-state-refresh` guard their import the same way: the two Git-hook tools exit
+     `0` in hook mode with the retry notice, and fail with the message otherwise.
+   - Mid-merge or mid-rebase recovery (amended during implementation: final review): `git checkout -- harnesses.toml` fails on an
+     unmerged path; resolve the conflict or run `git merge --abort` /
+     `git rebase --abort`. Never unset `required`.
 3. **`.githooks/harness-state-refresh`**:
    - Does **not** load `harnesses.toml` at import time. Inside `main()`, it drains
      `sys.stdin.read()` first (avoiding `EPIPE` in the calling harness), runs
@@ -536,7 +557,7 @@ import path with no `runpy` cycles:
        `relink_home`, and `adopt_detached` for `"agy/settings.json"` (`AGY_HOME`,
        `AGY_LINK`, `AGY_ANCHORS`) as an explicit home-adoption adapter while updating
        `adopt_detached` to dispatch through `spec` (`merge_picks(spec, saved, h_picks)`
-       and `spec_field(spec)`).
+       and `field(spec)`; the spec's `spec_field` name was left to the builder (amended during implementation: final review)).
 5. **`.githooks/codex-trust`**:
    - Does **not** load `harnesses.toml` at import time. Inside `main(argv)`, after
      validating CLI arguments and `linked_worktree()` (and `rebasing()` on
@@ -548,12 +569,17 @@ import path with no `runpy` cycles:
      `codex-trust hook <event>` prints `codex-trust: <problem>` and
      `codex-trust: trust not restored; the next turn end retries` to stderr and **exits
      `0`**; CLI commands exit non-zero.
+   - Refuses (`codex-trust: harnesses.toml: codex live_state config is ..., not
+     'codex/config.toml'`) when the codex entry's `config` is not `codex/config.toml`,
+     the path `LIVE_NAME` it reads and writes (amended during implementation: final review).
    - Uses `harness_state.TOML_HEADER`, `CODEX_SPEC.trust_table`, and
      `harness_state.clean_for_spec(CODEX_SPEC, ...)` instead of `runpy.run_path`.
 6. **`.githooks/pre-commit`**:
    - Resolves the real repository's absolute Git directory first
      (`real_git_dir = os.path.abspath(git("rev-parse", "--git-dir"))`), exports
-     `staged_tree` once during `main()`, and runs both `facts_check(tree)`
+     `staged_tree` once during `main()` with `-c filter.harness-state.smudge=cat` forced on
+     the `checkout-index` (amended during implementation: Ruling 2) (so the export never depends on the smudge config that
+     `manifest_check` is about to report on), and runs both `facts_check(tree)`
      (`tools/harness-facts check`) and
      `manifest_check(tree, git_dir=real_git_dir)`
      (`python3 <tree>/.githooks/harness_state.py check --git-dir <real_git_dir> --staged-tree`).
@@ -610,7 +636,8 @@ import path with no `runpy` cycles:
 ### 5.5 Behavior changes and compatibility notes
 
 1. **Clean filter fails closed (`filter.harness-state.required = true`) with active enforcement**:
-   `harness-state` defines a `clean` filter (no `smudge` filter). While `harnesses.toml`
+   `harness-state` defines a `clean` filter and an identity `smudge = cat` (amended during implementation: Ruling 2) (git treats
+   a required filter's missing smudge as fatal on checkout). While `harnesses.toml`
    is broken and `required = true`, `git add`, `git diff`, and `git status` (when a
    filtered settings file's working-tree stat differs from the index) fail closed instead
    of staging or diffing unfiltered picks. Recovery requires only fixing `harnesses.toml`
@@ -736,7 +763,7 @@ import path with no `runpy` cycles:
    (`harness_state.py check --git-dir`), and gated `live_state` + `.gitattributes` parity
    in `pre-commit`, while keeping Git `post-*` hooks (`live-picks hook`,
    `codex-trust hook`) exit-`0` on manifest errors via deferred pre-lock loading in
-   `main()`.
+   `main()`. The filter's identity `smudge = cat` is part of the verified config (amended during implementation: Ruling 2).
 3. **True single source for capability facts**: removed `harnesses = [...]` from
    `facts/capabilities.toml`, adding trailing `manifest=None` / `--manifest` to
    `tools/harness-facts` while preserving positional `SourceFileLoader` compatibility and
