@@ -149,12 +149,23 @@ databases elsewhere).
 
 ### session-archive changes
 
-- `Source` gains a capture selector: a predicate on the path relative to the root. Claude
-  Code and Codex select everything (today's behaviour). agy selects only transcripts (below).
+- `Source` gains a capture selector that the walk applies while descending, so a source
+  never scans directories it cannot select from: a directory predicate (descend or not)
+  and a file predicate on the path relative to the root. Claude Code and Codex select
+  everything (today's behaviour). agy selects only transcripts and the summaries database
+  (below), and `agy-summaries` does not descend at all.
+- `Source` gains `append_only` (true for every source today). For a source with
+  `append_only = false`, a changed file that does not extend its mirror replaces the
+  mirror, and the previous mirror is kept under `versions/` by the same atomic rotation
+  `promote` uses; the outcome counts as `copied`, not `diverged`, so `status` keeps
+  `diverged` for real transcript rewrites. The mirror path then always holds the latest
+  copy. Crush and opencode (hq-ce3ab4, hq-aafc2a) reuse this for their databases.
 - Each source is `required` or `optional`. Claude Code and Codex sources are required
   and keep today's rule exactly: a missing or symlinked root aborts the run (exit 2).
 - An optional source (agy) is skipped when its root does not exist (`os.path.lexists`
-  false) and the manifest has never captured that source on this archive. Home presence
+  false) and the manifest has never captured that source on this archive, meaning
+  `manifest.sqlite`'s `versions` table has no row for the source name (not the `runs`
+  table: a run that selected no files is not a capture). Home presence
   is not the test: `just link --apply` creates `~/.gemini/antigravity-cli` for its
   `settings.json` link before agy has ever run, leaving the home present and `brain/`
   absent. Once the manifest holds a capture for the source, a missing root aborts as for
@@ -211,13 +222,16 @@ Facts below were read from this host's store on 2026-11-01 (agy 1.4.12).
     `<id>/.system_generated/logs/transcript.jsonl` and `transcript_full.jsonl`.
     `transcript_full.jsonl` kept its prefix while a live session appended to it (one
     observation over several minutes); a rewrite would still be kept under `versions/`.
-  - `agy-summaries`: root `~/.gemini/antigravity-cli`, selecting only
-    `conversation_summaries.db` (40 KB here, no WAL file beside it). It holds the only
-    copy of each conversation's workspace, title and subagent parent, which an archived
-    transcript needs to be attributed. SQLite rewrites it in place, so each changed
-    capture is a new entry under `versions/`, and a copy that races a write is reported
-    `busy` and retried on the next run, as for any file. (My call: small, and without it
-    an archive re-read cannot recover agy's cwd.)
+  - `agy-summaries`: root `~/.gemini/antigravity-cli`, `append_only = false`, selecting
+    only the top-level file `conversation_summaries.db` (40 KB here, no WAL file beside
+    it) and descending into no directory. It holds the only copy of each conversation's
+    workspace, title and subagent parent, which an archived transcript needs to be
+    attributed. SQLite rewrites it in place, so each changed capture replaces the mirror
+    and keeps the previous copy under `versions/`; a copy that races a write is reported
+    `busy` and retried on the next run, as for any file. Before agy's first run the root
+    exists (the linked home) and the file does not: the source selects nothing and is not
+    skipped, which is harmless. (My call: small, and without it an archive re-read cannot
+    recover agy's cwd.)
   - Not captured, and recorded as a capability fact: `conversations/<id>.db` (agy's
     native SQLite store, 152 MB here, rewritten in place; it holds the per-step model and
     token metadata, and is what `agy --conversation` resumes from); tool outputs too large
@@ -231,7 +245,9 @@ Facts below were read from this host's store on 2026-11-01 (agy 1.4.12).
     the trial, so the default run loses nothing). `show`, `confirm` and `label` take no
     `--harness`: they dispatch every ref by its harness, `agy:` refs included. Making agy
     part of the default run after the readout is a follow-up for obs-f5710b, which owns
-    the tool by then.
+    the tool by then. The stderr summary keeps its keys: `roots` by the short names
+    (`claude`, `codex`, now `agy`) and `files` by the canonical slugs (`claude-code`,
+    `codex`, `agy`), as today; the default run's summary is byte-identical.
   - *Root.* `SESSION_LOGS_AGY` names the agy home (`~/.gemini/antigravity-cli`) by
     default; the reader walks `brain/*/.system_generated/logs/transcript_full.jsonl`.
     An agy transcript is read on its own, with no summaries row needed: a conversation
@@ -251,10 +267,13 @@ Facts below were read from this host's store on 2026-11-01 (agy 1.4.12).
     Three cases the pairing must handle, all seen here:
     1. A `run_command` that outlives `WaitMsBeforeAsync` (75 here, including most
        `tasks start` calls): its `GENERIC` step has `status: RUNNING` and content naming
-       `background task with task id: <bg-id>`. Its result text and time come from the
-       later `SYSTEM_MESSAGE` whose content names `sender=<bg-id>` and `finished with
-       result:`. Until that message exists the result is absent, as for a Claude or
-       Codex call with no result yet.
+       `background task with task id: <bg-id>`. Its result comes from the later
+       `SYSTEM_MESSAGE` naming `sender=<bg-id>`: `finished with result:` gives the result
+       text and time; `Task id "<bg-id>" was canceled with result:` (an agent stopping it
+       with `manage_task`; 3 conversations here) is an error result, like case 2. Daemon
+       commands (`IsDaemon`) and early-cancelled `schedule` timers may never get such a
+       message; until one exists the result is absent, as for a Claude or Codex call with
+       no result yet, so an anchor on it stays unconfirmed.
     2. A `GENERIC` step with `status: ERROR` (29 here; content `Encountered error in step
        execution: …`) is an error result: `attribute` and `_confirm` treat it as they
        treat an error line today, never as a match.
@@ -263,12 +282,15 @@ Facts below were read from this host's store on 2026-11-01 (agy 1.4.12).
   - *Turn and outcome.* A turn runs from a human `USER_INPUT` to the step before the next
     one, spanning the controller-wake `SYSTEM_MESSAGE` steps (`[Message] … sender=…`)
     and the planner steps they trigger. Outcome uses the existing vocabulary
-    (`completed`, `wait`, `interrupted`, `unknown`) with the Claude reader's rules for
-    pending calls: `wait` when the only pending calls are `ask_question` (added to
-    `WAIT_TOOLS`); `unknown` when the turn ends with other unpaired calls, a background
-    task with no result yet, or an `ERROR_MESSAGE` as its last step; otherwise
-    `completed`. agy marks no user interrupt that was seen here, so `interrupted` is
-    unused unless the builder finds one.
+    (`completed`, `wait`, `interrupted`, `unknown`) and, like `_claude_turn`, is judged
+    from the turn's tail, never from background work started earlier in it: `completed`
+    when the last step is a `PLANNER_RESPONSE` with text and no tool calls; `wait` when
+    the last `PLANNER_RESPONSE`'s unpaired calls are only `ask_question` (added to
+    `WAIT_TOOLS`); `unknown` when the turn ends on other unpaired calls, a `GENERIC` step
+    with no `PLANNER_RESPONSE` after it, or an `ERROR_MESSAGE`. A turn that starts a
+    background command and ends by telling the user is `completed`, as in Claude Code.
+    agy marks no user interrupt that was seen here, so `interrupted` is unused unless
+    the builder finds one.
   - *Provenance.* `agy:<conversation-id>` (tasks-75a0fe).
 - **session-logs skill.** A Stores row and record shapes for agy, its human-or-injected
   markers, and how to find the session behind a task id, worktree or commit.
