@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-11-01T08:44:46Z
-updated: 2026-11-01T16:09:27Z
+updated: 2026-11-01T16:09:28Z
 started: 2026-11-01T16:09:11Z
 depends: [tasks-ba29d3, fam-55f1af]
 tags: [hooks, cross-project]
@@ -37,3 +37,4 @@ Where: relay/, agy/hooks.json, agy/hook, tools/test_agy_hooks.py, tools/test_cla
 - 2026-11-01T15:18:05Z (main): familiar side landed (fam-55f1af, familiar main c037b11): familiar accepts agy rows. The entry hq's subscribers template needs is setupDocument('relay', bin, { agy: true })'s familiar-agy: role observer, harnesses [agy], kinds [session-start, before-tool, turn-end], argv [<familiar>/bin/familiar, observe], timeoutMs 2000. No reconcile kind (the familiar entry already receives reconcile). agy PreToolUse --outer-ms must stay at least 8000 with this entry, or relay's budget refuses every agy tool call. fam-8244b1 makes it familiar's default output.
 - 2026-11-01T16:09:11Z (main): started
 - 2026-11-01T16:09:27Z (main): trial: flow-trial-1 — enrolled — flow on
+- 2026-11-01T16:09:28Z (main): arm: flow-trial-1 — unit tack-8af61d — flow on
