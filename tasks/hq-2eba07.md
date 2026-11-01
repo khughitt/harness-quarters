@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-2eba07-harness-manifest
 created: 2026-11-01T01:25:51Z
-updated: 2026-11-01T09:56:11Z
+updated: 2026-11-01T09:56:27Z
 started: 2026-11-01T09:55:45Z
 depends: []
 tags: [hooks]
@@ -32,3 +32,4 @@ Where: .githooks/{harness-state-clean,harness-state-refresh,live-picks}, facts/c
   provenance: {"origin":"mixed"}
 - 2026-11-01T09:55:45Z (main): started
 - 2026-11-01T09:56:11Z (feat/hq-2eba07-harness-manifest): resumed
+- 2026-11-01T09:56:27Z (feat/hq-2eba07-harness-manifest): trial: flow-trial-1 — enrolled — flow off
