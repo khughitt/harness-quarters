@@ -1,0 +1,102 @@
+{
+  "harness": "claude-code",
+  "version": "2.1.316",
+  "evidence": "hq-fe672f",
+  "run": "claude/probes/turn-pause-probe.py run cron",
+  "tool": "CronCreate",
+  "records": [
+    {
+      "event": "PreToolUse",
+      "denied_by_probe": false,
+      "payload": {
+        "session_id": "7f0c44c1-4c1f-40da-9a15-aa0917fa0728",
+        "transcript_path": "<scratch>/claude-cron-1/config/projects/<scratch-slug>-claude-cron-1-work/7f0c44c1-4c1f-40da-9a15-aa0917fa0728.jsonl",
+        "cwd": "<scratch>/claude-cron-1/work",
+        "prompt_id": "914defd5-5d69-47f6-bd1d-0210e7368c89",
+        "permission_mode": "bypassPermissions",
+        "effort": {
+          "level": "medium"
+        },
+        "hook_event_name": "PreToolUse",
+        "tool_name": "CronCreate",
+        "tool_input": {
+          "cron": "* * * * *",
+          "prompt": "Reply with the single word CRONFIRED, then delete this cron job with CronDelete.",
+          "recurring": true
+        },
+        "tool_use_id": "toolu_012MYg5yUhE1n8tho9oE3mZz"
+      }
+    },
+    {
+      "event": "PostToolUse",
+      "denied_by_probe": false,
+      "payload": {
+        "session_id": "7f0c44c1-4c1f-40da-9a15-aa0917fa0728",
+        "transcript_path": "<scratch>/claude-cron-1/config/projects/<scratch-slug>-claude-cron-1-work/7f0c44c1-4c1f-40da-9a15-aa0917fa0728.jsonl",
+        "cwd": "<scratch>/claude-cron-1/work",
+        "prompt_id": "914defd5-5d69-47f6-bd1d-0210e7368c89",
+        "permission_mode": "bypassPermissions",
+        "effort": {
+          "level": "medium"
+        },
+        "hook_event_name": "PostToolUse",
+        "tool_name": "CronCreate",
+        "tool_input": {
+          "cron": "* * * * *",
+          "prompt": "Reply with the single word CRONFIRED, then delete this cron job with CronDelete.",
+          "recurring": true
+        },
+        "tool_response": {
+          "id": "8c941349",
+          "humanSchedule": "Every minute",
+          "recurring": true,
+          "durable": false,
+          "nextFireAt": 1793539756474.0334
+        },
+        "tool_use_id": "toolu_012MYg5yUhE1n8tho9oE3mZz",
+        "duration_ms": 1
+      }
+    },
+    {
+      "event": "Stop",
+      "denied_by_probe": false,
+      "payload": {
+        "session_id": "7f0c44c1-4c1f-40da-9a15-aa0917fa0728",
+        "transcript_path": "<scratch>/claude-cron-1/config/projects/<scratch-slug>-claude-cron-1-work/7f0c44c1-4c1f-40da-9a15-aa0917fa0728.jsonl",
+        "cwd": "<scratch>/claude-cron-1/work",
+        "prompt_id": "914defd5-5d69-47f6-bd1d-0210e7368c89",
+        "permission_mode": "bypassPermissions",
+        "effort": {
+          "level": "medium"
+        },
+        "hook_event_name": "Stop",
+        "stop_hook_active": false,
+        "last_assistant_message": "WAITING",
+        "background_tasks": [
+          {
+            "id": "b7od2qy27",
+            "type": "shell",
+            "status": "running",
+            "description": "Sleep 150 seconds in background",
+            "command": "sleep 150"
+          }
+        ],
+        "session_crons": [
+          {
+            "id": "8c941349",
+            "schedule": "* * * * *",
+            "recurring": true,
+            "prompt": "Reply with the single word CRONFIRED, then delete this cron job with CronDelete."
+          },
+          {
+            "id": "a1de64e1",
+            "schedule": "30 8 * * *",
+            "recurring": false,
+            "prompt": "Reply with the single word WOKE."
+          }
+        ]
+      }
+    }
+  ],
+  "note": "CronCreate PostToolUse tool_response: {id, humanSchedule, recurring, durable, nextFireAt (epoch ms)}; the job id is id. Stop payloads list the session's jobs in session_crons ({id, schedule, recurring, prompt}). This recurring every-minute job never fired in the 170 s the headless session stayed alive."
+}

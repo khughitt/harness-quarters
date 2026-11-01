@@ -9,7 +9,10 @@ one JSON line {event, hook_event_name, t, payload, denied} to $TURN_PAUSE_PROBE_
 PreToolUse, $TURN_PAUSE_PROBE_DENY holds comma-separated tool-name patterns (fnmatch;
 a bare name matches only itself): the first call matching each pattern is refused with
 relay's PreToolUse deny JSON, whose reason carries a nonce (TPP-DENY-<n>) and asks the
-model to retry, and every later match is let through. The hook never exits 2.
+model to retry, and every later match is let through. A pattern written agent:<pattern>
+matches only a subagent's call (one whose payload carries agent_id), and !<pattern> refuses
+every match rather than the first. A name matching $TURN_PAUSE_PROBE_ALLOW is never refused.
+The hook never exits 2.
 
 As a driver (`turn-pause-probe.py run <case> <out-dir>`), it runs one headless session
 in OUT-DIR with a temporary HOME and CLAUDE_CONFIG_DIR, project setting sources only, no
@@ -25,12 +28,18 @@ environment. Cases:
   main     the scripted probe: a refused-then-retried Bash, Write and background Agent,
            then a background Bash and an immediate turn end (wake check). 2.1.316 offers no
            wait tool (no TaskOutput): a background agent reports by notification
+  cron     CronCreate (every minute) and ScheduleWakeup (60 s), a foreground subagent whose
+           first Bash is refused, and a background sleep that keeps the session alive while
+           they fire
+  cron2    a one-shot cron pinned two minutes ahead and a far-future cron deleted at once
+           (the cron run's recurring job never fired)
   compact  one turn, then `/compact` on the resumed session
 
 Each run writes stream.jsonl (stdout), stderr.txt, hooks.jsonl, settings.json and
 run.json (command shape, exit status, wall time). `turn-pause-probe.py summarize <out-dir>`
 prints one line per hook event. The model is claude-haiku-5-5; a run costs cents.
 """
+import datetime
 import fcntl
 import fnmatch
 import http.client
@@ -75,8 +84,18 @@ def hook(event):
             name = str(payload.get("tool_name") or "")
             used_path = pathlib.Path(log + ".denied")
             used = set(used_path.read_text().split()) if used_path.exists() else set()
+            allowed = [p for p in os.environ.get("TURN_PAUSE_PROBE_ALLOW", "").split(",") if p]
             for index, pattern in enumerate(patterns):
-                if pattern not in used and fnmatch.fnmatchcase(name, pattern):
+                if any(fnmatch.fnmatchcase(name, allow) for allow in allowed):
+                    break
+                # !<pattern> denies every match, not only the first; agent:<pattern> matches
+                # only a worker's call (one carrying agent_id).
+                always = pattern.startswith("!")
+                bare = pattern.removeprefix("!")
+                if bare.startswith("agent:") and not payload.get("agent_id"):
+                    continue
+                bare = bare.removeprefix("agent:")
+                if (always or pattern not in used) and fnmatch.fnmatchcase(name, bare):
                     used.add(pattern)
                     used_path.write_text("\n".join(sorted(used)) + "\n")
                     reply = deny_reply(name, index)
@@ -148,6 +167,29 @@ MAIN_PROMPT = """This is a scripted hook probe in a scratch directory. Do exactl
 5. Then end your turn at once by replying with the single word WAITING. When you are later told that the agent and the background command have finished, reply with the single word DONE."""
 
 
+# Scheduled wakes and a subagent's own refused call. A recurring every-minute cron and a
+# 60 s ScheduleWakeup are set, a foreground subagent's first Bash is refused (agent:Bash),
+# and a background sleep keeps the headless session alive long enough for both to fire.
+CRON_PROMPT = """This is a scripted hook probe in a scratch directory. Do exactly these steps, in order, one tool call at a time. Never retry a call that is refused or fails: note its result and go on.
+1. Use ToolSearch with query "select:CronCreate,CronDelete,ScheduleWakeup" and max_results 3.
+2. Use CronCreate with cron "* * * * *", recurring true, and prompt: Reply with the single word CRONFIRED, then delete this cron job with CronDelete.
+3. Use ScheduleWakeup with delaySeconds 60, reason "probe wake", prompt "Reply with the single word WOKE.", and noop false.
+4. Use the Agent tool once, foreground (run_in_background false), subagent_type general-purpose, description "probe child", prompt: Use the Bash tool once to run: touch subagent-side-effect.txt . If it is refused, do not retry; reply with the refusal message verbatim.
+5. Use the Bash tool with run_in_background true to run: sleep 150
+6. End your turn at once by replying with the single word WAITING. Each later message that arrives is a separate turn: do what it asks."""
+
+
+# Second cron run: the cron run's recurring every-minute job never fired in 170 s. Here a
+# one-shot job pinned two minutes ahead (local time), and a far-future job deleted at once.
+CRON2_PROMPT = """This is a scripted hook probe in a scratch directory. Do exactly these steps, in order, one tool call at a time. Never retry a call that is refused or fails: note its result and go on.
+1. Use ToolSearch with query "select:CronCreate,CronDelete" and max_results 2.
+2. Use CronCreate with cron "<pinned>", recurring false, and prompt: Reply with the single word CRONFIRED.
+3. Use CronCreate with cron "7 3 1 1 *", recurring true, and prompt: Reply with the single word NEVER.
+4. Use CronDelete with the id that step 3 returned.
+5. Use the Bash tool with run_in_background true to run: sleep 200
+6. End your turn at once by replying with the single word WAITING. Each later message that arrives is a separate turn: do what it asks."""
+
+
 def build_settings(out):
     command = f"python3 {SELF} hook"
     hooks = {}
@@ -161,14 +203,14 @@ def build_settings(out):
     return path
 
 
-def environment(out, deny):
+def environment(out, deny, allow=""):
     key = os.environ.get("ANTHROPIC_API_KEY")
     if not key:
         raise SystemExit("ANTHROPIC_API_KEY is not set; the probe authenticates with it")
     env = {"PATH": os.environ["PATH"], "HOME": str(out / "home"), "CLAUDE_CONFIG_DIR": str(out / "config"),
            "USER": os.environ.get("USER", "probe"), "LANG": "C.UTF-8", "TERM": "dumb",
            "ANTHROPIC_API_KEY": key, "TURN_PAUSE_PROBE_LOG": str(out / "hooks.jsonl"),
-           "TURN_PAUSE_PROBE_DENY": deny}
+           "TURN_PAUSE_PROBE_DENY": deny, "TURN_PAUSE_PROBE_ALLOW": allow}
     return env
 
 
@@ -242,6 +284,15 @@ def run(case, out):
                 runs.append(claude(out, env, settings, prompt, ["--disable-slash-commands", "--max-turns", "2"], "-search"))
         finally:
             server.shutdown()
+    elif case == "cron":
+        env = environment(out, "agent:Bash")
+        runs.append(claude(out, env, settings, CRON_PROMPT, ["--disable-slash-commands"], "", timeout=900))
+    elif case == "cron2":
+        env = environment(out, "")
+        fire = datetime.datetime.now() + datetime.timedelta(minutes=2)
+        pinned = f"{fire.minute} {fire.hour} {fire.day} {fire.month} *"
+        runs.append(claude(out, env, settings, CRON2_PROMPT.replace("<pinned>", pinned), ["--disable-slash-commands"],
+                           "", timeout=900))
     elif case == "compact":
         env = environment(out, "")
         runs.append(claude(out, env, settings, "Reply with the single word ready. Use no tools.",

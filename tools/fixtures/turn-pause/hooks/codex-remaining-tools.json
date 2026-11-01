@@ -1,0 +1,304 @@
+{
+  "harness": "codex",
+  "version": "0.166.0",
+  "evidence": "hq-fe672f",
+  "runs": [
+    "codex/probes/turn-pause-probe.py run all-tools",
+    "codex/probes/turn-pause-probe.py run all-tools-rest"
+  ],
+  "records": [
+    {
+      "run": "all-tools (all-tools)",
+      "denied_by_probe": true,
+      "payload": {
+        "session_id": "01a19747-7473-7953-b535-24b881483e36",
+        "turn_id": "01a19747-7ecb-7d82-801d-58b36592c4d8",
+        "transcript_path": "<scratch>/codex-all-tools-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-23-27-01a19747-7473-7953-b535-24b881483e36.jsonl",
+        "cwd": "<scratch>/codex-all-tools-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "collaborationsend_message",
+        "tool_input": {
+          "target": "probe_worker",
+          "message": "<encrypted>"
+        },
+        "tool_use_id": "call_54c1cfd365b543c483d4da720acd07a7"
+      }
+    },
+    {
+      "run": "all-tools (all-tools)",
+      "denied_by_probe": true,
+      "payload": {
+        "session_id": "01a19747-7473-7953-b535-24b881483e36",
+        "turn_id": "01a19747-7ecb-7d82-801d-58b36592c4d8",
+        "transcript_path": "<scratch>/codex-all-tools-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-23-27-01a19747-7473-7953-b535-24b881483e36.jsonl",
+        "cwd": "<scratch>/codex-all-tools-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "collaborationfollowup_task",
+        "tool_input": {
+          "target": "probe_worker",
+          "message": "<encrypted>"
+        },
+        "tool_use_id": "call_298e70fd1a024570844720354a52e819"
+      }
+    },
+    {
+      "run": "all-tools (all-tools)",
+      "denied_by_probe": true,
+      "payload": {
+        "session_id": "01a19747-7473-7953-b535-24b881483e36",
+        "turn_id": "01a19747-7ecb-7d82-801d-58b36592c4d8",
+        "transcript_path": "<scratch>/codex-all-tools-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-23-27-01a19747-7473-7953-b535-24b881483e36.jsonl",
+        "cwd": "<scratch>/codex-all-tools-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "collaborationlist_agents",
+        "tool_input": {},
+        "tool_use_id": "call_698774912e784a49867f330d0e187c36"
+      }
+    },
+    {
+      "run": "all-tools (all-tools)",
+      "denied_by_probe": true,
+      "payload": {
+        "session_id": "01a19747-7473-7953-b535-24b881483e36",
+        "turn_id": "01a19747-7ecb-7d82-801d-58b36592c4d8",
+        "transcript_path": "<scratch>/codex-all-tools-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-23-27-01a19747-7473-7953-b535-24b881483e36.jsonl",
+        "cwd": "<scratch>/codex-all-tools-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "request_user_input_async",
+        "tool_input": {
+          "questions": [
+            {
+              "title": "Pick one",
+              "options": [
+                "A (Recommended)",
+                "B"
+              ]
+            }
+          ]
+        },
+        "tool_use_id": "call_81d0f3fe62034906bac9e2d092bb312a"
+      }
+    },
+    {
+      "run": "all-tools (all-tools)",
+      "denied_by_probe": true,
+      "payload": {
+        "session_id": "01a19747-7473-7953-b535-24b881483e36",
+        "turn_id": "01a19747-7ecb-7d82-801d-58b36592c4d8",
+        "transcript_path": "<scratch>/codex-all-tools-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-23-27-01a19747-7473-7953-b535-24b881483e36.jsonl",
+        "cwd": "<scratch>/codex-all-tools-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "clocksleep",
+        "tool_input": {
+          "duration_ms": 1000
+        },
+        "tool_use_id": "call_9fd71bd5f28b463485700c5e4697bb4c"
+      }
+    },
+    {
+      "run": "all-tools (all-tools)",
+      "denied_by_probe": true,
+      "payload": {
+        "session_id": "01a19747-7473-7953-b535-24b881483e36",
+        "turn_id": "01a19747-7ecb-7d82-801d-58b36592c4d8",
+        "transcript_path": "<scratch>/codex-all-tools-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-23-27-01a19747-7473-7953-b535-24b881483e36.jsonl",
+        "cwd": "<scratch>/codex-all-tools-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "clockcurr_time",
+        "tool_input": {},
+        "tool_use_id": "exec-f5846b66-68d1-44b3-911f-d3e188f900ec"
+      }
+    },
+    {
+      "run": "all-tools (all-tools)",
+      "denied_by_probe": true,
+      "payload": {
+        "session_id": "01a19747-7473-7953-b535-24b881483e36",
+        "turn_id": "01a19747-7ecb-7d82-801d-58b36592c4d8",
+        "transcript_path": "<scratch>/codex-all-tools-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-23-27-01a19747-7473-7953-b535-24b881483e36.jsonl",
+        "cwd": "<scratch>/codex-all-tools-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "webrun",
+        "tool_input": {
+          "search_query": [
+            {
+              "q": "example"
+            }
+          ]
+        },
+        "tool_use_id": "exec-3beae82c-fedc-4119-b8fc-bee1d99b06f5"
+      }
+    },
+    {
+      "run": "all-tools (all-tools)",
+      "denied_by_probe": true,
+      "payload": {
+        "session_id": "01a19747-7473-7953-b535-24b881483e36",
+        "turn_id": "01a19747-7ecb-7d82-801d-58b36592c4d8",
+        "transcript_path": "<scratch>/codex-all-tools-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-23-27-01a19747-7473-7953-b535-24b881483e36.jsonl",
+        "cwd": "<scratch>/codex-all-tools-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "get_goal",
+        "tool_input": {},
+        "tool_use_id": "exec-a678853b-01a8-49fa-ae13-b5dced15beaa"
+      }
+    },
+    {
+      "run": "all-tools (all-tools)",
+      "denied_by_probe": true,
+      "payload": {
+        "session_id": "01a19747-7473-7953-b535-24b881483e36",
+        "turn_id": "01a19747-7ecb-7d82-801d-58b36592c4d8",
+        "transcript_path": "<scratch>/codex-all-tools-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-23-27-01a19747-7473-7953-b535-24b881483e36.jsonl",
+        "cwd": "<scratch>/codex-all-tools-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "create_goal",
+        "tool_input": {
+          "objective": "Probe goal: nothing to do.",
+          "token_budget": 1000
+        },
+        "tool_use_id": "exec-ceb285cf-6421-4748-aaeb-8792e661c7b8"
+      }
+    },
+    {
+      "run": "all-tools (all-tools)",
+      "denied_by_probe": true,
+      "payload": {
+        "session_id": "01a19747-7473-7953-b535-24b881483e36",
+        "turn_id": "01a19747-7ecb-7d82-801d-58b36592c4d8",
+        "transcript_path": "<scratch>/codex-all-tools-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-23-27-01a19747-7473-7953-b535-24b881483e36.jsonl",
+        "cwd": "<scratch>/codex-all-tools-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "update_goal",
+        "tool_input": {
+          "status": "complete"
+        },
+        "tool_use_id": "exec-40e5e61a-adc3-4b2d-b09b-b219ef9c45b7"
+      }
+    },
+    {
+      "run": "all-tools (all-tools)",
+      "denied_by_probe": true,
+      "payload": {
+        "session_id": "01a19747-7473-7953-b535-24b881483e36",
+        "turn_id": "01a19747-7ecb-7d82-801d-58b36592c4d8",
+        "transcript_path": "<scratch>/codex-all-tools-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-23-27-01a19747-7473-7953-b535-24b881483e36.jsonl",
+        "cwd": "<scratch>/codex-all-tools-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "view_image",
+        "tool_input": {
+          "path": "<scratch>/codex-all-tools-1/work/probe.png"
+        },
+        "tool_use_id": "exec-3dae029e-04f5-470c-ad8b-01543eaa7e86"
+      }
+    },
+    {
+      "run": "all-tools (all-tools)",
+      "denied_by_probe": true,
+      "payload": {
+        "session_id": "01a19747-7473-7953-b535-24b881483e36",
+        "turn_id": "01a19747-7ecb-7d82-801d-58b36592c4d8",
+        "transcript_path": "<scratch>/codex-all-tools-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-23-27-01a19747-7473-7953-b535-24b881483e36.jsonl",
+        "cwd": "<scratch>/codex-all-tools-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "list_mcp_resources",
+        "tool_input": {},
+        "tool_use_id": "exec-22b05202-e33b-42a5-b3c1-2782aa5ffcb3"
+      }
+    },
+    {
+      "run": "all-tools (all-tools)",
+      "denied_by_probe": true,
+      "payload": {
+        "session_id": "01a19747-7473-7953-b535-24b881483e36",
+        "turn_id": "01a19747-7ecb-7d82-801d-58b36592c4d8",
+        "transcript_path": "<scratch>/codex-all-tools-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-23-27-01a19747-7473-7953-b535-24b881483e36.jsonl",
+        "cwd": "<scratch>/codex-all-tools-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "list_mcp_resource_templates",
+        "tool_input": {},
+        "tool_use_id": "exec-a8804159-88bf-4004-8862-7074ab47aaa9"
+      }
+    },
+    {
+      "run": "all-tools (all-tools-rest)",
+      "denied_by_probe": true,
+      "payload": {
+        "session_id": "01a19749-6e2d-7141-ba58-5c577e6b6aa5",
+        "turn_id": "01a19749-77d9-79c3-b70a-5b59c01ba882",
+        "transcript_path": "<scratch>/codex-all-tools-2/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-25-36-01a19749-6e2d-7141-ba58-5c577e6b6aa5.jsonl",
+        "cwd": "<scratch>/codex-all-tools-2/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "request_user_input",
+        "tool_input": {
+          "questions": [
+            {
+              "header": "Probe",
+              "id": "probe",
+              "question": "Pick one",
+              "options": [
+                {
+                  "label": "A (Recommended)",
+                  "description": "Alpha"
+                },
+                {
+                  "label": "B",
+                  "description": "Beta"
+                }
+              ]
+            }
+          ]
+        },
+        "tool_use_id": "call_ccedf37092f7441f9c404601ff785ea9"
+      }
+    },
+    {
+      "run": "all-tools (all-tools-rest)",
+      "denied_by_probe": true,
+      "payload": {
+        "session_id": "01a19749-6e2d-7141-ba58-5c577e6b6aa5",
+        "turn_id": "01a19749-77d9-79c3-b70a-5b59c01ba882",
+        "transcript_path": "<scratch>/codex-all-tools-2/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-25-36-01a19749-6e2d-7141-ba58-5c577e6b6aa5.jsonl",
+        "cwd": "<scratch>/codex-all-tools-2/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "read_mcp_resource",
+        "tool_input": {
+          "server": "codex_apps",
+          "uri": "none://probe"
+        },
+        "tool_use_id": "exec-babba64f-b5bb-4e09-8a81-f17297ba69d2"
+      }
+    }
+  ],
+  "note": "One PreToolUse per remaining tool, each refused by the probe (deny !*) so none ran. Nested tools carry tool_use_id exec-<uuid>; function tools call_<hex>. Namespaced tools are named namespace plus tool with no separator (clocksleep, clockcurr_time, webrun, collaborationsend_message); others keep their names. send_message and followup_task messages arrive encrypted."
+}

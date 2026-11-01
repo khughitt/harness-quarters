@@ -1,0 +1,115 @@
+{
+  "harness": "claude-code",
+  "version": "2.1.316",
+  "evidence": "hq-fe672f",
+  "run": "claude/probes/turn-pause-probe.py run cron",
+  "tool": "ScheduleWakeup",
+  "records": [
+    {
+      "event": "PreToolUse",
+      "denied_by_probe": false,
+      "payload": {
+        "session_id": "7f0c44c1-4c1f-40da-9a15-aa0917fa0728",
+        "transcript_path": "<scratch>/claude-cron-1/config/projects/<scratch-slug>-claude-cron-1-work/7f0c44c1-4c1f-40da-9a15-aa0917fa0728.jsonl",
+        "cwd": "<scratch>/claude-cron-1/work",
+        "prompt_id": "914defd5-5d69-47f6-bd1d-0210e7368c89",
+        "permission_mode": "bypassPermissions",
+        "effort": {
+          "level": "medium"
+        },
+        "hook_event_name": "PreToolUse",
+        "tool_name": "ScheduleWakeup",
+        "tool_input": {
+          "delaySeconds": 60,
+          "reason": "probe wake",
+          "prompt": "Reply with the single word WOKE.",
+          "noop": false
+        },
+        "tool_use_id": "toolu_01Lq76RhqLo6mihXYp6bRme3"
+      }
+    },
+    {
+      "event": "PostToolUse",
+      "denied_by_probe": false,
+      "payload": {
+        "session_id": "7f0c44c1-4c1f-40da-9a15-aa0917fa0728",
+        "transcript_path": "<scratch>/claude-cron-1/config/projects/<scratch-slug>-claude-cron-1-work/7f0c44c1-4c1f-40da-9a15-aa0917fa0728.jsonl",
+        "cwd": "<scratch>/claude-cron-1/work",
+        "prompt_id": "914defd5-5d69-47f6-bd1d-0210e7368c89",
+        "permission_mode": "bypassPermissions",
+        "effort": {
+          "level": "medium"
+        },
+        "hook_event_name": "PostToolUse",
+        "tool_name": "ScheduleWakeup",
+        "tool_input": {
+          "delaySeconds": 60,
+          "reason": "probe wake",
+          "prompt": "Reply with the single word WOKE.",
+          "noop": false
+        },
+        "tool_response": {
+          "scheduledFor": 1793539800000,
+          "clampedDelaySeconds": 60,
+          "wasClamped": false
+        },
+        "tool_use_id": "toolu_01Lq76RhqLo6mihXYp6bRme3",
+        "duration_ms": 1
+      }
+    },
+    {
+      "event": "Stop",
+      "denied_by_probe": false,
+      "payload": {
+        "session_id": "7f0c44c1-4c1f-40da-9a15-aa0917fa0728",
+        "transcript_path": "<scratch>/claude-cron-1/config/projects/<scratch-slug>-claude-cron-1-work/7f0c44c1-4c1f-40da-9a15-aa0917fa0728.jsonl",
+        "cwd": "<scratch>/claude-cron-1/work",
+        "prompt_id": "914defd5-5d69-47f6-bd1d-0210e7368c89",
+        "permission_mode": "bypassPermissions",
+        "effort": {
+          "level": "medium"
+        },
+        "hook_event_name": "Stop",
+        "stop_hook_active": false,
+        "last_assistant_message": "WAITING",
+        "background_tasks": [
+          {
+            "id": "b7od2qy27",
+            "type": "shell",
+            "status": "running",
+            "description": "Sleep 150 seconds in background",
+            "command": "sleep 150"
+          }
+        ],
+        "session_crons": [
+          {
+            "id": "8c941349",
+            "schedule": "* * * * *",
+            "recurring": true,
+            "prompt": "Reply with the single word CRONFIRED, then delete this cron job with CronDelete."
+          },
+          {
+            "id": "a1de64e1",
+            "schedule": "30 8 * * *",
+            "recurring": false,
+            "prompt": "Reply with the single word WOKE."
+          }
+        ]
+      }
+    },
+    {
+      "event": "UserPromptSubmit",
+      "denied_by_probe": false,
+      "payload": {
+        "session_id": "7f0c44c1-4c1f-40da-9a15-aa0917fa0728",
+        "transcript_path": "<scratch>/claude-cron-1/config/projects/<scratch-slug>-claude-cron-1-work/7f0c44c1-4c1f-40da-9a15-aa0917fa0728.jsonl",
+        "cwd": "<scratch>/claude-cron-1/work",
+        "prompt_id": "a7a57c8d-674c-4a5a-a28a-353a5d5f548e",
+        "permission_mode": "bypassPermissions",
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "Reply with the single word WOKE."
+      }
+    }
+  ],
+  "note": "Called outside /loop in a headless -p session, ScheduleWakeup was accepted (tool_response {scheduledFor, clampedDelaySeconds, wasClamped}) and stored as a one-shot session cron (session_crons entry with the wake prompt). It fired 60 s later as a new turn whose UserPromptSubmit prompt is the wake prompt verbatim, with nothing marking it as a wake."
+}
