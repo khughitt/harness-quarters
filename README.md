@@ -207,7 +207,8 @@ MIT licensed; see `LICENSE`.
   home's settings and hooks files are symlinks to them: `~/.claude` and `~/.codex` to the
   plain files, `~/.codex-work` to `codex/work/hooks.json`, `~/.gemini/antigravity-cli` to
   `agy/settings.json`, and `~/.gemini/config` to `agy/hooks.json`, `agy/skills.json`
-  (pointing `agy` at `~/.agents/skills`) and lore's `AGENTS.md`. `agy/hook` adapts
+  (pointing `agy` at `~/.agents/skills` via `{"path": "../../.agents/skills"}`; `agy`
+  does not expand `~/` in `skills.json`) and lore's `AGENTS.md`. `agy/hook` adapts
   `agy/hooks.json`'s `SessionStart`, `PreToolUse` and `Stop` events to lore's profile
   hook, ops's capture notice and relay guard, and a one-shot `agy` claim check.
 - `claude/mods/`: Claude Code function-hook plugins, linked as `~/.claude/mods` and

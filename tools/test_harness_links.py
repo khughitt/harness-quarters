@@ -1,6 +1,7 @@
 """harness-links converges home links from links.toml and never overwrites data."""
 import importlib.machinery
 import importlib.util
+import json
 import os
 import shutil
 import subprocess
@@ -362,7 +363,15 @@ def test_real_manifest_links_agy_and_agy_config_when_homes_exist(tmp_path):
     assert (home / ".gemini/antigravity-cli/settings.json").resolve() == (clone / "agy/settings.json").resolve()
     assert (home / ".gemini/config/AGENTS.md").resolve() == (tmp_path / "lore/instructions/AGENTS.md").resolve()
     assert (home / ".gemini/config/hooks.json").resolve() == (clone / "agy/hooks.json").resolve()
-    assert (home / ".gemini/config/skills.json").resolve() == (clone / "agy/skills.json").resolve()
+    skills_manifest = home / ".gemini/config/skills.json"
+    assert skills_manifest.resolve() == (clone / "agy/skills.json").resolve()
+    entries = json.loads(skills_manifest.read_text())["entries"]
+    assert entries and all(not entry["path"].startswith("~") and not os.path.isabs(entry["path"])
+                           for entry in entries)
+    resolved_dirs = [Path(os.path.normpath(skills_manifest.parent / entry["path"]))
+                     for entry in entries]
+    assert resolved_dirs == [home / ".agents/skills"]
+    assert any(resolved_dirs[0].iterdir())
     assert link(clone, home, "--check").returncode == 0
 
 
