@@ -1,0 +1,28 @@
+window [2026-10-02T00:00:00Z, 2026-11-01T00:00:00Z); limits .worktrees/hq-9aa713/tools/turn_pause/limits.toml sha256 a18e0437be2fc1f5e6bc9b06662ba3c9e271464204367fa415a3fbb3b7616793
+limits: active 4:00, calls 500, spawns 30, compactions 2
+turns: 5639 (claude-code 3185, codex 2454)
+paused: 45 (1.50 a day over 30 days)
+per limit: active 34, calls 3, spawns 8, compactions 0
+per harness: claude-code 15 (active 8, calls 1, spawns 6), codex 30 (active 26, calls 2, spawns 2)
+whole turns over each limit alone (counted as the hook counts, nothing refused):
+  claude-code: active 11, calls 1, spawns 9, compactions 0
+  codex: active 28, calls 10, spawns 5, compactions 0
+== claude-code: 3185 turns
+  active_min   p50=3.0  p90=23.5  p99=128.6  p99.9=510.1  max=1266.1
+  calls        p50=10.0  p90=49.0  p99=143.0  p99.9=300.0  max=529.0
+  spawns       p50=0.0  p90=1.0  p99=15.0  p99.9=38.0  max=103.0
+  compactions  p50=0.0  p90=0.0  p99=1.0  p99.9=1.0  max=1.0
+== codex: 2454 turns
+  active_min   p50=4.3  p90=29.6  p99=251.9  p99.9=611.7  max=2498.6
+  calls        p50=22.0  p90=84.0  p99=318.0  p99.9=712.0  max=1801.0
+  spawns       p50=0.0  p90=1.0  p99=19.0  p99.9=50.0  max=82.0
+  compactions  p50=0.0  p90=0.0  p99=0.0  p99.9=0.0  max=0.0
+sun-fbaf80 controller codex:01a18943-2b9d-7e50-926f-b74169571349: turn 2026-10-29T20:04:49Z: paused at 2026-10-30T00:05:45Z by active (active 4:00, calls 228, spawns 21, compactions 0); whole turn active 4:26, calls 236, spawns 22, compactions 0
+sun-fbaf80 controller codex:01a18943-2b9d-7e50-926f-b74169571349: turn 2026-10-30T00:42:54Z: not paused; whole turn active 0:55, calls 96, spawns 8, compactions 0
+sun-fbaf80 controller codex:01a18943-2b9d-7e50-926f-b74169571349: turn 2026-10-30T01:51:58Z: paused at 2026-10-30T05:52:52Z by active (active 4:00, calls 236, spawns 16, compactions 0); whole turn active 41:38, calls 1801, spawns 82, compactions 0
+codex converter: exec_command yielded inside its cell, open until Stop 436, exec_command yielded, ended by write_stdin 2917, exec_command yielded, open until Stop 10380, function calls 13163, nested calls 150408, nested closed at completion 136675, unrecorded nested clock__curr_time 115
+read 6284 files in 65 s
+
+real	1m4.939s
+user	0m58.345s
+sys	0m3.056s
