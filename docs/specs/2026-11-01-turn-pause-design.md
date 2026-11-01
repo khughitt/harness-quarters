@@ -3,12 +3,18 @@
 Task: hq-9aa713. Companion: lore-911121 (what the paused agent reports and does,
 and the rule an agent follows where no hook runs), designed with this one in
 `<records root>/lore/docs/specs/2026-11-01-turn-pause-guidance-design.md`.
-Status: revision 4 for the user's review. Revision 3 was accepted at `8a130e9`;
+Status: revision 5 for the user's review. Revision 3 was accepted at `8a130e9`;
 the plan's Task 1 probes (hq-fe672f) then showed that Codex 0.166.0 fires no hook
 for its outer code-mode `exec`, which that revision's Codex enforcement assumed.
-The user chose (2026-11-01) to enforce Codex on the calls its hooks do see. This
-revision changes what exists today, the Codex counters, the cancellation table and
-the Codex `exec` rule; the rest stands as accepted. Earlier rounds: round 3
+The user chose (2026-11-01) to enforce Codex on the calls its hooks do see.
+Revision 4 (`762b0c04`) made that change; round 5 (claude-code/claude-opus-5-5,
+a pre-review before the user's) found the shell validator open under zsh, Codex
+workers owned by the wrong identifier, scheduled wakes able to reset counters,
+deferred Claude Code cancellation tools unreachable while paused, and claims about
+unprobed tools; revision 5 fixes those from a third probe round. Since revision
+3, what exists today, the Codex counters, the turn unit's wake rule, the
+cancellation table, the shell validator, the Codex `exec` rule and its
+limitation, and Verification changed; the rest stands as accepted. Earlier rounds: round 3
 (codex/gpt-6.1-sol at `e184ba1`: no git while paused, cancellation by function with
 probed tool names, budget examples ignored silently); round 2 (same reviewer at
 `88b8958`: in-flight active time, the enforced closing allowlist, cancellation
@@ -25,7 +31,8 @@ silently (which hq + lore should handle)". obs-59789b (baselines and alarms) is
 shelved until this task closes.
 
 The case: sun-fbaf80's Codex controller ran one turn of about 40 h after the
-user's last message (35.1 h of it active), with 1,622 tool calls, 80 subagent
+user's last message (35.1 h of it active by the task's first profile; the
+measurement below, which counts running calls in full, reads 41.6 h), with 1,622 tool calls, 80 subagent
 spawns and 10 compactions, until the user killed it. Nothing stopped it or told the
 user.
 
@@ -107,9 +114,20 @@ recorded in `facts/capabilities.toml`):
   account's MCP tools; each call to one fires its own PreToolUse (the hook name
   joins app and tool with a double underscore) and a deny holds. Two controls fire
   **no hook at all**: a nested `write_stdin` (input to a running exec session) and
-  the top-level `wait` (including `terminate: true` on a running `exec` cell). The
-  PostToolUse of an `exec_command` that yields carries no session id. A deny on a
-  worker's own nested call holds.
+  the top-level `wait` (including `terminate: true` on a running `exec` cell).
+  Every other Codex tool the probes called fires its hook; function tools arrive
+  as `collaboration<name>` or `clock<name>`, nested tools under their own names
+  (fact `hook-tool-names`). An `exec_command` that yields gets no PostToolUse at
+  the yield: one arrives only if a later `write_stdin` ends the process, and none
+  if the process ends on its own. A deny on a worker's own nested call holds.
+  `spawn_agent` takes a bare `task_name` and returns it as `/root/<name>`;
+  `interrupt_agent`, `send_message` and `followup_task` target that name, and no
+  hook payload links a name to the worker's `agent_id`. A goal continuation turn
+  fires no UserPromptSubmit.
+- Claude Code (round 3): a `ScheduleWakeup` wake arrives as a UserPromptSubmit
+  whose prompt is the scheduled text verbatim, with no marker; whether a
+  `CronCreate` job's fire does the same is unknown (two runs never saw one fire).
+  A deny on a subagent's own call holds.
 - agy hooks PreToolUse only for `run_command`, plus SessionStart and Stop.
   opencode and pi have no hook path hq wires.
 
@@ -199,7 +217,15 @@ three stay in step. A Codex worker's events (`agent_id` present) belong to the r
 
 A background wake (a task notification, a scheduled loop tick) does not start a
 turn. That is deliberate: an unattended loop is exactly what must not reset its own
-counters.
+counters, and a job an agent scheduled before a pause must not lift it. A wake that
+arrives as a `<…>` block is caught by the rule above. A scheduled prompt an agent
+wrote itself may arrive as plain text, so the hook also records the prompt of every
+scheduled wake set up in the tree (Claude Code `CronCreate` and `ScheduleWakeup`
+calls, which it sees at PreToolUse) and treats a UserPromptSubmit whose text equals
+a recorded one as a wake. The probes showed a Claude Code `ScheduleWakeup` wake
+arrives exactly so (its scheduled text, verbatim); a `CronCreate` fire was not
+observed, and the same match covers it. A Codex goal continuation fires no
+UserPromptSubmit, so it never starts a turn.
 
 ### Counters
 
@@ -226,11 +252,11 @@ Kept per root session by the hook itself, from events it already receives:
   in that respect). For Codex, the in-flight operations are the hooked calls: a
   nested call inside an `exec` and a function tool such as `wait_agent`. The outer
   `exec` itself is never seen, so time an `exec` spends in tool-free code counts
-  only through the idle-gap rule. So does time after an `exec_command` yields: its
-  PostToolUse fires at the yield, and the unhooked `wait` or `write_stdin` that
-  follows it is invisible, so a quiet wait over 10 minutes on a yielded process
-  counts nothing (a `wait_agent` on a worker, the case's long wait, is hooked and
-  counts in full);
+  only through the idle-gap rule. A nested `exec_command` that yields stays in
+  flight until its PostToolUse or its agent's Stop, since Codex sends no
+  PostToolUse at the yield: time spent driving or waiting on a yielded process
+  counts in full, and a process that ended on its own still counts until the
+  agent's turn ends, an overcount accepted over missing work;
 - **tool calls**: the root's own calls the hook sees, counted at PreToolUse.
   Children's calls are not added: the measurement below counted the root
   transcript only, and counting the tree would make the approved numbers mean
@@ -263,8 +289,11 @@ the hook and by `hq pause limits`; lore's rule refers to that command rather tha
 repeating the numbers.
 
 The verification replay recomputes the fire rate from the hook's own code over
-the same window, with Codex calls and spawns counted the way the hook sees them
-(above). If it differs from 1.67 a day by more than half, the plan stops and
+the same window, with Codex counted the way the hook sees it (above): calls are
+nested and function calls, spawns are started workers, active time comes only from
+hooked calls in flight and the idle-gap rule, and compactions are not counted. It
+prints the pauses per limit and per harness, so a changed Codex count is visible
+even when the overall rate stays inside its band. If it differs from 1.67 a day by more than half, the plan stops and
 brings the numbers back to the user before wiring anything.
 
 ### Warning, pause, notification
@@ -326,10 +355,15 @@ names differ by runtime and an unlisted name is refused:
 | Control | Claude Code 2.1.316 | Codex 0.166.0 | Ownership check |
 | --- | --- | --- | --- |
 | Stop an own background task | `TaskStop {task_id}` (2.1.316 offers no `KillShell`) | `wait` with `terminate: true` on a running `exec` cell: fires no hook, so it is never refused and stays available | the harness scopes `TaskStop` to the session; Codex `wait` cannot be checked |
-| Interrupt an own worker | `TaskStop` on a background subagent's task id or name (its description says it accepts them; not exercised live) | `interrupt_agent {target}` (0.166.0 offers no `close_agent`) | the target is a worker id or name the hook recorded under this root at spawn |
+| Interrupt an own worker | `TaskStop` on a background subagent's task id or name (its description says it accepts them; not exercised live) | `interrupt_agent {target}` (hook name `collaborationinterrupt_agent`; 0.166.0 offers no `close_agent`) | Claude Code: harness-scoped. Codex: the target is a task name an allowed `spawn_agent` in this tree gave (its `task_name`, bare or as `/root/<name>`); no hook payload links a task name to the worker's `agent_id`, so names and ids are recorded separately |
 | Interrupt an own exec session | (none) | nested `write_stdin`: fires no hook, so it is never refused or checked, whatever input it sends | none possible (see the limitation below) |
 | Cancel own scheduled work | `CronDelete {id}`; `ScheduleWakeup {stop: true}` | (none) | a `CronDelete` id must have been created by this session's own `CronCreate`; `ScheduleWakeup` is scoped to the session |
 | Signal an own process | shell `kill <pid>…`, optionally with one of `-TERM`, `-INT`, `-KILL`, `-HUP` | the same through a nested `exec_command` (hook tool name `Bash`) | every target pid descends from the harness process the hook runs under (ancestry read from `/proc`), and none is that process |
+
+Claude Code defers `TaskStop`, `CronDelete` and `ScheduleWakeup`: a session loads
+their schemas through `ToolSearch` before it can call them. A `ToolSearch` whose
+query is `select:` naming only cancellation tools is therefore itself in the
+cancellation class; any other `ToolSearch` is refused while paused.
 
 The tool-surface probe (Verification) lists the tools each runtime offers its
 model; a cancellation control named here that the probe does not find, or a
@@ -337,12 +371,22 @@ cancellation tool it finds that is not named, fails the plan's gate until this
 table is corrected.
 
 **The shell validator** decides whether a shell call (Claude Code `Bash`, Codex
-`exec_command` or `shell`) is on the allowlist:
+nested `exec_command`, hook name `Bash`) is on the allowlist. It must hold under
+any shell the harness may run, because the hook does not see which one: Codex
+`exec_command` defaults to the user's login shell (zsh on this host) and takes
+`shell`, `login` and `tty` arguments the hook payload does not carry. zsh expands
+words POSIX `shlex` treats as plain text (`cat =(touch x)` and the glob qualifier
+`cat a(e:'touch x':)` both run a command; reproduced by the round 5 reviewer), so
+the validator reads the raw command, not only its `shlex` split:
 
-- the command parses (POSIX `shlex`) as one simple command: no `;`, `&`, `&&`,
-  `||`, `|`, redirection, `` ` ``, `$(`, `${`, `$` variable, glob character,
-  newline, or leading environment assignment; anything that fails to parse is
-  refused;
+- outside quotes, every character is a letter, digit, space or one of
+  `_ . / : @ % + , = -`, and no word starts with `=` or `~`; this alone excludes
+  `;`, `&`, `|`, redirection, `` ` ``, `$`, globs, braces, parentheses, `#`, `^`
+  and newline;
+- inside single quotes, anything but a newline; inside double quotes, anything but
+  `$`, `` ` ``, `\`, `!` and a newline;
+- the command then parses (POSIX `shlex`) as one simple command with no leading
+  environment assignment; anything that fails either step is refused;
 - `argv[0]` is a bare program name (no path) on the table above;
 - every option is on that program's own option list, which excludes options that
   run programs, follow, or write files (for `tail`: no `-f`);
@@ -352,22 +396,38 @@ table is corrected.
 **Codex code-mode `exec`** reaches no hook, so its source is never read or
 judged. Each call it makes is judged on its own, by the same rules as any other
 call: a nested `exec_command` (tool name `Bash`) passes only through the shell
-validator, a nested `apply_patch` is a file write and is refused, and a nested
-`write_stdin` passes only as cancellation. Code inside an `exec` that calls no
+validator, and a nested `apply_patch` is a file write and is refused. Code inside an `exec` that calls no
 tool (arithmetic, string handling, the `text` and `store` helpers) still runs
 while paused; it can change nothing outside the session without a tool, so it is
 accepted as unseen rather than blocked. A nested MCP call is refused like any MCP
 tool.
 
-**Limitation: unhooked Codex controls.** Nested `write_stdin` and top-level `wait`
-reach no hook in Codex 0.166.0. A paused Codex agent can therefore still send input
-to an exec session it opened before the pause (an interactive shell, for example)
-or end a running `exec` cell, and the hook neither sees nor counts it. This is
-accepted for the first release as stated, not closed: ending work is what a paused
-agent should do with them, the refusal text and lore's rule allow only an
-interrupt, and opening a new session needs a hooked `exec_command`, which the pause
-refuses. A follow-up re-probes each Codex version and asks upstream for hooks on
-both.
+**Limitation: unhooked Codex controls.** Nested `write_stdin` (input to a yielded
+`exec_command` session) and top-level `wait` (polling or terminating a yielded
+`exec` cell) reach no hook in Codex 0.166.0, alongside the outer `exec`; every other tool the
+probes called is hooked, and two were never called (`request_plugin_install`,
+which the model declined, and `image_gen__imagegen`, skipped for its quota cost):
+they are refused while paused if hooked and unprobed otherwise. Three consequences:
+
+- *While paused*, an agent can still send any input to a session it opened before
+  the pause (an interactive shell, an `ssh` session), and the hook neither sees nor
+  refuses it. That includes editing the pause state or limits file through such a
+  shell: the protected-path check matches only inputs the hook sees.
+- *Before the pause*, work driven through such a session makes no hooked calls,
+  so it is invisible to the call counter. Its time does count: the
+  `exec_command` that opened the session stays in flight until its PostToolUse
+  or the agent's Stop (above). A turn that works only through one long-lived
+  session would never reach its call limit, but would reach its active-time
+  limit.
+- The mitigation is narrow: opening a *new* session needs a hooked `exec_command`,
+  which the pause refuses (once it passes the shell validator above, which no
+  session-opening command does).
+
+This is accepted for the first release as stated, not closed. The refusal text and
+lore's rule allow only an interrupt, and agents do not use long-lived interactive
+sessions as their normal way of working. A follow-up re-probes each Codex version
+and prepares an upstream request for hooks on both, for the user to approve
+publishing.
 
 Bookkeeping and cancellation stay allowed in every state, so claim-guard's Stop
 block and the refusal never loop, and no session is left unable to stop its own
@@ -456,24 +516,28 @@ rule tells agents when to run them.
 ## Verification
 
 - **Replay.** Feeding the sun-fbaf80 controller rollout through the counter logic
-  pauses its long turn at 4 h active, not later, and does not pause its earlier
-  4.0 h turn twice.
+  pauses its long turn no later than 4 h active, by whichever limit is crossed
+  first, and does not pause its earlier 4.4 h turn twice.
 - **Fire rate.** Replaying the 30-day store through the hook's counting (root
   calls, tree spawns and active time, compactions) gives the pause rate the user
   approves numbers against; the gate under Limits applies.
-- **Live probes, per harness**, recorded as capability facts (done for Claude
-  Code 2.1.316 and Codex 0.166.0 in hq-fe672f; rerun on a version change): a deny
-  holds for every tool the hook sees, including `Agent`/`Task`, `spawn_agent` and
-  `wait_agent`, and for a child's own call; which Codex calls fire a hook (outer
-  `exec`, nested `write_stdin` and `wait` none; nested calls including MCP
-  tools, and function tools, each one, under the hook names the facts record); PreCompact or PostCompact and
-  SubagentStart fire for hooks; UserPromptSubmit carries the prompt, and a
-  task-notification wake arrives as a prompt the genuine-prompt rule filters;
-  child calls carry `agent_id`; PostToolUse fires; a **tool-surface probe** per
-  harness lists the tools the runtime offers its model and each cancellation
-  tool's argument schema, and sets the names in the cancellation table. The
-  isolated lifecycle run (cross the limit, spend grace, cancel own work, park,
-  resume) shows that a refused turn can still park and end.
+- **Live probes, per harness**, recorded as capability facts and rerun on a
+  version change (the plan's Task 1 re-probe gate). Done for Claude Code 2.1.316
+  and Codex 0.166.0 in hq-fe672f: a deny holds, with its side effect prevented,
+  for a spawn, a worker wait, a shell call, a file write, an MCP call and a
+  child's own call in both harnesses; the hook names of every tool called, and
+  the unhooked set (Codex: outer `exec`, nested `write_stdin`, `wait`);
+  PreCompact and PostCompact fire for Claude Code; SubagentStart fires per
+  started child; UserPromptSubmit carries the prompt; a Claude Code task
+  notification wake arrives as a `<task-notification>` block and a
+  `ScheduleWakeup` wake as its scheduled text; a Codex goal continuation fires no
+  UserPromptSubmit; child calls carry `agent_id`; PostToolUse fires for allowed
+  calls but not at a Codex yield; each runtime's tool surface and cancellation
+  argument schemas. Still unknown: whether a Codex compaction fires a hook,
+  whether a Claude Code `CronCreate` fire arrives as plain text, and the hooking
+  of the two Codex tools never called. The isolated lifecycle run (cross the
+  limit, spend grace, cancel own work, park, resume) shows that a refused turn
+  can still park and end.
 - **Tests** cover, at least:
   - active time: eight back-to-back half-hour calls count 4 h and pause; a
     half-hour `wait_agent` with a silent child counts in full; a call with no
@@ -489,8 +553,14 @@ rule tells agents when to run them.
     with `budget:` but does not parse; scaling and named overrides;
   - the shell validator: each allowlisted command passes; each operator,
     expansion, redirection, path-qualified program, write-capable option and
-    unlisted subcommand is refused; a Codex nested `Bash` call is judged by the
-    same validator, and a nested `apply_patch` is refused;
+    unlisted subcommand is refused, and so are the zsh forms `cat =(touch x)`,
+    `cat =ls`, `cat a(e:'touch x':)` and `cat a~b`; a Codex nested `Bash` call is
+    judged by the same validator, and a nested `apply_patch` is refused;
+  - `kill` refuses process groups and broadcast targets (`kill 0`, `kill -1`,
+    `kill -TERM -1`, `kill -- -1`);
+  - Codex worker ownership: `interrupt_agent` passes for a task name an allowed
+    `spawn_agent` in the tree gave, in bare and `/root/` form, and is refused for
+    any other name;
   - Codex counting: an `exec` with three nested calls counts three root calls, one
     with no tool call counts none; spawns count from SubagentStart once per worker,
     and a refused `spawn_agent` attempt counts nothing;
