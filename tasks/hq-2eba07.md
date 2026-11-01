@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-2eba07-harness-manifest
 created: 2026-11-01T01:25:51Z
-updated: 2026-11-01T19:19:30Z
+updated: 2026-11-01T19:19:58Z
 started: 2026-11-01T09:55:45Z
 completed: 2026-11-01T19:04:08Z
 closed: 2026-11-01T19:04:08Z
@@ -94,3 +94,4 @@ Where: .githooks/{harness-state-clean,harness-state-refresh,live-picks}, facts/c
   provenance: {"harness_session":"claude-code:fdf3b32f-5e63-4593-bba2-4e994bcdf1eb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-01T19:15:17Z (main): Post-merge verification on main (795571ba, merge --no-ff of feat/hq-2eba07-harness-manifest): harness_state.py check rc=0, harness-facts check rc=0, just link-check rc=0. just test rc=1: agents/bin 268 passed; .githooks+tools 1410 passed, 2 failed (tools/test_harness_links.py agy adopt and dirty-source tests asserting a clean agy/settings.json status). Cause established: both tests copy the checkout's working-tree agy/, and main's agy/settings.json carries a live non-pick edit by agy (statusLine.enabled); both pass in a clean clone of 795571ba (2 passed). The failing lines predate this branch. Filed as a follow-up task. The relay cutover steps that just test did not reach are being run separately on main.
 - 2026-11-01T19:19:30Z (main): Relay cutover steps on main 795571ba: 391 passed, 1 passed (rc=0). Worktree .worktrees/hq-2eba07 ignored-file dispositions before removal: .githooks/__pycache__, tools/*/__pycache__, .pytest_cache — regenerable, discarded. .superpowers/sdd/2026-11-01-harness-manifest/: progress.md (ledger) attached as files:sdd-ledger-harness-manifest.md and final-review-report.md attached as files:final-review-report-round1.md (both sha256-verified equal to the workspace copies); task briefs and review-*.diff packages regenerable from the plan and git history, discarded; implementer/fix reports, RED/GREEN captures, just-test logs, task-6-verify.log and task-5-wip.patch superseded by the commits on main, the step children's done notes and the ledger, discarded. git status clean, no submodules, tt-report run, no host pointer (~/bin, ~/.local/bin, user systemd units) resolves into the worktree, every retention checkpoint basis commit is an ancestor of main.
+- 2026-11-01T19:19:58Z (main): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-2eba07","state":"released","verification":"verified","purpose":"Removed after merge of feat/hq-2eba07-harness-manifest into main (795571ba): git worktree unlock + remove succeeded, worktree list no longer shows it, its storage path is gone; ignored files given dispositions in the preceding note; branch deleted after ancestry check (was 4235a645)","next_owner":"none","cleanup_trigger":"none"}
