@@ -3,9 +3,11 @@
 Task: hq-9aa713. Companion: lore-911121 (what the paused agent reports and does,
 and the rule an agent follows where no hook runs), designed with this one in
 `<records root>/lore/docs/specs/2026-11-01-turn-pause-guidance-design.md`.
-Status: revision 2 for the user's review, after review round 2 (codex/gpt-6.1-sol
-at `88b8958`: in-flight active time, enforced closing allowlist, cancellation after
-grace, budget directive, one reproducible fire rate).
+Status: revision 3 for the user's review, after review round 3 (codex/gpt-6.1-sol
+at `e184ba1`: no git while paused, cancellation by function with probed tool names,
+budget examples ignored silently). Round 2 (same reviewer at `88b8958`) brought
+in-flight active time, the enforced closing allowlist, cancellation after grace,
+the budget directive and one reproducible fire rate.
 
 ## Intent
 
@@ -182,7 +184,8 @@ Kept per root session by the hook itself, from events it already receives:
     flight until the next hook event of the same agent. An agent's open calls close
     at its Stop or SubagentStop, and every open call closes at the next genuine
     prompt. A call that waits on the user (Claude Code `AskUserQuestion`, Codex
-    `request_user_input`) is never in flight: waiting on the user is not work.
+    `request_user_input` and `request_user_input_async`) is never in flight:
+    waiting on the user is not work.
   - *the idle gap*: the time from one tree event to the next.
 
   The gap counts in full while any operation in the tree is in flight, however
@@ -234,11 +237,18 @@ and brings the numbers back to the user before wiring anything.
 - **Paused calls.** Once paused, the hook allows only calls on the closing
   allowlist below and refuses everything else, including every shell command that
   does not pass the shell validator. Each session in the tree gets 25 allowlisted
-  calls of **grace** to report, account for what it holds and park (the global
-  rules ask for worktree and process accounting at park). After grace, only the
-  *bookkeeping* and *cancellation* classes stay allowed. Cancellation is never
+  calls of **grace** to read what its report needs and park. After grace, only
+  the *bookkeeping* and *cancellation* classes stay allowed. Cancellation is never
   exhausted: a session that finds a running process on its last call can still
-  stop it.
+  stop it. Git and other repository-configured readers are not on the list (see
+  below), so a paused park records the accounting the session already holds and
+  says it was not refreshed; lore's rule makes that the paused park's form, and
+  the resuming session refreshes it first.
+- **Notification.** When the pause fires, once per turn: a desktop notification,
+  and a relay inbox notice when relay serve is reachable. Both are dispatched
+  within the hook's time budget, with standard streams redirected so nothing holds
+  the hook open. A failed notification is recorded in the pause state and shown by
+  `hq pause status`; it does not lift the pause.
 
 #### Closing allowlist
 
@@ -246,19 +256,40 @@ and brings the numbers back to the user before wiring anything.
 | --- | --- | --- |
 | Bookkeeping: `tasks park`, `tasks note`, `hq pause status` | yes | yes |
 | Cancellation (below) | yes | yes |
-| Records reads and attachments: `tasks show`, `tasks claims`, `tasks list`, `tasks attach` | yes | no |
-| Reading: Claude Code `Read`, `Grep`, `Glob`; shell `cat`, `head`, `tail`, `wc`, `ls`; `git status`, `git log`, `git diff`, `git show`, `git worktree list`; `host-load --section session` | yes | no |
-| Everything else: file writes (`Edit`, `Write`, `NotebookEdit`, `apply_patch`), spawns, web and MCP tools, any other command | no | no |
+| Records reads and attachments: `tasks show --no-fetch`, `tasks claims`, `tasks list`, `tasks attach` | yes | no |
+| Reading: Claude Code `Read`, `Grep`, `Glob`; shell `cat`, `head`, `tail`, `wc`, `ls`; `host-load --section session` | yes | no |
+| Everything else: file writes (`Edit`, `Write`, `NotebookEdit`, `apply_patch`), spawns and worker messages (`send_message`, `followup_task`), web and MCP tools, `git` in any form, any other command | no | no |
 
-**Cancellation** stops work the session already started, and nothing else:
+Each reader on the list runs no program the repository or user configuration
+chooses. Git does: plain `git diff` runs a configured external diff helper, and
+other subcommands can run fsmonitor, textconv, pager or signature programs, so no
+git invocation is allowed while paused, rather than an option list that would
+have to anticipate every configured program (finding reproduced by the round 3
+reviewer in an isolated fixture). `tasks show` must carry `--no-fetch`, since it
+otherwise runs a configured document provider for external links.
 
-- Claude Code's own task controls (`TaskStop`, `KillShell`), which only reach the
-  session's own background tasks;
-- Codex `close_agent` for its own workers, and `write_stdin` to one of its own
-  exec sessions when the input is only an interrupt (`\u0003`) or end of input;
-- shell `kill [-TERM|-INT|-KILL|-HUP] <pid>…` when every target pid is a
-  descendant of the harness process the hook runs under (its ancestry read from
-  `/proc`) and none is that process itself.
+One boundary is accepted, not closed: `tasks park`, `tasks note` and
+`tasks attach` commit records in projects that set `[git] commit`, and that
+commit runs the repository's own pre-commit hook. Parking must work, the hook is
+the repository's configuration rather than a command the agent chose, and lore's
+rule already forbids changing it to get work done.
+
+**Cancellation** stops work the session already started, and nothing else. It is
+defined by what a control does, each with an ownership check; the tool names the
+hook accepts come from capability facts recorded per harness version, because
+names differ by runtime and an unlisted name is refused:
+
+| Control | Claude Code 2.1.316 | Codex 0.166.0 | Ownership check |
+| --- | --- | --- | --- |
+| Stop an own background task | `TaskStop` (`KillShell` in older releases) | (none) | the harness scopes it to the session |
+| Interrupt an own worker | `TaskStop` on a background subagent's task id, if the probe shows it reaches subagents | `interrupt_agent`, the tool this runtime exposes (round 3 reviewer); `close_agent` only if a probe shows the runtime offers it | the target is a worker id or name the hook recorded under this root at spawn |
+| Interrupt an own exec session | (none) | `write_stdin` with only an interrupt (`\u0003`) or end of input | the session id was returned to this agent by its own `exec_command` |
+| Signal an own process | shell `kill <pid>…`, optionally with one of `-TERM`, `-INT`, `-KILL`, `-HUP` | the same through `exec_command` | every target pid descends from the harness process the hook runs under (ancestry read from `/proc`), and none is that process |
+
+The tool-surface probe (Verification) lists the tools each runtime offers its
+model; a cancellation control named here that the probe does not find, or a
+cancellation tool it finds that is not named, fails the plan's gate until this
+table is corrected.
 
 **The shell validator** decides whether a shell call (Claude Code `Bash`, Codex
 `exec_command` or `shell`) is on the allowlist:
@@ -269,17 +300,17 @@ and brings the numbers back to the user before wiring anything.
   refused;
 - `argv[0]` is a bare program name (no path) on the table above;
 - every option is on that program's own option list, which excludes options that
-  run programs or write files (for git: `-C <dir>` is allowed; `-c`, `--output`,
-  `--ext-diff` and `--textconv` are not; for `tail`: no `-f`);
-  `git` runs only the subcommands named;
-- `tasks` and `hq` run only the subcommands named, with any options.
+  run programs, follow, or write files (for `tail`: no `-f`);
+- `tasks` and `hq` run only the subcommands named, with any options except that
+  `tasks show` requires `--no-fetch`.
 
 **Codex code-mode `exec`** calls pass only when their whole source is one
 `tools.exec_command({cmd: "<string literal>", …})` call, optionally wrapped in
 `text(await …)`, with only literal option values from a short list (`workdir`,
 `max_output_tokens`, `yield_time_ms`), and the literal passes the shell
-validator; or one `tools.close_agent(…)` or interrupt-only `tools.write_stdin(…)`
-call with literal arguments. Anything else, including any second statement,
+validator; or one cancellation call from the table above (for example
+`tools.interrupt_agent(…)` or an interrupt-only `tools.write_stdin(…)`) with
+literal arguments that pass its ownership check. Anything else, including any second statement,
 template literal or variable, is refused. If the ops-daf2cd probe shows Codex
 fires PreToolUse for each nested call, the hook validates those nested calls
 directly and refuses an `exec` body that does anything else.
@@ -287,11 +318,6 @@ directly and refuses an `exec` body that does anything else.
 Bookkeeping and cancellation stay allowed in every state, so claim-guard's Stop
 block and the refusal never loop, and no session is left unable to stop its own
 work.
-- **Notification.** When the pause fires, once per turn: a desktop notification,
-  and a relay inbox notice when relay serve is reachable. Both are dispatched
-  within the hook's time budget, with standard streams redirected so nothing holds
-  the hook open. A failed notification is recorded in the pause state and shown by
-  `hq pause status`; it does not lift the pause.
 
 ### Resuming and granting more
 
@@ -303,9 +329,13 @@ work.
   `budget: 10h, 2000 calls, 80 agents`). The text the user typed excludes
   `<pasted_content …>` blocks, so a pasted prompt never grants a budget; a line
   inside a code fence or a quote (`> budget: …`) is not a first line that starts
-  with `budget:`, so neither does a fenced or quoted example. A `budget:` line
-  anywhere else, or a malformed directive, sets nothing; the hook adds context
-  saying it was ignored and why, so the agent can tell the user.
+  with `budget:`, so neither does a fenced or quoted example. Budget text
+  anywhere else is an example, not a directive: it sets nothing, and the hook says
+  nothing about it, so reviewing a spec full of budget examples raises no
+  question. A first typed line that starts with `budget:` but does not parse is an
+  attempted directive: it sets nothing, the turn keeps its limits, and the hook
+  adds one line of context naming the parse error, for the agent to mention in
+  its next report without stopping its work.
 - The duration sets the active limit and scales every unnamed limit by the same
   factor over the 4 h default: `budget: 12h` allows 1,500 calls, 90 spawns and 6
   compactions. A named count overrides its scaled value. The hook confirms the
@@ -381,8 +411,10 @@ rule tells agents when to run them.
   end; UserPromptSubmit fires on a typed prompt and does not, or is filtered, on a
   task-notification wake; Codex worker and Claude Code subagent calls carry
   `agent_id`; whether Codex has PostToolUse, which decides its in-flight rule;
-  the names and reach of Claude Code's task controls (`TaskStop`, `KillShell`)
-  and Codex's `close_agent` and `write_stdin`.
+  a **tool-surface probe** per harness that lists the tools the runtime offers
+  its model, recorded as a capability fact, which sets the names in the
+  cancellation table (Claude Code `TaskStop`/`KillShell`; Codex `interrupt_agent`,
+  `close_agent`, `write_stdin`).
 - **Tests** cover, at least:
   - active time: eight back-to-back half-hour calls count 4 h and pause; a
     half-hour `wait_agent` with a silent child counts in full; a call with no
@@ -400,9 +432,18 @@ rule tells agents when to run them.
     unlisted subcommand is refused; Codex `exec` bodies with one literal
     `exec_command` pass and bodies with a second statement, a variable or a
     template literal are refused;
-  - cancellation after grace: an exhausted session can `kill` its own background
-    process and `close_agent` its worker, and cannot `kill` a process outside its
-    harness's tree;
+  - cancellation after grace, per harness, with each control in the
+    cancellation table: an exhausted Claude Code session can `TaskStop` its
+    background task and `kill` its own process; an exhausted Codex controller can
+    `interrupt_agent` its own worker, interrupt its own exec session and `kill` its
+    own process; each control is refused against a worker, session or pid this
+    tree does not own;
+  - the paused allowlist refuses every `git` invocation, including plain
+    `git diff`, `git status` and `git worktree list`, and `tasks show` without
+    `--no-fetch`;
+  - the budget directive's silent cases: a reviewed spec whose body holds
+    `budget:` examples sets nothing and adds no context; a malformed first-line
+    directive adds exactly one line of context;
   - root versus child refusal text, refused edits to the state and limits,
     concurrent writes, unreadable state, and the warning firing once.
 
