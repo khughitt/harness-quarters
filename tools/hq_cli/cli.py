@@ -9,7 +9,10 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from . import color, launch, projects, sessions
+import harness_stores
+from harness_stores import Session, SourceError
+
+from . import color, launch, projects
 
 DEFAULT_CONFIG = Path(__file__).resolve().parent.parent / "hq.toml"
 LABEL_WIDTH = 60
@@ -35,7 +38,7 @@ def parser() -> argparse.ArgumentParser:
         description="Recent Claude Code and Codex sessions across personal and work homes, newest first.")
     listing.add_argument("-i", "--interactive", action="store_true",
                          help="pick a session (fzf when on PATH, else a numbered prompt) and resume it")
-    listing.add_argument("--harness", choices=("claude", "codex"))
+    listing.add_argument("--harness", choices=tuple(adapter.alias for adapter in harness_stores.ADAPTERS))
     listing.add_argument("--home", choices=("personal", "work"))
     listing.add_argument("--here", action="store_true",
                          help="only sessions whose cwd is in this checkout or one of its worktrees")
@@ -65,7 +68,9 @@ def checkout_roots(cwd: str) -> set[str]:
 
 
 def here_filter(roots: set[str]):
-    def keep(session: sessions.Session) -> bool:
+    def keep(session: Session) -> bool:
+        if session.cwd is None:
+            return False
         candidates = {os.path.normpath(session.cwd), os.path.realpath(session.cwd)}
         return any(inside(path, root) for path in candidates for root in roots)
     return keep
@@ -73,38 +78,35 @@ def here_filter(roots: set[str]):
 
 def collect(args, user_home: Path):
     """Rows to show, sorted newest first, and the footer line describing the rest."""
-    chosen = [home for home in sessions.homes(user_home)
+    chosen = [home for home in harness_stores.homes(user_home)
               if (args.harness is None or home.harness == args.harness)
               and (args.home is None or home.kind == args.home)]
     keep = here_filter(checkout_roots(os.getcwd())) if args.here else (lambda session: True)
     absent = [home.name for home in chosen if not home.path.is_dir()]
     present = [home for home in chosen if home.path.is_dir()]
-    found: list[sessions.Session] = []
-    skipped = sessions.Skipped()
+    found: list[Session] = []
+    notes: dict[str, dict[str, int]] = {}
     for home in present:
-        if home.harness == "claude":
-            read, home_skipped = sessions.read_claude(home)
-            skipped.without_id += home_skipped.without_id
-            skipped.malformed += home_skipped.malformed
-        else:
-            read = sessions.read_codex(home, args.archived)
+        read, home_notes = harness_stores.by_alias(home.harness).list_sessions(home, args.archived)
+        for key, value in home_notes.items():
+            notes.setdefault(home.harness, {}).setdefault(key, 0)
+            notes[home.harness][key] += value
         found.extend(session for session in read if keep(session))
     listed = sorted((s for s in found if s.excluded is None), key=lambda s: s.recency_ms, reverse=True)
     harnesses = {home.harness for home in present}
+    adapters = [adapter for adapter in harness_stores.ADAPTERS if adapter.alias in harnesses]
 
     def count(harness: str, reason: str) -> int:
         return sum(1 for s in found if s.home.harness == harness and s.excluded == reason)
 
     parts = [f"{min(len(listed), args.limit)} of {len(listed)} shown"]
-    if "claude" in harnesses:
-        parts.append(f"skipped claude history lines: {skipped.without_id} without sessionId, "
-                     f"{skipped.malformed} malformed")
-    excluded = []
-    if "claude" in harnesses:
-        excluded.append(f"claude {count('claude', 'transcript gone')} transcript gone")
-    if "codex" in harnesses:
-        excluded.append(f"codex {count('codex', 'non-interactive')} non-interactive, "
-                        f"{count('codex', 'transcript gone')} transcript gone")
+    for adapter in adapters:
+        segment = adapter.notes_segment(notes.get(adapter.alias, {}))
+        if segment:
+            parts.append(segment)
+    excluded = [f"{adapter.alias} " + ", ".join(f"{count(adapter.alias, reason)} {reason}"
+                                                for reason in adapter.exclusion_reasons)
+                for adapter in adapters if adapter.exclusion_reasons]
     if excluded:
         parts.append("excluded: " + "; ".join(excluded))
     if absent:
@@ -157,7 +159,7 @@ def place_parts(cwd: str, place: projects.Place | None, user_home: Path,
     return parts
 
 
-def format_rows(shown: list[sessions.Session], places: dict[str, projects.Place | None], user_home: Path,
+def format_rows(shown: list[Session], places: dict[str, projects.Place | None], user_home: Path,
                 painter: color.Painter) -> list[str]:
     """One line per session. Cells are padded outside their colour codes, so a painted line
     with the codes stripped is the plain line."""
@@ -167,7 +169,6 @@ def format_rows(shown: list[sessions.Session], places: dict[str, projects.Place 
     plain = ["".join(text for text, _ in row_parts) + (MISSING if gone else "")
              for row_parts, gone in zip(parts, missing)]
     width = max((len(text) for text in plain), default=0)
-    harness_hue = {"claude": color.CLAUDE, "codex": color.CODEX}
     lines = []
     for s, row_parts, gone, place in zip(shown, parts, missing, plain):
         row = (color.DIM,) if s.archived else ()
@@ -179,7 +180,7 @@ def format_rows(shown: list[sessions.Session], places: dict[str, projects.Place 
         if gone:
             cwd += " " + painter.paint(MISSING.strip(), *row, painter.fg(color.MISSING))
         cells = [
-            painter.paint(s.home.harness, *row, painter.fg(harness_hue[s.home.harness])) + pad(s.home.harness, 6),
+            painter.paint(s.home.harness, *row, painter.fg(harness_stores.by_alias(s.home.harness).colour)) + pad(s.home.harness, 6),
             painter.paint(s.home.kind, *row, *kind) + pad(s.home.kind, 8),
             painter.paint(printable(s.id[:8]), *row, color.DIM),
             pad(when, 10) + painter.paint(when, *row, painter.age(seconds)),
@@ -246,7 +247,7 @@ def main(argv: list[str]) -> int:
         code = sessions_command(args)
         sys.stdout.flush()   # inside the try: a short listing is otherwise written at exit
         return code
-    except (UsageError, sessions.SourceError, projects.ProjectError, launch.LaunchError) as error:
+    except (UsageError, SourceError, projects.ProjectError, launch.LaunchError) as error:
         print(f"hq: {error}", file=sys.stderr)
         return 1
     except BrokenPipeError:

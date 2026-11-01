@@ -256,7 +256,7 @@ def test_newest_first_by_transcript_mtime_and_codex_recency(env):
 
 def test_claude_recency_falls_back_to_history_timestamp_when_stat_fails(tmp_path):
     sys.path.insert(0, str(TOOL.parent))
-    from hq_cli import sessions
+    from harness_stores import claude as sessions
     assert sessions.claude_recency_ms(tmp_path / "gone.jsonl", 1234) == 1234
     present = tmp_path / "here.jsonl"
     present.write_text("")

@@ -4,9 +4,8 @@ import sys
 import tomllib
 from pathlib import Path
 
-from .sessions import Session
-
-HOME_VARIABLES = {"claude": "CLAUDE_CONFIG_DIR", "codex": "CODEX_HOME"}
+import harness_stores
+from harness_stores import Session
 
 
 class LaunchError(Exception):
@@ -31,20 +30,19 @@ def load_flags(path: Path) -> dict[str, list[str]]:
 
 
 def argv(session: Session, flags: list[str]) -> list[str]:
-    if session.home.harness == "claude":
-        return ["claude", *flags, "--resume", session.id]
-    return ["codex", *flags, "resume", session.id]   # Codex takes its flags before the subcommand
+    return harness_stores.by_alias(session.home.harness).resume_argv(session, flags)
 
 
 def environment(session: Session, base: dict[str, str]) -> dict[str, str]:
-    """A work row names its home; a personal row unsets both variables, since setting
+    """A work row names its home; a personal row unsets every adapter's variable, since setting
     CLAUDE_CONFIG_DIR=~/.claude would read a different .claude.json than ~/.claude.json."""
     env = dict(base)
     if session.home.kind == "work":
-        env[HOME_VARIABLES[session.home.harness]] = str(session.home.path)
+        env[harness_stores.by_alias(session.home.harness).home_variable] = str(session.home.path)
     else:
-        for variable in HOME_VARIABLES.values():
-            env.pop(variable, None)
+        for adapter in harness_stores.ADAPTERS:
+            if adapter.home_variable is not None:
+                env.pop(adapter.home_variable, None)
     return env
 
 
