@@ -165,7 +165,9 @@ into its owning checkout (`lore`, including its Superpowers submodule, `flows`, 
 
 1. **Native `~/.agents/skills` discovery** (`codex`, `pi`): nothing to link.
 2. **Directory manifest** (`agy`): link a tracked manifest such as `agy/skills.json`
-   containing `{"entries": [{"path": "~/.agents/skills"}]}`.
+   containing `{"entries": [{"path": "../../.agents/skills"}]}` (`agy` resolves relative
+   entries against the manifest directory `~/.gemini/config` and rejects unexpanded
+   `~/`).
 3. **Home-local skill directory** (`claude`): link each skill the harness does not get
    another way under `skills/<skill-name>`. Claude Code gets Superpowers from its
    plugin, so `[harness.claude.links]` lists only the non-Superpowers skills, and
