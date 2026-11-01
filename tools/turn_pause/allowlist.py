@@ -53,6 +53,13 @@ READERS = {
 HOST_LOAD = ('host-load', '--section', 'session')
 SIGNALS = {'-TERM', '-INT', '-KILL', '-HUP'}
 PID = re.compile(r'[1-9][0-9]{0,9}')
+# head/tail options that take a count, and the only form that count may take. GNU tail
+# also reads a leading `+` operand as obsolete syntax (`tail +1f a` follows), so a `+`
+# word passes for tail only as the value of -n or -c.
+COUNTED = {'head', 'tail'}
+COUNT_OPTIONS = {'-n', '-c'}
+COUNT = re.compile(r'\+?[0-9]{1,18}')
+SHOWN = 200
 
 CLAUDE_READERS = {'Read', 'Grep', 'Glob'}
 
@@ -73,6 +80,12 @@ IN_DOUBLE_FORBIDDEN = frozenset('$`\\!\n')
 
 def _refuse(reason: str) -> Verdict:
     return Verdict('refuse', reason)
+
+
+def _show(value) -> str:
+    """Untrusted text for a reason: its repr, cut to SHOWN characters."""
+    text = repr(value)
+    return text if len(text) <= SHOWN else text[:SHOWN] + '...'
 
 
 def _scan(cmd: str) -> str | None:
@@ -115,12 +128,12 @@ def shell(cmd: str, owned: Owned) -> Verdict:
         return _refuse('empty shell command')
     for word in argv:
         if word[:1] in ('=', '~'):
-            return _refuse(f'word {word!r} starts with {word[0]!r}, which zsh expands')
+            return _refuse(f'word {_show(word)} starts with {word[0]!r}, which zsh expands')
     prog = argv[0]
     if '=' in prog:
-        return _refuse(f'{prog!r}: no environment assignment is allowed while paused')
+        return _refuse(f'{_show(prog)}: no environment assignment is allowed while paused')
     if '/' in prog:
-        return _refuse(f'{prog!r}: the program must be a bare name, not a path')
+        return _refuse(f'{_show(prog)}: the program must be a bare name, not a path')
     if prog == 'kill':
         return _kill(argv[1:], owned)
     if prog in ('tasks', 'hq'):
@@ -128,11 +141,27 @@ def shell(cmd: str, owned: Owned) -> Verdict:
     if tuple(argv) == HOST_LOAD:
         return Verdict('read', 'host-load --section session')
     if prog in READERS:
-        for word in argv[1:]:
-            if word.startswith('-') and word not in READERS[prog]:
-                return _refuse(f'{prog} option {word!r} is not allowed while paused (allowed: {sorted(READERS[prog])})')
-        return Verdict('read', f'{prog} reads files')
-    return _refuse(f'{prog!r} is not on the closing allowlist (git in any form is refused while paused)')
+        return _reader(prog, argv[1:])
+    return _refuse(f'{_show(prog)} is not on the closing allowlist (git in any form is refused while paused)')
+
+
+def _reader(prog: str, words: list[str]) -> Verdict:
+    i = 0
+    while i < len(words):
+        word = words[i]
+        if word.startswith('-'):
+            if word not in READERS[prog]:
+                return _refuse(f'{prog} option {_show(word)} is not allowed while paused (allowed: {sorted(READERS[prog])})')
+            if prog in COUNTED and word in COUNT_OPTIONS:
+                if i + 1 == len(words) or not COUNT.fullmatch(words[i + 1]):
+                    value = _show(words[i + 1]) if i + 1 < len(words) else 'nothing'
+                    return _refuse(f'{prog} {word} takes a plain count, not {value}')
+                i += 2
+                continue
+        elif prog == 'tail' and word.startswith('+'):
+            return _refuse(f'tail operand {_show(word)}: a leading + is GNU tail\'s obsolete syntax, which can follow')
+        i += 1
+    return Verdict('read', f'{prog} reads files')
 
 
 def _records(argv: list[str]) -> Verdict:
@@ -145,7 +174,7 @@ def _records(argv: list[str]) -> Verdict:
         if pair == ('tasks', 'show') and '--no-fetch' not in argv[2:]:
             return _refuse('tasks show needs --no-fetch while paused')
         return Verdict('read', ' '.join(pair))
-    return _refuse(f'{" ".join(argv[:2])!r} is not on the closing allowlist')
+    return _refuse(f'{_show(" ".join(argv[:2]))} is not on the closing allowlist')
 
 
 def _kill(args: list[str], owned: Owned) -> Verdict:
@@ -157,7 +186,7 @@ def _kill(args: list[str], owned: Owned) -> Verdict:
         return _refuse('kill needs at least one pid')
     for arg in args:
         if not PID.fullmatch(arg):
-            return _refuse(f'kill target {arg!r} is not a positive pid (signal, if any, must be one of {sorted(SIGNALS)} first)')
+            return _refuse(f'kill target {_show(arg)} is not a positive pid (signal, if any, must be one of {sorted(SIGNALS)} first)')
         pid = int(arg)
         if not descends_from(pid, owned.harness_pid):
             return _refuse(f'kill target {pid} does not descend from the harness process {owned.harness_pid}')
@@ -165,7 +194,9 @@ def _kill(args: list[str], owned: Owned) -> Verdict:
 
 
 def descends_from(pid: int, ancestor: int, proc: Path = Path('/proc')) -> bool:
-    """Whether ancestor is a proper ancestor of pid, by PPid in <proc>/<pid>/status."""
+    """Whether ancestor is a proper ancestor of pid, by PPid in <proc>/<pid>/status.
+    False when any status on the way is missing, unreadable or malformed: a kill the
+    walk cannot prove is refused, and nothing escapes into the hook."""
     if pid == ancestor:
         return False
     seen = set()
@@ -173,10 +204,9 @@ def descends_from(pid: int, ancestor: int, proc: Path = Path('/proc')) -> bool:
     while current not in seen:
         seen.add(current)
         try:
-            status = (proc / str(current) / 'status').read_text()
-        except (FileNotFoundError, ProcessLookupError):
+            ppid = _ppid((proc / str(current) / 'status').read_text(), proc / str(current) / 'status')
+        except (OSError, ValueError):
             return False
-        ppid = _ppid(status, proc / str(current) / 'status')
         if ppid == ancestor:
             return True
         if ppid <= 0:
@@ -188,7 +218,10 @@ def descends_from(pid: int, ancestor: int, proc: Path = Path('/proc')) -> bool:
 def _ppid(status: str, where: Path) -> int:
     for line in status.splitlines():
         if line.startswith('PPid:'):
-            return int(line.split()[1])
+            parts = line.split()
+            if len(parts) != 2:
+                raise ValueError(f'{where}: malformed PPid line {line!r}')
+            return int(parts[1])
     raise ValueError(f'{where}: no PPid line')
 
 
@@ -196,6 +229,8 @@ def classify(harness: str, tool: str, tool_input: dict, owned: Owned) -> Verdict
     """The class of a hooked call while paused; 'refuse' for anything not allowlisted."""
     if harness not in CONTROLS:
         raise ValueError(f'unknown harness {harness!r}')
+    if not isinstance(tool_input, dict):
+        return _refuse(f'{_show(tool)} input is not a JSON object')
     if tool == 'Bash':
         cmd = tool_input.get('command')
         if not isinstance(cmd, str):
@@ -205,7 +240,7 @@ def classify(harness: str, tool: str, tool_input: dict, owned: Owned) -> Verdict
         return Verdict('read', f'{tool} reads files')
     controls = CONTROLS[harness]
     if tool not in controls:
-        return _refuse(f'{tool} is not on the closing allowlist')
+        return _refuse(f'{_show(tool)} is not on the closing allowlist')
     arg = controls[tool]
     value = None if arg is None else tool_input.get(arg)
     if tool == 'TaskStop':
@@ -213,7 +248,7 @@ def classify(harness: str, tool: str, tool_input: dict, owned: Owned) -> Verdict
     if tool == 'CronDelete':
         if isinstance(value, str) and value in owned.cron_jobs:
             return Verdict('cancellation', f'CronDelete of pending job {value}')
-        return _refuse(f'CronDelete id {value!r} is not a pending job of this session')
+        return _refuse(f'CronDelete id {_show(value)} is not a pending job of this session')
     if tool == 'ScheduleWakeup':
         if value is True:
             return Verdict('cancellation', 'ScheduleWakeup stop')
@@ -223,11 +258,11 @@ def classify(harness: str, tool: str, tool_input: dict, owned: Owned) -> Verdict
     if tool == 'collaborationinterrupt_agent':
         if isinstance(value, str) and value in owned.worker_names:
             return Verdict('cancellation', f'interrupt_agent on own worker {value}')
-        return _refuse(f'interrupt_agent target {value!r} is not a worker this session spawned')
+        return _refuse(f'interrupt_agent target {_show(value)} is not a worker this session spawned')
     if tool == 'update_goal':
-        if value == 'paused':
+        if set(tool_input) == {'status'} and value == 'paused':
             return Verdict('cancellation', 'update_goal status paused')
-        return _refuse('update_goal passes only with status: paused')
+        return _refuse('update_goal passes only as {status: paused}, with no other field')
     raise AssertionError(f'control {tool} has no rule')
 
 
@@ -255,12 +290,14 @@ def touches_protected(tool_input: dict, paths: Sequence[Path]) -> bool:
 
 
 def _strings(value) -> Iterator[str]:
-    if isinstance(value, str):
-        yield value
-    elif isinstance(value, dict):
-        for k, v in value.items():
-            yield from _strings(k)
-            yield from _strings(v)
-    elif isinstance(value, (list, tuple)):
-        for v in value:
-            yield from _strings(v)
+    """Every string in a JSON value, keys included; iterative, so no depth escapes."""
+    stack = [value]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, str):
+            yield item
+        elif isinstance(item, dict):
+            stack.extend(item.keys())
+            stack.extend(item.values())
+        elif isinstance(item, (list, tuple)):
+            stack.extend(item)

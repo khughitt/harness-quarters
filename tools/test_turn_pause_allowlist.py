@@ -72,26 +72,32 @@ def owned(**kw):
 
 @pytest.fixture
 def child(tmp_path):
-    """A real child of this process and a grandchild through sh, both reaped afterwards."""
+    """A real child of this process and a grandchild through sh (in its own process
+    group), all reaped afterwards; each cleanup step runs even if another fails."""
     env = {'PATH': '/usr/bin:/bin', 'HOME': str(tmp_path)}
-    procs, grandchild = [], None
+    procs = []
     try:
         procs.append(subprocess.Popen(['sleep', '30'], env=env))
         procs.append(subprocess.Popen(['sh', '-c', 'sleep 30 & echo $!; wait'], env=env,
-                                      stdout=subprocess.PIPE, text=True))
+                                      stdout=subprocess.PIPE, text=True, start_new_session=True))
         grandchild = int(procs[1].stdout.readline())
         yield procs[0].pid, grandchild
     finally:
-        if grandchild is not None:
+        if len(procs) > 1:
             try:
-                os.kill(grandchild, signal.SIGKILL)
+                os.killpg(procs[1].pid, signal.SIGKILL)
             except ProcessLookupError:
                 pass
         for p in procs:
-            p.kill()
-            p.wait()
-            if p.stdout:
-                p.stdout.close()
+            try:
+                p.kill()
+            except ProcessLookupError:
+                pass
+            try:
+                p.wait(timeout=10)
+            finally:
+                if p.stdout:
+                    p.stdout.close()
 
 
 # ---- shell validator: passes -------------------------------------------------------
@@ -110,6 +116,8 @@ SHELL_PASSES = [
     ('cat -n a.txt b/c.txt', 'read'),
     ('head -n 5 a', 'read'),
     ('tail -c 10 a', 'read'),
+    ('tail -n +1 a', 'read'),
+    ('tail -c +5 a', 'read'),
     ('wc -l -w a', 'read'),
     ('ls', 'read'),
     ('ls -la docs/', 'read'),
@@ -147,6 +155,9 @@ OPTIONS = [
     'tail -f log', 'tail -F log', 'tail --follow log', 'tail -n5 a', 'head -n -5 a',
     'cat -v a', 'cat --version', 'ls -R', 'ls --color=always', 'wc --files0-from=x',
     'cat -- a', 'ls -lR',
+    # GNU tail's obsolete syntax: a leading + operand turns on follow (fix round 1, I1)
+    'tail +1f a', 'tail +f a', 'tail +1cf a', 'tail a +1f', 'tail -n +1f a', 'tail -c 5k a',
+    'head -n 5x a', 'tail -n', 'tail -c', 'tail -n -n a',
 ]
 GLOBS = ['ls *', 'cat a?', 'cat [ab]', 'cat a*']
 ZSH = [
@@ -227,6 +238,25 @@ def test_descends_from_walks_ppid(tmp_path):
     assert not descends_from(99, 10, proc)
     assert not descends_from(50, 10, proc)
     assert not descends_from(50, 50, proc)
+
+
+def test_descends_from_false_on_unreadable_or_malformed_status(tmp_path):
+    proc = fake_proc(tmp_path, {1: 0, 10: 1})
+    for pid, text in ((20, 'Name:\tx\n'), (30, 'PPid:\tten\n'), (40, 'PPid:\n')):
+        (proc / str(pid)).mkdir()
+        (proc / str(pid) / 'status').write_text(text)
+        assert not descends_from(pid, 10, proc), text
+    (proc / '50' / 'status').mkdir(parents=True)
+    assert not descends_from(50, 10, proc)
+    (proc / '60').mkdir()
+    (proc / '60' / 'status').write_text('PPid:\t10\n')
+    (proc / '60' / 'status').chmod(0)
+    try:
+        if os.access(proc / '60' / 'status', os.R_OK):
+            pytest.skip('running with privileges that ignore file modes')
+        assert not descends_from(60, 10, proc)
+    finally:
+        (proc / '60' / 'status').chmod(0o644)
 
 
 def test_descends_from_real_proc(child):
@@ -340,6 +370,9 @@ def test_codex_update_goal_paused_only():
     for status in ('complete', 'blocked', 'active', 'PAUSED', None):
         assert classify('codex', p['tool_name'], {'status': status}, NOBODY).klass == 'refuse'
     assert classify('codex', p['tool_name'], {}, NOBODY).klass == 'refuse'
+    # only status may be set (fix round 1, I2)
+    for extra in ({'objective': 'keep going'}, {'token_budget': 1e9}):
+        assert classify('codex', p['tool_name'], {'status': 'paused', **extra}, NOBODY).klass == 'refuse'
 
 
 def test_codex_nested_mcp_refused():
@@ -378,6 +411,23 @@ def test_codex_refusals(tool, tool_input):
 def test_codex_spawn_fixture_refused():
     p = payload('codex-spawn_agent.json', 'collaborationspawn_agent')
     assert classify('codex', p['tool_name'], p['tool_input'], owned(worker_names=spawned_names())).klass == 'refuse'
+
+
+@pytest.mark.parametrize('tool_input', ['cat a', ['cat', 'a'], None, 3])
+@pytest.mark.parametrize('harness, tool', [('claude-code', 'Bash'), ('claude-code', 'TaskStop'),
+                                           ('codex', 'update_goal'), ('claude-code', 'Read')])
+def test_non_dict_tool_input_refused(harness, tool, tool_input):
+    v = classify(harness, tool, tool_input, NOBODY)
+    assert v.klass == 'refuse' and 'object' in v.reason
+
+
+def test_refusal_reasons_truncate_untrusted_text():
+    long = 'x' * 5000
+    mine = owned(harness_pid=os.getpid())
+    for v in (shell(f'git {long}', NOBODY), shell(f'kill {long}', mine), shell(f'cat -{long}', NOBODY),
+              shell(f'{long}=1 cat', NOBODY), classify('claude-code', 'CronDelete', {'id': long}, NOBODY),
+              classify('codex', 'collaborationinterrupt_agent', {'target': long}, NOBODY)):
+        assert v.klass == 'refuse' and len(v.reason) < 400, len(v.reason)
 
 
 def test_unknown_harness_is_an_error():
@@ -442,3 +492,18 @@ def test_touches_protected(protected):
     assert not touches_protected({'command': 'cat ~/.local/state/hq/other'}, protected)
     assert not touches_protected({'file_path': 'limits.toml', 'n': 3, 'flag': True, 'none': None}, protected)
     assert not touches_protected({}, protected)
+
+
+def nest(leaf, depth, as_dict):
+    value = leaf
+    for _ in range(depth):
+        value = {'k': value} if as_dict else [value]
+    return value
+
+
+@pytest.mark.parametrize('as_dict', [False, True])
+def test_touches_protected_deep_input(protected, as_dict):
+    """A deeply nested input neither escapes as RecursionError nor hides a path (I3)."""
+    state, _ = protected
+    assert touches_protected({'x': nest(f'cat {state}/x', 20000, as_dict)}, protected)
+    assert not touches_protected({'x': nest('cat a', 20000, as_dict)}, protected)
