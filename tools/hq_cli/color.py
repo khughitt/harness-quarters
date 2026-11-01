@@ -100,6 +100,7 @@ def project_colour(text: str) -> Colour:
 
 CLAUDE = Colour(oklch(0.68, 0.14, 55), 166)
 CODEX = Colour(oklch(0.66, 0.12, 245), 32)
+AGY = Colour(oklch(0.60, 0.12, 150), 65)
 WORK = Colour(oklch(0.64, 0.16, 335), 169)
 MISSING = Colour(oklch(0.62, 0.17, 25), 160)
 # The age ramp in xterm-256, in equal steps of the log scale (under ~10m, 2h, 20h, 9d,

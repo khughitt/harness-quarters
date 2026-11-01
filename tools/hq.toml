@@ -13,5 +13,8 @@ flags = ["--dangerously-skip-permissions"]
 [homes.codex]
 flags = ["--no-daemon", "--dangerously-bypass-approvals-and-sandbox"]
 
+[homes.agy]
+flags = ["--dangerously-skip-permissions"]
+
 [homes.codex-work]
 flags = ["--no-daemon", "--dangerously-bypass-approvals-and-sandbox"]

@@ -234,3 +234,65 @@ def test_copy_reads_held_file_when_parent_is_replaced(archive, manifest, live, t
         cap(archive, manifest, live, "p/s.jsonl")
     assert manifest.latest("claude", "p/s.jsonl") is None
     assert not list(archive.rglob(".capture-*"))
+
+
+def test_non_append_rewrite_replaces_mirror_and_keeps_previous_version(archive, manifest, live):
+    src = write(live / "p/s.json", b"one")
+    cap(archive, manifest, live, "p/s.json", append_only=False)
+    src.write_bytes(b"two!")
+    os.utime(src, ns=(1_000_000_000, 2_000_000_000))
+    assert cap(archive, manifest, live, "p/s.json", append_only=False).action == "copied"
+    assert mirror_path(archive, "claude", "p/s.json").read_bytes() == b"two!"
+    kept = [p for p in (archive / "versions").rglob("*") if p.is_file()]
+    assert len(kept) == 1 and kept[0].read_bytes() == b"one"
+    assert manifest.diverged() == []
+
+
+def test_append_only_rewrite_still_diverges(archive, manifest, live):
+    src = write(live / "p/s.json", b"one")
+    cap(archive, manifest, live, "p/s.json")
+    src.write_bytes(b"two!")
+    os.utime(src, ns=(1_000_000_000, 2_000_000_000))
+    assert cap(archive, manifest, live, "p/s.json").action == "diverged"
+    assert len(manifest.diverged()) == 1
+
+
+def _rewrite(src):
+    src.write_bytes(b"two!")
+    os.utime(src, ns=(1_000_000_000, 2_000_000_000))
+
+
+def test_non_append_rotation_refuses_damaged_mirror(archive, manifest, live):
+    src = write(live / "p/s.json", b"one")
+    cap(archive, manifest, live, "p/s.json", append_only=False)
+    mirror_path(archive, "claude", "p/s.json").write_bytes(b"oxe")
+    _rewrite(src)
+    with pytest.raises(OSError, match="damaged"):
+        cap(archive, manifest, live, "p/s.json", append_only=False)
+    assert manifest.mirror("claude", "p/s.json") is not None
+    assert not (archive / "versions").exists() or not list((archive / "versions").rglob("*.json*"))
+
+
+def test_non_append_rotation_refuses_foreign_file_at_old_location(archive, manifest, live):
+    src = write(live / "p/s.json", b"one")
+    cap(archive, manifest, live, "p/s.json", append_only=False)
+    mirror = manifest.mirror("claude", "p/s.json")
+    old = archive / capture.version_location("claude", "p/s.json", mirror.captured_at)
+    write(old, b"foreign")
+    _rewrite(src)
+    with pytest.raises(OSError, match="other content"):
+        cap(archive, manifest, live, "p/s.json", append_only=False)
+    assert mirror_path(archive, "claude", "p/s.json").read_bytes() == b"one"
+    assert old.read_bytes() == b"foreign"
+
+
+def test_non_append_rotation_reuses_identical_old_file(archive, manifest, live):
+    src = write(live / "p/s.json", b"one")
+    cap(archive, manifest, live, "p/s.json", append_only=False)
+    mirror = manifest.mirror("claude", "p/s.json")
+    old = archive / capture.version_location("claude", "p/s.json", mirror.captured_at)
+    write(old, b"one")
+    _rewrite(src)
+    assert cap(archive, manifest, live, "p/s.json", append_only=False).action == "copied"
+    assert old.read_bytes() == b"one"
+    assert manifest.diverged() == []

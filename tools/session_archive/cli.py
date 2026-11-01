@@ -11,8 +11,10 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+import harness_stores
+
 from . import capture, config, inputs, probe, prune, status
-from .manifest import Manifest, Run, utc_now
+from .manifest import FILENAME, Manifest, Run, utc_now
 
 LOCKED = frozenset({"capture", "prune", "promote", "probe-codex"})
 CODEX = "codex"
@@ -36,12 +38,12 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def cmd_capture(cfg, table, args) -> int:
+def cmd_capture(cfg, table, args, skipped) -> int:
     manifest = Manifest.open(cfg.archive_root)
     try:
         started = utc_now()
         try:
-            report, ok = capture.capture_run(cfg.archive_root, manifest, table)
+            report, ok = capture.capture_run(cfg.archive_root, manifest, table, skipped)
         except OSError as error:
             report, ok = {"error": f"{type(error).__name__}: {error}"}, False
         manifest.record_run(Run(uuid.uuid4().hex, "capture", "apply", started, utc_now(), ok, report))
@@ -120,17 +122,42 @@ def cmd_status(cfg, table, args) -> int:
     return 0 if ok else 1
 
 
-COMMANDS = {"capture": cmd_capture, "promote": cmd_promote, "probe-codex": cmd_probe_codex,
+COMMANDS = {"promote": cmd_promote, "probe-codex": cmd_probe_codex,
             "prune": cmd_prune, "status": cmd_status}
+
+
+class CapturedSources:
+    """Whether a source has ever been captured; opens the manifest read-only on first use."""
+
+    def __init__(self, archive_root: Path):
+        self.archive_root = archive_root
+        self.manifest = None
+
+    def __call__(self, source: str) -> bool:
+        if self.manifest is None:
+            if not (self.archive_root / FILENAME).exists():
+                return False
+            self.manifest = Manifest.open_readonly(self.archive_root)
+        return self.manifest.has_source(source)
+
+    def close(self) -> None:
+        if self.manifest is not None:
+            self.manifest.close()
 
 
 def main(argv) -> int:
     args = build_parser().parse_args(argv)
     try:
         cfg = config.load_config(config_path())
-        table = config.sources(Path.home())
-        config.check_sources(table)
+        table = harness_stores.archive_sources(Path.home())
+        captured = CapturedSources(cfg.archive_root)
+        try:
+            skipped = config.check_sources(table, captured)
+        finally:
+            captured.close()
         with config.archive_lock(cfg.archive_root) if args.command in LOCKED else nullcontext():
+            if args.command == "capture":
+                return cmd_capture(cfg, table, args, skipped)
             return COMMANDS[args.command](cfg, table, args)
     except config.HostGateError as error:
         print(f"session-archive: {error}", file=sys.stderr)

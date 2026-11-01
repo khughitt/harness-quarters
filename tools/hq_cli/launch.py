@@ -4,9 +4,8 @@ import sys
 import tomllib
 from pathlib import Path
 
-from .sessions import Session
-
-HOME_VARIABLES = {"claude": "CLAUDE_CONFIG_DIR", "codex": "CODEX_HOME"}
+import harness_stores
+from harness_stores import Session
 
 
 class LaunchError(Exception):
@@ -31,20 +30,22 @@ def load_flags(path: Path) -> dict[str, list[str]]:
 
 
 def argv(session: Session, flags: list[str]) -> list[str]:
-    if session.home.harness == "claude":
-        return ["claude", *flags, "--resume", session.id]
-    return ["codex", *flags, "resume", session.id]   # Codex takes its flags before the subcommand
+    return harness_stores.by_alias(session.home.harness).resume_argv(session, flags)
 
 
 def environment(session: Session, base: dict[str, str]) -> dict[str, str]:
-    """A work row names its home; a personal row unsets both variables, since setting
+    """A work row names its home; a personal row unsets every adapter's variable, since setting
     CLAUDE_CONFIG_DIR=~/.claude would read a different .claude.json than ~/.claude.json."""
     env = dict(base)
     if session.home.kind == "work":
-        env[HOME_VARIABLES[session.home.harness]] = str(session.home.path)
+        variable = harness_stores.by_alias(session.home.harness).home_variable
+        if variable is None:
+            raise LaunchError(f"{session.home.harness} has no work home variable; cannot launch {session.home.name}")
+        env[variable] = str(session.home.path)
     else:
-        for variable in HOME_VARIABLES.values():
-            env.pop(variable, None)
+        for adapter in harness_stores.ADAPTERS:
+            if adapter.home_variable is not None:
+                env.pop(adapter.home_variable, None)
     return env
 
 
@@ -52,6 +53,8 @@ def launch(session: Session, flags_by_home: dict[str, list[str]], config: Path) 
     """Replace this process with the harness; rechecks cwd and transcript just before."""
     if session.home.name not in flags_by_home:
         raise LaunchError(f"{config}: no [homes.{session.home.name}] flags; add them to launch this home")
+    if session.cwd is None:
+        raise LaunchError(f"{session.home.harness} session {session.id} has no workspace; not launching")
     if not os.path.isdir(session.cwd):
         raise LaunchError(f"cwd missing: {session.cwd}; not launching elsewhere")
     if not session.transcript.is_file():

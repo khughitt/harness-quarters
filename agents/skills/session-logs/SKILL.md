@@ -17,6 +17,7 @@ in `hq`); nothing puts it on PATH. Its contract is
 | --- | --- | --- | --- |
 | Claude Code | `~/.claude/projects/<cwd-slug>/<session-uuid>.jsonl` | one JSONL file per session; a subagent transcript is a file whose records are all `isSidechain` | `--resume` forks a new uuid that copies the old records (same `uuid`s and tool ids, `sessionId` rewritten): two files, one conversation |
 | Codex | `~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<uuid>.jsonl` | one rollout per session; `session_meta` first | no session on this host has a second rollout |
+| agy | `~/.gemini/antigravity-cli/brain/<conversation-id>/.system_generated/logs/transcript_full.jsonl` | one step per line, one file per conversation; a subagent is a conversation of its own | titles, workspaces and parents live in `~/.gemini/antigravity-cli/conversation_summaries.db`; episodes never reads it |
 | opencode | `~/.local/share/opencode/opencode.db` (sqlite; `opencode-local.db` beside it) | rows, not files | store only; tooling arrives with obs-175b10 |
 | Crush | `~/.crush/crush.db` and `<project>/.crush/crush.db` (sqlite) | rows, per project | store only; as above |
 
@@ -48,6 +49,36 @@ Older rollouts use `function_call` (`name: "shell"`, `arguments` JSON with a
 `command` array) and `function_call_output` (`output` string). A turn is
 bracketed by `task_started` … `task_complete`; `turn_aborted` ends one early.
 
+agy — one step per line, `{"step_index","source","type","status","created_at",…}`:
+
+    {"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","created_at":"2026-11-01T09:16:40Z",
+     "content":"<USER_REQUEST>\nLet's take ai-6c8245\n</USER_REQUEST>\n<ADDITIONAL_METADATA>…</ADDITIONAL_METADATA>"}
+    {"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","content":"…","tool_calls":[
+       {"name":"run_command","args":{"CommandLine":"tasks start ai-6c8245","WaitMsBeforeAsync":5000}}]}
+    {"step_index":2,"source":"MODEL","type":"GENERIC","status":"DONE","content":"Created At: …\nCommand exited with code 0.\n\nCommand output:\n{\"id\":\"ai-6c8245\",\"warnings\":[]}"}
+    {"step_index":3,"source":"SYSTEM","type":"SYSTEM_MESSAGE","content":"… <SYSTEM_MESSAGE>\n[Message] timestamp=… sender=<id>/task-2 … content=Task id \"<id>/task-2\" finished with result:\n…</SYSTEM_MESSAGE>"}
+    {"step_index":4,"source":"SYSTEM","type":"ERROR_MESSAGE","error":"API error (attempt 1): …"}
+
+Also `CHECKPOINT` steps. agy records no call ids: the k-th `GENERIC` step after a
+`PLANNER_RESPONSE` is the result of its k-th tool call, and session-episodes names
+the call `<conversation-id>:<step_index>:<k>`. Three cases the pairing handles:
+
+1. A command that outlives `WaitMsBeforeAsync`: its `GENERIC` has `status: RUNNING`
+   and names `background task with task id: <bg-id>`. Its result is the later
+   `SYSTEM_MESSAGE` naming `sender=<bg-id>`: the text after `finished with result:`,
+   or, after `was canceled with result:`, an error result. A daemon or an
+   early-cancelled timer may never get one; its call then has no result.
+2. A `GENERIC` with `status: ERROR` (`Encountered error in step execution: …`) is an
+   error result: it never confirms a start.
+3. Fewer `GENERIC` steps than calls (an interrupted or unfinished step): the unpaired
+   calls have no result.
+
+A turn runs from a human `USER_INPUT` to the step before the next one, across the
+`SYSTEM_MESSAGE` wake-ups and the planner steps they trigger. It is completed when
+it ends on a `PLANNER_RESPONSE` with text and no tool calls (also after starting a
+background command), wait when the last planner step's unanswered calls are only
+`ask_question`, unknown on an `ERROR_MESSAGE` or any other unanswered tail.
+
 ## Human or injected
 
 Not the human, in Claude Code: `isMeta`, `isCompactSummary`, `isSidechain`,
@@ -63,11 +94,19 @@ wrapper tags are the harness's, the rest is theirs. The same list lives in obs's
 `claude_adapter.py` / `codex_adapter.py` and in `session-episodes`; change all
 three together.
 
+In agy, the human is a `USER_INPUT` step with `source: USER_EXPLICIT`, and only the
+text inside `<USER_REQUEST>…</USER_REQUEST>`: the `<ADDITIONAL_METADATA>` and
+`<USER_SETTINGS_CHANGE>` blocks after it are agy's, and so is every other step type,
+`SYSTEM_MESSAGE` included (its `[Message] … sender=…` lines are controller and
+background-task wake-ups). A conversation with no `USER_EXPLICIT` input is a
+subagent's.
+
 ## Finding the session behind a thing
 
 - **A task id.** Since 2026-09-17 lifecycle notes carry
-  `provenance: {"harness_session": "claude-code:<uuid>" | "codex:<uuid>", …}`;
-  `tasks show <id>` prints them. Before that, search *tool-call inputs* for
+  `provenance: {"harness_session": "claude-code:<uuid>" | "codex:<uuid>" | "agy:<conversation-id>", …}`;
+  `tasks show <id>` prints them; an agy id names the `brain/<conversation-id>`
+  directory. Before that, search *tool-call inputs* for
   `tasks start <id>` — never the raw text, which also matches the tasks
   skill's own instructions and Codex's AGENTS.md injection (a text grep hits
   ~1,400 Codex files; tool calls are the real ones):
@@ -85,7 +124,13 @@ three together.
 
   For Codex, filter `response_item` lines whose payload type is
   `function_call`/`custom_tool_call` and search their `arguments`/`input`.
-- **A worktree.** `cwd` on any timed Claude record; `session_meta.cwd` in Codex.
+  For agy, read the `PLANNER_RESPONSE` steps and search
+  `tool_calls[].args.CommandLine` of the `run_command` calls; the conversation id
+  is the directory under `~/.gemini/antigravity-cli/brain/`.
+- **A worktree.** `cwd` on any timed Claude record; `session_meta.cwd` in Codex;
+  in agy, the `workspace_uris` of the conversation's row in
+  `~/.gemini/antigravity-cli/conversation_summaries.db` (`hq sessions --harness agy`
+  lists them), or the paths in its `run_command` calls.
 - **A commit.** A tool call whose command contains `git commit`, then the sha
   in its result.
 
@@ -112,16 +157,22 @@ The output feeds obs Task 4 (`obs baseline --input episodes.jsonl`). One pass:
 1. `~/.agents/bin/session-episodes extract --out <dir>/episodes.jsonl`
    The JSON summary on stderr is the run's provenance: files per harness,
    exclusions, unconfirmed starts by reason, turn outcomes, label sources,
-   `note_missing`, `origin_unknown`, `retired`. Keep it with the file. Every
-   file in both stores is seen, and `skipped` counts the ones not parsed
+   `note_missing`, `origin_unknown`, `retired`. Keep it with the file. It
+   reads Claude Code and Codex; `--harness claude-code|codex|agy`, repeated,
+   names the stores instead, and until the flow-trial-1 readout (2027-02-16)
+   agy is read only when `--harness agy` is given, so the default run and its
+   summary stay as they were. Every file in the selected stores is seen, and `skipped` counts the ones not parsed
    because they cannot hold an anchor (a subagent rollout by its first line,
    a file older than `--since` by mtime, a file without `tasks … start|park|
    done|drop` in its text; about 2 minutes for 23 GB on this host);
    `--since DAYS` and `--project PREFIX` narrow the *episodes*, and `--since`
    also skips older files;
    `--window-minutes N` sets the window (default 10); `--labels` / `--anchors`
-   name the sidecars when they are not beside `--out`; `SESSION_LOGS_CLAUDE`
-   and `SESSION_LOGS_CODEX` point at other store roots.
+   name the sidecars when they are not beside `--out`; `SESSION_LOGS_CLAUDE`,
+   `SESSION_LOGS_CODEX` and `SESSION_LOGS_AGY` (the agy home, holding `brain/`)
+   point at other store roots. The default roots come from hq's
+   `tools/harness_stores`, which the script finds from its own real path; a copy
+   outside an hq checkout stops with an error naming that path.
 2. Hand over `episodes.jsonl` and the summary now: the consumer reports
    coverage per harness and does not wait for the queue.
 3. Walk `<dir>/episodes.candidates.jsonl` within the budget the consumer set,

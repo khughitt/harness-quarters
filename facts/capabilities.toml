@@ -527,3 +527,102 @@ version = "2.1.304"
 date = 2026-10-22
 evidence = "hq-0b8f2c"
 note = "Hand-made pair of ordinary sessions: O ran one background agent to completion, N is a --fork-session copy of O, and N/subagents/agent-<id>.jsonl is an absolute link to O's transcript beside a regular .meta.json copy, the shape of the live links. Live successors are background sessions (sessionKind bg) that took over a running agent; that path was not driven. N was resumed headless (-p --resume) and in the terminal interface (--resume), with the link resolving and with O's whole unit moved aside, under strace -ff -y over file syscalls, content syscalls (read, pread, preadv, mmap, sendfile, copy_file_range, splice) and getdents64. No call opened, read or changed the link or its target, or named anything under N/subagents; no unparsed trace line named them; no io_uring ring was set up and no untraced claude process was seen before or after a resume; every resume exited 0 and replied, and the link was left as it was. One recorded run at the probe's committed revision (attached to hq-0b8f2c); three earlier runs of draft revisions agreed under weaker checks (one attached at 565b286). Not shown: a pair Claude Code makes itself (claude --bg --resume of a running session started a copy that did not take the agent; /background offered to stop it), resuming or reattaching a background session through its daemon, opening the agent's transcript from the agent view, or the relink sweep, which turns symlinked agent-* names into hard links or copies on resume only behind a storage-v5 gate that was off here."
+
+[facts.tool-result-call-ids]
+type = "boolean"
+description = "A tool result in the harness's transcript names the call it answers."
+[facts.tool-result-call-ids.harness.agy]
+status = "probed"
+value = false
+version = "1.4.12"
+date = 2026-11-01
+evidence = "hq-57d68e"
+note = "Positional pairing: an agy transcript result record carries no call id, so a result is matched to its call by order. A backgrounded command reports its result later, as a system message naming the sender, not as the call's own result."
+
+[facts.tool-result-call-ids.harness.claude-code]
+status = "probed"
+value = true
+version = "2.1.316"
+date = 2026-11-01
+evidence = "hq-57d68e"
+note = "A tool_result block in a Claude Code transcript carries tool_use_id, which the session-logs skill and session-episodes pair on. Read from a live sample on this host while closing the agy adapter work."
+
+[facts.tool-result-call-ids.harness.codex]
+status = "probed"
+value = true
+version = "0.166.0"
+date = 2026-11-01
+evidence = "hq-57d68e"
+note = "A function or custom-tool call output item in a Codex rollout carries call_id, which the session-logs skill and session-episodes pair on. Read from a live sample on this host while closing the agy adapter work."
+
+
+[facts.session-metadata-marks-headless]
+type = "boolean"
+description = "The harness's session metadata tells headless runs from interactive ones."
+[facts.session-metadata-marks-headless.harness.agy]
+status = "unknown"
+note = "Not probed. Telling the two apart needs one headless agy -p run in an isolated home, and the only route to a signed-in isolated home is copying the live OAuth token out of the live agy home, which was not done. The live summaries database has a source column, but it is empty on every row, so existing rows show no marker. hq sessions excludes agy rows only by parent_conversation_id (subagents)."
+
+[facts.session-metadata-marks-headless.harness.claude-code]
+status = "probed"
+value = true
+version = "2.1.316"
+date = 2026-11-01
+evidence = "hq-57d68e"
+note = "The first record's entrypoint (cli, sdk-cli, sdk-py) separates interactive from headless runs, per docs/notes/2026-10-15-session-discovery-contract.md. A live sample on this host shows entrypoint cli."
+
+[facts.session-metadata-marks-headless.harness.codex]
+status = "probed"
+value = true
+version = "0.166.0"
+date = 2026-11-01
+evidence = "hq-57d68e"
+note = "The session_meta source (cli, exec and others) separates interactive from headless runs, per docs/notes/2026-10-15-session-discovery-contract.md. A live sample on this host shows source cli."
+
+
+[facts.transcript-self-describing]
+type = "boolean"
+description = "A transcript file names its session's working directory without another store."
+[facts.transcript-self-describing.harness.agy]
+status = "probed"
+value = false
+version = "1.4.12"
+date = 2026-11-01
+evidence = "hq-57d68e"
+note = "An agy transcript names neither its working directory nor its title; both live only in the conversation summaries database (workspace_uris, title), so hq sessions reads that database (session-episodes does not)."
+
+[facts.transcript-self-describing.harness.claude-code]
+status = "probed"
+value = true
+version = "2.1.316"
+date = 2026-11-01
+evidence = "hq-57d68e"
+note = "Records in a Claude Code transcript carry cwd. Read from a live sample on this host."
+
+[facts.transcript-self-describing.harness.codex]
+status = "probed"
+value = true
+version = "0.166.0"
+date = 2026-11-01
+evidence = "hq-57d68e"
+note = "The session_meta record at the head of a Codex rollout carries cwd. Read from a live sample on this host."
+
+
+[facts.session-archive-complete]
+type = "boolean"
+description = "hq's session-archive captures everything needed to resume or fully re-read a session."
+[facts.session-archive-complete.harness.agy]
+status = "probed"
+value = false
+version = "1.4.12"
+date = 2026-11-01
+evidence = "hq-57d68e"
+note = "Not captured: each conversation's own database under conversations, steps whose output was spilled to a separate output file, and model and token metadata. Captured: transcripts and the summaries database."
+
+[facts.session-archive-complete.harness.claude-code]
+status = "unknown"
+note = "The archive spec does not state completeness for Claude Code, and it was not checked."
+
+[facts.session-archive-complete.harness.codex]
+status = "unknown"
+note = "The archive spec does not state completeness for Codex, and it was not checked."

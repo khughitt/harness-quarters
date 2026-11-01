@@ -1,11 +1,13 @@
 """The prune run: two phases, dry run, gates, leftovers, repair and divergence (spec §3.4)."""
 import json
+from dataclasses import replace
 import os
 import sys
 import time
 
 import pytest
 
+import harness_stores
 from session_archive import config, prune
 from session_archive.capture import capture_run, hash_file, mirror_path, promote
 from session_archive.manifest import Manifest
@@ -19,7 +21,7 @@ OTHER = "22222222-2222-4333-8444-555555555555"
 
 @pytest.fixture
 def table(home):
-    return config.sources(home)
+    return harness_stores.archive_sources(home)
 
 
 def src(table, name):
@@ -170,7 +172,8 @@ def test_io_error_stops_phase_two_and_keeps_the_report(table, archive, manifest,
     def broken(unit, ctx):
         raise OSError(5, "Input/output error")
 
-    monkeypatch.setattr(prune, "delete_claude_unit", broken)
+    table = tuple(replace(s, prune=replace(s.prune, delete_unit=broken))
+                  if s.name == "claude" else s for s in table)
     report = {}
     paths = transcripts(claude.root) + transcripts(claude.root, OTHER)
     assert not prune_run(ctx_for(archive, manifest, paths), table, True, True, report)
@@ -238,7 +241,7 @@ def test_command_records_expected_errors_with_partial_report(home, archive, mani
             raise error
 
         monkeypatch.setattr(prune, "prune_run", failed_run)
-        assert cli.cmd_prune(cfg, config.sources(home), Namespace(apply=False)) == 1
+        assert cli.cmd_prune(cfg, harness_stores.archive_sources(home), Namespace(apply=False)) == 1
         report = json.loads(capsys.readouterr().out)
         recorded = manifest.last_run("prune")
         assert not recorded.ok and recorded.mode == "dry-run"
