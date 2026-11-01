@@ -1,15 +1,17 @@
 ---
 id: hq-2eba07
 title: Extract a declarative harness manifest so live-state hooks and capability facts read one source of truth
-status: doing
+status: done
 priority: 2
 size: m
 complexity: mid
 process: planned
 owner: feat/hq-2eba07-harness-manifest
 created: 2026-11-01T01:25:51Z
-updated: 2026-11-01T19:04:06Z
+updated: 2026-11-01T19:04:08Z
 started: 2026-11-01T09:55:45Z
+completed: 2026-11-01T19:04:08Z
+closed: 2026-11-01T19:04:08Z
 depends: []
 tags: [hooks]
 source: hq-6c8a9f
@@ -86,3 +88,7 @@ Where: .githooks/{harness-state-clean,harness-state-refresh,live-picks}, facts/c
 - 2026-11-01T19:03:35Z (feat/hq-2eba07-harness-manifest): User approved merging feat/hq-2eba07-harness-manifest into main in session (message: "Approved."). Identify the current integration owner.
   provenance: {"harness_session":"claude-code:fdf3b32f-5e63-4593-bba2-4e994bcdf1eb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-01T19:04:06Z (feat/hq-2eba07-harness-manifest): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-2eba07","state":"kept","verification":"verified","purpose":"Hold reviewed branch feat/hq-2eba07-harness-manifest and its SDD workspace only until this session merges it into main and runs the removal checks","next_owner":"session:claude-code:fdf3b32f-5e63-4593-bba2-4e994bcdf1eb","cleanup_trigger":"User-authorized merge of feat/hq-2eba07-harness-manifest into main (approved this session), then checked removal: tt-report, ignored-file dispositions, host-pointer check, basis ancestry"}
+- 2026-11-01T19:04:08Z (feat/hq-2eba07-harness-manifest): done
+  provenance: {"harness_session":"claude-code:fdf3b32f-5e63-4593-bba2-4e994bcdf1eb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-01T19:04:08Z (feat/hq-2eba07-harness-manifest): Harness manifest implemented and reviewed; user approved merge. Verification: final code tree just test 268 + 1412 + 391 + 1 passed rc=0; ops-check, ops-docs check, harness-facts check, harness_state.py check, tasks check rc=0 (Status-only doc commits got the doc checks). Reviews: Tasks 1-5 task reviews accepted after fix rounds; final whole-branch review round 1 With fixes (claude-opus-5-5), corrective round 1 re-review clean (claude-sonnet-5-5). Rulings (1-3 plus re-grades) and all deferred minors: attached files:sdd-ledger-harness-manifest.md; final review files:final-review-report-round1.md. Disclosures: shared repository git config holds filter.harness-state.required = true and filter.harness-state.smudge = cat, live on this host and the second host via the synced .git, intended to stay; hosts not sharing this .git run just setup after pulling. host-load --section session: nothing left running. Pushes: none. Others' work: main's live codex/config.toml and agy/settings.json modifications left untouched; another session's .worktrees/hq-8af61d untouched. Integration and worktree: this session merges feat/hq-2eba07-harness-manifest into main with --no-ff, runs just test and just link-check there, then removes .worktrees/hq-2eba07 after the checks and records its release on main. Follow-ups: hq-5adbfd, hq-0e5941.
+  provenance: {"harness_session":"claude-code:fdf3b32f-5e63-4593-bba2-4e994bcdf1eb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
