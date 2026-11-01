@@ -106,7 +106,7 @@ def test_recipe_refuses_a_different_file(tmp_path):
     assert dest.read_text() == TEMPLATE.read_text().replace("@HOME@", str(tmp_path))
 
 
-def test_template_validates_against_registered_relay_budgets():
+def test_template_validates_against_registered_relay_budgets(tmp_path):
     import tomllib
     import pytest
 
@@ -145,7 +145,7 @@ for (const [harness, nativeEvent, kind, outerMs] of [
     res = subprocess.run(
         ["/usr/bin/node", "--input-type=module", "-", str(subscribers_js), str(TEMPLATE)],
         cwd=CHECKOUT,
-        env={"PATH": os.defpath},
+        env={"PATH": os.defpath, "HOME": str(tmp_path)},
         input=script,
         capture_output=True,
         text=True,

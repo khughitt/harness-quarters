@@ -45,9 +45,11 @@ limits:
 - `pi`, `pi-durable`: a pinned runtime and launcher, live-state hygiene through an
   in-process extension, and probes.
 - `agy`: split homes, a skills manifest, workspace trust and anchored atomic-save
-  settings adoption in `live-picks` and `links.toml` (3.1), and an adapter hook
-  (`agy/hook`) for profile, command guard and a one-shot Stop claim check (no relay
-  observer or native `claim-guard` support yet; ops-33cef9).
+  settings adoption in `live-picks` and `links.toml` (3.1), relay dispatch on
+  `SessionStart`, `PreToolUse` and `Stop` (`ops-guard` and `familiar-agy`), and a
+  local adapter hook (`agy/hook`) for detached `settings.json` healing, `SessionStart`
+  `injectSteps` wrapping and a one-shot `Stop` claim check until native `claim-guard`
+  and `SessionStart` support land (ops-33cef9, hq-c59809).
 - `claude-code`, `codex`: every layer, through relay.
 
 ## 1. Discover every enumeration
@@ -583,16 +585,18 @@ the same change that widens its parser.
    `src/adapters/index.js`:
    - events and state: `events` (`nativeEvent -> {kind, level}`), `stateForEvent`,
      `reduceState`, `replies` flags (`refuse` on each before-tool event is required
-     for a guard subscriber), `outerTimeouts`, `encodeReply`, optional `workerIdOf` /
-     `backgroundOf`;
+     for a guard subscriber), `outerTimeouts`, `encodeReply`, optional `nativeFields`,
+     `failureExitCode`, and `workerIdOf` / `backgroundOf`;
    - process tree: `isHarness(row, ops)` (only Claude Code's uses `ops`, which supplies
      `executableOf`), `resolveSessionPid`, `resolveTerminalPid`.
-3. **Payload parsing is shared, not per adapter**: `normalizeEvent`
-   (`src/adapters/index.js`) calls `parsePayload` (`src/adapters/payload.js`), which
-   requires a non-empty `session_id`, an absolute `cwd`, and on `PreToolUse` a
-   `tool_name` and object `tool_input`; `hook_event_name` is optional but must match
-   the native event when present. A camelCase harness therefore needs either a bridge
-   that emits snake_case or a change to the shared parser.
+3. **Payload parsing is shared, with optional adapter field normalization**:
+   `normalizeEvent` (`src/adapters/index.js`) calls `parsePayload`
+   (`src/adapters/payload.js`), which runs `adapter.nativeFields(nativeEvent, raw)` when
+   defined and then requires a non-empty `session_id`, an absolute `cwd`, and on
+   `PreToolUse` a `tool_name` and object `tool_input`; `hook_event_name` is optional but
+   must match the native event when present. A camelCase harness implements
+   `nativeFields` on its adapter to map native keys into that shared contract before
+   validation.
 4. **Plugin-event harnesses**: when the harness exposes plugin events rather than shell
    hooks, follow `integrations/opencode/` (`plugin.js`, `binding.js`, `hook.js`,
    `queue.js`, `window.js`, exported from `package.json` as `./opencode`); its event
@@ -623,7 +627,7 @@ the same change that widens its parser.
   `harnesses` entry is outside its closed list (`src/subscribers.js`). A rejected file
   sends dispatch down its fail-closed path: every refusable event is denied (so every
   PreToolUse call is blocked) and other events exit 1. Hook images name fixed runtime
-  versions (Claude Code's and Codex's differ; `tools/test_relay_wiring.py` records
+  versions (versions can differ across harnesses; `tools/test_relay_wiring.py` records
   them), and a CLI pin change does not move them. So, in this order:
   1. land and install a relay release whose `HARNESSES` includes the new slug (and, for
      a guard subscriber, whose new adapter declares `refuse` for its before-tool
