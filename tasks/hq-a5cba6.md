@@ -1,13 +1,15 @@
 ---
 id: hq-a5cba6
 title: Counters
-status: todo
+status: doing
 priority: 1
 size: s
 complexity: mid
 process: direct
+owner: feat/hq-9aa713-pause-past-range
 created: 2026-11-01T10:29:22Z
-updated: 2026-11-01T10:29:23Z
+updated: 2026-11-01T15:05:09Z
+started: 2026-11-01T15:05:09Z
 depends: []
 parent: hq-9aa713
 tags: []
@@ -25,3 +27,5 @@ Implements Task 3 of the turn-pause plan in .worktrees/hq-9aa713 (branch feat/hq
   provenance: {"harness_session":"claude-code:de7b905c-a6e0-4009-9b0c-e09dacbc2697","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
 - 2026-11-01T10:29:22Z (feat/hq-9aa713-pause-past-range): gate: scoped — step of hq-9aa713 plan, Task 3
   provenance: {"harness_session":"claude-code:de7b905c-a6e0-4009-9b0c-e09dacbc2697","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-01T15:05:09Z (feat/hq-9aa713-pause-past-range): started
+  provenance: {"harness_session":"claude-code:536b5ebf-5753-4a8b-ac83-61dde5ef4c79","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
