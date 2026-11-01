@@ -41,3 +41,14 @@ def test_budget_malformed(): assert isinstance(prompt.parse_budget('budget: 12 h
 
 @pytest.mark.parametrize('text', ['budget:', 'budget: 0h', 'budget: 2h, 5 widgets', 'budget: 2h, 5 calls, 6 calls', 'budget: 2h,'])
 def test_budget_malformed_cases(text): assert isinstance(prompt.parse_budget(text), Malformed)
+
+def test_budget_oversized_duration_is_malformed():
+    assert isinstance(prompt.parse_budget('budget: ' + '9' * 400 + 'h'), Malformed)
+    assert isinstance(prompt.parse_budget('budget: 1.' + '9' * 400 + 'h'), Malformed)
+
+def test_budget_oversized_count_is_malformed():
+    assert isinstance(prompt.parse_budget('budget: 2h, ' + '9' * 5000 + ' calls'), Malformed)
+
+def test_budget_unicode_digits_are_malformed():
+    assert isinstance(prompt.parse_budget('budget: ٣h'), Malformed)
+    assert isinstance(prompt.parse_budget('budget: 2h, ٣ calls'), Malformed)

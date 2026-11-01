@@ -4,8 +4,8 @@ from dataclasses import dataclass
 
 PASTED_OPEN = '<pasted_content'
 _PASTED_BLOCK = re.compile(r'<pasted_content id="([^"]*)">.*?</pasted_content id="\1">', re.DOTALL)
-_DURATION = re.compile(r'(\d+(?:\.\d+)?)([hm])')
-_COUNT = re.compile(r'(\d+) (calls|agents|compactions)')
+_DURATION = re.compile(r'([0-9]{1,6}(?:\.[0-9]{1,6})?)([hm])')
+_COUNT = re.compile(r'([0-9]{1,9}) (calls|agents|compactions)')
 _UNIT_SECONDS = {'h': 3600, 'm': 60}
 _COUNT_FIELD = {'calls': 'calls', 'agents': 'agents', 'compactions': 'compactions'}
 
