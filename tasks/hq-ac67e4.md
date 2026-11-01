@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-11-01T22:03:31Z
-updated: 2026-11-01T23:52:51Z
+updated: 2026-11-01T23:54:44Z
 started: 2026-11-01T22:06:20Z
 depends: []
 tags: [hooks]
@@ -53,3 +53,4 @@ Where: links.toml, harnesses.toml, agy/settings.json, tools/harness-links, tools
 - 2026-11-01T23:52:49Z (main): resumed
   provenance: {"harness_session":"claude-code:6dcbd897-967a-4e20-a982-604b9c48faaf","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-01T23:52:51Z (main): User approved in session (2026-11-01): 'Yes; approved.' — merge into main and run just link --apply on europa. Merged as 254f0140.
+- 2026-11-01T23:54:44Z (main): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-ac67e4","state":"removed","verification":"verified","purpose":"branch feat/hq-ac67e4-agy-bootstrap merged into main 254f0140 and deleted","ignored":"pycache and .pytest_cache discarded (regenerable)","checks":"tt-report run; no host pointer resolved into the worktree; worktree status clean"}
