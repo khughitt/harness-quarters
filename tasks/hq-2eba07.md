@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-2eba07-harness-manifest
 created: 2026-11-01T01:25:51Z
-updated: 2026-11-01T13:37:18Z
+updated: 2026-11-01T17:16:48Z
 started: 2026-11-01T09:55:45Z
 depends: []
 tags: [hooks]
@@ -68,3 +68,4 @@ Where: .githooks/{harness-state-clean,harness-state-refresh,live-picks}, facts/c
 - 2026-11-01T13:24:40Z (feat/hq-2eba07-harness-manifest): resumed
   provenance: {"harness_session":"claude-code:fdf3b32f-5e63-4593-bba2-4e994bcdf1eb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-01T13:37:18Z (feat/hq-2eba07-harness-manifest): baseline: just test in .worktrees/hq-2eba07 at 19c3366b exited 0 (~12 min): harness-facts check ok; agents/bin pytest passed (count not captured: output tail truncated); .githooks+tools 1243 passed; relay_cutover xdist 391 passed; signal test 1 passed, 154 deselected. Controller: claude-code/claude-opus-5-5, subagent-driven; SDD ledger .worktrees/hq-2eba07/.superpowers/sdd/2026-11-01-harness-manifest/progress.md
+- 2026-11-01T17:16:48Z (feat/hq-2eba07-harness-manifest): host change: just setup in .worktrees/hq-2eba07 wrote filter.harness-state.required = true and filter.harness-state.smudge = cat (identity smudge; git treats a required filter's missing smudge as fatal on checkout) into the shared repository git config (commondir; live for main and every worktree on this host before merge approval). Benign with main's pre-manifest clean filter and intended to remain set permanently after merge. Rollback if ever needed before merge: git config --unset filter.harness-state.required && git config --unset filter.harness-state.smudge. Other hosts sharing this checkout must run just setup once after merge. Ruling 2 in the plan ledger.
