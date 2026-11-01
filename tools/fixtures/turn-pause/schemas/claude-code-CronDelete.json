@@ -1,0 +1,22 @@
+{
+  "harness": "claude-code",
+  "version": "2.1.316",
+  "tool": "CronDelete",
+  "role": "cancellation tool the table does not name",
+  "source": "the input_schema Claude Code 2.1.316 sent for this tool in a probe session's API request (after ToolSearch loaded it), recorded by claude/probes/turn-pause-probe.py run surface",
+  "deferred": true,
+  "input_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "id": {
+        "description": "Job ID returned by CronCreate.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "id"
+    ],
+    "additionalProperties": false
+  }
+}

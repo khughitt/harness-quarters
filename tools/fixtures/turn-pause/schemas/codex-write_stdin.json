@@ -1,0 +1,10 @@
+{
+  "harness": "codex",
+  "version": "0.166.0",
+  "tool": "write_stdin",
+  "namespace": "functions",
+  "kind": "exec-nested",
+  "role": "named cancellation control (interrupt or end of input only)",
+  "source": "the TypeScript declaration in the description of the exec tool Codex 0.166.0 offered its model, from a probe session's additional_tools rollout record; nested tools carry no JSON schema",
+  "declaration": "declare const tools: { write_stdin(args: {\n  // Bytes to write to stdin. Defaults to empty, which polls without writing.\n  chars?: string;\n  // Output token budget. Defaults to 10000 tokens; larger requests may be capped by policy.\n  max_output_tokens?: number;\n  // Identifier of the running unified exec session.\n  session_id: number;\n  // Wait before yielding output. Non-empty writes default to 250 ms and cap at 30000 ms; empty polls wait 5000-300000 ms by default.\n  yield_time_ms?: number;\n}): Promise<{\n  // Chunk identifier included when the response reports one.\n  chunk_id?: string;\n  // Process exit code when the command finished during this call.\n  exit_code?: number;\n  // Approximate token count before output truncation.\n  original_token_count?: number;\n  // Command output text, possibly truncated.\n  output: string;\n  // Session identifier to pass to write_stdin when the process is still running.\n  session_id?: number;\n  // Elapsed wall time spent waiting for output in seconds.\n  wall_time_seconds: number;\n}>; };"
+}

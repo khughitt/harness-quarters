@@ -465,6 +465,24 @@ revision pi requests, and the probe does not record it. After `rpc-probe.py` rep
 The value is the `LATEST_PROTOCOL_VERSION` printed, provided the `new McpClient({…})`
 line passes no `protocolVersion`; if it does, that option's value is the revision.
 
+### Re-probing the turn-pause hook facts
+
+The hook facts the turn pause reads (`hook-*`, `model-tool-surface`, `codex-*`) come
+from `claude/probes/turn-pause-probe.py` and `codex/probes/turn-pause-probe.py`. After
+a Claude Code or Codex upgrade, run each case into a fresh directory under the task's
+scratch (`run <case> <dir>`, then `summarize <dir>`) and refresh that harness's entries
+in one commit:
+
+- Claude Code: `surface`, `main`, `compact`. They need `ANTHROPIC_API_KEY` and use a
+  temporary HOME and `CLAUDE_CONFIG_DIR`, so no user hook, skill or mod loads.
+- Codex: `surface`, `main`, `spawn`, `spawn-direct`, `compact <dir> <token limit>`. The
+  temporary `CODEX_HOME` links its auth file to the live login rather than copying it; the
+  driver refuses to run when that login last refreshed over 7 days ago, and restores the
+  live file if Codex replaced the link.
+
+Each run costs a few model calls. Raw logs carry host paths: keep them in the scratch
+directory and attach portable derivatives to the evidence task.
+
 Ops's claim guard reads this validated view directly. No consumer mirror runs in
 this hook or gates. Hq still validates the staged fact blob, including when its
 working-tree copy differs; edit facts in a worktree and integrate them only after
