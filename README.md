@@ -207,9 +207,10 @@ MIT licensed; see `LICENSE`.
   home's settings and hooks files are symlinks to them: `~/.claude` and `~/.codex` to the
   plain files, `~/.codex-work` to `codex/work/hooks.json`, `~/.gemini/antigravity-cli` to
   `agy/settings.json`, and `~/.gemini/config` to `agy/hooks.json`, `agy/skills.json`
-  (pointing `agy` at `~/.agents/skills`) and lore's `AGENTS.md`. `agy/hook` adapts
-  `agy/hooks.json`'s `SessionStart`, `PreToolUse` and `Stop` events to lore's profile
-  hook, ops's capture notice and relay guard, and a one-shot `agy` claim check.
+  (pointing `agy` at `~/.agents/skills`) and lore's `AGENTS.md`. `agy/hooks.json` routes
+  `SessionStart`, `PreToolUse` and `Stop` through `relay`, while `agy/hook` heals detached
+  `agy` settings saves and adapts `SessionStart` (lore's profile hook, ops's capture
+  notice) and `Stop` (a one-shot `agy` claim check until ops-33cef9 lands).
 - `claude/mods/`: Claude Code function-hook plugins, linked as `~/.claude/mods` and
   loaded by `CLAUDE_CODE_PLUGIN_DIRS` in `claude/settings.json`. `cli-pane` adds
   `/tas <id>` and `/m <id>`, which show `tasks show` and `mindful show` output in a
@@ -390,16 +391,20 @@ Codex `/hooks` in each native home.
 ## Antigravity CLI hooks
 
 `agy/hooks.json`, linked as `~/.gemini/config/hooks.json`, wires `SessionStart`,
-`PreToolUse` (`run_command`) and `Stop` through `agy/hook`: `SessionStart` and
-`PreToolUse` first run `.githooks/harness-state-refresh` whenever
-`~/.gemini/antigravity-cli/settings.json` has been replaced by a regular file so startup
-trust and mid-turn `/model`, `/effort` or `/config` saves sync back and relink before
-commands run; `SessionStart` then runs lore's
-profile hook and ops's capture notice in `workspacePaths[0]` and injects their text as
-a `systemMessage`; `PreToolUse` translates `run_command` into a schema-1 `before-tool`
-envelope for ops's `relay-guard`, failing closed; and `Stop` runs a one-shot
-`agy:<conversationId>` live task claim check (allowing stops while `fullyIdle` is
-`false` under `agy`'s probed `controller-wake`) alongside `harness-state-refresh`.
+`PreToolUse` and `Stop` through both `agy/hook` and `relay` (`v0.3.0`, with handler
+`timeout` `60` paired with `--outer-ms 60000`): `SessionStart` and `PreToolUse`
+(`run_command`) first run `agy/hook` to trigger `.githooks/harness-state-refresh`
+whenever `~/.gemini/antigravity-cli/settings.json` has been replaced by a regular file so
+startup trust and mid-turn `/model`, `/effort` or `/config` saves sync back and relink
+before commands run (emitting empty stdout on `PreToolUse` so `agy` keeps its own
+permission prompts); `SessionStart` in `agy/hook` also runs lore's profile hook and ops's
+capture notice in `workspacePaths[0]` and injects their text as a `systemMessage`;
+`relay` publishes the `agy:<conversationId>` session row, dispatches `SessionStart`,
+`PreToolUse` (`*`) and `Stop` to `familiar-agy`, and translates `run_command` to `Bash`
+for ops's `relay-guard` (`ops-guard`), failing closed; and `Stop` runs `agy/hook`'s
+one-shot `agy:<conversationId>` live task claim check (allowing stops while `fullyIdle`
+is `false` under `agy`'s probed `controller-wake`, until ops-33cef9 lands) alongside
+`harness-state-refresh` and `relay`.
 
 ## Capability facts
 

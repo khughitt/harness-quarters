@@ -81,7 +81,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' SessionStart",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.3.0/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' SessionStart",
             "timeout": 600
           }
         ]
@@ -102,7 +102,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' UserPromptSubmit",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.3.0/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' UserPromptSubmit",
             "timeout": 600
           }
         ]
@@ -114,7 +114,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' PreToolUse",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.3.0/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' PreToolUse",
             "timeout": 600
           }
         ]
@@ -126,7 +126,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' Notification:idle_prompt",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.3.0/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' Notification:idle_prompt",
             "timeout": 600
           }
         ]
@@ -136,7 +136,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' Notification:permission_prompt",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.3.0/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' Notification:permission_prompt",
             "timeout": 600
           }
         ]
@@ -163,7 +163,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' Stop",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.3.0/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' Stop",
             "timeout": 600
           }
         ]
@@ -174,7 +174,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' StopFailure",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.3.0/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' StopFailure",
             "timeout": 600
           }
         ]
@@ -185,7 +185,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 60000 --subscribers '/home/keith/.config/relay/subscribers.json' SessionEnd",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.3.0/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 60000 --subscribers '/home/keith/.config/relay/subscribers.json' SessionEnd",
             "timeout": 60
           }
         ]

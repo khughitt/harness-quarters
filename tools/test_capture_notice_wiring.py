@@ -37,4 +37,6 @@ def test_codex_work_home_has_no_capture_notice():
 def test_agy_registers_profile_and_capture_notice_once():
     hooks = json.loads((ROOT / 'agy' / 'hooks.json').read_text())['hq']
     commands = [h['command'] for h in hooks['SessionStart'] if h.get('type') == 'command']
-    assert commands == [AGY_SESSION_START]
+    assert len(commands) == 2
+    assert commands[0] == AGY_SESSION_START
+    assert parse_relay_command(commands[1], HOOK_VERSIONS['agy/hooks.json']) == ('agy', 60000, 'SessionStart')

@@ -6,10 +6,16 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-FILES = ['claude/settings.json', 'codex/hooks.json', 'codex/work/hooks.json']
-# Hook upgrades have a separate approval gate from the CLI pin, per harness: Codex took
-# v0.2.1 for root retirement; Claude Code keeps v0.1.1, which that release does not change.
-HOOK_VERSIONS = {FILES[0]: 'v0.1.1', FILES[1]: 'v0.2.1', FILES[2]: 'v0.2.1'}
+FILES = ['claude/settings.json', 'codex/hooks.json', 'codex/work/hooks.json', 'agy/hooks.json']
+# Hook upgrades have a separate approval gate from the CLI pin, per harness; routing agy
+# through relay v0.3.0 moves every relayed harness to v0.3.0 so snapshots and subscribers
+# naming agy are accepted across Claude Code, Codex, and agy.
+HOOK_VERSIONS = {
+    FILES[0]: 'v0.3.0',
+    FILES[1]: 'v0.3.0',
+    FILES[2]: 'v0.3.0',
+    FILES[3]: 'v0.3.0',
+}
 
 
 def parse_relay_command(command, version):
@@ -29,16 +35,35 @@ def parse_relay_command(command, version):
 
 
 def hook_entries(file):
-    hooks = json.loads((ROOT / file).read_text())['hooks']
+    doc = json.loads((ROOT / file).read_text())
+    if file == 'agy/hooks.json':
+        hq = doc['hq']
+        entries = []
+        for event, items in hq.items():
+            if event == 'enabled':
+                continue
+            if event in ('PreToolUse', 'PostToolUse'):
+                for group in items:
+                    for hook in group['hooks']:
+                        entries.append((event, group.get('matcher'), hook))
+            else:
+                for hook in items:
+                    entries.append((event, None, hook))
+        return entries
+    hooks = doc['hooks']
     return [(event, group.get('matcher'), hook)
             for event, groups in hooks.items() for group in groups
             for hook in group['hooks']]
 
 
 def relay_entries(file):
-    return [(event, matcher, *parsed, hook['timeout'])
-            for event, matcher, hook in hook_entries(file)
-            if (parsed := parse_relay_command(hook['command'], HOOK_VERSIONS[file])) is not None]
+    entries = []
+    for event, matcher, hook in hook_entries(file):
+        parsed = parse_relay_command(hook['command'], HOOK_VERSIONS[file])
+        if parsed is not None:
+            assert hook['timeout'] * 1000 == parsed[1]
+            entries.append((event, matcher, *parsed, hook['timeout']))
+    return entries
 
 
 def test_claude_relay_events():
@@ -54,7 +79,7 @@ def test_claude_relay_events():
     ]
 
 
-@pytest.mark.parametrize('file', FILES[1:])
+@pytest.mark.parametrize('file', FILES[1:3])
 def test_codex_relay_events(file):
     assert sorted(relay_entries(file)) == sorted([
         ('SessionStart', None, 'codex', 600000, 'SessionStart', 600),
@@ -68,11 +93,20 @@ def test_codex_relay_events(file):
     ])
 
 
+def test_agy_relay_events():
+    assert relay_entries(FILES[3]) == [
+        ('SessionStart', None, 'agy', 60000, 'SessionStart', 60),
+        ('PreToolUse', '*', 'agy', 60000, 'PreToolUse', 60),
+        ('Stop', None, 'agy', 60000, 'Stop', 60),
+    ]
+
+
 @pytest.mark.parametrize('file', FILES)
 def test_no_familiar_hook_or_native_guard(file):
     for _, _, hook in hook_entries(file):
         assert 'familiar hook' not in hook['command']
         assert 'claude-pretooluse' not in hook['command']
+        assert 'relay-guard' not in hook['command']
 
 
 @pytest.mark.parametrize('file', FILES)
@@ -91,6 +125,12 @@ def test_native_entries_kept_in_order(file):
                      '~/.local/bin/harness-state-refresh'],
             'PostToolUse': ['~/d/ops/hooks/claude-posttooluse'],
             'PostToolUseFailure': ['~/d/ops/hooks/claude-posttooluse'],
+        }
+    elif file == FILES[3]:
+        assert native == {
+            'SessionStart': ['~/d/hq/agy/hook SessionStart ~/d/lore/hooks/claude-profile ~/d/ops/hooks/capture-notice'],
+            'PreToolUse': ['~/d/hq/agy/hook PreToolUse'],
+            'Stop': ['~/d/hq/agy/hook Stop', '~/.local/bin/harness-state-refresh'],
         }
     else:
         session_start = ['~/d/lore/hooks/claude-profile']

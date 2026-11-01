@@ -2,14 +2,14 @@
 """Antigravity CLI (agy) lifecycle hook adapter for SessionStart, PreToolUse, and Stop.
 
 Bridges agy's camelCase JSON hook protocol (where hooks run with cwd set to the config
-directory containing hooks.json) to the ecosystem's harness-neutral hooks:
+directory containing hooks.json) for hq-owned state and hooks not yet covered by relay:
 - SessionStart: heals any detached `~/.gemini/antigravity-cli/settings.json` regular file
   through `.githooks/harness-state-refresh`, runs profile and capture-notice delegates in
   workspacePaths[0], and wraps their combined text in agy's injectSteps.systemMessage
   envelope.
-- PreToolUse: heals any detached `~/.gemini/antigravity-cli/settings.json` regular file,
-  translates agy's run_command PreToolHookArgs into a schema-1 before-tool relay-guard
-  envelope, and fails closed on any unreadable payload or guard error.
+- PreToolUse: heals any detached `~/.gemini/antigravity-cli/settings.json` regular file
+  and emits empty stdout (agy's no-op, preserving agy's permission flow while relay v0.3.0
+  dispatches before-tool events to ops-guard and familiar-agy).
 - Stop: enforces a one-shot live task claim check for agy:<conversationId> (allowing
   in-flight waking children when controller-wake is probed true and fullyIdle is false)
   until ops-33cef9 adds native agy support to claim-guard.
@@ -181,88 +181,8 @@ def handle_session_start(delegates, stdin_text, env):
     return {"injectSteps": [{"systemMessage": {"systemMessage": "\n\n".join(blocks)}}]}
 
 
-def _deny(reason):
-    return {"decision": "deny", "reason": reason}
-
-
-def handle_pre_tool_use(guard_target, stdin_text, env):
+def handle_pre_tool_use(env):
     refresh_detached_settings(env)
-    try:
-        payload = json.loads(stdin_text)
-    except (ValueError, TypeError, RecursionError) as error:
-        return _deny(f"agy-hook PreToolUse: unreadable stdin payload ({error}); refusing tool execution.")
-    if not isinstance(payload, dict):
-        return _deny("agy-hook PreToolUse: stdin payload is not a JSON object; refusing tool execution.")
-
-    cwd = _workspace_cwd(payload)
-    if cwd is None:
-        return _deny("agy-hook PreToolUse: missing absolute workspacePaths[0]; refusing tool execution.")
-
-    conv_id = payload.get("conversationId")
-    if not isinstance(conv_id, str) or not conv_id:
-        return _deny("agy-hook PreToolUse: missing conversationId; refusing tool execution.")
-
-    tool_call = payload.get("toolCall")
-    if not isinstance(tool_call, dict) or not isinstance(tool_call.get("name"), str) or not tool_call["name"]:
-        return _deny("agy-hook PreToolUse: missing toolCall.name; refusing tool execution.")
-
-    raw_name = tool_call["name"]
-    raw_args = tool_call.get("args")
-    if raw_name == "run_command":
-        mapped_name = "Bash"
-        command = raw_args.get("CommandLine") if isinstance(raw_args, dict) and isinstance(raw_args.get("CommandLine"), str) else None
-    else:
-        mapped_name = raw_name
-        command = None
-
-    envelope = {
-        "schema": 1,
-        "type": "event",
-        "event": {
-            "kind": "before-tool",
-            "harness": "agy",
-            "sessionId": conv_id,
-            "cwd": cwd,
-            "tool": {"name": mapped_name, "command": command},
-        },
-    }
-    target = os.path.expanduser(guard_target)
-    run_cwd = cwd if _is_dir(cwd) else None
-    try:
-        done = subprocess.run(
-            [target],
-            input=json.dumps(envelope),
-            cwd=run_cwd,
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=TIMEOUT_S,
-        )
-    except subprocess.TimeoutExpired:
-        return _deny(f"agy-hook PreToolUse: guard timed out after {TIMEOUT_S} s; refusing tool execution.")
-    except OSError as error:
-        return _deny(f"agy-hook PreToolUse: guard could not execute ({error}); refusing tool execution.")
-
-    if done.returncode != 0:
-        detail = done.stderr.strip() or f"exit {done.returncode}"
-        return _deny(f"agy-hook PreToolUse: guard failed ({detail}); refusing tool execution.")
-
-    try:
-        reply = json.loads(done.stdout)
-    except (ValueError, TypeError, RecursionError) as error:
-        return _deny(f"agy-hook PreToolUse: guard printed invalid JSON ({error}); refusing tool execution.")
-
-    if not isinstance(reply, dict):
-        return _deny("agy-hook PreToolUse: guard reply is not a JSON object; refusing tool execution.")
-    decision = reply.get("decision")
-    if decision == "allow":
-        return {"decision": "allow"}
-    if decision == "deny":
-        reason = reply.get("reason")
-        if isinstance(reason, str) and reason:
-            return {"decision": "deny", "reason": reason}
-        return _deny("agy-hook PreToolUse: denied by guard.")
-    return _deny(f"agy-hook PreToolUse: unsupported guard decision {decision!r}; refusing tool execution.")
 
 
 def parse_claims(text):
@@ -479,14 +399,13 @@ def main(argv, stdin, stdout, env):
         return 0
 
     if sub == "PreToolUse":
-        if len(argv) != 2:
-            sys.stderr.write("usage: agy/hook PreToolUse <guard-hook>\n")
+        if len(argv) != 1:
+            sys.stderr.write("usage: agy/hook PreToolUse\n")
             return 2
         try:
-            reply = handle_pre_tool_use(argv[1], raw, env)
+            handle_pre_tool_use(env)
         except Exception as error:
-            reply = _deny(f"agy-hook PreToolUse crashed ({error!r}); refusing tool execution.")
-        stdout.write(json.dumps(reply))
+            sys.stderr.write(f"agy-hook PreToolUse: {error!r}\n")
         return 0
 
     if sub == "Stop":

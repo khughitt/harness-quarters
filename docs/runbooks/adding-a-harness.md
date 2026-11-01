@@ -464,12 +464,14 @@ Consequences:
 - **Adapter hooks for JSON-stdout harnesses**: do not wire plain-text `claude-profile`
   or `capture-notice` to a harness that parses `SessionStart` stdout as JSON, or emit
   `"decision": "block"` where only `"continue"` holds the turn. Write one adapter hook
-  in the harness's directory, as `agy/hook` does: it wraps `claude-profile` and
-  `capture-notice` output in `injectSteps`, translates `run_command` into a relay-guard
-  envelope and fails closed, and runs a one-shot Stop claim check until claim-guard
-  supports agy natively (ops-33cef9). Its tests are `tools/test_agy_hooks.py` and
-  the agy cases in `tools/test_claim_guard_wiring.py` and
-  `tools/test_capture_notice_wiring.py`.
+  in the harness's directory, as `agy/hook` does: it heals detached `settings.json`
+  files on `SessionStart` and `PreToolUse` (emitting empty stdout on `PreToolUse` so
+  `agy` keeps its permission flow), wraps `claude-profile` and `capture-notice` output
+  in `injectSteps`, and runs a one-shot Stop claim check until claim-guard supports agy
+  natively (ops-33cef9), while `agy/hooks.json` routes `SessionStart`, `PreToolUse` (`*`)
+  and `Stop` through `relay` (`v0.3.0`). Its tests are `tools/test_agy_hooks.py` and
+  the agy cases in `tools/test_claim_guard_wiring.py`,
+  `tools/test_capture_notice_wiring.py` and `tools/test_relay_wiring.py`.
 - **Interactive hook trust (Codex)**: Codex hashes every hook command per home. Any
   edit to `codex/hooks.json` or `codex/work/hooks.json` lands with no Codex TUI or
   `codex app-server` running, followed by an interactive `/hooks` review in each home
@@ -482,28 +484,33 @@ only `COMMAND_TOOLS = {"Bash"}` as command-bearing: a `null` command on `Bash` i
 refused, and on any other tool name is allowed without running the policy. Every link
 on the way to it must know the new harness's shell tool. There are two routes:
 
-- **Relayed** (Claude Code, Codex):
-  1. native before-tool payload, in snake_case with `tool_name` and `tool_input`
-     (directly or from a bridge);
+- **Relayed** (Claude Code, Codex, agy):
+  1. native before-tool payload, either in snake_case with `tool_name` and `tool_input`
+     or normalized by the adapter's `nativeFields` (`agy` maps `conversationId` ->
+     `session_id`, `workspacePaths[0]` -> `cwd`, and `run_command` / `args.CommandLine`
+     -> `Bash` + `{command}`);
   2. relay's shared `normalizeEvent` (`<relay-checkout>/src/adapters/index.js`) sets
      `tool.command` only for `tool_name == "Bash"` with a string `tool_input.command`;
      anything else becomes `null`;
   3. the `ops-guard` subscriber in `relay/subscribers.template.json` lists
-     `"harnesses": ["claude-code", "codex"]` and `"tools": ["Bash"]`, matched literally
-     (`src/subscribers.js`), and relay accepts a guard subscriber only when the
-     harness's adapter declares `replies[<native>].refuse` for its before-tool events;
+     `"harnesses": ["claude-code", "codex", "agy"]` and `"tools": ["Bash"]`, matched
+     literally (`src/subscribers.js`), and relay accepts a guard subscriber only when the
+     harness's adapter declares `replies[<native>].refuse` for its before-tool events
+     (raise the harness's handler `timeout` and `--outer-ms` together when its default
+     outer timeout leaves less than `ops-guard`'s 30 s plus observer budgets, as `agy`
+     raises both to 60 s / 60000 ms);
   4. relay-guard's policy;
-  5. a denial encoded in the harness's own reply schema (the adapter's `encodeReply`).
+  5. a denial encoded in the harness's own reply schema (the adapter's `encodeReply`),
+     with empty stdout on allow so the harness keeps its own permission prompts.
 
   A native tool named `run_command` or `shell` either misses the subscriber or, if the
   filter is merely widened, reaches the policy as a non-command and is allowed. Have
-  the bridge emit `Bash` + `command`, or change extraction, `COMMAND_TOOLS` and the
-  subscriber filter together.
-- **Direct adapter** (agy): relay is not involved. `agy/hooks.json` runs
-  `agy/hook PreToolUse <relay-guard>`, and `agy/hook` builds the envelope itself
-  (`harness: "agy"`, `run_command` / `CommandLine` mapped to `Bash` + `command`),
-  calls relay-guard, fails closed on any unreadable payload or guard error, and
-  encodes the denial for agy.
+  the adapter or bridge emit `Bash` + `command`, or change extraction, `COMMAND_TOOLS`
+  and the subscriber filter together.
+- **Direct adapter** (before a relay adapter exists): when onboarding a harness before
+  relay speaks its protocol, an in-tree adapter hook can build the schema-1 `before-tool`
+  envelope itself, call relay-guard, fail closed on any unreadable payload or guard
+  error, and encode the denial in the harness's schema until relay takes over.
 
 The guard layer passes only with isolated evidence for three cases: a harmless permitted
 command runs; a fixture command the policy refuses is denied and never executes; a
@@ -605,10 +612,11 @@ the same change that widens its parser.
 - **`<obs-checkout>/record.py` `HARNESSES`**: add `<name>` whenever relay publishes
   envelopes for it. Otherwise `obs ingest` rejects them, printing only
   `{"event": "obs-ingest-failed", "error": "ValueError"}`.
-- **Subscribers (`hq`)**: `relay/subscribers.template.json` scopes `ops-guard`,
-  `familiar` and `familiar-teardown` to `["claude-code", "codex"]`. Add the harness only
-  to the subscribers whose layer is selected; adding it to `ops-guard` alone does not
-  guard it (Command guard above).
+- **Subscribers (`hq`)**: `relay/subscribers.template.json` scopes `ops-guard` to
+  `["claude-code", "codex", "agy"]` and pairs `familiar`, `familiar-opencode`,
+  `familiar-teardown`, `familiar-teardown-codex` and `familiar-agy` to their respective
+  harnesses and event kinds. Add the harness only to the subscribers whose layer is
+  selected; adding it to `ops-guard` alone does not guard it (Command guard above).
 
   **Ordering hazard**: every relayed harness's hook images read the one rendered
   `~/.config/relay/subscribers.json`, and each runtime rejects the whole file if any

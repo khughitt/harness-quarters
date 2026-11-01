@@ -35,8 +35,9 @@ The generated global Projects block is checked by lore.
 - `links.toml` and `tools/harness-links`: real harness homes, declared home links and
   their reconciliation through the tasks project registry.
 - `claude/`, `codex/`, `agy/` and `local/`: harness settings, hooks, skills registries and
-  untracked host state. `agy/hook` adapts `agy/hooks.json` events to the ecosystem's
-  profile, capture-notice, relay-guard and claim-guard contracts. `claude/mods/` holds
+  untracked host state. `agy/hooks.json` routes lifecycle and `before-tool` events through
+  `relay`, while `agy/hook` heals detached `agy` settings files and adapts `SessionStart`
+  (profile, capture-notice) and `Stop` (claim-guard until ops-33cef9 lands). `claude/mods/` holds
   Claude Code function-hook plugins; `claude/probes/` the probes behind Claude Code facts.
 - `.githooks/`: config-state filtering, Codex trust and model pick preservation, and commit checks.
 - `facts/capabilities.toml` and `tools/harness-facts`: what each harness has been shown

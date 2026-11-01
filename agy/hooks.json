@@ -5,6 +5,11 @@
       {
         "type": "command",
         "command": "~/d/hq/agy/hook SessionStart ~/d/lore/hooks/claude-profile ~/d/ops/hooks/capture-notice"
+      },
+      {
+        "type": "command",
+        "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.3.0/node_modules/relay/bin/relay.js' hook --harness agy --outer-ms 60000 --subscribers '/home/keith/.config/relay/subscribers.json' SessionStart",
+        "timeout": 60
       }
     ],
     "PreToolUse": [
@@ -13,7 +18,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/d/hq/agy/hook PreToolUse ~/d/ops/hooks/relay-guard"
+            "command": "~/d/hq/agy/hook PreToolUse"
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.3.0/node_modules/relay/bin/relay.js' hook --harness agy --outer-ms 60000 --subscribers '/home/keith/.config/relay/subscribers.json' PreToolUse",
+            "timeout": 60
           }
         ]
       }
@@ -26,6 +41,11 @@
       {
         "type": "command",
         "command": "~/.local/bin/harness-state-refresh"
+      },
+      {
+        "type": "command",
+        "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.3.0/node_modules/relay/bin/relay.js' hook --harness agy --outer-ms 60000 --subscribers '/home/keith/.config/relay/subscribers.json' Stop",
+        "timeout": 60
       }
     ]
   }
