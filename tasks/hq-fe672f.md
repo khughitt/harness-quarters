@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-9aa713-pause-past-range
 created: 2026-11-01T10:29:21Z
-updated: 2026-11-01T12:50:14Z
+updated: 2026-11-01T13:04:02Z
 started: 2026-11-01T11:56:46Z
 depends: []
 parent: hq-9aa713
@@ -43,4 +43,6 @@ Implements Task 1 of the turn-pause plan in .worktrees/hq-9aa713 (branch feat/hq
 - 2026-11-01T12:50:11Z (feat/hq-9aa713-pause-past-range): retention checkpoint: observed 2026-11-01T12:50Z on titan; basis hq in-tree . 5e6f9abea7dbc7ba37ea222e61e075d6b51068a5:tasks/hq-fe672f.md; retained by feat/hq-9aa713-pause-past-range; this host: kept verified 2, kept unknown 0, released 1; changed 3. Rechecked all kept/verified items on this host; unknown items none. Other hosts hold no items. Next: after the user's ruling on hq-9aa713, extend or close Task 1
   provenance: {"harness_session":"claude-code:536b5ebf-5753-4a8b-ac83-61dde5ef4c79","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-01T12:50:14Z (feat/hq-9aa713-pause-past-range): parked (waiting on agent): Agent, after the user's ruling on hq-9aa713: under option A add the nested MCP, write_stdin and wait hooking probe to this task, then write its verified gate and close it; under B or C close it with its facts as recorded
+  provenance: {"harness_session":"claude-code:536b5ebf-5753-4a8b-ac83-61dde5ef4c79","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-01T13:04:02Z (feat/hq-9aa713-pause-past-range): resumed
   provenance: {"harness_session":"claude-code:536b5ebf-5753-4a8b-ac83-61dde5ef4c79","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
