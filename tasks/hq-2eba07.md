@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-2eba07-harness-manifest
 created: 2026-11-01T01:25:51Z
-updated: 2026-11-01T13:24:40Z
+updated: 2026-11-01T13:37:18Z
 started: 2026-11-01T09:55:45Z
 depends: []
 tags: [hooks]
@@ -67,3 +67,4 @@ Where: .githooks/{harness-state-clean,harness-state-refresh,live-picks}, facts/c
 - 2026-11-01T13:16:17Z (feat/hq-2eba07-harness-manifest): parked (waiting on agent, session): Fresh controller: resume hq-2eba07 in .worktrees/hq-2eba07, run trial-arm (flow off), read approved spec and plan (5a2e525b:docs/plans/2026-11-01-harness-manifest.md, no further plan review owed), run Setup baseline (just test), then execute Tasks 1-6 strictly sequentially (hq-e8f2db -> hq-bfef03 -> hq-f5ccb6 -> hq-1a6bba -> hq-d2b9cb -> hq-746f05) using superpowers:subagent-driven-development
 - 2026-11-01T13:24:40Z (feat/hq-2eba07-harness-manifest): resumed
   provenance: {"harness_session":"claude-code:fdf3b32f-5e63-4593-bba2-4e994bcdf1eb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-01T13:37:18Z (feat/hq-2eba07-harness-manifest): baseline: just test in .worktrees/hq-2eba07 at 19c3366b exited 0 (~12 min): harness-facts check ok; agents/bin pytest passed (count not captured: output tail truncated); .githooks+tools 1243 passed; relay_cutover xdist 391 passed; signal test 1 passed, 154 deselected. Controller: claude-code/claude-opus-5-5, subagent-driven; SDD ledger .worktrees/hq-2eba07/.superpowers/sdd/2026-11-01-harness-manifest/progress.md
