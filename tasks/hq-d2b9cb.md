@@ -1,17 +1,15 @@
 ---
 id: hq-d2b9cb
 title: "Enforce fail-closed filter config, staged-tree pre-commit gate, and reference docs"
-status: done
+status: todo
 priority: 2
 size: s
 complexity: mid
 process: direct
 owner: feat/hq-2eba07-harness-manifest
 created: 2026-11-01T12:36:38Z
-updated: 2026-11-01T18:07:33Z
+updated: 2026-11-01T18:20:16Z
 started: 2026-11-01T16:44:25Z
-completed: 2026-11-01T18:07:33Z
-closed: 2026-11-01T18:07:33Z
 depends: [hq-1a6bba]
 parent: hq-2eba07
 tags: [hooks, docs]
