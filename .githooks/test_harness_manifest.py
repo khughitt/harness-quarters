@@ -1,6 +1,6 @@
 """harnesses.toml loader, validation, .gitattributes/filter-config/tree checks and cleaners."""
 import importlib.util
-import json
+import os
 import re
 import shutil
 import subprocess
@@ -253,6 +253,9 @@ def test_check_filter_config_and_cli_check(tmp_path, monkeypatch):
         if required is not None:
             git(repo, env, "config", "filter.harness-state.required", required)
 
+    # check_filter_config spawns git with the process environment: leave only the isolated keys.
+    for key in list(os.environ):
+        monkeypatch.delenv(key)
     for key, value in env.items():
         monkeypatch.setenv(key, value)
     for clean, required in ((None, "true"), ("/abs/path/harness-state-clean %f", "true"),
@@ -262,6 +265,31 @@ def test_check_filter_config_and_cli_check(tmp_path, monkeypatch):
             hs.check_filter_config(git_dir)
     configure(hs.EXPECTED_CLEAN_FILTER, "true")
     hs.check_filter_config(git_dir)
+
+
+def test_cli_check_reports_filter_config_through_isolated_subprocess(tmp_path):
+    repo, env = scratch_checkout(tmp_path, '{\n  "theme": "system"\n}\n')
+    assert run_check(repo, env).returncode == 0
+    git(repo, env, "config", "filter.harness-state.required", "false")
+    result = run_check(repo, env)
+    assert result.returncode == 2 and "just setup" in result.stderr
+    git(repo, env, "config", "filter.harness-state.required", "true")
+    git(repo, env, "config", "filter.harness-state.clean", "/abs/harness-state-clean %f")
+    result = run_check(repo, env)
+    assert result.returncode == 2 and "just setup" in result.stderr
+
+
+def test_non_object_json_is_reported_cleanly(tmp_path):
+    manifest = hs.load_manifest()
+    (tmp_path / "pi").mkdir()
+    (tmp_path / "pi" / "settings.json").write_text("[]")
+    with pytest.raises(hs.ManifestError, match="pi/settings.json"):
+        hs.check_clean_tree(manifest, tmp_path)
+    (tmp_path / "cli").mkdir()
+    repo, env = scratch_checkout(tmp_path / "cli", "[]")
+    result = run_check(repo, env)
+    assert result.returncode == 2 and "Traceback" not in result.stderr
+    assert "pi/settings.json" in result.stderr and "harness-state: " in result.stderr
 
 
 def scratch_checkout(tmp_path, pi_text):

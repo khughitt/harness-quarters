@@ -17,7 +17,6 @@ import subprocess
 import sys
 import tempfile
 import tomllib
-from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -505,6 +504,8 @@ def check_clean_tree(manifest, root=None):
 
 def clean_json(text, keys):
     data = json.loads(text)
+    if not isinstance(data, dict):
+        raise ValueError(f"top level is {type(data).__name__}, expected an object")
     for key in keys:
         data.pop(key, None)
     return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
