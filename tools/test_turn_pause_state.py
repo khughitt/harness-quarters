@@ -131,6 +131,8 @@ def test_corrupt_file_raises_state_error_with_path(tmp_path, text):
     ('workers', '"abc"'), ('workers', '[1]'), ('worker_names', '"abc"'), ('cron_jobs', '[]'),
     ('grace_used', '{"calls": "x"}'), ('notified', '"yes"'), ('harness_pid', '"1"'),
     ('wakeups', '"ab"'), ('paused', '3'),
+    ('wakeups', '[["x","b",1]]'), ('wakeups', '["abc"]'), ('wakeups', '[["x",1,"z"]]'),
+    ('wakeups', '[["x",1]]'), ('wakeups', '[["x",true,2]]'), ('wakeups', '[[1,1,2]]'),
 ])
 def test_wrong_types_in_complete_file_raise(tmp_path, field, bad):
     store = Store(tmp_path)
@@ -143,6 +145,30 @@ def test_wrong_types_in_complete_file_raise(tmp_path, field, bad):
     d[field] = json.loads(bad)
     path.write_text(json.dumps(d))
     with pytest.raises(StateError, match=str(path)):
+        store.read('claude', 'r')
+
+
+@pytest.mark.parametrize('path,bad', [
+    (('spawn_keys',), '"abc"'), (('warned',), '"abc"'), (('calls',), '"7"'), (('calls',), 'true'),
+    (('active',), '"1"'), (('started',), '"1"'), (('last_t',), '"1"'), (('limits_sha',), '1'),
+    (('limits', 'calls'), '"x"'), (('limits', 'active_seconds'), 'null'), (('limits',), '[]'),
+    (('limits',), '{"calls": 1}'),
+    (('in_flight',), '[]'), (('in_flight',), '{"c": 1}'), (('in_flight',), '{"c": 1}'),
+    (('spawn_keys',), '[1]'), (('compactions',), '1.5'),
+])
+def test_wrong_types_in_turn_raise(tmp_path, path, bad):
+    import json
+    store = Store(tmp_path)
+    with store.locked('claude', 'r') as st:
+        st.turn = turn()
+    file = tmp_path / 'claude-r.json'
+    d = json.loads(file.read_text())
+    target = d['turn']
+    for k in path[:-1]:
+        target = target[k]
+    target[path[-1]] = json.loads(bad)
+    file.write_text(json.dumps(d))
+    with pytest.raises(StateError, match=str(file)):
         store.read('claude', 'r')
 
 
@@ -160,17 +186,50 @@ def test_read_only_directory_raises_state_error(tmp_path):
         d.chmod(0o700)
 
 
-def test_unwritable_target_raises_state_error(tmp_path):
-    store = Store(tmp_path / 'missing' / 'deeper')
-    with pytest.raises(StateError):
-        with store.locked('claude', 'r'):
+def test_fresh_directory_is_created_private(tmp_path):
+    d = tmp_path / 'missing' / 'deeper'
+    store = Store(d)
+    with store.locked('claude', 'r') as st:
+        st.paused = 'calls'
+    assert store.read('claude', 'r').paused == 'calls'
+    assert (d.stat().st_mode & 0o777) == 0o700
+
+
+def test_unwritable_parent_raises_state_error(tmp_path):
+    if os.geteuid() == 0:
+        pytest.skip('running as root bypasses directory permissions')
+    parent = tmp_path / 'ro'
+    parent.mkdir()
+    parent.chmod(0o500)
+    try:
+        with pytest.raises(StateError, match=str(parent)):
+            with Store(parent / 'sub').locked('claude', 'r'):
+                pass
+    finally:
+        parent.chmod(0o700)
+
+
+def test_directory_path_is_a_file_raises_state_error(tmp_path):
+    f = tmp_path / 'f'
+    f.write_text('')
+    with pytest.raises(StateError, match=str(f)):
+        with Store(f).locked('claude', 'r'):
             pass
 
 
-def test_bad_names_refused(tmp_path):
-    with pytest.raises(StateError):
-        with Store(tmp_path).locked('claude', '../x'):
+@pytest.mark.parametrize('harness,root', [
+    ('claude', '../x'), ('claude', 'a/b'), ('claude', '.'), ('claude', '..'), ('claude', ''),
+    ('', 'r'), ('a/b', 'r'), ('claude', 'a\0b'),
+])
+def test_bad_names_refused(tmp_path, harness, root):
+    store = Store(tmp_path)
+    with pytest.raises(StateError, match='invalid state name'):
+        with store.locked(harness, root):
             pass
+    with pytest.raises(StateError, match='invalid state name'):
+        store.read(harness, root)
+    with pytest.raises(StateError, match='invalid state name'):
+        store.remove(harness, root)
 
 
 def test_prune_by_idle_time(tmp_path):
@@ -218,3 +277,137 @@ def test_root_for_agent(tmp_path):
     assert store.root_for_agent('codex', 'w2') == 'root2'
     assert store.root_for_agent('codex', 'w1') == 'root1'
     assert store.root_for_agent('codex', 'zzz') is None
+
+
+def test_remove_waits_for_holder_and_waiter_does_not_lose_update(tmp_path):
+    """A holds the lock, W waits, remove runs: W must see A's write or a fresh state, and
+    W and a later C never hold the lock together."""
+    import time
+    store = Store(tmp_path)
+    with store.locked('claude', 'r') as st:
+        st.turn = turn()
+    inside = []
+    overlap = []
+    started = threading.Event()
+
+    def holder():
+        with store.locked('claude', 'r') as st:
+            started.set()
+            time.sleep(0.3)
+            st.turn.calls += 1
+
+    def bump():
+        with store.locked('claude', 'r') as st:
+            inside.append(1)
+            if len(inside) > 1:
+                overlap.append(1)
+            time.sleep(0.05)
+            if st.turn is not None:
+                st.turn.calls += 1
+            inside.pop()
+
+    a = threading.Thread(target=holder)
+    a.start()
+    started.wait()
+    w = threading.Thread(target=bump)
+    w.start()
+    time.sleep(0.05)
+    r = threading.Thread(target=lambda: store.remove('claude', 'r'))
+    r.start()
+    time.sleep(0.05)
+    cs = [threading.Thread(target=bump) for _ in range(4)]
+    for c in cs:
+        c.start()
+    for t in [a, w, r, *cs]:
+        t.join()
+    assert not overlap
+
+
+def test_remove_does_not_unlink_while_lock_held(tmp_path):
+    import time
+    store = Store(tmp_path)
+    with store.locked('claude', 'r') as st:
+        st.paused = 'calls'
+    done = threading.Event()
+
+    def rm():
+        store.remove('claude', 'r')
+        done.set()
+
+    with store.locked('claude', 'r'):
+        t = threading.Thread(target=rm)
+        t.start()
+        time.sleep(0.2)
+        assert not done.is_set()
+        assert (tmp_path / 'claude-r.json').exists()
+    t.join()
+    assert store.read('claude', 'r') is None
+
+
+def test_prune_rechecks_idle_under_lock(tmp_path):
+    import time
+    store = Store(tmp_path)
+    now = 10_000_000.0
+    with store.locked('claude', 'r'):
+        pass
+    path = tmp_path / 'claude-r.json'
+    age(path, now, 8)
+    out = []
+    with store.locked('claude', 'r') as st:
+        st.paused = 'calls'
+        t = threading.Thread(target=lambda: out.append(store.prune(now)))
+        t.start()
+        time.sleep(0.2)
+    os.utime(path, (now, now))
+    t.join()
+    assert out == [[]]
+    assert store.read('claude', 'r').paused == 'calls'
+
+
+def test_waiter_on_unlinked_lock_file_retries_on_the_new_one(tmp_path):
+    """A waiter blocked on a lock file that remove then unlinks must not enter beside a
+    process that locks the replacement file."""
+    import fcntl
+    import time
+    store = Store(tmp_path)
+    with store.locked('claude', 'r'):
+        pass
+    lock = tmp_path / 'claude-r.lock'
+    fd = os.open(lock, os.O_RDWR)
+    fcntl.flock(fd, fcntl.LOCK_EX)
+    inside = []
+    overlap = []
+
+    def body():
+        with store.locked('claude', 'r'):
+            inside.append(1)
+            if len(inside) > 1:
+                overlap.append(1)
+            time.sleep(0.3)
+            inside.pop()
+
+    w = threading.Thread(target=body)
+    w.start()
+    time.sleep(0.2)
+    lock.unlink()
+    fcntl.flock(fd, fcntl.LOCK_UN)
+    os.close(fd)
+    time.sleep(0.1)
+    c = threading.Thread(target=body)
+    c.start()
+    w.join()
+    c.join()
+    assert not overlap
+
+
+def test_wakeup_message_names_the_field(tmp_path):
+    import json
+    store = Store(tmp_path)
+    with store.locked('claude', 'r'):
+        pass
+    path = tmp_path / 'claude-r.json'
+    d = json.loads(path.read_text())
+    d['wakeups'] = [['x', 'b', 1]]
+    path.write_text(json.dumps(d))
+    with pytest.raises(StateError, match='wakeup not_before must be int/float, not str'):
+        store.read('claude', 'r')

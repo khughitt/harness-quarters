@@ -1,5 +1,6 @@
 """Locked per-root pause state: one JSON file per root session, updated under flock."""
 import contextlib
+import dataclasses
 import fcntl
 import json
 import os
@@ -9,6 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .counters import TurnState
+from .limits import Limits
 
 IDLE_SECONDS = 7 * 86400
 
@@ -50,9 +52,15 @@ def state_dir(env: Mapping[str, str] = os.environ) -> Path:
 
 
 def _check(value, kind, what):
-    if not isinstance(value, kind) or (kind is int and isinstance(value, bool)):
-        raise TypeError(f'{what} must be {kind.__name__}, not {type(value).__name__}')
+    kinds = kind if isinstance(kind, tuple) else (kind,)
+    if not isinstance(value, kinds) or (isinstance(value, bool) and bool not in kinds):
+        names = '/'.join(k.__name__ for k in kinds)
+        raise TypeError(f'{what} must be {names}, not {type(value).__name__}')
     return value
+
+
+def _num(value, what):
+    return float(_check(value, (int, float), what))
 
 
 def _opt(value, kind, what):
@@ -74,6 +82,33 @@ def _str_map(value, kind, what):
     return value
 
 
+def _turn_from_dict(t: dict) -> TurnState:
+    expected = {f.name for f in dataclasses.fields(TurnState)}
+    if set(t) != expected:
+        raise KeyError(f'turn fields differ: missing {sorted(expected - set(t))}, extra {sorted(set(t) - expected)}')
+    lim = _check(t['limits'], dict, 'turn.limits')
+    if set(lim) != {f.name for f in dataclasses.fields(Limits)}:
+        raise KeyError(f'turn.limits fields differ: {sorted(lim)}')
+    limits = Limits(**{k: _check(v, int, f'turn.limits.{k}') for k, v in lim.items()})
+    in_flight = _check(t['in_flight'], dict, 'turn.in_flight')
+    for k, v in in_flight.items():
+        _check(k, str, 'turn.in_flight key')
+        _opt(v, str, 'turn.in_flight value')
+    return TurnState(
+        started=_num(t['started'], 'turn.started'),
+        limits=limits,
+        limits_sha=_check(t['limits_sha'], str, 'turn.limits_sha'),
+        active=_num(t['active'], 'turn.active'),
+        calls=_check(t['calls'], int, 'turn.calls'),
+        spawns=_check(t['spawns'], int, 'turn.spawns'),
+        compactions=_check(t['compactions'], int, 'turn.compactions'),
+        last_t=None if t['last_t'] is None else _num(t['last_t'], 'turn.last_t'),
+        in_flight=dict(in_flight),
+        spawn_keys=set(_strs(t['spawn_keys'], 'turn.spawn_keys')),
+        warned=set(_strs(t['warned'], 'turn.warned')),
+    )
+
+
 def _to_json(st: RootState) -> str:
     return json.dumps({
         'harness': st.harness, 'root': st.root,
@@ -92,14 +127,16 @@ def _from_json(text: str) -> RootState:
     turn = d['turn']
     wakeups = []
     for w in _check(d['wakeups'], list, 'wakeups'):
+        if not isinstance(w, list) or len(w) != 3:
+            raise TypeError(f'wakeup must be a list of 3, not {w!r}')
         text_, before, after = w
         wakeups.append(Wakeup(_check(text_, str, 'wakeup text'),
-                              float(_check(before, (int, float), 'wakeup not_before')),
-                              float(_check(after, (int, float), 'wakeup not_after'))))
+                              _num(before, 'wakeup not_before'),
+                              _num(after, 'wakeup not_after')))
     return RootState(
         harness=_check(d['harness'], str, 'harness'),
         root=_check(d['root'], str, 'root'),
-        turn=None if turn is None else TurnState.from_json(json.dumps(_check(turn, dict, 'turn'))),
+        turn=None if turn is None else _turn_from_dict(_check(turn, dict, 'turn')),
         paused=_opt(d['paused'], str, 'paused'),
         grace_used=_str_map(d['grace_used'], int, 'grace_used'),
         workers=set(_strs(d['workers'], 'workers')),
@@ -133,7 +170,7 @@ class Store:
             raise StateError(f'cannot read {path}: {e}') from e
         try:
             return _from_json(text)
-        except (ValueError, TypeError, KeyError) as e:
+        except Exception as e:  # any malformed content must refuse, never escape raw
             raise StateError(f'cannot parse {path}: {type(e).__name__}: {e}') from e
 
     def _write(self, path: Path, st: RootState) -> None:
@@ -154,24 +191,44 @@ class Store:
                     os.unlink(tmp)
 
     @contextlib.contextmanager
+    def _flocked(self, stem: str) -> Iterator[Path]:
+        """Hold the exclusive lock on <stem>.lock. The lock file may be unlinked by remove
+        and prune while held, so after flock the fd must still be the file at that path;
+        otherwise a newer lock file exists and we retry on it."""
+        lock = self.dir / f'{stem}.lock'
+        try:
+            self.dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        except OSError as e:
+            raise StateError(f'cannot create state directory {self.dir}: {e}') from e
+        while True:
+            try:
+                fd = os.open(lock, os.O_CREAT | os.O_RDWR, 0o600)
+            except OSError as e:
+                raise StateError(f'cannot open lock {lock}: {e}') from e
+            try:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX)
+                    try:
+                        current = os.stat(lock).st_ino
+                    except FileNotFoundError:
+                        current = None
+                except OSError as e:
+                    raise StateError(f'cannot lock {lock}: {e}') from e
+                if current != os.fstat(fd).st_ino:
+                    continue
+                yield lock
+                return
+            finally:
+                os.close(fd)
+
+    @contextlib.contextmanager
     def locked(self, harness: str, root: str) -> Iterator[RootState]:
         stem = self._stem(harness, root)
         path = self.dir / f'{stem}.json'
-        lock = self.dir / f'{stem}.lock'
-        try:
-            fd = os.open(lock, os.O_CREAT | os.O_RDWR, 0o600)
-        except OSError as e:
-            raise StateError(f'cannot open lock {lock}: {e}') from e
-        try:
-            try:
-                fcntl.flock(fd, fcntl.LOCK_EX)
-            except OSError as e:
-                raise StateError(f'cannot lock {lock}: {e}') from e
+        with self._flocked(stem):
             st = self._load(path) or RootState(harness, root, None)
             yield st
             self._write(path, st)
-        finally:
-            os.close(fd)
 
     def read(self, harness: str, root: str) -> RootState | None:
         return self._load(self.dir / f'{self._stem(harness, root)}.json')
@@ -200,31 +257,47 @@ class Store:
                 return st.root
         return None
 
+    @staticmethod
+    def _unlink(path: Path) -> None:
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError as e:
+            raise StateError(f'cannot remove {path}: {e}') from e
+
+    def _delete_locked(self, stem: str, min_idle: float | None, now: float = 0.0) -> bool:
+        """Under the lock, unlink the state and its lock file (the lock file last, so a
+        waiter notices the swap through the inode check in _flocked)."""
+        with self._flocked(stem) as lock:
+            path = self.dir / f'{stem}.json'
+            if min_idle is not None:
+                try:
+                    idle = now - path.stat().st_mtime
+                except FileNotFoundError:
+                    idle = None
+                except OSError as e:
+                    raise StateError(f'cannot stat {path}: {e}') from e
+                if idle is None or idle <= min_idle:
+                    return False
+            self._unlink(path)
+            self._unlink(lock)
+            return True
+
     def remove(self, harness: str, root: str) -> None:
-        stem = self._stem(harness, root)
-        for suffix in ('.json', '.lock'):
-            try:
-                (self.dir / f'{stem}{suffix}').unlink()
-            except FileNotFoundError:
-                pass
-            except OSError as e:
-                raise StateError(f'cannot remove {self.dir / (stem + suffix)}: {e}') from e
+        self._delete_locked(self._stem(harness, root), None)
 
     def prune(self, now: float, max_idle: float = IDLE_SECONDS) -> list[str]:
-        """Remove states idle longer than max_idle (by file mtime); return their stems."""
+        """Remove states idle longer than max_idle (by file mtime, re-checked under the
+        lock); return their stems."""
         removed = []
         for path in self._files():
             try:
                 idle = now - path.stat().st_mtime
+            except FileNotFoundError:
+                continue
             except OSError as e:
                 raise StateError(f'cannot stat {path}: {e}') from e
-            if idle > max_idle:
-                for p in (path, path.with_suffix('.lock')):
-                    try:
-                        p.unlink()
-                    except FileNotFoundError:
-                        pass
-                    except OSError as e:
-                        raise StateError(f'cannot remove {p}: {e}') from e
+            if idle > max_idle and self._delete_locked(path.stem, max_idle, now):
                 removed.append(path.stem)
         return removed
