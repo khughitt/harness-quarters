@@ -1,13 +1,15 @@
 ---
 id: hq-e8f2db
 title: "Add harnesses.toml manifest and shared harness_state loader, cleaners, and checks"
-status: todo
+status: doing
 priority: 2
 size: s
 complexity: mid
 process: direct
+owner: feat/hq-2eba07-harness-manifest
 created: 2026-11-01T12:36:07Z
-updated: 2026-11-01T12:36:07Z
+updated: 2026-11-01T13:37:20Z
+started: 2026-11-01T13:37:20Z
 depends: []
 parent: hq-2eba07
 tags: [hooks]
@@ -23,3 +25,5 @@ Step 1 of hq-2eba07 plan (spec §5.1-§5.2, §5.3.6): create root harnesses.toml
 
 - 2026-11-01T12:36:07Z (add): created
   provenance: {"origin":"agent"}
+- 2026-11-01T13:37:20Z (feat/hq-2eba07-harness-manifest): started
+  provenance: {"harness_session":"claude-code:fdf3b32f-5e63-4593-bba2-4e994bcdf1eb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
