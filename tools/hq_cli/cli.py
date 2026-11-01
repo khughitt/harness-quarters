@@ -35,7 +35,7 @@ def parser() -> argparse.ArgumentParser:
     commands = top.add_subparsers(dest="command", required=True)
     listing = commands.add_parser(
         "sessions", help="list recent agent sessions; -i resumes one",
-        description="Recent Claude Code and Codex sessions across personal and work homes, newest first.")
+        description="Recent Claude Code, Codex and agy sessions across personal and work homes, newest first.")
     listing.add_argument("-i", "--interactive", action="store_true",
                          help="pick a session (fzf when on PATH, else a numbered prompt) and resume it")
     listing.add_argument("--harness", choices=tuple(adapter.alias for adapter in harness_stores.ADAPTERS))
@@ -163,6 +163,9 @@ def format_rows(shown: list[Session], places: dict[str, projects.Place | None], 
                 painter: color.Painter) -> list[str]:
     """One line per session. Cells are padded outside their colour codes, so a painted line
     with the codes stripped is the plain line."""
+    for s in shown:
+        if s.cwd is None:   # an adapter excludes these ("no workspace"); one listed is a bug
+            raise UsageError(f"{s.home.harness} session {s.id} has no workspace and cannot be listed")
     now_ms = int(time.time() * 1000)
     parts = [place_parts(s.cwd, places[s.cwd], user_home, painter) for s in shown]
     missing = [not os.path.isdir(s.cwd) for s in shown]

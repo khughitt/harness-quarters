@@ -38,7 +38,10 @@ def environment(session: Session, base: dict[str, str]) -> dict[str, str]:
     CLAUDE_CONFIG_DIR=~/.claude would read a different .claude.json than ~/.claude.json."""
     env = dict(base)
     if session.home.kind == "work":
-        env[harness_stores.by_alias(session.home.harness).home_variable] = str(session.home.path)
+        variable = harness_stores.by_alias(session.home.harness).home_variable
+        if variable is None:
+            raise LaunchError(f"{session.home.harness} has no work home variable; cannot launch {session.home.name}")
+        env[variable] = str(session.home.path)
     else:
         for adapter in harness_stores.ADAPTERS:
             if adapter.home_variable is not None:
@@ -50,6 +53,8 @@ def launch(session: Session, flags_by_home: dict[str, list[str]], config: Path) 
     """Replace this process with the harness; rechecks cwd and transcript just before."""
     if session.home.name not in flags_by_home:
         raise LaunchError(f"{config}: no [homes.{session.home.name}] flags; add them to launch this home")
+    if session.cwd is None:
+        raise LaunchError(f"{session.home.harness} session {session.id} has no workspace; not launching")
     if not os.path.isdir(session.cwd):
         raise LaunchError(f"cwd missing: {session.cwd}; not launching elsewhere")
     if not session.transcript.is_file():

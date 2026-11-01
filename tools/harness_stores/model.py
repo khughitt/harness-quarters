@@ -13,7 +13,7 @@ class SourceError(Exception):
 @dataclass(frozen=True)
 class Home:
     name: str       # the launch-config key
-    harness: str    # the adapter alias: "claude" or "codex"
+    harness: str    # the adapter alias: "claude", "codex" or "agy"
     kind: str       # "personal" or "work"
     path: Path
 

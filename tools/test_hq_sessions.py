@@ -9,6 +9,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -19,6 +20,8 @@ SID2 = "bbbbbbbb-2222-4222-8222-000000000002"
 TID = "019e0000-0000-7000-8000-00000000000a"
 TID2 = "019e1111-0000-7000-8000-00000000000b"
 TID3 = "019e2222-0000-7000-8000-00000000000c"
+AID = "cccccccc-3333-4333-8333-000000000003"
+AID2 = "dddddddd-4444-4444-8444-000000000004"
 NOW_MS = int(time.time() * 1000)
 CODEX_COLUMNS = ("id", "rollout_path", "source", "thread_source", "archived", "preview", "cwd",
                  "recency_at_ms", "name", "title")
@@ -97,7 +100,7 @@ class Env:
             (self.home / name / "history.jsonl").write_text("")
         for name in (".codex", ".codex-work"):
             codex_db(self.home / name, [])
-        for tool in ("claude", "codex"):
+        for tool in ("claude", "codex", "agy"):
             self.script(tool, STUB.format(python=sys.executable, tool=tool))
         self.script("tasks", TASKS_STUB.format(python=sys.executable))
         (self.bin / "git").symlink_to(shutil.which("git"))
@@ -173,6 +176,47 @@ def thread(home: Path, tid: str, cwd: Path, age_s: float = 0, rollout: bool = Tr
     return {"id": tid, "rollout_path": str(path), "source": "cli", "thread_source": "user",
             "archived": 0, "preview": "a prompt", "cwd": str(cwd),
             "recency_at_ms": int(time.time() * 1000) - int(age_s * 1000), "name": None, "title": "a title", **fields}
+
+
+AGY_COLUMNS = ("conversation_id", "title", "preview", "workspace_uris", "last_modified_time",
+               "parent_conversation_id")
+AGY_LIVE_EXTRA = ("step_count", "status", "source")   # live columns the adapter ignores
+
+
+def agy_db(home: Path, rows: list[dict], drop: str | None = None) -> None:
+    home.mkdir(parents=True, exist_ok=True)
+    columns = [c for c in (*AGY_COLUMNS, *AGY_LIVE_EXTRA) if c != drop]
+    path = home / "conversation_summaries.db"
+    path.unlink(missing_ok=True)
+    db = sqlite3.connect(path)
+    with db:
+        db.execute(f"CREATE TABLE conversation_summaries ({', '.join(columns)})")
+        for row in rows:
+            db.execute(f"INSERT INTO conversation_summaries ({', '.join(columns)}) "
+                       f"VALUES ({', '.join('?' * len(columns))})", [row.get(c) for c in columns])
+    db.close()
+
+
+def agy_transcript(home: Path, cid: str) -> Path:
+    path = home / "brain" / cid / ".system_generated" / "logs" / "transcript_full.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("{}\n")
+    return path
+
+
+def agy_stamp(age_s: float = 0) -> str:
+    moment = datetime.fromtimestamp(time.time() - age_s, timezone.utc)
+    return moment.strftime("%Y-%m-%d %H:%M:%S.%f") + "123+00:00"   # nanosecond fraction, as agy writes
+
+
+def agy_row(home: Path, cid: str, workspace: Path | None, age_s: float = 0, transcript: bool = True,
+            **fields) -> dict:
+    if transcript:
+        agy_transcript(home, cid)
+    uris = [] if workspace is None else [workspace.as_uri()]
+    return {"conversation_id": cid, "title": "an agy title", "preview": "a preview",
+            "workspace_uris": json.dumps(uris), "last_modified_time": agy_stamp(age_s),
+            "parent_conversation_id": "", **fields}
 
 
 def rows(result: subprocess.CompletedProcess) -> list[str]:
@@ -889,12 +933,155 @@ def test_tracked_launch_config_matches_the_users_aliases():
     claude = ["--dangerously-skip-permissions"]
     codex = ["--no-daemon", "--dangerously-bypass-approvals-and-sandbox"]
     assert {home: entry["flags"] for home, entry in data["homes"].items()} == {
-        "claude": claude, "claude-work": claude, "codex": codex, "codex-work": codex}
+        "claude": claude, "claude-work": claude, "codex": codex, "codex-work": codex,
+        "agy": ["--dangerously-skip-permissions"]}
+
+
+# --- agy ----------------------------------------------------------------------------------
+
+
+def test_agy_row_shows_harness_cwd_and_title(env):
+    home, project = env.home / ".gemini" / "antigravity-cli", env.project("alpha")
+    agy_db(home, [agy_row(home, AID, project)])
+    [row] = rows(env.run("sessions", "--harness", "agy"))
+    assert row.split()[:3] == ["agy", "personal", AID[:8]]
+    assert str(project) in row and row.endswith("an agy title")
+
+
+def test_agy_label_falls_back_to_preview(env):
+    home, project = env.home / ".gemini" / "antigravity-cli", env.project("alpha")
+    agy_db(home, [agy_row(home, AID, project, title="", preview="first words")])
+    assert rows(env.run("sessions", "--harness", "agy"))[0].endswith("first words")
+
+
+def test_agy_subagent_rows_are_counted_non_interactive(env):
+    home, project = env.home / ".gemini" / "antigravity-cli", env.project("alpha")
+    agy_db(home, [agy_row(home, AID, project), agy_row(home, AID2, project, parent_conversation_id=AID)])
+    result = env.run("sessions", "--harness", "agy")
+    assert len(rows(result)) == 1
+    assert "agy 1 non-interactive, 0 transcript gone, 0 no workspace" in footer(result)
+
+
+def test_agy_row_without_transcript_is_counted_gone(env):
+    home, project = env.home / ".gemini" / "antigravity-cli", env.project("alpha")
+    agy_db(home, [agy_row(home, AID, project, transcript=False)])
+    result = env.run("sessions", "--harness", "agy")
+    assert rows(result) == []
+    assert "agy 0 non-interactive, 1 transcript gone, 0 no workspace" in footer(result)
+
+
+def test_agy_workspace_uri_is_percent_decoded(env):
+    home, project = env.home / ".gemini" / "antigravity-cli", env.project("my proj")
+    row = agy_row(home, AID, project)
+    row["workspace_uris"] = json.dumps([f"file://{str(project).replace(' ', '%20')}"])
+    assert "%20" in row["workspace_uris"]
+    agy_db(home, [row])
+    assert str(project) in rows(env.run("sessions", "--harness", "agy"))[0]
+
+
+def test_agy_row_without_workspace_is_excluded_and_never_matches_here(env):
+    home, project = env.home / ".gemini" / "antigravity-cli", env.project("alpha")
+    agy_db(home, [agy_row(home, AID, None), agy_row(home, AID2, project)])
+    result = env.run("sessions", "--harness", "agy")
+    assert len(rows(result)) == 1
+    assert "agy 0 non-interactive, 0 transcript gone, 1 no workspace" in footer(result)
+    subprocess.run(["git", "init", "-q", str(project)], check=True,
+                   env={"PATH": os.environ["PATH"], "HOME": str(env.home), "GIT_CONFIG_GLOBAL": os.devnull,
+                        "GIT_CONFIG_NOSYSTEM": "1"})
+    here = env.run("sessions", "--harness", "agy", "--here", cwd=project)
+    assert [r.split()[2] for r in rows(here)] == [AID2[:8]]
+
+
+@pytest.mark.parametrize("uri", ["https://example.com/x", "file://host/x", "file:relative/x"])
+def test_agy_non_file_uri_is_an_error_naming_the_file(env, uri):
+    home = env.home / ".gemini" / "antigravity-cli"
+    agy_db(home, [agy_row(home, AID, env.project("alpha"), workspace_uris=json.dumps([uri]))])
+    result = env.run("sessions", "--harness", "agy")
+    assert result.returncode != 0
+    assert str(home / "conversation_summaries.db") in result.stderr and uri in result.stderr
+
+
+@pytest.mark.parametrize("column", AGY_COLUMNS)
+def test_agy_schema_drift_is_an_error_naming_the_file(env, column):
+    home = env.home / ".gemini" / "antigravity-cli"
+    agy_db(home, [], drop=column)
+    result = env.run("sessions", "--harness", "agy")
+    assert result.returncode != 0
+    assert str(home / "conversation_summaries.db") in result.stderr and column in result.stderr
+
+
+@pytest.mark.parametrize("field, value", [("workspace_uris", "not json"), ("workspace_uris", '"a string"'),
+                                          ("workspace_uris", "[1]"), ("last_modified_time", "yesterday"),
+                                          ("last_modified_time", "2026-11-01 13:20:56"),
+                                          ("conversation_id", ""), ("parent_conversation_id", None)])
+def test_agy_unexpected_value_is_an_error_naming_the_file(env, field, value):
+    home = env.home / ".gemini" / "antigravity-cli"
+    agy_db(home, [agy_row(home, AID, env.project("alpha"), **{field: value})])
+    result = env.run("sessions", "--harness", "agy")
+    assert result.returncode != 0
+    assert str(home / "conversation_summaries.db") in result.stderr
+    assert "agy's summary schema changed" in result.stderr
+
+
+def test_agy_missing_table_is_an_error_naming_the_file(env):
+    home = env.home / ".gemini" / "antigravity-cli"
+    home.mkdir(parents=True)
+    sqlite3.connect(home / "conversation_summaries.db").close()
+    result = env.run("sessions", "--harness", "agy")
+    assert result.returncode != 0 and str(home / "conversation_summaries.db") in result.stderr
+
+
+def test_agy_missing_database_is_an_error_naming_the_file(env):
+    home = env.home / ".gemini" / "antigravity-cli"
+    home.mkdir(parents=True)
+    result = env.run("sessions", "--harness", "agy")
+    assert result.returncode != 0 and str(home / "conversation_summaries.db") in result.stderr
+
+
+def test_agy_locked_database_is_an_error_naming_the_file(env):
+    home = env.home / ".gemini" / "antigravity-cli"
+    agy_db(home, [agy_row(home, AID, env.project("alpha"))])
+    writer = sqlite3.connect(home / "conversation_summaries.db", isolation_level=None)
+    writer.execute("BEGIN EXCLUSIVE")
+    try:
+        result = env.run("sessions", "--harness", "agy")
+    finally:
+        writer.close()
+    assert result.returncode == 1
+    assert str(home / "conversation_summaries.db") in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+def test_absent_agy_home_is_named_not_an_error(env):
+    project = env.project("alpha")
+    claude_session(env.home / ".claude", SID, project)
+    result = env.run("sessions")
+    assert len(rows(result)) == 1
+    assert footer(result).endswith("absent: agy")
+
+
+def test_launch_agy_passes_flags_and_conversation_id(env):
+    home, project = env.home / ".gemini" / "antigravity-cli", env.project("my proj")
+    row = agy_row(home, AID, project)
+    row["workspace_uris"] = json.dumps([f"file://{str(project).replace(' ', '%20')}"])
+    agy_db(home, [row])
+    result = env.run("sessions", "-i", input="1\n", CLAUDE_CONFIG_DIR="/x", CODEX_HOME="/y")
+    assert launched(result) == {"tool": "agy", "argv": ["--dangerously-skip-permissions", "--conversation", AID],
+                                "cwd": str(project), "CLAUDE_CONFIG_DIR": None, "CODEX_HOME": None}
+
+
+def test_filter_harness_agy(env):
+    populate_all(env)
+    home = env.home / ".gemini" / "antigravity-cli"
+    agy_db(home, [agy_row(home, AID, env.project("alpha"), title="agy-one")])
+    assert labels(env.run("sessions", "--harness", "agy")) == {"agy-one"}
+    assert "agy-one" in labels(env.run("sessions"))
 
 
 # --- colour ----------------------------------------------------------------------------
 
 sys.path.insert(0, str(TOOL.parent))
+import harness_stores  # noqa: E402
 from hq_cli import color  # noqa: E402
 
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
@@ -1184,17 +1371,18 @@ def contrast(a, b) -> float:
 
 def test_colors_read_on_dark_and_light_backgrounds():
     ages = [color.AGE_MIN_S * 1.1 ** i for i in range(130)]
-    colours = [color.CLAUDE, color.CODEX, color.WORK, color.MISSING, *map(color.age_colour, ages)]
+    colours = [*(a.colour for a in harness_stores.ADAPTERS), color.WORK, color.MISSING, *map(color.age_colour, ages)]
     for rgb in [c.rgb for c in colours] + [xterm256_rgb(c.index) for c in colours]:
         assert contrast(rgb, DARK) >= 3 and contrast(rgb, LIGHT) >= 3, rgb
 
 
 @pytest.mark.parametrize("pick", [lambda c: c.rgb, lambda c: xterm256_rgb(c.index)], ids=["truecolor", "256"])
 def test_harness_hues_are_apart(pick):
-    """The one pair of hues that share a column. Other pairs never sit side by side, so
-    they need no floor (claude orange and the missing-cwd red are 10-11 apart)."""
-    a, b = oklab(pick(color.CLAUDE)), oklab(pick(color.CODEX))
-    assert 100 * sum((x - y) ** 2 for x, y in zip(a, b)) ** 0.5 >= 15
+    """Every pair of harness colours, since any two can sit side by side in a listing."""
+    import itertools
+    for first, second in itertools.combinations(harness_stores.ADAPTERS, 2):
+        a, b = oklab(pick(first.colour)), oklab(pick(second.colour))
+        assert 100 * sum((x - y) ** 2 for x, y in zip(a, b)) ** 0.5 >= 15, (first.alias, second.alias)
 
 
 # Records its argv to $FZF_ARGS, then picks as FZF_STUB does.

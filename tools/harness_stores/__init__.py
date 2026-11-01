@@ -1,10 +1,10 @@
 """Per-harness session-store adapters; the registry order is the display order."""
 from pathlib import Path
 
-from . import claude, codex
+from . import agy, claude, codex
 from .model import Adapter, Home, Session, SourceError
 
-ADAPTERS: tuple[Adapter, ...] = (claude.ADAPTER, codex.ADAPTER)
+ADAPTERS: tuple[Adapter, ...] = (claude.ADAPTER, codex.ADAPTER, agy.ADAPTER)
 
 __all__ = ["ADAPTERS", "Adapter", "Home", "Session", "SourceError", "by_alias", "archive_sources", "by_slug", "homes"]
 
