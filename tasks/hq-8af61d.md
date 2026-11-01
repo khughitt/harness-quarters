@@ -7,8 +7,8 @@ size: s
 complexity: mid
 process: direct
 created: 2026-11-01T08:44:46Z
-updated: 2026-11-01T12:00:26Z
-depends: []
+updated: 2026-11-01T12:21:01Z
+depends: [tasks-ba29d3, fam-55f1af]
 tags: [hooks, cross-project]
 source: hq-e72097
 agent: agy
