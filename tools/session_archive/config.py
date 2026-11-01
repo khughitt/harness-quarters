@@ -87,13 +87,24 @@ def load_config(path: Path) -> Config:
     return Config(root, tuple(os.path.expanduser(part) for part in command), tuple(allowed))
 
 
-def check_sources(table) -> None:
-    linked = [str(source.root) for source in table if source.root.is_symlink()]
+def check_sources(table, captured: Callable[[str], bool]) -> dict[str, str]:
+    """Refuse linked homes or roots and absent roots that must exist. Return the optional
+    sources skipped because their root is absent and they were never captured."""
+    linked = [str(path) for source in table for path in (source.home, source.root)
+              if path.is_symlink()]
     if linked:
         raise HostGateError("source root is a symlink: " + ", ".join(linked))
-    missing = [str(source.root) for source in table if not source.root.is_dir()]
+    missing, skipped = [], {}
+    for source in table:
+        if os.path.lexists(source.root):
+            continue
+        if source.required or captured(source.name):
+            missing.append(str(source.root))
+        else:
+            skipped[source.name] = "root absent, never captured"
     if missing:
         raise HostGateError("source root missing: " + ", ".join(missing))
+    return skipped
 
 
 @contextmanager

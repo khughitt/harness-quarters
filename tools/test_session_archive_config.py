@@ -134,3 +134,47 @@ def test_invalid_config_encoding_exits_2(home, archive):
     assert str(path) in result.stderr
     assert "cannot read configuration" in result.stderr
     assert "Traceback" not in result.stderr
+
+
+def source_at(tmp_path, name="x", required=False, root_name="root"):
+    from session_archive.config import Source
+    home = tmp_path / "h"
+    home.mkdir(exist_ok=True)
+    return Source(name, name, home, home / root_name, None, required=required)
+
+
+def test_optional_source_with_absent_root_is_skipped_when_never_captured(tmp_path):
+    source = source_at(tmp_path)
+    assert config.check_sources([source], lambda name: False) == {"x": "root absent, never captured"}
+
+
+def test_optional_source_with_absent_root_aborts_once_captured(tmp_path):
+    source = source_at(tmp_path)
+    with pytest.raises(config.HostGateError, match=str(source.root)):
+        config.check_sources([source], lambda name: True)
+
+
+def test_required_source_with_absent_root_still_aborts(tmp_path):
+    source = source_at(tmp_path, required=True)
+    with pytest.raises(config.HostGateError, match="missing"):
+        config.check_sources([source], lambda name: False)
+
+
+def test_present_optional_source_does_not_ask_captured(tmp_path):
+    source = source_at(tmp_path)
+    source.root.mkdir()
+
+    def captured(name):
+        raise AssertionError("captured must not be called")
+    assert config.check_sources([source], captured) == {}
+
+
+def test_symlinked_home_aborts(tmp_path):
+    from session_archive.config import Source
+    real = tmp_path / "real"
+    (real / "root").mkdir(parents=True)
+    link = tmp_path / "link"
+    link.symlink_to(real, target_is_directory=True)
+    source = Source("x", "x", link, link / "root", None)
+    with pytest.raises(config.HostGateError, match="symlink"):
+        config.check_sources([source], lambda name: False)
