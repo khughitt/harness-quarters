@@ -10,6 +10,7 @@ SCRIPT = Path(__file__).with_name("session-episodes")
 spec = importlib.util.spec_from_loader("session_episodes", loader=None)
 se = importlib.util.module_from_spec(spec)
 sys.modules["session_episodes"] = se
+se.__dict__["__file__"] = str(SCRIPT)  # the script finds tools/harness_stores from its own path
 exec(compile(SCRIPT.read_text(), str(SCRIPT), "exec"), se.__dict__)
 
 from datetime import datetime, timezone
@@ -1532,8 +1533,9 @@ def test_before_since_skip_changes_no_output(tmp_path):
     rollout("rollout-b-new.jsonl", "NEW", "c1", 1000, OK)
     claude_root, codex_root = tmp_path / "claude", tmp_path / "codex"
     since = ms(900)
-    parsed = se.scan_stores(claude_root, codex_root)
-    skipped = se.scan_stores(claude_root, codex_root, since)
+    stores = {"claude-code": claude_root, "codex": codex_root}
+    parsed = se.scan_stores(stores)
+    skipped = se.scan_stores(stores, since)
     assert [s.skipped for s in parsed] == [None, None] and [s.skipped for s in skipped] == ["before_since", None]
 
     def run(sessions):
@@ -1668,3 +1670,331 @@ def test_show_and_label_find_the_call_behind_an_episode_started_under_a_retired_
     code, stdout, stderr = run_cli(["show", ep["id"], "--episodes", str(out)], env)
     assert code == 0 and "tasks start tack-000001" in stdout, stderr
     assert run_cli(["label", ep["id"], "no", "--episodes", str(out)], env)[0] == 0
+
+
+# --- agy ------------------------------------------------------------------------
+#
+# One step per line under brain/<conversation>/.system_generated/logs/transcript_full.jsonl;
+# the shapes follow agy's transcripts, the content is made up.
+
+AGY_CONV = "c0ffee00-0000-4000-8000-000000000001"
+
+
+def a_ts(seconds):
+    return datetime.fromtimestamp(BASE + seconds, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def a_step(kind, i, t, source="MODEL", status="DONE", **extra):
+    r = {"step_index": i, "source": source, "type": kind, "status": status, "created_at": a_ts(t)}
+    r.update(extra)
+    return r
+
+
+def a_user(text, i, t):
+    return a_step("USER_INPUT", i, t, source="USER_EXPLICIT",
+                  content=f"<USER_REQUEST>\n{text}\n</USER_REQUEST>\n<ADDITIONAL_METADATA>\n"
+                          f"The current local time is: {a_ts(t)}.\n</ADDITIONAL_METADATA>\n"
+                          "<USER_SETTINGS_CHANGE>\nThe user changed setting `Model Selection`.\n</USER_SETTINGS_CHANGE>")
+
+
+def a_system(content, i, t, source="SYSTEM"):
+    return a_step("SYSTEM_MESSAGE", i, t, source=source,
+                  content="The following is a <SYSTEM_MESSAGE> not actually sent by the user.\n\n"
+                          f"<SYSTEM_MESSAGE>\n{content}\n</SYSTEM_MESSAGE>")
+
+
+def a_planner(i, t, calls=(), content=None):
+    extra = {"thinking": "Thinking.", "input_tokens": 1, "output_tokens": 1, "cache_read_tokens": 0}
+    if content is not None:
+        extra["content"] = content
+    if calls:
+        extra["tool_calls"] = [{"name": name, "args": args} for name, args in calls]
+    return a_step("PLANNER_RESPONSE", i, t, **extra)
+
+
+def a_run(command):
+    return ("run_command", {"CommandLine": command, "WaitMsBeforeAsync": 5000, "toolSummary": "run"})
+
+
+def a_ask(question="Which way?"):
+    return ("ask_question", {"questions": [{"question": question, "options": ["a", "b"]}]})
+
+
+def a_generic(i, t, output, status="DONE"):
+    return a_step("GENERIC", i, t, status=status,
+                  content=f"Created At: {a_ts(t)}\nCompleted At: {a_ts(t)}\nCommand exited with code 0.\n\n"
+                          f"Command output:\n{output}")
+
+
+def a_generic_error(i, t, message="target content not found in the file"):
+    return a_step("GENERIC", i, t, status="ERROR", error=message,
+                  content=f"Created At: {a_ts(t)}\nCompleted At: {a_ts(t)}\nEncountered error in step execution: {message}")
+
+
+def a_running(i, t, bg, command):
+    return a_step("GENERIC", i, t, status="RUNNING",
+                  content=f"Created At: {a_ts(t)}\nTool is running as a background task with task id: {bg}\n"
+                          f"Task Description: {command}\nLog output:\n{OK}\nYOU MUST TAKE ONE OF THE FOLLOWING TWO ACTIONS")
+
+
+def a_background(i, t, bg, result, cancelled=False):
+    verb = "was canceled with result:" if cancelled else "finished with result:"
+    return a_system(f"[Message] timestamp={a_ts(t)} sender={bg} priority=MESSAGE_PRIORITY_HIGH "
+                    f'content=Task id "{bg}" {verb}\n{result}\nLog: file:///logs/{bg}.log', i, t)
+
+
+def a_error_message(i, t, message="API error (attempt 1): stream idle timeout"):
+    return a_step("ERROR_MESSAGE", i, t, source="SYSTEM", error=message)
+
+
+def agy_file(root, steps, conv=AGY_CONV, raw=()):
+    """A transcript under root/brain/<conv>; `raw` lines are written verbatim before the steps."""
+    p = root / "brain" / conv / ".system_generated" / "logs" / "transcript_full.jsonl"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text("".join(line + "\n" for line in raw) + "".join(json.dumps(r) + "\n" for r in steps))
+    return p
+
+
+def agy_call(conv, step, k=0):
+    return f"{conv}:{step}:{k}"
+
+
+BG = f"{AGY_CONV}/task-2"
+
+
+def agy_background_story(root, cancelled=False, result=None):
+    """A start that outlives WaitMsBeforeAsync: the turn tells the user, the result arrives later."""
+    return agy_file(root, [
+        a_user("Let's take ai-000001", 0, 0),
+        a_planner(1, 5, [a_run("tasks start ai-000001")]),
+        a_running(2, 10, BG, "tasks start ai-000001"),
+        a_planner(3, 20, content="The start is running in the background; I will continue once it finishes."),
+        a_background(4, 40, BG, result if result is not None else f"Command exited with code 0.\n\nCommand output:\n{OK}",
+                     cancelled=cancelled),
+        a_planner(5, 60, content="Started ai-000001."),
+        a_user("Is it still running?", 6, 700),
+    ])
+
+
+def test_agy_human_text_is_the_user_request_only(tmp_path):
+    p = agy_file(tmp_path / "agy", [a_user("Let's take ai-000001", 0, 0), a_planner(1, 5, content="On it.")])
+    s = se.read_agy(p)
+    assert s.harness == "agy" and s.session_id == AGY_CONV and s.entrypoint == "agy" and s.subagent is False
+    humans = [e for e in s.events if e.kind == "human"]
+    assert [(e.text, e.line, e.at_ms) for e in humans] == [("Let's take ai-000001", 1, ms(0))]
+    assert [(e.kind, e.text, e.text_only) for e in s.events[1:]] == [("assistant", "On it.", True)]
+
+
+def test_agy_subagent_is_a_transcript_without_user_explicit_input(tmp_path):
+    sub = agy_file(tmp_path / "agy", [a_system("[Message] sender=parent content=Review the diff", 0, 0),
+                                      a_planner(1, 5, [a_run("tasks start ai-000001")])], conv="sub")
+    top = agy_file(tmp_path / "agy", [a_system("[Message] sender=parent content=hello", 0, 0),
+                                      a_user("go", 1, 1)], conv="top")
+    assert se.read_agy(sub).subagent is True and se.agy_header(sub).subagent is True
+    assert se.read_agy(top).subagent is False and se.agy_header(top).subagent is False
+    assert se.agy_header(sub).session_id == "sub" and se.agy_header(sub).entrypoint == "agy"
+
+
+def test_agy_backgrounded_tasks_start_confirms_from_its_system_message(tmp_path):
+    s = se.read_agy(agy_background_story(tmp_path / "agy"))
+    call = anchor_at(s, agy_call(AGY_CONV, 1))
+    assert s.events[call].commands == ("tasks start ai-000001",)
+    result = se._result_for(s, call)
+    assert result.at_ms == ms(40) and se.ids_in_result(result.text) == ["ai-000001"]
+    eps, cands, summary = se.build_episodes(inputs(tmp_path, [s], project(tmp_path), now=ms(60) + 10 * 60 * 1000 + 1))
+    assert cands == [] and len(eps) == 1
+    e = eps[0]
+    assert e["id"] == se.episode_id("agy", agy_call(AGY_CONV, 1), "ai-000001")
+    assert e["anchor_source"] == "result" and e["session_key"] == f"agy:{AGY_CONV}"
+    assert e["ended_at"] == ms(60) and e["next_human_at"] == ms(700) and e["status_question"] is True
+    assert e["source_refs"][0] == f"agy:{AGY_CONV}:{s.path}#L2"
+    assert summary["files"] == {"agy": 1} and summary["turns"]["completed"] == 1
+
+
+def test_agy_cancelled_background_command_is_an_error_result(tmp_path):
+    s = se.read_agy(agy_background_story(tmp_path / "agy", cancelled=True,
+                                         result=f"Tool execution was canceled\n{OK}"))
+    result = se._result_for(s, anchor_at(s, agy_call(AGY_CONV, 1)))
+    assert result.text.startswith("error: canceled: Tool execution was canceled") and se.has_error_line(result.text)
+    eps, cands, _ = se.build_episodes(inputs(tmp_path, [s], project(tmp_path)))
+    assert eps == [] and [c["reason"] for c in cands] == ["error-output"]
+
+
+def test_agy_error_generic_is_an_error_result(tmp_path):
+    s = se.read_agy(agy_file(tmp_path / "agy", [
+        a_user("go", 0, 0), a_planner(1, 5, [a_run("tasks start ai-000001")]), a_generic_error(2, 6),
+        a_planner(3, 60, content="The start failed."), a_user("status?", 4, 700)]))
+    result = se._result_for(s, anchor_at(s, agy_call(AGY_CONV, 1)))
+    assert result.text.startswith("error: Created At:") and se.has_error_line(result.text)
+    eps, cands, _ = se.build_episodes(inputs(tmp_path, [s], project(tmp_path)))
+    assert eps == [] and [c["reason"] for c in cands] == ["error-output"]
+
+
+def test_agy_unpaired_calls_have_no_result(tmp_path):
+    s = se.read_agy(agy_file(tmp_path / "agy", [
+        a_user("go", 0, 0),
+        a_planner(1, 5, [a_run("pwd"), a_run("tasks start ai-000001"), ("view_file", {"AbsolutePath": "/w/x"})]),
+        a_generic(2, 6, "/w"),
+        a_planner(3, 7, [a_run("ls")]),
+        a_generic(4, 8, "x"),
+        a_generic(5, 9, "surplus")]))
+    calls = [e.call_id for e in s.events if e.kind == "tool_call"]
+    assert calls == [agy_call(AGY_CONV, 1, 0), agy_call(AGY_CONV, 1, 1), agy_call(AGY_CONV, 1, 2), agy_call(AGY_CONV, 3, 0)]
+    results = [(e.call_id, e.text.rsplit("\n", 1)[-1]) for e in s.events if e.kind == "tool_result"]
+    assert results == [(agy_call(AGY_CONV, 1, 0), "/w"), (agy_call(AGY_CONV, 3, 0), "x")]
+    assert se._result_for(s, anchor_at(s, agy_call(AGY_CONV, 1, 1))) is None
+    assert s.events[1].pending == tuple(calls[:3]) and s.events[1].text_only is False
+
+
+def test_agy_turn_ending_in_text_after_background_start_is_completed(tmp_path):
+    s = se.read_agy(agy_file(tmp_path / "agy", [
+        a_user("go", 0, 0), a_planner(1, 5, [a_run("tasks start ai-000001")]),
+        a_running(2, 10, BG, "tasks start ai-000001"),
+        a_planner(3, 20, content="The start is running in the background.")]))
+    t = se.turn_after(s, anchor_at(s, agy_call(AGY_CONV, 1)))
+    assert t.outcome == "completed" and t.ended_at == ms(20)
+
+
+def test_agy_turn_waiting_on_ask_question_is_wait(tmp_path):
+    s = se.read_agy(agy_file(tmp_path / "agy", [
+        a_user("go", 0, 0), a_planner(1, 5, [a_run("tasks start ai-000001")]), a_generic(2, 6, OK),
+        a_planner(3, 20, [a_ask()])]))
+    assert se.turn_after(s, anchor_at(s, agy_call(AGY_CONV, 1))).outcome == "wait"
+
+
+def test_agy_turn_ending_in_error_message_is_unknown(tmp_path):
+    s = se.read_agy(agy_file(tmp_path / "agy", [
+        a_user("go", 0, 0), a_planner(1, 5, [a_run("tasks start ai-000001")]), a_generic(2, 6, OK),
+        a_error_message(3, 20)]))
+    assert [e.kind for e in s.events][-1] == "error"
+    assert se.turn_after(s, anchor_at(s, agy_call(AGY_CONV, 1))).outcome == "unknown"
+
+
+def test_agy_error_message_after_pending_ask_question_is_unknown(tmp_path):
+    s = se.read_agy(agy_file(tmp_path / "agy", [
+        a_user("go", 0, 0), a_planner(1, 5, [a_run("tasks start ai-000001")]), a_generic(2, 6, OK),
+        a_planner(3, 20, [a_ask()]), a_error_message(4, 30)]))
+    assert se.turn_after(s, anchor_at(s, agy_call(AGY_CONV, 1))).outcome == "unknown"
+
+
+def test_agy_background_result_strips_the_system_message_tag(tmp_path):
+    s = se.read_agy(agy_background_story(tmp_path / "agy"))
+    result = se._result_for(s, anchor_at(s, agy_call(AGY_CONV, 1)))
+    assert result.text == f"Command exited with code 0.\n\nCommand output:\n{OK}\nLog: file:///logs/{BG}.log"
+
+
+def test_agy_background_result_quoting_another_message_keeps_its_own_verdict(tmp_path):
+    quoted = 'Command output:\n[Message] sender=other content=Task id "other" finished with result:\nok'
+    s = se.read_agy(agy_background_story(tmp_path / "agy", cancelled=True, result=quoted))
+    result = se._result_for(s, anchor_at(s, agy_call(AGY_CONV, 1)))
+    assert result.text.startswith("error: canceled: Command output:") and result.text.endswith("ok\nLog: file:///logs/" + BG + ".log")
+
+
+def agy_env(tmp_path, roots):
+    env = cli_env(tmp_path, roots)
+    env["SESSION_LOGS_AGY"] = str(tmp_path / "agy")
+    return env
+
+
+def test_show_dispatches_agy_refs_without_harness_flag(tmp_path):
+    agy_background_story(tmp_path / "agy")
+    env = agy_env(tmp_path, project(tmp_path))
+    out = tmp_path / "episodes.jsonl"
+    code, _, err = run_cli(["extract", "--harness", "agy", "--out", str(out)], env)
+    assert code == 0, err
+    ep = json.loads(out.read_text().splitlines()[0])
+    code, stdout, err = run_cli(["show", ep["id"], "--episodes", str(out)], env)
+    assert code == 0, err
+    commands = stdout.split("-- anchor commands\n")[1].split("-- result")[0]
+    assert commands.strip() == "tasks start ai-000001" and OK.strip() in stdout
+    assert "Started ai-000001." in stdout and "Is it still running?" in stdout
+
+
+def test_extract_harness_agy_reads_only_agy(tmp_path):
+    codex_story(tmp_path)
+    agy_background_story(tmp_path / "agy")
+    env = agy_env(tmp_path, project(tmp_path))
+    out = tmp_path / "episodes.jsonl"
+    code, _, err = run_cli(["extract", "--harness", "agy", "--out", str(out)], env)
+    assert code == 0, err
+    summary = json.loads(err)
+    assert summary["roots"] == {"agy": str(tmp_path / "agy")} and summary["missing_roots"] == []
+    assert summary["files"] == {"agy": 1} and summary["episodes"] == 1
+    assert [json.loads(l)["session_key"] for l in out.read_text().splitlines()] == [f"agy:{AGY_CONV}"]
+    code, _, err = run_cli(["extract", "--harness", "codex", "--harness", "agy", "--harness", "codex",
+                            "--out", str(out)], env)
+    assert code == 0, err
+    summary = json.loads(err)
+    assert summary["files"] == {"agy": 1, "codex": 1} and summary["episodes"] == 2
+    assert set(summary["roots"]) == {"codex", "agy"}
+
+
+def test_default_extract_is_identical_with_and_without_agy_home(tmp_path):
+    """Review Focus 5: until the readout, a run without --harness never reads agy."""
+    codex_story(tmp_path)
+    roots = project(tmp_path)
+    env = cli_env(tmp_path, roots)
+    assert "SESSION_LOGS_AGY" not in env
+    out = tmp_path / "ep" / "episodes.jsonl"
+
+    def run():
+        code, stdout, stderr = run_cli(["extract", "--out", str(out)], env)
+        assert code == 0, stderr
+        return stdout, stderr, out.read_bytes(), se.sidecar(out, "candidates").read_bytes()
+
+    without = run()
+    home = tmp_path / ".gemini" / "antigravity-cli"
+    agy_background_story(home)
+    agy_file(home, [a_user("go", 0, 0), a_planner(1, 5, [a_run("tasks start ai-000001")]), a_generic(2, 6, "nope")],
+             conv="other")
+    with_agy = run()
+    assert with_agy == without
+    summary = json.loads(without[1])
+    assert set(summary["roots"]) == {"claude", "codex"} and set(summary["files"]) == {"codex"}
+    # the same home does hold agy anchors, read once asked for
+    code, _, err = run_cli(["extract", "--harness", "agy", "--out", str(tmp_path / "agy-only.jsonl")], env)
+    assert code == 0 and json.loads(err)["roots"] == {"agy": str(home)} and json.loads(err)["anchors_seen"] == 2
+
+
+@pytest.mark.parametrize("bad", ["not json", "[1, 2]", json.dumps({"type": "GENERIC", "created_at": "2026-09-17T12:00:00Z"}),
+                                 json.dumps({"type": "GENERIC", "step_index": 1, "created_at": "yesterday"})])
+def test_malformed_agy_line_stops_the_run_naming_agy(tmp_path, bad):
+    p = agy_file(tmp_path / "agy", [a_user("go", 1, 1), a_planner(2, 5, [a_run("tasks start ai-000001")]),
+                                    a_generic(3, 6, OK)],
+                 raw=[json.dumps(a_system("[Message] sender=x content=hello", 0, 0)), bad])
+    with pytest.raises(SystemExit) as header:
+        se.agy_header(p)
+    with pytest.raises(SystemExit) as full:
+        se.read_agy(p)
+    for error in (header.value, full.value):
+        assert "agy" in str(error.code) and f"{p}:2" in str(error.code)
+    env = agy_env(tmp_path, project(tmp_path))
+    code, _, err = run_cli(["extract", "--harness", "agy", "--out", str(tmp_path / "e.jsonl")], env)
+    assert code == 2 and "agy" in err and str(p) in err
+
+
+def child_env(tmp_path):
+    import os
+    return {"PATH": os.environ["PATH"], "HOME": str(tmp_path)}
+
+
+def test_import_failure_names_the_tools_path(tmp_path):
+    import shutil
+    copy = tmp_path / "elsewhere" / "agents" / "bin" / "session-episodes"
+    copy.parent.mkdir(parents=True)
+    shutil.copy(SCRIPT, copy)
+    result = subprocess.run([sys.executable, str(copy), "extract", "--out", str(tmp_path / "e.jsonl")],
+                            capture_output=True, text=True, env=child_env(tmp_path))
+    tools = copy.resolve().parents[2] / "tools"
+    assert result.returncode != 0 and str(tools) in result.stderr and "harness_stores" in result.stderr
+    assert "Traceback" not in result.stderr and not (tmp_path / "e.jsonl").exists()
+
+
+def test_a_symlinked_script_imports_from_its_real_checkout(tmp_path):
+    link = tmp_path / "bin" / "session-episodes"
+    link.parent.mkdir()
+    link.symlink_to(SCRIPT)
+    result = subprocess.run([sys.executable, str(link), "extract", "--help"], capture_output=True, text=True,
+                            env=child_env(tmp_path))
+    assert result.returncode == 0, result.stderr
+    assert "--harness" in result.stdout and "agy" in result.stdout
