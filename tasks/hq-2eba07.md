@@ -7,9 +7,9 @@ size: m
 complexity: mid
 process: planned
 created: 2026-11-01T01:25:51Z
-updated: 2026-11-01T01:25:51Z
+updated: 2026-11-01T01:30:28Z
 depends: []
-tags: [architecture]
+tags: [hooks]
 source: hq-6c8a9f
 agent: agy
 origin: mixed
