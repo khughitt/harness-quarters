@@ -5,6 +5,7 @@
       "command(tasks)"
     ]
   },
+  "showFeedbackSurvey": false,
   "statusLine": {
     "type": "",
     "command": "",

@@ -98,7 +98,7 @@ def test_shipped_manifest_loads_and_matches_gitattributes_and_git_check_attr(tmp
     assert manifest.harnesses == ("agy", "claude-code", "codex", "opencode", "pi", "pi-durable")
     assert manifest.by_harness["opencode"] is None and manifest.by_harness["pi-durable"] is None
     expected = {
-        "agy": (("model", "effort", "effortByBase", "trustedWorkspaces"), ()),
+        "agy": (("model", "effort", "effortByBase", "trustedWorkspaces", "seasonalThemesOptIn"), ()),
         "claude-code": (("model", "modelSettings", "effortLevel"), ()),
         "codex": (("model", "model_reasoning_effort"), ()),
         "pi": (("defaultProvider", "defaultModel", "defaultThinkingLevel"), ("deviceId", "trackingId")),

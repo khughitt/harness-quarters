@@ -47,9 +47,11 @@ tables it strips, and the pick units `live-picks` saves. The filter keeps `model
 the top-level `model` and `model_reasoning_effort` in `codex/config*.toml`,
 `defaultProvider`, `defaultModel` and `defaultThinkingLevel` in `pi/settings*.json`
 (with pi's installation ids, `deviceId` and `trackingId`), and `model`, `effort`,
-`effortByBase` and `trustedWorkspaces` in `agy/settings*.json` out of the index: model and
-effort picks (and agy's trusted workspace list) write into the live files (the homes
-symlink here), and they are session or host state, not configuration. A fresh home
+`effortByBase`, `trustedWorkspaces` and `seasonalThemesOptIn` in `agy/settings*.json` out
+of the index: model and effort picks (and agy's trusted workspace list and seasonal theme
+opt-in) write into the live files (the homes symlink here), and they are session or host
+state, not configuration. agy's other settings-UI writes are configuration and are
+tracked, `showFeedbackSurvey` and `statusLine` included. A fresh home
 therefore runs each harness's default model and effort until the first pick.
 
 While `harnesses.toml` is broken (bad TOML, or an entry its validation refuses), the
@@ -77,8 +79,8 @@ no hook runs (the commands listed below for trust). Each picker's fields are one
 Claude's `/model` (`model`, `modelSettings`) and `/effort` (`effortLevel`) separately,
 Codex's model and effort together; pi's default model (`defaultProvider`,
 `defaultModel`) and thinking level (`defaultThinkingLevel`) separately; agy's `/model`
-(`model`), `/effort` (`effort`, `effortByBase`) and workspace trust
-(`trustedWorkspaces`) separately. A unit holding
+(`model`), `/effort` (`effort`, `effortByBase`), workspace trust
+(`trustedWorkspaces`) and the seasonal theme opt-in (`seasonalThemesOptIn`) separately. A unit holding
 any of its fields is never touched, so a newer pick always wins, and a pick of one
 Claude, pi or agy picker keeps the other's saved value. A unit holding none is ambiguous,
 so only an explicit act resets the saved pick:
@@ -93,7 +95,9 @@ not a capture point. The tested Codex picker actions kept both model fields; use
 by atomic rename over the home link, an anchored host (one whose `~/.gemini/config`
 hooks or skills link already targets this checkout) reads any regular file there during
 `capture`, adopts its picks and any tracked `/config` or `permissions` edits back into
-`agy/settings.json`, and restores the symlink on `restore`, `hook` and `forget`. A
+`agy/settings.json`, and restores the symlink on `restore`, `hook` and `forget` (a host
+not anchored yet adopts a first-run file through `just link --apply` instead; see Home
+links). A
 Claude or Codex pick made since the last turn end is not saved yet; a git command in
 that window brings back the one before (for agy, `hook` captures a detached regular file
 before restoring onto the newly checked-out `agy/settings.json`).
@@ -556,7 +560,14 @@ a new host after installing a harness. It refuses to run from a worktree and nev
 overwrites a real file (`refuse`), except a regular file at a link declared in a
 harness's `adopt` list once one of its declared `anchors` already points into this
 checkout (`just link` reports `adopt`, `just link-check` exits 1, and `just link --apply`
-syncs and relinks it via `.githooks/live-picks sync`; an unanchored host still refuses).
+syncs and relinks it via `.githooks/live-picks sync`). On a host not anchored yet, a
+regular file there is a first-run file the harness wrote before its home was linked (a
+new host where agy ran first). `just link` reports it as `adopt` only when the same run
+would create every anchor, with nothing at any of them. `just link --apply` then runs
+`.githooks/live-picks first-run` before it creates any link: the file's picks merge into
+the tracked config, which stays the base, and any other key the tracked config does not
+already hold refuses the whole apply, writing nothing, as does a running agy (quit every
+agy session first). A foreign file or link at an anchor still refuses.
 
 Global-file, profile and general skill links target lore directly; tasks/curate/scope
 target tasks, quick-add targets ops, and flow tools and skills target flows. Settings,

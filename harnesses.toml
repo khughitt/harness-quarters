@@ -7,9 +7,9 @@ schema = 1
 config = "agy/settings.json"
 filter_glob = "agy/settings*.json"
 format = "json"
-clean_keys = ["model", "effort", "effortByBase", "trustedWorkspaces"]
+clean_keys = ["model", "effort", "effortByBase", "trustedWorkspaces", "seasonalThemesOptIn"]
 picks_record = "local/live-picks-agy.json"
-pick_units = [["model"], ["effort", "effortByBase"], ["trustedWorkspaces"]]
+pick_units = [["model"], ["effort", "effortByBase"], ["trustedWorkspaces"], ["seasonalThemesOptIn"]]
 
 [harnesses.claude-code.live_state]
 config = "claude/settings.json"

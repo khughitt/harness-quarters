@@ -1203,7 +1203,8 @@ def edit_manifest(repo, old, new):
 
 CLAUDE_UNITS = 'pick_units = [["model", "modelSettings"], ["effortLevel"]]'
 PI_UNITS = 'pick_units = [["defaultProvider", "defaultModel"], ["defaultThinkingLevel"]]'
-AGY_UNITS = 'pick_units = [["model"], ["effort", "effortByBase"], ["trustedWorkspaces"]]'
+AGY_UNITS = ('pick_units = [["model"], ["effort", "effortByBase"], ["trustedWorkspaces"], '
+             '["seasonalThemesOptIn"]]')
 CODEX_UNITS = 'pick_units = [["model", "model_reasoning_effort"]]'
 
 
@@ -1211,7 +1212,7 @@ CODEX_UNITS = 'pick_units = [["model", "model_reasoning_effort"]]'
     (PI_UNITS, 'pick_units = [["defaultProvider", "defaultModel"], ["defaultModel", "defaultThinkingLevel"]]'),
     (PI_UNITS, 'pick_units = [["defaultProvider", "defaultModel"], ["defaultThinkingLevel"], ["theme"]]'),
     (CLAUDE_UNITS, 'pick_units = [["model", "modelSettings"]]'),
-    (AGY_UNITS, 'pick_units = [["model"], ["effort", "effortByBase"]]'),
+    (AGY_UNITS, 'pick_units = [["model"], ["effort", "effortByBase"], ["trustedWorkspaces"]]'),
     (CODEX_UNITS, 'pick_units = [["model"]]'),
 ], ids=["pi-overlap", "pi-unfiltered", "claude-missing", "agy-missing", "codex-missing"])
 def test_manifest_partition_and_overlap_violations_are_refused(repo, tmp_path, old, new):
@@ -1835,7 +1836,7 @@ def test_pinned_pre_pi_commands_leave_the_agy_record_untouched(repo, pre_pi_hook
 
 def agy_env(home):
     return {
-        "PATH": os.environ["PATH"],
+        "PATH": f"{home / '.test-bin'}:{os.environ['PATH']}",
         "HOME": str(home),
         "XDG_CONFIG_HOME": str(home / ".config"),
         "XDG_STATE_HOME": str(home / ".local/state"),
@@ -2118,6 +2119,124 @@ def test_agy_unanchored_home_regular_file_is_left_untouched(repo, tmp_path):
     assert result.returncode == 0, result.stderr
     assert not regular.is_symlink()
     assert regular.read_text() == raw
+    assert (repo / AGY).read_bytes() == repo_before
+    assert not agy_record_path(repo).exists()
+
+
+def first_run_agy_home(tmp_path, data):
+    """A host agy ran on before this checkout linked its home: real dirs, no anchors."""
+    home = tmp_path / "first-run-home"
+    (home / ".gemini/antigravity-cli").mkdir(parents=True)
+    (home / ".gemini/config").mkdir(parents=True)
+    path = home / ".gemini/antigravity-cli/settings.json"
+    path.write_text(json.dumps(data, indent=2) + "\n")
+    stub_pgrep(home)
+    return home, path
+
+
+def stub_pgrep(home, running=""):
+    """A pgrep on the isolated PATH: live-picks first-run never sees this host's agy."""
+    bin_dir = home / ".test-bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    pgrep = bin_dir / "pgrep"
+    pgrep.write_text(f"#!/bin/sh\nprintf '%s' '{running}'\n" + ("exit 0\n" if running else "exit 1\n"))
+    pgrep.chmod(0o755)
+
+
+def test_agy_first_run_file_is_merged_onto_the_tracked_config_and_relinked(repo, tmp_path):
+    write_agy(repo, showFeedbackSurvey=False)
+    git(repo, "commit", "-q", "-am", "track showFeedbackSurvey")
+    write_agy(repo, showFeedbackSurvey=False, model="Gemini 4 Argon (Medium)",
+              trustedWorkspaces=["/work/a"])
+    save_agy(repo, {"model": "Gemini 4 Argon (Medium)", "trustedWorkspaces": ["/work/a"],
+                    "effort": "high", "effortByBase": {"Gemini 4 Argon": "high"}})
+    home, path = first_run_agy_home(tmp_path, {
+        "model": "Gemini 4 Argon (Low)",
+        "seasonalThemesOptIn": "halloween-2026",
+        "showFeedbackSurvey": False,
+        "trustedWorkspaces": ["/work/b", "/work/a"],
+    })
+
+    result = isolated_picks(repo, home, "first-run")
+
+    assert result.returncode == 0, result.stderr
+    assert path.is_symlink() and path.resolve() == (repo / AGY).resolve()
+    want = {"model": "Gemini 4 Argon (Medium)", "effort": "high",
+            "effortByBase": {"Gemini 4 Argon": "high"},
+            "trustedWorkspaces": ["/work/a", "/work/b"], "seasonalThemesOptIn": "halloween-2026"}
+    assert agy_settings(repo) == {**AGY_BASE, "showFeedbackSurvey": False, **want}
+    assert json.loads(agy_record_path(repo).read_text()) == {AGY: {"state": "set", "values": want}}
+    assert isolated_git(repo, home, "diff", "--quiet", "--", AGY, check=False).returncode == 0
+
+
+def test_agy_first_run_file_with_a_key_the_config_lacks_is_refused_untouched(repo, tmp_path):
+    write_agy(repo, showFeedbackSurvey=True)
+    repo_before = (repo / AGY).read_bytes()
+    home, path = first_run_agy_home(tmp_path, {
+        "queuedMessages": "send-immediately",
+        "showFeedbackSurvey": False,
+        "trustedWorkspaces": ["/first-run"],
+    })
+    raw = path.read_text()
+
+    result = isolated_picks(repo, home, "first-run")
+
+    assert result.returncode != 0
+    assert "queuedMessages, showFeedbackSurvey" in result.stderr
+    assert "nothing written" in result.stderr
+    assert "Traceback" not in result.stderr
+    assert not path.is_symlink() and path.read_text() == raw
+    assert (repo / AGY).read_bytes() == repo_before
+    assert not agy_record_path(repo).exists()
+
+
+def test_agy_first_run_refuses_an_anchored_home_and_a_corrupt_file(repo, tmp_path):
+    home, link = anchor_agy_home(repo, tmp_path)
+    repo_before = (repo / AGY).read_bytes()
+    atomic_agy_save(link, {**AGY_BASE, "model": "Gemini 4 Argon (High)"})
+
+    anchored = isolated_picks(repo, home, "first-run")
+
+    assert anchored.returncode != 0
+    assert "anchored" in anchored.stderr and "live-picks sync" in anchored.stderr
+    assert not link.is_symlink()
+    assert (repo / AGY).read_bytes() == repo_before
+
+    home, path = first_run_agy_home(tmp_path / "corrupt", {})
+    path.write_text("{corrupt\n")
+
+    corrupt = isolated_picks(repo, home, "first-run")
+
+    assert corrupt.returncode != 0
+    assert f"{path} does not parse" in corrupt.stderr
+    assert not path.is_symlink() and path.read_text() == "{corrupt\n"
+    assert (repo / AGY).read_bytes() == repo_before
+
+
+def test_agy_first_run_refuses_while_agy_runs(repo, tmp_path):
+    home, path = first_run_agy_home(tmp_path, {"trustedWorkspaces": ["/first-run"]})
+    stub_pgrep(home, running="4242")
+    raw = path.read_text()
+    repo_before = (repo / AGY).read_bytes()
+
+    result = isolated_picks(repo, home, "first-run")
+
+    assert result.returncode != 0
+    assert "agy is running (pid 4242)" in result.stderr and "quit every agy session" in result.stderr
+    assert not path.is_symlink() and path.read_text() == raw
+    assert (repo / AGY).read_bytes() == repo_before
+    assert not agy_record_path(repo).exists()
+
+
+def test_agy_first_run_without_a_regular_file_writes_nothing(repo, tmp_path):
+    home, path = first_run_agy_home(tmp_path, {})
+    path.unlink()
+    repo_before = (repo / AGY).read_bytes()
+
+    result = isolated_picks(repo, home, "first-run")
+
+    assert result.returncode == 0, result.stderr
+    assert not path.exists() and not path.is_symlink()
     assert (repo / AGY).read_bytes() == repo_before
     assert not agy_record_path(repo).exists()
 
