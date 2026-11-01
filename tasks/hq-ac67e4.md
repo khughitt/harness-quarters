@@ -1,13 +1,15 @@
 ---
 id: hq-ac67e4
 title: Converge agy ~/.gemini/config links on europa and reconcile ~/.gemini/antigravity-cli/settings.json live-state drift across titan and europa
-status: todo
+status: doing
 priority: 2
 size: s
 complexity: mid
 process: direct
+owner: main
 created: 2026-11-01T22:03:31Z
-updated: 2026-11-01T22:04:00Z
+updated: 2026-11-01T22:06:20Z
+started: 2026-11-01T22:06:20Z
 depends: []
 tags: [hooks]
 source: hq-8af61d
@@ -31,3 +33,5 @@ Where: links.toml, harnesses.toml, agy/settings.json, tools/harness-links, tools
 - 2026-11-01T22:03:31Z (add): created
   provenance: {"origin":"user"}
 - 2026-11-01T22:04:00Z (main): concerns: hq-8af61d extension — onboard europa ~/.gemini/config/* links past unanchored initial settings.json and classify agy/settings.json live-state drift across titan and europa
+- 2026-11-01T22:06:20Z (main): started
+  provenance: {"harness_session":"claude-code:6dcbd897-967a-4e20-a982-604b9c48faaf","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
