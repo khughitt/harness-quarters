@@ -1,17 +1,15 @@
 ---
 id: hq-e8f2db
 title: "Add harnesses.toml manifest and shared harness_state loader, cleaners, and checks"
-status: done
+status: todo
 priority: 2
 size: s
 complexity: mid
 process: direct
 owner: feat/hq-2eba07-harness-manifest
 created: 2026-11-01T12:36:07Z
-updated: 2026-11-01T14:10:32Z
+updated: 2026-11-01T18:20:10Z
 started: 2026-11-01T13:37:20Z
-completed: 2026-11-01T14:10:32Z
-closed: 2026-11-01T14:10:32Z
 depends: []
 parent: hq-2eba07
 tags: [hooks]
