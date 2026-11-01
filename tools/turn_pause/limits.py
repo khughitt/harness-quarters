@@ -1,33 +1,57 @@
-"""Default turn limits and how a budget directive scales them."""
-import hashlib
+"""Default turn limits and how a budget directive scales them.
+
+The hook imports this module on every call, so it keeps to cheap imports: tomllib and
+fractions load only where they are needed, and the sha256 comes from the C module _sha2
+rather than hashlib. DEFAULTS_PATH (a pathlib.Path) is built on first access; the hook
+uses DEFAULTS_FILE, a str.
+"""
+from __future__ import annotations
+
 import math
-from dataclasses import dataclass
-from pathlib import Path
+import os
 
-from .prompt import Budget
+from .record import Frozen
 
-DEFAULTS_PATH = Path(__file__).with_name('limits.toml')
+try:
+    from _sha2 import sha256
+except ImportError:  # an interpreter built without _sha2: same digest, slower import
+    from hashlib import sha256
 
-
-@dataclass(frozen=True)
-class Limits:
-    active_seconds: int
-    calls: int
-    spawns: int
-    compactions: int
+DEFAULTS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'limits.toml')
 
 
-def load(path: Path = DEFAULTS_PATH) -> tuple[Limits, str]:
+def __getattr__(name):
+    if name == 'DEFAULTS_PATH':
+        from pathlib import Path
+        return Path(DEFAULTS_FILE)
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
+
+
+class Limits(Frozen):
+    __slots__ = _fields = ('active_seconds', 'calls', 'spawns', 'compactions')
+
+
+def sha256_hex(data: bytes) -> str:
+    return sha256(data).hexdigest()
+
+
+def file_sha256(path) -> str:
+    with open(path, 'rb') as f:
+        return sha256_hex(f.read())
+
+
+def load(path=DEFAULTS_FILE) -> tuple[Limits, str]:
     """The limits in the file and the sha256 of its bytes."""
-    import tomllib  # here, not at the top: the hook imports this module on every call (latency)
-    raw = path.read_bytes()
+    import tomllib
+    with open(path, 'rb') as f:
+        raw = f.read()
     data = tomllib.loads(raw.decode())
-    return Limits(data['active_seconds'], data['calls'], data['spawns'], data['compactions']), hashlib.sha256(raw).hexdigest()
+    return Limits(data['active_seconds'], data['calls'], data['spawns'], data['compactions']), sha256_hex(raw)
 
 
-def with_budget(defaults: Limits, budget: Budget) -> Limits:
+def with_budget(defaults: Limits, budget) -> Limits:
     """Scale unnamed limits by budget.seconds over the default; named counts override."""
-    from fractions import Fraction  # only a budget directive needs it (hook latency)
+    from fractions import Fraction
     factor = Fraction(budget.seconds, defaults.active_seconds)
 
     def scaled(value: int) -> int:

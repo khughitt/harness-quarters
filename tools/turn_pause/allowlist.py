@@ -11,31 +11,27 @@ Tool names are the ones hook payloads carry (fact hook-tool-names). Codex's oute
 `exec`, nested `write_stdin` and top-level `wait` reach no hook (fact
 hook-unhooked-tools), so nothing here classifies them.
 """
+from __future__ import annotations
+
 import os
 import re
 import shlex
 import string
-from collections.abc import Iterator, Sequence
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Literal
 
-Klass = Literal['bookkeeping', 'cancellation', 'read', 'refuse']
+from .protect import touches_protected  # noqa: F401  (re-exported: its home before the hook split it out)
+from .record import Frozen
 
-
-@dataclass(frozen=True)
-class Verdict:
-    klass: Klass
-    reason: str
+# Klass: 'bookkeeping', 'cancellation', 'read' or 'refuse'.
 
 
-@dataclass(frozen=True)
-class Owned:
+class Verdict(Frozen):
+    __slots__ = _fields = ('klass', 'reason')
+
+
+class Owned(Frozen):
     """What this session tree started: Codex worker task names (bare and /root/ form),
     pending Claude Code cron job ids, and the harness process the hook runs under."""
-    worker_names: frozenset[str]
-    cron_jobs: frozenset[str]
-    harness_pid: int | None
+    __slots__ = _fields = ('worker_names', 'cron_jobs', 'harness_pid')
 
 
 # Shell programs. `hq pause` passes only as `hq pause status|limits` (ledger ruling R2);
@@ -210,7 +206,7 @@ def _kill(args: list[str], owned: Owned) -> Verdict:
     return Verdict('cancellation', 'kill of processes this session started')
 
 
-def descends_from(pid: int, ancestor: int, proc: Path = Path('/proc')) -> bool:
+def descends_from(pid: int, ancestor: int, proc='/proc') -> bool:
     """Whether ancestor is a proper ancestor of pid, by PPid in <proc>/<pid>/status.
     False when any status on the way is missing, unreadable or malformed: a kill the
     walk cannot prove is refused, and nothing escapes into the hook."""
@@ -221,7 +217,9 @@ def descends_from(pid: int, ancestor: int, proc: Path = Path('/proc')) -> bool:
     while current not in seen:
         seen.add(current)
         try:
-            ppid = _ppid((proc / str(current) / 'status').read_text(), proc / str(current) / 'status')
+            status = os.path.join(os.fspath(proc), str(current), 'status')
+            with open(status) as f:
+                ppid = _ppid(f.read(), status)
         except (OSError, ValueError):
             return False
         if ppid == ancestor:
@@ -232,7 +230,7 @@ def descends_from(pid: int, ancestor: int, proc: Path = Path('/proc')) -> bool:
     return False
 
 
-def _ppid(status: str, where: Path) -> int:
+def _ppid(status: str, where: str) -> int:
     for line in status.splitlines():
         if line.startswith('PPid:'):
             parts = line.split()
@@ -294,34 +292,3 @@ def _tool_search(query) -> Verdict:
     if not all(n in SELECTABLE for n in names):
         return _refuse(f'ToolSearch may load only {sorted(SELECTABLE)} while paused')
     return Verdict('cancellation', f'ToolSearch loads {",".join(names)}')
-
-
-def touches_protected(tool_input: dict, paths: Sequence[Path]) -> bool:
-    """Whether any string in the input names a protected path, in full or with ~.
-    A string match: it raises the bar, it is not a sandbox."""
-    home = os.path.expanduser('~')
-    needles = set()
-    for path in paths:
-        full = os.path.expanduser(str(path))
-        for form in {full, os.path.realpath(full)}:
-            needles.add(form)
-            if form.startswith(home + os.sep):
-                needles.add('~' + form[len(home):])
-    # One search per needle over all strings joined by NUL, which no path contains, so a
-    # match never spans two strings: linear, and fast on multi-megabyte inputs.
-    text = '\0'.join(_strings(tool_input))
-    return any(needle in text for needle in needles)
-
-
-def _strings(value) -> Iterator[str]:
-    """Every string in a JSON value, keys included; iterative, so no depth escapes."""
-    stack = [value]
-    while stack:
-        item = stack.pop()
-        if isinstance(item, str):
-            yield item
-        elif isinstance(item, dict):
-            stack.extend(item.keys())
-            stack.extend(item.values())
-        elif isinstance(item, (list, tuple)):
-            stack.extend(item)

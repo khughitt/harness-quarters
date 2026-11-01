@@ -45,6 +45,9 @@ CHILD_TEXT = (
     'already started (your background calls and processes), park any claim --waiting-on agent '
     'for your controller, and return a short status (done, left, running). Do not write a '
     'pause report.')
+LIMITS_CHANGED_TEXT = (
+    'turn paused: the turn limits file changed mid-turn (active {a} of {A}, calls {c}/{C}, spawns {s}/{S}, '
+    'compactions {k}/{K}). ' + ROOT_TEXT[ROOT_TEXT.index('Start nothing new'):])
 WARNING_TEXT = 'turn-pause: {limit} at {n}% ({used} of {value}). Finish a coherent step and prepare your report.'
 BUDGET_TEXT = 'turn-pause: budget for this turn: active {a}, {c} calls, {s} spawns, {k} compactions.'
 MALFORMED_TEXT = ('turn-pause: the first line looks like a budget but does not parse ({reason}); '
@@ -276,6 +279,32 @@ def test_schedule_wakeup_inside_window_is_a_wake_and_consumed(tmp_path, notices)
     assert st.paused is None and st.turn.calls == 0
 
 
+def test_a_worker_prompt_never_matches_or_consumes_a_wake(tmp_path, notices):
+    d = Driver(tmp_path, 'claude-code')
+    write_limits(d.limits, calls=1)
+    pre = fixture('claude-code-ScheduleWakeup.json', 'PreToolUse', 'ScheduleWakeup')
+    after = fixture('claude-code-ScheduleWakeup.json', 'PostToolUse', 'ScheduleWakeup')
+    wake = fixture('claude-code-ScheduleWakeup.json', 'UserPromptSubmit')
+    fire = after['tool_response']['scheduledFor'] / 1000
+    d.t = fire - 120
+    d.prompt('loop on this')
+    d('PreToolUse', pre)
+    d('PostToolUse', after)
+    d('Stop', claude_stop())  # its cron list also holds the wake prompt and a recurring job
+    assert denied(d.bash('ls'))
+    d.t = fire + 5
+    worker = dict(wake, agent_id='a620dc1cd95e3a1c5', agent_type='general-purpose')
+    assert d('UserPromptSubmit', worker, dt=0) is None
+    cron = dict(worker, prompt=claude_stop()['session_crons'][0]['prompt'])
+    assert d('UserPromptSubmit', cron, dt=0) is None
+    st = d.state()
+    assert st.paused == 'calls' and len(st.wakeups) == 1
+    # the root's own wake still matches and is consumed, and does not lift the pause
+    assert context(d('UserPromptSubmit', wake, dt=0)) == WAKE_TEXT
+    st = d.state()
+    assert st.paused == 'calls' and st.wakeups == []
+
+
 def test_cron_prompt_is_a_wake_until_its_delete(tmp_path):
     d = Driver(tmp_path, 'claude-code')
     d.prompt('set a cron')
@@ -394,8 +423,9 @@ def test_changed_limits_file_pauses_with_limits_changed_and_notifies(tmp_path, n
     write_limits(d.limits, calls=5000)
     out = d.bash('ls')
     assert denied(out)
-    assert reason(out) == ROOT_TEXT.format(limit='limits-changed', a='0:00', A='4:00', c=2, C=500,
-                                           s=0, S=30, k=0, K=2)
+    assert reason(out) == LIMITS_CHANGED_TEXT.format(a='0:00', A='4:00', c=2, C=500, s=0, S=30, k=0, K=2)
+    assert reason(out).startswith('turn paused: the turn limits file changed mid-turn (active 0:00 of 4:00, '
+                                  'calls 2/500, spawns 0/30, compactions 0/2). Start nothing new and stop')
     assert d.state().paused == 'limits-changed'
     assert len(notices) == 1
     assert denied(d.bash('touch y'))
@@ -638,7 +668,7 @@ def test_feed_refused_call_is_not_in_flight_and_spawns_nothing():
 
 
 def test_normalize_spawn_sources():
-    facts = adapters.load_facts(None)
+    facts = adapters.load_facts()
     pre = fixture('claude-code-subagent-bash-denied.json', 'PreToolUse', 'Agent')
     root, events = adapters.normalize('claude-code', 'PreToolUse', pre, T0, facts)
     assert root == pre['session_id']
@@ -661,20 +691,49 @@ def test_normalize_spawn_sources():
     assert [e.kind for e in adapters.normalize('claude-code', 'PostCompact', claude_bare('PostCompact', trigger='manual'), T0, facts)[1]] == ['compact']
 
 
-def test_facts_come_from_harness_facts(tmp_path):
-    facts = adapters.load_facts(tmp_path)
-    assert facts.posttooluse == {'claude-code': True, 'codex': True}
-    assert facts.stop_carries_agent == {'claude-code': True, 'codex': True}
-    assert facts.compact_events == {'claude-code': frozenset({'PreCompact', 'PostCompact'}), 'codex': None}
-    assert adapters.load_facts(tmp_path) == facts  # from the cache this time
-    cache = tmp_path / adapters.CACHE_NAME
-    data = json.loads(cache.read_text())
-    data['posttooluse']['codex'] = None
-    cache.write_text(json.dumps(data))
-    assert adapters.load_facts(tmp_path).posttooluse['codex'] is None  # the cache is what is read
-    data['key'] = 'a fact file that has since changed'
-    cache.write_text(json.dumps(data))
-    assert adapters.load_facts(tmp_path) == facts  # a stale key is a miss, looked up again
+def _facts_module():
+    import importlib.machinery
+    import importlib.util
+    loader = importlib.machinery.SourceFileLoader('harness_facts', str(TOOLS / 'harness-facts'))
+    spec = importlib.util.spec_from_loader('harness_facts', loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+
+
+def test_facts_snapshot_equals_what_harness_facts_reads_now():
+    """The hook reads a checked-in snapshot, not the fact file; it must stay equal to the
+    lookups. Regenerate after a facts edit with: tools/turn-pause --write-facts-snapshot"""
+    module = _facts_module()
+
+    def value(name, harness):
+        entry = module.lookup(name, harness)
+        return entry['value'] if entry['status'] == 'probed' else None
+
+    want = adapters.Facts(
+        posttooluse={h: value('hook-posttooluse', h) for h in adapters.HARNESSES},
+        stop_carries_agent={h: value('hook-stop-carries-agent', h) for h in adapters.HARNESSES},
+        compact_events={h: None if value('hook-compact-event', h) is None else frozenset(value('hook-compact-event', h))
+                        for h in adapters.HARNESSES})
+    assert adapters.load_facts() == want, (
+        f'{adapters.SNAPSHOT} differs from tools/harness-facts; regenerate it with: tools/turn-pause --write-facts-snapshot')
+    assert want.compact_events == {'claude-code': frozenset({'PreCompact', 'PostCompact'}), 'codex': None}
+
+
+def test_write_facts_snapshot_regenerates_the_file(tmp_path):
+    target = tmp_path / 'facts.json'
+    r = subprocess.run([str(ENTRY), '--write-facts-snapshot', str(target)], env=make_env(tmp_path),
+                       capture_output=True, timeout=20)
+    assert r.returncode == 0, r.stderr
+    assert target.read_bytes() == Path(adapters.SNAPSHOT).read_bytes()
+
+
+def test_the_hook_keeps_nothing_but_state_in_the_state_dir(tmp_path):
+    d = Driver(tmp_path, 'claude-code')
+    d.prompt('work')
+    d.bash('ls')
+    assert sorted(p.name for p in state_dir(d.env).iterdir()) == [f'claude-code-{CLAUDE_ROOT}.json',
+                                                                  f'claude-code-{CLAUDE_ROOT}.lock']
 
 
 def test_unknown_posttooluse_keeps_a_call_in_flight_until_the_agents_next_event():
@@ -830,7 +889,8 @@ def test_entry_stop_with_a_broken_state_file_prints_nothing(tmp_path):
     assert r.returncode == 0 and r.stdout == b'' and str(path).encode() in r.stderr
 
 
-def test_entry_refuses_an_oversized_pretooluse_payload_quickly(tmp_path):
+def test_entry_refuses_a_pretooluse_over_32_mib_quickly(tmp_path):
+    assert hook.MAX_PAYLOAD_BYTES == 32 * 1024 * 1024
     pre = claude_pre('Write', {'file_path': '/srv/x', 'content': 'a' * (hook.MAX_PAYLOAD_BYTES + 1)}, 'c1')
     start = time.monotonic()
     r = run_entry(tmp_path, 'PreToolUse', pre)
@@ -838,8 +898,59 @@ def test_entry_refuses_an_oversized_pretooluse_payload_quickly(tmp_path):
     assert r.returncode == 0
     out = json.loads(r.stdout)
     assert denied(out) and str(hook.MAX_PAYLOAD_BYTES) in reason(out)
-    r = run_entry(tmp_path, 'PostToolUse', post(pre))
+
+
+def test_entry_allows_a_5_mb_write_while_not_paused(tmp_path):
+    r = run_entry(tmp_path, 'UserPromptSubmit', claude_prompt('write the dump'))
+    pre = claude_pre('Write', {'file_path': '/srv/dump.txt', 'content': 'a' * 5_300_000}, 'c1')
+    r = run_entry(tmp_path, 'PreToolUse', pre)
     assert r.returncode == 0 and r.stdout == b''
+
+
+def _entry_state(tmp_path):
+    return Store(state_dir(make_env(tmp_path))).read('claude-code', CLAUDE_ROOT)
+
+
+def test_entry_oversized_genuine_prompt_still_starts_a_turn_without_its_budget(tmp_path):
+    limits = tmp_path / 'limits.toml'
+    write_limits(limits, calls=1)
+    run_entry(tmp_path, 'UserPromptSubmit', claude_prompt('work'), limits=limits)
+    for call in ('c1', 'c2'):
+        r = run_entry(tmp_path, 'PreToolUse', claude_pre('Bash', {'command': 'touch x'}, call), limits=limits)
+    assert denied(json.loads(r.stdout)) and _entry_state(tmp_path).paused == 'calls'
+    big = 'budget: 12h\n' + 'x' * (hook.MAX_PAYLOAD_BYTES + 1)
+    r = run_entry(tmp_path, 'UserPromptSubmit', claude_prompt(big), limits=limits)
+    assert r.returncode == 0 and r.stdout == b'', r.stderr
+    st = _entry_state(tmp_path)
+    assert st.paused is None and st.turn.calls == 0 and st.turn.limits == load(limits)[0]
+
+
+def test_entry_oversized_post_tool_use_still_closes_its_call(tmp_path):
+    run_entry(tmp_path, 'UserPromptSubmit', claude_prompt('work'))
+    pre = claude_pre('Bash', {'command': 'cat big.log'}, 'c1')
+    run_entry(tmp_path, 'PreToolUse', pre)
+    assert _entry_state(tmp_path).turn.in_flight == {'c1': None}
+    r = run_entry(tmp_path, 'PostToolUse', post(pre, {'stdout': 'y' * (hook.MAX_PAYLOAD_BYTES + 1)}))
+    assert r.returncode == 0 and r.stdout == b'', r.stderr
+    assert _entry_state(tmp_path).turn.in_flight == {}
+
+
+HEAVY = ('dataclasses', 'typing', 'tempfile', 'pathlib', 'hashlib', 'shlex', 'string', 'turn_pause.allowlist')
+
+
+def test_entry_hot_path_imports_none_of_the_heavy_modules(tmp_path):
+    env = make_env(tmp_path)
+    run_entry(tmp_path, 'UserPromptSubmit', claude_prompt('work'))
+    run_entry(tmp_path, 'PreToolUse', claude_pre('Bash', {'command': 'ls'}, 'warm'))
+    payload = json.dumps(claude_pre('Bash', {'command': 'ls'}, 'c1')).encode()
+    r = subprocess.run(['/usr/bin/python3', '-S', '-X', 'importtime', str(ENTRY), '--harness', 'claude-code',
+                        'PreToolUse'], input=payload, env=env, capture_output=True, timeout=20)
+    assert r.returncode == 0 and r.stdout == b''
+    imported = {line.rsplit('|', 1)[1].strip() for line in r.stderr.decode().splitlines() if line.startswith('import time:')}
+    assert 'turn_pause.hook' in imported
+    assert sorted(imported & set(HEAVY)) == []
+    shebang = ENTRY.read_text().splitlines()[0]
+    assert shebang.split()[-1] == '-S' and '-E' not in shebang
 
 
 def _proc(root, pid, name, ppid, cmdline=None):
@@ -847,6 +958,16 @@ def _proc(root, pid, name, ppid, cmdline=None):
     d.mkdir(parents=True)
     (d / 'status').write_text(f'Name:\t{name}\nUmask:\t0022\nPPid:\t{ppid}\n')
     (d / 'cmdline').write_bytes('\0'.join(cmdline or [name]).encode() + b'\0')
+
+
+def test_a_recorded_harness_pid_that_is_no_longer_an_ancestor_is_found_again(tmp_path):
+    proc = tmp_path / 'proc'
+    _proc(proc, 50, 'sh', 40)
+    _proc(proc, 40, 'claude', 1)
+    _proc(proc, 1, 'systemd', 0)
+    assert hook.current_harness_pid(40, 50, proc) == 40
+    assert hook.current_harness_pid(None, 50, proc) == 40
+    assert hook.current_harness_pid(999, 50, proc) == 40  # a resumed session runs under a new process
 
 
 def test_harness_pid_is_the_nearest_claude_or_codex_else_node_running_one(tmp_path):

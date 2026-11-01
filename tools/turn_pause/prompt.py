@@ -1,6 +1,7 @@
 """Prompt rules: which prompts start a turn, what the user typed, and the budget directive."""
 import re
-from dataclasses import dataclass
+
+from .record import Frozen
 
 PASTED_OPEN = '<pasted_content'
 _PASTED_BLOCK = re.compile(r'<pasted_content id="([^"]*)">.*?</pasted_content id="\1">', re.DOTALL)
@@ -10,17 +11,12 @@ _UNIT_SECONDS = {'h': 3600, 'm': 60}
 _COUNT_FIELD = {'calls': 'calls', 'agents': 'agents', 'compactions': 'compactions'}
 
 
-@dataclass(frozen=True)
-class Budget:
-    seconds: int
-    calls: int | None
-    agents: int | None
-    compactions: int | None
+class Budget(Frozen):
+    __slots__ = _fields = ('seconds', 'calls', 'agents', 'compactions')
 
 
-@dataclass(frozen=True)
-class Malformed:
-    reason: str
+class Malformed(Frozen):
+    __slots__ = _fields = ('reason',)
 
 
 def is_genuine(text: str, harness: str) -> bool:

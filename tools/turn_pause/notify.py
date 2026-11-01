@@ -7,11 +7,11 @@ entries"), bounded by a 300 ms timeout. relay serve not running (no socket, or n
 listening on it) is not a failure: the spec sends the notice when serve is reachable.
 The heavy imports are local to send(), which runs only when a pause fires.
 """
+from __future__ import annotations
+
 import json
 import os
 import time
-from collections.abc import Mapping
-from pathlib import Path
 
 TIMEOUT = 0.3
 NOTICE_TTL_MS = 24 * 3600 * 1000
@@ -19,9 +19,9 @@ TITLE_MAX = 80
 TEXT_MAX = 2000
 
 
-def relay_socket(env: Mapping[str, str]) -> Path:
-    base = env.get('XDG_STATE_HOME') or str(Path(env['HOME']) / '.local' / 'state')
-    return Path(base) / 'relay' / 'serve.sock'
+def relay_socket(env: Mapping[str, str]) -> str:
+    base = env.get('XDG_STATE_HOME') or os.path.join(env['HOME'], '.local', 'state')
+    return os.path.join(base, 'relay', 'serve.sock')
 
 
 def notice(title: str, body: str, *, agent: str | None, cwd: str | None, now_ms: int, id_: str) -> dict:
@@ -67,7 +67,7 @@ def _relay(title: str, body: str, env: Mapping[str, str], agent: str | None, cwd
     try:
         sock.settimeout(left())
         try:
-            sock.connect(str(path))
+            sock.connect(path)
         except (FileNotFoundError, ConnectionRefusedError):
             return None
         sock.settimeout(left())

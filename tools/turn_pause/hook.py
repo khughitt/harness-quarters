@@ -7,33 +7,40 @@ the hook cannot judge is refused with the error; no other event is ever blocked 
 answered with a decision (a blocked Stop makes the agent continue). Slow work (the
 notification) runs after the state is written, and its result is recorded in a second
 short locked update. Spec: docs/specs/2026-11-01-turn-pause-design.md.
+
+Every call pays for its imports (they were most of its latency), so this module and
+those it imports keep to json, os, sys, time, fcntl and _sha2: no dataclasses, typing,
+tempfile, pathlib or hashlib, and the allowlist (with shlex) loads only on the paused
+path. tools/test_turn_pause_hook.py checks the import set.
 """
-import hashlib
+from __future__ import annotations
+
 import json
 import os
-import re
 import sys
 import time
-from collections.abc import Mapping
-from pathlib import Path
 
-from . import adapters, allowlist, counters, engine, notify
+from . import adapters, counters, engine, notify
 from .engine import Decision
 from .events import Event
-from .limits import DEFAULTS_PATH, load, with_budget
+from .limits import DEFAULTS_FILE, file_sha256, load, with_budget
 from .prompt import Budget, Malformed, is_genuine, parse_budget
-from .state import RootState, Store, Wakeup, state_dir
+from .protect import touches_protected
+from .state import Store, Wakeup, state_path
 
-CHECKOUT = Path(__file__).resolve().parent.parent.parent
+CHECKOUT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 # The hook wiring in this checkout, and the harness home files that link to it
 # (links.toml), protected with the state directory and the limits file.
 WIRING = ('claude/settings.json', 'codex/hooks.json', 'codex/work/hooks.json', 'local/claude/settings.work.json')
 HOME_LINKS = ('.claude/settings.json', '.claude-work/settings.json', '.codex/hooks.json', '.codex-work/hooks.json')
 GRACE = 25
-# The largest payload the hook parses. A Write of a few megabytes parses and scans in
-# well under a second; beyond this a PreToolUse is refused (fail closed) and any other
-# event is dropped, so no input can hold the hook past its timeout.
-MAX_PAYLOAD_BYTES = 4 * 1024 * 1024
+# The largest PreToolUse the hook judges. Its protected-path scan walks every string in
+# the input; at this size the worst case (all one-character strings) takes about a second,
+# inside the 5 s hook timeout. A larger PreToolUse is refused (fail closed). Every other
+# event is parsed whatever its size, since only json.loads (linear, in C) runs over it,
+# so an oversized PostToolUse still closes its call and an oversized prompt still starts a
+# turn; only the budget directive of an oversized prompt is not parsed.
+MAX_PAYLOAD_BYTES = 32 * 1024 * 1024
 OUTPUT_EVENTS = ('PreToolUse', 'UserPromptSubmit')
 
 ROOT_TEXT = (
@@ -50,6 +57,8 @@ CHILD_TEXT = (
     'already started (your background calls and processes), park any claim --waiting-on agent '
     'for your controller, and return a short status (done, left, running). Do not write a '
     'pause report.')
+LIMITS_CHANGED_HEAD = ('turn paused: the turn limits file changed mid-turn (active {a} of {A}, calls {c}/{C}, '
+                       'spawns {s}/{S}, compactions {k}/{K}). ')
 WARNING_TEXT = 'turn-pause: {limit} at {n}% ({used} of {value}). Finish a coherent step and prepare your report.'
 BUDGET_TEXT = 'turn-pause: budget for this turn: active {a}, {c} calls, {s} spawns, {k} compactions.'
 MALFORMED_TEXT = ('turn-pause: the first line looks like a budget but does not parse ({reason}); '
@@ -62,7 +71,7 @@ PROTECTED_TEXT = ('turn-pause: this call names a protected path (the pause state
 GRACE_TEXT = (f'the {GRACE} allowlisted reads of grace are used up; only bookkeeping and stopping your '
               'own work remain')
 HARNESS_NAMES = ('claude', 'codex')
-NODE_HARNESS = re.compile(r'(^|/)(claude|codex)([-./]|$)')
+LIMITS_CHANGED = 'limits-changed'
 
 
 def hmm(seconds: float) -> str:
@@ -79,8 +88,15 @@ def _context(event: str, text: str) -> dict:
     return {'hookSpecificOutput': {'hookEventName': event, 'additionalContext': text}}
 
 
+def _turn(rs: RootState):
+    if rs.turn is None:
+        raise ValueError(f'{rs.harness} {rs.root} has no turn')
+    return rs.turn
+
+
 def _counts(rs: RootState) -> dict:
-    t, lim = rs.turn, rs.turn.limits
+    t = _turn(rs)
+    lim = t.limits
     return dict(a=hmm(t.active), A=hmm(lim.active_seconds), c=t.calls, C=lim.calls, s=t.spawns,
                 S=lim.spawns, k=t.compactions, K=lim.compactions)
 
@@ -88,81 +104,117 @@ def _counts(rs: RootState) -> dict:
 def refusal(rs: RootState, agent: str | None) -> str:
     if agent is not None:
         return CHILD_TEXT.format(limit=rs.paused)
+    if rs.paused == LIMITS_CHANGED:
+        return LIMITS_CHANGED_HEAD.format(**_counts(rs)) + ROOT_TEXT[ROOT_TEXT.index('Start nothing new'):]
     return ROOT_TEXT.format(limit=rs.paused, **_counts(rs))
 
 
 def warning(rs: RootState, name: str) -> str:
-    t = rs.turn
+    t = _turn(rs)
     used = t.active if name == 'active' else getattr(t, name)
     limit = t.limits.active_seconds if name == 'active' else getattr(t.limits, name)
     shown = hmm if name == 'active' else (lambda v: str(int(v)))
     return WARNING_TEXT.format(limit=name, n=int(used * 100 // limit), used=shown(used), value=shown(limit))
 
 
-def protected_paths(store_dir: Path, limits_path: Path, env: Mapping[str, str]) -> list[Path]:
-    paths = [Path(store_dir), Path(limits_path), DEFAULTS_PATH] + [CHECKOUT / w for w in WIRING]
+def protected_paths(store_dir, limits_path, env: Mapping[str, str]) -> list[str]:
+    paths = [os.fspath(store_dir), os.fspath(limits_path), DEFAULTS_FILE] + [os.path.join(CHECKOUT, w) for w in WIRING]
     if env.get('HOME'):
-        paths += [Path(env['HOME']) / h for h in HOME_LINKS]
+        paths += [os.path.join(env['HOME'], h) for h in HOME_LINKS]
     return paths
 
 
-def find_harness_pid(start: int, proc: Path = Path('/proc')) -> int | None:
+def _status(pid: int, proc) -> dict | None:
+    try:
+        with open(os.path.join(os.fspath(proc), str(pid), 'status')) as f:
+            text = f.read()
+    except OSError:
+        return None
+    return dict(line.split(':', 1) for line in text.splitlines() if ':' in line)
+
+
+def _parent(fields: dict) -> int:
+    try:
+        return int(fields.get('PPid', '0').strip())
+    except ValueError:
+        return 0
+
+
+def find_harness_pid(start: int, proc='/proc') -> int | None:
     """The nearest ancestor (from start) named claude or codex; failing that, the nearest
     node running either; None when neither is found or /proc cannot be read."""
     node = None
     pid, seen = start, set()
     while pid > 0 and pid not in seen:
         seen.add(pid)
-        try:
-            status = (proc / str(pid) / 'status').read_text()
-        except OSError:
+        fields = _status(pid, proc)
+        if fields is None:
             break
-        fields = dict(line.split(':', 1) for line in status.splitlines() if ':' in line)
         name = fields.get('Name', '').strip()
         if name in HARNESS_NAMES:
             return pid
         if name == 'node' and node is None:
+            import re
             try:
-                argv = (proc / str(pid) / 'cmdline').read_bytes().decode(errors='replace').split('\0')
+                with open(os.path.join(os.fspath(proc), str(pid), 'cmdline'), 'rb') as f:
+                    argv = f.read().decode(errors='replace').split('\0')
             except OSError:
                 argv = []
-            if any(NODE_HARNESS.search(a) for a in argv[1:]):
+            if any(re.search(r'(^|/)(claude|codex)([-./]|$)', a) for a in argv[1:]):
                 node = pid
-        try:
-            pid = int(fields.get('PPid', '0').strip())
-        except ValueError:
-            break
+        pid = _parent(fields)
     return node
 
 
-def _sha(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def is_ancestor(pid: int, start: int, proc='/proc') -> bool:
+    """Whether pid is start or one of its ancestors."""
+    current, seen = start, set()
+    while current > 0 and current not in seen:
+        if current == pid:
+            return True
+        seen.add(current)
+        fields = _status(current, proc)
+        if fields is None:
+            return False
+        current = _parent(fields)
+    return False
+
+
+def current_harness_pid(recorded: int | None, start: int, proc='/proc') -> int | None:
+    """The recorded harness pid while it is still an ancestor of start; otherwise (a
+    resumed session runs under a new process) the one found again."""
+    if recorded is not None and is_ancestor(recorded, start, proc):
+        return recorded
+    return find_harness_pid(start, proc)
 
 
 class Judge:
     """The real decision for one PreToolUse's tool_start."""
 
-    def __init__(self, harness: str, payload: dict, limits_sha: str, protected: list[Path]):
+    def __init__(self, harness: str, payload: dict, limits_sha: str, protected: list[str]):
         self.harness, self.payload, self.limits_sha, self.protected = harness, payload, limits_sha, protected
 
     def __call__(self, rs: RootState, ev: Event) -> Decision:
         tool_input = self.payload.get('tool_input')
+        turn = _turn(rs)
         if rs.paused is None:
-            limit = 'limits-changed' if self.limits_sha != rs.turn.limits_sha else counters.crossed(rs.turn)
+            limit = LIMITS_CHANGED if self.limits_sha != turn.limits_sha else counters.crossed(turn)
             if limit is not None:
                 rs.paused = limit
                 return Decision(False, _deny(refusal(rs, ev.agent)), limit)
-        if allowlist.touches_protected(tool_input, self.protected):
+        if touches_protected(tool_input, self.protected):
             return Decision(False, _deny(PROTECTED_TEXT), None)
         if rs.paused is not None:
             return self._paused(rs, ev, tool_input)
-        due = counters.due_warnings(rs.turn)
+        due = counters.due_warnings(turn)
         if due:
-            rs.turn.warned.update(due)
+            turn.warned.update(due)
             return Decision(True, _context('PreToolUse', '\n'.join(warning(rs, n) for n in due)), None)
         return Decision(True, None, None)
 
     def _paused(self, rs: RootState, ev: Event, tool_input) -> Decision:
+        from . import allowlist  # with shlex: only a paused turn needs it
+        rs.harness_pid = current_harness_pid(rs.harness_pid, os.getppid())
         owned = allowlist.Owned(frozenset(rs.worker_names), frozenset(rs.cron_jobs), rs.harness_pid)
         verdict = allowlist.classify(self.harness, ev.tool, tool_input, owned)
         if verdict.klass in ('bookkeeping', 'cancellation'):
@@ -183,14 +235,15 @@ def _never(rs: RootState, ev: Event) -> Decision:
     raise AssertionError(f'{ev.kind} needs no decision')
 
 
-def _prompt(rs: RootState, harness: str, payload: dict, now: float, limits_path: Path, agent: str | None) -> dict | None:
+def _prompt(rs: RootState, harness: str, payload: dict, now: float, limits_path, agent: str | None,
+            oversized: bool) -> dict | None:
     text = payload.get('prompt')
     if not isinstance(text, str):
         raise ValueError('UserPromptSubmit payload has no prompt string')
     kind = engine.prompt_kind(rs, harness, text, now, agent)
     if kind == 'turn':
         limits, sha = load(limits_path)
-        budget = parse_budget(text)
+        budget = None if oversized else parse_budget(text)
         note = None
         if isinstance(budget, Budget):
             limits = with_budget(limits, budget)
@@ -293,20 +346,22 @@ def _notice(rs: RootState, harness: str, root: str, limit: str) -> tuple[str, st
     return f'turn paused ({limit})', body
 
 
-def decide(harness: str, event: str, payload: dict, now: float, store: Store, limits_path: Path,
-           env: Mapping[str, str]) -> dict | None:
+def decide(harness: str, event: str, payload: dict, now: float, store: Store, limits_path,
+           env: Mapping[str, str], *, oversized: bool = False) -> dict | None:
     """The decision JSON (a deny, or added context) or None. A PreToolUse that cannot be
-    judged is denied with the error; any other event's error is raised to the entry."""
+    judged is denied with the error; any other event's error is raised to the entry.
+    oversized: the payload was over MAX_PAYLOAD_BYTES, so a prompt's budget is not parsed."""
+    limits_path = os.fspath(limits_path)
     if event != 'PreToolUse':
-        return _decide(harness, event, payload, now, store, Path(limits_path), env)
+        return _decide(harness, event, payload, now, store, limits_path, env, oversized)
     try:
-        return _decide(harness, event, payload, now, store, Path(limits_path), env)
+        return _decide(harness, event, payload, now, store, limits_path, env, oversized)
     except Exception as e:
         return _deny(f'turn-pause could not judge this call, so it is refused: {type(e).__name__}: {e}')
 
 
-def _decide(harness, event, payload, now, store, limits_path, env):
-    facts = adapters.load_facts(store.dir)
+def _decide(harness, event, payload, now, store, limits_path, env, oversized):
+    facts = adapters.load_facts()
     root, events = adapters.normalize(harness, event, payload, now, facts)
     agent = adapters.agent_of(payload)
     if event == 'SessionEnd':
@@ -314,7 +369,7 @@ def _decide(harness, event, payload, now, store, limits_path, env):
             store.remove(harness, root)
             store.prune(now)
         return None
-    limits_sha = _sha(limits_path) if event == 'PreToolUse' else None
+    limits_sha = file_sha256(limits_path) if event == 'PreToolUse' else None
     pause = None
     with store.locked(harness, root) as rs:
         if rs.harness_pid is None:
@@ -324,7 +379,7 @@ def _decide(harness, event, payload, now, store, limits_path, env):
         output = None
         allowed = False
         if event == 'UserPromptSubmit':
-            output = _prompt(rs, harness, payload, now, limits_path, agent)
+            output = _prompt(rs, harness, payload, now, limits_path, agent, oversized)
         elif event == 'PreToolUse':
             protected = protected_paths(store.dir, limits_path, env)
             decision = engine.feed(rs, events, Judge(harness, payload, limits_sha, protected))
@@ -346,39 +401,55 @@ def _decide(harness, event, payload, now, store, limits_path, env):
     return output
 
 
-def _args(argv: list[str]) -> tuple[str, Path, str]:
-    harness, limits_path, rest = None, DEFAULTS_PATH, []
+USAGE = (f'usage: turn-pause --harness {"|".join(adapters.HARNESSES)} [--limits PATH] EVENT\n'
+         '       turn-pause --write-facts-snapshot [PATH]')
+
+
+def _args(argv: list[str]) -> tuple[str, str, str]:
+    harness, limits_path, rest = None, DEFAULTS_FILE, []
     i = 0
     while i < len(argv):
         if argv[i] in ('--harness', '--limits') and i + 1 < len(argv):
             if argv[i] == '--harness':
                 harness = argv[i + 1]
             else:
-                limits_path = Path(argv[i + 1])
+                limits_path = argv[i + 1]
             i += 2
         else:
             rest.append(argv[i])
             i += 1
     if harness not in adapters.HARNESSES or len(rest) != 1:
-        raise ValueError(f'usage: turn-pause --harness {"|".join(adapters.HARNESSES)} [--limits PATH] EVENT; got {argv!r}')
+        raise ValueError(f'{USAGE}; got {argv!r}')
     return harness, limits_path, rest[0]
 
 
 def main(argv: list[str], stdin=None, stdout=None, stderr=None, env: Mapping[str, str] = os.environ) -> int:
     """Run one hook call. Prints at most one JSON object and always exits 0: a PreToolUse
-    that fails is refused, every other event's failure goes to stderr."""
+    that fails is refused, every other event's failure goes to stderr. With
+    --write-facts-snapshot it instead regenerates the facts snapshot (exit 1 on failure)."""
     stdin = stdin or sys.stdin.buffer
     stdout, stderr = stdout or sys.stdout, stderr or sys.stderr
+    if argv[:1] == ['--write-facts-snapshot']:
+        if len(argv) > 2:
+            print(USAGE, file=stderr)
+            return 2
+        target = argv[1] if len(argv) == 2 else adapters.SNAPSHOT
+        adapters.write_snapshot(target)
+        print(f'wrote {target}', file=stderr)
+        return 0
     event = argv[-1] if argv else ''
     output = None
     try:
         harness, limits_path, event = _args(argv)
         raw = stdin.read()
-        if len(raw) > MAX_PAYLOAD_BYTES:
+        oversized = len(raw) > MAX_PAYLOAD_BYTES
+        if oversized and event == 'PreToolUse':
             raise ValueError(f'the hook payload is {len(raw)} bytes, over the {MAX_PAYLOAD_BYTES} byte cap; '
                              'split the work into smaller calls')
         payload = json.loads(raw)
-        output = decide(harness, event, payload, time.time(), Store(state_dir(env)), limits_path, env)
+        del raw
+        output = decide(harness, event, payload, time.time(), Store(state_path(env)), limits_path, env,
+                        oversized=oversized)
     except BaseException as e:  # nothing escapes: a crashing hook lets the call through
         if event == 'PreToolUse':
             output = _deny(f'turn-pause could not judge this call, so it is refused: {type(e).__name__}: {e}')

@@ -1,31 +1,25 @@
 """Turn counters: active time with in-flight calls, root calls, tree spawns, compactions."""
 import json
-from dataclasses import asdict, dataclass, field
 
 from .events import USER_WAIT_TOOLS, Event
 from .limits import Limits
+from .record import Record
 
 IDLE_GAP_SECONDS = 600
 WARN_FRACTION = (3, 4)
 COUNTS = ('active', 'calls', 'spawns', 'compactions')
 
 
-@dataclass
-class TurnState:
-    started: float
-    limits: Limits
-    limits_sha: str
-    active: float = 0.0
-    calls: int = 0
-    spawns: int = 0
-    compactions: int = 0
-    last_t: float | None = None
-    in_flight: dict[str, str | None] = field(default_factory=dict)
-    spawn_keys: set[str] = field(default_factory=set)
-    warned: set[str] = field(default_factory=set)
+class TurnState(Record):
+    __slots__ = _fields = ('started', 'limits', 'limits_sha', 'active', 'calls', 'spawns', 'compactions',
+                           'last_t', 'in_flight', 'spawn_keys', 'warned')
+    _defaults = {'active': 0.0, 'calls': 0, 'spawns': 0, 'compactions': 0, 'last_t': None}
+    _factories = {'in_flight': dict, 'spawn_keys': set, 'warned': set}
 
     def to_json(self) -> str:
-        data = asdict(self)
+        data = self._asdict()
+        data['limits'] = self.limits._asdict()
+        data['in_flight'] = dict(self.in_flight)
         data['spawn_keys'] = sorted(self.spawn_keys)
         data['warned'] = sorted(self.warned)
         return json.dumps(data)

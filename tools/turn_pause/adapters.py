@@ -1,123 +1,85 @@
 """Native hook payloads to turn-pause events, per harness.
 
-The capability facts the adapters read (Task 1) come from tools/harness-facts as a
-module, never by parsing its file. A fact that reads `unknown` selects the spec's
-fallback: no PostToolUse keeps a call in flight until its agent's next hook event; a
-SubagentStop without an agent id closes nothing (the next genuine prompt does); no
-compaction event counts no compactions. Validating the fact file costs about 13 ms per
-lookup, too much for a hook that runs on every call, so the values are memoised in the
-state directory under the sha256 of the fact file and of the tool that reads it.
-Imports needed only on a cache miss are local to it: the hook's latency is mostly imports.
+The capability facts the adapters read (Task 1) come from facts.json beside this
+module: a checked-in snapshot of exactly the facts the hook reads, taken through
+tools/harness-facts as a module (never by parsing its file). The hook loads it at no
+cost on every call; a test fails when it no longer equals what harness-facts returns.
+Regenerate it with `tools/turn-pause --write-facts-snapshot`. A fact that reads
+`unknown` (null in the snapshot) selects the spec's fallback: no PostToolUse keeps a
+call in flight until its agent's next hook event; a SubagentStop without an agent id
+closes nothing (the next genuine prompt does); no compaction event counts no
+compactions.
 """
-import hashlib
+from __future__ import annotations
+
 import json
 import os
-from dataclasses import dataclass
-from pathlib import Path
 
 from .events import Event
+from .record import Frozen
 
-TOOLS = Path(__file__).resolve().parent.parent
-FACTS_TOOL = TOOLS / 'harness-facts'
-FACTS_FILE = TOOLS.parent / 'facts' / 'capabilities.toml'
-CACHE_NAME = 'facts.cache'
+HERE = os.path.dirname(os.path.abspath(__file__))
+TOOLS = os.path.dirname(HERE)
+FACTS_TOOL = os.path.join(TOOLS, 'harness-facts')
+SNAPSHOT = os.path.join(HERE, 'facts.json')
 HARNESSES = ('claude-code', 'codex')
+FACT_NAMES = {'posttooluse': 'hook-posttooluse', 'stop_carries_agent': 'hook-stop-carries-agent',
+              'compact_events': 'hook-compact-event'}
 SPAWN_TOOLS = {'claude-code': frozenset({'Agent', 'Task'}), 'codex': frozenset()}
 EVENTS = frozenset({'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'Stop',
                     'SubagentStop', 'SubagentStart', 'PreCompact', 'PostCompact', 'SessionEnd'})
 
 
-@dataclass(frozen=True)
-class Facts:
+class Facts(Frozen):
     """Per harness: a probed value, or None for unknown."""
-    posttooluse: dict[str, bool | None]
-    stop_carries_agent: dict[str, bool | None]
-    compact_events: dict[str, frozenset[str] | None]
+    __slots__ = _fields = ('posttooluse', 'stop_carries_agent', 'compact_events')
 
 
-def _facts_module():
+def _from_data(data) -> Facts:
+    """Facts from the snapshot's JSON; anything malformed raises (the hook fails closed)."""
+    if not isinstance(data, dict) or set(data) != set(FACT_NAMES):
+        raise ValueError(f'{SNAPSHOT}: keys must be {sorted(FACT_NAMES)}')
+    out = {}
+    for key, table in data.items():
+        if not isinstance(table, dict) or set(table) != set(HARNESSES):
+            raise ValueError(f'{SNAPSHOT}: {key} must name {list(HARNESSES)}')
+        for harness, value in table.items():
+            ok = value is None or (isinstance(value, list) and all(isinstance(v, str) for v in value)
+                                   if key == 'compact_events' else isinstance(value, bool))
+            if not ok:
+                raise ValueError(f'{SNAPSHOT}: {key}.{harness} is {value!r}')
+        out[key] = ({h: None if v is None else frozenset(v) for h, v in table.items()}
+                    if key == 'compact_events' else dict(table))
+    return Facts(**out)
+
+
+def load_facts() -> Facts:
+    """The facts the hook reads, from the checked-in snapshot."""
+    with open(SNAPSHOT) as f:
+        return _from_data(json.load(f))
+
+
+def snapshot_text() -> str:
+    """The snapshot as tools/harness-facts reports the facts now."""
     import importlib.machinery
     import importlib.util
-    loader = importlib.machinery.SourceFileLoader('harness_facts', str(FACTS_TOOL))
+    loader = importlib.machinery.SourceFileLoader('harness_facts', FACTS_TOOL)
     spec = importlib.util.spec_from_loader('harness_facts', loader)
     module = importlib.util.module_from_spec(spec)
     loader.exec_module(module)
-    return module
+    data = {}
+    for key, fact in FACT_NAMES.items():
+        data[key] = {}
+        for harness in HARNESSES:
+            entry = module.lookup(fact, harness)
+            value = entry['value'] if entry['status'] == 'probed' else None
+            data[key][harness] = sorted(value) if isinstance(value, list) else value
+    return json.dumps(data, indent=2, sort_keys=True) + '\n'
 
 
-def _looked_up() -> Facts:
-    module = _facts_module()
-
-    def value(name, harness):
-        entry = module.lookup(name, harness)
-        return entry['value'] if entry['status'] == 'probed' else None
-
-    compact = {}
-    for h in HARNESSES:
-        names = value('hook-compact-event', h)
-        compact[h] = None if names is None else frozenset(names)
-    return Facts(posttooluse={h: value('hook-posttooluse', h) for h in HARNESSES},
-                 stop_carries_agent={h: value('hook-stop-carries-agent', h) for h in HARNESSES},
-                 compact_events=compact)
-
-
-def _key() -> str:
-    digest = hashlib.sha256()
-    for path in (FACTS_TOOL, FACTS_FILE):
-        digest.update(hashlib.sha256(path.read_bytes()).digest())
-    return digest.hexdigest()
-
-
-def _to_cache(key: str, facts: Facts) -> str:
-    return json.dumps({'key': key, 'posttooluse': facts.posttooluse,
-                       'stop_carries_agent': facts.stop_carries_agent,
-                       'compact_events': {h: None if v is None else sorted(v) for h, v in facts.compact_events.items()}})
-
-
-def _from_cache(text: str, key: str) -> Facts | None:
-    """The cached facts when the cache is for this key and well formed; else None (a miss)."""
-    try:
-        data = json.loads(text)
-        if data['key'] != key:
-            return None
-        posttooluse, stops, compact = data['posttooluse'], data['stop_carries_agent'], data['compact_events']
-        for table, ok in ((posttooluse, lambda v: v is None or isinstance(v, bool)),
-                          (stops, lambda v: v is None or isinstance(v, bool)),
-                          (compact, lambda v: v is None or (isinstance(v, list) and all(isinstance(s, str) for s in v)))):
-            if set(table) != set(HARNESSES) or not all(ok(v) for v in table.values()):
-                return None
-        return Facts(posttooluse=dict(posttooluse), stop_carries_agent=dict(stops),
-                     compact_events={h: None if v is None else frozenset(v) for h, v in compact.items()})
-    except (ValueError, KeyError, TypeError):
-        return None
-
-
-def load_facts(cache_dir: Path | None) -> Facts:
-    """The facts, through the cache in cache_dir when one is given."""
-    if cache_dir is None:
-        return _looked_up()
-    key = _key()
-    cache = Path(cache_dir) / CACHE_NAME
-    try:
-        cached = _from_cache(cache.read_text(), key)
-    except FileNotFoundError:
-        cached = None
-    if cached is not None:
-        return cached
-    import contextlib
-    import tempfile
-    facts = _looked_up()
-    Path(cache_dir).mkdir(parents=True, exist_ok=True, mode=0o700)
-    fd, tmp = tempfile.mkstemp(dir=cache_dir, prefix=CACHE_NAME + '.', suffix='.tmp')
-    try:
-        with os.fdopen(fd, 'w') as f:
-            f.write(_to_cache(key, facts))
-        os.replace(tmp, cache)
-    except BaseException:
-        with contextlib.suppress(OSError):
-            os.unlink(tmp)
-        raise
-    return facts
+def write_snapshot(path: str = SNAPSHOT) -> None:
+    with open(path, 'w') as f:
+        f.write(snapshot_text())
 
 
 def _text(payload: dict, key: str) -> str:

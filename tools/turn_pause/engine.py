@@ -4,31 +4,21 @@ The hook feeds it with the real decision; the replay (Task 8) with a recording o
 other code calls counters.attempt, started or apply. Spec:
 docs/specs/2026-11-01-turn-pause-design.md, "The unit" and "Counters".
 """
-from collections.abc import Callable
-from dataclasses import dataclass
-from typing import Literal
+from __future__ import annotations
 
 from . import counters
 from .counters import TurnState
-from .events import Event
-from .limits import Limits
 from .prompt import is_genuine
-from .state import RootState
+from .record import Frozen
 
 # A ScheduleWakeup prompt is pending from a minute before its fire time to ten after.
 WAKE_BEFORE = 60
 WAKE_AFTER = 600
 
-PromptKind = Literal['turn', 'wake', 'injected']
-
-
-@dataclass(frozen=True)
-class Decision:
+class Decision(Frozen):
     """allow: the call proceeds; output: the hook's JSON; paused: the limit this decision
     newly paused the turn on, or None."""
-    allow: bool
-    output: dict | None
-    paused: str | None
+    __slots__ = _fields = ('allow', 'output', 'paused')
 
 
 def feed(rs: RootState, events: list[Event], decide: Callable[[RootState, Event], Decision]) -> Decision | None:
@@ -66,11 +56,14 @@ def start_turn(rs: RootState, t: float, limits: Limits, limits_sha: str, budget_
     rs.budget_note = budget_note
 
 
-def prompt_kind(rs: RootState, harness: str, text: str, now: float, agent: str | None) -> PromptKind:
-    """'wake' when the text equals a pending scheduled prompt (a ScheduleWakeup inside its
-    window, consumed here, or any pending cron job's prompt); 'injected' when it is not a
-    genuine human prompt in the root; else 'turn'. Expired wakeups are dropped."""
+def prompt_kind(rs: RootState, harness: str, text: str, now: float, agent: str | None) -> str:
+    """'turn', 'wake' or 'injected'. Only a root prompt can be a wake or a turn: 'wake'
+    when the text equals a pending scheduled prompt (a ScheduleWakeup inside its window,
+    consumed here, or any pending cron job's prompt); 'injected' for a worker's prompt or
+    one that is not a genuine human prompt; else 'turn'. Expired wakeups are dropped."""
     rs.wakeups = [w for w in rs.wakeups if w.not_after >= now]
+    if agent is not None:
+        return 'injected'
     said = text.strip()
     for i, w in enumerate(rs.wakeups):
         if w.text.strip() == said and w.not_before <= now <= w.not_after:
@@ -78,6 +71,6 @@ def prompt_kind(rs: RootState, harness: str, text: str, now: float, agent: str |
             return 'wake'
     if any(p.strip() == said for p in rs.cron_jobs.values()):
         return 'wake'
-    if agent is not None or not is_genuine(text, harness):
+    if not is_genuine(text, harness):
         return 'injected'
     return 'turn'
