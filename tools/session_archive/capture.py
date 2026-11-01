@@ -152,9 +152,13 @@ def capture_file(root: Path, manifest: Manifest, source: str, relpath: str, path
             os.utime(copied.tmp, ns=(live.mtime_ns, live.mtime_ns))
             if rotate:
                 old = version_location(source, relpath, mirror.captured_at)
+                if hash_file(mirrored) != mirror.sha256:
+                    raise OSError(f"{mirrored} is damaged; run capture to repair it first")
                 mkdir_synced((root / old).parent)
                 if not (root / old).exists():
                     os.link(mirrored, root / old)
+                elif hash_file(root / old) != mirror.sha256:
+                    raise OSError(f"{root / old} exists with other content")
                 fsync_dir((root / old).parent)
                 manifest.put(replace(mirror, location=old))
             if location == MIRROR:
