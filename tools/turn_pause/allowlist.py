@@ -60,6 +60,14 @@ COUNTED = {'head', 'tail'}
 COUNT_OPTIONS = {'-n', '-c'}
 COUNT = re.compile(r'\+?[0-9]{1,18}')
 SHOWN = 200
+# The longest shell command or control argument judged while paused. Every allowlisted
+# call fits easily; anything longer is refused before it is scanned, because shlex is
+# superlinear (a 1 MB command took seconds) and a hook that outlives the harness's
+# timeout lets the call proceed. The spec's budget is 50 ms per call.
+MAX_TEXT = 4096
+# Distinct kill targets per command: each costs a /proc ancestry walk. A larger kill
+# splits across calls, which cancellation never runs out of.
+MAX_KILL_TARGETS = 64
 
 CLAUDE_READERS = {'Read', 'Grep', 'Glob'}
 
@@ -121,6 +129,8 @@ def _scan(cmd: str) -> str | None:
 
 def shell(cmd: str, owned: Owned) -> Verdict:
     """The shell validator: one simple command of an allowlisted program and options."""
+    if len(cmd) > MAX_TEXT:
+        return _refuse(f'shell command is {len(cmd)} characters; the limit while paused is {MAX_TEXT}')
     bad = _scan(cmd)
     if bad:
         return _refuse(f'shell command refused while paused: {bad}')
@@ -191,7 +201,10 @@ def _kill(args: list[str], owned: Owned) -> Verdict:
     for arg in args:
         if not PID.fullmatch(arg):
             return _refuse(f'kill target {_show(arg)} is not a positive pid (signal, if any, must be one of {sorted(SIGNALS)} first)')
-        pid = int(arg)
+    pids = {int(arg) for arg in args}
+    if len(pids) > MAX_KILL_TARGETS:
+        return _refuse(f'kill names {len(pids)} distinct pids; at most {MAX_KILL_TARGETS} per call while paused, so split it')
+    for pid in sorted(pids):
         if not descends_from(pid, owned.harness_pid):
             return _refuse(f'kill target {pid} does not descend from the harness process {owned.harness_pid}')
     return Verdict('cancellation', 'kill of processes this session started')
@@ -249,6 +262,8 @@ def classify(harness: str, tool: str, tool_input: dict, owned: Owned) -> Verdict
         return _refuse(f'{_show(tool)} is not on the closing allowlist')
     arg = controls[tool]
     value = None if arg is None else tool_input.get(arg)
+    if isinstance(value, str) and len(value) > MAX_TEXT:
+        return _refuse(f'{tool} {arg} is {len(value)} characters; the limit while paused is {MAX_TEXT}')
     if tool == 'TaskStop':
         return Verdict('cancellation', 'TaskStop is scoped to this session')
     if tool == 'CronDelete':
@@ -292,7 +307,10 @@ def touches_protected(tool_input: dict, paths: Sequence[Path]) -> bool:
             needles.add(form)
             if form.startswith(home + os.sep):
                 needles.add('~' + form[len(home):])
-    return any(needle in s for s in _strings(tool_input) for needle in needles)
+    # One search per needle over all strings joined by NUL, which no path contains, so a
+    # match never spans two strings: linear, and fast on multi-megabyte inputs.
+    text = '\0'.join(_strings(tool_input))
+    return any(needle in text for needle in needles)
 
 
 def _strings(value) -> Iterator[str]:

@@ -9,6 +9,7 @@ import json
 import os
 import signal
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -210,6 +211,32 @@ def test_kill_refusals(child, template):
     pid, _ = child
     cmd = template.format(me=os.getpid(), parent=os.getppid(), pid=pid)
     assert shell(cmd, owned(harness_pid=os.getpid())).klass == 'refuse', cmd
+
+
+def test_kill_many_targets_within_budget(child):
+    """Each distinct pid is walked once, and a kill names at most MAX_KILL_TARGETS
+    distinct pids, so a 4 KB kill stays within the per-call budget."""
+    pid, grandchild = child
+    me = owned(harness_pid=os.getppid())  # two levels above the child: a longer walk
+    cmd = 'kill'
+    while len(cmd) + len(str(pid)) + 1 <= allowlist.MAX_TEXT:
+        cmd += f' {pid}'
+    v, took = fastest(lambda: shell(cmd, me))
+    assert v.klass == 'cancellation' and took < BUDGET, took
+    many = 'kill ' + ' '.join(str(pid + 1000 + i) for i in range(allowlist.MAX_KILL_TARGETS + 1))
+    v = shell(many, me)
+    assert v.klass == 'refuse' and 'distinct pids' in v.reason, v.reason
+    assert shell(f'kill {pid} {grandchild} {pid}', owned(harness_pid=os.getpid())).klass == 'cancellation'
+
+
+def test_kill_walks_each_distinct_pid_once(child, monkeypatch):
+    pid, grandchild = child
+    calls = []
+    real = allowlist.descends_from
+    monkeypatch.setattr(allowlist, 'descends_from', lambda p, a: calls.append(p) or real(p, a))
+    cmd = 'kill ' + ' '.join([str(pid)] * 300 + [str(grandchild)] * 200)
+    assert shell(cmd, owned(harness_pid=os.getpid())).klass == 'cancellation'
+    assert sorted(calls) == sorted({pid, grandchild})
 
 
 def test_kill_without_known_harness_refused(child):
@@ -469,6 +496,51 @@ def test_non_str_tool_name_refused(tool):
         assert v.klass == 'refuse' and 'tool name' in v.reason
 
 
+MB = 1 << 20
+BUDGET = 0.05  # the spec's per-call latency budget, in seconds
+
+
+def fastest(f, runs=3):
+    """The result of f and its best wall time over a few runs."""
+    best, result = None, None
+    for _ in range(runs):
+        start = time.perf_counter()
+        result = f()
+        took = time.perf_counter() - start
+        best = took if best is None else min(best, took)
+    return result, best
+
+
+@pytest.mark.parametrize('size', [MB, 10 * MB])
+@pytest.mark.parametrize('template', ['cat {}', "tasks note x '{}'", 'cat {}'.format('a ' * 8 + '{}')])
+def test_long_command_refused_within_budget(template, size):
+    """A padded command is refused by length before any scan or split (fix round 3):
+    a hook that outlives the harness's timeout lets the call proceed."""
+    cmd = template.format('x' * size)
+    v, took = fastest(lambda: shell(cmd, NOBODY))
+    assert v.klass == 'refuse' and str(len(cmd)) in v.reason and took < BUDGET, (v.reason[:80], took)
+    v, took = fastest(lambda: classify('codex', 'Bash', {'command': cmd}, NOBODY))
+    assert v.klass == 'refuse' and took < BUDGET, took
+
+
+def test_command_length_bound_is_exact():
+    at = 'cat ' + 'x' * (allowlist.MAX_TEXT - 4)
+    assert len(at) == allowlist.MAX_TEXT and shell(at, NOBODY).klass == 'read'
+    assert shell(at + 'x', NOBODY).klass == 'refuse'
+
+
+@pytest.mark.parametrize('harness, tool, arg, value', [
+    ('claude-code', 'ToolSearch', 'query', 'select:' + 'TaskStop,' * (10 * MB // 9) + 'TaskStop'),
+    ('claude-code', 'CronDelete', 'id', 'j' * 10 * MB),
+    ('codex', 'collaborationinterrupt_agent', 'target', 'w' * 10 * MB),
+    ('codex', 'update_goal', 'status', 'p' * 10 * MB),
+])
+def test_long_control_argument_refused_within_budget(harness, tool, arg, value):
+    mine = owned(worker_names=frozenset({'w0'}), cron_jobs=frozenset({'j1'}))
+    v, took = fastest(lambda: classify(harness, tool, {arg: value}, mine))
+    assert v.klass == 'refuse' and str(len(value)) in v.reason and took < BUDGET, (v.reason[:80], took)
+
+
 def test_unknown_harness_is_an_error():
     with pytest.raises(ValueError):
         classify('opencode', 'Bash', {'command': 'cat a'}, NOBODY)
@@ -546,3 +618,19 @@ def test_touches_protected_deep_input(protected, as_dict):
     state, _ = protected
     assert touches_protected({'x': nest(f'cat {state}/x', 20000, as_dict)}, protected)
     assert not touches_protected({'x': nest('cat a', 20000, as_dict)}, protected)
+
+
+def test_touches_protected_large_input_within_budget(protected):
+    """touches_protected runs on every call, paused or not, where a multi-megabyte Write
+    is normal: it must stay linear and within the per-call budget."""
+    state, limits = protected
+    big = 'z' * 10 * MB
+    for tool_input, expected in (
+        ({'content': big}, False),
+        ({'content': big + str(limits)}, True),
+        ({'content': big, 'file_path': '~/.local/state/hq/pause/x'}, True),
+        ({'edits': [{'old_string': 'a' * 100, 'new_string': 'b' * 100}] * 10000}, False),
+        ({'edits': [{'old_string': 'a' * 100, 'new_string': 'b' * 100}] * 10000 + [{'p': f'{state}/x'}]}, True),
+    ):
+        result, took = fastest(lambda: touches_protected(tool_input, protected))
+        assert result is expected and took < BUDGET, took
