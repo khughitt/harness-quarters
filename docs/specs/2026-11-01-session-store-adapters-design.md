@@ -29,8 +29,13 @@ through it. hq-963ea4 (pi), hq-ce3ab4 (Crush) and hq-aafc2a (opencode) then reus
    instead of branching on harness names. Adding a harness is one module, one registry
    entry, a colour and a launch-flags table, plus that harness's transcript parsing in
    session-episodes.
-3. Claude Code and Codex move behind the seam with no change in behaviour; their existing
-   tests pass unchanged (only imports and fixture wiring may change).
+3. Claude Code and Codex move behind the seam with no change in behaviour: their rows,
+   footer segments, launch argv and archive decisions, and `hq sessions --harness
+   claude|codex` output, stay byte-identical. Their tests pass with only imports and
+   fixture wiring changed; closed-set tests over every home or source
+   (`test_tracked_launch_config_matches_the_users_aliases`,
+   `test_sources_table_matches_spec`) and unfiltered `hq sessions` fixture expectations
+   gain the agy entry (an `absent: agy` footer segment where the fixture has no agy home).
 4. agy reaches parity: `hq sessions` lists and resumes agy conversations;
    `session-archive capture` mirrors agy transcripts; `session-episodes` reads them; the
    session-logs skill documents the store.
@@ -117,7 +122,7 @@ hierarchy. It provides:
 | --- | --- | --- |
 | `slug` (canonical, as declared for capability facts) and `alias` for `--harness` and display | hq sessions, archive, facts | `claude-code`/`claude`, `codex`/`codex` |
 | `homes(user_home)` → `Home(name, kind, path)` | hq sessions | `sessions.homes()` |
-| `list_sessions(home, archived)` → sessions and per-reason exclusion counts | hq sessions | `read_claude`, `read_codex`, footer counts in `cli.collect()` |
+| `list_sessions(home, archived)` → `(sessions, home_notes)`; `exclusion_reasons`, an ordered tuple | hq sessions | `read_claude`, `read_codex`, `Skipped`, footer counts in `cli.collect()` |
 | `resume_argv(session, flags)` and `environment(session, base)` | hq sessions `-i` | `launch.argv`, `launch.environment`, `HOME_VARIABLES` |
 | `colour` | hq sessions | `color.CLAUDE`, `color.CODEX`, `harness_hue` |
 | `archive_sources(user_home)` → `Source` rows, each with a capture selector | session-archive | `config.sources()`, `decide.is_transcript` |
@@ -125,19 +130,43 @@ hierarchy. It provides:
 | `episode_roots(env)` and the episodes harness label | session-episodes | `_roots()`, `scan_stores()` arguments |
 
 The Claude Code and Codex adapters wrap the existing functions; this work moves code,
-it does not rewrite readers. Footer text stays byte-identical for existing homes.
-`tools/hq.toml` keeps per-home launch flags, gaining `[homes.agy]`.
+it does not rewrite readers. `tools/hq.toml` keeps per-home launch flags, gaining
+`[homes.agy]`.
+
+`list_sessions` returns every session, excluded ones included as `Session` rows with
+`excluded` set, exactly as `read_claude` and `read_codex` do now, so `cli.collect()` can
+apply `--here` before counting exclusions (today's order; counting inside the adapter
+would change `--here` footers). `home_notes` carries home-wide counts that belong to no
+session, such as Claude's skipped history lines. The footer builds each harness's
+segment from its adapter's `exclusion_reasons`, in that order, so Claude Code and Codex
+segments read as today.
+
+`Session.cwd` becomes `str | None`. A session with no cwd is never kept by `--here`
+(`os.path.realpath("")` is the current directory and would match) and cannot be
+resumed. `Session.transcript` is the file `-i` checks before launching; nothing assumes
+it lies under `Home.path` or is one file per session (Crush and opencode keep SQLite
+databases elsewhere).
 
 ### session-archive changes
 
 - `Source` gains a capture selector: a predicate on the path relative to the root. Claude
   Code and Codex select everything (today's behaviour). agy selects only transcripts (below).
-- `check_sources()` keeps aborting on a symlinked root, and on a missing root whose
-  harness home exists. A source whose whole harness home is absent on a host (agy is not
-  installed there) is skipped and named in the run report rather than aborting the run.
-  Claude Code and Codex keep today's rule exactly: a missing root aborts. (My call: an
-  uninstalled harness should not stop every other harness's capture, but a vanished
-  transcript directory under an existing home is still the failure the rule exists for.)
+- Each source is `required` or `optional`. Claude Code and Codex sources are required
+  and keep today's rule exactly: a missing or symlinked root aborts the run (exit 2).
+- An optional source (agy) is skipped when its root does not exist (`os.path.lexists`
+  false) and the manifest has never captured that source on this archive. Home presence
+  is not the test: `just link --apply` creates `~/.gemini/antigravity-cli` for its
+  `settings.json` link before agy has ever run, leaving the home present and `brain/`
+  absent. Once the manifest holds a capture for the source, a missing root aborts as for
+  a required source. (My call: an uninstalled or never-used harness must not stop every
+  other harness's capture, while a transcript directory that vanishes after capture is
+  still the failure the rule exists for.)
+- A symlinked root or a symlinked harness home aborts for every source; `check_sources`
+  tests `home.is_symlink()` as well as `root.is_symlink()`, since quarantine work
+  traverses the home.
+- A skipped source is not walked. `capture`'s report gives it an explicit entry
+  (`{"skipped": "root absent, never captured"}`, exact shape the builder's), counted as
+  healthy, so the run's `ok` and `status` stay true.
 - Kind branches in `prune.py`, `inputs.py` and `decide.py` dispatch through the adapter;
   an adapter without prune hooks makes `prune` skip its sources and say so.
 
@@ -155,48 +184,90 @@ Facts below were read from this host's store on 2026-11-01 (agy 1.4.12).
   or column, or a value of the wrong shape, is `SourceError` ("agy's summary schema
   changed"), as for Codex. `history.jsonl` is not used: it names only some conversations
   (7 of 20 here).
-- **Row values.** `cwd`: the path of the first `file://` URI in `workspace_uris`; a row
-  with none is excluded as `no workspace`. `recency_ms`: `last_modified_time`. `label`:
+- **Row values.** `cwd`: the first entry of `workspace_uris`, parsed with
+  `urllib.parse.urlparse` and decoded with `unquote`; it must have scheme `file`, an
+  empty or `localhost` host and an absolute path, otherwise `SourceError`. A row whose
+  list is empty has `cwd = None` and is excluded as `no workspace`. `recency_ms`: `last_modified_time`. `label`:
   `title`, else `preview`. `transcript`:
   `brain/<id>/.system_generated/logs/transcript_full.jsonl`.
 - **Exclusions.** A row with a non-empty `parent_conversation_id` is a subagent
-  conversation (`invoke_subagent`, agent name `research`) and is excluded as
-  `non-interactive`. A row whose transcript file is absent is `transcript gone`.
+  conversation (`invoke_subagent`; agent names `research` and `self` seen here) and is
+  excluded as `non-interactive`. A row whose transcript file is absent is
+  `transcript gone`. `exclusion_reasons` is `("non-interactive", "transcript gone",
+  "no workspace")`.
   `status`, `killed` and `nesting_depth` drive no rule (my call, for parity: Claude Code
-  and Codex have no running-session guard on resume either). A running conversation is
+  and Codex have no running-session guard on resume either; `status` can also stay
+  `RUNNING` after an abrupt exit). A running conversation is
   listed and resumable, as a running Claude Code or Codex session is today.
 - **Headless runs.** `agy -p` conversations may not be distinguishable from interactive
   ones in the summaries (`source` was empty on every row here). The builder probes this in
   an isolated agy home. If they cannot be told apart, they are listed, and a capability
   fact records that agy's session metadata does not mark headless runs.
 - **Resume.** `agy [flags] --conversation <id>` in the recorded cwd (`--resume` does not
-  exist). Flags come from `[homes.agy]` in `tools/hq.toml`, matching the user's own agy
-  launcher; the builder reads it from the dotfiles or, if there is none, uses `[]`.
-- **Archive.** One source: root `~/.gemini/antigravity-cli/brain`, `pruned=False`,
-  selecting only `<id>/.system_generated/logs/transcript.jsonl` and
-  `transcript_full.jsonl`. Not captured: `logs/chunks/` (byte-identical split copies of
-  the two transcripts, checked on one conversation), `steps/`, `messages/`, `scratch/`,
-  `task.md`, and `conversations/<id>.db` (agy's native SQLite store, 152 MB here, outside
-  the root). `transcript_full.jsonl` kept its prefix while a live session appended to it
-  (one observation over several minutes); a rewrite would still be kept under
-  `versions/`.
-- **Episodes.** session-episodes gains an agy reader in its own file. Until the
-  flow-trial-1 readout it runs only when asked (`--harness agy`, or the builder's
-  equivalent flag); the default `extract` reads Claude Code and Codex exactly as today,
-  with an unchanged stderr summary (my call, from the trial gate; agy sessions all fall
-  inside the trial, so the default run loses nothing). When agy is asked for, an agy
-  schema change stops that run with an error naming agy. Making agy part of the default
-  run after the readout is a follow-up for obs-f5710b, which owns the tool by then.
-  - Human turn: a `USER_INPUT` step with `source: USER_EXPLICIT`; the person's text is
+  exist). `[homes.agy]` in `tools/hq.toml` is `flags = ["--dangerously-skip-permissions"]`,
+  matching the user's `ay` alias in the dotfiles.
+- **Archive.** Two optional sources, both `pruned=False`:
+  - `agy`: root `~/.gemini/antigravity-cli/brain`, selecting only
+    `<id>/.system_generated/logs/transcript.jsonl` and `transcript_full.jsonl`.
+    `transcript_full.jsonl` kept its prefix while a live session appended to it (one
+    observation over several minutes); a rewrite would still be kept under `versions/`.
+  - `agy-summaries`: root `~/.gemini/antigravity-cli`, selecting only
+    `conversation_summaries.db` (40 KB here, no WAL file beside it). It holds the only
+    copy of each conversation's workspace, title and subagent parent, which an archived
+    transcript needs to be attributed. SQLite rewrites it in place, so each changed
+    capture is a new entry under `versions/`, and a copy that races a write is reported
+    `busy` and retried on the next run, as for any file. (My call: small, and without it
+    an archive re-read cannot recover agy's cwd.)
+  - Not captured, and recorded as a capability fact: `conversations/<id>.db` (agy's
+    native SQLite store, 152 MB here, rewritten in place; it holds the per-step model and
+    token metadata, and is what `agy --conversation` resumes from); tool outputs too large
+    for `transcript_full.jsonl`, which agy spills to `steps/<N>/output.txt` (154 steps,
+    16 MB here); and `logs/chunks/` (byte-identical split copies of the two transcripts,
+    checked on one conversation), `messages/`, `scratch/` and `task.md`.
+- **Episodes.** session-episodes gains an agy reader in its own file.
+  - *Selection.* `extract` takes a repeatable `--harness` (`claude-code`, `codex`,
+    `agy`); without it the set is Claude Code and Codex, read exactly as today with an
+    unchanged stderr summary (my call, from the trial gate; agy sessions all fall inside
+    the trial, so the default run loses nothing). `show`, `confirm` and `label` take no
+    `--harness`: they dispatch every ref by its harness, `agy:` refs included. Making agy
+    part of the default run after the readout is a follow-up for obs-f5710b, which owns
+    the tool by then.
+  - *Root.* `SESSION_LOGS_AGY` names the agy home (`~/.gemini/antigravity-cli`) by
+    default; the reader walks `brain/*/.system_generated/logs/transcript_full.jsonl`.
+    An agy transcript is read on its own, with no summaries row needed: a conversation
+    is a subagent when it has no `USER_INPUT` step with `source: USER_EXPLICIT` (here,
+    all 14 top-level conversations open with one; all 13 subagent conversations have
+    none and open with a `SYSTEM_MESSAGE`). So an archived mirror re-parses like a live
+    one, and episodes never reads `conversation_summaries.db`. A transcript line that is
+    not a JSON step object stops the run with an error naming agy and the file.
+  - *Human turn.* A `USER_INPUT` step with `source: USER_EXPLICIT`; the person's text is
     inside `<USER_REQUEST>…</USER_REQUEST>`, and the `<ADDITIONAL_METADATA>` and
-    `<USER_SETTINGS_CHANGE>` blocks after it are agy's. `SYSTEM_MESSAGE`, `CHECKPOINT`
-    and `ERROR_MESSAGE` steps are injected.
-  - Tool calls: `PLANNER_RESPONSE.tool_calls[]` (`name`, `args`; shell commands are
-    `run_command` with `args.CommandLine`). agy records no call ids: each call's result is
-    the next `GENERIC` step, in order. The reader derives a call id from the conversation
-    id and the call's step index and position.
-  - Interactive and subagent: from the summaries row of the conversation, as in listing.
-  - Provenance: `agy:<conversation-id>` (tasks-75a0fe).
+    `<USER_SETTINGS_CHANGE>` blocks after it are agy's. Every other step type is the
+    harness's.
+  - *Tool calls and results.* Calls are `PLANNER_RESPONSE.tool_calls[]` (`name`, `args`;
+    shell commands are `run_command` with `args.CommandLine`). agy records no call ids:
+    the k-th call of a planner step pairs with the k-th `GENERIC` step after it, and the
+    reader derives a call id from the conversation id, the planner step index and k.
+    Three cases the pairing must handle, all seen here:
+    1. A `run_command` that outlives `WaitMsBeforeAsync` (75 here, including most
+       `tasks start` calls): its `GENERIC` step has `status: RUNNING` and content naming
+       `background task with task id: <bg-id>`. Its result text and time come from the
+       later `SYSTEM_MESSAGE` whose content names `sender=<bg-id>` and `finished with
+       result:`. Until that message exists the result is absent, as for a Claude or
+       Codex call with no result yet.
+    2. A `GENERIC` step with `status: ERROR` (29 here; content `Encountered error in step
+       execution: …`) is an error result: `attribute` and `_confirm` treat it as they
+       treat an error line today, never as a match.
+    3. Fewer `GENERIC` steps than calls (an interrupted or still-running step): the
+       unpaired calls have no result.
+  - *Turn and outcome.* A turn runs from a human `USER_INPUT` to the step before the next
+    one, spanning the controller-wake `SYSTEM_MESSAGE` steps (`[Message] … sender=…`)
+    and the planner steps they trigger. Outcome, matched to the Claude and Codex
+    readers' vocabulary: `wait` when the turn's last call is `ask_question` (as
+    `WAIT_TOOLS`); `interrupted` when it ends with an unpaired call or a background task
+    with no result yet; `error` when its last step is an `ERROR_MESSAGE`; otherwise
+    `completed`. The builder maps these onto the existing outcome strings exactly.
+  - *Provenance.* `agy:<conversation-id>` (tasks-75a0fe).
 - **session-logs skill.** A Stores row and record shapes for agy, its human-or-injected
   markers, and how to find the session behind a task id, worktree or commit.
 
@@ -206,9 +277,14 @@ Each gap found becomes a fact in `facts/capabilities.toml` for agy, with Claude 
 Codex values where they are known, following the file's existing schema and the README's
 probing rules. Expected from what is known now:
 
-- tool results carry a call id (agy: no, positional pairing);
+- tool results carry a call id (agy: no, positional pairing, and backgrounded commands
+  report later in a system message);
 - session metadata marks headless runs (agy: unknown until probed);
-- the archive holds the harness's native session store (agy: no, transcripts only).
+- transcripts are self-describing (agy: no cwd or title in the transcript; they live in
+  `conversation_summaries.db`, which the archive therefore captures);
+- the archive holds everything needed to resume or fully re-read a session (agy: no;
+  `conversations/<id>.db`, spilled tool outputs and model/token metadata are not
+  captured).
 
 The builder names and types the facts; the set grows with what the work finds.
 
@@ -233,8 +309,12 @@ rows, record its gaps as facts.
   the obvious fit) and how the registry is ordered.
 - How session-episodes locates the package (resolving its real path) and the error text
   when it cannot.
-- agy's colour (meeting the contrast rule in `color.py`) and display padding.
-- Fixture design for agy (a small summaries database and two transcripts built in tests).
+- agy's colour, meeting the contrast rule in `color.py`; `test_harness_hues_are_apart`
+  extends from the Claude/Codex pair to every pair of registered colours (OKLab distance
+  `>= 0.15`). Display padding.
+- Fixture design for agy: a small summaries database and transcripts built in tests,
+  covering the three pairing cases, a subagent conversation, a percent-encoded workspace
+  URI and an empty workspace list.
 - The probe for headless runs, and the exact facts, names and types.
 - Commit order: the seam with Claude Code and Codex first, proven by the unchanged
   suites; agy after.
