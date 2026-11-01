@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/agy-ops-check
 created: 2026-10-31T21:00:30Z
-updated: 2026-11-01T01:28:30Z
+updated: 2026-11-01T01:28:32Z
 started: 2026-10-31T21:00:48Z
 depends: []
 tags: []
@@ -46,3 +46,4 @@ Where: links.toml, agy/{settings,hooks,skills}.json, .gitattributes, .githooks/{
 - 2026-10-31T22:00:10Z (feat/agy-setup): done
 - 2026-10-31T22:00:10Z (feat/agy-setup): Added agy/ config files (settings.json, hooks.json, skills.json), declared [harness.agy] and [harness.agy-config] home links in links.toml, wired agy/settings*.json into .gitattributes, harness-state-clean, harness-state-refresh, and live-picks (with separate local/live-picks-agy.json record), registered agy in facts/capabilities.toml, and added unit/rollback tests and documentation.
 - 2026-11-01T01:28:30Z (fix/agy-ops-check): resumed
+- 2026-11-01T01:28:32Z (fix/agy-ops-check): gate: implementing .worktrees/agy-ops-check — reopened: live agy/settings.json trustedWorkspaces requires .ops-check.toml layout_allowed entry
