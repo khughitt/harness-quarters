@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-8af61d-agy-relay
 created: 2026-11-01T08:44:46Z
-updated: 2026-11-01T19:55:35Z
+updated: 2026-11-01T19:55:37Z
 started: 2026-11-01T16:09:11Z
 depends: [tasks-ba29d3, fam-55f1af]
 tags: [hooks, cross-project]
@@ -56,3 +56,4 @@ Where: relay/, claude/settings.json, codex/hooks.json, codex/work/hooks.json, ag
 - 2026-11-01T19:26:00Z (feat/hq-8af61d-agy-relay): resumed
 - 2026-11-01T19:54:45Z (feat/hq-8af61d-agy-relay): review: impl round 3 — verdict: accept; findings: none; reviewer: agy
 - 2026-11-01T19:55:35Z (feat/hq-8af61d-agy-relay): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-8af61d","state":"kept","verification":"verified","purpose":"Hold closed verified branch feat/hq-8af61d-agy-relay (covered tree a0c48e959f646b1e60b92cfde46c66eb1de474a1) across immediate authorized merge into main and live rollout verification on titan and europa; open follow-up task:hq-c59809 named as pre-done fallback owner because tasks note --stamp emits no harness_session on agy prior to live relay rollout","next_owner":"task:hq-c59809","cleanup_trigger":"Immediately after authorized merge of feat/hq-8af61d-agy-relay into main and live rollout verification on titan and europa, run worktree removal checks and release .worktrees/hq-8af61d"}
+- 2026-11-01T19:55:37Z (feat/hq-8af61d-agy-relay): retention checkpoint: observed 2026-11-01T19:55:37Z on titan; basis hq (in-tree, .) 4baac026c2b23bdbc61952da54a5fceda41307dd:tasks/hq-8af61d.md; retained by refs/heads/feat/hq-8af61d-agy-relay; this host: kept verified 1, kept unknown 0, released 0; changed 1. Rechecked all kept/verified items on this host; unknown items remain unverified with actions in basis. Other hosts retain their own dated observations. Next: record gate: verified, retro, and tasks done on feat/hq-8af61d-agy-relay, merge into main during a zero-Codex-process window, render subscribers.json on titan and europa, and release .worktrees/hq-8af61d.
