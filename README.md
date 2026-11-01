@@ -250,6 +250,9 @@ MIT licensed; see `LICENSE`.
 - [Relay operator cutover](docs/runbooks/relay-cutover.md): the record of the completed
   2026-10-22 window. The cutover tool is retired pending deletion (hq-7e81ed).
   Relay upgrades follow the [pinned relay runtime runbook](docs/runbooks/relay-runtime.md).
+- [Adding an agent harness](docs/runbooks/adding-a-harness.md): onboarding a new harness
+  across home routing, live-state hygiene, capability facts, hooks and profiles,
+  process ancestry and provenance, and session discovery and archiving.
 - `local/`: untracked, and carried between hosts by Dropbox, not git. It holds
   claude/settings.work.json, codex/config.work.toml and codex/rules/, the files
   a home links to that the repository must not publish. The `~/.claude-work`,
