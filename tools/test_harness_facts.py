@@ -90,6 +90,21 @@ def write(tmp_path, text, manifest_text=GOOD_MANIFEST):
     return path
 
 
+HOME = []   # the current test's own temporary HOME, set by the autouse fixture
+
+
+@pytest.fixture(autouse=True)
+def _own_home(tmp_path_factory):
+    HOME[:] = [tmp_path_factory.mktemp("home")]
+    yield
+    HOME.clear()
+
+
+def tool_env():
+    """Built key by key, never from os.environ's contents beyond PATH."""
+    return {"PATH": os.environ["PATH"], "HOME": str(HOME[0]), "PYTHONDONTWRITEBYTECODE": "1"}
+
+
 def run(*args, cwd=None):
     """Run the tool; a --file next to a harnesses.toml gets --manifest for it too."""
     args = list(map(str, args))
@@ -97,8 +112,7 @@ def run(*args, cwd=None):
         manifest = Path(args[args.index("--file") + 1]).with_name("harnesses.toml")
         if manifest.exists():
             args += ["--manifest", str(manifest)]
-    env = {"PATH": os.environ["PATH"], "HOME": str(cwd or ROOT), "PYTHONDONTWRITEBYTECODE": "1"}
-    return subprocess.run([sys.executable, str(TOOL), *args], text=True, capture_output=True, cwd=cwd, env=env)
+    return subprocess.run([sys.executable, str(TOOL), *args], text=True, capture_output=True, cwd=cwd, env=tool_env())
 
 
 def manifest_of(path):
@@ -153,16 +167,16 @@ def test_each_refusal_names_its_table(tmp_path, old, new, problem):
 
 
 MANIFEST_REFUSALS = [
-    ("missing", None, "harnesses.toml"),
-    ("invalid-toml", "schema = [", "not valid TOML: "),
-    ("non-utf8", b"schema = 1\n\xff\xfe", "not valid TOML: "),
+    ("missing", None, "harnesses.toml: No such file or directory"),
+    ("invalid-toml", "schema = [", "not valid TOML: harnesses.toml: "),
+    ("non-utf8", b"schema = 1\n\xff\xfe", "not valid TOML: harnesses.toml: "),
     ("schema-2", GOOD_MANIFEST.replace("schema = 1", "schema = 2"), "manifest: schema must be 1"),
     ("schema-true", GOOD_MANIFEST.replace("schema = 1", "schema = true"), "manifest: schema must be 1"),
     ("schema-float", GOOD_MANIFEST.replace("schema = 1", "schema = 1.0"), "manifest: schema must be 1"),
     ("unknown-key", GOOD_MANIFEST.replace("schema = 1", "schema = 1\nextra = 1"), "manifest: unknown key extra"),
     ("empty-harnesses", "schema = 1\n[harnesses]\n", "manifest: harnesses must be a non-empty table"),
     ("bad-slug", GOOD_MANIFEST.replace("[harnesses.opencode]", "[harnesses.Claude]"), "manifest: harnesses.Claude: Claude is not a valid name"),
-    ("non-table", GOOD_MANIFEST.replace("[harnesses.opencode]", "").replace("[harnesses.claude-code]", "").replace("[harnesses.codex.live_state]", "[harnesses]\ncodex = 1\n[x]"), "manifest: "),
+    ("non-table", "schema = 1\n[harnesses]\ncodex = 1\n", "manifest: harnesses.codex: must be a table"),
     ("unknown-harness-key", GOOD_MANIFEST.replace("[harnesses.opencode]", "[harnesses.opencode]\nconfig = 1"), "manifest: harnesses.opencode: unknown key config"),
     ("live-state-not-table", "schema = 1\n[harnesses.codex]\nlive_state = 1\n", "manifest: harnesses.codex.live_state: must be a table"),
 ]
@@ -394,7 +408,7 @@ def test_the_default_file_is_found_through_a_link(tmp_path):
     link.symlink_to(checkout / "tools" / "harness-facts")
     elsewhere = tmp_path / "elsewhere"
     elsewhere.mkdir()
-    done = subprocess.run([sys.executable, str(link), "get", "controller-wake", "claude-code"], text=True, capture_output=True, cwd=elsewhere)
+    done = subprocess.run([sys.executable, str(link), "get", "controller-wake", "claude-code"], text=True, capture_output=True, cwd=elsewhere, env=tool_env())
     assert done.returncode == 0 and json.loads(done.stdout)["value"] is True
 
 

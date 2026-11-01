@@ -154,7 +154,7 @@ def _load(path):
     except OSError as error:
         raise Invalid([f"{path}: {error.strerror or error}"]) from None
     except (tomllib.TOMLDecodeError, UnicodeDecodeError) as error:
-        raise Invalid([f"not valid TOML: {error}"]) from None
+        raise Invalid([f"not valid TOML: {pathlib.Path(path).name}: {error}"]) from None
 
 
 def validate(path=None, root=None, manifest=None):
