@@ -3,11 +3,16 @@
 Task: hq-9aa713. Companion: lore-911121 (what the paused agent reports and does,
 and the rule an agent follows where no hook runs), designed with this one in
 `<records root>/lore/docs/specs/2026-11-01-turn-pause-guidance-design.md`.
-Status: revision 3 for the user's review, after review round 3 (codex/gpt-6.1-sol
-at `e184ba1`: no git while paused, cancellation by function with probed tool names,
-budget examples ignored silently). Round 2 (same reviewer at `88b8958`) brought
-in-flight active time, the enforced closing allowlist, cancellation after grace,
-the budget directive and one reproducible fire rate.
+Status: revision 4 for the user's review. Revision 3 was accepted at `8a130e9`;
+the plan's Task 1 probes (hq-fe672f) then showed that Codex 0.166.0 fires no hook
+for its outer code-mode `exec`, which that revision's Codex enforcement assumed.
+The user chose (2026-11-01) to enforce Codex on the calls its hooks do see. This
+revision changes what exists today, the Codex counters, the cancellation table and
+the Codex `exec` rule; the rest stands as accepted. Earlier rounds: round 3
+(codex/gpt-6.1-sol at `e184ba1`: no git while paused, cancellation by function with
+probed tool names, budget examples ignored silently); round 2 (same reviewer at
+`88b8958`: in-flight active time, the enforced closing allowlist, cancellation
+after grace, the budget directive and one reproducible fire rate).
 
 ## Intent
 
@@ -76,12 +81,35 @@ From the survey recorded on hq-9aa713 (2026-11-01):
 - Relay's guard protocol (relay `docs/api.md`, Guard protocol) can refuse every
   tool, but its `Event` carries no prompt text, so a relay guard cannot read a
   budget line or tell a human prompt from an injected one.
-- hq wires SubagentStart for Codex only, and no compaction hook. Both installed
-  binaries (Claude Code 2.1.316, Codex 0.166.0) name `PreCompact`, `PostCompact`
-  and `SubagentStart` events; that they fire for hooks is not yet probed.
-- Codex code-mode `exec` calls are what a Codex transcript records as tool calls;
-  whether PreToolUse fires once per `exec` or per nested call is unproven
-  (ops-daf2cd).
+- hq wires SubagentStart for Codex only, and no compaction hook.
+
+Probed by the plan's Task 1 (hq-fe672f, Claude Code 2.1.316 and Codex 0.166.0,
+recorded in `facts/capabilities.toml`):
+
+- Both harnesses: a PreToolUse deny holds and its reason reaches the model; the
+  prompt text arrives on UserPromptSubmit; a child's calls carry its `agent_id` and
+  the root's `session_id`; PostToolUse fires for every allowed call and none for a
+  refused one; SubagentStart fires once per started child; SubagentStop names the
+  child, Stop does not.
+- Claude Code: PreCompact and PostCompact fire. A background completion wakes the
+  session with a UserPromptSubmit whose prompt is a `<task-notification>` block.
+  The runtime offers no wait tool (waiting is a turn end and a notification wake),
+  no `KillShell`, and no `Grep` or `Glob`.
+- Codex: **no hook fires for the outer code-mode `exec`**, under the same `*`
+  matcher that catches every other call. Each call *inside* an `exec` fires its own
+  PreToolUse and PostToolUse (a nested `exec_command` arrives as tool name `Bash`,
+  `apply_patch` as `apply_patch`), and a nested deny stops that call's side effect.
+  Function tools outside `exec` (`spawn_agent`, `wait_agent`, `interrupt_agent`)
+  fire their own hooks. `spawn_agent` cannot be called from inside `exec`; spawns
+  are direct function calls, and SubagentStart counts started workers exactly,
+  while PreToolUse also counts refused attempts. Whether compaction fires a hook is
+  unknown (two probe runs did not compact). `exec` also exposes the signed-in
+  account's MCP tools; each call to one fires its own PreToolUse (the hook name
+  joins app and tool with a double underscore) and a deny holds. Two controls fire
+  **no hook at all**: a nested `write_stdin` (input to a running exec session) and
+  the top-level `wait` (including `terminate: true` on a running `exec` cell). The
+  PostToolUse of an `exec_command` that yields carries no session id. A deny on a
+  worker's own nested call holds.
 - agy hooks PreToolUse only for `run_command`, plus SessionStart and Stop.
   opencode and pi have no hook path hq wires.
 
@@ -195,16 +223,31 @@ Kept per root session by the hook itself, from events it already receives:
   at a question overnight counts nothing. Nothing after the turn's last event
   counts. The measurement script applies the same rule to transcripts, except
   the user-wait exception (it counts those calls, so its rate is an upper bound
-  in that respect);
-- **tool calls**: the root's own PreToolUse calls. Children's calls are not added:
-  the measurement below counted the root transcript only, and counting the tree
-  would make the approved numbers mean something else. (Codex: one per `exec`
-  until ops-daf2cd settles nesting, which is what the measurement counted.)
-- **subagent spawns**: every spawn in the tree: Claude Code `Agent`/`Task` tool
-  calls, Codex `spawn_agent` (SubagentStart where it fires);
-- **compactions**: PreCompact or PostCompact, once the probe below shows it fires
-  for that harness. Where it does not, the harness has no compaction counter and
-  lore's rule has the agent count its own.
+  in that respect). For Codex, the in-flight operations are the hooked calls: a
+  nested call inside an `exec` and a function tool such as `wait_agent`. The outer
+  `exec` itself is never seen, so time an `exec` spends in tool-free code counts
+  only through the idle-gap rule. So does time after an `exec_command` yields: its
+  PostToolUse fires at the yield, and the unhooked `wait` or `write_stdin` that
+  follows it is invisible, so a quiet wait over 10 minutes on a yielded process
+  counts nothing (a `wait_agent` on a worker, the case's long wait, is hooked and
+  counts in full);
+- **tool calls**: the root's own calls the hook sees, counted at PreToolUse.
+  Children's calls are not added: the measurement below counted the root
+  transcript only, and counting the tree would make the approved numbers mean
+  something else. For Codex that is each nested call and each function tool, not
+  each `exec`: an `exec` running three commands counts three, and an `exec` that
+  calls no tool counts none. The measurement counted one per `exec`, so the
+  verification replay recounts Codex calls the hook's way before anything is
+  wired, and the fire-rate gate under Limits decides whether 500 still fits;
+- **subagent spawns**: every child started in the tree, counted once per child:
+  Claude Code from each allowed `Agent`/`Task` call, keyed by its tool-use id;
+  Codex from SubagentStart, keyed by the worker's `agent_id` (PreToolUse on
+  `spawn_agent` also sees refused attempts, so it is not the count). Under
+  SubagentStart the 31st worker exists before it is counted, and the tree pauses
+  at its next call;
+- **compactions**: PreCompact or PostCompact, counted once per compaction, for
+  Claude Code. Codex has no compaction counter until a probe shows a compaction
+  hook fires; lore's rule has its agents count their own.
 
 Tokens and rate limits are not visible to a hook and are not counted.
 
@@ -220,8 +263,9 @@ the hook and by `hq pause limits`; lore's rule refers to that command rather tha
 repeating the numbers.
 
 The verification replay recomputes the fire rate from the hook's own code over
-the same window. If it differs from 1.67 a day by more than half, the plan stops
-and brings the numbers back to the user before wiring anything.
+the same window, with Codex calls and spawns counted the way the hook sees them
+(above). If it differs from 1.67 a day by more than half, the plan stops and
+brings the numbers back to the user before wiring anything.
 
 ### Warning, pause, notification
 
@@ -257,7 +301,7 @@ and brings the numbers back to the user before wiring anything.
 | Bookkeeping: `tasks park`, `tasks note`, `hq pause status` | yes | yes |
 | Cancellation (below) | yes | yes |
 | Records reads and attachments: `tasks show --no-fetch`, `tasks claims`, `tasks list`, `tasks attach` | yes | no |
-| Reading: Claude Code `Read`, `Grep`, `Glob`; shell `cat`, `head`, `tail`, `wc`, `ls`; `host-load --section session` | yes | no |
+| Reading: Claude Code `Read` (and `Grep`, `Glob` in a release that offers them; 2.1.316 does not); shell `cat`, `head`, `tail`, `wc`, `ls`; `host-load --section session` | yes | no |
 | Everything else: file writes (`Edit`, `Write`, `NotebookEdit`, `apply_patch`), spawns and worker messages (`send_message`, `followup_task`), web and MCP tools, `git` in any form, any other command | no | no |
 
 Each reader on the list runs no program the repository or user configuration
@@ -281,10 +325,11 @@ names differ by runtime and an unlisted name is refused:
 
 | Control | Claude Code 2.1.316 | Codex 0.166.0 | Ownership check |
 | --- | --- | --- | --- |
-| Stop an own background task | `TaskStop` (`KillShell` in older releases) | (none) | the harness scopes it to the session |
-| Interrupt an own worker | `TaskStop` on a background subagent's task id, if the probe shows it reaches subagents | `interrupt_agent`, the tool this runtime exposes (round 3 reviewer); `close_agent` only if a probe shows the runtime offers it | the target is a worker id or name the hook recorded under this root at spawn |
-| Interrupt an own exec session | (none) | `write_stdin` with only an interrupt (`\u0003`) or end of input | the session id was returned to this agent by its own `exec_command` |
-| Signal an own process | shell `kill <pid>…`, optionally with one of `-TERM`, `-INT`, `-KILL`, `-HUP` | the same through `exec_command` | every target pid descends from the harness process the hook runs under (ancestry read from `/proc`), and none is that process |
+| Stop an own background task | `TaskStop {task_id}` (2.1.316 offers no `KillShell`) | `wait` with `terminate: true` on a running `exec` cell: fires no hook, so it is never refused and stays available | the harness scopes `TaskStop` to the session; Codex `wait` cannot be checked |
+| Interrupt an own worker | `TaskStop` on a background subagent's task id or name (its description says it accepts them; not exercised live) | `interrupt_agent {target}` (0.166.0 offers no `close_agent`) | the target is a worker id or name the hook recorded under this root at spawn |
+| Interrupt an own exec session | (none) | nested `write_stdin`: fires no hook, so it is never refused or checked, whatever input it sends | none possible (see the limitation below) |
+| Cancel own scheduled work | `CronDelete {id}`; `ScheduleWakeup {stop: true}` | (none) | a `CronDelete` id must have been created by this session's own `CronCreate`; `ScheduleWakeup` is scoped to the session |
+| Signal an own process | shell `kill <pid>…`, optionally with one of `-TERM`, `-INT`, `-KILL`, `-HUP` | the same through a nested `exec_command` (hook tool name `Bash`) | every target pid descends from the harness process the hook runs under (ancestry read from `/proc`), and none is that process |
 
 The tool-surface probe (Verification) lists the tools each runtime offers its
 model; a cancellation control named here that the probe does not find, or a
@@ -304,16 +349,25 @@ table is corrected.
 - `tasks` and `hq` run only the subcommands named, with any options except that
   `tasks show` requires `--no-fetch`.
 
-**Codex code-mode `exec`** calls pass only when their whole source is one
-`tools.exec_command({cmd: "<string literal>", …})` call, optionally wrapped in
-`text(await …)`, with only literal option values from a short list (`workdir`,
-`max_output_tokens`, `yield_time_ms`), and the literal passes the shell
-validator; or one cancellation call from the table above (for example
-`tools.interrupt_agent(…)` or an interrupt-only `tools.write_stdin(…)`) with
-literal arguments that pass its ownership check. Anything else, including any second statement,
-template literal or variable, is refused. If the ops-daf2cd probe shows Codex
-fires PreToolUse for each nested call, the hook validates those nested calls
-directly and refuses an `exec` body that does anything else.
+**Codex code-mode `exec`** reaches no hook, so its source is never read or
+judged. Each call it makes is judged on its own, by the same rules as any other
+call: a nested `exec_command` (tool name `Bash`) passes only through the shell
+validator, a nested `apply_patch` is a file write and is refused, and a nested
+`write_stdin` passes only as cancellation. Code inside an `exec` that calls no
+tool (arithmetic, string handling, the `text` and `store` helpers) still runs
+while paused; it can change nothing outside the session without a tool, so it is
+accepted as unseen rather than blocked. A nested MCP call is refused like any MCP
+tool.
+
+**Limitation: unhooked Codex controls.** Nested `write_stdin` and top-level `wait`
+reach no hook in Codex 0.166.0. A paused Codex agent can therefore still send input
+to an exec session it opened before the pause (an interactive shell, for example)
+or end a running `exec` cell, and the hook neither sees nor counts it. This is
+accepted for the first release as stated, not closed: ending work is what a paused
+agent should do with them, the refusal text and lore's rule allow only an
+interrupt, and opening a new session needs a hooked `exec_command`, which the pause
+refuses. A follow-up re-probes each Codex version and asks upstream for hooks on
+both.
 
 Bookkeeping and cancellation stay allowed in every state, so claim-guard's Stop
 block and the refusal never loop, and no session is left unable to stop its own
@@ -374,8 +428,9 @@ A direct hook, not a relay guard, because it needs the prompt text. It is wired 
 `claude/settings.json` and `codex/hooks.json` (and their work variants) on
 PreToolUse, PostToolUse and PostToolUseFailure (all tools) and UserPromptSubmit;
 on Stop and SubagentStop as an observer that never blocks (it closes in-flight
-calls); on SessionEnd for pruning; and on PreCompact/PostCompact and
-SubagentStart where their probes pass. Target: under 50 ms at p99 on this host
+calls); on SessionEnd for pruning; on PreCompact/PostCompact for Claude Code; and
+on SubagentStart for both (Claude Code records workers from it, Codex counts its
+spawns from it). Target: under 50 ms at p99 on this host
 per call, measured over a replay of a large rollout; hq's test-latency practice
 applies.
 
@@ -384,7 +439,7 @@ applies.
 | Harness | First release | Notes |
 | --- | --- | --- |
 | Claude Code | pause, warning, budget | |
-| Codex | pause, warning, budget | worker events grouped by root |
+| Codex | pause, warning, budget | worker events grouped by root; enforced on the calls its hooks see (nested calls and function tools), not on the outer `exec`, nested `write_stdin` or `wait` (limitation under Closing allowlist); no compaction counter until a compaction hook is shown to fire |
 | agy | not covered | PreToolUse sees only `run_command`; a partial pause would mislead. Follow-up task. |
 | opencode, pi | not covered | no hook path; lore's rule is the only bound |
 
@@ -393,7 +448,9 @@ applies.
 `hq pause status` prints the current root session's counters, limits, budget,
 pause state and notification result as one line (`--json` for tools), found from
 the harness's session environment (`CODEX_THREAD_ID`; Claude Code's session id as
-the hook records it per cwd). `hq pause limits` prints the defaults. lore-911121's
+the hook records it per cwd). A count the harness's hook does not keep (Codex
+compactions today) prints as not counted, and lore-911121's rule has the agent
+keep that count itself. `hq pause limits` prints the defaults. lore-911121's
 rule tells agents when to run them.
 
 ## Verification
@@ -404,17 +461,19 @@ rule tells agents when to run them.
 - **Fire rate.** Replaying the 30-day store through the hook's counting (root
   calls, tree spawns and active time, compactions) gives the pause rate the user
   approves numbers against; the gate under Limits applies.
-- **Live probes, per harness**, recorded as capability facts: a deny holds for
-  every tool, including `Agent`/`Task`, `spawn_agent` and `wait_agent`; whether
-  Codex PreToolUse fires per `exec` or per nested call (ops-daf2cd); PreCompact or
-  PostCompact and SubagentStart fire for hooks; a refused turn can still park and
-  end; UserPromptSubmit fires on a typed prompt and does not, or is filtered, on a
-  task-notification wake; Codex worker and Claude Code subagent calls carry
-  `agent_id`; whether Codex has PostToolUse, which decides its in-flight rule;
-  a **tool-surface probe** per harness that lists the tools the runtime offers
-  its model, recorded as a capability fact, which sets the names in the
-  cancellation table (Claude Code `TaskStop`/`KillShell`; Codex `interrupt_agent`,
-  `close_agent`, `write_stdin`).
+- **Live probes, per harness**, recorded as capability facts (done for Claude
+  Code 2.1.316 and Codex 0.166.0 in hq-fe672f; rerun on a version change): a deny
+  holds for every tool the hook sees, including `Agent`/`Task`, `spawn_agent` and
+  `wait_agent`, and for a child's own call; which Codex calls fire a hook (outer
+  `exec`, nested `write_stdin` and `wait` none; nested calls including MCP
+  tools, and function tools, each one, under the hook names the facts record); PreCompact or PostCompact and
+  SubagentStart fire for hooks; UserPromptSubmit carries the prompt, and a
+  task-notification wake arrives as a prompt the genuine-prompt rule filters;
+  child calls carry `agent_id`; PostToolUse fires; a **tool-surface probe** per
+  harness lists the tools the runtime offers its model and each cancellation
+  tool's argument schema, and sets the names in the cancellation table. The
+  isolated lifecycle run (cross the limit, spend grace, cancel own work, park,
+  resume) shows that a refused turn can still park and end.
 - **Tests** cover, at least:
   - active time: eight back-to-back half-hour calls count 4 h and pause; a
     half-hour `wait_agent` with a silent child counts in full; a call with no
@@ -430,15 +489,18 @@ rule tells agents when to run them.
     with `budget:` but does not parse; scaling and named overrides;
   - the shell validator: each allowlisted command passes; each operator,
     expansion, redirection, path-qualified program, write-capable option and
-    unlisted subcommand is refused; Codex `exec` bodies with one literal
-    `exec_command` pass and bodies with a second statement, a variable or a
-    template literal are refused;
+    unlisted subcommand is refused; a Codex nested `Bash` call is judged by the
+    same validator, and a nested `apply_patch` is refused;
+  - Codex counting: an `exec` with three nested calls counts three root calls, one
+    with no tool call counts none; spawns count from SubagentStart once per worker,
+    and a refused `spawn_agent` attempt counts nothing;
   - cancellation after grace, per harness, with each control in the
     cancellation table: an exhausted Claude Code session can `TaskStop` its
-    background task and `kill` its own process; an exhausted Codex controller can
-    `interrupt_agent` its own worker, interrupt its own exec session and `kill` its
-    own process; each control is refused against a worker, session or pid this
-    tree does not own;
+    background task, `CronDelete` its own job, stop its loop and `kill` its own
+    process; an exhausted Codex controller can `interrupt_agent` its own worker
+    and `kill` its own process through a nested `exec_command`; each control is
+    refused against a worker, job or pid this tree does not own (Codex
+    `write_stdin` and `wait` never reach the hook, so no test can cover them);
   - the paused allowlist refuses every `git` invocation, including plain
     `git diff`, `git status` and `git worktree list`, and `tasks show` without
     `--no-fetch`;
@@ -451,8 +513,7 @@ rule tells agents when to run them.
 ## Left to the builder
 
 The hook's language and file layout inside hq, the state file format, the exact
-notification command, the parsing of Codex code-mode `exec` inputs for spawns, and
-how Claude Code's session id reaches `hq pause status`.
+notification command, and how Claude Code's session id reaches `hq pause status`.
 
 ## Activation
 
