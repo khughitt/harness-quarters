@@ -45,12 +45,32 @@ The adapters in Tasks 6 and 8 depend on what the installed harnesses actually se
 - Test: `tools/test_harness_facts.py` (existing check covers the new entries)
 
 **Interfaces:**
-- Produces facts, each per harness `claude-code` and `codex`: `hook-posttooluse` (boolean), `hook-compact-event` (`PreCompact`, `PostCompact`, both, none), `hook-subagent-start` (boolean), `hook-agent-id-on-child-calls` (boolean), `hook-deny-all-tools` (boolean: a deny held for a spawn tool, a wait tool and a shell tool), `hook-prompt-on-wake` (boolean or unknown: UserPromptSubmit fires on a task-notification wake), `codex-exec-nested-pretooluse` (Codex only: PreToolUse fires per nested `tools.*` call), `model-tool-surface` (the list of tool names the runtime offers its model, read from the session's own tool list).
+- Produces facts, each per harness `claude-code` and `codex`, in two classes.
+
+**Mandatory**: the design cannot hold without them. A `false`, an `unknown` or a missing result for any of them stops the plan before Task 5; bring the evidence to the user. No later task may proceed on a fallback for these.
+
+| Fact | Must show |
+| --- | --- |
+| `hook-deny-all-tools` | a PreToolUse deny held, with the reason shown to the model, for a spawn tool, a wait tool, a shell tool, a file-write tool and (Codex) an outer `exec` |
+| `hook-prompt-text` | UserPromptSubmit carries the typed prompt text |
+| `hook-agent-id-on-child-calls` | a child's tool calls carry an identifier distinct from the root's (`agent_id`), and the root's `session_id` |
+| `model-tool-surface` | the tool names the runtime offers its model **and each cancellation tool's argument schema** (for example Codex `interrupt_agent` takes `{target: …}`), read from the session's own tool list |
+
+**Optional with a documented fallback**: a `false` or `unknown` selects the fallback named here, which Tasks 3 to 6 implement and test; it does not stop the plan.
+
+| Fact | Fallback when absent |
+| --- | --- |
+| `hook-posttooluse` | an agent's open call closes at that agent's next hook event or Stop; `write_stdin` cancellation stays refused |
+| `hook-compact-event` (`PreCompact`, `PostCompact`, both, none) | no compaction counter for that harness; lore's rule has the agent count |
+| `hook-subagent-start` | spawns and workers are recorded from spawn tool calls and child events only |
+| `hook-stop-carries-agent` (Stop/SubagentStop identify which agent stopped) | open calls close at the next genuine prompt only |
+| `hook-prompt-on-wake` | the genuine-prompt filter applies regardless, so a wake never starts a turn |
+| `codex-exec-nested-pretooluse` (Codex only) | spawns and cancellation calls are read from the outer `exec` source |
 
 - [ ] **Step 1:** Write the probe hook: read stdin JSON, append it with the hook event name and `time.time()` to `$TURN_PAUSE_PROBE_LOG`; when `tool_name` equals `$TURN_PAUSE_PROBE_DENY`, print the PreToolUse deny JSON from relay `docs/api.md` "Verified native facts".
 - [ ] **Step 2:** Run each harness headless in an isolated home per README "Re-probing a fact" (Claude Code with `--settings` naming a temporary settings file; Codex with a temporary `CODEX_HOME` carrying only the probe hooks and the auth the README names), on a prompt that spawns one subagent, waits on it, runs one shell command, and is denied one tool of each kind in turn.
 - [ ] **Step 3:** Read the logs and record each fact with `status = "probed"`, `version`, `date`, `evidence = "hq-<child id>"` and a `note` naming the observation; record `unknown` where a run could not show it. Add a note on ops-daf2cd with the nested-PreToolUse observation.
-- [ ] **Step 4:** Compare `model-tool-surface` against the spec's cancellation table (Claude Code `TaskStop`/`KillShell`; Codex `interrupt_agent`, `close_agent`, `write_stdin`). A named control the runtime lacks, or a cancellation tool it offers that the table does not name, stops the plan: bring the corrected table to the user before Task 5.
+- [ ] **Step 4:** Check every mandatory fact holds. Compare `model-tool-surface` against the spec's cancellation table (Claude Code `TaskStop`/`KillShell`; Codex `interrupt_agent`, `close_agent`, `write_stdin`) by name and by argument schema. Any mandatory failure, a named control the runtime lacks, or a cancellation tool it offers that the table does not name, stops the plan: bring the evidence and a corrected table to the user before Task 5. Save each recorded argument schema as a fixture under `tools/fixtures/turn-pause/schemas/<harness>-<tool>.json`; Task 5's tests build their inputs from these files.
 - [ ] **Step 5:** `tools/harness-facts check` passes; `just test`; commit `feat(facts): probe the hook surfaces the turn pause needs`.
 
 ### Task 2: Prompt rules and limits
@@ -112,21 +132,28 @@ def test_budget_named_overrides(): assert limits.with_budget(Limits(14400, 500, 
 **Interfaces:**
 - Consumes: `Limits` (Task 2).
 - Produces:
-  - `@dataclass(frozen=True) Event(t: float, agent: str | None, kind: Literal['prompt', 'tool_start', 'tool_end', 'agent_stop', 'compact', 'tick'], call_id: str | None = None, tool: str | None = None)`; `agent=None` means the root.
-  - `events.SPAWN_TOOLS = {'Agent', 'Task', 'spawn_agent'}`; `events.USER_WAIT_TOOLS = {'AskUserQuestion', 'request_user_input', 'request_user_input_async'}`.
-  - `@dataclass TurnState(started: float, limits: Limits, limits_sha: str, active: float = 0.0, calls: int = 0, spawns: int = 0, compactions: int = 0, last_t: float | None = None, in_flight: dict[str, str | None] = field(default_factory=dict), warned: set[str] = field(default_factory=set))`, JSON round-trippable through `to_json()`/`from_json()`.
-  - `counters.apply(state: TurnState, ev: Event) -> None`: adds the gap since `last_t` (in full while `in_flight` is non-empty, else when under 600 s), then updates: `tool_start` adds to `in_flight` unless the tool is a user-wait tool, counts a root call when `agent is None`, counts a spawn when the tool is a spawn tool; `tool_end` removes the call; `agent_stop` removes that agent's open calls; `compact` counts only for the root. A `prompt` event is never applied (the caller starts a new turn).
+  - `@dataclass(frozen=True) Event(t: float, agent: str | None, kind: Literal['prompt', 'tool_start', 'tool_end', 'agent_stop', 'compact', 'spawn', 'tick'], call_id: str | None = None, tool: str | None = None, nested: bool = False, key: str | None = None)`; `agent=None` means the root; `nested` marks a Codex call made inside an outer `exec`; `key` identifies a spawn for deduplication.
+  - `events.USER_WAIT_TOOLS = {'AskUserQuestion', 'request_user_input', 'request_user_input_async'}`.
+  - Spawns are their own events, never inferred from a tool start, so one call can carry several. The adapters (Task 6) emit one `spawn` per spawn the call makes, with these keys: a Claude Code `Agent`/`Task` call, its tool-use id; a Codex `spawn_agent` function call, its call id; an outer Codex `exec` whose source holds *n* `tools.spawn_agent(` calls, `<call id>#0` to `<call id>#n-1`, and only when `codex-exec-nested-pretooluse` is false (when true, each nested `spawn_agent` PreToolUse supplies its own key and the outer source is not parsed for spawns). SubagentStart never emits a `spawn`; it only records a worker (Task 6). That is the deduplication rule: each spawn has exactly one source.
+  - `@dataclass TurnState(started: float, limits: Limits, limits_sha: str, active: float = 0.0, calls: int = 0, spawns: int = 0, compactions: int = 0, last_t: float | None = None, in_flight: dict[str, str | None] = field(default_factory=dict), spawn_keys: set[str] = field(default_factory=set), warned: set[str] = field(default_factory=set))`, JSON round-trippable through `to_json()`/`from_json()`.
+  - Every function below first adds the gap since `last_t` (in full while `in_flight` is non-empty, else when under 600 s) and sets `last_t`.
+  - `counters.attempt(state: TurnState, ev: Event) -> None` for a `tool_start`: counts a root call when `agent is None` and not `nested`. It does **not** record the call as in flight: a refused call has no completion event, so recording it would keep the tree active forever.
+  - `counters.started(state: TurnState, ev: Event) -> None` for a `tool_start` the hook allowed: adds it to `in_flight` unless the tool is a user-wait tool.
+  - `counters.apply(state: TurnState, ev: Event) -> None` for every other kind: `tool_end` removes the call; `agent_stop` removes that agent's open calls; `compact` counts only for the root; `spawn` counts once per `key` (`spawn_keys`); `tick` only moves time. A `prompt` is never applied (the caller starts a new turn). The hook applies a call's `spawn` events only after allowing the call.
   - `counters.crossed(state: TurnState) -> str | None`: the first of `'active'`, `'calls'`, `'spawns'`, `'compactions'` whose count is above its limit.
   - `counters.due_warnings(state: TurnState) -> list[str]`: limits at or above three quarters not yet in `warned` (the caller adds them).
 
 - [ ] **Step 1: Write the failing tests**, building events with a helper `ev(t, kind, agent=None, call=None, tool=None)`:
-  - `test_eight_half_hour_calls_count_four_hours`: eight `tool_start`/`tool_end` pairs of 1800 s each, 5 s apart; `state.active == pytest.approx(8 * 1800 + 7 * 5)` and `crossed(state) == 'active'` after one more second of in-flight call.
+  - `test_eight_half_hour_calls_count_four_hours`: eight `attempt`+`started`/`tool_end` pairs of 1800 s each, 5 s apart; `state.active == pytest.approx(8 * 1800 + 7 * 5)` and `crossed(state) == 'active'` after one more second of in-flight call.
   - `test_long_wait_on_silent_child_counts`: root `tool_start` of `wait_agent`, `tool_end` 1800 s later, no events between; active grows by 1800.
   - `test_idle_gap_over_ten_minutes_with_nothing_in_flight_counts_nothing`.
   - `test_user_wait_tool_never_in_flight`: `AskUserQuestion` start, end 8 h later; active grows by 0.
   - `test_agent_stop_closes_only_that_agents_calls`: root and child each with an open call; root `agent_stop`; child call still open and a later gap counts in full.
   - `test_children_keep_tree_active_after_root_stop` (Review Focus 1).
-  - `test_counts_root_calls_tree_spawns_root_compactions`: child `tool_start` adds no call; child `Agent` start adds a spawn; child `compact` adds nothing.
+  - `test_counts_root_calls_tree_spawns_root_compactions`: a child's `attempt` adds no call; a child's `spawn` event adds a spawn; a child's `compact` adds nothing.
+  - `test_one_exec_with_three_spawns`: one root `attempt` of an outer `exec` plus `spawn` events keyed `c1#0`, `c1#1`, `c1#2` give `calls == 1` and `spawns == 3`; applying `c1#1` again leaves `spawns == 3`.
+  - `test_nested_calls_count_no_root_calls`: `attempt` with `nested=True` leaves `calls` unchanged.
+  - `test_refused_call_then_long_idle_counts_nothing`: `attempt` of a root call (never `started`), then a `tick` 3 h later; `active` grows by 0 and `in_flight` is empty.
   - `test_crossing_is_strictly_above`: 500 root calls → `None`; 501 → `'calls'`; 3 compactions → `'compactions'`.
   - `test_warning_once_per_limit`: at 375 calls `due_warnings == ['calls']`; after adding to `warned`, `[]`.
 - [ ] **Step 2:** Run `uv run -q --with pytest pytest tools/test_turn_pause_counters.py -q`; expected: FAIL.
@@ -146,10 +173,10 @@ def test_budget_named_overrides(): assert limits.with_budget(Limits(14400, 500, 
   - `@dataclass RootState(harness: str, root: str, turn: TurnState | None, paused: str | None = None, grace_used: dict[str, int] = field(default_factory=dict), workers: set[str] = …, exec_sessions: set[str] = …, harness_pid: int | None = None, cwd: str | None = None, notified: bool = False, notify_error: str | None = None, budget_note: str | None = None)`; `paused` holds the crossed limit's name or `'limits-changed'`.
   - `class StateError(Exception)`.
   - `state.state_dir(env: Mapping[str, str] = os.environ) -> Path`.
-  - `class Store(dir: Path)` with `locked(harness: str, root: str) -> ContextManager[RootState]` (`fcntl.flock` on `<dir>/<harness>-<root>.lock`, load or create, write `<dir>/<harness>-<root>.json` through a temporary file and `os.replace` on exit), `read(harness, root) -> RootState | None` (no lock, for status), `latest_for_cwd(cwd: str) -> tuple[str, str] | None` (harness and root of the newest state whose `cwd` matches), `remove(harness, root)`, `prune(now: float, max_idle: float = 7 * 86400) -> list[str]`.
+  - `class Store(dir: Path)` with `locked(harness: str, root: str) -> ContextManager[RootState]` (`fcntl.flock` on `<dir>/<harness>-<root>.lock`, load or create, write `<dir>/<harness>-<root>.json` through a temporary file and `os.replace` on exit), `read(harness, root) -> RootState | None` (no lock, for status), `latest_for_cwd(cwd: str) -> tuple[str, str] | None` (harness and root of the newest state whose `cwd` matches), `root_for_agent(harness: str, agent_id: str) -> str | None` (the root whose `workers` holds the id), `remove(harness, root)`, `prune(now: float, max_idle: float = 7 * 86400) -> list[str]`.
   - Any unreadable, unparsable or unwritable file raises `StateError` naming the path and the error.
 
-- [ ] **Step 1: Write the failing tests** (every test uses `tmp_path`): round trip of a `RootState` with an open call; `test_parallel_updates_do_not_lose_counts` (Review Focus 2: 8 threads × 50 increments of `turn.calls` under `locked` give 400); corrupt JSON raises `StateError` with the path in its message; a read-only directory raises `StateError`; `prune` removes a state idle 8 days and keeps one idle 6 days; `latest_for_cwd` picks the newest.
+- [ ] **Step 1: Write the failing tests** (every test uses `tmp_path`): round trip of a `RootState` with an open call; `test_parallel_updates_do_not_lose_counts` (Review Focus 2: 8 threads × 50 increments of `turn.calls` under `locked` give 400); corrupt JSON raises `StateError` with the path in its message; a read-only directory raises `StateError`; `prune` removes a state idle 8 days and keeps one idle 6 days; `latest_for_cwd` picks the newest; `root_for_agent` finds a worker's root and returns `None` for an unknown id.
 - [ ] **Step 2:** Run `uv run -q --with pytest pytest tools/test_turn_pause_state.py -q`; expected: FAIL.
 - [ ] **Step 3:** Implement `state.py`.
 - [ ] **Step 4:** Rerun; expected: PASS.
@@ -174,7 +201,7 @@ def test_budget_named_overrides(): assert limits.with_budget(Limits(14400, 500, 
   - Program tables in the module: `BOOKKEEPING = {('tasks', 'park'), ('tasks', 'note'), ('hq', 'pause')}`; `RECORD_READS = {('tasks', 'show'), ('tasks', 'claims'), ('tasks', 'list'), ('tasks', 'attach')}` (`show` requires `--no-fetch`); `READERS = {'cat': {'-n'}, 'head': {'-n', '-c'}, 'tail': {'-n', '-c'}, 'wc': {'-l', '-c', '-w'}, 'ls': {'-l', '-a', '-la', '-al'}}`; `host-load --section session`; Claude Code `Read`, `Grep`, `Glob` as `read`; cancellation names from the spec's table as confirmed by Task 1.
 
 - [ ] **Step 1: Write the failing tests**, table-driven:
-  - passes: `tasks park lore-1 "next"` → bookkeeping; `tasks show x --no-fetch` → read; `cat a.txt` → read; `kill -TERM <pid of a child the test spawns>` with `harness_pid=os.getpid()` → cancellation; Codex `text(await tools.exec_command({cmd: "tasks note x \"y\""}))` → bookkeeping; `tools.interrupt_agent({id: "w1"})` with `workers={'w1'}` → cancellation; `write_stdin` with `{"session_id": 7, "chars": "\u0003"}` and `exec_sessions={'7'}` → cancellation.
+  - passes: `tasks park lore-1 "next"` → bookkeeping; `tasks show x --no-fetch` → read; `cat a.txt` → read; `kill -TERM <pid of a child the test spawns>` with `harness_pid=os.getpid()` → cancellation; Codex `text(await tools.exec_command({cmd: "tasks note x \"y\""}))` → bookkeeping; `tools.interrupt_agent({target: "w1"})` with `workers={'w1'}` → cancellation; `write_stdin` with `{"session_id": 7, "chars": "\u0003"}` and `exec_sessions={'7'}` → cancellation. Every cancellation input is built from the argument-schema fixtures Task 1 saved (`tools/fixtures/turn-pause/schemas/`), and a test asserts each fixture's required argument names match what `classify` reads (`target` for `interrupt_agent` today), so a schema change fails a test rather than silently refusing cancellation.
   - refusals: `git diff`, `git status`, `git worktree list`, `tasks show x`, `cat a; rm b`, `cat a | sh`, `cat $(x)`, `cat a > b`, `FOO=1 cat a`, `/bin/cat a`, `tail -f log`, `ls *`, `sed -n 1p a`, `Edit`, `Write`, `apply_patch`, `Agent`, `spawn_agent`, `send_message`, `kill 1`, `kill <own harness pid>`, `interrupt_agent` on `w9` not owned, `write_stdin` with `"ls\n"`, an `exec` body with two statements, with a variable, with a template literal.
   - `touches_protected` true for `cat ~/.local/state/hq/pause/x.json` and for an `Edit` whose `file_path` is the limits file.
 - [ ] **Step 2:** Run `uv run -q --with pytest pytest tools/test_turn_pause_allowlist.py -q`; expected: FAIL.
@@ -192,7 +219,7 @@ def test_budget_named_overrides(): assert limits.with_budget(Limits(14400, 500, 
 - Consumes: Tasks 2 to 5; Task 1's facts for which events each harness sends.
 - Produces:
   - `tools/turn-pause --harness claude-code|codex <Event>`: reads the native payload on stdin, prints at most one JSON object, exits 0. Events: `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `Stop`, `SubagentStop`, `SubagentStart`, `PreCompact`, `PostCompact`, `SessionEnd`.
-  - `adapters.normalize(harness: str, event: str, payload: dict, now: float) -> tuple[str, Event | None]`: the root id (Codex: `session_id`; a worker's events carry `agent_id` and are grouped under `session_id`; Claude Code: `session_id`, child by `agent_id`) and the event.
+  - `adapters.normalize(harness: str, event: str, payload: dict, now: float, facts: Facts) -> tuple[str, list[Event]]`: the root id (Codex: `session_id`; a worker's events carry `agent_id` and are grouped under `session_id`; Claude Code: `session_id`, child by `agent_id`) and the events in order. A PreToolUse gives one `tool_start` followed by that call's `spawn` events (Task 3's key rule). `Facts` holds the optional-fact values from Task 1 that select fallbacks (`posttooluse`, `exec_nested_pretooluse`, `stop_carries_agent`), read once through `tools/harness-facts` as a module.
   - `hook.decide(harness, event, payload, now, store, limits_path, env) -> dict | None`: the decision JSON (deny or additional context) or nothing.
   - Ownership records kept on `RootState` (Task 5 checks them): every `agent_id` seen under the root is added to `workers`; the session id in the output of an agent's own `exec_command` (read from PostToolUse, where Task 1 shows Codex sends it) is added to `exec_sessions`; `harness_pid` is the nearest ancestor of the hook process whose executable name is `claude` or `codex` (falling back to `node` running either), found once per root from `/proc`. Without PostToolUse, `write_stdin` cancellation stays refused and `kill` remains.
   - `notify.send(title: str, body: str, *, env: Mapping[str, str]) -> str | None`: starts `notify-send` detached with all three standard streams redirected, then writes one relay `notify` request to `$XDG_STATE_HOME/relay/serve.sock` (relay `docs/api.md`, "Local socket protocol" and the notice message shape) with a 300 ms socket timeout; returns the first error or `None`.
@@ -207,10 +234,12 @@ def test_budget_named_overrides(): assert limits.with_budget(Limits(14400, 500, 
   - a changed `limits.toml` sha256 mid-turn pauses with `limits-changed` and calls `notify.send` (Review Focus 5);
   - an `Edit` naming the limits file is denied before the pause;
   - a `StateError` produces a deny whose reason names the state file;
+  - a refused call (a protected-path `Edit`) followed by a 3 h gap with nothing else running adds no active time;
+  - one Codex outer `exec` whose source spawns three workers counts one root call and three spawns; a later SubagentStart for each worker adds none;
   - `notify.send` failure is stored in `notify_error` and the pause stands;
   - `SessionEnd` removes the root's state.
 - [ ] **Step 2:** Run `uv run -q --with pytest pytest tools/test_turn_pause_hook.py -q`; expected: FAIL.
-- [ ] **Step 3:** Implement. The entry script inserts `tools/` on `sys.path` as `tools/hq` does and imports nothing outside the standard library. The pause fires inside `PreToolUse`: apply the event, then check `crossed` before deciding.
+- [ ] **Step 3:** Implement. The entry script inserts `tools/` on `sys.path` as `tools/hq` does and imports nothing outside the standard library. PreToolUse order: `counters.attempt` on the `tool_start`; then `crossed`; then decide (pause, allowlist, protected paths); only if the call is allowed, `counters.started` and the call's `spawn` events. A refused call is never in flight and spawns nothing. The entry also takes `--limits <path>` for tests and isolated runs only; the live wiring never passes it, and the wiring files are added to the protected paths.
 - [ ] **Step 4:** Rerun; expected: PASS. Then measure latency: 1,000 `PreToolUse` runs of the entry script against a warm state file; record p50 and p99 in the task note; p99 must be under 50 ms.
 - [ ] **Step 5:** `just test`; commit `feat(turn-pause): hook entry, decisions and notification`.
 
@@ -223,9 +252,9 @@ def test_budget_named_overrides(): assert limits.with_budget(Limits(14400, 500, 
 
 **Interfaces:**
 - Consumes: `Store.read`, `Store.latest_for_cwd` (Task 4); `limits.load` (Task 2).
-- Produces: `hq pause status [--session <id>] [--json]` prints one line, `active 1:12/4:00 calls 140/500 spawns 3/30 compactions 0/2 paused:no budget:none notify:ok`, finding the session from `--session`, else `CODEX_THREAD_ID`, else the newest state for the current directory; no state is an error naming what it looked for. `hq pause limits [--json]` prints the defaults.
+- Produces: `hq pause status [--session <id>] [--json]` prints one line, `active 1:12/4:00 calls 140/500 spawns 3/30 compactions 0/2 paused:no budget:none notify:ok`, finding the session from `--session`, else `CODEX_THREAD_ID`, else the newest state for the current directory. A Codex worker's thread id is not a root: the lookup first resolves an id through `Store.root_for_agent(harness: str, agent_id: str) -> str | None` (Task 4: the root whose `workers` holds the id) and reads that root's state, so a worker sees its tree's counts. No state is an error naming what it looked for. `hq pause limits [--json]` prints the defaults.
 
-- [ ] **Step 1:** Write failing tests for both commands (text and `--json`), the `CODEX_THREAD_ID` route, the cwd route, and the no-state error, with `XDG_STATE_HOME` under `tmp_path`.
+- [ ] **Step 1:** Write failing tests for both commands (text and `--json`), the `CODEX_THREAD_ID` route for a root, the worker route (`CODEX_THREAD_ID` set to a worker id recorded under root `r1` prints `r1`'s counts), the cwd route, and the no-state error, with `XDG_STATE_HOME` under `tmp_path`.
 - [ ] **Step 2:** Run `uv run -q --with pytest pytest tools/test_hq_pause.py -q`; expected: FAIL.
 - [ ] **Step 3:** Implement `pause.py` and register the `pause` subcommand in `cli.py`.
 - [ ] **Step 4:** Rerun; expected: PASS.
@@ -248,7 +277,24 @@ def test_budget_named_overrides(): assert limits.with_budget(Limits(14400, 500, 
 - [ ] **Step 5:** Run `tools/turn-pause-replay 2026-10-02T00:00:00Z 2026-11-01T00:00:00Z`. **Gate:** pauses a day within 0.84 to 2.51 (1.67 ± half), and the sun-fbaf80 controller pauses at about 4 h active. Outside that range, stop and bring the numbers to the user; wire nothing. Attach the output to this child.
 - [ ] **Step 6:** `just test`; commit `feat(turn-pause): replay over stored sessions`.
 
-### Task 9: Wiring, follow-ups and integration hand-off
+### Task 9: Isolated end-to-end lifecycle
+
+Unit tests and the probe hook do not show that a real session can be paused, clean up, park and resume. This task runs the finished hook (this worktree's `tools/turn-pause`, by explicit path) in isolated, headless sessions of each harness, never in the live homes. It is a live operation: two failed attempts with no established cause stop for the user.
+
+**Files:**
+- Create: `tools/turn-pause-lifecycle` (the driver), `tools/fixtures/turn-pause/lifecycle/limits.toml` (`active_seconds = 3600`, `calls = 6`, `spawns = 3`, `compactions = 2`)
+- Test: the driver's own run, recorded on this child
+
+**Interfaces:**
+- Consumes: Tasks 2 to 7; Task 1's isolation recipe; the entry's `--limits` flag.
+- Produces: `tools/turn-pause-lifecycle --harness claude-code|codex` prints one line per stage and `PASS` or the failing stage.
+
+- [ ] **Step 1:** Write the driver. It creates a temporary `HOME`, `XDG_STATE_HOME`, `XDG_CONFIG_HOME` and harness home (Claude Code `--settings`; Codex `CODEX_HOME`) whose hooks run `<worktree>/tools/turn-pause --limits <fixture> --harness <h> <Event>`, and a throwaway tasks project registered under that `XDG_CONFIG_HOME` holding one claimed task. Every subprocess gets an environment built key by key (global Tests rule).
+- [ ] **Step 2:** Stages, each asserted from the state file and the transcript: (1) a prompt makes the agent start a long background command and then run calls until the seventh is refused with the root text; (2) the agent spends its 25 grace calls (the driver's prompt asks it to keep reading), and the 26th read is refused; (3) the agent stops its own background process (Claude Code `TaskStop` or `kill`; Codex `kill` and `interrupt_agent` with `{target: …}` on a worker it spawned before the pause) and the process is gone; (4) `tasks park … --waiting-on user` succeeds and the turn ends; (5) a resumed session with the genuine prompt `continue` ends the pause, resets counters and runs one allowed shell command.
+- [ ] **Step 3:** Run it for both harnesses; record the output on this child. A failing stage is a defect in Tasks 2 to 7: fix it there (RED test first) and rerun.
+- [ ] **Step 4:** `just test`; commit `test(turn-pause): isolated end-to-end lifecycle driver`.
+
+### Task 10: Wiring, follow-ups and integration hand-off
 
 **Files:**
 - Modify: `claude/settings.json`, `codex/hooks.json`, `codex/work/hooks.json`
