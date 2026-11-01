@@ -2,7 +2,7 @@
   "harness": "codex",
   "version": "0.166.0",
   "tool": "write_stdin",
-  "namespace": "functions",
+  "namespace": "exec (nested)",
   "kind": "exec-nested",
   "role": "named cancellation control (interrupt or end of input only)",
   "source": "the TypeScript declaration in the description of the exec tool Codex 0.166.0 offered its model, from a probe session's additional_tools rollout record; nested tools carry no JSON schema",

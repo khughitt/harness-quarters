@@ -9,7 +9,8 @@ one JSON line {event, hook_event_name, t, payload, denied} to $TURN_PAUSE_PROBE_
 PreToolUse, $TURN_PAUSE_PROBE_DENY holds comma-separated tool-name patterns (fnmatch;
 a bare name matches only itself): the first call matching each pattern is refused with
 relay's PreToolUse deny JSON, whose reason carries a nonce (TPP-DENY-<n>) and asks the
-model to retry, and every later match is let through. The hook never exits 2.
+model to retry, and every later match is let through. A pattern written agent:<pattern>
+matches only a worker's call (one whose payload carries agent_id). The hook never exits 2.
 
 As a driver (`turn-pause-probe.py run <case> <out-dir>`), it runs `codex exec` in
 OUT-DIR/work with a temporary HOME and a temporary CODEX_HOME holding only config.toml
@@ -29,6 +30,10 @@ environment is built key by key. Cases:
            a spawn in a branch that never runs, then one direct spawn_agent call
   spawn-direct
            four direct spawn_agent calls, since 0.166.0 offers no spawn_agent inside exec
+  cancel   which cancellation and nested calls reach a hook: a nested account MCP call
+           (read-only, denied), nested write_stdin with an interrupt, wait terminate on a
+           running exec cell, a worker's own denied Bash, and interrupt_agent
+  mcp-deny one exec calling the read-only account MCP tool, denied by its hook name
   nested   one exec that prints Object.keys(tools) and ALL_TOOLS names: the nested tools
            the isolate holds, which exec's description may not list in full
   compact  model_auto_compact_token_limit set just above the session's base context,
@@ -84,7 +89,11 @@ def hook(event):
             used_path = pathlib.Path(log + ".denied")
             used = set(used_path.read_text().split()) if used_path.exists() else set()
             for index, pattern in enumerate(patterns):
-                if pattern not in used and fnmatch.fnmatchcase(name, pattern):
+                # agent:<pattern> matches only a worker's call (one carrying agent_id).
+                worker_only = pattern.startswith("agent:")
+                if worker_only and not payload.get("agent_id"):
+                    continue
+                if pattern not in used and fnmatch.fnmatchcase(name, pattern.removeprefix("agent:")):
                     used.add(pattern)
                     used_path.write_text("\n".join(sorted(used)) + "\n")
                     reply = deny_reply(name, index)
@@ -159,6 +168,31 @@ DIRECT_PROMPT = """This is a scripted hook probe. Make exactly these calls and n
 2. Call wait_agent until all four workers have finished.
 Then reply with the single word DONE."""
 
+# Which cancellation and nested calls reach a hook. The MCP tool is read-only (it lists the
+# account's Codex pets) and is denied by pattern, so a hooked call never reaches the service.
+MCP_TOOL = "mcp__codex_apps__pets_list_pets"
+# Hooks name an account MCP tool mcp__<server>__<app>__<tool> (pets__list_pets), not the
+# model's mcp__<server>__<app>_<tool>; the first cancel run's pattern missed it for that reason.
+MCP_HOOK_NAME = "mcp__codex_apps__pets__list_pets"
+CANCEL_DENY = f"{MCP_HOOK_NAME},agent:Bash"
+MCP_DENY_PROMPT = (f"Make one exec call with the source: text(JSON.stringify(await tools.{MCP_TOOL}({{}}))); "
+                   "If it is refused, do not retry. Then reply with the word DONE and the exec result verbatim.")
+CANCEL_PROMPT = f"""This is a scripted hook probe in a scratch directory. Do exactly these steps, in order, one tool call at a time. Some calls are refused by a hook on purpose; never retry a refused call: note its message and go on.
+1. One exec call with the source: text(ALL_TOOLS.find(t => t.name === "{MCP_TOOL}")?.description ?? "absent");
+2. One exec call with the source: text(JSON.stringify(await tools.{MCP_TOOL}({{}})));
+3. One exec call with the source: text(JSON.stringify(await tools.exec_command({{cmd: "sleep 30; echo late", yield_time_ms: 1000}})));
+   It returns a session_id while the command keeps running.
+4. One exec call with the source: text(JSON.stringify(await tools.write_stdin({{session_id: <that session_id as a number>, chars: "\\u0003"}})));
+5. One exec call whose source is exactly these two lines (the first line makes it yield while it still runs):
+// @exec: {{"yield_time_ms": 1000}}
+await new Promise(r => setTimeout(r, 20000)); text("cell finished");
+   It returns "Script running with cell ID ...".
+6. Call the wait tool with that cell_id and terminate true.
+7. Spawn exactly one worker with spawn_agent, task_name probe_worker and fork_turns none. Its message: Run the shell command `touch worker-side-effect.txt` once with exec_command. If it is refused, do not retry: reply with the refusal message verbatim. Use no other tool.
+8. Call wait_agent until that worker has finished.
+9. Call interrupt_agent with target probe_worker.
+10. Reply with the word DONE, then each step's result in one line."""
+
 # exec's description may omit deferred nested tools ("still available on the global
 # `tools` object"), so the nested surface is read from the isolate itself.
 NESTED_SOURCE = ('text(JSON.stringify({keys: Object.keys(tools).sort(), '
@@ -231,6 +265,10 @@ def run(case, out, compact_limit=None):
         prompt, deny = SPAWN_PROMPT, ""
     elif case == "spawn-direct":
         prompt, deny = DIRECT_PROMPT, ""
+    elif case == "cancel":
+        prompt, deny = CANCEL_PROMPT, CANCEL_DENY
+    elif case == "mcp-deny":
+        prompt, deny = MCP_DENY_PROMPT, MCP_HOOK_NAME
     elif case == "nested":
         prompt, deny = NESTED_PROMPT, ""
     elif case == "compact":

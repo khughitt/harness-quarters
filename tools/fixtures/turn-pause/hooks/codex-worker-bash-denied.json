@@ -1,0 +1,30 @@
+{
+  "harness": "codex",
+  "version": "0.166.0",
+  "evidence": "hq-fe672f",
+  "tool": "exec.exec_command (worker)",
+  "run": "codex/probes/turn-pause-probe.py run cancel",
+  "records": [
+    {
+      "event": "PreToolUse",
+      "denied_by_probe": true,
+      "payload": {
+        "session_id": "01a19737-5420-7280-9b27-80cdf4ba57c6",
+        "turn_id": "01a19737-d291-7891-9d85-4dfe137c41cc",
+        "agent_id": "01a19737-d284-73c3-a7bf-a465efd1d1d0",
+        "agent_type": "default",
+        "transcript_path": "<scratch>/codex-cancel-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-06-20-01a19737-d284-73c3-a7bf-a465efd1d1d0.jsonl",
+        "cwd": "<scratch>/codex-cancel-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "touch worker-side-effect.txt"
+        },
+        "tool_use_id": "exec-d731f896-35e6-4553-9adb-f291a4ed5dc1"
+      }
+    }
+  ],
+  "note": "A worker's own nested exec_command (touch worker-side-effect.txt) denied by the hook: agent_id present; the worker's script failed with the reason, the worker replied with it, and the file was not created."
+}

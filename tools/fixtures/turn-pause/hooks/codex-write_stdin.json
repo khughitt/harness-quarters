@@ -1,0 +1,9 @@
+{
+  "harness": "codex",
+  "version": "0.166.0",
+  "evidence": "hq-fe672f",
+  "tool": "write_stdin",
+  "run": "codex/probes/turn-pause-probe.py run cancel",
+  "records": [],
+  "note": "Nested tools.write_stdin({session_id: 83217, chars: \"\\u0003\"}) inside exec interrupted a running exec_command session (exit_code 130) and fired no hook event at all: no PreToolUse, no PostToolUse. There is no payload to record."
+}

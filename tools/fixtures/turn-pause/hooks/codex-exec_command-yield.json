@@ -1,0 +1,47 @@
+{
+  "harness": "codex",
+  "version": "0.166.0",
+  "evidence": "hq-fe672f",
+  "tool": "exec.exec_command",
+  "run": "codex/probes/turn-pause-probe.py run cancel",
+  "records": [
+    {
+      "event": "PreToolUse",
+      "denied_by_probe": false,
+      "payload": {
+        "session_id": "01a19737-5420-7280-9b27-80cdf4ba57c6",
+        "turn_id": "01a19737-5d39-7722-a8ea-b811d5c85fcb",
+        "transcript_path": "<scratch>/codex-cancel-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-05-50-01a19737-5420-7280-9b27-80cdf4ba57c6.jsonl",
+        "cwd": "<scratch>/codex-cancel-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "sleep 30; echo late"
+        },
+        "tool_use_id": "exec-44c3196d-924b-4a7a-bca3-813f64e17e9c"
+      }
+    },
+    {
+      "event": "PostToolUse",
+      "denied_by_probe": false,
+      "payload": {
+        "session_id": "01a19737-5420-7280-9b27-80cdf4ba57c6",
+        "turn_id": "01a19737-5d39-7722-a8ea-b811d5c85fcb",
+        "transcript_path": "<scratch>/codex-cancel-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-05-50-01a19737-5420-7280-9b27-80cdf4ba57c6.jsonl",
+        "cwd": "<scratch>/codex-cancel-1/work",
+        "hook_event_name": "PostToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "sleep 30; echo late"
+        },
+        "tool_response": "",
+        "tool_use_id": "exec-44c3196d-924b-4a7a-bca3-813f64e17e9c"
+      }
+    }
+  ],
+  "note": "Nested exec_command \"sleep 30; echo late\" with yield_time_ms 1000: PreToolUse as Bash, and PostToolUse when the call yielded with the process still running; tool_response is empty, so the session_id (83217) returned to the model is absent from the hook payload."
+}

@@ -1,0 +1,42 @@
+{
+  "harness": "codex",
+  "version": "0.166.0",
+  "evidence": "hq-fe672f",
+  "tool": "exec.mcp__codex_apps__pets_list_pets",
+  "run": "codex/probes/turn-pause-probe.py run cancel, then run mcp-deny",
+  "records": [
+    {
+      "event": "PreToolUse",
+      "denied_by_probe": false,
+      "payload": {
+        "session_id": "01a19737-5420-7280-9b27-80cdf4ba57c6",
+        "turn_id": "01a19737-5d39-7722-a8ea-b811d5c85fcb",
+        "transcript_path": "<scratch>/codex-cancel-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-05-50-01a19737-5420-7280-9b27-80cdf4ba57c6.jsonl",
+        "cwd": "<scratch>/codex-cancel-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "mcp__codex_apps__pets__list_pets",
+        "tool_input": {},
+        "tool_use_id": "exec-f59e73b5-4b1d-4dc0-ba96-f696a74d47a3"
+      }
+    },
+    {
+      "event": "PreToolUse",
+      "denied_by_probe": true,
+      "payload": {
+        "session_id": "01a19739-148b-7323-80f9-8724985416eb",
+        "turn_id": "01a19739-1e8b-7d51-a293-e27aec8ed892",
+        "transcript_path": "<scratch>/codex-mcp-deny-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-07-45-01a19739-148b-7323-80f9-8724985416eb.jsonl",
+        "cwd": "<scratch>/codex-mcp-deny-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "mcp__codex_apps__pets__list_pets",
+        "tool_input": {},
+        "tool_use_id": "exec-a4a8f7c2-32bd-4b4f-8a3b-728f79d01064"
+      }
+    }
+  ],
+  "note": "Nested account MCP call: hook tool_name mcp__codex_apps__pets__list_pets (app and tool joined by a double underscore, unlike the model-facing name), tool_input {} as passed. First record: not denied (the pattern missed the name), the call ran. Second: denied, the script failed with the reason, no PostToolUse."
+}
