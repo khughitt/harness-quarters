@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-2eba07-harness-manifest
 created: 2026-11-01T01:25:51Z
-updated: 2026-11-01T17:42:56Z
+updated: 2026-11-01T18:19:24Z
 started: 2026-11-01T09:55:45Z
 depends: []
 tags: [hooks]
@@ -70,3 +70,4 @@ Where: .githooks/{harness-state-clean,harness-state-refresh,live-picks}, facts/c
 - 2026-11-01T13:37:18Z (feat/hq-2eba07-harness-manifest): baseline: just test in .worktrees/hq-2eba07 at 19c3366b exited 0 (~12 min): harness-facts check ok; agents/bin pytest passed (count not captured: output tail truncated); .githooks+tools 1243 passed; relay_cutover xdist 391 passed; signal test 1 passed, 154 deselected. Controller: claude-code/claude-opus-5-5, subagent-driven; SDD ledger .worktrees/hq-2eba07/.superpowers/sdd/2026-11-01-harness-manifest/progress.md
 - 2026-11-01T17:16:48Z (feat/hq-2eba07-harness-manifest): host change: just setup in .worktrees/hq-2eba07 wrote filter.harness-state.required = true and filter.harness-state.smudge = cat (identity smudge; git treats a required filter's missing smudge as fatal on checkout) into the shared repository git config (commondir; live for main and every worktree on this host before merge approval). Benign with main's pre-manifest clean filter and intended to remain set permanently after merge. Rollback if ever needed before merge: git config --unset filter.harness-state.required && git config --unset filter.harness-state.smudge. Other hosts sharing this checkout must run just setup once after merge. Ruling 2 in the plan ledger.
 - 2026-11-01T17:42:56Z (feat/hq-2eba07-harness-manifest): host change correction: the main checkout's .git is in the Dropbox-synced tree (not ignored), so the filter.harness-state.required = true and filter.harness-state.smudge = cat write from just setup also reached the second host's hq checkout via sync (verified read-only over ssh: both keys present there). Benign there for the same reason (main's pre-manifest clean filter, identity smudge). Rollback is the same command on either host and propagates through sync. The earlier note's 'on this host' scope understated this.
+- 2026-11-01T18:19:24Z (feat/hq-2eba07-harness-manifest): review: impl round 1 — verdict: revise; findings: Important 2, Minor 3; reviewer: claude-code/claude-opus-5-5
