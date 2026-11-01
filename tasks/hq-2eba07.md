@@ -6,9 +6,9 @@ priority: 2
 size: m
 complexity: mid
 process: planned
-owner: main
+owner: feat/hq-2eba07-harness-manifest
 created: 2026-11-01T01:25:51Z
-updated: 2026-11-01T09:55:45Z
+updated: 2026-11-01T09:56:11Z
 started: 2026-11-01T09:55:45Z
 depends: []
 tags: [hooks]
@@ -31,3 +31,4 @@ Where: .githooks/{harness-state-clean,harness-state-refresh,live-picks}, facts/c
 - 2026-11-01T01:25:51Z (add): created
   provenance: {"origin":"mixed"}
 - 2026-11-01T09:55:45Z (main): started
+- 2026-11-01T09:56:11Z (feat/hq-2eba07-harness-manifest): resumed
