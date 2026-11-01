@@ -12,7 +12,7 @@
 
 **Task:** hq-2eba07; source hq-6c8a9f.
 
-**Status:** implemented on feat/hq-2eba07-harness-manifest, awaiting user merge approval, 2026-11-01 (approved for execution at `5a2e525`; Tasks 1–5 reviewed and the whole-branch review accepted after one corrective round; rulings and deferred minors are in hq-2eba07's record).
+**Status:** complete, 2026-11-01, merged into main on user approval (approved for execution at `5a2e525`; Tasks 1–5 reviewed and the whole-branch review accepted after one corrective round; rulings and deferred minors are in hq-2eba07's record).
 
 **Execution:** preserve the user's subagent-driven choice (`superpowers:subagent-driven-development`). Execute Tasks 1–6 strictly sequentially (never in parallel) in the existing locked, hydrated `.worktrees/hq-2eba07/`; do not create another `hq` worktree.
 

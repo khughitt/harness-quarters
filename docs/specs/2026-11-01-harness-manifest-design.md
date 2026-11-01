@@ -1,7 +1,6 @@
 # Declarative harness manifest: one source of truth for live-state hooks and capability facts
 
-Status: implemented on feat/hq-2eba07-harness-manifest, awaiting user merge approval,
-2026-11-01 (`hq-2eba07`, source `hq-6c8a9f`; design accepted at `077b8f6`; sections marked
+Status: complete, 2026-11-01, merged into main on user approval (`hq-2eba07`, source `hq-6c8a9f`; design accepted at `077b8f6`; sections marked
 "amended during implementation" record the identity smudge and the final-review changes).
 Extends `docs/specs/2026-10-06-residue-design.md` §4 (capability facts) and
 `docs/specs/2026-10-10-live-model-preservation-design.md` /
