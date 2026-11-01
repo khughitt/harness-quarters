@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-9aa713-pause-past-range
 created: 2026-11-01T10:29:21Z
-updated: 2026-11-01T12:49:47Z
+updated: 2026-11-01T12:50:11Z
 started: 2026-11-01T11:56:46Z
 depends: []
 parent: hq-9aa713
@@ -40,3 +40,5 @@ Implements Task 1 of the turn-pause plan in .worktrees/hq-9aa713 (branch feat/hq
 - 2026-11-01T12:49:44Z (feat/hq-9aa713-pause-past-range): retained: {"host":"titan","kind":"scratch","path":"$WORK_ROOT/hq/hq-fe672f","state":"kept","verification":"verified","purpose":"raw probe logs and isolated harness homes behind the Task 1 capability facts, raw source of the portable attachments","next_owner":"task:hq-fe672f","cleanup_trigger":"hq-fe672f closes with its facts merged to main","manifest":"$WORK_ROOT/hq/hq-fe672f.manifest-2026-11-01T1305Z.txt","sha256":"c568917e0e1545d85356133b745a026d030e28e38f9b3a39cd5f59d70d8d9ee1"}
 - 2026-11-01T12:49:46Z (feat/hq-9aa713-pause-past-range): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/hq/hq-fe672f.manifest-2026-11-01T1305Z.txt","state":"kept","verification":"verified","purpose":"immutable manifest version for the scratch checkpoint (2894 entries, 1 symlink)","next_owner":"task:hq-fe672f","cleanup_trigger":"the scratch directory is released","sha256":"c568917e0e1545d85356133b745a026d030e28e38f9b3a39cd5f59d70d8d9ee1"}
 - 2026-11-01T12:49:47Z (feat/hq-9aa713-pause-past-range): retained: {"host":"titan","kind":"evidence","path":"/tmp/claude-1000/-mnt-ssd3-work-hq-hq-fe672f-claude-main-1-work","state":"released","verification":"verified","purpose":"probe session background task outputs copied byte for byte into $WORK_ROOT/hq/hq-fe672f/claude-main-1/tmp-task-outputs, then the tmpfs copy removed","next_owner":"none","cleanup_trigger":"none"}
+- 2026-11-01T12:50:11Z (feat/hq-9aa713-pause-past-range): retention checkpoint: observed 2026-11-01T12:50Z on titan; basis hq in-tree . 5e6f9abea7dbc7ba37ea222e61e075d6b51068a5:tasks/hq-fe672f.md; retained by feat/hq-9aa713-pause-past-range; this host: kept verified 2, kept unknown 0, released 1; changed 3. Rechecked all kept/verified items on this host; unknown items none. Other hosts hold no items. Next: after the user's ruling on hq-9aa713, extend or close Task 1
+  provenance: {"harness_session":"claude-code:536b5ebf-5753-4a8b-ac83-61dde5ef4c79","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
