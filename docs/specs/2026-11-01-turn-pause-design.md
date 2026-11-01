@@ -3,7 +3,9 @@
 Task: hq-9aa713. Companion: lore-911121 (what the paused agent reports and does,
 and the rule an agent follows where no hook runs), designed with this one in
 `<records root>/lore/docs/specs/2026-11-01-turn-pause-guidance-design.md`.
-Status: draft for the user's review.
+Status: revision 2 for the user's review, after review round 2 (codex/gpt-6.1-sol
+at `88b8958`: in-flight active time, enforced closing allowlist, cancellation after
+grace, budget directive, one reproducible fire rate).
 
 ## Intent
 
@@ -24,7 +26,8 @@ user.
 
 - A turn that leaves its range stops doing work: every further tool call in its
   session tree is refused, with a reason that tells the agent what to do, until the
-  user replies.
+  user replies. The only exceptions are an enforced closing allowlist for the
+  report, the park and stopping work already started.
 - The pause is never silent: the user is notified when it fires, on the desktop and
   through relay's inbox where that is running.
 - A user who starts deliberately long work can give that turn a larger budget in
@@ -82,33 +85,54 @@ From the survey recorded on hq-9aa713 (2026-11-01):
 
 ## Measured range
 
-A read-only pass over 30 days of top-level sessions on this host (attachment
-`turn-spans-2026-11-01.txt` on lore-911121, script `turn-spans.py` beside it):
-5,468 human turns (Claude Code 3,033, Codex 2,435). A turn runs from one human
-prompt to the next; active time sums gaps under 10 minutes, as obs does. The script
-reads root transcripts only: tool calls are the root's own, spawns are the root's
-(a child's own spawns are missed), and compactions are the root's. The hook's
-counting below is chosen to match, and the verification replay checks it.
+One read-only pass over the session trees on this host whose turns began in the
+fixed window [2026-10-02T00:00Z, 2026-11-01T00:00Z), counted with the hook's own
+rules below: tree events (the root plus Claude Code `subagents/` transcripts and
+Codex child rollouts linked through obs's index), the in-flight active-time rule,
+root tool calls, tree spawns and root compactions. Attachments on lore-911121:
+script `turn-spans-v2.py`, output `turn-spans-v2-2026-10-02_2026-11-01.txt`, rows
+`turn-rows-v2-2026-10-02_2026-11-01.json.gz` (uncompressed sha256 `e377c032…8d8ed4`,
+printed in full in the output). Rerunning the attached script reproduced the output
+byte for byte. It reproduces only while the stores keep these files; session
+retention (hq-401088) may later prune some.
+
+5,483 turns (Claude Code 3,033, Codex 2,450):
 
 | Per turn | p50 | p90 | p99 | p99.9 | max |
 | --- | --- | --- | --- | --- | --- |
-| Active minutes, Claude Code | 5.5 | 24.6 | 103 | 236 | 761 |
-| Active minutes, Codex | 6.0 | 32.0 | 236 | 591 | 2,105 |
-| Tool calls, Claude Code | 9 | 50 | 147 | 300 | 529 |
-| Tool calls, Codex | 12 | 55 | 246 | 700 | 1,622 |
-| Subagent spawns, Claude Code | 0 | 1 | 17 | 38 | 103 |
-| Subagent spawns, Codex | 0 | 1 | 19 | 50 | 80 |
+| Active minutes, Claude Code | 2.8 | 25.4 | 163 | 510 | 1,266 |
+| Active minutes, Codex | 6.0 | 32.0 | 252 | 616 | 2,499 |
+| Root tool calls, Claude Code | 9 | 49 | 143 | 300 | 529 |
+| Root tool calls, Codex | 12 | 55 | 246 | 700 | 1,622 |
+| Tree spawns, Claude Code | 0 | 1 | 16 | 38 | 103 |
+| Tree spawns, Codex | 0 | 1 | 19 | 50 | 80 |
+| Root compactions, Claude Code | 0 | 0 | 1 | 1 | 1 |
+| Root compactions, Codex | 0 | 0 | 1 | 4 | 10 |
 
-How often a limit would have fired over those 30 days, across both harnesses:
+Turns over each limit alone, and over any limit of a set, in those 30 days:
 
 | Limit | Turns |
 | --- | --- |
-| Active over 3 h / 4 h / 6 h | 45 / 26 / 12 |
-| Tool calls over 300 / 500 / 800 | 19 / 6 / 1 |
-| Spawns over 20 / 30 / 50 | 40 / 14 / 4 |
-| 3 h or 500 calls or 20 spawns | 63 (2.1 a day) |
-| **4 h or 500 calls or 30 spawns** | **34 (1.1 a day)** |
-| 6 h or 800 calls or 50 spawns | 13 (0.4 a day) |
+| Active over 3 h / 4 h / 6 h | 63 / 42 / 19 |
+| Root calls over 300 / 500 / 800 | 19 / 6 / 1 |
+| Tree spawns over 20 / 30 / 50 | 39 / 14 / 4 |
+| Compactions over 1 / 2 | 20 / 11 |
+| 3 h, 500 calls, 20 spawns, 1 compaction | 81 (2.70 a day) |
+| 4 h, 500 calls, 30 spawns, 1 compaction | 56 (1.87 a day) |
+| **4 h, 500 calls, 30 spawns, 2 compactions** | **50 (1.67 a day)** |
+| 6 h, 800 calls, 50 spawns, 2 compactions | 24 (0.80 a day) |
+
+The sun-fbaf80 controller's long turn reads 41.6 h active, 1,622 calls, 80 spawns
+and 10 compactions; every set above pauses it within its first 3 to 6 active hours.
+Its earlier turn (4.4 h active, 219 calls, 22 spawns) also pauses under a 3 h or
+4 h limit.
+
+Superseded: the first draft quoted 5,468 turns and 1.1 a day from an earlier
+script. That script used a window relative to its run time (its attachment, from a
+second run, holds 5,470), counted harness bookkeeping records written around the
+user's next prompt as activity, dropped every gap over 10 minutes even while a
+call was running, and left compactions out of the combined rate. Its attachments
+stay on lore-911121 as the record of that draft.
 
 Wall time since the prompt is not a usable measure: turns that sit idle and are
 woken days later by a background notification read as 40 to 200 h with a handful
@@ -151,10 +175,24 @@ counters.
 
 Kept per root session by the hook itself, from events it already receives:
 
-- **active seconds**: on each event of the tree (PreToolUse, PostToolUse,
-  UserPromptSubmit, child events), the gap since the previous event is added when
-  under 10 minutes. PostToolUse is wired so a long tool call or a long wait on a
-  child does not drop out;
+- **active seconds**, from two separate records the hook keeps:
+  - *operations in flight*: a tool call is in flight from its PreToolUse (when
+    allowed) to its PostToolUse or PostToolUseFailure, matched by tool-use id.
+    Where a harness has no PostToolUse (the probe below says), the call stays in
+    flight until the next hook event of the same agent. An agent's open calls close
+    at its Stop or SubagentStop, and every open call closes at the next genuine
+    prompt. A call that waits on the user (Claude Code `AskUserQuestion`, Codex
+    `request_user_input`) is never in flight: waiting on the user is not work.
+  - *the idle gap*: the time from one tree event to the next.
+
+  The gap counts in full while any operation in the tree is in flight, however
+  long it is; otherwise it counts only when under 10 minutes (model inference
+  between calls). So eight back-to-back half-hour calls count four hours, a
+  half-hour `wait_agent` on a quiet child counts half an hour, and a session left
+  at a question overnight counts nothing. Nothing after the turn's last event
+  counts. The measurement script applies the same rule to transcripts, except
+  the user-wait exception (it counts those calls, so its rate is an upper bound
+  in that respect);
 - **tool calls**: the root's own PreToolUse calls. Children's calls are not added:
   the measurement below counted the root transcript only, and counting the tree
   would make the approved numbers mean something else. (Codex: one per `exec`
@@ -169,15 +207,17 @@ Tokens and rate limits are not visible to a hook and are not counted.
 
 ### Limits
 
-Defaults, for the user to approve at this review: **4 h active, 500 tool calls,
-30 subagent spawns, 1 compaction per turn** (the second compaction pauses).
-Whichever is crossed first pauses the turn. One compaction in a turn is normal
-(p99 is 1); more than one happened in 20 measured turns in 30 days, the case had
-10. They live in one hq file, read by the hook and by `hq pause limits`; lore's
-rule refers to that command rather than repeating the numbers.
+Defaults, for the user to approve at this review: **4 h active, 500 root tool
+calls, 30 tree spawns, 2 compactions per turn** (the third compaction pauses).
+Whichever is crossed first pauses the turn. Over the measured window these pause
+50 of 5,483 turns, 1.67 a day, about one turn in 110. Allowing only one compaction
+raises that to 56 (1.87 a day); the case pauses at 4 h active under either. The
+other rows of the table above are the alternatives. The limits live in one hq file, read by
+the hook and by `hq pause limits`; lore's rule refers to that command rather than
+repeating the numbers.
 
-The verification replay recomputes the fire rate under the hook's own counting.
-If it differs from the measured 1.1 turns a day by more than half, the plan stops
+The verification replay recomputes the fire rate from the hook's own code over
+the same window. If it differs from 1.67 a day by more than half, the plan stops
 and brings the numbers back to the user before wiring anything.
 
 ### Warning, pause, notification
@@ -191,13 +231,62 @@ and brings the numbers back to the user before wiring anything.
   child (a Codex worker by `agent_id`, a Claude Code subagent by its `agent_id`)
   is told: stop, release any claim to your controller (`--waiting-on agent`), and
   return; only the root reports, so the user gets one decision, not one per child.
-- **Closing grace.** After the pause fires, each session in the tree gets 25 more
-  calls to report, account for what it holds and park (the global rules ask for
-  worktree and process accounting at park), and to stop the processes it started.
-  During grace the hook still refuses new spawns (`Agent`/`Task`, `spawn_agent`)
-  and file writes (`Edit`, `Write`, `NotebookEdit`, `apply_patch`). After grace,
-  every call is refused except `tasks park`, `tasks note` and `hq pause status`,
-  so claim-guard's Stop block and the refusal never loop.
+- **Paused calls.** Once paused, the hook allows only calls on the closing
+  allowlist below and refuses everything else, including every shell command that
+  does not pass the shell validator. Each session in the tree gets 25 allowlisted
+  calls of **grace** to report, account for what it holds and park (the global
+  rules ask for worktree and process accounting at park). After grace, only the
+  *bookkeeping* and *cancellation* classes stay allowed. Cancellation is never
+  exhausted: a session that finds a running process on its last call can still
+  stop it.
+
+#### Closing allowlist
+
+| Class | During grace | After grace |
+| --- | --- | --- |
+| Bookkeeping: `tasks park`, `tasks note`, `hq pause status` | yes | yes |
+| Cancellation (below) | yes | yes |
+| Records reads and attachments: `tasks show`, `tasks claims`, `tasks list`, `tasks attach` | yes | no |
+| Reading: Claude Code `Read`, `Grep`, `Glob`; shell `cat`, `head`, `tail`, `wc`, `ls`; `git status`, `git log`, `git diff`, `git show`, `git worktree list`; `host-load --section session` | yes | no |
+| Everything else: file writes (`Edit`, `Write`, `NotebookEdit`, `apply_patch`), spawns, web and MCP tools, any other command | no | no |
+
+**Cancellation** stops work the session already started, and nothing else:
+
+- Claude Code's own task controls (`TaskStop`, `KillShell`), which only reach the
+  session's own background tasks;
+- Codex `close_agent` for its own workers, and `write_stdin` to one of its own
+  exec sessions when the input is only an interrupt (`\u0003`) or end of input;
+- shell `kill [-TERM|-INT|-KILL|-HUP] <pid>…` when every target pid is a
+  descendant of the harness process the hook runs under (its ancestry read from
+  `/proc`) and none is that process itself.
+
+**The shell validator** decides whether a shell call (Claude Code `Bash`, Codex
+`exec_command` or `shell`) is on the allowlist:
+
+- the command parses (POSIX `shlex`) as one simple command: no `;`, `&`, `&&`,
+  `||`, `|`, redirection, `` ` ``, `$(`, `${`, `$` variable, glob character,
+  newline, or leading environment assignment; anything that fails to parse is
+  refused;
+- `argv[0]` is a bare program name (no path) on the table above;
+- every option is on that program's own option list, which excludes options that
+  run programs or write files (for git: `-C <dir>` is allowed; `-c`, `--output`,
+  `--ext-diff` and `--textconv` are not; for `tail`: no `-f`);
+  `git` runs only the subcommands named;
+- `tasks` and `hq` run only the subcommands named, with any options.
+
+**Codex code-mode `exec`** calls pass only when their whole source is one
+`tools.exec_command({cmd: "<string literal>", …})` call, optionally wrapped in
+`text(await …)`, with only literal option values from a short list (`workdir`,
+`max_output_tokens`, `yield_time_ms`), and the literal passes the shell
+validator; or one `tools.close_agent(…)` or interrupt-only `tools.write_stdin(…)`
+call with literal arguments. Anything else, including any second statement,
+template literal or variable, is refused. If the ops-daf2cd probe shows Codex
+fires PreToolUse for each nested call, the hook validates those nested calls
+directly and refuses an `exec` body that does anything else.
+
+Bookkeeping and cancellation stay allowed in every state, so claim-guard's Stop
+block and the refusal never loop, and no session is left unable to stop its own
+work.
 - **Notification.** When the pause fires, once per turn: a desktop notification,
   and a relay inbox notice when relay serve is reachable. Both are dispatched
   within the hook's time budget, with standard streams redirected so nothing holds
@@ -208,12 +297,20 @@ and brings the numbers back to the user before wiring anything.
 
 - The next genuine human prompt in the root session ends the pause and starts a new
   turn with fresh counters. The user's reply is the review.
-- A prompt may carry a budget line, `budget: <duration>[, <n> calls][, <n> agents]`
-  (for example `budget: 10h, 2000 calls, 80 agents`), anywhere in its text. The
-  duration sets the active limit and scales every unnamed limit by the same factor
-  over the 4 h default: `budget: 12h` allows 1,500 calls, 90 spawns and 3
+- A prompt sets a budget only with a **budget directive**: the first non-empty
+  line of the text the user typed, alone on its line, matching
+  `budget: <duration>[, <n> calls][, <n> agents][, <n> compactions]` (for example
+  `budget: 10h, 2000 calls, 80 agents`). The text the user typed excludes
+  `<pasted_content …>` blocks, so a pasted prompt never grants a budget; a line
+  inside a code fence or a quote (`> budget: …`) is not a first line that starts
+  with `budget:`, so neither does a fenced or quoted example. A `budget:` line
+  anywhere else, or a malformed directive, sets nothing; the hook adds context
+  saying it was ignored and why, so the agent can tell the user.
+- The duration sets the active limit and scales every unnamed limit by the same
+  factor over the 4 h default: `budget: 12h` allows 1,500 calls, 90 spawns and 6
   compactions. A named count overrides its scaled value. The hook confirms the
-  limits it read as added context, so a typo shows at once. A budget lasts one turn.
+  limits it read as added context, so a typo shows at once. A budget lasts one
+  turn.
 - Only the UserPromptSubmit payload is read for a budget. Nothing an agent writes
   (a task note, a plan, a file) can set or raise one.
 - **Limitation.** A session an agent launches from the shell (`claude -p`,
@@ -245,9 +342,12 @@ proceeds) is the one fail-open path, and the latency budget keeps it remote.
 
 A direct hook, not a relay guard, because it needs the prompt text. It is wired in
 `claude/settings.json` and `codex/hooks.json` (and their work variants) on
-PreToolUse and PostToolUse (all tools) and UserPromptSubmit, plus SessionEnd for
-pruning, and PreCompact/PostCompact and SubagentStart where their probes pass. Target: under 50 ms at p99 on this host per call,
-measured over a replay of a large rollout; hq's test-latency practice applies.
+PreToolUse, PostToolUse and PostToolUseFailure (all tools) and UserPromptSubmit;
+on Stop and SubagentStop as an observer that never blocks (it closes in-flight
+calls); on SessionEnd for pruning; and on PreCompact/PostCompact and
+SubagentStart where their probes pass. Target: under 50 ms at p99 on this host
+per call, measured over a replay of a large rollout; hq's test-latency practice
+applies.
 
 ### Coverage
 
@@ -280,11 +380,31 @@ rule tells agents when to run them.
   PostCompact and SubagentStart fire for hooks; a refused turn can still park and
   end; UserPromptSubmit fires on a typed prompt and does not, or is filtered, on a
   task-notification wake; Codex worker and Claude Code subagent calls carry
-  `agent_id`.
-- **Tests** cover counter grouping, the genuine-prompt rule (shared fixtures with
-  obs's adapters), budget parsing and scaling, root versus child refusal text,
-  closing grace and the final allowlist, refused edits to the state and limits,
-  concurrent writes, unreadable state, and the warning firing once.
+  `agent_id`; whether Codex has PostToolUse, which decides its in-flight rule;
+  the names and reach of Claude Code's task controls (`TaskStop`, `KillShell`)
+  and Codex's `close_agent` and `write_stdin`.
+- **Tests** cover, at least:
+  - active time: eight back-to-back half-hour calls count 4 h and pause; a
+    half-hour `wait_agent` with a silent child counts in full; a call with no
+    PostToolUse closes at the agent's next event or Stop; an `AskUserQuestion`
+    left open overnight counts nothing; idle gaps over 10 minutes with nothing in
+    flight count nothing;
+  - counter grouping across root, Claude Code subagents and Codex workers, and
+    the genuine-prompt rule (shared fixtures with obs's adapters);
+  - the budget directive: honoured on the first typed line; ignored, with the
+    hook's notice, on a later line, inside a code fence, after `>`, inside a
+    `<pasted_content>` block, when malformed, and when two directives appear;
+    scaling and named overrides;
+  - the shell validator: each allowlisted command passes; each operator,
+    expansion, redirection, path-qualified program, write-capable option and
+    unlisted subcommand is refused; Codex `exec` bodies with one literal
+    `exec_command` pass and bodies with a second statement, a variable or a
+    template literal are refused;
+  - cancellation after grace: an exhausted session can `kill` its own background
+    process and `close_agent` its worker, and cannot `kill` a process outside its
+    harness's tree;
+  - root versus child refusal text, refused edits to the state and limits,
+    concurrent writes, unreadable state, and the warning firing once.
 
 ## Left to the builder
 
