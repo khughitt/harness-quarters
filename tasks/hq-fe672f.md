@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-9aa713-pause-past-range
 created: 2026-11-01T10:29:21Z
-updated: 2026-11-01T14:09:31Z
+updated: 2026-11-01T14:09:43Z
 started: 2026-11-01T11:56:46Z
 depends: []
 parent: hq-9aa713
@@ -55,4 +55,6 @@ Implements Task 1 of the turn-pause plan in .worktrees/hq-9aa713 (branch feat/hq
 - 2026-11-01T14:09:28Z (feat/hq-9aa713-pause-past-range): retained: {"host":"titan","kind":"evidence","path":"/tmp/claude-1000/-mnt-ssd3-work-hq-hq-fe672f-claude-cron-1-work","state":"released","verification":"verified","purpose":"probe session background task outputs copied byte for byte into $WORK_ROOT/hq/hq-fe672f/claude-cron-1/tmp-task-outputs, then the tmpfs copy removed","next_owner":"none","cleanup_trigger":"none"}
 - 2026-11-01T14:09:30Z (feat/hq-9aa713-pause-past-range): retained: {"host":"titan","kind":"evidence","path":"/tmp/claude-1000/-mnt-ssd3-work-hq-hq-fe672f-claude-cron-2-work","state":"released","verification":"verified","purpose":"probe session background task outputs copied byte for byte into $WORK_ROOT/hq/hq-fe672f/claude-cron-2/tmp-task-outputs, then the tmpfs copy removed","next_owner":"none","cleanup_trigger":"none"}
 - 2026-11-01T14:09:31Z (feat/hq-9aa713-pause-past-range): retention checkpoint: observed 2026-11-01T14:09Z on titan; basis hq in-tree . 679db18850dc480bc9546f8ecb28f18a2750fa8e:tasks/hq-fe672f.md; retained by feat/hq-9aa713-pause-past-range; this host: kept verified 3, kept unknown 0, released 3; changed 4. Rechecked all kept/verified items on this host (the 1305Z manifest file rehashed unchanged; scratch remanifested after rounds 2 and 3); unknown items none. Other hosts hold no items. Next: close Task 1 after the user accepts spec r6 and plan r4
+  provenance: {"harness_session":"claude-code:536b5ebf-5753-4a8b-ac83-61dde5ef4c79","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-01T14:09:43Z (feat/hq-9aa713-pause-past-range): parked (waiting on agent): Agent, after the user accepts spec r6 and plan r4 on hq-9aa713: write this task's verified gate over the facts at c83d0661 (reviews rounds 1 to 4) and close it; if the user's review asks for more probes, run them here first
   provenance: {"harness_session":"claude-code:536b5ebf-5753-4a8b-ac83-61dde5ef4c79","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
