@@ -9,6 +9,7 @@ import pytest
 HOOKS = Path(__file__).parent
 SETTINGS = "claude/settings.json"
 PI_SETTINGS = "pi/settings.json"
+AGY_SETTINGS = "agy/settings.json"
 
 
 def git(repo, *args, check=True):
@@ -29,13 +30,15 @@ def repo(tmp_path):
     (repo / "claude").mkdir()
     (repo / "codex").mkdir()
     (repo / "pi").mkdir()
+    (repo / "agy").mkdir()
     (repo / "local" / "codex").mkdir(parents=True)
     for name in ("harness-state-clean", "harness-state-refresh", "codex-trust",
                  "harness_state.py", "live-picks"):
         shutil.copy2(HOOKS / name, repo / ".githooks" / name)
     (repo / ".gitattributes").write_text("claude/settings*.json filter=harness-state\n"
                                          "codex/config*.toml filter=harness-state\n"
-                                         "pi/settings*.json filter=harness-state\n")
+                                         "pi/settings*.json filter=harness-state\n"
+                                         "agy/settings*.json filter=harness-state\n")
     (repo / ".gitignore").write_text("local/\n__pycache__/\n")
     (repo / "codex" / "config.toml").write_text("[features]\nhooks = true\n")
     git(tmp_path, "init", "-q", str(repo))
@@ -44,6 +47,8 @@ def repo(tmp_path):
     git(repo, "config", "user.name", "t")
     write_settings(repo, model="opus")
     (repo / PI_SETTINGS).write_text(json.dumps({"lastChangelogVersion": "1.1.0", "theme": "system"}, indent=2))
+    (repo / AGY_SETTINGS).write_text(json.dumps(
+        {"allowNonWorkspaceAccess": True, "permissions": {"allow": ["command(tasks)"]}}, indent=2) + "\n")
     git(repo, "add", "-A")
     git(repo, "commit", "-q", "-m", "init")
     return repo
@@ -117,4 +122,18 @@ def test_a_pi_model_switch_mark_is_cleared(repo, tmp_path):
 
     assert result.returncode == 0, result.stderr
     assert not marked(repo, PI_SETTINGS)
+    assert git(repo, "diff", "--cached", "--quiet", check=False).returncode == 0
+
+
+def test_an_agy_model_or_trust_mark_is_cleared(repo, tmp_path):
+    (repo / AGY_SETTINGS).write_text(json.dumps(
+        {"allowNonWorkspaceAccess": True, "model": "Gemini 4 Argon (Medium)",
+         "permissions": {"allow": ["command(tasks)"]}, "trustedWorkspaces": ["/work/a"]},
+        indent=2) + "\n")
+    assert marked(repo, AGY_SETTINGS)
+
+    result = refresh(repo, cwd=tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert not marked(repo, AGY_SETTINGS)
     assert git(repo, "diff", "--cached", "--quiet", check=False).returncode == 0

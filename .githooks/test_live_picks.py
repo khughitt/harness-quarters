@@ -21,10 +21,15 @@ HOOK_FILES = ("harness-state-clean", "harness_state.py", "codex-trust", "live-pi
 CLAUDE = "claude/settings.json"
 CODEX = "codex/config.toml"
 PI = "pi/settings.json"
+AGY = "agy/settings.json"
 PI_BASE = {"lastChangelogVersion": "1.1.0", "theme": "system"}
 PI_VALUES = {"defaultProvider": "anthropic", "defaultModel": "claude-opus-5-5",
              "defaultThinkingLevel": "high"}
 PI_SET = {"state": "set", "values": PI_VALUES}
+AGY_BASE = {"allowNonWorkspaceAccess": True, "permissions": {"allow": ["command(tasks)"]}}
+AGY_VALUES = {"model": "Gemini 4 Argon (Medium)", "effort": "high",
+              "effortByBase": {"Gemini 4 Argon": "high"}, "trustedWorkspaces": ["/work/a"]}
+AGY_SET = {"state": "set", "values": AGY_VALUES}
 BASE = "[features]\nhooks = true\n"
 TUI = "[tui]\nx = 1\n"
 PICK = 'model = "gpt-6.1-sol"\nmodel_reasoning_effort = "high"\n'
@@ -46,6 +51,10 @@ def write_pi(repo, **settings):
     (repo / PI).write_text(json.dumps({**PI_BASE, **settings}, indent=2) + "\n")
 
 
+def write_agy(repo, **settings):
+    (repo / AGY).write_text(json.dumps({**AGY_BASE, **settings}, indent=2) + "\n")
+
+
 @pytest.fixture
 def repo(tmp_path):
     """A main checkout shaped like this one: the filter, the hooks, both configs, local/."""
@@ -56,14 +65,17 @@ def repo(tmp_path):
     (repo / "claude").mkdir()
     (repo / "codex").mkdir()
     (repo / "pi").mkdir()
+    (repo / "agy").mkdir()
     (repo / "local" / "codex").mkdir(parents=True)
     (repo / ".gitattributes").write_text("claude/settings*.json filter=harness-state\n"
                                          "codex/config*.toml filter=harness-state\n"
-                                         "pi/settings*.json filter=harness-state\n")
+                                         "pi/settings*.json filter=harness-state\n"
+                                         "agy/settings*.json filter=harness-state\n")
     (repo / ".gitignore").write_text("local/\n__pycache__/\n")
     write_claude(repo)
     (repo / CODEX).write_text(BASE)
     write_pi(repo)
+    write_agy(repo)
     git(tmp_path, "init", "-q", "-b", "main", str(repo))
     git(repo, "config", "filter.harness-state.clean", ".githooks/harness-state-clean %f")
     git(repo, "config", "core.hooksPath", ".githooks")
@@ -1171,12 +1183,19 @@ def test_pi_ids_are_neither_captured_nor_restored_and_other_settings_survive(rep
 
 @pytest.mark.parametrize("groups", [
     {CLAUDE: (("model", "modelSettings"), ("effortLevel",)),
-     PI: (("defaultProvider", "defaultModel"), ("defaultModel",))},
-    {CLAUDE: (("model", "modelSettings"), ("effortLevel",)), PI: (("theme",),)},
+     PI: (("defaultProvider", "defaultModel"), ("defaultModel",)),
+     AGY: (("model",), ("effort", "effortByBase"), ("trustedWorkspaces",))},
+    {CLAUDE: (("model", "modelSettings"), ("effortLevel",)), PI: (("theme",),),
+     AGY: (("model",), ("effort", "effortByBase"), ("trustedWorkspaces",))},
     {CLAUDE: (("model", "modelSettings"), ("effortLevel", "effortLevel")),
-     PI: (("defaultProvider", "defaultModel"), ("defaultThinkingLevel",))},
+     PI: (("defaultProvider", "defaultModel"), ("defaultThinkingLevel",)),
+     AGY: (("model",), ("effort", "effortByBase"), ("trustedWorkspaces",))},
     {CLAUDE: (("model", "modelSettings"),),
-     PI: (("defaultProvider", "defaultModel"), ("defaultThinkingLevel",))},
+     PI: (("defaultProvider", "defaultModel"), ("defaultThinkingLevel",)),
+     AGY: (("model",), ("effort", "effortByBase"), ("trustedWorkspaces",))},
+    {CLAUDE: (("model", "modelSettings"), ("effortLevel",)),
+     PI: (("defaultProvider", "defaultModel"), ("defaultThinkingLevel",)),
+     AGY: (("model",), ("effort", "effortByBase"))},
 ])
 def test_json_groups_refuse_overlap_unfiltered_keys_and_missing_claude_keys(repo, groups):
     tool = repo / ".githooks/live-picks"
@@ -1199,6 +1218,7 @@ def test_json_groups_refuse_overlap_unfiltered_keys_and_missing_claude_keys(repo
     assert "filter" in result.stderr.lower()
     assert not record_path(repo).exists()
     assert not pi_record_path(repo).exists()
+    assert not agy_record_path(repo).exists()
 
 
 @pytest.mark.parametrize("rewrite", ["merge", "switch", "checkout", "rebase"])
@@ -1412,3 +1432,112 @@ tool["main"](["live-picks", "capture"])
         assert result.returncode == 0, err
     assert record(repo) == {CLAUDE: CLAUDE_SET, CODEX: CODEX_SET}
     assert PI not in record(repo)
+
+
+def agy_record_path(repo):
+    return repo / "local/live-picks-agy.json"
+
+
+def save_agy(repo, values=AGY_VALUES):
+    agy_record_path(repo).write_text(json.dumps({AGY: {"state": "set", "values": values}}) + "\n")
+
+
+def agy_settings(repo):
+    return json.loads((repo / AGY).read_text())
+
+
+def test_agy_capture_uses_its_own_record_and_keeps_other_records_unchanged(repo):
+    saved_both(repo)
+    save_pi(repo)
+    original_main = record_path(repo).read_bytes()
+    original_pi = pi_record_path(repo).read_bytes()
+    write_agy(repo, **AGY_VALUES)
+
+    result = picks(repo, "capture")
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(agy_record_path(repo).read_text()) == {AGY: AGY_SET}
+    assert record_path(repo).read_bytes() == original_main
+    assert pi_record_path(repo).read_bytes() == original_pi
+    assert AGY not in record(repo)
+
+
+@pytest.mark.parametrize("held, want", [
+    ({"model": "Claude Sonnet 4.6"}, {**AGY_VALUES, "model": "Claude Sonnet 4.6"}),
+    ({"effort": "low", "effortByBase": {"Gemini 4 Argon": "low"}},
+     {**AGY_VALUES, "effort": "low", "effortByBase": {"Gemini 4 Argon": "low"}}),
+    ({"trustedWorkspaces": ["/work/a", "/work/b"]},
+     {**AGY_VALUES, "trustedWorkspaces": ["/work/a", "/work/b"]}),
+])
+def test_agy_restore_fills_only_the_absent_unit_then_capture_saves_all(repo, held, want):
+    save_agy(repo)
+    write_agy(repo, **held)
+
+    assert picks(repo, "restore").returncode == 0
+    assert agy_settings(repo) == {**AGY_BASE, **want}
+    assert picks(repo, "capture").returncode == 0
+    assert json.loads(agy_record_path(repo).read_text()) == {AGY: {"state": "set", "values": want}}
+
+
+def test_agy_forget_resets_all_units_and_survives_a_rewrite(repo):
+    write_agy(repo, **AGY_VALUES)
+    assert picks(repo, "capture").returncode == 0
+
+    result = picks(repo, "forget", AGY)
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(agy_record_path(repo).read_text()) == {AGY: {"state": "default"}}
+    assert agy_settings(repo) == AGY_BASE
+    write_agy(repo, allowNonWorkspaceAccess=False)
+    git(repo, "checkout", "--", AGY)
+    assert picks(repo, "restore").returncode == 0
+    assert agy_settings(repo) == AGY_BASE
+    assert status(repo) == ""
+
+
+@pytest.mark.parametrize("rewrite", ["merge", "switch", "checkout", "rebase"])
+def test_agy_git_rewrites_restore_the_pick_without_tracking_it(repo, rewrite):
+    git(repo, "switch", "-q", "-c", "side")
+    write_agy(repo, allowNonWorkspaceAccess=False)
+    git(repo, "add", AGY)
+    git(repo, "commit", "-q", "-m", "side settings")
+    git(repo, "switch", "-q", "main")
+    if rewrite == "rebase":
+        (repo / "u").write_text("main\n")
+        git(repo, "add", "u")
+        git(repo, "commit", "-q", "-m", "main")
+    write_agy(repo, **AGY_VALUES)
+    assert picks(repo, "capture").returncode == 0
+    git(repo, "add", AGY)
+    if rewrite == "checkout":
+        write_agy(repo, allowNonWorkspaceAccess=False, **AGY_VALUES)
+        result = git(repo, "checkout", "--", AGY)
+    else:
+        result = git(repo, rewrite, "-q", "side")
+
+    assert result.stderr == "" or rewrite == "rebase"
+    assert agy_settings(repo) == {**AGY_BASE, **AGY_VALUES,
+                                  "allowNonWorkspaceAccess": True if rewrite == "checkout" else False}
+    assert "trustedWorkspaces" not in git(repo, "show", "HEAD:" + AGY).stdout
+    assert "model" not in git(repo, "show", "HEAD:" + AGY).stdout
+    assert status(repo) == ""
+
+
+@pytest.mark.parametrize("command", [
+    ("live-picks", "capture"), ("live-picks", "restore"),
+    ("live-picks", "hook", "post-merge"), ("harness-state-refresh",),
+])
+def test_pinned_pre_pi_commands_leave_the_agy_record_untouched(repo, pre_pi_hooks, command):
+    saved_both(repo)
+    write_agy(repo, **AGY_VALUES)
+    with owned_process([str(repo / ".githooks/live-picks"), "capture"]) as captured:
+        _, err = captured.communicate("", timeout=10)
+        assert captured.returncode == 0, err
+    before = agy_record_path(repo).read_bytes()
+    install_pre_pi_hooks(repo, pre_pi_hooks)
+
+    with owned_process([str(repo / ".githooks" / command[0]), *command[1:]]) as result:
+        _, err = result.communicate("", timeout=10)
+        assert result.returncode == 0, err
+    assert agy_record_path(repo).read_bytes() == before
+    assert AGY not in record(repo)

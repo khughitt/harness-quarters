@@ -130,3 +130,16 @@ home = "~/.pi/agent"
 "AGENTS.md" = "lore:instructions/AGENTS.md"
 "settings.json" = "pi/settings.json"
 "extensions/harness-state.ts" = "pi/extensions/harness-state.ts"
+
+# Antigravity CLI's app-data home and global customization home.
+[harness.agy]
+home = "~/.gemini/antigravity-cli"
+[harness.agy.links]
+"settings.json" = "agy/settings.json"
+
+[harness.agy-config]
+home = "~/.gemini/config"
+[harness.agy-config.links]
+"AGENTS.md" = "lore:instructions/AGENTS.md"
+"hooks.json" = "agy/hooks.json"
+"skills.json" = "agy/skills.json"

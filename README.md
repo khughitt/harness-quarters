@@ -26,33 +26,38 @@ and creates `local/codex/rules/`. `local/` is untracked (see Layout). The work c
 under it come from another host's `local/`, never from `just setup`.
 
 The filter keeps `model`, `modelSettings` and `effortLevel` in `claude/settings*.json`,
-the top-level `model` and `model_reasoning_effort` in `codex/config*.toml`, and
+the top-level `model` and `model_reasoning_effort` in `codex/config*.toml`,
 `defaultProvider`, `defaultModel` and `defaultThinkingLevel` in `pi/settings*.json`
-(with pi's installation ids, `deviceId` and `trackingId`) out of the index: model and
-effort picks write into the live files (the homes symlink here), and they are session
-state, not configuration. A fresh home therefore runs each harness's default model and
-effort until the first pick.
+(with pi's installation ids, `deviceId` and `trackingId`), and `model`, `effort`,
+`effortByBase` and `trustedWorkspaces` in `agy/settings*.json` out of the index: model and
+effort picks (and agy's trusted workspace list) write into the live files (the homes
+symlink here), and they are session or host state, not configuration. A fresh home
+therefore runs each harness's default model and effort until the first pick.
 
 The working tree keeps the harness's last pick, and a checkout of the file drops it.
 `.githooks/live-picks` puts it back. At every turn end it saves the picks from
-`claude/settings.json` and `codex/config.toml` in local/live-picks.json, and
-`pi/settings.json` in the separate local/live-picks-pi.json record. The
+`claude/settings.json` and `codex/config.toml` in local/live-picks.json,
+`pi/settings.json` in the separate local/live-picks-pi.json record, and
+`agy/settings.json` in local/live-picks-agy.json. The
 `post-checkout`, `post-merge` and `post-rewrite` hooks restore it right after a git
 command drops it, in the main checkout only, and the next turn end restores it where
 no hook runs (the commands listed below for trust). Each picker's fields are one unit:
 Claude's `/model` (`model`, `modelSettings`) and `/effort` (`effortLevel`) separately,
 Codex's model and effort together; pi's default model (`defaultProvider`,
-`defaultModel`) and thinking level (`defaultThinkingLevel`) separately. A unit holding
+`defaultModel`) and thinking level (`defaultThinkingLevel`) separately; agy's `/model`
+(`model`), `/effort` (`effort`, `effortByBase`) and workspace trust
+(`trustedWorkspaces`) separately. A unit holding
 any of its fields is never touched, so a newer pick always wins, and a pick of one
-Claude or pi picker keeps the other's saved value. A unit holding none is ambiguous,
+Claude, pi or agy picker keeps the other's saved value. A unit holding none is ambiguous,
 so only an explicit act resets the saved pick:
-`.githooks/live-picks forget claude/settings.json` (or `codex/config.toml` or
-`pi/settings.json`), which resets every unit of that file and removes them from it.
+`.githooks/live-picks forget claude/settings.json` (or `codex/config.toml`,
+`pi/settings.json` or `agy/settings.json`), which resets every unit of that file and
+removes them from it.
 Claude's `/model` Default clears its fields and the next turn end may
 restore the saved pick; use `forget` for a deliberate reset. PostModelSwitch fires
 before the settings write and may skip a reset to the same resolved model, so it is
 not a capture point. The tested Codex picker actions kept both model fields; use
-`forget` to return it to its default. A Claude or Codex pick made since the last
+`forget` to return it to its default. A Claude, Codex or agy pick made since the last
 turn end is not saved yet; a git command in that window brings back the one before.
 
 The pi extension `pi/extensions/harness-state.ts` calls the same refresh after `model_select` and
@@ -68,12 +73,12 @@ shutdown awaits the current run and one final run, delaying exit by at most abou
 kills any refresh group it still owns. A failure warns once per session without
 failing the pi operation.
 
-Both records are machine-owned: an invalid record is refused independently, never
-overwritten, and deleting it starts that record over. pi's separate record lets the
+Each record is machine-owned: an invalid record is refused independently, never
+overwritten, and deleting it starts that record over. pi's and agy's separate records let the
 previous tool keep saving Claude and Codex picks during recovery. To back the extension
 out, revert its merge, remove the `~/.pi/agent/extensions/harness-state.ts` link on each
 host and run `just link-check`.
-The previous tool ignores local/live-picks-pi.json, which may be deleted; Claude and
+The previous tool ignores local/live-picks-pi.json and local/live-picks-agy.json, which may be deleted; Claude and
 Codex preservation continues. pi then keeps defaults only until a Git rewrite drops
 them.
 
@@ -114,12 +119,12 @@ sources, hook trust hashes — is tracked as usual.
 One residual: git decides "modified" from the file's size before it runs the
 filter, so a switch whose value changes length leaves the file marked `M` in
 `git status` (and `git diff-index`) until the next `git add` of it — `git diff`
-is content-true. A Stop hook in both harnesses (`.githooks/harness-state-refresh`,
-wired in `claude/settings*.json` and `codex/hooks*.json` through the
+is content-true. A Stop hook in Claude, Codex and agy (`.githooks/harness-state-refresh`,
+wired in `claude/settings*.json`, `codex/hooks*.json` and `agy/hooks.json` through the
 `~/.local/bin` link in `links.toml`) stages each harness config
 whose filtered diff is empty, so the mark clears at the end of the turn that made
 it; pi's extension calls the same refresh at the events above. It skips while another
-git process holds the index lock. By hand, `git add -u -- claude codex pi` does the same
+git process holds the index lock. By hand, `git add -u -- claude codex pi agy` does the same
 while staging only real changes. Do not `git stash` these files to get past it: the stash tree
 equals `HEAD`, so `stash pop` brings back the file without its model pick until the next turn end restores it.
 Their tests run with `just test`.
@@ -160,10 +165,10 @@ Things you can take from here without the rest:
   owner: lore, flows, [tasks](https://github.com/khughitt/tasks), ops, or hq's
   session-logs skill.
 - `.githooks/harness-state-clean`: a git clean filter that keeps `/model` and `/effort`
-  picks, Codex bookkeeping and Codex project trust out of committed harness configs.
+  picks, Codex bookkeeping and Codex/agy project trust out of committed harness configs.
   It selects its JSON keys by this repository's paths (`claude/settings*.json`,
-  `pi/settings*.json`) and refuses any other JSON path, so a reuse elsewhere edits
-  `JSON_FILES` first.
+  `pi/settings*.json`, `agy/settings*.json`) and refuses any other JSON path, so a reuse
+  elsewhere edits `JSON_FILES` first.
 - `tools/harness-links` with `links.toml`: declares every link from a harness home into a
   checkout. Targets are checkout-relative or `<project>:<relative-path>`, resolved
   through `tasks projects --paths`. `[directories]` declares real directories, with
@@ -192,9 +197,11 @@ MIT licensed; see `LICENSE`.
 - `agents/skills/session-logs/`: the retained skill. `agents/bin/`: session-episodes,
   wake-judge and their tests. Profile fragments and
   the remaining skill corpus live in lore.
-- `claude/` and `codex/`: per-harness settings and hooks. Each home's settings and hooks
-  files are symlinks to them: `~/.claude` and `~/.codex` to the plain files,
-  `~/.codex-work` to `codex/work/hooks.json`.
+- `claude/`, `codex/` and `agy/`: per-harness settings, hooks and skill registries. Each
+  home's settings and hooks files are symlinks to them: `~/.claude` and `~/.codex` to the
+  plain files, `~/.codex-work` to `codex/work/hooks.json`, `~/.gemini/antigravity-cli` to
+  `agy/settings.json`, and `~/.gemini/config` to `agy/hooks.json`, `agy/skills.json`
+  (pointing `agy` at `~/.agents/skills`) and lore's `AGENTS.md`.
 - `claude/mods/`: Claude Code function-hook plugins, linked as `~/.claude/mods` and
   loaded by `CLAUDE_CODE_PLUGIN_DIRS` in `claude/settings.json`. `cli-pane` adds
   `/tas <id>` and `/m <id>`, which show `tasks show` and `mindful show` output in a

@@ -1,0 +1,11 @@
+{
+  "harness-state-refresh": {
+    "enabled": true,
+    "Stop": [
+      {
+        "type": "command",
+        "command": "~/.local/bin/harness-state-refresh"
+      }
+    ]
+  }
+}

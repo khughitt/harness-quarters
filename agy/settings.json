@@ -1,0 +1,13 @@
+{
+  "allowNonWorkspaceAccess": true,
+  "permissions": {
+    "allow": [
+      "command(tasks)"
+    ]
+  },
+  "statusLine": {
+    "type": "",
+    "command": "",
+    "enabled": true
+  }
+}

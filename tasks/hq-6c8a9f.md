@@ -1,15 +1,17 @@
 ---
 id: hq-6c8a9f
 title: "Set up Antigravity CLI (agy) configuration, links, and live-state hygiene in hq"
-status: doing
+status: done
 priority: 1
 size: m
 complexity: mid
 process: direct
-owner: main
+owner: feat/agy-setup
 created: 2026-10-31T21:00:30Z
-updated: 2026-10-31T21:01:58Z
+updated: 2026-10-31T22:00:10Z
 started: 2026-10-31T21:00:48Z
+completed: 2026-10-31T22:00:10Z
+closed: 2026-10-31T22:00:10Z
 depends: []
 tags: []
 agent: agy
@@ -35,3 +37,13 @@ Where: links.toml, agy/{settings,hooks,skills}.json, .gitattributes, .githooks/{
 - 2026-10-31T21:01:06Z (main): trial: flow-trial-1 — enrolled — flow on
 - 2026-10-31T21:01:07Z (main): arm: flow-trial-1 — unit tack-6c8a9f — flow on
 - 2026-10-31T21:01:58Z (main): gate: scoped — adopted
+- 2026-10-31T21:02:24Z (feat/agy-setup): resumed
+- 2026-10-31T21:15:38Z (feat/agy-setup): gate: implementing .worktrees/agy-setup — baseline just test 1793 passed
+- 2026-10-31T21:55:51Z (feat/agy-setup): review: impl round 1 — changes-requested; 1 blocking (README.md:200-204 agy-config link paths), 1 non-blocking (README.md:60,76 Stop harnesses and record count wording); fixed in README.md [ reviewer:research tree:68eb4e4026eec2b87c968e05470990ebca180843 ]
+- 2026-10-31T21:56:56Z (feat/agy-setup): review: impl round 2 — approved; 0 blocking, 0 non-blocking; clean [ reviewer:research tree:98d1babf84b8e9e92d8546a9c019c74cd438ae73 ]
+- 2026-10-31T21:56:58Z (feat/agy-setup): gate: verified tree:98d1babf84b8e9e92d8546a9c019c74cd438ae73 — just test (231 + 1187 + 391 + 1 = 1810 passed); ops-check, ops-docs check, harness-facts check, tasks check, and agy plugin validate passed; clean filter byte-exact match on live ~/.gemini/antigravity-cli/settings.json; independent review approved
+- 2026-10-31T21:57:00Z (feat/agy-setup): retro: clean — Disassembling agy's WriteCliSettings and MarshalSparse caught before commit that DefaultCliSetting initializes a non-nil StatusLine pointer, so including the default statusLine object in agy/settings.json was required for byte-exact clean filter output; independent review caught the README.md agy vs agy-config link attribution
+- 2026-10-31T21:59:48Z (feat/agy-setup): gate: verified tree:98d1babf84b8e9e92d8546a9c019c74cd438ae73 — checks: just test (1810 passed), ops-check, ops-docs check, harness-facts check, tasks check, agy plugin validate, and clean filter byte-exact match on live ~/.gemini/antigravity-cli/settings.json; review: important addressed README.md agy vs agy-config link attribution, minor addressed README.md Stop harnesses and record count wording; reviewer: agy session:agy:db2d7956-edc7-47fa-a236-15bc376bc61d
+- 2026-10-31T21:59:50Z (feat/agy-setup): retro: clean — Disassembling agy's WriteCliSettings and MarshalSparse caught before commit that DefaultCliSetting initializes a non-nil StatusLine pointer, so including the default statusLine object in agy/settings.json was required for byte-exact clean filter output; independent review caught the README.md agy vs agy-config link attribution
+- 2026-10-31T22:00:10Z (feat/agy-setup): done
+- 2026-10-31T22:00:10Z (feat/agy-setup): Added agy/ config files (settings.json, hooks.json, skills.json), declared [harness.agy] and [harness.agy-config] home links in links.toml, wired agy/settings*.json into .gitattributes, harness-state-clean, harness-state-refresh, and live-picks (with separate local/live-picks-agy.json record), registered agy in facts/capabilities.toml, and added unit/rollback tests and documentation.

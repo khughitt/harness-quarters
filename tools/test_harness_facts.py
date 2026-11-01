@@ -333,6 +333,7 @@ def test_the_shipped_file_is_valid_and_holds_the_three_facts():
     assert facts.lookup("controller-wake", "claude-code")["value"] is True
     assert facts.lookup("controller-wake", "codex")["value"] is False
     assert facts.lookup("controller-wake", "opencode")["status"] == "unknown"
+    assert facts.lookup("controller-wake", "agy")["status"] == "unknown"
     assert facts.lookup("controller-wake-kinds", "claude-code")["value"] == ["shell", "subagent"]
     assert facts.lookup("controller-wake-kinds", "codex")["value"] == []
     assert facts.lookup("stop-input-in-flight-statuses", "claude-code")["value"] == ["pending", "running"]
