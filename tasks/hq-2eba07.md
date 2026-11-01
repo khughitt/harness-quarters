@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-2eba07-harness-manifest
 created: 2026-11-01T01:25:51Z
-updated: 2026-11-01T12:21:29Z
+updated: 2026-11-01T12:36:06Z
 started: 2026-11-01T09:55:45Z
 depends: []
 tags: [hooks]
@@ -16,6 +16,7 @@ source: hq-6c8a9f
 agent: agy
 origin: mixed
 spec: docs/specs/2026-11-01-harness-manifest-design.md
+plan: docs/plans/2026-11-01-harness-manifest.md
 ---
 
 Why: Onboarding agy in hq-6c8a9f required parallel edits across .githooks/harness-state-clean (JSON_FILES, *_JSON_KEYS), .githooks/harness-state-refresh (PATTERNS), .githooks/live-picks (OWNED, RECORDS, JSON_GROUPS, CLEAN, FIELD), and facts/capabilities.toml (harnesses). A declarative manifest eliminates per-harness constant duplication while keeping format/store adapters explicit.
