@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-9aa713-pause-past-range
 created: 2026-11-01T10:29:21Z
-updated: 2026-11-01T12:31:51Z
+updated: 2026-11-01T12:42:57Z
 started: 2026-11-01T11:56:46Z
 depends: []
 parent: hq-9aa713
@@ -34,3 +34,4 @@ Implements Task 1 of the turn-pause plan in .worktrees/hq-9aa713 (branch feat/hq
 - 2026-11-01T11:58:10Z (feat/hq-9aa713-pause-past-range): scratch created: host titan, /mnt/ssd3/work/hq/hq-fe672f, raw probe logs and temporary harness homes for Task 1; owner hq-fe672f; contents mutable
 - 2026-11-01T12:20:57Z (feat/hq-9aa713-pause-past-range): attached: turn-pause-probe-evidence.json (87917 bytes): Portable derivative of the turn-pause probe runs (Claude Code 2.1.316, Codex 0.166.0): per run the command shape, exit, wall time, every hook event's identity fields and truncated payload, and the tool calls; paths are placeholders
 - 2026-11-01T12:31:51Z (feat/hq-9aa713-pause-past-range): Task 1 probes committed (32addb8; evidence attachment 71d8530). Mandatory concerns: codex hook-deny-all-tools false (outer code-mode exec fires no PreToolUse); codex-spawn-evidence specified exec-loop arm impossible (tools.spawn_agent not a function in exec; 4/4 only via direct spawns); cancellation table contradicted (unnamed: codex wait terminate, claude CronDelete and ScheduleWakeup stop; KillShell absent). Codex hook-compact-event unknown after two attempts. Raw logs: WORK_ROOT/hq/hq-fe672f/ (raw-manifest.sha256). Full report: .superpowers/sdd/2026-11-01-turn-pause/task-1-report.md in the hq-9aa713 worktree.
+- 2026-11-01T12:42:57Z (feat/hq-9aa713-pause-past-range): review: impl round 1 — verdict: revise; findings: important 4, minor 8; reviewer: claude-code/claude-opus-5-5
