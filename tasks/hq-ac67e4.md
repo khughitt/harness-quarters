@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-11-01T22:03:31Z
-updated: 2026-11-01T22:06:38Z
+updated: 2026-11-01T22:06:40Z
 started: 2026-11-01T22:06:20Z
 depends: []
 tags: [hooks]
@@ -36,3 +36,4 @@ Where: links.toml, harnesses.toml, agy/settings.json, tools/harness-links, tools
 - 2026-11-01T22:06:20Z (main): started
   provenance: {"harness_session":"claude-code:6dcbd897-967a-4e20-a982-604b9c48faaf","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-01T22:06:38Z (main): trial: flow-trial-1 — enrolled — flow off
+- 2026-11-01T22:06:40Z (main): arm: flow-trial-1 — unit tack-ac67e4 — flow off
