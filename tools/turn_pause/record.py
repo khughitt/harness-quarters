@@ -64,3 +64,8 @@ class Frozen(Record):
 
     def __hash__(self):
         return hash(self._astuple())
+
+    def __reduce__(self):
+        """copy, deepcopy and pickle rebuild through the constructor, as for a frozen
+        dataclass; the default slot restore would hit __setattr__."""
+        return (type(self), self._astuple())

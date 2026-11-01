@@ -25,21 +25,26 @@ from .engine import Decision
 from .events import Event
 from .limits import DEFAULTS_FILE, file_sha256, load, with_budget
 from .prompt import Budget, Malformed, is_genuine, parse_budget
-from .protect import touches_protected
+from .protect import MAX_NODES, TooManyNodes, too_many_nodes, touches_protected
 from .state import Store, Wakeup, state_path
 
 CHECKOUT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 # The hook wiring in this checkout, and the harness home files that link to it
-# (links.toml), protected with the state directory and the limits file.
+# (links.toml), protected with the state directory, the limits file and the facts
+# snapshot (which decides, among other things, whether compactions are counted).
 WIRING = ('claude/settings.json', 'codex/hooks.json', 'codex/work/hooks.json', 'local/claude/settings.work.json')
 HOME_LINKS = ('.claude/settings.json', '.claude-work/settings.json', '.codex/hooks.json', '.codex-work/hooks.json')
 GRACE = 25
-# The largest PreToolUse the hook judges. Its protected-path scan walks every string in
-# the input; at this size the worst case (all one-character strings) takes about a second,
-# inside the 5 s hook timeout. A larger PreToolUse is refused (fail closed). Every other
-# event is parsed whatever its size, since only json.loads (linear, in C) runs over it,
-# so an oversized PostToolUse still closes its call and an oversized prompt still starts a
-# turn; only the budget directive of an oversized prompt is not parsed.
+# The largest PreToolUse the hook judges; a larger one is refused (fail closed). Bytes
+# alone do not bound the time: just under this cap, a payload of tiny elements has some
+# sixteen million JSON nodes and took the entry over 5 s to parse and walk, past the hook
+# timeout. So a PreToolUse is also refused, paused or not, past protect.MAX_NODES nodes,
+# counted on the raw bytes before parsing (about 0.15 s at the cap). Within both bounds
+# parsing and the protected-path scan stay well inside the timeout (measured in the Task 6
+# report, fix round 2). Every other event is parsed whatever its size, since only
+# json.loads (linear, in C) runs over it, so an oversized PostToolUse still closes its
+# call and an oversized prompt still starts a turn; only the budget directive of an
+# oversized prompt is not parsed.
 MAX_PAYLOAD_BYTES = 32 * 1024 * 1024
 OUTPUT_EVENTS = ('PreToolUse', 'UserPromptSubmit')
 
@@ -68,6 +73,9 @@ WAKE_TEXT = ('turn-pause: this prompt matches a pending scheduled prompt and was
 PROTECTED_TEXT = ('turn-pause: this call names a protected path (the pause state, the turn limits or '
                   'the hook wiring), so it is refused. Do not edit or read them; hq pause status and '
                   'hq pause limits show what they hold.')
+NODES_TEXT = (f'turn-pause: the tool input has more than {MAX_NODES} JSON nodes, more than any real tool '
+              'input needs and more than the hook can check in time, so the call is refused. Split the '
+              'work into smaller calls.')
 GRACE_TEXT = (f'the {GRACE} allowlisted reads of grace are used up; only bookkeeping and stopping your '
               'own work remain')
 HARNESS_NAMES = ('claude', 'codex')
@@ -118,7 +126,8 @@ def warning(rs: RootState, name: str) -> str:
 
 
 def protected_paths(store_dir, limits_path, env: Mapping[str, str]) -> list[str]:
-    paths = [os.fspath(store_dir), os.fspath(limits_path), DEFAULTS_FILE] + [os.path.join(CHECKOUT, w) for w in WIRING]
+    paths = [os.fspath(store_dir), os.fspath(limits_path), DEFAULTS_FILE, adapters.SNAPSHOT]
+    paths += [os.path.join(CHECKOUT, w) for w in WIRING]
     if env.get('HOME'):
         paths += [os.path.join(env['HOME'], h) for h in HOME_LINKS]
     return paths
@@ -202,8 +211,11 @@ class Judge:
             if limit is not None:
                 rs.paused = limit
                 return Decision(False, _deny(refusal(rs, ev.agent)), limit)
-        if touches_protected(tool_input, self.protected):
-            return Decision(False, _deny(PROTECTED_TEXT), None)
+        try:
+            if touches_protected(tool_input, self.protected):
+                return Decision(False, _deny(PROTECTED_TEXT), None)
+        except TooManyNodes:
+            return Decision(False, _deny(NODES_TEXT), None)
         if rs.paused is not None:
             return self._paused(rs, ev, tool_input)
         due = counters.due_warnings(turn)
@@ -446,6 +458,9 @@ def main(argv: list[str], stdin=None, stdout=None, stderr=None, env: Mapping[str
         if oversized and event == 'PreToolUse':
             raise ValueError(f'the hook payload is {len(raw)} bytes, over the {MAX_PAYLOAD_BYTES} byte cap; '
                              'split the work into smaller calls')
+        if event == 'PreToolUse' and too_many_nodes(raw):
+            output = _deny(NODES_TEXT)
+            return _emit(output, event, stdout)
         payload = json.loads(raw)
         del raw
         output = decide(harness, event, payload, time.time(), Store(state_path(env)), limits_path, env,
@@ -456,6 +471,10 @@ def main(argv: list[str], stdin=None, stdout=None, stderr=None, env: Mapping[str
         else:
             print(f'turn-pause: {event or "?"}: {type(e).__name__}: {e}', file=stderr)
             output = None
+    return _emit(output, event, stdout)
+
+
+def _emit(output: dict | None, event: str, stdout) -> int:
     if output is not None and event in OUTPUT_EVENTS:
         stdout.write(json.dumps(output) + '\n')
         stdout.flush()

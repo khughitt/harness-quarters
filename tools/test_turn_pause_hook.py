@@ -432,14 +432,15 @@ def test_changed_limits_file_pauses_with_limits_changed_and_notifies(tmp_path, n
     assert len(notices) == 1
 
 
-@pytest.mark.parametrize('target', ['limits', 'state', 'wiring', 'home-link'])
+@pytest.mark.parametrize('target', ['limits', 'state', 'wiring', 'home-link', 'facts'])
 def test_a_call_naming_a_protected_path_is_denied_before_any_pause(tmp_path, target):
     d = Driver(tmp_path, 'claude-code')
     d.prompt('work')
     path = {'limits': d.limits,
             'state': state_dir(d.env) / f'claude-code-{CLAUDE_ROOT}.json',
             'wiring': CHECKOUT / 'codex' / 'hooks.json',
-            'home-link': Path(d.env['HOME']) / '.claude' / 'settings.json'}[target]
+            'home-link': Path(d.env['HOME']) / '.claude' / 'settings.json',
+            'facts': Path(adapters.SNAPSHOT)}[target]
     out, _ = d.pre('Edit', {'file_path': str(path), 'old_string': '500', 'new_string': '5000'})
     assert denied(out)
     assert 'protected' in reason(out)
@@ -1006,3 +1007,60 @@ def test_an_unreadable_record_is_raised_after_the_counters_are_written(tmp_path)
         d('PostToolUse', post(pre, 'spawn failed: too many agents'))
     st = d.state()
     assert st.turn.in_flight == {} and 'w0' in st.worker_names
+
+
+# --- round 2: structure bound, record copies ------------------------------------------
+
+def _many_nodes(element: bytes, size=33_000_000) -> bytes:
+    pre = json.dumps(claude_pre('Write', {'file_path': '/srv/x', 'content': None}, 'c1'))
+    head, tail = pre.split('null', 1)
+    count = (size - len(pre)) // (len(element) + 1)
+    return head.encode() + b'[' + (element + b',') * count + element + b']' + tail.encode()
+
+
+@pytest.mark.parametrize('element', [b'0', b'[]', b'{}'])
+def test_entry_refuses_a_33_mb_payload_of_many_nodes_well_under_a_second(tmp_path, element):
+    run_entry(tmp_path, 'UserPromptSubmit', claude_prompt('work'))
+    raw = _many_nodes(element)
+    assert len(raw) < hook.MAX_PAYLOAD_BYTES
+    start = time.monotonic()
+    r = run_entry(tmp_path, 'PreToolUse', raw)
+    assert time.monotonic() - start < 1.0
+    out = json.loads(r.stdout)
+    assert denied(out) and 'JSON nodes' in reason(out)
+
+
+def test_entry_allows_a_large_write_whose_commas_are_inside_its_string(tmp_path):
+    run_entry(tmp_path, 'UserPromptSubmit', claude_prompt('write the table'))
+    rows = 'id,name,"quoted, value",3\n' * 800_000  # about 3.2M commas, all inside one string
+    r = run_entry(tmp_path, 'PreToolUse', claude_pre('Write', {'file_path': '/srv/t.csv', 'content': rows}, 'c1'))
+    assert r.returncode == 0 and r.stdout == b'', r.stdout[:300]
+
+
+@pytest.mark.parametrize('paused', [False, True])
+def test_a_tool_input_over_the_node_budget_is_refused_paused_or_not(tmp_path, notices, paused):
+    from turn_pause import protect
+    d = Driver(tmp_path, 'claude-code')
+    if paused:
+        d.pause_on_calls()
+    else:
+        d.prompt('work')
+    out, _ = d.pre('Write', {'file_path': '/srv/x', 'content': [0] * (protect.MAX_NODES + 1)})
+    assert denied(out) and 'JSON nodes' in reason(out)
+
+
+def test_frozen_records_copy_deepcopy_and_pickle(tmp_path):
+    import pickle
+    from turn_pause.limits import Limits
+    from turn_pause.prompt import Budget
+    values = [Event(T0, 'a1', 'tool_start', call_id='c1', tool='Bash'), Limits(1, 2, 3, 4), Budget(60, None, 5, None),
+              engine.Decision(False, {'x': [1]}, 'calls'), adapters.load_facts()]
+    for value in values:
+        for twin in (copy.copy(value), copy.deepcopy(value), pickle.loads(pickle.dumps(value))):
+            assert twin == value and type(twin) is type(value)
+    d = Driver(tmp_path, 'claude-code')
+    d.prompt('work')
+    d.bash('ls')
+    st = d.state()
+    for twin in (copy.deepcopy(st), pickle.loads(pickle.dumps(st))):
+        assert twin == st
