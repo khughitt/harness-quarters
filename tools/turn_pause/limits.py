@@ -1,9 +1,7 @@
 """Default turn limits and how a budget directive scales them."""
 import hashlib
 import math
-import tomllib
 from dataclasses import dataclass
-from fractions import Fraction
 from pathlib import Path
 
 from .prompt import Budget
@@ -21,6 +19,7 @@ class Limits:
 
 def load(path: Path = DEFAULTS_PATH) -> tuple[Limits, str]:
     """The limits in the file and the sha256 of its bytes."""
+    import tomllib  # here, not at the top: the hook imports this module on every call (latency)
     raw = path.read_bytes()
     data = tomllib.loads(raw.decode())
     return Limits(data['active_seconds'], data['calls'], data['spawns'], data['compactions']), hashlib.sha256(raw).hexdigest()
@@ -28,6 +27,7 @@ def load(path: Path = DEFAULTS_PATH) -> tuple[Limits, str]:
 
 def with_budget(defaults: Limits, budget: Budget) -> Limits:
     """Scale unnamed limits by budget.seconds over the default; named counts override."""
+    from fractions import Fraction  # only a budget directive needs it (hook latency)
     factor = Fraction(budget.seconds, defaults.active_seconds)
 
     def scaled(value: int) -> int:
