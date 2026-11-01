@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-9aa713-pause-past-range
 created: 2026-11-01T10:29:21Z
-updated: 2026-11-01T14:05:02Z
+updated: 2026-11-01T14:09:25Z
 started: 2026-11-01T11:56:46Z
 depends: []
 parent: hq-9aa713
@@ -50,3 +50,4 @@ Implements Task 1 of the turn-pause plan in .worktrees/hq-9aa713 (branch feat/hq
 - 2026-11-01T13:49:56Z (feat/hq-9aa713-pause-past-range): Probe round 3 committed (c83d0661): every remaining Codex tool called is hooked (names in hook-tool-names; request_plugin_install not called, model declined twice; image_gen skipped for quota); Codex goal continuation turns fire no UserPromptSubmit (hook-prompt-on-goal-turn false); no hook payload links Codex task_name to agent_id; empty Bash PostToolUse is no yield sign and a yield gets no PostToolUse (corrects the extension note); Claude ScheduleWakeup fires a UserPromptSubmit with the scheduled text verbatim, CronCreate fire unknown after two runs; subagent's own Bash deny held. Report: .superpowers/sdd/2026-11-01-turn-pause/task-1-report.md, Probe round 3.
 - 2026-11-01T13:53:14Z (feat/hq-9aa713-pause-past-range): review: impl round 3 — verdict: accept; findings: minor 4; reviewer: claude-code/claude-sonnet-5-5
 - 2026-11-01T14:05:02Z (feat/hq-9aa713-pause-past-range): review: impl round 4 — verdict: accept; findings: minor 4; reviewer: claude-code/claude-sonnet-5-5 (round 3 facts, c83d0661; counted as round 4 because round 3 was recorded for the extension)
+- 2026-11-01T14:09:25Z (feat/hq-9aa713-pause-past-range): retained: {"host":"titan","kind":"scratch","path":"$WORK_ROOT/hq/hq-fe672f","state":"kept","verification":"verified","purpose":"raw probe logs and isolated harness homes behind the Task 1 capability facts (rounds 1 to 3), raw source of the portable attachments and fixtures","next_owner":"task:hq-fe672f","cleanup_trigger":"hq-fe672f closes with its facts merged to main","manifest":"$WORK_ROOT/hq/hq-fe672f.manifest-2026-11-01T1408Z.txt","sha256":"c0fac5b1a67c7033b01ae52c227d21456cbf3713d2d560c5f6c5e23c2ec49f76"}
