@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-11-01T22:03:31Z
-updated: 2026-11-01T22:06:20Z
+updated: 2026-11-01T22:06:38Z
 started: 2026-11-01T22:06:20Z
 depends: []
 tags: [hooks]
@@ -35,3 +35,4 @@ Where: links.toml, harnesses.toml, agy/settings.json, tools/harness-links, tools
 - 2026-11-01T22:04:00Z (main): concerns: hq-8af61d extension — onboard europa ~/.gemini/config/* links past unanchored initial settings.json and classify agy/settings.json live-state drift across titan and europa
 - 2026-11-01T22:06:20Z (main): started
   provenance: {"harness_session":"claude-code:6dcbd897-967a-4e20-a982-604b9c48faaf","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-01T22:06:38Z (main): trial: flow-trial-1 — enrolled — flow off
