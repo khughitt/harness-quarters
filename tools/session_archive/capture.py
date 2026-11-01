@@ -153,7 +153,7 @@ def capture_file(root: Path, manifest: Manifest, source: str, relpath: str, path
             if rotate:
                 old = version_location(source, relpath, mirror.captured_at)
                 if hash_file(mirrored) != mirror.sha256:
-                    raise OSError(f"{mirrored} is damaged; run capture to repair it first")
+                    raise OSError(f"{mirrored} is damaged (hash differs from its manifest entry); a non-append source cannot be repaired by rerunning capture, so inspect or remove the mirror copy by hand")
                 mkdir_synced((root / old).parent)
                 if not (root / old).exists():
                     os.link(mirrored, root / old)

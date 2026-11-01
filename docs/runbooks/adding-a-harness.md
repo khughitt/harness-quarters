@@ -739,13 +739,17 @@ transcript does not name its own working directory).
    mutated mid-copy (`"busy"`), and keeps non-append rewrites under `versions/`
    (`"diverged"`).
 2. `check_sources()` runs before every `session-archive` command and aborts the whole
-   run (`EX_HOST`), for every harness, if a required `Source.root` is a symlink or
-   missing. Once a required `Source` lands, run `mkdir -p <Source.root>` on **every**
-   archive-configured host before the daily capture timer runs.
-3. Pruning stays off (`prune=None`) until `<obs-checkout>` indexes the store at
-   contract-2 readiness (see `docs/specs/2026-09-30-session-archive-design.md`), the
-   `claude`-else-`codex` branches in `tools/session_archive/inputs.py`, `decide.py` and
-   `prune.py` dispatch `<kind>` explicitly, and live pruning is separately approved.
+   run (`EX_HOST`), for every harness, if any source's home or root is a symlink, or if
+   a root is missing and the source is either required or already captured (an optional
+   source whose root is absent and never captured is skipped). Once a required `Source`
+   lands, run `mkdir -p <Source.root>` on **every** archive-configured host before the
+   daily capture timer runs.
+3. Pruning is opt-in per harness: give the `Source` a `PruneHooks` and `decide.py` and
+   `prune.py` dispatch through it; `prune=None` means the archive never prunes it. Do so
+   only once `<obs-checkout>` indexes the store at contract-2 readiness (see
+   `docs/specs/2026-09-30-session-archive-design.md`), the obs identity check in
+   `tools/session_archive/inputs.py` accepts the harness, and live pruning is separately
+   approved.
    Never add a harness's `comm` to `uninspectable_ok` in
    `~/.config/session-archive/config.toml`: that would suppress `InspectionFailed`
    during `prune` and risk deleting open session files. Archive tests use temporary

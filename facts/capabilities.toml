@@ -589,7 +589,7 @@ value = false
 version = "1.4.12"
 date = 2026-11-01
 evidence = "hq-57d68e"
-note = "An agy transcript names neither its working directory nor its title; both live only in the conversation summaries database (workspace_uris, title), so hq sessions and session-episodes read that database."
+note = "An agy transcript names neither its working directory nor its title; both live only in the conversation summaries database (workspace_uris, title), so hq sessions reads that database (session-episodes does not)."
 
 [facts.transcript-self-describing.harness.claude-code]
 status = "probed"
