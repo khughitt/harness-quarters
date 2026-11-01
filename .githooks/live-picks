@@ -65,8 +65,16 @@ import stat
 import sys
 import tomllib
 
-import harness_state
-from harness_state import TOML_HEADER, TOML_KEY
+try:
+    import harness_state
+    from harness_state import TOML_HEADER, TOML_KEY
+except (ImportError, SyntaxError) as error:
+    # A module that will not import (conflict markers after a merge) must not traceback.
+    message = f"live-picks: cannot load .githooks/harness_state.py: {error}; resolve or restore it"
+    if sys.argv[1:2] == ["hook"]:
+        print(f"{message}\nlive-picks: a pick was not restored; the next turn end retries", file=sys.stderr)
+        sys.exit(0)
+    sys.exit(message)
 
 CHECKOUT = harness_state.Checkout("live-picks")
 fail = CHECKOUT.fail

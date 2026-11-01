@@ -1236,11 +1236,15 @@ def damage_manifest(path, damage):
         path.unlink()
     elif damage == "truncated":
         path.write_text(path.read_text()[:path.read_text().index("[harnesses.agy.live_state]") + 18])
+    elif damage == "format-list":
+        text = path.read_text()
+        assert 'format = "json"' in text
+        path.write_text(text.replace('format = "json"', 'format = ["json"]', 1))
     else:
         path.write_bytes(b"schema = 1\n\xff\xfe\n")
 
 
-@pytest.mark.parametrize("damage", ["truncated", "non-utf8", "missing"])
+@pytest.mark.parametrize("damage", ["truncated", "non-utf8", "missing", "format-list"])
 def test_broken_manifest_hook_exits_zero_with_retry_while_cli_fails_and_bad_args_print_usage(
         repo, tmp_path, damage):
     home = isolated_home(repo, tmp_path)
@@ -2167,3 +2171,24 @@ def test_agy_foreign_symlink_is_ignored_and_directory_at_link_is_refused(repo, t
     assert "not a regular file" in dir_res.stderr
     assert "Traceback" not in dir_res.stderr
     assert link.is_dir() and not link.is_symlink()
+
+
+@pytest.mark.parametrize("damage", ["conflict", "syntax"])
+def test_unimportable_harness_state_hook_exits_zero_with_retry_while_cli_fails(
+        repo, tmp_path, damage):
+    home = isolated_home(repo, tmp_path)
+    module = repo / ".githooks/harness_state.py"
+    module.write_text("<<<<<<< ours\nx = 1\n=======\nx = 2\n>>>>>>> theirs\n"
+                      if damage == "conflict" else "def (:\n")
+
+    hook = isolated_picks(repo, home, "hook", "post-merge")
+    cli = isolated_picks(repo, home, "capture")
+
+    assert hook.returncode == 0, hook.stderr
+    assert "live-picks: cannot load .githooks/harness_state.py: " in hook.stderr
+    assert "resolve or restore it" in hook.stderr
+    assert "the next turn end retries" in hook.stderr
+    assert cli.returncode != 0
+    assert cli.stderr.startswith("live-picks: cannot load .githooks/harness_state.py: ")
+    for result in (hook, cli):
+        assert "Traceback" not in result.stderr

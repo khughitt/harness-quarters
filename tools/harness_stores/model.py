@@ -32,7 +32,7 @@ class Session:
 
 @dataclass(frozen=True)
 class Adapter:
-    slug: str                     # canonical harness slug (facts/capabilities.toml)
+    slug: str                     # canonical harness slug (harnesses.toml, [harnesses.<slug>])
     alias: str                    # the `hq sessions --harness` value
     colour: color.Colour
     home_variable: str | None     # environment variable naming a work home

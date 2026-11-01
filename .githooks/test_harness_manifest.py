@@ -172,14 +172,61 @@ clean_keys = ["k"]
                                      'pick_units = [["m", "e"]]\nunrestored_keys = ["m"]', TOML_ENTRY),
     "json-unknown-live-key": replaced('format = "json"', 'format = "json"\ntrust_table = "x"'),
     "bad-format": replaced('"json"', '"yaml"'),
+    "format-list": replaced('format = "json"', 'format = ["json"]'),
+    "format-table": replaced('format = "json"', 'format = {json = 1}'),
 }
+
+# The invariant each case above must trip: the message names it, so one invariant cannot
+# break unnoticed while another still fires.
+EXPECTED = {
+    "schema2": "schema must be the integer 1",
+    "schema-bool": "schema must be the integer 1",
+    "schema-float": "schema must be the integer 1",
+    "top-unknown": "has unknown key 'extra'",
+    "empty-harnesses": "harnesses must be a non-empty table",
+    "bad-slug": "must match [a-z][a-z0-9-]*",
+    "unknown-key": "has unknown key 'foo'",
+    "config-star": "must not hold glob characters",
+    "config-dotdot": "must not have empty, '.' or '..' segments",
+    "config-local": "must be outside local/",
+    "config-noslash": "must be directory-qualified",
+    "glob-question": "may use '*' as its only wildcard",
+    "glob-class": "may use '*' as its only wildcard",
+    "glob-doublestar": "at most one '*' per '/' segment",
+    "glob-two-star": "at most one '*' per '/' segment",
+    "config-not-in-glob": "does not match filter_glob",
+    "dup-config": "is used by both pi and dup",
+    "dup-glob": "filter_glob 'pi/settings*.json' is used by both pi and dup",
+    "glob-overlap": "overlaps 'a/s-x*.json'",
+    "bad-regex-table": "is not a valid regex",
+    "bad-regex-clean-tables": "is not a valid regex",
+    "trust-not-in-tables": "must appear in clean_tables",
+    "record-without-units": "picks_record and pick_units must both be present or both omitted",
+    "units-without-record": "picks_record and pick_units must both be present or both omitted",
+    "record-outside-local": "must be local/<filename>",
+    "record-dotdot": "must be local/<filename>",
+    "units-overlap-across": "must not repeat a key within or across units",
+    "units-overlap-within": "must not repeat a key within or across units",
+    "json-key-missing": "must equal the filtered keys",
+    "json-key-in-both": "unrestored_keys overlaps pick_units",
+    "toml-top-key-missing": "must equal the filtered top-level keys",
+    "toml-top-key-in-both": "unrestored_keys overlaps pick_units",
+    "json-unknown-live-key": "has unknown key 'trust_table' for format 'json'",
+    "bad-format": 'format must be "json" or "toml"',
+    "format-list": 'format must be "json" or "toml"',
+    "format-table": 'format must be "json" or "toml"',
+}
+
+
+def test_every_violation_case_names_its_invariant():
+    assert set(EXPECTED) == set(VIOLATIONS)
 
 
 @pytest.mark.parametrize("name", sorted(VIOLATIONS))
 def test_manifest_validation_refuses_each_schema_and_partition_violation(tmp_path, name):
     with pytest.raises(hs.ManifestError) as caught:
         manifest_from(tmp_path, VIOLATIONS[name])
-    assert caught.value.problems
+    assert any(EXPECTED[name] in problem for problem in caught.value.problems), caught.value.problems
 
 
 def test_valid_fixtures_load(tmp_path):

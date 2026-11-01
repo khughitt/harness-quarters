@@ -212,6 +212,17 @@ def test_broken_manifest_drains_stdin_skips_staging_and_fails_cleanly(repo, tmp_
     assert marked(repo)
 
 
+def test_unimportable_harness_state_drains_stdin_and_fails_with_a_named_message(repo, tmp_path):
+    (repo / ".githooks" / "harness_state.py").write_text("<<<<<<< ours\nx = 1\n=======\nx = 2\n>>>>>>> theirs\n")
+
+    result = refresh(repo, cwd=tmp_path, payload="x" * (4 * 1024 * 1024))
+
+    assert result.returncode != 0
+    assert result.stderr.startswith("harness-state-refresh: cannot load .githooks/harness_state.py: ")
+    assert "resolve or restore it" in result.stderr
+    assert "BrokenPipe" not in result.stderr and "Traceback" not in result.stderr
+
+
 def test_clean_only_harness_is_filtered_and_refreshed_end_to_end(repo, tmp_path):
     (repo / "extra").mkdir()
     (repo / "harnesses.toml").write_text(

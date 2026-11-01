@@ -44,7 +44,13 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
-import harness_state
+try:
+    import harness_state
+except (ImportError, SyntaxError) as error:
+    # A harness hook: drain its stdin payload, then fail with a named message, not a traceback.
+    sys.stdin.read()
+    sys.exit(f"harness-state-refresh: cannot load .githooks/harness_state.py: {error}; "
+             "resolve or restore it")
 
 REPO = HERE.parent
 TRUST = HERE / "codex-trust"

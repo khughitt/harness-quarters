@@ -270,7 +270,7 @@ def _parse_live_state(name, table, problems):
         return None
     start = len(problems)
     fmt = table.get("format")
-    if fmt not in ALLOWED_KEYS:
+    if not isinstance(fmt, str) or fmt not in ALLOWED_KEYS:
         problems.append(f'{label}.format must be "json" or "toml"')
         return None
     for key in sorted(set(table) - ALLOWED_KEYS[fmt]):

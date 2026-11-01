@@ -22,8 +22,13 @@ from pathlib import Path
 if str(Path(__file__).resolve().parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import harness_state
-from harness_state import TOML_HEADER, TOML_KEY, clean_json, clean_toml  # noqa: F401  re-exported
+try:
+    import harness_state
+    from harness_state import TOML_HEADER, TOML_KEY, clean_json, clean_toml  # noqa: F401  re-exported
+except (ImportError, SyntaxError) as error:
+    # Git runs this filter as required: a traceback here fails every status, diff and add.
+    sys.exit(f"harness-state-clean: cannot load .githooks/harness_state.py: {error}; "
+             "resolve or restore it")
 
 # harnesses.toml names each config this filter cleans, the keys and tables it drops, and
 # the path glob .gitattributes routes to it.
@@ -44,7 +49,11 @@ def main(argv):
     matches = [spec for spec in MANIFEST.live_state if spec.filter_re.fullmatch(path)]
     if not matches:
         sys.exit(f"harness-state-clean: {path} is not a harness config; check .gitattributes")
-    sys.stdout.write(harness_state.clean_for_spec(matches[0], text))
+    try:
+        cleaned = harness_state.clean_for_spec(matches[0], text)
+    except ValueError as error:  # includes json.JSONDecodeError and the non-object refusal
+        sys.exit(f"harness-state-clean: {path}: {error}; fix the file, then retry")
+    sys.stdout.write(cleaned)
 
 
 if __name__ == "__main__":

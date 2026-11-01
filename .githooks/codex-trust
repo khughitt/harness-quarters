@@ -31,7 +31,15 @@ import os
 import sys
 import tomllib
 
-import harness_state
+try:
+    import harness_state
+except (ImportError, SyntaxError) as error:
+    # A module that will not import (conflict markers after a merge) must not traceback.
+    message = f"codex-trust: cannot load .githooks/harness_state.py: {error}; resolve or restore it"
+    if sys.argv[1:2] == ["hook"]:
+        print(f"{message}\ncodex-trust: trust not restored; the next turn end retries", file=sys.stderr)
+        sys.exit(0)
+    sys.exit(message)
 
 CHECKOUT = harness_state.Checkout("codex-trust")
 HERE = harness_state.HERE

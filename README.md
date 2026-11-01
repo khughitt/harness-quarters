@@ -55,7 +55,13 @@ therefore runs each harness's default model and effort until the first pick.
 While `harnesses.toml` is broken (bad TOML, or an entry its validation refuses), the
 filter fails, and so does every git command that runs it on a changed config: nothing
 unfiltered is staged. Restore the manifest (`git checkout -- harnesses.toml`, or fix
-it); never unset `filter.harness-state.required` to get past it. A config blob staged
+it); never unset `filter.harness-state.required` to get past it. The same refusal
+follows a live config that is not valid JSON (a trailing comma, JSONC) or a
+`.githooks/harness_state.py` that will not import: the filter prints
+`harness-state-clean: <path>: <problem>` (or `cannot load .githooks/harness_state.py`)
+and git stops; fix the file or restore the module. During a merge or rebase,
+`git checkout -- harnesses.toml` fails on an unmerged path: resolve the conflict, or run
+`git merge --abort` / `git rebase --abort`, instead. A config blob staged
 while the filter was not configured (before `just setup`, or across a checkout of a
 commit older than the manifest) keeps the picks it was staged with; the pre-commit hook
 refuses it until `git add --renormalize <path>` stages it through the filter.

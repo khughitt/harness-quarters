@@ -344,7 +344,12 @@ are cleaned line by line, keeping comments and every other table intact.
   markers such as `pi`'s `lastChangelogVersion`).
 - **Failure and recovery**: while `harnesses.toml` is broken, `git add`, `git diff` and
   `git status` on a changed config fail; restore the manifest (`git checkout --
-  harnesses.toml`), never unset `required`. A blob staged before `just setup` holds
+  harnesses.toml`), never unset `required`. The filter also refuses, with
+  `harness-state-clean: <path>: <problem>`, a live config that is not valid JSON, and
+  `cannot load .githooks/harness_state.py` when that module will not import (conflict
+  markers); fix the file or restore the module. During a merge or rebase `git checkout --
+  harnesses.toml` fails on an unmerged path: resolve the conflict, or run `git merge
+  --abort` / `git rebase --abort`, instead. A blob staged before `just setup` holds
   its picks; the pre-commit hook refuses it until `git add --renormalize <path>`.
 
 ### 3.4 Preserve user picks across checkouts in `.githooks/live-picks`
@@ -777,7 +782,7 @@ transcript does not name its own working directory).
 ### The adapter (`hq`)
 
 1. **`tools/harness_stores/<name>.py`**: define the `Adapter` fields: `slug` (the key in
-   `facts/capabilities.toml`), `alias` (the `hq sessions --harness` value),
+   `harnesses.toml`, `[harnesses.<slug>]`), `alias` (the `hq sessions --harness` value),
    `colour`, `home_variable` (the environment variable naming a work home, or `None`),
    `homes(user_home)` returning `Home` entries, `list_sessions(home, archived)` returning
    `(list[Session], counts)`, `notes_segment` for the footer, `exclusion_reasons`,

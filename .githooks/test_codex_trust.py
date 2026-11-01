@@ -742,3 +742,38 @@ def test_broken_manifest_hook_exits_zero_while_cli_fails(repo, tmp_path):
                             cwd=tmp_path, text=True, capture_output=True, env=child_env(repo))
     assert silent.returncode == 0
     assert silent.stderr == ""
+
+
+def test_wrong_typed_manifest_format_hook_exits_zero_with_retry(repo):
+    text = (repo / "harnesses.toml").read_text()
+    assert 'format = "json"' in text
+    (repo / "harnesses.toml").write_text(text.replace('format = "json"', 'format = ["json"]', 1))
+
+    hook = trust(repo, "hook", "post-checkout")
+    cli = trust(repo, "capture")
+
+    assert hook.returncode == 0, hook.stderr
+    assert "codex-trust: trust not restored; the next turn end retries" in hook.stderr
+    assert cli.returncode != 0
+    for result in (hook, cli):
+        assert "codex-trust:" in result.stderr
+        assert "Traceback" not in result.stderr
+
+
+@pytest.mark.parametrize("damage", ["conflict", "syntax"])
+def test_unimportable_harness_state_hook_exits_zero_with_retry_while_cli_fails(repo, damage):
+    (repo / ".githooks" / "harness_state.py").write_text(
+        "<<<<<<< ours\nx = 1\n=======\nx = 2\n>>>>>>> theirs\n" if damage == "conflict"
+        else "def (:\n")
+
+    hook = trust(repo, "hook", "post-merge")
+    cli = trust(repo, "capture")
+
+    assert hook.returncode == 0, hook.stderr
+    assert "codex-trust: cannot load .githooks/harness_state.py: " in hook.stderr
+    assert "resolve or restore it" in hook.stderr
+    assert "codex-trust: trust not restored; the next turn end retries" in hook.stderr
+    assert cli.returncode != 0
+    assert cli.stderr.startswith("codex-trust: cannot load .githooks/harness_state.py: ")
+    for result in (hook, cli):
+        assert "Traceback" not in result.stderr
