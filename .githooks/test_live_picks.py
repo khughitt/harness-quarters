@@ -1501,6 +1501,18 @@ def pre_pi_hooks():
         check=True, capture_output=True).stdout for name in HOOK_FILES}
 
 
+def pinned_blob(scratch, path):
+    """PRE_PI_COMMIT's blob of path, read from this checkout by git with an environment
+    built key by key: no inherited GIT_* variable, a HOME and global config under scratch."""
+    home = scratch / "pinned-read-home"
+    home.mkdir(exist_ok=True)
+    (home / ".gitconfig").touch()
+    env = {"PATH": os.environ["PATH"], "HOME": str(home), "XDG_CONFIG_HOME": str(home / ".config"),
+           "GIT_CONFIG_GLOBAL": str(home / ".gitconfig"), "GIT_CONFIG_NOSYSTEM": "1"}
+    return subprocess.run(["git", "-C", str(HOOKS.parent), "show", f"{PRE_PI_COMMIT}:{path}"],
+                          env=env, check=True, capture_output=True).stdout
+
+
 def install_pre_pi_hooks(repo, pre_pi_hooks):
     for name, content in pre_pi_hooks.items():
         (repo / ".githooks" / name).write_bytes(content)
@@ -1605,9 +1617,7 @@ def test_pinned_pre_pi_commands_leave_the_pi_record_untouched(repo, pre_pi_hooks
     install_pre_pi_hooks(repo, pre_pi_hooks)
     # A rollback brings back the pinned commit's .gitattributes with its hooks: under the
     # required filter, the pinned clean filter refuses the agy path it predates.
-    (repo / ".gitattributes").write_bytes(subprocess.run(
-        ["git", "-C", str(HOOKS.parent), "show", f"{PRE_PI_COMMIT}:.gitattributes"],
-        check=True, capture_output=True).stdout)
+    (repo / ".gitattributes").write_bytes(pinned_blob(repo.parent, ".gitattributes"))
 
     with owned_process([str(repo / ".githooks" / command[0]), *command[1:]]) as result:
         _, err = result.communicate("", timeout=10)

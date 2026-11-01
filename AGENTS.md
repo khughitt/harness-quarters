@@ -8,7 +8,9 @@ Authority: `docs/specs/2026-10-06-residue-design.md`
 
 ## Setup
 
-Run `just setup` once per checkout, and again on each host after pulling a change to it.
+Run `just setup` once per checkout, and once on each host after pulling a change to the
+recipe; it is idempotent. The repository git config it writes (`filter.harness-state.*`
+included) lives in the synced checkout and is shared between hosts.
 It installs the git hooks and the harness-state filter (`filter.harness-state.clean`,
 `required = true` so a failing clean stops git instead of staging live picks, and the
 identity `smudge = cat`, without which git fails every checkout of a required-filter

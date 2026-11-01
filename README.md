@@ -23,9 +23,11 @@ Once per clone:
 
 It points `core.hooksPath` at `.githooks`, registers the `harness-state` filter, and
 creates `local/codex/rules/`. `local/` is untracked (see Layout). The work configs
-under it come from another host's `local/`, never from `just setup`. The checkout is
-shared between hosts but git config is not: after pulling a change to `just setup`, run
-it once on each host.
+under it come from another host's `local/`, never from `just setup`. The repository's git
+config, these filter keys included, lives in the checkout's `.git`, which syncs between
+hosts with the rest of the checkout, so one host's `just setup` reaches the others. A
+host still runs `just setup` once after pulling a change to the recipe: it is
+idempotent, and it does not rely on the synced config or `local/` having arrived.
 
 The filter is three keys of git config. `filter.harness-state.clean` runs
 `.githooks/harness-state-clean %f`. `filter.harness-state.required = true` makes a

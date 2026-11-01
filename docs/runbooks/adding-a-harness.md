@@ -327,8 +327,10 @@ matches it and exits non-zero for any other path, JSON or TOML. `just setup` wri
 filter config: `filter.harness-state.clean = .githooks/harness-state-clean %f`,
 `required = true`, so a failing clean (a broken manifest, an unparsable config) stops
 git instead of staging live picks, and `smudge = cat`, the identity, because git treats a
-required filter with no smudge as failed at every checkout of a filtered file. Every host
-runs `just setup` again after pulling a change to it.
+required filter with no smudge as failed at every checkout of a filtered file. That
+config lives in the repository's `.git`, which the synced checkout shares between hosts;
+each host still runs `just setup` once after pulling a change to the recipe, which is
+idempotent.
 
 What the filter does with the declared keys: JSON configs are parsed strictly and
 re-serialized with `json.dumps(indent=2, ensure_ascii=False)`, so a JSONC file (with

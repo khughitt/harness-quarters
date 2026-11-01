@@ -439,6 +439,19 @@ def test_required_filter_fails_closed_on_broken_manifest_without_leaking_picks(t
     assert staged(repo, env, "pi/settings.json") == '{\n  "theme": "system"\n}\n'
     assert staged(repo, env, "claude/settings.json") == '{\n  "theme": "dark"\n}\n'
 
+    # A deleted manifest fails closed the same way.
+    (repo / "pi/settings.json").write_text(
+        '{\n  "theme": "system",\n  "deviceId": "dev-2",\n  "trackingId": "track-2"\n}\n')
+    (repo / "harnesses.toml").unlink()
+    added = git(repo, env, "add", "--", "pi/settings.json", check=False)
+    assert added.returncode != 0
+    assert "harness-state-clean" in added.stderr and "harnesses.toml" in added.stderr
+    blob = staged(repo, env, "pi/settings.json")
+    assert not any(leak in blob for leak in ("dev-2", "track-2")), blob
+    git(repo, env, "checkout", "--", "harnesses.toml")
+    assert git(repo, env, "add", "--", "pi/settings.json", check=False).returncode == 0
+    assert staged(repo, env, "pi/settings.json") == '{\n  "theme": "system"\n}\n'
+
     # A .toml path no filter_glob declares, routed through the filter, is refused unstaged.
     with (repo / ".gitattributes").open("a") as attributes:
         attributes.write("notes/*.toml filter=harness-state\n")
