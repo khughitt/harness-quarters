@@ -1,18 +1,21 @@
 ---
 id: hq-ac67e4
 title: Converge agy ~/.gemini/config links on europa and reconcile ~/.gemini/antigravity-cli/settings.json live-state drift across titan and europa
-status: doing
+status: done
 priority: 2
 size: s
 complexity: mid
 process: direct
 owner: main
 created: 2026-11-01T22:03:31Z
-updated: 2026-11-01T23:54:46Z
+updated: 2026-11-01T23:54:47Z
 started: 2026-11-01T22:06:20Z
+completed: 2026-11-01T23:54:47Z
+closed: 2026-11-01T23:54:47Z
 depends: []
 tags: [hooks]
 source: hq-8af61d
+model: claude-opus-5-5
 agent: agy
 origin: user
 ---
@@ -55,3 +58,7 @@ Where: links.toml, harnesses.toml, agy/settings.json, tools/harness-links, tools
 - 2026-11-01T23:52:51Z (main): User approved in session (2026-11-01): 'Yes; approved.' — merge into main and run just link --apply on europa. Merged as 254f0140.
 - 2026-11-01T23:54:44Z (main): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-ac67e4","state":"removed","verification":"verified","purpose":"branch feat/hq-ac67e4-agy-bootstrap merged into main 254f0140 and deleted","ignored":"pycache and .pytest_cache discarded (regenerable)","checks":"tt-report run; no host pointer resolved into the worktree; worktree status clean"}
 - 2026-11-01T23:54:46Z (main): Rollout (approved): europa just link reported adopt + 3 creates; just link --apply exit 0; just link-check ok on europa and titan. Shared picks now include europa's /home/keith/d/dotfiles trust and seasonalThemesOptIn; tracked keys (permissions, allowNonWorkspaceAccess, showFeedbackSurvey, statusLine) intact. titan agy/settings.json stat mark cleared by harness-state-refresh; git status clean except pre-existing codex/config.toml (not this task's). europa's temporary /tmp backup of the first-run file removed after verification (contents recorded in the task body). Processes: host-load --section session nothing left running. Nothing pushed.
+- 2026-11-01T23:54:47Z (main): done
+  provenance: {"harness_session":"claude-code:6dcbd897-967a-4e20-a982-604b9c48faaf","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-01T23:54:47Z (main): First-run agy settings adoption (live-picks first-run, run by harness-links --apply before any link) and agy key classification landed in main 254f0140; europa and titan converge (just link-check ok) with agy/settings.json clean. Verification and deferred minors in notes; flake filed as hq-457348.
+  provenance: {"harness_session":"claude-code:6dcbd897-967a-4e20-a982-604b9c48faaf","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
