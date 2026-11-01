@@ -7,7 +7,7 @@ size: s
 complexity: low
 process: direct
 created: 2026-11-01T11:43:17Z
-updated: 2026-11-01T11:43:17Z
+updated: 2026-11-01T11:43:18Z
 depends: []
 tags: [hooks]
 source: hq-b24c39
@@ -28,3 +28,4 @@ Where: .githooks/live-picks, .githooks/test_live_picks.py, tools/harness-links, 
 
 - 2026-11-01T11:43:17Z (add): created
   provenance: {"origin":"agent"}
+- 2026-11-01T11:43:18Z (main): concerns: hq-b24c39 defect — harden detached settings parse and post-sync diagnostics, relink inode race check, and links.toml anchor parity deferred from hq-b24c39 round 1 review
