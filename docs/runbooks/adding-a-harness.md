@@ -60,18 +60,17 @@ for repo in <hq-checkout> <lore-checkout> <ops-checkout> <relay-checkout> \
   git -C "$repo" grep -n -I -E \
     "claude-code|opencode|\"claude\"|'claude'|\"codex\"|'codex'|CLAUDECODE|CODEX_(CI|THREAD_ID|SESSION_ID)|CLAUDE_CODE_SESSION_ID" \
     -- ':!tasks/' ':!docs/specs/' ':!docs/plans/'
+  # bare TOML keys and path-shaped constants the first pattern misses
+  git -C "$repo" grep -n -I -E \
+    '(^|[^a-z-])(claude|codex)[[:space:]]*=|\[harness\.|"(claude|codex)/' \
+    -- ':!tasks/' ':!docs/specs/' ':!docs/plans/'
 done
 ```
 
-The pattern needs a quote or the full slug, so it misses bare TOML keys
-(`claude = "~/.claude"` in `<ops-checkout>/profiles.toml`, `[harness.claude]` in
-`links.toml`) and path-shaped constants (`"claude/settings.json"` in
-`.githooks/harness-state-refresh` and `live-picks`). Search for those too:
-
-```sh
-git -C "$repo" grep -n -I -E '(^|[^a-z-])(claude|codex)[[:space:]]*=|\[harness\.|"(claude|codex)/' \
-  -- ':!tasks/' ':!docs/specs/' ':!docs/plans/'
-```
+The second pattern catches what the first cannot without a quote or the full slug: bare
+TOML keys (`claude = "~/.claude"` in `<ops-checkout>/profiles.toml`, `[harness.claude]`
+in `links.toml`) and path-shaped constants (`"claude/settings.json"` in
+`.githooks/harness-state-refresh` and `live-picks`).
 
 Hits run to hundreds in the larger repositories, mostly tests. Group them by file and
 classify each site before editing it:
@@ -96,7 +95,7 @@ rejects the new harness until it is extended. A hit inside a two-way branch
 | `<ops-checkout>/bin/tt` | copy in every project | broadcast: `just vendor-publish tt` from ops after the merge (not an adoption pass) | when the broadcast lands |
 | `<lore-checkout>/vendor/superpowers` | submodule pinned to `github.com/obra/superpowers` | upstream contribution or fork, then a pin bump in lore | when lore's pin bump merges |
 | relay `test/fixtures/ancestry.json` (and `handles.json`) | byte copy in `<tasks-checkout>/tests/fixtures/relay/`, pinned to a relay revision in its README | copy the file from the newer relay revision and update that revision in one tasks commit | tasks tests only |
-| `<relay-checkout>` source | the CLI pin in `relay/package.json` and `relay/package-lock.json`; each harness's hook images name a fixed versioned runtime path | `just relay-install` into the versioned root on this host **before** merging the pin, on other hosts as soon as it syncs; hook images move per harness under their own approval ([Pinned relay runtime](relay-runtime.md)) | CLI pin: on merge, on every host sharing the checkout (the launcher exits 127 where that version is not installed). Hook images: at each harness's hook apply |
+| `<relay-checkout>` source | the CLI pin in `relay/package.json` and `relay/package-lock.json`; each harness's hook images name a fixed versioned runtime path | `just relay-install` into the versioned root on this host **before** merging the pin, on other hosts as soon as it syncs; hook images (the tracked hook configs) move per harness in their own hq merge, under their own approval ([Pinned relay runtime](relay-runtime.md)) | CLI pin and hook images: both on merge, on every host sharing the checkout. The launcher exits 127, and a hook image's command cannot start, where the version it names is not installed, so every host installs first |
 | `relay/subscribers.template.json` | rendered to `~/.config/relay/subscribers.json`, one file read by **every** relayed harness's hook images | `just relay-subscribers` (with `FORCE=1` over a different file) on each host | per host, at render. A file naming a harness outside a runtime's closed list fails to load in that runtime, which then denies every refusable event (see section 6, Subscribers) |
 | hook scripts in `<ops-checkout>/hooks`, `<lore-checkout>/hooks`, `agy/hook` | invoked by path from the tracked hook configs and the subscriber file | none | on merge to each owner's main |
 | `links.toml` | home links on each host | `just link --apply` from `<hq-checkout>` main on each host | per host, at apply |
@@ -205,9 +204,9 @@ real directory (not a symlink), and refuses to overwrite an existing real file; 
 refusal aborts the whole `--apply` pass with no partial writes.
 
 1. Land every target named in `links.toml` in its owning project's main checkout.
-2. After the approval in section 8 step 1, from `<hq-checkout>` on `main` (never a
-   worktree, which would leave live harnesses pointing into temporary storage), create
-   the home and converge links **before** the harness's first interactive run:
+2. After the section 3.1 save probe and the approval in section 8 step 1, from
+   `<hq-checkout>` on `main` (never a worktree, which would leave live harnesses
+   pointing into temporary storage), create the home and converge links **before** the harness's first interactive run:
 
    ```sh
    mkdir -p ~/.<harness>
@@ -238,8 +237,10 @@ Probe this before section 2 links the live home, in a disposable one: the clean 
 is not wired yet, so an in-place save into the live link would write runtime keys
 unfiltered into main's working tree, and an atomic save would leave a real file that
 `just link-check` then refuses. Point the harness's config-directory variable (or
-`HOME`) at a temporary directory whose settings file is a symlink to a scratch copy,
-change a setting inside the harness, and check:
+`HOME`) at a temporary directory whose settings file is a symlink to a scratch copy.
+If the harness then has no credentials, copy only its credential file into the
+temporary home (as `<ops-checkout>/bin/relay-guard-probe` `CREDENTIALS` does) and delete
+it afterwards. Change a setting inside the harness, and check:
 
 ```sh
 readlink -f <temp-home>/<settings-file>   # still resolves to the scratch copy
@@ -608,8 +609,10 @@ the same change that widens its parser.
   1. land and install a relay release whose `HARNESSES` includes the new slug (and, for
      a guard subscriber, whose new adapter declares `refuse` for its before-tool
      events);
-  2. with approval, move **every** relayed harness's hook images to that release
-     ([Pinned relay runtime](relay-runtime.md));
+  2. once **every** host sharing the checkout has installed that release, move every
+     relayed harness's hook images to it in one approved hq merge, with the Codex
+     no-process and `/hooks` re-trust steps ([Pinned relay runtime](relay-runtime.md));
+     the merge takes effect on every host at once;
   3. only then, with approval, add the slug to the template and run
      `just relay-subscribers` on each host;
   4. run one hook from an existing harness (a harmless command in Claude Code and in
@@ -767,10 +770,11 @@ present home's metadata is missing, unreadable or at an unexpected schema versio
    images, the subscriber file, archive pruning) needs the user's approval under every
    profile, and approving a docs change or a plan does not grant it. Ask per surface,
    naming when it activates:
-   - hook scripts, tracked settings and runtime CLI pins take effect when they merge to
-     their owner's main, on every host sharing the checkout;
-   - `links.toml`, hook images and the subscriber file take effect on each host's
-     `just link --apply`, hook apply and `just relay-subscribers`.
+   - hook scripts, tracked settings, runtime CLI pins and hook images (tracked hook
+     configs) take effect when they merge to their owner's main, on every host sharing
+     the checkout;
+   - `links.toml` and the subscriber file take effect on each host's
+     `just link --apply` and `just relay-subscribers`.
 2. **Verify in worktrees, then land in order**: `ops` first when `cli.toml`, `tt` or
    shared hooks change; then each consumer (`relay`, `tasks`, `obs`, `familiar`,
    `lore`) with its adoption in the same change; then `hq`. Each project verifies by its
@@ -784,11 +788,13 @@ present home's metadata is missing, unreadable or at an unexpected schema versio
    every runtime version a hook image names recoverable. Follow
    [Pinned relay runtime](relay-runtime.md) for relay state preservation and rollback;
    never reset or downgrade durable state to recover.
-4. **Per host, in this order**: install the newly pinned runtimes as soon as the merge
-   syncs; `mkdir -p` any new `Source.root` on archive-configured hosts; move hook images
-   and only then render subscribers (section 6, Subscribers, ordering hazard); then
-   `mkdir -p <home>`, `just link --apply` and `just link-check` from `<hq-checkout>`
-   main before the harness's first interactive run.
+4. **Across hosts, in this order** (section 6, Subscribers, ordering hazard):
+   1. on every host, install each runtime version a pin or hook image will name, and
+      `mkdir -p` any new `Source.root` on archive-configured hosts;
+   2. once, globally: the hq merge that moves the hook images;
+   3. on each host: render subscribers, then `mkdir -p <home>`, `just link --apply` and
+      `just link-check` from `<hq-checkout>` main before the harness's first
+      interactive run.
 5. **One end-to-end check per configuration path**: verify every selected layer on one
    host and one profile; other hosts and profiles configured by the same process count
    as covered. A host or profile reached through a different path gets its own check.
