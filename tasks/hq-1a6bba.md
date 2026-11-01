@@ -1,17 +1,15 @@
 ---
 id: hq-1a6bba
 title: "Migrate harness-state-clean, harness-state-refresh, and codex-trust to harnesses.toml"
-status: done
+status: todo
 priority: 2
 size: s
 complexity: mid
 process: direct
 owner: feat/hq-2eba07-harness-manifest
 created: 2026-11-01T13:14:43Z
-updated: 2026-11-01T16:44:23Z
+updated: 2026-11-01T18:20:13Z
 started: 2026-11-01T15:38:31Z
-completed: 2026-11-01T16:44:23Z
-closed: 2026-11-01T16:44:23Z
 depends: [hq-f5ccb6]
 parent: hq-2eba07
 tags: [hooks]
