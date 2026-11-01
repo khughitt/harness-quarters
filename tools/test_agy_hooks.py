@@ -63,14 +63,15 @@ def write_facts_fixture(path: Path, wake_status="probed", wake_value=True, kinds
     )
     base = (ROOT / "facts" / "capabilities.toml").read_text()
     doc = tomllib.loads(base)
-    lines = ["schema = 1\n", f'harnesses = {json.dumps(doc["harnesses"])}\n']
+    slugs = list(tomllib.loads((ROOT / "harnesses.toml").read_text())["harnesses"])
+    lines = ["schema = 1\n"]
     for fact_name, fact in doc["facts"].items():
         lines.append(f"\n[facts.{fact_name}]\n")
         lines.append(f'type = {json.dumps(fact["type"])}\n')
         lines.append(f'description = {json.dumps(fact["description"])}\n')
         if "probe" in fact:
             lines.append(f'probe = {json.dumps(fact["probe"])}\n')
-        for harness in doc["harnesses"]:
+        for harness in slugs:
             if harness == "agy" and fact_name == "controller-wake":
                 lines.append(f"\n[facts.{fact_name}.harness.{harness}]\n{wake_entry}")
             elif harness == "agy" and fact_name == "controller-wake-kinds":
@@ -710,6 +711,7 @@ def make_agy_checkout(tmp_path: Path):
     (repo / ".githooks").mkdir(parents=True)
     for name in ("harness-state-clean", "harness_state.py", "codex-trust", "live-picks", "harness-state-refresh"):
         shutil.copy2(ROOT / ".githooks" / name, repo / ".githooks" / name)
+    shutil.copy2(ROOT / "harnesses.toml", repo / "harnesses.toml")
     (repo / "agy").mkdir()
     shutil.copy2(HOOK, repo / "agy" / "hook")
     for folder in ("claude", "codex", "pi"):
@@ -755,6 +757,8 @@ def make_agy_checkout(tmp_path: Path):
         env=env,
         check=True,
     )
+    subprocess.run(["git", "-C", str(repo), "config", "filter.harness-state.required", "true"], env=env, check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "filter.harness-state.smudge", "cat"], env=env, check=True)
     subprocess.run(["git", "-C", str(repo), "add", "-A"], env=env, check=True)
     subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "init"], env=env, check=True)
 

@@ -6,7 +6,11 @@ After refusing every staged path under local/, this hook runs the vendored tools
 (guide references, layout, vendored contracts) and then the vendored tools/ops-docs, both
 against the working tree as they read it everywhere, preserving the README/AGENTS identity
 contract.
-The staged tools/harness-facts must pass its own check over the staged tree.
+The staged tools/harness-facts must pass its own check over the staged tree, and the staged
+.githooks/harness_state.py its own `check --staged-tree` over it: harnesses.toml,
+.gitattributes and every staged harness config blob as staged, and the filter config
+(`filter.harness-state.clean`, `required = true`, `smudge = cat`) of the real repository,
+which a linked worktree shares. The tree is exported once for both.
 Installed by git config core.hooksPath .githooks.
 """
 import os
@@ -66,6 +70,7 @@ def local_layer():
 
 FACTS = "facts/capabilities.toml"
 FACTS_TOOL = pathlib.Path("tools") / "harness-facts"
+MANIFEST_TOOL = pathlib.Path(".githooks") / "harness_state.py"
 
 
 def git(*args, env=None):
@@ -77,40 +82,85 @@ def staged_tree(directory):
     write-tree and a fresh index, so intent-to-add entries, which the commit leaves out,
     stay out, and skip-worktree or sparse entries, which it keeps, come along. It works
     on a copy of the index being committed, so it neither takes nor waits on that
-    index's lock."""
+    index's lock. The export runs the harness-state smudge as the identity `cat` whatever
+    the repository config says: a required filter without a smudge fails every checkout,
+    and the export must still hold the staged bytes for manifest_check to name the config."""
     index = os.path.join(directory, "index")
     shutil.copyfile(git("rev-parse", "--git-path", "index"), index)   # honours GIT_INDEX_FILE
     env = {**os.environ, "GIT_INDEX_FILE": index}
     git("read-tree", git("write-tree", env=env), env=env)
-    git("checkout-index", "--all", f"--prefix={directory}/tree/", env=env)
+    git("-c", "filter.harness-state.smudge=cat", "checkout-index", "--all",
+        f"--prefix={directory}/tree/", env=env)
     return pathlib.Path(directory) / "tree"
 
 
-def facts_check():
+def with_staged_tree(check):
+    """Run check(tree) over an export of the tree this commit will hold, then remove it."""
+    with tempfile.TemporaryDirectory(prefix="staged-tree-") as directory:
+        try:
+            tree = staged_tree(os.path.realpath(directory))     # the readers name resolved paths
+        except subprocess.CalledProcessError as error:
+            return fail(f"could not export the staged tree: `{' '.join(error.cmd)}`: {error.stderr.strip()}")
+        return check(tree)
+
+
+def real_git_dir():
+    """The repository's git directory as an absolute path; in a linked worktree, its own
+    directory under the main one, whose commondir holds the shared config."""
+    return os.path.abspath(git("rev-parse", "--git-dir"))
+
+
+def facts_check(tree=None):
     """The staged reader must pass its own check over the staged tree, at its own default
     path. A blob check of the fact file alone misses a file deleted or renamed away, a
     reader whose default moved without the file, and a deleted probe; a move that updates
     the reader in the same commit passes."""
-    with tempfile.TemporaryDirectory(prefix="staged-tree-") as directory:
-        try:
-            tree = staged_tree(os.path.realpath(directory))     # the reader names resolved paths
-        except subprocess.CalledProcessError as error:
-            return fail(f"could not export the staged tree: `{' '.join(error.cmd)}`: {error.stderr.strip()}")
-        tool = tree / FACTS_TOOL
-        if not tool.is_file():
-            return fail(f"{FACTS_TOOL} is not staged; this commit would leave the fact file without its reader")
-        done = subprocess.run([sys.executable, str(tool), "check"], text=True, capture_output=True)
-        if done.returncode:
-            sys.stderr.write(done.stderr.replace(f"{tree}/", ""))
-            return fail(f"the staged tree does not pass its own `{FACTS_TOOL} check`; fix what it "
-                        f"names, and if {FACTS} moved, stage the reader's default with it")
+    if tree is None:
+        return with_staged_tree(facts_check)
+    tool = tree / FACTS_TOOL
+    if not tool.is_file():
+        return fail(f"{FACTS_TOOL} is not staged; this commit would leave the fact file without its reader")
+    done = subprocess.run([sys.executable, str(tool), "check"], text=True, capture_output=True)
+    if done.returncode:
+        sys.stderr.write(done.stderr.replace(f"{tree}/", ""))
+        return fail(f"the staged tree does not pass its own `{FACTS_TOOL} check`; fix what it "
+                    f"names, and if {FACTS} moved, stage the reader's default with it")
     return 0
+
+
+def manifest_check(tree=None, git_dir=None):
+    """The staged manifest checker must pass over the staged tree: harnesses.toml and
+    .gitattributes as staged, each staged harness config blob already clean (a blob staged
+    while the filter was off, or across a checkout of a pre-manifest commit, holds live
+    picks until `git add --renormalize`), and the real repository's filter config."""
+    if git_dir is None:
+        git_dir = real_git_dir()
+    if tree is None:
+        return with_staged_tree(lambda tree: manifest_check(tree, git_dir))
+    tool = tree / MANIFEST_TOOL
+    if not tool.is_file():
+        return fail(f"{MANIFEST_TOOL} is not staged; this commit would leave harnesses.toml "
+                    "and the clean filter without their checker")
+    done = subprocess.run([sys.executable, str(tool), "check", "--git-dir", git_dir, "--staged-tree"],
+                          cwd=tree, text=True, capture_output=True)
+    if done.returncode:
+        sys.stderr.write(done.stderr.replace(f"{tree}/", ""))
+        return fail(f"the staged tree does not pass `{MANIFEST_TOOL} check`; fix what it names "
+                    "(run `just setup` for the filter config, `git add --renormalize <path>` "
+                    "for a staged blob the filter would strip)")
+    return 0
+
+
+def staged_checks():
+    """Both staged-tree checks over one export of the tree."""
+    git_dir = real_git_dir()
+    return with_staged_tree(lambda tree: facts_check(tree) or manifest_check(tree, git_dir=git_dir))
 
 
 def main(argv):
     if argv:
         return fail("pre-commit accepts no arguments")
-    return local_layer() or hygiene_check() or docs_check() or facts_check()
+    return local_layer() or hygiene_check() or docs_check() or staged_checks()
 
 
 if __name__ == "__main__":

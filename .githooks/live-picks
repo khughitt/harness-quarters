@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """Keep the model and effort picks in the live harness configs across git commands that drop them.
 
-The harness-state clean filter keeps the picks out of the index: `model`,
-`modelSettings` and `effortLevel` in claude/settings.json, the top-level `model` and
-`model_reasoning_effort` in codex/config.toml; `defaultProvider`, `defaultModel` and
-`defaultThinkingLevel` in pi/settings.json; `model`, `effort`, `effortByBase` and
-`trustedWorkspaces` in agy/settings.json. A git command that writes a new blob of
-a file over the live one drops the pick, and the harness runs on its default. This
-tool saves Claude and Codex picks in local/live-picks.json, pi picks in
-local/live-picks-pi.json and agy picks in local/live-picks-agy.json, untracked and
-carried between hosts by Dropbox, and puts them back:
+The harness-state clean filter keeps the picks out of the index. Which config each
+harness picks in, the keys its pickers write, how they group into units and which
+record under local/ saves them come from harnesses.toml (`[harnesses.<name>.live_state]`
+entries with `picks_record` and `pick_units`): today Claude's `model`, `modelSettings`
+and `effortLevel` in claude/settings.json and the top-level `model` and
+`model_reasoning_effort` in codex/config.toml, saved in local/live-picks.json; pi's
+`defaultProvider`, `defaultModel` and `defaultThinkingLevel` in pi/settings.json, saved in
+local/live-picks-pi.json; agy's `model`, `effort`, `effortByBase` and `trustedWorkspaces`
+in agy/settings.json, saved in local/live-picks-agy.json. A git command that writes a new
+blob of a file over the live one drops the pick, and the harness runs on its default.
+The records are untracked and carried between hosts by Dropbox; this tool puts the
+picks back:
 
     capture               save the pick each file holds; absence never records a reset
     restore               put a saved pick into a file holding none of its fields
@@ -17,10 +20,13 @@ carried between hosts by Dropbox, and puts them back:
     forget <file>         record the file's default and remove its pick from the file
     hook <name>           restore from a git hook, then restage what it wrote
 
-Each picker's owned fields are one unit: Codex's model and effort; Claude's model and
-modelSettings (/model), and its effortLevel (/effort); pi's defaultProvider and
+Each picker's owned fields are one unit (`pick_units`): Codex's model and effort; Claude's
+model and modelSettings (/model), and its effortLevel (/effort); pi's defaultProvider and
 defaultModel, and its defaultThinkingLevel; agy's model (/model), effort and effortByBase
-(/effort), and trustedWorkspaces. Each separate picker writes one unit.
+(/effort), and trustedWorkspaces. Each separate picker writes one unit. Keys the filter
+drops that no picker owns (`unrestored_keys`, such as pi's installation ids) are neither
+saved nor restored, and forget leaves them in the file. An entry with no `picks_record`
+is the filter's alone: live-picks skips it.
 Git drops all of a file's fields together, so a unit holding none is the only state a
 git rewrite leaves; any other state was written by a harness or a person, and the live
 file wins. Absence alone cannot tell a rewrite from a return to
@@ -33,69 +39,52 @@ during capture and adopts it back into `agy/settings.json`, restoring the symlin
 restore, hook and forget.
 Setting the current selection as a default emits no event: it is saved at turn end
 or exit, so a git rewrite before then restores the previous saved default. restore
-fills only units holding none of their fields, so a newer pick is never overwritten, and capture replaces
-only the units the file holds, so a pick of one JSON picker keeps the other's saved
-value. forget resets every unit of the file. It prepends Codex's lines, which are top-level keys
-whatever follows, and writes only when the result parses to the live values plus the
-saved ones and the filter's output, what git stages, is unchanged.
+fills only units holding none of their fields, so a newer pick is never overwritten, and
+capture replaces only the units the file holds, so a pick of one picker keeps the
+other's saved value; a saved pick lists its units in declaration order. forget resets
+every unit of the file. A TOML pick is one-line top-level keys, which restore prepends,
+and writes happen only when the result parses to the live values plus the saved ones
+and the filter's output, what git stages, is unchanged.
 
 Each record is machine-owned and written whole only when changed; an invalid one is
 refused independently, never overwritten. A file that cannot be read is refused alone.
-Every operation holds local/harness-state.lock, the host lock codex-trust also takes. A
-hook reports a failure on stderr and exits 0, and skips a linked worktree silently and,
-from post-checkout, a rebase in progress; the next turn end retries. Every other
-operation refuses a linked worktree, whose configs are not live. Design:
+harnesses.toml is read after the argument and worktree checks and before the host
+lock, local/harness-state.lock, which every operation holds and codex-trust also takes.
+A hook reports a failure, a broken harnesses.toml included, on stderr and exits 0, and
+skips a linked worktree silently and, from post-checkout, a rebase in progress; the next
+turn end retries. Every other operation refuses a linked worktree, whose configs are not
+live, and a broken harnesses.toml. Design:
 docs/specs/2026-10-10-live-model-preservation-design.md, extended by
-docs/specs/2026-10-15-pi-live-picks-design.md.
+docs/specs/2026-10-15-pi-live-picks-design.md and
+docs/specs/2026-11-01-harness-manifest-design.md §5.3.
 """
-import fnmatch
-import functools
 import json
 import os
 from pathlib import Path
-import runpy
 import stat
 import sys
 import tomllib
 
-import harness_state
+try:
+    import harness_state
+    from harness_state import TOML_HEADER, TOML_KEY
+except (ImportError, SyntaxError) as error:
+    # A module that will not import (conflict markers after a merge) must not traceback.
+    message = f"live-picks: cannot load .githooks/harness_state.py: {error}; resolve or restore it"
+    if sys.argv[1:2] == ["hook"]:
+        print(f"{message}\nlive-picks: a pick was not restored; the next turn end retries", file=sys.stderr)
+        sys.exit(0)
+    sys.exit(message)
 
 CHECKOUT = harness_state.Checkout("live-picks")
 fail = CHECKOUT.fail
 REPO = harness_state.REPO
-CLAUDE = "claude/settings.json"
-CODEX = "codex/config.toml"
-PI = "pi/settings.json"
-AGY = "agy/settings.json"
-OWNED = (CLAUDE, CODEX, PI, AGY)
-RECORDS = {CLAUDE: "local/live-picks.json", CODEX: "local/live-picks.json",
-           PI: "local/live-picks-pi.json", AGY: "local/live-picks-agy.json"}
-USAGE = ("usage: live-picks capture | restore | sync | forget <file> | "
-         "hook post-checkout|post-merge|post-rewrite (files: " + ", ".join(OWNED) + ")")
-# Every owned field must be dropped by the filter for absence to imply a rewrite.
-FILTER = runpy.run_path(str(harness_state.HERE / "harness-state-clean"))
-TOML_KEYS = tuple(name for table, name in FILTER["TOML_KEYS"] if table.fullmatch(""))
-TOML_HEADER = FILTER["TOML_HEADER"]
-TOML_KEY = FILTER["TOML_KEY"]
-# Each picker is a unit: a pick of one keeps the other picker's saved value.
-CLAUDE_GROUPS = (("model", "modelSettings"), ("effortLevel",))
-AGY_GROUPS = (("model",), ("effort", "effortByBase"), ("trustedWorkspaces",))
-JSON_GROUPS = {CLAUDE: CLAUDE_GROUPS,
-               PI: (("defaultProvider", "defaultModel"), ("defaultThinkingLevel",)),
-               AGY: AGY_GROUPS}
-JSON_KEYS = {name: sum(groups, ()) for name, groups in JSON_GROUPS.items()}
-for name, keys in JSON_KEYS.items():
-    dropped = [keys for pattern, keys in FILTER["JSON_FILES"] if fnmatch.fnmatch(name, pattern)]
-    if (len(dropped) != 1 or len(keys) != len(set(keys))
-            or not set(keys) <= set(dropped[0])
-            or name in (CLAUDE, AGY) and set(keys) != set(dropped[0])):
-        sys.exit(f"live-picks: {name} groups {JSON_GROUPS[name]} must be disjoint and "
-                 "within the filter's keys (equal for Claude and agy)")
-CLEAN = {CLAUDE: functools.partial(FILTER["clean_json"], keys=FILTER["CLAUDE_JSON_KEYS"]),
-         CODEX: FILTER["clean_toml"],
-         PI: functools.partial(FILTER["clean_json"], keys=FILTER["PI_JSON_KEYS"]),
-         AGY: functools.partial(FILTER["clean_json"], keys=FILTER["AGY_JSON_KEYS"])}
-FIELD = {CLAUDE: "values", CODEX: "lines", PI: "values", AGY: "values"}
+SYNOPSIS = ("usage: live-picks capture | restore | sync | forget <file> | "
+            "hook post-checkout|post-merge|post-rewrite")
+# The record field that holds a set pick, by config format.
+FIELD = {"json": "values", "toml": "lines"}
+# agy's home adoption: an anchored host's agy home link, replaced by a regular file.
+AGY_CONFIG = "agy/settings.json"
 AGY_HOME = Path(".gemini/antigravity-cli")
 AGY_LINK = AGY_HOME / "settings.json"
 AGY_ANCHORS = (
@@ -108,24 +97,48 @@ class Refused(Exception):
     """One file cannot be read or written; the others are still handled."""
 
 
-def parse(name, text):
+def usage():
+    """The synopsis, naming the files live-picks owns while harnesses.toml loads."""
     try:
-        data = json.loads(text) if name in JSON_GROUPS else tomllib.loads(text)
+        manifest = harness_state.load_manifest()
+    except harness_state.ManifestError:
+        return SYNOPSIS
+    files = [spec.config for spec in manifest.live_state if spec.picks_record is not None]
+    return f"{SYNOPSIS} (files: {', '.join(files)})"
+
+
+def load_specs():
+    """The live-state entries live-picks owns, by config path; exits on a broken manifest."""
+    manifest = harness_state.load_manifest_or_exit("live-picks")
+    return {spec.config: spec for spec in manifest.live_state if spec.picks_record is not None}
+
+
+def field(spec):
+    return FIELD[spec.format]
+
+
+def parse(spec, text):
+    try:
+        data = json.loads(text) if spec.format == "json" else tomllib.loads(text)
     except (json.JSONDecodeError, tomllib.TOMLDecodeError) as error:
-        raise Refused(f"{name} does not parse: {error}")
+        raise Refused(f"{spec.config} does not parse: {error}")
     if not isinstance(data, dict):
-        raise Refused(f"{name} is not an object")
+        raise Refused(f"{spec.config} is not an object")
     return data
 
 
-def codex_lines(text):
+def key_of(line):
+    key = TOML_KEY.match(line)
+    return key.group(1) if key else None
+
+
+def toml_lines(spec, text):
     """The owned key lines before the first table header, in file order."""
     lines = []
     for line in text.splitlines(keepends=True):
         if TOML_HEADER.match(line):
             break
-        key = TOML_KEY.match(line)
-        if key and key.group(1) in TOML_KEYS:
+        if key_of(line) in spec.pick_keys:
             lines.append(line if line.endswith("\n") else line + "\n")
     return lines
 
@@ -137,46 +150,52 @@ def toml_or_none(text):
         return None
 
 
-def pick(name, text):
-    """The owned fields text holds: JSON values or Codex's lines; empty when none.
+def lines_parse(spec, lines):
+    """What lines parse to when they are duplicate-free owned one-line keys, else None."""
+    keys = [key_of(line) for line in lines]
+    text = "".join(lines)
+    if len(keys) != len(set(keys)) or toml_lines(spec, text) != lines:
+        return None
+    return toml_or_none(text)
 
-    A Codex pick the filter could not drop line by line (a multi-line value, a key after
-    a header-like line) is refused.
+
+def pick(spec, text):
+    """The owned fields text holds: JSON values or TOML lines; empty when none.
+
+    A TOML pick the filter could not drop line by line (a multi-line value, a quoted
+    key, a key after a header-like line) is refused.
     """
-    data = parse(name, text)
-    if name in JSON_GROUPS:
-        return {key: data[key] for key in JSON_KEYS[name] if key in data}
-    lines = codex_lines(text)
-    if toml_or_none("".join(lines)) != {key: data[key] for key in TOML_KEYS if key in data}:
-        raise Refused(f"{name}: write {' and '.join(TOML_KEYS)} as one-line keys "
+    data = parse(spec, text)
+    if spec.format == "json":
+        return {key: data[key] for key in spec.pick_keys if key in data}
+    lines = toml_lines(spec, text)
+    if lines_parse(spec, lines) != {key: data[key] for key in spec.pick_keys if key in data}:
+        raise Refused(f"{spec.config}: write {' and '.join(spec.pick_keys)} as one-line keys "
                       "before the first table")
     return lines
 
 
-def invalid(name, saved):
-    """Why a record entry is malformed, or None."""
-    if name not in OWNED:
-        return "not a file live-picks owns"
+def invalid(spec, saved):
+    """Why a record entry for spec's config is malformed, or None."""
     if not isinstance(saved, dict) or saved.get("state") not in ("set", "default"):
         return 'state must be "set" or "default"'
     if saved["state"] == "default":
         return None if set(saved) == {"state"} else "a default entry holds only its state"
-    if set(saved) != {"state", FIELD[name]}:
-        return f'a set entry holds its state and "{FIELD[name]}"'
-    held = saved[FIELD[name]]
-    if name in JSON_GROUPS:
-        if isinstance(held, dict) and held and set(held) <= set(JSON_KEYS[name]):
+    if set(saved) != {"state", field(spec)}:
+        return f'a set entry holds its state and "{field(spec)}"'
+    held = saved[field(spec)]
+    if spec.format == "json":
+        if isinstance(held, dict) and held and set(held) <= set(spec.pick_keys):
             return None
-        return f"values must name some of {', '.join(JSON_KEYS[name])}"
+        return f"values must name some of {', '.join(spec.pick_keys)}"
     if isinstance(held, list) and held and all(isinstance(line, str) for line in held):
-        text = "".join(held)
-        parsed = toml_or_none(text)
-        if parsed is not None and set(parsed) <= set(TOML_KEYS) and codex_lines(text) == held:
+        parsed = lines_parse(spec, held)
+        if parsed is not None and set(parsed) <= set(spec.pick_keys):
             return None
-    return f"lines must be one-line {' or '.join(TOML_KEYS)} keys"
+    return f"lines must be one-line {' or '.join(spec.pick_keys)} keys, each once"
 
 
-def read_record(record_name):
+def read_record(record_name, specs):
     path = REPO / record_name
     if not path.exists():
         return {}
@@ -187,18 +206,19 @@ def read_record(record_name):
     if not isinstance(record, dict):
         raise Refused(f"{record_name} is not an object; fix or delete it")
     for name, saved in record.items():
-        problem = (invalid(name, saved) if RECORDS.get(name) == record_name
+        spec = specs.get(name)
+        problem = (invalid(spec, saved) if spec is not None and spec.picks_record == record_name
                    else "not a file this record owns")
         if problem:
             raise Refused(f"{record_name}: {name}: {problem}; fix or delete it")
     return record
 
 
-def read_records():
+def read_records(specs):
     records, refusals = {}, []
-    for record_name in dict.fromkeys(RECORDS.values()):
+    for record_name in dict.fromkeys(spec.picks_record for spec in specs.values()):
         try:
-            records[record_name] = read_record(record_name)
+            records[record_name] = read_record(record_name, specs)
         except Refused as error:
             refusals.append(str(error))
         except (OSError, UnicodeError) as error:
@@ -220,8 +240,8 @@ def read_text(path, label):
         raise Refused(f"{label} cannot be read: {error}") from None
 
 
-def live(name):
-    return read_text(REPO / name, name)
+def live(spec):
+    return read_text(REPO / spec.config, spec.config)
 
 
 def points_to(link, target):
@@ -242,9 +262,9 @@ def agy_anchored():
     return any(points_to(home / link, REPO / target) for link, target in AGY_ANCHORS)
 
 
-def detached_home(name):
-    """A regular file that replaced name's home symlink on an anchored host, or None."""
-    if name != AGY or not agy_anchored():
+def detached_home(spec):
+    """A regular file that replaced spec's home symlink on an anchored host, or None."""
+    if spec.config != AGY_CONFIG or not agy_anchored():
         return None
     path = Path.home() / AGY_LINK
     try:
@@ -275,45 +295,69 @@ def relink_home(path, target):
         raise
 
 
-def merged_values(name, saved, held):
-    """JSON values to save: each group the file holds, else the saved group."""
-    saved = saved["values"] if saved and saved["state"] == "set" else {}
+def saved_pick(spec, saved):
+    """The saved pick's values or lines; empty unless the entry is set."""
+    if saved and saved["state"] == "set":
+        return saved[field(spec)]
+    return {} if spec.format == "json" else []
+
+
+def merged_values(spec, saved, held):
+    """JSON values to save: each unit the file holds, else the saved unit, in unit order."""
+    saved = saved_pick(spec, saved)
     values = {}
-    for group in JSON_GROUPS[name]:
-        source = held if any(key in held for key in group) else saved
-        values.update({key: source[key] for key in group if key in source})
+    for unit in spec.pick_units:
+        source = held if any(key in held for key in unit) else saved
+        values.update({key: source[key] for key in unit if key in source})
     return values
 
 
-def missing(name, text, saved):
-    """The saved pick for the groups text holds none of; None when there is none."""
-    held = pick(name, text)
-    if name == CODEX:
-        return None if held else saved
-    values = {key: value for group in JSON_GROUPS[name] if not any(key in held for key in group)
-              for key, value in saved["values"].items() if key in group}
-    return {"state": "set", "values": values} if values else None
+def merged_lines(spec, saved, held):
+    """TOML lines to save: each unit the file holds, else the saved unit, in unit order."""
+    saved = saved_pick(spec, saved)
+    lines = []
+    for unit in spec.pick_units:
+        source = held if any(key_of(line) in unit for line in held) else saved
+        lines += [line for line in source if key_of(line) in unit]
+    return lines
 
 
-def capture():
+def merge_picks(spec, saved, held):
+    return (merged_values if spec.format == "json" else merged_lines)(spec, saved, held)
+
+
+def missing(spec, text, saved):
+    """The saved pick for the units text holds none of; None when there is none."""
+    held = pick(spec, text)
+    if spec.format == "json":
+        held_keys = set(held)
+        wanted = {key: value for unit in spec.pick_units if not held_keys & set(unit)
+                  for key, value in saved["values"].items() if key in unit}
+    else:
+        held_keys = {key_of(line) for line in held}
+        wanted = [line for unit in spec.pick_units if not held_keys & set(unit)
+                  for line in saved["lines"] if key_of(line) in unit]
+    return {"state": "set", field(spec): wanted} if wanted else None
+
+
+def capture(specs):
     """Save the pick each file holds; returns the refusals."""
-    records, refusals = read_records()
+    records, refusals = read_records(specs)
     updated = {path: dict(record) for path, record in records.items()}
-    for name in OWNED:
-        record_name = RECORDS[name]
+    for name, spec in specs.items():
+        record_name = spec.picks_record
         if record_name not in records:
             continue
         try:
-            detached = detached_home(name)
-            source = read_text(detached, str(detached)) if detached is not None else live(name)
-            held = pick(name, source)
+            detached = detached_home(spec)
+            source = read_text(detached, str(detached)) if detached is not None else live(spec)
+            held = pick(spec, source)
         except Refused as error:
             refusals.append(str(error))
             continue
-        if name in JSON_GROUPS:
-            held = merged_values(name, records[record_name].get(name), held)
         if held:
-            updated[record_name][name] = {"state": "set", FIELD[name]: held}
+            merged = merge_picks(spec, records[record_name].get(name), held)
+            updated[record_name][name] = {"state": "set", field(spec): merged}
     for record_name, record in updated.items():
         if record != records[record_name]:
             try:
@@ -323,98 +367,96 @@ def capture():
     return refusals
 
 
-def checked(name, text, result, want):
+def checked(spec, text, result, want):
     """result, when it parses to want and the filter's output is text's; else refused."""
     try:
-        got = parse(name, result)
+        got = parse(spec, result)
     except Refused:
         got = None
-    if got != want or CLEAN[name](result) != CLEAN[name](text):
-        raise Refused(f"found no way to change {name} that keeps its other values and what "
-                      "git stages; nothing written")
+    if (got != want or harness_state.clean_for_spec(spec, result)
+            != harness_state.clean_for_spec(spec, text)):
+        raise Refused(f"found no way to change {spec.config} that keeps its other values and "
+                      "what git stages; nothing written")
     return result
 
 
-def with_pick(name, text, saved):
-    data = parse(name, text)
-    if name in JSON_GROUPS:
+def with_pick(spec, text, saved):
+    data = parse(spec, text)
+    if spec.format == "json":
         want = {**data, **saved["values"]}
         result = json.dumps(want, indent=2, ensure_ascii=False) + "\n"
     else:
         want = {**data, **tomllib.loads("".join(saved["lines"]))}
         result = "".join(saved["lines"]) + text
-    return checked(name, text, result, want)
+    return checked(spec, text, result, want)
 
 
-def without_pick(name, text):
-    data = parse(name, text)
-    if name in JSON_GROUPS:
-        want = {key: value for key, value in data.items() if key not in JSON_KEYS[name]}
+def without_pick(spec, text):
+    """text without the pick keys; unrestored keys such as installation ids stay."""
+    data = parse(spec, text)
+    want = {key: value for key, value in data.items() if key not in spec.pick_keys}
+    if spec.format == "json":
         result = json.dumps(want, indent=2, ensure_ascii=False) + "\n"
     else:
-        want = {key: value for key, value in data.items() if key not in TOML_KEYS}
         kept, top = [], True
         for line in text.splitlines(keepends=True):
             top = top and not TOML_HEADER.match(line)
-            key = top and TOML_KEY.match(line)
-            if not (key and key.group(1) in TOML_KEYS):
+            if not (top and key_of(line) in spec.pick_keys):
                 kept.append(line)
         result = "".join(kept)
-    return checked(name, text, result, want)
+    return checked(spec, text, result, want)
 
 
-def adopt_detached(name, detached, records, from_hook):
-    """Sync a regular file that replaced name's home symlink back into REPO / name and relink."""
-    record_name = RECORDS[name]
+def adopt_detached(spec, detached, records, from_hook):
+    """Sync a regular file that replaced spec's home symlink back into its config and relink."""
+    name, record_name = spec.config, spec.picks_record
     h_text = read_text(detached, str(detached))
-    r_text = live(name)
-    h_picks = pick(name, h_text)
-    r_picks = pick(name, r_text)
+    r_text = live(spec)
+    h_picks = pick(spec, h_text)
+    r_picks = pick(spec, r_text)
     saved = records[record_name].get(name)
-    merged = merged_values(name, saved, h_picks)
+    merged = merge_picks(spec, saved, h_picks)
     repo_mtime = (REPO / name).stat().st_mtime_ns
     detached_mtime = detached.stat().st_mtime_ns
     git_rewrote_r = not r_picks and (
         repo_mtime >= detached_mtime if from_hook else repo_mtime > detached_mtime
     )
     base_text = r_text if git_rewrote_r else h_text
-    clean_base = without_pick(name, base_text)
-    result = (with_pick(name, clean_base, {"state": "set", "values": merged})
-              if merged else clean_base)
-    if merged:
-        entry = {"state": "set", FIELD[name]: merged}
-        if records[record_name].get(name) != entry:
-            updated = {**records[record_name], name: entry}
-            write_record(record_name, updated)
-            records[record_name] = updated
+    clean_base = without_pick(spec, base_text)
+    entry = {"state": "set", field(spec): merged}
+    result = with_pick(spec, clean_base, entry) if merged else clean_base
+    if merged and records[record_name].get(name) != entry:
+        updated = {**records[record_name], name: entry}
+        write_record(record_name, updated)
+        records[record_name] = updated
     harness_state.write((REPO / name).resolve(), result)
     relink_home(detached, REPO / name)
 
 
-def restore(from_hook=False):
-    """Put each saved pick into a file holding none of its fields (per JSON picker group).
+def restore(specs, from_hook=False):
+    """Put each saved pick into a file holding none of its fields (per picker unit).
 
     Returns the files written and the refusals.
     """
-    records, refusals = read_records()
+    records, refusals = read_records(specs)
     written = []
-    for name in OWNED:
-        if RECORDS[name] not in records:
+    for name, spec in specs.items():
+        if spec.picks_record not in records:
             continue
-        saved = records[RECORDS[name]].get(name)
+        saved = records[spec.picks_record].get(name)
         try:
-            detached = detached_home(name)
+            detached = detached_home(spec)
             if detached is not None:
-                adopt_detached(name, detached, records, from_hook)
+                adopt_detached(spec, detached, records, from_hook)
                 written.append(name)
                 continue
             if saved is None or saved["state"] != "set":
                 continue
-            text = live(name)
-            wanted = missing(name, text, saved)
+            text = live(spec)
+            wanted = missing(spec, text, saved)
             if wanted is None:
                 continue
-            result = with_pick(name, text, wanted)
+            result = with_pick(spec, text, wanted)
             harness_state.write((REPO / name).resolve(), result)
         except Refused as error:
             refusals.append(str(error))
@@ -426,23 +468,23 @@ def restore(from_hook=False):
     return written, refusals
 
 
-def forget(name):
-    record_name = RECORDS[name]
+def forget(spec, specs):
+    name, record_name = spec.config, spec.picks_record
     try:
-        record = read_record(record_name)
-        detached = detached_home(name)
+        record = read_record(record_name, specs)
+        detached = detached_home(spec)
         if detached is not None:
             h_text = read_text(detached, str(detached))
-            r_text = live(name)
-            git_rewrote_r = (not pick(name, r_text)
+            r_text = live(spec)
+            git_rewrote_r = (not pick(spec, r_text)
                              and (REPO / name).stat().st_mtime_ns > detached.stat().st_mtime_ns)
             base_text = r_text if git_rewrote_r else h_text
-            harness_state.write((REPO / name).resolve(), without_pick(name, base_text))
+            harness_state.write((REPO / name).resolve(), without_pick(spec, base_text))
             relink_home(detached, REPO / name)
         else:
-            text = live(name)
-            if pick(name, text):
-                harness_state.write((REPO / name).resolve(), without_pick(name, text))
+            text = live(spec)
+            if pick(spec, text):
+                harness_state.write((REPO / name).resolve(), without_pick(spec, text))
     except Refused as error:
         fail(str(error))
     if record.get(name) != {"state": "default"}:
@@ -456,7 +498,7 @@ def refuse(refusals):
         fail("; ".join(refusals))
 
 
-def operate(args):
+def operate(args, specs):
     """Run the operation args name under the host lock.
 
     A filesystem or decoding failure (an unreadable record, a directory where a file
@@ -465,21 +507,29 @@ def operate(args):
     try:
         with CHECKOUT.locked():
             if args[0] == "hook":
-                written, refusals = restore(from_hook=True)
+                written, refusals = restore(specs, from_hook=True)
                 for name in written:
                     CHECKOUT.restage(name)
             elif args[0] == "forget":
-                forget(args[1])
+                forget(specs[args[1]], specs)
                 return
             else:
                 refusals = []
                 if args[0] in ("capture", "sync"):
-                    refusals += capture()
+                    refusals += capture(specs)
                 if args[0] in ("restore", "sync"):
-                    refusals += restore()[1]
+                    refusals += restore(specs)[1]
             refuse(refusals)
     except (OSError, UnicodeError) as error:
         fail(str(error))
+
+
+def cli_specs(args):
+    """The owned entries for a CLI operation, after checking forget names one of them."""
+    specs = load_specs()
+    if args[0] == "forget" and args[1] not in specs:
+        fail(f"{args[1]!r} is not a file live-picks owns; forget takes {' or '.join(specs)}")
+    return specs
 
 
 def main(argv):
@@ -487,20 +537,18 @@ def main(argv):
     if not (args in (["capture"], ["restore"], ["sync"])
             or len(args) == 2 and (args[0] == "forget" or args[0] == "hook"
                                    and args[1] in harness_state.GIT_HOOKS)):
-        fail(USAGE)
-    if args[0] == "forget" and args[1] not in OWNED:
-        fail(f"forget takes {' or '.join(OWNED)}, not {args[1]!r}")
+        fail(usage())
     if CHECKOUT.linked_worktree():
         if args[0] == "hook":
             return
         fail(f"{REPO} is a linked worktree; its harness configs are not live")
     if args[0] != "hook":
-        operate(args)
+        operate(args, cli_specs(args))
         return
     if args[1] == "post-checkout" and CHECKOUT.rebasing():
         return
     try:
-        operate(args)
+        operate(args, load_specs())
     except SystemExit as error:
         print(f"{error}\nlive-picks: a pick was not restored; the next turn end retries",
               file=sys.stderr)

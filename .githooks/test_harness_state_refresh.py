@@ -1,5 +1,6 @@
 """The harness-state refresh clears git's size-only "modified" mark and stages nothing real."""
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -12,9 +13,19 @@ PI_SETTINGS = "pi/settings.json"
 AGY_SETTINGS = "agy/settings.json"
 
 
+def child_env(repo):
+    home = repo.parent / "subprocess-home"
+    home.mkdir(exist_ok=True)
+    return {"PATH": os.environ["PATH"], "HOME": str(home), "XDG_CONFIG_HOME": str(home / ".config"),
+            "GIT_CONFIG_GLOBAL": str(home / ".gitconfig"), "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid",
+            "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid",
+            "PYTHONDONTWRITEBYTECODE": "1"}
+
+
 def git(repo, *args, check=True):
     return subprocess.run(["git", "-C", str(repo), *args], check=check, text=True,
-                          capture_output=True)
+                          capture_output=True, env=child_env(repo))
 
 
 def write_settings(repo, **extra):
@@ -35,14 +46,19 @@ def repo(tmp_path):
     for name in ("harness-state-clean", "harness-state-refresh", "codex-trust",
                  "harness_state.py", "live-picks"):
         shutil.copy2(HOOKS / name, repo / ".githooks" / name)
+    shutil.copy2(HOOKS.parent / "harnesses.toml", repo / "harnesses.toml")
     (repo / ".gitattributes").write_text("claude/settings*.json filter=harness-state\n"
                                          "codex/config*.toml filter=harness-state\n"
                                          "pi/settings*.json filter=harness-state\n"
                                          "agy/settings*.json filter=harness-state\n")
     (repo / ".gitignore").write_text("local/\n__pycache__/\n")
     (repo / "codex" / "config.toml").write_text("[features]\nhooks = true\n")
-    git(tmp_path, "init", "-q", str(repo))
+    git(repo, "init", "-q")
+    assert Path(git(repo, "rev-parse", "--show-toplevel").stdout.strip()) == repo.resolve()
+    assert Path(git(repo, "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(repo.resolve())
     git(repo, "config", "filter.harness-state.clean", ".githooks/harness-state-clean %f")
+    git(repo, "config", "filter.harness-state.required", "true")
+    git(repo, "config", "filter.harness-state.smudge", "cat")
     git(repo, "config", "user.email", "t@example.invalid")
     git(repo, "config", "user.name", "t")
     write_settings(repo, model="opus")
@@ -54,10 +70,10 @@ def repo(tmp_path):
     return repo
 
 
-def refresh(repo, cwd):
+def refresh(repo, cwd, payload='{"hook_event_name":"Stop"}'):
     """Run the refresh as a harness hook would: from another directory, payload on stdin."""
     return subprocess.run([str(repo / ".githooks" / "harness-state-refresh")], cwd=cwd,
-                          input='{"hook_event_name":"Stop"}', text=True, capture_output=True)
+                          input=payload, text=True, capture_output=True, env=child_env(repo))
 
 
 def marked(repo, path=SETTINGS):
@@ -180,3 +196,69 @@ def test_an_agy_replaced_regular_file_is_adopted_relinked_and_unmarked(repo, tmp
     assert not marked(repo, AGY_SETTINGS)
     assert subprocess.run(["git", "-C", str(repo), "status", "--porcelain"], env=env,
                           text=True, capture_output=True).stdout == ""
+
+
+def test_broken_manifest_drains_stdin_skips_staging_and_fails_cleanly(repo, tmp_path):
+    write_settings(repo, model="claude-sonnet-5")
+    assert marked(repo)
+    (repo / "harnesses.toml").write_text("schema = [\n")
+
+    result = refresh(repo, cwd=tmp_path, payload="x" * (4 * 1024 * 1024))
+
+    assert result.returncode != 0
+    assert "harness-state-refresh:" in result.stderr
+    assert "live-picks:" in result.stderr
+    assert "BrokenPipe" not in result.stderr and "Traceback" not in result.stderr
+    assert marked(repo)
+
+
+def test_unimportable_harness_state_drains_stdin_and_fails_with_a_named_message(repo, tmp_path):
+    (repo / ".githooks" / "harness_state.py").write_text("<<<<<<< ours\nx = 1\n=======\nx = 2\n>>>>>>> theirs\n")
+
+    result = refresh(repo, cwd=tmp_path, payload="x" * (4 * 1024 * 1024))
+
+    assert result.returncode != 0
+    assert result.stderr.startswith("harness-state-refresh: cannot load .githooks/harness_state.py: ")
+    assert "resolve or restore it" in result.stderr
+    assert "BrokenPipe" not in result.stderr and "Traceback" not in result.stderr
+
+
+def test_clean_only_harness_is_filtered_and_refreshed_end_to_end(repo, tmp_path):
+    (repo / "extra").mkdir()
+    (repo / "harnesses.toml").write_text(
+        (repo / "harnesses.toml").read_text()
+        + '\n[harnesses.extra.live_state]\nconfig = "extra/settings.json"\n'
+          'filter_glob = "extra/settings*.json"\nformat = "json"\nclean_keys = ["pick"]\n')
+    with (repo / ".gitattributes").open("a") as attributes:
+        attributes.write("extra/settings*.json filter=harness-state\n")
+    (repo / "extra/settings.json").write_text(json.dumps({"theme": "x"}, indent=2) + "\n")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "extra")
+    (repo / "extra/settings.json").write_text(json.dumps({"theme": "x", "pick": "a"}, indent=2) + "\n")
+    assert marked(repo, "extra/settings.json")
+
+    result = refresh(repo, cwd=tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert not marked(repo, "extra/settings.json")
+    assert json.loads(git(repo, "show", "HEAD:extra/settings.json").stdout) == {"theme": "x"}
+    assert sorted(path.name for path in (repo / "local").glob("live-picks*")
+                  if "extra" in path.name) == []
+
+
+@pytest.mark.parametrize("key, value", [("required", None), ("required", "false"),
+                                        ("smudge", None), ("smudge", "cat -u")])
+def test_refresh_refuses_when_filter_required_is_unset_or_false(repo, tmp_path, key, value):
+    write_settings(repo, model="claude-sonnet-5")
+    assert marked(repo)
+    if value is None:
+        git(repo, "config", "--unset", f"filter.harness-state.{key}")
+    else:
+        git(repo, "config", f"filter.harness-state.{key}", value)
+
+    result = refresh(repo, cwd=tmp_path)
+
+    assert result.returncode != 0
+    assert "harness-state-refresh:" in result.stderr and "just setup" in result.stderr
+    assert "Traceback" not in result.stderr
+    assert marked(repo)

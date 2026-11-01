@@ -1,6 +1,7 @@
 """harness-links converges home links from links.toml and never overwrites data."""
 import importlib.machinery
 import importlib.util
+import json
 import os
 import shutil
 import subprocess
@@ -262,6 +263,8 @@ def fresh_clone(tmp_path, home, repo=None):
     stage_project_targets(repo / "links.toml", tmp_path, home)
     # Exercise the working manifest and tool, including changes not committed yet.
     shutil.copy2(repo / "links.toml", clone / "links.toml")
+    shutil.copy2(repo / "harnesses.toml", clone / "harnesses.toml")
+    shutil.copy2(repo / "justfile", clone / "justfile")
     shutil.copy2(TOOL, clone / "tools/harness-links")
     shutil.copytree(repo / ".githooks", clone / ".githooks", dirs_exist_ok=True)
     shutil.copytree(repo / "relay", clone / "relay", dirs_exist_ok=True)
@@ -362,7 +365,15 @@ def test_real_manifest_links_agy_and_agy_config_when_homes_exist(tmp_path):
     assert (home / ".gemini/antigravity-cli/settings.json").resolve() == (clone / "agy/settings.json").resolve()
     assert (home / ".gemini/config/AGENTS.md").resolve() == (tmp_path / "lore/instructions/AGENTS.md").resolve()
     assert (home / ".gemini/config/hooks.json").resolve() == (clone / "agy/hooks.json").resolve()
-    assert (home / ".gemini/config/skills.json").resolve() == (clone / "agy/skills.json").resolve()
+    skills_manifest = home / ".gemini/config/skills.json"
+    assert skills_manifest.resolve() == (clone / "agy/skills.json").resolve()
+    entries = json.loads(skills_manifest.read_text())["entries"]
+    assert entries and all(not entry["path"].startswith("~") and not os.path.isabs(entry["path"])
+                           for entry in entries)
+    resolved_dirs = [Path(os.path.normpath(skills_manifest.parent / entry["path"]))
+                     for entry in entries]
+    assert resolved_dirs == [home / ".agents/skills"]
+    assert any(resolved_dirs[0].iterdir())
     assert link(clone, home, "--check").returncode == 0
 
 
@@ -378,6 +389,8 @@ def test_setup_is_idempotent_and_creates_only_the_rules_directory(tmp_path):
     config = lambda key: run("-C", str(clone), "config", key).stdout.strip()
     assert config("core.hooksPath") == ".githooks"
     assert config("filter.harness-state.clean") == ".githooks/harness-state-clean %f"
+    assert config("filter.harness-state.required") == "true"
+    assert config("filter.harness-state.smudge") == "cat"
     assert run("-C", str(clone), "status", "--porcelain", "--", "local").stdout == ""   # ignored
 
 
@@ -814,6 +827,7 @@ def test_fresh_clone_strips_live_agy_picks_from_dirty_source_checkout(tmp_path):
     dirty_source = tmp_path / "dirty-source"
     run("clone", "-q", str(checkout), str(dirty_source))
     shutil.copy2(checkout / "links.toml", dirty_source / "links.toml")
+    shutil.copy2(checkout / "harnesses.toml", dirty_source / "harnesses.toml")
     shutil.copytree(checkout / ".githooks", dirty_source / ".githooks", dirs_exist_ok=True)
     shutil.copytree(checkout / "relay", dirty_source / "relay", dirs_exist_ok=True)
     shutil.copytree(checkout / "codex/work", dirty_source / "codex/work", dirs_exist_ok=True)
