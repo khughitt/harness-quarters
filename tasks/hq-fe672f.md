@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-9aa713-pause-past-range
 created: 2026-11-01T10:29:21Z
-updated: 2026-11-01T13:53:14Z
+updated: 2026-11-01T14:05:02Z
 started: 2026-11-01T11:56:46Z
 depends: []
 parent: hq-9aa713
@@ -49,3 +49,4 @@ Implements Task 1 of the turn-pause plan in .worktrees/hq-9aa713 (branch feat/hq
 - 2026-11-01T13:20:34Z (feat/hq-9aa713-pause-past-range): Extension probe committed (5d03eaa4): Codex 0.166.0 fires PreToolUse for nested account MCP calls (hook name mcp__codex_apps__<app>__<tool>; deny held) and a worker's own nested Bash (deny held, no side effect); nested write_stdin and top-level wait terminate fire no hook at all (fact hook-unhooked-tools: exec, exec.write_stdin, wait); exec_command PostToolUse at yield has empty tool_response. Raw: WORK_ROOT/hq/hq-fe672f/codex-cancel-1, codex-mcp-deny-1. Report extension: .superpowers/sdd/2026-11-01-turn-pause/task-1-report.md.
 - 2026-11-01T13:49:56Z (feat/hq-9aa713-pause-past-range): Probe round 3 committed (c83d0661): every remaining Codex tool called is hooked (names in hook-tool-names; request_plugin_install not called, model declined twice; image_gen skipped for quota); Codex goal continuation turns fire no UserPromptSubmit (hook-prompt-on-goal-turn false); no hook payload links Codex task_name to agent_id; empty Bash PostToolUse is no yield sign and a yield gets no PostToolUse (corrects the extension note); Claude ScheduleWakeup fires a UserPromptSubmit with the scheduled text verbatim, CronCreate fire unknown after two runs; subagent's own Bash deny held. Report: .superpowers/sdd/2026-11-01-turn-pause/task-1-report.md, Probe round 3.
 - 2026-11-01T13:53:14Z (feat/hq-9aa713-pause-past-range): review: impl round 3 — verdict: accept; findings: minor 4; reviewer: claude-code/claude-sonnet-5-5
+- 2026-11-01T14:05:02Z (feat/hq-9aa713-pause-past-range): review: impl round 4 — verdict: accept; findings: minor 4; reviewer: claude-code/claude-sonnet-5-5 (round 3 facts, c83d0661; counted as round 4 because round 3 was recorded for the extension)
