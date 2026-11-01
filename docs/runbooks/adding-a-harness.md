@@ -230,9 +230,9 @@ disk without polluting the Git index or disappearing across `git checkout`.
 ### 3.1 Probe how the harness saves settings
 
 The whole pipeline assumes the harness writes **through** its home symlink into the
-tracked file. Some harnesses save atomically (write a temporary file, rename it over the
-path), which replaces the symlink with a regular file; the tracked file then stays clean
-while the live settings diverge from it. agy does this (hq-b24c39).
+tracked file, or has an explicit adoption contract when it saves atomically (write a
+temporary file, rename it over the path, replacing the symlink with a regular file;
+`agy` does this).
 
 Probe this before section 2 links the live home, in a disposable one: the clean filter
 is not wired yet, so an in-place save into the live link would write runtime keys
@@ -248,9 +248,17 @@ readlink -f <temp-home>/<settings-file>   # still resolves to the scratch copy
 diff <scratch-copy> <before-copy>         # the change landed in the scratch copy
 ```
 
-A harness that replaces the link needs an explicit synchronization contract (agy's is
-the open remedy hq-b24c39) before its live-state layer counts as selected. The live
-`just link-check` after a real save belongs to the post-apply checks (section 8).
+A harness that replaces the link needs an explicit synchronization contract before its
+live-state layer counts as selected: for `agy`, `.githooks/live-picks` checks an
+in-checkout anchor link (`~/.gemini/config/hooks.json` or `skills.json`), reads any
+detached regular `~/.gemini/antigravity-cli/settings.json` during `capture`, adopts its
+picks and tracked settings back into `agy/settings.json` while atomically restoring the
+symlink on `restore`, `hook` and `forget`, `agy/hook` runs `harness-state-refresh` on
+`SessionStart` and `PreToolUse` when the file is regular, and `[harness.agy]` declares
+`adopt = ["settings.json"]` with `anchors` in `links.toml` so `just link-check` flags an
+unhealed zero-turn replacement and `just link --apply` converges it via `live-picks sync`
+(still refusing pre-existing files on an unanchored host). The live `just link-check`
+after a real save belongs to the post-apply checks (section 8).
 
 ### 3.2 Route the file through `.gitattributes`
 

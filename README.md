@@ -57,8 +57,14 @@ Claude's `/model` Default clears its fields and the next turn end may
 restore the saved pick; use `forget` for a deliberate reset. PostModelSwitch fires
 before the settings write and may skip a reset to the same resolved model, so it is
 not a capture point. The tested Codex picker actions kept both model fields; use
-`forget` to return it to its default. A Claude, Codex or agy pick made since the last
-turn end is not saved yet; a git command in that window brings back the one before.
+`forget` to return it to its default. Because agy saves `~/.gemini/antigravity-cli/settings.json`
+by atomic rename over the home link, an anchored host (one whose `~/.gemini/config`
+hooks or skills link already targets this checkout) reads any regular file there during
+`capture`, adopts its picks and any tracked `/config` or `permissions` edits back into
+`agy/settings.json`, and restores the symlink on `restore`, `hook` and `forget`. A
+Claude or Codex pick made since the last turn end is not saved yet; a git command in
+that window brings back the one before (for agy, `hook` captures a detached regular file
+before restoring onto the newly checked-out `agy/settings.json`).
 
 The pi extension `pi/extensions/harness-state.ts` calls the same refresh after `model_select` and
 `thinking_level_select` (yielding for the settings write), at `agent_settled` and at
@@ -375,7 +381,11 @@ Codex `/hooks` in each native home.
 ## Antigravity CLI hooks
 
 `agy/hooks.json`, linked as `~/.gemini/config/hooks.json`, wires `SessionStart`,
-`PreToolUse` (`run_command`) and `Stop` through `agy/hook`: `SessionStart` runs lore's
+`PreToolUse` (`run_command`) and `Stop` through `agy/hook`: `SessionStart` and
+`PreToolUse` first run `.githooks/harness-state-refresh` whenever
+`~/.gemini/antigravity-cli/settings.json` has been replaced by a regular file so startup
+trust and mid-turn `/model`, `/effort` or `/config` saves sync back and relink before
+commands run; `SessionStart` then runs lore's
 profile hook and ops's capture notice in `workspacePaths[0]` and injects their text as
 a `systemMessage`; `PreToolUse` translates `run_command` into a schema-1 `before-tool`
 envelope for ops's `relay-guard`, failing closed; and `Stop` runs a one-shot
@@ -481,8 +491,11 @@ missing target under `local/` names the remedy: copy it from another host's `loc
 or run `just setup`. `just link` reports what would change,
 `just link --apply` converges this host, and `just link-check` exits non-zero on drift.
 Run `just link --apply` once on each host after pulling a change to `links.toml`, and on
-a new host after installing a harness. It never overwrites a real file (`refuse`) and
-refuses to run from a worktree.
+a new host after installing a harness. It refuses to run from a worktree and never
+overwrites a real file (`refuse`), except a regular file at a link declared in a
+harness's `adopt` list once one of its declared `anchors` already points into this
+checkout (`just link` reports `adopt`, `just link-check` exits 1, and `just link --apply`
+syncs and relinks it via `.githooks/live-picks sync`; an unanchored host still refuses).
 
 Global-file, profile and general skill links target lore directly; tasks/curate/scope
 target tasks, quick-add targets ops, and flow tools and skills target flows. Settings,

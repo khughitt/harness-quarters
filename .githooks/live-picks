@@ -26,6 +26,11 @@ git rewrite leaves; any other state was written by a harness or a person, and th
 file wins. Absence alone cannot tell a rewrite from a return to
 the default, so only forget records `default`. Claude, Codex and agy capture at Stop; pi
 captures through its extension after picker events, at turn end and at shutdown.
+Because agy saves `~/.gemini/antigravity-cli/settings.json` by atomic rename over the
+home link when persisting picks or `/config` edits, an anchored host whose
+`~/.gemini/config` links point into this checkout also reads any regular file there
+during capture and adopts it back into `agy/settings.json`, restoring the symlink on
+restore, hook and forget.
 Setting the current selection as a default emits no event: it is saved at turn end
 or exit, so a git rewrite before then restores the previous saved default. restore
 fills only units holding none of their fields, so a newer pick is never overwritten, and capture replaces
@@ -46,7 +51,10 @@ docs/specs/2026-10-15-pi-live-picks-design.md.
 import fnmatch
 import functools
 import json
+import os
+from pathlib import Path
 import runpy
+import stat
 import sys
 import tomllib
 
@@ -88,6 +96,12 @@ CLEAN = {CLAUDE: functools.partial(FILTER["clean_json"], keys=FILTER["CLAUDE_JSO
          PI: functools.partial(FILTER["clean_json"], keys=FILTER["PI_JSON_KEYS"]),
          AGY: functools.partial(FILTER["clean_json"], keys=FILTER["AGY_JSON_KEYS"])}
 FIELD = {CLAUDE: "values", CODEX: "lines", PI: "values", AGY: "values"}
+AGY_HOME = Path(".gemini/antigravity-cli")
+AGY_LINK = AGY_HOME / "settings.json"
+AGY_ANCHORS = (
+    (Path(".gemini/config/hooks.json"), Path("agy/hooks.json")),
+    (Path(".gemini/config/skills.json"), Path("agy/skills.json")),
+)
 
 
 class Refused(Exception):
@@ -197,14 +211,68 @@ def write_record(record_name, record):
     harness_state.write(path, json.dumps(record, indent=2, ensure_ascii=False) + "\n")
 
 
-def live(name):
-    path = REPO / name
+def read_text(path, label):
     try:
         if not path.is_file():
-            raise Refused(f"{name} is missing")
+            raise Refused(f"{label} is missing")
         return path.read_text()
     except (OSError, UnicodeError) as error:
-        raise Refused(f"{name} cannot be read: {error}") from None
+        raise Refused(f"{label} cannot be read: {error}") from None
+
+
+def live(name):
+    return read_text(REPO / name, name)
+
+
+def points_to(link, target):
+    if not link.is_symlink() or not link.exists():
+        return False
+    try:
+        actual = link.parent / os.readlink(link)
+        return actual.parent.resolve() / actual.name == target.parent.resolve() / target.name
+    except OSError:
+        return False
+
+
+def agy_anchored():
+    home = Path.home()
+    agy_dir = home / AGY_HOME
+    if not (agy_dir.is_dir() and not agy_dir.is_symlink()):
+        return False
+    return any(points_to(home / link, REPO / target) for link, target in AGY_ANCHORS)
+
+
+def detached_home(name):
+    """A regular file that replaced name's home symlink on an anchored host, or None."""
+    if name != AGY or not agy_anchored():
+        return None
+    path = Path.home() / AGY_LINK
+    try:
+        mode = path.lstat().st_mode
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        raise Refused(f"{path} cannot be stat'd: {error}") from None
+    if stat.S_ISLNK(mode):
+        return None
+    if not stat.S_ISREG(mode):
+        raise Refused(f"{path} is not a regular file")
+    return path
+
+
+def relink_home(path, target):
+    """Atomically replace a detached regular file at path with a symlink to target."""
+    staging = path.with_name(f".{path.name}.live-picks.{os.getpid()}")
+    try:
+        staging.unlink(missing_ok=True)
+        staging.symlink_to(target)
+        if not stat.S_ISREG(path.lstat().st_mode):
+            staging.unlink(missing_ok=True)
+            raise Refused(f"{path} changed before relinking")
+        os.replace(staging, path)
+    except BaseException:
+        staging.unlink(missing_ok=True)
+        raise
 
 
 def merged_values(name, saved, held):
@@ -236,7 +304,9 @@ def capture():
         if record_name not in records:
             continue
         try:
-            held = pick(name, live(name))
+            detached = detached_home(name)
+            source = read_text(detached, str(detached)) if detached is not None else live(name)
+            held = pick(name, source)
         except Refused as error:
             refusals.append(str(error))
             continue
@@ -293,7 +363,33 @@ def without_pick(name, text):
     return checked(name, text, result, want)
 
 
-def restore():
+def adopt_detached(name, detached, records, from_hook):
+    """Sync a regular file that replaced name's home symlink back into REPO / name and relink."""
+    record_name = RECORDS[name]
+    h_text = read_text(detached, str(detached))
+    r_text = live(name)
+    h_picks = pick(name, h_text)
+    r_picks = pick(name, r_text)
+    saved = records[record_name].get(name)
+    merged = merged_values(name, saved, h_picks)
+    git_rewrote_r = from_hook or (
+        not r_picks and (REPO / name).stat().st_mtime_ns > detached.stat().st_mtime_ns
+    )
+    base_text = r_text if git_rewrote_r else h_text
+    clean_base = without_pick(name, base_text)
+    result = (with_pick(name, clean_base, {"state": "set", "values": merged})
+              if merged else clean_base)
+    if merged:
+        entry = {"state": "set", FIELD[name]: merged}
+        if records[record_name].get(name) != entry:
+            updated = {**records[record_name], name: entry}
+            write_record(record_name, updated)
+            records[record_name] = updated
+    harness_state.write((REPO / name).resolve(), result)
+    relink_home(detached, REPO / name)
+
+
+def restore(from_hook=False):
     """Put each saved pick into a file holding none of its fields (per JSON picker group).
 
     Returns the files written and the refusals.
@@ -301,10 +397,17 @@ def restore():
     records, refusals = read_records()
     written = []
     for name in OWNED:
-        saved = records.get(RECORDS[name], {}).get(name)
-        if saved is None or saved["state"] != "set":
+        if RECORDS[name] not in records:
             continue
+        saved = records[RECORDS[name]].get(name)
         try:
+            detached = detached_home(name)
+            if detached is not None:
+                adopt_detached(name, detached, records, from_hook)
+                written.append(name)
+                continue
+            if saved is None or saved["state"] != "set":
+                continue
             text = live(name)
             wanted = missing(name, text, saved)
             if wanted is None:
@@ -325,9 +428,19 @@ def forget(name):
     record_name = RECORDS[name]
     try:
         record = read_record(record_name)
-        text = live(name)
-        if pick(name, text):
-            harness_state.write((REPO / name).resolve(), without_pick(name, text))
+        detached = detached_home(name)
+        if detached is not None:
+            h_text = read_text(detached, str(detached))
+            r_text = live(name)
+            git_rewrote_r = (not pick(name, r_text)
+                             and (REPO / name).stat().st_mtime_ns > detached.stat().st_mtime_ns)
+            base_text = r_text if git_rewrote_r else h_text
+            harness_state.write((REPO / name).resolve(), without_pick(name, base_text))
+            relink_home(detached, REPO / name)
+        else:
+            text = live(name)
+            if pick(name, text):
+                harness_state.write((REPO / name).resolve(), without_pick(name, text))
     except Refused as error:
         fail(str(error))
     if record.get(name) != {"state": "default"}:
@@ -350,7 +463,7 @@ def operate(args):
     try:
         with CHECKOUT.locked():
             if args[0] == "hook":
-                written, refusals = restore()
+                written, refusals = restore(from_hook=True)
                 for name in written:
                     CHECKOUT.restage(name)
             elif args[0] == "forget":

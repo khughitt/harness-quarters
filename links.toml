@@ -134,6 +134,8 @@ home = "~/.pi/agent"
 # Antigravity CLI's app-data home and global customization home.
 [harness.agy]
 home = "~/.gemini/antigravity-cli"
+adopt = ["settings.json"]
+anchors = ["~/.gemini/config/hooks.json", "~/.gemini/config/skills.json"]
 [harness.agy.links]
 "settings.json" = "agy/settings.json"
 
