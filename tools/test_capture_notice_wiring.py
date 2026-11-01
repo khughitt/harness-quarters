@@ -1,4 +1,4 @@
-"""The personal Claude Code and Codex homes run ops's capture notice at session start."""
+"""The personal Claude Code, Codex and agy homes run ops's capture notice at session start."""
 import json
 from pathlib import Path
 
@@ -6,6 +6,7 @@ from test_relay_wiring import HOOK_VERSIONS, parse_relay_command
 
 ROOT = Path(__file__).resolve().parents[1]
 COMMAND = '~/d/ops/hooks/capture-notice'
+AGY_SESSION_START = '~/d/hq/agy/hook SessionStart ~/d/lore/hooks/claude-profile ~/d/ops/hooks/capture-notice'
 
 
 def session_start(path):
@@ -31,3 +32,9 @@ def test_codex_work_home_has_no_capture_notice():
     commands = [h['command'] for groups in hooks.values() for group in groups
                 for h in group['hooks'] if h['type'] == 'command']
     assert COMMAND not in commands
+
+
+def test_agy_registers_profile_and_capture_notice_once():
+    hooks = json.loads((ROOT / 'agy' / 'hooks.json').read_text())['hq']
+    commands = [h['command'] for h in hooks['SessionStart'] if h.get('type') == 'command']
+    assert commands == [AGY_SESSION_START]

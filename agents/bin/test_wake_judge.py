@@ -339,3 +339,188 @@ def test_corrupt_transcript_line_fails(tmp_path, capsys):
     p = tmp_path / "prompt"; p.write_text(PROMPT)
     assert wj.main(["claude-code", str(t), NONCE, str(p)]) == 1
     assert capsys.readouterr().out.startswith("FAIL: unreadable transcript line")
+
+
+# Record forms from the Antigravity CLI (agy) 1.4.12 wake probes (2026-10-31), ids and paths replaced.
+AGY_CONV = "1e9adf4a-ae3b-4261-896c-648dd48c3388"
+AGY_SUB = "abb9b545-1003-45c7-9ddf-07a269c1ff5c"
+
+
+def agy_user(request_text, extra_tail="", source="USER_EXPLICIT"):
+    body = (
+        f"<USER_REQUEST>\n{request_text}\n</USER_REQUEST>\n"
+        "<ADDITIONAL_METADATA>\nThe current local time is: 2026-10-31T22:19:25-04:00.\n</ADDITIONAL_METADATA>\n"
+        "<USER_SETTINGS_CHANGE>\nThe user changed setting `Model Selection` from None to Gemini 3.8 Flash (Low).\n</USER_SETTINGS_CHANGE>"
+        + extra_tail
+    )
+    return {"step_index": 0, "source": source, "type": "USER_INPUT", "status": "DONE", "content": body}
+
+
+def agy_plan(content=None, tool_calls=None, source="MODEL"):
+    rec = {"source": source, "type": "PLANNER_RESPONSE", "status": "DONE"}
+    if content is not None:
+        rec["content"] = content
+    if tool_calls is not None:
+        rec["tool_calls"] = tool_calls
+    return rec
+
+
+def agy_generic(content, status="DONE", source="MODEL"):
+    return {"source": source, "type": "GENERIC", "status": status, "content": content}
+
+
+def agy_sysmsg(inner, source="SYSTEM"):
+    body = (
+        "The following is a <SYSTEM_MESSAGE> not actually sent by the user. "
+        "It is provided by the system as important information to pay attention to.\n\n"
+        f"<SYSTEM_MESSAGE>\n{inner}\n</SYSTEM_MESSAGE>"
+    )
+    return {"source": source, "type": "SYSTEM_MESSAGE", "status": "DONE", "content": body}
+
+
+def agy_subagent_wake():
+    return [
+        agy_user(PROMPT),
+        agy_plan(tool_calls=[{"name": "invoke_subagent", "args": {"Prompt": "run", "Role": "Reader", "TypeName": "self"}}]),
+        agy_generic(
+            "Created At: 2026-10-31T22:19:31-04:00\nCompleted At: 2026-10-31T22:19:31-04:00\n"
+            f'Created the following subagent:\n{{\n  "conversationId":  "{AGY_SUB}",\n  "logAbsoluteUri":  "file:///s/t.jsonl"\n}}\n'
+            "The subagent will send you a message when it has completed its task or requires guidance."
+        ),
+        agy_plan(content="WAITING"),
+        agy_sysmsg(f"[Message] timestamp=2026-11-01T02:19:56Z sender={AGY_SUB} priority=MESSAGE_PRIORITY_HIGH content={NONCE}"),
+        agy_plan(content=NONCE),
+    ]
+
+
+def agy_shell_wake(is_daemon=False):
+    return [
+        agy_user(PROMPT),
+        agy_plan(tool_calls=[{"name": "run_command", "args": {"CommandLine": "sleep 20; cat /s/nonce", "IsDaemon": is_daemon, "WaitMsBeforeAsync": 500}}]),
+        agy_generic(
+            "Created At: 2026-10-31T22:19:31-04:00\n"
+            f"Tool is running as a background task with task id: {AGY_CONV}/task-2\n"
+            "Task Description: sleep 20; cat /s/nonce",
+            status="RUNNING",
+        ),
+        agy_plan(content="WAITING"),
+        agy_sysmsg(
+            f'[Message] timestamp=2026-11-01T02:19:51Z sender={AGY_CONV}/task-2 priority=MESSAGE_PRIORITY_HIGH '
+            f'content=Task id "{AGY_CONV}/task-2" finished with result:\nCommand exited with code 0.\n\nCommand output:\n{NONCE}'
+        ),
+        agy_plan(content=NONCE),
+    ]
+
+
+def test_agy_subagent_wake_passes():
+    assert verdict("agy", agy_subagent_wake()) == "PASS"
+
+
+def test_agy_shell_wake_passes_with_native_and_stringified_args():
+    assert verdict("agy", agy_shell_wake(is_daemon=False)) == "PASS"
+    assert verdict("agy", agy_shell_wake(is_daemon="false")) == "PASS"
+
+
+def test_agy_session_start_hook_context_is_allowed():
+    records = agy_subagent_wake()
+    records.insert(1, agy_sysmsg("The following system message was injected by a SessionStart hook:\nprofile: personal", source="SYSTEM_SDK"))
+    assert verdict("agy", records) == "PASS"
+
+
+def test_agy_stop_hook_continuation_is_not_a_wake():
+    records = agy_subagent_wake()
+    records[4] = agy_sysmsg(f"Stop hook blocked termination: report {AGY_SUB}")
+    assert verdict("agy", records).startswith("FAIL: unclassified system message")
+
+
+def test_agy_waiting_beside_a_tool_call_is_not_a_turn_end():
+    records = agy_subagent_wake()
+    records[3] = agy_plan(content="WAITING", tool_calls=[{"name": "manage_subagents", "args": {"Action": "list"}}])
+    assert verdict("agy", records).startswith("FAIL: the controller's turn had not ended")
+
+
+def test_agy_waiting_mentioned_but_not_final_reply_fails():
+    records = agy_subagent_wake()
+    records[3] = agy_plan(content="I will say WAITING soon")
+    assert verdict("agy", records).startswith("FAIL: the controller's turn did not end with a reply of exactly WAITING")
+
+
+def test_agy_second_human_prompt_fails():
+    records = agy_subagent_wake()
+    records.insert(4, agy_user(PROMPT))
+    assert verdict("agy", records).startswith("FAIL: 2 human prompts")
+
+
+def test_agy_unclassified_user_input_and_unknown_metadata_fail():
+    records = agy_subagent_wake()
+    records.insert(4, agy_user("Did it finish?"))
+    assert verdict("agy", records).startswith("FAIL: unclassified input")
+    extra_tag = agy_subagent_wake()
+    extra_tag[0] = agy_user(PROMPT, extra_tail="\n<QUEUED_USER_NOTE>poke</QUEUED_USER_NOTE>")
+    assert verdict("agy", extra_tag).startswith("FAIL: unclassified input")
+    mismatched_tag = agy_subagent_wake()
+    mismatched_tag[0] = agy_user(
+        PROMPT,
+        extra_tail="\n<ADDITIONAL_METADATA>sneaky user text</USER_SETTINGS_CHANGE>",
+    )
+    assert verdict("agy", mismatched_tag).startswith("FAIL: unclassified input")
+
+
+def test_agy_unknown_record_type_or_source_fails():
+    records = agy_subagent_wake()
+    records.insert(4, {"source": "MODEL", "type": "MYSTERY_STEP", "content": ""})
+    assert verdict("agy", records).startswith("FAIL: unclassified record type")
+    bad_source = agy_subagent_wake()
+    bad_source[0] = agy_user(PROMPT, source="SYSTEM")
+    assert verdict("agy", bad_source).startswith("FAIL: unclassified record source")
+
+
+def test_agy_truncated_record_fails():
+    records = agy_shell_wake()
+    records[2] = {**records[2], "truncated_fields": ["content"]}
+    assert verdict("agy", records).startswith("FAIL: truncated record")
+
+
+def test_agy_nonce_before_notification_fails():
+    records = agy_subagent_wake()
+    records.insert(3, agy_plan(content=f"peeked: {NONCE}"))
+    assert verdict("agy", records).startswith("FAIL: the nonce appeared before")
+
+
+def test_agy_notification_for_another_task_in_same_conversation_fails():
+    records = agy_shell_wake()
+    records[4] = agy_sysmsg(
+        f'[Message] timestamp=2026-11-01T02:19:51Z sender={AGY_CONV}/task-9 priority=MESSAGE_PRIORITY_HIGH content={NONCE}'
+    )
+    assert verdict("agy", records).startswith("FAIL: the notification does not name")
+
+
+def test_agy_id_from_an_unrelated_tool_result_does_not_count():
+    records = agy_shell_wake()
+    records[1:1] = [
+        agy_plan(tool_calls=[{"name": "read_file", "args": {"Path": "/s/log"}}]),
+        agy_generic(f"Tool is running as a background task with task id: {AGY_CONV}/task-9"),
+    ]
+    records[-2] = agy_sysmsg(
+        f'[Message] timestamp=2026-11-01T02:19:51Z sender={AGY_CONV}/task-9 priority=MESSAGE_PRIORITY_HIGH content={NONCE}'
+    )
+    assert verdict("agy", records).startswith("FAIL: the notification does not name")
+
+
+def test_agy_daemon_command_is_not_a_waking_child():
+    assert verdict("agy", agy_shell_wake(is_daemon=True)).startswith("FAIL: no child was launched")
+    assert verdict("agy", agy_shell_wake(is_daemon="true")).startswith("FAIL: no child was launched")
+
+
+def test_agy_no_reply_after_notification_fails():
+    assert verdict("agy", agy_subagent_wake()[:-1]).startswith("FAIL: no controller reply")
+
+
+def test_cli_accepts_agy(tmp_path, capsys):
+    import json
+    t = tmp_path / "t.jsonl"
+    t.write_text("\n".join(json.dumps(r) for r in agy_shell_wake()) + "\n")
+    p = tmp_path / "prompt"
+    p.write_text(PROMPT)
+    assert wj.main(["agy", str(t), NONCE, str(p)]) == 0
+    assert capsys.readouterr().out.strip() == "PASS"

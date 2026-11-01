@@ -2,7 +2,7 @@
 """Judge one controller-wake probe transcript: did the harness start a new controller
 turn, without human input, because a child it was running finished?
 
-wake-judge <claude-code|codex> <transcript.jsonl> <nonce> <prompt-file>
+wake-judge <agy|claude-code|codex> <transcript.jsonl> <nonce> <prompt-file>
 
 Prints PASS, or FAIL: <why>; exits 0 on PASS and 1 on FAIL. It fails closed. Every
 input record must classify as the one human prompt (byte-equal to <prompt-file>, stripped),
@@ -55,6 +55,31 @@ ID_IN_RESULT = re.compile(r"(?i)\b(?:agent|task|shell|process|background)[ _-]?i
 # Tool calls that launch a child a notification may name; nothing else counts.
 CLAUDE_LAUNCH_TOOLS = frozenset({"Agent", "Task"})
 CODEX_LAUNCH_TOOLS = frozenset({"spawn_agent"})
+AGY_RECORD_SOURCES = {
+    "USER_INPUT": frozenset({"USER_EXPLICIT"}),
+    "PLANNER_RESPONSE": frozenset({"MODEL"}),
+    "GENERIC": frozenset({"MODEL"}),
+    "SYSTEM_MESSAGE": frozenset({"SYSTEM", "SYSTEM_SDK"}),
+}
+AGY_USER_REQUEST_RE = re.compile(r"<USER_REQUEST>\n?(.*?)\n?</USER_REQUEST>", re.DOTALL)
+AGY_ALLOWED_USER_META_RE = re.compile(
+    r"<(ADDITIONAL_METADATA|USER_SETTINGS_CHANGE)>.*?</\1>",
+    re.DOTALL,
+)
+AGY_SYSMSG_RE = re.compile(
+    r"\AThe following is a <SYSTEM_MESSAGE> not actually sent by the user\. "
+    r"It is provided by the system as important information to pay attention to\.\s*"
+    r"<SYSTEM_MESSAGE>\n(.*)\n</SYSTEM_MESSAGE>\s*\Z",
+    re.DOTALL,
+)
+AGY_SESSION_START_PREFIX = "The following system message was injected by a SessionStart hook:\n"
+AGY_NOTIFICATION_RE = re.compile(r"\A\[Message\]\s+timestamp=\S+\s+sender=(\S+)\s+")
+AGY_SUBAGENT_ID_RE = re.compile(
+    r'Created the following subagent:\s*\{[^}]*"conversationId"\s*:\s*"([0-9a-fA-F-]+)"'
+)
+AGY_BG_TASK_ID_RE = re.compile(
+    r"Tool is running as a background task with task id:\s*([0-9a-fA-F-]+/task-\d+)\b"
+)
 
 
 class Fail(Exception):
@@ -239,9 +264,141 @@ def judge_codex(records, nonce, prompt):
         raise Fail("no controller reply in the new turn reports the nonce")
 
 
+def _agy_sysmsg_inner(record):
+    content = record.get("content")
+    if not isinstance(content, str):
+        raise Fail("SYSTEM_MESSAGE record without string content")
+    match = AGY_SYSMSG_RE.match(content)
+    if not match:
+        raise Fail(f"unclassified system message: {content[:60]!r}")
+    return match.group(1)
+
+
+def _agy_kind(record, prompt):
+    if record.get("truncated_fields"):
+        raise Fail("truncated record; judge transcript_full.jsonl")
+    kind = record.get("type")
+    if kind not in AGY_RECORD_SOURCES:
+        raise Fail(f"unclassified record type {kind!r}")
+    source = record.get("source")
+    if source not in AGY_RECORD_SOURCES[kind]:
+        raise Fail(f"unclassified record source {source!r} for {kind!r}")
+    if kind == "USER_INPUT":
+        content = record.get("content")
+        if not isinstance(content, str):
+            raise Fail("USER_INPUT record without string content")
+        requests = AGY_USER_REQUEST_RE.findall(content)
+        if len(requests) != 1:
+            raise Fail(f"unclassified input: {content[:60]!r}")
+        outside = AGY_USER_REQUEST_RE.sub("", content, count=1)
+        outside = AGY_ALLOWED_USER_META_RE.sub("", outside).strip()
+        if outside:
+            raise Fail(f"unclassified input: {outside[:60]!r}")
+        text = requests[0].strip()
+        if text == prompt:
+            return "human"
+        raise Fail(f"unclassified input: {text[:60]!r}")
+    if kind == "SYSTEM_MESSAGE":
+        inner = _agy_sysmsg_inner(record)
+        if source == "SYSTEM_SDK":
+            if inner.startswith(AGY_SESSION_START_PREFIX):
+                return "context"
+            raise Fail(f"unclassified system message: {inner[:60]!r}")
+        if AGY_NOTIFICATION_RE.match(inner):
+            return "notification"
+        raise Fail(f"unclassified system message: {inner[:60]!r}")
+    if kind == "PLANNER_RESPONSE":
+        tool_calls = record.get("tool_calls")
+        content = record.get("content")
+        if content is not None and not isinstance(content, str):
+            raise TypeError("PLANNER_RESPONSE content must be str or None")
+        if tool_calls is not None:
+            if not isinstance(tool_calls, list) or any(not isinstance(tc, dict) for tc in tool_calls):
+                raise TypeError("PLANNER_RESPONSE tool_calls must be a list of dicts")
+            if tool_calls:
+                return "assistant-tool"
+        if not isinstance(content, str):
+            raise Fail("PLANNER_RESPONSE record without content or tool_calls")
+        return "assistant"
+    content = record.get("content")
+    if not isinstance(content, str):
+        raise Fail("GENERIC record without string content")
+    return "tool-result"
+
+
+def _agy_launched_ids(seq_before):
+    ids = set()
+    idx = 0
+    while idx < len(seq_before):
+        kind, record = seq_before[idx]
+        if kind == "assistant-tool":
+            calls = record["tool_calls"]
+            results = []
+            cursor = idx + 1
+            while cursor < len(seq_before) and len(results) < len(calls):
+                next_kind, next_record = seq_before[cursor]
+                if next_kind == "context":
+                    cursor += 1
+                    continue
+                if next_kind != "tool-result":
+                    break
+                results.append(next_record)
+                cursor += 1
+            if len(results) != len(calls):
+                raise Fail("tool-call and tool-result count mismatch before notification")
+            for call, result in zip(calls, results):
+                name = call.get("name")
+                text = result["content"]
+                if name == "invoke_subagent":
+                    ids.update(AGY_SUBAGENT_ID_RE.findall(text))
+                elif name == "run_command":
+                    args = call.get("args") or {}
+                    if not isinstance(args, dict):
+                        raise TypeError("run_command args must be a dict")
+                    if args.get("IsDaemon") not in (True, "true", "True"):
+                        ids.update(AGY_BG_TASK_ID_RE.findall(text))
+            idx = cursor
+        elif kind == "tool-result":
+            raise Fail("orphan tool-result without preceding tool call")
+        else:
+            idx += 1
+    return ids
+
+
+def judge_agy(records, nonce, prompt):
+    seq = [(k, r) for r in records if (k := _agy_kind(r, prompt)) is not None]
+    kinds = [k for k, _ in seq]
+    if kinds.count("human") != 1:
+        raise Fail(f"{kinds.count('human')} human prompts; expected exactly one")
+    first_human = kinds.index("human")
+    if any(k.startswith("assistant") for k in kinds[:first_human]):
+        raise Fail("the controller spoke before the prompt")
+    if "notification" not in kinds:
+        raise Fail("no completion notification")
+    n = kinds.index("notification")
+    before = [i for i in range(n) if kinds[i] != "context"]
+    if not before or kinds[before[-1]] != "assistant":
+        raise Fail("the controller's turn had not ended before the notification (last record is not a text-only reply)")
+    if (seq[before[-1]][1].get("content") or "").strip() != "WAITING":
+        raise Fail("the controller's turn did not end with a reply of exactly WAITING")
+    if any(nonce in json.dumps(r) for _, r in seq[:n]):
+        raise Fail("the nonce appeared before the notification")
+    launched = _agy_launched_ids(seq[:n])
+    if not launched:
+        raise Fail("no child was launched before the notification")
+    sender = AGY_NOTIFICATION_RE.match(_agy_sysmsg_inner(seq[n][1])).group(1)
+    if sender not in launched:
+        raise Fail("the notification does not name a child launched in the first turn")
+    if not any(k.startswith("assistant") and nonce in (r.get("content") or "") for k, r in seq[n + 1:]):
+        raise Fail("no controller reply after the notification reports the nonce")
+
+
+JUDGES = {"agy": judge_agy, "claude-code": judge_claude, "codex": judge_codex}
+
+
 def judge(harness, records, nonce, prompt):
     try:
-        (judge_claude if harness == "claude-code" else judge_codex)(records, nonce, prompt.strip())
+        JUDGES[harness](records, nonce, prompt.strip())
     except Fail as failure:
         return f"FAIL: {failure}"
     except (AttributeError, KeyError, TypeError, ValueError) as error:
@@ -250,7 +407,7 @@ def judge(harness, records, nonce, prompt):
 
 
 def main(argv):
-    if len(argv) != 4 or argv[0] not in ("claude-code", "codex"):
+    if len(argv) != 4 or argv[0] not in JUDGES:
         print(__doc__.splitlines()[3], file=sys.stderr)
         return 2
     harness, path, nonce, prompt_file = argv

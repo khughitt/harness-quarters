@@ -333,17 +333,39 @@ def test_the_shipped_file_is_valid_and_holds_the_three_facts():
     assert facts.lookup("controller-wake", "claude-code")["value"] is True
     assert facts.lookup("controller-wake", "codex")["value"] is False
     assert facts.lookup("controller-wake", "opencode")["status"] == "unknown"
-    assert facts.lookup("controller-wake", "agy")["status"] == "unknown"
+    assert facts.lookup("controller-wake", "agy")["value"] is True
     assert facts.lookup("controller-wake-kinds", "claude-code")["value"] == ["shell", "subagent"]
+    assert facts.lookup("controller-wake-kinds", "agy")["value"] == ["shell", "subagent"]
     assert facts.lookup("controller-wake-kinds", "codex")["value"] == []
     assert facts.lookup("stop-input-in-flight-statuses", "claude-code")["value"] == ["pending", "running"]
     assert facts.lookup("stop-input-in-flight-statuses", "codex")["status"] == "unknown"
+    assert facts.lookup("stop-input-in-flight-statuses", "agy")["status"] == "unknown"
+    assert facts.lookup("session-start-before-first-turn", "agy")["value"] is False
+    assert facts.lookup("mcp-stdio", "agy")["value"] is True
+    assert facts.lookup("mcp-stdio-revisions", "agy")["value"] == ["2025-11-25", "2026-07-28"]
+    assert facts.lookup("answer-hook-terminal", "agy")["value"] is False
+    assert facts.lookup("answer-defer-managed", "agy")["value"] is False
+    assert facts.lookup("answer-async-question", "agy")["value"] is False
 
 
 def test_every_shipped_note_names_the_probe_mode():
     """Entries key on the harness alone, so each note says how the probe ran (spec §4.5)."""
-    modes = {"claude-code": "interactive session", "codex": "terminal interface"}
+    modes = {
+        "agy": "interactive terminal session",
+        "claude-code": "interactive session",
+        "codex": "terminal interface",
+    }
     for fact in ("controller-wake", "controller-wake-kinds"):
         for harness, mode in modes.items():
             assert mode in facts.lookup(fact, harness)["note"], (fact, harness)
     assert "headless" in facts.lookup("stop-input-in-flight-statuses", "claude-code")["note"]
+    for fact, expected_mode in (
+        ("answer-hook-terminal", "interactive terminal session"),
+        ("session-start-before-first-turn", "interactive terminal session"),
+        ("answer-defer-managed", "headless"),
+        ("answer-async-question", "headless"),
+        ("mcp-stdio", "headless"),
+        ("mcp-stdio-revisions", "headless"),
+    ):
+        assert expected_mode in facts.lookup(fact, "agy")["note"], fact
+    assert "headless daemon" not in facts.lookup("controller-wake-kinds", "agy")["note"]
