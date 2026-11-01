@@ -1,6 +1,7 @@
 # Declarative harness manifest: one source of truth for live-state hooks and capability facts
 
-Status: draft for user review (round 3), 2026-11-01 (`hq-2eba07`, source `hq-6c8a9f`).
+Status: accepted for planning, 2026-11-01 (`hq-2eba07`, source `hq-6c8a9f`, accepted at
+`077b8f6` with round-3 staged-blob and linked-worktree refinements folded in).
 Extends `docs/specs/2026-10-06-residue-design.md` §4 (capability facts) and
 `docs/specs/2026-10-10-live-model-preservation-design.md` /
 `docs/specs/2026-10-15-pi-live-picks-design.md` (clean filter, refresh, and live-picks
@@ -411,15 +412,23 @@ import path with no `runpy` cycles:
     `{spec.filter_glob for spec in manifest.live_state}`.
   - `check_filter_config(git_dir: Path | None = None) -> None`: checks the **real
     repository's** Git config (using `git --git-dir=<git_dir> config ...` when `git_dir`
-    is supplied, or `git -C REPO config ...` otherwise) and raises `ManifestError` unless
+    is supplied, or `git -C REPO config ...` otherwise; in a linked worktree, Git resolves
+    the shared repository config through `commondir`) and raises `ManifestError` unless
     `filter.harness-state.clean == EXPECTED_CLEAN_FILTER` and
     `git config --bool --get filter.harness-state.required == "true"`, naming
     `run 'just setup'` in the error message.
-  - CLI entrypoint (`python3 .githooks/harness_state.py check [--git-dir <path>]`): runs
+  - `check_clean_tree(manifest: HarnessManifest, root: Path | None = None) -> None`: walks
+    `root or REPO` (excluding `.git`) and, for every file whose relative POSIX path
+    full-matches a `spec.filter_re`, verifies the file is valid UTF-8, parses under
+    `clean_for_spec(spec, text)`, and satisfies `clean_for_spec(spec, text) == text`,
+    raising `ManifestError` naming `git add --renormalize <path>` on any already-leaked
+    staged blob.
+  - CLI entrypoint
+    (`python3 .githooks/harness_state.py check [--git-dir <path>] [--staged-tree]`): runs
     `manifest = load_manifest(MANIFEST_PATH)`,
-    `check_gitattributes(manifest, GITATTRIBUTES_PATH)`, and
-    `check_filter_config(git_dir)`, printing `harness-state: <problem>` lines to stderr
-    and exiting `2` on `ManifestError`.
+    `check_gitattributes(manifest, GITATTRIBUTES_PATH)`, `check_filter_config(git_dir)`,
+    and (when `--staged-tree` is passed) `check_clean_tree(manifest, REPO)`, printing
+    `harness-state: <problem>` lines to stderr and exiting `2` on `ManifestError`.
 - Pure cleaners (moved from `harness-state-clean`):
   - `clean_json(text: str, keys: Iterable[str]) -> str`: parses JSON, removes `keys`,
     and serializes with `json.dumps(data, indent=2, ensure_ascii=False) + "\n"`.
@@ -469,7 +478,9 @@ import path with no `runpy` cycles:
 4. **`.githooks/live-picks`**:
    - Imports `TOML_HEADER`, `TOML_KEY`, and `clean_for_spec` directly from `harness_state`
      (removing `runpy.run_path` on `harness-state-clean`).
-   - Does **not** load `harnesses.toml` at import time. Inside `main(argv)`:
+   - Does **not** load `harnesses.toml` at import time (building usage output lazily via a
+     `usage()` helper that appends `(files: ...)` when `load_manifest()` succeeds and falls
+     back to the static command synopsis otherwise). Inside `main(argv)`:
      1. Validates CLI argument shape (`capture`, `restore`, `sync`, `forget <file>`, or
         `hook post-checkout|post-merge|post-rewrite`) first.
      2. Checks `CHECKOUT.linked_worktree()` (returning `0` silently for `hook` and
@@ -545,11 +556,14 @@ import path with no `runpy` cycles:
      `staged_tree` once during `main()`, and runs both `facts_check(tree)`
      (`tools/harness-facts check`) and
      `manifest_check(tree, git_dir=real_git_dir)`
-     (`python3 <tree>/.githooks/harness_state.py check --git-dir <real_git_dir>`).
+     (`python3 <tree>/.githooks/harness_state.py check --git-dir <real_git_dir> --staged-tree`).
    - Because `staged_tree` is a plain directory checkout without `.git`, passing
-     `--git-dir <real_git_dir>` checks `harnesses.toml` and `.gitattributes` from the
-     **staged tree** while checking `filter.harness-state.clean` and
-     `filter.harness-state.required == true` from the **real repository's** Git config.
+     `--git-dir <real_git_dir> --staged-tree` checks `harnesses.toml`, `.gitattributes`,
+     and the cleanliness of every staged settings blob (`clean_for_spec(spec, blob) == blob`,
+     catching blobs staged earlier while `required` was unset or after a rebase/bisect across
+     pre-manifest commits) from the **staged tree**, while checking
+     `filter.harness-state.clean` and `filter.harness-state.required == true` from the
+     **real repository's** Git config (including from linked worktrees via `commondir`).
    - `manifest_check(tree=None, git_dir=None)` (resolving `git_dir` and exporting its own
      staged tree when called directly in tests with `tree=None`, matching
      `facts_check(tree=None)`) refuses if `.githooks/harness_state.py` is unstaged/missing
@@ -601,10 +615,12 @@ import path with no `runpy` cycles:
    filtered settings file's working-tree stat differs from the index) fail closed instead
    of staging or diffing unfiltered picks. Recovery requires only fixing `harnesses.toml`
    (e.g. `git checkout -- harnesses.toml`); never unset `filter.harness-state.required`.
-   If an existing clone has not re-run `just setup` after pulling, both
+   If an existing clone has not re-run `just setup` after pulling (or holds a differently
+   spelled `filter.harness-state.clean` command such as a stale absolute path), both
    `harness-state-refresh` (at the next turn end) and `pre-commit` (at the next commit)
-   detect the missing `filter.harness-state.required = true` in the real repository's Git
-   config and refuse with `run 'just setup'`.
+   detect the mismatch in the real repository's Git config and refuse with
+   `run 'just setup'`; `pre-commit` also refuses any already-staged raw settings blob until
+   `git add --renormalize <path>` re-filters the index.
 2. **Unconfigured `.toml` paths are refused by `harness-state-clean`**: previously, any
    `.toml` path passed to `harness-state-clean` fell through `elif path.endswith(".toml")`
    and had Codex's TOML rules applied; now only paths matching a declared
@@ -675,16 +691,18 @@ import path with no `runpy` cycles:
       `filter.harness-state.required` is unset/`false`.
   - `.githooks/test_pre_commit.py` and `.githooks/test_pre_commit_facts.py`:
     - Add stub `.githooks/harness_state.py` and `filter.harness-state.{clean,required}`
-      to `test_pre_commit.py`'s `world` fixture, plus a test verifying `pre-commit`
-      refuses when `filter.harness-state.required` is unset or `false` in the real
-      repository.
+      to `test_pre_commit.py`'s `world` fixture, plus tests verifying `pre-commit` runs
+      cleanly from a linked worktree (`git worktree add`) and refuses when
+      `filter.harness-state.required` is unset or `false` or `filter.harness-state.clean`
+      drifts in the real repository.
     - Add `harnesses.toml`, `.githooks/harness_state.py`, `.gitattributes`, and
       `filter.harness-state.{clean,required}` to `test_pre_commit_facts.py` with tests
       proving `pre-commit` refuses staged `live_state` violations (bad regex, partition
-      violation, overlapping `filter_glob`), staged `.gitattributes` drift, missing
-      `filter.harness-state.required = true` in the real repo, staged deletion of
-      `harnesses.toml` or `.githooks/harness_state.py`, and undeclared harnesses in
-      `facts/capabilities.toml`.
+      violation, overlapping `filter_glob`), staged `.gitattributes` drift, already-leaked
+      raw settings blobs staged before `just setup` (until `git add --renormalize <path>`
+      cleans the index), missing `filter.harness-state.required = true` in the real repo,
+      staged deletion of `harnesses.toml` or `.githooks/harness_state.py`, and undeclared
+      harnesses in `facts/capabilities.toml`.
   - `tools/test_harness_facts.py`, `tools/test_agy_hooks.py`, and
     `tools/test_harness_links.py`:
     - Update `tools/test_harness_facts.py` fixtures for `harnesses.toml` / `--manifest`
