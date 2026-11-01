@@ -8,9 +8,10 @@ from pathlib import Path
 
 import pytest
 
+import harness_stores
 from session_archive import config
 from session_archive.capture import capture_run
-from session_archive.decide import is_transcript
+from session_archive.decide import claude_is_transcript, codex_is_transcript
 from session_archive.inputs import claude_units, codex_units, load_obs_state
 from session_archive.prune import Context, evaluate, prune_run
 from session_archive.testing import claude_session, codex_rollout, obs_payload
@@ -22,10 +23,10 @@ def load(payload):
 
 
 def make_world(home, archive, manifest, kind, *, capture=True):
-    source = next(s for s in config.sources(home) if s.name == kind)
+    source = next(s for s in harness_stores.archive_sources(home) if s.name == kind)
     path = claude_session(source.root) if kind == "claude" else codex_rollout(source.root)
     (unit,) = claude_units(source) if kind == "claude" else codex_units(source)
-    payload = obs_payload(*(source.root / rel for rel in unit.files if is_transcript(kind, rel)))
+    payload = obs_payload(*(source.root / rel for rel in unit.files if (claude_is_transcript if kind == "claude" else codex_is_transcript)(rel)))
     if capture:
         capture_run(archive, manifest, [source])
     ctx = Context(archive, manifest, load(payload), lambda: set(), time.time_ns(), "proof")

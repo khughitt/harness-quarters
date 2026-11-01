@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+import harness_stores
 from session_archive import config
 from session_archive.capture import capture_run, mirror_path
 from session_archive.prune import Context, Hooks, LeftoverQuarantine, prune_run
@@ -55,7 +56,7 @@ def context(src, archive, manifest, hooks=None) -> Context:
 
 @pytest.fixture
 def src(home):
-    return next(s for s in config.sources(home) if s.name == "claude")
+    return next(s for s in harness_stores.archive_sources(home) if s.name == "claude")
 
 
 def outcomes(report) -> dict[str, str]:

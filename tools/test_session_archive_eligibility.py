@@ -3,7 +3,7 @@ from dataclasses import replace
 
 import pytest
 
-from session_archive.decide import FileFacts, ObsFile, Stat, file_reason, is_transcript, unit_reason
+from session_archive.decide import FileFacts, ObsFile, Stat, claude_is_transcript, codex_is_transcript, file_reason, unit_reason
 from session_archive.manifest import MIRROR, Version
 from session_archive.testing import TID
 
@@ -73,13 +73,13 @@ def test_strict_evidence_must_match_live(change):
 ])
 def test_strict_codex_identity_must_match_filename(change):
     indexed = replace(INDEXED, harness="codex", thread_id=TID, filename_id=TID)
-    facts = replace(PASSING, harness="codex", thread_id=TID, obs=replace(indexed, **change))
+    facts = replace(PASSING, harness="codex", thread_id=TID, thread_identity=True, obs=replace(indexed, **change))
     assert file_reason(facts, NOW) == "index-stale"
 
 
 def test_matching_codex_identity_passes():
     indexed = replace(INDEXED, harness="codex", thread_id=TID, filename_id=TID)
-    assert file_reason(replace(PASSING, harness="codex", thread_id=TID, obs=indexed), NOW) is None
+    assert file_reason(replace(PASSING, harness="codex", thread_id=TID, thread_identity=True, obs=indexed), NOW) is None
 
 
 def test_non_transcript_needs_no_index():
@@ -101,4 +101,5 @@ def test_unit_takes_first_failure_and_keeps_empty():
     ("codex", "2026/01/01/notes.txt", False),
 ])
 def test_is_transcript(kind, rel, expected):
-    assert is_transcript(kind, rel) is expected
+    check = claude_is_transcript if kind == "claude" else codex_is_transcript
+    assert check(rel) is expected

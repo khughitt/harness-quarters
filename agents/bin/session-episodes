@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-"""Prepare pre-flow episodes from the Claude Code and Codex session stores.
+"""Prepare pre-flow episodes from the Claude Code, Codex and agy session stores.
 
-session-episodes extract  [--since DAYS] [--project PREFIX] [--window-minutes N]
+session-episodes extract  [--harness SLUG]... [--since DAYS] [--project PREFIX] [--window-minutes N]
                           [--labels PATH] [--anchors PATH] --out PATH
 session-episodes show     <id>        --episodes PATH
 session-episodes confirm  <id> yes|no --episodes PATH [--anchors PATH]
 session-episodes label    <id> yes|no --episodes PATH [--labels PATH]
 
 The contract is docs/specs/2026-09-19-session-logs-design.md in the ai checkout.
-Read-only over the stores and every tasks/ directory; standard library only.
+Read-only over the stores and every tasks/ directory; standard library only. Store roots
+come from hq's tools/harness_stores, found from this file's real path; `extract` reads
+Claude Code and Codex unless `--harness` names the set (agy only on request until the
+flow-trial-1 readout, 2027-02-16).
 """
 
 from __future__ import annotations
@@ -24,14 +27,29 @@ import subprocess
 import sys
 from dataclasses import dataclass, field, replace
 from pathlib import Path
+from typing import Callable
+
+# hq's adapter registry names each store's root: <hq>/tools beside <hq>/agents/bin, found
+# from this file's real path (~/.agents/bin links here). There is no built-in fallback.
+TOOLS = Path(__file__).resolve().parents[2] / "tools"
+if not (TOOLS / "harness_stores" / "__init__.py").is_file():
+    raise SystemExit(f"session-episodes: no harness_stores package under {TOOLS}; run the script from an hq checkout")
+sys.path.insert(0, str(TOOLS))
+try:
+    import harness_stores
+except ImportError as error:
+    raise SystemExit(f"session-episodes: cannot import harness_stores from {TOOLS}: {error}")
 
 CLAUDE_HARNESS = "claude-code"
 CODEX_HARNESS = "codex"
+AGY_HARNESS = "agy"
 WAIT_TOOLS = {"AskUserQuestion", "EnterPlanMode", "ExitPlanMode"}
+AGY_WAIT_TOOLS = {"ask_question"}
 CODEX_WAIT_TOOL = "request_user_input"
 CODEX_INJECTED = ("# AGENTS.md", "<environment_context>", "<INSTRUCTIONS>", "<skills_instruct",
                   "<turn_aborted>", "<permissions", "<user_shell", "<collaboration_mode")
-INTERACTIVE = {CLAUDE_HARNESS: ("cli",), CODEX_HARNESS: ("codex-tui", "codex_exec")}
+INTERACTIVE = {CLAUDE_HARNESS: ("cli",), CODEX_HARNESS: ("codex-tui", "codex_exec"), AGY_HARNESS: ("agy",)}
+DEFAULT_HARNESSES = (CLAUDE_HARNESS, CODEX_HARNESS)  # agy joins after the 2027-02-16 readout (obs-f5710b)
 INTERRUPT_MARK = "[Request interrupted by user"
 # a Claude Code or Codex user turn that starts with a paste: the wrapper tags are the harness's, the
 # text inside and after them is the person's
@@ -265,6 +283,116 @@ def read_codex(path: Path) -> Session:
         elif pt in ("function_call_output", "custom_tool_call_output"):
             s.events.append(Event("tool_result", t, line, call_id=p.get("call_id"),
                                   text=_codex_output_text(p.get("output"))))
+    return s
+
+
+# --- agy -----------------------------------------------------------------------
+#
+# One step per line: {"step_index","source","type","status","created_at",…}. agy records no
+# call ids: the k-th GENERIC step after a PLANNER_RESPONSE is that step's k-th call's result.
+
+_AGY_REQUEST = re.compile(r"<USER_REQUEST>(.*?)</USER_REQUEST>", re.S)
+_AGY_BACKGROUND = re.compile(r"background task with task id: (\S+)")
+_AGY_SENDER = re.compile(r"\bsender=(\S+)")
+_AGY_FINISHED = "finished with result:"
+_AGY_CANCELED = "was canceled with result:"
+_AGY_MESSAGE_TAG = "</SYSTEM_MESSAGE>"
+
+
+def _agy_steps(path: Path):
+    """(line, step, at_ms) per step; a line that is not a step stops the run."""
+    for line, r in _lines(path):
+        if not isinstance(r, dict) or not all(k in r for k in ("type", "step_index", "created_at")):
+            raise SystemExit(f"session-episodes: agy transcript {path}:{line} is not a JSON step object "
+                             "with type, step_index and created_at")
+        try:
+            t = at_ms(str(r["created_at"]))
+        except ValueError:
+            raise SystemExit(f"session-episodes: agy transcript {path}:{line} has created_at {r['created_at']!r}")
+        yield line, r, t
+
+
+def _agy_human(r: dict) -> bool:
+    return r["type"] == "USER_INPUT" and r.get("source") == "USER_EXPLICIT"
+
+
+def _agy_session(path: Path) -> Session:
+    return Session(AGY_HARNESS, path, path.parents[2].name, None, "agy", True, [], 0)
+
+
+def agy_header(path: Path) -> Session:
+    """The conversation's identity: subagent unless a USER_EXPLICIT input exists, so the read
+    stops at the first one, checking every line before it."""
+    s = _agy_session(path)
+    for _, r, _ in _agy_steps(path):
+        if _agy_human(r):
+            s.subagent = False
+            break
+    return s
+
+
+def _agy_background_result(content: str) -> tuple[str, str] | None:
+    """(sender, result text) of a SYSTEM_MESSAGE reporting a background task's end. The first
+    sender and the first marker are the message's own; the result text may quote others."""
+    sender = _AGY_SENDER.search(content)
+    if sender is None:
+        return None
+    found = [(content.find(marker), marker, prefix)
+             for marker, prefix in ((_AGY_FINISHED, ""), (_AGY_CANCELED, "error: canceled: ")) if marker in content]
+    if not found:
+        return None
+    at, marker, prefix = min(found)
+    body = content[at + len(marker):].strip().removesuffix(_AGY_MESSAGE_TAG).strip()
+    return sender.group(1), prefix + body
+
+
+def read_agy(path: Path) -> Session:
+    s = _agy_session(path)
+    queue: list[str] = []            # the latest planner step's call ids still awaiting a GENERIC
+    background: dict[str, str] = {}  # background task id -> the call it runs
+    for line, r, t in _agy_steps(path):
+        kind = r["type"]
+        content = r.get("content") if isinstance(r.get("content"), str) else ""
+        if _agy_human(r):
+            s.subagent = False
+            request = _AGY_REQUEST.search(content)
+            if request is not None and request.group(1).strip():
+                s.events.append(Event("human", t, line, text=request.group(1).strip()))
+        elif kind == "PLANNER_RESPONSE":
+            calls = r.get("tool_calls") or []
+            ids = [f"{s.session_id}:{r['step_index']}:{k}" for k in range(len(calls))]
+            s.events.append(Event("assistant", t, line, text=content,
+                                  text_only=bool(content.strip()) and not calls, pending=tuple(ids)))
+            for call_id, call in zip(ids, calls):
+                name = call.get("name")
+                commands = ()
+                if name == "run_command":
+                    command = (call.get("args") or {}).get("CommandLine")
+                    if not isinstance(command, str):
+                        raise SystemExit(f"session-episodes: agy transcript {path}:{line} has a run_command "
+                                         "without a CommandLine string")
+                    commands = (command,)
+                s.events.append(Event("tool_call", t, line, call_id=call_id, tool=name, commands=commands))
+            queue = ids
+        elif kind == "GENERIC":
+            if not queue:
+                continue  # a surplus GENERIC step pairs with nothing
+            call_id = queue.pop(0)
+            status = r.get("status")
+            if status == "RUNNING":
+                started = _AGY_BACKGROUND.search(content)
+                if started is not None:
+                    background[started.group(1)] = call_id
+            elif status == "ERROR":
+                s.events.append(Event("tool_result", t, line, call_id=call_id, text="error: " + content))
+            else:
+                s.events.append(Event("tool_result", t, line, call_id=call_id, text=content))
+        elif kind == "SYSTEM_MESSAGE":
+            ended = _agy_background_result(content)
+            if ended is not None and ended[0] in background:
+                s.events.append(Event("tool_result", t, line, call_id=background.pop(ended[0]), text=ended[1]))
+        elif kind == "ERROR_MESSAGE":
+            s.events.append(Event("error", t, line, text=str(r.get("error", ""))))
     return s
 
 
@@ -686,7 +814,9 @@ class Turn:
     end_index: int
 
 
-def _claude_turn(session: Session, anchor_index: int) -> Turn:
+def _tail_turn(session: Session, anchor_index: int, wait_tools: set[str]) -> Turn:
+    """A turn judged from its tail (Claude Code and agy): text with no tool calls completes
+    it; an error tail is unknown; unanswered calls that only ask the person are wait."""
     events = session.events
     results: set[str] = set()
     last_assistant = None
@@ -714,9 +844,11 @@ def _claude_turn(session: Session, anchor_index: int) -> Turn:
         tail = events[last_index]
         if tail.kind == "assistant" and tail.text_only:
             outcome = "completed"
+        elif tail.kind == "error":
+            outcome = "unknown"
         elif last_assistant is not None and any(p not in results for p in last_assistant.pending):
             pending_tools = {e.tool for e in events if e.kind == "tool_call" and e.call_id in last_assistant.pending and e.call_id not in results}
-            outcome = "wait" if pending_tools and pending_tools <= WAIT_TOOLS else "unknown"
+            outcome = "wait" if pending_tools and pending_tools <= wait_tools else "unknown"
         else:
             outcome = "unknown"
     return Turn(ended_at, outcome, last_index)
@@ -747,7 +879,7 @@ def _codex_turn(session: Session, anchor_index: int) -> Turn:
 
 
 def turn_after(session: Session, anchor_index: int) -> Turn:
-    return _claude_turn(session, anchor_index) if session.harness == CLAUDE_HARNESS else _codex_turn(session, anchor_index)
+    return READERS[session.harness][3](session, anchor_index)
 
 
 def next_human_after(session: Session, end_index: int) -> Event | None:
@@ -1175,22 +1307,31 @@ def _prefilter(header: Session, since_ms: int | None) -> str | None:
     return None
 
 
-def scan_stores(claude_root: Path, codex_root: Path, since_ms: int | None = None) -> list[Session]:
-    """Every file in both stores as a Session: parsed, or a header carrying its skip reason.
-    Skipped files still count in the summary's files and excluded, since the header settles
-    subagent and entrypoint the way the full read does."""
+# slug -> (glob under the store root, header, full read, turn); a header of None means
+# the file's identity needs the full read
+READERS: dict[str, tuple[str, Callable[[Path], Session | None], Callable[[Path], Session],
+                         Callable[[Session, int], Turn]]] = {
+    CLAUDE_HARNESS: ("*/*.jsonl", claude_header, read_claude, lambda s, i: _tail_turn(s, i, WAIT_TOOLS)),
+    CODEX_HARNESS: ("**/*.jsonl", codex_header, read_codex, _codex_turn),
+    AGY_HARNESS: ("brain/*/.system_generated/logs/transcript_full.jsonl", agy_header, read_agy,
+                  lambda s, i: _tail_turn(s, i, AGY_WAIT_TOOLS)),
+}
+
+
+def scan_stores(roots: dict[str, Path], since_ms: int | None = None) -> list[Session]:
+    """Every file in the given stores (slug -> root, in that order) as a Session: parsed, or a
+    header carrying its skip reason. Skipped files still count in the summary's files and
+    excluded, since the header settles subagent and entrypoint the way the full read does."""
     sessions = []
-    if claude_root.is_dir():
-        for path in sorted(claude_root.glob("*/*.jsonl")):
-            header = claude_header(path)
-            header.skipped = _prefilter(header, since_ms)
-            sessions.append(header if header.skipped else read_claude(path))
-    if codex_root.is_dir():
-        for path in sorted(codex_root.rglob("*.jsonl")):
-            header = codex_header(path)
+    for slug, root in roots.items():
+        pattern, header_of, read, _ = READERS[slug]
+        if not root.is_dir():
+            continue
+        for path in sorted(root.glob(pattern)):
+            header = header_of(path)
             if header is not None:
                 header.skipped = _prefilter(header, since_ms)
-            sessions.append(header if header is not None and header.skipped else read_codex(path))
+            sessions.append(header if header is not None and header.skipped else read(path))
     return sessions
 
 
@@ -1220,20 +1361,27 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
     path.write_text("".join(json.dumps(r, sort_keys=True) + "\n" for r in rows), encoding="utf-8")
 
 
-def _roots(env: dict) -> tuple[Path, Path]:
-    home = Path(env.get("HOME", "~")).expanduser()
-    return (Path(env.get("SESSION_LOGS_CLAUDE") or home / ".claude" / "projects"),
-            Path(env.get("SESSION_LOGS_CODEX") or home / ".codex" / "sessions"))
+def _roots(env: dict, harnesses: tuple[str, ...]) -> dict[str, Path]:
+    """slug -> store root: the adapter's override variable, else its root under HOME."""
+    roots = {}
+    for slug in harnesses:
+        adapter = harness_stores.by_slug(slug)
+        override = env.get(adapter.episode_env)
+        if not override and not env.get("HOME"):
+            raise SystemExit(f"session-episodes: neither {adapter.episode_env} nor HOME is set")
+        roots[slug] = Path(override) if override else adapter.episode_root(Path(env["HOME"]))
+    return roots
 
 
 def cmd_extract(args, env: dict) -> int:
     out = Path(args.out)
     labels_path = Path(args.labels) if args.labels else sidecar(out, "labels")
     anchors_path = Path(args.anchors) if args.anchors else sidecar(out, "anchors")
-    claude_root, codex_root = _roots(env)
+    harnesses = tuple(dict.fromkeys(args.harness or DEFAULT_HARNESSES))
+    roots = _roots(env, harnesses)
     now = int(dt.datetime.now(dt.timezone.utc).timestamp() * 1000)
     since = now - args.since * 86_400_000 if args.since is not None else None
-    sessions = scan_stores(claude_root, codex_root, since)
+    sessions = scan_stores(roots, since)
     records, canonical = resolve_ids(anchor_ids(sessions) + ([args.project] if args.project else []), env)
     project = canonical.get(args.project) if args.project else None
     if args.project and project not in records:
@@ -1246,8 +1394,8 @@ def cmd_extract(args, env: dict) -> int:
     inputs = Inputs(sessions, records, read_jsonl_map(labels_path), read_jsonl_map(anchors_path),
                     now, args.window_minutes * 60_000, since, project, canonical)
     episodes, candidates, summary = build_episodes(inputs)
-    summary["roots"] = {"claude": str(claude_root), "codex": str(codex_root)}
-    summary["missing_roots"] = [str(r) for r in (claude_root, codex_root) if not r.is_dir()]
+    summary["roots"] = {harness_stores.by_slug(slug).alias: str(root) for slug, root in roots.items()}
+    summary["missing_roots"] = [str(root) for root in roots.values() if not root.is_dir()]
     write_jsonl(out, episodes)
     write_jsonl(sidecar(out, "candidates"), candidates)
     print(json.dumps(summary, sort_keys=True), file=sys.stderr)
@@ -1272,7 +1420,7 @@ def _parse_ref(ref: str) -> tuple[str, Path, int]:
 def _session_for(ref: str, cache: dict) -> Session:
     harness, path, _ = _parse_ref(ref)
     if path not in cache:
-        cache[path] = read_claude(path) if harness == CLAUDE_HARNESS else read_codex(path)
+        cache[path] = READERS[harness][2](path)
     return cache[path]
 
 
@@ -1349,6 +1497,10 @@ def main(argv: list[str], env: dict) -> int:
     parser = argparse.ArgumentParser(prog="session-episodes", description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="command", required=True)
     ex = sub.add_parser("extract")
+    # append to None, not to a default list: argparse would keep the default beside agy
+    ex.add_argument("--harness", action="append", default=None, metavar="SLUG",
+                    choices=[adapter.slug for adapter in harness_stores.ADAPTERS],
+                    help="a store to read, one of %(choices)s; repeatable (default: claude-code and codex)")
     ex.add_argument("--since", type=int, metavar="DAYS")
     ex.add_argument("--project", metavar="PREFIX")
     ex.add_argument("--window-minutes", type=int, default=10)

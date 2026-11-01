@@ -4,7 +4,9 @@ import os
 import tempfile
 from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import Callable, Mapping
 
+from .config import ALL
 from .decide import Stat, capture_action, extends
 from .manifest import MIRROR, Manifest, Version, utc_now
 
@@ -118,7 +120,8 @@ class Outcome:
 
 
 def capture_file(root: Path, manifest: Manifest, source: str, relpath: str, path: Path, *,
-                 force: bool = False, now=utc_now) -> Outcome:
+                 force: bool = False, now=utc_now,
+                 append_only: bool = True) -> Outcome:
     """Capture `path` as `source`/`relpath`. `path` is normally the live file; prune passes a
     quarantined one. With force, an unchanged file is copied again (read-back repair)."""
     with os.fdopen(open_nofollow(path), "rb") as reader:
@@ -138,13 +141,26 @@ def capture_file(root: Path, manifest: Manifest, source: str, relpath: str, path
                     or Stat(current_info.st_size, current_info.st_mtime_ns) != live):
                 return Outcome("busy", None)
             captured_at = now()
-            if extends(copied.size, copied.prefix_sha256, mirror):
+            rotate = (not append_only and mirror is not None
+                      and not extends(copied.size, copied.prefix_sha256, mirror))
+            if rotate or extends(copied.size, copied.prefix_sha256, mirror):
                 location, dest = MIRROR, mirrored
             else:
                 location = version_location(source, relpath, captured_at)
                 dest = root / location
                 mkdir_synced(dest.parent)
             os.utime(copied.tmp, ns=(live.mtime_ns, live.mtime_ns))
+            if rotate:
+                old = version_location(source, relpath, mirror.captured_at)
+                if hash_file(mirrored) != mirror.sha256:
+                    raise OSError(f"{mirrored} is damaged (hash differs from its manifest entry); a non-append source cannot be repaired by rerunning capture, so inspect or remove the mirror copy by hand")
+                mkdir_synced((root / old).parent)
+                if not (root / old).exists():
+                    os.link(mirrored, root / old)
+                elif hash_file(root / old) != mirror.sha256:
+                    raise OSError(f"{root / old} exists with other content")
+                fsync_dir((root / old).parent)
+                manifest.put(replace(mirror, location=old))
             if location == MIRROR:
                 os.replace(copied.tmp, dest)
             else:
@@ -163,10 +179,11 @@ def capture_file(root: Path, manifest: Manifest, source: str, relpath: str, path
 COUNTS = ("scanned", "copied", "repaired", "diverged", "unchanged", "busy", "vanished", "failed")
 
 
-def walk_files(top: Path, errors: list | None = None):
+def walk_files(top: Path, errors: list | None = None, descend: Callable[[str], bool] = ALL):
     """Every regular file under top, depth first in sorted order, never following or
     yielding symlinks. A directory or entry that cannot be read raises; with `errors`
-    given, it is appended there as (path, error) and the walk goes on."""
+    given, it is appended there as (path, error) and the walk goes on. A subdirectory whose
+    path relative to top fails `descend` is not opened."""
     stack = [Path(top)]
     while stack:
         directory = stack.pop()
@@ -182,7 +199,8 @@ def walk_files(top: Path, errors: list | None = None):
                         if entry.is_symlink():
                             continue
                         if entry.is_dir(follow_symlinks=False):
-                            subdirectories.append(path)
+                            if descend(path.relative_to(top).as_posix()):
+                                subdirectories.append(path)
                         elif entry.is_file(follow_symlinks=False):
                             files.append(path)
                     except OSError as error:
@@ -200,16 +218,23 @@ def walk_files(top: Path, errors: list | None = None):
         stack.extend(reversed(subdirectories))
 
 
-def capture_run(root: Path, manifest: Manifest, sources) -> tuple[dict, bool]:
+def capture_run(root: Path, manifest: Manifest, sources,
+                skipped: Mapping[str, str] = {}) -> tuple[dict, bool]:
     report = {}
     for source in sources:
+        if source.name in skipped:
+            report[source.name] = {"skipped": skipped[source.name]}
+            continue
         counts = dict.fromkeys(COUNTS, 0)
         errors, unreadable = [], []
-        for path in walk_files(source.root, unreadable):
+        for path in walk_files(source.root, unreadable, descend=source.descend):
             relpath = path.relative_to(source.root).as_posix()
+            if not source.select(relpath):
+                continue
             counts["scanned"] += 1
             try:
-                counts[capture_file(root, manifest, source.name, relpath, path).action] += 1
+                counts[capture_file(root, manifest, source.name, relpath, path,
+                                    append_only=source.append_only).action] += 1
             except OSError as error:
                 try:
                     path.lstat()
@@ -224,7 +249,7 @@ def capture_run(root: Path, manifest: Manifest, sources) -> tuple[dict, bool]:
             counts["failed"] += 1
             errors.append(f"{path.relative_to(source.root).as_posix()}: unreadable: {error}")
         report[source.name] = {**counts, "errors": errors} if errors else counts
-    return report, all(entry["failed"] == 0 for entry in report.values())
+    return report, all(entry["failed"] == 0 for entry in report.values() if "skipped" not in entry)
 
 
 class PromoteError(Exception):

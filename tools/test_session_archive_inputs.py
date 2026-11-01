@@ -8,6 +8,7 @@ from contextlib import contextmanager
 
 import pytest
 
+import harness_stores
 from session_archive import config
 from session_archive.inputs import (InspectionFailed, ObsUnavailable, claude_units, codex_units,
                                     load_obs_state, open_inodes)
@@ -15,7 +16,7 @@ from session_archive.testing import SID, TID, claude_session, codex_rollout, len
 
 
 def source(home, name):
-    return next(s for s in config.sources(home) if s.name == name)
+    return next(s for s in harness_stores.archive_sources(home) if s.name == name)
 
 
 def fake_runner(stdout="", returncode=0, calls=None):

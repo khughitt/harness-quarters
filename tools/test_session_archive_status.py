@@ -4,6 +4,8 @@ import json
 import os
 
 import pytest
+
+import harness_stores
 from datetime import datetime, timedelta, timezone
 
 from session_archive.capture import capture_file
@@ -143,7 +145,7 @@ def test_status_reports_quarantine_io_failure(home, archive, manifest, monkeypat
 
     monkeypatch.setattr(quarantine, "open_nofollow", unreadable)
     cfg = config.Config(archive, ("unused-obs",), ())
-    assert cli.cmd_status(cfg, config.sources(home), Namespace()) == 1
+    assert cli.cmd_status(cfg, harness_stores.archive_sources(home), Namespace()) == 1
     output = capsys.readouterr()
     assert json.loads(output.out) == {
         "ok": False, "error": "PermissionError: quarantine cannot be read"}

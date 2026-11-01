@@ -6,6 +6,7 @@ import time
 
 import pytest
 
+import harness_stores
 from session_archive import config, prune
 from session_archive.capture import capture_run, hash_file, mirror_path
 from session_archive.inputs import InspectionFailed, claude_units
@@ -16,7 +17,7 @@ from session_archive.testing import SID, claude_session, lenient_open_inodes, ob
 
 @pytest.fixture
 def world(home, archive, manifest):
-    src = next(s for s in config.sources(home) if s.name == "claude")
+    src = next(s for s in harness_stores.archive_sources(home) if s.name == "claude")
     jsonl = claude_session(src.root)
     capture_run(archive, manifest, [src])
     (unit,) = claude_units(src)

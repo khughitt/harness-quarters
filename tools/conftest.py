@@ -5,6 +5,7 @@ import os
 
 import pytest
 
+import harness_stores
 from session_archive import config
 from session_archive.manifest import Manifest
 from session_archive.testing import STUB_CODEX
@@ -13,8 +14,8 @@ from session_archive.testing import STUB_CODEX
 @pytest.fixture
 def home(tmp_path, monkeypatch):
     path = tmp_path / "home"
-    for source in config.sources(path):
-        source.root.mkdir(parents=True)
+    for source in harness_stores.archive_sources(path):
+        source.root.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("HOME", str(path))
     return path
 

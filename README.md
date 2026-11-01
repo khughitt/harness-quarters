@@ -306,7 +306,10 @@ MIT licensed; see `LICENSE`.
   a home links to that the repository must not publish. The `~/.claude-work`,
   `~/.codex-work` and `~/.codex/rules` links point into it
   (`docs/specs/2026-09-28-local-layer-design.md`).
-- `tools/session-archive` and `systemd/user/`: daily capture of agent transcripts to a
+- `tools/session-archive` and `systemd/user/`: daily capture of agent transcripts (Claude
+  Code, Codex and, when `~/.gemini/antigravity-cli` exists, agy's brain transcripts and
+  summaries database; agy's per-conversation databases and spilled step outputs are not
+  captured, see the `session-archive-complete` fact) to a
   backup disk, and a monthly prune of what the archive and obs verifiably hold
   (`docs/specs/2026-09-30-session-archive-design.md`). Prune requires contract-2
   readiness, matching live device/inode, and equality of the live, archive read-back
@@ -341,14 +344,18 @@ consume hq's capture and prune tools. Lore owns the corpus and its block check.
 
 ## Finding a past session
 
-`hq sessions` lists recent Claude Code and Codex sessions from every home (`~/.claude`,
-`~/.claude-work`, `~/.codex`, `~/.codex-work`) and every project, newest first, 20 rows
+`hq sessions` lists recent Claude Code, Codex and agy sessions from every home (`~/.claude`,
+`~/.claude-work`, `~/.codex`, `~/.codex-work`, `~/.gemini/antigravity-cli`) and every project, newest first, 20 rows
 by default (`-n` changes it). `hq sessions -i` picks one, with fzf when it is on `PATH`
 and a numbered prompt otherwise, and resumes it in its own harness, home and recorded
 cwd. It reads each harness's own metadata and keeps no index
 (`docs/notes/2026-10-15-session-discovery-contract.md`): Claude's history.jsonl with
-the transcript found under `projects/*/<id>.jsonl`, and Codex's `state_5.sqlite`
-`threads` table.
+the transcript found under `projects/*/<id>.jsonl`, Codex's `state_5.sqlite`
+`threads` table, and agy's conversation_summaries.db (a `conversation_summaries` table
+that alone names a conversation's workspace and title, with the transcript under
+`brain/<id>/.system_generated/logs`). The code for each harness is an adapter in
+`tools/harness_stores/`, registered in `tools/harness_stores/__init__.py`; the display
+order and the `--harness` choices follow the registry.
 
 - **Rows.** Harness, home (`personal` or `work`), short id, age, place (marked
   `cwd missing` when the directory is gone, which is common for removed worktrees), and
@@ -365,7 +372,7 @@ the transcript found under `projects/*/<id>.jsonl`, and Codex's `state_5.sqlite`
 - **Colour.** `--color auto|always|never`, as the tasks CLI spells it: `auto` (the
   default) paints only when stdout is a terminal and `NO_COLOR` is unset or empty;
   `always` paints whatever `NO_COLOR` says. The harness has a hue (claude orange, codex
-  blue), a work home is bold magenta, a project prefix takes its project's colour (the
+  blue, agy green), a work home is bold magenta, a project prefix takes its project's colour (the
   `color` on its `tasks resolve` row; a project without one, and a path outside every
   project, stay plain), a worktree name is dimmed, a missing cwd is dimmed with a red
   marker, and an archived Codex row is dimmed throughout. Age is one teal hue on a log
@@ -379,14 +386,15 @@ the transcript found under `projects/*/<id>.jsonl`, and Codex's `state_5.sqlite`
   last two grays are close). Cells are padded outside their colour codes, so the columns
   line up as in plain output. `-i` hands fzf the same colours (`--ansi`), and the
   numbered prompt shows them too.
-- **Filters.** `--harness claude|codex`, `--home personal|work`, `--here` (cwd inside
+- **Filters.** `--harness claude|codex|agy`, `--home personal|work`, `--here` (cwd inside
   the current checkout or one of its worktrees, removed ones included), and `--archived`
   (archived Codex threads, hidden by default as Codex's picker hides them). Codex
   threads with an empty preview are always hidden, as Codex's own visible-thread
   indexes leave them out; most subagent threads are among them.
 - **Footer.** One line counting what the sources show: Claude history lines skipped
   (without `sessionId`, malformed), and sessions excluded: Claude sessions whose
-  transcript is gone, and Codex threads with a preview that are non-interactive
+  transcript is gone, agy conversations that are subagents (`parent_conversation_id` set),
+  whose transcript is gone or that name no workspace, and Codex threads with a preview that are non-interactive
   (subagents and `exec`) or whose rollout is gone. Most Codex subagent threads have no
   preview and are hidden without a count. Claude's history never records subagent, `-p`
   or SDK runs, so there is no Claude count for them. A selected home whose directory
@@ -401,7 +409,8 @@ the transcript found under `projects/*/<id>.jsonl`, and Codex's `state_5.sqlite`
   with the file named: Codex's schema is internal, and a version change must stop the
   list rather than empty it.
 - **Launch.** Claude runs `claude <flags> --resume <id>`, Codex `codex <flags> resume
-  <id>`. A work row sets `CLAUDE_CONFIG_DIR` or `CODEX_HOME` to its home; a personal row
+  <id>`, agy `agy <flags> --conversation <id>` (agy has one home and no work-home
+  variable). A work row sets `CLAUDE_CONFIG_DIR` or `CODEX_HOME` to its home; a personal row
   unsets both (`CLAUDE_CONFIG_DIR=~/.claude` would read a different `.claude.json`).
   The cwd and the transcript are rechecked just before launch, and a gone one refuses
   with its path; nothing is launched elsewhere. Per-home flags live in `tools/hq.toml`
