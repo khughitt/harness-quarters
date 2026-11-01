@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-ac67e4-agy-bootstrap
 created: 2026-11-01T22:03:31Z
-updated: 2026-11-01T23:28:06Z
+updated: 2026-11-01T23:28:08Z
 started: 2026-11-01T22:06:20Z
 depends: []
 tags: [hooks]
@@ -48,3 +48,5 @@ Where: links.toml, harnesses.toml, agy/settings.json, tools/harness-links, tools
 - 2026-11-01T23:27:23Z (feat/hq-ac67e4-agy-bootstrap): verified: just test on 35ba1e80 — agents/bin 268 passed, .githooks+tools 1417 passed, relay-cutover xdist 390 passed 1 failed (test_partial_finish_keeps_original_timers, unrelated flake: passed 3/3 alone and 391/391 on xdist rerun; filed as its own task), signal cancel 1 passed, harness-facts check exit 0. Focused: first-run/adopt/agy selections 41 passed; RED shown for 6 new behaviour tests on pre-change code and for the running-agy and refusal-detail tests on b7b6a75e.
 - 2026-11-01T23:28:04Z (feat/hq-ac67e4-agy-bootstrap): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-ac67e4","state":"kept","verification":"verified","purpose":"Hold verified branch feat/hq-ac67e4-agy-bootstrap (code b7b6a75e, 35ba1e80) pending user approval to merge live .githooks/live-picks and tools/harness-links changes into main and run just link --apply on europa","ignored":"pycache and .pytest_cache only (regenerable, discard)","next_owner":"task:hq-ac67e4","cleanup_trigger":"After merge into main and europa link convergence: tt-report, then unlock and remove the worktree"}
 - 2026-11-01T23:28:06Z (feat/hq-ac67e4-agy-bootstrap): Host state: titan just link-check exit 0 on main (already anchored). europa (read over ssh, 2026-11-01): no agy running (pgrep exit 1), ~/.gemini/config holds no AGENTS.md/hooks.json/skills.json, first-run settings.json unchanged. Surviving processes: host-load --section session reports nothing left running. Nothing pushed. main carries adaa54d6 (statusLine.enabled false) ahead of the branch base.
+- 2026-11-01T23:28:08Z (feat/hq-ac67e4-agy-bootstrap): parked (waiting on user, approval): User approves; then from main: git merge --no-ff feat/hq-ac67e4-agy-bootstrap; titan just link-check; on europa (no agy running) just link and just link --apply from the shared main checkout, then just link-check on both hosts and git status clean for agy/settings.json; then tt-report, worktree removal checks, tasks done
+  provenance: {"harness_session":"claude-code:6dcbd897-967a-4e20-a982-604b9c48faaf","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
