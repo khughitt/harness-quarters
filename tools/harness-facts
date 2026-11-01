@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Capability facts: validate facts/capabilities.toml and read it.
 
+The declared harness list comes from the root harnesses.toml (its top-level shape is
+checked here; live_state is validated by the git hooks that read it).
+
 A fact is an operational fact about a harness: a typed value and, separately, where the
 value comes from. An entry is `probed` (value, harness version, local date, evidence) or
 `unknown` (no value). A harness with no entry is unknown. Unknown is an answer and never a
@@ -21,6 +24,7 @@ import tomllib
 
 CHECKOUT = pathlib.Path(__file__).resolve().parent.parent
 DEFAULT = CHECKOUT / "facts" / "capabilities.toml"
+DEFAULT_MANIFEST = CHECKOUT / "harnesses.toml"
 NAME = re.compile(r"[a-z][a-z0-9-]*\Z")
 TYPES = ("boolean", "set")
 VALUE = {"boolean": "a boolean", "set": "a list of unique strings"}
@@ -77,21 +81,37 @@ def _entry(where, kind, entry, out):
         out.append(f"{where}: note must be a non-empty string")
 
 
-def problems(data, root):
+def manifest_problems(data):
+    """Top-level shape of harnesses.toml only: live_state is validated by its own readers."""
     out = []
-    for key in sorted(set(data) - {"schema", "harnesses", "facts"}):
+    for key in sorted(set(data) - {"schema", "harnesses"}):
+        out.append(f"manifest: unknown key {key}")
+    if type(data.get("schema")) is not int or data["schema"] != 1:   # true == 1 and 1.0 == 1 in Python
+        out.append("manifest: schema must be 1")
+    table = data.get("harnesses")
+    if not isinstance(table, dict) or not table:
+        out.append("manifest: harnesses must be a non-empty table")
+        return out
+    for name, entry in table.items():
+        where = f"manifest: harnesses.{name}"
+        if not NAME.match(name):
+            out.append(f"{where}: {name} is not a valid name")
+        if not isinstance(entry, dict):
+            out.append(f"{where}: must be a table")
+            continue
+        for key in sorted(set(entry) - {"live_state"}):
+            out.append(f"{where}: unknown key {key}")
+        if "live_state" in entry and not isinstance(entry["live_state"], dict):
+            out.append(f"{where}.live_state: must be a table")
+    return out
+
+
+def problems(data, root, harnesses):
+    out = []
+    for key in sorted(set(data) - {"schema", "facts"}):
         out.append(f"unknown key {key}")
     if type(data.get("schema")) is not int or data["schema"] != 1:   # true == 1 and 1.0 == 1 in Python
         out.append("schema must be 1")
-    harnesses = data.get("harnesses")
-    if not isinstance(harnesses, list) or not harnesses or not all(isinstance(h, str) for h in harnesses):
-        out.append("harnesses must be a non-empty list of names")
-        harnesses = []
-    elif len(set(harnesses)) != len(harnesses):
-        out.append("harnesses must be unique")
-    for harness in harnesses:
-        if not NAME.match(harness):
-            out.append(f"harnesses: {harness} is not a valid name")
     table = data.get("facts", {})
     if not isinstance(table, dict):
         out.append("facts must be a table")
@@ -127,20 +147,33 @@ def problems(data, root):
     return out
 
 
-def validate(path=None, root=None):
-    """The parsed fact file, or Invalid. Opens the file for reading only."""
-    path = pathlib.Path(path or DEFAULT)
+def _load(path):
     try:
         with open(path, "rb") as handle:
-            data = tomllib.load(handle)
+            return tomllib.load(handle)
     except OSError as error:
         raise Invalid([f"{path}: {error.strerror or error}"]) from None
     except (tomllib.TOMLDecodeError, UnicodeDecodeError) as error:
         raise Invalid([f"not valid TOML: {error}"]) from None
-    found = problems(data, pathlib.Path(root or CHECKOUT))
+
+
+def validate(path=None, root=None, manifest=None):
+    """The parsed fact file with the manifest's `harnesses` list attached, or Invalid.
+    Opens both files for reading only. The manifest defaults to root's harnesses.toml
+    when root is given, else the checkout's."""
+    path = pathlib.Path(path or DEFAULT)
+    if manifest is None:
+        manifest = pathlib.Path(root) / "harnesses.toml" if root is not None else DEFAULT_MANIFEST
+    declared = _load(pathlib.Path(manifest))
+    found = manifest_problems(declared)
     if found:
         raise Invalid(found)
-    return data
+    harnesses = list(declared["harnesses"])
+    data = _load(path)
+    found = problems(data, pathlib.Path(root or CHECKOUT), harnesses)
+    if found:
+        raise Invalid(found)
+    return {**data, "harnesses": harnesses}
 
 
 def _shown(name, harness, fact, entry):
@@ -166,10 +199,10 @@ def view(data):
     return {"schema": data["schema"], "harnesses": list(data["harnesses"]), "facts": facts}
 
 
-def lookup(fact, harness, path=None):
+def lookup(fact, harness, path=None, manifest=None):
     """One entry. Invalid for a refused file; Undeclared (a LookupError) for an undeclared
     fact or harness, so a misspelt name can never read as unknown."""
-    shown = view(validate(path))
+    shown = view(validate(path, manifest=manifest))
     if fact not in shown["facts"]:
         raise Undeclared(f"{fact} is not a declared fact")
     if harness not in shown["harnesses"]:
@@ -194,10 +227,12 @@ def _pretty(shown):
 def main(argv):
     parser = argparse.ArgumentParser(prog="harness-facts", description=__doc__.splitlines()[0])
     parser.add_argument("--file", type=pathlib.Path, default=None, help="read this file, not the checkout's")
+    parser.add_argument("--manifest", type=pathlib.Path, default=None, help="read this harness manifest, not the checkout's")
     commands = parser.add_subparsers(dest="command", required=True)
     for name, text in (("check", "validate the fact file"), ("list", "print every fact as JSON"), ("get", "print one entry as JSON")):
         command = commands.add_parser(name, help=text)
         command.add_argument("--file", type=pathlib.Path, default=argparse.SUPPRESS)
+        command.add_argument("--manifest", type=pathlib.Path, default=argparse.SUPPRESS)
         if name == "list":
             command.add_argument("--pretty", action="store_true", help="a table for a person")
         if name == "get":
@@ -206,12 +241,12 @@ def main(argv):
     args = parser.parse_args(argv)
     try:
         if args.command == "check":
-            validate(args.file)
+            validate(args.file, manifest=args.manifest)
         elif args.command == "list":
-            shown = view(validate(args.file))
+            shown = view(validate(args.file, manifest=args.manifest))
             sys.stdout.write(_pretty(shown) if args.pretty else json.dumps(shown, indent=2) + "\n")
         else:
-            sys.stdout.write(json.dumps(lookup(args.fact, args.harness, args.file)) + "\n")
+            sys.stdout.write(json.dumps(lookup(args.fact, args.harness, args.file, args.manifest)) + "\n")
     except Invalid as error:
         for problem in error.problems:
             sys.stderr.write(f"harness-facts: {problem}\n")

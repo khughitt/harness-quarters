@@ -2,7 +2,6 @@
 # Read only through tools/harness-facts (a command, or a module). Edit in a worktree.
 # Re-probing: README.md, "Re-probing a fact". Design: docs/specs/2026-10-06-residue-design.md §4.
 schema = 1
-harnesses = ["agy", "claude-code", "codex", "opencode", "pi", "pi-durable"]
 
 [facts.controller-wake]
 type = "boolean"

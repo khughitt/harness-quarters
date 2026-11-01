@@ -27,7 +27,7 @@ def repo(tmp_path, monkeypatch):
     root = tmp_path / "repo"
     facts = tomllib.loads((CHECKOUT / "facts" / "capabilities.toml").read_text())["facts"]
     probes = {fact["probe"] for fact in facts.values() if "probe" in fact}
-    for name in ("tools/harness-facts", "facts/capabilities.toml", *sorted(probes)):
+    for name in ("tools/harness-facts", "facts/capabilities.toml", "harnesses.toml", *sorted(probes)):
         (root / name).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(CHECKOUT / name, root / name)
     subprocess.run(["git", "init", "-q", str(root)], check=True)
