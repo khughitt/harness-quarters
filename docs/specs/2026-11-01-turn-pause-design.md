@@ -423,10 +423,11 @@ rule tells agents when to run them.
     flight count nothing;
   - counter grouping across root, Claude Code subagents and Codex workers, and
     the genuine-prompt rule (shared fixtures with obs's adapters);
-  - the budget directive: honoured on the first typed line; ignored, with the
-    hook's notice, on a later line, inside a code fence, after `>`, inside a
-    `<pasted_content>` block, when malformed, and when two directives appear;
-    scaling and named overrides;
+  - the budget directive: honoured on the first typed line; ignored silently, as
+    an example, on a later line, inside a code fence, after `>`, inside a
+    `<pasted_content>` block, and as a second `budget:` line after a valid
+    directive; ignored with one line of context when the first typed line starts
+    with `budget:` but does not parse; scaling and named overrides;
   - the shell validator: each allowlisted command passes; each operator,
     expansion, redirection, path-qualified program, write-capable option and
     unlisted subcommand is refused; Codex `exec` bodies with one literal
