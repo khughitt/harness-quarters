@@ -675,3 +675,238 @@ def test_stop_reads_shipped_capabilities_toml_by_default(tmp_path):
     )
     assert idle.returncode == 0
     assert json.loads(idle.stdout)["decision"] == "continue"
+
+
+def make_agy_checkout(tmp_path: Path):
+    import shutil
+
+    repo = tmp_path / "hq"
+    home = tmp_path / "home"
+    (repo / ".githooks").mkdir(parents=True)
+    for name in ("harness-state-clean", "harness_state.py", "codex-trust", "live-picks", "harness-state-refresh"):
+        shutil.copy2(ROOT / ".githooks" / name, repo / ".githooks" / name)
+    (repo / "agy").mkdir()
+    shutil.copy2(HOOK, repo / "agy" / "hook")
+    for folder in ("claude", "codex", "pi"):
+        (repo / folder).mkdir()
+    (repo / "local" / "codex").mkdir(parents=True)
+    (repo / ".gitattributes").write_text(
+        "claude/settings*.json filter=harness-state\n"
+        "codex/config*.toml filter=harness-state\n"
+        "pi/settings*.json filter=harness-state\n"
+        "agy/settings*.json filter=harness-state\n"
+    )
+    (repo / ".gitignore").write_text("local/\n__pycache__/\n")
+    (repo / "claude" / "settings.json").write_text('{"theme": "dark-ansi"}\n')
+    (repo / "codex" / "config.toml").write_text("[features]\nhooks = true\n")
+    (repo / "pi" / "settings.json").write_text('{"theme": "system"}\n')
+    (repo / "agy" / "settings.json").write_text(
+        json.dumps({"allowNonWorkspaceAccess": True, "permissions": {"allow": ["command(tasks)"]}}, indent=2) + "\n"
+    )
+    (repo / "agy" / "hooks.json").write_text("{}\n")
+
+    env = clean_env(
+        HOME=home,
+        XDG_CONFIG_HOME=home / ".config",
+        XDG_STATE_HOME=home / ".local" / "state",
+        GIT_CONFIG_NOSYSTEM="1",
+        GIT_CONFIG_GLOBAL="/dev/null",
+        GIT_AUTHOR_NAME="t",
+        GIT_AUTHOR_EMAIL="t@example.invalid",
+        GIT_COMMITTER_NAME="t",
+        GIT_COMMITTER_EMAIL="t@example.invalid",
+    )
+    subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], env=env, check=True)
+    top = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "--show-toplevel"], env=env, check=True, text=True, capture_output=True
+    ).stdout.strip()
+    git_dir = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "--absolute-git-dir"], env=env, check=True, text=True, capture_output=True
+    ).stdout.strip()
+    assert Path(top).resolve() == repo.resolve()
+    assert repo.resolve() in Path(git_dir).resolve().parents
+    subprocess.run(
+        ["git", "-C", str(repo), "config", "filter.harness-state.clean", ".githooks/harness-state-clean %f"],
+        env=env,
+        check=True,
+    )
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], env=env, check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "init"], env=env, check=True)
+
+    (home / ".gemini" / "antigravity-cli").mkdir(parents=True)
+    (home / ".gemini" / "config").mkdir(parents=True)
+    (home / ".gemini" / "config" / "hooks.json").symlink_to(repo / "agy" / "hooks.json")
+    link = home / ".gemini" / "antigravity-cli" / "settings.json"
+    link.symlink_to(repo / "agy" / "settings.json")
+    return repo, home, link, env
+
+
+@pytest.mark.parametrize("event", ["SessionStart", "PreToolUse"])
+def test_session_start_and_pre_tool_use_heal_detached_settings_before_returning(tmp_path, event):
+    repo, home, link, env = make_agy_checkout(tmp_path)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    tmp_file = link.with_name(".settings.json.agy-tmp")
+    tmp_file.write_text(
+        json.dumps(
+            {
+                "allowNonWorkspaceAccess": True,
+                "model": "Gemini 4 Argon (High)",
+                "permissions": {"allow": ["command(tasks)"]},
+                "trustedWorkspaces": ["/work/a", "/work/b"],
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+    tmp_file.chmod(0o600)
+    os.replace(tmp_file, link)
+    assert not link.is_symlink()
+
+    if event == "SessionStart":
+        delegate = write_script(
+            tmp_path / "profile-stub",
+            f"""import sys
+from pathlib import Path
+assert Path({str(link)!r}).is_symlink()
+sys.stdout.write("profile: personal\\n")
+""",
+        )
+        argv = [str(repo / "agy" / "hook"), "SessionStart", str(delegate)]
+        payload = {"conversationId": CONV_ID, "workspacePaths": [str(workspace)]}
+    else:
+        guard = write_script(
+            tmp_path / "guard-stub",
+            f"""import json, sys
+from pathlib import Path
+assert Path({str(link)!r}).is_symlink()
+sys.stdout.write(json.dumps({{"decision": "allow"}}))
+""",
+        )
+        argv = [str(repo / "agy" / "hook"), "PreToolUse", str(guard)]
+        payload = {
+            "conversationId": CONV_ID,
+            "workspacePaths": [str(workspace)],
+            "toolCall": {"name": "run_command", "args": {"CommandLine": "just link-check"}},
+        }
+
+    res = subprocess.run(
+        argv,
+        input=json.dumps(payload),
+        cwd=str(home / ".gemini" / "config"),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert res.returncode == 0, res.stderr
+    reply = json.loads(res.stdout)
+    if event == "SessionStart":
+        assert reply == {"injectSteps": [{"systemMessage": {"systemMessage": "profile: personal"}}]}
+    else:
+        assert reply == {"decision": "allow"}
+    assert link.is_symlink() and link.resolve() == (repo / "agy" / "settings.json").resolve()
+    assert json.loads((repo / "agy" / "settings.json").read_text())["model"] == "Gemini 4 Argon (High)"
+    assert json.loads((repo / "local" / "live-picks-agy.json").read_text()) == {
+        "agy/settings.json": {
+            "state": "set",
+            "values": {"model": "Gemini 4 Argon (High)", "trustedWorkspaces": ["/work/a", "/work/b"]},
+        }
+    }
+    status = subprocess.run(
+        ["git", "-C", str(repo), "status", "--porcelain"], env=env, check=True, text=True, capture_output=True
+    ).stdout
+    assert status == ""
+
+
+@pytest.mark.parametrize("state", ["symlink", "absent"])
+def test_session_start_and_pre_tool_use_skip_refresh_when_settings_not_regular_file(tmp_path, state):
+    repo, home, link, env = make_agy_checkout(tmp_path)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    if state == "absent":
+        link.unlink()
+    called = tmp_path / "refresh-called"
+    write_script(
+        repo / ".githooks" / "harness-state-refresh",
+        f"""import sys
+from pathlib import Path
+Path({str(called)!r}).write_text("called\\n")
+sys.exit(99)
+""",
+    )
+    silent = write_script(tmp_path / "silent", "import sys; sys.exit(0)")
+    guard = write_script(
+        tmp_path / "guard",
+        'import json, sys; sys.stdout.write(json.dumps({"decision": "allow"}))',
+    )
+
+    ss = subprocess.run(
+        [str(repo / "agy" / "hook"), "SessionStart", str(silent)],
+        input=json.dumps({"conversationId": CONV_ID, "workspacePaths": [str(workspace)]}),
+        cwd=str(tmp_path),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    pt = subprocess.run(
+        [str(repo / "agy" / "hook"), "PreToolUse", str(guard)],
+        input=json.dumps(
+            {
+                "conversationId": CONV_ID,
+                "workspacePaths": [str(workspace)],
+                "toolCall": {"name": "run_command", "args": {"CommandLine": "true"}},
+            }
+        ),
+        cwd=str(tmp_path),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert ss.returncode == 0 and json.loads(ss.stdout) == {}
+    assert pt.returncode == 0 and json.loads(pt.stdout) == {"decision": "allow"}
+    assert not called.exists()
+
+
+@pytest.mark.parametrize("event", ["SessionStart", "PreToolUse"])
+def test_session_start_and_pre_tool_use_do_not_fail_when_detached_refresh_errors(tmp_path, event):
+    repo, home, link, env = make_agy_checkout(tmp_path)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    link.unlink()
+    link.write_text("{corrupt\n")
+
+    if event == "SessionStart":
+        delegate = write_script(tmp_path / "profile-stub", 'import sys; sys.stdout.write("profile: personal\\n")')
+        argv = [str(repo / "agy" / "hook"), "SessionStart", str(delegate)]
+        payload = {"conversationId": CONV_ID, "workspacePaths": [str(workspace)]}
+    else:
+        guard = write_script(
+            tmp_path / "guard-stub",
+            'import json, sys; sys.stdout.write(json.dumps({"decision": "allow"}))',
+        )
+        argv = [str(repo / "agy" / "hook"), "PreToolUse", str(guard)]
+        payload = {
+            "conversationId": CONV_ID,
+            "workspacePaths": [str(workspace)],
+            "toolCall": {"name": "run_command", "args": {"CommandLine": "true"}},
+        }
+
+    res = subprocess.run(
+        argv,
+        input=json.dumps(payload),
+        cwd=str(tmp_path),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert res.returncode == 0
+    if event == "SessionStart":
+        assert json.loads(res.stdout) == {"injectSteps": [{"systemMessage": {"systemMessage": "profile: personal"}}]}
+    else:
+        assert json.loads(res.stdout) == {"decision": "allow"}
+    assert "does not parse" in res.stderr
+    assert not link.is_symlink() and link.read_text() == "{corrupt\n"

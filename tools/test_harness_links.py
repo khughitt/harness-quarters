@@ -4,6 +4,7 @@ import importlib.util
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -249,25 +250,38 @@ def test_local_target_resolves_like_any_other(world):
     assert (home / ".work" / "settings.json").resolve() == (root / "local" / "work.json").resolve()
 
 
-def fresh_clone(tmp_path, home):
+def fresh_clone(tmp_path, home, repo=None):
     """A clone of this checkout with the working manifest and tool. Every `<project>:`
     target the manifest names gets a sibling under tmp_path holding those targets, copied
     from the live project's registered root, and registered in `home`'s isolated registry:
     the real manifest then resolves there as it does on a host."""
-    repo = Path(__file__).resolve().parent.parent
+    checkout = Path(__file__).resolve().parent.parent
+    repo = repo or checkout
     clone = tmp_path / "clone"
     run("clone", "-q", str(repo), str(clone))
     stage_project_targets(repo / "links.toml", tmp_path, home)
     # Exercise the working manifest and tool, including changes not committed yet.
     shutil.copy2(repo / "links.toml", clone / "links.toml")
     shutil.copy2(TOOL, clone / "tools/harness-links")
+    shutil.copytree(repo / ".githooks", clone / ".githooks", dirs_exist_ok=True)
     shutil.copytree(repo / "relay", clone / "relay", dirs_exist_ok=True)
     shutil.copytree(repo / "codex/work", clone / "codex/work", dirs_exist_ok=True)
     if (repo / "agy").exists():
         shutil.copytree(repo / "agy", clone / "agy", dirs_exist_ok=True)
+        agy_settings = clone / "agy/settings.json"
+        if agy_settings.exists():
+            cleaned = subprocess.run(
+                [sys.executable, "-B", str(clone / ".githooks/harness-state-clean"), "agy/settings.json"],
+                input=agy_settings.read_text(),
+                env=isolated_env(home),
+                text=True,
+                capture_output=True,
+                check=True,
+            )
+            agy_settings.write_text(cleaned.stdout)
     # A public clone needs the submodule and sibling skill checkouts. Use the local
     # sources in these fixtures so the tests require neither network nor live writes.
-    main = Path(run("-C", str(repo), "worktree", "list", "--porcelain").stdout.splitlines()[0][9:])
+    main = Path(run("-C", str(checkout), "worktree", "list", "--porcelain").stdout.splitlines()[0][9:])
     for path in (clone / "agents/skills").iterdir():
         if path.is_symlink():
             shutil.copytree((main / "agents/skills" / path.name).resolve(), path.resolve(),
@@ -596,3 +610,236 @@ def test_managed_paths_reject_parent_traversal(world, table):
     assert result.returncode == 2
     assert ".." in result.stderr
     assert (home / ".agents").is_symlink()
+
+
+def isolated_env(home):
+    return {
+        "PATH": os.environ["PATH"],
+        "HOME": str(home),
+        "XDG_CONFIG_HOME": str(home / ".config"),
+        "XDG_STATE_HOME": str(home / ".local/state"),
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@example.invalid",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@example.invalid",
+        "PYTHONDONTWRITEBYTECODE": "1",
+    }
+
+
+def isolated_link(root, home, *args):
+    return subprocess.run(
+        [str(root / "tools/harness-links"), *args],
+        env=isolated_env(home),
+        text=True,
+        capture_output=True,
+    )
+
+
+def isolated_git(root, home, *args):
+    return subprocess.run(
+        ["git", "-C", str(root), *args],
+        env=isolated_env(home),
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+
+
+def test_real_manifest_adopts_agy_replaced_settings_on_anchored_host_and_clears_stat_mark(tmp_path):
+    import json
+
+    home = tmp_path / "home"
+    (home / ".gemini/antigravity-cli").mkdir(parents=True)
+    (home / ".gemini/config").mkdir(parents=True)
+    clone = fresh_clone(tmp_path, home)
+    setup = subprocess.run(["just", "setup"], cwd=clone, env=isolated_env(home), text=True, capture_output=True)
+    assert setup.returncode == 0, setup.stderr
+    assert isolated_link(clone, home, "--apply").returncode == 0
+
+    settings_link = home / ".gemini/antigravity-cli/settings.json"
+    base = json.loads((clone / "agy/settings.json").read_text())
+    tmp = settings_link.with_name(".settings.json.agy-tmp")
+    tmp.write_text(
+        json.dumps(
+            {
+                **base,
+                "model": "Gemini 4 Argon (High)",
+                "trustedWorkspaces": ["/work/a", "/work/b"],
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+    tmp.chmod(0o600)
+    os.replace(tmp, settings_link)
+    assert not settings_link.is_symlink()
+
+    report = isolated_link(clone, home)
+    assert report.returncode == 0, report.stderr
+    assert states(report)["~/.gemini/antigravity-cli/settings.json"] == "adopt"
+    assert not settings_link.is_symlink()
+
+    check = isolated_link(clone, home, "--check")
+    assert check.returncode == 1
+
+    applied = isolated_link(clone, home, "--apply")
+    assert applied.returncode == 0, applied.stderr
+    assert settings_link.is_symlink()
+    assert settings_link.resolve() == (clone / "agy/settings.json").resolve()
+    assert json.loads((clone / "agy/settings.json").read_text())["model"] == "Gemini 4 Argon (High)"
+    assert json.loads((clone / "local/live-picks-agy.json").read_text()) == {
+        "agy/settings.json": {
+            "state": "set",
+            "values": {
+                "model": "Gemini 4 Argon (High)",
+                "trustedWorkspaces": ["/work/a", "/work/b"],
+            },
+        }
+    }
+    assert isolated_link(clone, home, "--check").returncode == 0
+    assert isolated_git(clone, home, "status", "--porcelain", "--", "agy/settings.json").stdout == ""
+
+    tmp2 = settings_link.with_name(".settings.json.agy-tmp2")
+    tmp2.write_text(
+        json.dumps(
+            {
+                **base,
+                "queuedMessages": "send-immediately",
+                "model": "Gemini 4 Argon (High)",
+                "trustedWorkspaces": ["/work/a", "/work/b"],
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+    tmp2.chmod(0o600)
+    os.replace(tmp2, settings_link)
+
+    applied2 = isolated_link(clone, home, "--apply")
+    assert applied2.returncode == 0, applied2.stderr
+    assert settings_link.is_symlink()
+    assert isolated_link(clone, home, "--check").returncode == 0
+    assert isolated_git(clone, home, "status", "--porcelain", "--", "agy/settings.json").stdout == " M agy/settings.json\n"
+
+
+def test_real_manifest_refuses_preexisting_agy_settings_before_agy_is_anchored(tmp_path):
+    home = tmp_path / "home"
+    (home / ".claude").mkdir(parents=True)
+    clone = fresh_clone(tmp_path, home)
+    setup = subprocess.run(["just", "setup"], cwd=clone, env=isolated_env(home), text=True, capture_output=True)
+    assert setup.returncode == 0, setup.stderr
+    assert isolated_link(clone, home, "--apply").returncode == 0
+
+    (home / ".gemini/antigravity-cli").mkdir(parents=True)
+    (home / ".gemini/config").mkdir(parents=True)
+    preexisting = home / ".gemini/antigravity-cli/settings.json"
+    preexisting.write_text('{"trustedWorkspaces": ["/first-run"]}\n')
+    tracked_before = (clone / "agy/settings.json").read_bytes()
+
+    report = isolated_link(clone, home)
+    assert report.returncode == 1
+    assert states(report)["~/.gemini/antigravity-cli/settings.json"] == "refuse"
+
+    applied = isolated_link(clone, home, "--apply")
+    assert applied.returncode == 1
+    assert not preexisting.is_symlink()
+    assert preexisting.read_text() == '{"trustedWorkspaces": ["/first-run"]}\n'
+    assert (clone / "agy/settings.json").read_bytes() == tracked_before
+
+
+def test_adopt_manifest_validation_and_apply_refusal_on_corrupt_or_directory(world, tmp_path):
+    root, home = world
+    foreign = tmp_path / "peer"
+    (foreign / "rules.md").parent.mkdir(parents=True, exist_ok=True)
+    (foreign / "rules.md").write_text("rules\n")
+    subprocess.run(["tasks", "init", "--prefix", "peer"], cwd=foreign, env=isolated_env(home), check=True,
+                   capture_output=True, text=True)
+
+    for bad_manifest, snippet in (
+        (
+            '[harness.a]\nhome = "~/.claude"\nadopt = ["missing"]\n[harness.a.links]\n"CLAUDE.md" = "AGENTS.md"\n',
+            "not in harness.a.links",
+        ),
+        (
+            '[harness.a]\nhome = "~/.claude"\nadopt = ["rules"]\n[harness.a.links]\n"CLAUDE.md" = "AGENTS.md"\n"rules" = "peer:rules.md"\n',
+            "running checkout",
+        ),
+        (
+            '[harness.a]\nhome = "~/.claude"\nadopt = ["CLAUDE.md"]\n[harness.a.links]\n"CLAUDE.md" = "AGENTS.md"\n',
+            "anchor",
+        ),
+        (
+            '[harness.a]\nhome = "~/.claude"\nadopt = ["CLAUDE.md"]\nanchors = ["~/.undeclared"]\n[harness.a.links]\n"CLAUDE.md" = "AGENTS.md"\n',
+            "anchor",
+        ),
+    ):
+        (root / "links.toml").write_text(bad_manifest)
+        res = isolated_link(root, home)
+        assert res.returncode == 2, bad_manifest
+        assert snippet in res.stderr
+
+    (home / ".gemini/antigravity-cli").mkdir(parents=True)
+    (home / ".gemini/config").mkdir(parents=True)
+    clone_dir = tmp_path / "adopt-failure"
+    clone_dir.mkdir()
+    clone = fresh_clone(clone_dir, home)
+    setup = subprocess.run(["just", "setup"], cwd=clone, env=isolated_env(home), text=True, capture_output=True)
+    assert setup.returncode == 0, setup.stderr
+    assert isolated_link(clone, home, "--apply").returncode == 0
+
+    settings_link = home / ".gemini/antigravity-cli/settings.json"
+    settings_link.unlink()
+    settings_link.mkdir()
+    dir_res = isolated_link(clone, home)
+    assert dir_res.returncode == 1
+    assert states(dir_res)["~/.gemini/antigravity-cli/settings.json"] == "refuse"
+    settings_link.rmdir()
+
+    settings_link.write_text("{corrupt\n")
+    corrupt_plan = isolated_link(clone, home)
+    assert corrupt_plan.returncode == 0
+    assert states(corrupt_plan)["~/.gemini/antigravity-cli/settings.json"] == "adopt"
+    corrupt_apply = isolated_link(clone, home, "--apply")
+    assert corrupt_apply.returncode == 1
+    assert "does not parse" in corrupt_apply.stderr
+    assert not settings_link.is_symlink() and settings_link.read_text() == "{corrupt\n"
+
+
+def test_fresh_clone_strips_live_agy_picks_from_dirty_source_checkout(tmp_path):
+    import json
+
+    checkout = Path(__file__).resolve().parent.parent
+    dirty_source = tmp_path / "dirty-source"
+    run("clone", "-q", str(checkout), str(dirty_source))
+    shutil.copy2(checkout / "links.toml", dirty_source / "links.toml")
+    shutil.copytree(checkout / ".githooks", dirty_source / ".githooks", dirs_exist_ok=True)
+    shutil.copytree(checkout / "relay", dirty_source / "relay", dirs_exist_ok=True)
+    shutil.copytree(checkout / "codex/work", dirty_source / "codex/work", dirs_exist_ok=True)
+    shutil.copytree(checkout / "agy", dirty_source / "agy", dirs_exist_ok=True)
+    source_settings = json.loads((dirty_source / "agy/settings.json").read_text())
+    (dirty_source / "agy/settings.json").write_text(
+        json.dumps(
+            {
+                **source_settings,
+                "model": "Gemini 3.1 Pro (Medium)",
+                "effort": "medium",
+                "effortByBase": {"Gemini 3.1 Pro": "medium"},
+                "trustedWorkspaces": ["/host/live"],
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+
+    home = tmp_path / "home"
+    (home / ".gemini/antigravity-cli").mkdir(parents=True)
+    (home / ".gemini/config").mkdir(parents=True)
+    case_dir = tmp_path / "case"
+    case_dir.mkdir()
+    clone = fresh_clone(case_dir, home, repo=dirty_source)
+
+    cloned_settings = json.loads((clone / "agy/settings.json").read_text())
+    assert not (set(cloned_settings) & {"model", "effort", "effortByBase", "trustedWorkspaces"})
+    assert isolated_git(clone, home, "status", "--porcelain", "--", "agy/settings.json").stdout == ""

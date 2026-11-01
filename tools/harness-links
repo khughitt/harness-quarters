@@ -5,7 +5,9 @@ Report mode prints one line per entry and writes nothing; --check exits 1 on any
 drift; --apply writes, and only when no entry is refused. A link counts as ok when its
 immediate target matches, allowing parent-directory aliases. A dangling or foreign
 link is repointed; a real file or directory at a link path is refused, never
-overwritten. Required links go on
+overwritten, except a regular file at a link listed in a harness's `adopt` once one of
+its `anchors` already points into this checkout (`--check` exits 1; `--apply` syncs and
+relinks it through `.githooks/live-picks sync`). Required links go on
 every host (their parent directory is created); a harness group applies only where its
 home is a real directory. Run from the main checkout: links must never resolve into a
 worktree. A target is checked only when its entry applies (a required link, or a group
@@ -21,6 +23,7 @@ removed. Undeclared paths are never pruned. See the agent-layer split design in 
 import argparse
 import json
 import os
+import stat
 import subprocess
 import sys
 import tomllib
@@ -44,6 +47,8 @@ class Entry:
     target: Path
     home: Path | None      # None for a required link
     kind: str = "link"     # link, directory, or retired
+    adopt: bool = False
+    anchors: tuple[Path, ...] = ()
 
 
 def git(*args):
@@ -100,11 +105,50 @@ def load(root):
         if root != entry.target and root not in entry.target.parents:
             raise ManifestError(f"{entry.link}: directory's former target must belong to the running checkout")
     entries += [Entry(expand(link), target(rel), None) for link, rel in data.get("required", {}).items()]
+    raw_targets = {expand(link): rel for link, rel in data.get("required", {}).items()}
     homes = []
     for name, table in data.get("harness", {}).items():
         home = expand(table["home"])
         homes.append(home)
-        entries += [Entry(home / link, target(rel, home), home) for link, rel in table["links"].items()]
+        raw_adopt = table.get("adopt", [])
+        if not isinstance(raw_adopt, list) or not all(isinstance(item, str) for item in raw_adopt):
+            raise ManifestError(f"harness.{name}.adopt must be a list of link names")
+        adopt_set = set(raw_adopt)
+        for item in raw_adopt:
+            if item not in table["links"]:
+                raise ManifestError(f"harness.{name}.adopt: {item!r} is not in harness.{name}.links")
+        raw_anchors = table.get("anchors")
+        if not adopt_set and raw_anchors is not None:
+            raise ManifestError(f"harness.{name}.anchors requires adopt")
+        if adopt_set:
+            if raw_anchors is None:
+                anchor_paths = tuple(home / other for other in table["links"] if other not in adopt_set)
+            elif isinstance(raw_anchors, list) and all(isinstance(a, str) for a in raw_anchors):
+                anchor_paths = tuple(expand(a) for a in raw_anchors)
+            else:
+                raise ManifestError(f"harness.{name}.anchors must be a list of link paths")
+            if not anchor_paths:
+                raise ManifestError(f"harness.{name}.adopt requires at least one anchor link")
+        else:
+            anchor_paths = ()
+        for link, rel in table["links"].items():
+            raw_targets[home / link] = rel
+            entry_target = target(rel, home)
+            is_adopt = link in adopt_set
+            if is_adopt and (":" in rel or root not in entry_target.parents):
+                raise ManifestError(f"{home / link}: adopted link target must belong to the running checkout")
+            entries.append(Entry(home / link, entry_target, home, adopt=is_adopt,
+                                 anchors=anchor_paths if is_adopt else ()))
+    by_link = {entry.link: entry for entry in entries if entry.kind == "link"}
+    for entry in entries:
+        for anchor in entry.anchors:
+            anchor_entry = by_link.get(anchor)
+            if (anchor_entry is None or anchor == entry.link
+                    or ":" in raw_targets.get(anchor, "")
+                    or root not in anchor_entry.target.parents):
+                raise ManifestError(
+                    f"{entry.link}: anchor {anchor} must be another declared link into the running checkout"
+                )
     declared = {entry.link for entry in entries}
     for link, rel in data.get("retired", {}).items():
         path = expand(link)
@@ -149,7 +193,19 @@ def check_targets(root, entries):
         raise ManifestError(message)
 
 
-def state(entry):
+def is_anchored(entry, by_link):
+    if not by_link:
+        return False
+    return any(
+        anchor in by_link
+        and by_link[anchor].link.is_symlink()
+        and by_link[anchor].link.exists()
+        and owns_link(by_link[anchor])
+        for anchor in entry.anchors
+    )
+
+
+def state(entry, by_link=None):
     if entry.kind == "retired":
         if entry.link.is_symlink():
             if owns_link(entry):
@@ -173,6 +229,9 @@ def state(entry):
             return "ok", ""
         return "repoint", f"was {os.readlink(entry.link)}"
     if entry.link.exists():
+        if (entry.adopt and is_anchored(entry, by_link)
+                and stat.S_ISREG(entry.link.lstat().st_mode)):
+            return "adopt", "replaced by a regular file"
         kind = "directory" if entry.link.is_dir() else "file"
         return "refuse", f"a real {kind} is there"
     return "create", ""
@@ -193,6 +252,7 @@ def show(path):
 
 def plan(entries, homes):
     rows, skipped, converting = [], set(), set()
+    by_link = {entry.link: entry for entry in entries if entry.kind == "link"}
     # Parent directories are planned first. Children of a conversion do not exist
     # in the future home yet: inspecting them now would follow the old checkout link.
     ordered = sorted(entries, key=lambda e: (e.kind != "directory", len(e.link.parts)))
@@ -205,19 +265,39 @@ def plan(entries, homes):
         if any(parent in converting for parent in entry.link.parents):
             name, detail = ("ok" if entry.kind == "retired" else "create"), ""
         else:
-            name, detail = state(entry)
+            name, detail = state(entry, by_link)
         if name == "convert":
             converting.add(entry.link)
         rows.append((name, entry.link, detail, entry))
     return rows
 
 
-def apply(rows):
+def restage_if_filtered_equal(checkout, target_path):
+    rel = target_path.relative_to(checkout).as_posix()
+    lock_res = subprocess.run(
+        ["git", "-C", str(checkout), "rev-parse", "--path-format=absolute", "--git-path", "index.lock"],
+        text=True,
+        capture_output=True,
+    )
+    if lock_res.returncode != 0 or Path(lock_res.stdout.strip()).exists():
+        return
+    diff = subprocess.run(["git", "-C", str(checkout), "diff", "--quiet", "--", rel],
+                          text=True, capture_output=True)
+    if diff.returncode == 0:
+        add = subprocess.run(["git", "-C", str(checkout), "add", "--", rel],
+                             text=True, capture_output=True)
+        if add.returncode != 0:
+            raise ApplyRefused(f"git add {rel}: {add.stderr.strip()}")
+
+
+def apply(rows, root=None):
+    by_link = {entry.link: entry for _, _, _, entry in rows if entry is not None and entry.kind == "link"}
+    adopted = []
     for name, _, _, entry in rows:
         if entry is None:
             continue
         if entry.kind == "directory":
-            current, detail = state(entry)
+            current, detail = state(entry, by_link)
             if current == "refuse":
                 raise ApplyRefused(f"{show(entry.link)}: {detail}")
             if current == "convert":
@@ -226,11 +306,14 @@ def apply(rows):
             continue
         if entry.kind == "retired":
             if name == "remove":
-                current, detail = state(entry)
+                current, detail = state(entry, by_link)
                 if current == "refuse":
                     raise ApplyRefused(f"{show(entry.link)}: {detail}")
                 if current == "remove":
                     entry.link.unlink()
+            continue
+        if name == "adopt":
+            adopted.append(entry)
             continue
         if name not in ("create", "repoint"):
             continue
@@ -246,6 +329,23 @@ def apply(rows):
             staging.unlink()
             raise ApplyRefused(f"{show(entry.link)}: a real {kind} is there")
         os.replace(staging, entry.link)
+    if adopted:
+        checkout = root or Path(git("rev-parse", "--show-toplevel"))
+        for entry in adopted:
+            current, detail = state(entry, by_link)
+            if current == "refuse":
+                raise ApplyRefused(f"{show(entry.link)}: {detail}")
+        env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
+        synced = subprocess.run([sys.executable, "-B", str(checkout / ".githooks" / "live-picks"), "sync"],
+                                env=env, text=True, capture_output=True)
+        if synced.returncode != 0:
+            detail = synced.stderr.strip() or f"live-picks sync exited {synced.returncode}"
+            raise ApplyRefused(detail)
+        for entry in adopted:
+            current, detail = state(entry, by_link)
+            if current != "ok":
+                raise ApplyRefused(f"{show(entry.link)}: {detail or f'still {current} after live-picks sync'}")
+            restage_if_filtered_equal(checkout, entry.target)
 
 
 def main(argv):
@@ -267,10 +367,10 @@ def main(argv):
         print(f"{name}\t{show(path)}\t{detail}".rstrip("\t"))
     refused = any(row[0] == "refuse" for row in rows)
     if args.check:
-        return 1 if any(row[0] in ("create", "repoint", "convert", "remove", "refuse") for row in rows) else 0
+        return 1 if any(row[0] in ("create", "repoint", "convert", "remove", "adopt", "refuse") for row in rows) else 0
     if args.apply and not refused:
         try:
-            apply(rows)
+            apply(rows, root)
         except ApplyRefused as error:
             print(f"harness-links: {error}", file=sys.stderr)
             return 1
