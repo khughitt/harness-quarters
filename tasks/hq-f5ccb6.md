@@ -1,13 +1,15 @@
 ---
 id: hq-f5ccb6
 title: Migrate live-picks to harnesses.toml
-status: todo
+status: doing
 priority: 2
 size: m
 complexity: mid
 process: direct
+owner: feat/hq-2eba07-harness-manifest
 created: 2026-11-01T12:36:37Z
-updated: 2026-11-01T13:14:41Z
+updated: 2026-11-01T14:41:56Z
+started: 2026-11-01T14:41:56Z
 depends: [hq-bfef03]
 parent: hq-2eba07
 tags: [hooks]
@@ -23,3 +25,5 @@ Step 3 of hq-2eba07 plan (spec §5.3.4): check main for hq-ece26a, copy harnesse
 
 - 2026-11-01T12:36:37Z (add): created
   provenance: {"origin":"agent"}
+- 2026-11-01T14:41:56Z (feat/hq-2eba07-harness-manifest): started
+  provenance: {"harness_session":"claude-code:fdf3b32f-5e63-4593-bba2-4e994bcdf1eb","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
