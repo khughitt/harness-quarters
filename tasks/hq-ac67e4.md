@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-ac67e4-agy-bootstrap
 created: 2026-11-01T22:03:31Z
-updated: 2026-11-01T22:59:30Z
+updated: 2026-11-01T23:27:23Z
 started: 2026-11-01T22:06:20Z
 depends: []
 tags: [hooks]
@@ -45,3 +45,4 @@ Where: links.toml, harnesses.toml, agy/settings.json, tools/harness-links, tools
 - 2026-11-01T22:56:05Z (feat/hq-ac67e4-agy-bootstrap): Round 1 dispositions: I1 (running agy re-saves first-run settings after apply; sync then adopts them as base) addressed in 35ba1e80 — first-run refuses while pgrep finds agy for this uid. M3, M4, M7, M8 addressed in 35ba1e80. minor (deferred): M1 seasonalThemesOptIn opt-out may be undone by restore if agy deletes the key on opt-out (unprobed; forget is the reset); M2 first-run drops a first-run file's unrestored_keys silently (latent: agy declares none); M5 live-picks hardcodes AGY_ANCHORS while harness-links reads links.toml anchors (fails closed as 'still adopt'); M6 relink_home checks S_ISREG only, so an agy save between read and relink is lost (same gap hq-b24c39 deferred).
 - 2026-11-01T22:59:28Z (feat/hq-ac67e4-agy-bootstrap): review: impl round 2 — verdict: accept; findings: Minor 4; reviewer: claude-code/claude-opus-5-5
 - 2026-11-01T22:59:30Z (feat/hq-ac67e4-agy-bootstrap): Round 2 minor (deferred): R2-M1 a running agy that has not yet written settings.json is not checked (apply creates the link unchecked; a later save could be adopted as base by sync); R2-M2 runbook adding-a-harness.md 3.1 omits the running-agy refusal; R2-M3 plan detail says only keys are checked at apply, not running agy; R2-M4 pgrep stub ignores its arguments, and pgrep exit >=2, missing pgrep, and the harness-links-relayed running-agy refusal are untested.
+- 2026-11-01T23:27:23Z (feat/hq-ac67e4-agy-bootstrap): verified: just test on 35ba1e80 — agents/bin 268 passed, .githooks+tools 1417 passed, relay-cutover xdist 390 passed 1 failed (test_partial_finish_keeps_original_timers, unrelated flake: passed 3/3 alone and 391/391 on xdist rerun; filed as its own task), signal cancel 1 passed, harness-facts check exit 0. Focused: first-run/adopt/agy selections 41 passed; RED shown for 6 new behaviour tests on pre-change code and for the running-agy and refusal-detail tests on b7b6a75e.
