@@ -79,8 +79,16 @@ through it. hq-963ea4 (pi), hq-ce3ab4 (Crush) and hq-aafc2a (opencode) then reus
   environments per the global Tests rules.
 - **Capability facts** are edited in a worktree and read only through
   `tools/harness-facts`; `unknown` is an answer, never a default.
-- **Harness names.** `facts/capabilities.toml` names harnesses `claude-code`, `codex`,
-  `agy`; `hq sessions --harness` takes `claude`, `codex`. Both stay as they are.
+- **Harness names.** The canonical harness slugs (`claude-code`, `codex`, `agy`, ...) are
+  declared once: today in `facts/capabilities.toml`'s `harnesses`, and in `harnesses.toml`
+  once hq-2eba07 lands (its draft spec moves the list there and names session discovery
+  and archiving as out of its scope). An adapter is keyed by its canonical slug and keeps
+  no second list: a test asserts every registered adapter's slug is a declared harness,
+  read through `tools/harness-facts`. `hq sessions --harness` keeps its short names
+  (`claude`, `codex`), which become a display alias on the adapter.
+- **The flow-trial-1 gate.** Until the readout (2027-02-16), nothing here may change what
+  obs and the trial's verdict tools measure (obs-f5710b, revision 3, change 5).
+  session-episodes' default output feeds obs's baseline, so it must stay byte-identical.
 
 ## Approaches
 
@@ -107,7 +115,7 @@ hierarchy. It provides:
 
 | Part | Used by | Claude Code / Codex today |
 | --- | --- | --- |
-| `name` for `--harness` and display; `fact_name` for capability facts | hq sessions, archive, facts | `claude`/`claude-code`, `codex`/`codex` |
+| `slug` (canonical, as declared for capability facts) and `alias` for `--harness` and display | hq sessions, archive, facts | `claude-code`/`claude`, `codex`/`codex` |
 | `homes(user_home)` → `Home(name, kind, path)` | hq sessions | `sessions.homes()` |
 | `list_sessions(home, archived)` → sessions and per-reason exclusion counts | hq sessions | `read_claude`, `read_codex`, footer counts in `cli.collect()` |
 | `resume_argv(session, flags)` and `environment(session, base)` | hq sessions `-i` | `launch.argv`, `launch.environment`, `HOME_VARIABLES` |
@@ -143,7 +151,7 @@ Facts below were read from this host's store on 2026-11-01 (agy 1.4.12).
 - **Listing.** `conversation_summaries.db`, table `conversation_summaries`, opened
   `mode=ro`. Columns used: `conversation_id`, `title`, `preview`, `workspace_uris` (JSON
   list of `file://` URIs), `last_modified_time` (text timestamp with nanoseconds and
-  offset), `parent_conversation_id`, `nesting_depth`, `killed`, `status`. A missing table
+  offset), `parent_conversation_id`. A missing table
   or column, or a value of the wrong shape, is `SourceError` ("agy's summary schema
   changed"), as for Codex. `history.jsonl` is not used: it names only some conversations
   (7 of 20 here).
@@ -154,6 +162,9 @@ Facts below were read from this host's store on 2026-11-01 (agy 1.4.12).
 - **Exclusions.** A row with a non-empty `parent_conversation_id` is a subagent
   conversation (`invoke_subagent`, agent name `research`) and is excluded as
   `non-interactive`. A row whose transcript file is absent is `transcript gone`.
+  `status`, `killed` and `nesting_depth` drive no rule (my call, for parity: Claude Code
+  and Codex have no running-session guard on resume either). A running conversation is
+  listed and resumable, as a running Claude Code or Codex session is today.
 - **Headless runs.** `agy -p` conversations may not be distinguishable from interactive
   ones in the summaries (`source` was empty on every row here). The builder probes this in
   an isolated agy home. If they cannot be told apart, they are listed, and a capability
@@ -169,7 +180,13 @@ Facts below were read from this host's store on 2026-11-01 (agy 1.4.12).
   the root). `transcript_full.jsonl` kept its prefix while a live session appended to it
   (one observation over several minutes); a rewrite would still be kept under
   `versions/`.
-- **Episodes.** session-episodes gains an agy reader in its own file:
+- **Episodes.** session-episodes gains an agy reader in its own file. Until the
+  flow-trial-1 readout it runs only when asked (`--harness agy`, or the builder's
+  equivalent flag); the default `extract` reads Claude Code and Codex exactly as today,
+  with an unchanged stderr summary (my call, from the trial gate; agy sessions all fall
+  inside the trial, so the default run loses nothing). When agy is asked for, an agy
+  schema change stops that run with an error naming agy. Making agy part of the default
+  run after the readout is a follow-up for obs-f5710b, which owns the tool by then.
   - Human turn: a `USER_INPUT` step with `source: USER_EXPLICIT`; the person's text is
     inside `<USER_REQUEST>…</USER_REQUEST>`, and the `<ADDITIONAL_METADATA>` and
     `<USER_SETTINGS_CHANGE>` blocks after it are agy's. `SYSTEM_MESSAGE`, `CHECKPOINT`
@@ -194,6 +211,15 @@ probing rules. Expected from what is known now:
 - the archive holds the harness's native session store (agy: no, transcripts only).
 
 The builder names and types the facts; the set grows with what the work finds.
+
+### Coordination with hq-2eba07
+
+hq-2eba07 (doing, draft spec uncommitted) moves the harness list into `harnesses.toml`
+and rewrites runbook sections 3 and 4; this work adds facts and rewrites section 7.
+Neither waits on the other. Whichever lands second rebases: if hq-2eba07 lands first,
+the slug test reads the list through `tools/harness-facts` as before, which by then reads
+`harnesses.toml`; new agy facts go under the facts file's existing per-fact tables, which
+hq-2eba07 does not change.
 
 ### Runbook
 
