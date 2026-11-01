@@ -45,7 +45,7 @@ def _advance(state: TurnState, t: float) -> None:
         gap = t - state.last_t
         if state.in_flight or gap < IDLE_GAP_SECONDS:
             state.active += max(gap, 0.0)
-    state.last_t = t
+    state.last_t = t if state.last_t is None else max(state.last_t, t)
 
 
 def attempt(state: TurnState, ev: Event) -> None:

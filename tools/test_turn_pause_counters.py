@@ -176,3 +176,13 @@ def test_state_json_round_trip():
     assert back == s
     assert back.in_flight == {'open': 'kid'} and back.spawn_keys == {'w1'}
     assert back.warned == {'calls'} and back.limits == LIMITS
+
+
+def test_out_of_order_event_does_not_double_count_in_flight_time():
+    s = new()
+    call(s, 100, 'c')
+    counters.apply(s, ev(110, 'tick'))
+    counters.apply(s, ev(105, 'tick'))
+    counters.apply(s, ev(112, 'tick'))
+    assert s.active == 12
+    assert s.last_t == 112
