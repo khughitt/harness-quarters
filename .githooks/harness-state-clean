@@ -16,72 +16,24 @@ toggles, marketplace sources, hook trust hashes) stays tracked. Wired by
 identity, so a checkout drops the pick and `live-picks` puts the saved one back
 for Claude, Codex, pi and agy; pi's installation ids are not saved.
 """
-import fnmatch
-import json
-import re
 import sys
+from pathlib import Path
 
-CLAUDE_JSON_KEYS = ("model", "modelSettings", "effortLevel")
-# pi writes defaultProvider and defaultModel together when a model is set as its
-# default, and defaultThinkingLevel when a thinking level is; cycling writes neither.
-# deviceId (made on first use, e.g. at an OpenAI login) and trackingId (made when
-# analytics is enabled) identify the installation: pi's own bug report strips them, and
-# this repository is public. The rest is configuration and stays: what /settings
-# writes, enabledModels (setting a default model outside the enabled scope also adds
-# it), hideThinkingBlock (its keybinding), and lastChangelogVersion, which changes only
-# when pi/package.json's pin does (README, "Re-probing pi"); dropping it would make pi
-# treat each checkout as a fresh install and report it.
-PI_JSON_KEYS = ("defaultProvider", "defaultModel", "defaultThinkingLevel",
-                "deviceId", "trackingId")
-# Antigravity CLI writes model (/model), effort and effortByBase (/effort), and
-# trustedWorkspaces (startup workspace trust) into settings.json; live-picks preserves
-# all three units in local/live-picks-agy.json.
-AGY_JSON_KEYS = ("model", "effort", "effortByBase", "trustedWorkspaces")
-# The keys each JSON config drops, by the repository path git passes as %f.
-JSON_FILES = (("claude/settings*.json", CLAUDE_JSON_KEYS),
-              ("pi/settings*.json", PI_JSON_KEYS),
-              ("agy/settings*.json", AGY_JSON_KEYS))
-# (table, key) pairs; the table is a full-match pattern over the header's name, "" for
-# the top level before any header.
-TOML_KEYS = (
-    (re.compile(r""), "model"),
-    (re.compile(r""), "model_reasoning_effort"),
-    (re.compile(r"tui"), "screen_reader_detection_done"),
-    (re.compile(r'marketplaces\.(?:"[^"]*"|[^."]+)'), "last_updated"),
-    (re.compile(r'marketplaces\.(?:"[^"]*"|[^."]+)'), "last_revision"),
-)
-# Codex appends a [projects."<path>"] table each time a directory is trusted: that is
-# host state naming every checkout, kept in the live file and out of the index.
-# codex-trust saves what this pattern drops and puts it back after a checkout.
-PROJECT_TRUST = re.compile(r"projects\..+")
-# Tables dropped whole, header and blank lines up to the next header included.
-TOML_TABLES = (re.compile(r"tui\.model_availability_nux"), PROJECT_TRUST)
-TOML_HEADER = re.compile(r"^\s*\[\[?\s*(.*?)\s*\]\]?\s*(#.*)?$")
-TOML_KEY = re.compile(r'^\s*("[^"]*"|[A-Za-z0-9_-]+)\s*=')
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import harness_state
+from harness_state import TOML_HEADER, TOML_KEY, clean_json, clean_toml  # noqa: F401  re-exported
 
-def clean_json(text, keys):
-    data = json.loads(text)
-    for key in keys:
-        data.pop(key, None)
-    return json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+# harnesses.toml names each config this filter cleans, the keys and tables it drops, and
+# the path glob .gitattributes routes to it.
+MANIFEST = harness_state.load_manifest_or_exit("harness-state-clean")
 
-
-def clean_toml(text):
-    out = []
-    table = ""
-    for line in text.splitlines(keepends=True):
-        header = TOML_HEADER.match(line)
-        if header:
-            table = header.group(1)
-        if any(pattern.fullmatch(table) for pattern in TOML_TABLES):
-            continue
-        key = None if header else TOML_KEY.match(line)
-        if key and any(pattern.fullmatch(table) and key.group(1) == name
-                       for pattern, name in TOML_KEYS):
-            continue
-        out.append(line)
-    return "".join(out)
+# tools/relay_cutover_bootstrap/inputs.py reads this name through runpy until hq-7e1e9c
+# retires it. Bound only when the manifest gives claude-code a JSON config: no fallback.
+_CLAUDE = MANIFEST.by_harness.get("claude-code")
+if _CLAUDE is not None and _CLAUDE.format == "json":
+    CLAUDE_JSON_KEYS = _CLAUDE.json_clean_keys
 
 
 def main(argv):
@@ -89,13 +41,10 @@ def main(argv):
         sys.exit("harness-state-clean: usage: harness-state-clean <path>  (stdin -> stdout)")
     path = argv[1]
     text = sys.stdin.read()
-    json_keys = [keys for pattern, keys in JSON_FILES if fnmatch.fnmatch(path, pattern)]
-    if json_keys:
-        sys.stdout.write(clean_json(text, json_keys[0]))
-    elif path.endswith(".toml"):
-        sys.stdout.write(clean_toml(text))
-    else:
+    matches = [spec for spec in MANIFEST.live_state if spec.filter_re.fullmatch(path)]
+    if not matches:
         sys.exit(f"harness-state-clean: {path} is not a harness config; check .gitattributes")
+    sys.stdout.write(harness_state.clean_for_spec(matches[0], text))
 
 
 if __name__ == "__main__":

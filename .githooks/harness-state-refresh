@@ -35,9 +35,13 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parent.parent
-PATTERNS = ("claude/settings*.json", "codex/config*.toml", "pi/settings*.json", "agy/settings*.json")
 HERE = Path(__file__).resolve().parent
+if str(HERE) not in sys.path:
+    sys.path.insert(0, str(HERE))
+
+import harness_state
+
+REPO = HERE.parent
 TRUST = HERE / "codex-trust"
 PICKS = HERE / "live-picks"
 
@@ -74,11 +78,13 @@ def main():
     steps = [run("live-picks capture", PICKS, "capture")]
     failed = []
     try:
+        manifest = harness_state.load_manifest_or_exit("harness-state-refresh")
+        patterns = tuple(f":(glob){spec.filter_glob}" for spec in manifest.live_state)
         lock = Path(checked("rev-parse", "--path-format=absolute", "--git-path", "index.lock").strip())
         if not lock.exists():
             steps.append(run("codex-trust sync", TRUST, "sync"))
             steps.append(run("live-picks restore", PICKS, "restore"))
-            marked = checked("diff-files", "--name-only", "--", *PATTERNS).split()
+            marked = checked("diff-files", "--name-only", "--", *patterns).split()
             stale = [path for path in marked if filtered_equal(path)]
             if stale:
                 checked("add", "--", *stale)

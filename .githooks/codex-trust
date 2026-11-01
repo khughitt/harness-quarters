@@ -28,7 +28,6 @@ docs/specs/2026-09-29-codex-trust-restore-design.md.
 """
 import contextlib
 import os
-import runpy
 import sys
 import tomllib
 
@@ -43,16 +42,31 @@ LIVE = REPO / LIVE_NAME
 SAVED = REPO / SAVED_NAME
 USAGE = ("usage: codex-trust capture | restore | sync | forget <project path> | "
          "hook post-checkout|post-merge|post-rewrite")
-# The filter decides what a checkout drops; reading its patterns keeps the saved tables
-# exactly the dropped ones.
-FILTER = runpy.run_path(str(HERE / "harness-state-clean"))
-TOML_HEADER = FILTER["TOML_HEADER"]
-PROJECT_TRUST = FILTER["PROJECT_TRUST"]
-CLEAN_TOML = FILTER["clean_toml"]
+TOML_HEADER = harness_state.TOML_HEADER
+# harnesses.toml decides what a checkout drops; the codex entry's trust_table is the
+# pattern of the dropped tables, so the saved tables are exactly those. Loaded in main(),
+# once the arguments and checkout are known to be usable.
+CODEX_SPEC = None
 fail = CHECKOUT.fail
 git = CHECKOUT.git
 git_path = CHECKOUT.git_path
 linked_worktree = CHECKOUT.linked_worktree
+
+
+def load_codex_spec():
+    """The codex live-state entry from harnesses.toml; exits when it cannot trust-restore."""
+    global CODEX_SPEC
+    manifest = harness_state.load_manifest_or_exit("codex-trust")
+    spec = manifest.by_harness.get("codex")
+    if spec is None or spec.format != "toml" or spec.trust_table is None:
+        fail("harnesses.toml: codex needs a TOML live_state with trust_table")
+    if spec.config != LIVE_NAME:
+        fail(f"harnesses.toml: codex live_state config is {spec.config!r}, not {LIVE_NAME!r}")
+    CODEX_SPEC = spec
+
+
+def clean_toml(text):
+    return harness_state.clean_for_spec(CODEX_SPEC, text)
 
 
 def parse(text, name):
@@ -73,7 +87,7 @@ def trust_tables(text, name):
     for line in text.splitlines(keepends=True):
         header = TOML_HEADER.match(line)
         if header:
-            blocks.append([line] if PROJECT_TRUST.fullmatch(header.group(1)) else None)
+            blocks.append([line] if CODEX_SPEC.trust_table.fullmatch(header.group(1)) else None)
         elif blocks and blocks[-1] is not None:
             blocks[-1].append(line)
     tables = {}
@@ -160,7 +174,7 @@ def restore():
     want = parse(live, LIVE_NAME)
     want.setdefault("projects", {}).update(parse(tables, SAVED_NAME)["projects"])
     for result in placements(live, tables):
-        if loads(result) == want and CLEAN_TOML(result) == CLEAN_TOML(live):
+        if loads(result) == want and clean_toml(result) == clean_toml(live):
             write(LIVE.resolve(), result)
             return True
     fail(f"found no place in {LIVE_NAME} for the saved tables that keeps its values and "
@@ -173,7 +187,7 @@ def without_table(text, project):
     for line in text.splitlines(keepends=True):
         header = TOML_HEADER.match(line)
         if header:
-            skipping = (PROJECT_TRUST.fullmatch(header.group(1)) is not None
+            skipping = (CODEX_SPEC.trust_table.fullmatch(header.group(1)) is not None
                         and project in parse(line, LIVE_NAME).get("projects", {}))
         if not skipping:
             kept.append(line)
@@ -189,7 +203,7 @@ def forget(project):
         fail(f"no trust for {project!r} in {SAVED_NAME} or {LIVE_NAME}")
     if in_live:
         result = without_table(live, project)
-        if CLEAN_TOML(result) != CLEAN_TOML(live) or project in trust_tables(result, LIVE_NAME):
+        if clean_toml(result) != clean_toml(live) or project in trust_tables(result, LIVE_NAME):
             fail(f"could not remove {project!r} from {LIVE_NAME} without changing what git "
                  "stages; nothing written")
         write(LIVE.resolve(), result)
@@ -229,6 +243,7 @@ def main(argv):
         if args[1] == "post-checkout" and rebasing():
             return
         try:
+            load_codex_spec()
             with locked():
                 if restore():
                     restage()
@@ -236,6 +251,7 @@ def main(argv):
             print(f"{error}\ncodex-trust: trust not restored; the next turn end retries",
                   file=sys.stderr)
         return
+    load_codex_spec()
     with locked():
         if args[0] == "forget":
             forget(args[1])

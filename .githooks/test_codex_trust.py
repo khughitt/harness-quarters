@@ -717,3 +717,26 @@ def test_callers_environment_cannot_reach_fixture_subprocesses(tmp_path, contami
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert config.read_text() == "[fixture]\ncontaminated = true\n"
+
+
+def test_broken_manifest_hook_exits_zero_while_cli_fails(repo, tmp_path):
+    (repo / "harnesses.toml").write_text("schema = [\n")
+
+    hook = trust(repo, "hook", "post-merge")
+    assert hook.returncode == 0
+    assert "codex-trust:" in hook.stderr
+    assert "codex-trust: trust not restored; the next turn end retries" in hook.stderr
+    assert "Traceback" not in hook.stderr
+
+    cli = trust(repo, "capture")
+    assert cli.returncode != 0
+    assert "codex-trust:" in cli.stderr
+    assert "Traceback" not in cli.stderr
+
+    linked = tmp_path / "linked"
+    git(repo, "worktree", "add", "-q", str(linked))
+    (linked / "harnesses.toml").write_text("schema = [\n")
+    silent = subprocess.run([str(linked / ".githooks" / "codex-trust"), "hook", "post-merge"],
+                            cwd=tmp_path, text=True, capture_output=True, env=child_env(repo))
+    assert silent.returncode == 0
+    assert silent.stderr == ""
