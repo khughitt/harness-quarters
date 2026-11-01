@@ -11,6 +11,8 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+import harness_stores
+
 from . import capture, config, inputs, probe, prune, status
 from .manifest import Manifest, Run, utc_now
 
@@ -128,7 +130,7 @@ def main(argv) -> int:
     args = build_parser().parse_args(argv)
     try:
         cfg = config.load_config(config_path())
-        table = config.sources(Path.home())
+        table = harness_stores.archive_sources(Path.home())
         config.check_sources(table)
         with config.archive_lock(cfg.archive_root) if args.command in LOCKED else nullcontext():
             return COMMANDS[args.command](cfg, table, args)

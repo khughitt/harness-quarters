@@ -1,23 +1,37 @@
 """The host gate refuses with exit 2 and a named cause; the archive lock refuses with 75."""
 import fcntl
 import os
+from pathlib import Path
 
 import pytest
 
+import harness_stores
+
+import harness_stores
 from session_archive import config
 from session_archive.testing import run_tool, write_config
 
 
 def test_sources_table_matches_spec(tmp_path):
-    table = {s.name: (s.kind, s.root.relative_to(tmp_path).as_posix(), s.pruned)
-             for s in config.sources(tmp_path)}
+    table = {s.name: (s.harness, s.home.relative_to(tmp_path).as_posix(),
+                      s.root.relative_to(tmp_path).as_posix(), s.prune is not None,
+                      s.required, s.append_only)
+             for s in harness_stores.archive_sources(tmp_path)}
     assert table == {
-        "claude": ("claude", ".claude/projects", True),
-        "claude-work": ("claude", ".claude-work/projects", True),
-        "codex": ("codex", ".codex/sessions", True),
-        "codex-archived": ("codex", ".codex/archived_sessions", False),
-        "codex-work": ("codex", ".codex-work/sessions", False),
+        "claude": ("claude-code", ".claude", ".claude/projects", True, True, True),
+        "claude-work": ("claude-code", ".claude-work", ".claude-work/projects", True, True, True),
+        "codex": ("codex", ".codex", ".codex/sessions", True, True, True),
+        "codex-archived": ("codex", ".codex", ".codex/archived_sessions", False, True, True),
+        "codex-work": ("codex", ".codex-work", ".codex-work/sessions", False, True, True),
     }
+
+
+def test_no_kind_branches_remain():
+    package = Path(config.__file__).parent
+    for name in ("prune.py", "decide.py", "inputs.py"):
+        text = (package / name).read_text()
+        assert 'kind == "claude"' not in text and 'kind == "codex"' not in text, name
+        assert ".kind ==" not in text, name
 
 
 def test_unconfigured_host_exits_2(home):

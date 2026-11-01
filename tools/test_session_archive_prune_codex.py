@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import harness_stores
 from session_archive import config, prune
 from session_archive.capture import capture_run, hash_file, mirror_path
 from session_archive.inputs import codex_units
@@ -17,7 +18,7 @@ from session_archive.testing import TID, codex_rollout, lenient_open_inodes, obs
 
 @pytest.fixture
 def world(home, archive, manifest, stub_codex):
-    src = next(s for s in config.sources(home) if s.name == "codex")
+    src = next(s for s in harness_stores.archive_sources(home) if s.name == "codex")
     rollout = codex_rollout(src.root)
     capture_run(archive, manifest, [src])
     (unit,) = codex_units(src)

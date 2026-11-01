@@ -5,6 +5,11 @@ import tomllib
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING, Callable
+
+if TYPE_CHECKING:
+    from .inputs import Unit
+    from .prune import Context
 
 MARKER = ".session-archive-root"
 EX_HOST = 2
@@ -19,25 +24,34 @@ class LockHeld(Exception):
     """Another capture, prune, promote or probe holds the archive lock; exit 75."""
 
 
+def ALL(relpath: str) -> bool:
+    return True
+
+
+@dataclass(frozen=True)
+class PruneHooks:
+    """What prune needs from a harness: unit discovery, the deletion protocol and the facts
+    obs is compared against (spec §3.4)."""
+    harness: str     # the obs harness label
+    units: Callable[["Source"], list["Unit"]]
+    delete_unit: Callable[["Unit", "Context"], str]
+    is_transcript: Callable[[str], bool]    # whether obs indexes this path
+    thread_id: Callable[[Path], str | None]
+    needs_probe: bool         # deletion waits for the harness's delete probe
+    thread_identity: bool     # obs's thread identity must match the filename
+
+
 @dataclass(frozen=True)
 class Source:
     name: str
-    kind: str        # "claude" or "codex"
-    home: Path       # the harness home: parent of the quarantine; CODEX_HOME for codex
+    harness: str     # the adapter's canonical slug
+    home: Path       # the harness home: parent of the quarantine
     root: Path       # the live root the archive mirrors
-    pruned: bool     # prune covers it (spec §3.2)
-
-
-def sources(home: Path) -> tuple[Source, ...]:
-    claude, claude_work = home / ".claude", home / ".claude-work"
-    codex, codex_work = home / ".codex", home / ".codex-work"
-    return (
-        Source("claude", "claude", claude, claude / "projects", True),
-        Source("claude-work", "claude", claude_work, claude_work / "projects", True),
-        Source("codex", "codex", codex, codex / "sessions", True),
-        Source("codex-archived", "codex", codex, codex / "archived_sessions", False),
-        Source("codex-work", "codex", codex_work, codex_work / "sessions", False),
-    )
+    prune: PruneHooks | None    # None: prune does not cover it (spec §3.2)
+    required: bool = True
+    append_only: bool = True
+    descend: Callable[[str], bool] = ALL
+    select: Callable[[str], bool] = ALL
 
 
 @dataclass(frozen=True)

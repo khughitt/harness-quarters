@@ -4,6 +4,7 @@ import os
 
 import pytest
 
+import harness_stores
 from session_archive import capture, config
 from session_archive.capture import capture_run, mirror_path
 from session_archive.manifest import Manifest
@@ -11,7 +12,7 @@ from session_archive.testing import run_tool, write, write_config
 
 
 def table(home):
-    return config.sources(home)
+    return harness_stores.archive_sources(home)
 
 
 def test_counts_and_mirror(home, archive, manifest):

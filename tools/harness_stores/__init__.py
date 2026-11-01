@@ -6,7 +6,7 @@ from .model import Adapter, Home, Session, SourceError
 
 ADAPTERS: tuple[Adapter, ...] = (claude.ADAPTER, codex.ADAPTER)
 
-__all__ = ["ADAPTERS", "Adapter", "Home", "Session", "SourceError", "by_alias", "by_slug", "homes"]
+__all__ = ["ADAPTERS", "Adapter", "Home", "Session", "SourceError", "by_alias", "archive_sources", "by_slug", "homes"]
 
 
 def by_alias(alias: str) -> Adapter:
@@ -25,3 +25,7 @@ def by_slug(slug: str) -> Adapter:
 
 def homes(user_home: Path) -> tuple[Home, ...]:
     return tuple(home for adapter in ADAPTERS for home in adapter.homes(user_home))
+
+
+def archive_sources(user_home: Path) -> tuple:
+    return tuple(source for adapter in ADAPTERS for source in adapter.archive_sources(user_home))

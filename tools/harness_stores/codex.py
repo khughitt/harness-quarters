@@ -86,9 +86,30 @@ def resume_argv(session: Session, flags: list[str]) -> list[str]:
     return ["codex", *flags, "resume", session.id]   # Codex takes its flags before the subcommand
 
 
+def archive_sources(user_home: Path) -> tuple:
+    from session_archive.config import PruneHooks, Source
+    from session_archive.decide import codex_is_transcript
+    from session_archive.inputs import ROLLOUT_RE, codex_units
+    from session_archive.prune import delete_codex_unit
+
+    def thread_id(path: Path) -> str | None:
+        match = ROLLOUT_RE.fullmatch(path.name)
+        return match[1] if match else None
+
+    hooks = PruneHooks(harness="codex", units=codex_units, delete_unit=delete_codex_unit,
+                       is_transcript=codex_is_transcript, thread_id=thread_id,
+                       needs_probe=True, thread_identity=True)
+    personal, work = homes(user_home)
+    return (
+        Source(personal.name, "codex", personal.path, personal.path / "sessions", hooks),
+        Source("codex-archived", "codex", personal.path, personal.path / "archived_sessions", None),
+        Source(work.name, "codex", work.path, work.path / "sessions", None),
+    )
+
+
 ADAPTER = Adapter(
     slug="codex", alias="codex", colour=color.CODEX, home_variable="CODEX_HOME",
     homes=homes, list_sessions=read_codex, notes_segment=lambda notes: None,
     exclusion_reasons=("non-interactive", "transcript gone"), resume_argv=resume_argv,
-    archive_sources=lambda user_home: (), episode_env="SESSION_LOGS_CODEX",
+    archive_sources=archive_sources, episode_env="SESSION_LOGS_CODEX",
     episode_root=lambda user_home: user_home / ".codex" / "sessions")

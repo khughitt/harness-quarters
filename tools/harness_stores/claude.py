@@ -101,9 +101,22 @@ def resume_argv(session: Session, flags: list[str]) -> list[str]:
     return ["claude", *flags, "--resume", session.id]
 
 
+def archive_sources(user_home: Path) -> tuple:
+    from session_archive.config import PruneHooks, Source
+    from session_archive.decide import claude_is_transcript
+    from session_archive.inputs import claude_units
+    from session_archive.prune import delete_claude_unit
+
+    hooks = PruneHooks(harness="claude-code", units=claude_units, delete_unit=delete_claude_unit,
+                       is_transcript=claude_is_transcript, thread_id=lambda path: None,
+                       needs_probe=False, thread_identity=False)
+    return tuple(Source(home.name, "claude-code", home.path, home.path / "projects", hooks)
+                 for home in homes(user_home))
+
+
 ADAPTER = Adapter(
     slug="claude-code", alias="claude", colour=color.CLAUDE, home_variable="CLAUDE_CONFIG_DIR",
     homes=homes, list_sessions=read_claude, notes_segment=notes_segment,
     exclusion_reasons=("transcript gone",), resume_argv=resume_argv,
-    archive_sources=lambda user_home: (), episode_env="SESSION_LOGS_CLAUDE",
+    archive_sources=archive_sources, episode_env="SESSION_LOGS_CLAUDE",
     episode_root=lambda user_home: user_home / ".claude" / "projects")
