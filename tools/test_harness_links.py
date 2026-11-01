@@ -737,19 +737,100 @@ def test_real_manifest_adopts_agy_replaced_settings_on_anchored_host_and_clears_
     assert isolated_git(clone, home, "status", "--porcelain", "--", "agy/settings.json").stdout == " M agy/settings.json\n"
 
 
-def test_real_manifest_refuses_preexisting_agy_settings_before_agy_is_anchored(tmp_path):
+def first_run_host(tmp_path, settings):
+    """A set-up clone and a host agy ran on before its home was linked (europa's shape)."""
+    import json
+
     home = tmp_path / "home"
     (home / ".claude").mkdir(parents=True)
     clone = fresh_clone(tmp_path, home)
     setup = subprocess.run(["just", "setup"], cwd=clone, env=isolated_env(home), text=True, capture_output=True)
     assert setup.returncode == 0, setup.stderr
     assert isolated_link(clone, home, "--apply").returncode == 0
-
     (home / ".gemini/antigravity-cli").mkdir(parents=True)
     (home / ".gemini/config").mkdir(parents=True)
-    preexisting = home / ".gemini/antigravity-cli/settings.json"
-    preexisting.write_text('{"trustedWorkspaces": ["/first-run"]}\n')
+    first_run = home / ".gemini/antigravity-cli/settings.json"
+    first_run.write_text(json.dumps(settings, indent=2) + "\n")
+    return clone, home, first_run
+
+
+AGY_ANCHOR_LINKS = ("~/.gemini/config/AGENTS.md", "~/.gemini/config/hooks.json", "~/.gemini/config/skills.json")
+
+
+def test_real_manifest_adopts_a_first_run_agy_file_before_linking_its_anchors(tmp_path):
+    import json
+
+    clone, home, first_run = first_run_host(tmp_path, {
+        "seasonalThemesOptIn": "halloween-2026",
+        "showFeedbackSurvey": False,
+        "trustedWorkspaces": ["/work/dotfiles"],
+    })
+    tracked = json.loads((clone / "agy/settings.json").read_text())
+    # The clone tracks this checkout's HEAD; its working agy/ may hold uncommitted edits.
+    diff_before = isolated_git(clone, home, "diff", "--", "agy/settings.json").stdout
+
+    report = isolated_link(clone, home)
+    assert report.returncode == 0, report.stderr
+    planned = states(report)
+    assert planned["~/.gemini/antigravity-cli/settings.json"] == "adopt"
+    assert "first-run" in report.stdout
+    assert all(planned[link] == "create" for link in AGY_ANCHOR_LINKS)
+    assert isolated_link(clone, home, "--check").returncode == 1
+
+    applied = isolated_link(clone, home, "--apply")
+    assert applied.returncode == 0, applied.stderr
+    assert first_run.is_symlink() and first_run.resolve() == (clone / "agy/settings.json").resolve()
+    assert (home / ".gemini/config/hooks.json").resolve() == (clone / "agy/hooks.json").resolve()
+    assert json.loads((clone / "agy/settings.json").read_text()) == {
+        **tracked,
+        "trustedWorkspaces": ["/work/dotfiles"],
+        "seasonalThemesOptIn": "halloween-2026",
+    }
+    assert json.loads((clone / "local/live-picks-agy.json").read_text()) == {
+        "agy/settings.json": {
+            "state": "set",
+            "values": {"trustedWorkspaces": ["/work/dotfiles"], "seasonalThemesOptIn": "halloween-2026"},
+        }
+    }
+    check = isolated_link(clone, home, "--check")
+    assert check.returncode == 0, check.stdout
+    assert isolated_git(clone, home, "diff", "--", "agy/settings.json").stdout == diff_before
+
+
+def test_real_manifest_refuses_a_first_run_agy_file_holding_untracked_settings(tmp_path):
+    clone, home, first_run = first_run_host(tmp_path, {
+        "queuedMessages": "send-immediately",
+        "trustedWorkspaces": ["/first-run"],
+    })
+    raw = first_run.read_text()
     tracked_before = (clone / "agy/settings.json").read_bytes()
+
+    report = isolated_link(clone, home)
+    assert states(report)["~/.gemini/antigravity-cli/settings.json"] == "adopt"
+
+    applied = isolated_link(clone, home, "--apply")
+    assert applied.returncode == 1
+    assert "queuedMessages" in applied.stderr and "nothing written" in applied.stderr
+    assert not first_run.is_symlink() and first_run.read_text() == raw
+    assert (clone / "agy/settings.json").read_bytes() == tracked_before
+    assert not (clone / "local/live-picks-agy.json").exists()
+    for link in AGY_ANCHOR_LINKS:
+        path = home / link.removeprefix("~/")
+        assert not path.exists() and not path.is_symlink()
+
+
+@pytest.mark.parametrize("conflict", ["file", "foreign-link"])
+def test_real_manifest_refuses_a_first_run_agy_file_while_an_anchor_holds_something_else(tmp_path, conflict):
+    clone, home, first_run = first_run_host(tmp_path, {"trustedWorkspaces": ["/first-run"]})
+    raw = first_run.read_text()
+    tracked_before = (clone / "agy/settings.json").read_bytes()
+    anchor = home / ".gemini/config/hooks.json"
+    if conflict == "file":
+        anchor.write_text("{}\n")
+    else:
+        foreign = tmp_path / "foreign-hooks.json"
+        foreign.write_text("{}\n")
+        anchor.symlink_to(foreign)
 
     report = isolated_link(clone, home)
     assert report.returncode == 1
@@ -757,9 +838,9 @@ def test_real_manifest_refuses_preexisting_agy_settings_before_agy_is_anchored(t
 
     applied = isolated_link(clone, home, "--apply")
     assert applied.returncode == 1
-    assert not preexisting.is_symlink()
-    assert preexisting.read_text() == '{"trustedWorkspaces": ["/first-run"]}\n'
+    assert not first_run.is_symlink() and first_run.read_text() == raw
     assert (clone / "agy/settings.json").read_bytes() == tracked_before
+    assert not (home / ".gemini/config/skills.json").exists()
 
 
 def test_adopt_manifest_validation_and_apply_refusal_on_corrupt_or_directory(world, tmp_path):
@@ -786,6 +867,11 @@ def test_adopt_manifest_validation_and_apply_refusal_on_corrupt_or_directory(wor
         (
             '[harness.a]\nhome = "~/.claude"\nadopt = ["CLAUDE.md"]\nanchors = ["~/.undeclared"]\n[harness.a.links]\n"CLAUDE.md" = "AGENTS.md"\n',
             "anchor",
+        ),
+        (
+            '[harness.a]\nhome = "~/.claude"\nadopt = ["CLAUDE.md", "rules"]\nanchors = ["~/.claude/rules"]\n'
+            '[harness.a.links]\n"CLAUDE.md" = "AGENTS.md"\n"rules" = "rules.md"\n',
+            "must not itself be adopted",
         ),
     ):
         (root / "links.toml").write_text(bad_manifest)

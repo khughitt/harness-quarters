@@ -263,7 +263,10 @@ symlink on `restore`, `hook` and `forget`, `agy/hook` runs `harness-state-refres
 `SessionStart` and `PreToolUse` when the file is regular, and `[harness.agy]` declares
 `adopt = ["settings.json"]` with `anchors` in `links.toml` so `just link-check` flags an
 unhealed zero-turn replacement and `just link --apply` converges it via `live-picks sync`
-(still refusing pre-existing files on an unanchored host). The live `just link-check`
+(on a host not anchored yet, a first-run file agy wrote before the home was linked is
+adopted by `live-picks first-run` before any anchor is created, only when every anchor
+would be created and its keys outside the live state already match the tracked config;
+a foreign anchor, or any other key, still refuses). The live `just link-check`
 after a real save belongs to the post-apply checks (section 8).
 
 ### 3.2 Declare the harness and its live config in `harnesses.toml`
@@ -400,7 +403,8 @@ never hardcode `<hq-checkout>`) from whichever lifecycle hook the harness provid
 ### 3.6 Workspace trust preservation
 
 - **Single JSON key** (`agy/settings.json`'s `trustedWorkspaces`): declare it in
-  `clean_keys` and as its own pick unit, `["trustedWorkspaces"]`.
+  `clean_keys` and as its own pick unit, `["trustedWorkspaces"]`. `live-picks first-run`
+  adds a first-run file's new trusted workspaces to the held list rather than replacing it.
 - **Dynamic TOML tables per directory** (`codex/config.toml`'s `[projects."<path>"]`):
   drop them through `clean_tables` and name that pattern as `trust_table`. Saving and
   restoring them is a helper of its own, not a manifest entry: `.githooks/codex-trust`

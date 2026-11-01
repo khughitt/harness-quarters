@@ -5,9 +5,14 @@ Report mode prints one line per entry and writes nothing; --check exits 1 on any
 drift; --apply writes, and only when no entry is refused. A link counts as ok when its
 immediate target matches, allowing parent-directory aliases. A dangling or foreign
 link is repointed; a real file or directory at a link path is refused, never
-overwritten, except a regular file at a link listed in a harness's `adopt` once one of
-its `anchors` already points into this checkout (`--check` exits 1; `--apply` syncs and
-relinks it through `.githooks/live-picks sync`). Required links go on
+overwritten, except a regular file at a link listed in a harness's `adopt` (`--check`
+exits 1). Once one of its `anchors` already points into this checkout, the file replaced
+the link, and `--apply` syncs and relinks it through `.githooks/live-picks sync`. Before
+any anchor is linked, the file is a first-run file the harness wrote before this checkout
+managed its home: it is adopted only when this run would create every anchor (nothing,
+not even a foreign link, is at any of them), and `--apply` runs `.githooks/live-picks
+first-run`, which keeps the tracked config and refuses keys outside the live state that
+it does not hold, before it creates any link. Required links go on
 every host (their parent directory is created); a harness group applies only where its
 home is a real directory. Run from the main checkout: links must never resolve into a
 worktree. A target is checked only when its entry applies (a required link, or a group
@@ -149,6 +154,8 @@ def load(root):
                 raise ManifestError(
                     f"{entry.link}: anchor {anchor} must be another declared link into the running checkout"
                 )
+            if anchor_entry.adopt:
+                raise ManifestError(f"{entry.link}: anchor {anchor} must not itself be adopted")
     declared = {entry.link for entry in entries}
     for link, rel in data.get("retired", {}).items():
         path = expand(link)
@@ -205,6 +212,18 @@ def is_anchored(entry, by_link):
     )
 
 
+def first_run(entry, by_link):
+    """Whether this run would create every anchor of entry: nothing, not even a link, is at any."""
+    if not by_link:
+        return False
+    return all(
+        anchor in by_link
+        and active(by_link[anchor])
+        and state(by_link[anchor], by_link)[0] == "create"
+        for anchor in entry.anchors
+    )
+
+
 def state(entry, by_link=None):
     if entry.kind == "retired":
         if entry.link.is_symlink():
@@ -229,9 +248,11 @@ def state(entry, by_link=None):
             return "ok", ""
         return "repoint", f"was {os.readlink(entry.link)}"
     if entry.link.exists():
-        if (entry.adopt and is_anchored(entry, by_link)
-                and stat.S_ISREG(entry.link.lstat().st_mode)):
-            return "adopt", "replaced by a regular file"
+        if entry.adopt and stat.S_ISREG(entry.link.lstat().st_mode):
+            if is_anchored(entry, by_link):
+                return "adopt", "replaced by a regular file"
+            if first_run(entry, by_link):
+                return "adopt", "a first-run file, adopted before its anchors are linked"
         kind = "directory" if entry.link.is_dir() else "file"
         return "refuse", f"a real {kind} is there"
     return "create", ""
@@ -290,8 +311,36 @@ def restage_if_filtered_equal(checkout, target_path):
             raise ApplyRefused(f"git add {rel}: {add.stderr.strip()}")
 
 
+def live_picks(checkout, operation):
+    env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
+    result = subprocess.run([sys.executable, "-B", str(checkout / ".githooks" / "live-picks"), operation],
+                            env=env, text=True, capture_output=True)
+    if result.returncode != 0:
+        raise ApplyRefused(result.stderr.strip() or f"live-picks {operation} exited {result.returncode}")
+
+
+def adopt_rows(entries, by_link, checkout, operation):
+    """Refuse an adopted entry refused since the plan, run live-picks, then require each one linked."""
+    for entry in entries:
+        current, detail = state(entry, by_link)
+        if current == "refuse":
+            raise ApplyRefused(f"{show(entry.link)}: {detail}")
+    live_picks(checkout, operation)
+    for entry in entries:
+        current, detail = state(entry, by_link)
+        if current != "ok":
+            raise ApplyRefused(f"{show(entry.link)}: {detail or f'still {current} after live-picks {operation}'}")
+        restage_if_filtered_equal(checkout, entry.target)
+
+
 def apply(rows, root=None):
     by_link = {entry.link: entry for _, _, _, entry in rows if entry is not None and entry.kind == "link"}
+    # A first-run file is adopted before anything is written: once an anchor is linked,
+    # the file would read as a replaced link and become the base of the tracked config.
+    first = [entry for name, _, _, entry in rows
+             if name == "adopt" and not is_anchored(entry, by_link)]
+    if first:
+        adopt_rows(first, by_link, root or Path(git("rev-parse", "--show-toplevel")), "first-run")
     adopted = []
     for name, _, _, entry in rows:
         if entry is None:
@@ -313,7 +362,8 @@ def apply(rows, root=None):
                     entry.link.unlink()
             continue
         if name == "adopt":
-            adopted.append(entry)
+            if entry not in first:
+                adopted.append(entry)
             continue
         if name not in ("create", "repoint"):
             continue
@@ -330,22 +380,7 @@ def apply(rows, root=None):
             raise ApplyRefused(f"{show(entry.link)}: a real {kind} is there")
         os.replace(staging, entry.link)
     if adopted:
-        checkout = root or Path(git("rev-parse", "--show-toplevel"))
-        for entry in adopted:
-            current, detail = state(entry, by_link)
-            if current == "refuse":
-                raise ApplyRefused(f"{show(entry.link)}: {detail}")
-        env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
-        synced = subprocess.run([sys.executable, "-B", str(checkout / ".githooks" / "live-picks"), "sync"],
-                                env=env, text=True, capture_output=True)
-        if synced.returncode != 0:
-            detail = synced.stderr.strip() or f"live-picks sync exited {synced.returncode}"
-            raise ApplyRefused(detail)
-        for entry in adopted:
-            current, detail = state(entry, by_link)
-            if current != "ok":
-                raise ApplyRefused(f"{show(entry.link)}: {detail or f'still {current} after live-picks sync'}")
-            restage_if_filtered_equal(checkout, entry.target)
+        adopt_rows(adopted, by_link, root or Path(git("rev-parse", "--show-toplevel")), "sync")
 
 
 def main(argv):

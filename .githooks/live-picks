@@ -8,8 +8,8 @@ entries with `picks_record` and `pick_units`): today Claude's `model`, `modelSet
 and `effortLevel` in claude/settings.json and the top-level `model` and
 `model_reasoning_effort` in codex/config.toml, saved in local/live-picks.json; pi's
 `defaultProvider`, `defaultModel` and `defaultThinkingLevel` in pi/settings.json, saved in
-local/live-picks-pi.json; agy's `model`, `effort`, `effortByBase` and `trustedWorkspaces`
-in agy/settings.json, saved in local/live-picks-agy.json. A git command that writes a new
+local/live-picks-pi.json; agy's `model`, `effort`, `effortByBase`, `trustedWorkspaces` and
+`seasonalThemesOptIn` in agy/settings.json, saved in local/live-picks-agy.json. A git command that writes a new
 blob of a file over the live one drops the pick, and the harness runs on its default.
 The records are untracked and carried between hosts by Dropbox; this tool puts the
 picks back:
@@ -17,13 +17,14 @@ picks back:
     capture               save the pick each file holds; absence never records a reset
     restore               put a saved pick into a file holding none of its fields
     sync                  capture, then restore
+    first-run             adopt agy's first-run home file before its anchors are linked
     forget <file>         record the file's default and remove its pick from the file
     hook <name>           restore from a git hook, then restage what it wrote
 
 Each picker's owned fields are one unit (`pick_units`): Codex's model and effort; Claude's
 model and modelSettings (/model), and its effortLevel (/effort); pi's defaultProvider and
 defaultModel, and its defaultThinkingLevel; agy's model (/model), effort and effortByBase
-(/effort), and trustedWorkspaces. Each separate picker writes one unit. Keys the filter
+(/effort), trustedWorkspaces, and seasonalThemesOptIn. Each separate picker writes one unit. Keys the filter
 drops that no picker owns (`unrestored_keys`, such as pi's installation ids) are neither
 saved nor restored, and forget leaves them in the file. An entry with no `picks_record`
 is the filter's alone: live-picks skips it.
@@ -36,7 +37,12 @@ Because agy saves `~/.gemini/antigravity-cli/settings.json` by atomic rename ove
 home link when persisting picks or `/config` edits, an anchored host whose
 `~/.gemini/config` links point into this checkout also reads any regular file there
 during capture and adopts it back into `agy/settings.json`, restoring the symlink on
-restore, hook and forget.
+restore, hook and forget. A host not anchored yet can hold a first-run file agy wrote
+before this checkout linked its home: it never held the tracked config, so `first-run`
+(run by `tools/harness-links --apply` before it links the anchors) keeps
+`agy/settings.json` as the base, refuses any key outside the live state that the config
+does not already hold, takes the pick units only that file holds, adds its new list items
+to a held list pick (trustedWorkspaces), and relinks.
 Setting the current selection as a default emits no event: it is saved at turn end
 or exit, so a git rewrite before then restores the previous saved default. restore
 fills only units holding none of their fields, so a newer pick is never overwritten, and
@@ -79,7 +85,7 @@ except (ImportError, SyntaxError) as error:
 CHECKOUT = harness_state.Checkout("live-picks")
 fail = CHECKOUT.fail
 REPO = harness_state.REPO
-SYNOPSIS = ("usage: live-picks capture | restore | sync | forget <file> | "
+SYNOPSIS = ("usage: live-picks capture | restore | sync | first-run | forget <file> | "
             "hook post-checkout|post-merge|post-rewrite")
 # The record field that holds a set pick, by config format.
 FIELD = {"json": "values", "toml": "lines"}
@@ -433,6 +439,107 @@ def adopt_detached(spec, detached, records, from_hook):
     relink_home(detached, REPO / name)
 
 
+def first_run_home(spec):
+    """A first-run regular file at spec's home link on a host not yet anchored, or None.
+
+    The harness wrote it before this checkout linked its home, so it never held the
+    tracked config. An anchored host's regular file is a replaced link: `sync` adopts it.
+    """
+    if spec.config != AGY_CONFIG:
+        return None
+    home = Path.home()
+    agy_dir = home / AGY_HOME
+    if not (agy_dir.is_dir() and not agy_dir.is_symlink()):
+        return None
+    path = home / AGY_LINK
+    try:
+        mode = path.lstat().st_mode
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        raise Refused(f"{path} cannot be stat'd: {error}") from None
+    if stat.S_ISLNK(mode):
+        return None
+    if not stat.S_ISREG(mode):
+        raise Refused(f"{path} is not a regular file")
+    if agy_anchored():
+        raise Refused(f"{path}: the agy home is anchored, so this file replaced its link; "
+                      "`live-picks sync` adopts it")
+    return path
+
+
+def adopt_first_run(spec, path, records):
+    """Merge a first-run file's picks into spec's config, keeping the config, and relink.
+
+    Keys outside the live state must already match the config; any other key refuses,
+    since adopting it would change the tracked config without a commit's review. A pick
+    unit the checkout holds (in the file or the saved record) wins; a list value gains
+    the first-run file's new items. Units only the first-run file holds are taken.
+    """
+    name, record_name = spec.config, spec.picks_record
+    h_text = read_text(path, str(path))
+    try:
+        first = json.loads(h_text)
+    except json.JSONDecodeError as error:
+        raise Refused(f"{path} does not parse: {error}") from None
+    if not isinstance(first, dict):
+        raise Refused(f"{path} is not an object")
+    r_text = live(spec)
+    tracked = parse(spec, r_text)
+    live_keys = set(spec.pick_keys) | set(spec.unrestored_keys)
+    unlike = sorted(key for key in first
+                    if key not in live_keys and (key not in tracked or tracked[key] != first[key]))
+    if unlike:
+        raise Refused(f"{path}: the first-run file sets {', '.join(unlike)} unlike {name}; set "
+                      f"{'it' if len(unlike) == 1 else 'them'} in {name} or declare "
+                      f"{'it' if len(unlike) == 1 else 'them'} live state in harnesses.toml; "
+                      "nothing written")
+    held = merge_picks(spec, records[record_name].get(name), pick(spec, r_text))
+    merged = {}
+    for unit in spec.pick_units:
+        if any(key in held for key in unit):
+            for key in unit:
+                if key not in held:
+                    continue
+                value = held[key]
+                if isinstance(value, list) and isinstance(first.get(key), list):
+                    value = value + [item for item in first[key] if item not in value]
+                merged[key] = value
+        else:
+            merged.update({key: first[key] for key in unit if key in first})
+    clean_base = without_pick(spec, r_text)
+    entry = {"state": "set", "values": merged}
+    result = with_pick(spec, clean_base, entry) if merged else clean_base
+    if merged and records[record_name].get(name) != entry:
+        updated = {**records[record_name], name: entry}
+        write_record(record_name, updated)
+        records[record_name] = updated
+    harness_state.write((REPO / name).resolve(), result)
+    relink_home(path, REPO / name)
+
+
+def first_run(specs):
+    """Adopt each first-run home file; returns the files written and the refusals."""
+    records, refusals = read_records(specs)
+    written = []
+    for name, spec in specs.items():
+        if spec.picks_record not in records:
+            continue
+        try:
+            path = first_run_home(spec)
+            if path is None:
+                continue
+            adopt_first_run(spec, path, records)
+        except Refused as error:
+            refusals.append(str(error))
+            continue
+        except (OSError, UnicodeError) as error:
+            refusals.append(f"{name}: {error}")
+            continue
+        written.append(name)
+    return written, refusals
+
+
 def restore(specs, from_hook=False):
     """Put each saved pick into a file holding none of its fields (per picker unit).
 
@@ -519,6 +626,8 @@ def operate(args, specs):
                     refusals += capture(specs)
                 if args[0] in ("restore", "sync"):
                     refusals += restore(specs)[1]
+                if args[0] == "first-run":
+                    refusals += first_run(specs)[1]
             refuse(refusals)
     except (OSError, UnicodeError) as error:
         fail(str(error))
@@ -534,7 +643,7 @@ def cli_specs(args):
 
 def main(argv):
     args = argv[1:]
-    if not (args in (["capture"], ["restore"], ["sync"])
+    if not (args in (["capture"], ["restore"], ["sync"], ["first-run"])
             or len(args) == 2 and (args[0] == "forget" or args[0] == "hook"
                                    and args[1] in harness_state.GIT_HOOKS)):
         fail(usage())
