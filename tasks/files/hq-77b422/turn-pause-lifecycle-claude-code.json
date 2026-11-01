@@ -1,0 +1,211 @@
+{
+  "harness": "claude-code",
+  "model": "claude-haiku-5-5",
+  "task": "tpl-c7ff4e",
+  "stages": [
+    {
+      "stage": 1,
+      "name": "cross the call limit",
+      "ok": true,
+      "detail": "root calls before the pause: ['Agent', 'Bash', 'Bash', 'Bash', 'Bash', 'Bash'], all allowed: True; 7th Bash allowed: False; background Bash started: 2; state paused=calls calls=7/6; root text in: ['8d40b422-ba7d-497b-b16e-a0d8e5511de7.jsonl', 'stream.jsonl']"
+    },
+    {
+      "stage": 2,
+      "name": "spend the grace",
+      "ok": true,
+      "detail": "reads after the pause: 26, allowed 25; state grace_used.root max 25; a read refused after the 25th: True; grace text in: ['8d40b422-ba7d-497b-b16e-a0d8e5511de7.jsonl', 'stream.jsonl']"
+    },
+    {
+      "stage": 3,
+      "name": "stop own work",
+      "ok": true,
+      "detail": "ToolSearch before the pause: 0; select:TaskStop after it allowed: 1; TaskStop calls [({'task_id': 'bjgf50lcw'}, True, True)] (input, allowed, after grace); kill calls [('kill 3132549', True, True)]; background pids recorded and gone: True"
+    },
+    {
+      "stage": 4,
+      "name": "park and end the turn",
+      "ok": true,
+      "detail": "tasks park calls [('tasks park tpl-c7ff4e \"review the turn-pause lifecycle report\" --waiting-on user --reason decision', True)]; record parked waiting on user (decision); root Stop after the park: 2"
+    },
+    {
+      "stage": 5,
+      "name": "resume with continue",
+      "ok": true,
+      "detail": "paused before continue: calls; continue prompt seen: True; new turn state: paused=None calls=1 grace_used={}; echo resumed allowed: True"
+    }
+  ],
+  "answers": {
+    "q2_hook_names": {
+      "TaskStop": [
+        "TaskStop"
+      ],
+      "Read": [
+        "Read"
+      ],
+      "all_pre_tool_names": [
+        "Agent",
+        "Bash",
+        "Read",
+        "TaskStop",
+        "ToolSearch"
+      ],
+      "toolsearch_after_pause": [
+        {
+          "query": "select:TaskStop",
+          "max_results": 1
+        }
+      ],
+      "taskstop_inputs": [
+        {
+          "task_id": "bjgf50lcw"
+        }
+      ]
+    },
+    "q4_texts": {
+      "root_text_in": [
+        "8d40b422-ba7d-497b-b16e-a0d8e5511de7.jsonl",
+        "stream.jsonl"
+      ],
+      "child_text_in": [
+        "agent-a6958a5dbdf133139.jsonl",
+        "stream.jsonl"
+      ],
+      "child_calls": [
+        [
+          "Bash",
+          "until [ -e go.flag ]; do sleep 1; done; echo released",
+          true
+        ],
+        [
+          "Bash",
+          "echo child-after",
+          false
+        ]
+      ]
+    },
+    "warning_in": [
+      "8d40b422-ba7d-497b-b16e-a0d8e5511de7.jsonl"
+    ],
+    "prompts": [
+      "This is a scripted end-to-end test of a turn-pause hook, in a scratch directory. The hook counts your tool calls and pau",
+      "<task-notification>\n<task-id>a6958a5dbdf133139</task-id>\n<tool-use-id>toolu_01UaHXEWQ6cy15txSPoCPYs3</tool-use-id>\n<outp",
+      "<task-notification>\n<task-id>btxuky3nt</task-id>\n<tool-use-id>toolu_01NpzSuydkoBFEws6BvAwRNr</tool-use-id>\n<output-file>",
+      "continue"
+    ],
+    "notify_log": [
+      "--app-name=turn-pause --urgency=critical turn paused (calls) claude-code session 8d40b422-ba7d-497b-b16e-a0d8e5511de7 in <run>/work: active 0:00 of 1:00, calls 7/6, spawns 1/3, compactions 0/2. Reply in the session to resume."
+    ],
+    "state_removed_at_session_end": true,
+    "pause_state": {
+      "paused": "calls",
+      "harness_pid": 3129312,
+      "notified": true,
+      "notify_error": null,
+      "worker_names": [],
+      "workers": [
+        "a6958a5dbdf133139"
+      ]
+    }
+  },
+  "runs": [
+    {
+      "command": [
+        "claude",
+        "-p",
+        "--input-format",
+        "stream-json",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--model",
+        "claude-haiku-5-5",
+        "--session-id",
+        "<session id>",
+        "--setting-sources",
+        "project",
+        "--strict-mcp-config",
+        "--disable-slash-commands",
+        "--settings",
+        "<run>/settings.json",
+        "--permission-mode",
+        "bypassPermissions"
+      ],
+      "exit": 0,
+      "wall_s": 133.6,
+      "cost_usd": 0.0158,
+      "stdin": [
+        "<scripted prompt>",
+        "continue"
+      ]
+    }
+  ],
+  "notes": [
+    "cost_usd recomputed after the run as the last result total_cost_usd (a running total); the driver at run time summed the per-turn totals (0.0309)"
+  ],
+  "checks": {
+    "session": "8d40b422-ba7d-497b-b16e-a0d8e5511de7",
+    "version": "2.1.316 (Claude Code)",
+    "before_resume": {
+      "task_stop_pid_alive": false,
+      "kill_me_pid_alive": false,
+      "task_stop_pid_recorded": true,
+      "kill_me_pid_recorded": true,
+      "results": 1,
+      "state": {
+        "harness": "claude-code",
+        "root": "8d40b422-ba7d-497b-b16e-a0d8e5511de7",
+        "turn": {
+          "started": 1793575100.1109643,
+          "limits": {
+            "active_seconds": 3600,
+            "calls": 6,
+            "spawns": 3,
+            "compactions": 2
+          },
+          "limits_sha": "40ac1a0d7aa3f916f73873062d608e928b3fc92f62d383a51e52b3f8e341ece6",
+          "active": 85.1658239364624,
+          "calls": 37,
+          "spawns": 1,
+          "compactions": 0,
+          "last_t": 1793575185.2767882,
+          "in_flight": {},
+          "tools": {},
+          "spawn_keys": [
+            "toolu_01UaHXEWQ6cy15txSPoCPYs3"
+          ],
+          "warned": [
+            "calls"
+          ]
+        },
+        "paused": "calls",
+        "grace_used": {
+          "root": 25
+        },
+        "workers": [
+          "a6958a5dbdf133139"
+        ],
+        "worker_names": [],
+        "cron_jobs": {},
+        "wakeups": [],
+        "harness_pid": 3129312,
+        "cwd": "<run>/work",
+        "notified": true,
+        "notify_error": null,
+        "budget_note": null
+      }
+    },
+    "continue_sent": 1793575210.4563935,
+    "reaped": []
+  },
+  "park": {
+    "at": "2026-11-01T23:19:41Z",
+    "next_step": "review the turn-pause lifecycle report",
+    "waiting_on": "user",
+    "reason": "decision",
+    "session": "claude:8d40b422-ba7d-497b-b16e-a0d8e5511de7",
+    "owner": "keith",
+    "host": "<host>",
+    "worktree": "<run>/work"
+  },
+  "verdict": "PASS"
+}
