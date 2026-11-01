@@ -1,0 +1,6 @@
+# Default per-turn limits for hq's turn pause.
+# Spec: docs/specs/2026-11-01-turn-pause-design.md; values approved 2026-11-01.
+active_seconds = 14400
+calls = 500
+spawns = 30
+compactions = 2
