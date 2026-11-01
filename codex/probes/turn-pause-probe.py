@@ -29,6 +29,8 @@ environment is built key by key. Cases:
            a spawn in a branch that never runs, then one direct spawn_agent call
   spawn-direct
            four direct spawn_agent calls, since 0.166.0 offers no spawn_agent inside exec
+  nested   one exec that prints Object.keys(tools) and ALL_TOOLS names: the nested tools
+           the isolate holds, which exec's description may not list in full
   compact  model_auto_compact_token_limit set just above the session's base context,
            and a command whose output crosses it
 
@@ -157,6 +159,13 @@ DIRECT_PROMPT = """This is a scripted hook probe. Make exactly these calls and n
 2. Call wait_agent until all four workers have finished.
 Then reply with the single word DONE."""
 
+# exec's description may omit deferred nested tools ("still available on the global
+# `tools` object"), so the nested surface is read from the isolate itself.
+NESTED_SOURCE = ('text(JSON.stringify({keys: Object.keys(tools).sort(), '
+                 'all: (typeof ALL_TOOLS === "undefined") ? null : ALL_TOOLS.map(t => t.name).sort()}));')
+NESTED_PROMPT = (f"Make one exec call whose JavaScript source is exactly `{NESTED_SOURCE}` and then reply "
+                 "with the single word DONE. Make no other tool call.")
+
 # The output must reach the model's context: an exec that prints nothing adds no tokens.
 COMPACT_PROMPT = ("Make one exec call whose JavaScript source is exactly "
                   "`text((await tools.exec_command({cmd: \"seq 1 4000\", max_output_tokens: 12000})).output);` "
@@ -222,6 +231,8 @@ def run(case, out, compact_limit=None):
         prompt, deny = SPAWN_PROMPT, ""
     elif case == "spawn-direct":
         prompt, deny = DIRECT_PROMPT, ""
+    elif case == "nested":
+        prompt, deny = NESTED_PROMPT, ""
     elif case == "compact":
         if not compact_limit:
             raise SystemExit("compact needs a token limit: run compact <out-dir> <limit>")

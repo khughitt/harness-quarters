@@ -593,7 +593,7 @@ note = "Run main: the worker's nested exec_command PreToolUse and PostToolUse (t
 
 [facts.model-tool-surface]
 type = "set"
-description = "The tool names the runtime offers its model, read from the session's own tool list, under an isolated configuration with no MCP servers or plugins. Codex tools reachable only inside code-mode exec are written exec.<name>."
+description = "The tool names the runtime offers its model, read from the session's own tool list, under an isolated configuration with no configured MCP servers or plugins. Codex tools reachable only inside code-mode exec are written exec.<name>; MCP tools an account provides are left out and counted in the note."
 probe = "claude/probes/turn-pause-probe.py"
 
 [facts.model-tool-surface.harness.claude-code]
@@ -610,7 +610,7 @@ value = ["exec", "exec.apply_patch", "exec.clock__curr_time", "exec.create_goal"
 version = "0.166.0"
 date = 2026-11-01
 evidence = "hq-fe672f"
-note = "codex/probes/turn-pause-probe.py run surface: the rollout's additional_tools record (gpt-6.1-sol, multi_agent v2, hooks and multi_agent on). Namespaces: functions (exec, wait, request_user_input, request_user_input_async), clock (sleep), collaboration (followup_task, interrupt_agent, list_agents, send_message, spawn_agent, wait_agent); exec.* are the nested tools its description declares. A live personal-home session on the same release listed the same set less request_plugin_install. No close_agent. spawn_agent is not reachable inside exec (TypeError in run spawn). wait {cell_id, terminate} stops a running exec cell. Schemas: tools/fixtures/turn-pause/schemas/codex-{interrupt_agent,wait,write_stdin}.json."
+note = "codex/probes/turn-pause-probe.py run surface: the rollout's additional_tools record (gpt-6.1-sol, multi_agent v2, hooks and multi_agent on). Namespaces: functions (exec, wait, request_user_input, request_user_input_async), clock (sleep), collaboration (followup_task, interrupt_agent, list_agents, send_message, spawn_agent, wait_agent); exec.* are the nested tools its description declares. A live personal-home session on the same release listed the same set less request_plugin_install. Because exec's description says deferred nested tools may be omitted from it, run nested printed the isolate's own Object.keys(tools) and ALL_TOOLS (195 names each, identical): the 14 built-in nested tools match the description exactly; the other 181 are deferred mcp__codex_apps__* tools the signed-in account provides (Linear 91, ChatGPT spaces 38, sites 25, pets 11, plugin 6, safety 5, codex 3, hotline 1, search 1), none of which stops work the session started. No close_agent. spawn_agent is not reachable inside exec (TypeError in run spawn). wait {cell_id, terminate} stops a running exec cell. Schemas: tools/fixtures/turn-pause/schemas/codex-{interrupt_agent,wait,write_stdin}.json."
 
 [facts.codex-spawn-evidence]
 type = "set"
@@ -623,7 +623,7 @@ value = ["PreToolUse", "SubagentStart"]
 version = "0.166.0"
 date = 2026-11-01
 evidence = "hq-fe672f"
-note = "run spawn (the specified probe): the exec whose loop spawns three workers failed at once with 'TypeError: tools.spawn_agent is not a function', so it started none; the direct spawn_agent started one worker, seen by one PreToolUse (collaborationspawn_agent) and one SubagentStart: neither source saw four starts, because only one worker can start that way. run spawn-direct: four direct spawn_agent calls gave four PreToolUse and four SubagentStart events with four distinct agent_ids. Every observed spawn is a direct function call."
+note = "run spawn (the specified probe): the exec whose loop spawns three workers failed at once with 'TypeError: tools.spawn_agent is not a function', so it started none; the direct spawn_agent started one worker, seen by one PreToolUse (collaborationspawn_agent) and one SubagentStart. Neither source saw four starts: the four-start criterion was unreachable, because exec cannot spawn on 0.166.0, so whether this answers the fact is the user's ruling. run spawn-direct: four direct spawn_agent calls gave four PreToolUse and four SubagentStart events with four distinct agent_ids. PreToolUse counts spawn attempts, not starts: in run main a denied spawn and its retry gave two spawn PreToolUse records for one SubagentStart, so a PreToolUse count is exact only when denied calls (by this hook or any other guard in the chain) are excluded; SubagentStart counted starts exactly in every run. Every observed spawn is a direct function call."
 
 [facts.hook-posttooluse]
 type = "boolean"

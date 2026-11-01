@@ -215,7 +215,10 @@ def run(case, out):
     for sub in ("home", "config", "work"):
         (out / sub).mkdir(parents=True, exist_ok=True)
     settings = build_settings(out)
-    version = subprocess.run(["claude", "--version"], capture_output=True, text=True, check=True).stdout.strip()
+    # Even --version gets the isolated environment, never the caller's.
+    version_env = {"PATH": os.environ["PATH"], "HOME": str(out / "home"), "CLAUDE_CONFIG_DIR": str(out / "config")}
+    version = subprocess.run(["claude", "--version"], capture_output=True, text=True, env=version_env,
+                             check=True).stdout.strip()
     runs = []
     if case == "main":
         env = environment(out, "Bash,Write,Agent,Task")
