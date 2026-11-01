@@ -9,7 +9,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from . import color, launch, projects, sessions
+from . import color, launch, pause, projects, sessions
 
 DEFAULT_CONFIG = Path(__file__).resolve().parent.parent / "hq.toml"
 LABEL_WIDTH = 60
@@ -44,6 +44,7 @@ def parser() -> argparse.ArgumentParser:
     listing.add_argument("--color", choices=("auto", "always", "never"), default="auto",
                          help="colour classes and age: auto (when stdout is a terminal and NO_COLOR "
                               "is unset), always, or never")
+    pause.add_parser(commands)
     return top
 
 
@@ -242,6 +243,8 @@ def sessions_command(args) -> int:
 
 def main(argv: list[str]) -> int:
     args = parser().parse_args(argv)
+    if args.command == "pause":
+        return pause.run(args)
     try:
         code = sessions_command(args)
         sys.stdout.flush()   # inside the try: a short listing is otherwise written at exit
