@@ -95,7 +95,7 @@ rejects the new harness until it is extended. A hit inside a two-way branch
 | `<ops-checkout>/bin/tt` | copy in every project | broadcast: `just vendor-publish tt` from ops after the merge (not an adoption pass) | when the broadcast lands |
 | `<lore-checkout>/vendor/superpowers` | submodule pinned to `github.com/obra/superpowers` | upstream contribution or fork, then a pin bump in lore | when lore's pin bump merges |
 | relay `test/fixtures/ancestry.json` (and `handles.json`) | byte copy in `<tasks-checkout>/tests/fixtures/relay/`, pinned to a relay revision in its README | copy the file from the newer relay revision and update that revision in one tasks commit | tasks tests only |
-| `<relay-checkout>` source | the CLI pin in `relay/package.json` and `relay/package-lock.json`; each harness's hook images name a fixed versioned runtime path | `just relay-install` into the versioned root on this host **before** merging the pin, on other hosts as soon as it syncs; hook images (the tracked hook configs) move per harness in their own hq merge, under their own approval ([Pinned relay runtime](relay-runtime.md)) | CLI pin and hook images: both on merge, on every host sharing the checkout. The launcher exits 127, and a hook image's command cannot start, where the version it names is not installed, so every host installs first |
+| `<relay-checkout>` source | the CLI pin in `relay/package.json` and `relay/package-lock.json`; each harness's hook images name a fixed versioned runtime path | `just relay-install` into the versioned root on this host **before** merging the pin, on other hosts as soon as it syncs; hook images (the tracked hook configs) move per harness in their own hq merge, under their own approval ([Pinned relay runtime](relay-runtime.md)) | CLI pin and hook images: both on merge, on every host sharing the checkout. The launcher exits 127, and a hook image's command cannot start, where the version it names is not installed: every host installs a hook image's version before the image merge; for the CLI pin, other hosts install as soon as the pin merge syncs |
 | `relay/subscribers.template.json` | rendered to `~/.config/relay/subscribers.json`, one file read by **every** relayed harness's hook images | `just relay-subscribers` (with `FORCE=1` over a different file) on each host | per host, at render. A file naming a harness outside a runtime's closed list fails to load in that runtime, which then denies every refusable event (see section 6, Subscribers) |
 | hook scripts in `<ops-checkout>/hooks`, `<lore-checkout>/hooks`, `agy/hook` | invoked by path from the tracked hook configs and the subscriber file | none | on merge to each owner's main |
 | `links.toml` | home links on each host | `just link --apply` from `<hq-checkout>` main on each host | per host, at apply |
@@ -206,7 +206,8 @@ refusal aborts the whole `--apply` pass with no partial writes.
 1. Land every target named in `links.toml` in its owning project's main checkout.
 2. After the section 3.1 save probe and the approval in section 8 step 1, from
    `<hq-checkout>` on `main` (never a worktree, which would leave live harnesses
-   pointing into temporary storage), create the home and converge links **before** the harness's first interactive run:
+   pointing into temporary storage), create the home and converge links **before**
+   the harness's first interactive run:
 
    ```sh
    mkdir -p ~/.<harness>
@@ -777,10 +778,11 @@ present home's metadata is missing, unreadable or at an unexpected schema versio
      `just link --apply` and `just relay-subscribers`.
 2. **Verify in worktrees, then land in order**: `ops` first when `cli.toml`, `tt` or
    shared hooks change; then each consumer (`relay`, `tasks`, `obs`, `familiar`,
-   `lore`) with its adoption in the same change; then `hq`. Each project verifies by its
-   own test policy and gates (in `hq`: `just test`, which the pre-commit hook
-   complements with `tools/ops-check`, `tools/ops-docs check` and
-   `tools/harness-facts check`). A green suite does not replace the selected-layer
+   `lore`) with its adoption in the same change; then `hq`, in the stages section 6
+   (Subscribers) and step 4 give (pin, then hook images, then the subscriber template),
+   never as one merge. Each project verifies by its own test policy and gates (in
+   `hq`: `just test`, which the pre-commit hook complements with `tools/ops-check`,
+   `tools/ops-docs check` and `tools/harness-facts check`). A green suite does not replace the selected-layer
    evidence in section 0. Every target named in `links.toml` exists on its owner's main
    branch before links are applied. A runtime pin is installed on this host
    (`just relay-install`, `just <name>-install`) before it merges.
