@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-8af61d-agy-relay
 created: 2026-11-01T08:44:46Z
-updated: 2026-11-01T18:56:51Z
+updated: 2026-11-01T18:56:53Z
 started: 2026-11-01T16:09:11Z
 depends: [tasks-ba29d3, fam-55f1af]
 tags: [hooks, cross-project]
@@ -48,3 +48,4 @@ Where: relay/, claude/settings.json, codex/hooks.json, codex/work/hooks.json, ag
 - 2026-11-01T18:35:48Z (feat/hq-8af61d-agy-relay): review: impl round 1 — verdict: revise; findings: Important 1, Minor 2; reviewer: agy
 - 2026-11-01T18:56:48Z (feat/hq-8af61d-agy-relay): review: impl round 2 — verdict: accept; findings: Minor 1; reviewer: agy
 - 2026-11-01T18:56:51Z (feat/hq-8af61d-agy-relay): Review dispositions and bounded decisions: round 1 Important 1 (adding-a-harness.md Section 0 agy summary) and Minor 1-2 (Section 6 adapter surface/hook-version prose and test_relay_subscribers.py budget subprocess HOME) addressed in 275ef7e0; round 2 minor (deferred): docs/runbooks/adding-a-harness.md line 594 writes adapter.nativeFields(nativeEvent, raw) whereas relay v0.3.0 parsePayload parses JSON first and calls nativeFields(data, nativeEvent). Bounded decisions: kept matcher run_command on agy/hook PreToolUse per hq-b24c39 Ruling 1 while using matcher * on relay PreToolUse so non-shell turns after SessionStart still update relay state and notify familiar-agy (rejected: matcher run_command on relay PreToolUse, which would miss read-only turns after turn 1); kept agy handler timeout 60 paired with --outer-ms 60000 (rejected: default 30 s, whose 11000 ms subscriber budget is below ops-guard 30000 ms + familiar-agy 2000 ms).
+- 2026-11-01T18:56:53Z (feat/hq-8af61d-agy-relay): gate: verified tree:45f18a68ec7a198bce5ef7754f1de6aa93c882d7 — checks: just test 1955 passed (agents/bin 268 and .githooks+tools 1295 and relay-cutover 391 and signal cancel 1) and harness-facts check exit 0 and ops-check exit 0 and ops-docs check exit 0 and tasks check exit 0 and git diff --check exit 0 and isolated live agy 1.4.12 smoke 5/5 verdicts passed (files:agy-relay-smoke.json); review: important addressed adding-a-harness.md Section 0 agy capability summary updated for relay v0.3.0 and hq-c59809, minor addressed adding-a-harness.md Section 6 adapter surface and hook-version note updated for relay v0.3.0, minor addressed test_relay_subscribers.py budget subprocess env sets HOME to tmp_path, minor deferred adding-a-harness.md line 594 writes nativeFields(nativeEvent raw) instead of nativeFields(data nativeEvent); reviewer: agy session:agy:dae0f5f0-e9ef-486b-8d7a-b1d0fe3902a8
