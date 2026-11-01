@@ -7,7 +7,7 @@ size: s
 complexity: low
 process: direct
 created: 2026-11-01T11:43:17Z
-updated: 2026-11-01T11:43:18Z
+updated: 2026-11-01T11:43:20Z
 depends: []
 tags: [hooks]
 source: hq-b24c39
@@ -29,3 +29,4 @@ Where: .githooks/live-picks, .githooks/test_live_picks.py, tools/harness-links, 
 - 2026-11-01T11:43:17Z (add): created
   provenance: {"origin":"agent"}
 - 2026-11-01T11:43:18Z (main): concerns: hq-b24c39 defect — harden detached settings parse and post-sync diagnostics, relink inode race check, and links.toml anchor parity deferred from hq-b24c39 round 1 review
+- 2026-11-01T11:43:20Z (main): filing decision: grouped all three hq-b24c39 round-1 deferred minors into one P3 s low direct task because they touch the same .githooks/live-picks and tools/harness-links adoption path and share one live-hook merge approval gate. Rejected alternatives: splitting into three xs tasks (duplicates worktree setup and rollout gates), widening PreToolUse beyond run_command (adds hook subprocess overhead to every read/edit tool call while Stop already heals non-shell turns), or filing separate tasks for declarative manifest unification (already covered by hq-2eba07 in .worktrees/hq-2eba07) and relay hook migration (already covered by hq-8af61d).
