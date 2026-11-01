@@ -627,7 +627,7 @@ def test_managed_paths_reject_parent_traversal(world, table):
 
 def isolated_env(home):
     return {
-        "PATH": os.environ["PATH"],
+        "PATH": f"{home / '.test-bin'}:{os.environ['PATH']}",
         "HOME": str(home),
         "XDG_CONFIG_HOME": str(home / ".config"),
         "XDG_STATE_HOME": str(home / ".local/state"),
@@ -751,7 +751,17 @@ def first_run_host(tmp_path, settings):
     (home / ".gemini/config").mkdir(parents=True)
     first_run = home / ".gemini/antigravity-cli/settings.json"
     first_run.write_text(json.dumps(settings, indent=2) + "\n")
+    stub_pgrep(home)
     return clone, home, first_run
+
+
+def stub_pgrep(home, running=""):
+    """A pgrep on the isolated PATH: live-picks first-run never sees this host's agy."""
+    bin_dir = home / ".test-bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    pgrep = bin_dir / "pgrep"
+    pgrep.write_text(f"#!/bin/sh\nprintf '%s' '{running}'\n" + ("exit 0\n" if running else "exit 1\n"))
+    pgrep.chmod(0o755)
 
 
 AGY_ANCHOR_LINKS = ("~/.gemini/config/AGENTS.md", "~/.gemini/config/hooks.json", "~/.gemini/config/skills.json")
@@ -819,7 +829,7 @@ def test_real_manifest_refuses_a_first_run_agy_file_holding_untracked_settings(t
         assert not path.exists() and not path.is_symlink()
 
 
-@pytest.mark.parametrize("conflict", ["file", "foreign-link"])
+@pytest.mark.parametrize("conflict", ["file", "foreign-link", "no-config-home"])
 def test_real_manifest_refuses_a_first_run_agy_file_while_an_anchor_holds_something_else(tmp_path, conflict):
     clone, home, first_run = first_run_host(tmp_path, {"trustedWorkspaces": ["/first-run"]})
     raw = first_run.read_text()
@@ -827,6 +837,8 @@ def test_real_manifest_refuses_a_first_run_agy_file_while_an_anchor_holds_someth
     anchor = home / ".gemini/config/hooks.json"
     if conflict == "file":
         anchor.write_text("{}\n")
+    elif conflict == "no-config-home":
+        anchor.parent.rmdir()
     else:
         foreign = tmp_path / "foreign-hooks.json"
         foreign.write_text("{}\n")
@@ -835,6 +847,7 @@ def test_real_manifest_refuses_a_first_run_agy_file_while_an_anchor_holds_someth
     report = isolated_link(clone, home)
     assert report.returncode == 1
     assert states(report)["~/.gemini/antigravity-cli/settings.json"] == "refuse"
+    assert "a first-run file; not adopted" in report.stdout
 
     applied = isolated_link(clone, home, "--apply")
     assert applied.returncode == 1

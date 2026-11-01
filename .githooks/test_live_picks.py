@@ -1836,7 +1836,7 @@ def test_pinned_pre_pi_commands_leave_the_agy_record_untouched(repo, pre_pi_hook
 
 def agy_env(home):
     return {
-        "PATH": os.environ["PATH"],
+        "PATH": f"{home / '.test-bin'}:{os.environ['PATH']}",
         "HOME": str(home),
         "XDG_CONFIG_HOME": str(home / ".config"),
         "XDG_STATE_HOME": str(home / ".local/state"),
@@ -2130,7 +2130,17 @@ def first_run_agy_home(tmp_path, data):
     (home / ".gemini/config").mkdir(parents=True)
     path = home / ".gemini/antigravity-cli/settings.json"
     path.write_text(json.dumps(data, indent=2) + "\n")
+    stub_pgrep(home)
     return home, path
+
+
+def stub_pgrep(home, running=""):
+    """A pgrep on the isolated PATH: live-picks first-run never sees this host's agy."""
+    bin_dir = home / ".test-bin"
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    pgrep = bin_dir / "pgrep"
+    pgrep.write_text(f"#!/bin/sh\nprintf '%s' '{running}'\n" + ("exit 0\n" if running else "exit 1\n"))
+    pgrep.chmod(0o755)
 
 
 def test_agy_first_run_file_is_merged_onto_the_tracked_config_and_relinked(repo, tmp_path):
@@ -2141,6 +2151,7 @@ def test_agy_first_run_file_is_merged_onto_the_tracked_config_and_relinked(repo,
     save_agy(repo, {"model": "Gemini 4 Argon (Medium)", "trustedWorkspaces": ["/work/a"],
                     "effort": "high", "effortByBase": {"Gemini 4 Argon": "high"}})
     home, path = first_run_agy_home(tmp_path, {
+        "model": "Gemini 4 Argon (Low)",
         "seasonalThemesOptIn": "halloween-2026",
         "showFeedbackSurvey": False,
         "trustedWorkspaces": ["/work/b", "/work/a"],
@@ -2200,6 +2211,21 @@ def test_agy_first_run_refuses_an_anchored_home_and_a_corrupt_file(repo, tmp_pat
     assert f"{path} does not parse" in corrupt.stderr
     assert not path.is_symlink() and path.read_text() == "{corrupt\n"
     assert (repo / AGY).read_bytes() == repo_before
+
+
+def test_agy_first_run_refuses_while_agy_runs(repo, tmp_path):
+    home, path = first_run_agy_home(tmp_path, {"trustedWorkspaces": ["/first-run"]})
+    stub_pgrep(home, running="4242")
+    raw = path.read_text()
+    repo_before = (repo / AGY).read_bytes()
+
+    result = isolated_picks(repo, home, "first-run")
+
+    assert result.returncode != 0
+    assert "agy is running (pid 4242)" in result.stderr and "quit every agy session" in result.stderr
+    assert not path.is_symlink() and path.read_text() == raw
+    assert (repo / AGY).read_bytes() == repo_before
+    assert not agy_record_path(repo).exists()
 
 
 def test_agy_first_run_without_a_regular_file_writes_nothing(repo, tmp_path):

@@ -42,7 +42,8 @@ before this checkout linked its home: it never held the tracked config, so `firs
 (run by `tools/harness-links --apply` before it links the anchors) keeps
 `agy/settings.json` as the base, refuses any key outside the live state that the config
 does not already hold, takes the pick units only that file holds, adds its new list items
-to a held list pick (trustedWorkspaces), and relinks.
+to a held list pick (trustedWorkspaces), and relinks. It refuses while agy runs, since a
+session still holding the first-run settings would save them over the new link.
 Setting the current selection as a default emits no event: it is saved at turn end
 or exit, so a git rewrite before then restores the previous saved default. restore
 fills only units holding none of their fields, so a newer pick is never overwritten, and
@@ -68,6 +69,7 @@ import json
 import os
 from pathlib import Path
 import stat
+import subprocess
 import sys
 import tomllib
 
@@ -465,7 +467,25 @@ def first_run_home(spec):
     if agy_anchored():
         raise Refused(f"{path}: the agy home is anchored, so this file replaced its link; "
                       "`live-picks sync` adopts it")
+    refuse_running_agy(path)
     return path
+
+
+def refuse_running_agy(path):
+    """Refuse while agy runs: a session holding first-run settings in memory would save
+    them over the new link, and once the anchors exist `sync` would adopt them as the base."""
+    try:
+        found = subprocess.run(["pgrep", "-u", str(os.getuid()), "-x", "agy"],
+                               text=True, capture_output=True)
+    except OSError as error:
+        raise Refused(f"{path}: cannot check for a running agy (pgrep: {error}); nothing written") from None
+    if found.returncode == 0:
+        pids = ", ".join(found.stdout.split())
+        raise Refused(f"{path}: agy is running (pid {pids}); quit every agy session, then rerun; "
+                      "nothing written")
+    if found.returncode != 1:
+        raise Refused(f"{path}: cannot check for a running agy (pgrep exited {found.returncode}: "
+                      f"{found.stderr.strip()}); nothing written")
 
 
 def adopt_first_run(spec, path, records):

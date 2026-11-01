@@ -12,7 +12,7 @@ any anchor is linked, the file is a first-run file the harness wrote before this
 managed its home: it is adopted only when this run would create every anchor (nothing,
 not even a foreign link, is at any of them), and `--apply` runs `.githooks/live-picks
 first-run`, which keeps the tracked config and refuses keys outside the live state that
-it does not hold, before it creates any link. Required links go on
+it does not hold, or a running agy, before it creates any link. Required links go on
 every host (their parent directory is created); a harness group applies only where its
 home is a real directory. Run from the main checkout: links must never resolve into a
 worktree. A target is checked only when its entry applies (a required link, or a group
@@ -252,7 +252,10 @@ def state(entry, by_link=None):
             if is_anchored(entry, by_link):
                 return "adopt", "replaced by a regular file"
             if first_run(entry, by_link):
-                return "adopt", "a first-run file, adopted before its anchors are linked"
+                return "adopt", ("a first-run file, adopted before its anchors are linked "
+                                 "(its keys are checked at apply)")
+            return "refuse", ("a first-run file; not adopted while an anchor is linked "
+                              "elsewhere, holds a file, or has no home")
         kind = "directory" if entry.link.is_dir() else "file"
         return "refuse", f"a real {kind} is there"
     return "create", ""

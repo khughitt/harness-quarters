@@ -95,7 +95,9 @@ not a capture point. The tested Codex picker actions kept both model fields; use
 by atomic rename over the home link, an anchored host (one whose `~/.gemini/config`
 hooks or skills link already targets this checkout) reads any regular file there during
 `capture`, adopts its picks and any tracked `/config` or `permissions` edits back into
-`agy/settings.json`, and restores the symlink on `restore`, `hook` and `forget`. A
+`agy/settings.json`, and restores the symlink on `restore`, `hook` and `forget` (a host
+not anchored yet adopts a first-run file through `just link --apply` instead; see Home
+links). A
 Claude or Codex pick made since the last turn end is not saved yet; a git command in
 that window brings back the one before (for agy, `hook` captures a detached regular file
 before restoring onto the newly checked-out `agy/settings.json`).
@@ -564,8 +566,8 @@ new host where agy ran first). `just link` reports it as `adopt` only when the s
 would create every anchor, with nothing at any of them. `just link --apply` then runs
 `.githooks/live-picks first-run` before it creates any link: the file's picks merge into
 the tracked config, which stays the base, and any other key the tracked config does not
-already hold refuses the whole apply, writing nothing. A foreign file or link at an anchor
-still refuses.
+already hold refuses the whole apply, writing nothing, as does a running agy (quit every
+agy session first). A foreign file or link at an anchor still refuses.
 
 Global-file, profile and general skill links target lore directly; tasks/curate/scope
 target tasks, quick-add targets ops, and flow tools and skills target flows. Settings,
