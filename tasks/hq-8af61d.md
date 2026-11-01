@@ -1,6 +1,6 @@
 ---
 id: hq-8af61d
-title: Route agy/hooks.json through pinned relay and native ops hooks once relay-7b8340 and ops-33cef9 land
+title: Route agy/hooks.json through pinned relay v0.3.0 and slim agy/hook PreToolUse
 status: doing
 priority: 3
 size: s
@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-11-01T08:44:46Z
-updated: 2026-11-01T16:14:14Z
+updated: 2026-11-01T17:29:29Z
 started: 2026-11-01T16:09:11Z
 depends: [tasks-ba29d3, fam-55f1af]
 tags: [hooks, cross-project]
@@ -17,13 +17,14 @@ agent: agy
 origin: mixed
 ---
 
-Why: hq-e72097 introduced agy/hook as a local adapter because relay (relay-7b8340) and ops (ops-33cef9) do not yet speak Antigravity CLI camelCase hook payloads or its ~/.gemini/config hook working directory. Once those upstream adapters ship, hq should update its pinned relay runtime and route agy/hooks.json through relay and native ops hooks so agy participates in the live-agent registry and avoids duplicating claim-guard translation.
+Why: hq-e72097 introduced agy/hook as a local adapter before relay v0.3.0 (relay-7b8340), tasks-ba29d3, and familiar's agy support (fam-d08564, fam-55f1af) shipped. With relay v0.3.0, tasks, and familiar ready while ops-33cef9 remains open, hq should pin relay v0.3.0, upgrade claude/codex/agy hook configs and relay/subscribers.template.json to v0.3.0 (restoring ops-guard and subscribing agy + familiar-agy), and slim agy/hook PreToolUse to hq-owned detached settings.json healing while keeping agy/hook SessionStart and Stop until ops-33cef9 lands (tracked in hq-c59809).
 
 Done:
-- After relay-7b8340 and ops-33cef9 land, just relay-install updates relay/ and agy/hooks.json dispatches through relay and native ops hooks (retiring or slimming agy/hook to only hq-owned state).
-- Isolated live agy smoke checks and just test pass, with explicit rollout approval before merging live hook changes.
+- relay/ pins relay v0.3.0 and relay/subscribers.template.json reconciles ops-guard (claude-code, codex, agy) with familiar's current entries plus familiar-agy.
+- claude/settings.json, codex/hooks.json, codex/work/hooks.json, and agy/hooks.json route through relay v0.3.0 (with agy timeout 60 paired with --outer-ms 60000), and agy/hook PreToolUse retires relay-guard translation while keeping detached settings.json healing and SessionStart/Stop handling.
+- Isolated live agy smoke checks (allow permission prompt, ops-guard denial, private registry agy row, familiar observe dispatch) and just test pass, with explicit rollout approval before merging live hook changes or updating ~/.local/share/relay and ~/.config/relay/subscribers.json.
 
-Where: relay/, agy/hooks.json, agy/hook, tools/test_agy_hooks.py, tools/test_claim_guard_wiring.py, README.md.
+Where: relay/, claude/settings.json, codex/hooks.json, codex/work/hooks.json, agy/hooks.json, agy/hook, tools/test_agy_hooks.py, tools/test_claim_guard_wiring.py, tools/test_relay_wiring.py, tools/test_relay_subscribers.py, README.md, docs/runbooks/.
 
 ## Notes
 
