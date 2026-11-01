@@ -1,18 +1,21 @@
 ---
 id: hq-fe672f
 title: Probe the hook surfaces and record capability facts
-status: doing
+status: done
 priority: 1
 size: m
 complexity: mid
 process: direct
 owner: feat/hq-9aa713-pause-past-range
 created: 2026-11-01T10:29:21Z
-updated: 2026-11-01T14:34:40Z
+updated: 2026-11-01T14:34:49Z
 started: 2026-11-01T11:56:46Z
+completed: 2026-11-01T14:34:49Z
+closed: 2026-11-01T14:34:49Z
 depends: []
 parent: hq-9aa713
 tags: []
+model: claude-opus-5-5
 agent: claude-code/claude-opus-5-5
 origin: agent
 plan: docs/plans/2026-11-01-turn-pause.md
@@ -68,3 +71,7 @@ Implements Task 1 of the turn-pause plan in .worktrees/hq-9aa713 (branch feat/hq
 - 2026-11-01T14:34:39Z (feat/hq-9aa713-pause-past-range): retention checkpoint: observed 2026-11-01T14:34Z on titan; basis hq in-tree . c6cb0490d1f35afdfdfb52b59a7f026c6e9b743b:tasks/hq-fe672f.md; retained by feat/hq-9aa713-pause-past-range; this host: kept verified 3, kept unknown 0, released 3; changed 3. Rechecked all kept/verified items on this host (scratch remanifested identical, both manifest files rehashed); unknown items none. Other hosts hold no items. Next owner of all kept items: task:hq-9aa713
   provenance: {"harness_session":"claude-code:536b5ebf-5753-4a8b-ac83-61dde5ef4c79","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-01T14:34:40Z (feat/hq-9aa713-pause-past-range): retro: probing before coding paid off — Task 1 overturned a mandatory assumption (unhooked Codex exec) and two later rounds found unhooked write_stdin and wait, no PostToolUse at a yield, and worker names as targets; a fresh-context pre-review of the revised spec before the human gate caught a zsh bypass and the wrong worker identifier that the probes alone did not. Hurt: one implementer carried three probe rounds and reached about 380k tokens, and one round recorded a wrong yield claim that the next round corrected
+- 2026-11-01T14:34:49Z (feat/hq-9aa713-pause-past-range): done
+  provenance: {"harness_session":"claude-code:536b5ebf-5753-4a8b-ac83-61dde5ef4c79","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-01T14:34:49Z (feat/hq-9aa713-pause-past-range): Task 1 facts landed (32addb8..c83d0661): Claude Code and Codex hook surfaces, hook tool names, the unhooked Codex set (exec, write_stdin, wait), spawn, wake and goal behaviour, schema and hook fixtures; reviews rounds 1 to 4
+  provenance: {"harness_session":"claude-code:536b5ebf-5753-4a8b-ac83-61dde5ef4c79","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
