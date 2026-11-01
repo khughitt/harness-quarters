@@ -63,6 +63,16 @@ for repo in <hq-checkout> <lore-checkout> <ops-checkout> <relay-checkout> \
 done
 ```
 
+The pattern needs a quote or the full slug, so it misses bare TOML keys
+(`claude = "~/.claude"` in `<ops-checkout>/profiles.toml`, `[harness.claude]` in
+`links.toml`) and path-shaped constants (`"claude/settings.json"` in
+`.githooks/harness-state-refresh` and `live-picks`). Search for those too:
+
+```sh
+git -C "$repo" grep -n -I -E '(^|[^a-z-])(claude|codex)[[:space:]]*=|\[harness\.|"(claude|codex)/' \
+  -- ':!tasks/' ':!docs/specs/' ':!docs/plans/'
+```
+
 Hits run to hundreds in the larger repositories, mostly tests. Group them by file and
 classify each site before editing it:
 
@@ -86,9 +96,9 @@ rejects the new harness until it is extended. A hit inside a two-way branch
 | `<ops-checkout>/bin/tt` | copy in every project | broadcast: `just vendor-publish tt` from ops after the merge (not an adoption pass) | when the broadcast lands |
 | `<lore-checkout>/vendor/superpowers` | submodule pinned to `github.com/obra/superpowers` | upstream contribution or fork, then a pin bump in lore | when lore's pin bump merges |
 | relay `test/fixtures/ancestry.json` (and `handles.json`) | byte copy in `<tasks-checkout>/tests/fixtures/relay/`, pinned to a relay revision in its README | copy the file from the newer relay revision and update that revision in one tasks commit | tasks tests only |
-| `<relay-checkout>` source | pinned in `relay/package.json` and `relay/package-lock.json` | `just relay-install` per host, then hook images per harness ([Pinned relay runtime](relay-runtime.md)) | per host, at install and hook apply |
-| `relay/subscribers.template.json` | rendered to `~/.config/relay/subscribers.json` | `just relay-subscribers` (with `FORCE=1` over a different file) on each host | per host, at render |
-| hook scripts in `<ops-checkout>/hooks`, `<lore-checkout>/hooks`, `agy/hook` | read in place through home links | none | on merge to each owner's main |
+| `<relay-checkout>` source | the CLI pin in `relay/package.json` and `relay/package-lock.json`; each harness's hook images name a fixed versioned runtime path | `just relay-install` into the versioned root on this host **before** merging the pin, on other hosts as soon as it syncs; hook images move per harness under their own approval ([Pinned relay runtime](relay-runtime.md)) | CLI pin: on merge, on every host sharing the checkout (the launcher exits 127 where that version is not installed). Hook images: at each harness's hook apply |
+| `relay/subscribers.template.json` | rendered to `~/.config/relay/subscribers.json`, one file read by **every** relayed harness's hook images | `just relay-subscribers` (with `FORCE=1` over a different file) on each host | per host, at render. A file naming a harness outside a runtime's closed list fails to load in that runtime, which then denies every refusable event (see section 6, Subscribers) |
+| hook scripts in `<ops-checkout>/hooks`, `<lore-checkout>/hooks`, `agy/hook` | invoked by path from the tracked hook configs and the subscriber file | none | on merge to each owner's main |
 | `links.toml` | home links on each host | `just link --apply` from `<hq-checkout>` main on each host | per host, at apply |
 | tracked harness settings (`claude/settings.json`, `codex/*.toml`, `agy/settings.json`, …) | read through home links | none | on merge to main, while the link still resolves |
 
@@ -141,7 +151,9 @@ home = "~/.<harness>"
   `pi/package.json` + `pi/bin/pi` and `relay/package.json` + `relay/bin/relay` do), add
   `"~/.local/bin/<tool>" = "<name>/bin/<tool>"` under `[required]` and a
   `just <name>-install` recipe that installs with `npm ci --ignore-scripts` under
-  `~/.local/share/<name>/<version>`, outside the synced checkout.
+  `~/.local/share/<name>/<version>`, outside the synced checkout. The launcher reads
+  the pin from the checkout each time it runs, so a pin change takes effect on merge:
+  install it on this host before merging and on each other host as soon as it syncs.
 - A new tracked `<name>/` directory is also described in hq's `AGENTS.md` Layout and in
   `README.md`.
 
@@ -193,9 +205,9 @@ real directory (not a symlink), and refuses to overwrite an existing real file; 
 refusal aborts the whole `--apply` pass with no partial writes.
 
 1. Land every target named in `links.toml` in its owning project's main checkout.
-2. From `<hq-checkout>` on `main` (never a worktree, which would leave live harnesses
-   pointing into temporary storage), create the home and converge links **before** the
-   harness's first interactive run:
+2. After the approval in section 8 step 1, from `<hq-checkout>` on `main` (never a
+   worktree, which would leave live harnesses pointing into temporary storage), create
+   the home and converge links **before** the harness's first interactive run:
 
    ```sh
    mkdir -p ~/.<harness>
@@ -222,15 +234,21 @@ tracked file. Some harnesses save atomically (write a temporary file, rename it 
 path), which replaces the symlink with a regular file; the tracked file then stays clean
 while the live settings diverge from it. agy does this (hq-b24c39).
 
-Before choosing this pipeline, change a setting inside the harness, then check:
+Probe this before section 2 links the live home, in a disposable one: the clean filter
+is not wired yet, so an in-place save into the live link would write runtime keys
+unfiltered into main's working tree, and an atomic save would leave a real file that
+`just link-check` then refuses. Point the harness's config-directory variable (or
+`HOME`) at a temporary directory whose settings file is a symlink to a scratch copy,
+change a setting inside the harness, and check:
 
 ```sh
-readlink -f ~/.<harness>/<settings-file>   # still resolves into <hq-checkout>
-just link-check                            # still converged
+readlink -f <temp-home>/<settings-file>   # still resolves to the scratch copy
+diff <scratch-copy> <before-copy>         # the change landed in the scratch copy
 ```
 
-A harness that replaces the link needs an explicit synchronization contract (the remedy
-hq-b24c39 is designing for agy) before its live-state layer counts as selected.
+A harness that replaces the link needs an explicit synchronization contract (agy's is
+the open remedy hq-b24c39) before its live-state layer counts as selected. The live
+`just link-check` after a real save belongs to the post-apply checks (section 8).
 
 ### 3.2 Route the file through `.gitattributes`
 
@@ -447,25 +465,33 @@ Consequences:
 
 ### Command guard
 
-The guard path has five links, and each must know the new harness's shell tool:
+`<ops-checkout>/hooks/relay-guard` reads a schema-1 before-tool envelope and treats
+only `COMMAND_TOOLS = {"Bash"}` as command-bearing: a `null` command on `Bash` is
+refused, and on any other tool name is allowed without running the policy. Every link
+on the way to it must know the new harness's shell tool. There are two routes:
 
-1. **Native hook**: the harness's before-tool event, with its tool name and command
-   field.
-2. **Extraction**: relay's shared `normalizeEvent` (`<relay-checkout>/src/adapters/index.js`)
-   sets `tool.command` only for `tool_name == "Bash"` with a string
-   `tool_input.command`; anything else becomes `null`.
-3. **Subscriber filter**: `ops-guard` in `relay/subscribers.template.json` lists
-   `"harnesses": ["claude-code", "codex"]` and `"tools": ["Bash"]`, and relay matches
-   tool names literally (`src/subscribers.js`).
-4. **Policy**: `relay-guard` treats only `COMMAND_TOOLS = {"Bash"}` as command-bearing.
-   A `null` command on another tool name is allowed without running the policy.
-5. **Native denial**: the reply must deny in the harness's own schema.
+- **Relayed** (Claude Code, Codex):
+  1. native before-tool payload, in snake_case with `tool_name` and `tool_input`
+     (directly or from a bridge);
+  2. relay's shared `normalizeEvent` (`<relay-checkout>/src/adapters/index.js`) sets
+     `tool.command` only for `tool_name == "Bash"` with a string `tool_input.command`;
+     anything else becomes `null`;
+  3. the `ops-guard` subscriber in `relay/subscribers.template.json` lists
+     `"harnesses": ["claude-code", "codex"]` and `"tools": ["Bash"]`, matched literally
+     (`src/subscribers.js`), and relay accepts a guard subscriber only when the
+     harness's adapter declares `replies[<native>].refuse` for its before-tool events;
+  4. relay-guard's policy;
+  5. a denial encoded in the harness's own reply schema (the adapter's `encodeReply`).
 
-So a native tool named `run_command` or `shell` either misses the subscriber entirely
-or, if the filter is merely widened, reaches the policy as a non-command and is
-allowed. Either map the native shell call to `Bash` + `command` before relay sees it
-(as `agy/hook` does for `run_command` / `CommandLine`) or change extraction,
-`COMMAND_TOOLS` and the subscriber filter together.
+  A native tool named `run_command` or `shell` either misses the subscriber or, if the
+  filter is merely widened, reaches the policy as a non-command and is allowed. Have
+  the bridge emit `Bash` + `command`, or change extraction, `COMMAND_TOOLS` and the
+  subscriber filter together.
+- **Direct adapter** (agy): relay is not involved. `agy/hooks.json` runs
+  `agy/hook PreToolUse <relay-guard>`, and `agy/hook` builds the envelope itself
+  (`harness: "agy"`, `run_command` / `CommandLine` mapped to `Bash` + `command`),
+  calls relay-guard, fails closed on any unreadable payload or guard error, and
+  encodes the denial for agy.
 
 The guard layer passes only with isolated evidence for three cases: a harmless permitted
 command runs; a fixture command the policy refuses is denied and never executes; a
@@ -517,8 +543,9 @@ malformed command input is refused. For a relayed harness, also extend
 ### Shared CLI vocabulary first (`<ops-checkout>`)
 
 Add the slug to `cli.toml`: `[vocabulary.values.harness]` and each `--harness` enum the
-harness should appear in (relay `hook`, `install`, `ask`; obs `index`, `report`). Each
-project's conformance test (`tests/test_cli_surface.py` in obs, and relay's equivalent)
+harness should appear in (`git grep -n 'shared = "harness"' cli.toml` lists them: relay
+`hook`, `install`, `ask`, `model`; obs `index`, `report`). Each project's conformance
+test (`tests/test_cli_surface.py` in obs, `test/cli-surface.test.js` in relay)
 requires its live parser to equal these rows, so widening relay `HARNESSES` or the obs
 `--harness` choices without this change fails those tests. After the ops merge, each
 project runs `vendored adopt cli.toml` (ops `bin/vendored`) from its own checkout in
@@ -536,9 +563,11 @@ the same change that widens its parser.
 2. **Adapter**: implement `src/adapters/<name>.js` and register it in `adapters` in
    `src/adapters/index.js`:
    - events and state: `events` (`nativeEvent -> {kind, level}`), `stateForEvent`,
-     `reduceState`, `replies` flags, `outerTimeouts`, `encodeReply`, optional
-     `workerIdOf` / `backgroundOf`;
-   - process tree: `isHarness(row, ops)`, `resolveSessionPid`, `resolveTerminalPid`.
+     `reduceState`, `replies` flags (`refuse` on each before-tool event is required
+     for a guard subscriber), `outerTimeouts`, `encodeReply`, optional `workerIdOf` /
+     `backgroundOf`;
+   - process tree: `isHarness(row, ops)` (only Claude Code's uses `ops`, which supplies
+     `executableOf`), `resolveSessionPid`, `resolveTerminalPid`.
 3. **Payload parsing is shared, not per adapter**: `normalizeEvent`
    (`src/adapters/index.js`) calls `parsePayload` (`src/adapters/payload.js`), which
    requires a non-empty `session_id`, an absolute `cwd`, and on `PreToolUse` a
@@ -566,8 +595,25 @@ the same change that widens its parser.
   `{"event": "obs-ingest-failed", "error": "ValueError"}`.
 - **Subscribers (`hq`)**: `relay/subscribers.template.json` scopes `ops-guard`,
   `familiar` and `familiar-teardown` to `["claude-code", "codex"]`. Add the harness only
-  to the subscribers whose layer is selected, then render with `just relay-subscribers`
-  on each host. Adding it to `ops-guard` alone does not guard it (Command guard above).
+  to the subscribers whose layer is selected; adding it to `ops-guard` alone does not
+  guard it (Command guard above).
+
+  **Ordering hazard**: every relayed harness's hook images read the one rendered
+  `~/.config/relay/subscribers.json`, and each runtime rejects the whole file if any
+  `harnesses` entry is outside its closed list (`src/subscribers.js`). A rejected file
+  sends dispatch down its fail-closed path: every refusable event is denied (so every
+  PreToolUse call is blocked) and other events exit 1. Hook images name fixed runtime
+  versions (Claude Code's and Codex's differ; `tools/test_relay_wiring.py` records
+  them), and a CLI pin change does not move them. So, in this order:
+  1. land and install a relay release whose `HARNESSES` includes the new slug (and, for
+     a guard subscriber, whose new adapter declares `refuse` for its before-tool
+     events);
+  2. with approval, move **every** relayed harness's hook images to that release
+     ([Pinned relay runtime](relay-runtime.md));
+  3. only then, with approval, add the slug to the template and run
+     `just relay-subscribers` on each host;
+  4. run one hook from an existing harness (a harmless command in Claude Code and in
+     Codex) against the new file and confirm it is allowed.
 - **Familiar (`<fam-checkout>`)**, only when its observer is selected:
   `src/render/harness.js` throws on any harness outside its set, and
   `src/observe/emission.js` calls it, so events from a new harness throw during
@@ -716,30 +762,33 @@ present home's metadata is missing, unreadable or at an unexpected schema versio
 
 ## 8. Rollout
 
-1. **Land in order, in worktrees**: `ops` first when `cli.toml`, `tt` or shared hooks
-   change; then each consumer (`relay`, `tasks`, `obs`, `familiar`, `lore`) with its
-   adoption in the same change; then `hq`. Each project verifies by its own test policy
-   and gates (in `hq`: `just test`, which the pre-commit hook complements with
-   `tools/ops-check`, `tools/ops-docs check` and `tools/harness-facts check`). A green
-   suite does not replace the selected-layer evidence in section 0. Every target named
-   in `links.toml` exists on its owner's main branch before links are applied.
-2. **Get approval before activation**: a merge or apply that changes a live global
-   surface (hooks, settings, home links, pinned runtimes, the subscriber file, archive
-   pruning) needs the user's approval under every profile; approving a docs change or a
-   plan does not grant it. Activation is not one moment:
-   - hook scripts and tracked settings read through home links take effect when they
-     merge to their owner's main;
-   - `links.toml`, runtime pins and the subscriber file take effect only on each host's
-     `just link --apply`, `just relay-install` / hook apply, and
-     `just relay-subscribers`.
+1. **Get approval before landing anything live**: a merge or apply that changes a live
+   global surface (hook scripts, tracked settings, home links, runtime pins, hook
+   images, the subscriber file, archive pruning) needs the user's approval under every
+   profile, and approving a docs change or a plan does not grant it. Ask per surface,
+   naming when it activates:
+   - hook scripts, tracked settings and runtime CLI pins take effect when they merge to
+     their owner's main, on every host sharing the checkout;
+   - `links.toml`, hook images and the subscriber file take effect on each host's
+     `just link --apply`, hook apply and `just relay-subscribers`.
+2. **Verify in worktrees, then land in order**: `ops` first when `cli.toml`, `tt` or
+   shared hooks change; then each consumer (`relay`, `tasks`, `obs`, `familiar`,
+   `lore`) with its adoption in the same change; then `hq`. Each project verifies by its
+   own test policy and gates (in `hq`: `just test`, which the pre-commit hook
+   complements with `tools/ops-check`, `tools/ops-docs check` and
+   `tools/harness-facts check`). A green suite does not replace the selected-layer
+   evidence in section 0. Every target named in `links.toml` exists on its owner's main
+   branch before links are applied. A runtime pin is installed on this host
+   (`just relay-install`, `just <name>-install`) before it merges.
 3. **Preserve before activating**: keep current settings, saved trust, live picks and
-   the installed runtime version recoverable. Follow
+   every runtime version a hook image names recoverable. Follow
    [Pinned relay runtime](relay-runtime.md) for relay state preservation and rollback;
    never reset or downgrade durable state to recover.
-4. **Per host**: install newly pinned runtimes, `mkdir -p` any new `Source.root` on
-   archive-configured hosts, render subscribers, and `mkdir -p <home>` followed by
-   `just link --apply` and `just link-check` from `<hq-checkout>` main before the
-   harness's first interactive run.
+4. **Per host, in this order**: install the newly pinned runtimes as soon as the merge
+   syncs; `mkdir -p` any new `Source.root` on archive-configured hosts; move hook images
+   and only then render subscribers (section 6, Subscribers, ordering hazard); then
+   `mkdir -p <home>`, `just link --apply` and `just link-check` from `<hq-checkout>`
+   main before the harness's first interactive run.
 5. **One end-to-end check per configuration path**: verify every selected layer on one
    host and one profile; other hosts and profiles configured by the same process count
    as covered. A host or profile reached through a different path gets its own check.
