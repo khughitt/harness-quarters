@@ -1,0 +1,2268 @@
+{
+  "schema": "scratch-manifest-v1",
+  "task": "hq-e72097",
+  "container": "$WORK_ROOT/hq/hq-e72097",
+  "entry_count": 452,
+  "entries": [
+    {
+      "path": "batch1_results.json",
+      "bytes": 6653,
+      "sha256": "66ad3c70013f3c3cac7eef117c49a4728fd5d4a8094a5b7af8ba9701c53bb261"
+    },
+    {
+      "path": "batch2a_results.json",
+      "bytes": 5603,
+      "sha256": "ce74a700bb4d368ffacecb9de83fc830c83b44598a44320714634f9312e702ec"
+    },
+    {
+      "path": "batch2b_part1.json",
+      "bytes": 12297,
+      "sha256": "901e8006779a12cbd945794df7b2854060da6e1f3027dd2f5596042f1d80614b"
+    },
+    {
+      "path": "batch2b_wake.json",
+      "bytes": 20207,
+      "sha256": "2dc67ca13cb457aed7dc8208d32aeb040470b5ced063c5cb3fd919412bf74411"
+    },
+    {
+      "path": "pilot1/home/.gemini/antigravity-cli/annotations/d825e0d7-bc37-420d-9813-51eb564918a2.pbtxt",
+      "bytes": 42,
+      "sha256": "05e7fa92e8590b195d279ff4fecff84a20f702fd7ecd1320f2acd602914b39a2"
+    },
+    {
+      "path": "pilot1/home/.gemini/antigravity-cli/brain/d825e0d7-bc37-420d-9813-51eb564918a2/.system_generated/logs/chunks/transcript/00000000.jsonl",
+      "bytes": 1889,
+      "sha256": "079719749d82a653d46af6520d8d26428b1a70cd66e7ede9d13fad570f9d734a"
+    },
+    {
+      "path": "pilot1/home/.gemini/antigravity-cli/brain/d825e0d7-bc37-420d-9813-51eb564918a2/.system_generated/logs/chunks/transcript_full/00000000.jsonl",
+      "bytes": 1879,
+      "sha256": "44b94f2de38c42181bf83d42fe2c5f01aafb9dd0b17205ce4314e4459a210ca2"
+    },
+    {
+      "path": "pilot1/home/.gemini/antigravity-cli/brain/d825e0d7-bc37-420d-9813-51eb564918a2/.system_generated/logs/transcript.jsonl",
+      "bytes": 1889,
+      "sha256": "079719749d82a653d46af6520d8d26428b1a70cd66e7ede9d13fad570f9d734a"
+    },
+    {
+      "path": "pilot1/home/.gemini/antigravity-cli/brain/d825e0d7-bc37-420d-9813-51eb564918a2/.system_generated/logs/transcript_full.jsonl",
+      "bytes": 1879,
+      "sha256": "44b94f2de38c42181bf83d42fe2c5f01aafb9dd0b17205ce4314e4459a210ca2"
+    },
+    {
+      "path": "pilot1/home/.gemini/antigravity-cli/brain/d825e0d7-bc37-420d-9813-51eb564918a2/.system_generated/steps/3/output.txt",
+      "bytes": 58,
+      "sha256": "d559c148baf9c70d444a1a73a869135ecd3d343f56dd652b91eada0d0f4c74e2"
+    },
+    {
+      "path": "pilot1/home/.gemini/antigravity-cli/cache/default_project_id.txt",
+      "bytes": 19,
+      "sha256": "31f9f362eeb86456e8dd4a3892f825bbcb090a5e19683e05d5b5847c13e1ee91"
+    },
+    {
+      "path": "pilot1/home/.gemini/antigravity-cli/cache/last_conversations.json",
+      "bytes": 92,
+      "sha256": "37e5cd27e528240fc585ff39c6004ea3d72538c035ab105cd3a73636600331a4"
+    },
+    {
+      "path": "pilot1/home/.gemini/antigravity-cli/cache/onboarding.json",
+      "bytes": 113,
+      "sha256": "561768544bad45cadb4877973416573845a909e88af44e18d6a263c64e68b061"
+    },
+    {
+      "path": "pilot1/home/.gemini/antigravity-cli/cli.log",
+      "kind": "symlink",
+      "target": "log/cli-20261031_220633.log"
+    },
+    {
+      "path": "pilot1/home/.gemini/antigravity-cli/conversation_summaries.db",
+      "bytes": 20480,
+      "sha256": "3b96a7159f13194bb5d11503af663d74ef75f9aac1aa684505007a8fa014f48a"
+    },
+    {
+      "path": "pilot1/home/.gemini/antigravity-cli/conversations/d825e0d7-bc37-420d-9813-51eb564918a2.db",
+      "bytes": 425984,
+      "sha256": "03eb1aa9860df0576c0b710b1a49c51a450f6f3ae735d5e0d2ca45a08fed6409"
+    },
+    {
+      "path": "pilot1/home/.gemini/antigravity-cli/implicit/a7b48fbc-b457-467c-8867-cbdc64cd9635.pb",
+      "bytes": 275,
+      "sha256": "8d8609f3c99b63cfd1dad1ca611c256e015060c05b3ec8d91e5a81755fd7baa7"
+    },
+    {
+      "path": "pilot1/home/.gemini/antigravity-cli/jetbox_summaries_proto.pb",
+      "bytes": 494,
+      "sha256": "28d3943d9533fef01b4bb4c358e861962c60ced74e2a78e5ba0ed90c4a3d70b8"
+    },
+    {
+      "path": "pilot1/home/.gemini/antigravity-cli/last_check.timestamp",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "pilot1/home/.gemini/antigravity-cli/log/cli-20261031_220633.log",
+      "bytes": 65476,
+      "sha256": "6b954ee10879ccc58f70db6605031bc1578d626185f62657856984522f362827"
+    },
+    {
+      "path": "pilot1/home/.gemini/antigravity-cli/presence/d825e0d7-bc37-420d-9813-51eb564918a2.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "pilot1/home/.gemini/antigravity-cli/updater/update.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "pilot1/home/.gemini/antigravity-cli/updater/update_status.json",
+      "bytes": 59,
+      "sha256": "71ca2ae1c9825feb1f25c5bee6327d08873035a97a0c33bac2bd60f04d10b724"
+    },
+    {
+      "path": "pilot1/home/.gemini/config/.migrated",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "pilot1/home/.gemini/config/hooks.json",
+      "bytes": 726,
+      "sha256": "e79eefe36fbdfb7e44985fb0adf846aa93f44bd60c07daf80d2b32f498ce2f1b"
+    },
+    {
+      "path": "pilot1/home/.gemini/config/mcp_config.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "pilot1/home/.gemini/config/projects/default-cli-project.json",
+      "bytes": 87,
+      "sha256": "d3128db8397d3b0e751fa26d3b6290e107a87c24e4280d0f56044382b123cf38"
+    },
+    {
+      "path": "pilot1/hook_logger.py",
+      "bytes": 650,
+      "sha256": "7321c4c4cbbddc2b667643032a26cdfe51f43d1d992325fe90a2b7e067d02f3f"
+    },
+    {
+      "path": "pilot1/hooks.jsonl",
+      "bytes": 6179,
+      "sha256": "29008622d49825e2a621421dd6193f584a1fa3723169b58fa47b3cbec89a7706"
+    },
+    {
+      "path": "probe-evidence-v2.json",
+      "bytes": 47491,
+      "sha256": "ea072bd0b30c968c21d91c80efc219805444d4aef4094d212b2fd3cb2587a0b3"
+    },
+    {
+      "path": "probe-evidence.json",
+      "bytes": 46978,
+      "sha256": "a717c1559a2d7938eeace528ffc4262f67f3197ea16763a257bd8f0a80ad57ee"
+    },
+    {
+      "path": "probe_a2_headless_ask/ask_hook.py",
+      "bytes": 312,
+      "sha256": "2b00e156a5ee3bac123b27b56d3c2dd85d0d7066b998bab22a49fb60cdb33bdd"
+    },
+    {
+      "path": "probe_a2_headless_ask/ask_hooks.jsonl",
+      "bytes": 2519,
+      "sha256": "19b20bb26b488eba892e089c5602155b58674f7b9ea45db2e1ff442aeb1c202e"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/antigravity-cli/annotations/b620c681-0ccb-4858-a2e3-c98c5efcb4ce.pbtxt",
+      "bytes": 36,
+      "sha256": "8b869857ff3de42644fd09924ac1eda9be3a6afeaef794a77428af8e5c0fc3f0"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/antigravity-cli/brain/b620c681-0ccb-4858-a2e3-c98c5efcb4ce/.system_generated/logs/chunks/transcript/00000000.jsonl",
+      "bytes": 1588,
+      "sha256": "598c2077a4c973faec9f8747a5a4372926923c7390d704185f9bf028c0207a06"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/antigravity-cli/brain/b620c681-0ccb-4858-a2e3-c98c5efcb4ce/.system_generated/logs/chunks/transcript_full/00000000.jsonl",
+      "bytes": 1574,
+      "sha256": "91187bf13bcc4630e490d6f612c4b99cc9d5b723b2a3e4d73c2513f405716e24"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/antigravity-cli/brain/b620c681-0ccb-4858-a2e3-c98c5efcb4ce/.system_generated/logs/transcript.jsonl",
+      "bytes": 1588,
+      "sha256": "598c2077a4c973faec9f8747a5a4372926923c7390d704185f9bf028c0207a06"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/antigravity-cli/brain/b620c681-0ccb-4858-a2e3-c98c5efcb4ce/.system_generated/logs/transcript_full.jsonl",
+      "bytes": 1574,
+      "sha256": "91187bf13bcc4630e490d6f612c4b99cc9d5b723b2a3e4d73c2513f405716e24"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/antigravity-cli/brain/b620c681-0ccb-4858-a2e3-c98c5efcb4ce/.system_generated/steps/2/output.txt",
+      "bytes": 16,
+      "sha256": "76c64c86845234971f32afc60b8b2d779402cae432e573cc59f13175ec942221"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/antigravity-cli/cache/default_project_id.txt",
+      "bytes": 19,
+      "sha256": "31f9f362eeb86456e8dd4a3892f825bbcb090a5e19683e05d5b5847c13e1ee91"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/antigravity-cli/cache/last_conversations.json",
+      "bytes": 107,
+      "sha256": "42837c41972309525c4f0c22a9a2d29beb935632fe95b2b6c72ce3103d3b58f8"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/antigravity-cli/cache/onboarding.json",
+      "bytes": 113,
+      "sha256": "561768544bad45cadb4877973416573845a909e88af44e18d6a263c64e68b061"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/antigravity-cli/cli.log",
+      "kind": "symlink",
+      "target": "log/cli-20261031_221013.log"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/antigravity-cli/conversation_summaries.db",
+      "bytes": 20480,
+      "sha256": "38769c279bf1080597036e57a6f796bc3429e13b3ab8e865f0d774c5988aaa7c"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/antigravity-cli/conversations/b620c681-0ccb-4858-a2e3-c98c5efcb4ce.db",
+      "bytes": 425984,
+      "sha256": "7372e71473c3b6f1d228fd0f24e18d73c6cba8414eb2c3c60434429f4d75abeb"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/antigravity-cli/implicit/dc593ed6-d689-4304-9713-881066c6ebcb.pb",
+      "bytes": 305,
+      "sha256": "85cab5d521a6c03c39d8ab96c1bca7ed9eef8aa239b4a1850d5d7def6142264b"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/antigravity-cli/jetbox_summaries_proto.pb",
+      "bytes": 524,
+      "sha256": "81b247143760222d2cc33bc00896a8cd2a115b3255ba23df0abd552c154e8792"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/antigravity-cli/last_check.timestamp",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/antigravity-cli/log/cli-20261031_221013.log",
+      "bytes": 29608,
+      "sha256": "3ad42b190d80ddb1ce2b803b0a6dabe7afa5d795c6ec9c3b3feb73722cd12a5b"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/antigravity-cli/presence/b620c681-0ccb-4858-a2e3-c98c5efcb4ce.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/antigravity-cli/updater/update.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/antigravity-cli/updater/update_status.json",
+      "bytes": 59,
+      "sha256": "71ca2ae1c9825feb1f25c5bee6327d08873035a97a0c33bac2bd60f04d10b724"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/config/.migrated",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/config/hooks.json",
+      "bytes": 424,
+      "sha256": "1ed630e5b45a1ab6af11f6ad144e328ddef66222424a77adadf23d985de8a318"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/config/mcp_config.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_a2_headless_ask/home/.gemini/config/projects/default-cli-project.json",
+      "bytes": 87,
+      "sha256": "d3128db8397d3b0e751fa26d3b6290e107a87c24e4280d0f56044382b123cf38"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/antigravity-cli/annotations/22acac37-f858-43b4-aa27-fc2a40c0df5e.pbtxt",
+      "bytes": 34,
+      "sha256": "f98c7b97397d85cfeae61181537d3f233e1a8903d80e308832f8c622814d0d9c"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/antigravity-cli/brain/22acac37-f858-43b4-aa27-fc2a40c0df5e/.system_generated/logs/chunks/transcript/00000000.jsonl",
+      "bytes": 1532,
+      "sha256": "e7ddea110a5b119a14a0d182cbe652e2e95c5a8c18e1c7b4c47eb95e5c63b145"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/antigravity-cli/brain/22acac37-f858-43b4-aa27-fc2a40c0df5e/.system_generated/logs/chunks/transcript_full/00000000.jsonl",
+      "bytes": 1520,
+      "sha256": "069ede37d41965dbee4a1d1533babd8a0371d60a575a45fd3ceec5dd36e178aa"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/antigravity-cli/brain/22acac37-f858-43b4-aa27-fc2a40c0df5e/.system_generated/logs/transcript.jsonl",
+      "bytes": 1532,
+      "sha256": "e7ddea110a5b119a14a0d182cbe652e2e95c5a8c18e1c7b4c47eb95e5c63b145"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/antigravity-cli/brain/22acac37-f858-43b4-aa27-fc2a40c0df5e/.system_generated/logs/transcript_full.jsonl",
+      "bytes": 1520,
+      "sha256": "069ede37d41965dbee4a1d1533babd8a0371d60a575a45fd3ceec5dd36e178aa"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/antigravity-cli/brain/22acac37-f858-43b4-aa27-fc2a40c0df5e/.system_generated/steps/2/output.txt",
+      "bytes": 16,
+      "sha256": "76c64c86845234971f32afc60b8b2d779402cae432e573cc59f13175ec942221"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/antigravity-cli/cache/default_project_id.txt",
+      "bytes": 19,
+      "sha256": "31f9f362eeb86456e8dd4a3892f825bbcb090a5e19683e05d5b5847c13e1ee91"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/antigravity-cli/cache/last_conversations.json",
+      "bytes": 109,
+      "sha256": "65895cfcb157e7acb0bf0232893323cc0129d4d947f06b6a426817acc8c5cda0"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/antigravity-cli/cache/onboarding.json",
+      "bytes": 113,
+      "sha256": "561768544bad45cadb4877973416573845a909e88af44e18d6a263c64e68b061"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/antigravity-cli/cli.log",
+      "kind": "symlink",
+      "target": "log/cli-20261031_221250.log"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/antigravity-cli/conversation_summaries.db",
+      "bytes": 20480,
+      "sha256": "0d108052becff78eea017465877884e5fdbbb10f0091b61257525a7842eef557"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/antigravity-cli/conversations/22acac37-f858-43b4-aa27-fc2a40c0df5e.db",
+      "bytes": 425984,
+      "sha256": "02ca2c4e718bc67b6d3c50d2a7c0f00658397f0fed434cce7d15290ebc6b68f4"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/antigravity-cli/implicit/f2c008ca-7557-450a-9a07-def8ef352c85.pb",
+      "bytes": 309,
+      "sha256": "3cea5c7dde74be26c2efc1f9fe9bf7bbf806ab9edfe2eaefb907fadc6b3bcf7f"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/antigravity-cli/jetbox_summaries_proto.pb",
+      "bytes": 525,
+      "sha256": "3dabc27b5e94bf27d2ae6929cb54efb92ec48b8bdba7c7a979dcb0dcf7ed3c7a"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/antigravity-cli/last_check.timestamp",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/antigravity-cli/log/cli-20261031_221250.log",
+      "bytes": 28950,
+      "sha256": "08cbb9dcce0e6ddf0135abf0dcbbf25e4df288b401ca752df2a671cc61a56665"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/antigravity-cli/presence/22acac37-f858-43b4-aa27-fc2a40c0df5e.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/antigravity-cli/settings.json",
+      "bytes": 101,
+      "sha256": "d982c6577c24865b86c5745e57b8b91fae14184fa6f21a1f34a3634182b3ad10"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/antigravity-cli/updater/update.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/antigravity-cli/updater/update_status.json",
+      "bytes": 59,
+      "sha256": "71ca2ae1c9825feb1f25c5bee6327d08873035a97a0c33bac2bd60f04d10b724"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/config/.migrated",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/config/mcp_config.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_a2b_default_perms/home/.gemini/config/projects/default-cli-project.json",
+      "bytes": 87,
+      "sha256": "d3128db8397d3b0e751fa26d3b6290e107a87c24e4280d0f56044382b123cf38"
+    },
+    {
+      "path": "probe_a2b_defer_hook/defer.py",
+      "bytes": 98,
+      "sha256": "f4c4b7f5ec9c280e4cb4684c166a15f7a0972ed58aebf6d5f2b743948080700f"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/antigravity-cli/annotations/4baafe5d-8e02-4f9c-8b61-9bcf2da40208.pbtxt",
+      "bytes": 36,
+      "sha256": "8034a37cdeb3221e40f4007604bfb9a17860cf639738f2ba2d4213842036ab18"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/antigravity-cli/brain/4baafe5d-8e02-4f9c-8b61-9bcf2da40208/.system_generated/logs/chunks/transcript/00000000.jsonl",
+      "bytes": 1693,
+      "sha256": "1bd6e0a22c35fd342ea906ce7e47e4a529d7547e235af925a2ab72cf37e045b9"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/antigravity-cli/brain/4baafe5d-8e02-4f9c-8b61-9bcf2da40208/.system_generated/logs/chunks/transcript_full/00000000.jsonl",
+      "bytes": 1679,
+      "sha256": "89b3bdec6b8e8ae1a72e7a2c20157ec287f87a2f71f60991976a15e89b1ccd51"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/antigravity-cli/brain/4baafe5d-8e02-4f9c-8b61-9bcf2da40208/.system_generated/logs/transcript.jsonl",
+      "bytes": 1693,
+      "sha256": "1bd6e0a22c35fd342ea906ce7e47e4a529d7547e235af925a2ab72cf37e045b9"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/antigravity-cli/brain/4baafe5d-8e02-4f9c-8b61-9bcf2da40208/.system_generated/logs/transcript_full.jsonl",
+      "bytes": 1679,
+      "sha256": "89b3bdec6b8e8ae1a72e7a2c20157ec287f87a2f71f60991976a15e89b1ccd51"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/antigravity-cli/cache/default_project_id.txt",
+      "bytes": 19,
+      "sha256": "31f9f362eeb86456e8dd4a3892f825bbcb090a5e19683e05d5b5847c13e1ee91"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/antigravity-cli/cache/last_conversations.json",
+      "bytes": 106,
+      "sha256": "a6fc4e476b8a966f09439f526afc85460d7a55bde20c53fc4da35f65f30c4035"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/antigravity-cli/cache/onboarding.json",
+      "bytes": 113,
+      "sha256": "561768544bad45cadb4877973416573845a909e88af44e18d6a263c64e68b061"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/antigravity-cli/cli.log",
+      "kind": "symlink",
+      "target": "log/cli-20261031_221304.log"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/antigravity-cli/conversation_summaries.db",
+      "bytes": 20480,
+      "sha256": "50fd17bfbf7d07beb7bc3c51f05122335814def9a855af984ff698f9c45802a3"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/antigravity-cli/conversations/4baafe5d-8e02-4f9c-8b61-9bcf2da40208.db",
+      "bytes": 425984,
+      "sha256": "0347ebb66231db13b93ddb82e02483219a698e6b47be7160dfc9c175fe79857f"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/antigravity-cli/implicit/e4a2371a-196c-4e21-b21e-b689709bd136.pb",
+      "bytes": 303,
+      "sha256": "41812957f3fe005590c7954d0468d798875c215a8fecab70489dc2fece39a53d"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/antigravity-cli/jetbox_summaries_proto.pb",
+      "bytes": 523,
+      "sha256": "2c93494801258c092c95ffd92e40e31f46811f1a2eccd9c3821f0d7d6f8dcaa1"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/antigravity-cli/last_check.timestamp",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/antigravity-cli/log/cli-20261031_221304.log",
+      "bytes": 29440,
+      "sha256": "aecc22439fab951b55e912743b38fadfa622db52bbd4fdde4843cca1f9607130"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/antigravity-cli/presence/4baafe5d-8e02-4f9c-8b61-9bcf2da40208.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/antigravity-cli/settings.json",
+      "bytes": 98,
+      "sha256": "1637ce9009f88f45a9a1c0e4560f8949fa6094a5a8d4fcd38f6e41a1143b29e3"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/antigravity-cli/updater/update.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/antigravity-cli/updater/update_status.json",
+      "bytes": 59,
+      "sha256": "71ca2ae1c9825feb1f25c5bee6327d08873035a97a0c33bac2bd60f04d10b724"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/config/.migrated",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/config/hooks.json",
+      "bytes": 168,
+      "sha256": "29708e0226cacee81cfc92b22b89d945042bf87c1926bfdd765e4b1caae1aba4"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/config/mcp_config.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_a2b_defer_hook/home/.gemini/config/projects/default-cli-project.json",
+      "bytes": 87,
+      "sha256": "d3128db8397d3b0e751fa26d3b6290e107a87c24e4280d0f56044382b123cf38"
+    },
+    {
+      "path": "probe_a2c_stream_json/home/.gemini/antigravity-cli/cache/default_project_id.txt",
+      "bytes": 19,
+      "sha256": "31f9f362eeb86456e8dd4a3892f825bbcb090a5e19683e05d5b5847c13e1ee91"
+    },
+    {
+      "path": "probe_a2c_stream_json/home/.gemini/antigravity-cli/cache/last_conversations.json",
+      "bytes": 107,
+      "sha256": "6efa6c216be4a87f308c22d0ab7c2165cee87b53fb004f5dbb59ee0089497be2"
+    },
+    {
+      "path": "probe_a2c_stream_json/home/.gemini/antigravity-cli/cache/onboarding.json",
+      "bytes": 111,
+      "sha256": "1aa3e7b17067c259f56b1c7feb17094172729c977d4a7fcbea030f9247c0bbe4"
+    },
+    {
+      "path": "probe_a2c_stream_json/home/.gemini/antigravity-cli/cli.log",
+      "kind": "symlink",
+      "target": "log/cli-20261031_221722.log"
+    },
+    {
+      "path": "probe_a2c_stream_json/home/.gemini/antigravity-cli/conversation_summaries.db",
+      "bytes": 20480,
+      "sha256": "3c8d2210cf00a7e674b94460cecbf8d9e2d5057a77408a374127f55586f0c749"
+    },
+    {
+      "path": "probe_a2c_stream_json/home/.gemini/antigravity-cli/conversations/005069d3-b72b-4cac-96b6-c26f4fa47ff6.db",
+      "bytes": 393216,
+      "sha256": "022cab11dd10c5cf8c8852ed356e6cf42a2a3cc306f6206dd4d71ecbf1f936e2"
+    },
+    {
+      "path": "probe_a2c_stream_json/home/.gemini/antigravity-cli/implicit/c88fe317-1d06-492c-926a-3d25f36decca.pb",
+      "bytes": 305,
+      "sha256": "0c8b069f611814b6ff630f14321644bab6ae43f57f175f25a8ba1e4e84f3bb1e"
+    },
+    {
+      "path": "probe_a2c_stream_json/home/.gemini/antigravity-cli/jetbox_summaries_proto.pb",
+      "bytes": 429,
+      "sha256": "853251257b5dbb83b11bcd21fd02b71abc79b1ca282f7352c0ff7b25f9ce1ed7"
+    },
+    {
+      "path": "probe_a2c_stream_json/home/.gemini/antigravity-cli/last_check.timestamp",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_a2c_stream_json/home/.gemini/antigravity-cli/log/cli-20261031_221722.log",
+      "bytes": 29958,
+      "sha256": "3acb91fbad1c73f94ad3c3010d1dfbc9c4037243ab63a2618c6be87613c9d59b"
+    },
+    {
+      "path": "probe_a2c_stream_json/home/.gemini/antigravity-cli/presence/005069d3-b72b-4cac-96b6-c26f4fa47ff6.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_a2c_stream_json/home/.gemini/antigravity-cli/settings.json",
+      "bytes": 134,
+      "sha256": "e9cdd726056bc44390f4d284ea6d3373776b6aa287557317a6244e2b0493cbca"
+    },
+    {
+      "path": "probe_a2c_stream_json/home/.gemini/antigravity-cli/updater/update.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_a2c_stream_json/home/.gemini/antigravity-cli/updater/update_status.json",
+      "bytes": 59,
+      "sha256": "71ca2ae1c9825feb1f25c5bee6327d08873035a97a0c33bac2bd60f04d10b724"
+    },
+    {
+      "path": "probe_a2c_stream_json/home/.gemini/config/.migrated",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_a2c_stream_json/home/.gemini/config/mcp_config.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_a2c_stream_json/home/.gemini/config/projects/default-cli-project.json",
+      "bytes": 87,
+      "sha256": "d3128db8397d3b0e751fa26d3b6290e107a87c24e4280d0f56044382b123cf38"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/annotations/e0f1034b-29d8-414c-a4f1-f73a94708ac1.pbtxt",
+      "bytes": 40,
+      "sha256": "4a2e26babbdf6d7ec7c5f3fefd9924ace3db5374a61787c16431caddd7f9aa9c"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/brain/e0f1034b-29d8-414c-a4f1-f73a94708ac1/.system_generated/logs/chunks/transcript/00000000.jsonl",
+      "bytes": 1914,
+      "sha256": "4fd98196fa7c95633da0b2b02ef74d96da4b6e7eacaadf76d1c0470209195794"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/brain/e0f1034b-29d8-414c-a4f1-f73a94708ac1/.system_generated/logs/chunks/transcript_full/00000000.jsonl",
+      "bytes": 1902,
+      "sha256": "c8d0644f34e873a54907aa747515725d991386f5f7994ed7377e25a4b749765a"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/brain/e0f1034b-29d8-414c-a4f1-f73a94708ac1/.system_generated/logs/transcript.jsonl",
+      "bytes": 1914,
+      "sha256": "4fd98196fa7c95633da0b2b02ef74d96da4b6e7eacaadf76d1c0470209195794"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/brain/e0f1034b-29d8-414c-a4f1-f73a94708ac1/.system_generated/logs/transcript_full.jsonl",
+      "bytes": 1902,
+      "sha256": "c8d0644f34e873a54907aa747515725d991386f5f7994ed7377e25a4b749765a"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/brain/e0f1034b-29d8-414c-a4f1-f73a94708ac1/.system_generated/tasks/task-2.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/cache/default_project_id.txt",
+      "bytes": 19,
+      "sha256": "31f9f362eeb86456e8dd4a3892f825bbcb090a5e19683e05d5b5847c13e1ee91"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/cache/last_conversations.json",
+      "bytes": 103,
+      "sha256": "5c7149ccbe9605a05287af459da7fde8b1d000ef32f7f301d66ade43f57a460f"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/cache/marketplaces/antigravity-plugins-official/marketplace.json",
+      "bytes": 19503,
+      "sha256": "5630d22ddb879439fee8f4f4989981119fcf721bcafdbf50f38dc15ee1c774a7"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/cache/marketplaces/antigravity-plugins-official/meta.json",
+      "bytes": 48,
+      "sha256": "08b889fc209066869ff688509fe8e95411710e1fa032f7ee8e1cd3f4825dcbd5"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/cache/marketplaces/antigravity-plugins-partners/marketplace.json",
+      "bytes": 69443,
+      "sha256": "94509e6c542bcc6f89ed2c797edd52702adcdf64c787baf1d1a447448d2db119"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/cache/marketplaces/antigravity-plugins-partners/meta.json",
+      "bytes": 48,
+      "sha256": "5ed0a37bba3ccaeed6c6e11242325bffc5275d733945a1044df47fb3304d1b9b"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/cache/onboarding.json",
+      "bytes": 111,
+      "sha256": "1aa3e7b17067c259f56b1c7feb17094172729c977d4a7fcbea030f9247c0bbe4"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/cli.log",
+      "kind": "symlink",
+      "target": "log/cli-20261031_222143.log"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/conversation_summaries.db",
+      "bytes": 20480,
+      "sha256": "a85b6fdc8d91d2393fdb3d24aa6265231e6d6b2cc925688e90765152cd9f3e32"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/conversations/e0f1034b-29d8-414c-a4f1-f73a94708ac1.db",
+      "bytes": 425984,
+      "sha256": "64fcf6f5d1e2c43690561a9b2ed21bd5b11553b7fba2ecda80c1860a2e0ba48f"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/history.jsonl",
+      "bytes": 222,
+      "sha256": "4a8c56e18ffa4c9a582e8afe92a7041d72acce4c1bf051b78760b0fb2c5bcb52"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/implicit/9aa34440-a9a9-464f-9e58-b7fa568250cc.pb",
+      "bytes": 297,
+      "sha256": "3155e53055e1bbbd8f96348c27962cae97beac74d6198e1a66dfa8a613a65bcf"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/jetbox_summaries_proto.pb",
+      "bytes": 528,
+      "sha256": "598c93a0e5a42a89baa11ee0cd887bee0bfd19a8a291233ed330ce377999c5d8"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/last_check.timestamp",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/log/cli-20261031_222143.log",
+      "bytes": 71250,
+      "sha256": "d3f4e10b9d5e4d578484bd41307a2e7cfc8935124d92481c79ade5081cb4c658"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/presence/e0f1034b-29d8-414c-a4f1-f73a94708ac1.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/settings.json",
+      "bytes": 130,
+      "sha256": "5e9cf663bdf0724ef409a9bddc7bf4ef55c05f8363f64cc30030fc4b02647bda"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/updater/update.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/antigravity-cli/updater/update_status.json",
+      "bytes": 59,
+      "sha256": "71ca2ae1c9825feb1f25c5bee6327d08873035a97a0c33bac2bd60f04d10b724"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/config/.migrated",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/config/hooks.json",
+      "bytes": 114,
+      "sha256": "a01308a55d6043bdb300f8e8416e23177cc34010924c977a8d8d804e51be023e"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/config/mcp_config.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_daemon_idle/home/.gemini/config/projects/default-cli-project.json",
+      "bytes": 87,
+      "sha256": "d3128db8397d3b0e751fa26d3b6290e107a87c24e4280d0f56044382b123cf38"
+    },
+    {
+      "path": "probe_daemon_idle/p.txt",
+      "bytes": 109,
+      "sha256": "de9097980b0154955ba444a44f7180439c721f0d29da04c1b7973a8b76b1fdd3"
+    },
+    {
+      "path": "probe_daemon_idle/stop.jsonl",
+      "bytes": 725,
+      "sha256": "be3eb58dfec83d13757958e6fa6b03f416e1c0390e004e21922c78e84b8ff93d"
+    },
+    {
+      "path": "probe_daemon_idle/stop.py",
+      "bytes": 210,
+      "sha256": "2a23eeffcfec7f8914008008f1f76a6d04e7b6d4959171a58e29756f296add8a"
+    },
+    {
+      "path": "probe_h1_deny/home/.gemini/antigravity-cli/annotations/d77a47c6-6ae6-4d17-9dd0-060fb39929fa.pbtxt",
+      "bytes": 33,
+      "sha256": "ecbdb5510ca25f2138e93a67d6bd07c1e99223dea6bfb7a75997a0fd021d267f"
+    },
+    {
+      "path": "probe_h1_deny/home/.gemini/antigravity-cli/brain/d77a47c6-6ae6-4d17-9dd0-060fb39929fa/.system_generated/logs/chunks/transcript/00000000.jsonl",
+      "bytes": 1716,
+      "sha256": "400290f5cf895e6c6526075c3acfd4b8f094827846f12a2b245f22fc6c37a765"
+    },
+    {
+      "path": "probe_h1_deny/home/.gemini/antigravity-cli/brain/d77a47c6-6ae6-4d17-9dd0-060fb39929fa/.system_generated/logs/chunks/transcript_full/00000000.jsonl",
+      "bytes": 1706,
+      "sha256": "8ade1b9fd3b364c00c6ae5f8158d7f6fb4f8da4ef9c0c3861c8f678d34320681"
+    },
+    {
+      "path": "probe_h1_deny/home/.gemini/antigravity-cli/brain/d77a47c6-6ae6-4d17-9dd0-060fb39929fa/.system_generated/logs/transcript.jsonl",
+      "bytes": 1716,
+      "sha256": "400290f5cf895e6c6526075c3acfd4b8f094827846f12a2b245f22fc6c37a765"
+    },
+    {
+      "path": "probe_h1_deny/home/.gemini/antigravity-cli/brain/d77a47c6-6ae6-4d17-9dd0-060fb39929fa/.system_generated/logs/transcript_full.jsonl",
+      "bytes": 1706,
+      "sha256": "8ade1b9fd3b364c00c6ae5f8158d7f6fb4f8da4ef9c0c3861c8f678d34320681"
+    },
+    {
+      "path": "probe_h1_deny/home/.gemini/antigravity-cli/cache/default_project_id.txt",
+      "bytes": 19,
+      "sha256": "31f9f362eeb86456e8dd4a3892f825bbcb090a5e19683e05d5b5847c13e1ee91"
+    },
+    {
+      "path": "probe_h1_deny/home/.gemini/antigravity-cli/cache/last_conversations.json",
+      "bytes": 99,
+      "sha256": "933f295c9c1df5cb84aa04797a09f88ae0e774ad329501b8a46b0cd5f33b4103"
+    },
+    {
+      "path": "probe_h1_deny/home/.gemini/antigravity-cli/cache/onboarding.json",
+      "bytes": 113,
+      "sha256": "561768544bad45cadb4877973416573845a909e88af44e18d6a263c64e68b061"
+    },
+    {
+      "path": "probe_h1_deny/home/.gemini/antigravity-cli/cli.log",
+      "kind": "symlink",
+      "target": "log/cli-20261031_220900.log"
+    },
+    {
+      "path": "probe_h1_deny/home/.gemini/antigravity-cli/conversation_summaries.db",
+      "bytes": 20480,
+      "sha256": "6e7b05718928e28812099a9bf0a1085be35e685d99d2887096f510f66a793e94"
+    },
+    {
+      "path": "probe_h1_deny/home/.gemini/antigravity-cli/conversations/d77a47c6-6ae6-4d17-9dd0-060fb39929fa.db",
+      "bytes": 425984,
+      "sha256": "c9f53a89647f162ecf9f8e49e4eda10b6d17c7f59a1bb698c4375e1ccadc9c67"
+    },
+    {
+      "path": "probe_h1_deny/home/.gemini/antigravity-cli/implicit/3225038e-59bc-4959-9e01-06d044b207c1.pb",
+      "bytes": 289,
+      "sha256": "b247406537bd02b579ea98aafb9539da78fabf2e547d59636776e601ce3eaf63"
+    },
+    {
+      "path": "probe_h1_deny/home/.gemini/antigravity-cli/jetbox_summaries_proto.pb",
+      "bytes": 497,
+      "sha256": "a4254120a2bae47d89af9ebf6ce94836e6dc62ddfac73f32ca800563329e7b0d"
+    },
+    {
+      "path": "probe_h1_deny/home/.gemini/antigravity-cli/last_check.timestamp",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_h1_deny/home/.gemini/antigravity-cli/log/cli-20261031_220900.log",
+      "bytes": 28807,
+      "sha256": "3bbbb998ee367428e7e7e6dd00140850877596229e38bca4f07313a707a91ef9"
+    },
+    {
+      "path": "probe_h1_deny/home/.gemini/antigravity-cli/presence/d77a47c6-6ae6-4d17-9dd0-060fb39929fa.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_h1_deny/home/.gemini/antigravity-cli/updater/update.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_h1_deny/home/.gemini/antigravity-cli/updater/update_status.json",
+      "bytes": 59,
+      "sha256": "71ca2ae1c9825feb1f25c5bee6327d08873035a97a0c33bac2bd60f04d10b724"
+    },
+    {
+      "path": "probe_h1_deny/home/.gemini/config/.migrated",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_h1_deny/home/.gemini/config/hooks.json",
+      "bytes": 156,
+      "sha256": "a8e09d4e13062b75b4e9e5d01d1eab3c2f533ad62c71bd1a6b1b1c4ee872890c"
+    },
+    {
+      "path": "probe_h1_deny/home/.gemini/config/mcp_config.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_h1_deny/home/.gemini/config/projects/default-cli-project.json",
+      "bytes": 87,
+      "sha256": "d3128db8397d3b0e751fa26d3b6290e107a87c24e4280d0f56044382b123cf38"
+    },
+    {
+      "path": "probe_h1_deny/hook.py",
+      "bytes": 271,
+      "sha256": "518a5575dfd3fc81351a2f6b691aac8841b0a9aa154c2ee3e30e539fbc17d100"
+    },
+    {
+      "path": "probe_h1_deny/hooks.jsonl",
+      "bytes": 900,
+      "sha256": "e8a8bc0aabb9b3062d03c7b75162ab3e57055c7c466ec3289982166aa2a1d473"
+    },
+    {
+      "path": "probe_h1b_crash/home/.gemini/antigravity-cli/annotations/0955eb24-4d64-4fa6-9dba-853737258180.pbtxt",
+      "bytes": 32,
+      "sha256": "830abf99795470c231993f263bd261de602a2e458bbacac085df476441ac343c"
+    },
+    {
+      "path": "probe_h1b_crash/home/.gemini/antigravity-cli/brain/0955eb24-4d64-4fa6-9dba-853737258180/.system_generated/logs/chunks/transcript/00000000.jsonl",
+      "bytes": 1707,
+      "sha256": "db19e92a322e7d594a41de88f2012ed2aa971f849a2eaa17e7df31239ac74eca"
+    },
+    {
+      "path": "probe_h1b_crash/home/.gemini/antigravity-cli/brain/0955eb24-4d64-4fa6-9dba-853737258180/.system_generated/logs/chunks/transcript_full/00000000.jsonl",
+      "bytes": 1697,
+      "sha256": "aa5d23c89d04dd2fe1c2bdf016569ce4c0916b7fb2dcf209ae0dc641e06aa6b5"
+    },
+    {
+      "path": "probe_h1b_crash/home/.gemini/antigravity-cli/brain/0955eb24-4d64-4fa6-9dba-853737258180/.system_generated/logs/transcript.jsonl",
+      "bytes": 1707,
+      "sha256": "db19e92a322e7d594a41de88f2012ed2aa971f849a2eaa17e7df31239ac74eca"
+    },
+    {
+      "path": "probe_h1b_crash/home/.gemini/antigravity-cli/brain/0955eb24-4d64-4fa6-9dba-853737258180/.system_generated/logs/transcript_full.jsonl",
+      "bytes": 1697,
+      "sha256": "aa5d23c89d04dd2fe1c2bdf016569ce4c0916b7fb2dcf209ae0dc641e06aa6b5"
+    },
+    {
+      "path": "probe_h1b_crash/home/.gemini/antigravity-cli/cache/default_project_id.txt",
+      "bytes": 19,
+      "sha256": "31f9f362eeb86456e8dd4a3892f825bbcb090a5e19683e05d5b5847c13e1ee91"
+    },
+    {
+      "path": "probe_h1b_crash/home/.gemini/antigravity-cli/cache/last_conversations.json",
+      "bytes": 101,
+      "sha256": "7c9ace152acd7976a6750e59235960f74bf2716b744d39d52dc4070983be33e5"
+    },
+    {
+      "path": "probe_h1b_crash/home/.gemini/antigravity-cli/cache/onboarding.json",
+      "bytes": 113,
+      "sha256": "561768544bad45cadb4877973416573845a909e88af44e18d6a263c64e68b061"
+    },
+    {
+      "path": "probe_h1b_crash/home/.gemini/antigravity-cli/cli.log",
+      "kind": "symlink",
+      "target": "log/cli-20261031_220915.log"
+    },
+    {
+      "path": "probe_h1b_crash/home/.gemini/antigravity-cli/conversation_summaries.db",
+      "bytes": 20480,
+      "sha256": "a2e56f1730895cf0a3373c77ea228a05e7cac1855796b3d9ee9e6d72a5305189"
+    },
+    {
+      "path": "probe_h1b_crash/home/.gemini/antigravity-cli/conversations/0955eb24-4d64-4fa6-9dba-853737258180.db",
+      "bytes": 425984,
+      "sha256": "95e30724a52d33f9e5bd3496ef6432536a3a68244fce12aecf5007c3e9bbc4ca"
+    },
+    {
+      "path": "probe_h1b_crash/home/.gemini/antigravity-cli/implicit/aa68c97c-a22d-4ee8-92ab-a189b28bd465.pb",
+      "bytes": 293,
+      "sha256": "e9dfd1bd6c0b782768708abd58b990f5dcd407fc41aaad200a4ec60f66c96380"
+    },
+    {
+      "path": "probe_h1b_crash/home/.gemini/antigravity-cli/jetbox_summaries_proto.pb",
+      "bytes": 501,
+      "sha256": "8f7d669453c5c11d1eb072cfea1e28af8ee08725a45e49f7835ea4615c8fa2c9"
+    },
+    {
+      "path": "probe_h1b_crash/home/.gemini/antigravity-cli/last_check.timestamp",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_h1b_crash/home/.gemini/antigravity-cli/log/cli-20261031_220915.log",
+      "bytes": 33252,
+      "sha256": "3193b491f6fcfa4aeffbdf9bda875a7eee4bf9c8bf10d6eb6bf56e274c639fe2"
+    },
+    {
+      "path": "probe_h1b_crash/home/.gemini/antigravity-cli/presence/0955eb24-4d64-4fa6-9dba-853737258180.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_h1b_crash/home/.gemini/antigravity-cli/updater/update.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_h1b_crash/home/.gemini/antigravity-cli/updater/update_status.json",
+      "bytes": 59,
+      "sha256": "71ca2ae1c9825feb1f25c5bee6327d08873035a97a0c33bac2bd60f04d10b724"
+    },
+    {
+      "path": "probe_h1b_crash/home/.gemini/config/.migrated",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_h1b_crash/home/.gemini/config/hooks.json",
+      "bytes": 130,
+      "sha256": "d694c0524967841ff9523d14c345907d449972b75884da82f5a357191c37703f"
+    },
+    {
+      "path": "probe_h1b_crash/home/.gemini/config/mcp_config.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_h1b_crash/home/.gemini/config/projects/default-cli-project.json",
+      "bytes": 87,
+      "sha256": "d3128db8397d3b0e751fa26d3b6290e107a87c24e4280d0f56044382b123cf38"
+    },
+    {
+      "path": "probe_h2_stop_continue/home/.gemini/antigravity-cli/annotations/ebb11d15-db54-4ebc-8f82-da2f1856b437.pbtxt",
+      "bytes": 21,
+      "sha256": "282ab1a8266122685729a4388aba0cfbbb2b42e66bfbeae87d0f7e72c43bac18"
+    },
+    {
+      "path": "probe_h2_stop_continue/home/.gemini/antigravity-cli/brain/ebb11d15-db54-4ebc-8f82-da2f1856b437/.system_generated/logs/chunks/transcript/00000000.jsonl",
+      "bytes": 1376,
+      "sha256": "c07faeed30540c96e8c017fb4911bb448e031a44c2f5265f67cb445192210914"
+    },
+    {
+      "path": "probe_h2_stop_continue/home/.gemini/antigravity-cli/brain/ebb11d15-db54-4ebc-8f82-da2f1856b437/.system_generated/logs/chunks/transcript_full/00000000.jsonl",
+      "bytes": 1376,
+      "sha256": "c07faeed30540c96e8c017fb4911bb448e031a44c2f5265f67cb445192210914"
+    },
+    {
+      "path": "probe_h2_stop_continue/home/.gemini/antigravity-cli/brain/ebb11d15-db54-4ebc-8f82-da2f1856b437/.system_generated/logs/transcript.jsonl",
+      "bytes": 1376,
+      "sha256": "c07faeed30540c96e8c017fb4911bb448e031a44c2f5265f67cb445192210914"
+    },
+    {
+      "path": "probe_h2_stop_continue/home/.gemini/antigravity-cli/brain/ebb11d15-db54-4ebc-8f82-da2f1856b437/.system_generated/logs/transcript_full.jsonl",
+      "bytes": 1376,
+      "sha256": "c07faeed30540c96e8c017fb4911bb448e031a44c2f5265f67cb445192210914"
+    },
+    {
+      "path": "probe_h2_stop_continue/home/.gemini/antigravity-cli/cache/default_project_id.txt",
+      "bytes": 19,
+      "sha256": "31f9f362eeb86456e8dd4a3892f825bbcb090a5e19683e05d5b5847c13e1ee91"
+    },
+    {
+      "path": "probe_h2_stop_continue/home/.gemini/antigravity-cli/cache/last_conversations.json",
+      "bytes": 108,
+      "sha256": "dcd4cba8226e82c8c25822e13d4c648863d8fa04132e2ce9ecdc2ebee2fd9c1c"
+    },
+    {
+      "path": "probe_h2_stop_continue/home/.gemini/antigravity-cli/cache/onboarding.json",
+      "bytes": 113,
+      "sha256": "561768544bad45cadb4877973416573845a909e88af44e18d6a263c64e68b061"
+    },
+    {
+      "path": "probe_h2_stop_continue/home/.gemini/antigravity-cli/cli.log",
+      "kind": "symlink",
+      "target": "log/cli-20261031_220930.log"
+    },
+    {
+      "path": "probe_h2_stop_continue/home/.gemini/antigravity-cli/conversation_summaries.db",
+      "bytes": 20480,
+      "sha256": "324b42024fa7ed0fd4a67840d12ef070995fe2276221a30455fddbe13cc7bdab"
+    },
+    {
+      "path": "probe_h2_stop_continue/home/.gemini/antigravity-cli/conversations/ebb11d15-db54-4ebc-8f82-da2f1856b437.db",
+      "bytes": 425984,
+      "sha256": "aabf87798a7c934a4979248e7426096f2ba44d2cbce98983738119c659a808c0"
+    },
+    {
+      "path": "probe_h2_stop_continue/home/.gemini/antigravity-cli/implicit/017877c6-dd99-4e00-9be7-55834b1df4a8.pb",
+      "bytes": 307,
+      "sha256": "feec734a53d208511df9f5a24a83cb849335c3be0f5fc12886475f90212a71b2"
+    },
+    {
+      "path": "probe_h2_stop_continue/home/.gemini/antigravity-cli/jetbox_summaries_proto.pb",
+      "bytes": 500,
+      "sha256": "c9a1c2e4c59a39de9783c3c337b9a4a3e422a783373f0c4ad10517322f40eb5d"
+    },
+    {
+      "path": "probe_h2_stop_continue/home/.gemini/antigravity-cli/last_check.timestamp",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_h2_stop_continue/home/.gemini/antigravity-cli/log/cli-20261031_220930.log",
+      "bytes": 32700,
+      "sha256": "8c19f4b87e6e49a8240daa1bb1929ab824c2ed4bfc4bf5600c884f4683fec9e9"
+    },
+    {
+      "path": "probe_h2_stop_continue/home/.gemini/antigravity-cli/presence/ebb11d15-db54-4ebc-8f82-da2f1856b437.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_h2_stop_continue/home/.gemini/antigravity-cli/updater/update.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_h2_stop_continue/home/.gemini/antigravity-cli/updater/update_status.json",
+      "bytes": 59,
+      "sha256": "71ca2ae1c9825feb1f25c5bee6327d08873035a97a0c33bac2bd60f04d10b724"
+    },
+    {
+      "path": "probe_h2_stop_continue/home/.gemini/config/.migrated",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_h2_stop_continue/home/.gemini/config/hooks.json",
+      "bytes": 120,
+      "sha256": "baa7238db0c3a189a728b0388b1bd8d5ad7a6cadcf9650026039180b0efb477a"
+    },
+    {
+      "path": "probe_h2_stop_continue/home/.gemini/config/mcp_config.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_h2_stop_continue/home/.gemini/config/projects/default-cli-project.json",
+      "bytes": 87,
+      "sha256": "d3128db8397d3b0e751fa26d3b6290e107a87c24e4280d0f56044382b123cf38"
+    },
+    {
+      "path": "probe_h2_stop_continue/stop.jsonl",
+      "bytes": 1308,
+      "sha256": "c36e99b3b706a76c2ca0a2834f4edca3719b3687ee782755ea4c884cf53ae962"
+    },
+    {
+      "path": "probe_h2_stop_continue/stop.py",
+      "bytes": 397,
+      "sha256": "2b2acf11bdcb1f05ebbe340e679af69a6d0cdf11a3c65ad6b74dc36b6b240bd1"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/antigravity-cli/annotations/315f37d1-7ff7-4e52-ac2f-d377fc0b5e5e.pbtxt",
+      "bytes": 38,
+      "sha256": "251b1b41750697bf420a99519e35828dd174d7f96083ccd5894bbe201c2bf1b9"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/antigravity-cli/brain/315f37d1-7ff7-4e52-ac2f-d377fc0b5e5e/.system_generated/logs/chunks/transcript/00000000.jsonl",
+      "bytes": 2034,
+      "sha256": "e6116c177c2166a3a0f60d5b6d4f6fbaa6a746fd47fce2ff1a45ab4a7c0b3928"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/antigravity-cli/brain/315f37d1-7ff7-4e52-ac2f-d377fc0b5e5e/.system_generated/logs/chunks/transcript_full/00000000.jsonl",
+      "bytes": 2020,
+      "sha256": "d7bffd68c3c829a0ef41b343db1aba8137b03a4d6b93a5421415f9c5773c2e89"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/antigravity-cli/brain/315f37d1-7ff7-4e52-ac2f-d377fc0b5e5e/.system_generated/logs/transcript.jsonl",
+      "bytes": 2034,
+      "sha256": "e6116c177c2166a3a0f60d5b6d4f6fbaa6a746fd47fce2ff1a45ab4a7c0b3928"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/antigravity-cli/brain/315f37d1-7ff7-4e52-ac2f-d377fc0b5e5e/.system_generated/logs/transcript_full.jsonl",
+      "bytes": 2020,
+      "sha256": "d7bffd68c3c829a0ef41b343db1aba8137b03a4d6b93a5421415f9c5773c2e89"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/antigravity-cli/brain/315f37d1-7ff7-4e52-ac2f-d377fc0b5e5e/.system_generated/steps/4/output.txt",
+      "bytes": 12,
+      "sha256": "69eae5115f722ab477bd1e8cc1997e7200bd1f3bedc3591df56357e8254256ed"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/antigravity-cli/cache/default_project_id.txt",
+      "bytes": 19,
+      "sha256": "31f9f362eeb86456e8dd4a3892f825bbcb090a5e19683e05d5b5847c13e1ee91"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/antigravity-cli/cache/last_conversations.json",
+      "bytes": 98,
+      "sha256": "3e3939a5c049d35ebd49f9e10f7ee89bb2f641af5873226ae89eba99366a4c08"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/antigravity-cli/cache/onboarding.json",
+      "bytes": 113,
+      "sha256": "561768544bad45cadb4877973416573845a909e88af44e18d6a263c64e68b061"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/antigravity-cli/cli.log",
+      "kind": "symlink",
+      "target": "log/cli-20261031_220945.log"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/antigravity-cli/conversation_summaries.db",
+      "bytes": 20480,
+      "sha256": "07c55b991264109c17214780925e48b45eccafd836e9eb52536857a649046de8"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/antigravity-cli/conversations/315f37d1-7ff7-4e52-ac2f-d377fc0b5e5e.db",
+      "bytes": 425984,
+      "sha256": "049d283e44bd6cb39b7ac12a9ca162ab0c787b19ec7b94825f6c494fde777579"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/antigravity-cli/implicit/69905c04-a766-46a1-b1b1-8eaef570135b.pb",
+      "bytes": 286,
+      "sha256": "07e10f3f04e59c7392f33c28a6426c7289cbf8dd02dbab4e5099f45d99898141"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/antigravity-cli/jetbox_summaries_proto.pb",
+      "bytes": 504,
+      "sha256": "74da7483922d5d22074ba43b681e274c239077ef6dda0042193b9ee4c9b51e90"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/antigravity-cli/last_check.timestamp",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/antigravity-cli/log/cli-20261031_220945.log",
+      "bytes": 30022,
+      "sha256": "898f1d96f708c24d06b7b636dfa924cc88413fd8653489dd852e91043c07387c"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/antigravity-cli/mcp/probe/secret_word.json",
+      "bytes": 109,
+      "sha256": "041aa95bb22c4c0b401ac473d5db4dcf1839f6425710d0d389ba48bacb1b1c51"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/antigravity-cli/presence/315f37d1-7ff7-4e52-ac2f-d377fc0b5e5e.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/antigravity-cli/updater/update.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/antigravity-cli/updater/update_status.json",
+      "bytes": 59,
+      "sha256": "71ca2ae1c9825feb1f25c5bee6327d08873035a97a0c33bac2bd60f04d10b724"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/config/.migrated",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/config/mcp_config.json",
+      "bytes": 117,
+      "sha256": "fd3027074eb8e4e6d6287ddd3c90a710827203e8b7b88df03742619065c5b569"
+    },
+    {
+      "path": "probe_m1_mcp/home/.gemini/config/projects/default-cli-project.json",
+      "bytes": 87,
+      "sha256": "d3128db8397d3b0e751fa26d3b6290e107a87c24e4280d0f56044382b123cf38"
+    },
+    {
+      "path": "probe_m1_mcp/mcp.jsonl",
+      "bytes": 1385,
+      "sha256": "7131500388f56409200551df3cefc9eaa330a41c5198c2e28255104b2d1c52cb"
+    },
+    {
+      "path": "probe_m1_mcp/mcp_server.py",
+      "bytes": 966,
+      "sha256": "30eb2e49152b9eea09b21e803a9b6c9de09f4b0b5757639acf5ac2d0f5a79843"
+    },
+    {
+      "path": "probe_m2_mcp_2026/home/.gemini/antigravity-cli/annotations/aa26de6a-5e98-4e6d-9d8b-5937d55d204b.pbtxt",
+      "bytes": 31,
+      "sha256": "9dec07123a6bca12853e8e047608e1daf588566f920f6cced240ca3cde6be2ff"
+    },
+    {
+      "path": "probe_m2_mcp_2026/home/.gemini/antigravity-cli/brain/aa26de6a-5e98-4e6d-9d8b-5937d55d204b/.system_generated/logs/chunks/transcript/00000000.jsonl",
+      "bytes": 851,
+      "sha256": "2ce699d5f0d08ddcc6669591b417104a52da6877f42617bbacf80d0cea0ae840"
+    },
+    {
+      "path": "probe_m2_mcp_2026/home/.gemini/antigravity-cli/brain/aa26de6a-5e98-4e6d-9d8b-5937d55d204b/.system_generated/logs/chunks/transcript_full/00000000.jsonl",
+      "bytes": 851,
+      "sha256": "2ce699d5f0d08ddcc6669591b417104a52da6877f42617bbacf80d0cea0ae840"
+    },
+    {
+      "path": "probe_m2_mcp_2026/home/.gemini/antigravity-cli/brain/aa26de6a-5e98-4e6d-9d8b-5937d55d204b/.system_generated/logs/transcript.jsonl",
+      "bytes": 851,
+      "sha256": "2ce699d5f0d08ddcc6669591b417104a52da6877f42617bbacf80d0cea0ae840"
+    },
+    {
+      "path": "probe_m2_mcp_2026/home/.gemini/antigravity-cli/brain/aa26de6a-5e98-4e6d-9d8b-5937d55d204b/.system_generated/logs/transcript_full.jsonl",
+      "bytes": 851,
+      "sha256": "2ce699d5f0d08ddcc6669591b417104a52da6877f42617bbacf80d0cea0ae840"
+    },
+    {
+      "path": "probe_m2_mcp_2026/home/.gemini/antigravity-cli/cache/default_project_id.txt",
+      "bytes": 19,
+      "sha256": "31f9f362eeb86456e8dd4a3892f825bbcb090a5e19683e05d5b5847c13e1ee91"
+    },
+    {
+      "path": "probe_m2_mcp_2026/home/.gemini/antigravity-cli/cache/last_conversations.json",
+      "bytes": 103,
+      "sha256": "06633c5cd91f5250848c0b98e01b693952d55a644e533f4593cab0de6a9aca5a"
+    },
+    {
+      "path": "probe_m2_mcp_2026/home/.gemini/antigravity-cli/cache/onboarding.json",
+      "bytes": 113,
+      "sha256": "561768544bad45cadb4877973416573845a909e88af44e18d6a263c64e68b061"
+    },
+    {
+      "path": "probe_m2_mcp_2026/home/.gemini/antigravity-cli/cli.log",
+      "kind": "symlink",
+      "target": "log/cli-20261031_221002.log"
+    },
+    {
+      "path": "probe_m2_mcp_2026/home/.gemini/antigravity-cli/conversation_summaries.db",
+      "bytes": 20480,
+      "sha256": "8515c59f220ecdbad8a2df7495fc3a6e77d5f6fb4c2d954b7bbfee444f1293dc"
+    },
+    {
+      "path": "probe_m2_mcp_2026/home/.gemini/antigravity-cli/conversations/aa26de6a-5e98-4e6d-9d8b-5937d55d204b.db",
+      "bytes": 425984,
+      "sha256": "d33d8b4d3009349ba5a664a3ac4b327812b504c728c53d503ce183345cb0e47a"
+    },
+    {
+      "path": "probe_m2_mcp_2026/home/.gemini/antigravity-cli/implicit/d89a88ee-490c-4492-a727-5489ccd50521.pb",
+      "bytes": 297,
+      "sha256": "d372cd6bbdff671f87cb6c2b3197cbff882e9923c3192c7dbac816798fbeb69d"
+    },
+    {
+      "path": "probe_m2_mcp_2026/home/.gemini/antigravity-cli/jetbox_summaries_proto.pb",
+      "bytes": 505,
+      "sha256": "d651475cc07254569fbdfb5be771f97ee2ec2fdb514f5b60b61eb906ad85a67b"
+    },
+    {
+      "path": "probe_m2_mcp_2026/home/.gemini/antigravity-cli/last_check.timestamp",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_m2_mcp_2026/home/.gemini/antigravity-cli/log/cli-20261031_221002.log",
+      "bytes": 32495,
+      "sha256": "09f2f13e44dabde9532f99bbcef762afa3e004419cf0b1836a8e9f32dccb7348"
+    },
+    {
+      "path": "probe_m2_mcp_2026/home/.gemini/antigravity-cli/presence/aa26de6a-5e98-4e6d-9d8b-5937d55d204b.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_m2_mcp_2026/home/.gemini/antigravity-cli/updater/update.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_m2_mcp_2026/home/.gemini/antigravity-cli/updater/update_status.json",
+      "bytes": 59,
+      "sha256": "71ca2ae1c9825feb1f25c5bee6327d08873035a97a0c33bac2bd60f04d10b724"
+    },
+    {
+      "path": "probe_m2_mcp_2026/home/.gemini/config/.migrated",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_m2_mcp_2026/home/.gemini/config/mcp_config.json",
+      "bytes": 125,
+      "sha256": "8fa6df6102037312aab077a7b8a84c746c98a6e399634ac2ae46555bee80889a"
+    },
+    {
+      "path": "probe_m2_mcp_2026/home/.gemini/config/projects/default-cli-project.json",
+      "bytes": 87,
+      "sha256": "d3128db8397d3b0e751fa26d3b6290e107a87c24e4280d0f56044382b123cf38"
+    },
+    {
+      "path": "probe_m2_mcp_2026/mcp2.jsonl",
+      "bytes": 1204,
+      "sha256": "72985526774dff01e7811effe094d612f93381f114e99df1a1c8639200109e98"
+    },
+    {
+      "path": "probe_m2_mcp_2026/mcp2_server.py",
+      "bytes": 1615,
+      "sha256": "9f9ccee99d3dee0e6914b5318c402904190ef9ddb508482cf155e4e68d71d3e9"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/antigravity-cli/annotations/31be05d2-cf34-4bd3-98c0-2781b577bfea.pbtxt",
+      "bytes": 43,
+      "sha256": "f7a2836e9dc446a6d47204ef751d8e9c31a5ec9cc803ea648fdd83fcca94f0d1"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/antigravity-cli/brain/31be05d2-cf34-4bd3-98c0-2781b577bfea/.system_generated/logs/chunks/transcript/00000000.jsonl",
+      "bytes": 2038,
+      "sha256": "63e9e4cfb67827ac0515d72526725d87e999c76f010ee6f60ec2ce3444717dd7"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/antigravity-cli/brain/31be05d2-cf34-4bd3-98c0-2781b577bfea/.system_generated/logs/chunks/transcript_full/00000000.jsonl",
+      "bytes": 2024,
+      "sha256": "c77cb2daf7ca89dc28540354f0151cdf32e0ec5e7ceb7129846d5bad94525d75"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/antigravity-cli/brain/31be05d2-cf34-4bd3-98c0-2781b577bfea/.system_generated/logs/transcript.jsonl",
+      "bytes": 2038,
+      "sha256": "63e9e4cfb67827ac0515d72526725d87e999c76f010ee6f60ec2ce3444717dd7"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/antigravity-cli/brain/31be05d2-cf34-4bd3-98c0-2781b577bfea/.system_generated/logs/transcript_full.jsonl",
+      "bytes": 2024,
+      "sha256": "c77cb2daf7ca89dc28540354f0151cdf32e0ec5e7ceb7129846d5bad94525d75"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/antigravity-cli/brain/31be05d2-cf34-4bd3-98c0-2781b577bfea/.system_generated/steps/4/output.txt",
+      "bytes": 12,
+      "sha256": "815c3ec5383ed7721fe2a11f87914ad13ec1c022689aec8d1d183a630cb95fb3"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/antigravity-cli/cache/default_project_id.txt",
+      "bytes": 19,
+      "sha256": "31f9f362eeb86456e8dd4a3892f825bbcb090a5e19683e05d5b5847c13e1ee91"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/antigravity-cli/cache/last_conversations.json",
+      "bytes": 100,
+      "sha256": "6a54b69f85fc5e63de6ba62c0024424713628a587b71e22e2b75701c9e809261"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/antigravity-cli/cache/onboarding.json",
+      "bytes": 113,
+      "sha256": "561768544bad45cadb4877973416573845a909e88af44e18d6a263c64e68b061"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/antigravity-cli/cli.log",
+      "kind": "symlink",
+      "target": "log/cli-20261031_221233.log"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/antigravity-cli/conversation_summaries.db",
+      "bytes": 20480,
+      "sha256": "14dc6733d0511b0084c006e6ba7c7f4ef56193c6195cd1d47ee1dd6611804d10"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/antigravity-cli/conversations/31be05d2-cf34-4bd3-98c0-2781b577bfea.db",
+      "bytes": 425984,
+      "sha256": "77a1c85bd50f5579a577e9c99ca9632d4fa935cba460ca42a8bf201f994652f1"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/antigravity-cli/implicit/7af769e4-2083-4083-96c3-b979341dd891.pb",
+      "bytes": 291,
+      "sha256": "c195c61d034fa6bd7cdd7397f0c097a00d5a5bf64ab25971bc33a4094c454321"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/antigravity-cli/jetbox_summaries_proto.pb",
+      "bytes": 520,
+      "sha256": "a05c64666619113f3f939dbf950ca07b5afac7b36a72ebfecb7c41d276ba6572"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/antigravity-cli/last_check.timestamp",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/antigravity-cli/log/cli-20261031_221233.log",
+      "bytes": 29999,
+      "sha256": "e2962577b121af3ce6fa921bec922507c1599ea5aabc29b4c6c9ad1704d3c723"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/antigravity-cli/mcp/probe26/secret_word_26.json",
+      "bytes": 108,
+      "sha256": "1d8f0c80c3814739ffb5826403e7dc16baac69bed3ebb21737405843ba6d49ac"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/antigravity-cli/presence/31be05d2-cf34-4bd3-98c0-2781b577bfea.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/antigravity-cli/settings.json",
+      "bytes": 92,
+      "sha256": "7dd2375f8bd59b63ef27f793ccf024c20ca24eb5f181501d7732ddcf97b49e73"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/antigravity-cli/updater/update.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/antigravity-cli/updater/update_status.json",
+      "bytes": 59,
+      "sha256": "71ca2ae1c9825feb1f25c5bee6327d08873035a97a0c33bac2bd60f04d10b724"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/config/.migrated",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/config/mcp_config.json",
+      "bytes": 114,
+      "sha256": "c1db19a311e4a94be00041e5bfb0f1f21538380670823f9f5ae9f9524a747952"
+    },
+    {
+      "path": "probe_m2b_2026/home/.gemini/config/projects/default-cli-project.json",
+      "bytes": 87,
+      "sha256": "d3128db8397d3b0e751fa26d3b6290e107a87c24e4280d0f56044382b123cf38"
+    },
+    {
+      "path": "probe_m2b_2026/mcp.jsonl",
+      "bytes": 1609,
+      "sha256": "a5948f428be966a2580205159284aab7f97139cab8dad6724cd42c4cadf31a76"
+    },
+    {
+      "path": "probe_m2b_2026/srv.py",
+      "bytes": 1903,
+      "sha256": "31f5481252398759e273a45d0693e9f29740b5deefc380d15c3b16df161ba854"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/annotations/e00846cb-6aeb-4d8b-804e-50b99a5ca5d6.pbtxt",
+      "bytes": 37,
+      "sha256": "4d4742868dc8bce36b98ec855ef239ec98721b7de3c8820eb876914332d55dbe"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/brain/e00846cb-6aeb-4d8b-804e-50b99a5ca5d6/.system_generated/logs/chunks/transcript/00000000.jsonl",
+      "bytes": 1569,
+      "sha256": "56ad001c38d4eabf8520d37b90e94af5e0653a3741fecbbf05d06eb17de4343c"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/brain/e00846cb-6aeb-4d8b-804e-50b99a5ca5d6/.system_generated/logs/chunks/transcript_full/00000000.jsonl",
+      "bytes": 1555,
+      "sha256": "3c4a73d63b1ef1e92bd08c7d328af094f6c95642496280960b273ce7c9f98860"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/brain/e00846cb-6aeb-4d8b-804e-50b99a5ca5d6/.system_generated/logs/transcript.jsonl",
+      "bytes": 1569,
+      "sha256": "56ad001c38d4eabf8520d37b90e94af5e0653a3741fecbbf05d06eb17de4343c"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/brain/e00846cb-6aeb-4d8b-804e-50b99a5ca5d6/.system_generated/logs/transcript_full.jsonl",
+      "bytes": 1555,
+      "sha256": "3c4a73d63b1ef1e92bd08c7d328af094f6c95642496280960b273ce7c9f98860"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/brain/e00846cb-6aeb-4d8b-804e-50b99a5ca5d6/.system_generated/steps/2/output.txt",
+      "bytes": 16,
+      "sha256": "76c64c86845234971f32afc60b8b2d779402cae432e573cc59f13175ec942221"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/cache/default_project_id.txt",
+      "bytes": 19,
+      "sha256": "31f9f362eeb86456e8dd4a3892f825bbcb090a5e19683e05d5b5847c13e1ee91"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/cache/last_conversations.json",
+      "bytes": 101,
+      "sha256": "3952971d8f65feb31237cff0ce6e7911a2f5a7bd74e08cc78aa490837329edec"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/cache/marketplaces/antigravity-plugins-official/marketplace.json",
+      "bytes": 19503,
+      "sha256": "5630d22ddb879439fee8f4f4989981119fcf721bcafdbf50f38dc15ee1c774a7"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/cache/marketplaces/antigravity-plugins-official/meta.json",
+      "bytes": 48,
+      "sha256": "08b889fc209066869ff688509fe8e95411710e1fa032f7ee8e1cd3f4825dcbd5"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/cache/marketplaces/antigravity-plugins-partners/marketplace.json",
+      "bytes": 69443,
+      "sha256": "94509e6c542bcc6f89ed2c797edd52702adcdf64c787baf1d1a447448d2db119"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/cache/marketplaces/antigravity-plugins-partners/meta.json",
+      "bytes": 48,
+      "sha256": "5ed0a37bba3ccaeed6c6e11242325bffc5275d733945a1044df47fb3304d1b9b"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/cache/onboarding.json",
+      "bytes": 111,
+      "sha256": "1aa3e7b17067c259f56b1c7feb17094172729c977d4a7fcbea030f9247c0bbe4"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/cli.log",
+      "kind": "symlink",
+      "target": "log/cli-20261031_221731.log"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/conversation_summaries.db",
+      "bytes": 20480,
+      "sha256": "01919f117bb37fd1c5332417129c5b48c18b2f92f9c709b437719d2d4491f55a"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/conversations/e00846cb-6aeb-4d8b-804e-50b99a5ca5d6.db",
+      "bytes": 425984,
+      "sha256": "28e9d083470d66186423fdd0de4829acd8b44bb8858d2b1aaeed045c4ab0db84"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/crashes/crash_1844447_c40a9e8c-9013-4466-bf28-3eef18837afc.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/history.jsonl",
+      "bytes": 243,
+      "sha256": "fddd907bc8d1e9ddfc97dd0c38911a8938ed3dcbb0753edbeda41d1086c42ec8"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/implicit/406bf9e8-fdd7-422f-8800-9c074e2ab55b.pb",
+      "bytes": 293,
+      "sha256": "c2dc8cc42c74972e35ec107882b14db68e2ae4efba065403eca15fa91e151ce9"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/jetbox_summaries_proto.pb",
+      "bytes": 509,
+      "sha256": "4bedd34936a96a1f2cc2fa6e923f4ba5683dfed4b35e40421478171153206487"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/last_check.timestamp",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/log/cli-20261031_221731.log",
+      "bytes": 33240,
+      "sha256": "4a11c1f28c8be947f1b7c74d2722babdb45e002542378038f0531cdde658ce06"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/presence/e00846cb-6aeb-4d8b-804e-50b99a5ca5d6.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/settings.json",
+      "bytes": 128,
+      "sha256": "d0d53c762b32699e4f2e10f93700b966e74288b354a34375460a900656aa8208"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/updater/update.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/antigravity-cli/updater/update_status.json",
+      "bytes": 59,
+      "sha256": "71ca2ae1c9825feb1f25c5bee6327d08873035a97a0c33bac2bd60f04d10b724"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/config/.migrated",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/config/hooks.json",
+      "bytes": 424,
+      "sha256": "0438f56580db8cc1914a2a355ddffc6ca668eaf1e8d6dc6b99efbce65be4f048"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/config/mcp_config.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_tui_h3_a1/home/.gemini/config/projects/default-cli-project.json",
+      "bytes": 87,
+      "sha256": "d3128db8397d3b0e751fa26d3b6290e107a87c24e4280d0f56044382b123cf38"
+    },
+    {
+      "path": "probe_tui_h3_a1/hook.py",
+      "bytes": 831,
+      "sha256": "18c35477dfa826a0bebd3a436441f04cc4cbf2ce6b86986a46b8031194a370a5"
+    },
+    {
+      "path": "probe_tui_h3_a1/hooks.jsonl",
+      "bytes": 2415,
+      "sha256": "4d30e1a311346c155bec7cab26cc84ccfebe84a36f71aae62ab75cea6c40c5d1"
+    },
+    {
+      "path": "probe_tui_h3_a1/outside_answer.json",
+      "bytes": 75,
+      "sha256": "43d07c1f1c8d1cad5b869ea5f2281a0030c732802600e776d8d01eb640c1a559"
+    },
+    {
+      "path": "probe_tui_h3_a1/pretool_waiting",
+      "bytes": 7,
+      "sha256": "80cfa3e7f28dde4df64436b652230aff28d7779116d1369c21ef2bbf37261d71"
+    },
+    {
+      "path": "probe_tui_h3_a1/prompt.txt",
+      "bytes": 134,
+      "sha256": "c93a95555cec5a7ca846dd5fad337b6e9244d292904ff271d03f8d71b6056dba"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/annotations/1e9adf4a-ae3b-4261-896c-648dd48c3388.pbtxt",
+      "bytes": 45,
+      "sha256": "acf11c00f6e1352d58999b776879240c76908f6ae3f99083f9147403553bdd4c"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/brain/1e9adf4a-ae3b-4261-896c-648dd48c3388/.system_generated/logs/chunks/transcript/00000000.jsonl",
+      "bytes": 3263,
+      "sha256": "210b0623809db68479e0b9cad9766075c314a125f065c7ec47210d58f569346b"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/brain/1e9adf4a-ae3b-4261-896c-648dd48c3388/.system_generated/logs/chunks/transcript_full/00000000.jsonl",
+      "bytes": 3251,
+      "sha256": "7200712a4a49475d6e24cd6cd9797e6c956da73d799b4b9e4a44693b28b498a1"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/brain/1e9adf4a-ae3b-4261-896c-648dd48c3388/.system_generated/logs/transcript.jsonl",
+      "bytes": 3263,
+      "sha256": "210b0623809db68479e0b9cad9766075c314a125f065c7ec47210d58f569346b"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/brain/1e9adf4a-ae3b-4261-896c-648dd48c3388/.system_generated/logs/transcript_full.jsonl",
+      "bytes": 3251,
+      "sha256": "7200712a4a49475d6e24cd6cd9797e6c956da73d799b4b9e4a44693b28b498a1"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/brain/1e9adf4a-ae3b-4261-896c-648dd48c3388/.system_generated/messages/4010d1b5-2de8-4372-8ecb-c2964db907e9.json",
+      "bytes": 1150,
+      "sha256": "2f56659fd0cdb20a4fa551ac43f0f29aaae8277197fcb5c20700341f894f4a81"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/brain/1e9adf4a-ae3b-4261-896c-648dd48c3388/.system_generated/messages/read.json",
+      "bytes": 45,
+      "sha256": "33a4230c46911e989663d1bae2f444845266031c2b9ff0dc27f6c537e25433ad"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/brain/1e9adf4a-ae3b-4261-896c-648dd48c3388/.system_generated/steps/2/output.txt",
+      "bytes": 63,
+      "sha256": "9b3113684f496729f2787e83a31fdd9885555f5c90010dab2ffb2ea227a9b88e"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/brain/1e9adf4a-ae3b-4261-896c-648dd48c3388/.system_generated/tasks/task-2.log",
+      "bytes": 18,
+      "sha256": "f38519bd3dc5745f9cea46ea280e4e9600c5eef95bef401945c6d9aa9d6e0da7"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/cache/default_project_id.txt",
+      "bytes": 19,
+      "sha256": "31f9f362eeb86456e8dd4a3892f825bbcb090a5e19683e05d5b5847c13e1ee91"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/cache/last_conversations.json",
+      "bytes": 105,
+      "sha256": "793fdf3d79ea55decd28e3ed6bfe5f100758708f9146bd31437a422cd499f59f"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/cache/marketplaces/antigravity-plugins-official/marketplace.json",
+      "bytes": 19503,
+      "sha256": "5630d22ddb879439fee8f4f4989981119fcf721bcafdbf50f38dc15ee1c774a7"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/cache/marketplaces/antigravity-plugins-official/meta.json",
+      "bytes": 48,
+      "sha256": "08b889fc209066869ff688509fe8e95411710e1fa032f7ee8e1cd3f4825dcbd5"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/cache/marketplaces/antigravity-plugins-partners/marketplace.json",
+      "bytes": 69443,
+      "sha256": "94509e6c542bcc6f89ed2c797edd52702adcdf64c787baf1d1a447448d2db119"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/cache/marketplaces/antigravity-plugins-partners/meta.json",
+      "bytes": 48,
+      "sha256": "5ed0a37bba3ccaeed6c6e11242325bffc5275d733945a1044df47fb3304d1b9b"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/cache/onboarding.json",
+      "bytes": 111,
+      "sha256": "1aa3e7b17067c259f56b1c7feb17094172729c977d4a7fcbea030f9247c0bbe4"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/cli.log",
+      "kind": "symlink",
+      "target": "log/cli-20261031_221918.log"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/conversation_summaries.db",
+      "bytes": 20480,
+      "sha256": "8c1b77e360cc97a628c7a667db58758800e76dba5a36b0eaee672c7fe9593aa3"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/conversations/1e9adf4a-ae3b-4261-896c-648dd48c3388.db",
+      "bytes": 425984,
+      "sha256": "e95da498becd19c159cec196eb82225071de26a6cdb5e1f03494eb4a623f07f5"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/history.jsonl",
+      "bytes": 491,
+      "sha256": "4fe869e9052b744ddeccc635ea2322b9591def2114f21451827ae3111316069f"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/implicit/9227d7fb-d2ff-4de1-8b38-a210a00f9f8d.pb",
+      "bytes": 301,
+      "sha256": "2968a32ddf3bf5fbc64227436cb08707e04c219f92a8d3162160c5d49f381295"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/jetbox_summaries_proto.pb",
+      "bytes": 537,
+      "sha256": "dd00b1ccee42936d8c23e242e5cca2830ba917109979221d9b36452cb09fe088"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/last_check.timestamp",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/log/cli-20261031_221918.log",
+      "bytes": 31961,
+      "sha256": "46cd9ffafa21685fbf44e3467f0503499eea36b874aaa5a48b88e76e8ed6bf9c"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/presence/1e9adf4a-ae3b-4261-896c-648dd48c3388.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/settings.json",
+      "bytes": 132,
+      "sha256": "63b62f3c8830be5678cbbf857a95be49f7624d1d6734d51eff212c9e3953283b"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/updater/update.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/antigravity-cli/updater/update_status.json",
+      "bytes": 59,
+      "sha256": "71ca2ae1c9825feb1f25c5bee6327d08873035a97a0c33bac2bd60f04d10b724"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/config/.migrated",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/config/hooks.json",
+      "bytes": 128,
+      "sha256": "9327650992798b316421ba60cd7f6f1e304d9d8c1dfcef283650d8a1d0ce9229"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/config/mcp_config.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_w1_wake_shell/home/.gemini/config/projects/default-cli-project.json",
+      "bytes": 87,
+      "sha256": "d3128db8397d3b0e751fa26d3b6290e107a87c24e4280d0f56044382b123cf38"
+    },
+    {
+      "path": "probe_w1_wake_shell/nonce",
+      "bytes": 17,
+      "sha256": "b5cc79f971c1c50b194be688fe2a65c8a11218a9616f1453762ea563cc227773"
+    },
+    {
+      "path": "probe_w1_wake_shell/prompt.txt",
+      "bytes": 376,
+      "sha256": "53af6ca7dde289f070344ab1f40fd9e722ecdf209acdadebb40e4232b10a96d7"
+    },
+    {
+      "path": "probe_w1_wake_shell/stop.jsonl",
+      "bytes": 2078,
+      "sha256": "8230aa99eb4fd84b4859ca886981bda1dd28758a32bb79becd855b1bf62c68a4"
+    },
+    {
+      "path": "probe_w1_wake_shell/stop.py",
+      "bytes": 264,
+      "sha256": "29b2e2e63aa19b6a0222bb871481fc9ef1de94fe023ec94e864b0f5d84ac4b95"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/annotations/1f82d71f-ddba-48e4-a55d-02a5e547523b.pbtxt",
+      "bytes": 45,
+      "sha256": "f8e257557afbd57eb8bfbc25c1f1680972f761809d44a45735ba254add0565d8"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/1f82d71f-ddba-48e4-a55d-02a5e547523b/.system_generated/logs/chunks/transcript/00000000.jsonl",
+      "bytes": 3081,
+      "sha256": "b27ff38ca929b45c458b583ca7e26fea15015bd3304e593a1f7a0ec3277b8c00"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/1f82d71f-ddba-48e4-a55d-02a5e547523b/.system_generated/logs/chunks/transcript_full/00000000.jsonl",
+      "bytes": 3065,
+      "sha256": "7c1a1fb7757a690096845740d3972d527b1fdbe77ec13c381d360be52db352a9"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/1f82d71f-ddba-48e4-a55d-02a5e547523b/.system_generated/logs/transcript.jsonl",
+      "bytes": 3081,
+      "sha256": "b27ff38ca929b45c458b583ca7e26fea15015bd3304e593a1f7a0ec3277b8c00"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/1f82d71f-ddba-48e4-a55d-02a5e547523b/.system_generated/logs/transcript_full.jsonl",
+      "bytes": 3065,
+      "sha256": "7c1a1fb7757a690096845740d3972d527b1fdbe77ec13c381d360be52db352a9"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/1f82d71f-ddba-48e4-a55d-02a5e547523b/.system_generated/messages/5059d01c-0b65-4d31-b95c-89c2656ad05f.json",
+      "bytes": 752,
+      "sha256": "d7e8c5efc530f25cc40f35ce96dc394b444a6be3a455e16add98c2546fc39959"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/1f82d71f-ddba-48e4-a55d-02a5e547523b/.system_generated/messages/read.json",
+      "bytes": 45,
+      "sha256": "ae2925a09320f2544eb7daf5bc8e591287355cdc5ea307ec0826cf40d773ddf4"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/1f82d71f-ddba-48e4-a55d-02a5e547523b/.system_generated/steps/2/output.txt",
+      "bytes": 523,
+      "sha256": "1ae9076793a48e968efd65fb44cb29bd4a22b54f7b83b8752778c1492d327b62"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/1f82d71f-ddba-48e4-a55d-02a5e547523b/.system_generated/subagents/abb9b545-1003-45c7-9ddf-07a269c1ff5c.json",
+      "bytes": 263,
+      "sha256": "c8345071ad5c94342d5b1c732bfe5158ea117a2e9d21f78451f156d68df62258"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/abb9b545-1003-45c7-9ddf-07a269c1ff5c/.system_generated/logs/chunks/transcript/00000000.jsonl",
+      "bytes": 3592,
+      "sha256": "75bc95536bbc1319877896548362a27fb7fe11e51e388b4eb9aa09b36a56cce6"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/abb9b545-1003-45c7-9ddf-07a269c1ff5c/.system_generated/logs/chunks/transcript_full/00000000.jsonl",
+      "bytes": 3572,
+      "sha256": "1b2535c981e8ae2387c5c9e3d0acd5c763979674a66ca5a3da04c1c4fa37022d"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/abb9b545-1003-45c7-9ddf-07a269c1ff5c/.system_generated/logs/transcript.jsonl",
+      "bytes": 3592,
+      "sha256": "75bc95536bbc1319877896548362a27fb7fe11e51e388b4eb9aa09b36a56cce6"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/abb9b545-1003-45c7-9ddf-07a269c1ff5c/.system_generated/logs/transcript_full.jsonl",
+      "bytes": 3572,
+      "sha256": "1b2535c981e8ae2387c5c9e3d0acd5c763979674a66ca5a3da04c1c4fa37022d"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/abb9b545-1003-45c7-9ddf-07a269c1ff5c/.system_generated/messages/2546c03b-7179-442d-9a2d-0e34789121e4.json",
+      "bytes": 1090,
+      "sha256": "1d0376c7a34f16dd9a9700b6c42e88d533a3478ccad1d5f2d0644ef82592eb65"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/abb9b545-1003-45c7-9ddf-07a269c1ff5c/.system_generated/messages/b5d3c368-2eb7-440c-9b8a-979d2f40224d.json",
+      "bytes": 1148,
+      "sha256": "b5fced9e6cc60c00ca81731bb3cf652880b4b0050563ab70b198adf02dfcfed4"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/abb9b545-1003-45c7-9ddf-07a269c1ff5c/.system_generated/messages/read.json",
+      "bytes": 89,
+      "sha256": "65f34b00e8ae381e51236cf71970b6ff19da267ba71e01c877294cfee5219609"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/abb9b545-1003-45c7-9ddf-07a269c1ff5c/.system_generated/steps/2/output.txt",
+      "bytes": 63,
+      "sha256": "0342eb997b0b760561ce86b189832c2704734484658c1b1e8282122aba113ca7"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/abb9b545-1003-45c7-9ddf-07a269c1ff5c/.system_generated/steps/6/output.txt",
+      "bytes": 55,
+      "sha256": "d2d4db3e5ad5df7ac9961cec511a7d2c08d847b160b14ffc658bbae5147b988c"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/brain/abb9b545-1003-45c7-9ddf-07a269c1ff5c/.system_generated/tasks/task-2.log",
+      "bytes": 18,
+      "sha256": "4df68a584d2a64bde4290acac616e2dd005451926409e7de8c7a8cc689de6544"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/cache/default_project_id.txt",
+      "bytes": 19,
+      "sha256": "31f9f362eeb86456e8dd4a3892f825bbcb090a5e19683e05d5b5847c13e1ee91"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/cache/last_conversations.json",
+      "bytes": 108,
+      "sha256": "ab036de578e4a841e58498245274a7772143caff5fee99bd228fb8d12eea3946"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/cache/marketplaces/antigravity-plugins-official/marketplace.json",
+      "bytes": 19503,
+      "sha256": "5630d22ddb879439fee8f4f4989981119fcf721bcafdbf50f38dc15ee1c774a7"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/cache/marketplaces/antigravity-plugins-official/meta.json",
+      "bytes": 48,
+      "sha256": "08b889fc209066869ff688509fe8e95411710e1fa032f7ee8e1cd3f4825dcbd5"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/cache/marketplaces/antigravity-plugins-partners/marketplace.json",
+      "bytes": 69443,
+      "sha256": "94509e6c542bcc6f89ed2c797edd52702adcdf64c787baf1d1a447448d2db119"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/cache/marketplaces/antigravity-plugins-partners/meta.json",
+      "bytes": 48,
+      "sha256": "5ed0a37bba3ccaeed6c6e11242325bffc5275d733945a1044df47fb3304d1b9b"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/cache/onboarding.json",
+      "bytes": 111,
+      "sha256": "1aa3e7b17067c259f56b1c7feb17094172729c977d4a7fcbea030f9247c0bbe4"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/cli.log",
+      "kind": "symlink",
+      "target": "log/cli-20261031_221918.log"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/conversation_summaries.db",
+      "bytes": 20480,
+      "sha256": "8fe3150598df701be43a9e11d7501a0c3fd9b5fd303441120b0a5a1ce0527229"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/conversations/1f82d71f-ddba-48e4-a55d-02a5e547523b.db",
+      "bytes": 425984,
+      "sha256": "48ffdbcc4aa2cdce3951afed1d83699602addc7fec320a77f06a55475a9cd6e0"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/conversations/abb9b545-1003-45c7-9ddf-07a269c1ff5c.db",
+      "bytes": 425984,
+      "sha256": "85ebaf1921ec7f2ddf18d878fe75f10c4d6c916a523d4aa6fb2c9e3e50826904"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/crashes/crash_1866546_a823e2bd-3a4c-4c02-98a7-0cc15e4f03f7.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/history.jsonl",
+      "bytes": 582,
+      "sha256": "9a4ff041060dd829e7cc5898bbca52a4fc9b8060f679d4eef1b53ab980536726"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/implicit/e44b2f7d-8bf3-4223-ab47-876f15af5f64.pb",
+      "bytes": 307,
+      "sha256": "df7c5215c4965a18a0af42c2d0fb09fa21d93d41ec55ab59fd1718653b2c69cb"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/jetbox_summaries_proto.pb",
+      "bytes": 1079,
+      "sha256": "e26e485a7cf1582f1a09f697994bdbe2970beb752dd6b444fa84c3d340650948"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/last_check.timestamp",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/log/cli-20261031_221918.log",
+      "bytes": 34705,
+      "sha256": "540bc0153d34388827d0b893a7837ccee167fb3e30906c80fab8b27667693e48"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/presence/1f82d71f-ddba-48e4-a55d-02a5e547523b.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/settings.json",
+      "bytes": 135,
+      "sha256": "c1d63bbae5856155552881863a945591c6f5c41d0777fb379276ca0ed149c9a6"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/updater/update.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/antigravity-cli/updater/update_status.json",
+      "bytes": 59,
+      "sha256": "71ca2ae1c9825feb1f25c5bee6327d08873035a97a0c33bac2bd60f04d10b724"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/config/.migrated",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/config/hooks.json",
+      "bytes": 131,
+      "sha256": "ea84df6a70bbac3b5e7e0909f7b6c4d993339fd45610a00b143cdce011acb65c"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/config/mcp_config.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_w2_wake_subagent/home/.gemini/config/projects/default-cli-project.json",
+      "bytes": 87,
+      "sha256": "d3128db8397d3b0e751fa26d3b6290e107a87c24e4280d0f56044382b123cf38"
+    },
+    {
+      "path": "probe_w2_wake_subagent/nonce",
+      "bytes": 17,
+      "sha256": "a988393896aebd4c8ece215cf7ac66c0bad259ad4099319b1d25ebba7cbf85d1"
+    },
+    {
+      "path": "probe_w2_wake_subagent/prompt.txt",
+      "bytes": 462,
+      "sha256": "f877ce9555aad6d6f4d0d9c8739700d2625a92184a291b2ca4f86969dce74261"
+    },
+    {
+      "path": "probe_w2_wake_subagent/stop.jsonl",
+      "bytes": 3613,
+      "sha256": "2253c41a920dce3721174c49c23fbd98b5836c49e59299e30ec312cd42536327"
+    },
+    {
+      "path": "probe_w2_wake_subagent/stop.py",
+      "bytes": 267,
+      "sha256": "b3c5f40c8f72fb60aa1a5bfe0128d10de34014ed1a735e73ad0f62f91dac89ab"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/annotations/55146078-5f93-4654-8289-9983d64fd2ec.pbtxt",
+      "bytes": 47,
+      "sha256": "862c11d6dd8153d80774e1689a9ce00cd777e00e8f54832c42621492ad145d2f"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/annotations/87d120e7-e84e-4981-a556-6eca6daf04ec.pbtxt",
+      "bytes": 40,
+      "sha256": "e733eb039d5b2c9398b6cd35f9f58fdb8866c5eaf0d34ec01b91aa962fea20ef"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/brain/55146078-5f93-4654-8289-9983d64fd2ec/.system_generated/logs/chunks/transcript/00000000.jsonl",
+      "bytes": 5919,
+      "sha256": "2b312c68e5f3ee070961b957f79c7346d7728f70ee95f9953a078e604c967ea8"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/brain/55146078-5f93-4654-8289-9983d64fd2ec/.system_generated/logs/chunks/transcript_full/00000000.jsonl",
+      "bytes": 5891,
+      "sha256": "9788ec9dc0d9c31f923228be259b9963d8c964660ddf28a29ee74c75d6504f51"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/brain/55146078-5f93-4654-8289-9983d64fd2ec/.system_generated/logs/transcript.jsonl",
+      "bytes": 5919,
+      "sha256": "2b312c68e5f3ee070961b957f79c7346d7728f70ee95f9953a078e604c967ea8"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/brain/55146078-5f93-4654-8289-9983d64fd2ec/.system_generated/logs/transcript_full.jsonl",
+      "bytes": 5891,
+      "sha256": "9788ec9dc0d9c31f923228be259b9963d8c964660ddf28a29ee74c75d6504f51"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/brain/55146078-5f93-4654-8289-9983d64fd2ec/.system_generated/steps/3/output.txt",
+      "bytes": 61,
+      "sha256": "b1892b8c53af158a8196e4dc18f5ac3368763a40f80362f8e56a4863d9658e8d"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/brain/87d120e7-e84e-4981-a556-6eca6daf04ec/.system_generated/logs/chunks/transcript/00000000.jsonl",
+      "bytes": 4912,
+      "sha256": "475895d96beecd6d9ac363ac7851706e69f5990ca891820e9c8120498cb65d34"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/brain/87d120e7-e84e-4981-a556-6eca6daf04ec/.system_generated/logs/chunks/transcript_full/00000000.jsonl",
+      "bytes": 4912,
+      "sha256": "475895d96beecd6d9ac363ac7851706e69f5990ca891820e9c8120498cb65d34"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/brain/87d120e7-e84e-4981-a556-6eca6daf04ec/.system_generated/logs/transcript.jsonl",
+      "bytes": 4912,
+      "sha256": "475895d96beecd6d9ac363ac7851706e69f5990ca891820e9c8120498cb65d34"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/brain/87d120e7-e84e-4981-a556-6eca6daf04ec/.system_generated/logs/transcript_full.jsonl",
+      "bytes": 4912,
+      "sha256": "475895d96beecd6d9ac363ac7851706e69f5990ca891820e9c8120498cb65d34"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/cache/default_project_id.txt",
+      "bytes": 19,
+      "sha256": "31f9f362eeb86456e8dd4a3892f825bbcb090a5e19683e05d5b5847c13e1ee91"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/cache/last_conversations.json",
+      "bytes": 86,
+      "sha256": "608d401dda0b880e5aa3531270380ff29fa7d84a394c8c0fba88eb572db506dd"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/cache/onboarding.json",
+      "bytes": 111,
+      "sha256": "1aa3e7b17067c259f56b1c7feb17094172729c977d4a7fcbea030f9247c0bbe4"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/cli.log",
+      "kind": "symlink",
+      "target": "log/cli-20261031_224226.log"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/conversation_summaries.db",
+      "bytes": 20480,
+      "sha256": "ff802cd1e3cd18fa3dc56e81180c6b75017f4decd8984c42a1d5a10a57fe508a"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/conversations/55146078-5f93-4654-8289-9983d64fd2ec.db",
+      "bytes": 491520,
+      "sha256": "97a13db15015a5d29e118b1aed40068aaee1cbe8203706feee05c077dfc0b1c5"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/conversations/87d120e7-e84e-4981-a556-6eca6daf04ec.db",
+      "bytes": 425984,
+      "sha256": "e0b5832cecf5e856e3213f8513add0cbf61cf9d97801896d108a870968e0ae82"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/implicit/15779de7-c99e-489c-9f05-1629f43fe85b.pb",
+      "bytes": 483,
+      "sha256": "40335168d26b80c6cc8675e3f2e3a20c31ac1cf061917332e7a5853c714625ad"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/jetbox_summaries_proto.pb",
+      "bytes": 1543,
+      "sha256": "a7cbc52be82ff37c855e1f97bfadce8178179e55d6495a171698e5c7d7a9c2e5"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/last_check.timestamp",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/log/cli-20261031_224118.log",
+      "bytes": 31112,
+      "sha256": "48abf4905b099d62ef9a7db77bc357ba90be723a2810875f56a1037b59d88d54"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/log/cli-20261031_224226.log",
+      "bytes": 28937,
+      "sha256": "34ecefd3a1fb4163b8896f0584084dbf3cf297e2836f4c47b33b057c23d2012f"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/presence/55146078-5f93-4654-8289-9983d64fd2ec.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/presence/87d120e7-e84e-4981-a556-6eca6daf04ec.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/updater/update.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/antigravity-cli/updater/update_status.json",
+      "bytes": 59,
+      "sha256": "71ca2ae1c9825feb1f25c5bee6327d08873035a97a0c33bac2bd60f04d10b724"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/config/.migrated",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/config/hooks.json",
+      "bytes": 664,
+      "sha256": "9c238df4ddf53b64d1c020975a5e93649825dfe0084fd10422d0e5875cc6368a"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/config/mcp_config.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "probe_wired_smoke/home/.gemini/config/projects/default-cli-project.json",
+      "bytes": 87,
+      "sha256": "d3128db8397d3b0e751fa26d3b6290e107a87c24e4280d0f56044382b123cf38"
+    },
+    {
+      "path": "probe_wired_smoke/home/.local/bin/harness-state-refresh",
+      "bytes": 136,
+      "sha256": "3b1fa6081241d8926e22630396408f20bbd6e5ae9ce813781da0904551a66cdd"
+    },
+    {
+      "path": "probe_wired_smoke/home/.local/bin/tasks",
+      "bytes": 644,
+      "sha256": "f311b5e4a3def11484ae1d0ee4f61e39331de34b287f5d6e01a4b61043a5a328"
+    },
+    {
+      "path": "probe_wired_smoke/refresh_ran.txt",
+      "bytes": 4,
+      "sha256": "f4472a14b6160e58b35bfeb710d23d240ab59402cc84bc7b5a579c7373849295"
+    },
+    {
+      "path": "probe_wired_smoke/state/ops/attribution-blocks.log",
+      "bytes": 547,
+      "sha256": "e7a0a43e1e7c410bf1f5c0a2405230fbe0deea4fc848764845c842b93f7f2bca"
+    },
+    {
+      "path": "probe_wired_smoke/stop_claim_smoke.json",
+      "bytes": 995,
+      "sha256": "1e367a2d4e745b708975107faac4713a720d8128ee1f0a19b7c62ea7d48d0f47"
+    },
+    {
+      "path": "probe_wired_smoke/summary.json",
+      "bytes": 1678,
+      "sha256": "519403b02ce5bb21ff5e4967e725066337740300c97bb775ff339ce372535404"
+    }
+  ]
+}
