@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-2eba07-harness-manifest
 created: 2026-11-01T01:25:51Z
-updated: 2026-11-01T19:00:10Z
+updated: 2026-11-01T19:00:11Z
 started: 2026-11-01T09:55:45Z
 depends: []
 tags: [hooks]
@@ -73,3 +73,4 @@ Where: .githooks/{harness-state-clean,harness-state-refresh,live-picks}, facts/c
 - 2026-11-01T18:19:24Z (feat/hq-2eba07-harness-manifest): review: impl round 1 — verdict: revise; findings: Important 2, Minor 3; reviewer: claude-code/claude-opus-5-5
 - 2026-11-01T18:58:42Z (feat/hq-2eba07-harness-manifest): review: impl round 2 — verdict: accept; findings: Minor 2; reviewer: claude-code/claude-sonnet-5-5
 - 2026-11-01T19:00:10Z (feat/hq-2eba07-harness-manifest): attached: sdd-ledger-harness-manifest.md (23776 bytes): SDD plan ledger for 2026-11-01-harness-manifest: pre-flight table, every Ruling (Why/Cost), every minor (deferred), review rounds and verification lines
+- 2026-11-01T19:00:11Z (feat/hq-2eba07-harness-manifest): attached: final-review-report-round1.md (16634 bytes): Final whole-branch review round 1, claude-code/claude-opus-5-5, range 7f21b455..88450204, verbatim
