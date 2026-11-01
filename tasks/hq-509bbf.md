@@ -6,7 +6,7 @@ priority: 2
 complexity: mid
 process: direct
 created: 2026-11-01T10:53:38Z
-updated: 2026-11-01T15:29:10Z
+updated: 2026-11-01T15:29:16Z
 completed: 2026-11-01T15:29:04Z
 closed: 2026-11-01T15:29:04Z
 depends: [hq-6297cc]
@@ -28,4 +28,6 @@ step: "Task 3: Optional sources, selectors and non-append capture"
 - 2026-11-01T15:29:04Z (main): landed in 186f8164 via the SDD run of hq-57d68e
   provenance: {"harness_session":"claude-code:912255a4-e9d6-41e9-a745-b7c6fb4af0fc","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-01T15:29:10Z (main): landed in 186f8164 via the SDD run of hq-57d68e
+  provenance: {"harness_session":"claude-code:912255a4-e9d6-41e9-a745-b7c6fb4af0fc","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-01T15:29:16Z (main): landed in 186f8164 via the SDD run of hq-57d68e
   provenance: {"harness_session":"claude-code:912255a4-e9d6-41e9-a745-b7c6fb4af0fc","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
