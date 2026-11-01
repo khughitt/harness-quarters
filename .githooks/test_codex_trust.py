@@ -62,6 +62,8 @@ def repo(tmp_path):
     (repo / ".gitignore").write_text("local/\n__pycache__/\n")
     (repo / CONFIG).write_text(BASE)
     git(repo, "config", "filter.harness-state.clean", ".githooks/harness-state-clean %f")
+    git(repo, "config", "filter.harness-state.required", "true")
+    git(repo, "config", "filter.harness-state.smudge", "cat")
     git(repo, "config", "core.hooksPath", ".githooks")
     git(repo, "config", "user.email", "t@example.invalid")
     git(repo, "config", "user.name", "t")

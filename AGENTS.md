@@ -8,9 +8,12 @@ Authority: `docs/specs/2026-10-06-residue-design.md`
 
 ## Setup
 
-Run `just setup` once per checkout. It installs the git hooks and harness-state
-clean filter, and creates `local/codex/rules/`. Work settings under `local/` come
-from another configured host; setup creates directories, not private settings.
+Run `just setup` once per checkout, and again on each host after pulling a change to it.
+It installs the git hooks and the harness-state filter (`filter.harness-state.clean`,
+`required = true` so a failing clean stops git instead of staging live picks, and the
+identity `smudge = cat`, without which git fails every checkout of a required-filter
+file), and creates `local/codex/rules/`. Work settings under `local/` come from another
+configured host; setup creates directories, not private settings.
 
 ## Gates
 
@@ -19,7 +22,12 @@ There is no CI or pre-push suite here. The pre-commit hook refuses staged paths 
 `local/`, then runs `tools/ops-check` over the working tree (the hygiene checks ops
 projects share: guide references, conflicted copies, agent scratch, machine layout and
 adopted copies), then checks the guide identity regions with `tools/ops-docs check`, and
-last runs the staged `tools/harness-facts check` over the staged tree. A record commit
+last exports the staged tree once for the staged `tools/harness-facts check` and the
+staged `.githooks/harness_state.py check --staged-tree`. The latter validates
+`harnesses.toml` and `.gitattributes` as staged, refuses a staged harness config blob that
+still holds what the filter strips (fix with `git add --renormalize <path>`), and refuses
+when the repository's filter config is not what `just setup` writes (`clean`,
+`required = true`, `smudge = cat`; read from the shared config in a linked worktree too). A record commit
 that the hygiene checks refuse means a finding somewhere in the working tree, not in the
 record. A new attachment that carries host values follows the attachment fallback in
 lore `skills/references/retained-item-records.md`: keep the raw bytes under WORK_ROOT
@@ -38,9 +46,16 @@ The generated global Projects block is checked by lore.
   untracked host state. `agy/hook` adapts `agy/hooks.json` events to the ecosystem's
   profile, capture-notice, relay-guard and claim-guard contracts. `claude/mods/` holds
   Claude Code function-hook plugins; `claude/probes/` the probes behind Claude Code facts.
-- `.githooks/`: config-state filtering, Codex trust and model pick preservation, and commit checks.
+- `harnesses.toml`: the declared harnesses (`[harnesses.<name>]`) and, for each tracked
+  live config, its `[harnesses.<name>.live_state]`: path, filter glob, the keys and tables
+  the clean filter strips, and the pick units `live-picks` saves. `.gitattributes` routes
+  exactly those globs to the filter.
+- `.githooks/`: config-state filtering, Codex trust and model pick preservation, and commit
+  checks, all reading `harnesses.toml` through `.githooks/harness_state.py`, whose `check`
+  validates the manifest, `.gitattributes` and the filter config.
 - `facts/capabilities.toml` and `tools/harness-facts`: what each harness has been shown
-  to do, with the record behind each value. The tool is the only reader.
+  to do, with the record behind each value. The tool is the only reader; it takes the
+  declared harness names from `[harnesses]` in `harnesses.toml`.
 - `agents/skills/session-logs/`: session-store guidance. `agents/bin/` keeps
   session-episodes, wake-judge and their tests.
 - `pi/`: the pinned pi install (`just pi-install`), its launcher, the `settings.json`
@@ -66,7 +81,9 @@ file is hq's project guide; home links to global instructions target lore.
   publishing it would expose host and work state.
 - Treat model picks, effort and Codex trust as live state. The clean filter and trust
   hooks preserve their contract; avoid stashing or overwriting main's harness configs
-  merely to clear a modified marker. See README.md for the recovery behavior.
+  merely to clear a modified marker. See README.md for the recovery behavior. While
+  `harnesses.toml` is broken, git commands that run the filter fail closed: restore the
+  manifest (`git checkout -- harnesses.toml`), never unset `filter.harness-state.required`.
 - Enable session-archive timers only on a host with its archive configuration and
   backup destination. Archive tests must use temporary stores rather than live logs.
 - Read a capability fact through `tools/harness-facts` (`get`, `list`, or its `lookup`

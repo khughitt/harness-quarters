@@ -78,6 +78,8 @@ def repo(tmp_path):
     write_agy(repo)
     git(tmp_path, "init", "-q", "-b", "main", str(repo))
     git(repo, "config", "filter.harness-state.clean", ".githooks/harness-state-clean %f")
+    git(repo, "config", "filter.harness-state.required", "true")
+    git(repo, "config", "filter.harness-state.smudge", "cat")
     git(repo, "config", "core.hooksPath", ".githooks")
     git(repo, "config", "user.email", "t@example.invalid")
     git(repo, "config", "user.name", "t")
@@ -1601,6 +1603,11 @@ def test_pinned_pre_pi_commands_leave_the_pi_record_untouched(repo, pre_pi_hooks
         assert captured.returncode == 0, err
     before = pi_record_path(repo).read_bytes()
     install_pre_pi_hooks(repo, pre_pi_hooks)
+    # A rollback brings back the pinned commit's .gitattributes with its hooks: under the
+    # required filter, the pinned clean filter refuses the agy path it predates.
+    (repo / ".gitattributes").write_bytes(subprocess.run(
+        ["git", "-C", str(HOOKS.parent), "show", f"{PRE_PI_COMMIT}:.gitattributes"],
+        check=True, capture_output=True).stdout)
 
     with owned_process([str(repo / ".githooks" / command[0]), *command[1:]]) as result:
         _, err = result.communicate("", timeout=10)

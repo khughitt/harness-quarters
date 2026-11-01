@@ -57,6 +57,8 @@ def repo(tmp_path):
     assert Path(git(repo, "rev-parse", "--show-toplevel").stdout.strip()) == repo.resolve()
     assert Path(git(repo, "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(repo.resolve())
     git(repo, "config", "filter.harness-state.clean", ".githooks/harness-state-clean %f")
+    git(repo, "config", "filter.harness-state.required", "true")
+    git(repo, "config", "filter.harness-state.smudge", "cat")
     git(repo, "config", "user.email", "t@example.invalid")
     git(repo, "config", "user.name", "t")
     write_settings(repo, model="opus")
@@ -231,3 +233,21 @@ def test_clean_only_harness_is_filtered_and_refreshed_end_to_end(repo, tmp_path)
     assert json.loads(git(repo, "show", "HEAD:extra/settings.json").stdout) == {"theme": "x"}
     assert sorted(path.name for path in (repo / "local").glob("live-picks*")
                   if "extra" in path.name) == []
+
+
+@pytest.mark.parametrize("key, value", [("required", None), ("required", "false"),
+                                        ("smudge", None), ("smudge", "cat -u")])
+def test_refresh_refuses_when_filter_required_is_unset_or_false(repo, tmp_path, key, value):
+    write_settings(repo, model="claude-sonnet-5")
+    assert marked(repo)
+    if value is None:
+        git(repo, "config", "--unset", f"filter.harness-state.{key}")
+    else:
+        git(repo, "config", f"filter.harness-state.{key}", value)
+
+    result = refresh(repo, cwd=tmp_path)
+
+    assert result.returncode != 0
+    assert "harness-state-refresh:" in result.stderr and "just setup" in result.stderr
+    assert "Traceback" not in result.stderr
+    assert marked(repo)

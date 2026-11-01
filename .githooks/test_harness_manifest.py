@@ -1,10 +1,12 @@
 """harnesses.toml loader, validation, .gitattributes/filter-config/tree checks and cleaners."""
 import importlib.util
+import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -245,25 +247,31 @@ def test_check_filter_config_and_cli_check(tmp_path, monkeypatch):
     repo, env = init_repo(tmp_path)
     git_dir = repo / ".git"
 
-    def configure(clean=None, required=None):
-        for key in ("clean", "required"):
+    def configure(clean=None, required=None, smudge=None):
+        for key in ("clean", "required", "smudge"):
             git(repo, env, "config", "--unset", f"filter.harness-state.{key}", check=False)
         if clean is not None:
             git(repo, env, "config", "filter.harness-state.clean", clean)
         if required is not None:
             git(repo, env, "config", "filter.harness-state.required", required)
+        if smudge is not None:
+            git(repo, env, "config", "filter.harness-state.smudge", smudge)
 
     # check_filter_config spawns git with the process environment: leave only the isolated keys.
     for key in list(os.environ):
         monkeypatch.delenv(key)
     for key, value in env.items():
         monkeypatch.setenv(key, value)
-    for clean, required in ((None, "true"), ("/abs/path/harness-state-clean %f", "true"),
-                            (hs.EXPECTED_CLEAN_FILTER, None), (hs.EXPECTED_CLEAN_FILTER, "false")):
-        configure(clean, required)
-        with pytest.raises(hs.ManifestError, match="just setup"):
+    good = hs.EXPECTED_CLEAN_FILTER
+    for clean, required, smudge in ((None, "true", "cat"), ("/abs/path/harness-state-clean %f", "true", "cat"),
+                                    (good, None, "cat"), (good, "false", "cat"),
+                                    (good, "true", None), (good, "true", "cat -u"), (good, "true", "")):
+        configure(clean, required, smudge)
+        with pytest.raises(hs.ManifestError, match="just setup") as caught:
             hs.check_filter_config(git_dir)
-    configure(hs.EXPECTED_CLEAN_FILTER, "true")
+        if smudge != "cat":
+            assert "filter.harness-state.smudge" in str(caught.value)
+    configure(good, "true", "cat")
     hs.check_filter_config(git_dir)
 
 
@@ -277,6 +285,11 @@ def test_cli_check_reports_filter_config_through_isolated_subprocess(tmp_path):
     git(repo, env, "config", "filter.harness-state.clean", "/abs/harness-state-clean %f")
     result = run_check(repo, env)
     assert result.returncode == 2 and "just setup" in result.stderr
+    git(repo, env, "config", "filter.harness-state.clean", hs.EXPECTED_CLEAN_FILTER)
+    git(repo, env, "config", "--unset", "filter.harness-state.smudge")
+    result = run_check(repo, env)
+    assert result.returncode == 2 and "filter.harness-state.smudge" in result.stderr
+    assert "just setup" in result.stderr
 
 
 def test_non_object_json_is_reported_cleanly(tmp_path):
@@ -304,6 +317,7 @@ def scratch_checkout(tmp_path, pi_text):
     (repo / "pi" / "settings.json").write_text(pi_text)
     git(repo, env, "config", "filter.harness-state.clean", hs.EXPECTED_CLEAN_FILTER)
     git(repo, env, "config", "filter.harness-state.required", "true")
+    git(repo, env, "config", "filter.harness-state.smudge", "cat")
     return repo, env
 
 
@@ -378,3 +392,147 @@ def test_clean_json_and_three_arg_clean_toml(tmp_path):
     assert hs.clean_for_spec(pi, '{"deviceId": "d", "theme": "t"}') == '{\n  "theme": "t"\n}\n'
     unmatched = re.compile(r"nomatch")
     assert hs.clean_toml(text, (), (unmatched,)) == text
+
+
+def staged(repo, env, path):
+    """The staged blob of path, or None when the index has no entry for it."""
+    if not git(repo, env, "ls-files", "--stage", "--", path).stdout.strip():
+        return None
+    return git(repo, env, "show", f":{path}").stdout
+
+
+def test_required_filter_fails_closed_on_broken_manifest_without_leaking_picks(tmp_path):
+    repo, env = init_repo(tmp_path)
+    env["PATH"] = os.environ["PATH"]                  # just setup needs just
+    (repo / ".githooks").mkdir()
+    for name in ("harness_state.py", "harness-state-clean"):
+        shutil.copy2(HOOKS / name, repo / ".githooks" / name)
+    for name in ("justfile", "harnesses.toml", ".gitattributes"):
+        shutil.copy(REPO / name, repo / name)
+    (repo / ".gitignore").write_text("local/\n__pycache__/\n")
+    for folder in ("claude", "pi", "notes"):
+        (repo / folder).mkdir()
+    (repo / "claude/settings.json").write_text('{\n  "theme": "dark"\n}\n')
+    (repo / "pi/settings.json").write_text('{\n  "theme": "system"\n}\n')
+    setup = subprocess.run(["just", "setup"], cwd=repo, env=env, text=True, capture_output=True)
+    assert setup.returncode == 0, setup.stderr
+    assert git(repo, env, "config", "--get", "filter.harness-state.required").stdout.strip() == "true"
+    git(repo, env, "add", "-A")
+    git(repo, env, "commit", "-q", "--no-verify", "-m", "init")
+
+    (repo / "pi/settings.json").write_text(
+        '{\n  "theme": "system",\n  "deviceId": "dev-1",\n  "trackingId": "track-1"\n}\n')
+    (repo / "claude/settings.json").write_text('{\n  "theme": "dark",\n  "model": "opus"\n}\n')
+    (repo / "harnesses.toml").write_text("schema = [\n")
+    for path in ("pi/settings.json", "claude/settings.json"):
+        added = git(repo, env, "add", "--", path, check=False)
+        assert added.returncode != 0, path
+        assert "harness-state-clean" in added.stderr
+    assert git(repo, env, "diff", check=False).returncode != 0
+    for path in ("pi/settings.json", "claude/settings.json"):
+        blob = staged(repo, env, path)
+        assert not any(leak in blob for leak in ("dev-1", "track-1", "opus")), blob
+
+    git(repo, env, "checkout", "--", "harnesses.toml")      # the recovery: required stays set
+    for path in ("pi/settings.json", "claude/settings.json"):
+        assert git(repo, env, "add", "--", path, check=False).returncode == 0
+    assert staged(repo, env, "pi/settings.json") == '{\n  "theme": "system"\n}\n'
+    assert staged(repo, env, "claude/settings.json") == '{\n  "theme": "dark"\n}\n'
+
+    # A .toml path no filter_glob declares, routed through the filter, is refused unstaged.
+    with (repo / ".gitattributes").open("a") as attributes:
+        attributes.write("notes/*.toml filter=harness-state\n")
+    (repo / "notes/extra.toml").write_text('model = "gpt"\nkeep = 1\n')
+    added = git(repo, env, "add", "--", "notes/extra.toml", check=False)
+    assert added.returncode != 0
+    assert "not a harness config" in added.stderr
+    assert staged(repo, env, "notes/extra.toml") is None
+
+
+PRE_MANIFEST = "6b434eb"
+
+
+def test_branch_switch_across_pre_manifest_and_post_manifest_commits_with_required_filter(tmp_path):
+    """Each branch commits different filtered blobs of both configs, so every switch writes
+    them through the smudge and drops the live picks; the checked-out branch's post-checkout
+    hook puts them back from local/live-picks.json, which the last turn end captured."""
+    found = git(REPO, isolated_env(tmp_path), "rev-parse", "--verify", "--quiet",
+                f"{PRE_MANIFEST}^{{commit}}", check=False)
+    if found.returncode == 1 and not found.stderr:
+        pytest.skip(f"pre-manifest commit {PRE_MANIFEST} is absent (shallow clone)")
+    found.check_returncode()
+    repo, env = init_repo(tmp_path)
+    git(repo, env, "switch", "-q", "-c", "pre-manifest")
+    hooks = repo / ".githooks"
+    hooks.mkdir()
+    names = git(REPO, env, "ls-tree", "--name-only", PRE_MANIFEST, ".githooks/").stdout.split()
+    for name in names:
+        if Path(name).name.startswith("test_"):
+            continue
+        blob = subprocess.run(["git", "-C", str(REPO), "show", f"{PRE_MANIFEST}:{name}"], env=env,
+                              check=True, capture_output=True).stdout
+        (repo / name).write_bytes(blob)
+        (repo / name).chmod(0o755)
+    (repo / ".gitattributes").write_text("claude/settings*.json filter=harness-state\n"
+                                         "codex/config*.toml filter=harness-state\n")
+    (repo / ".gitignore").write_text("local/\n__pycache__/\n")
+    (repo / "local" / "codex").mkdir(parents=True)
+    for folder in ("claude", "codex", "pi", "agy"):
+        (repo / folder).mkdir()
+    (repo / "pi/settings.json").write_text('{\n  "theme": "system"\n}\n')       # the same on both
+    (repo / "agy/settings.json").write_text('{\n  "allowNonWorkspaceAccess": true\n}\n')
+    tracked = {"pre-manifest": ({"theme": "dark"}, "[features]\nhooks = true\n"),
+               "post-manifest": ({"theme": "dark", "verbose": True}, "[features]\nhooks = true\nweb = true\n")}
+
+    def write_tracked(branch):
+        settings, config = tracked[branch]
+        (repo / "claude/settings.json").write_text(json.dumps(settings, indent=2) + "\n")
+        (repo / "codex/config.toml").write_text(config)
+
+    write_tracked("pre-manifest")
+    git(repo, env, "config", "filter.harness-state.clean", hs.EXPECTED_CLEAN_FILTER)
+    git(repo, env, "config", "filter.harness-state.required", "true")
+    git(repo, env, "config", "filter.harness-state.smudge", "cat")
+    git(repo, env, "add", "-A")
+    git(repo, env, "commit", "-q", "--no-verify", "-m", "pre-manifest")
+
+    git(repo, env, "switch", "-q", "-c", "post-manifest")
+    for old in hooks.iterdir():
+        old.unlink()
+    for current in HOOKS.iterdir():
+        if current.is_file() and not current.name.startswith("test_"):
+            shutil.copy2(current, hooks / current.name)
+    shutil.copy(REPO / "harnesses.toml", repo / "harnesses.toml")
+    shutil.copy(REPO / ".gitattributes", repo / ".gitattributes")
+    write_tracked("post-manifest")
+    git(repo, env, "add", "-A")
+    git(repo, env, "commit", "-q", "--no-verify", "-m", "post-manifest")
+    for branch in tracked:
+        assert json.loads(git(repo, env, "show", f"{branch}:claude/settings.json").stdout) == tracked[branch][0]
+        assert git(repo, env, "show", f"{branch}:codex/config.toml").stdout == tracked[branch][1]
+
+    picks = {"model": "opus", "effortLevel": "high"}
+    codex_picks = {"model": "gpt-6.1-sol", "model_reasoning_effort": "high"}
+    settings, config = tracked["post-manifest"]
+    (repo / "claude/settings.json").write_text(json.dumps({**settings, **picks}, indent=2) + "\n")
+    (repo / "codex/config.toml").write_text(
+        'model = "gpt-6.1-sol"\nmodel_reasoning_effort = "high"\n' + config)
+    captured = subprocess.run([str(hooks / "live-picks"), "capture"], cwd=tmp_path, env=env,
+                              text=True, capture_output=True)          # the turn end's capture
+    assert captured.returncode == 0, captured.stderr
+    git(repo, env, "add", "--", "claude/settings.json", "codex/config.toml")   # and its refresh
+    git(repo, env, "config", "core.hooksPath", ".githooks")
+    assert git(repo, env, "status", "--porcelain").stdout == ""
+
+    for branch in ("pre-manifest", "post-manifest", "pre-manifest", "post-manifest"):
+        switched = git(repo, env, "switch", "-q", branch, check=False)
+        assert switched.returncode == 0, (branch, switched.stderr)
+        assert "smudge" not in switched.stderr and "failed" not in switched.stderr, switched.stderr
+        assert (repo / "harnesses.toml").exists() == (branch == "post-manifest")
+        live = json.loads((repo / "claude/settings.json").read_text())
+        assert live == {**tracked[branch][0], **picks}, (branch, live)
+        live_codex = tomllib.loads((repo / "codex/config.toml").read_text())
+        assert {k: live_codex.get(k) for k in codex_picks} == codex_picks, branch
+        assert live_codex["features"] == tomllib.loads(tracked[branch][1])["features"], branch
+        status = git(repo, env, "status", "--porcelain", check=False)
+        assert status.returncode == 0 and status.stdout == "", (branch, status.stdout, status.stderr)

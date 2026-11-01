@@ -27,6 +27,8 @@ LOCK = LOCAL / "harness-state.lock"
 MANIFEST_PATH = REPO / "harnesses.toml"
 GITATTRIBUTES_PATH = REPO / ".gitattributes"
 EXPECTED_CLEAN_FILTER = ".githooks/harness-state-clean %f"
+# Identity smudge: git treats a required filter's missing smudge as fatal on checkout.
+EXPECTED_SMUDGE_FILTER = "cat"
 FILTER_NAME = "harness-state"
 SLUG = re.compile(r"[a-z][a-z0-9-]*")
 # Header and key lines of a TOML config, for the line-preserving cleaner.
@@ -468,6 +470,12 @@ def check_filter_config(git_dir=None):
         got = required.stdout.strip() if required.returncode == 0 else "unset"
         problems.append(f"git config filter.{FILTER_NAME}.required is {got!r}, expected 'true'; "
                         "run 'just setup'")
+    smudge = config("--get", f"filter.{FILTER_NAME}.smudge")
+    if smudge.returncode != 0 or smudge.stdout.rstrip("\n") != EXPECTED_SMUDGE_FILTER:
+        got = smudge.stdout.rstrip("\n") if smudge.returncode == 0 else "unset"
+        problems.append(f"git config filter.{FILTER_NAME}.smudge is {got!r}, expected "
+                        f"{EXPECTED_SMUDGE_FILTER!r} (a required filter without a smudge fails "
+                        "every checkout); run 'just setup'")
     if problems:
         raise ManifestError(problems)
 

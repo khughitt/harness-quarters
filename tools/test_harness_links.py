@@ -263,6 +263,7 @@ def fresh_clone(tmp_path, home, repo=None):
     # Exercise the working manifest and tool, including changes not committed yet.
     shutil.copy2(repo / "links.toml", clone / "links.toml")
     shutil.copy2(repo / "harnesses.toml", clone / "harnesses.toml")
+    shutil.copy2(repo / "justfile", clone / "justfile")
     shutil.copy2(TOOL, clone / "tools/harness-links")
     shutil.copytree(repo / ".githooks", clone / ".githooks", dirs_exist_ok=True)
     shutil.copytree(repo / "relay", clone / "relay", dirs_exist_ok=True)
@@ -379,6 +380,8 @@ def test_setup_is_idempotent_and_creates_only_the_rules_directory(tmp_path):
     config = lambda key: run("-C", str(clone), "config", key).stdout.strip()
     assert config("core.hooksPath") == ".githooks"
     assert config("filter.harness-state.clean") == ".githooks/harness-state-clean %f"
+    assert config("filter.harness-state.required") == "true"
+    assert config("filter.harness-state.smudge") == "cat"
     assert run("-C", str(clone), "status", "--porcelain", "--", "local").stdout == ""   # ignored
 
 

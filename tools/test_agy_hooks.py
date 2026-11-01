@@ -732,6 +732,8 @@ def make_agy_checkout(tmp_path: Path):
         env=env,
         check=True,
     )
+    subprocess.run(["git", "-C", str(repo), "config", "filter.harness-state.required", "true"], env=env, check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "filter.harness-state.smudge", "cat"], env=env, check=True)
     subprocess.run(["git", "-C", str(repo), "add", "-A"], env=env, check=True)
     subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "init"], env=env, check=True)
 
