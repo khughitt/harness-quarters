@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3 standard library only (`tomllib`, `fcntl`, `shlex`, `json`, `socket`); pytest via `uv run --with pytest`, as hq's justfile does.
 
-**Spec:** `docs/specs/2026-11-01-turn-pause-design.md` (revision 3 accepted at `8a130e9`, wording fix `ba9178a`; revision 4 after Task 1's probes, for review at SPEC_REV). Revision 2 of this plan follows the user's 2026-11-01 ruling after Task 1's mandatory probe failure: Codex is enforced on the calls its hooks see (nested calls and function tools); the outer code-mode `exec` reaches no hook and its source is never judged; Codex spawns count from SubagentStart; Codex root calls count hooked calls, and Task 8's gate decides whether 500 still fits. Companion: lore-911121's guidance spec, records `lore/docs/specs/2026-11-01-turn-pause-guidance-design.md` at `fbae8f0d6`.
+**Spec:** `docs/specs/2026-11-01-turn-pause-design.md` (revision 3 accepted at `8a130e9`, wording fix `ba9178a`; revision 4 after Task 1's probes, for review at `762b0c04`). Revision 2 of this plan follows the user's 2026-11-01 ruling after Task 1's mandatory probe failure: Codex is enforced on the calls its hooks see (nested calls and function tools); the outer code-mode `exec` reaches no hook and its source is never judged; Codex spawns count from SubagentStart; Codex root calls count hooked calls, and Task 8's gate decides whether 500 still fits. Companion: lore-911121's guidance spec, records `lore/docs/specs/2026-11-01-turn-pause-guidance-design.md` at `fbae8f0d6`.
 
 ## Global Constraints
 
