@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-11-01T22:03:31Z
-updated: 2026-11-01T22:03:31Z
+updated: 2026-11-01T22:04:00Z
 depends: []
 tags: [hooks]
 source: hq-8af61d
@@ -30,3 +30,4 @@ Where: links.toml, harnesses.toml, agy/settings.json, tools/harness-links, tools
 
 - 2026-11-01T22:03:31Z (add): created
   provenance: {"origin":"user"}
+- 2026-11-01T22:04:00Z (main): concerns: hq-8af61d extension — onboard europa ~/.gemini/config/* links past unanchored initial settings.json and classify agy/settings.json live-state drift across titan and europa
