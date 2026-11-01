@@ -3,7 +3,7 @@
 Task: hq-9aa713. Companion: lore-911121 (what the paused agent reports and does,
 and the rule an agent follows where no hook runs), designed with this one in
 `<records root>/lore/docs/specs/2026-11-01-turn-pause-guidance-design.md`.
-Status: revision 5 for the user's review. Revision 3 was accepted at `8a130e9`;
+Status: revision 6 for the user's review. Revision 3 was accepted at `8a130e9`;
 the plan's Task 1 probes (hq-fe672f) then showed that Codex 0.166.0 fires no hook
 for its outer code-mode `exec`, which that revision's Codex enforcement assumed.
 The user chose (2026-11-01) to enforce Codex on the calls its hooks do see.
@@ -11,7 +11,10 @@ Revision 4 (`762b0c04`) made that change; round 5 (claude-code/claude-opus-5-5,
 a pre-review before the user's) found the shell validator open under zsh, Codex
 workers owned by the wrong identifier, scheduled wakes able to reset counters,
 deferred Claude Code cancellation tools unreachable while paused, and claims about
-unprobed tools; revision 5 fixes those from a third probe round. Since revision
+unprobed tools; revision 5 (`17162c3a`) fixed those from a third probe round.
+Round 6 (same reviewer, scoped) found a paused Codex goal able to keep starting
+turns, the validator's any-shell claim too broad for Codex's `shell` argument, and
+scheduled-prompt records that never expire; revision 6 fixes those. Since revision
 3, what exists today, the Codex counters, the turn unit's wake rule, the
 cancellation table, the shell validator, the Codex `exec` rule and its
 limitation, and Verification changed; the rest stands as accepted. Earlier rounds: round 3
@@ -118,7 +121,9 @@ recorded in `facts/capabilities.toml`):
   Every other Codex tool the probes called fires its hook; function tools arrive
   as `collaboration<name>` or `clock<name>`, nested tools under their own names
   (fact `hook-tool-names`). An `exec_command` that yields gets no PostToolUse at
-  the yield: one arrives only if a later `write_stdin` ends the process, and none
+  the yield: one arrived when a later `write_stdin` interrupted the process (the
+  one case probed; a `write_stdin` that only collects an already-ended process is
+  unprobed), and none
   if the process ends on its own. A deny on a worker's own nested call holds.
   `spawn_agent` takes a bare `task_name` and returns it as `/root/<name>`;
   `interrupt_agent`, `send_message` and `followup_task` target that name, and no
@@ -219,13 +224,26 @@ A background wake (a task notification, a scheduled loop tick) does not start a
 turn. That is deliberate: an unattended loop is exactly what must not reset its own
 counters, and a job an agent scheduled before a pause must not lift it. A wake that
 arrives as a `<…>` block is caught by the rule above. A scheduled prompt an agent
-wrote itself may arrive as plain text, so the hook also records the prompt of every
-scheduled wake set up in the tree (Claude Code `CronCreate` and `ScheduleWakeup`
-calls, which it sees at PreToolUse) and treats a UserPromptSubmit whose text equals
-a recorded one as a wake. The probes showed a Claude Code `ScheduleWakeup` wake
-arrives exactly so (its scheduled text, verbatim); a `CronCreate` fire was not
-observed, and the same match covers it. A Codex goal continuation fires no
-UserPromptSubmit, so it never starts a turn.
+wrote itself may arrive as plain text, so the hook keeps the session's **pending
+scheduled prompts** and treats a UserPromptSubmit whose text equals a pending one
+as a wake:
+
+- a `ScheduleWakeup` (seen at PreToolUse, its fire time from the PostToolUse
+  `scheduledFor`) is pending from 1 minute before its fire time to 10 minutes
+  after it, and is consumed by its first match;
+- a `CronCreate` job is pending while it exists: recorded at its PostToolUse
+  (its `id`), dropped at its `CronDelete`, and the whole set refreshed from the
+  `session_crons` list every Claude Code Stop payload carries, so a durable job
+  or one created before the hook was installed is covered from the first Stop.
+
+The probes showed a `ScheduleWakeup` wake arrives exactly so (its scheduled text,
+verbatim); a `CronCreate` fire was not observed, and the same match covers it.
+The cost is stated, not hidden: a prompt the user types that is identical to a
+pending scheduled prompt (a self-pacing loop that schedules `continue`, say) is
+read as a wake, and ends neither the turn nor a pause; the hook then adds one line
+of context saying so, so the agent can tell the user to rephrase. A Codex goal
+continuation fires no UserPromptSubmit, so it never starts a turn; how a paused
+Codex root stops its goal is under Cancellation.
 
 ### Counters
 
@@ -246,7 +264,9 @@ Kept per root session by the hook itself, from events it already receives:
   long it is; otherwise it counts only when under 10 minutes (model inference
   between calls). So eight back-to-back half-hour calls count four hours, a
   half-hour `wait_agent` on a quiet child counts half an hour, and a session left
-  at a question overnight counts nothing. Nothing after the turn's last event
+  at a question overnight counts nothing, unless another call is still in flight
+  meanwhile (a background worker, a yielded Codex `exec_command`), in which case
+  the wait counts as the time that call runs. Nothing after the turn's last event
   counts. The measurement script applies the same rule to transcripts, except
   the user-wait exception (it counts those calls, so its rate is an upper bound
   in that respect). For Codex, the in-flight operations are the hooked calls: a
@@ -357,11 +377,11 @@ names differ by runtime and an unlisted name is refused:
 | Stop an own background task | `TaskStop {task_id}` (2.1.316 offers no `KillShell`) | `wait` with `terminate: true` on a running `exec` cell: fires no hook, so it is never refused and stays available | the harness scopes `TaskStop` to the session; Codex `wait` cannot be checked |
 | Interrupt an own worker | `TaskStop` on a background subagent's task id or name (its description says it accepts them; not exercised live) | `interrupt_agent {target}` (hook name `collaborationinterrupt_agent`; 0.166.0 offers no `close_agent`) | Claude Code: harness-scoped. Codex: the target is a task name an allowed `spawn_agent` in this tree gave (its `task_name`, bare or as `/root/<name>`); no hook payload links a task name to the worker's `agent_id`, so names and ids are recorded separately |
 | Interrupt an own exec session | (none) | nested `write_stdin`: fires no hook, so it is never refused or checked, whatever input it sends | none possible (see the limitation below) |
-| Cancel own scheduled work | `CronDelete {id}`; `ScheduleWakeup {stop: true}` | (none) | a `CronDelete` id must have been created by this session's own `CronCreate`; `ScheduleWakeup` is scoped to the session |
+| Cancel own scheduled work | `CronDelete {id}`; `ScheduleWakeup {stop: true}` | `update_goal` setting `status` to `paused` (a goal continues, starting a new turn after each Stop, until its status is `complete`, `paused` or `blocked`) | a `CronDelete` id must be a pending job of this session; `ScheduleWakeup` and the Codex goal are scoped to the session |
 | Signal an own process | shell `kill <pid>…`, optionally with one of `-TERM`, `-INT`, `-KILL`, `-HUP` | the same through a nested `exec_command` (hook tool name `Bash`) | every target pid descends from the harness process the hook runs under (ancestry read from `/proc`), and none is that process |
 
-Claude Code defers `TaskStop`, `CronDelete` and `ScheduleWakeup`: a session loads
-their schemas through `ToolSearch` before it can call them. A `ToolSearch` whose
+Claude Code defers `TaskStop` and `CronDelete` (2.1.316's deferred list; whether
+`ScheduleWakeup` is deferred is not recorded): a session loads their schemas through `ToolSearch` before it can call them. A `ToolSearch` whose
 query is `select:` naming only cancellation tools is therefore itself in the
 cancellation class; any other `ToolSearch` is refused while paused.
 
@@ -372,15 +392,20 @@ table is corrected.
 
 **The shell validator** decides whether a shell call (Claude Code `Bash`, Codex
 nested `exec_command`, hook name `Bash`) is on the allowlist. It must hold under
-any shell the harness may run, because the hook does not see which one: Codex
-`exec_command` defaults to the user's login shell (zsh on this host) and takes
-`shell`, `login` and `tty` arguments the hook payload does not carry. zsh expands
+the shells a harness runs by default, POSIX `sh`, `bash`, `dash` and `zsh`, because
+the hook does not see which one runs: Codex `exec_command` defaults to the user's
+login shell (zsh on this host). It cannot hold for an arbitrary binary: Codex
+`exec_command` also takes a `shell` argument (and `login`, `tty`, `workdir`), and
+the hook payload carries only `command` (inferred from the payloads observed, which
+dropped every other argument the model passed; not separately probed). That gap is
+part of the unhooked-controls limitation below. zsh expands
 words POSIX `shlex` treats as plain text (`cat =(touch x)` and the glob qualifier
 `cat a(e:'touch x':)` both run a command; reproduced by the round 5 reviewer), so
 the validator reads the raw command, not only its `shlex` split:
 
-- outside quotes, every character is a letter, digit, space or one of
-  `_ . / : @ % + , = -`, and no word starts with `=` or `~`; this alone excludes
+- outside quotes, every character is an ASCII letter, an ASCII digit, a space
+  (U+0020) or one of `_ . / : @ % + , = -`, and no `shlex` word (after quote
+  removal, so `''=ls` counts) starts with `=` or `~`; this alone excludes
   `;`, `&`, `|`, redirection, `` ` ``, `$`, globs, braces, parentheses, `#`, `^`
   and newline;
 - inside single quotes, anything but a newline; inside double quotes, anything but
@@ -407,7 +432,11 @@ tool.
 `exec` cell) reach no hook in Codex 0.166.0, alongside the outer `exec`; every other tool the
 probes called is hooked, and two were never called (`request_plugin_install`,
 which the model declined, and `image_gen__imagegen`, skipped for its quota cost):
-they are refused while paused if hooked and unprobed otherwise. Three consequences:
+they are refused while paused if hooked and unprobed otherwise. The arguments of
+a hooked `exec_command` other than `command` (`shell`, `login`, `tty`, `workdir`)
+are not in its hook payload either, so an allowed command line can run under a
+binary the validator never considered (`shell: "script"` turns `-c "cat a"` into
+a file write). Three consequences:
 
 - *While paused*, an agent can still send any input to a session it opened before
   the pause (an interactive shell, an `ssh` session), and the hook neither sees nor
@@ -419,14 +448,16 @@ they are refused while paused if hooked and unprobed otherwise. Three consequenc
   or the agent's Stop (above). A turn that works only through one long-lived
   session would never reach its call limit, but would reach its active-time
   limit.
-- The mitigation is narrow: opening a *new* session needs a hooked `exec_command`,
-  which the pause refuses (once it passes the shell validator above, which no
-  session-opening command does).
+- The mitigation is narrow: opening a *new* session needs a hooked
+  `exec_command`, which the pause refuses unless its command passes the shell
+  validator, and an agent choosing an unusual `shell` binary to slip a validated
+  command past it is outside what the hook can see.
 
 This is accepted for the first release as stated, not closed. The refusal text and
 lore's rule allow only an interrupt, and agents do not use long-lived interactive
 sessions as their normal way of working. A follow-up re-probes each Codex version
-and prepares an upstream request for hooks on both, for the user to approve
+and prepares an upstream request for hooks on `write_stdin` and `wait` and for
+the full `exec_command` arguments in the hook payload, for the user to approve
 publishing.
 
 Bookkeeping and cancellation stay allowed in every state, so claim-guard's Stop
@@ -524,8 +555,9 @@ rule tells agents when to run them.
 - **Live probes, per harness**, recorded as capability facts and rerun on a
   version change (the plan's Task 1 re-probe gate). Done for Claude Code 2.1.316
   and Codex 0.166.0 in hq-fe672f: a deny holds, with its side effect prevented,
-  for a spawn, a worker wait, a shell call, a file write, an MCP call and a
-  child's own call in both harnesses; the hook names of every tool called, and
+  for a spawn, a shell call, a file write and a child's own call in both
+  harnesses, and for a worker wait and an MCP call in Codex (Claude Code offers no
+  wait tool, and its runs loaded no MCP server); the hook names of every tool called, and
   the unhooked set (Codex: outer `exec`, nested `write_stdin`, `wait`);
   PreCompact and PostCompact fire for Claude Code; SubagentStart fires per
   started child; UserPromptSubmit carries the prompt; a Claude Code task
@@ -554,13 +586,22 @@ rule tells agents when to run them.
   - the shell validator: each allowlisted command passes; each operator,
     expansion, redirection, path-qualified program, write-capable option and
     unlisted subcommand is refused, and so are the zsh forms `cat =(touch x)`,
-    `cat =ls`, `cat a(e:'touch x':)` and `cat a~b`; a Codex nested `Bash` call is
+    `cat =ls`, `cat ''=ls`, `cat a(e:'touch x':)` and `cat a~b`; a Codex nested `Bash` call is
     judged by the same validator, and a nested `apply_patch` is refused;
   - `kill` refuses process groups and broadcast targets (`kill 0`, `kill -1`,
     `kill -TERM -1`, `kill -- -1`);
   - Codex worker ownership: `interrupt_agent` passes for a task name an allowed
-    `spawn_agent` in the tree gave, in bare and `/root/` form, and is refused for
-    any other name;
+    `spawn_agent` in the tree gave, as the full path its response returns and as
+    the bare name, including a worker's own nested spawn, and is refused for any
+    other name;
+  - scheduled wakes: a fired `ScheduleWakeup` prompt within its window is a wake
+    and is consumed; the same text typed after the window is genuine; a pending
+    `CronCreate` prompt is a wake until its `CronDelete` or its absence from a
+    Stop's `session_crons`; a genuine prompt identical to a pending one is read as
+    a wake and adds the one context line;
+  - a paused Codex root can set its goal to `paused`, and any other `update_goal`
+    is refused; a yielded call closed by Stop whose PostToolUse arrives in a later
+    turn neither reopens it nor adds time;
   - Codex counting: an `exec` with three nested calls counts three root calls, one
     with no tool call counts none; spawns count from SubagentStart once per worker,
     and a refused `spawn_agent` attempt counts nothing;
