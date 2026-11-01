@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-ac67e4-agy-bootstrap
 created: 2026-11-01T22:03:31Z
-updated: 2026-11-01T22:59:28Z
+updated: 2026-11-01T22:59:30Z
 started: 2026-11-01T22:06:20Z
 depends: []
 tags: [hooks]
@@ -44,3 +44,4 @@ Where: links.toml, harnesses.toml, agy/settings.json, tools/harness-links, tools
 - 2026-11-01T22:50:08Z (feat/hq-ac67e4-agy-bootstrap): review: impl round 1 — verdict: revise; findings: Important 1, Minor 8; reviewer: claude-code/claude-opus-5-5
 - 2026-11-01T22:56:05Z (feat/hq-ac67e4-agy-bootstrap): Round 1 dispositions: I1 (running agy re-saves first-run settings after apply; sync then adopts them as base) addressed in 35ba1e80 — first-run refuses while pgrep finds agy for this uid. M3, M4, M7, M8 addressed in 35ba1e80. minor (deferred): M1 seasonalThemesOptIn opt-out may be undone by restore if agy deletes the key on opt-out (unprobed; forget is the reset); M2 first-run drops a first-run file's unrestored_keys silently (latent: agy declares none); M5 live-picks hardcodes AGY_ANCHORS while harness-links reads links.toml anchors (fails closed as 'still adopt'); M6 relink_home checks S_ISREG only, so an agy save between read and relink is lost (same gap hq-b24c39 deferred).
 - 2026-11-01T22:59:28Z (feat/hq-ac67e4-agy-bootstrap): review: impl round 2 — verdict: accept; findings: Minor 4; reviewer: claude-code/claude-opus-5-5
+- 2026-11-01T22:59:30Z (feat/hq-ac67e4-agy-bootstrap): Round 2 minor (deferred): R2-M1 a running agy that has not yet written settings.json is not checked (apply creates the link unchecked; a later save could be adopted as base by sync); R2-M2 runbook adding-a-harness.md 3.1 omits the running-agy refusal; R2-M3 plan detail says only keys are checked at apply, not running agy; R2-M4 pgrep stub ignores its arguments, and pgrep exit >=2, missing pgrep, and the harness-links-relayed running-agy refusal are untested.
