@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-2eba07-harness-manifest
 created: 2026-11-01T01:25:51Z
-updated: 2026-11-01T11:42:04Z
+updated: 2026-11-01T11:42:06Z
 started: 2026-11-01T09:55:45Z
 depends: []
 tags: [hooks]
@@ -41,3 +41,4 @@ Where: .githooks/{harness-state-clean,harness-state-refresh,live-picks}, facts/c
 - 2026-11-01T10:15:38Z (feat/hq-2eba07-harness-manifest): retention checkpoint: observed 2026-11-01T10:15:17Z on titan; basis hq in-tree . 369f0dcdc86109d61cba0dc421e6a6336b5dab80:tasks/hq-2eba07.md; retained by refs/heads/feat/hq-2eba07-harness-manifest; this host: kept verified 1, kept unknown 0, released 0; changed 1; observer attribution unknown (no session stamp resolved by tasks --stamp under agy). Rechecked all kept/verified items on this host; unknown items remain unverified with actions in basis. Other hosts retain their own dated observations. Next: await user review of frozen spec 623f6f443a024f906f9d7372a9b19fb4261303aa:docs/specs/2026-11-01-harness-manifest-design.md.
 - 2026-11-01T10:15:42Z (feat/hq-2eba07-harness-manifest): parked (waiting on user, review): User reviews frozen spec at hq (.worktrees/hq-2eba07) commit 623f6f443a024f906f9d7372a9b19fb4261303aa:docs/specs/2026-11-01-harness-manifest-design.md (sha256 b276a5afa2623591acc950054a809bf6f75d7e9a45bc32f8d82df25e83004b1e); on approval, resume hq-2eba07, write implementation plan docs/plans/2026-11-01-harness-manifest.md, file step children, and request plan review
 - 2026-11-01T11:42:04Z (feat/hq-2eba07-harness-manifest): resumed
+- 2026-11-01T11:42:06Z (feat/hq-2eba07-harness-manifest): review: spec round 1 — verdict: revise; findings: Important 4, Gap 4, Minor 4; reviewer: claude-code/claude-sonnet-5-5
