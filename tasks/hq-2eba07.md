@@ -1,13 +1,15 @@
 ---
 id: hq-2eba07
 title: Extract a declarative harness manifest so live-state hooks and capability facts read one source of truth
-status: todo
+status: doing
 priority: 2
 size: m
 complexity: mid
 process: planned
+owner: main
 created: 2026-11-01T01:25:51Z
-updated: 2026-11-01T01:30:28Z
+updated: 2026-11-01T09:55:45Z
+started: 2026-11-01T09:55:45Z
 depends: []
 tags: [hooks]
 source: hq-6c8a9f
@@ -28,3 +30,4 @@ Where: .githooks/{harness-state-clean,harness-state-refresh,live-picks}, facts/c
 
 - 2026-11-01T01:25:51Z (add): created
   provenance: {"origin":"mixed"}
+- 2026-11-01T09:55:45Z (main): started
