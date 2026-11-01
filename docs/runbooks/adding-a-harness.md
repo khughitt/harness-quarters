@@ -694,43 +694,55 @@ Register the same key, in the same change, in every reader:
 
 ## 7. Session discovery, archive and transcript readers (`hq`, `obs`)
 
-### `hq sessions` listing and `-i` resume (`hq`)
-
 Read `docs/notes/2026-10-15-session-discovery-contract.md` first: `hq sessions` keeps no
 index, reads each harness's native metadata directly, and raises `SourceError` when a
 present home's metadata is missing, unreadable or at an unexpected schema version.
 
-1. **`tools/hq_cli/sessions.py`**: add `Home(name, harness, kind, path)` entries to
-   `homes(user_home)`, and implement `read_<name>(home)` returning `list[Session]` (or
-   `(list[Session], Skipped)` like `read_claude`, or taking `(home, archived)` like
-   `read_codex`), populating `home`, `id`, `cwd`, `recency_ms`, `label`, `transcript`,
-   plus `excluded="non-interactive"` or `"transcript gone"` and `archived=True` where
-   applicable. Split JSONL on `"\n"`, not `str.splitlines()`, which breaks on `U+2028`
-   inside JSON strings.
-2. **`tools/hq_cli/color.py` and `cli.py`**: define `<NAME> = Colour(oklch(L, C, H),
-   <xterm-256-index>)` whose 24-bit and xterm-256 forms both reach
-   `contrast(..., DARK) >= 3` and `contrast(..., LIGHT) >= 3`; add `<name>` to
-   `--harness` `choices`, dispatch `read_<name>` and the footer counts in `collect()`,
-   and register `"<name>": color.<NAME>` in `harness_hue` (widening
-   `pad(s.home.harness, 6)` for a longer name).
-3. **`tools/hq_cli/launch.py` and `tools/hq.toml`**: add the resume argv shape in
-   `argv(session, flags)`; for a work home selected by environment variable, register
-   `<name>: "<HOME_ENV_VAR>"` in `HOME_VARIABLES`; add `[homes.<home-name>]`
-   `flags = [...]` to `tools/hq.toml`.
+One module per harness carries all of it: `tools/harness_stores/<name>.py` exports an
+`ADAPTER` (`tools/harness_stores/model.py`, `Adapter`). `hq sessions`, `session-archive`
+and `session-episodes` each read the registry, so a new harness is not threaded through
+their code. Use `claude.py`, `codex.py` and `agy.py` as models (agy is the one whose
+transcript does not name its own working directory).
+
+### The adapter (`hq`)
+
+1. **`tools/harness_stores/<name>.py`**: define the `Adapter` fields: `slug` (the key in
+   `facts/capabilities.toml`), `alias` (the `hq sessions --harness` value),
+   `colour`, `home_variable` (the environment variable naming a work home, or `None`),
+   `homes(user_home)` returning `Home` entries, `list_sessions(home, archived)` returning
+   `(list[Session], counts)`, `notes_segment` for the footer, `exclusion_reasons`,
+   `resume_argv(session, flags)`, `archive_sources(user_home)`, `episode_env` and
+   `episode_root`. `Session` carries `home`, `id`, `cwd` (`None` when the transcript store
+   cannot name one; listing and launch then refuse the row, they never guess), `recency_ms`,
+   `label`, `transcript`, and `excluded` (`"non-interactive"`, `"transcript gone"` or a
+   reason of your own listed in `exclusion_reasons`). Split JSONL on `"\n"`, not
+   `str.splitlines()`, which breaks on `U+2028` inside JSON strings. A source that has
+   drifted raises `SourceError` naming the file; never return an empty list for it.
+2. **Register it** in `tools/harness_stores/__init__.py` (`ADAPTERS`; the order is the
+   display order).
+3. **Colour and flags**: define `<NAME> = Colour(oklch(L, C, H), <xterm-256-index>)` in
+   `tools/hq_cli/color.py`, with both its 24-bit and xterm-256 forms reaching
+   `contrast(..., DARK) >= 3` and `contrast(..., LIGHT) >= 3`, and add
+   `[homes.<home-name>]` `flags = [...]` to `tools/hq.toml`. For a work home selected by
+   an environment variable, set `home_variable` on the adapter.
 
 ### Transcript capture and pruning (`tools/session_archive/`)
 
-1. Add `Source(name, kind, home, root, pruned)` entries to `sources(home)` in
-   `tools/session_archive/config.py`, passing `pruned=False` explicitly (it has no
-   default). `capture` is `kind`-agnostic: it walks regular files under `Source.root`,
-   skips files mutated mid-copy (`"busy"`), and keeps non-append rewrites under
-   `versions/` (`"diverged"`). Scope `Source.root` to the transcript subdirectory, not
-   the home, so mutable SQLite/WAL databases stay outside it.
+1. Declare sources in the adapter's `archive_sources(user_home)` as
+   `Source(name, harness, home, root, prune, ...)`, passing `prune=None` (the archive
+   does not prune it) explicitly, as it has no default. Use `required=False` for a home that may be absent
+   on an archive host, so a host without it skips the source instead of aborting the
+   run. Narrow a source with `descend` and `select` (agy's brain tree holds many
+   files that are not transcripts), and set `append_only=True` only for files that
+   grow by appending; a database rewritten in place is `append_only=False` so the
+   mirror rotates it. `capture` walks regular files under `Source.root`, skips files
+   mutated mid-copy (`"busy"`), and keeps non-append rewrites under `versions/`
+   (`"diverged"`).
 2. `check_sources()` runs before every `session-archive` command and aborts the whole
-   run (`EX_HOST`), for every harness, if any `Source.root` is a symlink or missing.
-   Once a `Source` lands, run `mkdir -p <Source.root>` on **every** archive-configured
-   host before the daily capture timer runs.
-3. Pruning stays off (`pruned=False`) until `<obs-checkout>` indexes the store at
+   run (`EX_HOST`), for every harness, if a required `Source.root` is a symlink or
+   missing. Once a required `Source` lands, run `mkdir -p <Source.root>` on **every**
+   archive-configured host before the daily capture timer runs.
+3. Pruning stays off (`prune=None`) until `<obs-checkout>` indexes the store at
    contract-2 readiness (see `docs/specs/2026-09-30-session-archive-design.md`), the
    `claude`-else-`codex` branches in `tools/session_archive/inputs.py`, `decide.py` and
    `prune.py` dispatch `<kind>` explicitly, and live pruning is separately approved.
@@ -743,12 +755,19 @@ present home's metadata is missing, unreadable or at an unexpected schema versio
 
 1. **`agents/skills/session-logs/SKILL.md`**: document the live store path, the session
    unit (JSONL file, SQLite database, or per-conversation directory), record types,
-   subagent storage, and the markers that tell human prompts from injected context.
-2. **`agents/bin/session-episodes`**: wires only Claude Code and Codex; a third store
-   needs `INTERACTIVE`, `_roots()` / `scan_stores()`, and the `CLAUDE_HARNESS`-else-Codex
-   branches in `turn_after()` and `_session_for()`, kept in step with the obs adapter's
+   subagent storage, how a tool result is paired with its call (by id or by position),
+   and the markers that tell human prompts from injected context.
+2. **`agents/bin/session-episodes`**: add the harness to `READERS` (slug to glob,
+   header reader, full reader and turn function) and to `INTERACTIVE`; roots come from
+   the adapter's `episode_env` and `episode_root`, so `_roots()` needs no edit. A
+   harness stays out of `DEFAULT_HARNESSES` (readable only with `--harness <name>`)
+   until its episodes are judged useful. Keep the reader in step with the obs adapter's
    prompt stripping.
-3. **`<obs-checkout>`**: implement `<name>_adapter.py` (session metadata, turns, usage,
+3. **Capability facts**: record what the store cannot do as facts rather than prose:
+   `tool-result-call-ids`, `session-metadata-marks-headless`, `transcript-self-describing`
+   and `session-archive-complete` (section 4). A `false` is an answer; an unprobed
+   value is `unknown`.
+4. **`<obs-checkout>`**: implement `<name>_adapter.py` (session metadata, turns, usage,
    tool and shell calls, skill reads, hook runs, turn-end reasons, truncation markers)
    and register it in `stores.py` (`ADAPTERS`, `SKILL_COVERAGE`, `store_roots()` with an
    `OBS_<NAME>_...` override so tests never read live homes, `_paths()`, `_peek_cwd()`,
@@ -761,7 +780,7 @@ present home's metadata is missing, unreadable or at an unexpected schema versio
    `tools/archive_replay_rehearsal.py`, `tools/retention_readiness.py`, the README's
    `--harness` text, and tests that pass a fixed harness list to `stores.run` or assert
    exact skills coverage.
-4. Run the adapter against the real local store (`obs index`) and verify `tt_runs`
+5. Run the adapter against the real local store (`obs index`) and verify `tt_runs`
    session-key joins before enabling archive pruning.
 
 ## 8. Rollout
