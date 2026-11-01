@@ -1541,3 +1541,343 @@ def test_pinned_pre_pi_commands_leave_the_agy_record_untouched(repo, pre_pi_hook
         assert result.returncode == 0, err
     assert agy_record_path(repo).read_bytes() == before
     assert AGY not in record(repo)
+
+
+def agy_env(home):
+    return {
+        "PATH": os.environ["PATH"],
+        "HOME": str(home),
+        "XDG_CONFIG_HOME": str(home / ".config"),
+        "XDG_STATE_HOME": str(home / ".local/state"),
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@example.invalid",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@example.invalid",
+        "PYTHONDONTWRITEBYTECODE": "1",
+    }
+
+
+def isolated_git(repo, home, *args, check=True):
+    return subprocess.run(["git", "-C", str(repo), *args], env=agy_env(home), check=check,
+                          text=True, capture_output=True)
+
+
+def isolated_picks(repo, home, *args):
+    return subprocess.run([str(repo / ".githooks/live-picks"), *args], cwd=repo.parent,
+                          env=agy_env(home), text=True, capture_output=True)
+
+
+def isolated_refresh(repo, home):
+    return subprocess.run([str(repo / ".githooks/harness-state-refresh")], cwd=repo.parent,
+                          env=agy_env(home), input="", text=True, capture_output=True)
+
+
+def anchor_agy_home(repo, tmp_path):
+    home = tmp_path / "agy-home"
+    (home / ".gemini/antigravity-cli").mkdir(parents=True)
+    (home / ".gemini/config").mkdir(parents=True)
+    assert Path(isolated_git(repo, home, "rev-parse", "--show-toplevel").stdout.strip()).resolve() == repo.resolve()
+    assert repo.resolve() in Path(isolated_git(repo, home, "rev-parse", "--absolute-git-dir").stdout.strip()).resolve().parents
+    hooks = repo / "agy/hooks.json"
+    if not hooks.exists():
+        hooks.write_text("{}\n")
+        isolated_git(repo, home, "add", "agy/hooks.json")
+        isolated_git(repo, home, "commit", "-q", "-m", "track agy hooks")
+    (home / ".gemini/config/hooks.json").symlink_to(hooks)
+    link = home / ".gemini/antigravity-cli/settings.json"
+    link.symlink_to(repo / AGY)
+    return home, link
+
+
+def atomic_agy_save(link, data):
+    tmp = link.with_name(".settings.json.agy-tmp")
+    tmp.write_text(json.dumps(data, indent=2) + "\n")
+    tmp.chmod(0o600)
+    os.replace(tmp, link)
+
+
+def test_agy_atomic_replace_is_adopted_and_relinked_on_refresh(repo, tmp_path):
+    home, link = anchor_agy_home(repo, tmp_path)
+    save_agy(repo)
+    atomic_agy_save(link, {
+        **AGY_BASE,
+        "model": "Gemini 4 Argon (High)",
+        "trustedWorkspaces": ["/work/a", "/work/b"],
+    })
+    assert not link.is_symlink()
+
+    result = isolated_refresh(repo, home)
+
+    assert result.returncode == 0, result.stderr
+    assert link.is_symlink()
+    assert link.resolve() == (repo / AGY).resolve()
+    want_picks = {
+        **AGY_VALUES,
+        "model": "Gemini 4 Argon (High)",
+        "trustedWorkspaces": ["/work/a", "/work/b"],
+    }
+    assert agy_settings(repo) == {**AGY_BASE, **want_picks}
+    assert json.loads(agy_record_path(repo).read_text()) == {AGY: {"state": "set", "values": want_picks}}
+    assert isolated_git(repo, home, "status", "--porcelain").stdout == ""
+    assert isolated_git(repo, home, "diff", "--cached", "--quiet", check=False).returncode == 0
+
+
+def test_agy_atomic_replace_preserves_non_pick_config_change_unstaged(repo, tmp_path):
+    home, link = anchor_agy_home(repo, tmp_path)
+    atomic_agy_save(link, {
+        **AGY_BASE,
+        "queuedMessages": "send-immediately",
+        "model": "Gemini 4 Argon (High)",
+        "trustedWorkspaces": ["/work/a"],
+    })
+
+    result = isolated_refresh(repo, home)
+
+    assert result.returncode == 0, result.stderr
+    assert link.is_symlink() and link.resolve() == (repo / AGY).resolve()
+    assert agy_settings(repo) == {
+        **AGY_BASE,
+        "queuedMessages": "send-immediately",
+        "model": "Gemini 4 Argon (High)",
+        "trustedWorkspaces": ["/work/a"],
+    }
+    assert json.loads(agy_record_path(repo).read_text()) == {
+        AGY: {"state": "set", "values": {"model": "Gemini 4 Argon (High)", "trustedWorkspaces": ["/work/a"]}}
+    }
+    assert isolated_git(repo, home, "status", "--porcelain").stdout == f" M {AGY}\n"
+    diff = isolated_git(repo, home, "diff", "--", AGY).stdout
+    assert '"queuedMessages": "send-immediately"' in diff
+    assert '"model"' not in diff
+    assert isolated_git(repo, home, "diff", "--cached", "--quiet", check=False).returncode == 0
+
+
+def test_agy_detached_capture_while_index_locked_touches_only_record_until_unlocked(repo, tmp_path):
+    home, link = anchor_agy_home(repo, tmp_path)
+    repo_before = (repo / AGY).read_bytes()
+    before_tree = isolated_git(repo, home, "write-tree").stdout
+    atomic_agy_save(link, {
+        **AGY_BASE,
+        "model": "Gemini 4 Argon (High)",
+        "trustedWorkspaces": ["/work/a"],
+    })
+    lock = Path(isolated_git(repo, home, "rev-parse", "--path-format=absolute", "--git-path", "index.lock").stdout.strip())
+    lock.write_text("")
+
+    locked_run = isolated_refresh(repo, home)
+
+    assert locked_run.returncode == 0, locked_run.stderr
+    assert json.loads(agy_record_path(repo).read_text()) == {
+        AGY: {"state": "set", "values": {"model": "Gemini 4 Argon (High)", "trustedWorkspaces": ["/work/a"]}}
+    }
+    assert (repo / AGY).read_bytes() == repo_before
+    assert not link.is_symlink()
+    lock.unlink()
+    assert isolated_git(repo, home, "write-tree").stdout == before_tree
+
+    unlocked_run = isolated_refresh(repo, home)
+
+    assert unlocked_run.returncode == 0, unlocked_run.stderr
+    assert link.is_symlink() and link.resolve() == (repo / AGY).resolve()
+    assert agy_settings(repo) == {
+        **AGY_BASE,
+        "model": "Gemini 4 Argon (High)",
+        "trustedWorkspaces": ["/work/a"],
+    }
+    assert isolated_git(repo, home, "status", "--porcelain").stdout == ""
+
+
+@pytest.mark.parametrize("rewrite", ["merge", "switch", "checkout", "rebase", "reset"])
+def test_agy_git_rewrites_adopt_detached_picks_onto_checked_out_settings_and_relink(repo, tmp_path, rewrite):
+    home, link = anchor_agy_home(repo, tmp_path)
+    isolated_git(repo, home, "switch", "-q", "-c", "side")
+    write_agy(repo, allowNonWorkspaceAccess=False)
+    isolated_git(repo, home, "add", AGY)
+    isolated_git(repo, home, "commit", "-q", "-m", "side settings")
+    isolated_git(repo, home, "switch", "-q", "main")
+    if rewrite == "rebase":
+        (repo / "u").write_text("main\n")
+        isolated_git(repo, home, "add", "u")
+        isolated_git(repo, home, "commit", "-q", "-m", "main")
+    detached_picks = {
+        "model": "Gemini 4 Argon (High)",
+        "effort": "high",
+        "effortByBase": {"Gemini 4 Argon": "high"},
+        "trustedWorkspaces": ["/work/a", "/work/c"],
+    }
+    atomic_agy_save(link, {**AGY_BASE, **detached_picks})
+    if rewrite == "reset":
+        old_ns = (repo / AGY).stat().st_mtime_ns - 1_000_000_000
+        os.utime(link, ns=(old_ns, old_ns))
+        isolated_git(repo, home, "reset", "-q", "--hard", "side")
+        result = isolated_refresh(repo, home)
+        assert result.returncode == 0, result.stderr
+    elif rewrite == "checkout":
+        write_agy(repo, allowNonWorkspaceAccess=False)
+        result = isolated_git(repo, home, "checkout", "--", AGY)
+        assert result.stderr == ""
+    else:
+        result = isolated_git(repo, home, rewrite, "-q", "side")
+        assert result.stderr == "" or rewrite == "rebase"
+
+    assert link.is_symlink() and link.resolve() == (repo / AGY).resolve()
+    want_allow = True if rewrite == "checkout" else False
+    assert agy_settings(repo) == {**AGY_BASE, **detached_picks, "allowNonWorkspaceAccess": want_allow}
+    assert json.loads(agy_record_path(repo).read_text()) == {AGY: {"state": "set", "values": detached_picks}}
+    assert isolated_git(repo, home, "status", "--porcelain").stdout == ""
+
+
+def test_agy_git_hooks_not_rewriting_agy_preserve_detached_non_pick_edits(repo, tmp_path):
+    home, link = anchor_agy_home(repo, tmp_path)
+    isolated_git(repo, home, "switch", "-q", "-c", "other-only")
+    (repo / "other.txt").write_text("other\n")
+    isolated_git(repo, home, "add", "other.txt")
+    isolated_git(repo, home, "commit", "-q", "-m", "touch other file only")
+    isolated_git(repo, home, "switch", "-q", "main")
+
+    save_agy(repo)
+    assert isolated_refresh(repo, home).returncode == 0
+    atomic_agy_save(link, {
+        **AGY_BASE,
+        "queuedMessages": "send-immediately",
+        **AGY_VALUES,
+        "model": "Gemini 4 Argon (High)",
+    })
+
+    switched = isolated_git(repo, home, "switch", "-q", "-c", "feature")
+
+    assert switched.returncode == 0, switched.stderr
+    assert link.is_symlink() and link.resolve() == (repo / AGY).resolve()
+    assert agy_settings(repo) == {
+        **AGY_BASE,
+        "queuedMessages": "send-immediately",
+        **AGY_VALUES,
+        "model": "Gemini 4 Argon (High)",
+    }
+    assert isolated_git(repo, home, "status", "--porcelain", "--", AGY).stdout == f" M {AGY}\n"
+
+    isolated_git(repo, home, "checkout", "--", AGY)
+    isolated_git(repo, home, "switch", "-q", "main")
+    atomic_agy_save(link, {
+        **AGY_BASE,
+        "permissions": {"allow": ["Bash(just test)"], "deny": []},
+        **AGY_VALUES,
+    })
+
+    merged = isolated_git(repo, home, "merge", "-q", "--no-ff", "other-only", "-m", "merge other")
+
+    assert merged.returncode == 0, merged.stderr
+    assert link.is_symlink() and link.resolve() == (repo / AGY).resolve()
+    assert agy_settings(repo) == {
+        **AGY_BASE,
+        "permissions": {"allow": ["Bash(just test)"], "deny": []},
+        **AGY_VALUES,
+    }
+    assert isolated_git(repo, home, "status", "--porcelain", "--", AGY).stdout == f" M {AGY}\n"
+
+    isolated_git(repo, home, "checkout", "--", AGY)
+    assert isolated_picks(repo, home, "forget", AGY).returncode == 0
+    assert isolated_refresh(repo, home).returncode == 0
+    old_ns = (repo / AGY).stat().st_mtime_ns - 1_000_000_000
+    os.utime(repo / AGY, ns=(old_ns, old_ns))
+    atomic_agy_save(link, {
+        **AGY_BASE,
+        "queuedMessages": "send-immediately",
+    })
+
+    switched_empty = isolated_git(repo, home, "switch", "-q", "-c", "no-picks-feature")
+
+    assert switched_empty.returncode == 0, switched_empty.stderr
+    assert link.is_symlink() and link.resolve() == (repo / AGY).resolve()
+    assert agy_settings(repo) == {
+        **AGY_BASE,
+        "queuedMessages": "send-immediately",
+    }
+    assert isolated_git(repo, home, "status", "--porcelain", "--", AGY).stdout == f" M {AGY}\n"
+
+
+def test_agy_forget_adopts_non_pick_settings_clears_picks_and_relinks(repo, tmp_path):
+    home, link = anchor_agy_home(repo, tmp_path)
+    save_agy(repo)
+    atomic_agy_save(link, {
+        **AGY_BASE,
+        "queuedMessages": "send-immediately",
+        **AGY_VALUES,
+    })
+
+    result = isolated_picks(repo, home, "forget", AGY)
+
+    assert result.returncode == 0, result.stderr
+    assert link.is_symlink() and link.resolve() == (repo / AGY).resolve()
+    assert agy_settings(repo) == {**AGY_BASE, "queuedMessages": "send-immediately"}
+    assert json.loads(agy_record_path(repo).read_text()) == {AGY: {"state": "default"}}
+    assert isolated_git(repo, home, "status", "--porcelain").stdout == f" M {AGY}\n"
+
+
+def test_agy_unanchored_home_regular_file_is_left_untouched(repo, tmp_path):
+    home = tmp_path / "unanchored-home"
+    (home / ".gemini/antigravity-cli").mkdir(parents=True)
+    regular = home / ".gemini/antigravity-cli/settings.json"
+    raw = '{"trustedWorkspaces": ["/unanchored"]}\n'
+    regular.write_text(raw)
+    repo_before = (repo / AGY).read_bytes()
+
+    result = isolated_picks(repo, home, "sync")
+
+    assert result.returncode == 0, result.stderr
+    assert not regular.is_symlink()
+    assert regular.read_text() == raw
+    assert (repo / AGY).read_bytes() == repo_before
+    assert not agy_record_path(repo).exists()
+
+
+def test_agy_corrupt_detached_file_or_record_refuses_without_clobbering(repo, tmp_path):
+    home, link = anchor_agy_home(repo, tmp_path)
+    write_claude(repo, model="sonnet")
+    repo_before = (repo / AGY).read_bytes()
+    link.unlink()
+    link.write_text("{corrupt\n")
+
+    bad_file = isolated_picks(repo, home, "sync")
+
+    assert bad_file.returncode != 0
+    assert "does not parse" in bad_file.stderr
+    assert not link.is_symlink() and link.read_text() == "{corrupt\n"
+    assert (repo / AGY).read_bytes() == repo_before
+    assert record(repo)[CLAUDE] == {"state": "set", "values": {"model": "sonnet"}}
+
+    atomic_agy_save(link, {**AGY_BASE, **AGY_VALUES})
+    agy_record_path(repo).write_text("{corrupt-record\n")
+
+    bad_record = isolated_picks(repo, home, "sync")
+
+    assert bad_record.returncode != 0
+    assert "local/live-picks-agy.json" in bad_record.stderr
+    assert agy_record_path(repo).read_text() == "{corrupt-record\n"
+    assert not link.is_symlink()
+    assert (repo / AGY).read_bytes() == repo_before
+
+
+def test_agy_foreign_symlink_is_ignored_and_directory_at_link_is_refused(repo, tmp_path):
+    home, link = anchor_agy_home(repo, tmp_path)
+    foreign = tmp_path / "foreign-settings.json"
+    foreign.write_text('{"model": "Foreign"}\n')
+    link.unlink()
+    link.symlink_to(foreign)
+
+    foreign_res = isolated_picks(repo, home, "sync")
+
+    assert foreign_res.returncode == 0, foreign_res.stderr
+    assert os.readlink(link) == str(foreign)
+    assert not agy_record_path(repo).exists()
+
+    link.unlink()
+    link.mkdir()
+
+    dir_res = isolated_picks(repo, home, "sync")
+
+    assert dir_res.returncode != 0
+    assert "not a regular file" in dir_res.stderr
+    assert "Traceback" not in dir_res.stderr
+    assert link.is_dir() and not link.is_symlink()

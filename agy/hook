@@ -3,10 +3,13 @@
 
 Bridges agy's camelCase JSON hook protocol (where hooks run with cwd set to the config
 directory containing hooks.json) to the ecosystem's harness-neutral hooks:
-- SessionStart: runs profile and capture-notice delegates in workspacePaths[0] and
-  wraps their combined text in agy's injectSteps.systemMessage envelope.
-- PreToolUse: translates agy's run_command PreToolHookArgs into a schema-1 before-tool
-  relay-guard envelope and fails closed on any unreadable payload or guard error.
+- SessionStart: heals any detached `~/.gemini/antigravity-cli/settings.json` regular file
+  through `.githooks/harness-state-refresh`, runs profile and capture-notice delegates in
+  workspacePaths[0], and wraps their combined text in agy's injectSteps.systemMessage
+  envelope.
+- PreToolUse: heals any detached `~/.gemini/antigravity-cli/settings.json` regular file,
+  translates agy's run_command PreToolHookArgs into a schema-1 before-tool relay-guard
+  envelope, and fails closed on any unreadable payload or guard error.
 - Stop: enforces a one-shot live task claim check for agy:<conversationId> (allowing
   in-flight waking children when controller-wake is probed true and fullyIdle is false)
   until ops-33cef9 adds native agy support to claim-guard.
@@ -15,6 +18,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import stat
 import subprocess
 import sys
 
@@ -68,7 +72,45 @@ def _profile_failure_line(detail):
     return f"profile: unresolved — {detail}; run ops-profile session"
 
 
+def refresh_detached_settings(env):
+    """Best-effort adopt and relink `~/.gemini/antigravity-cli/settings.json` when agy replaced it."""
+    home = env.get("HOME")
+    if not isinstance(home, str) or not home or "\x00" in home:
+        return
+    settings = Path(home) / ".gemini" / "antigravity-cli" / "settings.json"
+    try:
+        mode = settings.lstat().st_mode
+    except OSError:
+        return
+    if not stat.S_ISREG(mode):
+        return
+    refresh = ROOT / ".githooks" / "harness-state-refresh"
+    if not refresh.is_file():
+        return
+    child_env = {k: v for k, v in env.items() if k != "CLAUDE_ENV_FILE"}
+    child_env["PYTHONDONTWRITEBYTECODE"] = "1"
+    try:
+        done = subprocess.run(
+            [sys.executable, "-B", str(refresh)],
+            input="",
+            env=child_env,
+            capture_output=True,
+            text=True,
+            timeout=TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        sys.stderr.write(f"agy-hook: harness-state-refresh timed out after {TIMEOUT_S} s\n")
+        return
+    except OSError as error:
+        sys.stderr.write(f"agy-hook: harness-state-refresh failed ({error})\n")
+        return
+    if done.returncode != 0:
+        detail = done.stderr.strip() or f"exit {done.returncode}"
+        sys.stderr.write(f"agy-hook: {detail}\n")
+
+
 def handle_session_start(delegates, stdin_text, env):
+    refresh_detached_settings(env)
     blocks = []
     if not stdin_text.strip():
         payload = None
@@ -144,6 +186,7 @@ def _deny(reason):
 
 
 def handle_pre_tool_use(guard_target, stdin_text, env):
+    refresh_detached_settings(env)
     try:
         payload = json.loads(stdin_text)
     except (ValueError, TypeError, RecursionError) as error:

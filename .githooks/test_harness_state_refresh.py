@@ -137,3 +137,46 @@ def test_an_agy_model_or_trust_mark_is_cleared(repo, tmp_path):
     assert result.returncode == 0, result.stderr
     assert not marked(repo, AGY_SETTINGS)
     assert git(repo, "diff", "--cached", "--quiet", check=False).returncode == 0
+
+
+def test_an_agy_replaced_regular_file_is_adopted_relinked_and_unmarked(repo, tmp_path):
+    import os
+    home = tmp_path / "home"
+    (home / ".gemini/antigravity-cli").mkdir(parents=True)
+    (home / ".gemini/config").mkdir(parents=True)
+    env = {
+        "PATH": os.environ["PATH"],
+        "HOME": str(home),
+        "XDG_CONFIG_HOME": str(home / ".config"),
+        "XDG_STATE_HOME": str(home / ".local/state"),
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@example.invalid",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@example.invalid",
+        "PYTHONDONTWRITEBYTECODE": "1",
+    }
+    (repo / "agy/hooks.json").write_text("{}\n")
+    subprocess.run(["git", "-C", str(repo), "add", "agy/hooks.json"], env=env, check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "hooks"], env=env, check=True)
+    (home / ".gemini/config/hooks.json").symlink_to(repo / "agy/hooks.json")
+    link = home / ".gemini/antigravity-cli/settings.json"
+    link.write_text(json.dumps({
+        "allowNonWorkspaceAccess": True,
+        "model": "Gemini 4 Argon (High)",
+        "permissions": {"allow": ["command(tasks)"]},
+        "trustedWorkspaces": ["/work/a", "/work/b"],
+    }, indent=2) + "\n")
+    link.chmod(0o600)
+
+    result = subprocess.run([str(repo / ".githooks/harness-state-refresh")], cwd=tmp_path,
+                            env=env, input='{"hook_event_name":"Stop"}', text=True,
+                            capture_output=True)
+
+    assert result.returncode == 0, result.stderr
+    assert link.is_symlink() and link.resolve() == (repo / AGY_SETTINGS).resolve()
+    assert json.loads((repo / AGY_SETTINGS).read_text())["model"] == "Gemini 4 Argon (High)"
+    assert not marked(repo, AGY_SETTINGS)
+    assert subprocess.run(["git", "-C", str(repo), "status", "--porcelain"], env=env,
+                          text=True, capture_output=True).stdout == ""
