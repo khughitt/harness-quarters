@@ -26,3 +26,18 @@ def test_both_codex_homes_guard_root_and_worker(file, home):
     assert parse_relay_command(others[1], HOOK_VERSIONS[f'codex/{file}']) == ('codex', 600000, 'Stop')
     manifest = tomllib.loads((ROOT / 'links.toml').read_text())
     assert manifest['harness'][home]['links']['hooks.json'] == f'codex/{file}'
+
+
+def test_agy_home_guards_pretooluse_and_stop():
+    hooks = json.loads((ROOT / 'agy' / 'hooks.json').read_text())['hq']
+    pre_tool = [
+        (group['matcher'], h['command'])
+        for group in hooks['PreToolUse']
+        for h in group['hooks']
+        if h.get('type') == 'command'
+    ]
+    assert pre_tool == [('run_command', '~/d/hq/agy/hook PreToolUse ~/d/ops/hooks/relay-guard')]
+    stop = [h['command'] for h in hooks['Stop'] if h.get('type') == 'command']
+    assert stop == ['~/d/hq/agy/hook Stop', '~/.local/bin/harness-state-refresh']
+    manifest = tomllib.loads((ROOT / 'links.toml').read_text())
+    assert manifest['harness']['agy-config']['links']['hooks.json'] == 'agy/hooks.json'

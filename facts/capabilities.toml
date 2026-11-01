@@ -9,6 +9,14 @@ type = "boolean"
 description = "The harness starts a new controller turn, without human input, when a child it runs finishes."
 probe = "agents/bin/wake-judge"
 
+[facts.controller-wake.harness.agy]
+status = "probed"
+value = true
+version = "1.4.12"
+date = 2026-10-31
+evidence = "hq-e72097"
+note = "Both child kinds woke the controller in isolated interactive terminal sessions on agy 1.4.12; wake-judge agy reported PASS on both compact and full transcripts. In each run the controller launched the child, replied WAITING, and fired Stop with executionNum 0 and fullyIdle false; when the child finished, agy appended a SYSTEM SYSTEM_MESSAGE ([Message] timestamp=... sender=<child-id> ...), woke the controller without human input, and the controller replied with the nonce before firing Stop with fullyIdle true."
+
 [facts.controller-wake.harness.claude-code]
 status = "probed"
 value = true
@@ -30,6 +38,14 @@ type = "set"
 description = "The kinds of child for which a wake was shown, as Claude Code's Stop input names them in `type`: shell is a background command, subagent a subagent."
 probe = "agents/bin/wake-judge"
 
+[facts.controller-wake-kinds.harness.agy]
+status = "probed"
+value = ["shell", "subagent"]
+version = "1.4.12"
+date = 2026-10-31
+evidence = "hq-e72097"
+note = "In isolated interactive terminal sessions on agy 1.4.12, a non-daemon background run_command (WaitMsBeforeAsync 500, IsDaemon false, sender <conversationId>/task-<N>) and an invoke_subagent child (TypeName self, sender <childConversationId>) each woke the controller (wake-judge agy PASS). In an isolated interactive terminal session, a daemon run_command (IsDaemon true) reported fullyIdle true on Stop while still running; whether a finishing daemon emits a completion wake was not probed."
+
 [facts.controller-wake-kinds.harness.claude-code]
 status = "probed"
 value = ["shell", "subagent"]
@@ -49,6 +65,10 @@ note = "Both kinds were run, in the terminal interface, and neither woke."
 [facts.stop-input-in-flight-statuses]
 type = "set"
 description = "The statuses Claude Code's Stop input gives, in background_tasks, to work that is still to finish."
+
+[facts.stop-input-in-flight-statuses.harness.agy]
+status = "unknown"
+note = "agy 1.4.12's Stop JSON payload has no background_tasks array or per-task status strings (probed in both headless agy -p and interactive terminal sessions on hq-e72097); instead agy sends boolean fullyIdle, which was false while a non-daemon background run_command or invoke_subagent child ran and true once they finished (and true while an IsDaemon true command remained running)."
 
 [facts.stop-input-in-flight-statuses.harness.claude-code]
 status = "probed"
@@ -98,6 +118,14 @@ note = "Changing to GPT-6-Astra, changing its effort to high, and selecting the 
 type = "boolean"
 description = "In an interactive terminal session, a PreToolUse hook that blocks until an answer arrives from outside the terminal can answer the harness's question tool, and the same turn continues with that answer."
 
+[facts.answer-hook-terminal.harness.agy]
+status = "probed"
+value = false
+version = "1.4.12"
+date = 2026-10-31
+evidence = "hq-e72097"
+note = "In an interactive terminal session on agy 1.4.12, PreToolUse fired on ask_question, blocked until an outside signal file arrived, and returned allow with overwrite setting answers for the asked question. agy prefixed the tool output with 'A pre-tool hook changed the arguments of this tool call before it ran. Changed: answers.' and still opened the interactive TUI question card, blocking until Esc dismissed it with 'A1: User Skipped': PreToolUse overwrite mutates toolCall.args before execution and cannot answer ask_question."
+
 [facts.answer-hook-terminal.harness.claude-code]
 status = "probed"
 value = true
@@ -122,6 +150,14 @@ note = "OpenCode plugin hooks were not probed; its server form route answers ter
 type = "boolean"
 description = "In a managed session launched headless, the harness can stop at a question and a later resume delivers the answer to the same tool call."
 
+[facts.answer-defer-managed.harness.agy]
+status = "probed"
+value = false
+version = "1.4.12"
+date = 2026-10-31
+evidence = "hq-e72097"
+note = "In headless agy -p runs on 1.4.12 (both default permissions and --dangerously-skip-permissions), ask_question never paused or exited the session: agy immediately returned 'A1: User Skipped' to the model in-turn and exited 0. Returning {\"decision\": \"defer\"} from a PreToolUse hook failed the tool call in-turn with 'unsupported hook decision: defer' (agy accepts only allow, deny, ask and force_ask)."
+
 [facts.answer-defer-managed.harness.claude-code]
 status = "probed"
 value = true
@@ -137,6 +173,10 @@ note = "Codex hooks have no defer decision, codex exec lists both question tools
 [facts.answer-server-terminal]
 type = "boolean"
 description = "In an interactive terminal session, an outside client of the harness's own session server receives a pending question, and its answer continues the same turn."
+
+[facts.answer-server-terminal.harness.agy]
+status = "unknown"
+note = "Each agy 1.4.12 process runs an in-process loopback language-server endpoint (ANTIGRAVITY_LS_ADDRESS exported only to child processes, with zero-byte lockfiles in presence/), and agy remote-control registers a cloud-paired daemon rather than a local host control socket; no outside client route into an interactive terminal session was probed (hq-e72097)."
 
 [facts.answer-server-terminal.harness.codex]
 status = "probed"
@@ -162,6 +202,10 @@ note = "No session-server route into an interactive Claude Code session was prob
 type = "boolean"
 description = "With no terminal attached to the session, an outside client of the harness's session server receives a pending question, and its answer continues the same turn."
 
+[facts.answer-server-managed.harness.agy]
+status = "unknown"
+note = "Neither agy remote-control nor the Antigravity Python SDK was probed as an outside question-answering session server without an attached terminal (hq-e72097)."
+
 [facts.answer-server-managed.harness.codex]
 status = "probed"
 value = true
@@ -185,6 +229,14 @@ note = "The Agent SDK canUseTool route was not probed; the headless route probed
 [facts.answer-async-question]
 type = "boolean"
 description = "A question asked without blocking can be answered from outside the terminal: the turn ends at the question, and the answer reaches the model as a new turn."
+
+[facts.answer-async-question.harness.agy]
+status = "probed"
+value = false
+version = "1.4.12"
+date = 2026-10-31
+evidence = "hq-e72097"
+note = "The 56-tool inventory emitted by headless agy 1.4.12 (--output-format stream-json init event) declares ask_question as the only question tool, with no async parameter or companion non-blocking question tool, and calling ask_question in an interactive terminal session blocks the turn on the TUI card rather than ending the turn."
 
 [facts.answer-async-question.harness.codex]
 status = "probed"
@@ -210,6 +262,14 @@ note = "Write's validateInput refuses a caller with an agent id when path.basena
 [facts.session-start-before-first-turn]
 type = "boolean"
 description = "In an interactive terminal session, the harness fires its SessionStart hook when the session opens, before the first model turn."
+
+[facts.session-start-before-first-turn.harness.agy]
+status = "probed"
+value = false
+version = "1.4.12"
+date = 2026-10-31
+evidence = "hq-e72097"
+note = "In an isolated interactive terminal session on agy 1.4.12 with onboarding pre-seeded, the TUI opened to the idle prompt ('? for shortcuts') and sat idle for 5 s with zero hook invocations; agy fired SessionStart only after the user submitted the first prompt."
 
 [facts.session-start-before-first-turn.harness.claude-code]
 status = "probed"
@@ -239,13 +299,17 @@ date = 2026-10-22
 evidence = "hq-f27918"
 note = "The primary host's Claude personal smoke f169ae86 (transcript permissionMode default; no allow rule in the home's settings names sleep): Bash 'sleep 7' ran with no permission dialog, while 'touch approval.marker && sleep 7' in the same session asked. A command meant to raise a permission prompt needs more than a plain sleep; a file write did it here. Which other commands run unasked, and why, was not probed."
 
-# pi: `pi` is the CLI and its RPC mode, `pi-durable` the SDK's durable Harness; the CLI does
-# not use pi-durable. Each harness's entries come from its own probe under pi/probes;
-# the epoch rule: README.md, "Re-probing pi".
-
 [facts.mcp-stdio]
 type = "boolean"
 description = "In a headless run, the harness connects to a local MCP server over stdio from its own configuration, and the model calls one of the server's tools. Shown only for the protocol revisions mcp-stdio-revisions names."
+
+[facts.mcp-stdio.harness.agy]
+status = "probed"
+value = true
+version = "1.4.12"
+date = 2026-10-31
+evidence = "hq-e72097"
+note = "In headless agy -p runs on 1.4.12 with a local stdio server configured in .gemini/config/mcp_config.json, agy connected over stdio and the model called the server's tool and replied with the server-held nonce, both against a stateful 2025-11-25 server and against a stateless-only 2026-07-28 server (mcp-stdio-revisions)."
 
 [facts.mcp-stdio.harness.pi]
 status = "probed"
@@ -263,6 +327,14 @@ note = "Not probed. The pi-durable README and exports name no MCP client; connec
 type = "set"
 description = "The MCP protocol revisions for which mcp-stdio was shown: the revision the server answered on the connection whose tool the model called. A server that speaks only a revision outside the set was not shown to connect."
 
+[facts.mcp-stdio-revisions.harness.agy]
+status = "probed"
+value = ["2025-11-25", "2026-07-28"]
+version = "1.4.12"
+date = 2026-10-31
+evidence = "hq-e72097"
+note = "In headless agy -p runs on 1.4.12, agy probed stdio MCP servers with 2026-07-28 stateless server/discover first (_meta['io.modelcontextprotocol/protocolVersion'] = '2026-07-28') and fell back to stateful initialize requesting protocolVersion '2025-11-25' when server/discover returned -32601. Separate probe servers speaking only 2025-11-25 (rejecting server/discover) and only 2026-07-28 (rejecting initialize and requiring 2026-07-28 _meta on tools/list and tools/call) each connected and delivered their secret nonce through a model tool call."
+
 [facts.mcp-stdio-revisions.harness.pi]
 status = "probed"
 value = ["2025-11-25"]
@@ -270,6 +342,10 @@ version = "1.1.0"
 date = 2026-10-11
 evidence = "hq-57132d; hq-501726; sci-b40b23"
 note = "pi's MCP runtime builds its client with no protocol version, so initialize requests the bundled pi-mcp's LATEST_PROTOCOL_VERSION, 2025-11-25 (read from the pinned source, hq-501726), and the hq-57132d probe server answers with the requested revision; the probe output does not record it. The same source accepts 2025-06-18, 2025-03-26 and 2024-11-05 from a server; none was probed. science's MCP server, which speaks only 2026-07-28 (stateless: server/discover in place of initialize, _meta on every request), did not connect: pi mcp list reported it failed with Request _meta is required (sci-b40b23 finding F1). Upstream: earendil-works/pi#10416, open."
+
+# pi: `pi` is the CLI and its RPC mode, `pi-durable` the SDK's durable Harness; the CLI does
+# not use pi-durable. Each harness's entries come from its own probe under pi/probes;
+# the epoch rule: README.md, "Re-probing pi".
 
 [facts.headless-controls]
 type = "set"

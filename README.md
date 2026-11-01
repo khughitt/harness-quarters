@@ -201,7 +201,9 @@ MIT licensed; see `LICENSE`.
   home's settings and hooks files are symlinks to them: `~/.claude` and `~/.codex` to the
   plain files, `~/.codex-work` to `codex/work/hooks.json`, `~/.gemini/antigravity-cli` to
   `agy/settings.json`, and `~/.gemini/config` to `agy/hooks.json`, `agy/skills.json`
-  (pointing `agy` at `~/.agents/skills`) and lore's `AGENTS.md`.
+  (pointing `agy` at `~/.agents/skills`) and lore's `AGENTS.md`. `agy/hook` adapts
+  `agy/hooks.json`'s `SessionStart`, `PreToolUse` and `Stop` events to lore's profile
+  hook, ops's capture notice and relay guard, and a one-shot `agy` claim check.
 - `claude/mods/`: Claude Code function-hook plugins, linked as `~/.claude/mods` and
   loaded by `CLAUDE_CODE_PLUGIN_DIRS` in `claude/settings.json`. `cli-pane` adds
   `/tas <id>` and `/m <id>`, which show `tasks show` and `mindful show` output in a
@@ -272,7 +274,7 @@ MIT licensed; see `LICENSE`.
   2026-10-16 commit map in `docs/rewrites/` for old SHAs cited in records. Frozen
   documents moved to lore and flows stay as references for closed tasks.
 - `tools/ops-docs` and `tools/ops-check`: vendored from ops; change them there.
-- `.ops-check.toml`: the paths the layout check lets carry host values. The five harness
+- `.ops-check.toml`: the paths the layout check lets carry host values. The six harness
   settings and hooks files hold absolute paths their homes read literally. The relay
   cutover tool, its tests, runbook and window plan use fixed fleet names and deployment
   paths; hq-7e81ed removes those entries if it retires the tool. The capture-notice,
@@ -365,6 +367,16 @@ personal and work homes respectively. The worker event uses `agent_id` to select
 its own claim; shared root metadata does not grant foreign closure authority.
 After a definition changes, inspect and trust that exact definition through
 Codex `/hooks` in each native home.
+
+## Antigravity CLI hooks
+
+`agy/hooks.json`, linked as `~/.gemini/config/hooks.json`, wires `SessionStart`,
+`PreToolUse` (`run_command`) and `Stop` through `agy/hook`: `SessionStart` runs lore's
+profile hook and ops's capture notice in `workspacePaths[0]` and injects their text as
+a `systemMessage`; `PreToolUse` translates `run_command` into a schema-1 `before-tool`
+envelope for ops's `relay-guard`, failing closed; and `Stop` runs a one-shot
+`agy:<conversationId>` live task claim check (allowing stops while `fullyIdle` is
+`false` under `agy`'s probed `controller-wake`) alongside `harness-state-refresh`.
 
 ## Capability facts
 

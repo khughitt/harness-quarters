@@ -1,7 +1,28 @@
 {
-  "harness-state-refresh": {
+  "hq": {
     "enabled": true,
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "~/d/hq/agy/hook SessionStart ~/d/lore/hooks/claude-profile ~/d/ops/hooks/capture-notice"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/hq/agy/hook PreToolUse ~/d/ops/hooks/relay-guard"
+          }
+        ]
+      }
+    ],
     "Stop": [
+      {
+        "type": "command",
+        "command": "~/d/hq/agy/hook Stop"
+      },
       {
         "type": "command",
         "command": "~/.local/bin/harness-state-refresh"
