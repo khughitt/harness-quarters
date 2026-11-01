@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-8af61d-agy-relay
 created: 2026-11-01T08:44:46Z
-updated: 2026-11-01T19:57:06Z
+updated: 2026-11-01T19:59:43Z
 started: 2026-11-01T16:09:11Z
 completed: 2026-11-01T19:57:06Z
 closed: 2026-11-01T19:57:06Z
@@ -63,3 +63,4 @@ Where: relay/, claude/settings.json, codex/hooks.json, codex/work/hooks.json, ag
 - 2026-11-01T19:55:55Z (feat/hq-8af61d-agy-relay): retro: Running an isolated live agy 1.4.12 PTY smoke check in a sandbox HOME caught familiar's ~/.config/familiar/scheme.json requirement before touching live hooks, and preflighting europa over ssh caught its stale Dropbox-ignored ~/d/familiar/node_modules/relay@0.1.1 before rendering familiar-agy into subscribers.json. Merging updated main (hq-2eba07 and hq-dd5230) instead of rebasing preserved retention checkpoint basis ancestry while picking up harnesses.toml cleanly.
 - 2026-11-01T19:57:06Z (feat/hq-8af61d-agy-relay): done
 - 2026-11-01T19:57:06Z (feat/hq-8af61d-agy-relay): Pinned relay v0.3.0, upgraded claude/codex/agy hooks and subscribers.template.json (ops-guard + familiar-agy), and slimmed agy/hook PreToolUse to detached settings.json healing
+- 2026-11-01T19:59:43Z (feat/hq-8af61d-agy-relay): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-8af61d","state":"kept","verification":"verified","purpose":"Hold closed verified branch feat/hq-8af61d-agy-relay (covered tree a0c48e959f646b1e60b92cfde46c66eb1de474a1) after post-done integration stopped per docs/runbooks/relay-runtime.md on surviving Codex pid-update-loop process 2956681 (holding defunct child 2980971) on titan; open follow-up task:hq-c59809 holds retention ownership across the stop","next_owner":"task:hq-c59809","cleanup_trigger":"After user stops surviving Codex pid-update-loop PID 2956681 on titan so pgrep -a codex prints nothing on titan and europa, merge feat/hq-8af61d-agy-relay into main, run FORCE=1 just relay-subscribers on titan and europa, re-trust Codex /hooks, and run checked worktree removal"}
