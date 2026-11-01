@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-ac67e4-agy-bootstrap
 created: 2026-11-01T22:03:31Z
-updated: 2026-11-01T22:50:08Z
+updated: 2026-11-01T22:56:05Z
 started: 2026-11-01T22:06:20Z
 depends: []
 tags: [hooks]
@@ -42,3 +42,4 @@ Where: links.toml, harnesses.toml, agy/settings.json, tools/harness-links, tools
 - 2026-11-01T22:31:04Z (feat/hq-ac67e4-agy-bootstrap): baseline: just test in .worktrees/hq-ac67e4 — 2068 passed (agents/bin 268, .githooks+tools 1408, relay-cutover 391, signal cancel 1); harness-facts check ok
 - 2026-11-01T22:43:11Z (feat/hq-ac67e4-agy-bootstrap): Decisions: (1) bootstrap: new live-picks first-run, run by harness-links --apply before any link when every anchor would be created; keeps agy/settings.json as base, union for list picks, refuses non-live keys the tracked config lacks. Why: anchored adopt_detached takes the detached file as base and would drop permissions/allowNonWorkspaceAccess/statusLine from a first-run file. Rejected: two-pass apply (create anchors, then sync) for the same reason; accepting repoint anchors (foreign/dangling link) — kept refusing. Cost if wrong: a foreign-link anchor still deadlocks until removed by hand. (2) classification: agy sets these from its UI (binary symbols SetSeasonalThemes, SetShowFeedbackSurveyOverride, SetStatusLineConfig). seasonalThemesOptIn ('halloween-2026', seasonal churn) -> clean key + own pick unit; showFeedbackSurvey false -> tracked. Why: stable preference vs season-keyed host value. Cost: a showFeedbackSurvey toggle shows as a tracked diff. (3) statusLine.enabled false (titan agy UI write 2026-11-01 16:58:53 -0500) committed on main adaa54d6 rather than reverted; Why: a recorded UI action on a tracked key; hq-e77206 owns the command and must set enabled when it points at familiar. Rejected: revert to true.
 - 2026-11-01T22:50:08Z (feat/hq-ac67e4-agy-bootstrap): review: impl round 1 — verdict: revise; findings: Important 1, Minor 8; reviewer: claude-code/claude-opus-5-5
+- 2026-11-01T22:56:05Z (feat/hq-ac67e4-agy-bootstrap): Round 1 dispositions: I1 (running agy re-saves first-run settings after apply; sync then adopts them as base) addressed in 35ba1e80 — first-run refuses while pgrep finds agy for this uid. M3, M4, M7, M8 addressed in 35ba1e80. minor (deferred): M1 seasonalThemesOptIn opt-out may be undone by restore if agy deletes the key on opt-out (unprobed; forget is the reset); M2 first-run drops a first-run file's unrestored_keys silently (latent: agy declares none); M5 live-picks hardcodes AGY_ANCHORS while harness-links reads links.toml anchors (fails closed as 'still adopt'); M6 relink_home checks S_ISREG only, so an agy save between read and relink is lost (same gap hq-b24c39 deferred).
