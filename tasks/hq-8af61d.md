@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-8af61d-agy-relay
 created: 2026-11-01T08:44:46Z
-updated: 2026-11-01T17:30:11Z
+updated: 2026-11-01T17:44:27Z
 started: 2026-11-01T16:09:11Z
 depends: [tasks-ba29d3, fam-55f1af]
 tags: [hooks, cross-project]
@@ -43,3 +43,4 @@ Where: relay/, claude/settings.json, codex/hooks.json, codex/work/hooks.json, ag
 - 2026-11-01T17:29:32Z (main): User scope decision: approved Option 1 — scope hq-8af61d to the relay v0.3.0 cutover now (upgrade relay pin to v0.3.0, upgrade claude/settings.json, codex/hooks.json, codex/work/hooks.json, and agy/hooks.json to relay v0.3.0, reconcile relay/subscribers.template.json to restore ops-guard + add agy and familiar-agy, slim agy/hook PreToolUse to detached settings.json healing while keeping agy/hook SessionStart and Stop until ops-33cef9 lands, split ops-33cef9 Stop/SessionStart migration to follow-up hq-c59809, and pause before main merge/live rollout for explicit approval).
 - 2026-11-01T17:29:35Z (main): gate: scoped — adopted
 - 2026-11-01T17:30:11Z (feat/hq-8af61d-agy-relay): resumed
+- 2026-11-01T17:44:27Z (feat/hq-8af61d-agy-relay): gate: implementing .worktrees/hq-8af61d — baseline just test 1959 passed (agents/bin 268, .githooks+tools 1299, relay-cutover xdist 391, signal cancel 1; harness-facts check exit 0)
