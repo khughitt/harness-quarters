@@ -257,7 +257,12 @@ Kept per root session by the hook itself, from events it already receives:
     at its Stop or SubagentStop, and every open call closes at the next genuine
     prompt. A call that waits on the user (Claude Code `AskUserQuestion`, Codex
     `request_user_input` and `request_user_input_async`) is never in flight:
-    waiting on the user is not work.
+    waiting on the user is not work. An agent's open calls also close when that
+    agent starts a call that waits on the user, except a Codex nested
+    `exec_command` (hook name `Bash`), the one call that can stay open without a
+    PostToolUse after a yield. An open call at that point is in practice one
+    another hook refused (refused calls get no PostToolUse in either harness),
+    and without this rule the wait after it would count as active.
   - *the idle gap*: the time from one tree event to the next.
 
   The gap counts in full while any operation in the tree is in flight, however
