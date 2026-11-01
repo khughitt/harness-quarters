@@ -411,3 +411,17 @@ def test_wakeup_message_names_the_field(tmp_path):
     path.write_text(json.dumps(d))
     with pytest.raises(StateError, match='wakeup not_before must be int/float, not str'):
         store.read('claude', 'r')
+
+
+def test_non_utf8_file_raises_state_error_with_path(tmp_path):
+    store = Store(tmp_path)
+    path = tmp_path / 'claude-r.json'
+    path.write_bytes(b'\xff\xfe{')
+    with pytest.raises(StateError, match=str(path)):
+        store.read('claude', 'r')
+    with pytest.raises(StateError, match=str(path)):
+        with store.locked('claude', 'r'):
+            pass
+    with pytest.raises(StateError, match=str(path)):
+        store.latest_for_cwd('/x')
+    assert path.read_bytes() == b'\xff\xfe{'

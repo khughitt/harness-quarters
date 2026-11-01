@@ -163,11 +163,13 @@ class Store:
 
     def _load(self, path: Path) -> RootState | None:
         try:
-            text = path.read_text()
+            text = path.read_bytes().decode()
         except FileNotFoundError:
             return None
         except OSError as e:
             raise StateError(f'cannot read {path}: {e}') from e
+        except UnicodeDecodeError as e:
+            raise StateError(f'cannot parse {path}: {e}') from e
         try:
             return _from_json(text)
         except Exception as e:  # any malformed content must refuse, never escape raw
