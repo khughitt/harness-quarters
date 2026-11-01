@@ -163,3 +163,15 @@ def test_a_local_refusal_is_not_masked_by_a_layout_finding(world):
     assert result.returncode == 1
     assert "staged paths under local/" in result.stderr
     assert "machine layout" not in result.stderr
+
+
+def test_shipped_ops_check_config_allows_live_agy_trusted_workspaces(world):
+    repo, env, _ = world
+    shutil.copyfile(OPS_CHECK.parent.parent / ".ops-check.toml", repo / ".ops-check.toml")
+    (repo / "agy").mkdir()
+    (repo / "agy" / "settings.json").write_text(
+        f'{{"allowNonWorkspaceAccess": true, "trustedWorkspaces": ["{env["HOME"]}/d/hq"]}}\n'
+    )
+    sh(repo, env, "git", "add", ".ops-check.toml", "agy/settings.json")
+    result = run_hook(repo, env)
+    assert result.returncode == 0, result.stderr

@@ -145,7 +145,7 @@ refuses too. A new attachment that carries host values (a hostname, the home dir
 WORK_ROOT, a registered checkout or its parent directory) follows the attachment
 fallback in lore `skills/references/retained-item-records.md`: the raw bytes stay under
 WORK_ROOT, owned by a task, and a portable derivative is attached. `.ops-check.toml` is
-never widened for an attachment. Eleven pre-commit tests cover the local-layer refusal,
+never widened for an attachment. Twelve pre-commit tests cover the local-layer refusal,
 the hygiene check and the guide check; `just test` runs them.
 
 The same hook runs `tools/ops-docs check`, vendored from ops: the identity regions at
@@ -272,7 +272,7 @@ MIT licensed; see `LICENSE`.
   2026-10-16 commit map in `docs/rewrites/` for old SHAs cited in records. Frozen
   documents moved to lore and flows stay as references for closed tasks.
 - `tools/ops-docs` and `tools/ops-check`: vendored from ops; change them there.
-- `.ops-check.toml`: the paths the layout check lets carry host values. The four harness
+- `.ops-check.toml`: the paths the layout check lets carry host values. The five harness
   settings and hooks files hold absolute paths their homes read literally. The relay
   cutover tool, its tests, runbook and window plan use fixed fleet names and deployment
   paths; hq-7e81ed removes those entries if it retires the tool. The capture-notice,

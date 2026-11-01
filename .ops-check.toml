@@ -4,6 +4,7 @@ layout_allowed = [
   "codex/config.toml",
   "codex/hooks.json",
   "codex/work/hooks.json",
+  "agy/settings.json",
   # The relay cutover tool, its tests, runbook and window plan carry the fixed fleet
   # names and deployment paths. Remove these with the tool if hq-7e81ed retires it.
   "tools/relay-cutover",
