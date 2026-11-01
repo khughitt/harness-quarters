@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-9aa713-pause-past-range
 created: 2026-11-01T10:29:21Z
-updated: 2026-11-01T14:09:28Z
+updated: 2026-11-01T14:09:30Z
 started: 2026-11-01T11:56:46Z
 depends: []
 parent: hq-9aa713
@@ -53,3 +53,4 @@ Implements Task 1 of the turn-pause plan in .worktrees/hq-9aa713 (branch feat/hq
 - 2026-11-01T14:09:25Z (feat/hq-9aa713-pause-past-range): retained: {"host":"titan","kind":"scratch","path":"$WORK_ROOT/hq/hq-fe672f","state":"kept","verification":"verified","purpose":"raw probe logs and isolated harness homes behind the Task 1 capability facts (rounds 1 to 3), raw source of the portable attachments and fixtures","next_owner":"task:hq-fe672f","cleanup_trigger":"hq-fe672f closes with its facts merged to main","manifest":"$WORK_ROOT/hq/hq-fe672f.manifest-2026-11-01T1408Z.txt","sha256":"c0fac5b1a67c7033b01ae52c227d21456cbf3713d2d560c5f6c5e23c2ec49f76"}
 - 2026-11-01T14:09:27Z (feat/hq-9aa713-pause-past-range): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/hq/hq-fe672f.manifest-2026-11-01T1408Z.txt","state":"kept","verification":"verified","purpose":"immutable manifest version for the scratch checkpoint after probe round 3 (5370 entries, 2 symlinks)","next_owner":"task:hq-fe672f","cleanup_trigger":"the scratch directory is released","sha256":"c0fac5b1a67c7033b01ae52c227d21456cbf3713d2d560c5f6c5e23c2ec49f76"}
 - 2026-11-01T14:09:28Z (feat/hq-9aa713-pause-past-range): retained: {"host":"titan","kind":"evidence","path":"/tmp/claude-1000/-mnt-ssd3-work-hq-hq-fe672f-claude-cron-1-work","state":"released","verification":"verified","purpose":"probe session background task outputs copied byte for byte into $WORK_ROOT/hq/hq-fe672f/claude-cron-1/tmp-task-outputs, then the tmpfs copy removed","next_owner":"none","cleanup_trigger":"none"}
+- 2026-11-01T14:09:30Z (feat/hq-9aa713-pause-past-range): retained: {"host":"titan","kind":"evidence","path":"/tmp/claude-1000/-mnt-ssd3-work-hq-hq-fe672f-claude-cron-2-work","state":"released","verification":"verified","purpose":"probe session background task outputs copied byte for byte into $WORK_ROOT/hq/hq-fe672f/claude-cron-2/tmp-task-outputs, then the tmpfs copy removed","next_owner":"none","cleanup_trigger":"none"}
