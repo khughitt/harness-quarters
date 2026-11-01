@@ -83,7 +83,11 @@ def _refuse(reason: str) -> Verdict:
 
 
 def _show(value) -> str:
-    """Untrusted text for a reason: its repr, cut to SHOWN characters."""
+    """Untrusted value for a reason, never raising: a str as its repr cut to SHOWN
+    characters, anything else by its type name (repr of a deeply nested JSON value
+    raises RecursionError, which would crash the hook and let the call through)."""
+    if not isinstance(value, str):
+        return f'<{type(value).__name__}>'
     text = repr(value)
     return text if len(text) <= SHOWN else text[:SHOWN] + '...'
 
@@ -229,6 +233,8 @@ def classify(harness: str, tool: str, tool_input: dict, owned: Owned) -> Verdict
     """The class of a hooked call while paused; 'refuse' for anything not allowlisted."""
     if harness not in CONTROLS:
         raise ValueError(f'unknown harness {harness!r}')
+    if not isinstance(tool, str):
+        return _refuse(f'tool name {_show(tool)} is not a string')
     if not isinstance(tool_input, dict):
         return _refuse(f'{_show(tool)} input is not a JSON object')
     if tool == 'Bash':

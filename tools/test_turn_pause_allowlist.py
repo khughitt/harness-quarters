@@ -430,6 +430,45 @@ def test_refusal_reasons_truncate_untrusted_text():
         assert v.klass == 'refuse' and len(v.reason) < 400, len(v.reason)
 
 
+DEEP = 50_000
+
+
+def deep_json():
+    """A dict nested DEEP levels, parsed from JSON where this interpreter's json accepts
+    the depth (3.14 does); otherwise the same object built directly."""
+    try:
+        return json.loads('{"a":' * DEEP + '1' + '}' * DEEP)
+    except RecursionError:
+        value = 1
+        for _ in range(DEEP):
+            value = {'a': value}
+        return value
+
+
+@pytest.mark.parametrize('harness, tool, arg', [
+    ('claude-code', 'CronDelete', 'id'),
+    ('codex', 'collaborationinterrupt_agent', 'target'),
+    ('claude-code', 'ToolSearch', 'query'),
+    ('claude-code', 'ScheduleWakeup', 'stop'),
+    ('codex', 'update_goal', 'status'),
+    ('claude-code', 'Bash', 'command'),
+])
+def test_deep_argument_refused_without_raising(harness, tool, arg):
+    """A deeply nested argument must not raise out of classify (RecursionError in a
+    reason's repr would crash the hook, which lets the call through)."""
+    mine = owned(worker_names=frozenset({'w0'}), cron_jobs=frozenset({'j1'}), harness_pid=os.getpid())
+    v = classify(harness, tool, {arg: deep_json()}, mine)
+    assert v.klass == 'refuse' and len(v.reason) < 400
+
+
+@pytest.mark.parametrize('tool', [['Bash'], {'Read': 1}, None, 3, deep_json])
+def test_non_str_tool_name_refused(tool):
+    tool = tool() if callable(tool) else tool
+    for harness in ('claude-code', 'codex'):
+        v = classify(harness, tool, {'command': 'cat a'}, NOBODY)
+        assert v.klass == 'refuse' and 'tool name' in v.reason
+
+
 def test_unknown_harness_is_an_error():
     with pytest.raises(ValueError):
         classify('opencode', 'Bash', {'command': 'cat a'}, NOBODY)
