@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-b2b50b-active-limit
 created: 2026-11-02T19:14:07Z
-updated: 2026-11-02T21:00:56Z
+updated: 2026-11-02T21:09:19Z
 started: 2026-11-02T20:22:25Z
 depends: []
 tags: [feedback, friction, "from:mm"]
@@ -46,3 +46,4 @@ Scope: choose and prepare a measured default active-time cutoff with the existin
 - 2026-11-02T20:47:22Z (fix/hq-b2b50b-active-limit): RED: declared uv/pytest route narrowed to limits/hook/CLI files: 13 failed, 99 passed in 39.60 s against 4 h. Both new long-turn adapter cases fail on the post-4 h call; default/CLI and 12h/48h budget assertions fail as expected. Production change is one value in tools/turn_pause/limits.toml plus its calibration comment; remaining 4 h values are explicit historical/custom test fixtures, not live defaults. Merged current main before full verification; incoming changes were hq-1400a4 task notes only.
 - 2026-11-02T20:47:45Z (fix/hq-b2b50b-active-limit): GREEN: same declared uv/pytest invocation narrowed to limits, hook, CLI and replay tests: 132 passed in 27.06 s. Synthetic long call now remains allowed past 4 h and through exactly 16 h, warns at 12 h, and pauses above 16 h under both adapters. Default CLI JSON reports 57600/500/30/2; budgets 12h and 48h scale correctly. Full just test is now running, with log in task scratch. Current-main merge commit: 1ee00253dcd8c793ca26a1789649f88753cc0165
 - 2026-11-02T21:00:56Z (fix/hq-b2b50b-active-limit): review: impl round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
+- 2026-11-02T21:09:19Z (fix/hq-b2b50b-active-limit): attached: final-review-report.md (2125 bytes): Full read-only review by codex/gpt-6.1-sol of frozen tree dbc616b5; accepted with no findings
