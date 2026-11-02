@@ -1,6 +1,12 @@
 # rename-cutover for detached projects — design
 
-Task: hq-5300fd. Status: draft, revision 3 (2026-11-02).
+Task: hq-5300fd. Status: draft, revision 4 (2026-11-02).
+
+Revision 4 (after spec review round 3, revise: Important 1, Minor 1): the restore
+and the commit take separate path sets, since `git restore` matches only its source
+and the index (§4.5 steps 3 and 4); an untracked file at a saved-head path that
+differs from the saved blob is copied into the snapshot before the restore
+overwrites it (§4.5 step 2).
 
 Revision 3 (after spec review round 2, revise: Important 2, Minor 4): the restore
 uses `git restore --source=<head> --staged --worktree`, which removes tracked files
@@ -196,10 +202,10 @@ The order keeps every check before the first mutation, as today.
    `validate_kept_destinations`, and the new `validate_records_repos`. For each records
    repository, it walks the filesystem under `<old>/` and `<new>/`, ignored files
    included, and classifies every file that is in none of the index, the current
-   HEAD and the saved head's tree. A file at one of those paths is either an original
-   the restore puts back or a tracked change the patch holds; leaving it out of the
-   walk is what lets a retry pass after an earlier rollback restored and staged
-   `<old>/` but stopped before its commit:
+   HEAD and the saved head's tree. A file at one of those paths is an original the
+   restore puts back, a tracked change the patch holds, or (step 2) an untracked file
+   the snapshot keeps; leaving it out of the walk is what lets a retry pass after an
+   earlier rollback restored and staged `<old>/` but stopped before its commit:
    - under `<new>/`: `<new>/<rest>` must map to an original `<old>/<rest'>` that
      exists at the saved head, where `rest'` is `rest` with the id mapping applied
      (`tasks/<new>-<hex>.md` to `tasks/<old>-<hex>.md`, `tasks/files/<new>-<hex>/…`
@@ -219,11 +225,17 @@ The order keeps every check before the first mutation, as today.
    the commit (refused by the hook, so untracked) is such a leftover, so it is kept
    here rather than lost. A new task filed there in that window has no original at
    the saved head, so step 1 stops rollback naming it, for the person to move aside.
+   The same copy takes every file under an owned path that is in neither the index
+   nor the current HEAD, sits at a path the saved head holds, and differs from the
+   saved blob (something recreated under `<old>/` after the rename's commit): the
+   restore overwrites it and the patch, a diff of tracked content, does not hold it.
 3. Mutations, in today's order, with the records repositories inserted after the
    reset of the checkout and the in-tree `--repo` repositories:
-   - `git restore --source=<head> --staged --worktree -- <known owned paths>`, where
-     the known owned paths are those the index, the current HEAD or the saved head
-     holds (a pathspec git knows nothing of fails the command). `restore` works
+   - `git restore --source=<head> --staged --worktree -- <restorable owned paths>`,
+     where the restorable owned paths are those the index or the saved head holds:
+     `restore` matches a pathspec only against its source and the index, and one it
+     cannot match fails the command (a retry after the committed `<new>/` left the
+     index is the case: only the current HEAD still holds it). `restore` works
      without overlay: it removes tracked files the saved head lacks (a task filed in
      `p` since save, the committed `<new>/`) and overwrites uncommitted changes; the
      patch holds both;
@@ -236,8 +248,9 @@ The order keeps every check before the first mutation, as today.
    record activity since save, not only the retarget; the patch holds it.
 4. After `restore_dir` puts the registry and state back, commit each records
    repository whose owned content differs from HEAD, naming only the owned paths
-   that HEAD or the index knows (`git ls-files` and `git ls-tree HEAD`), since a
-   pathspec git does not know fails the commit: `git commit -q -m "revert: roll back
+   that the current HEAD or the index knows (`git ls-files` and `git ls-tree HEAD`; a
+   set apart from step 3's, since the commit matches against HEAD and the index), as
+   a pathspec git does not know fails the commit: `git commit -q -m "revert: roll back
    rename <old> -> <new>" -- <known owned paths>`. The pathspec keeps any other
    project's staged change out, and the commit comes after the registry restore so the
    records repository's pre-commit hook (`tasks check` for each staged prefix) sees
