@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-11-02T19:14:07Z
-updated: 2026-11-02T20:22:49Z
+updated: 2026-11-02T20:22:52Z
 started: 2026-11-02T20:22:25Z
 depends: []
 tags: [feedback, friction, "from:mm"]
@@ -27,3 +27,4 @@ The user asked for this (their request): the 4 h active-time limit is too aggres
 - 2026-11-02T20:22:25Z (main): started
   provenance: {"harness_session":"codex:01a19deb-d3a4-7b80-a260-fdc7e14f54ea","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-02T20:22:49Z (main): trial: flow-trial-1 — enrolled — flow off
+- 2026-11-02T20:22:52Z (main): arm: flow-trial-1 — unit tack-b2b50b — flow off
