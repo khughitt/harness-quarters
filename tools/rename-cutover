@@ -87,11 +87,18 @@ def check_environment(command, meta):
         raise Stop(f"{command}: environment does not match the snapshot ({', '.join(bad)})")
 
 
+def in_tree_repos(meta):
+    """The --repo repositories rollback resets: a detached one's code checkout is never
+    written by the cutover, so it is not reset, checked for leftovers or required clean."""
+    return [r for r in meta["repos"] if r["kind"] == "in-tree"]
+
+
 def check_branches(meta):
     """The current branch of each repository, checked before any mutation: rollback must
-    not reset a branch a person has since switched away from."""
+    not reset or restore in a branch a person has since switched away from."""
     pairs = [(checkout_now(meta), meta["checkout"]["branch"])]
-    pairs += [(Path(r["root"]), r["branch"]) for r in meta["repos"]]
+    pairs += [(Path(r["root"]), r["branch"]) for r in in_tree_repos(meta)]
+    pairs += [(Path(r["root"]), r["branch"]) for r in meta["records_repos"]]
     for root, expected in pairs:
         current = branch_of(root)
         if current != expected:
@@ -552,10 +559,89 @@ def validate_leftovers(meta):
                                capture_output=True)
         if check.returncode != 0:
             raise Stop(f"leftovers: {path} has no restored original {original}")
-    for repo in meta["repos"]:
+    for repo in in_tree_repos(meta):
         if run("git", "-C", repo["root"], "ls-files", "--others", "--exclude-standard").strip():
             raise Stop(f"leftovers: {repo['root']} has untracked files")
     return untracked
+
+
+def renames_records(meta, entry):
+    """Whether this records repository holds the renamed checkout's records (`<old>/` and
+    `<new>/`), not only the `<p>/` of detached --repo projects."""
+    records = meta["checkout"]["records"]
+    return records is not None and records["repo"] == entry["root"]
+
+
+def git_files(root, where, paths):
+    """The files under `paths` that `where` holds: the index, or a commit's tree."""
+    if not paths:
+        return set()
+    if where == "index":
+        out = run("git", "-C", root, "ls-files", "-z", "--", *paths)
+    else:
+        out = run("git", "-C", root, "ls-tree", "-r", "-z", "--name-only", where, "--", *paths)
+    return set(filter(None, out.split("\0")))
+
+
+def holds(root, where, path):
+    return bool(git_files(root, where, [path]))
+
+
+def files_on_disk(directory):
+    """Every file under `directory`, ignored or not, a link counted as a file and never
+    followed; empty when the directory is absent."""
+    found = []
+    for parent, dirs, names in os.walk(directory):
+        parent = Path(parent)
+        for name in list(dirs):
+            if (parent / name).is_symlink():
+                dirs.remove(name)
+                names.append(name)
+        found += [parent / name for name in names]
+    return found
+
+
+def validate_records_repos(meta):
+    """The walk, run before any mutation, in each records repository that holds the renamed
+    checkout's records. Every file on disk under `<old>/` and `<new>/` (ignored files
+    included) that none of the index, the current HEAD and the saved head holds must be a
+    rename leftover. A file at a path one of them holds is left out: it is an original the
+    restore puts back, a tracked change the patch holds, or one an earlier attempt's
+    restore staged, which is what lets a retry pass. Under `<new>/`, `<new>/<rest>` maps to
+    `<old>/<rest>` with the id mapping applied, or to `<old>/<rest>` itself; under `<old>/`,
+    only the id mapping applies (a rename that stopped before it moved the directory). The
+    original must be at the saved head. Any other file stops rollback, naming it. Returns
+    each repository's leftovers, relative to its top level."""
+    old, new = meta["old"], meta["new"]
+    found = {}
+    for entry in meta["records_repos"]:
+        if not renames_records(meta, entry):
+            continue
+        root, paths = Path(entry["root"]), [f"{old}/", f"{new}/"]
+        known = git_files(root, "index", paths) | git_files(root, "HEAD", paths)
+        saved = git_files(root, entry["head"], paths)
+        known |= saved
+        leftovers = []
+        for path in sorted(str(p.relative_to(root)) for name in (old, new) for p in files_on_disk(root / name)):
+            if path in known:
+                continue
+            top, rest = path.split("/", 1)
+            mapped = leftover_original(rest, old, new)
+            if top == new and mapped is None:
+                mapped = rest
+            if mapped is None:
+                raise Stop(f"rollback: {root}: {path} is not a rename leftover; move it aside first")
+            original = f"{old}/{mapped}"
+            if original not in saved:
+                raise Stop(f"rollback: {root}: {path} is not a rename leftover: the saved head has no "
+                           f"{original}; move it aside first")
+            leftovers.append(path)
+        found[entry["root"]] = leftovers
+    return found
+
+
+def records_label(entry):
+    return f"records-{Path(entry['root']).name}"
 
 
 def restore_dir(saved, live):
@@ -563,28 +649,136 @@ def restore_dir(saved, live):
     shutil.copytree(saved, live, symlinks=True)
 
 
-def save_reset_patch(root, head, snap, label):
-    """`git reset --hard` is destructive; keep whatever it would discard as a patch.
+def save_reset_patch(root, head, snap, label, paths=()):
+    """`git reset --hard` is destructive; keep whatever it would discard as a patch. Given
+    `paths` (a records repository's owned paths), only what restoring them discards.
 
     Covers commits made since save plus any working-tree edits, since diffing the
     working tree against the saved head captures both. Never overwrites an earlier
     patch: a rollback stopped and retried writes the next unused rollback-<label>-<n>.patch."""
-    diff = run("git", "-C", root, "diff", "--binary", head)
+    diff = run("git", "-C", root, "diff", "--binary", head, *(("--", *paths) if paths else ()))
     n = 1
     while (path := snap / f"rollback-{label}-{n}.patch").exists():
         n += 1
     path.write_text(diff)
     if diff.strip():
-        print(f"rename-cutover: reset {root}: changes since save kept in {path}", file=sys.stderr)
+        print(f"rename-cutover: {'restore' if paths else 'reset'} {root}: changes since save kept in {path}",
+              file=sys.stderr)
 
 
-def reset_all(resets, snap):
-    """Keep every repository's discarded changes as a patch before resetting any: a patch
-    that cannot be written stops rollback before the first reset, not between two."""
+def leftovers_dir(snap):
+    """This attempt's rollback-leftovers-<n>/, the next unused number: a retry never writes
+    into an earlier attempt's copies."""
+    n = 1
+    while (path := snap / f"rollback-leftovers-{n}").exists():
+        n += 1
+    return path
+
+
+def copy_leftovers(dest, copies):
+    """Copy each leftover, as bytes and mode (a link as a link), to <dest>/<label>/<path>.
+    `dest` is created here, never reused: an existing one stops the copy."""
+    if not any(paths for _, _, paths in copies):
+        return
+    dest.mkdir()
+    for label, root, paths in copies:
+        for path in paths:
+            target = dest / label / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(Path(root) / path, target, follow_symlinks=False)
+    print(f"rename-cutover: leftovers kept in {dest}", file=sys.stderr)
+
+
+def reset_all(resets, snap, records=(), copies=()):
+    """Keep everything rollback discards before discarding any: every reset repository's
+    patch, each records repository's patch of its owned paths, and a copy of each validated
+    leftover, `copies` holding (label, root, paths). A patch or copy that cannot be written
+    stops rollback before the first reset or restore, not between two. The leftovers
+    directory is chosen once, before anything is written."""
+    dest = leftovers_dir(snap)
     for root, head, label in resets:
         save_reset_patch(root, head, snap, label)
+    for entry in records:
+        save_reset_patch(entry["root"], entry["head"], snap, records_label(entry), entry["owned"])
+    copy_leftovers(dest, copies)
     for root, head, _ in resets:
         run("git", "-C", root, "reset", "-q", "--hard", head)
+
+
+def prune_empty(directory, stop):
+    """Remove `directory` and each parent it leaves empty, up to but not including `stop`."""
+    while stop in directory.parents and directory.is_dir() and not any(directory.iterdir()):
+        directory.rmdir()
+        directory = directory.parent
+
+
+def restore_records(meta, leftovers):
+    """Each records repository's owned paths back to the saved head. `git restore` matches a
+    pathspec only against its source and the index and fails on one it cannot match, so it
+    is given the owned paths the index or the saved head holds; it removes tracked files the
+    saved head lacks and overwrites uncommitted changes, which the patch holds. Any git
+    failure stops rollback here. Then, where the renamed checkout's records live: `<new>/`
+    is deleted whole (what is left there is untracked and was validated), the leftovers
+    under `<old>/` and the directories they emptied are deleted, and every directory save
+    listed under `<old>/` is recreated, empty ones included."""
+    old, new = meta["old"], meta["new"]
+    for entry in meta["records_repos"]:
+        root = Path(entry["root"])
+        paths = [p for p in entry["owned"] if holds(root, "index", p) or holds(root, entry["head"], p)]
+        if paths:
+            run("git", "-C", root, "restore", f"--source={entry['head']}", "--staged", "--worktree", "--", *paths)
+        if not renames_records(meta, entry):
+            continue
+        if (root / new).exists():
+            shutil.rmtree(root / new)
+        under_old = [path for path in leftovers[entry["root"]] if path.startswith(f"{old}/")]
+        for path in under_old:
+            (root / path).unlink()
+        for path in under_old:
+            prune_empty((root / path).parent, root / old)
+        for directory in meta["checkout"]["records"]["dirs"]:
+            (root / directory).mkdir(parents=True, exist_ok=True)
+
+
+def commit_records(meta):
+    """Commit each records repository whose owned content differs from HEAD, after the
+    registry is restored so that the repository's hook (`tasks check` for each staged
+    prefix) sees the old prefix registered. The pathspec keeps any other project's staged
+    change out and names only the owned paths the index or the current HEAD holds: a
+    pathspec git does not know fails the commit."""
+    for entry in meta["records_repos"]:
+        root = entry["root"]
+        paths = [p for p in entry["owned"] if holds(root, "index", p) or holds(root, "HEAD", p)]
+        if not paths:
+            continue
+        same = subprocess.run(["git", "-C", root, "diff", "--quiet", "HEAD", "--", *paths], capture_output=True,
+                              text=True)
+        if same.returncode == 0:
+            continue
+        if same.returncode != 1:
+            raise Stop(f"git -C {root} diff --quiet HEAD: {same.stderr.strip()}")
+        run("git", "-C", root, "commit", "-q", "-m", f"revert: roll back rename {meta['old']} -> {meta['new']}",
+            "--", *paths)
+
+
+def check_records(meta):
+    """After rollback, in each records repository: `<new>` absent where the renamed
+    checkout's records live, no tracked change under the owned paths, and the owned paths
+    equal to the saved head."""
+    for entry in meta["records_repos"]:
+        root, owned = Path(entry["root"]), entry["owned"]
+        new = root / meta["new"]
+        if renames_records(meta, entry) and (new.exists() or new.is_symlink()):
+            raise Stop(f"check: {new} still exists")
+        changes = run("git", "-C", root, "status", "--porcelain", "--untracked-files=no", "--", *owned)
+        if changes.strip():
+            raise Stop(f"check: {root} has uncommitted changes under {', '.join(owned)}: "
+                       f"{', '.join(line.strip() for line in changes.splitlines())}")
+        same = subprocess.run(["git", "-C", str(root), "diff", "--quiet", entry["head"], "--", *owned],
+                              capture_output=True, text=True)
+        if same.returncode != 0:
+            raise Stop(f"check: {root} differs from the saved head {entry['head'][:7]} under {', '.join(owned)}"
+                       + (f": {same.stderr.strip()}" if same.returncode != 1 else ""))
 
 
 def restore_kept(checkout, snap, meta):
@@ -637,16 +831,24 @@ def rollback(args):
     check_branches(meta)
     leftovers = validate_leftovers(meta)
     validate_kept_destinations(meta)
+    records_leftovers = validate_records_repos(meta)
     move_back(meta)
     checkout = Path(meta["checkout"]["root"])
     resets = [(checkout, meta["checkout"]["head"], "checkout")]
-    resets += [(Path(r["root"]), r["head"], Path(r["root"]).name) for r in meta["repos"]]
-    reset_all(resets, snap)
+    resets += [(Path(r["root"]), r["head"], Path(r["root"]).name) for r in in_tree_repos(meta)]
+    # The in-tree leftovers were validated where the checkout was; move_back only renamed
+    # it, so they are read at its old path.
+    copies = [("checkout", checkout, leftovers)]
+    copies += [(records_label(e), e["root"], records_leftovers[e["root"]]) for e in meta["records_repos"]
+               if e["root"] in records_leftovers]
+    reset_all(resets, snap, meta["records_repos"], copies)
+    restore_records(meta, records_leftovers)
     remove_leftovers(checkout, leftovers)
     restore_kept(checkout, snap, meta)
     refresh_kept(checkout, meta)
     restore_dir(snap / "config", Path(meta["config"]))
     restore_dir(snap / "state", Path(meta["state"]))
+    commit_records(meta)
     tool = link_tool(checkout, meta)
     run(tool, "--apply")
     if link_report(tool) != (snap / "links.txt").read_text():
@@ -656,8 +858,13 @@ def rollback(args):
             raise Stop(f"check: tasks check reports findings in {root}")
         if porcelain(root):
             raise Stop(f"check: {root} is not clean")
+    for repo in meta["repos"]:
+        if repo["kind"] == "detached" and run("tasks", "check", cwd=repo["root"]).strip():
+            raise Stop(f"check: tasks check reports findings in {repo['root']}")
+    check_records(meta)
     check_kept(checkout, snap, meta)
-    print("rolled back to " + ", ".join(f"{head[:7]} ({label})" for _, head, label in resets))
+    print("rolled back to " + ", ".join([f"{head[:7]} ({label})" for _, head, label in resets]
+                                        + [f"{e['head'][:7]} ({records_label(e)})" for e in meta["records_repos"]]))
 
 
 RETIRED_PREFIX_RE = re.compile(

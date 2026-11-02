@@ -1427,6 +1427,330 @@ def test_rollback_tolerates_empty_foreign_claims_files(box):
     assert box.fingerprint() == before
 
 
+def test_rollback_copies_in_tree_leftovers_into_the_snapshot(box):
+    """The in-tree leftovers are deleted after the reset; their bytes are kept first."""
+    box.save()
+    box.forward()
+    renamed = {p.name: p.read_bytes() for p in (box.new_root / "tasks").glob("tack-*.md")}
+    assert len(renamed) == 2
+    box.cutover("rollback", "--snapshot", box.snapshot)
+    copies = box.snapshot / "rollback-leftovers-1" / "checkout" / "tasks"
+    assert {p.name: p.read_bytes() for p in copies.iterdir()} == renamed
+
+
+def test_reset_all_copies_every_leftover_into_one_new_directory(tmp_path):
+    """One rollback attempt's copies, of every repository, land in one directory whose
+    number is chosen before anything is written; an existing one is never written into."""
+    cutover = load_cutover()
+    snap, a, b = tmp_path / "snap", tmp_path / "a", tmp_path / "b"
+    for root, rel in ((a, "tasks/tack-1.md"), (b, "tack/tasks/tack-2.md")):
+        (root / rel).parent.mkdir(parents=True)
+        (root / rel).write_text(f"{rel}\n")
+    (snap / "rollback-leftovers-1").mkdir(parents=True)
+    (snap / "rollback-leftovers-1" / "earlier").write_text("an earlier attempt's\n")
+    cutover.reset_all([], snap, copies=[("checkout", a, ["tasks/tack-1.md"]),
+                                        ("records-b", b, ["tack/tasks/tack-2.md"])])
+    assert sorted(os.listdir(snap)) == ["rollback-leftovers-1", "rollback-leftovers-2"]
+    assert os.listdir(snap / "rollback-leftovers-1") == ["earlier"]
+    second = snap / "rollback-leftovers-2"
+    assert (second / "checkout" / "tasks" / "tack-1.md").read_text() == "tasks/tack-1.md\n"
+    assert (second / "records-b" / "tack" / "tasks" / "tack-2.md").read_text() == "tack/tasks/tack-2.md\n"
+
+
+# --- rollback: detached projects ------------------------------------------------
+
+
+def untouched(box):
+    """What a refused rollback must leave as it found it: every file under sync/ (its
+    directories too), the registry and state, the snapshot's listing, and each
+    repository's HEAD, index and status."""
+    def tree(root):
+        return {str(p.relative_to(root)): p.read_bytes() if p.is_file() else None for p in sorted(root.rglob("*"))
+                if ".git" not in p.relative_to(root).parts}
+
+    repos = [r for r in (box.checkout, box.new_root, *box.repos, box.records) if r.exists()]
+    git = {str(r): [box.run("git", *cmd, cwd=r).stdout for cmd in
+                    (("rev-parse", "HEAD"), ("ls-files", "-s"),
+                     ("status", "--porcelain", "--untracked-files=all", "--ignored"))] for r in repos}
+    return {"sync": tree(box.sync), "cfg": tree(box.tmp / "cfg"), "state": tree(box.tmp / "state"),
+            "snapshot": sorted(os.listdir(box.snapshot)), "git": git}
+
+
+def refused_rollback(box, message):
+    """rollback exits 1 naming `message`, having changed nothing."""
+    before = untouched(box)
+    result = box.cutover("rollback", "--snapshot", box.snapshot, check=False)
+    assert result.returncode == 1, result.stdout
+    assert message in result.stderr, result.stderr
+    assert untouched(box) == before
+
+
+def rolled_back(box, before):
+    """rollback restores the fingerprint; every snapshot project checks clean, and every
+    repository rollback resets or restores has nothing uncommitted."""
+    box.cutover("rollback", "--snapshot", box.snapshot)
+    assert box.fingerprint() == before
+    for root in (box.checkout, *box.repos):
+        assert box.run("tasks", "check", cwd=root).stdout == ""
+    for root in (box.checkout, *(r for r in box.repos if not box.is_detached(r))):
+        assert box.run("git", "status", "--porcelain", cwd=root).stdout == ""
+    assert box.run("git", "status", "--porcelain", "--untracked-files=no", cwd=box.records).stdout == ""
+
+
+def checkout_ids(box):
+    """The checkout's task ids, read from its saved records."""
+    return sorted(p.stem for p in (box.records / box.old / "tasks").glob(f"{box.old}-*.md"))
+
+
+def records_patch(box, n=1):
+    return box.snapshot / f"rollback-records-{box.records.name}-{n}.patch"
+
+
+REVERT = "revert: roll back rename ai -> tack"
+
+
+def test_detached_rollback_before_commit_restores_everything(dbox):
+    dbox.depend_on_checkout(dbox.ops)
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.apply()
+    dbox.cutover("link", "--snapshot", dbox.snapshot)
+    head = head_of(dbox, dbox.records)
+    rolled_back(dbox, before)
+    # Nothing owned differed from HEAD once restored, so nothing was committed.
+    assert head_of(dbox, dbox.records) == head
+
+
+def test_detached_rollback_after_commit_restores_everything(dbox):
+    dbox.depend_on_checkout(dbox.ops)
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.apply()
+    dbox.commit_rename()
+    dbox.cutover("link", "--snapshot", dbox.snapshot)
+    rolled_back(dbox, before)
+    assert dbox.run("git", "log", "-1", "--format=%s", cwd=dbox.records).stdout.strip() == REVERT
+    assert "tack" not in dbox.run("git", "ls-tree", "--name-only", "HEAD", cwd=dbox.records).stdout.split()
+
+
+def test_detached_rollback_after_a_retarget_without_the_renames_commit(dbox):
+    dbox.depend_on_checkout(dbox.ops)
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.forward()
+    rolled_back(dbox, before)
+    last = dbox.run("git", "log", "-1", "--name-only", "--format=%s", cwd=dbox.records).stdout.split("\n")
+    assert last[0] == REVERT and all(p.startswith("ops/") for p in last[1:] if p), last
+
+
+def test_detached_rollback_after_a_retarget_with_the_renames_commit(dbox):
+    dbox.depend_on_checkout(dbox.ops)
+    before = dbox.fingerprint()
+    detached_cutover(dbox)
+    rolled_back(dbox, before)
+    assert dbox.run("git", "log", "-1", "--format=%s", cwd=dbox.records).stdout.strip() == REVERT
+
+
+def test_rollback_with_an_in_tree_checkout_and_a_detached_repo_restores_p(tmp_path):
+    box = Sandbox(tmp_path, detached_repos=("ops",)).build()
+    box.depend_on_checkout(box.ops)
+    before = box.fingerprint()
+    box.save()
+    box.apply()
+    box.commit_rename()
+    box.cutover("retarget", "--snapshot", box.snapshot, "--repo", box.ops)
+    box.cutover("link", "--snapshot", box.snapshot)
+    rolled_back(box, before)
+    last = box.run("git", "log", "-1", "--name-only", "--format=%s", cwd=box.records).stdout.split("\n")
+    assert last[0] == REVERT and all(p.startswith("ops/") for p in last[1:] if p), last
+
+
+def test_detached_rollback_keeps_another_projects_commit_and_draft(dbox):
+    """zz, a detached project outside the snapshot, commits a record and leaves a draft
+    after save, and a draft appears under ops/: rollback restores only the owned paths and
+    commits only them, so all three survive, the drafts in place and untracked."""
+    dbox.code_repo(dbox.sync / "zz", "zz")
+    dbox.depend_on_checkout(dbox.ops)
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.apply()
+    dbox.commit_rename()
+    added = task_id(dbox.run("tasks", "add", "zz work", "--process", "direct", cwd=dbox.sync / "zz").stdout)
+    drafts = {"zz/docs/specs/draft.md": b"zz's draft\n", "ops/docs/specs/draft.md": b"a draft in ops\n"}
+    for rel, text in drafts.items():
+        (dbox.records / rel).write_bytes(text)
+    dbox.cutover("retarget", "--snapshot", dbox.snapshot, "--repo", dbox.ops)
+    dbox.cutover("link", "--snapshot", dbox.snapshot)
+    record = f"zz/tasks/{added}.md"
+    kept = {record: (dbox.records / record).read_bytes(), **drafts}
+    dbox.cutover("rollback", "--snapshot", dbox.snapshot)
+    after = dbox.fingerprint()
+    assert after["records"] == {**before["records"], **kept}
+    assert {k: v for k, v in after.items() if k != "records"} == {k: v for k, v in before.items() if k != "records"}
+    assert dbox.run("git", "ls-tree", "--name-only", "HEAD", "--", record, cwd=dbox.records).stdout.strip() == record
+    assert dbox.run("git", "status", "--porcelain", "--untracked-files=all", cwd=dbox.records).stdout.splitlines() \
+        == ["?? ops/docs/specs/draft.md", "?? zz/docs/specs/draft.md"]
+    last = dbox.run("git", "log", "-1", "--name-only", "--format=%s", cwd=dbox.records).stdout.split("\n")
+    assert last[0] == REVERT
+    assert all(p.split("/", 1)[0] in ("ai", "ops", "tack") for p in last[1:] if p), last
+
+
+def test_detached_rollback_removes_a_task_filed_in_p_since_save_and_patches_it(dbox):
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.apply()
+    dbox.commit_rename()
+    filed = task_id(dbox.run("tasks", "add", "filed since save", "--process", "direct", cwd=dbox.ops).stdout)
+    assert (dbox.records / "ops" / "tasks" / f"{filed}.md").is_file()
+    rolled_back(dbox, before)
+    patch = records_patch(dbox).read_text()
+    assert f"ops/tasks/{filed}.md" in patch and "filed since save" in patch
+    assert not dbox.run("git", "ls-tree", "-r", "HEAD", "--", f"ops/tasks/{filed}.md", cwd=dbox.records).stdout
+
+
+def test_detached_rollback_recreates_the_old_empty_doc_directories(dbox):
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.apply()
+    assert not (dbox.records / "ai").exists()
+    rolled_back(dbox, before)
+    for d in ("docs/specs", "docs/plans"):
+        assert (dbox.records / "ai" / d).is_dir() and not any((dbox.records / "ai" / d).iterdir())
+
+
+def test_detached_rollback_leaves_a_detached_repos_code_checkout_alone(dbox):
+    """ops's code checkout is never reset, nor checked for leftovers or cleanliness."""
+    before = dbox.fingerprint()
+    detached_cutover(dbox)
+    (dbox.ops / "README").write_text("work since save\n")
+    dbox.commit(dbox.ops, "work since save")
+    head = head_of(dbox, dbox.ops)
+    (dbox.ops / "stray").write_text("untracked\n")
+    dbox.cutover("rollback", "--snapshot", dbox.snapshot)
+    assert head_of(dbox, dbox.ops) == head
+    assert (dbox.ops / "README").read_text() == "work since save\n"
+    assert (dbox.ops / "stray").read_text() == "untracked\n"
+    after = dbox.fingerprint()
+    assert {k: v for k, v in after.items() if k != "ops"} == {k: v for k, v in before.items() if k != "ops"}
+    assert not list(dbox.snapshot.glob("rollback-ops-*.patch"))
+
+
+def test_detached_rollback_stops_when_the_records_repository_changed_branch(dbox):
+    dbox.save()
+    dbox.apply()
+    dbox.run("git", "checkout", "-qb", "other", cwd=dbox.records)
+    refused_rollback(dbox, f"rollback: {dbox.records.resolve()} is on refs/heads/other, expected refs/heads/main")
+
+
+# The walk: every file under <old>/ and <new>/ that is in none of the index, HEAD and the
+# saved head is a rename leftover with an original at the saved head, or rollback stops.
+
+
+@pytest.mark.parametrize("stage", ["files", "config", "records", "registry"])
+def test_detached_rollback_after_rename_stopped_after(dbox, stage):
+    before = dbox.fingerprint()
+    dbox.save()
+    env = {**dbox.env, "TASKS_RENAME_STOP_AFTER": stage}
+    subprocess.run(["tasks", "rename", "ai", "tack"], cwd=dbox.checkout, env=env, text=True, capture_output=True)
+    assert (dbox.tmp / "state" / "tasks" / "rename" / "ai.toml").exists()
+    moved = (dbox.records / "tack").exists()
+    assert moved == (stage in ("records", "registry"))
+    if not moved:
+        assert list((dbox.records / "ai" / "tasks").glob("tack-*.md"))
+    rolled_back(dbox, before)
+
+
+def test_detached_rollback_after_partial_apply(dbox):
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.run("tasks", "rename", "ai", "tack", cwd=dbox.checkout)
+    os.rename(dbox.checkout, dbox.new_root)      # interrupted before storage, init --force, links
+    rolled_back(dbox, before)
+
+
+NOT_LEFTOVER = "is not a rename leftover"
+
+
+def test_detached_rollback_stops_on_a_foreign_file_under_new(dbox):
+    dbox.save()
+    dbox.apply()
+    (dbox.records / "tack" / "docs" / "specs" / "mine.md").write_text("mine\n")
+    refused_rollback(dbox, f"rollback: {dbox.records.resolve()}: tack/docs/specs/mine.md {NOT_LEFTOVER}: "
+                           f"the saved head has no ai/docs/specs/mine.md; move it aside first")
+
+
+def test_detached_rollback_stops_on_a_foreign_file_under_old(dbox):
+    dbox.save()
+    dbox.apply()
+    (dbox.records / "ai" / "docs").mkdir(parents=True)
+    (dbox.records / "ai" / "docs" / "mine.md").write_text("mine\n")
+    refused_rollback(dbox, f"rollback: {dbox.records.resolve()}: ai/docs/mine.md {NOT_LEFTOVER}; "
+                           f"move it aside first")
+
+
+def test_detached_rollback_stops_on_an_ignored_file_under_new(dbox):
+    dbox.save()
+    dbox.apply()
+    with (dbox.records / ".git" / "info" / "exclude").open("a") as f:
+        f.write("*.tmp\n")
+    (dbox.records / "tack" / "tasks" / "x.tmp").write_text("mine\n")
+    refused_rollback(dbox, f"rollback: {dbox.records.resolve()}: tack/tasks/x.tmp {NOT_LEFTOVER}: "
+                           f"the saved head has no ai/tasks/x.tmp; move it aside first")
+
+
+def test_detached_rollback_stops_on_a_new_task_written_before_the_commit(dbox):
+    """A task filed after apply and before the rename's commit: the hook refuses its record
+    commit, and it has no original to restore, so the person moves it aside."""
+    dbox.save()
+    dbox.apply()
+    added = dbox.run("tasks", "add", "filed before the commit", "--process", "direct", cwd=dbox.new_root).stdout
+    assert "commit_failed:" in added
+    hex_ = task_id(added).split("-", 1)[1]
+    refused_rollback(dbox, f"rollback: {dbox.records.resolve()}: tack/tasks/tack-{hex_}.md {NOT_LEFTOVER}: "
+                           f"the saved head has no ai/tasks/ai-{hex_}.md; move it aside first")
+
+
+# The copies: every validated leftover is kept in the snapshot before it is deleted.
+
+
+def test_detached_rollback_copies_a_note_written_before_the_commit(dbox):
+    hex_ = checkout_ids(dbox)[0].split("-", 1)[1]
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.apply()
+    noted = dbox.run("tasks", "note", f"tack-{hex_}", "a note before the commit", cwd=dbox.new_root).stdout
+    assert "commit_failed:" in noted
+    rolled_back(dbox, before)
+    copy = dbox.snapshot / "rollback-leftovers-1" / f"records-{dbox.records.name}" / "tack" / "tasks" / f"tack-{hex_}.md"
+    assert "a note before the commit" in copy.read_text()
+
+
+def test_detached_rollback_takes_one_new_leftovers_directory_per_attempt(dbox):
+    """A planted index.lock stops the first attempt at the records restore, after its copies;
+    the retry copies again, into the next number, and converges."""
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.apply()
+    renamed = {str(p.relative_to(dbox.records)): p.read_bytes()
+               for p in (dbox.records / "tack").rglob("*") if p.is_file()}
+    assert len(renamed) == 3
+    lock = dbox.records / ".git" / "index.lock"
+    lock.write_text("")
+    result = dbox.cutover("rollback", "--snapshot", dbox.snapshot, check=False)
+    assert result.returncode == 1
+    assert "index.lock': File exists" in result.stderr
+    lock.unlink()
+    dbox.cutover("rollback", "--snapshot", dbox.snapshot)
+    assert dbox.fingerprint() == before
+    label = f"records-{dbox.records.name}"
+    for n in (1, 2):
+        attempt = dbox.snapshot / f"rollback-leftovers-{n}"
+        assert os.listdir(attempt) == [label]
+        assert {str(p.relative_to(attempt / label)): p.read_bytes()
+                for p in (attempt / label).rglob("*") if p.is_file()} == renamed
+    assert not (dbox.snapshot / "rollback-leftovers-3").exists()
+
+
 # --- the guard ----------------------------------------------------------------
 
 
