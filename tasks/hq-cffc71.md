@@ -1,17 +1,20 @@
 ---
 id: hq-cffc71
 title: Default harness sessions to small runner worker counts so unbudgeted runs cannot take the whole host
-status: doing
+status: done
 priority: 1
 size: s
 complexity: mid
 process: direct
 owner: main
 created: 2026-11-01T23:43:00Z
-updated: 2026-11-02T01:01:18Z
+updated: 2026-11-02T01:01:20Z
 started: 2026-11-02T00:02:05Z
+completed: 2026-11-02T01:01:20Z
+closed: 2026-11-02T01:01:20Z
 depends: []
 tags: [hooks]
+model: claude-opus-5-5
 agent: claude-code/claude-opus-5-5
 origin: user
 ---
@@ -47,4 +50,8 @@ Done when a fresh session's Bash shell shows the defaults, a bare `pytest -n aut
 - 2026-11-02T00:59:50Z (hq-cffc71-worker-defaults): resumed
   provenance: {"harness_session":"claude-code:cc9d0598-86ea-48e9-8298-c41d9389039b","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-02T01:01:18Z (main): resumed
+  provenance: {"harness_session":"claude-code:cc9d0598-86ea-48e9-8298-c41d9389039b","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-02T01:01:20Z (main): done
+  provenance: {"harness_session":"claude-code:cc9d0598-86ea-48e9-8298-c41d9389039b","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-02T01:01:20Z (main): Claude settings env, Codex shell_environment_policy.set and pi/bin/pi default PYTEST_XDIST_AUTO_NUM_WORKERS, CARGO_BUILD_JOBS, RUST_TEST_THREADS, NEXTEST_TEST_THREADS, GOMAXPROCS to 4 (merge 3881ff69; tools/test_worker_defaults.py). Verified: gate host-budget run -- just test exit 0 (268+1421+391+1); bare pytest -n auto 4/4 workers vs 32/32 unset; host-budget run overwrites inherited values with its grant; fresh claude -p and codex exec from main homes show all five = 4. Pi checked by launcher test only, no live pi session. Skipped: library vars (host pins them to 1), agy (hq-32317f), work homes under local/ (untracked, left to the user). Main's Codex hook trust hashes committed as 860fb94d with the user's consent. Retained: worktree removed (caches discarded, tt-report run, no host pointers), branch deleted after merge, scratch discarded; host-load: nothing left running; nothing pushed.
   provenance: {"harness_session":"claude-code:cc9d0598-86ea-48e9-8298-c41d9389039b","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
