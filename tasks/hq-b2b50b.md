@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-11-02T19:14:07Z
-updated: 2026-11-02T20:22:20Z
+updated: 2026-11-02T20:22:23Z
 depends: []
 tags: [feedback, friction, "from:mm"]
 agent: claude-code
@@ -20,3 +20,5 @@ The user asked for this (their request): the 4 h active-time limit is too aggres
 
 - 2026-11-02T19:14:07Z (feedback): created
   provenance: {"harness_session":"claude-code:c67f4b5f-818d-4533-83b0-172009b992c2","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-02T20:22:23Z (main): scope: scoped; origin: filing matched, Claude session c67f4b5f-818d-4533-83b0-172009b992c2 lines 519, 533-534 (duplicate records 535-536 lack timestamps and repeat the same tool id); user explicitly requested a historic-data cutoff, suggesting 12 or 16 h. Direct: existing replay and limits file settle approach; compare historical turn tails at 4/12/16 h, record coverage and outlier evidence, update only active default plus dependent tests and current docs. Keep calls/spawns/compactions and counting semantics unchanged. Verification: hydrated full baseline and just test before commit, default/CLI and budget scaling checks. Activation changes a live hook surface and requires user approval before merge.
+  provenance: {"harness_session":"codex:01a19deb-d3a4-7b80-a260-fdc7e14f54ea","harness_session_source":"CODEX_THREAD_ID"}
