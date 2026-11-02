@@ -541,6 +541,21 @@ revision pi requests, and the probe does not record it. After `rpc-probe.py` rep
 The value is the `LATEST_PROTOCOL_VERSION` printed, provided the `new McpClient({…})`
 line passes no `protocolVersion`; if it does, that option's value is the revision.
 
+### Turn-pause limits
+
+`hq pause limits` shows the current defaults: 16 active hours, 500 root tool calls,
+30 tree spawns and 2 compactions per turn. The next hooked call after a limit is
+exceeded pauses the turn. Activity includes time with a tool in flight, including
+subagent work; it is not CPU time. Codex compactions are not counted by the hook.
+The [cutoff calibration](docs/notes/2026-11-02-active-cutoff-report.md) records the
+historical comparison and its limits; duration alone cannot prove a runaway.
+
+A first-line budget directive scales unnamed counts relative to the default:
+`budget: 12h` gives 375 calls, 23 spawns and 2 compactions, while `budget: 48h` gives
+1,500 calls, 90 spawns and 6 compactions. Named counts override scaling.
+Changing the live limits file pauses existing turns with `limits-changed`; a new
+genuine user prompt starts a turn with the updated limits.
+
 ### Re-probing the turn-pause hook facts
 
 The hook facts the turn pause reads (`hook-*`, `model-tool-surface`, `codex-*`) come

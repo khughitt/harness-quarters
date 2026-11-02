@@ -8,7 +8,7 @@ from turn_pause.limits import Limits
 from turn_pause.prompt import Budget
 
 
-def test_defaults_file(): assert limits.load()[0] == Limits(14400, 500, 30, 2)
+def test_defaults_file(): assert limits.load()[0] == Limits(57600, 500, 30, 2)
 
 def test_load_returns_file_sha256():
     assert limits.load()[1] == hashlib.sha256(limits.DEFAULTS_PATH.read_bytes()).hexdigest()
