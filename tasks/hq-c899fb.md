@@ -7,8 +7,8 @@ size: s
 complexity: low
 process: direct
 created: 2026-11-02T20:00:54Z
-updated: 2026-11-02T20:00:54Z
-depends: [hq-ca01cf]
+updated: 2026-11-02T20:16:54Z
+depends: []
 tags: [rename-cutover]
 source: hq-5300fd
 agent: claude-code
