@@ -27,6 +27,13 @@ the nested fixture creates its directory, the deferred-commit check runs after e
 edit, and the location refusals cover a `--repo` and a top level equal to the
 checkout (M1–M4).
 
+Revision 4 (after plan review round 3, revise: Important 1, Minor 5): the "top level
+is the checkout" fixture holds a detached `--repo`'s records at `<checkout>/<p>`
+(N5); the index-lock test's break is caught by its state assertion; the verify row
+copy is a sibling at the same depth; `commit_rename()` and `depend_on_checkout` state
+their scope; the hook is made to fail by overwriting the box's copy; the misnamed
+fixture's move is committed.
+
 **Goal:** `tools/rename-cutover` saves, applies, retargets, links, verifies and rolls
 back a rename whose checkout or `--repo` repositories are detached tasks projects,
 restoring only the rename's own paths in the shared records repository.
@@ -103,12 +110,14 @@ Spec §4.6, §5 (fixture, `registry_view`).
     committed, records under `sync/records/<name>`); other repos stay in-tree;
   - `commit(root, message)` is unchanged and still fails when there is nothing to
     commit, so a test that expected a commit learns it did not happen.
-    `depend_on_checkout` skips `commit` for a detached root (its records committed
-    themselves) and calls it for an in-tree root as today;
-  - `commit_rename()` runs, for a detached box, the records commit `apply` prints
-    (the scoped `add` and `commit` over `ai` and `tack`), then asserts that the records
-    repository's HEAD holds `tack/` and no `ai/`. Every after-commit test of a detached
-    box uses it, so none can silently run as a before-commit test;
+    `depend_on_checkout` makes two commits, one in the checkout and one in `root`;
+    each is skipped when that project is detached (its records committed themselves)
+    and made as today when it is in-tree;
+  - `commit_rename()`: when the checkout is detached, runs the records commit `apply`
+    prints (the scoped `add` and `commit` over `ai` and `tack`) and asserts that the
+    records repository's HEAD holds `tack/` and no `ai/`; when the checkout is in-tree,
+    commits the new root as the existing tests do (`commit(new_root, "rename")`). Every
+    after-commit test uses it, so none can silently run as a before-commit test;
   - `fingerprint()` adds, for a detached box, the records repository's files
     (excluding `.git`) and its sorted directory list, so empty `docs/specs` and
     `docs/plans` count.
@@ -160,15 +169,18 @@ Spec §4, §4.1.
     sync/records/sub`, then `init --records sync/records/sub`, whose setup commit needs
     `--no-verify` because the hook refuses `sub/` without a config at its top); a
     records directory not named for its prefix (move `sync/records/<p>` to
-    `sync/records/other` and edit `[records] <p>` in the sandbox registry's text to
-    match, as `test_save_refuses_a_checkout_the_registry_does_not_map` edits the
+    `sync/records/other`, commit the move in the records repository through the hook,
+    and edit `[records] <p>` in the sandbox registry's text to match, as `test_save_refuses_a_checkout_the_registry_does_not_map` edits the
     registry; the round-2 reviewer's probe showed the row, the hook and `tasks check`
     accept that layout); a records repository inside the checkout and one inside a
     `--repo` (each nested repository git-ignored in its outer one, so the clean check
     does not refuse first); a records directory whose repository's top level is the
-    checkout itself (records kept in a git-ignored subdirectory of the checkout, not
-    a repository of its own, so `git rev-parse --show-toplevel` from it answers the
-    checkout and the clean check does not refuse first); the snapshot inside the
+    checkout itself: a detached `--repo` `p` initialised with `tasks init --prefix p
+    --records <checkout>` from `p`'s code checkout, with `p/` git-ignored in the
+    checkout, so `p`'s records sit at `<checkout>/p`, their parent is the checkout's
+    top level (the parent-and-name check passes) and the location check refuses. These
+    are `p`'s records; the checkout's own records cannot live in its tree (tasks
+    refuses that at init); the snapshot inside the
     records repository; a records directory outside any git repository (`git
     rev-parse` fails and `run` raises the `Stop`, asserted by its message).
 - [ ] Implement in `save` and `preconditions`:
@@ -208,7 +220,9 @@ Spec §4.2, §4.3, §4.4.
   - `test_verify_fails_while_the_records_repository_holds_the_uncommitted_rename`;
   - `test_verify_fails_while_the_old_records_directory_exists`;
   - `test_verify_fails_when_the_row_names_other_records` (after the full cutover,
-    copy `sync/records/tack` elsewhere and edit `[records] tack` in the sandbox
+    copy `sync/records/tack` to a sibling of `sync/records` at the same depth,
+    `sync/records2/tack`, since `[checkout] path` is relative to the records
+    directory, and edit `[records] tack` in the sandbox
     registry's text to name the copy, so the row still sits at the new root and
     `project_row` finds it; verify names the `records` mismatch);
   - `test_verify_fails_on_a_tracked_change_under_p`;
@@ -306,9 +320,11 @@ Spec §4.5 (step 2's differing-file copy, concurrent writers), §4.7, §5.
     is restored);
   - `test_detached_rollback_retry_converges_after_a_stop_at_the_commit` (**guard** on
     Task 4's two path sets and walk: after `commit_rename()`, the box's hook copy is
-    made to fail, so the first attempt stops at `commit_records` with `<old>/` restored
-    and staged and `<new>/` dropped from the index; the test asserts that exit status,
-    message and state; the hook copy is restored; then a file is written at
+    overwritten with an executable `#!/bin/sh` script that prints a marker and exits 1,
+    so the first attempt stops at `commit_records` with `<old>/` restored and staged
+    and `<new>/` dropped from the index; the test asserts the exit status, that the
+    stop names the hook's refusal (the marker), and that state; the hook copy is
+    restored with its mode; then a file is written at
     `tack/tasks/tack-<hex>.md`, a path only the current HEAD holds, and the retry exits
     0, the file's bytes land under `rollback-leftovers-<n>/` (RED for that part), and
     the fingerprint matches. Seen to fail against each of two breaks: the restore set
@@ -319,9 +335,11 @@ Spec §4.5 (step 2's differing-file copy, concurrent writers), §4.7, §5.
   - `test_detached_rollback_retry_converges_after_an_index_lock` (**guard**: a
     planted `index.lock` stops `git restore` before it changes anything, leaving the
     checkout reset and the records repository untouched; the test asserts git's lock
-    message and that state; the lock is removed and the retry converges. Seen to fail
-    when `restore_records` does not raise on git's failure: the first attempt then
-    goes on and its output lacks the lock message);
+    message and that state explicitly (`tack/` still on disk, the records
+    repository's `git status --porcelain` empty); the lock is removed and the retry
+    converges. Seen to fail when `restore_records` does not raise on git's failure:
+    rollback then goes on, deletes `<new>/` and meets the lock again at the commit, so
+    the message still appears but the state assertion fails);
   - `test_detached_second_host_adopts_the_rename` (§4.7: `tasks rename ai tack
     --adopt` from the new root under a second registry; `[projects] tack` and
     `[records] tack` follow; the old id resolves; the first host's state is untouched;
