@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-b2b50b-active-limit
 created: 2026-11-02T19:14:07Z
-updated: 2026-11-02T20:47:22Z
+updated: 2026-11-02T20:47:45Z
 started: 2026-11-02T20:22:25Z
 depends: []
 tags: [feedback, friction, "from:mm"]
@@ -44,3 +44,4 @@ Scope: choose and prepare a measured default active-time cutoff with the existin
 - 2026-11-02T20:28:31Z (fix/hq-b2b50b-active-limit): Correction to candidate arithmetic: 8 h pauses 27 turns (14 Claude plus 13 Codex), not 26. The selected 12 h / 16 h totals remain 26. Full comparison and limitations are in docs/notes/2026-11-02-active-cutoff-report.md; the two measurement attachments are committed and portable.
 - 2026-11-02T20:45:52Z (fix/hq-b2b50b-active-limit): Baseline: hydrated worktree via just setup; no .tt.toml, so policy enabled. just test passed 2672 tests (268 agent-tool + 2012 hook/tool + 391 parallel cutover + 1 serial signal); the hook/tool segment took 695.41 s and parallel segment 600.89 s. No test-fast or test-one declared; focused verification uses the uv/pytest invocation declared by just test, narrowed to affected files, with just test again before commit. No code was changed before baseline.
 - 2026-11-02T20:47:22Z (fix/hq-b2b50b-active-limit): RED: declared uv/pytest route narrowed to limits/hook/CLI files: 13 failed, 99 passed in 39.60 s against 4 h. Both new long-turn adapter cases fail on the post-4 h call; default/CLI and 12h/48h budget assertions fail as expected. Production change is one value in tools/turn_pause/limits.toml plus its calibration comment; remaining 4 h values are explicit historical/custom test fixtures, not live defaults. Merged current main before full verification; incoming changes were hq-1400a4 task notes only.
+- 2026-11-02T20:47:45Z (fix/hq-b2b50b-active-limit): GREEN: same declared uv/pytest invocation narrowed to limits, hook, CLI and replay tests: 132 passed in 27.06 s. Synthetic long call now remains allowed past 4 h and through exactly 16 h, warns at 12 h, and pauses above 16 h under both adapters. Default CLI JSON reports 57600/500/30/2; budgets 12h and 48h scale correctly. Full just test is now running, with log in task scratch. Current-main merge commit: 1ee00253dcd8c793ca26a1789649f88753cc0165
