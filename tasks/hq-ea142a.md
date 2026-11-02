@@ -1,18 +1,21 @@
 ---
 id: hq-ea142a
 title: "rename-cutover detached: rollback restores the owned paths"
-status: doing
+status: done
 priority: 3
 size: l
 complexity: high
 process: direct
 owner: feat/hq-5300fd-detached-rename
 created: 2026-11-02T14:57:10Z
-updated: 2026-11-02T18:00:30Z
+updated: 2026-11-02T18:00:32Z
 started: 2026-11-02T17:15:04Z
+completed: 2026-11-02T18:00:32Z
+closed: 2026-11-02T18:00:32Z
 depends: [hq-62ba95]
 parent: hq-5300fd
 tags: []
+model: claude-opus-5-5
 agent: claude-code/claude-opus-5-5
 plan: docs/plans/2026-11-02-detached-rename-cutover.md
 step: "Task 4: rollback restores the records repository's owned paths"
@@ -37,3 +40,7 @@ Contract: spec docs/specs/2026-11-02-detached-rename-cutover-design.md revision 
 - 2026-11-02T18:00:28Z (feat/hq-5300fd-detached-rename): gate: verified tree:d37bca12e5ac7ae722dc203a3e1bc34694496b9d — checks: just test exit 0 (harness-facts ok, agents/bin 268 passed, .githooks and tools 1993 passed, relay xdist 391 passed, signal test 1 passed) and focused tools/test_rename_cutover.py 161 passed, all 23 new tests seen RED, four targeted breaks (resetting detached repo code checkouts, skipping commit_records, committing before the registry restore, not recreating dirs) each seen failing, reviewer probes of the retry, index.lock, staged foreign file, attachments and links converged; review: minor deferred a link at the new or old records directory crashes rollback after it starts (Task 5 brief), minor deferred the walk silently skips an unreadable directory (Task 5 brief), minor deferred pre-pass mkdir and copy failures raise raw exceptions (Task 5 brief), minor deferred two records repositories with one basename share a patch label (Task 5 brief); reviewer: claude-code/claude-opus-5-5
   provenance: {"harness_session":"claude-code:7104a322-b727-4975-8f34-3d210db837b3","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-02T18:00:30Z (feat/hq-5300fd-detached-rename): retro: the plan's precise path-set language (restore: index or saved head, commit: index or current HEAD) let the implementer land the hardest task in one commit and the reviewer confirm it with a throwaway git probe; reviewers should keep probing filesystem edge cases (links, unreadable dirs) the spec leaves implicit
+- 2026-11-02T18:00:32Z (feat/hq-5300fd-detached-rename): done
+  provenance: {"harness_session":"claude-code:7104a322-b727-4975-8f34-3d210db837b3","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-02T18:00:32Z (feat/hq-5300fd-detached-rename): Task 4 landed: rollback restores and commits only the owned paths of a records repository, walk, pre-pass patches and leftover copies; just test green; review accepted, 4 minors folded into Task 5
+  provenance: {"harness_session":"claude-code:7104a322-b727-4975-8f34-3d210db837b3","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
