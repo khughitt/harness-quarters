@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-11-02T19:54:56Z
-updated: 2026-11-02T19:54:56Z
+updated: 2026-11-02T20:01:07Z
 depends: []
 tags: [rename-cutover]
 source: hq-5300fd
@@ -29,3 +29,4 @@ Verification: RED-first tests in tools/test_rename_cutover.py for items 1, 3 and
 
 - 2026-11-02T19:54:56Z (add): created
   provenance: {"harness_session":"claude-code:7104a322-b727-4975-8f34-3d210db837b3","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
+- 2026-11-02T20:01:07Z (main): same tool as hq-4a1b85 and hq-7255db (open deferred minors on rename-cutover); worth doing the three in one pass
