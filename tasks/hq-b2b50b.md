@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-b2b50b-active-limit
 created: 2026-11-02T19:14:07Z
-updated: 2026-11-02T20:27:12Z
+updated: 2026-11-02T20:27:14Z
 started: 2026-11-02T20:22:25Z
 depends: []
 tags: [feedback, friction, "from:mm"]
@@ -33,3 +33,4 @@ The user asked for this (their request): the 4 h active-time limit is too aggres
 - 2026-11-02T20:23:42Z (fix/hq-b2b50b-active-limit): Created scratch on titan: $WORK_ROOT/hq/hq-b2b50b for replay measurement script/results; owner task:hq-b2b50b; contents mutable, not yet checkpointed.
 - 2026-11-02T20:24:41Z (fix/hq-b2b50b-active-limit): Pilot: existing replay recovered the reported 4.099 h / 59 calls / 7 spawns / 0 compactions turn and pauses it only at the 4 h candidate. The 41.643 h controller remains caught at 9.857 active hours by the 501st root call under 12/16/24 h candidates. Pilot: 2 roots, 122 transcript files, 5.37 s, no scheduled-record problems. Beginning 2026-10-02 through 2026-11-02T20:00Z store comparison at 4/8/12/16/24 h; explicit-budget turns separated.
 - 2026-11-02T20:27:12Z (fix/hq-b2b50b-active-limit): attached: active-cutoff-measure.py (3411 bytes): Read-only candidate comparison using turn_pause.replay; run from hq checkout
+- 2026-11-02T20:27:14Z (fix/hq-b2b50b-active-limit): attached: active-cutoff-measurement.json (12410 bytes): 2026-10-02 through 2026-11-02T20Z: 6005 turns, 6596 files, 4/8/12/16/24 h replay candidates

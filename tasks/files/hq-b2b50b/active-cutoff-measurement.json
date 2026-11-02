@@ -1,0 +1,541 @@
+{
+  "window": [
+    "2026-10-02T00:00:00Z",
+    "2026-11-02T20:00:00Z"
+  ],
+  "pilot": false,
+  "roots": 2028,
+  "files": 6596,
+  "elapsed_seconds": 116.24,
+  "converter": {
+    "function calls": 13166,
+    "nested closed at completion": 137240,
+    "exec_command yielded, open until Stop": 10389,
+    "nested calls": 150989,
+    "exec_command yielded, ended by write_stdin": 2923,
+    "exec_command yielded inside its cell, open until Stop": 437,
+    "unrecorded nested clock__curr_time": 115
+  },
+  "problems": {},
+  "candidates": {
+    "4": {
+      "claude-code": {
+        "turns": 3490,
+        "default_turns": 3490,
+        "explicit_budget_turns": 0,
+        "paused": {
+          "active": 14,
+          "spawns": 7,
+          "calls": 1
+        },
+        "active_over": 17,
+        "active_only": 9,
+        "active_hours": {
+          "p50": 0.051,
+          "p90": 0.411,
+          "p99": 2.761,
+          "p99.9": 9.549
+        },
+        "max_active_hours": 21.101
+      },
+      "codex": {
+        "turns": 2515,
+        "default_turns": 2515,
+        "explicit_budget_turns": 0,
+        "paused": {
+          "active": 26,
+          "spawns": 2,
+          "calls": 2
+        },
+        "active_over": 28,
+        "active_only": 18,
+        "active_hours": {
+          "p50": 0.07,
+          "p90": 0.487,
+          "p99": 4.164,
+          "p99.9": 10.195
+        },
+        "max_active_hours": 41.643
+      }
+    },
+    "8": {
+      "claude-code": {
+        "turns": 3490,
+        "default_turns": 3490,
+        "explicit_budget_turns": 0,
+        "paused": {
+          "spawns": 10,
+          "active": 3,
+          "calls": 1
+        },
+        "active_over": 6,
+        "active_only": 1,
+        "active_hours": {
+          "p50": 0.051,
+          "p90": 0.411,
+          "p99": 2.761,
+          "p99.9": 9.549
+        },
+        "max_active_hours": 21.101
+      },
+      "codex": {
+        "turns": 2515,
+        "default_turns": 2515,
+        "explicit_budget_turns": 0,
+        "paused": {
+          "spawns": 4,
+          "calls": 7,
+          "active": 2
+        },
+        "active_over": 7,
+        "active_only": 2,
+        "active_hours": {
+          "p50": 0.07,
+          "p90": 0.487,
+          "p99": 4.164,
+          "p99.9": 10.195
+        },
+        "max_active_hours": 41.643
+      }
+    },
+    "12": {
+      "claude-code": {
+        "turns": 3490,
+        "default_turns": 3490,
+        "explicit_budget_turns": 0,
+        "paused": {
+          "spawns": 11,
+          "active": 2,
+          "calls": 1
+        },
+        "active_over": 2,
+        "active_only": 1,
+        "active_hours": {
+          "p50": 0.051,
+          "p90": 0.411,
+          "p99": 2.761,
+          "p99.9": 9.549
+        },
+        "max_active_hours": 21.101
+      },
+      "codex": {
+        "turns": 2515,
+        "default_turns": 2515,
+        "explicit_budget_turns": 0,
+        "paused": {
+          "spawns": 4,
+          "calls": 8
+        },
+        "active_over": 1,
+        "active_only": 0,
+        "active_hours": {
+          "p50": 0.07,
+          "p90": 0.487,
+          "p99": 4.164,
+          "p99.9": 10.195
+        },
+        "max_active_hours": 41.643
+      }
+    },
+    "16": {
+      "claude-code": {
+        "turns": 3490,
+        "default_turns": 3490,
+        "explicit_budget_turns": 0,
+        "paused": {
+          "spawns": 12,
+          "active": 1,
+          "calls": 1
+        },
+        "active_over": 1,
+        "active_only": 1,
+        "active_hours": {
+          "p50": 0.051,
+          "p90": 0.411,
+          "p99": 2.761,
+          "p99.9": 9.549
+        },
+        "max_active_hours": 21.101
+      },
+      "codex": {
+        "turns": 2515,
+        "default_turns": 2515,
+        "explicit_budget_turns": 0,
+        "paused": {
+          "spawns": 4,
+          "calls": 8
+        },
+        "active_over": 1,
+        "active_only": 0,
+        "active_hours": {
+          "p50": 0.07,
+          "p90": 0.487,
+          "p99": 4.164,
+          "p99.9": 10.195
+        },
+        "max_active_hours": 41.643
+      }
+    },
+    "24": {
+      "claude-code": {
+        "turns": 3490,
+        "default_turns": 3490,
+        "explicit_budget_turns": 0,
+        "paused": {
+          "spawns": 12,
+          "calls": 1
+        },
+        "active_over": 0,
+        "active_only": 0,
+        "active_hours": {
+          "p50": 0.051,
+          "p90": 0.411,
+          "p99": 2.761,
+          "p99.9": 9.549
+        },
+        "max_active_hours": 21.101
+      },
+      "codex": {
+        "turns": 2515,
+        "default_turns": 2515,
+        "explicit_budget_turns": 0,
+        "paused": {
+          "spawns": 4,
+          "calls": 8
+        },
+        "active_over": 1,
+        "active_only": 0,
+        "active_hours": {
+          "p50": 0.07,
+          "p90": 0.487,
+          "p99": 4.164,
+          "p99.9": 10.195
+        },
+        "max_active_hours": 41.643
+      }
+    }
+  },
+  "tail_at_16h": [
+    {
+      "harness": "claude-code",
+      "root": "393db06d-9424-4fd1-a855-8adaa7768b36",
+      "start": "2026-10-20T14:27:54Z",
+      "active_hours": 21.101,
+      "calls": 183,
+      "spawns": 27,
+      "compactions": 0,
+      "limits": {
+        "active_seconds": 57600,
+        "calls": 500,
+        "spawns": 30,
+        "compactions": 2
+      },
+      "pause": {
+        "limit": "active",
+        "active_hours": 16.104
+      }
+    },
+    {
+      "harness": "claude-code",
+      "root": "536b5ebf-5753-4a8b-ac83-61dde5ef4c79",
+      "start": "2026-11-01T14:32:57Z",
+      "active_hours": 11.513,
+      "calls": 174,
+      "spawns": 35,
+      "compactions": 0,
+      "limits": {
+        "active_seconds": 57600,
+        "calls": 500,
+        "spawns": 30,
+        "compactions": 2
+      },
+      "pause": {
+        "limit": "spawns",
+        "active_hours": 9.992
+      }
+    },
+    {
+      "harness": "claude-code",
+      "root": "82304e68-73b7-472c-a752-a65b6620ecdd",
+      "start": "2026-10-15T22:06:14Z",
+      "active_hours": 9.549,
+      "calls": 272,
+      "spawns": 60,
+      "compactions": 0,
+      "limits": {
+        "active_seconds": 57600,
+        "calls": 500,
+        "spawns": 30,
+        "compactions": 2
+      },
+      "pause": {
+        "limit": "spawns",
+        "active_hours": 3.483
+      }
+    },
+    {
+      "harness": "claude-code",
+      "root": "822b40ee-44d3-484f-b85d-0292cb7adb70",
+      "start": "2026-11-01T19:26:32Z",
+      "active_hours": 15.655,
+      "calls": 208,
+      "spawns": 33,
+      "compactions": 1,
+      "limits": {
+        "active_seconds": 57600,
+        "calls": 500,
+        "spawns": 30,
+        "compactions": 2
+      },
+      "pause": {
+        "limit": "spawns",
+        "active_hours": 14.021
+      }
+    },
+    {
+      "harness": "claude-code",
+      "root": "c67f4b5f-818d-4533-83b0-172009b992c2",
+      "start": "2026-11-02T15:05:32Z",
+      "active_hours": 4.099,
+      "calls": 59,
+      "spawns": 7,
+      "compactions": 0,
+      "limits": {
+        "active_seconds": 57600,
+        "calls": 500,
+        "spawns": 30,
+        "compactions": 2
+      },
+      "pause": null
+    },
+    {
+      "harness": "claude-code",
+      "root": "c67f4b5f-818d-4533-83b0-172009b992c2",
+      "start": "2026-11-02T19:13:47Z",
+      "active_hours": 0.01,
+      "calls": 4,
+      "spawns": 0,
+      "compactions": 0,
+      "limits": {
+        "active_seconds": 57600,
+        "calls": 500,
+        "spawns": 30,
+        "compactions": 2
+      },
+      "pause": null
+    },
+    {
+      "harness": "claude-code",
+      "root": "c67f4b5f-818d-4533-83b0-172009b992c2",
+      "start": "2026-11-02T19:15:20Z",
+      "active_hours": 0.744,
+      "calls": 15,
+      "spawns": 3,
+      "compactions": 0,
+      "limits": {
+        "active_seconds": 57600,
+        "calls": 500,
+        "spawns": 30,
+        "compactions": 2
+      },
+      "pause": null
+    },
+    {
+      "harness": "claude-code",
+      "root": "d94b6c27-6ff9-417d-82a7-331430293ed7",
+      "start": "2026-10-10T16:34:08Z",
+      "active_hours": 9.262,
+      "calls": 300,
+      "spawns": 103,
+      "compactions": 1,
+      "limits": {
+        "active_seconds": 57600,
+        "calls": 500,
+        "spawns": 30,
+        "compactions": 2
+      },
+      "pause": {
+        "limit": "spawns",
+        "active_hours": 0.663
+      }
+    },
+    {
+      "harness": "claude-code",
+      "root": "ad0396b3-824c-4825-aa17-a5252221a532",
+      "start": "2026-10-25T18:45:56Z",
+      "active_hours": 8.501,
+      "calls": 180,
+      "spawns": 33,
+      "compactions": 0,
+      "limits": {
+        "active_seconds": 57600,
+        "calls": 500,
+        "spawns": 30,
+        "compactions": 2
+      },
+      "pause": {
+        "limit": "spawns",
+        "active_hours": 7.299
+      }
+    },
+    {
+      "harness": "codex",
+      "root": "01a10620-6c94-7382-a4ad-acf3540e572e",
+      "start": "2026-10-04T08:55:58Z",
+      "active_hours": 10.195,
+      "calls": 643,
+      "spawns": 50,
+      "compactions": 0,
+      "limits": {
+        "active_seconds": 57600,
+        "calls": 500,
+        "spawns": 30,
+        "compactions": 2
+      },
+      "pause": {
+        "limit": "spawns",
+        "active_hours": 6.385
+      }
+    },
+    {
+      "harness": "codex",
+      "root": "01a11c84-88e2-7213-9235-5b5c189ab28a",
+      "start": "2026-10-09T01:28:58Z",
+      "active_hours": 9.774,
+      "calls": 456,
+      "spawns": 4,
+      "compactions": 0,
+      "limits": {
+        "active_seconds": 57600,
+        "calls": 500,
+        "spawns": 30,
+        "compactions": 2
+      },
+      "pause": null
+    },
+    {
+      "harness": "codex",
+      "root": "01a120a0-0c85-7cd2-a352-de86112531db",
+      "start": "2026-10-09T23:29:53Z",
+      "active_hours": 9.594,
+      "calls": 544,
+      "spawns": 26,
+      "compactions": 0,
+      "limits": {
+        "active_seconds": 57600,
+        "calls": 500,
+        "spawns": 30,
+        "compactions": 2
+      },
+      "pause": {
+        "limit": "calls",
+        "active_hours": 7.941
+      }
+    },
+    {
+      "harness": "codex",
+      "root": "01a126e1-7d47-73f2-a3ee-9c413b0d955f",
+      "start": "2026-10-10T17:34:43Z",
+      "active_hours": 8.678,
+      "calls": 494,
+      "spawns": 25,
+      "compactions": 0,
+      "limits": {
+        "active_seconds": 57600,
+        "calls": 500,
+        "spawns": 30,
+        "compactions": 2
+      },
+      "pause": null
+    },
+    {
+      "harness": "codex",
+      "root": "01a13a0d-9e3b-7362-b2e0-51b8d883a810",
+      "start": "2026-10-14T10:56:37Z",
+      "active_hours": 8.17,
+      "calls": 840,
+      "spawns": 50,
+      "compactions": 0,
+      "limits": {
+        "active_seconds": 57600,
+        "calls": 500,
+        "spawns": 30,
+        "compactions": 2
+      },
+      "pause": {
+        "limit": "spawns",
+        "active_hours": 3.878
+      }
+    },
+    {
+      "harness": "codex",
+      "root": "01a17ea0-12b3-7052-89b6-e4664b22cb1c",
+      "start": "2026-10-27T18:30:41Z",
+      "active_hours": 10.627,
+      "calls": 711,
+      "spawns": 7,
+      "compactions": 0,
+      "limits": {
+        "active_seconds": 57600,
+        "calls": 500,
+        "spawns": 30,
+        "compactions": 2
+      },
+      "pause": {
+        "limit": "calls",
+        "active_hours": 7.853
+      }
+    },
+    {
+      "harness": "codex",
+      "root": "01a18943-2b9d-7e50-926f-b74169571349",
+      "start": "2026-10-29T20:04:49Z",
+      "active_hours": 4.435,
+      "calls": 236,
+      "spawns": 22,
+      "compactions": 0,
+      "limits": {
+        "active_seconds": 57600,
+        "calls": 500,
+        "spawns": 30,
+        "compactions": 2
+      },
+      "pause": null
+    },
+    {
+      "harness": "codex",
+      "root": "01a18943-2b9d-7e50-926f-b74169571349",
+      "start": "2026-10-30T00:42:54Z",
+      "active_hours": 0.927,
+      "calls": 96,
+      "spawns": 8,
+      "compactions": 0,
+      "limits": {
+        "active_seconds": 57600,
+        "calls": 500,
+        "spawns": 30,
+        "compactions": 2
+      },
+      "pause": null
+    },
+    {
+      "harness": "codex",
+      "root": "01a18943-2b9d-7e50-926f-b74169571349",
+      "start": "2026-10-30T01:51:58Z",
+      "active_hours": 41.643,
+      "calls": 1801,
+      "spawns": 82,
+      "compactions": 0,
+      "limits": {
+        "active_seconds": 57600,
+        "calls": 500,
+        "spawns": 30,
+        "compactions": 2
+      },
+      "pause": {
+        "limit": "calls",
+        "active_hours": 9.857
+      }
+    }
+  ]
+}
