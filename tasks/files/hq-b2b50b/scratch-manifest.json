@@ -1,0 +1,32 @@
+{
+  "entries": [
+    {
+      "path": "final-review-report.md",
+      "sha256": "daa9be18c596909fff2db4a3ed2592df29e3a6800016e2d225f73520d2eeea9c"
+    },
+    {
+      "path": "full-verification.txt",
+      "sha256": "1525d748d8a0a02b9c6b98e31869b00aa722dd8477613db209043a862ab987d6"
+    },
+    {
+      "path": "green.txt",
+      "sha256": "da5a22a8d7fd3ea77a10ccf7f3a4dae55e6222089de8c01b9968f34df1682f48"
+    },
+    {
+      "path": "measure.py",
+      "sha256": "10a4891d72a82373a54912eadc94f91e4999abd911cfa8dc1fd28ee7e56f5ac8"
+    },
+    {
+      "path": "measurement.json",
+      "sha256": "ce760224d36f8e62c78f1098eb48184c1791fe27a7a44500adf68731e25dee3e"
+    },
+    {
+      "path": "pilot.json",
+      "sha256": "2bf8946765dc17c6ea93c74b118aeb8c016f4b2b6257f53e930919b2846ad175"
+    },
+    {
+      "path": "red.txt",
+      "sha256": "d305d32c238b1f79d48883649928a144afb65b5d0c66668a05d5d7a83cf8f6d4"
+    }
+  ]
+}
