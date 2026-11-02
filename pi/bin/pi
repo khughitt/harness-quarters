@@ -34,4 +34,10 @@ if ! cmp -s "$dir/package-lock.json" "$pin/package-lock.json"; then
     exit 127
 fi
 export PI_SKIP_VERSION_CHECK=1
+# Start an unbudgeted runner small (pytest -n auto, cargo, nextest, Go); host-budget run
+# overwrites these with its grant, and a value pi was given is kept. Kept equal to
+# claude/settings.json env and codex/config.toml (tools/test_worker_defaults.py).
+for var in PYTEST_XDIST_AUTO_NUM_WORKERS CARGO_BUILD_JOBS RUST_TEST_THREADS NEXTEST_TEST_THREADS GOMAXPROCS; do
+    export "$var=${!var:-4}"
+done
 exec "$dir/node_modules/.bin/pi" "$@"

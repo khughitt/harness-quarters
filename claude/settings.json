@@ -2,7 +2,12 @@
   "cleanupPeriodDays": 90,
   "env": {
     "CLAUDE_CODE_PLUGIN_DIRS": "~/.claude/mods/cli-pane",
+    "CARGO_BUILD_JOBS": "4",
     "CLAUDE_CODE_SHELL": "/bin/bash",
+    "GOMAXPROCS": "4",
+    "NEXTEST_TEST_THREADS": "4",
+    "PYTEST_XDIST_AUTO_NUM_WORKERS": "4",
+    "RUST_TEST_THREADS": "4",
     "TASKS_FORMAT": "json"
   },
   "includeCoAuthoredBy": false,
