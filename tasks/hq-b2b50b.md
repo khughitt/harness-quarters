@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-b2b50b-active-limit
 created: 2026-11-02T19:14:07Z
-updated: 2026-11-02T22:33:34Z
+updated: 2026-11-02T22:33:37Z
 started: 2026-11-02T20:22:25Z
 completed: 2026-11-02T22:32:00Z
 closed: 2026-11-02T22:32:00Z
@@ -77,3 +77,4 @@ Scope: choose and prepare a measured default active-time cutoff with the existin
   provenance: {"harness_session":"codex:01a19deb-d3a4-7b80-a260-fdc7e14f54ea","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-02T22:33:32Z (main): retained: {"host":"titan","kind":"scratch","path":"$WORK_ROOT/hq/hq-b2b50b","state":"released","verification":"verified","purpose":"Removed ten verified scratch files: script/data/reviews/combined logs retained byte-for-byte in committed task attachments; pilot and superseded RED/GREEN/full logs discarded under recorded resolved-run dispositions","next_owner":"none","cleanup_trigger":"none"}
 - 2026-11-02T22:33:34Z (main): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-b2b50b","state":"released","verification":"verified","purpose":"Removed clean merged worktree and regenerable pytest/Python caches after tt-report and fresh host-pointer checks; branch deleted after approved code and checkpoint bases verified in main ancestry","next_owner":"none","cleanup_trigger":"none"}
+- 2026-11-02T22:33:37Z (main): Activated by approved local merge 4bf3214bdfe757b951b4c7881163c49848fb0cfe; main hq pause limits JSON verified active_seconds=57600, calls=500, spawns=30, compactions=2. Merged tree exactly matched reviewed/tested feature tree; combined evidence is 408 focused and 2702 full-suite passes. Both retained identities were released after verified dispositions; no kept task worktree or scratch remains, so no empty retention checkpoint is emitted. Feature branch deleted; approved code and historical checkpoint bases remain reachable from main. No pushes and no host repointing. Session process observation: session kitty-3841945-0.scope: nothing left running. Existing turns pause on limits-changed until a fresh genuine user prompt.
