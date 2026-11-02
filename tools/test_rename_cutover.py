@@ -3,14 +3,19 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+import shlex
 import shutil
+import stat
 import subprocess
+import tomllib
 from pathlib import Path
 
 import pytest
 
 TOOLS = Path(__file__).parent
 LINK_TOOL = "tools/harness-links"
+# A copy of the records repository's pre-commit hook (fixtures/records-hook/README.md).
+RECORDS_HOOK = TOOLS / "fixtures" / "records-hook" / "pre-commit"
 
 
 def load_cutover():
@@ -60,9 +65,16 @@ class Sandbox:
     `ai` (prefix ai) becomes `tack`, retargeting in `repos` (ops, unless a test asks).
     The hq shape (`hq=True`): checkout `tack`, renamed once before from `ai` so the
     registry holds `ai = "tack"`, in the group `agent-layer`, becomes `hq`; its Codex
-    trust files are a filtered tracked file and an ignored one, saved with --keep."""
+    trust files are a filtered tracked file and an ignored one, saved with --keep.
+    `detached=True` makes the checkout a detached project and `detached_repos` names the
+    repos that are; their records live in the records repository `sync/records`, which only
+    such a box creates, so in-tree boxes and their fingerprints are unchanged."""
 
-    def __init__(self, tmp, repos=("ops",), hq=False):
+    def __init__(self, tmp, repos=("ops",), hq=False, detached=False, detached_repos=()):
+        if not set(detached_repos) <= set(repos):
+            raise ValueError(f"detached_repos {detached_repos} must name repos in {repos}")
+        if hq and (detached or detached_repos):
+            raise ValueError("the hq shape is in-tree only")
         self.tmp = tmp
         self.env = {"PATH": os.environ["PATH"], "HOME": str(tmp / "home"), "USER": "test",
                     "XDG_CONFIG_HOME": str(tmp / "cfg"), "XDG_STATE_HOME": str(tmp / "state"),
@@ -79,6 +91,13 @@ class Sandbox:
         self.repos = [self.sync / name for name in repos]
         self.ops = self.repos[0]
         self.snapshot = tmp / "snap"
+        # Detached projects keep their records in one records repository beside the code
+        # checkouts, which runs its own copy of the records repository's hook.
+        self.detached, self.detached_repos = detached, tuple(detached_repos)
+        self.records = self.sync / "records" if detached or detached_repos else None
+        self.hook = tmp / "hooks" / "pre-commit"
+        # apply's stdout, which carries the records commit commit_rename() runs.
+        self.applied = None
 
     def run(self, *cmd, cwd=None, check=True, env=None):
         result = subprocess.run([str(c) for c in cmd], cwd=cwd, env=env or self.env, text=True,
@@ -94,12 +113,63 @@ class Sandbox:
         assert Path(self.run("git", "rev-parse", "--absolute-git-dir", cwd=path).stdout.strip()).resolve().is_relative_to(path.resolve())
         self.run("tasks", "init", "--prefix", prefix, cwd=path)
 
+    def code_repo(self, path, prefix):
+        """A detached project: a code checkout with no tasks/, paired with records under
+        the records repository. Its config is committed there at once: until it is in the
+        index, the hook refuses every record commit under <prefix>/."""
+        path.mkdir(parents=True)
+        self.run("git", "init", "-q", "-b", "main", path)
+        assert Path(self.run("git", "rev-parse", "--show-toplevel", cwd=path).stdout.strip()).resolve() == path.resolve()
+        assert Path(self.run("git", "rev-parse", "--absolute-git-dir", cwd=path).stdout.strip()).resolve().is_relative_to(path.resolve())
+        self.run("tasks", "init", "--prefix", prefix, "--records", self.records, cwd=path)
+        self.commit(self.records, f"{prefix} records")
+
+    def records_repo(self):
+        """The records repository, its first commit, and the box's own copy of the hook,
+        which a test may overwrite to make it fail; the tracked fixture is never edited."""
+        self.hook.parent.mkdir()
+        shutil.copy2(RECORDS_HOOK, self.hook)
+        self.records.mkdir(parents=True)
+        self.run("git", "init", "-q", "-b", "main", self.records)
+        assert Path(self.run("git", "rev-parse", "--show-toplevel", cwd=self.records).stdout.strip()).resolve() == self.records.resolve()
+        assert Path(self.run("git", "rev-parse", "--absolute-git-dir", cwd=self.records).stdout.strip()).resolve().is_relative_to(self.records.resolve())
+        self.run("git", "commit", "-q", "--allow-empty", "-m", "init", cwd=self.records)
+        self.run("git", "config", "core.hooksPath", self.hook.parent, cwd=self.records)
+
+    def is_detached(self, root):
+        """Whether `root` (the checkout or one of `repos`) keeps its records in the records repository."""
+        if root == self.checkout:
+            return self.detached
+        return root in self.repos and root.name in self.detached_repos
+
     def commit(self, root, message):
         self.run("git", "add", "-A", cwd=root)
         self.run("git", "commit", "-qm", message, cwd=root)
 
+    def commit_rename(self):
+        """The runbook's commit after apply, run once per cutover. Detached: the one records
+        commit line apply printed (`apply()` or `forward()` keeps its stdout), run as
+        printed through the box's hook, after which HEAD holds <new>/ and no <old>/; a
+        second call fails, since the line is consumed. In-tree: the new root, as the
+        existing after-commit tests commit it."""
+        if not self.detached:
+            self.commit(self.new_root, "rename")
+            return
+        assert self.applied is not None, "commit_rename() runs once, after apply"
+        lines = [line.strip() for line in self.applied.splitlines() if line.strip().startswith("git -C ")]
+        assert len(lines) == 1, self.applied
+        self.applied = None
+        self.run("bash", "-c", lines[0], cwd=self.tmp)
+        top = self.run("git", "-C", self.records, "ls-tree", "--name-only", "HEAD").stdout.split()
+        assert self.new in top and self.old not in top, top
+
     def build(self):
-        self.repo(self.checkout, "ai")
+        if self.records:
+            self.records_repo()
+        if self.detached:
+            self.code_repo(self.checkout, "ai")
+        else:
+            self.repo(self.checkout, "ai")
         (self.checkout / "tools").mkdir()
         for name in ("harness-links", "rename-cutover"):
             shutil.copy2(TOOLS / name, self.checkout / "tools" / name)
@@ -116,7 +186,11 @@ class Sandbox:
         (self.checkout / ".worktrees").symlink_to(f"../../.dropbox-work/{self.checkout.name}/.worktrees")
         self.commit(self.checkout, "init")
         for root in self.repos:
-            self.repo(root, root.name)
+            if self.is_detached(root):
+                self.code_repo(root, root.name)
+                (root / "README").write_text("x\n")
+            else:
+                self.repo(root, root.name)
             self.commit(root, "init")
         if self.hq:
             self.build_hq()
@@ -164,22 +238,31 @@ class Sandbox:
     def save(self, check=True):
         return self.cutover(*self.save_args(), check=check)
 
+    def apply(self):
+        """apply, its stdout kept for commit_rename()."""
+        result = self.cutover("apply", "--snapshot", self.snapshot)
+        self.applied = result.stdout
+        return result
+
     def forward(self):
         """The whole cutover up to the runbook's commits: apply, retarget everywhere, link."""
-        self.cutover("apply", "--snapshot", self.snapshot)
+        self.apply()
         for root in self.repos:
             self.cutover("retarget", "--snapshot", self.snapshot, "--repo", root)
         self.cutover("link", "--snapshot", self.snapshot)
 
     def depend_on_checkout(self, root):
-        """A task in `root` that depends on a checkout task, both committed. Returns
-        (checkout id, dependent id)."""
+        """A task in `root` that depends on a checkout task, both committed: by this
+        helper for an in-tree side, by tasks itself for a detached one, whose record
+        writes commit themselves. Returns (checkout id, dependent id)."""
         target = task_id(self.run("tasks", "add", "depended on", "--process", "direct",
                                   cwd=self.checkout).stdout)
-        self.commit(self.checkout, "a task to depend on")
+        if not self.is_detached(self.checkout):
+            self.commit(self.checkout, "a task to depend on")
         dependent = task_id(self.run("tasks", "add", "depends", "--process", "direct", cwd=root).stdout)
         self.run("tasks", "dep", dependent, "--on", target, cwd=root)
-        self.commit(root, "depend on the checkout")
+        if not self.is_detached(root):
+            self.commit(root, "depend on the checkout")
         return target, dependent
 
     def fingerprint(self):
@@ -192,7 +275,13 @@ class Sandbox:
                 "worktrees": os.readlink(self.checkout / ".worktrees"),
                 "agents": os.path.realpath(self.tmp / "home" / ".agents"),
                 "modes": {rel: oct((self.checkout / rel).stat().st_mode) for rel in KEPT
-                          if (self.checkout / rel).exists()}}
+                          if (self.checkout / rel).exists()},
+                # A detached box's records, with its directories, so empty docs/specs and
+                # docs/plans count.
+                **({"records": tree(self.records),
+                    "records_dirs": sorted(str(p.relative_to(self.records)) for p in self.records.rglob("*")
+                                           if p.is_dir() and ".git" not in p.relative_to(self.records).parts)}
+                   if self.records else {})}
 
     def edit_trust(self):
         """What the runbook's step 4 does to the trust files at the new root."""
@@ -358,46 +447,362 @@ def test_save_refuses_a_checkout_the_registry_does_not_map(box, tmp_path):
     assert not box.snapshot.exists()
 
 
-def detached(box, name):
-    """A project `name` whose records live in the records repository beside the checkouts,
-    committed there; its code checkout holds no tasks/."""
-    records = box.sync / "records"
-    if not records.exists():
-        records.mkdir()
-        box.run("git", "init", "-q", "-b", "main", records)
-        box.run("git", "commit", "-q", "--allow-empty", "-m", "init", cwd=records)
+@pytest.mark.parametrize("detached, detached_repos", [(True, ()), (True, ("ops",)), (False, ("ops",))])
+def test_detached_sandbox_builds(tmp_path, detached, detached_repos):
+    """The fixture the detached tests stand on: each detached project's code checkout holds
+    no tasks/, its row is detached with records under sync/records, the fixture's own
+    record writes committed themselves, and the records repository's hook is installed."""
+    box = Sandbox(tmp_path, detached=detached, detached_repos=detached_repos).build()
+    rows = {Path(row["root"]).resolve(): row for row in
+            json.loads(box.run("tasks", "projects", "--json", cwd=box.checkout).stdout)["projects"]}
+    detached_roots = ([box.checkout] if detached else []) + [box.sync / n for n in detached_repos]
+    for root in detached_roots:
+        assert not (root / "tasks").exists()
+        row = rows[root.resolve()]
+        assert row["kind"] == "detached"
+        assert Path(row["records"]).resolve() == (box.records / row["prefix"]).resolve()
+    for root in {box.checkout, *box.repos} - set(detached_roots):
+        assert (root / "tasks" / ".config.toml").is_file()
+    assert box.run("git", "status", "--porcelain", "--untracked-files=all", "--ignored",
+                   cwd=box.records).stdout == ""
+    (box.records / "zz").mkdir()
+    (box.records / "zz" / "note.md").write_text("x\n")
+    box.run("git", "add", "zz", cwd=box.records)
+    result = box.run("git", "commit", "-qm", "zz", cwd=box.records, check=False)
+    assert result.returncode == 1
+    assert "pre-commit: zz/ has staged files but no tasks/.config.toml" in result.stderr
+
+
+# --- save: detached projects ----------------------------------------------------
+
+
+@pytest.fixture
+def dbox(tmp_path):
+    """A detached checkout and a detached --repo, ops, sharing the records repository."""
+    return Sandbox(tmp_path, detached=True, detached_repos=("ops",)).build()
+
+
+def load_meta(box):
+    return json.loads((box.snapshot / "meta.json").read_text())
+
+
+def head_of(box, root):
+    return box.run("git", "rev-parse", "HEAD", cwd=root).stdout.strip()
+
+
+def refused(box, message):
+    """save exits 1 naming `message`, and writes no snapshot."""
+    result = box.save(check=False)
+    assert result.returncode == 1, result.stdout
+    assert message in result.stderr, result.stderr
+    assert not box.snapshot.exists()
+
+
+def extra_detached(box, name, records_root):
+    """A detached --repo `name`, added to the box after its build, whose records tasks
+    places under `records_root`. Its code checkout has one commit; its records config is
+    left for the caller to commit, since where it may be committed is what each test varies."""
     code = box.sync / name
     code.mkdir()
     box.run("git", "init", "-q", "-b", "main", code)
     (code / "README").write_text("x\n")
     box.commit(code, "init")
-    box.run("tasks", "init", "--prefix", name, "--records", records, cwd=code)
-    box.commit(records, f"{name} records")
-    return code, records / name
-
-
-def test_save_refuses_a_repository_whose_records_live_in_another(box):
-    """Rollback resets only the snapshot's repositories; a retarget in a detached project
-    commits in its records repository, which it would leave renamed."""
-    code, records = detached(box, "lore")
+    box.run("tasks", "init", "--prefix", name, "--records", records_root, cwd=code)
     box.repos.append(code)
-    result = box.save(check=False)
-    assert result.returncode == 1
-    assert f"preconditions: {code} keeps its records in {records}, outside it" in result.stderr
-    assert not box.snapshot.exists()
+    return code
 
 
-def test_save_refuses_a_detached_checkout(box):
-    code, records = detached(box, "lore")
-    (code / "tools").mkdir()
+def nested_records_repo(box, outer):
+    """A records repository at <outer>/recs, git-ignored in `outer` so that outer's clean
+    check passes, holding the records of a detached --repo `nr`."""
+    with (outer / ".gitignore").open("a") as f:
+        f.write("recs/\n")
+    box.commit(outer, "ignore recs")
+    recs = outer / "recs"
+    recs.mkdir()
+    box.run("git", "init", "-q", "-b", "main", recs)
+    box.run("git", "commit", "-q", "--allow-empty", "-m", "init", cwd=recs)
+    extra_detached(box, "nr", recs)
+    box.commit(recs, "nr records")
+    return recs
+
+
+def test_save_accepts_a_detached_checkout_and_records_its_records_repository(tmp_path):
+    box = Sandbox(tmp_path, repos=("ops", "lore"), detached=True, detached_repos=("ops",)).build()
+    box.save()
+    meta = load_meta(box)
+    records = box.records.resolve()
+    assert meta["checkout"]["records"] == {
+        "repo": str(records), "records_root": str(records),
+        "dirs": ["ai/docs", "ai/docs/plans", "ai/docs/specs", "ai/tasks"]}
+    assert meta["records_repos"] == [{"root": str(records), "head": head_of(box, records),
+                                      "branch": "refs/heads/main", "owned": ["ai/", "ops/", "tack/"]}]
+    assert {Path(r["root"]).name: r["kind"] for r in meta["repos"]} == {"ops": "detached", "lore": "in-tree"}
+
+
+def test_save_with_an_in_tree_checkout_and_a_detached_repo_owns_only_p(tmp_path):
+    box = Sandbox(tmp_path, detached_repos=("ops",)).build()
+    box.save()
+    meta = load_meta(box)
+    records = box.records.resolve()
+    assert meta["checkout"]["records"] is None
+    assert meta["records_repos"] == [{"root": str(records), "head": head_of(box, records),
+                                      "branch": "refs/heads/main", "owned": ["ops/"]}]
+    assert [r["kind"] for r in meta["repos"]] == ["detached"]
+
+
+def test_save_accepts_a_dirty_detached_repo_code_checkout(dbox):
+    """The cutover never writes in a detached --repo's code checkout."""
+    (dbox.ops / "stray").write_text("x\n")
+    (dbox.ops / "README").write_text("edited\n")
+    dbox.save()
+
+
+def test_save_accepts_untracked_files_outside_the_owned_paths(dbox):
+    # Build every project before any draft: code_repo commits the whole records repository.
+    dbox.code_repo(dbox.sync / "zz", "zz")
+    (dbox.records / "zz" / "docs" / "specs" / "draft.md").write_text("another session's draft\n")
+    (dbox.records / "ops" / "docs" / "specs" / "draft.md").write_text("a draft in ops\n")
+    dbox.save()
+
+
+def linked(box):
+    """A linked project lnk: its records in an overlay directory, its code beside it. The
+    overlay is the registered root, so it holds the link tool save checks before the kind,
+    and the cutover's own copy, which `Sandbox.cutover` runs from the checkout."""
+    code = box.sync / "lnkcode"
+    code.mkdir()
+    box.run("git", "init", "-q", "-b", "main", code)
+    (code / "README").write_text("x\n")
+    box.commit(code, "init")
+    overlay = box.sync / "overlay"
+    overlay.mkdir()
+    box.run("tasks", "init", "--prefix", "lnk", "--checkout", code, cwd=overlay)
+    (overlay / "tools").mkdir()
     for name in ("harness-links", "rename-cutover"):
-        shutil.copy2(TOOLS / name, code / "tools" / name)
-    box.commit(code, "the tools")
-    box.checkout, box.old, box.new, box.new_root = code, "lore", "lore2", box.sync / "lore2"
-    result = box.save(check=False)
-    assert result.returncode == 1
-    assert f"save: {code} keeps its records in {records}, outside it" in result.stderr
-    assert not box.snapshot.exists()
+        shutil.copy2(TOOLS / name, overlay / "tools" / name)
+    return overlay
+
+
+LINKED = "is a linked project; this cutover renames and retargets only in-tree and detached projects"
+
+
+def test_save_refuses_a_linked_checkout(box):
+    overlay = linked(box)
+    box.checkout, box.old, box.new, box.new_root = overlay, "lnk", "lnk2", box.sync / "lnk2"
+    refused(box, f"save: {overlay.resolve()} {LINKED}")
+
+
+def test_save_refuses_a_linked_repo(box):
+    overlay = linked(box)
+    box.repos.append(overlay)
+    refused(box, f"save: {overlay.resolve()} {LINKED}")
+
+
+def test_save_refuses_an_unreachable_repo(box):
+    config = box.ops / "tasks" / ".config.toml"
+    config.rename(config.with_name("config.aside"))
+    row = next(r for r in json.loads(box.run("tasks", "projects", "--json", cwd=box.checkout).stdout)["projects"]
+               if r["prefix"] == "ops")
+    assert row["reachable"] is False and "kind" not in row
+    refused(box, f"save: {box.ops.resolve()} (ops) is unreachable")
+
+
+def test_project_kind_names_a_reachable_row_without_a_kind(tmp_path, monkeypatch):
+    """A reachable row with no kind is not unreachable: tasks read its records but did not
+    say what kind of project it is."""
+    cutover = load_cutover()
+    monkeypatch.setattr(cutover, "project_row", lambda root, command: {"prefix": "ops", "reachable": True})
+    with pytest.raises(cutover.Stop) as stop:
+        cutover.project_kind(tmp_path, "save")
+    assert str(stop.value) == (f"save: {tmp_path} (ops) is reachable but tasks projects gives it no kind; "
+                               f"update tasks to one that reports kind (records-home) first")
+
+
+# Refusals on the records repository.
+
+
+def test_save_refuses_a_records_repository_off_main(dbox):
+    dbox.run("git", "checkout", "-qb", "side", cwd=dbox.records)
+    refused(dbox, f"preconditions: {dbox.records.resolve()} is on refs/heads/side, not main")
+
+
+def test_save_refuses_a_records_repository_with_a_stash(dbox):
+    (dbox.records / "README").write_text("x\n")
+    dbox.commit(dbox.records, "a top-level file")
+    (dbox.records / "README").write_text("stashed\n")
+    dbox.run("git", "stash", "-q", cwd=dbox.records)
+    refused(dbox, f"preconditions: {dbox.records.resolve()} has stashes")
+
+
+def test_save_refuses_a_records_repository_with_a_second_worktree(dbox):
+    dbox.run("git", "worktree", "add", "-q", dbox.tmp / "wt", cwd=dbox.records)
+    refused(dbox, f"preconditions: {dbox.records.resolve()} has more than one worktree")
+
+
+def test_save_refuses_a_records_repository_with_an_unmerged_branch(dbox):
+    dbox.run("git", "checkout", "-qb", "feature", cwd=dbox.records)
+    (dbox.records / "README").write_text("x\n")
+    dbox.commit(dbox.records, "unmerged")
+    dbox.run("git", "checkout", "-q", "main", cwd=dbox.records)
+    refused(dbox, f"preconditions: {dbox.records.resolve()} has branches with commits its current "
+                  f"branch lacks: feature")
+
+
+OLD_NOT_CLEAN = "has untracked, ignored or changed files under ai/"
+OLD_REMEDY = ("every file there after the rename must be the rename's, so commit, discard or move "
+              "them aside first")
+
+
+def test_save_refuses_an_untracked_file_under_old(dbox):
+    (dbox.records / "ai" / "docs" / "specs" / "draft.md").write_text("x\n")
+    refused(dbox, f"preconditions: {dbox.records.resolve()} {OLD_NOT_CLEAN}: ?? ai/docs/specs/draft.md; "
+                  f"{OLD_REMEDY}")
+
+
+def test_save_refuses_an_ignored_file_under_old(dbox):
+    with (dbox.records / ".git" / "info" / "exclude").open("a") as f:
+        f.write("*.tmp\n")
+    (dbox.records / "ai" / "docs" / "plans" / "x.tmp").write_text("x\n")
+    assert dbox.run("git", "status", "--porcelain", cwd=dbox.records).stdout == ""
+    refused(dbox, f"preconditions: {dbox.records.resolve()} {OLD_NOT_CLEAN}: !! ai/docs/plans/x.tmp; "
+                  f"{OLD_REMEDY}")
+
+
+def test_save_refuses_a_tracked_change_under_old(dbox):
+    """The same check sees a tracked edit, which its message and remedy cover too."""
+    spec = dbox.records / "ai" / "docs" / "specs" / "a.md"
+    spec.write_text("x\n")
+    dbox.run("git", "add", "ai/docs/specs/a.md", cwd=dbox.records)
+    dbox.run("git", "commit", "-qm", "an ai spec", cwd=dbox.records)
+    spec.write_text("changed\n")
+    refused(dbox, f"preconditions: {dbox.records.resolve()} {OLD_NOT_CLEAN}: M ai/docs/specs/a.md; "
+                  f"{OLD_REMEDY}")
+
+
+def test_save_refuses_a_tracked_change_under_p(dbox):
+    spec = dbox.records / "ops" / "docs" / "specs" / "a.md"
+    spec.write_text("x\n")
+    dbox.commit(dbox.records, "an ops spec")
+    spec.write_text("changed\n")
+    refused(dbox, f"preconditions: {dbox.records.resolve()} has tracked changes under ops/: "
+                  f"M ops/docs/specs/a.md")
+
+
+def test_save_refuses_a_staged_file_of_another_project(dbox):
+    dbox.code_repo(dbox.sync / "zz", "zz")
+    (dbox.records / "zz" / "docs" / "specs" / "d.md").write_text("x\n")
+    dbox.run("git", "add", "zz/docs/specs/d.md", cwd=dbox.records)
+    refused(dbox, f"preconditions: {dbox.records.resolve()} has staged changes (zz/docs/specs/d.md)")
+
+
+def test_save_refuses_when_the_new_records_directory_exists(dbox):
+    (dbox.records / "tack").mkdir()
+    refused(dbox, f"save: {(dbox.records / 'tack').resolve()} already exists")
+
+
+def test_save_refuses_a_dangling_link_at_the_new_records_directory(dbox):
+    (dbox.records / "tack").symlink_to("nowhere")
+    assert not (dbox.records / "tack").exists()
+    refused(dbox, f"save: {dbox.records.resolve() / 'tack'} already exists")
+
+
+@pytest.mark.parametrize("where, what", [("HEAD", "directory"), ("index", "directory"), ("index", "file")])
+def test_save_refuses_a_new_records_directory_git_still_tracks(dbox, where, what):
+    """tack gone from the working tree but still in HEAD or the index, as a directory or a
+    file: tasks rename would write over it, and rollback's restore of the owned paths would
+    then fail its check."""
+    if where == "HEAD":
+        # Another detached project tack, committed through the hook, then deleted from disk.
+        dbox.code_repo(dbox.sync / "tackcode", "tack")
+        shutil.rmtree(dbox.records / "tack")
+    elif what == "directory":
+        (dbox.records / "tack").mkdir()
+        (dbox.records / "tack" / "x.md").write_text("x\n")
+        dbox.run("git", "add", "tack/x.md", cwd=dbox.records)
+        shutil.rmtree(dbox.records / "tack")
+    else:
+        (dbox.records / "tack").write_text("x\n")
+        dbox.run("git", "add", "tack", cwd=dbox.records)
+        (dbox.records / "tack").unlink()
+    refused(dbox, f"save: {dbox.records.resolve()} still tracks tack in its {where} although "
+                  f"{(dbox.records / 'tack').resolve()} is absent; remove it from git "
+                  f"(git rm -r --cached tack, then commit) first")
+
+
+def test_save_refuses_a_records_directory_not_directly_under_its_top_level(dbox):
+    (dbox.records / "sub").mkdir()
+    extra_detached(dbox, "nest", dbox.records / "sub")
+    # The only fixture that bypasses the hook: the layout under test is one the hook
+    # refuses (sub/ is staged with no tasks/.config.toml at its top), so it cannot be
+    # committed through it.
+    dbox.run("git", "add", "-A", cwd=dbox.records)
+    dbox.run("git", "commit", "-q", "--no-verify", "-m", "nest records", cwd=dbox.records)
+    records = (dbox.records / "sub" / "nest").resolve()
+    refused(dbox, f"save: nest's records directory {records} must be named nest and sit directly "
+                  f"under its repository's top level {dbox.records.resolve()}")
+
+
+def test_save_refuses_a_records_directory_not_named_for_its_prefix(dbox):
+    registry = dbox.tmp / "cfg" / "tasks" / "projects.toml"
+    dbox.run("git", "mv", "ops", "other", cwd=dbox.records)
+    # The registry first: the hook's tasks check reads the moved records through it.
+    registry.write_text(registry.read_text().replace(f'ops = "{dbox.records / "ops"}"',
+                                                     f'ops = "{dbox.records / "other"}"'))
+    dbox.run("git", "commit", "-qm", "move ops's records", cwd=dbox.records)
+    records = (dbox.records / "other").resolve()
+    refused(dbox, f"save: ops's records directory {records} must be named ops and sit directly "
+                  f"under its repository's top level {dbox.records.resolve()}")
+
+
+def test_save_refuses_a_records_repository_inside_the_checkout(box):
+    recs = nested_records_repo(box, box.checkout)
+    refused(box, f"save: nr's records repository {recs.resolve()} lies inside the checkout "
+                 f"{box.checkout.resolve()}")
+
+
+def test_save_refuses_a_records_repository_inside_a_repo(box):
+    recs = nested_records_repo(box, box.ops)
+    refused(box, f"save: nr's records repository {recs.resolve()} lies inside --repo {box.ops.resolve()}")
+
+
+def test_save_refuses_a_records_repository_that_is_the_checkout(box):
+    """pp's records at <checkout>/pp: their parent is the checkout's top level, so the
+    parent-and-name check passes and the location check refuses. No tasks are written in
+    pp: its records sit in a git-ignored path, so every record commit there fails."""
+    with (box.checkout / ".gitignore").open("a") as f:
+        f.write("pp/\n")
+    box.commit(box.checkout, "ignore pp")
+    extra_detached(box, "pp", box.checkout)
+    assert box.run("git", "status", "--porcelain", cwd=box.checkout).stdout == ""
+    refused(box, f"save: pp's records repository is the checkout {box.checkout.resolve()}")
+
+
+def test_save_refuses_a_snapshot_inside_the_records_repository(dbox):
+    dbox.snapshot = dbox.records / "snap"
+    refused(dbox, f"lies inside records repository {dbox.records.resolve()}")
+
+
+def test_save_refuses_a_records_directory_outside_any_git_repository(box):
+    loose = box.tmp / "loose"
+    loose.mkdir()
+    extra_detached(box, "qq", loose)
+    refused(box, f"git -C {(loose / 'qq').resolve()} rev-parse --show-toplevel: fatal: not a git repository")
+
+
+def test_save_refuses_two_records_repositories_with_one_name(dbox):
+    """Rollback labels a records repository's patches and copies by its directory name, so
+    two named alike would share them."""
+    other = dbox.tmp / "elsewhere" / "records"
+    other.mkdir(parents=True)
+    dbox.run("git", "init", "-q", "-b", "main", other)
+    dbox.run("git", "commit", "-q", "--allow-empty", "-m", "init", cwd=other)
+    extra_detached(dbox, "zz", other)
+    dbox.commit(other, "zz records")
+    first, second = sorted((dbox.records.resolve(), other.resolve()))
+    refused(dbox, f"save: the records repositories {first} and {second} share the directory name records, "
+                  f"which rollback labels each one's patches and copies by; rename one of the directories "
+                  f"first")
 
 
 def test_save_records_every_repository(box2):
@@ -477,6 +882,8 @@ def test_retarget_writes_each_task_once(tmp_path, monkeypatch):
             return json.dumps(check)
         if cmd[:2] == ("tasks", "show"):
             return json.dumps({"task": {"depends": ["ai-a", "ops-9", "ai-b"]}})
+        if cmd[:2] == ("tasks", "edit"):
+            return '{"id":"ops-1","warnings":[]}'
         return ""
 
     monkeypatch.setattr(cutover, "run", fake_run)
@@ -484,6 +891,44 @@ def test_retarget_writes_each_task_once(tmp_path, monkeypatch):
     writes = [c for c in calls if c[:2] in (("tasks", "edit"), ("tasks", "dep"))]
     assert writes == [("tasks", "edit", "ops-1", "--no-depends", "--depends", "tack-a",
                        "--depends", "ops-9", "--depends", "tack-b")]
+
+
+@pytest.mark.parametrize("edit_output, message", [
+    ("not json", "retarget: tasks edit ops-1 in {root} printed output that is not JSON"),
+    ('["a list"]', "retarget: tasks edit ops-1 in {root} printed no warnings list"),
+    ('{"id":"ops-1","warnings":["commit_failed: the hook refused"]}',
+     "retarget: tasks edit ops-1 in {root} left its record uncommitted: commit_failed: the hook refused; "
+     "no further task was edited; clear the cause, run `tasks commit` there, then rerun retarget --repo"),
+    ('{"id":"ops-1","warnings":["commit_unavailable: /r is not in a git repository (or git is missing); '
+     'left uncommitted: ops/tasks/ops-1.md"]}',
+     "retarget: tasks edit ops-1 in {root} left its record uncommitted: commit_unavailable: /r is not in a "
+     "git repository (or git is missing); left uncommitted: ops/tasks/ops-1.md; no further task was edited"),
+    ('{"id":"ops-1","warnings":[{"kind":"commit_failed"}]}',
+     "retarget: tasks edit ops-1 in {root} printed a warning that is not a string: {{'kind': 'commit_failed'}}; "
+     "no further task was edited"),
+])
+def test_retarget_repo_stops_on_edit_output_it_cannot_trust(tmp_path, monkeypatch, edit_output, message):
+    """Unparseable output is a stop, never "no warnings"; so is a failed record commit.
+    The second task's edit never runs."""
+    cutover = load_cutover()
+    calls = []
+    check = {"warnings": [
+        {"id": f"ops-{n}", "kind": "retired_prefix",
+         "detail": f'depends on ai-{n} through retired prefix "ai"; it is now tack-{n}'} for n in (1, 2)]}
+
+    def fake_run(*cmd, cwd=None):
+        calls.append(cmd)
+        if cmd[:2] == ("tasks", "check"):
+            return json.dumps(check)
+        if cmd[:2] == ("tasks", "show"):
+            return json.dumps({"task": {"depends": [f"ai-{cmd[2][4:]}"]}})
+        return edit_output
+
+    monkeypatch.setattr(cutover, "run", fake_run)
+    with pytest.raises(cutover.Stop) as stop:
+        cutover.retarget_dependencies(tmp_path, "ai")
+    assert message.format(root=tmp_path) in str(stop.value)
+    assert [c[2] for c in calls if c[:2] == ("tasks", "edit")] == ["ops-1"]
 
 
 def test_verify_fails_while_a_repository_still_names_a_retired_id(box2):
@@ -697,6 +1142,176 @@ def test_the_storage_follows_the_checkout_directory_not_the_prefix(box):
     box.cutover("verify", "--snapshot", box.snapshot)
 
 
+# --- apply, retarget, link, verify: detached projects -----------------------------
+
+
+def projects_row(box, prefix):
+    return next(row for row in json.loads(box.run("tasks", "projects", "--json", cwd=box.tmp).stdout)["projects"]
+                if row["prefix"] == prefix)
+
+
+@pytest.mark.parametrize("make", ["directory", "dangling link"])
+def test_apply_refuses_when_the_new_records_directory_exists(dbox, make):
+    dbox.save()
+    new = dbox.records / "tack"
+    if make == "directory":
+        new.mkdir()
+    else:
+        new.symlink_to("nowhere")
+    result = dbox.cutover("apply", "--snapshot", dbox.snapshot, check=False)
+    assert result.returncode == 1
+    assert (f"apply: {dbox.records.resolve() / 'tack'} already exists; tasks rename writes tack's "
+            f"records there, so move it aside first") in result.stderr
+    assert dbox.checkout.exists() and not dbox.new_root.exists()
+    assert (dbox.records / "ai" / "tasks" / ".config.toml").is_file()
+    assert projects_row(dbox, "ai")["kind"] == "detached"
+
+
+def test_apply_after_a_partial_apply_points_to_rollback(dbox):
+    """An apply that stopped after `tasks rename`, before the checkout moved: rerun, it finds
+    the renamed records at <new> and <old> gone. Those are the rename's, so it names
+    rollback, never moving them aside."""
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.run("tasks", "rename", "ai", "tack", cwd=dbox.checkout)
+    result = dbox.cutover("apply", "--snapshot", dbox.snapshot, check=False)
+    assert result.returncode == 1
+    records = dbox.records.resolve()
+    assert (f"apply: {records / 'tack'} already exists and {records / 'ai'} is gone: an earlier apply "
+            f"stopped after tasks rename moved ai's records there; they are the rename's, so do not move "
+            f"them aside: run rollback, then apply again") in result.stderr, result.stderr
+    assert dbox.checkout.exists() and not dbox.new_root.exists()
+    rolled_back(dbox, before)
+
+
+def commit_line(box):
+    repo = shlex.quote(str(box.records.resolve()))
+    return (f"git -C {repo} add -A -- ai tack && git -C {repo} commit -m "
+            f"'chore(tasks): rename ai -> tack' -- ai tack")
+
+
+def test_apply_repoints_a_detached_checkout_and_prints_the_records_commit(dbox):
+    dbox.save()
+    result = dbox.apply()
+    row = projects_row(dbox, "tack")
+    assert Path(row["root"]).resolve() == dbox.new_root.resolve()
+    assert row["kind"] == "detached"
+    assert Path(row["records"]).resolve() == (dbox.records / "tack").resolve()
+    assert not (dbox.new_root / "tasks").exists()
+    # [checkout] path is relative to the records directory.
+    config = tomllib.loads((dbox.records / "tack" / "tasks" / ".config.toml").read_text())
+    assert (dbox.records / "tack" / config["checkout"]["path"]).resolve() == dbox.new_root.resolve()
+    assert commit_line(dbox) in [line.strip() for line in result.stdout.splitlines()]
+    # Printed, not run: the rename is still uncommitted in the records repository.
+    assert "?? tack/tasks/.config.toml" in dbox.run("git", "status", "--porcelain", "--untracked-files=all",
+                                                    cwd=dbox.records).stdout
+
+
+@pytest.mark.parametrize("detached", [True, False], ids=["detached-checkout", "in-tree-checkout"])
+def test_the_whole_detached_cutover_retargets_links_and_verifies(tmp_path, detached):
+    """A detached --repo, ops, sharing the records repository with a detached checkout, or
+    with an in-tree checkout beside it; ops depends on a checkout task."""
+    box = Sandbox(tmp_path, detached=detached, detached_repos=("ops",)).build()
+    target, dependent = box.depend_on_checkout(box.ops)
+    box.save()
+    applied = box.apply()
+    assert ("git -C " in applied.stdout) == detached
+    box.commit_rename()
+    result = box.cutover("retarget", "--snapshot", box.snapshot, "--repo", box.ops)
+    assert f"retarget: {dependent}: {target} -> tack-{target.split('-', 1)[1]}" in result.stdout
+    assert box.run("tasks", "check", cwd=box.ops).stdout == ""
+    # The retarget's write committed itself in the records repository.
+    assert box.run("git", "status", "--porcelain", "--untracked-files=all", cwd=box.records).stdout == ""
+    last = box.run("git", "log", "-1", "--name-only", "--format=", cwd=box.records).stdout.split()
+    assert last == [f"ops/tasks/{dependent}.md"]
+    box.cutover("link", "--snapshot", box.snapshot)
+    assert os.path.realpath(box.tmp / "home" / ".agents") == str((box.new_root / "agents").resolve())
+    assert "verified" in box.cutover("verify", "--snapshot", box.snapshot).stdout
+
+
+def detached_cutover(box):
+    """The whole forward cutover of a detached box, the rename committed."""
+    box.save()
+    box.apply()
+    box.commit_rename()
+    for root in box.repos:
+        box.cutover("retarget", "--snapshot", box.snapshot, "--repo", root)
+    box.cutover("link", "--snapshot", box.snapshot)
+
+
+def verify_refused(box, message):
+    result = box.cutover("verify", "--snapshot", box.snapshot, check=False)
+    assert result.returncode == 1, result.stdout
+    assert message in result.stderr, result.stderr
+
+
+def test_verify_fails_while_the_records_repository_holds_the_uncommitted_rename(dbox):
+    dbox.save()
+    dbox.forward()
+    verify_refused(dbox, f"verify: {dbox.records.resolve()} has uncommitted changes under ai/: "
+                         f"D ai/tasks/.config.toml")
+    # The <old>/ deletions committed alone still leave <new>/ untracked.
+    dbox.run("git", "commit", "-qm", "the old half", "--", "ai", cwd=dbox.records)
+    verify_refused(dbox, f"verify: {dbox.records.resolve()} has uncommitted changes under tack/: "
+                         f"?? tack/tasks/.config.toml")
+
+
+def test_verify_fails_while_the_old_records_directory_exists(dbox):
+    detached_cutover(dbox)
+    (dbox.records / "ai").mkdir()
+    verify_refused(dbox, f"verify: {dbox.records.resolve() / 'ai'} still exists; the rename moved every "
+                         f"record out of it, so move it aside")
+
+
+def test_verify_fails_when_the_row_names_other_records(dbox):
+    """A copy at the same depth keeps [checkout] path (relative to the records directory)
+    pointing at the new root, so project_row still finds the row."""
+    detached_cutover(dbox)
+    copy = dbox.sync / "records2" / "tack"
+    shutil.copytree(dbox.records / "tack", copy)
+    registry = dbox.tmp / "cfg" / "tasks" / "projects.toml"
+    text = registry.read_text()
+    assert f'tack = "{dbox.records / "tack"}"' in text
+    registry.write_text(text.replace(f'tack = "{dbox.records / "tack"}"', f'tack = "{copy}"'))
+    verify_refused(dbox, f"verify: tasks projects' row for tack at {dbox.new_root} does not match the "
+                         f"rename: records is {copy.resolve()}, expected {(dbox.records / 'tack').resolve()}")
+
+
+def test_verify_fails_on_a_tracked_change_under_p(dbox):
+    spec = dbox.records / "ops" / "docs" / "specs" / "a.md"
+    spec.write_text("x\n")
+    dbox.commit(dbox.records, "an ops spec")
+    detached_cutover(dbox)
+    spec.write_text("changed\n")
+    verify_refused(dbox, f"verify: {dbox.records.resolve()} has uncommitted changes under ops/: "
+                         f"M ops/docs/specs/a.md")
+
+
+def test_retarget_repo_stops_on_a_deferred_record_commit(dbox):
+    """Another project's file staged after save makes tasks defer every record commit; the
+    first edit's warning stops the retarget before the second edit runs."""
+    dbox.code_repo(dbox.sync / "zz", "zz")
+    dependents = [dbox.depend_on_checkout(dbox.ops)[1] for _ in range(2)]
+    dbox.save()
+    dbox.apply()
+    dbox.commit_rename()
+    (dbox.records / "zz" / "docs" / "specs" / "d.md").write_text("x\n")
+    dbox.run("git", "add", "zz/docs/specs/d.md", cwd=dbox.records)
+
+    def record(dependent):
+        return (dbox.records / "ops" / "tasks" / f"{dependent}.md").read_bytes()
+
+    before = {d: record(d) for d in dependents}
+    result = dbox.cutover("retarget", "--snapshot", dbox.snapshot, "--repo", dbox.ops, check=False)
+    assert result.returncode == 1
+    edited = [d for d in dependents if record(d) != before[d]]
+    assert len(edited) == 1, "the second edit ran"
+    assert (f"retarget: tasks edit {edited[0]} in {dbox.ops.resolve()} left its record uncommitted: "
+            f"commit_deferred: ") in result.stderr
+    assert "staged changes: zz/docs/specs/d.md" in result.stderr
+    assert "no further task was edited" in result.stderr
+
+
 # --- rollback -----------------------------------------------------------------
 
 
@@ -856,6 +1471,548 @@ def test_rollback_tolerates_empty_foreign_claims_files(box):
     (claims / "ops.toml").write_text("")
     box.cutover("rollback", "--snapshot", box.snapshot)
     assert box.fingerprint() == before
+
+
+def test_rollback_copies_in_tree_leftovers_into_the_snapshot(box):
+    """The in-tree leftovers are deleted after the reset; their bytes are kept first."""
+    box.save()
+    box.forward()
+    renamed = {p.name: p.read_bytes() for p in (box.new_root / "tasks").glob("tack-*.md")}
+    assert len(renamed) == 2
+    box.cutover("rollback", "--snapshot", box.snapshot)
+    copies = box.snapshot / "rollback-leftovers-1" / "checkout" / "tasks"
+    assert {p.name: p.read_bytes() for p in copies.iterdir()} == renamed
+
+
+def test_reset_all_copies_every_leftover_into_one_new_directory(tmp_path):
+    """One rollback attempt's copies, of every repository, land in one directory whose
+    number is chosen before anything is written; an existing one is never written into."""
+    cutover = load_cutover()
+    snap, a, b = tmp_path / "snap", tmp_path / "a", tmp_path / "b"
+    for root, rel in ((a, "tasks/tack-1.md"), (b, "tack/tasks/tack-2.md")):
+        (root / rel).parent.mkdir(parents=True)
+        (root / rel).write_text(f"{rel}\n")
+    (snap / "rollback-leftovers-1").mkdir(parents=True)
+    (snap / "rollback-leftovers-1" / "earlier").write_text("an earlier attempt's\n")
+    cutover.reset_all([], snap, copies=[("checkout", a, ["tasks/tack-1.md"]),
+                                        ("records-b", b, ["tack/tasks/tack-2.md"])])
+    assert sorted(os.listdir(snap)) == ["rollback-leftovers-1", "rollback-leftovers-2"]
+    assert os.listdir(snap / "rollback-leftovers-1") == ["earlier"]
+    second = snap / "rollback-leftovers-2"
+    assert (second / "checkout" / "tasks" / "tack-1.md").read_text() == "tasks/tack-1.md\n"
+    assert (second / "records-b" / "tack" / "tasks" / "tack-2.md").read_text() == "tack/tasks/tack-2.md\n"
+
+
+# --- rollback: detached projects ------------------------------------------------
+
+
+def untouched(box):
+    """What a refused rollback must leave as it found it: every file under sync/ (its
+    directories too), the registry and state, the snapshot's listing, and each
+    repository's HEAD, index and status."""
+    def tree(root):
+        return {str(p.relative_to(root)): p.read_bytes() if p.is_file() else None for p in sorted(root.rglob("*"))
+                if ".git" not in p.relative_to(root).parts}
+
+    repos = [r for r in (box.checkout, box.new_root, *box.repos, box.records) if r.exists()]
+    git = {str(r): [box.run("git", *cmd, cwd=r).stdout for cmd in
+                    (("rev-parse", "HEAD"), ("ls-files", "-s"),
+                     ("status", "--porcelain", "--untracked-files=all", "--ignored"))] for r in repos}
+    return {"sync": tree(box.sync), "cfg": tree(box.tmp / "cfg"), "state": tree(box.tmp / "state"),
+            "snapshot": sorted(os.listdir(box.snapshot)), "git": git}
+
+
+def refused_rollback(box, message):
+    """rollback exits 1 naming `message`, having changed nothing."""
+    before = untouched(box)
+    result = box.cutover("rollback", "--snapshot", box.snapshot, check=False)
+    assert result.returncode == 1, result.stdout
+    assert message in result.stderr, result.stderr
+    assert untouched(box) == before
+
+
+def rolled_back(box, before):
+    """rollback restores the fingerprint; every snapshot project checks clean, and every
+    repository rollback resets or restores has nothing uncommitted."""
+    box.cutover("rollback", "--snapshot", box.snapshot)
+    assert box.fingerprint() == before
+    for root in (box.checkout, *box.repos):
+        assert box.run("tasks", "check", cwd=root).stdout == ""
+    for root in (box.checkout, *(r for r in box.repos if not box.is_detached(r))):
+        assert box.run("git", "status", "--porcelain", cwd=root).stdout == ""
+    assert box.run("git", "status", "--porcelain", "--untracked-files=no", cwd=box.records).stdout == ""
+
+
+def checkout_ids(box):
+    """The checkout's task ids, read from its saved records."""
+    return sorted(p.stem for p in (box.records / box.old / "tasks").glob(f"{box.old}-*.md"))
+
+
+def records_patch(box, n=1):
+    return box.snapshot / f"rollback-records-{box.records.name}-{n}.patch"
+
+
+REVERT = "revert: roll back rename ai -> tack"
+
+
+def test_detached_rollback_before_commit_restores_everything(dbox):
+    dbox.depend_on_checkout(dbox.ops)
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.apply()
+    dbox.cutover("link", "--snapshot", dbox.snapshot)
+    head = head_of(dbox, dbox.records)
+    rolled_back(dbox, before)
+    # Nothing owned differed from HEAD once restored, so nothing was committed.
+    assert head_of(dbox, dbox.records) == head
+
+
+def test_detached_rollback_after_commit_restores_everything(dbox):
+    dbox.depend_on_checkout(dbox.ops)
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.apply()
+    dbox.commit_rename()
+    dbox.cutover("link", "--snapshot", dbox.snapshot)
+    rolled_back(dbox, before)
+    assert dbox.run("git", "log", "-1", "--format=%s", cwd=dbox.records).stdout.strip() == REVERT
+    assert "tack" not in dbox.run("git", "ls-tree", "--name-only", "HEAD", cwd=dbox.records).stdout.split()
+
+
+def test_detached_rollback_after_a_retarget_without_the_renames_commit(dbox):
+    dbox.depend_on_checkout(dbox.ops)
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.forward()
+    rolled_back(dbox, before)
+    last = dbox.run("git", "log", "-1", "--name-only", "--format=%s", cwd=dbox.records).stdout.split("\n")
+    assert last[0] == REVERT and all(p.startswith("ops/") for p in last[1:] if p), last
+
+
+def test_detached_rollback_after_a_retarget_with_the_renames_commit(dbox):
+    dbox.depend_on_checkout(dbox.ops)
+    before = dbox.fingerprint()
+    detached_cutover(dbox)
+    rolled_back(dbox, before)
+    assert dbox.run("git", "log", "-1", "--format=%s", cwd=dbox.records).stdout.strip() == REVERT
+
+
+def test_rollback_with_an_in_tree_checkout_and_a_detached_repo_restores_p(tmp_path):
+    box = Sandbox(tmp_path, detached_repos=("ops",)).build()
+    box.depend_on_checkout(box.ops)
+    before = box.fingerprint()
+    box.save()
+    box.apply()
+    box.commit_rename()
+    box.cutover("retarget", "--snapshot", box.snapshot, "--repo", box.ops)
+    box.cutover("link", "--snapshot", box.snapshot)
+    rolled_back(box, before)
+    last = box.run("git", "log", "-1", "--name-only", "--format=%s", cwd=box.records).stdout.split("\n")
+    assert last[0] == REVERT and all(p.startswith("ops/") for p in last[1:] if p), last
+
+
+def test_detached_rollback_keeps_another_projects_commit_and_draft(dbox):
+    """zz, a detached project outside the snapshot, commits a record and leaves a draft
+    after save, and a draft appears under ops/: rollback restores only the owned paths and
+    commits only them, so all three survive, the drafts in place and untracked."""
+    dbox.code_repo(dbox.sync / "zz", "zz")
+    dbox.depend_on_checkout(dbox.ops)
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.apply()
+    dbox.commit_rename()
+    added = task_id(dbox.run("tasks", "add", "zz work", "--process", "direct", cwd=dbox.sync / "zz").stdout)
+    drafts = {"zz/docs/specs/draft.md": b"zz's draft\n", "ops/docs/specs/draft.md": b"a draft in ops\n"}
+    for rel, text in drafts.items():
+        (dbox.records / rel).write_bytes(text)
+    dbox.cutover("retarget", "--snapshot", dbox.snapshot, "--repo", dbox.ops)
+    dbox.cutover("link", "--snapshot", dbox.snapshot)
+    record = f"zz/tasks/{added}.md"
+    kept = {record: (dbox.records / record).read_bytes(), **drafts}
+    dbox.cutover("rollback", "--snapshot", dbox.snapshot)
+    after = dbox.fingerprint()
+    assert after["records"] == {**before["records"], **kept}
+    assert {k: v for k, v in after.items() if k != "records"} == {k: v for k, v in before.items() if k != "records"}
+    assert dbox.run("git", "ls-tree", "--name-only", "HEAD", "--", record, cwd=dbox.records).stdout.strip() == record
+    assert dbox.run("git", "status", "--porcelain", "--untracked-files=all", cwd=dbox.records).stdout.splitlines() \
+        == ["?? ops/docs/specs/draft.md", "?? zz/docs/specs/draft.md"]
+    last = dbox.run("git", "log", "-1", "--name-only", "--format=%s", cwd=dbox.records).stdout.split("\n")
+    assert last[0] == REVERT
+    assert all(p.split("/", 1)[0] in ("ai", "ops", "tack") for p in last[1:] if p), last
+
+
+def test_detached_rollback_removes_a_task_filed_in_p_since_save_and_patches_it(dbox):
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.apply()
+    dbox.commit_rename()
+    filed = task_id(dbox.run("tasks", "add", "filed since save", "--process", "direct", cwd=dbox.ops).stdout)
+    assert (dbox.records / "ops" / "tasks" / f"{filed}.md").is_file()
+    rolled_back(dbox, before)
+    patch = records_patch(dbox).read_text()
+    assert f"ops/tasks/{filed}.md" in patch and "filed since save" in patch
+    assert not dbox.run("git", "ls-tree", "-r", "HEAD", "--", f"ops/tasks/{filed}.md", cwd=dbox.records).stdout
+
+
+def test_detached_rollback_recreates_the_old_empty_doc_directories(dbox):
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.apply()
+    assert not (dbox.records / "ai").exists()
+    rolled_back(dbox, before)
+    for d in ("docs/specs", "docs/plans"):
+        assert (dbox.records / "ai" / d).is_dir() and not any((dbox.records / "ai" / d).iterdir())
+
+
+def test_detached_rollback_leaves_a_detached_repos_code_checkout_alone(dbox):
+    """ops's code checkout is never reset, nor checked for leftovers or cleanliness."""
+    before = dbox.fingerprint()
+    detached_cutover(dbox)
+    (dbox.ops / "README").write_text("work since save\n")
+    dbox.commit(dbox.ops, "work since save")
+    head = head_of(dbox, dbox.ops)
+    (dbox.ops / "stray").write_text("untracked\n")
+    dbox.cutover("rollback", "--snapshot", dbox.snapshot)
+    assert head_of(dbox, dbox.ops) == head
+    assert (dbox.ops / "README").read_text() == "work since save\n"
+    assert (dbox.ops / "stray").read_text() == "untracked\n"
+    after = dbox.fingerprint()
+    assert {k: v for k, v in after.items() if k != "ops"} == {k: v for k, v in before.items() if k != "ops"}
+    assert not list(dbox.snapshot.glob("rollback-ops-*.patch"))
+
+
+def test_detached_rollback_stops_when_the_records_repository_changed_branch(dbox):
+    dbox.save()
+    dbox.apply()
+    dbox.run("git", "checkout", "-qb", "other", cwd=dbox.records)
+    refused_rollback(dbox, f"rollback: {dbox.records.resolve()} is on refs/heads/other, expected refs/heads/main")
+
+
+# The walk: every file under <old>/ and <new>/ that is in none of the index, HEAD and the
+# saved head is a rename leftover with an original at the saved head, or rollback stops.
+
+
+@pytest.mark.parametrize("stage", ["files", "config", "records", "registry"])
+def test_detached_rollback_after_rename_stopped_after(dbox, stage):
+    before = dbox.fingerprint()
+    dbox.save()
+    env = {**dbox.env, "TASKS_RENAME_STOP_AFTER": stage}
+    subprocess.run(["tasks", "rename", "ai", "tack"], cwd=dbox.checkout, env=env, text=True, capture_output=True)
+    assert (dbox.tmp / "state" / "tasks" / "rename" / "ai.toml").exists()
+    moved = (dbox.records / "tack").exists()
+    assert moved == (stage in ("records", "registry"))
+    if not moved:
+        assert list((dbox.records / "ai" / "tasks").glob("tack-*.md"))
+    rolled_back(dbox, before)
+
+
+def test_detached_rollback_after_partial_apply(dbox):
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.run("tasks", "rename", "ai", "tack", cwd=dbox.checkout)
+    os.rename(dbox.checkout, dbox.new_root)      # interrupted before storage, init --force, links
+    rolled_back(dbox, before)
+
+
+NOT_LEFTOVER = "is not a rename leftover"
+
+
+def test_detached_rollback_stops_on_a_foreign_file_under_new(dbox):
+    dbox.save()
+    dbox.apply()
+    (dbox.records / "tack" / "docs" / "specs" / "mine.md").write_text("mine\n")
+    refused_rollback(dbox, f"rollback: {dbox.records.resolve()}: tack/docs/specs/mine.md {NOT_LEFTOVER}: "
+                           f"the saved head has no ai/docs/specs/mine.md; move it aside first")
+
+
+def test_detached_rollback_stops_on_a_foreign_file_under_old(dbox):
+    dbox.save()
+    dbox.apply()
+    (dbox.records / "ai" / "docs").mkdir(parents=True)
+    (dbox.records / "ai" / "docs" / "mine.md").write_text("mine\n")
+    refused_rollback(dbox, f"rollback: {dbox.records.resolve()}: ai/docs/mine.md {NOT_LEFTOVER}; "
+                           f"move it aside first")
+
+
+def test_detached_rollback_stops_on_an_ignored_file_under_new(dbox):
+    dbox.save()
+    dbox.apply()
+    with (dbox.records / ".git" / "info" / "exclude").open("a") as f:
+        f.write("*.tmp\n")
+    (dbox.records / "tack" / "tasks" / "x.tmp").write_text("mine\n")
+    refused_rollback(dbox, f"rollback: {dbox.records.resolve()}: tack/tasks/x.tmp {NOT_LEFTOVER}: "
+                           f"the saved head has no ai/tasks/x.tmp; move it aside first")
+
+
+def test_detached_rollback_stops_on_a_new_task_written_before_the_commit(dbox):
+    """A task filed after apply and before the rename's commit: the hook refuses its record
+    commit, and it has no original to restore, so the person moves it aside."""
+    dbox.save()
+    dbox.apply()
+    added = dbox.run("tasks", "add", "filed before the commit", "--process", "direct", cwd=dbox.new_root).stdout
+    assert "commit_failed:" in added
+    hex_ = task_id(added).split("-", 1)[1]
+    refused_rollback(dbox, f"rollback: {dbox.records.resolve()}: tack/tasks/tack-{hex_}.md {NOT_LEFTOVER}: "
+                           f"the saved head has no ai/tasks/ai-{hex_}.md; move it aside first")
+
+
+@pytest.mark.parametrize("name", ["tack", "ai"])
+@pytest.mark.parametrize("make", ["link", "file"])
+def test_detached_rollback_stops_on_a_link_or_file_at_new_or_old(dbox, name, make):
+    """A link at <new> or <old> would carry the walk and the deletion of <new>/ elsewhere,
+    and a file there cannot be walked or deleted as a directory: rollback stops before any
+    mutation. After apply, tack/ holds the renamed records, moved aside here, and ai/ is gone."""
+    dbox.save()
+    dbox.apply()
+    path = dbox.records / name
+    if name == "tack":
+        os.rename(path, dbox.sync / "moved-tack")
+    if make == "link":
+        path.symlink_to(dbox.sync / "moved-tack" if name == "tack" else "nowhere")
+        what = "is a link"
+    else:
+        path.write_text("x\n")
+        what = "is not a directory"
+    refused_rollback(dbox, f"rollback: {dbox.records.resolve()}: {name} {what}; move it aside first")
+
+
+requires_permissions = pytest.mark.skipif(os.geteuid() == 0, reason="root reads a directory whatever its mode")
+
+
+@requires_permissions
+def test_detached_rollback_stops_on_a_directory_the_walk_cannot_read(dbox):
+    dbox.save()
+    dbox.apply()
+    unreadable = dbox.records / "tack" / "docs" / "specs"
+    unreadable.chmod(0)
+    try:
+        result = dbox.cutover("rollback", "--snapshot", dbox.snapshot, check=False)
+    finally:
+        unreadable.chmod(0o755)
+    assert result.returncode == 1
+    assert (f"rollback: cannot read the directory {dbox.records.resolve() / 'tack' / 'docs' / 'specs'} "
+            f"(Permission denied); make it readable or move it aside first") in result.stderr, result.stderr
+    assert dbox.new_root.exists() and not dbox.checkout.exists()
+    assert sorted(os.listdir(dbox.snapshot)) == ["config", "links.txt", "meta.json", "rename-cutover", "state"]
+
+
+def test_copy_leftovers_stops_when_its_directory_exists(tmp_path):
+    """Another rollback took the number between the choice and the copy."""
+    cutover = load_cutover()
+    (tmp_path / "a").mkdir()
+    (tmp_path / "a" / "x.md").write_text("x\n")
+    dest = tmp_path / "rollback-leftovers-1"
+    dest.mkdir()
+    with pytest.raises(cutover.Stop) as stop:
+        cutover.copy_leftovers(dest, [("checkout", tmp_path / "a", ["x.md"])])
+    assert str(stop.value) == (f"rollback: {dest} already exists, taken by another rollback since this one "
+                               f"chose it; nothing was reset or restored, so rerun rollback")
+
+
+@requires_permissions
+def test_reset_all_stops_on_a_leftover_it_cannot_read_before_any_reset(tmp_path, monkeypatch):
+    cutover = load_cutover()
+    calls = []
+    monkeypatch.setattr(cutover, "save_reset_patch", lambda *args, **kwargs: None)
+    monkeypatch.setattr(cutover, "run", lambda *cmd, cwd=None: calls.append(cmd))
+    leftover = tmp_path / "a" / "x.md"
+    leftover.parent.mkdir()
+    leftover.write_text("x\n")
+    leftover.chmod(0)
+    snap = tmp_path / "snap"
+    snap.mkdir()
+    with pytest.raises(cutover.Stop) as stop:
+        cutover.reset_all([(tmp_path / "a", "h1", "checkout")], snap, copies=[("checkout", tmp_path / "a", ["x.md"])])
+    assert str(stop.value).startswith(f"rollback: cannot copy {leftover} to "
+                                      f"{snap / 'rollback-leftovers-1' / 'checkout' / 'x.md'}: ")
+    assert str(stop.value).endswith("; nothing was reset or restored; clear the cause, then rerun rollback")
+    assert calls == []
+
+
+# The copies: every validated leftover is kept in the snapshot before it is deleted.
+
+
+def test_detached_rollback_copies_a_note_written_before_the_commit(dbox):
+    hex_ = checkout_ids(dbox)[0].split("-", 1)[1]
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.apply()
+    noted = dbox.run("tasks", "note", f"tack-{hex_}", "a note before the commit", cwd=dbox.new_root).stdout
+    assert "commit_failed:" in noted
+    rolled_back(dbox, before)
+    copy = dbox.snapshot / "rollback-leftovers-1" / f"records-{dbox.records.name}" / "tack" / "tasks" / f"tack-{hex_}.md"
+    assert "a note before the commit" in copy.read_text()
+
+
+def test_detached_rollback_takes_one_new_leftovers_directory_per_attempt(dbox):
+    """A planted index.lock stops the first attempt at the records restore, after its copies;
+    the retry copies again, into the next number, and converges."""
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.apply()
+    renamed = {str(p.relative_to(dbox.records)): p.read_bytes()
+               for p in (dbox.records / "tack").rglob("*") if p.is_file()}
+    assert len(renamed) == 3
+    lock = dbox.records / ".git" / "index.lock"
+    lock.write_text("")
+    result = dbox.cutover("rollback", "--snapshot", dbox.snapshot, check=False)
+    assert result.returncode == 1
+    assert "index.lock': File exists" in result.stderr
+    lock.unlink()
+    dbox.cutover("rollback", "--snapshot", dbox.snapshot)
+    assert dbox.fingerprint() == before
+    label = f"records-{dbox.records.name}"
+    for n in (1, 2):
+        attempt = dbox.snapshot / f"rollback-leftovers-{n}"
+        assert os.listdir(attempt) == [label]
+        assert {str(p.relative_to(attempt / label)): p.read_bytes()
+                for p in (attempt / label).rglob("*") if p.is_file()} == renamed
+    assert not (dbox.snapshot / "rollback-leftovers-3").exists()
+
+
+# The differing-file copy: a file under an owned path that is not in the index, whose bytes
+# differ from the saved head's, is kept in the snapshot before the restore or the deletion of
+# <new>/ removes it.
+
+
+def leftover_copy(box, rel, n=1):
+    return box.snapshot / f"rollback-leftovers-{n}" / f"records-{box.records.name}" / rel
+
+
+def test_detached_rollback_copies_a_file_recreated_under_old_after_the_commit(dbox):
+    """Other bytes at an <old>/ path the saved head holds, written after the rename's commit:
+    the walk leaves it alone (the saved head holds its path) and the patch, a diff of tracked
+    content, does not hold it, so it is copied before the restore puts the saved blob back."""
+    rel = f"ai/tasks/{checkout_ids(dbox)[0]}.md"
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.apply()
+    dbox.commit_rename()
+    recreated = dbox.records / rel
+    recreated.parent.mkdir(parents=True)
+    recreated.write_text("recreated with other bytes\n")
+    rolled_back(dbox, before)
+    assert leftover_copy(dbox, rel).read_text() == "recreated with other bytes\n"
+
+
+@requires_permissions
+def test_detached_rollback_stops_on_a_directory_under_p_the_copy_cannot_read(dbox):
+    dbox.save()
+    dbox.apply()
+    unreadable = dbox.records / "ops" / "docs" / "specs"
+    unreadable.chmod(0)
+    try:
+        result = dbox.cutover("rollback", "--snapshot", dbox.snapshot, check=False)
+    finally:
+        unreadable.chmod(0o755)
+    assert result.returncode == 1
+    assert (f"rollback: cannot read the directory {dbox.records.resolve() / 'ops' / 'docs' / 'specs'} "
+            f"(Permission denied); make it readable or move it aside first") in result.stderr, result.stderr
+    assert dbox.new_root.exists() and not dbox.checkout.exists()
+    assert sorted(os.listdir(dbox.snapshot)) == ["config", "links.txt", "meta.json", "rename-cutover", "state"]
+
+
+@pytest.mark.parametrize("make", ["link", "file"])
+def test_detached_rollback_stops_on_a_link_or_file_at_p(dbox, make):
+    dbox.save()
+    dbox.apply()
+    os.rename(dbox.records / "ops", dbox.sync / "moved-ops")
+    if make == "link":
+        (dbox.records / "ops").symlink_to(dbox.sync / "moved-ops")
+        what = "is a link"
+    else:
+        (dbox.records / "ops").write_text("x\n")
+        what = "is not a directory"
+    refused_rollback(dbox, f"rollback: {dbox.records.resolve()}: ops {what}; move it aside first")
+
+
+def test_detached_rollback_retry_converges_after_a_stop_at_the_commit(dbox):
+    """The first attempt stops at the records commit, the hook refusing it, with <old>/
+    restored and staged and <new>/ dropped from the index. The retry passes the walk (the
+    restored <old>/ is in the index and the saved head) and restores only the paths the index
+    or the saved head holds (<new>/ is in neither); a file written between the attempts at a
+    <new>/ path only the current HEAD holds is copied before the retry deletes <new>/."""
+    hex_ = checkout_ids(dbox)[0].split("-", 1)[1]
+    saved = sorted(str(p.relative_to(dbox.records)) for p in (dbox.records / "ai").rglob("*") if p.is_file())
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.apply()
+    dbox.commit_rename()
+    hook, mode = dbox.hook.read_bytes(), stat.S_IMODE(dbox.hook.stat().st_mode)
+    dbox.hook.write_text("#!/bin/sh\necho the-test-hook-refuses >&2\nexit 1\n")
+    dbox.hook.chmod(0o755)
+    result = dbox.cutover("rollback", "--snapshot", dbox.snapshot, check=False)
+    assert result.returncode == 1
+    assert "the-test-hook-refuses" in result.stderr, result.stderr
+    assert sorted(dbox.run("git", "ls-files", "--", "ai", "tack", cwd=dbox.records).stdout.split()) == saved
+    staged = dbox.run("git", "diff", "--cached", "--no-renames", "--name-status", cwd=dbox.records).stdout.splitlines()
+    assert sorted(line.split("\t")[1] for line in staged if line.startswith("A\t")) == saved
+    assert staged and all(line.split("\t")[1].startswith(("ai/", "tack/")) for line in staged), staged
+    assert any(line.startswith("D\ttack/") for line in staged), staged
+    assert not (dbox.records / "tack").exists()
+    dbox.hook.write_bytes(hook)
+    dbox.hook.chmod(mode)
+    rel = f"tack/tasks/tack-{hex_}.md"
+    assert dbox.run("git", "ls-tree", "--name-only", "HEAD", "--", rel, cwd=dbox.records).stdout.strip() == rel
+    written = dbox.records / rel
+    written.parent.mkdir(parents=True)
+    written.write_text("written between the attempts\n")
+    dbox.cutover("rollback", "--snapshot", dbox.snapshot)
+    assert dbox.fingerprint() == before
+    assert [p.name for p in dbox.snapshot.glob("rollback-leftovers-*")] == ["rollback-leftovers-1"]
+    assert leftover_copy(dbox, rel).read_text() == "written between the attempts\n"
+    assert dbox.run("git", "log", "-1", "--format=%s", cwd=dbox.records).stdout.strip() == REVERT
+
+
+def test_detached_rollback_retry_converges_after_an_index_lock(dbox):
+    """A planted index.lock stops `git restore` before it changes anything: the checkout is
+    back and reset, the records repository untouched. The retry converges once it is gone."""
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.apply()
+    dbox.commit_rename()
+    head = head_of(dbox, dbox.records)
+    lock = dbox.records / ".git" / "index.lock"
+    lock.write_text("")
+    result = dbox.cutover("rollback", "--snapshot", dbox.snapshot, check=False)
+    assert result.returncode == 1
+    assert "index.lock': File exists" in result.stderr, result.stderr
+    assert dbox.checkout.exists() and not dbox.new_root.exists()
+    assert dbox.run("git", "status", "--porcelain", cwd=dbox.checkout).stdout == ""
+    assert (dbox.records / "tack").is_dir() and not (dbox.records / "ai").exists()
+    assert dbox.run("git", "status", "--porcelain", "--untracked-files=all", cwd=dbox.records).stdout == ""
+    assert head_of(dbox, dbox.records) == head
+    lock.unlink()
+    dbox.cutover("rollback", "--snapshot", dbox.snapshot)
+    assert dbox.fingerprint() == before
+
+
+# --- the second host (§4.7) -------------------------------------------------------
+
+
+def test_detached_second_host_adopts_the_rename(dbox):
+    """After the first host's cutover, the second host, whose registry still names ai, runs
+    `tasks rename ai tack --adopt` from the new root: its registry maps tack to the new root
+    and its records, the old id resolves, and the first host's state is untouched."""
+    second = {**dbox.env, "XDG_CONFIG_HOME": str(dbox.tmp / "cfg2"), "XDG_STATE_HOME": str(dbox.tmp / "state2")}
+    shutil.copytree(dbox.tmp / "cfg", dbox.tmp / "cfg2")       # the second host's registry, as it was
+    (dbox.tmp / "state2").mkdir()
+    hex_ = checkout_ids(dbox)[0].split("-", 1)[1]
+    detached_cutover(dbox)
+
+    def first_host():
+        return {str(p): p.read_bytes() for d in ("cfg", "state") for p in sorted((dbox.tmp / d).rglob("*"))
+                if p.is_file()}
+
+    first = first_host()
+    dbox.run("tasks", "rename", "ai", "tack", "--adopt", cwd=dbox.new_root, env=second)
+    registry = tomllib.loads((dbox.tmp / "cfg2" / "tasks" / "projects.toml").read_text())
+    assert Path(registry["projects"]["tack"]).resolve() == dbox.new_root.resolve()
+    assert Path(registry["records"]["tack"]).resolve() == (dbox.records / "tack").resolve()
+    assert "ai" not in registry["projects"] and "ai" not in registry["records"]
+    shown = json.loads(dbox.run("tasks", "show", f"ai-{hex_}", cwd=dbox.new_root, env=second).stdout)
+    assert shown["task"]["id"] == f"tack-{hex_}"
+    assert first_host() == first
 
 
 # --- the guard ----------------------------------------------------------------
@@ -1054,6 +2211,40 @@ def test_registry_view_reads_the_renamed_projects_locations_as_its_own(tmp_path)
     changes = cutover.registry_changes(cutover.registry_view(live, "tack", "hq"),
                                        cutover.registry_view(saved, "tack", "hq"))
     assert changes == ["locations.ops"]
+
+
+RECORDS_SAVED = ('[projects]\nai = "/c/ai"\nops = "/c/ops"\n'
+                 '[records]\nai = "/r/ai"\nops = "/r/ops"\n')
+
+
+def test_registry_view_reads_a_moved_records_key_as_the_renames_own(tmp_path):
+    # tasks rename moves a detached project's [records] key with its prefix.
+    cutover = load_cutover()
+    saved, live = tmp_path / "saved.toml", tmp_path / "live.toml"
+    saved.write_text(RECORDS_SAVED)
+    live.write_text('[projects]\nops = "/c/ops"\ntack = "/c/tack"\n'
+                    '[records]\nops = "/r/ops"\ntack = "/r/tack"\n')
+    assert cutover.registry_view(live, "ai", "tack") == cutover.registry_view(saved, "ai", "tack")
+    live.write_text(live.read_text().replace('ops = "/r/ops"', 'ops = "/r/elsewhere"'))
+    changes = cutover.registry_changes(cutover.registry_view(live, "ai", "tack"),
+                                       cutover.registry_view(saved, "ai", "tack"))
+    assert changes == ["records.ops"]
+
+
+@pytest.mark.parametrize("change, named", [
+    (lambda t: t.replace('ops = "/r/ops"', 'ops = "/r/elsewhere"'), "records.ops"),
+    (lambda t: t.replace('ops = "/r/ops"\n', ""), "records.ops"),
+    (lambda t: t + 'zz = "/r/zz"\n', "records.zz"),
+])
+def test_registry_view_sees_any_other_records_change(tmp_path, change, named):
+    cutover = load_cutover()
+    saved, live = tmp_path / "saved.toml", tmp_path / "live.toml"
+    saved.write_text(RECORDS_SAVED)
+    live.write_text(change(RECORDS_SAVED))
+    assert live.read_text() != RECORDS_SAVED
+    live_view, saved_view = (cutover.registry_view(path, "ai", "tack") for path in (live, saved))
+    assert live_view != saved_view
+    assert cutover.registry_changes(live_view, saved_view) == [named]
 
 
 @pytest.mark.parametrize("change, named", [
