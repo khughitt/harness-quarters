@@ -541,6 +541,15 @@ revision pi requests, and the probe does not record it. After `rpc-probe.py` rep
 The value is the `LATEST_PROTOCOL_VERSION` printed, provided the `new McpClient({…})`
 line passes no `protocolVersion`; if it does, that option's value is the revision.
 
+### Parking from a worktree while paused
+
+Use `tasks -C .worktrees/<name> park <id> "next step" --waiting-on user --reason decision`
+when the authoritative task record is in a worktree. `tasks -C .worktrees/<name> note <id> "status"`
+also stays allowed after the pause's read grace is exhausted. Quote a directory that
+contains spaces. The directory selector preserves each closing subcommand's existing
+restrictions: records reads and attachments use grace, and `tasks show` needs `--no-fetch`.
+The pause still refuses `cd`, `env` wrappers and compound shell commands.
+
 ### Re-probing the turn-pause hook facts
 
 The hook facts the turn pause reads (`hook-*`, `model-tool-surface`, `codex-*`) come

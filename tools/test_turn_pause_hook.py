@@ -8,6 +8,8 @@ built from the raw probe logs' keys and say so where they are built."""
 import copy
 import json
 import os
+import shlex
+import shutil
 import socket
 import subprocess
 import threading
@@ -379,6 +381,64 @@ def test_paused_park_spends_no_grace_reads_stop_at_25_cancellation_stays(tmp_pat
     assert denied(out)
     assert not denied(d.pre('TaskStop', {'task_id': 'b7od2qy27'})[0])
     assert d.bash(PARK) is None
+
+
+@pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+@pytest.mark.parametrize('reads', [0, 25])
+def test_scoped_tasks_preserve_bookkeeping_and_read_grace(tmp_path, notices, harness, reads):
+    d = Driver(tmp_path, harness)
+    d.pause_on_calls()
+    for _ in range(reads):
+        assert not denied(d.bash('tasks -C .worktrees/task claims'))
+    for command in ('park hq-123456 next', 'note hq-123456 paused'):
+        assert d.bash(f'tasks -C .worktrees/task {command}') is None
+    assert d.state().grace_used.get('root', 0) == reads
+    assert denied(d.bash('tasks -C .worktrees/task claims')) == (reads == 25)
+    assert denied(d.bash('tasks -C .worktrees/task show hq-123456'))
+    assert denied(d.bash('tasks -C .worktrees/task start hq-123456'))
+    assert denied(d.bash(f'tasks -C "{d.limits}" note hq-123456 paused'))
+
+
+@pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+def test_paused_scoped_tasks_write_note_and_release_claim(tmp_path, notices, harness):
+    tasks_cli = shutil.which('tasks')
+    assert tasks_cli is not None, 'the tasks CLI is required for the closing-path test'
+    d = Driver(tmp_path, harness)
+    project = tmp_path / 'project worktree'
+    project.mkdir()
+    outside = tmp_path / 'outside'
+    outside.mkdir()
+    env = {'PATH': f'{Path(tasks_cli).parent}:/usr/bin:/bin', 'HOME': d.env['HOME'],
+           'USER': 'fixture', 'XDG_CONFIG_HOME': str(tmp_path / 'config'),
+           'XDG_STATE_HOME': d.env['XDG_STATE_HOME'], 'XDG_DATA_HOME': str(tmp_path / 'data'),
+           'XDG_RUNTIME_DIR': d.env['XDG_RUNTIME_DIR'], 'TASKS_SESSION': 'pause-park-test',
+           'TASKS_OWNER': 'fixture', 'GIT_CONFIG_GLOBAL': '/dev/null',
+           'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CEILING_DIRECTORIES': str(tmp_path)}
+
+    def run(*args):
+        result = subprocess.run(['tasks', '-C', str(project), *args], cwd=outside, env=env,
+                                text=True, capture_output=True, timeout=15)
+        assert result.returncode == 0, result.stdout + result.stderr
+        return json.loads(result.stdout)
+
+    run('init', '--prefix', 'pause')
+    added = run('add', 'closing fixture', '--process', 'direct')
+    tid = added.get('id') or added['task']['id']
+    run('start', tid)
+    assert run('show', tid)['claim']['live']
+    d.pause_on_calls()
+    for _ in range(25):
+        assert not denied(d.bash('ls'))
+    assert denied(d.bash('ls'))
+    for args in [('note', tid, 'paused from another directory'),
+                 ('park', tid, 'resume after review', '--waiting-on', 'user', '--reason', 'decision')]:
+        command = shlex.join(['tasks', '-C', str(project), *args])
+        assert d.bash(command) is None
+        run(*args)
+    shown = run('show', tid)
+    assert any(n['text'] == 'paused from another directory' for n in shown['task']['notes'])
+    assert not shown.get('claim', {}).get('live', False)
+    assert d.state().grace_used['root'] == 25
 
 
 def test_continue_ends_the_pause_resets_counters_and_sets_no_budget(tmp_path, notices):

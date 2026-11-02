@@ -175,6 +175,10 @@ def _reader(prog: str, words: list[str]) -> Verdict:
 
 
 def _records(argv: list[str]) -> Verdict:
+    if argv[:2] == ['tasks', '-C']:
+        if len(argv) < 4 or not argv[2] or argv[2].startswith('-'):
+            return _refuse('tasks -C needs a non-empty directory before a closing subcommand')
+        argv = [argv[0], *argv[3:]]
     pair = (argv[0], argv[1] if len(argv) > 1 else '')
     if pair in BOOKKEEPING:
         if pair == ('hq', 'pause') and (len(argv) < 3 or argv[2] not in HQ_PAUSE):
