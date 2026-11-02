@@ -252,8 +252,9 @@ Kept per root session by the hook itself, from events it already receives:
 - **active seconds**, from two separate records the hook keeps:
   - *operations in flight*: a tool call is in flight from its PreToolUse (when
     allowed) to its PostToolUse or PostToolUseFailure, matched by tool-use id.
-    Where a harness has no PostToolUse (the probe below says), the call stays in
-    flight until the next hook event of the same agent. An agent's open calls close
+    Codex has no PostToolUseFailure event: a failed Codex call closes at its
+    PostToolUse if Codex sends one for a failure, which is not probed, and
+    otherwise at its agent's Stop. An agent's open calls close
     at its Stop or SubagentStop, and every open call closes at the next genuine
     prompt. A call that waits on the user (Claude Code `AskUserQuestion`, Codex
     `request_user_input` and `request_user_input_async`) is never in flight:
@@ -458,6 +459,14 @@ a file write). Three consequences:
   validator, and an agent choosing an unusual `shell` binary to slip a validated
   command past it is outside what the hook can see.
 
+Two more things outside the hook's view, found by the allowlist's adversarial
+review: a harness that evaluated commands after loading the user's shell snapshot
+would let zsh global aliases (`G` for `| grep -i`) extend a validated command,
+which no harness was seen doing (Codex runs commands in a fresh shell, inferred,
+not observed); and a reader shadowed earlier on `PATH` (a `cat` in `~/bin`) would
+run in place of the system one. Non-default zsh options (`rcquotes`,
+`magicequalsubst`) change arguments but run nothing.
+
 This is accepted for the first release as stated, not closed. The refusal text and
 lore's rule allow only an interrupt, and agents do not use long-lived interactive
 sessions as their normal way of working. A follow-up re-probes each Codex version
@@ -522,7 +531,8 @@ proceeds) is the one fail-open path, and the latency budget keeps it remote.
 
 A direct hook, not a relay guard, because it needs the prompt text. It is wired in
 `claude/settings.json` and `codex/hooks.json` (and their work variants) on
-PreToolUse, PostToolUse and PostToolUseFailure (all tools) and UserPromptSubmit;
+PreToolUse, PostToolUse (all tools), PostToolUseFailure (Claude Code only; Codex
+has no such event) and UserPromptSubmit;
 on Stop and SubagentStop as an observer that never blocks (it closes in-flight
 calls); on SessionEnd for pruning; on PreCompact/PostCompact for Claude Code; and
 on SubagentStart for both (Claude Code records workers from it, Codex counts its
