@@ -6,9 +6,9 @@ priority: 1
 size: s
 complexity: mid
 process: direct
-owner: hq-cffc71-worker-defaults
+owner: main
 created: 2026-11-01T23:43:00Z
-updated: 2026-11-02T00:59:50Z
+updated: 2026-11-02T01:01:18Z
 started: 2026-11-02T00:02:05Z
 depends: []
 tags: [hooks]
@@ -45,4 +45,6 @@ Done when a fresh session's Bash shell shows the defaults, a bare `pytest -n aut
 - 2026-11-02T00:48:45Z (hq-cffc71-worker-defaults): parked (waiting on user, decision): On the user's go-ahead: in main, commit codex/config.toml's hook trust hashes as chore(codex), merge hq-cffc71-worker-defaults, run env check in a fresh Claude and Codex session from main, then tasks done and remove .worktrees/hq-cffc71
   provenance: {"harness_session":"claude-code:cc9d0598-86ea-48e9-8298-c41d9389039b","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-02T00:59:50Z (hq-cffc71-worker-defaults): resumed
+  provenance: {"harness_session":"claude-code:cc9d0598-86ea-48e9-8298-c41d9389039b","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-02T01:01:18Z (main): resumed
   provenance: {"harness_session":"claude-code:cc9d0598-86ea-48e9-8298-c41d9389039b","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
