@@ -1,0 +1,106 @@
+{
+  "harness": "claude-code",
+  "version": "2.1.316",
+  "evidence": "hq-fe672f",
+  "tool": "CronDelete",
+  "run": "claude/probes/turn-pause-probe.py run cron2",
+  "records": [
+    {
+      "event": "PreToolUse",
+      "denied_by_probe": false,
+      "payload": {
+        "session_id": "906d82c9-4f90-4dd9-989f-fba6c5481497",
+        "transcript_path": "<scratch>/claude-cron-2/config/projects/<scratch-slug>-claude-cron-2-work/906d82c9-4f90-4dd9-989f-fba6c5481497.jsonl",
+        "cwd": "<scratch>/claude-cron-2/work",
+        "prompt_id": "0c34dfad-e4e1-456e-aecc-a84ad8459e8d",
+        "permission_mode": "bypassPermissions",
+        "effort": {
+          "level": "medium"
+        },
+        "hook_event_name": "PreToolUse",
+        "tool_name": "CronCreate",
+        "tool_input": {
+          "cron": "7 3 1 1 *",
+          "prompt": "Reply with the single word NEVER.",
+          "recurring": true
+        },
+        "tool_use_id": "toolu_01YNbstdYXfkYBHjNWWMmFRz"
+      }
+    },
+    {
+      "event": "PostToolUse",
+      "denied_by_probe": false,
+      "payload": {
+        "session_id": "906d82c9-4f90-4dd9-989f-fba6c5481497",
+        "transcript_path": "<scratch>/claude-cron-2/config/projects/<scratch-slug>-claude-cron-2-work/906d82c9-4f90-4dd9-989f-fba6c5481497.jsonl",
+        "cwd": "<scratch>/claude-cron-2/work",
+        "prompt_id": "0c34dfad-e4e1-456e-aecc-a84ad8459e8d",
+        "permission_mode": "bypassPermissions",
+        "effort": {
+          "level": "medium"
+        },
+        "hook_event_name": "PostToolUse",
+        "tool_name": "CronCreate",
+        "tool_input": {
+          "cron": "7 3 1 1 *",
+          "prompt": "Reply with the single word NEVER.",
+          "recurring": true
+        },
+        "tool_response": {
+          "id": "808dcbf2",
+          "humanSchedule": "7 3 1 1 *",
+          "recurring": true,
+          "durable": false,
+          "nextFireAt": 1798792620000
+        },
+        "tool_use_id": "toolu_01YNbstdYXfkYBHjNWWMmFRz",
+        "duration_ms": 1
+      }
+    },
+    {
+      "event": "PreToolUse",
+      "denied_by_probe": false,
+      "payload": {
+        "session_id": "906d82c9-4f90-4dd9-989f-fba6c5481497",
+        "transcript_path": "<scratch>/claude-cron-2/config/projects/<scratch-slug>-claude-cron-2-work/906d82c9-4f90-4dd9-989f-fba6c5481497.jsonl",
+        "cwd": "<scratch>/claude-cron-2/work",
+        "prompt_id": "0c34dfad-e4e1-456e-aecc-a84ad8459e8d",
+        "permission_mode": "bypassPermissions",
+        "effort": {
+          "level": "medium"
+        },
+        "hook_event_name": "PreToolUse",
+        "tool_name": "CronDelete",
+        "tool_input": {
+          "id": "808dcbf2"
+        },
+        "tool_use_id": "toolu_018autn2Y4YFsAhjymvqyaCu"
+      }
+    },
+    {
+      "event": "PostToolUse",
+      "denied_by_probe": false,
+      "payload": {
+        "session_id": "906d82c9-4f90-4dd9-989f-fba6c5481497",
+        "transcript_path": "<scratch>/claude-cron-2/config/projects/<scratch-slug>-claude-cron-2-work/906d82c9-4f90-4dd9-989f-fba6c5481497.jsonl",
+        "cwd": "<scratch>/claude-cron-2/work",
+        "prompt_id": "0c34dfad-e4e1-456e-aecc-a84ad8459e8d",
+        "permission_mode": "bypassPermissions",
+        "effort": {
+          "level": "medium"
+        },
+        "hook_event_name": "PostToolUse",
+        "tool_name": "CronDelete",
+        "tool_input": {
+          "id": "808dcbf2"
+        },
+        "tool_response": {
+          "id": "808dcbf2"
+        },
+        "tool_use_id": "toolu_018autn2Y4YFsAhjymvqyaCu",
+        "duration_ms": 1
+      }
+    }
+  ],
+  "note": "CronCreate returned id 808dcbf2; CronDelete took {id} and its PostToolUse tool_response is {id}. The next Stop no longer listed the job in session_crons."
+}

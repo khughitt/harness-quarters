@@ -36,6 +36,15 @@
             "timeout": 600
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/hq/tools/turn-pause --harness codex UserPromptSubmit",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PreToolUse": [
@@ -46,6 +55,16 @@
             "type": "command",
             "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.3.0/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' PreToolUse",
             "timeout": 600
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/hq/tools/turn-pause --harness codex PreToolUse",
+            "timeout": 5
           }
         ]
       }
@@ -78,6 +97,15 @@
             "timeout": 600
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/hq/tools/turn-pause --harness codex SubagentStop",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "Stop": [
@@ -105,6 +133,15 @@
             "timeout": 600
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/hq/tools/turn-pause --harness codex Stop",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "SubagentStart": [
@@ -116,6 +153,15 @@
             "timeout": 600
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/hq/tools/turn-pause --harness codex SubagentStart",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "SessionEnd": [
@@ -125,6 +171,27 @@
             "type": "command",
             "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.3.0/node_modules/relay/bin/relay.js' hook --harness codex --outer-ms 3000 --subscribers '/home/keith/.config/relay/subscribers.json' SessionEnd",
             "timeout": 3
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/hq/tools/turn-pause --harness codex SessionEnd",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/hq/tools/turn-pause --harness codex PostToolUse",
+            "timeout": 5
           }
         ]
       }

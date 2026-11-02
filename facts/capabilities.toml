@@ -527,6 +527,281 @@ date = 2026-10-22
 evidence = "hq-0b8f2c"
 note = "Hand-made pair of ordinary sessions: O ran one background agent to completion, N is a --fork-session copy of O, and N/subagents/agent-<id>.jsonl is an absolute link to O's transcript beside a regular .meta.json copy, the shape of the live links. Live successors are background sessions (sessionKind bg) that took over a running agent; that path was not driven. N was resumed headless (-p --resume) and in the terminal interface (--resume), with the link resolving and with O's whole unit moved aside, under strace -ff -y over file syscalls, content syscalls (read, pread, preadv, mmap, sendfile, copy_file_range, splice) and getdents64. No call opened, read or changed the link or its target, or named anything under N/subagents; no unparsed trace line named them; no io_uring ring was set up and no untraced claude process was seen before or after a resume; every resume exited 0 and replied, and the link was left as it was. One recorded run at the probe's committed revision (attached to hq-0b8f2c); three earlier runs of draft revisions agreed under weaker checks (one attached at 565b286). Not shown: a pair Claude Code makes itself (claude --bg --resume of a running session started a copy that did not take the agent; /background offered to stop it), resuming or reattaching a background session through its daemon, opening the agent's transcript from the agent view, or the relink sweep, which turns symlinked agent-* names into hard links or copies on resume only behind a storage-v5 gate that was off here."
 
+[facts.hook-deny-all-tools]
+type = "boolean"
+description = "A PreToolUse hook's deny (permissionDecision deny) refuses the call and shows its reason to the model, for every tool the runtime offers its model: spawn, wait, shell, file-write and, for Codex, the outer code-mode exec."
+probe = "claude/probes/turn-pause-probe.py"
+
+[facts.hook-deny-all-tools.harness.claude-code]
+status = "probed"
+value = true
+version = "2.1.316"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "Headless isolated run (claude/probes/turn-pause-probe.py run main): the first Bash, Write and Agent (background spawn) call each got the deny JSON and did not run; each tool_result was is_error with 'PreToolUse:<tool> hook error: <reason>' carrying the nonce, and the model retried. The 2.1.316 tool surface offers no wait tool (no TaskOutput, AgentOutputTool or BashOutput; a background agent reports by task-notification), so the wait kind has nothing to refuse. Run cron: a foreground subagent's first Bash (touch) was refused by an agent-scoped deny; the subagent saw the reason, replied with it, and the file was not created (fixture claude-code-subagent-bash-denied.json). Not exercised: a deny on a deferred tool."
+
+[facts.hook-deny-all-tools.harness.codex]
+status = "probed"
+value = false
+version = "0.166.0"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "Headless isolated runs (codex/probes/turn-pause-probe.py). No PreToolUse (or PostToolUse) fires for the outer code-mode exec, so it cannot be refused: the *exec pattern matched none of the 5 exec calls in run main (4 root, 1 worker), and no exec reached a hook in any other run. Run cancel: nested write_stdin and the top-level wait tool (terminate true) also fired no hook event, so neither can be refused (see hook-unhooked-tools). Refused with the reason shown: in run main, exec_command (hook tool_name Bash) and apply_patch inside exec failed the script with 'Script error: Command blocked by PreToolUse hook: <reason>', and spawn_agent and wait_agent (collaborationspawn_agent, collaborationwait_agent) returned 'Tool call blocked by PreToolUse hook: <reason>'; in run mcp-deny, a nested account MCP call (mcp__codex_apps__pets__list_pets) failed the script with the reason and got no PostToolUse; in run cancel, a worker's own nested exec_command (touch) was refused, the worker replied with the reason, and the file was not created."
+
+[facts.hook-prompt-text]
+type = "boolean"
+description = "UserPromptSubmit carries the typed prompt text, unchanged, in its prompt field."
+probe = "claude/probes/turn-pause-probe.py"
+
+[facts.hook-prompt-text.harness.claude-code]
+status = "probed"
+value = true
+version = "2.1.316"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "The run main UserPromptSubmit payload's prompt equalled the -p prompt byte for byte (multi-line). Payload keys: cwd, hook_event_name, permission_mode, prompt, prompt_id, session_id, transcript_path."
+
+[facts.hook-prompt-text.harness.codex]
+status = "probed"
+value = true
+version = "0.166.0"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "The run main UserPromptSubmit payload's prompt equalled the codex exec prompt byte for byte (multi-line); it carries turn_id and model besides session_id."
+
+[facts.hook-agent-id-on-child-calls]
+type = "boolean"
+description = "A child's (subagent's or worker's) tool-call hook payloads carry an agent_id distinct from anything on the root's calls, and the root's session_id."
+probe = "claude/probes/turn-pause-probe.py"
+
+[facts.hook-agent-id-on-child-calls.harness.claude-code]
+status = "probed"
+value = true
+version = "2.1.316"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "Run main: the background subagent's Bash PreToolUse and PostToolUse carried agent_id (also agent_type general-purpose) and the root's session_id; the root's calls carry no agent_id. SubagentStart and SubagentStop carry the same agent_id, which equals the Agent tool_response's agentId."
+
+[facts.hook-agent-id-on-child-calls.harness.codex]
+status = "probed"
+value = true
+version = "0.166.0"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "Run main: the worker's nested exec_command PreToolUse and PostToolUse (tool_name Bash) carried agent_id (the worker's thread id, agent_type default) and the root's session_id; the root's calls carry no agent_id. The spawn_agent tool_response names only the task name (/root/probe_worker), so the id first appears at SubagentStart. No hook payload in any run links a task_name to an agent_id: spawn_agent's tool_input carries the bare task_name and its PostToolUse response /root/<task_name>, interrupt_agent, send_message and followup_task take the name as target, and SubagentStart carries agent_id with no name. The worker rollout that SubagentStart's transcript_path names holds the link in its first line (session_meta source.subagent.thread_spawn.agent_path /root/<task_name>), read after the run; whether it is there when SubagentStart fires is not shown. Fixture: tools/fixtures/turn-pause/hooks/codex-spawn_agent.json."
+
+[facts.model-tool-surface]
+type = "set"
+description = "The tool names the runtime offers its model, read from the session's own tool list, under an isolated configuration with no configured MCP servers or plugins. Codex tools reachable only inside code-mode exec are written exec.<name>; MCP tools an account provides are left out and counted in the note."
+probe = "claude/probes/turn-pause-probe.py"
+
+[facts.model-tool-surface.harness.claude-code]
+status = "probed"
+value = ["Agent", "Bash", "CronCreate", "CronDelete", "CronList", "DesignSync", "Edit", "EnterWorktree", "ExitWorktree", "ListAgents", "Monitor", "NotebookEdit", "PushNotification", "Read", "ReportFindings", "ScheduleWakeup", "SendMessage", "TaskStop", "ToolSearch", "WebFetch", "WebSearch", "Workflow", "Write"]
+version = "2.1.316"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "run surface: the API request recorded by a local forwarding proxy, after ToolSearch loaded every deferred tool (CronCreate, CronDelete, CronList, DesignSync, EnterWorktree, ExitWorktree, Monitor, NotebookEdit, PushNotification, SendMessage, TaskStop, WebFetch, WebSearch are deferred; DeferredToolPlaceholder, which says never call it, is left out). The stream-json init list names the spawn tool Task; the model and hooks see Agent. No Grep, Glob, KillShell or TaskOutput is offered. Cancellation schemas: tools/fixtures/turn-pause/schemas/claude-code-{TaskStop,CronDelete,ScheduleWakeup}.json; TaskStop takes {task_id, shell_id (deprecated)}."
+
+[facts.model-tool-surface.harness.codex]
+status = "probed"
+value = ["exec", "exec.apply_patch", "exec.clock__curr_time", "exec.create_goal", "exec.exec_command", "exec.get_goal", "exec.image_gen__imagegen", "exec.list_mcp_resource_templates", "exec.list_mcp_resources", "exec.read_mcp_resource", "exec.request_plugin_install", "exec.update_goal", "exec.view_image", "exec.web__run", "exec.write_stdin", "followup_task", "interrupt_agent", "list_agents", "request_user_input", "request_user_input_async", "send_message", "sleep", "spawn_agent", "wait", "wait_agent"]
+version = "0.166.0"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "codex/probes/turn-pause-probe.py run surface: the rollout's additional_tools record (gpt-6.1-sol, multi_agent v2, hooks and multi_agent on). Namespaces: functions (exec, wait, request_user_input, request_user_input_async), clock (sleep), collaboration (followup_task, interrupt_agent, list_agents, send_message, spawn_agent, wait_agent); exec.* are the nested tools its description declares. A live personal-home session on the same release listed the same set less request_plugin_install. Because exec's description says deferred nested tools may be omitted from it, run nested printed the isolate's own Object.keys(tools) and ALL_TOOLS (195 names each, identical): the 14 built-in nested tools match the description exactly; the other 181 are deferred mcp__codex_apps__* tools the signed-in account provides (Linear 91, ChatGPT spaces 38, sites 25, pets 11, plugin 6, safety 5, codex 3, hotline 1, search 1), none of which, read from its name alone (not probed), stops work the session started. No close_agent. spawn_agent is not reachable inside exec (TypeError in run spawn). wait {cell_id, terminate} stops a running exec cell. Schemas: tools/fixtures/turn-pause/schemas/codex-{interrupt_agent,wait,write_stdin}.json."
+
+[facts.codex-spawn-evidence]
+type = "set"
+description = "The hook events that observed every worker that actually started exactly once: SubagentStart, or the spawn_agent PreToolUse."
+probe = "codex/probes/turn-pause-probe.py"
+
+[facts.codex-spawn-evidence.harness.codex]
+status = "probed"
+value = ["PreToolUse", "SubagentStart"]
+version = "0.166.0"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "run spawn (the specified probe): the exec whose loop spawns three workers failed at once with 'TypeError: tools.spawn_agent is not a function', so it started none; the direct spawn_agent started one worker, seen by one PreToolUse (collaborationspawn_agent) and one SubagentStart. Neither source saw four starts: the four-start criterion was unreachable, because exec cannot spawn on 0.166.0, so whether this answers the fact is the user's ruling. run spawn-direct: four direct spawn_agent calls gave four PreToolUse and four SubagentStart events with four distinct agent_ids. PreToolUse counts spawn attempts, not starts: in run main a denied spawn and its retry gave two spawn PreToolUse records for one SubagentStart, so a PreToolUse count is exact only when denied calls (by this hook or any other guard in the chain) are excluded; SubagentStart counted starts exactly in every run. Every observed spawn is a direct function call."
+
+[facts.hook-posttooluse]
+type = "boolean"
+description = "A PostToolUse hook fires when a tool call returns."
+probe = "claude/probes/turn-pause-probe.py"
+
+[facts.hook-posttooluse.harness.claude-code]
+status = "probed"
+value = true
+version = "2.1.316"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "Run main: PostToolUse fired for each allowed Bash, Write and Agent call, root and subagent, with tool_response and duration_ms; none fired for a denied call."
+
+[facts.hook-posttooluse.harness.codex]
+status = "probed"
+value = true
+version = "0.166.0"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "Run main and spawn-direct: PostToolUse fired for each allowed nested exec_command (Bash) and apply_patch call and for spawn_agent and wait_agent, root and worker; none for a denied call and none for the outer exec. A yielded exec_command gets no PostToolUse at the yield: in run cancel it came when nested write_stdin ended the process (exit 130), with an empty tool_response; in run all-tools a yielded process that ended on its own got none at all. An empty Bash tool_response is no sign of a yield: a completed true gives the same empty string (fixture codex-exec_command-yield.json). Nested write_stdin and the wait tool get none."
+
+[facts.hook-compact-event]
+type = "set"
+description = "The compaction hook events that fire for a command hook: PreCompact, PostCompact, both, or none."
+probe = "claude/probes/turn-pause-probe.py"
+
+[facts.hook-compact-event.harness.claude-code]
+status = "probed"
+value = ["PostCompact", "PreCompact"]
+version = "2.1.316"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "run compact: /compact on a resumed headless session fired PreCompact (trigger manual) and PostCompact (trigger manual, compact_summary), plus a SessionStart with source compact and a SubagentStop for the summarizer (agent_type empty, no SubagentStart). Auto compaction was not driven."
+
+[facts.hook-compact-event.harness.codex]
+status = "unknown"
+note = "Two runs with model_auto_compact_token_limit 20000 did not compact: in the first the exec printed nothing, so context stayed at about 14.5k tokens; in the second the output reached context (25.6k input tokens) but the single exec turn ended without compaction. Stopped after two attempts under the live-operation rule; a two-turn run (codex exec resume) is the untried next step. Both event names are in the 0.166.0 binary."
+
+[facts.hook-subagent-start]
+type = "boolean"
+description = "A SubagentStart hook fires when a subagent or worker starts, carrying its agent_id."
+probe = "claude/probes/turn-pause-probe.py"
+
+[facts.hook-subagent-start.harness.claude-code]
+status = "probed"
+value = true
+version = "2.1.316"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "Run main: SubagentStart fired once for the background Agent spawn, with agent_id, agent_type general-purpose and the root's session_id, before the subagent's first tool call. Compaction's summarizer fires SubagentStop without a SubagentStart."
+
+[facts.hook-subagent-start.harness.codex]
+status = "probed"
+value = true
+version = "0.166.0"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "Runs main, spawn and spawn-direct: SubagentStart fired once per started worker (1, 1, 4), with agent_id, agent_type default and the root's session_id."
+
+[facts.hook-stop-carries-agent]
+type = "boolean"
+description = "Stop and SubagentStop identify which agent stopped: SubagentStop carries the child's agent_id, and Stop the root's session alone."
+probe = "claude/probes/turn-pause-probe.py"
+
+[facts.hook-stop-carries-agent.harness.claude-code]
+status = "probed"
+value = true
+version = "2.1.316"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "Run main: SubagentStop carried the subagent's agent_id, agent_type and agent_transcript_path with the root's session_id; Stop carried no agent_id. Both carry background_tasks (the subagent and the shell, status running) and session_crons."
+
+[facts.hook-stop-carries-agent.harness.codex]
+status = "probed"
+value = true
+version = "0.166.0"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "Runs main and spawn-direct: each SubagentStop carried the worker's agent_id and agent_transcript_path with the root's session_id; the root's Stop carried no agent_id."
+
+[facts.hook-prompt-on-wake]
+type = "boolean"
+description = "UserPromptSubmit fires when a child's completion wakes the controller without human input, carrying the wake notification as its prompt."
+probe = "claude/probes/turn-pause-probe.py"
+
+[facts.hook-prompt-on-wake.harness.claude-code]
+status = "probed"
+value = true
+version = "2.1.316"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "Run main (headless -p): after the root ended its turn with a background agent and a background shell running, each completion started a new turn with a UserPromptSubmit whose prompt is a <task-notification> block (task-id, tool-use-id, output-file, status completed, summary), each with its own prompt_id."
+
+[facts.hook-prompt-on-wake.harness.codex]
+status = "unknown"
+note = "Not probed on 0.166.0: codex exec ends the session at the root's Stop, and controller-wake was false on 0.156.1."
+
+[facts.codex-exec-nested-pretooluse]
+type = "boolean"
+description = "Codex fires PreToolUse for each tool called inside a code-mode exec, rather than once for the exec."
+probe = "codex/probes/turn-pause-probe.py"
+
+[facts.codex-exec-nested-pretooluse.harness.codex]
+status = "probed"
+value = true
+version = "0.166.0"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "Run main: each exec that called tools.exec_command produced one PreToolUse with tool_name Bash and tool_input {command}, and each tools.apply_patch one with tool_name apply_patch and tool_input {command: <patch>}; the outer exec produced no PreToolUse or PostToolUse at all. A nested deny fails the script with the reason in its error. Run cancel and mcp-deny: a nested account MCP call fires PreToolUse as mcp__codex_apps__<app>__<tool> (pets__list_pets for the model's mcp__codex_apps__pets_list_pets) with tool_input as passed; nested write_stdin fires nothing. Nested calls carry tool_use_id exec-<uuid>, function tools call_<hex>. A yielded exec_command gets no PostToolUse at the yield (see hook-posttooluse); the session_id the model receives is in no hook payload. Fixtures: tools/fixtures/turn-pause/hooks/codex-*.json."
+
+[facts.hook-tool-names]
+type = "set"
+description = "How a hook names each tool the probes called, written <model-facing name>=<hook tool_name>; Codex tools reached inside code-mode exec are written exec.<name>. A tool that fired no hook is in hook-unhooked-tools instead."
+probe = "codex/probes/turn-pause-probe.py"
+
+[facts.hook-tool-names.harness.claude-code]
+status = "probed"
+value = ["Agent=Agent", "Bash=Bash", "CronCreate=CronCreate", "CronDelete=CronDelete", "ScheduleWakeup=ScheduleWakeup", "ToolSearch=ToolSearch", "Write=Write"]
+version = "2.1.316"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "claude/probes/turn-pause-probe.py runs main, cron and cron2: the hook tool_name equals the model-facing name for each tool called, deferred tools included; the stream-json init list calls the spawn tool Task, but hooks and the model see Agent. CronCreate's PostToolUse tool_response is {id, humanSchedule, recurring, durable, nextFireAt}; CronDelete takes {id} and returns {id}; ScheduleWakeup returns {scheduledFor, clampedDelaySeconds, wasClamped}. Fixtures: tools/fixtures/turn-pause/hooks/claude-code-*.json."
+
+[facts.hook-tool-names.harness.codex]
+status = "probed"
+value = ["exec.apply_patch=apply_patch", "exec.clock__curr_time=clockcurr_time", "exec.create_goal=create_goal", "exec.exec_command=Bash", "exec.get_goal=get_goal", "exec.list_mcp_resource_templates=list_mcp_resource_templates", "exec.list_mcp_resources=list_mcp_resources", "exec.mcp__codex_apps__pets_list_pets=mcp__codex_apps__pets__list_pets", "exec.read_mcp_resource=read_mcp_resource", "exec.update_goal=update_goal", "exec.view_image=view_image", "exec.web__run=webrun", "followup_task=collaborationfollowup_task", "interrupt_agent=collaborationinterrupt_agent", "list_agents=collaborationlist_agents", "request_user_input=request_user_input", "request_user_input_async=request_user_input_async", "send_message=collaborationsend_message", "sleep=clocksleep", "spawn_agent=collaborationspawn_agent", "wait_agent=collaborationwait_agent"]
+version = "0.166.0"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "Runs main, spawn-direct, cancel and mcp-deny. Collaboration function tools are named namespace plus tool with no separator; nested exec_command is Bash with tool_input {command}; apply_patch keeps its name with tool_input {command: <patch>}; an account MCP tool is mcp__codex_apps__<app>__<tool>, a double underscore where the model-facing name has one. Runs all-tools and all-tools-rest (deny !*, spawn and Bash allowed) called every remaining tool; each listed here fired PreToolUse and was refused before it ran. A namespaced nested tool drops its double underscore (clock__curr_time is clockcurr_time, web__run is webrun). request_user_input was refused by the hook, so what it does unrefused in codex exec is not shown (the model first declined it as Plan-mode only). read_mcp_resource naming an unknown server failed its server check before any hook; naming codex_apps it reached the hook. Not called: exec.request_plugin_install (the model declined twice, citing its instructions that a plugin must be on the recommended list) and exec.image_gen__imagegen (skipped: it may spend image-generation quota). Fixture: tools/fixtures/turn-pause/hooks/codex-remaining-tools.json."
+
+[facts.hook-unhooked-tools]
+type = "set"
+description = "Tools the probes called that fired no hook event at all (no PreToolUse, no PostToolUse), so a hook can neither see nor refuse them. Names as in hook-tool-names."
+probe = "codex/probes/turn-pause-probe.py"
+
+[facts.hook-unhooked-tools.harness.claude-code]
+status = "probed"
+value = []
+version = "2.1.316"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "Every tool claude/probes/turn-pause-probe.py runs main, cron and cron2 called (Agent, Bash, CronCreate, CronDelete, ScheduleWakeup, ToolSearch, Write, and subagents' Bash) fired PreToolUse. Tools not called are not covered."
+
+[facts.hook-unhooked-tools.harness.codex]
+status = "probed"
+value = ["exec", "exec.write_stdin", "wait"]
+version = "0.166.0"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "exec: no hook in any run. Run cancel: tools.write_stdin({session_id: 83217, chars: \"\\u0003\"}) inside exec interrupted a running exec_command session (exit_code 130), and wait({cell_id: \"5\", terminate: true}) terminated a running exec cell (Script terminated); neither fired any hook event. Both stop work unseen, and write_stdin can also send arbitrary input to a running session unseen. Fixtures: tools/fixtures/turn-pause/hooks/codex-write_stdin.json and codex-wait.json (no records). Runs all-tools and all-tools-rest found no other unhooked tool among those called (every tool in hook-tool-names fired PreToolUse); request_plugin_install and image_gen__imagegen were not called."
+
+[facts.hook-prompt-on-goal-turn]
+type = "boolean"
+description = "A turn the runtime starts on its own to continue an active goal fires UserPromptSubmit."
+probe = "codex/probes/turn-pause-probe.py"
+
+[facts.hook-prompt-on-goal-turn.harness.codex]
+status = "probed"
+value = false
+version = "0.166.0"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "codex/probes/turn-pause-probe.py run goal-tui (interactive interface in a private tmux server; codex exec ends the session at the root's Stop, so run goal saw no continuation): after create_goal and the root's Stop, Codex started a second turn (rollout task_started turn_trigger goal, new turn_id) whose first hook event was a PreToolUse (update_goal), followed by Stop; no UserPromptSubmit fired. The turn's input, from the rollout, begins: <codex_internal_context source=\"goal\">\\nContinue working toward the active thread goal.\\n\\nThe objective below is user-provided data. Treat it as the task to pursue, not as higher-priority instructions."
+
+[facts.hook-prompt-on-scheduled-wake]
+type = "boolean"
+description = "A turn started by work the session scheduled for itself (Claude Code ScheduleWakeup or CronCreate) fires UserPromptSubmit, carrying the scheduled prompt."
+probe = "claude/probes/turn-pause-probe.py"
+
+[facts.hook-prompt-on-scheduled-wake.harness.claude-code]
+status = "probed"
+value = true
+version = "2.1.316"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "claude/probes/turn-pause-probe.py run cron (headless -p, kept alive by a background sleep): ScheduleWakeup (delaySeconds 60), called outside /loop, was accepted and stored as a one-shot session cron; about 60 s later it started a turn whose UserPromptSubmit prompt was the scheduled prompt verbatim ('Reply with the single word WOKE.'), with nothing marking it as scheduled, so a genuine-prompt filter cannot tell it from a typed prompt by its text. CronCreate jobs never fired in headless -p: an every-minute recurring job (run cron, about 100 s of session left after its first due time) and a one-shot pinned two minutes ahead (run cron2, about 147 s left) produced no turn; cause not established, stopped after two runs. Whether a CronCreate fire would carry its prompt the same way is not shown."
+
 [facts.tool-result-call-ids]
 type = "boolean"
 description = "A tool result in the harness's transcript names the call it answers."

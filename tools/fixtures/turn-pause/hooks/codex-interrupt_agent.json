@@ -1,0 +1,47 @@
+{
+  "harness": "codex",
+  "version": "0.166.0",
+  "evidence": "hq-fe672f",
+  "tool": "interrupt_agent",
+  "run": "codex/probes/turn-pause-probe.py run cancel",
+  "records": [
+    {
+      "event": "PreToolUse",
+      "denied_by_probe": false,
+      "payload": {
+        "session_id": "01a19737-5420-7280-9b27-80cdf4ba57c6",
+        "turn_id": "01a19737-5d39-7722-a8ea-b811d5c85fcb",
+        "transcript_path": "<scratch>/codex-cancel-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-05-50-01a19737-5420-7280-9b27-80cdf4ba57c6.jsonl",
+        "cwd": "<scratch>/codex-cancel-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "collaborationinterrupt_agent",
+        "tool_input": {
+          "target": "probe_worker"
+        },
+        "tool_use_id": "call_4a09bfc966ed4ea1950cc5753efdb623"
+      }
+    },
+    {
+      "event": "PostToolUse",
+      "denied_by_probe": false,
+      "payload": {
+        "session_id": "01a19737-5420-7280-9b27-80cdf4ba57c6",
+        "turn_id": "01a19737-5d39-7722-a8ea-b811d5c85fcb",
+        "transcript_path": "<scratch>/codex-cancel-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-05-50-01a19737-5420-7280-9b27-80cdf4ba57c6.jsonl",
+        "cwd": "<scratch>/codex-cancel-1/work",
+        "hook_event_name": "PostToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "collaborationinterrupt_agent",
+        "tool_input": {
+          "target": "probe_worker"
+        },
+        "tool_response": "{\"previous_status\":{\"completed\":\"Command blocked by PreToolUse hook: turn-pause-probe refused this Bash call on purpose (nonce TPP-DENY-1). Retry the identical call once; it will be allowed.. Command: touch worker-side-effect.txt\"}}",
+        "tool_use_id": "call_4a09bfc966ed4ea1950cc5753efdb623"
+      }
+    }
+  ],
+  "note": "Root interrupt_agent on a worker that had already finished; PreToolUse and PostToolUse both fire, tool_name collaborationinterrupt_agent, tool_input {target}."
+}

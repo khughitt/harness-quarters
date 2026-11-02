@@ -1,0 +1,23 @@
+{
+  "harness": "claude-code",
+  "version": "2.1.316",
+  "tool": "TaskStop",
+  "role": "named cancellation control",
+  "source": "the input_schema Claude Code 2.1.316 sent for this tool in a probe session's API request (after ToolSearch loaded it), recorded by claude/probes/turn-pause-probe.py run surface",
+  "deferred": true,
+  "input_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "task_id": {
+        "description": "The ID of the background task to stop. Agent-team teammates and named background agents are also accepted by agent ID or name.",
+        "type": "string"
+      },
+      "shell_id": {
+        "description": "Deprecated: use task_id instead",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  }
+}

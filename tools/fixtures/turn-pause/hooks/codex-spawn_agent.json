@@ -1,0 +1,74 @@
+{
+  "harness": "codex",
+  "version": "0.166.0",
+  "evidence": "hq-fe672f",
+  "tool": "spawn_agent",
+  "run": "codex/probes/turn-pause-probe.py run spawn-direct",
+  "records": [
+    {
+      "event": "PreToolUse",
+      "payload": {
+        "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+        "turn_id": "01a19708-1012-7041-90f4-58aa56e6148f",
+        "transcript_path": "<scratch>/codex-spawn-direct-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T07-14-10-01a19708-02c1-7123-9e7e-60bfe03ac629.jsonl",
+        "cwd": "<scratch>/codex-spawn-direct-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "collaborationspawn_agent",
+        "tool_input": {
+          "task_name": "w0",
+          "fork_turns": "none",
+          "message": "<encrypted>"
+        },
+        "tool_use_id": "call_7cdbdf8f84c04b7e9407f4c4ed03a25d"
+      }
+    },
+    {
+      "event": "PostToolUse",
+      "payload": {
+        "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+        "turn_id": "01a19708-1012-7041-90f4-58aa56e6148f",
+        "transcript_path": "<scratch>/codex-spawn-direct-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T07-14-10-01a19708-02c1-7123-9e7e-60bfe03ac629.jsonl",
+        "cwd": "<scratch>/codex-spawn-direct-1/work",
+        "hook_event_name": "PostToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "collaborationspawn_agent",
+        "tool_input": {
+          "task_name": "w0",
+          "fork_turns": "none",
+          "message": "<encrypted>"
+        },
+        "tool_response": "{\"task_name\":\"/root/w0\"}",
+        "tool_use_id": "call_7cdbdf8f84c04b7e9407f4c4ed03a25d"
+      }
+    },
+    {
+      "event": "SubagentStart",
+      "payload": {
+        "session_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+        "turn_id": "01a19708-33cb-77f2-9618-8bc851c397ae",
+        "transcript_path": "<scratch>/codex-spawn-direct-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T07-14-19-01a19708-33c7-7081-8565-d4e918bd4284.jsonl",
+        "cwd": "<scratch>/codex-spawn-direct-1/work",
+        "hook_event_name": "SubagentStart",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "agent_id": "01a19708-33c7-7081-8565-d4e918bd4284",
+        "agent_type": "default"
+      }
+    }
+  ],
+  "worker_rollout_session_meta_source": {
+    "subagent": {
+      "thread_spawn": {
+        "parent_thread_id": "01a19708-02c1-7123-9e7e-60bfe03ac629",
+        "depth": 1,
+        "agent_path": "/root/w0",
+        "agent_nickname": "Hypatia",
+        "agent_role": null
+      }
+    }
+  },
+  "note": "spawn_agent PreToolUse tool_input carries the bare task_name (w0) and an encrypted message; its PostToolUse tool_response is {\"task_name\":\"/root/w0\"}; interrupt_agent and the other collaboration tools take that name as target (codex-interrupt_agent.json: target probe_worker). No hook payload links task_name to agent_id: SubagentStart carries agent_id (the worker thread id) and no name. The worker rollout named by SubagentStart transcript_path holds the link in its first line (session_meta source.subagent.thread_spawn.agent_path /root/w0); that file was read after the run, so whether it exists and holds that line when SubagentStart fires is not shown."
+}

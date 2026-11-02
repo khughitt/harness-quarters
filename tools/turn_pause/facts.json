@@ -1,0 +1,17 @@
+{
+  "compact_events": {
+    "claude-code": [
+      "PostCompact",
+      "PreCompact"
+    ],
+    "codex": null
+  },
+  "posttooluse": {
+    "claude-code": true,
+    "codex": true
+  },
+  "stop_carries_agent": {
+    "claude-code": true,
+    "codex": true
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "harness": "codex",
+  "version": "0.166.0",
+  "tool": "interrupt_agent",
+  "namespace": "collaboration",
+  "kind": "function",
+  "role": "named cancellation control",
+  "source": "the parameters Codex 0.166.0 offered its model in a probe session's additional_tools rollout record, recorded by codex/probes/turn-pause-probe.py run surface",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "target": {
+        "type": "string",
+        "description": "Agent id or canonical task name to interrupt (from spawn_agent)."
+      }
+    },
+    "required": [
+      "target"
+    ],
+    "additionalProperties": false
+  }
+}

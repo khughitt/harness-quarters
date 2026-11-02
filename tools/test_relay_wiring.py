@@ -113,6 +113,8 @@ def test_no_familiar_hook_or_native_guard(file):
 def test_native_entries_kept_in_order(file):
     native = {}
     for event, _, hook in hook_entries(file):
+        if '/turn-pause ' in hook['command']:
+            continue  # pinned by test_turn_pause_wiring.py
         if parse_relay_command(hook['command'], HOOK_VERSIONS[file]) is None:
             native.setdefault(event, []).append(hook['command'])
     if file == FILES[0]:

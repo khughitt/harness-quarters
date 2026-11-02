@@ -1,0 +1,198 @@
+{
+  "harness": "claude-code",
+  "version": "2.1.316",
+  "evidence": "hq-fe672f",
+  "run": "claude/probes/turn-pause-probe.py run cron",
+  "tool": "Bash (subagent)",
+  "records": [
+    {
+      "event": "PreToolUse",
+      "denied_by_probe": false,
+      "payload": {
+        "session_id": "7f0c44c1-4c1f-40da-9a15-aa0917fa0728",
+        "transcript_path": "<scratch>/claude-cron-1/config/projects/<scratch-slug>-claude-cron-1-work/7f0c44c1-4c1f-40da-9a15-aa0917fa0728.jsonl",
+        "cwd": "<scratch>/claude-cron-1/work",
+        "prompt_id": "914defd5-5d69-47f6-bd1d-0210e7368c89",
+        "permission_mode": "bypassPermissions",
+        "effort": {
+          "level": "medium"
+        },
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Agent",
+        "tool_input": {
+          "description": "probe child",
+          "prompt": "Use the Bash tool once to run: touch subagent-side-effect.txt . If it is refused, do not retry; reply with the refusal message verbatim.",
+          "subagent_type": "general-purpose",
+          "run_in_background": false
+        },
+        "tool_use_id": "toolu_0169FJKnwvy5snozornSjKmf"
+      }
+    },
+    {
+      "event": "SubagentStart",
+      "denied_by_probe": false,
+      "payload": {
+        "session_id": "7f0c44c1-4c1f-40da-9a15-aa0917fa0728",
+        "transcript_path": "<scratch>/claude-cron-1/config/projects/<scratch-slug>-claude-cron-1-work/7f0c44c1-4c1f-40da-9a15-aa0917fa0728.jsonl",
+        "cwd": "<scratch>/claude-cron-1/work",
+        "prompt_id": "914defd5-5d69-47f6-bd1d-0210e7368c89",
+        "agent_id": "a620dc1cd95e3a1c5",
+        "agent_type": "general-purpose",
+        "hook_event_name": "SubagentStart"
+      }
+    },
+    {
+      "event": "PreToolUse",
+      "denied_by_probe": true,
+      "payload": {
+        "session_id": "7f0c44c1-4c1f-40da-9a15-aa0917fa0728",
+        "transcript_path": "<scratch>/claude-cron-1/config/projects/<scratch-slug>-claude-cron-1-work/7f0c44c1-4c1f-40da-9a15-aa0917fa0728.jsonl",
+        "cwd": "<scratch>/claude-cron-1/work",
+        "prompt_id": "914defd5-5d69-47f6-bd1d-0210e7368c89",
+        "permission_mode": "bypassPermissions",
+        "agent_id": "a620dc1cd95e3a1c5",
+        "agent_type": "general-purpose",
+        "effort": {
+          "level": "medium"
+        },
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "touch subagent-side-effect.txt",
+          "description": "Create empty file subagent-side-effect.txt"
+        },
+        "tool_use_id": "toolu_01KccfgaNWP4gvcqWhqLsvjB"
+      }
+    },
+    {
+      "event": "SubagentStop",
+      "denied_by_probe": false,
+      "payload": {
+        "session_id": "7f0c44c1-4c1f-40da-9a15-aa0917fa0728",
+        "transcript_path": "<scratch>/claude-cron-1/config/projects/<scratch-slug>-claude-cron-1-work/7f0c44c1-4c1f-40da-9a15-aa0917fa0728.jsonl",
+        "cwd": "<scratch>/claude-cron-1/work",
+        "prompt_id": "914defd5-5d69-47f6-bd1d-0210e7368c89",
+        "permission_mode": "bypassPermissions",
+        "agent_id": "a620dc1cd95e3a1c5",
+        "agent_type": "general-purpose",
+        "effort": {
+          "level": "medium"
+        },
+        "hook_event_name": "SubagentStop",
+        "stop_hook_active": false,
+        "agent_transcript_path": "<scratch>/claude-cron-1/config/projects/<scratch-slug>-claude-cron-1-work/7f0c44c1-4c1f-40da-9a15-aa0917fa0728/subagents/agent-a620dc1cd95e3a1c5.jsonl",
+        "last_assistant_message": "The Bash call was refused, so I did not retry. The refusal message, verbatim:\n\n\"PreToolUse:Bash hook error: turn-pause-probe refused this Bash call on purpose (nonce TPP-DENY-0). Retry the identical call once; it will be allowed.\"\n\n`subagent-side-effect.txt` was not created.",
+        "background_tasks": [],
+        "session_crons": [
+          {
+            "id": "8c941349",
+            "schedule": "* * * * *",
+            "recurring": true,
+            "prompt": "Reply with the single word CRONFIRED, then delete this cron job with CronDelete."
+          },
+          {
+            "id": "a1de64e1",
+            "schedule": "30 8 * * *",
+            "recurring": false,
+            "prompt": "Reply with the single word WOKE."
+          }
+        ]
+      }
+    },
+    {
+      "event": "PostToolUse",
+      "denied_by_probe": false,
+      "payload": {
+        "session_id": "7f0c44c1-4c1f-40da-9a15-aa0917fa0728",
+        "transcript_path": "<scratch>/claude-cron-1/config/projects/<scratch-slug>-claude-cron-1-work/7f0c44c1-4c1f-40da-9a15-aa0917fa0728.jsonl",
+        "cwd": "<scratch>/claude-cron-1/work",
+        "prompt_id": "914defd5-5d69-47f6-bd1d-0210e7368c89",
+        "permission_mode": "bypassPermissions",
+        "effort": {
+          "level": "medium"
+        },
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Agent",
+        "tool_input": {
+          "description": "probe child",
+          "prompt": "Use the Bash tool once to run: touch subagent-side-effect.txt . If it is refused, do not retry; reply with the refusal message verbatim.",
+          "subagent_type": "general-purpose",
+          "run_in_background": false
+        },
+        "tool_response": {
+          "status": "completed",
+          "prompt": "Use the Bash tool once to run: touch subagent-side-effect.txt . If it is refused, do not retry; reply with the refusal message verbatim.",
+          "agentId": "a620dc1cd95e3a1c5",
+          "agentType": "general-purpose",
+          "toolsUsed": [
+            "Bash"
+          ],
+          "harnessNoteCount": 1,
+          "harnessTailCount": 0,
+          "harnessSectionHash": "95a9a24a93918066",
+          "content": [
+            {
+              "type": "text",
+              "text": "<tools-used-before-summary>Bash</tools-used-before-summary>\n"
+            },
+            {
+              "type": "text",
+              "text": "The Bash call was refused, so I did not retry. The refusal message, verbatim:\n\n\"PreToolUse:Bash hook error: turn-pause-probe refused this Bash call on purpose (nonce TPP-DENY-0). Retry the identical call once; it will be allowed.\"\n\n`subagent-side-effect.txt` was not created."
+            }
+          ],
+          "resolvedModel": "claude-haiku-5-5",
+          "totalDurationMs": 5099,
+          "totalTokens": 9362,
+          "totalToolUseCount": 1,
+          "usage": {
+            "output_tokens_details": {
+              "thinking_tokens": 211
+            },
+            "input_tokens": 2,
+            "cache_creation_input_tokens": 756,
+            "cache_read_input_tokens": 8281,
+            "output_tokens": 323,
+            "server_tool_use": {
+              "web_search_requests": 0,
+              "web_fetch_requests": 0
+            },
+            "service_tier": "standard",
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 0,
+              "ephemeral_5m_input_tokens": 756
+            },
+            "inference_geo": "global",
+            "iterations": [
+              {
+                "input_tokens": 2,
+                "output_tokens": 323,
+                "cache_read_input_tokens": 8281,
+                "cache_creation_input_tokens": 756,
+                "cache_creation": {
+                  "ephemeral_5m_input_tokens": 756,
+                  "ephemeral_1h_input_tokens": 0
+                },
+                "type": "message"
+              }
+            ],
+            "speed": "standard",
+            "fallback_credit": null
+          },
+          "toolStats": {
+            "readCount": 0,
+            "searchCount": 0,
+            "bashCount": 1,
+            "editFileCount": 0,
+            "linesAdded": 0,
+            "linesRemoved": 0,
+            "otherToolCount": 0
+          },
+          "canContinueAgent": true
+        },
+        "tool_use_id": "toolu_0169FJKnwvy5snozornSjKmf",
+        "duration_ms": 5100
+      }
+    }
+  ],
+  "note": "A foreground subagent's first Bash (touch subagent-side-effect.txt) refused by agent:Bash: PreToolUse carries agent_id; the subagent saw the reason and replied with it (SubagentStop last_assistant_message); the file was not created."
+}

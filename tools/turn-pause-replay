@@ -1,0 +1,18 @@
+#!/usr/bin/env python3
+"""turn-pause-replay: how often would the turn limits have paused the stored sessions?
+
+    turn-pause-replay START END [--limits PATH]
+    turn-pause-replay --all [--limits PATH]
+
+Replays the Claude Code and Codex session trees on this host (read-only) through the
+turn-pause hook's own counters. START and END are ISO times (2026-10-02T00:00:00Z):
+turns whose genuine prompt falls in [START, END) are counted. --all reads every record.
+Spec: docs/specs/2026-11-01-turn-pause-design.md, "Limits" and "Verification".
+"""
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+from turn_pause.replay import main  # noqa: E402
+
+sys.exit(main(sys.argv[1:]))

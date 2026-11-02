@@ -20,7 +20,8 @@ def test_both_codex_homes_guard_root_and_worker(file, home):
                     for h in group['hooks'] if h['type'] == 'command']
         assert commands.count(COMMAND) == 1
     others = [h['command'] for group in hooks['Stop'] for h in group['hooks']
-              if h['command'] != COMMAND]
+              if h['command'] != COMMAND
+              and '/turn-pause ' not in h['command']]  # pinned by test_turn_pause_wiring.py
     assert len(others) == 2
     assert others[0] == '~/.local/bin/harness-state-refresh'
     assert parse_relay_command(others[1], HOOK_VERSIONS[f'codex/{file}']) == ('codex', 600000, 'Stop')

@@ -1,0 +1,1079 @@
+#!/usr/bin/env python3
+"""turn-pause-lifecycle: run the turn-pause hook in one isolated, real session and check
+that a paused turn can spend its grace, stop its own work, park and resume.
+
+    turn-pause-lifecycle --harness claude-code|codex [--out DIR] [--model NAME]
+    turn-pause-lifecycle observe EVENT        (the recording hook the driver wires)
+
+Spec: docs/specs/2026-11-01-turn-pause-design.md ("Warning, pause, notification",
+"Closing allowlist", "Resuming and granting more"); plan Task 9. It is a live
+operation: each run spends model quota (cheap models, minimal prompts).
+
+Isolation. The run directory (OUT, a new temporary directory by default) holds a
+temporary HOME, XDG_CONFIG_HOME, XDG_STATE_HOME, XDG_RUNTIME_DIR, TMPDIR and harness
+home (Claude Code: CLAUDE_CONFIG_DIR plus `--settings`, with `--setting-sources project
+--strict-mcp-config --disable-slash-commands`; Codex: CODEX_HOME). Every subprocess gets
+an environment built key by key. PATH is OUT/bin (the harness, tasks, an `hq` that runs
+this checkout's tools/hq, and a `notify-send` stub that only logs) then /usr/bin:/bin.
+The hooks run this checkout's tools/turn-pause by explicit path with
+--limits tools/fixtures/turn-pause/lifecycle/limits.toml (6 calls), next to a recording
+hook (`observe`) that appends each payload to OUT/hooks.jsonl and never decides. A
+throwaway tasks project (prefix tpl) lives in OUT/work, registered only under the
+temporary XDG_CONFIG_HOME. Codex's auth.json is a symlink to the live login, never a
+copy: before the run only its last_refresh is read (over 7 days refuses the run), and
+after it the link is checked; a regular file Codex wrote in its place is copied over the
+live file (mode 600) and reported. Every process the run starts carries a marker in its
+environment and is reaped on exit, TERM and INT; Codex runs in a private tmux server
+whose socket is under OUT, killed in a finally.
+
+Stages, each asserted from the state snapshots (OUT/states.jsonl, polled while the
+session runs, since SessionEnd removes the state file) and the transcripts:
+  1 cross    the agent starts its background work, and its seventh root call is refused
+             with the root refusal text (paused on calls, 7 of 6)
+  2 grace    25 allowlisted reads pass after the pause; the next read is refused with
+             the grace text
+  3 cancel   the agent stops its own work: Claude Code loads TaskStop with ToolSearch
+             select:TaskStop (not loaded before) and stops its background task, and
+             kills its other process; Codex kills its process through a nested
+             exec_command, interrupts its worker with interrupt_agent and sets its goal
+             to paused; the processes are gone
+  4 park     tasks park ... --waiting-on user succeeds and the turn ends (Codex: and no
+             goal continuation turn follows within the watch window)
+  5 resume   the genuine prompt `continue` in the same session ends the pause, resets
+             the counters and runs one allowed shell command
+The session runs in one process across the pause (Claude Code: stream-json input;
+Codex: the interactive interface), so the pause still stands when `continue` arrives.
+
+Prints one line per stage and PASS, or FAIL naming the failing stages; writes
+OUT/summary.json with host paths replaced (<run> for OUT, ~ for the home directory).
+"""
+import argparse
+import datetime
+import fcntl
+import json
+import os
+import pathlib
+import re
+import shutil
+import signal
+import socket
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+import uuid
+
+HERE = pathlib.Path(__file__).resolve().parent
+HOOK = HERE / 'turn-pause'
+HQ = HERE / 'hq'
+LIMITS = HERE / 'fixtures' / 'turn-pause' / 'lifecycle' / 'limits.toml'
+SELF = pathlib.Path(__file__).resolve()
+sys.path.insert(0, str(HERE))
+from turn_pause import hook as tp  # noqa: E402  (the refusal texts, to match them verbatim)
+
+CLAUDE_MODEL = 'claude-haiku-5-5'
+CODEX_MODEL, CODEX_EFFORT = 'gpt-6.1-sol', 'low'
+MAX_AUTH_AGE = datetime.timedelta(days=7)
+CLAUDE_EVENTS = ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'Stop', 'SubagentStop',
+                 'SubagentStart', 'SessionEnd', 'PreCompact', 'PostCompact']
+CODEX_EVENTS = ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SubagentStop', 'SubagentStart',
+                'SessionEnd', 'PreCompact', 'PostCompact']
+OBSERVE_ONLY = ['SessionStart']
+TOOL_EVENTS = {'PreToolUse', 'PostToolUse', 'PostToolUseFailure'}
+HOOK_TIMEOUT = 5  # as the live wiring (plan Task 10)
+READS = 30
+TASK_TITLE = 'turn-pause lifecycle probe task'
+NEXT_STEP = 'review the turn-pause lifecycle report'
+MARKER = 'TURN_PAUSE_LIFECYCLE_RUN'
+LOG_VAR = 'TURN_PAUSE_LIFECYCLE_LOG'
+SLEEP_TASK, SLEEP_KILL = 1901, 1902
+
+
+# ---- the recording hook ---------------------------------------------------------------
+
+def observe(event: str) -> int:
+    """Append {event, t, payload} to $TURN_PAUSE_LIFECYCLE_LOG; print nothing, exit 0."""
+    raw = sys.stdin.read()
+    try:
+        payload = json.loads(raw)
+    except ValueError:
+        payload = {'_unparsed': raw[:2000]}
+    log = os.environ.get(LOG_VAR)
+    if log:
+        with open(log, 'a') as out:
+            fcntl.flock(out, fcntl.LOCK_EX)
+            out.write(json.dumps({'event': event, 't': time.time(), 'payload': payload}) + '\n')
+    return 0
+
+
+# ---- texts ------------------------------------------------------------------------------
+
+def _pattern(template: str, limit: str) -> str:
+    pat = re.escape(template)
+    pat = pat.replace(re.escape('{limit}'), re.escape(limit))
+    for field in ('a', 'A'):
+        pat = pat.replace(re.escape('{' + field + '}'), r'\d+:\d\d')
+    for field in ('c', 'C', 's', 'S', 'k', 'K'):
+        pat = pat.replace(re.escape('{' + field + '}'), r'\d+')
+    return pat
+
+
+ROOT_RE = re.compile(_pattern(tp.ROOT_TEXT, 'calls'))
+CHILD_RE = re.compile(_pattern(tp.CHILD_TEXT, 'calls'))
+GRACE_RE = re.compile(re.escape(tp.GRACE_TEXT))
+WARNING_RE = re.compile(re.escape('turn-pause: calls at 83% (5 of 6). Finish a coherent step and prepare your report.'))
+
+
+def claude_prompt(task: str) -> str:
+    return f"""This is a scripted end-to-end test of a turn-pause hook, in a scratch directory. The hook counts your tool calls and pauses the turn after the sixth. Follow these phases exactly, one tool call per message.
+
+Phase 1, before the pause:
+1. Use the Agent tool once: subagent_type general-purpose, run_in_background true, description "lifecycle child", prompt: "Use the Bash tool (timeout 300000) to run: until [ -e go.flag ]; do sleep 1; done; echo released . Then use the Bash tool to run: echo child-after . If a call is refused, follow the refusal's instructions and reply with the refusal message verbatim."
+2. Use Bash with run_in_background true to run: echo $$ > task-stop.pid; exec sleep {SLEEP_TASK}
+3. Use Bash with run_in_background true to run: echo $$ > kill-me.pid; exec sleep {SLEEP_KILL}
+4. Use Bash to run: sleep 2; cat task-stop.pid kill-me.pid
+   Remember both pids.
+5. Use Bash to run: echo step5
+6. Use Bash to run: echo step6
+7. Use Bash to run: echo step7
+   This call will be refused with a "turn paused" message.
+
+Phase 2, after that refusal: read the files r01.txt, r02.txt, r03.txt and so on up to r{READS}.txt, in order, with the Read tool, one file per call, until a Read is refused because the grace reads are used up. Do not stop reading before that refusal.
+
+Phase 3, stop your own work:
+a. Load the TaskStop tool with ToolSearch, query "select:TaskStop".
+b. Use TaskStop on the background task you started in step 2.
+c. Use Bash to run: kill <the pid from kill-me.pid>
+d. If the subagent from step 1 is still running, stop it with TaskStop too.
+
+Phase 4: use Bash to run: tasks park {task} "{NEXT_STEP}" --waiting-on user --reason decision
+Then end your turn with a three-line pause report: what you did, what is left, what is running.
+
+If a later message is a task notification, reply with the single word NOTED and use no tool.
+If the user later sends the single word continue, use Bash to run: echo resumed . Then reply DONE."""
+
+
+def codex_prompt(task: str) -> str:
+    return f"""This is a scripted end-to-end test of a turn-pause hook, in a scratch directory. The hook counts your tool calls and pauses the turn after the sixth. Follow these phases exactly. Make one tool call at a time: each exec call makes exactly one nested tool call.
+
+Phase 1, before the pause:
+1. Run the shell command `tasks start {task}` with exec_command.
+2. Create a goal in one exec call: create_goal with objective "Finish the scripted turn-pause lifecycle test from the first message."
+3. Spawn one worker with spawn_agent: task_name lifecycle_worker, fork_turns none, message: "Run the shell command `until [ -e go.flag ]; do sleep 1; done; echo released` with exec_command and wait until it finishes. Then run `echo child-after` with exec_command. If a call is refused, follow the refusal's instructions and reply with the refusal message verbatim." Do not wait for the worker.
+4. Run `sh -c 'echo $$ > kill-me.pid; grep NSpid /proc/$$/status >> kill-me.pid; exec sleep {SLEEP_KILL}'` with exec_command and yield_time_ms 1000. It keeps running in the background; do not wait for it.
+5. Run `cat kill-me.pid` with exec_command. Remember the pid on its first line.
+6. Run `echo step6` with exec_command.
+7. Run `echo step7` with exec_command. This call will be refused with a "turn paused" message.
+
+Phase 2, after that refusal: run `cat r01.txt`, `cat r02.txt`, `cat r03.txt` and so on up to `cat r{READS}.txt` with exec_command, in order, one file per call, until one is refused because the grace reads are used up. Do not stop reading before that refusal.
+
+Phase 3, stop your own work:
+a. Run `kill <the pid on the first line of kill-me.pid>` with exec_command.
+b. Call interrupt_agent with target lifecycle_worker.
+c. Set your goal to paused: update_goal with exactly {{status: "paused"}} and no other field.
+
+Phase 4: run `tasks park {task} "{NEXT_STEP}" --waiting-on user --reason decision` with exec_command. Then end your turn with a three-line pause report: what you did, what is left, what is running.
+
+If the user later sends the single word continue, run `echo resumed` with exec_command, then reply DONE and end your turn."""
+
+
+# ---- the run directory --------------------------------------------------------------------
+
+class Run:
+    def __init__(self, harness: str, out: pathlib.Path, model: str):
+        self.harness, self.out, self.model = harness, out, model
+        self.token = uuid.uuid4().hex
+        self.bin, self.home, self.work = out / 'bin', out / 'home', out / 'work'
+        self.config, self.state, self.runtime, self.tmp = out / 'config', out / 'state', out / 'runtime', out / 'tmp'
+        self.hooks_log, self.states_log, self.notify_log = out / 'hooks.jsonl', out / 'states.jsonl', out / 'notify.log'
+        self.pause_dir = self.state / 'hq' / 'pause'
+        self.harness_home = out / ('claude-config' if harness == 'claude-code' else 'codexhome')
+        self.task = ''
+        self.runs = []
+        self.notes = []
+        self.checks = {}
+        self.accept_auth_age = False
+
+    def portable(self, value):
+        """value with host values replaced: <run> for OUT, ~ for the home directory, <host>
+        for the host name and for any `host` field, <owner> for any `owner` field."""
+        host = socket.gethostname()
+        word = re.compile(rf'\b{re.escape(host)}\b') if host else None
+
+        def clean(v, key=None):
+            if isinstance(v, dict):
+                return {k: clean(x, k) for k, x in v.items()}
+            if isinstance(v, list):
+                return [clean(x) for x in v]
+            if isinstance(v, str):
+                if key == 'owner':
+                    return '<owner>'
+                if key == 'host':
+                    return '<host>'
+                v = v.replace(str(self.out), '<run>').replace(os.path.expanduser('~'), '~')
+                return word.sub('<host>', v) if word else v
+            return v
+
+        return clean(json.loads(json.dumps(value, default=str)))
+
+    def env(self, **extra) -> dict:
+        env = {
+            'PATH': f'{self.bin}:/usr/bin:/bin', 'HOME': str(self.home), 'USER': os.environ.get('USER', 'lifecycle'),
+            'LANG': 'C.UTF-8', 'TERM': 'dumb', 'TMPDIR': str(self.tmp),
+            'XDG_CONFIG_HOME': str(self.config), 'XDG_STATE_HOME': str(self.state), 'XDG_RUNTIME_DIR': str(self.runtime),
+            'XDG_CACHE_HOME': str(self.home / '.cache'), 'XDG_DATA_HOME': str(self.home / '.local' / 'share'),
+            'GIT_CONFIG_GLOBAL': '/dev/null', 'GIT_CONFIG_NOSYSTEM': '1',
+            'GIT_AUTHOR_NAME': 'lifecycle', 'GIT_AUTHOR_EMAIL': 'lifecycle@example.invalid',
+            'GIT_COMMITTER_NAME': 'lifecycle', 'GIT_COMMITTER_EMAIL': 'lifecycle@example.invalid',
+            LOG_VAR: str(self.hooks_log), MARKER: self.token,
+        }
+        env.update(extra)
+        return env
+
+    def harness_env(self) -> dict:
+        if self.harness == 'claude-code':
+            key = os.environ.get('ANTHROPIC_API_KEY')
+            if not key:
+                raise SystemExit('ANTHROPIC_API_KEY is not set; the Claude Code run authenticates with it')
+            return self.env(CLAUDE_CONFIG_DIR=str(self.harness_home), ANTHROPIC_API_KEY=key, SHELL='/usr/bin/bash',
+                            DISABLE_AUTOUPDATER='1')
+        return self.env(CODEX_HOME=str(self.harness_home), SHELL='/usr/bin/zsh', TMUX_TMPDIR=str(self.out / 'tmux'))
+
+
+def _which(name: str) -> str:
+    found = shutil.which(name)
+    if not found:
+        raise SystemExit(f'{name} is not on PATH')
+    return os.path.realpath(found)
+
+
+def _script(path: pathlib.Path, text: str) -> None:
+    path.write_text(text)
+    path.chmod(0o755)
+
+
+def _git_isolated(run: Run, *args: str) -> str:
+    """git in the work directory, off the host's config, every inherited GIT_* dropped."""
+    done = subprocess.run(['git', *args], cwd=run.work, env=run.env(), capture_output=True, text=True, check=True)
+    return done.stdout
+
+
+def setup(run: Run) -> None:
+    out = run.out
+    for d in (run.bin, run.home, run.work, run.config, run.state, run.tmp, run.harness_home, out / 'tmux'):
+        d.mkdir(parents=True, exist_ok=True)
+    run.runtime.mkdir(mode=0o700, parents=True, exist_ok=True)
+    tools = ['tasks', 'claude' if run.harness == 'claude-code' else 'codex']
+    for name in tools:
+        (run.bin / name).symlink_to(_which(name))
+    _script(run.bin / 'hq', f'#!/bin/sh\nexec /usr/bin/python3 {HQ} "$@"\n')
+    _script(run.bin / 'notify-send', f'#!/bin/sh\nprintf \'%s\\n\' "$*" >> {run.notify_log}\nexit 0\n')
+    # The throwaway tasks project, in its own git repository, registered under the temporary
+    # XDG_CONFIG_HOME only.
+    _git_isolated(run, 'init', '-q', '.')
+    top = _git_isolated(run, 'rev-parse', '--show-toplevel', '--absolute-git-dir').split()
+    if top != [str(run.work), str(run.work / '.git')]:
+        raise SystemExit(f'git fixture escaped its directory: {top}')
+    tasks = lambda *a, **kw: subprocess.run(['tasks', *a], cwd=run.work, env=run.env(**kw), capture_output=True,
+                                            text=True, check=True).stdout
+    tasks('init', '--prefix', 'tpl')
+    run.task = json.loads(tasks('add', TASK_TITLE))['id']
+    for i in range(1, READS + 1):
+        (run.work / f'r{i:02d}.txt').write_text(f'lifecycle read {i:02d}\n')
+    registry = (run.config / 'tasks' / 'projects.toml').read_text()
+    if str(run.work) not in registry:
+        raise SystemExit('the tasks project is not registered under the temporary XDG_CONFIG_HOME')
+
+
+def hook_entries(run: Run, events: list[str]) -> dict:
+    hooks = {}
+    for event in events + OBSERVE_ONLY:
+        commands = []
+        if event not in OBSERVE_ONLY:
+            commands.append({'type': 'command', 'timeout': HOOK_TIMEOUT,
+                             'command': f'{HOOK} --limits {LIMITS} --harness {run.harness} {event}'})
+        commands.append({'type': 'command', 'timeout': HOOK_TIMEOUT, 'command': f'/usr/bin/python3 {SELF} observe {event}'})
+        entry: dict[str, object] = {'hooks': commands}
+        if event in TOOL_EVENTS:
+            entry['matcher'] = '*'
+        hooks[event] = [entry]
+    return {'hooks': hooks}
+
+
+# ---- watching ----------------------------------------------------------------------------
+
+class StateWatcher(threading.Thread):
+    """Polls the pause state directory and appends each change to states.jsonl; touches
+    work/go.flag once a pause is seen (it releases the child's pre-pause command)."""
+
+    def __init__(self, run: Run):
+        super().__init__(daemon=True)
+        self.lc, self.stop = run, threading.Event()
+        self.last = {}
+        self.history = []
+
+    def poll(self):
+        current = {}
+        if self.lc.pause_dir.exists():
+            for path in sorted(self.lc.pause_dir.glob('*.json')):
+                try:
+                    current[path.name] = path.read_text()
+                except OSError:
+                    continue
+        now = time.time()
+        for name in sorted(set(current) | set(self.last)):
+            if current.get(name) == self.last.get(name):
+                continue
+            try:
+                state = json.loads(current[name]) if name in current else None
+            except ValueError:
+                continue  # a replace in progress; read again next poll
+            entry = {'t': now, 'file': name, 'state': state}
+            self.history.append(entry)
+            with open(self.lc.states_log, 'a') as out:
+                out.write(json.dumps(entry) + '\n')
+            if state and state.get('paused') and not (self.lc.work / 'go.flag').exists():
+                (self.lc.work / 'go.flag').write_text('go\n')
+            self.last[name] = current.get(name)
+        self.last = {k: v for k, v in self.last.items() if k in current}
+        if 'kill_target' not in self.lc.checks and (self.lc.work / 'kill-me.pid').exists():
+            target = kill_target(self.lc)
+            if target is not None:
+                self.lc.checks['kill_target'] = target
+
+    def run(self):  # noqa: D401  (threading.Thread.run)
+        while not self.stop.is_set():
+            self.poll()
+            time.sleep(0.2)
+        self.poll()
+
+
+def records(run: Run) -> list[dict]:
+    if not run.hooks_log.exists():
+        return []
+    out = []
+    for line in run.hooks_log.read_text().splitlines():
+        try:
+            out.append(json.loads(line))
+        except ValueError:
+            pass
+    return out
+
+
+def wait_until(pred, timeout: float, step: float = 0.5) -> bool:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if pred():
+            return True
+        time.sleep(step)
+    return pred()
+
+
+def last_activity(run: Run, files) -> float:
+    return max((f.stat().st_mtime for f in files if f.exists()), default=0.0)
+
+
+def marked_pids(token: str) -> list[int]:
+    """Processes whose environment carries this run's marker."""
+    needle = f'{MARKER}={token}'.encode()
+    pids = []
+    for entry in os.listdir('/proc'):
+        if not entry.isdigit():
+            continue
+        try:
+            with open(f'/proc/{entry}/environ', 'rb') as f:
+                if needle in f.read().split(b'\0'):
+                    pids.append(int(entry))
+        except OSError:
+            continue
+    return pids
+
+
+def reap(run: Run) -> list[int]:
+    """TERM, then KILL, every process carrying the marker. Returns those that were found."""
+    found = marked_pids(run.token)
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        for pid in marked_pids(run.token):
+            try:
+                os.kill(pid, sig)
+            except OSError:
+                pass
+        if not wait_until(lambda: not marked_pids(run.token), 3, 0.2):
+            continue
+        break
+    return found
+
+
+def alive(pid: int) -> bool:
+    """Running, not a zombie."""
+    try:
+        with open(f'/proc/{pid}/stat') as f:
+            return f.read().rsplit(')', 1)[1].split()[0] != 'Z'
+    except (OSError, IndexError):
+        return False
+
+
+def read_pid(run: Run, name: str) -> int | None:
+    try:
+        return int((run.work / name).read_text().split('\n', 1)[0].strip())
+    except (OSError, ValueError):
+        return None
+
+
+def _nspid(pid: int) -> list[int] | None:
+    try:
+        with open(f'/proc/{pid}/status') as f:
+            for line in f:
+                if line.startswith('NSpid:'):
+                    return [int(x) for x in line.split()[1:]]
+    except (OSError, ValueError):
+        return None
+    return None
+
+
+def kill_target(run: Run) -> dict | None:
+    """The process the agent will kill as the agent recorded it (kill-me.pid: the pid and
+    its NSpid line) and as the host sees it (the marked `sleep` process, its host pid and
+    NSpid). A recorded pid that differs from the host pid means the command ran in its own
+    PID namespace (the harness sandbox), where the hook's ancestry check cannot follow."""
+    try:
+        recorded = (run.work / 'kill-me.pid').read_text().splitlines()
+    except OSError:
+        return None
+    if not recorded:
+        return None
+    sleep = f'sleep{chr(0)}{SLEEP_KILL}'.encode()
+    hosts = []
+    for pid in marked_pids(run.token):
+        try:
+            with open(f'/proc/{pid}/cmdline', 'rb') as f:
+                if f.read().rstrip(b'\0') == sleep:
+                    hosts.append(pid)
+        except OSError:
+            continue
+    if not hosts:
+        return None
+    host = hosts[0]
+    return {'recorded': recorded, 'host_pid': host, 'host_nspid': _nspid(host), 'host_matches': len(hosts)}
+
+
+def namespaced(target: dict | None) -> bool | None:
+    """Whether the kill target ran in its own PID namespace; None when not captured."""
+    if not target:
+        return None
+    try:
+        recorded = int(target['recorded'][0].strip())
+    except (ValueError, IndexError):
+        return None
+    return recorded != target['host_pid'] or len(target.get('host_nspid') or []) > 1
+
+
+def task_record(run: Run) -> dict:
+    done = subprocess.run(['tasks', 'show', run.task, '--no-fetch'], cwd=run.work, env=run.env(),
+                          capture_output=True, text=True)
+    try:
+        return json.loads(done.stdout)
+    except ValueError:
+        return {'_error': done.stderr[-500:]}
+
+
+# ---- Claude Code ----------------------------------------------------------------------------
+
+def stream_events(path: pathlib.Path) -> list[dict]:
+    if not path.exists():
+        return []
+    out = []
+    for line in path.read_text().splitlines():
+        try:
+            out.append(json.loads(line))
+        except ValueError:
+            pass
+    return out
+
+
+def run_claude(run: Run) -> None:
+    sid = str(uuid.uuid4())
+    run.checks['session'] = sid
+    # The session's claim, taken under the session id the run will use.
+    subprocess.run(['tasks', 'start', run.task], cwd=run.work, check=True, capture_output=True, text=True,
+                   env=run.env(CLAUDECODE='1', CLAUDE_CODE_SESSION_ID=sid))
+    settings = run.out / 'settings.json'
+    settings.write_text(json.dumps(hook_entries(run, CLAUDE_EVENTS), indent=2) + '\n')
+    env = run.harness_env()
+    version = subprocess.run(['claude', '--version'], env=env, capture_output=True, text=True, check=True).stdout.strip()
+    run.checks['version'] = version
+    command = ['claude', '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
+               '--model', run.model, '--session-id', sid, '--setting-sources', 'project', '--strict-mcp-config',
+               '--disable-slash-commands', '--settings', str(settings), '--permission-mode', 'bypassPermissions']
+    stream, stderr = run.out / 'stream.jsonl', run.out / 'stderr.txt'
+    watcher = StateWatcher(run)
+    watcher.start()
+    start = time.time()
+    proc = None
+    try:
+        with open(stream, 'w') as so, open(stderr, 'w') as se:
+            proc = subprocess.Popen(command, cwd=run.work, env=env, stdin=subprocess.PIPE, stdout=so, stderr=se,
+                                    text=True, start_new_session=True)
+
+            stdin = proc.stdin
+            assert stdin is not None
+
+            def send(text: str) -> None:
+                stdin.write(json.dumps({'type': 'user', 'message': {'role': 'user', 'content': text}}) + '\n')
+                stdin.flush()
+
+            def results() -> int:
+                return sum(e.get('type') == 'result' for e in stream_events(stream))
+
+            def parked() -> bool:
+                return any(r['event'] == 'PostToolUse' and not r['payload'].get('agent_id')
+                           and str((r['payload'].get('tool_input') or {}).get('command', '')).startswith('tasks park')
+                           for r in records(run))
+
+            def quiet(seconds: float) -> bool:
+                return time.time() - last_activity(run, [stream, run.hooks_log]) >= seconds
+
+            send(claude_prompt(run.task))
+            if not wait_until(lambda: proc.poll() is not None or (results() >= 1 and parked()), 1200, 1):
+                run.notes.append('phase 1: no result after a park within 20 min')
+            # Background notifications start wake turns; wait for them to settle.
+            wait_until(lambda: proc.poll() is not None or quiet(25), 300, 1)
+            run.checks['before_resume'] = {
+                'task_stop_pid_alive': alive(read_pid(run, 'task-stop.pid') or 0),
+                'kill_me_pid_alive': alive(read_pid(run, 'kill-me.pid') or 0),
+                'task_stop_pid_recorded': read_pid(run, 'task-stop.pid') is not None,
+                'kill_me_pid_recorded': read_pid(run, 'kill-me.pid') is not None,
+                'results': results(),
+                'state': watcher.history[-1]['state'] if watcher.history else None,
+            }
+            run.checks['task_after_park'] = task_record(run)
+            if proc.poll() is None:
+                before = results()
+                run.checks['continue_sent'] = time.time()
+                send('continue')
+                if not wait_until(lambda: proc.poll() is not None or results() > before, 300, 1):
+                    run.notes.append('resume: no result within 5 min of continue')
+                wait_until(lambda: proc.poll() is not None or quiet(10), 120, 1)
+            else:
+                run.notes.append(f'claude exited (status {proc.returncode}) before continue')
+            stdin.close()
+            try:
+                proc.wait(timeout=60)
+            except subprocess.TimeoutExpired:
+                run.notes.append('claude did not exit within 60 s of end of input; terminated')
+                os.killpg(proc.pid, signal.SIGTERM)
+                proc.wait(timeout=10)
+    finally:
+        if proc is not None and proc.poll() is None:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except OSError:
+                pass
+        watcher.stop.set()
+        watcher.join(timeout=5)
+        run.checks['reaped'] = reap(run)
+    wall = round(time.time() - start, 1)
+    shape = [c if c != str(settings) else '<run>/settings.json' for c in command]
+    shape = ['<session id>' if c == sid else c for c in shape]
+    # total_cost_usd is the session's running total, so the last result holds the run's cost.
+    cost = max((e.get('total_cost_usd') or 0 for e in stream_events(stream) if e.get('type') == 'result'), default=0)
+    run.runs.append({'command': shape, 'exit': proc.returncode if proc else None, 'wall_s': wall,
+                     'cost_usd': round(cost, 4), 'stdin': ['<scripted prompt>', 'continue']})
+
+
+# ---- Codex -----------------------------------------------------------------------------------
+
+def live_auth() -> pathlib.Path:
+    return pathlib.Path(os.path.expanduser('~/.codex/auth.json')).resolve()
+
+
+def auth_age(path: pathlib.Path) -> datetime.timedelta:
+    """How long ago the live Codex login last refreshed; reads only that key."""
+    stamp = json.loads(path.read_text()).get('last_refresh')
+    if not stamp:
+        raise SystemExit('live auth.json carries no last_refresh; not running')
+    when = datetime.datetime.fromisoformat(re.sub(r'\.\d+', '', stamp).replace('Z', '+00:00'))
+    return datetime.datetime.now(datetime.timezone.utc) - when
+
+
+def check_link(link: pathlib.Path, live: pathlib.Path) -> str:
+    if link.is_symlink():
+        return 'symlink intact'
+    if link.exists():
+        shutil.copyfile(link, live)
+        os.chmod(live, 0o600)
+        link.unlink()
+        return 'REPLACED: Codex wrote a regular auth.json; copied over the live file (mode 600)'
+    return 'MISSING: the auth.json symlink is gone'
+
+
+def write_codex_home(run: Run) -> pathlib.Path:
+    home = run.harness_home
+    writable = json.dumps([str(run.state / 'tasks'), str(run.config / 'tasks')])
+    (home / 'config.toml').write_text(
+        f'model = "{run.model}"\nmodel_reasoning_effort = "{CODEX_EFFORT}"\napproval_policy = "never"\n'
+        'sandbox_mode = "workspace-write"\n\n'
+        f'[sandbox_workspace_write]\nwritable_roots = {writable}\n\n'
+        '[features]\nhooks = true\nmulti_agent = true\nshell_snapshot = true\n\n'
+        '[agents]\nmax_concurrent_threads_per_session = 8\n\n'
+        f'[projects."{run.work}"]\ntrust_level = "trusted"\n')
+    (home / 'hooks.json').write_text(json.dumps(hook_entries(run, CODEX_EVENTS), indent=2) + '\n')
+    link = home / 'auth.json'
+    link.symlink_to(live_auth())
+    return link
+
+
+def rollouts(run: Run) -> list[pathlib.Path]:
+    return sorted((run.harness_home / 'sessions').rglob('rollout-*.jsonl'))
+
+
+def run_codex(run: Run) -> None:
+    live = live_auth()
+    age = auth_age(live)
+    run.checks['auth_age_before'] = str(age)
+    if age > MAX_AUTH_AGE and not run.accept_auth_age:
+        raise NeedsContext(f'live Codex auth last refreshed {age} ago (over 7 days); not running')
+    link = write_codex_home(run)
+    env = run.harness_env()
+    run.checks['version'] = subprocess.run(['codex', '--version'], env=env, capture_output=True, text=True,
+                                           check=True).stdout.strip()
+    tmux = ['tmux', '-L', 'turn-pause-lifecycle', '-f', '/dev/null']
+    command = ['codex', '--no-daemon', '--dangerously-bypass-hook-trust', '-C', str(run.work), codex_prompt(run.task)]
+    watcher = StateWatcher(run)
+    watcher.start()
+    start = time.time()
+
+    def root(r):
+        return not r['payload'].get('agent_id')
+
+    def parked() -> bool:
+        return any(r['event'] == 'PostToolUse' and root(r) and r['payload'].get('tool_name') == 'Bash'
+                   and str((r['payload'].get('tool_input') or {}).get('command', '')).startswith('tasks park')
+                   for r in records(run))
+
+    def root_stop_after(t: float) -> float | None:
+        stops = [r['t'] for r in records(run) if r['event'] == 'Stop' and root(r) and r['t'] > t]
+        return stops[0] if stops else None
+
+    def capture(name: str) -> None:
+        pane = subprocess.run([*tmux, 'capture-pane', '-p', '-t', 'lc'], env=env, capture_output=True, text=True)
+        (run.out / name).write_text(pane.stdout)
+
+    try:
+        subprocess.run([*tmux, 'new-session', '-d', '-s', 'lc', '-x', '220', '-y', '50', '-c', str(run.work), *command],
+                       env=env, check=True)
+        if not wait_until(parked, 1200, 1):
+            run.notes.append('phase 1: no tasks park within 20 min')
+        park_t = max([r['t'] for r in records(run) if r['event'] == 'PostToolUse' and root(r)
+                      and str((r['payload'].get('tool_input') or {}).get('command', '')).startswith('tasks park')],
+                     default=time.time())
+        if not wait_until(lambda: root_stop_after(park_t) is not None, 300, 1):
+            run.notes.append('phase 1: no root Stop within 5 min of the park')
+        stop_t = root_stop_after(park_t) or time.time()
+        run.checks['park_t'], run.checks['stop_t'] = park_t, stop_t
+        # The goal row: watch for a continuation turn after the park (it fires no
+        # UserPromptSubmit; any root hook event or a new rollout turn would show it).
+        time.sleep(120)
+        run.checks['watch_end'] = time.time()
+        capture('tui-1.txt')
+        host = (run.checks.get('kill_target') or {}).get('host_pid')
+        run.checks['before_resume'] = {
+            'kill_me_pid_alive': alive(read_pid(run, 'kill-me.pid') or 0),
+            'kill_target_host_alive': alive(host) if host else None,
+            'kill_me_pid_recorded': read_pid(run, 'kill-me.pid') is not None,
+            'state': watcher.history[-1]['state'] if watcher.history else None,
+        }
+        run.checks['task_after_park'] = task_record(run)
+        run.checks['continue_sent'] = time.time()
+        subprocess.run([*tmux, 'send-keys', '-t', 'lc', '-l', 'continue'], env=env, check=True)
+        time.sleep(1)
+        subprocess.run([*tmux, 'send-keys', '-t', 'lc', 'Enter'], env=env, check=True)
+        sent = run.checks['continue_sent']
+        if not wait_until(lambda: root_stop_after(sent) is not None, 300, 1):
+            run.notes.append('resume: no root Stop within 5 min of continue')
+        time.sleep(5)
+        capture('tui-2.txt')
+        subprocess.run([*tmux, 'send-keys', '-t', 'lc', '-l', '/quit'], env=env)
+        time.sleep(1)
+        subprocess.run([*tmux, 'send-keys', '-t', 'lc', 'Enter'], env=env)
+        wait_until(lambda: any(r['event'] == 'SessionEnd' for r in records(run)), 20)
+    finally:
+        subprocess.run([*tmux, 'kill-server'], env=env, capture_output=True)
+        watcher.stop.set()
+        watcher.join(timeout=5)
+        run.checks['reaped'] = reap(run)
+        run.checks['auth_after'] = check_link(link, live)
+        if run.checks['auth_after'] == 'symlink intact':
+            link.unlink()  # leave no live-login link behind in the run directory
+    wall = round(time.time() - start, 1)
+    run.runs.append({'command': ['codex', '--no-daemon', '--dangerously-bypass-hook-trust', '-C', '<run>/work',
+                                 '<scripted prompt>'],
+                     'runner': 'private tmux server (socket under <run>/tmux)', 'typed': ['continue', '/quit'],
+                     'wall_s': wall})
+
+
+class NeedsContext(Exception):
+    pass
+
+
+# ---- analysis ----------------------------------------------------------------------------------
+
+def strings(value):
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for v in value.values():
+            yield from strings(v)
+    elif isinstance(value, list):
+        for v in value:
+            yield from strings(v)
+
+
+def transcript_texts(paths) -> list[tuple[str, str]]:
+    """(file label, string) for every string in every JSON line of the transcripts."""
+    out = []
+    for path in paths:
+        if not path.exists():
+            continue
+        for line in path.read_text(errors='replace').splitlines():
+            try:
+                value = json.loads(line)
+            except ValueError:
+                continue
+            for s in strings(value):
+                out.append((path.name, s))
+    return out
+
+
+def find(texts, regex) -> list[str]:
+    """Labels of the transcripts holding a match, with the first match."""
+    hits = {}
+    for label, s in texts:
+        m = regex.search(s)
+        if m and label not in hits:
+            hits[label] = m.group(0)
+    return sorted(hits)
+
+
+def states(run: Run) -> list[dict]:
+    if not run.states_log.exists():
+        return []
+    return [json.loads(line) for line in run.states_log.read_text().splitlines() if line.strip()]
+
+
+def tool_input(r: dict) -> dict:
+    value = r['payload'].get('tool_input')
+    return value if isinstance(value, dict) else {}
+
+
+def command_of(r: dict) -> str:
+    return str(tool_input(r).get('command', ''))
+
+
+def stage(results: list, n: int, name: str, ok, detail: str) -> None:
+    results.append({'stage': n, 'name': name, 'ok': bool(ok), 'detail': detail})
+
+
+def common(run: Run):
+    recs = records(run)
+    root = lambda r: not r['payload'].get('agent_id')
+    pre = [r for r in recs if r['event'] == 'PreToolUse' and root(r)]
+    posts = {r['payload'].get('tool_use_id'): r for r in recs
+             if r['event'] in ('PostToolUse', 'PostToolUseFailure')}
+    snaps = [s for s in states(run) if s['state']]
+    paused = [s for s in snaps if s['state'].get('paused')]
+    return recs, pre, posts, snaps, paused
+
+
+def analyze_claude(run: Run) -> tuple[list, dict]:
+    recs, pre, posts, snaps, paused = common(run)
+    texts = transcript_texts([run.out / 'stream.jsonl', *sorted(run.harness_home.rglob('*.jsonl'))])
+    results, answers = [], {}
+    allowed = lambda r: r['payload'].get('tool_use_id') in posts
+    first_pause = paused[0] if paused else None
+    seventh = pre[6] if len(pre) >= 7 else None
+    bg = [r for r in pre[:6] if r['payload'].get('tool_name') == 'Bash' and tool_input(r).get('run_in_background')]
+    root_hits = find(texts, ROOT_RE)
+    turn = first_pause['state']['turn'] if first_pause else {}
+    stage(results, 1, 'cross the call limit',
+          seventh is not None and all(allowed(r) for r in pre[:6]) and not allowed(seventh)
+          and first_pause is not None and first_pause['state']['paused'] == 'calls' and turn.get('calls') == 7
+          and len(bg) >= 2 and bool(root_hits),
+          f"root calls before the pause: {[r['payload'].get('tool_name') for r in pre[:6]]}, all allowed: "
+          f"{all(allowed(r) for r in pre[:6])}; 7th {seventh['payload'].get('tool_name') if seventh else None} "
+          f"allowed: {allowed(seventh) if seventh else None}; background Bash started: {len(bg)}; state paused="
+          f"{first_pause['state']['paused'] if first_pause else None} calls={turn.get('calls')}/"
+          f"{(turn.get('limits') or {}).get('calls')}; root text in: {root_hits}")
+    t7 = seventh['t'] if seventh else float('inf')
+    after = [r for r in pre if r['t'] > t7]
+    reads = [r for r in after if r['payload'].get('tool_name') == 'Read']
+    allowed_reads = [r for r in reads if allowed(r)]
+    grace_max = max((s['state'].get('grace_used', {}).get('root', 0) for s in snaps), default=0)
+    refused_read = next((r for r in reads if not allowed(r)), None)
+    grace_hits = find(texts, GRACE_RE)
+    stage(results, 2, 'spend the grace',
+          len(allowed_reads) == 25 and grace_max == 25 and refused_read is not None
+          and refused_read['t'] > allowed_reads[-1]['t'] and bool(grace_hits),
+          f'reads after the pause: {len(reads)}, allowed {len(allowed_reads)}; state grace_used.root max {grace_max}; '
+          f'a read refused after the 25th: {refused_read is not None}; grace text in: {grace_hits}')
+    t_grace = refused_read['t'] if refused_read else float('inf')
+    searches = [r for r in pre if r['payload'].get('tool_name') == 'ToolSearch']
+    early = [r for r in searches if r['t'] <= t7]
+    late = [r for r in searches if r['t'] > t7 and allowed(r)
+            and str(tool_input(r).get('query', '')).replace(' ', '') == 'select:TaskStop']
+    stops = [r for r in after if r['payload'].get('tool_name') == 'TaskStop']
+    kills = [r for r in after if r['payload'].get('tool_name') == 'Bash' and command_of(r).startswith('kill')]
+    before = run.checks.get('before_resume', {})
+    gone = (before.get('task_stop_pid_recorded') and before.get('kill_me_pid_recorded')
+            and not before.get('task_stop_pid_alive') and not before.get('kill_me_pid_alive'))
+    # Each process is tied to its control: the step-2 shell's background task id to
+    # TaskStop, the kill-me pid to kill (and the TaskStop pid to no kill).
+    step2 = next((posts[r['payload']['tool_use_id']] for r in pre[:6] if f'sleep {SLEEP_TASK}' in command_of(r)
+                  and r['payload'].get('tool_use_id') in posts), None)
+    step2_id = (step2['payload'].get('tool_response') or {}).get('backgroundTaskId') if step2 else None
+    stop_pid, kill_pid = read_pid(run, 'task-stop.pid'), read_pid(run, 'kill-me.pid')
+    tied_stop = [r for r in stops if allowed(r) and r['t'] > t_grace and step2_id
+                 and tool_input(r).get('task_id') == step2_id]
+    kill_args = lambda r: command_of(r).split()[1:]
+    tied_kill = [r for r in kills if allowed(r) and r['t'] > t_grace and str(kill_pid) in kill_args(r)]
+    stray = [r for r in kills if str(stop_pid) in kill_args(r)]
+    late_after_grace = [r for r in late if r['t'] > t_grace]
+    stage(results, 3, 'stop own work after grace',
+          not early and late_after_grace and tied_stop and tied_kill and not stray and gone,
+          f'ToolSearch before the pause: {len(early)}; select:TaskStop allowed after grace: {len(late_after_grace)}; '
+          f'TaskStop calls {[(tool_input(r), allowed(r), r["t"] > t_grace) for r in stops]} (input, allowed, after '
+          f'grace), step-2 task {step2_id}, tied: {len(tied_stop)}; kill calls '
+          f'{[(command_of(r), allowed(r), r["t"] > t_grace) for r in kills]}, kill-me pid {kill_pid}, tied: '
+          f'{len(tied_kill)}, kills of the TaskStop pid: {len(stray)}; background pids recorded and gone: {gone}')
+    parks = [r for r in after if r['payload'].get('tool_name') == 'Bash' and command_of(r).startswith('tasks park')]
+    park_ok = [r for r in parks if allowed(r) and '"id"' in str(posts[r['payload']['tool_use_id']]['payload']
+                                                                .get('tool_response'))]
+    record = run.checks.get('task_after_park', {})
+    parked = record.get('park') or {}
+    t_park = park_ok[0]['t'] if park_ok else float('inf')
+    stop_after = [r for r in recs if r['event'] == 'Stop' and r['t'] > t_park]
+    stage(results, 4, 'park and end the turn',
+          bool(park_ok) and parked.get('waiting_on') == 'user' and bool(stop_after),
+          f'tasks park calls {[(command_of(r), allowed(r)) for r in parks]}; record parked waiting on '
+          f'{parked.get("waiting_on")} ({parked.get("reason")}); root Stop after the park: {len(stop_after)}')
+    sent = run.checks.get('continue_sent', float('inf'))
+    prompts = [r for r in recs if r['event'] == 'UserPromptSubmit' and r['t'] >= sent - 1]
+    cont = [r for r in prompts if r['payload'].get('prompt') == 'continue']
+    t_c = cont[0]['t'] if cont else float('inf')
+    reset = [s for s in snaps if s['t'] >= t_c and s['state'].get('turn', {}).get('started', 0) >= t_c - 1]
+    fresh = reset[0]['state'] if reset else {}
+    echo = [r for r in pre if r['t'] > t_c and r['payload'].get('tool_name') == 'Bash'
+            and command_of(r).strip() == 'echo resumed']
+    echo_ok = [r for r in echo if allowed(r) and 'resumed' in str(posts[r['payload']['tool_use_id']]['payload']
+                                                                  .get('tool_response'))]
+    still = (before.get('state') or {}).get('paused')
+    final = reset[-1]['state'] if reset else {}
+    stage(results, 5, 'resume with continue',
+          still == 'calls' and bool(cont) and fresh.get('paused') is None and bool(echo_ok)
+          and (final.get('turn') or {}).get('calls', 99) <= 2 and not final.get('grace_used'),
+          f'paused before continue: {still}; continue prompt seen: {bool(cont)}; new turn state: paused='
+          f"{fresh.get('paused')} calls={(final.get('turn') or {}).get('calls')} grace_used={final.get('grace_used')}; "
+          f'echo resumed allowed: {bool(echo_ok)}')
+    names = sorted({r['payload'].get('tool_name') for r in recs if r['event'] == 'PreToolUse'})
+    child_hits = find(texts, CHILD_RE)
+    children = [r for r in recs if r['event'] == 'PreToolUse' and r['payload'].get('agent_id')]
+    answers['q2_hook_names'] = {'TaskStop': sorted({r['payload'].get('tool_name') for r in stops}),
+                                'Read': sorted({r['payload'].get('tool_name') for r in reads}),
+                                'all_pre_tool_names': names,
+                                'toolsearch_after_pause': [tool_input(r) for r in late],
+                                'taskstop_inputs': [tool_input(r) for r in stops]}
+    answers['q4_texts'] = {'root_text_in': root_hits, 'child_text_in': child_hits,
+                           'child_calls': [(r['payload'].get('tool_name'), command_of(r)[:80],
+                                            r['payload'].get('tool_use_id') in posts) for r in children]}
+    answers['warning_in'] = find(texts, WARNING_RE)
+    wake_prompts = [str(r['payload'].get('prompt'))[:120] for r in recs if r['event'] == 'UserPromptSubmit']
+    answers['prompts'] = wake_prompts
+    answers['notify_log'] = run.notify_log.read_text().splitlines() if run.notify_log.exists() else []
+    end = [s for s in states(run) if s['state'] is None]
+    answers['state_removed_at_session_end'] = bool(end)
+    answers['pause_state'] = {k: (first_pause['state'] if first_pause else {}).get(k)
+                              for k in ('paused', 'harness_pid', 'notified', 'notify_error', 'worker_names', 'workers')}
+    return results, answers
+
+
+def analyze_codex(run: Run) -> tuple[list, dict]:
+    recs, pre, posts, snaps, paused = common(run)
+    texts = transcript_texts(rollouts(run))
+    results, answers = [], {}
+    allowed = lambda r: r['payload'].get('tool_use_id') in posts
+    first_pause = paused[0] if paused else None
+    turn = first_pause['state']['turn'] if first_pause else {}
+    seventh = pre[6] if len(pre) >= 7 else None
+    root_hits = find(texts, ROOT_RE)
+    yielded = [r for r in pre[:6] if f'sleep {SLEEP_KILL}' in command_of(r)]
+    stage(results, 1, 'cross the call limit',
+          seventh is not None and not allowed(seventh) and first_pause is not None
+          and first_pause['state']['paused'] == 'calls' and turn.get('calls') == 7 and bool(yielded) and bool(root_hits),
+          f"root calls before the pause: {[(r['payload'].get('tool_name'), command_of(r)[:40]) for r in pre[:6]]}; "
+          f"7th {seventh['payload'].get('tool_name') if seventh else None} {command_of(seventh)[:40] if seventh else ''} "
+          f"allowed: {allowed(seventh) if seventh else None}; background command started: {bool(yielded)}; state paused="
+          f"{first_pause['state']['paused'] if first_pause else None} calls={turn.get('calls')}; root text in: {root_hits}")
+    t7 = seventh['t'] if seventh else float('inf')
+    after = [r for r in pre if r['t'] > t7]
+    reads = [r for r in after if r['payload'].get('tool_name') == 'Bash' and re.fullmatch(r'cat r\d\d\.txt', command_of(r).strip())]
+    allowed_reads = [r for r in reads if allowed(r)]
+    grace_max = max((s['state'].get('grace_used', {}).get('root', 0) for s in snaps), default=0)
+    refused_read = next((r for r in reads if not allowed(r)), None)
+    grace_hits = find(texts, GRACE_RE)
+    stage(results, 2, 'spend the grace',
+          len(allowed_reads) == 25 and grace_max == 25 and refused_read is not None and bool(grace_hits),
+          f'reads after the pause: {len(reads)}, allowed {len(allowed_reads)}; state grace_used.root max {grace_max}; '
+          f'a read refused: {refused_read is not None}; grace text in: {grace_hits}')
+    t_grace = refused_read['t'] if refused_read else float('inf')
+    kills = [r for r in after if r['payload'].get('tool_name') == 'Bash' and command_of(r).strip().startswith('kill')]
+    interrupts = [r for r in after if r['payload'].get('tool_name') == 'collaborationinterrupt_agent']
+    goals = [r for r in after if r['payload'].get('tool_name') == 'update_goal']
+    before = run.checks.get('before_resume', {})
+    # The host's view decides when it was captured: a namespaced pid names another process here.
+    host_alive = before.get('kill_target_host_alive')
+    gone = before.get('kill_me_pid_recorded') and not (before.get('kill_me_pid_alive') if host_alive is None else host_alive)
+    kill_pid = read_pid(run, 'kill-me.pid')
+    target = run.checks.get('kill_target')
+    ns = namespaced(target)
+    tied_kill = [r for r in kills if allowed(r) and r['t'] > t_grace and str(kill_pid) in command_of(r).split()[1:]]
+    tied_interrupt = [r for r in interrupts if allowed(r) and r['t'] > t_grace
+                      and tool_input(r).get('target') in ('lifecycle_worker', '/root/lifecycle_worker')]
+    goal_paused = [r for r in goals if allowed(r) and r['t'] > t_grace and tool_input(r) == {'status': 'paused'}]
+    ok = bool(tied_kill and tied_interrupt and goal_paused and gone)
+    label = ''
+    if not (tied_kill and gone) and ns:
+        label = 'PID namespace (sandbox): the recorded pid is not the host pid, so the hook cannot check or reach it; '
+    elif kills and not gone and tied_kill:
+        label = 'kill allowed but the process survived (harness: the signal did not reach it); '
+    stage(results, 3, 'stop own work after grace', ok,
+          f'{label}kill calls {[(command_of(r), allowed(r), r["t"] > t_grace) for r in kills]}, kill-me pid {kill_pid}, '
+          f'tied: {len(tied_kill)}; kill target {target} (namespaced: {ns}); interrupt_agent '
+          f'{[(tool_input(r), allowed(r), r["t"] > t_grace) for r in interrupts]}, tied: {len(tied_interrupt)}; '
+          f'update_goal {[(tool_input(r), allowed(r), r["t"] > t_grace) for r in goals]}; pid recorded and gone: {gone}')
+    parks = [r for r in after if r['payload'].get('tool_name') == 'Bash' and command_of(r).startswith('tasks park')]
+    park_ok = [r for r in parks if allowed(r)]
+    record = run.checks.get('task_after_park', {})
+    parked = record.get('park') or {}
+    stop_t, watch_end = run.checks.get('stop_t', float('inf')), run.checks.get('watch_end', 0)
+    sent = run.checks.get('continue_sent', float('inf'))
+    between = [r for r in recs if stop_t < r['t'] < sent and not r['payload'].get('agent_id')]
+    goal_turns = []
+    for path in rollouts(run):
+        for line in path.read_text(errors='replace').splitlines():
+            if '"turn_trigger"' in line and '"goal"' in line:
+                goal_turns.append(path.name)
+    stage(results, 4, 'park, end the turn, no goal continuation',
+          bool(park_ok) and parked.get('waiting_on') == 'user' and stop_t != float('inf') and not between
+          and watch_end - stop_t >= 100,
+          f'tasks park calls {[(command_of(r), allowed(r)) for r in parks]}; record parked waiting on '
+          f'{parked.get("waiting_on")} ({parked.get("reason")}); root Stop after the park: {stop_t != float("inf")}; '
+          f'root hook events between that Stop and continue ({round(sent - stop_t)} s): '
+          f'{[(r["event"], r["payload"].get("tool_name")) for r in between]}; rollout goal-trigger lines: {len(goal_turns)}')
+    cont = [r for r in recs if r['event'] == 'UserPromptSubmit' and r['payload'].get('prompt', '').strip() == 'continue']
+    t_c = cont[0]['t'] if cont else float('inf')
+    reset = [s for s in snaps if s['t'] >= t_c and s['state'].get('turn', {}).get('started', 0) >= t_c - 1]
+    fresh = reset[0]['state'] if reset else {}
+    final = reset[-1]['state'] if reset else {}
+    echo = [r for r in pre if r['t'] > t_c and r['payload'].get('tool_name') == 'Bash' and command_of(r).strip() == 'echo resumed']
+    echo_ok = [r for r in echo if allowed(r)]
+    still = (before.get('state') or {}).get('paused')
+    stage(results, 5, 'resume with continue',
+          still == 'calls' and bool(cont) and fresh.get('paused') is None and bool(echo_ok)
+          and (final.get('turn') or {}).get('calls', 99) <= 2 and not final.get('grace_used'),
+          f'paused before continue: {still}; continue prompt seen: {bool(cont)}; new turn state: paused='
+          f"{fresh.get('paused')} calls={(final.get('turn') or {}).get('calls')} grace_used={final.get('grace_used')}; "
+          f'echo resumed allowed: {bool(echo_ok)}')
+    children = [r for r in recs if r['event'] == 'PreToolUse' and r['payload'].get('agent_id')]
+    answers['q1_warning_in'] = find(texts, WARNING_RE)
+    answers['q3_goal'] = {'update_goal': [(tool_input(r), allowed(r)) for r in goals],
+                          'root_events_between_stop_and_continue': [(r['event'], r['payload'].get('tool_name')) for r in between],
+                          'watch_s': round(watch_end - stop_t, 1) if stop_t != float('inf') else None,
+                          'goal_trigger_lines': len(goal_turns)}
+    answers['q4_texts'] = {'root_text_in': root_hits, 'child_text_in': find(texts, CHILD_RE),
+                           'child_calls': [(r['payload'].get('tool_name'), command_of(r)[:80], allowed(r)) for r in children]}
+    answers['all_pre_tool_names'] = sorted({r['payload'].get('tool_name') for r in recs if r['event'] == 'PreToolUse'})
+    answers['notify_log'] = run.notify_log.read_text().splitlines() if run.notify_log.exists() else []
+    answers['pause_state'] = {k: (first_pause['state'] if first_pause else {}).get(k)
+                              for k in ('paused', 'harness_pid', 'notified', 'notify_error', 'worker_names', 'workers')}
+    return results, answers
+
+
+# ---- entry ------------------------------------------------------------------------------------
+
+def main(argv: list[str]) -> int:
+    if argv[:1] == ['observe'] and len(argv) == 2:
+        return observe(argv[1])
+    parser = argparse.ArgumentParser(description=(__doc__ or '').split('\n\n')[0])
+    parser.add_argument('--harness', required=True, choices=('claude-code', 'codex'))
+    parser.add_argument('--out', help='run directory (default: a new temporary directory)')
+    parser.add_argument('--model', help=f'default {CLAUDE_MODEL} (Claude Code) or {CODEX_MODEL} (Codex)')
+    parser.add_argument('--accept-auth-age', action='store_true',
+                        help='Codex: run even when the live login last refreshed over 7 days ago (a user ruling)')
+    parser.add_argument('--analyze', action='store_true',
+                        help='only judge the stages again from an earlier run in --out (its run.json and logs)')
+    args = parser.parse_args(argv)
+    if args.analyze:
+        if not args.out:
+            raise SystemExit('--analyze needs --out')
+        return report(load_run(args.harness, pathlib.Path(args.out).resolve()))
+    out = pathlib.Path(args.out).resolve() if args.out else pathlib.Path(tempfile.mkdtemp(prefix='turn-pause-lifecycle-'))
+    out.mkdir(parents=True, exist_ok=True)
+    if any(out.iterdir()):
+        raise SystemExit(f'{out} is not empty')
+    run = Run(args.harness, out, args.model or (CLAUDE_MODEL if args.harness == 'claude-code' else CODEX_MODEL))
+    run.accept_auth_age = args.accept_auth_age
+
+    def stop(signum, frame):
+        raise SystemExit(f'stopped by signal {signum}')
+
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
+    try:
+        setup(run)
+        (run_claude if args.harness == 'claude-code' else run_codex)(run)
+    except NeedsContext as e:
+        print(f'{args.harness}: NEEDS_CONTEXT: {e}')
+        return 3
+    finally:
+        reap(run)
+        save_run(run)
+    return report(run)
+
+
+def save_run(run: Run) -> None:
+    """What the analysis needs besides the logs, so --analyze can judge a run again."""
+    (run.out / 'run.json').write_text(json.dumps({'model': run.model, 'task': run.task, 'token': run.token,
+                                                 'runs': run.runs, 'notes': run.notes, 'checks': run.checks},
+                                                indent=2, default=str) + '\n')
+
+
+def load_run(harness: str, out: pathlib.Path) -> Run:
+    data = json.loads((out / 'run.json').read_text())
+    run = Run(harness, out, data['model'])
+    run.task, run.token, run.runs, run.notes, run.checks = (data['task'], data['token'], data['runs'], data['notes'],
+                                                            data['checks'])
+    return run
+
+
+def report(run: Run) -> int:
+    args, out = argparse.Namespace(harness=run.harness), run.out
+    results, answers = (analyze_claude if run.harness == 'claude-code' else analyze_codex)(run)
+    for r in results:
+        print(f"{args.harness} stage {r['stage']} {r['name']}: {'PASS' if r['ok'] else 'FAIL'} - {r['detail']}")
+    failed = [r['stage'] for r in results if not r['ok']]
+    summary = {'harness': args.harness, 'model': run.model, 'task': run.task, 'stages': results, 'answers': answers,
+               'runs': run.runs, 'notes': run.notes,
+               'checks': {k: v for k, v in run.checks.items() if k not in ('task_after_park',)},
+               'park': (run.checks.get('task_after_park') or {}).get('park'),
+               'verdict': 'PASS' if not failed else f'FAIL: stage {", ".join(map(str, failed))}'}
+    (out / 'summary.json').write_text(json.dumps(run.portable(summary), indent=2, default=str) + '\n')
+    for note in run.notes:
+        print(f'{args.harness} note: {note}')
+    print(summary['verdict'])
+    print(f'run directory: {out}')
+    return 0 if not failed else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

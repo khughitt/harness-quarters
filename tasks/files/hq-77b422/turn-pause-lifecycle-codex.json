@@ -1,0 +1,200 @@
+{
+  "harness": "codex",
+  "model": "gpt-6.1-sol",
+  "task": "tpl-c25138",
+  "stages": [
+    {
+      "stage": 1,
+      "name": "cross the call limit",
+      "ok": true,
+      "detail": "root calls before the pause: [('Bash', 'tasks start tpl-c25138'), ('create_goal', ''), ('collaborationspawn_agent', ''), ('Bash', \"sh -c 'echo $$ > kill-me.pid; grep NSpid\"), ('Bash', 'cat kill-me.pid'), ('Bash', 'echo step6')]; 7th Bash echo step7 allowed: False; background command started: True; state paused=calls calls=7; root text in: ['rollout-2026-11-01T18-43-47-01a1997f-6ed7-7213-b817-86195b28d773.jsonl']"
+    },
+    {
+      "stage": 2,
+      "name": "spend the grace",
+      "ok": true,
+      "detail": "reads after the pause: 26, allowed 25; state grace_used.root max 25; a read refused: True; grace text in: ['rollout-2026-11-01T18-43-47-01a1997f-6ed7-7213-b817-86195b28d773.jsonl']"
+    },
+    {
+      "stage": 3,
+      "name": "stop own work after grace",
+      "ok": false,
+      "detail": "PID namespace (sandbox): the recorded pid is not the host pid, so the hook cannot check or reach it; kill calls [('kill 2', False, True)], kill-me pid 2, tied: 0; kill target {'recorded': ['2', 'NSpid:\\t2'], 'host_pid': 3532193, 'host_nspid': [3532193, 2], 'host_matches': 1} (namespaced: True); interrupt_agent [({'target': 'lifecycle_worker'}, True, True)], tied: 1; update_goal [({'status': 'paused'}, True, True)]; pid recorded and gone: False"
+    },
+    {
+      "stage": 4,
+      "name": "park, end the turn, no goal continuation",
+      "ok": true,
+      "detail": "tasks park calls [('tasks park tpl-c25138 \"review the turn-pause lifecycle report\" --waiting-on user --reason decision', True)]; record parked waiting on user (decision); root Stop after the park: True; root hook events between that Stop and continue (121 s): []; rollout goal-trigger lines: 0"
+    },
+    {
+      "stage": 5,
+      "name": "resume with continue",
+      "ok": true,
+      "detail": "paused before continue: calls; continue prompt seen: True; new turn state: paused=None calls=1 grace_used={}; echo resumed allowed: True"
+    }
+  ],
+  "answers": {
+    "q1_warning_in": [
+      "rollout-2026-11-01T18-43-47-01a1997f-6ed7-7213-b817-86195b28d773.jsonl"
+    ],
+    "q3_goal": {
+      "update_goal": [
+        [
+          {
+            "status": "paused"
+          },
+          true
+        ]
+      ],
+      "root_events_between_stop_and_continue": [],
+      "watch_s": 120.5,
+      "goal_trigger_lines": 0
+    },
+    "q4_texts": {
+      "root_text_in": [
+        "rollout-2026-11-01T18-43-47-01a1997f-6ed7-7213-b817-86195b28d773.jsonl"
+      ],
+      "child_text_in": [
+        "rollout-2026-11-01T18-43-47-01a1997f-6ed7-7213-b817-86195b28d773.jsonl",
+        "rollout-2026-11-01T18-44-04-01a1997f-af2f-7d23-826a-737a10bbd3f2.jsonl"
+      ],
+      "child_calls": [
+        [
+          "Bash",
+          "until [ -e go.flag ]; do sleep 1; done; echo released",
+          true
+        ],
+        [
+          "Bash",
+          "echo child-after",
+          false
+        ]
+      ]
+    },
+    "all_pre_tool_names": [
+      "Bash",
+      "collaborationinterrupt_agent",
+      "collaborationspawn_agent",
+      "create_goal",
+      "update_goal"
+    ],
+    "notify_log": [
+      "--app-name=turn-pause --urgency=critical turn paused (calls) codex session 01a1997f-6ed7-7213-b817-86195b28d773 in <run>/work: active 0:00 of 1:00, calls 7/6, spawns 1/3, compactions 0/2. Reply in the session to resume."
+    ],
+    "pause_state": {
+      "paused": "calls",
+      "harness_pid": 3529589,
+      "notified": true,
+      "notify_error": null,
+      "worker_names": [
+        "/root/lifecycle_worker",
+        "lifecycle_worker"
+      ],
+      "workers": [
+        "01a1997f-af2f-7d23-826a-737a10bbd3f2"
+      ]
+    }
+  },
+  "runs": [
+    {
+      "command": [
+        "codex",
+        "--no-daemon",
+        "--dangerously-bypass-hook-trust",
+        "-C",
+        "<run>/work",
+        "<scripted prompt>"
+      ],
+      "runner": "private tmux server (socket under <run>/tmux)",
+      "typed": [
+        "continue",
+        "/quit"
+      ],
+      "wall_s": 248.3
+    }
+  ],
+  "notes": [],
+  "checks": {
+    "auth_age_before": "7 days, 0:29:14.943655",
+    "version": "codex-cli 0.166.0",
+    "kill_target": {
+      "recorded": [
+        "2",
+        "NSpid:\t2"
+      ],
+      "host_pid": 3532193,
+      "host_nspid": [
+        3532193,
+        2
+      ],
+      "host_matches": 1
+    },
+    "park_t": 1793576732.8264427,
+    "stop_t": 1793576736.5542393,
+    "watch_end": 1793576857.089924,
+    "before_resume": {
+      "kill_me_pid_alive": true,
+      "kill_me_pid_recorded": true,
+      "state": {
+        "harness": "codex",
+        "root": "01a1997f-6ed7-7213-b817-86195b28d773",
+        "turn": {
+          "started": 1793576635.384427,
+          "limits": {
+            "active_seconds": 3600,
+            "calls": 6,
+            "spawns": 3,
+            "compactions": 2
+          },
+          "limits_sha": "40ac1a0d7aa3f916f73873062d608e928b3fc92f62d383a51e52b3f8e341ece6",
+          "active": 101.13102459907532,
+          "calls": 37,
+          "spawns": 1,
+          "compactions": 0,
+          "last_t": 1793576736.5154517,
+          "in_flight": {},
+          "tools": {},
+          "spawn_keys": [
+            "01a1997f-af2f-7d23-826a-737a10bbd3f2"
+          ],
+          "warned": [
+            "calls"
+          ]
+        },
+        "paused": "calls",
+        "grace_used": {
+          "root": 25
+        },
+        "workers": [
+          "01a1997f-af2f-7d23-826a-737a10bbd3f2"
+        ],
+        "worker_names": [
+          "/root/lifecycle_worker",
+          "lifecycle_worker"
+        ],
+        "cron_jobs": {},
+        "wakeups": [],
+        "harness_pid": 3529589,
+        "cwd": "<run>/work",
+        "notified": true,
+        "notify_error": null,
+        "budget_note": null
+      }
+    },
+    "continue_sent": 1793576857.0984542,
+    "reaped": [],
+    "auth_after": "symlink intact"
+  },
+  "park": {
+    "at": "2026-11-01T23:45:32Z",
+    "next_step": "review the turn-pause lifecycle report",
+    "waiting_on": "user",
+    "reason": "decision",
+    "session": "codex:01a1997f-6ed7-7213-b817-86195b28d773",
+    "owner": "<owner>",
+    "host": "<host>",
+    "worktree": "<run>/work"
+  },
+  "verdict": "FAIL: stage 3"
+}

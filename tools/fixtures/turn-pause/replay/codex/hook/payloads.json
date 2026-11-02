@@ -1,0 +1,645 @@
+{
+ "note": "The hook payloads this tree would have produced, in order; t is epoch seconds.",
+ "records": [
+  {
+   "t": 1791633601.0,
+   "event": "UserPromptSubmit",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "UserPromptSubmit",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "prompt": "Build the thing"
+   }
+  },
+  {
+   "t": 1791633605.0,
+   "event": "PreToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PreToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "tool_name": "Bash",
+    "tool_input": {
+     "command": "ls"
+    },
+    "tool_use_id": "exec-r1"
+   }
+  },
+  {
+   "t": 1791633605.3,
+   "event": "PreToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PreToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "tool_name": "Bash",
+    "tool_input": {
+     "command": "pwd"
+    },
+    "tool_use_id": "exec-r2"
+   }
+  },
+  {
+   "t": 1791633605.35,
+   "event": "PostToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PostToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "tool_name": "Bash",
+    "tool_input": {
+     "command": "ls"
+    },
+    "tool_use_id": "exec-r1",
+    "tool_response": ""
+   }
+  },
+  {
+   "t": 1791633605.6,
+   "event": "PreToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PreToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "tool_name": "apply_patch",
+    "tool_input": {
+     "command": "*** Begin Patch\n*** Add File: notes.txt\n+x\n*** End Patch"
+    },
+    "tool_use_id": "exec-r3"
+   }
+  },
+  {
+   "t": 1791633605.65,
+   "event": "PostToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PostToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "tool_name": "Bash",
+    "tool_input": {
+     "command": "pwd"
+    },
+    "tool_use_id": "exec-r2",
+    "tool_response": ""
+   }
+  },
+  {
+   "t": 1791633605.85,
+   "event": "PostToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PostToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "tool_name": "apply_patch",
+    "tool_input": {
+     "command": "*** Begin Patch\n*** Add File: notes.txt\n+x\n*** End Patch"
+    },
+    "tool_use_id": "exec-r3",
+    "tool_response": "{}"
+   }
+  },
+  {
+   "t": 1791633610.0,
+   "event": "PreToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PreToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "tool_name": "collaborationspawn_agent",
+    "tool_input": {
+     "task_name": "w1",
+     "fork_turns": "none",
+     "message": "go"
+    },
+    "tool_use_id": "call_s1"
+   }
+  },
+  {
+   "t": 1791633610.1,
+   "event": "PostToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PostToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "tool_name": "collaborationspawn_agent",
+    "tool_input": {
+     "task_name": "w1",
+     "fork_turns": "none",
+     "message": "go"
+    },
+    "tool_use_id": "call_s1",
+    "tool_response": "{\"task_name\": \"/root/w1\"}"
+   }
+  },
+  {
+   "t": 1791633610.2,
+   "event": "SubagentStart",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "SubagentStart",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "agent_id": "01a18944-0001-7000-8000-000000000001",
+    "agent_type": "default"
+   }
+  },
+  {
+   "t": 1791633611.2,
+   "event": "PreToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PreToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "agent_id": "01a18944-0001-7000-8000-000000000001",
+    "agent_type": "default",
+    "tool_name": "Bash",
+    "tool_input": {
+     "command": "echo hi"
+    },
+    "tool_use_id": "exec-c1"
+   }
+  },
+  {
+   "t": 1791633611.75,
+   "event": "PostToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PostToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "agent_id": "01a18944-0001-7000-8000-000000000001",
+    "agent_type": "default",
+    "tool_name": "Bash",
+    "tool_input": {
+     "command": "echo hi"
+    },
+    "tool_use_id": "exec-c1",
+    "tool_response": "hi\n"
+   }
+  },
+  {
+   "t": 1791633612.0,
+   "event": "PreToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PreToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "tool_name": "collaborationspawn_agent",
+    "tool_input": {
+     "task_name": "w2",
+     "fork_turns": "none",
+     "message": "go"
+    },
+    "tool_use_id": "call_s2"
+   }
+  },
+  {
+   "t": 1791633612.1,
+   "event": "PostToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PostToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "tool_name": "collaborationspawn_agent",
+    "tool_input": {
+     "task_name": "w2",
+     "fork_turns": "none",
+     "message": "go"
+    },
+    "tool_use_id": "call_s2",
+    "tool_response": "{\"task_name\": \"/root/w2\"}"
+   }
+  },
+  {
+   "t": 1791633612.2,
+   "event": "SubagentStart",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "SubagentStart",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "agent_id": "01a18944-0002-7000-8000-000000000002",
+    "agent_type": "default"
+   }
+  },
+  {
+   "t": 1791633613.2,
+   "event": "PreToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PreToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "agent_id": "01a18944-0002-7000-8000-000000000002",
+    "agent_type": "default",
+    "tool_name": "Bash",
+    "tool_input": {
+     "command": "echo hi"
+    },
+    "tool_use_id": "exec-c2"
+   }
+  },
+  {
+   "t": 1791633613.7,
+   "event": "SubagentStop",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "SubagentStop",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "agent_id": "01a18944-0001-7000-8000-000000000001",
+    "agent_type": "default",
+    "stop_hook_active": false,
+    "last_assistant_message": "hi"
+   }
+  },
+  {
+   "t": 1791633613.75,
+   "event": "PostToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PostToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "agent_id": "01a18944-0002-7000-8000-000000000002",
+    "agent_type": "default",
+    "tool_name": "Bash",
+    "tool_input": {
+     "command": "echo hi"
+    },
+    "tool_use_id": "exec-c2",
+    "tool_response": "hi\n"
+   }
+  },
+  {
+   "t": 1791633614.0,
+   "event": "PreToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PreToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "tool_name": "collaborationspawn_agent",
+    "tool_input": {
+     "task_name": "w3",
+     "fork_turns": "none",
+     "message": "go"
+    },
+    "tool_use_id": "call_s3"
+   }
+  },
+  {
+   "t": 1791633614.1,
+   "event": "PostToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PostToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "tool_name": "collaborationspawn_agent",
+    "tool_input": {
+     "task_name": "w3",
+     "fork_turns": "none",
+     "message": "go"
+    },
+    "tool_use_id": "call_s3",
+    "tool_response": "{\"task_name\": \"/root/w3\"}"
+   }
+  },
+  {
+   "t": 1791633614.2,
+   "event": "SubagentStart",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "SubagentStart",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "agent_id": "01a18944-0003-7000-8000-000000000003",
+    "agent_type": "default"
+   }
+  },
+  {
+   "t": 1791633615.2,
+   "event": "PreToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PreToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "agent_id": "01a18944-0003-7000-8000-000000000003",
+    "agent_type": "default",
+    "tool_name": "Bash",
+    "tool_input": {
+     "command": "echo hi"
+    },
+    "tool_use_id": "exec-c3"
+   }
+  },
+  {
+   "t": 1791633615.7,
+   "event": "SubagentStop",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "SubagentStop",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "agent_id": "01a18944-0002-7000-8000-000000000002",
+    "agent_type": "default",
+    "stop_hook_active": false,
+    "last_assistant_message": "hi"
+   }
+  },
+  {
+   "t": 1791633615.75,
+   "event": "PostToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PostToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "agent_id": "01a18944-0003-7000-8000-000000000003",
+    "agent_type": "default",
+    "tool_name": "Bash",
+    "tool_input": {
+     "command": "echo hi"
+    },
+    "tool_use_id": "exec-c3",
+    "tool_response": "hi\n"
+   }
+  },
+  {
+   "t": 1791633617.7,
+   "event": "SubagentStop",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "SubagentStop",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "agent_id": "01a18944-0003-7000-8000-000000000003",
+    "agent_type": "default",
+    "stop_hook_active": false,
+    "last_assistant_message": "hi"
+   }
+  },
+  {
+   "t": 1791633620.0,
+   "event": "PreToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PreToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "tool_name": "collaborationwait_agent",
+    "tool_input": {
+     "timeout_ms": 60000
+    },
+    "tool_use_id": "call_w1"
+   }
+  },
+  {
+   "t": 1791633630.0,
+   "event": "PostToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PostToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "tool_name": "collaborationwait_agent",
+    "tool_input": {
+     "timeout_ms": 60000
+    },
+    "tool_use_id": "call_w1",
+    "tool_response": "{\"message\": \"Wait completed.\", \"timed_out\": false}"
+   }
+  },
+  {
+   "t": 1791633640.0,
+   "event": "PreToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PreToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "tool_name": "Bash",
+    "tool_input": {
+     "command": "make long"
+    },
+    "tool_use_id": "exec-y1"
+   }
+  },
+  {
+   "t": 1791635300.0,
+   "event": "PreToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PreToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "tool_name": "Bash",
+    "tool_input": {
+     "command": "git status"
+    },
+    "tool_use_id": "exec-b1"
+   }
+  },
+  {
+   "t": 1791635300.35,
+   "event": "PostToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PostToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "tool_name": "Bash",
+    "tool_input": {
+     "command": "git status"
+    },
+    "tool_use_id": "exec-b1",
+    "tool_response": "clean\n"
+   }
+  },
+  {
+   "t": 1791635305.0,
+   "event": "Stop",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "Stop",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "stop_hook_active": false,
+    "last_assistant_message": "Built."
+   }
+  },
+  {
+   "t": 1791635600.0,
+   "event": "UserPromptSubmit",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "UserPromptSubmit",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "prompt": "Next part"
+   }
+  },
+  {
+   "t": 1791635603.0,
+   "event": "PreToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PreToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "tool_name": "Bash",
+    "tool_input": {
+     "command": "npm run build"
+    },
+    "tool_use_id": "exec-n1"
+   }
+  },
+  {
+   "t": 1791635630.05,
+   "event": "PostToolUse",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "PostToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "tool_name": "Bash",
+    "tool_input": {
+     "command": "npm run build"
+    },
+    "tool_use_id": "exec-n1",
+    "tool_response": ""
+   }
+  },
+  {
+   "t": 1791635635.0,
+   "event": "Stop",
+   "payload": {
+    "session_id": "01a18943-2b9d-7e50-926f-b74169571349",
+    "turn_id": "turn",
+    "transcript_path": "/tmp/home/.codex/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01a18943-2b9d-7e50-926f-b74169571349.jsonl",
+    "cwd": "/tmp/replay",
+    "hook_event_name": "Stop",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "stop_hook_active": false,
+    "last_assistant_message": "Done."
+   }
+  }
+ ]
+}

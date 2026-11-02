@@ -1,0 +1,149 @@
+{
+  "harness": "codex",
+  "version": "0.166.0",
+  "evidence": "hq-fe672f",
+  "tool": "exec.exec_command",
+  "runs": [
+    "codex/probes/turn-pause-probe.py run all-tools",
+    "codex/probes/turn-pause-probe.py run cancel"
+  ],
+  "records": [
+    {
+      "label": "completed with output (echo probe-out)",
+      "event": "PreToolUse",
+      "s": 47.09,
+      "payload": {
+        "session_id": "01a19747-7473-7953-b535-24b881483e36",
+        "turn_id": "01a19747-7ecb-7d82-801d-58b36592c4d8",
+        "transcript_path": "<scratch>/codex-all-tools-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-23-27-01a19747-7473-7953-b535-24b881483e36.jsonl",
+        "cwd": "<scratch>/codex-all-tools-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "echo probe-out"
+        },
+        "tool_use_id": "exec-7e53ecbe-bc23-44fc-89e1-95ff824a1b54"
+      }
+    },
+    {
+      "label": "completed with output",
+      "event": "PostToolUse",
+      "s": 47.24,
+      "payload": {
+        "session_id": "01a19747-7473-7953-b535-24b881483e36",
+        "turn_id": "01a19747-7ecb-7d82-801d-58b36592c4d8",
+        "transcript_path": "<scratch>/codex-all-tools-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-23-27-01a19747-7473-7953-b535-24b881483e36.jsonl",
+        "cwd": "<scratch>/codex-all-tools-1/work",
+        "hook_event_name": "PostToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "echo probe-out"
+        },
+        "tool_response": "probe-out\n",
+        "tool_use_id": "exec-7e53ecbe-bc23-44fc-89e1-95ff824a1b54"
+      }
+    },
+    {
+      "label": "completed, no output (true)",
+      "event": "PreToolUse",
+      "s": 50.3,
+      "payload": {
+        "session_id": "01a19747-7473-7953-b535-24b881483e36",
+        "turn_id": "01a19747-7ecb-7d82-801d-58b36592c4d8",
+        "transcript_path": "<scratch>/codex-all-tools-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-23-27-01a19747-7473-7953-b535-24b881483e36.jsonl",
+        "cwd": "<scratch>/codex-all-tools-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "true"
+        },
+        "tool_use_id": "exec-03bafc09-0575-4a2b-a29e-2e087bea966d"
+      }
+    },
+    {
+      "label": "completed, no output",
+      "event": "PostToolUse",
+      "s": 50.43,
+      "payload": {
+        "session_id": "01a19747-7473-7953-b535-24b881483e36",
+        "turn_id": "01a19747-7ecb-7d82-801d-58b36592c4d8",
+        "transcript_path": "<scratch>/codex-all-tools-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-23-27-01a19747-7473-7953-b535-24b881483e36.jsonl",
+        "cwd": "<scratch>/codex-all-tools-1/work",
+        "hook_event_name": "PostToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "true"
+        },
+        "tool_response": "",
+        "tool_use_id": "exec-03bafc09-0575-4a2b-a29e-2e087bea966d"
+      }
+    },
+    {
+      "label": "yielded (sleep 5; yield_time_ms 1000): no PostToolUse followed, though the process ended about 5 s later, before the root Stop",
+      "event": "PreToolUse",
+      "s": 53.49,
+      "payload": {
+        "session_id": "01a19747-7473-7953-b535-24b881483e36",
+        "turn_id": "01a19747-7ecb-7d82-801d-58b36592c4d8",
+        "transcript_path": "<scratch>/codex-all-tools-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-23-27-01a19747-7473-7953-b535-24b881483e36.jsonl",
+        "cwd": "<scratch>/codex-all-tools-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "sleep 5; echo late"
+        },
+        "tool_use_id": "exec-34a6a9eb-a230-4306-8f3a-c4622a182d91"
+      }
+    },
+    {
+      "label": "yielded (sleep 30; yield_time_ms 1000), run cancel",
+      "event": "PreToolUse",
+      "s": 10.45,
+      "payload": {
+        "session_id": "01a19737-5420-7280-9b27-80cdf4ba57c6",
+        "turn_id": "01a19737-5d39-7722-a8ea-b811d5c85fcb",
+        "transcript_path": "<scratch>/codex-cancel-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-05-50-01a19737-5420-7280-9b27-80cdf4ba57c6.jsonl",
+        "cwd": "<scratch>/codex-cancel-1/work",
+        "hook_event_name": "PreToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "sleep 30; echo late"
+        },
+        "tool_use_id": "exec-44c3196d-924b-4a7a-bca3-813f64e17e9c"
+      }
+    },
+    {
+      "label": "PostToolUse 4.2 s later, when nested write_stdin interrupted the process (exit 130), not at the yield (about 1 s)",
+      "event": "PostToolUse",
+      "s": 14.61,
+      "payload": {
+        "session_id": "01a19737-5420-7280-9b27-80cdf4ba57c6",
+        "turn_id": "01a19737-5d39-7722-a8ea-b811d5c85fcb",
+        "transcript_path": "<scratch>/codex-cancel-1/codexhome/sessions/2026/11/01/rollout-2026-11-01T08-05-50-01a19737-5420-7280-9b27-80cdf4ba57c6.jsonl",
+        "cwd": "<scratch>/codex-cancel-1/work",
+        "hook_event_name": "PostToolUse",
+        "model": "gpt-6.1-sol",
+        "permission_mode": "bypassPermissions",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "sleep 30; echo late"
+        },
+        "tool_response": "",
+        "tool_use_id": "exec-44c3196d-924b-4a7a-bca3-813f64e17e9c"
+      }
+    }
+  ],
+  "note": "An empty Bash PostToolUse tool_response is not a sign of a yield: a completed true gives the same empty string. A yielded call got no PostToolUse at the yield in either run; in run cancel its PostToolUse came when write_stdin ended the process, with an empty response; in run all-tools the yielded process ended on its own and no PostToolUse came at all. The session_id the model receives (83217, 13889) is in no hook payload."
+}
