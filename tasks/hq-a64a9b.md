@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-5300fd-detached-rename
 created: 2026-11-02T14:57:06Z
-updated: 2026-11-02T16:16:25Z
+updated: 2026-11-02T16:16:27Z
 started: 2026-11-02T15:38:50Z
 depends: [hq-ff626a]
 parent: hq-5300fd
@@ -36,3 +36,4 @@ Contract: spec docs/specs/2026-11-02-detached-rename-cutover-design.md revision 
 - 2026-11-02T16:16:23Z (feat/hq-5300fd-detached-rename): review: impl round 1 — verdict: accept; findings: Minor 4; reviewer: claude-code/claude-opus-5-5
 - 2026-11-02T16:16:25Z (feat/hq-5300fd-detached-rename): gate: verified tree:ceab069c38fc2e24cafeed5c210bc10c4d0f3707 — checks: just test exit 0 (harness-facts ok, agents/bin 268 passed, .githooks and tools 1952 passed, relay xdist 391 passed, signal test 1 passed) and focused tools/test_rename_cutover.py 120 passed, 23 new tests seen RED before the save changes, five declared plan deviations accepted by the reviewer; review: minor deferred dangling symlink at the new records directory passes save (Task 3 brief), minor deferred a new directory tracked at HEAD but deleted on disk passes save (Task 3 brief), minor deferred old-directory refusal says untracked for tracked edits (Task 3 brief), minor deferred reachable row without kind reported as unreachable (Task 3 brief); reviewer: claude-code/claude-opus-5-5
   provenance: {"harness_session":"claude-code:7104a322-b727-4975-8f34-3d210db837b3","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-02T16:16:27Z (feat/hq-5300fd-detached-rename): retro: asking the implementer for one RED cause per group kept 23 refusal tests honest without 23 separate logs; the reviewer's probes outside the plan (dangling symlink, HEAD-tracked new dir) found real edges the plan missed, so later briefs should invite such probes
