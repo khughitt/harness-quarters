@@ -7,8 +7,8 @@ size: l
 complexity: high
 process: direct
 created: 2026-11-02T14:57:10Z
-updated: 2026-11-02T14:57:10Z
-depends: []
+updated: 2026-11-02T14:57:17Z
+depends: [hq-62ba95]
 parent: hq-5300fd
 tags: []
 agent: claude-code/claude-opus-5-5
