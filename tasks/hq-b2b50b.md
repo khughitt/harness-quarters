@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-b2b50b-active-limit
 created: 2026-11-02T19:14:07Z
-updated: 2026-11-02T22:33:32Z
+updated: 2026-11-02T22:33:34Z
 started: 2026-11-02T20:22:25Z
 completed: 2026-11-02T22:32:00Z
 closed: 2026-11-02T22:32:00Z
@@ -76,3 +76,4 @@ Scope: choose and prepare a measured default active-time cutoff with the existin
 - 2026-11-02T22:32:00Z (fix/hq-b2b50b-active-limit): Approved 16 h cutoff prepared for immediate local activation; merged current main, 408 focused and 2702 full-suite tests passed, both reviews accepted with no findings. All verification, retained evidence, same-turn integration ownership, cleanup dispositions and disclosures are recorded above.
   provenance: {"harness_session":"codex:01a19deb-d3a4-7b80-a260-fdc7e14f54ea","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-02T22:33:32Z (main): retained: {"host":"titan","kind":"scratch","path":"$WORK_ROOT/hq/hq-b2b50b","state":"released","verification":"verified","purpose":"Removed ten verified scratch files: script/data/reviews/combined logs retained byte-for-byte in committed task attachments; pilot and superseded RED/GREEN/full logs discarded under recorded resolved-run dispositions","next_owner":"none","cleanup_trigger":"none"}
+- 2026-11-02T22:33:34Z (main): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-b2b50b","state":"released","verification":"verified","purpose":"Removed clean merged worktree and regenerable pytest/Python caches after tt-report and fresh host-pointer checks; branch deleted after approved code and checkpoint bases verified in main ancestry","next_owner":"none","cleanup_trigger":"none"}
