@@ -1,8 +1,15 @@
 # rename-cutover for detached projects — design
 
-Task: hq-5300fd. Status: draft, revision 5 (2026-11-02), for the user's review.
+Task: hq-5300fd. Status: approved, revision 6 (2026-11-02).
 Spec review round 4 accepted revision 4; revision 5 adds its minor (a §5 test for the
 step-2 copy) and its note that the copy enumerates the saved head with `ls-tree`.
+Round 5 (relayed by the user, verdict accept) left three minors, folded into
+revision 6: save refuses staged changes anywhere in a records repository and
+`retarget --repo` stops on a deferred record commit (§4.1, §4.3); save asserts each
+detached records directory sits directly under its repository's top level and is
+named for its prefix (§4.1); step 2 copies every file not in the index whose bytes
+differ from the saved head's, so a retry cannot delete a file that sits only at a
+current-HEAD path (§4.5).
 
 Revision 4 (after spec review round 3, revise: Important 1, Minor 1): the restore
 and the commit take separate path sets, since `git restore` matches only its source
@@ -138,8 +145,11 @@ rollback.
 - For each detached snapshot project, the records directory must be inside a git
   repository whose top level is neither the checkout, any `--repo`, nor inside one of
   them, and the snapshot must not lie inside it.
-- When the checkout is detached: `<records-root>/<new>` must not exist, and the
-  records directory's name must equal `--old` (records-home's contract).
+- For each detached snapshot project, its records directory's parent must be its
+  records repository's top level and the directory's name must equal its prefix
+  (records-home's contract): the owned paths `<old>/`, `<new>/` and `<p>/` are
+  relative to that top level.
+- When the checkout is detached: `<records-root>/<new>` must not exist.
 - Records repositories are collected and deduplicated (several detached projects
   share one). For each:
   - on `main`, no stashes, one worktree, no branch with commits `main` lacks: the
@@ -150,7 +160,10 @@ rollback.
     after the rename is the rename's;
   - each `<p>/` with no tracked change (`git status --porcelain
     --untracked-files=no -- <p>/` empty). Untracked files under `<p>/` and anywhere
-    outside the owned paths (another session's draft) are allowed and left alone.
+    outside the owned paths (another session's draft) are allowed and left alone;
+  - nothing staged anywhere in the repository (`git diff --cached --quiet`): tasks
+    defers every record commit in a repository with staged changes, so a staged file
+    of another project would leave `retarget --repo`'s writes uncommitted.
 - `meta.json` gains:
   - `checkout.records`: `null` for in-tree; for detached `{"repo": <top level>,
     "records_root": <records root>, "dirs": [...]}`, where `dirs` lists every
@@ -177,8 +190,11 @@ rollback.
 
 `retarget --repo <root>` accepts a detached snapshot repository: its writes are
 `tasks edit` calls that commit under `<p>/` in a saved records repository, which
-rollback restores. `--forward` is unchanged: it ends rollback before its first write,
-whatever the kind of the project it writes in.
+rollback restores. A `tasks edit` whose output carries a `commit_deferred:` or
+`commit_failed:` warning stops the retarget, naming the warning, rather than leaving
+`<p>/` uncommitted for `verify` to find later (staging can appear after save).
+`--forward` is unchanged: it ends rollback before its first write, whatever the kind
+of the project it writes in.
 
 ### 4.4 verify
 
@@ -227,12 +243,14 @@ The order keeps every check before the first mutation, as today.
    the commit (refused by the hook, so untracked) is such a leftover, so it is kept
    here rather than lost. A new task filed there in that window has no original at
    the saved head, so step 1 stops rollback naming it, for the person to move aside.
-   The same copy takes every file under an owned path that is in neither the index
-   nor the current HEAD, sits at a path the saved head holds, and differs from the
-   saved blob (something recreated under `<old>/` after the rename's commit): the
-   restore overwrites it and the patch, a diff of tracked content, does not hold it.
-   It ranges over every owned path, `<p>/` included, so it enumerates the saved
-   head's paths with `git ls-tree` rather than reusing step 1's walk.
+   The same copy takes every other file under an owned path that is not in the index
+   and whose bytes differ from the saved head's blob at its path (absent counting as
+   different): something recreated under `<old>/` after the rename's commit, or, on a
+   retry after an earlier restore dropped `<new>/` from the index, a file at a path
+   only the current HEAD holds. The restore or the deletion of `<new>/` would remove
+   it, and the patch, a diff of tracked content, does not hold it. It ranges over
+   every owned path, `<p>/` included, so it walks the owned paths on disk rather than
+   reusing step 1's walk.
 3. Mutations, in today's order, with the records repositories inserted after the
    reset of the checkout and the in-tree `--repo` repositories:
    - `git restore --source=<head> --staged --worktree -- <restorable owned paths>`,
@@ -307,6 +325,9 @@ and the tasks registry as the existing `Sandbox` does.
   a second worktree or an unmerged branch is refused; an untracked or ignored file
   under `<old>/`, a tracked change under `<p>/`, and an existing `<records-root>/<new>`
   are refused; an untracked file under `<p>/` or outside the owned paths is accepted.
+- save refuses a records repository with a staged file of another project, and a
+  detached records directory not directly under its repository's top level or not
+  named for its prefix; `retarget --repo` stops on a deferred record commit.
 - The whole cutover for a detached checkout with a detached `--repo` sharing its
   records repository: save, apply, the commit `apply` prints, retarget, link, verify.
 - verify fails while the records repository holds the uncommitted rename.
@@ -327,7 +348,8 @@ and the tasks registry as the existing `Sandbox` does.
   `<old>/` path the saved head holds, copies it under `rollback-leftovers-<n>/` and
   then restores the saved blob.
 - rollback retried after the rename's commit converges, from a stop at the commit
-  (step 4) and from a stop inside step 3.
+  (step 4) and from a stop inside step 3; a file written at a `<new>/` path between
+  the two attempts is copied into the snapshot before the retry deletes `<new>/`.
 - The second host's adoption (§4.7).
 - The two tests that pin today's refusal are replaced by these.
 
