@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-b2b50b-active-limit
 created: 2026-11-02T19:14:07Z
-updated: 2026-11-02T22:29:42Z
+updated: 2026-11-02T22:30:44Z
 started: 2026-11-02T20:22:25Z
 depends: []
 tags: [feedback, friction, "from:mm"]
@@ -63,3 +63,4 @@ Scope: choose and prepare a measured default active-time cutoff with the existin
 - 2026-11-02T22:28:37Z (fix/hq-b2b50b-active-limit): attached: combined-focused.txt (501 bytes): Combined limits, hook, CLI, replay and allowlist checks: 408 passed
 - 2026-11-02T22:29:21Z (fix/hq-b2b50b-active-limit): review: impl round 2 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
 - 2026-11-02T22:29:42Z (fix/hq-b2b50b-active-limit): attached: merge-review-report.md (1269 bytes): Fresh scoped review of merge 57b47cd by codex/gpt-6.1-sol: accepted, no findings
+- 2026-11-02T22:30:44Z (fix/hq-b2b50b-active-limit): attached: scratch-manifest-v2.json (1316 bytes): Complete ten-file integration scratch checkpoint; old manifest remains historical
