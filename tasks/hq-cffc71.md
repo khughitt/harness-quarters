@@ -6,9 +6,9 @@ priority: 1
 size: s
 complexity: mid
 process: direct
-owner: main
+owner: hq-cffc71-worker-defaults
 created: 2026-11-01T23:43:00Z
-updated: 2026-11-02T00:02:27Z
+updated: 2026-11-02T00:03:54Z
 started: 2026-11-02T00:02:05Z
 depends: []
 tags: [hooks]
@@ -35,3 +35,5 @@ Done when a fresh session's Bash shell shows the defaults, a bare `pytest -n aut
   provenance: {"harness_session":"claude-code:cc9d0598-86ea-48e9-8298-c41d9389039b","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-02T00:02:24Z (main): trial: flow-trial-1 — enrolled — flow off
 - 2026-11-02T00:02:27Z (main): arm: flow-trial-1 — unit tack-cffc71 — flow off
+- 2026-11-02T00:03:54Z (hq-cffc71-worker-defaults): resumed
+  provenance: {"harness_session":"claude-code:cc9d0598-86ea-48e9-8298-c41d9389039b","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
