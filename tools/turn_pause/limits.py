@@ -45,8 +45,14 @@ def load(path=DEFAULTS_FILE) -> tuple[Limits, str]:
     import tomllib
     with open(path, 'rb') as f:
         raw = f.read()
-    data = tomllib.loads(raw.decode())
-    values = Limits(data['active_seconds'], data['calls'], data['spawns'], data['compactions'])
+    try:
+        data = tomllib.loads(raw.decode())
+    except (tomllib.TOMLDecodeError, UnicodeDecodeError) as error:
+        raise ValueError(f'{path}: not valid TOML: {error}') from error
+    missing = [name for name in Limits._fields if name not in data]
+    if missing:
+        raise ValueError(f'{path}: missing {", ".join(missing)}')
+    values = Limits(*(data[name] for name in Limits._fields))
     for name in Limits._fields:
         value = getattr(values, name)
         if isinstance(value, bool) or not isinstance(value, int) or value <= 0:

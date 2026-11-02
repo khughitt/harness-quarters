@@ -32,3 +32,15 @@ def test_load_refuses_a_non_positive_limit(tmp_path, field, value):
     path.write_text(''.join(f'{k} = {v}\n' for k, v in values.items()))
     with pytest.raises(ValueError, match=field):
         limits.load(path)
+
+
+@pytest.mark.parametrize('text, field', [
+    ('active_seconds = \n', 'line 1'),
+    ('active_seconds = 1\ncalls = 2\ncompactions = 1\n', 'spawns'),
+])
+def test_load_names_the_file_for_a_syntax_error_or_a_missing_key(tmp_path, text, field):
+    path = tmp_path / 'limits.toml'
+    path.write_text(text)
+    with pytest.raises(ValueError) as error:
+        limits.load(path)
+    assert str(path) in str(error.value) and field in str(error.value)
