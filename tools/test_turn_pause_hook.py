@@ -408,6 +408,16 @@ def test_malformed_budget_adds_its_context_once(tmp_path):
     assert d.bash('ls') is None
 
 
+@pytest.mark.parametrize('zero', ['spawns', 'compactions', 'calls', 'active_seconds'])
+def test_a_zero_limit_never_raises_on_a_pre_tool_use(tmp_path, zero):
+    d = Driver(tmp_path, 'claude-code')
+    d.prompt('work')
+    with d.store.locked('claude-code', CLAUDE_ROOT) as rs:
+        rs.turn.limits = Limits(**{**rs.turn.limits._asdict(), zero: 0})
+    out = d.bash('ls')
+    assert 'could not judge' not in (reason(out) if denied(out) else '')
+
+
 def test_budget_examples_in_a_spec_body_add_nothing(tmp_path):
     d = Driver(tmp_path, 'claude-code')
     body = ('Review this spec.\n\n```\nbudget: 10h, 2000 calls\n```\n> budget: 3h\n'
@@ -546,6 +556,16 @@ def test_claude_call_without_a_post_is_closed_when_the_agent_starts_a_user_wait(
     assert out is None and d.state().turn.in_flight == {}
     d('PostToolUse', post(ask), dt=5 * 3600)
     assert d.state().turn.active == 13
+
+
+def test_a_five_hour_plan_approval_wait_adds_no_active_time(tmp_path):
+    d = Driver(tmp_path, 'claude-code')
+    d.prompt('work')
+    out, plan = d.pre('ExitPlanMode', {'plan': 'x'}, dt=10)
+    assert out is None and d.state().turn.in_flight == {}
+    d('PostToolUse', post(plan), dt=5 * 3600)
+    assert d.bash('ls') is None
+    assert d.state().turn.active == 11
 
 
 def test_codex_user_wait_keeps_a_yielded_bash_open_and_the_wait_counts(tmp_path):

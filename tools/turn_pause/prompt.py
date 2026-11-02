@@ -53,6 +53,8 @@ def parse_budget(text: str) -> Budget | Malformed | None:
         count = _COUNT.fullmatch(part)
         if not count:
             return Malformed(f'{part!r} is not like "2000 calls", "80 agents" or "3 compactions"')
+        if int(count.group(1)) == 0:
+            return Malformed(f'{part!r}: a count must be above zero')
         name = _COUNT_FIELD[count.group(2)]
         if name in counts:
             return Malformed(f'{count.group(2)} named twice')

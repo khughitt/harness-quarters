@@ -5,7 +5,8 @@ from .record import Frozen
 # Kind: 'prompt', 'tool_start', 'tool_end', 'agent_stop', 'agent_close', 'compact', 'spawn', 'tick'.
 KINDS = ('prompt', 'tool_start', 'tool_end', 'agent_stop', 'agent_close', 'compact', 'spawn', 'tick')
 
-USER_WAIT_TOOLS = {'AskUserQuestion', 'request_user_input', 'request_user_input_async'}
+USER_WAIT_TOOLS = {'AskUserQuestion', 'request_user_input', 'request_user_input_async',
+                  'ExitPlanMode'}
 
 
 class Event(Frozen):

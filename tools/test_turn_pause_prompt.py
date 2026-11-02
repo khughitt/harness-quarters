@@ -39,7 +39,8 @@ def test_budget_after_pasted_block_is_first_typed_line():
 def test_second_budget_line_ignored(): assert prompt.parse_budget('budget: 2h\nbudget: 100h') == Budget(7200, None, None, None)
 def test_budget_malformed(): assert isinstance(prompt.parse_budget('budget: 12 hours please'), Malformed)
 
-@pytest.mark.parametrize('text', ['budget:', 'budget: 0h', 'budget: 2h, 5 widgets', 'budget: 2h, 5 calls, 6 calls', 'budget: 2h,'])
+@pytest.mark.parametrize('text', ['budget:', 'budget: 0h', 'budget: 2h, 5 widgets', 'budget: 2h, 5 calls, 6 calls', 'budget: 2h,',
+                                  'budget: 2h, 0 agents', 'budget: 2h, 0 calls', 'budget: 2h, 0 compactions'])
 def test_budget_malformed_cases(text): assert isinstance(prompt.parse_budget(text), Malformed)
 
 def test_budget_oversized_duration_is_malformed():

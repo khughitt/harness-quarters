@@ -122,7 +122,7 @@ def warning(rs: RootState, name: str) -> str:
     used = t.active if name == 'active' else getattr(t, name)
     limit = t.limits.active_seconds if name == 'active' else getattr(t.limits, name)
     shown = hmm if name == 'active' else (lambda v: str(int(v)))
-    return WARNING_TEXT.format(limit=name, n=int(used * 100 // limit), used=shown(used), value=shown(limit))
+    return WARNING_TEXT.format(limit=name, n=int(used * 100 // limit) if limit > 0 else 100, used=shown(used), value=shown(limit))
 
 
 def protected_paths(store_dir, limits_path, env: Mapping[str, str]) -> list[str]:
