@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: hq-cffc71-worker-defaults
 created: 2026-11-01T23:43:00Z
-updated: 2026-11-02T00:48:45Z
+updated: 2026-11-02T00:59:50Z
 started: 2026-11-02T00:02:05Z
 depends: []
 tags: [hooks]
@@ -43,4 +43,6 @@ Done when a fresh session's Bash shell shows the defaults, a bare `pytest -n aut
 - 2026-11-02T00:48:42Z (hq-cffc71-worker-defaults): verification: gate host-budget run -- just test on a2ebc48c, exit 0: 268 + 1421 + 391 + 1 passed (tools stage +4 = tools/test_worker_defaults.py). RED->GREEN on the new test (4 failed, then 19 passed with test_pi_launcher). Bare pytest -n auto: 'created: 4/4 workers' with the default, 32/32 without. host-budget run replaced an inherited 2 with its grant (1 at the time, host busy). Fresh claude -p --settings <worktree claude/settings.json> shell showed all five = 4 and OMP_NUM_THREADS=1 (host value); codex exec -c shell_environment_policy.set=<worktree value> showed all five = 4. The main-home check (no override) runs after the merge.
 - 2026-11-02T00:48:44Z (hq-cffc71-worker-defaults): merge blocked: main's working codex/config.toml has uncommitted Codex hook trust_hash/trusted_content_hash changes (written 2026-11-01 15:35, after the 13:19 hooks.json commit 6273c206), not this task's. The branch also edits that file, so git merge refuses. README warns against stashing harness configs. Recommended: commit those hashes on main as their own chore(codex) commit, then merge hq-cffc71-worker-defaults. Alternatives: the user commits them; or stash/merge/pop (live file briefly loses the hashes). Retained: .worktrees/hq-cffc71 (locked, branch hq-cffc71-worker-defaults at a2ebc48c, unmerged); session scratch discarded; host-load --section session: nothing left running.
 - 2026-11-02T00:48:45Z (hq-cffc71-worker-defaults): parked (waiting on user, decision): On the user's go-ahead: in main, commit codex/config.toml's hook trust hashes as chore(codex), merge hq-cffc71-worker-defaults, run env check in a fresh Claude and Codex session from main, then tasks done and remove .worktrees/hq-cffc71
+  provenance: {"harness_session":"claude-code:cc9d0598-86ea-48e9-8298-c41d9389039b","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-02T00:59:50Z (hq-cffc71-worker-defaults): resumed
   provenance: {"harness_session":"claude-code:cc9d0598-86ea-48e9-8298-c41d9389039b","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
