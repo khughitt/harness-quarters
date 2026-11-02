@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-b2b50b-active-limit
 created: 2026-11-02T19:14:07Z
-updated: 2026-11-02T22:06:56Z
+updated: 2026-11-02T22:28:36Z
 started: 2026-11-02T20:22:25Z
 depends: []
 tags: [feedback, friction, "from:mm"]
@@ -59,3 +59,4 @@ Scope: choose and prepare a measured default active-time cutoff with the existin
 - 2026-11-02T22:06:17Z (fix/hq-b2b50b-active-limit): resumed
   provenance: {"harness_session":"codex:01a19deb-d3a4-7b80-a260-fdc7e14f54ea","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-02T22:06:56Z (fix/hq-b2b50b-active-limit): User approved merging and activating aec828c4 in this session. Resumed with existing flow-off arm. Main advanced with reviewed hq-1400a4 closing-command fix, touching allowlist/hook tests and README; merging main into this branch before activation. Code/test merge was automatic; README adjacent inserted sections conflicted and will both be preserved. Combined verification and a scoped merge-resolution review precede activation. Approval covers the 16 h cutoff, existing-turn limits-changed pause and disclosed budget effects.
+- 2026-11-02T22:28:36Z (fix/hq-b2b50b-active-limit): attached: combined-full.txt (4022 bytes): Post-main-merge just test: 2702 passed; includes both approved fixes
