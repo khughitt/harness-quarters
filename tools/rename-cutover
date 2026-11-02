@@ -19,6 +19,7 @@ import filecmp
 import json
 import os
 import re
+import shlex
 import shutil
 import stat
 import subprocess
@@ -698,20 +699,51 @@ def dependency_rewrites(root, old):
     return rewrites
 
 
-def write_rewrites(root, rewrites):
+def write_rewrites(root, rewrites, check=None):
     """Each task's whole list in one `tasks edit` save, its old ids replaced in place.
     Removing and re-adding in two writes would lose the dependency if interrupted between
-    them, and a rerun would not see it again. A rerun reads the warnings left."""
+    them, and a rerun would not see it again. A rerun reads the warnings left. `check`,
+    when given, judges each edit's output before the next edit runs."""
     for task, (pairs, depends) in rewrites.items():
-        run("tasks", "edit", task, "--no-depends", *(arg for dep in depends for arg in ("--depends", dep)),
-            cwd=root)
+        output = run("tasks", "edit", task, "--no-depends",
+                     *(arg for dep in depends for arg in ("--depends", dep)), cwd=root)
         for old_id, new_id in pairs.items():
             print(f"retarget: {task}: {old_id} -> {new_id}")
+        if check:
+            check(task, output)
+
+
+UNCOMMITTED = ("commit_deferred:", "commit_failed:")
+
+
+def committed_check(root):
+    """A snapshot repository's edit must commit: a detached project's record commit is
+    deferred while anything is staged in its records repository (which can happen after
+    save) and fails when the hook refuses it. Either would leave the record uncommitted for
+    verify to find later, so it stops the retarget here, naming tasks' warning. Output that
+    is not tasks' JSON report is a stop too, never read as "no warnings"."""
+    def check(task, output):
+        try:
+            report = json.loads(output)
+        except json.JSONDecodeError as error:
+            raise Stop(f"retarget: tasks edit {task} in {root} printed output that is not JSON ({error}): "
+                       f"{output!r}; no further task was edited")
+        warnings = report.get("warnings") if isinstance(report, dict) else None
+        if not isinstance(warnings, list):
+            raise Stop(f"retarget: tasks edit {task} in {root} printed no warnings list: {output!r}; "
+                       f"no further task was edited")
+        for warning in warnings:
+            if isinstance(warning, str) and warning.startswith(UNCOMMITTED):
+                raise Stop(f"retarget: tasks edit {task} in {root} left its record uncommitted: {warning}; "
+                           f"no further task was edited; clear the cause, run `tasks commit` there, "
+                           f"then rerun retarget --repo")
+    return check
 
 
 def retarget_dependencies(root, old):
-    """Retarget one repository, so its `tasks check` comes back clean (`verify` requires that)."""
-    write_rewrites(root, dependency_rewrites(root, old))
+    """Retarget one snapshot repository, so its `tasks check` comes back clean (`verify`
+    requires that), each edit's record commit checked before the next edit."""
+    write_rewrites(root, dependency_rewrites(root, old), committed_check(root))
 
 
 def apply(args):
@@ -723,14 +755,28 @@ def apply(args):
         raise Stop(f"apply: {new_root} already exists")
     if meta["storage_new"] and Path(meta["storage_new"]).parent.exists():
         raise Stop(f"apply: {Path(meta['storage_new']).parent} already exists")
+    records = meta["checkout"]["records"]
+    if records:
+        new_records = Path(records["records_root"]) / new
+        if new_records.exists() or new_records.is_symlink():
+            raise Stop(f"apply: {new_records} already exists; tasks rename writes {new}'s records there, "
+                       f"so move it aside first")
     run("tasks", "rename", old, new, cwd=checkout)
     os.rename(checkout, new_root)
     if meta["storage_old"]:
         os.rename(Path(meta["storage_old"]).parent, Path(meta["storage_new"]).parent)
         (new_root / ".worktrees").unlink()
         run("work-link", "--root", new_root.parent, "--ensure", ".worktrees", cwd=new_root)
-    run("tasks", "init", "--prefix", new, "--force", cwd=new_root)
+    if records:
+        run("tasks", "init", "--prefix", new, "--records", records["records_root"], "--force", cwd=new_root)
+    else:
+        run("tasks", "init", "--prefix", new, "--force", cwd=new_root)
     print(f"applied: {old} -> {new} at {new_root}")
+    if records:
+        # Scoped to the rename's own paths, so another project's untracked draft stays out.
+        repo, message = shlex.quote(records["repo"]), shlex.quote(f"chore(tasks): rename {old} -> {new}")
+        print(f"commit the rename in the records repository {records['repo']} before retarget --repo:")
+        print(f"  git -C {repo} add -A -- {old} {new} && git -C {repo} commit -m {message} -- {old} {new}")
 
 
 def record_forward(snap, root):
@@ -823,6 +869,38 @@ def sample_task(records, new):
     return found.split("-", 1)[1]
 
 
+def verify_records(meta):
+    """A detached checkout's row names the new root and `<records-root>/<new>`, and
+    `<records-root>/<old>` is gone. In every records repository the owned paths hold no
+    uncommitted change (`<old>/` and `<new>/` no untracked file either): the rename and the
+    retargets were committed, so the other host's sync carries a committed state."""
+    old, new, new_root = meta["old"], meta["new"], Path(meta["new_root"])
+    records = meta["checkout"]["records"]
+    if records:
+        records_root = Path(records["records_root"])
+        row = project_row(new_root, "verify")
+        found = {"kind": row.get("kind"), "checkout": Path(row["checkout"]).resolve() if row.get("checkout") else None,
+                 "records": Path(row["records"]).resolve()}
+        expected = {"kind": "detached", "checkout": new_root.resolve(), "records": (records_root / new).resolve()}
+        wrong = [f"{key} is {found[key]}, expected {expected[key]}" for key in expected if found[key] != expected[key]]
+        if wrong:
+            raise Stop(f"verify: tasks projects' row for {new} at {new_root} does not match the rename: "
+                       + "; ".join(wrong))
+        old_records = records_root / old
+        if old_records.exists() or old_records.is_symlink():
+            raise Stop(f"verify: {old_records} still exists; the rename moved every record out of it, "
+                       f"so move it aside")
+    for entry in meta["records_repos"]:
+        for path in entry["owned"]:
+            untracked = "all" if path in (f"{old}/", f"{new}/") else "no"
+            changes = run("git", "-C", entry["root"], "status", "--porcelain", f"--untracked-files={untracked}",
+                          "--", path).splitlines()
+            if changes:
+                raise Stop(f"verify: {entry['root']} has uncommitted changes under {path}: "
+                           f"{', '.join(line.strip() for line in changes)}; commit them there (the rename with "
+                           f"the line apply printed) so the other host's sync carries them")
+
+
 def verify(args):
     meta = load_meta(args.snapshot)
     check_environment("verify", meta)
@@ -830,6 +908,7 @@ def verify(args):
     check = subprocess.run([str(link_tool(new_root, meta)), "--check"], text=True, capture_output=True)
     if check.returncode != 0:
         raise Stop(f"verify: link drift after apply:\n{check.stdout}")
+    verify_records(meta)
     for root in (new_root, *(Path(r["root"]) for r in meta["repos"])):
         if run("tasks", "check", cwd=root).strip():
             raise Stop(f"verify: tasks check reports findings in {root}")

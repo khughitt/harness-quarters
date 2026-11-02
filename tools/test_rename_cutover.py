@@ -3,8 +3,10 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+import shlex
 import shutil
 import subprocess
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -93,6 +95,8 @@ class Sandbox:
         self.detached, self.detached_repos = detached, tuple(detached_repos)
         self.records = self.sync / "records" if detached or detached_repos else None
         self.hook = tmp / "hooks" / "pre-commit"
+        # apply's stdout, which carries the records commit commit_rename() runs.
+        self.applied = None
 
     def run(self, *cmd, cwd=None, check=True, env=None):
         result = subprocess.run([str(c) for c in cmd], cwd=cwd, env=env or self.env, text=True,
@@ -142,16 +146,19 @@ class Sandbox:
         self.run("git", "commit", "-qm", message, cwd=root)
 
     def commit_rename(self):
-        """The runbook's commit after apply. Detached: the records commit apply prints,
-        scoped to the old and new records directories, after which HEAD holds <new>/ and no
-        <old>/. In-tree: the new root, as the existing after-commit tests commit it."""
+        """The runbook's commit after apply, run once per cutover. Detached: the one records
+        commit line apply printed (`apply()` or `forward()` keeps its stdout), run as
+        printed through the box's hook, after which HEAD holds <new>/ and no <old>/; a
+        second call fails, since the line is consumed. In-tree: the new root, as the
+        existing after-commit tests commit it."""
         if not self.detached:
             self.commit(self.new_root, "rename")
             return
-        owned = (self.old, self.new)
-        self.run("git", "-C", self.records, "add", "-A", "--", *owned)
-        self.run("git", "-C", self.records, "commit", "-q", "-m",
-                 f"chore(tasks): rename {self.old} -> {self.new}", "--", *owned)
+        assert self.applied is not None, "commit_rename() runs once, after apply"
+        lines = [line.strip() for line in self.applied.splitlines() if line.strip().startswith("git -C ")]
+        assert len(lines) == 1, self.applied
+        self.applied = None
+        self.run("bash", "-c", lines[0], cwd=self.tmp)
         top = self.run("git", "-C", self.records, "ls-tree", "--name-only", "HEAD").stdout.split()
         assert self.new in top and self.old not in top, top
 
@@ -230,9 +237,15 @@ class Sandbox:
     def save(self, check=True):
         return self.cutover(*self.save_args(), check=check)
 
+    def apply(self):
+        """apply, its stdout kept for commit_rename()."""
+        result = self.cutover("apply", "--snapshot", self.snapshot)
+        self.applied = result.stdout
+        return result
+
     def forward(self):
         """The whole cutover up to the runbook's commits: apply, retarget everywhere, link."""
-        self.cutover("apply", "--snapshot", self.snapshot)
+        self.apply()
         for root in self.repos:
             self.cutover("retarget", "--snapshot", self.snapshot, "--repo", root)
         self.cutover("link", "--snapshot", self.snapshot)
@@ -847,6 +860,8 @@ def test_retarget_writes_each_task_once(tmp_path, monkeypatch):
             return json.dumps(check)
         if cmd[:2] == ("tasks", "show"):
             return json.dumps({"task": {"depends": ["ai-a", "ops-9", "ai-b"]}})
+        if cmd[:2] == ("tasks", "edit"):
+            return '{"id":"ops-1","warnings":[]}'
         return ""
 
     monkeypatch.setattr(cutover, "run", fake_run)
@@ -854,6 +869,37 @@ def test_retarget_writes_each_task_once(tmp_path, monkeypatch):
     writes = [c for c in calls if c[:2] in (("tasks", "edit"), ("tasks", "dep"))]
     assert writes == [("tasks", "edit", "ops-1", "--no-depends", "--depends", "tack-a",
                        "--depends", "ops-9", "--depends", "tack-b")]
+
+
+@pytest.mark.parametrize("edit_output, message", [
+    ("not json", "retarget: tasks edit ops-1 in {root} printed output that is not JSON"),
+    ('["a list"]', "retarget: tasks edit ops-1 in {root} printed no warnings list"),
+    ('{"id":"ops-1","warnings":["commit_failed: the hook refused"]}',
+     "retarget: tasks edit ops-1 in {root} left its record uncommitted: commit_failed: the hook refused; "
+     "no further task was edited; clear the cause, run `tasks commit` there, then rerun retarget --repo"),
+])
+def test_retarget_repo_stops_on_edit_output_it_cannot_trust(tmp_path, monkeypatch, edit_output, message):
+    """Unparseable output is a stop, never "no warnings"; so is a failed record commit.
+    The second task's edit never runs."""
+    cutover = load_cutover()
+    calls = []
+    check = {"warnings": [
+        {"id": f"ops-{n}", "kind": "retired_prefix",
+         "detail": f'depends on ai-{n} through retired prefix "ai"; it is now tack-{n}'} for n in (1, 2)]}
+
+    def fake_run(*cmd, cwd=None):
+        calls.append(cmd)
+        if cmd[:2] == ("tasks", "check"):
+            return json.dumps(check)
+        if cmd[:2] == ("tasks", "show"):
+            return json.dumps({"task": {"depends": [f"ai-{cmd[2][4:]}"]}})
+        return edit_output
+
+    monkeypatch.setattr(cutover, "run", fake_run)
+    with pytest.raises(cutover.Stop) as stop:
+        cutover.retarget_dependencies(tmp_path, "ai")
+    assert message.format(root=tmp_path) in str(stop.value)
+    assert [c[2] for c in calls if c[:2] == ("tasks", "edit")] == ["ops-1"]
 
 
 def test_verify_fails_while_a_repository_still_names_a_retired_id(box2):
@@ -1065,6 +1111,159 @@ def test_the_storage_follows_the_checkout_directory_not_the_prefix(box):
     assert meta["storage_new"] == str((box.sync.parent / ".dropbox-work" / "renamed" / ".worktrees").resolve())
     box.forward()
     box.cutover("verify", "--snapshot", box.snapshot)
+
+
+# --- apply, retarget, link, verify: detached projects -----------------------------
+
+
+def projects_row(box, prefix):
+    return next(row for row in json.loads(box.run("tasks", "projects", "--json", cwd=box.tmp).stdout)["projects"]
+                if row["prefix"] == prefix)
+
+
+@pytest.mark.parametrize("make", ["directory", "dangling link"])
+def test_apply_refuses_when_the_new_records_directory_exists(dbox, make):
+    dbox.save()
+    new = dbox.records / "tack"
+    if make == "directory":
+        new.mkdir()
+    else:
+        new.symlink_to("nowhere")
+    result = dbox.cutover("apply", "--snapshot", dbox.snapshot, check=False)
+    assert result.returncode == 1
+    assert (f"apply: {dbox.records.resolve() / 'tack'} already exists; tasks rename writes tack's "
+            f"records there, so move it aside first") in result.stderr
+    assert dbox.checkout.exists() and not dbox.new_root.exists()
+    assert (dbox.records / "ai" / "tasks" / ".config.toml").is_file()
+    assert projects_row(dbox, "ai")["kind"] == "detached"
+
+
+def commit_line(box):
+    repo = shlex.quote(str(box.records.resolve()))
+    return (f"git -C {repo} add -A -- ai tack && git -C {repo} commit -m "
+            f"'chore(tasks): rename ai -> tack' -- ai tack")
+
+
+def test_apply_repoints_a_detached_checkout_and_prints_the_records_commit(dbox):
+    dbox.save()
+    result = dbox.apply()
+    row = projects_row(dbox, "tack")
+    assert Path(row["root"]).resolve() == dbox.new_root.resolve()
+    assert row["kind"] == "detached"
+    assert Path(row["records"]).resolve() == (dbox.records / "tack").resolve()
+    assert not (dbox.new_root / "tasks").exists()
+    # [checkout] path is relative to the records directory.
+    config = tomllib.loads((dbox.records / "tack" / "tasks" / ".config.toml").read_text())
+    assert (dbox.records / "tack" / config["checkout"]["path"]).resolve() == dbox.new_root.resolve()
+    assert commit_line(dbox) in [line.strip() for line in result.stdout.splitlines()]
+    # Printed, not run: the rename is still uncommitted in the records repository.
+    assert "?? tack/tasks/.config.toml" in dbox.run("git", "status", "--porcelain", "--untracked-files=all",
+                                                    cwd=dbox.records).stdout
+
+
+@pytest.mark.parametrize("detached", [True, False], ids=["detached-checkout", "in-tree-checkout"])
+def test_the_whole_detached_cutover_retargets_links_and_verifies(tmp_path, detached):
+    """A detached --repo, ops, sharing the records repository with a detached checkout, or
+    with an in-tree checkout beside it; ops depends on a checkout task."""
+    box = Sandbox(tmp_path, detached=detached, detached_repos=("ops",)).build()
+    target, dependent = box.depend_on_checkout(box.ops)
+    box.save()
+    applied = box.apply()
+    assert ("git -C " in applied.stdout) == detached
+    box.commit_rename()
+    result = box.cutover("retarget", "--snapshot", box.snapshot, "--repo", box.ops)
+    assert f"retarget: {dependent}: {target} -> tack-{target.split('-', 1)[1]}" in result.stdout
+    assert box.run("tasks", "check", cwd=box.ops).stdout == ""
+    # The retarget's write committed itself in the records repository.
+    assert box.run("git", "status", "--porcelain", "--untracked-files=all", cwd=box.records).stdout == ""
+    last = box.run("git", "log", "-1", "--name-only", "--format=", cwd=box.records).stdout.split()
+    assert last == [f"ops/tasks/{dependent}.md"]
+    box.cutover("link", "--snapshot", box.snapshot)
+    assert os.path.realpath(box.tmp / "home" / ".agents") == str((box.new_root / "agents").resolve())
+    assert "verified" in box.cutover("verify", "--snapshot", box.snapshot).stdout
+
+
+def detached_cutover(box):
+    """The whole forward cutover of a detached box, the rename committed."""
+    box.save()
+    box.apply()
+    box.commit_rename()
+    for root in box.repos:
+        box.cutover("retarget", "--snapshot", box.snapshot, "--repo", root)
+    box.cutover("link", "--snapshot", box.snapshot)
+
+
+def verify_refused(box, message):
+    result = box.cutover("verify", "--snapshot", box.snapshot, check=False)
+    assert result.returncode == 1, result.stdout
+    assert message in result.stderr, result.stderr
+
+
+def test_verify_fails_while_the_records_repository_holds_the_uncommitted_rename(dbox):
+    dbox.save()
+    dbox.forward()
+    verify_refused(dbox, f"verify: {dbox.records.resolve()} has uncommitted changes under ai/: "
+                         f"D ai/tasks/.config.toml")
+    # The <old>/ deletions committed alone still leave <new>/ untracked.
+    dbox.run("git", "commit", "-qm", "the old half", "--", "ai", cwd=dbox.records)
+    verify_refused(dbox, f"verify: {dbox.records.resolve()} has uncommitted changes under tack/: "
+                         f"?? tack/tasks/.config.toml")
+
+
+def test_verify_fails_while_the_old_records_directory_exists(dbox):
+    detached_cutover(dbox)
+    (dbox.records / "ai").mkdir()
+    verify_refused(dbox, f"verify: {dbox.records.resolve() / 'ai'} still exists; the rename moved every "
+                         f"record out of it, so move it aside")
+
+
+def test_verify_fails_when_the_row_names_other_records(dbox):
+    """A copy at the same depth keeps [checkout] path (relative to the records directory)
+    pointing at the new root, so project_row still finds the row."""
+    detached_cutover(dbox)
+    copy = dbox.sync / "records2" / "tack"
+    shutil.copytree(dbox.records / "tack", copy)
+    registry = dbox.tmp / "cfg" / "tasks" / "projects.toml"
+    text = registry.read_text()
+    assert f'tack = "{dbox.records / "tack"}"' in text
+    registry.write_text(text.replace(f'tack = "{dbox.records / "tack"}"', f'tack = "{copy}"'))
+    verify_refused(dbox, f"verify: tasks projects' row for tack at {dbox.new_root} does not match the "
+                         f"rename: records is {copy.resolve()}, expected {(dbox.records / 'tack').resolve()}")
+
+
+def test_verify_fails_on_a_tracked_change_under_p(dbox):
+    spec = dbox.records / "ops" / "docs" / "specs" / "a.md"
+    spec.write_text("x\n")
+    dbox.commit(dbox.records, "an ops spec")
+    detached_cutover(dbox)
+    spec.write_text("changed\n")
+    verify_refused(dbox, f"verify: {dbox.records.resolve()} has uncommitted changes under ops/: "
+                         f"M ops/docs/specs/a.md")
+
+
+def test_retarget_repo_stops_on_a_deferred_record_commit(dbox):
+    """Another project's file staged after save makes tasks defer every record commit; the
+    first edit's warning stops the retarget before the second edit runs."""
+    dbox.code_repo(dbox.sync / "zz", "zz")
+    dependents = [dbox.depend_on_checkout(dbox.ops)[1] for _ in range(2)]
+    dbox.save()
+    dbox.apply()
+    dbox.commit_rename()
+    (dbox.records / "zz" / "docs" / "specs" / "d.md").write_text("x\n")
+    dbox.run("git", "add", "zz/docs/specs/d.md", cwd=dbox.records)
+
+    def record(dependent):
+        return (dbox.records / "ops" / "tasks" / f"{dependent}.md").read_bytes()
+
+    before = {d: record(d) for d in dependents}
+    result = dbox.cutover("retarget", "--snapshot", dbox.snapshot, "--repo", dbox.ops, check=False)
+    assert result.returncode == 1
+    edited = [d for d in dependents if record(d) != before[d]]
+    assert len(edited) == 1, "the second edit ran"
+    assert (f"retarget: tasks edit {edited[0]} in {dbox.ops.resolve()} left its record uncommitted: "
+            f"commit_deferred: ") in result.stderr
+    assert "staged changes: zz/docs/specs/d.md" in result.stderr
+    assert "no further task was edited" in result.stderr
 
 
 # --- rollback -----------------------------------------------------------------
