@@ -256,7 +256,7 @@ Kept per root session by the hook itself, from events it already receives:
     PostToolUse if Codex sends one for a failure, which is not probed, and
     otherwise at its agent's Stop. An agent's open calls close
     at its Stop or SubagentStop, and every open call closes at the next genuine
-    prompt. A call that waits on the user (Claude Code `AskUserQuestion`, Codex
+    prompt. A call that waits on the user (Claude Code `AskUserQuestion` and `ExitPlanMode`, Codex
     `request_user_input` and `request_user_input_async`) is never in flight:
     waiting on the user is not work. An agent's open calls also close when that
     agent starts a call that waits on the user, except a Codex nested
