@@ -7,8 +7,8 @@ size: m
 complexity: mid
 process: direct
 created: 2026-11-02T14:57:06Z
-updated: 2026-11-02T14:57:06Z
-depends: []
+updated: 2026-11-02T14:57:13Z
+depends: [hq-ff626a]
 parent: hq-5300fd
 tags: []
 agent: claude-code/claude-opus-5-5
