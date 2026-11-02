@@ -5,6 +5,7 @@ import json
 import os
 import shlex
 import shutil
+import stat
 import subprocess
 import tomllib
 from pathlib import Path
@@ -1867,6 +1868,151 @@ def test_detached_rollback_takes_one_new_leftovers_directory_per_attempt(dbox):
         assert {str(p.relative_to(attempt / label)): p.read_bytes()
                 for p in (attempt / label).rglob("*") if p.is_file()} == renamed
     assert not (dbox.snapshot / "rollback-leftovers-3").exists()
+
+
+# The differing-file copy: a file under an owned path that is not in the index, whose bytes
+# differ from the saved head's, is kept in the snapshot before the restore or the deletion of
+# <new>/ removes it.
+
+
+def leftover_copy(box, rel, n=1):
+    return box.snapshot / f"rollback-leftovers-{n}" / f"records-{box.records.name}" / rel
+
+
+def test_detached_rollback_copies_a_file_recreated_under_old_after_the_commit(dbox):
+    """Other bytes at an <old>/ path the saved head holds, written after the rename's commit:
+    the walk leaves it alone (the saved head holds its path) and the patch, a diff of tracked
+    content, does not hold it, so it is copied before the restore puts the saved blob back."""
+    rel = f"ai/tasks/{checkout_ids(dbox)[0]}.md"
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.apply()
+    dbox.commit_rename()
+    recreated = dbox.records / rel
+    recreated.parent.mkdir(parents=True)
+    recreated.write_text("recreated with other bytes\n")
+    rolled_back(dbox, before)
+    assert leftover_copy(dbox, rel).read_text() == "recreated with other bytes\n"
+
+
+@requires_permissions
+def test_detached_rollback_stops_on_a_directory_under_p_the_copy_cannot_read(dbox):
+    dbox.save()
+    dbox.apply()
+    unreadable = dbox.records / "ops" / "docs" / "specs"
+    unreadable.chmod(0)
+    try:
+        result = dbox.cutover("rollback", "--snapshot", dbox.snapshot, check=False)
+    finally:
+        unreadable.chmod(0o755)
+    assert result.returncode == 1
+    assert (f"rollback: cannot read the directory {dbox.records.resolve() / 'ops' / 'docs' / 'specs'} "
+            f"(Permission denied); make it readable or move it aside first") in result.stderr, result.stderr
+    assert dbox.new_root.exists() and not dbox.checkout.exists()
+    assert sorted(os.listdir(dbox.snapshot)) == ["config", "links.txt", "meta.json", "rename-cutover", "state"]
+
+
+@pytest.mark.parametrize("make", ["link", "file"])
+def test_detached_rollback_stops_on_a_link_or_file_at_p(dbox, make):
+    dbox.save()
+    dbox.apply()
+    os.rename(dbox.records / "ops", dbox.sync / "moved-ops")
+    if make == "link":
+        (dbox.records / "ops").symlink_to(dbox.sync / "moved-ops")
+        what = "is a link"
+    else:
+        (dbox.records / "ops").write_text("x\n")
+        what = "is not a directory"
+    refused_rollback(dbox, f"rollback: {dbox.records.resolve()}: ops {what}; move it aside first")
+
+
+def test_detached_rollback_retry_converges_after_a_stop_at_the_commit(dbox):
+    """The first attempt stops at the records commit, the hook refusing it, with <old>/
+    restored and staged and <new>/ dropped from the index. The retry passes the walk (the
+    restored <old>/ is in the index and the saved head) and restores only the paths the index
+    or the saved head holds (<new>/ is in neither); a file written between the attempts at a
+    <new>/ path only the current HEAD holds is copied before the retry deletes <new>/."""
+    hex_ = checkout_ids(dbox)[0].split("-", 1)[1]
+    saved = sorted(str(p.relative_to(dbox.records)) for p in (dbox.records / "ai").rglob("*") if p.is_file())
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.apply()
+    dbox.commit_rename()
+    hook, mode = dbox.hook.read_bytes(), stat.S_IMODE(dbox.hook.stat().st_mode)
+    dbox.hook.write_text("#!/bin/sh\necho the-test-hook-refuses >&2\nexit 1\n")
+    dbox.hook.chmod(0o755)
+    result = dbox.cutover("rollback", "--snapshot", dbox.snapshot, check=False)
+    assert result.returncode == 1
+    assert "the-test-hook-refuses" in result.stderr, result.stderr
+    assert sorted(dbox.run("git", "ls-files", "--", "ai", "tack", cwd=dbox.records).stdout.split()) == saved
+    staged = dbox.run("git", "diff", "--cached", "--no-renames", "--name-status", cwd=dbox.records).stdout.splitlines()
+    assert sorted(line.split("\t")[1] for line in staged if line.startswith("A\t")) == saved
+    assert staged and all(line.split("\t")[1].startswith(("ai/", "tack/")) for line in staged), staged
+    assert any(line.startswith("D\ttack/") for line in staged), staged
+    assert not (dbox.records / "tack").exists()
+    dbox.hook.write_bytes(hook)
+    dbox.hook.chmod(mode)
+    rel = f"tack/tasks/tack-{hex_}.md"
+    assert dbox.run("git", "ls-tree", "--name-only", "HEAD", "--", rel, cwd=dbox.records).stdout.strip() == rel
+    written = dbox.records / rel
+    written.parent.mkdir(parents=True)
+    written.write_text("written between the attempts\n")
+    dbox.cutover("rollback", "--snapshot", dbox.snapshot)
+    assert dbox.fingerprint() == before
+    assert [p.name for p in dbox.snapshot.glob("rollback-leftovers-*")] == ["rollback-leftovers-1"]
+    assert leftover_copy(dbox, rel).read_text() == "written between the attempts\n"
+    assert dbox.run("git", "log", "-1", "--format=%s", cwd=dbox.records).stdout.strip() == REVERT
+
+
+def test_detached_rollback_retry_converges_after_an_index_lock(dbox):
+    """A planted index.lock stops `git restore` before it changes anything: the checkout is
+    back and reset, the records repository untouched. The retry converges once it is gone."""
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.apply()
+    dbox.commit_rename()
+    head = head_of(dbox, dbox.records)
+    lock = dbox.records / ".git" / "index.lock"
+    lock.write_text("")
+    result = dbox.cutover("rollback", "--snapshot", dbox.snapshot, check=False)
+    assert result.returncode == 1
+    assert "index.lock': File exists" in result.stderr, result.stderr
+    assert dbox.checkout.exists() and not dbox.new_root.exists()
+    assert dbox.run("git", "status", "--porcelain", cwd=dbox.checkout).stdout == ""
+    assert (dbox.records / "tack").is_dir() and not (dbox.records / "ai").exists()
+    assert dbox.run("git", "status", "--porcelain", "--untracked-files=all", cwd=dbox.records).stdout == ""
+    assert head_of(dbox, dbox.records) == head
+    lock.unlink()
+    dbox.cutover("rollback", "--snapshot", dbox.snapshot)
+    assert dbox.fingerprint() == before
+
+
+# --- the second host (§4.7) -------------------------------------------------------
+
+
+def test_detached_second_host_adopts_the_rename(dbox):
+    """After the first host's cutover, the second host, whose registry still names ai, runs
+    `tasks rename ai tack --adopt` from the new root: its registry maps tack to the new root
+    and its records, the old id resolves, and the first host's state is untouched."""
+    second = {**dbox.env, "XDG_CONFIG_HOME": str(dbox.tmp / "cfg2"), "XDG_STATE_HOME": str(dbox.tmp / "state2")}
+    shutil.copytree(dbox.tmp / "cfg", dbox.tmp / "cfg2")       # the second host's registry, as it was
+    (dbox.tmp / "state2").mkdir()
+    hex_ = checkout_ids(dbox)[0].split("-", 1)[1]
+    detached_cutover(dbox)
+
+    def first_host():
+        return {str(p): p.read_bytes() for d in ("cfg", "state") for p in sorted((dbox.tmp / d).rglob("*"))
+                if p.is_file()}
+
+    first = first_host()
+    dbox.run("tasks", "rename", "ai", "tack", "--adopt", cwd=dbox.new_root, env=second)
+    registry = tomllib.loads((dbox.tmp / "cfg2" / "tasks" / "projects.toml").read_text())
+    assert Path(registry["projects"]["tack"]).resolve() == dbox.new_root.resolve()
+    assert Path(registry["records"]["tack"]).resolve() == (dbox.records / "tack").resolve()
+    assert "ai" not in registry["projects"] and "ai" not in registry["records"]
+    shown = json.loads(dbox.run("tasks", "show", f"ai-{hex_}", cwd=dbox.new_root, env=second).stdout)
+    assert shown["task"]["id"] == f"tack-{hex_}"
+    assert first_host() == first
 
 
 # --- the guard ----------------------------------------------------------------

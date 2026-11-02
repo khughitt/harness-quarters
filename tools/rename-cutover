@@ -9,10 +9,20 @@ irreversible; rollback restores the saved originals and stops, leaving the state
 person, at the first check that fails.
 
 The renamed project is the checkout; the other repositories are the ones the cutover
-retargets in, and the only ones rollback resets. `apply` renames and moves, `retarget`
-fixes dependencies on retired ids in one of them or, with `--forward`, in every project
-outside them, `link` applies the home links, and `verify` checks the result: the runbook
-commits between them.
+retargets in. Each may be an in-tree or a detached tasks project (tasks
+docs/specs/2026-10-22-records-home-design.md); a detached project's records live in a
+records repository outside every snapshot repository, where the cutover owns `<old>/` and
+`<new>/` (the checkout's) and `<p>/` (each detached repository's). Rollback resets the
+checkout and the in-tree repositories, never a detached repository's code checkout, and
+in a records repository restores only the owned paths, leaving every other project's
+records there alone (docs/specs/2026-11-02-detached-rename-cutover-design.md). `apply`
+renames and moves (for a detached checkout it prints the records commit the runbook
+runs), `retarget` fixes dependencies on retired ids in one of them or, with `--forward`,
+in every project outside them, `link` applies the home links, and `verify` checks the
+result: the runbook commits between them.
+
+The other host, once its sync has delivered the moved checkout (and the committed records
+repository), runs `tasks rename <old> <new> --adopt` in the new root; no `init` follows.
 """
 import argparse
 import filecmp
@@ -638,16 +648,17 @@ def validate_records_repos(meta):
     restore staged, which is what lets a retry pass. Under `<new>/`, `<new>/<rest>` maps to
     `<old>/<rest>` with the id mapping applied, or to `<old>/<rest>` itself; under `<old>/`,
     only the id mapping applies (a rename that stopped before it moved the directory). The
-    original must be at the saved head. Any other file stops rollback, naming it. Returns
-    each repository's leftovers, relative to its top level."""
+    original must be at the saved head. Any other file stops rollback, naming it. First,
+    in every records repository, each owned path must be a real directory or absent.
+    Returns each repository's leftovers, relative to its top level."""
     old, new = meta["old"], meta["new"]
     found = {}
     for entry in meta["records_repos"]:
+        for path in entry["owned"]:
+            check_owned_directory(entry["root"], path.rstrip("/"))
         if not renames_records(meta, entry):
             continue
         root, paths = Path(entry["root"]), [f"{old}/", f"{new}/"]
-        for name in (old, new):
-            check_owned_directory(root, name)
         known = git_files(root, "index", paths) | git_files(root, "HEAD", paths)
         saved = git_files(root, entry["head"], paths)
         known |= saved
@@ -667,6 +678,65 @@ def validate_records_repos(meta):
                            f"{original}; move it aside first")
             leftovers.append(path)
         found[entry["root"]] = leftovers
+    return found
+
+
+def saved_blobs(root, head, paths):
+    """Each file under `paths` at the commit `head`: its path mapped to (mode, blob)."""
+    out = run("git", "-C", root, "ls-tree", "-r", "-z", head, "--", *paths)
+    blobs = {}
+    for line in filter(None, out.split("\0")):
+        info, path = line.split("\t", 1)
+        mode, _, blob = info.split()
+        blobs[path] = (mode, blob)
+    return blobs
+
+
+def same_as_saved(root, path, saved):
+    """Whether the file at `path` has the bytes of its saved blob (a link: its target, and
+    the saved entry a link too). A file the saved head lacks is never the same."""
+    if saved is None:
+        return False
+    mode, blob = saved
+    path = Path(path)
+    try:
+        if path.is_symlink():
+            if mode != "120000":
+                return False
+            data = os.fsencode(os.readlink(path))
+        else:
+            if mode == "120000":
+                return False
+            data = path.read_bytes()
+    except OSError as error:
+        raise Stop(f"rollback: cannot read {path}: {error.strerror}; make it readable or move it aside first")
+    shown = subprocess.run(["git", "-C", str(root), "cat-file", "blob", blob], capture_output=True)
+    if shown.returncode != 0:
+        raise Stop(f"git -C {root} cat-file blob {blob}: {shown.stderr.decode(errors='replace').strip()}")
+    return data == shown.stdout
+
+
+def differing_files(meta, leftovers):
+    """Step 2's other copies, found before any mutation: in each records repository, every
+    file on disk under an owned path, `<p>/` included and ignored files too, that is not in
+    the index and whose bytes differ from the saved head's blob at its path (absent counting
+    as different), unless it is a leftover. The restore or the deletion of `<new>/` would
+    remove it, and the patch, a diff of tracked content, does not hold it: a file recreated
+    under `<old>/` after the rename's commit, or, on a retry after an earlier restore dropped
+    `<new>/` from the index, a file at a path only the current HEAD holds. Returns each
+    repository's files, relative to its top level."""
+    found = {}
+    for entry in meta["records_repos"]:
+        root, owned = Path(entry["root"]), entry["owned"]
+        skip = git_files(root, "index", owned) | set(leftovers.get(entry["root"], ()))
+        saved = saved_blobs(root, entry["head"], owned)
+        differ = []
+        for name in owned:
+            for path in files_on_disk(root / name.rstrip("/")):
+                rel = str(path.relative_to(root))
+                if rel not in skip and not same_as_saved(root, path, saved.get(rel)):
+                    differ.append(rel)
+        found[entry["root"]] = sorted(differ)
     return found
 
 
@@ -730,9 +800,9 @@ def copy_leftovers(dest, copies):
 def reset_all(resets, snap, records=(), copies=()):
     """Keep everything rollback discards before discarding any: every reset repository's
     patch, each records repository's patch of its owned paths, and a copy of each validated
-    leftover, `copies` holding (label, root, paths). A patch or copy that cannot be written
-    stops rollback before the first reset or restore, not between two. The leftovers
-    directory is chosen once, before anything is written."""
+    leftover and each differing file, `copies` holding (label, root, paths). A patch or
+    copy that cannot be written stops rollback before the first reset or restore, not
+    between two. The leftovers directory is chosen once, before anything is written."""
     dest = leftovers_dir(snap)
     for root, head, label in resets:
         save_reset_patch(root, head, snap, label)
@@ -870,6 +940,7 @@ def rollback(args):
     leftovers = validate_leftovers(meta)
     validate_kept_destinations(meta)
     records_leftovers = validate_records_repos(meta)
+    differing = differing_files(meta, records_leftovers)
     move_back(meta)
     checkout = Path(meta["checkout"]["root"])
     resets = [(checkout, meta["checkout"]["head"], "checkout")]
@@ -877,8 +948,8 @@ def rollback(args):
     # The in-tree leftovers were validated where the checkout was; move_back only renamed
     # it, so they are read at its old path.
     copies = [("checkout", checkout, leftovers)]
-    copies += [(records_label(e), e["root"], records_leftovers[e["root"]]) for e in meta["records_repos"]
-               if e["root"] in records_leftovers]
+    copies += [(records_label(e), e["root"], sorted(records_leftovers.get(e["root"], []) + differing[e["root"]]))
+               for e in meta["records_repos"]]
     reset_all(resets, snap, meta["records_repos"], copies)
     restore_records(meta, records_leftovers)
     remove_leftovers(checkout, leftovers)
