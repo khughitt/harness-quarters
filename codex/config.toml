@@ -149,6 +149,27 @@ trusted_hash = "sha256:7dafc4d87348f5e5ce452917f49408d0d5084e20830c30c864b46017e
 [hooks.state."/home/keith/.codex/hooks.json:subagent_stop:1:0"]
 trusted_hash = "sha256:e5499c79512059622259ef3ee7522cb003a8c811639de373b910e25ddf70e704"
 
+[hooks.state."/home/keith/.codex/hooks.json:pre_tool_use:1:0"]
+trusted_hash = "sha256:ad9808dfde50bb1af94c00d8953a1f64d4ced63e6ddae95b9abf9eb376fd852d"
+
+[hooks.state."/home/keith/.codex/hooks.json:post_tool_use:0:0"]
+trusted_hash = "sha256:077826ba8a752a8ff8f0e393fe09f94a19eb7067e1c806c68c11d189e974dab1"
+
+[hooks.state."/home/keith/.codex/hooks.json:session_end:1:0"]
+trusted_hash = "sha256:be9edfd25f7d7dcf04c9d2d15fe36e804a37f544818deb4101c6eb546f690b05"
+
+[hooks.state."/home/keith/.codex/hooks.json:user_prompt_submit:1:0"]
+trusted_hash = "sha256:05d86bb4cb61acf103b181ec6199de93ff06d4acb0ed546c4bf7ec821a9db950"
+
+[hooks.state."/home/keith/.codex/hooks.json:subagent_start:1:0"]
+trusted_hash = "sha256:a2689d1c28fa3a24bee6a08bb3119cd40ce4a31de171c9c3a5389bf41a140cba"
+
+[hooks.state."/home/keith/.codex/hooks.json:subagent_stop:2:0"]
+trusted_hash = "sha256:5aa195fa3c8725e21ec504216075e4a3f9870783ac29440ca49683112d6499cd"
+
+[hooks.state."/home/keith/.codex/hooks.json:stop:3:0"]
+trusted_hash = "sha256:47d5fd259a04454b1b93f53c39a708977d33cf93ec72c27e01d39fc9dc2cd624"
+
 [marketplaces.ponytail]
 source_type = "git"
 source = "https://github.com/DietrichGebert/ponytail.git"
