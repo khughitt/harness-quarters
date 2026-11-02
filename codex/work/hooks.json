@@ -171,7 +171,7 @@
           {
             "type": "command",
             "command": "~/d/hq/tools/turn-pause --harness codex SessionEnd",
-            "timeout": 5
+            "timeout": 3
           }
         ]
       }
