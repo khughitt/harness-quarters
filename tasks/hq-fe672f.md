@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-9aa713-pause-past-range
 created: 2026-11-01T10:29:21Z
-updated: 2026-11-02T09:02:04Z
+updated: 2026-11-02T09:02:06Z
 started: 2026-11-01T11:56:46Z
 completed: 2026-11-01T14:34:49Z
 closed: 2026-11-01T14:34:49Z
@@ -77,3 +77,4 @@ Implements Task 1 of the turn-pause plan in .worktrees/hq-9aa713 (branch feat/hq
   provenance: {"harness_session":"claude-code:536b5ebf-5753-4a8b-ac83-61dde5ef4c79","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-02T09:02:02Z (feat/hq-9aa713-pause-past-range): retained: {"host":"titan","kind":"scratch","path":"$WORK_ROOT/hq/hq-fe672f","state":"kept","verification":"verified","purpose":"raw probe logs and isolated harness homes behind the turn-pause capability facts, the reference for re-probing Codex hooking","next_owner":"task:hq-e8a7d5","cleanup_trigger":"hq-e8a7d5 closes; its session decides each item's disposition","manifest":"$WORK_ROOT/hq/hq-fe672f.manifest-2026-11-01T1408Z.txt","sha256":"c0fac5b1a67c7033b01ae52c227d21456cbf3713d2d560c5f6c5e23c2ec49f76"}
 - 2026-11-02T09:02:04Z (feat/hq-9aa713-pause-past-range): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/hq/hq-fe672f.manifest-2026-11-01T1408Z.txt","state":"kept","verification":"verified","purpose":"immutable manifest version for the hq-fe672f scratch checkpoint after probe round 3","next_owner":"task:hq-e8a7d5","cleanup_trigger":"hq-e8a7d5 closes; its session decides each item's disposition","sha256":"c0fac5b1a67c7033b01ae52c227d21456cbf3713d2d560c5f6c5e23c2ec49f76"}
+- 2026-11-02T09:02:06Z (feat/hq-9aa713-pause-past-range): retained: {"host":"titan","kind":"evidence","path":"$WORK_ROOT/hq/hq-fe672f.manifest-2026-11-01T1305Z.txt","state":"kept","verification":"verified","purpose":"immutable manifest version for the first hq-fe672f scratch checkpoint","next_owner":"task:hq-e8a7d5","cleanup_trigger":"hq-e8a7d5 closes; its session decides each item's disposition","sha256":"c568917e0e1545d85356133b745a026d030e28e38f9b3a39cd5f59d70d8d9ee1"}
