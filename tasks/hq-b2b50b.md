@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-b2b50b-active-limit
 created: 2026-11-02T19:14:07Z
-updated: 2026-11-02T20:27:14Z
+updated: 2026-11-02T20:27:33Z
 started: 2026-11-02T20:22:25Z
 depends: []
 tags: [feedback, friction, "from:mm"]
@@ -34,3 +34,4 @@ The user asked for this (their request): the 4 h active-time limit is too aggres
 - 2026-11-02T20:24:41Z (fix/hq-b2b50b-active-limit): Pilot: existing replay recovered the reported 4.099 h / 59 calls / 7 spawns / 0 compactions turn and pauses it only at the 4 h candidate. The 41.643 h controller remains caught at 9.857 active hours by the 501st root call under 12/16/24 h candidates. Pilot: 2 roots, 122 transcript files, 5.37 s, no scheduled-record problems. Beginning 2026-10-02 through 2026-11-02T20:00Z store comparison at 4/8/12/16/24 h; explicit-budget turns separated.
 - 2026-11-02T20:27:12Z (fix/hq-b2b50b-active-limit): attached: active-cutoff-measure.py (3411 bytes): Read-only candidate comparison using turn_pause.replay; run from hq checkout
 - 2026-11-02T20:27:14Z (fix/hq-b2b50b-active-limit): attached: active-cutoff-measurement.json (12410 bytes): 2026-10-02 through 2026-11-02T20Z: 6005 turns, 6596 files, 4/8/12/16/24 h replay candidates
+- 2026-11-02T20:27:33Z (fix/hq-b2b50b-active-limit): Decision: use 16 h active, retaining 500 calls / 30 spawns / 2 compactions and existing proportional budget semantics. Why: 6005 replayed turns (3490 Claude, 2515 Codex), p99.9 active 9.549/10.195 h; 4 h pauses 52 turns, 8 h 26, 12 h 26, 16 h 26, 24 h 25. At 16 h only 2 turns exceed the time threshold; the 41.643 h Codex case pauses first on calls at 9.857 h, leaving one independent time-only stop at 21.101 h. 12 h adds no pause coverage and preempts the 15.655 h controller before its spawn limit at 14.021 h; 24 h loses the independent time-only guard. Cost: compared with 4 h a low-call low-spawn runaway can run up to 12 active hours longer; tails are not validity-labelled and the 21.101 h controller was doing review corrections, not proven runaway. One host/live-store window, partial edge turns and converter limitations apply; no claim of zero false positives. Budget: 12h now scales unnamed counts to 375 calls / 23 spawns / 2 compactions; 48h scales to 1500/90/6. Activation may pause already open turns via limits-changed; require fresh user prompt afterwards.
