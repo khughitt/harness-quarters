@@ -62,14 +62,18 @@ class FileFacts:
     inode: int
     harness: str
     thread_id: str | None
+    thread_identity: bool = False
 
 
-def is_transcript(kind: str, relpath: str) -> bool:
-    """Whether obs indexes this Claude or Codex path."""
+def codex_is_transcript(relpath: str) -> bool:
+    """Whether obs indexes this Codex path."""
+    return relpath.endswith(".jsonl")
+
+
+def claude_is_transcript(relpath: str) -> bool:
+    """Whether obs indexes this Claude Code path."""
     if not relpath.endswith(".jsonl"):
         return False
-    if kind == "codex":
-        return True
     parts = relpath.split("/")
     return len(parts) == 2 or (len(parts) == 4 and parts[2] == "subagents")
 
@@ -95,7 +99,7 @@ def file_reason(f: FileFacts, now_ns: int) -> str | None:
                 or (o.device, o.inode) != (f.device, f.inode) or o.harness != f.harness
                 or o.span_sha256 != f.live_sha256 or o.span_sha256 != f.mirror_sha256):
             return "index-stale"
-        if f.harness == "codex" and (f.thread_id is None or o.identity_conflicts
+        if f.thread_identity and (f.thread_id is None or o.identity_conflicts
                                      or not o.thread_id == o.filename_id == f.thread_id):
             return "index-stale"
     if f.open:

@@ -21,18 +21,52 @@ Once per clone:
 
     just setup
 
-It points `core.hooksPath` at `.githooks`, registers the `harness-state` clean filter,
-and creates `local/codex/rules/`. `local/` is untracked (see Layout). The work configs
-under it come from another host's `local/`, never from `just setup`.
+It points `core.hooksPath` at `.githooks`, registers the `harness-state` filter, and
+creates `local/codex/rules/`. `local/` is untracked (see Layout). The work configs
+under it come from another host's `local/`, never from `just setup`. The repository's git
+config, these filter keys included, lives in the checkout's `.git`, which syncs between
+hosts with the rest of the checkout, so one host's `just setup` reaches the others. A
+host still runs `just setup` once after pulling a change to the recipe: it is
+idempotent, and it does not rely on the synced config or `local/` having arrived.
 
-The filter keeps `model`, `modelSettings` and `effortLevel` in `claude/settings*.json`,
+The filter is three keys of git config. `filter.harness-state.clean` runs
+`.githooks/harness-state-clean %f`. `filter.harness-state.required = true` makes a
+failing clean stop the git command (`git add`, `git diff`, `git status` on a changed
+config) instead of staging the live file unfiltered. `filter.harness-state.smudge = cat`
+is the identity: git treats a required filter with no smudge as failed at every
+checkout of a filtered file, so the smudge must be set, and it changes nothing. The
+hooks check all three: `harness-state-refresh` and the pre-commit hook refuse, naming
+`just setup`, when any differs. Hooks older than `harnesses.toml` neither need nor check
+the two newer keys; backing them out, only to roll back to such hooks, unsets both:
+`git config --unset filter.harness-state.required && git config --unset filter.harness-state.smudge`.
+
+`harnesses.toml` declares, for each tracked live config, the path glob the filter takes
+(`.gitattributes` routes exactly those globs to it, and nothing else), the keys and
+tables it strips, and the pick units `live-picks` saves. The filter keeps `model`,
+`modelSettings` and `effortLevel` in `claude/settings*.json`,
 the top-level `model` and `model_reasoning_effort` in `codex/config*.toml`,
 `defaultProvider`, `defaultModel` and `defaultThinkingLevel` in `pi/settings*.json`
 (with pi's installation ids, `deviceId` and `trackingId`), and `model`, `effort`,
-`effortByBase` and `trustedWorkspaces` in `agy/settings*.json` out of the index: model and
-effort picks (and agy's trusted workspace list) write into the live files (the homes
-symlink here), and they are session or host state, not configuration. A fresh home
+`effortByBase`, `trustedWorkspaces` and `seasonalThemesOptIn` in `agy/settings*.json` out
+of the index: model and effort picks (and agy's trusted workspace list and seasonal theme
+opt-in) write into the live files (the homes symlink here), and they are session or host
+state, not configuration. agy's other settings-UI writes are configuration and are
+tracked, `showFeedbackSurvey` and `statusLine` included. A fresh home
 therefore runs each harness's default model and effort until the first pick.
+
+While `harnesses.toml` is broken (bad TOML, or an entry its validation refuses), the
+filter fails, and so does every git command that runs it on a changed config: nothing
+unfiltered is staged. Restore the manifest (`git checkout -- harnesses.toml`, or fix
+it); never unset `filter.harness-state.required` to get past it. The same refusal
+follows a live config that is not valid JSON (a trailing comma, JSONC) or a
+`.githooks/harness_state.py` that will not import: the filter prints
+`harness-state-clean: <path>: <problem>` (or `cannot load .githooks/harness_state.py`)
+and git stops; fix the file or restore the module. During a merge or rebase,
+`git checkout -- harnesses.toml` fails on an unmerged path: resolve the conflict, or run
+`git merge --abort` / `git rebase --abort`, instead. A config blob staged
+while the filter was not configured (before `just setup`, or across a checkout of a
+commit older than the manifest) keeps the picks it was staged with; the pre-commit hook
+refuses it until `git add --renormalize <path>` stages it through the filter.
 
 The working tree keeps the harness's last pick, and a checkout of the file drops it.
 `.githooks/live-picks` puts it back. At every turn end it saves the picks from
@@ -45,8 +79,8 @@ no hook runs (the commands listed below for trust). Each picker's fields are one
 Claude's `/model` (`model`, `modelSettings`) and `/effort` (`effortLevel`) separately,
 Codex's model and effort together; pi's default model (`defaultProvider`,
 `defaultModel`) and thinking level (`defaultThinkingLevel`) separately; agy's `/model`
-(`model`), `/effort` (`effort`, `effortByBase`) and workspace trust
-(`trustedWorkspaces`) separately. A unit holding
+(`model`), `/effort` (`effort`, `effortByBase`), workspace trust
+(`trustedWorkspaces`) and the seasonal theme opt-in (`seasonalThemesOptIn`) separately. A unit holding
 any of its fields is never touched, so a newer pick always wins, and a pick of one
 Claude, pi or agy picker keeps the other's saved value. A unit holding none is ambiguous,
 so only an explicit act resets the saved pick:
@@ -57,8 +91,16 @@ Claude's `/model` Default clears its fields and the next turn end may
 restore the saved pick; use `forget` for a deliberate reset. PostModelSwitch fires
 before the settings write and may skip a reset to the same resolved model, so it is
 not a capture point. The tested Codex picker actions kept both model fields; use
-`forget` to return it to its default. A Claude, Codex or agy pick made since the last
-turn end is not saved yet; a git command in that window brings back the one before.
+`forget` to return it to its default. Because agy saves `~/.gemini/antigravity-cli/settings.json`
+by atomic rename over the home link, an anchored host (one whose `~/.gemini/config`
+hooks or skills link already targets this checkout) reads any regular file there during
+`capture`, adopts its picks and any tracked `/config` or `permissions` edits back into
+`agy/settings.json`, and restores the symlink on `restore`, `hook` and `forget` (a host
+not anchored yet adopts a first-run file through `just link --apply` instead; see Home
+links). A
+Claude or Codex pick made since the last turn end is not saved yet; a git command in
+that window brings back the one before (for agy, `hook` captures a detached regular file
+before restoring onto the newly checked-out `agy/settings.json`).
 
 The pi extension `pi/extensions/harness-state.ts` calls the same refresh after `model_select` and
 `thinking_level_select` (yielding for the settings write), at `agent_settled` and at
@@ -145,12 +187,21 @@ refuses too. A new attachment that carries host values (a hostname, the home dir
 WORK_ROOT, a registered checkout or its parent directory) follows the attachment
 fallback in lore `skills/references/retained-item-records.md`: the raw bytes stay under
 WORK_ROOT, owned by a task, and a portable derivative is attached. `.ops-check.toml` is
-never widened for an attachment. Twelve pre-commit tests cover the local-layer refusal,
-the hygiene check and the guide check; `just test` runs them.
+never widened for an attachment. Thirteen pre-commit tests cover the local-layer
+refusal, the hygiene check, the guide check and the filter config from a linked
+worktree; `just test` runs them.
 
 The same hook runs `tools/ops-docs check`, vendored from ops: the identity regions at
 the top of this file and of `AGENTS.md` are generated from `identity.toml`, and
 `just docs` regenerates them.
+
+Last, the hook exports the tree the commit will hold and runs two staged checkers over
+it: `tools/harness-facts check` (below) and `.githooks/harness_state.py check
+--staged-tree`. The second validates `harnesses.toml` and `.gitattributes` as staged,
+refuses a staged config blob holding anything the filter strips (naming
+`git add --renormalize <path>`), and reads the filter config from the repository's own
+git config, which a linked worktree shares, so a commit from a worktree is held to the
+same three keys. A staged deletion of `harnesses.toml` or of the checker is refused.
 
 ## Usage
 
@@ -164,11 +215,12 @@ Things you can take from here without the rest:
   including its pinned superpowers submodule. The manifest links each skill to its
   owner: lore, flows, [tasks](https://github.com/khughitt/tasks), ops, or hq's
   session-logs skill.
-- `.githooks/harness-state-clean`: a git clean filter that keeps `/model` and `/effort`
-  picks, Codex bookkeeping and Codex/agy project trust out of committed harness configs.
-  It selects its JSON keys by this repository's paths (`claude/settings*.json`,
-  `pi/settings*.json`, `agy/settings*.json`) and refuses any other JSON path, so a reuse
-  elsewhere edits `JSON_FILES` first.
+- `.githooks/harness-state-clean` with `.githooks/harness_state.py` and
+  `harnesses.toml`: a git clean filter that keeps `/model` and `/effort` picks, Codex
+  bookkeeping and Codex/agy project trust out of committed harness configs. It cleans a
+  path only when one `filter_glob` in `harnesses.toml` matches it and refuses any other
+  path, JSON or TOML, so a reuse elsewhere declares its configs there and in
+  `.gitattributes`, and sets the three filter keys `just setup` sets.
 - `tools/harness-links` with `links.toml`: declares every link from a harness home into a
   checkout. Targets are checkout-relative or `<project>:<relative-path>`, resolved
   through `tasks projects --paths`. `[directories]` declares real directories, with
@@ -193,6 +245,9 @@ MIT licensed; see `LICENSE`.
   holds one symlink per entry, so a search rooted there is empty unless the searcher
   follows links: use `rg -L`, `fd -L` or `find -L`, or search the owner checkout the
   entry resolves to (`readlink -f`, or its `links.toml` target).
+- `harnesses.toml`: the declared harnesses and their tracked live configs (Setup above);
+  the hooks read it through `.githooks/harness_state.py`, and `tools/harness-facts`
+  reads its `[harnesses]` names.
 - `facts/capabilities.toml` and `tools/harness-facts`: capability facts. See below.
 - `agents/skills/session-logs/`: the retained skill. `agents/bin/`: session-episodes,
   wake-judge and their tests. Profile fragments and
@@ -201,9 +256,11 @@ MIT licensed; see `LICENSE`.
   home's settings and hooks files are symlinks to them: `~/.claude` and `~/.codex` to the
   plain files, `~/.codex-work` to `codex/work/hooks.json`, `~/.gemini/antigravity-cli` to
   `agy/settings.json`, and `~/.gemini/config` to `agy/hooks.json`, `agy/skills.json`
-  (pointing `agy` at `~/.agents/skills`) and lore's `AGENTS.md`. `agy/hook` adapts
-  `agy/hooks.json`'s `SessionStart`, `PreToolUse` and `Stop` events to lore's profile
-  hook, ops's capture notice and relay guard, and a one-shot `agy` claim check.
+  (pointing `agy` at `~/.agents/skills` via `{"path": "../../.agents/skills"}`; `agy`
+  does not expand `~/` in `skills.json`) and lore's `AGENTS.md`. `agy/hooks.json` routes
+  `SessionStart`, `PreToolUse` and `Stop` through `relay`, while `agy/hook` heals detached
+  `agy` settings saves and adapts `SessionStart` (lore's profile hook, ops's capture
+  notice) and `Stop` (a one-shot `agy` claim check until ops-33cef9 lands).
 - `claude/mods/`: Claude Code function-hook plugins, linked as `~/.claude/mods` and
   loaded by `CLAUDE_CODE_PLUGIN_DIRS` in `claude/settings.json`. `cli-pane` adds
   `/tas <id>` and `/m <id>`, which show `tasks show` and `mindful show` output in a
@@ -253,14 +310,18 @@ MIT licensed; see `LICENSE`.
   2026-10-22 window. The cutover tool is retired pending deletion (hq-7e81ed).
   Relay upgrades follow the [pinned relay runtime runbook](docs/runbooks/relay-runtime.md).
 - [Adding an agent harness](docs/runbooks/adding-a-harness.md): onboarding a new harness
-  across home routing, live-state hygiene, capability facts, hooks and profiles,
-  process ancestry and provenance, and session discovery and archiving.
+  layer by layer, starting from a search for existing harness enumerations: home
+  routing, live-state hygiene, capability facts, profile and command and claim guards,
+  relay, ancestry and provenance, session discovery and archiving, and rollout order.
 - `local/`: untracked, and carried between hosts by Dropbox, not git. It holds
   claude/settings.work.json, codex/config.work.toml and codex/rules/, the files
   a home links to that the repository must not publish. The `~/.claude-work`,
   `~/.codex-work` and `~/.codex/rules` links point into it
   (`docs/specs/2026-09-28-local-layer-design.md`).
-- `tools/session-archive` and `systemd/user/`: daily capture of agent transcripts to a
+- `tools/session-archive` and `systemd/user/`: daily capture of agent transcripts (Claude
+  Code, Codex and, when `~/.gemini/antigravity-cli` exists, agy's brain transcripts and
+  summaries database; agy's per-conversation databases and spilled step outputs are not
+  captured, see the `session-archive-complete` fact) to a
   backup disk, and a monthly prune of what the archive and obs verifiably hold
   (`docs/specs/2026-09-30-session-archive-design.md`). Prune requires contract-2
   readiness, matching live device/inode, and equality of the live, archive read-back
@@ -295,14 +356,18 @@ consume hq's capture and prune tools. Lore owns the corpus and its block check.
 
 ## Finding a past session
 
-`hq sessions` lists recent Claude Code and Codex sessions from every home (`~/.claude`,
-`~/.claude-work`, `~/.codex`, `~/.codex-work`) and every project, newest first, 20 rows
+`hq sessions` lists recent Claude Code, Codex and agy sessions from every home (`~/.claude`,
+`~/.claude-work`, `~/.codex`, `~/.codex-work`, `~/.gemini/antigravity-cli`) and every project, newest first, 20 rows
 by default (`-n` changes it). `hq sessions -i` picks one, with fzf when it is on `PATH`
 and a numbered prompt otherwise, and resumes it in its own harness, home and recorded
 cwd. It reads each harness's own metadata and keeps no index
 (`docs/notes/2026-10-15-session-discovery-contract.md`): Claude's history.jsonl with
-the transcript found under `projects/*/<id>.jsonl`, and Codex's `state_5.sqlite`
-`threads` table.
+the transcript found under `projects/*/<id>.jsonl`, Codex's `state_5.sqlite`
+`threads` table, and agy's conversation_summaries.db (a `conversation_summaries` table
+that alone names a conversation's workspace and title, with the transcript under
+`brain/<id>/.system_generated/logs`). The code for each harness is an adapter in
+`tools/harness_stores/`, registered in `tools/harness_stores/__init__.py`; the display
+order and the `--harness` choices follow the registry.
 
 - **Rows.** Harness, home (`personal` or `work`), short id, age, place (marked
   `cwd missing` when the directory is gone, which is common for removed worktrees), and
@@ -319,7 +384,7 @@ the transcript found under `projects/*/<id>.jsonl`, and Codex's `state_5.sqlite`
 - **Colour.** `--color auto|always|never`, as the tasks CLI spells it: `auto` (the
   default) paints only when stdout is a terminal and `NO_COLOR` is unset or empty;
   `always` paints whatever `NO_COLOR` says. The harness has a hue (claude orange, codex
-  blue), a work home is bold magenta, a project prefix takes its project's colour (the
+  blue, agy green), a work home is bold magenta, a project prefix takes its project's colour (the
   `color` on its `tasks resolve` row; a project without one, and a path outside every
   project, stay plain), a worktree name is dimmed, a missing cwd is dimmed with a red
   marker, and an archived Codex row is dimmed throughout. Age is one teal hue on a log
@@ -333,14 +398,15 @@ the transcript found under `projects/*/<id>.jsonl`, and Codex's `state_5.sqlite`
   last two grays are close). Cells are padded outside their colour codes, so the columns
   line up as in plain output. `-i` hands fzf the same colours (`--ansi`), and the
   numbered prompt shows them too.
-- **Filters.** `--harness claude|codex`, `--home personal|work`, `--here` (cwd inside
+- **Filters.** `--harness claude|codex|agy`, `--home personal|work`, `--here` (cwd inside
   the current checkout or one of its worktrees, removed ones included), and `--archived`
   (archived Codex threads, hidden by default as Codex's picker hides them). Codex
   threads with an empty preview are always hidden, as Codex's own visible-thread
   indexes leave them out; most subagent threads are among them.
 - **Footer.** One line counting what the sources show: Claude history lines skipped
   (without `sessionId`, malformed), and sessions excluded: Claude sessions whose
-  transcript is gone, and Codex threads with a preview that are non-interactive
+  transcript is gone, agy conversations that are subagents (`parent_conversation_id` set),
+  whose transcript is gone or that name no workspace, and Codex threads with a preview that are non-interactive
   (subagents and `exec`) or whose rollout is gone. Most Codex subagent threads have no
   preview and are hidden without a count. Claude's history never records subagent, `-p`
   or SDK runs, so there is no Claude count for them. A selected home whose directory
@@ -355,7 +421,8 @@ the transcript found under `projects/*/<id>.jsonl`, and Codex's `state_5.sqlite`
   with the file named: Codex's schema is internal, and a version change must stop the
   list rather than empty it.
 - **Launch.** Claude runs `claude <flags> --resume <id>`, Codex `codex <flags> resume
-  <id>`. A work row sets `CLAUDE_CONFIG_DIR` or `CODEX_HOME` to its home; a personal row
+  <id>`, agy `agy <flags> --conversation <id>` (agy has one home and no work-home
+  variable). A work row sets `CLAUDE_CONFIG_DIR` or `CODEX_HOME` to its home; a personal row
   unsets both (`CLAUDE_CONFIG_DIR=~/.claude` would read a different `.claude.json`).
   The cwd and the transcript are rechecked just before launch, and a gone one refuses
   with its path; nothing is launched elsewhere. Per-home flags live in `tools/hq.toml`
@@ -374,18 +441,27 @@ Codex `/hooks` in each native home.
 ## Antigravity CLI hooks
 
 `agy/hooks.json`, linked as `~/.gemini/config/hooks.json`, wires `SessionStart`,
-`PreToolUse` (`run_command`) and `Stop` through `agy/hook`: `SessionStart` runs lore's
-profile hook and ops's capture notice in `workspacePaths[0]` and injects their text as
-a `systemMessage`; `PreToolUse` translates `run_command` into a schema-1 `before-tool`
-envelope for ops's `relay-guard`, failing closed; and `Stop` runs a one-shot
-`agy:<conversationId>` live task claim check (allowing stops while `fullyIdle` is
-`false` under `agy`'s probed `controller-wake`) alongside `harness-state-refresh`.
+`PreToolUse` and `Stop` through both `agy/hook` and `relay` (`v0.3.0`, with handler
+`timeout` `60` paired with `--outer-ms 60000`): `SessionStart` and `PreToolUse`
+(`run_command`) first run `agy/hook` to trigger `.githooks/harness-state-refresh`
+whenever `~/.gemini/antigravity-cli/settings.json` has been replaced by a regular file so
+startup trust and mid-turn `/model`, `/effort` or `/config` saves sync back and relink
+before commands run (emitting empty stdout on `PreToolUse` so `agy` keeps its own
+permission prompts); `SessionStart` in `agy/hook` also runs lore's profile hook and ops's
+capture notice in `workspacePaths[0]` and injects their text as a `systemMessage`;
+`relay` publishes the `agy:<conversationId>` session row, dispatches `SessionStart`,
+`PreToolUse` (`*`) and `Stop` to `familiar-agy`, and translates `run_command` to `Bash`
+for ops's `relay-guard` (`ops-guard`), failing closed; and `Stop` runs `agy/hook`'s
+one-shot `agy:<conversationId>` live task claim check (allowing stops while `fullyIdle`
+is `false` under `agy`'s probed `controller-wake`, until ops-33cef9 lands) alongside
+`harness-state-refresh` and `relay`.
 
 ## Capability facts
 
 `facts/capabilities.toml` records what each harness has been shown to do: a typed value,
 and separately the harness version, date and record the value rests on. An entry is
-`probed` or `unknown`; a harness with no entry is unknown. "The harness does not do
+`probed` or `unknown`; a harness with no entry is unknown. The harnesses are the ones
+`harnesses.toml` declares. "The harness does not do
 this" is a probed value. "Nobody has looked" is `unknown`, and no reader may turn it
 into a default.
 
@@ -498,8 +574,18 @@ missing target under `local/` names the remedy: copy it from another host's `loc
 or run `just setup`. `just link` reports what would change,
 `just link --apply` converges this host, and `just link-check` exits non-zero on drift.
 Run `just link --apply` once on each host after pulling a change to `links.toml`, and on
-a new host after installing a harness. It never overwrites a real file (`refuse`) and
-refuses to run from a worktree.
+a new host after installing a harness. It refuses to run from a worktree and never
+overwrites a real file (`refuse`), except a regular file at a link declared in a
+harness's `adopt` list once one of its declared `anchors` already points into this
+checkout (`just link` reports `adopt`, `just link-check` exits 1, and `just link --apply`
+syncs and relinks it via `.githooks/live-picks sync`). On a host not anchored yet, a
+regular file there is a first-run file the harness wrote before its home was linked (a
+new host where agy ran first). `just link` reports it as `adopt` only when the same run
+would create every anchor, with nothing at any of them. `just link --apply` then runs
+`.githooks/live-picks first-run` before it creates any link: the file's picks merge into
+the tracked config, which stays the base, and any other key the tracked config does not
+already hold refuses the whole apply, writing nothing, as does a running agy (quit every
+agy session first). A foreign file or link at an anchor still refuses.
 
 Global-file, profile and general skill links target lore directly; tasks/curate/scope
 target tasks, quick-add targets ops, and flow tools and skills target flows. Settings,

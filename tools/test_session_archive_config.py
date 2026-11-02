@@ -1,23 +1,39 @@
 """The host gate refuses with exit 2 and a named cause; the archive lock refuses with 75."""
 import fcntl
 import os
+from pathlib import Path
 
 import pytest
 
+import harness_stores
+
+import harness_stores
 from session_archive import config
 from session_archive.testing import run_tool, write_config
 
 
 def test_sources_table_matches_spec(tmp_path):
-    table = {s.name: (s.kind, s.root.relative_to(tmp_path).as_posix(), s.pruned)
-             for s in config.sources(tmp_path)}
+    table = {s.name: (s.harness, s.home.relative_to(tmp_path).as_posix(),
+                      s.root.relative_to(tmp_path).as_posix(), s.prune is not None,
+                      s.required, s.append_only)
+             for s in harness_stores.archive_sources(tmp_path)}
     assert table == {
-        "claude": ("claude", ".claude/projects", True),
-        "claude-work": ("claude", ".claude-work/projects", True),
-        "codex": ("codex", ".codex/sessions", True),
-        "codex-archived": ("codex", ".codex/archived_sessions", False),
-        "codex-work": ("codex", ".codex-work/sessions", False),
+        "claude": ("claude-code", ".claude", ".claude/projects", True, True, True),
+        "claude-work": ("claude-code", ".claude-work", ".claude-work/projects", True, True, True),
+        "codex": ("codex", ".codex", ".codex/sessions", True, True, True),
+        "codex-archived": ("codex", ".codex", ".codex/archived_sessions", False, True, True),
+        "codex-work": ("codex", ".codex-work", ".codex-work/sessions", False, True, True),
+        "agy": ("agy", ".gemini/antigravity-cli", ".gemini/antigravity-cli/brain", False, False, True),
+        "agy-summaries": ("agy", ".gemini/antigravity-cli", ".gemini/antigravity-cli", False, False, False),
     }
+
+
+def test_no_kind_branches_remain():
+    package = Path(config.__file__).parent
+    for name in ("prune.py", "decide.py", "inputs.py"):
+        text = (package / name).read_text()
+        assert 'kind == "claude"' not in text and 'kind == "codex"' not in text, name
+        assert ".kind ==" not in text, name
 
 
 def test_unconfigured_host_exits_2(home):
@@ -120,3 +136,47 @@ def test_invalid_config_encoding_exits_2(home, archive):
     assert str(path) in result.stderr
     assert "cannot read configuration" in result.stderr
     assert "Traceback" not in result.stderr
+
+
+def source_at(tmp_path, name="x", required=False, root_name="root"):
+    from session_archive.config import Source
+    home = tmp_path / "h"
+    home.mkdir(exist_ok=True)
+    return Source(name, name, home, home / root_name, None, required=required)
+
+
+def test_optional_source_with_absent_root_is_skipped_when_never_captured(tmp_path):
+    source = source_at(tmp_path)
+    assert config.check_sources([source], lambda name: False) == {"x": "root absent, never captured"}
+
+
+def test_optional_source_with_absent_root_aborts_once_captured(tmp_path):
+    source = source_at(tmp_path)
+    with pytest.raises(config.HostGateError, match=str(source.root)):
+        config.check_sources([source], lambda name: True)
+
+
+def test_required_source_with_absent_root_still_aborts(tmp_path):
+    source = source_at(tmp_path, required=True)
+    with pytest.raises(config.HostGateError, match="missing"):
+        config.check_sources([source], lambda name: False)
+
+
+def test_present_optional_source_does_not_ask_captured(tmp_path):
+    source = source_at(tmp_path)
+    source.root.mkdir()
+
+    def captured(name):
+        raise AssertionError("captured must not be called")
+    assert config.check_sources([source], captured) == {}
+
+
+def test_symlinked_home_aborts(tmp_path):
+    from session_archive.config import Source
+    real = tmp_path / "real"
+    (real / "root").mkdir(parents=True)
+    link = tmp_path / "link"
+    link.symlink_to(real, target_is_directory=True)
+    source = Source("x", "x", link, link / "root", None)
+    with pytest.raises(config.HostGateError, match="symlink"):
+        config.check_sources([source], lambda name: False)

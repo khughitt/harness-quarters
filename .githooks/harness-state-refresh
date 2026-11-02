@@ -2,7 +2,9 @@
 """Harness refresh: clear git's size-only "modified" mark on tracked harness configs.
 
 A model or effort switch rewrites `claude/settings*.json`, `codex/config*.toml`,
-`pi/settings*.json` or `agy/settings*.json` through the homes' symlinks. The harness-state
+`pi/settings*.json` or `agy/settings*.json` through the homes' symlinks (or, for agy's
+atomic saves, replaces `~/.gemini/antigravity-cli/settings.json` with a regular file that
+`live-picks` adopts back into `agy/settings.json` and relinks). The harness-state
 clean filter keeps those keys out of the index, but git calls a file modified when its size
 differs from the index entry without running the filter, so `git status` shows `M` on a file
 whose filtered diff is empty. Staging such a file writes the blob already in the index and
@@ -25,17 +27,32 @@ local/live-picks-agy.json (agy), so it runs even while another git process holds
 reset; only forget records the default. Then, unless the index is locked,
 `codex-trust sync` saves and restores Codex's project trust and `live-picks restore` puts back a dropped pick; the staging below clears the mark
 their inserts leave. A failed step still lets the others run, then fails the hook with
-every failing step's message. Design:
+every failing step's message. After capture, a broken harnesses.toml fails the refresh
+before it syncs, restores or stages anything, and so does a filter config other than the
+one `just setup` writes (`filter.harness-state.clean`, `required = true` and the identity
+`smudge = cat`), with a
+message naming `just setup`. Design:
 docs/specs/2026-10-10-live-model-preservation-design.md §3.3, extended by
-docs/specs/2026-10-15-pi-live-picks-design.md §3.3.
+docs/specs/2026-10-15-pi-live-picks-design.md §3.3 and
+docs/specs/2026-11-01-harness-manifest-design.md §5.3.
 """
 import subprocess
 import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parent.parent
-PATTERNS = ("claude/settings*.json", "codex/config*.toml", "pi/settings*.json", "agy/settings*.json")
 HERE = Path(__file__).resolve().parent
+if str(HERE) not in sys.path:
+    sys.path.insert(0, str(HERE))
+
+try:
+    import harness_state
+except (ImportError, SyntaxError) as error:
+    # A harness hook: drain its stdin payload, then fail with a named message, not a traceback.
+    sys.stdin.read()
+    sys.exit(f"harness-state-refresh: cannot load .githooks/harness_state.py: {error}; "
+             "resolve or restore it")
+
+REPO = HERE.parent
 TRUST = HERE / "codex-trust"
 PICKS = HERE / "live-picks"
 
@@ -72,11 +89,17 @@ def main():
     steps = [run("live-picks capture", PICKS, "capture")]
     failed = []
     try:
+        manifest = harness_state.load_manifest_or_exit("harness-state-refresh")
+        try:
+            harness_state.check_filter_config()
+        except harness_state.ManifestError as error:
+            sys.exit(f"harness-state-refresh: {error}")
+        patterns = tuple(f":(glob){spec.filter_glob}" for spec in manifest.live_state)
         lock = Path(checked("rev-parse", "--path-format=absolute", "--git-path", "index.lock").strip())
         if not lock.exists():
             steps.append(run("codex-trust sync", TRUST, "sync"))
             steps.append(run("live-picks restore", PICKS, "restore"))
-            marked = checked("diff-files", "--name-only", "--", *PATTERNS).split()
+            marked = checked("diff-files", "--name-only", "--", *patterns).split()
             stale = [path for path in marked if filtered_equal(path)]
             if stale:
                 checked("add", "--", *stale)

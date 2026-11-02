@@ -1,0 +1,64 @@
+---
+id: hq-ac67e4
+title: Converge agy ~/.gemini/config links on europa and reconcile ~/.gemini/antigravity-cli/settings.json live-state drift across titan and europa
+status: done
+priority: 2
+size: s
+complexity: mid
+process: direct
+owner: main
+created: 2026-11-01T22:03:31Z
+updated: 2026-11-01T23:54:47Z
+started: 2026-11-01T22:06:20Z
+completed: 2026-11-01T23:54:47Z
+closed: 2026-11-01T23:54:47Z
+depends: []
+tags: [hooks]
+source: hq-8af61d
+model: claude-opus-5-5
+agent: agy
+origin: user
+---
+
+Why: During hq-8af61d rollout across titan and europa, two agy home-link and settings hygiene issues surfaced across ~/.gemini/antigravity-cli/settings.json and ~/.gemini/config/*:
+1. Bootstrap deadlock on europa (`just link` / `just link --apply`): europa already has real directories `~/.gemini/antigravity-cli` and `~/.gemini/config`, with an initial regular file at `~/.gemini/antigravity-cli/settings.json` (`{"seasonalThemesOptIn": "halloween-2026", "showFeedbackSurvey": false, "trustedWorkspaces": ["/home/keith/d/dotfiles"]}`) written when agy first ran before `just link --apply`. Because `[harness.agy]` in `links.toml` requires `anchors = ["~/.gemini/config/hooks.json", "~/.gemini/config/skills.json"]` and `tools/harness-links` checks `is_anchored` before creating planned `[harness.agy-config]` links (`create ~/.gemini/config/{AGENTS.md,hooks.json,skills.json}`), `just link` and `just link --apply` refuse `~/.gemini/antigravity-cli/settings.json` (`a real file is there`) and leave `~/.gemini/config/*` unlinked on europa (so agy on europa does not load `AGENTS.md`, `agy/hooks.json`, or `agy/skills.json`).
+2. Cross-host `agy/settings.json` live-state drift on titan and europa: on titan, agy rewrites `statusLine.enabled: false` into `agy/settings.json` (leaving `M agy/settings.json` dirty on main), while on europa agy wrote `seasonalThemesOptIn` and `showFeedbackSurvey` alongside host-local `trustedWorkspaces`. `[harnesses.agy.live_state]` in `harnesses.toml` currently strips only `["model", "effort", "effortByBase", "trustedWorkspaces"]`, so adopting europa's initial `settings.json` or running agy on titan/europa dirties tracked `agy/settings.json` unless host/UI keys are classified (either tracked intentionally or added to `harnesses.toml` `clean_keys` / `unrestored_keys` / `pick_units` and reconciled with `hq-e77206` for `statusLine`).
+
+Done:
+- `tools/harness-links` / `links.toml` and `.githooks/live-picks` cleanly onboard a second host where agy created an initial `~/.gemini/antigravity-cli/settings.json` before `~/.gemini/config/{AGENTS.md,hooks.json,skills.json}` were linked, without weakening foreign-file refusal when `[harness.agy-config]` itself has foreign conflicts.
+- `harnesses.toml` `[harnesses.agy.live_state]` and `agy/settings.json` classify or reconcile `seasonalThemesOptIn`, `showFeedbackSurvey`, and `statusLine` (coordinating with `hq-e77206` if `statusLine` is owned there) so normal agy runs and adoption across titan and europa leave `git status` clean.
+- After tests (`just test`) pass and home-link rollout is approved, `just link --apply` and `just link-check` converge on both titan and europa (`ok` across `~/.gemini/antigravity-cli/settings.json` and `~/.gemini/config/{AGENTS.md,hooks.json,skills.json}`).
+
+Where: links.toml, harnesses.toml, agy/settings.json, tools/harness-links, tools/test_harness_links.py, .githooks/harness_state.py, .githooks/live-picks, .githooks/test_live_picks.py.
+
+## Notes
+
+- 2026-11-01T22:03:31Z (add): created
+  provenance: {"origin":"user"}
+- 2026-11-01T22:04:00Z (main): concerns: hq-8af61d extension — onboard europa ~/.gemini/config/* links past unanchored initial settings.json and classify agy/settings.json live-state drift across titan and europa
+- 2026-11-01T22:06:20Z (main): started
+  provenance: {"harness_session":"claude-code:6dcbd897-967a-4e20-a982-604b9c48faaf","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-01T22:06:38Z (main): trial: flow-trial-1 — enrolled — flow off
+- 2026-11-01T22:06:40Z (main): arm: flow-trial-1 — unit tack-ac67e4 — flow off
+- 2026-11-01T22:09:58Z (feat/hq-ac67e4-agy-bootstrap): resumed
+  provenance: {"harness_session":"claude-code:6dcbd897-967a-4e20-a982-604b9c48faaf","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-01T22:31:04Z (feat/hq-ac67e4-agy-bootstrap): baseline: just test in .worktrees/hq-ac67e4 — 2068 passed (agents/bin 268, .githooks+tools 1408, relay-cutover 391, signal cancel 1); harness-facts check ok
+- 2026-11-01T22:43:11Z (feat/hq-ac67e4-agy-bootstrap): Decisions: (1) bootstrap: new live-picks first-run, run by harness-links --apply before any link when every anchor would be created; keeps agy/settings.json as base, union for list picks, refuses non-live keys the tracked config lacks. Why: anchored adopt_detached takes the detached file as base and would drop permissions/allowNonWorkspaceAccess/statusLine from a first-run file. Rejected: two-pass apply (create anchors, then sync) for the same reason; accepting repoint anchors (foreign/dangling link) — kept refusing. Cost if wrong: a foreign-link anchor still deadlocks until removed by hand. (2) classification: agy sets these from its UI (binary symbols SetSeasonalThemes, SetShowFeedbackSurveyOverride, SetStatusLineConfig). seasonalThemesOptIn ('halloween-2026', seasonal churn) -> clean key + own pick unit; showFeedbackSurvey false -> tracked. Why: stable preference vs season-keyed host value. Cost: a showFeedbackSurvey toggle shows as a tracked diff. (3) statusLine.enabled false (titan agy UI write 2026-11-01 16:58:53 -0500) committed on main adaa54d6 rather than reverted; Why: a recorded UI action on a tracked key; hq-e77206 owns the command and must set enabled when it points at familiar. Rejected: revert to true.
+- 2026-11-01T22:50:08Z (feat/hq-ac67e4-agy-bootstrap): review: impl round 1 — verdict: revise; findings: Important 1, Minor 8; reviewer: claude-code/claude-opus-5-5
+- 2026-11-01T22:56:05Z (feat/hq-ac67e4-agy-bootstrap): Round 1 dispositions: I1 (running agy re-saves first-run settings after apply; sync then adopts them as base) addressed in 35ba1e80 — first-run refuses while pgrep finds agy for this uid. M3, M4, M7, M8 addressed in 35ba1e80. minor (deferred): M1 seasonalThemesOptIn opt-out may be undone by restore if agy deletes the key on opt-out (unprobed; forget is the reset); M2 first-run drops a first-run file's unrestored_keys silently (latent: agy declares none); M5 live-picks hardcodes AGY_ANCHORS while harness-links reads links.toml anchors (fails closed as 'still adopt'); M6 relink_home checks S_ISREG only, so an agy save between read and relink is lost (same gap hq-b24c39 deferred).
+- 2026-11-01T22:59:28Z (feat/hq-ac67e4-agy-bootstrap): review: impl round 2 — verdict: accept; findings: Minor 4; reviewer: claude-code/claude-opus-5-5
+- 2026-11-01T22:59:30Z (feat/hq-ac67e4-agy-bootstrap): Round 2 minor (deferred): R2-M1 a running agy that has not yet written settings.json is not checked (apply creates the link unchecked; a later save could be adopted as base by sync); R2-M2 runbook adding-a-harness.md 3.1 omits the running-agy refusal; R2-M3 plan detail says only keys are checked at apply, not running agy; R2-M4 pgrep stub ignores its arguments, and pgrep exit >=2, missing pgrep, and the harness-links-relayed running-agy refusal are untested.
+- 2026-11-01T23:27:23Z (feat/hq-ac67e4-agy-bootstrap): verified: just test on 35ba1e80 — agents/bin 268 passed, .githooks+tools 1417 passed, relay-cutover xdist 390 passed 1 failed (test_partial_finish_keeps_original_timers, unrelated flake: passed 3/3 alone and 391/391 on xdist rerun; filed as its own task), signal cancel 1 passed, harness-facts check exit 0. Focused: first-run/adopt/agy selections 41 passed; RED shown for 6 new behaviour tests on pre-change code and for the running-agy and refusal-detail tests on b7b6a75e.
+- 2026-11-01T23:28:04Z (feat/hq-ac67e4-agy-bootstrap): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-ac67e4","state":"kept","verification":"verified","purpose":"Hold verified branch feat/hq-ac67e4-agy-bootstrap (code b7b6a75e, 35ba1e80) pending user approval to merge live .githooks/live-picks and tools/harness-links changes into main and run just link --apply on europa","ignored":"pycache and .pytest_cache only (regenerable, discard)","next_owner":"task:hq-ac67e4","cleanup_trigger":"After merge into main and europa link convergence: tt-report, then unlock and remove the worktree"}
+- 2026-11-01T23:28:06Z (feat/hq-ac67e4-agy-bootstrap): Host state: titan just link-check exit 0 on main (already anchored). europa (read over ssh, 2026-11-01): no agy running (pgrep exit 1), ~/.gemini/config holds no AGENTS.md/hooks.json/skills.json, first-run settings.json unchanged. Surviving processes: host-load --section session reports nothing left running. Nothing pushed. main carries adaa54d6 (statusLine.enabled false) ahead of the branch base.
+- 2026-11-01T23:28:08Z (feat/hq-ac67e4-agy-bootstrap): parked (waiting on user, approval): User approves; then from main: git merge --no-ff feat/hq-ac67e4-agy-bootstrap; titan just link-check; on europa (no agy running) just link and just link --apply from the shared main checkout, then just link-check on both hosts and git status clean for agy/settings.json; then tt-report, worktree removal checks, tasks done
+  provenance: {"harness_session":"claude-code:6dcbd897-967a-4e20-a982-604b9c48faaf","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-01T23:52:49Z (main): resumed
+  provenance: {"harness_session":"claude-code:6dcbd897-967a-4e20-a982-604b9c48faaf","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-01T23:52:51Z (main): User approved in session (2026-11-01): 'Yes; approved.' — merge into main and run just link --apply on europa. Merged as 254f0140.
+- 2026-11-01T23:54:44Z (main): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-ac67e4","state":"removed","verification":"verified","purpose":"branch feat/hq-ac67e4-agy-bootstrap merged into main 254f0140 and deleted","ignored":"pycache and .pytest_cache discarded (regenerable)","checks":"tt-report run; no host pointer resolved into the worktree; worktree status clean"}
+- 2026-11-01T23:54:46Z (main): Rollout (approved): europa just link reported adopt + 3 creates; just link --apply exit 0; just link-check ok on europa and titan. Shared picks now include europa's /home/keith/d/dotfiles trust and seasonalThemesOptIn; tracked keys (permissions, allowNonWorkspaceAccess, showFeedbackSurvey, statusLine) intact. titan agy/settings.json stat mark cleared by harness-state-refresh; git status clean except pre-existing codex/config.toml (not this task's). europa's temporary /tmp backup of the first-run file removed after verification (contents recorded in the task body). Processes: host-load --section session nothing left running. Nothing pushed.
+- 2026-11-01T23:54:47Z (main): done
+  provenance: {"harness_session":"claude-code:6dcbd897-967a-4e20-a982-604b9c48faaf","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-01T23:54:47Z (main): First-run agy settings adoption (live-picks first-run, run by harness-links --apply before any link) and agy key classification landed in main 254f0140; europa and titan converge (just link-check ok) with agy/settings.json clean. Verification and deferred minors in notes; flake filed as hq-457348.
+  provenance: {"harness_session":"claude-code:6dcbd897-967a-4e20-a982-604b9c48faaf","harness_session_source":"CLAUDE_CODE_SESSION_ID"}

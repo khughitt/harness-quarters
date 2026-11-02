@@ -1,7 +1,7 @@
 # Pinned relay runtime
 
-`relay/package.json` selects v0.2.1; `relay/package-lock.json` fixes its commit to
-`78a70be9b318511d88e0f8ca8d31f54807ed2540`. The declared home launcher resolves to
+`relay/package.json` selects v0.3.0; `relay/package-lock.json` fixes its commit to
+`ed0cb9573a3b147f68923b7ad6f5b152419c147d`. The declared home launcher resolves to
 `relay/bin/relay`, which reads that pin and runs the versioned installation under
 `$HOME/.local/share/relay/`. Node and npm come from `/usr/bin`.
 
@@ -44,11 +44,13 @@ Do not downgrade a service against such a store or reset the durable sequence to
 undo an upgrade. Keep the store intact and use a release that understands it.
 
 The standalone pin does not rewrite installed hooks: those use absolute runtime
-paths, and each harness's hook images move under their own approval. Codex's
-(`codex/hooks.json`, `codex/work/hooks.json`) name v0.2.1, whose SessionStart
-retires replaced Codex roots; Claude Code's (`claude/settings.json`) name v0.1.1,
-which that release does not change. `tools/test_relay_wiring.py` holds each file's
-version. Keep every installation a hook image names.
+paths, and each harness's hook images move under their own approval. Claude Code's
+(`claude/settings.json`), Codex's (`codex/hooks.json`, `codex/work/hooks.json`) and
+Antigravity CLI's (`agy/hooks.json`) all name v0.3.0, so every relayed runtime accepts
+snapshots and subscriber configs naming `agy`. In `agy/hooks.json`, each relay handler
+raises `"timeout": 60` paired with `--outer-ms 60000` so `ops-guard` (30 s) and
+`familiar-agy` (2 s) fit inside relay's 37 s subscriber budget. `tools/test_relay_wiring.py`
+holds each file's version. Keep every installation a hook image names.
 
 Root retirement assumes one active Codex root per process. TUIs launched with
 `--no-daemon`, as the shell aliases for both Codex homes are, satisfy it. A Codex

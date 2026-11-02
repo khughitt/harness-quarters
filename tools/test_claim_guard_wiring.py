@@ -32,13 +32,25 @@ def test_both_codex_homes_guard_root_and_worker(file, home):
 def test_agy_home_guards_pretooluse_and_stop():
     hooks = json.loads((ROOT / 'agy' / 'hooks.json').read_text())['hq']
     pre_tool = [
-        (group['matcher'], h['command'])
+        (group['matcher'], h['command'], h.get('timeout'))
         for group in hooks['PreToolUse']
         for h in group['hooks']
         if h.get('type') == 'command'
     ]
-    assert pre_tool == [('run_command', '~/d/hq/agy/hook PreToolUse ~/d/ops/hooks/relay-guard')]
-    stop = [h['command'] for h in hooks['Stop'] if h.get('type') == 'command']
-    assert stop == ['~/d/hq/agy/hook Stop', '~/.local/bin/harness-state-refresh']
+    assert len(pre_tool) == 2
+    assert pre_tool[0] == ('run_command', '~/d/hq/agy/hook PreToolUse', None)
+    assert pre_tool[1][0] == '*'
+    assert pre_tool[1][2] == 60
+    assert parse_relay_command(pre_tool[1][1], HOOK_VERSIONS['agy/hooks.json']) == ('agy', 60000, 'PreToolUse')
+
+    stop = [(h['command'], h.get('timeout')) for h in hooks['Stop'] if h.get('type') == 'command']
+    assert len(stop) == 3
+    assert stop[:2] == [
+        ('~/d/hq/agy/hook Stop', None),
+        ('~/.local/bin/harness-state-refresh', None),
+    ]
+    assert stop[2][1] == 60
+    assert parse_relay_command(stop[2][0], HOOK_VERSIONS['agy/hooks.json']) == ('agy', 60000, 'Stop')
+
     manifest = tomllib.loads((ROOT / 'links.toml').read_text())
     assert manifest['harness']['agy-config']['links']['hooks.json'] == 'agy/hooks.json'

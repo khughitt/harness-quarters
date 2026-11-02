@@ -5,9 +5,10 @@
       "command(tasks)"
     ]
   },
+  "showFeedbackSurvey": false,
   "statusLine": {
     "type": "",
     "command": "",
-    "enabled": true
+    "enabled": false
   }
 }

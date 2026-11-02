@@ -1,9 +1,11 @@
 """The daily run over every source, and the capture command (spec §3.3)."""
 import json
 import os
+import shutil
 
 import pytest
 
+import harness_stores
 from session_archive import capture, config
 from session_archive.capture import capture_run, mirror_path
 from session_archive.manifest import Manifest
@@ -11,7 +13,7 @@ from session_archive.testing import run_tool, write, write_config
 
 
 def table(home):
-    return config.sources(home)
+    return harness_stores.archive_sources(home)
 
 
 def test_counts_and_mirror(home, archive, manifest):
@@ -168,7 +170,7 @@ def test_linked_source_root_fails_without_archiving_outside(home, archive, manif
     assert report["claude"]["scanned"] == 0
     assert not (archive / "claude/secret.jsonl").exists()
     with pytest.raises(config.HostGateError):
-        config.check_sources(table(home))
+        config.check_sources(table(home), lambda name: False)
 
 
 def test_queued_directory_replaced_with_link_never_archives_outside(home, archive, manifest,
@@ -222,7 +224,7 @@ def test_host_gate_rejects_linked_source_root(home, tmp_path):
     outside.mkdir()
     root.symlink_to(outside, target_is_directory=True)
     with pytest.raises(config.HostGateError):
-        config.check_sources(table(home))
+        config.check_sources(table(home), lambda name: False)
 
 
 def test_file_replaced_by_link_after_walk_never_archives_outside(home, archive, manifest,
@@ -262,3 +264,106 @@ def test_yielded_parent_replaced_by_link_never_archives_outside(home, archive, m
     assert not ok and report["claude"]["failed"] >= 1
     assert not (archive / "claude/p/a.jsonl").exists()
     assert manifest.latest("claude", "p/a.jsonl") is None
+
+
+def test_walk_does_not_open_undescended_directories(tmp_path):
+    top = tmp_path / "top"
+    write(top / "keep/a.txt", b"a")
+    chunks = top / "denied/chunks"
+    chunks.mkdir(parents=True)
+    (top / "denied" / "b.txt").write_bytes(b"b")
+    chunks.chmod(0)
+    try:
+        errors = []
+        found = [p.relative_to(top).as_posix() for p in capture.walk_files(
+            top, errors, descend=lambda rel: not rel.startswith("denied/chunks"))]
+    finally:
+        chunks.chmod(0o700)
+    assert errors == []
+    assert found == ["denied/b.txt", "keep/a.txt"]
+
+
+def test_capture_run_reports_skipped_source_and_stays_ok(home, archive, manifest):
+    write(home / ".claude/projects/p/a.jsonl", b"a\n")
+    sources = table(home)
+    skipped_name = sources[0].name
+    report, ok = capture_run(archive, manifest, sources, {skipped_name: "root absent, never captured"})
+    assert ok
+    assert report[skipped_name] == {"skipped": "root absent, never captured"}
+
+
+def test_capture_run_applies_select(home, archive, manifest):
+    from dataclasses import replace
+    write(home / ".claude/projects/p/a.jsonl", b"a\n")
+    write(home / ".claude/projects/p/b.tmp", b"b\n")
+    sources = [replace(s, select=lambda rel: rel.endswith(".jsonl")) if s.name == "claude" else s
+               for s in table(home)]
+    report, ok = capture_run(archive, manifest, sources)
+    assert ok and report["claude"]["scanned"] == 1
+
+
+AGY = ".gemini/antigravity-cli"
+CID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+
+
+def agy_fixture(home):
+    root = home / AGY
+    logs = root / "brain" / CID / ".system_generated" / "logs"
+    write(logs / "transcript.jsonl", b"t\n")
+    write(logs / "transcript_full.jsonl", b"full\n")
+    write(logs / "chunks" / "transcript" / "00000000.jsonl", b"chunk\n")
+    write(root / "brain" / CID / ".system_generated" / "steps" / "1" / "output.txt", b"out")
+    write(root / "brain" / CID / "scratch" / "x", b"x")
+    write(root / "brain" / CID / "task.md", b"task")
+    write(root / "conversations" / f"{CID}.db", b"db")
+    write(root / "conversation_summaries.db", b"summaries-1")
+    return root
+
+
+def mirrored(archive, source):
+    base = archive / source
+    return sorted(p.relative_to(base).as_posix() for p in base.rglob("*") if p.is_file())
+
+
+def test_agy_capture_takes_only_transcripts_and_the_summaries_db(home, archive, manifest):
+    agy_fixture(home)
+    report, ok = capture_run(archive, manifest, table(home))
+    assert ok
+    logs = f"{CID}/.system_generated/logs"
+    assert mirrored(archive, "agy") == [f"{logs}/transcript.jsonl", f"{logs}/transcript_full.jsonl"]
+    assert mirrored(archive, "agy-summaries") == ["conversation_summaries.db"]
+    assert report["agy"]["copied"] == 2 and report["agy-summaries"]["copied"] == 1
+
+
+def test_agy_summaries_rewrite_replaces_mirror(home, archive, manifest):
+    root = agy_fixture(home)
+    capture_run(archive, manifest, table(home))
+    write(root / "conversation_summaries.db", b"summaries-2 longer")
+    report, ok = capture_run(archive, manifest, table(home))
+    assert ok and report["agy-summaries"]["copied"] == 1
+    assert mirror_path(archive, "agy-summaries", "conversation_summaries.db").read_bytes() == b"summaries-2 longer"
+    write_config(home, archive)
+    status = run_tool("status", home=home)   # exits 1: this test recorded no capture run
+    assert json.loads(status.stdout)["diverged"] == []
+
+
+def test_linked_never_run_agy_home_is_skipped(home, archive):
+    root = home / AGY
+    (root / "brain").rmdir()
+    write(root / "settings.json", b"{}")
+    write_config(home, archive)
+    result = run_tool("capture", home=home)
+    assert result.returncode == 0, result.stderr
+    report = json.loads(result.stdout)
+    assert "skipped" in report["agy"]
+    assert report["agy-summaries"]["scanned"] == 0 and report["agy-summaries"]["copied"] == 0
+
+
+def test_agy_brain_vanishing_after_capture_aborts(home, archive):
+    root = agy_fixture(home)
+    write_config(home, archive)
+    assert run_tool("capture", home=home).returncode == 0
+    shutil.rmtree(root / "brain")
+    result = run_tool("capture", home=home)
+    assert result.returncode == 2
+    assert "brain" in result.stderr

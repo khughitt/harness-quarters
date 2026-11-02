@@ -89,6 +89,10 @@ class Manifest:
             (source, relpath)).fetchone()
         return Version(*row) if row else None
 
+    def has_source(self, source: str) -> bool:
+        return self.conn.execute("SELECT 1 FROM versions WHERE source = ? LIMIT 1",
+                                 (source,)).fetchone() is not None
+
     def diverged(self) -> list[Version]:
         """Files whose newest version is not the mirrored one (spec §3.3)."""
         cursor = self.conn.execute(f"""

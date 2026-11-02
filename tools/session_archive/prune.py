@@ -12,8 +12,8 @@ from pathlib import Path
 from typing import Callable
 
 from .capture import archived_file, capture_file, fsync_dir, mirror_path, open_nofollow, stat_of, walk_files
-from .decide import INACTIVE_NS, FileFacts, ObsFile, Stat, is_transcript, unit_reason
-from .inputs import ROLLOUT_RE, InspectionFailed, Unit, claude_units, codex_units
+from .decide import INACTIVE_NS, FileFacts, ObsFile, Stat, unit_reason
+from .inputs import InspectionFailed, Unit
 from .manifest import MIRROR, Manifest
 from .quarantine import QUARANTINE, _rename_at, inodes, leftovers, quarantine_dir, release, remove_empty_dirs
 
@@ -83,7 +83,7 @@ def _facts(source, relpath: str, ctx: Context, held) -> FileFacts:
     mirror = ctx.manifest.mirror(source.name, relpath)
     obs = ctx.obs.get(str(path))
     info, sha = _read_file(path)
-    match = ROLLOUT_RE.fullmatch(path.name) if source.kind == "codex" else None
+    hooks = source.prune
     return FileFacts(
         relpath=relpath,
         live=Stat(info.st_size, info.st_mtime_ns),
@@ -91,12 +91,13 @@ def _facts(source, relpath: str, ctx: Context, held) -> FileFacts:
         mirror=mirror,
         latest=ctx.manifest.latest(source.name, relpath),
         mirror_sha256=_read_back(mirror_path(ctx.archive_root, source.name, relpath)) if mirror else None,
-        transcript=is_transcript(source.kind, relpath),
+        transcript=hooks.is_transcript(relpath),
         obs=obs,
         open=(info.st_dev, info.st_ino) in held,
         device=info.st_dev, inode=info.st_ino,
-        harness="claude-code" if source.kind == "claude" else "codex",
-        thread_id=match[1] if match else None)
+        harness=hooks.harness,
+        thread_id=hooks.thread_id(path),
+        thread_identity=hooks.thread_identity)
 
 
 def evaluate(unit: Unit, ctx: Context, held) -> str | None:
@@ -368,10 +369,11 @@ def _decide(unit: Unit, reason: str | None, ctx: Context, apply: bool, codex_pro
         return f"kept:{reason}"
     if not apply:
         return "eligible"
-    if unit.source.kind == "codex" and not codex_probed:
+    hooks = unit.source.prune
+    if hooks.needs_probe and not codex_probed:
         return "kept:codex-unprobed"
     ctx.hooks.after_precheck(unit)
-    return delete_claude_unit(unit, ctx) if unit.source.kind == "claude" else delete_codex_unit(unit, ctx)
+    return hooks.delete_unit(unit, ctx)
 
 
 def prune_run(ctx: Context, sources, apply: bool, codex_probed: bool, report: dict) -> bool:
@@ -382,11 +384,11 @@ def prune_run(ctx: Context, sources, apply: bool, codex_probed: bool, report: di
     left = leftovers([source.home for source in sources])
     if left:
         raise LeftoverQuarantine("quarantine not empty: " + ", ".join(str(path) for path in left))
-    pruned = [source for source in sources if source.pruned]
+    pruned = [source for source in sources if source.prune]
     held = ctx.held()
     plan = [(unit, _precheck(unit, ctx, held))
             for source in pruned
-            for unit in (claude_units(source) if source.kind == "claude" else codex_units(source))]
+            for unit in source.prune.units(source)]
     for source in pruned:
         report[source.name] = {"totals": {}, "units": []}
     ok, stopped = True, False
