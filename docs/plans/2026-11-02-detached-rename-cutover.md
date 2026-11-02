@@ -34,6 +34,9 @@ copy is a sibling at the same depth; `commit_rename()` and `depend_on_checkout` 
 their scope; the hook is made to fail by overwriting the box's copy; the misnamed
 fixture's move is committed.
 
+Revision 5 (plan review round 4 accepted revision 4 with one minor): the
+top-level-is-the-checkout fixture writes no tasks in `p`. For the user's review.
+
 **Goal:** `tools/rename-cutover` saves, applies, retargets, links, verifies and rolls
 back a rename whose checkout or `--repo` repositories are detached tasks projects,
 restoring only the rename's own paths in the shared records repository.
@@ -180,7 +183,9 @@ Spec §4, §4.1.
     checkout, so `p`'s records sit at `<checkout>/p`, their parent is the checkout's
     top level (the parent-and-name check passes) and the location check refuses. These
     are `p`'s records; the checkout's own records cannot live in its tree (tasks
-    refuses that at init); the snapshot inside the
+    refuses that at init). The fixture writes no tasks in `p`: its records sit in a
+    git-ignored path, so every record commit there fails with `commit_failed:`, which
+    is expected and not a fixture fault; the snapshot inside the
     records repository; a records directory outside any git repository (`git
     rev-parse` fails and `run` raises the `Stop`, asserted by its message).
 - [ ] Implement in `save` and `preconditions`:
