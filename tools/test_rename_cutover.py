@@ -11,6 +11,8 @@ import pytest
 
 TOOLS = Path(__file__).parent
 LINK_TOOL = "tools/harness-links"
+# A copy of the records repository's pre-commit hook (fixtures/records-hook/README.md).
+RECORDS_HOOK = TOOLS / "fixtures" / "records-hook" / "pre-commit"
 
 
 def load_cutover():
@@ -60,9 +62,16 @@ class Sandbox:
     `ai` (prefix ai) becomes `tack`, retargeting in `repos` (ops, unless a test asks).
     The hq shape (`hq=True`): checkout `tack`, renamed once before from `ai` so the
     registry holds `ai = "tack"`, in the group `agent-layer`, becomes `hq`; its Codex
-    trust files are a filtered tracked file and an ignored one, saved with --keep."""
+    trust files are a filtered tracked file and an ignored one, saved with --keep.
+    `detached=True` makes the checkout a detached project and `detached_repos` names the
+    repos that are; their records live in the records repository `sync/records`, which only
+    such a box creates, so in-tree boxes and their fingerprints are unchanged."""
 
-    def __init__(self, tmp, repos=("ops",), hq=False):
+    def __init__(self, tmp, repos=("ops",), hq=False, detached=False, detached_repos=()):
+        if not set(detached_repos) <= set(repos):
+            raise ValueError(f"detached_repos {detached_repos} must name repos in {repos}")
+        if hq and (detached or detached_repos):
+            raise ValueError("the hq shape is in-tree only")
         self.tmp = tmp
         self.env = {"PATH": os.environ["PATH"], "HOME": str(tmp / "home"), "USER": "test",
                     "XDG_CONFIG_HOME": str(tmp / "cfg"), "XDG_STATE_HOME": str(tmp / "state"),
@@ -79,6 +88,11 @@ class Sandbox:
         self.repos = [self.sync / name for name in repos]
         self.ops = self.repos[0]
         self.snapshot = tmp / "snap"
+        # Detached projects keep their records in one records repository beside the code
+        # checkouts, which runs its own copy of the records repository's hook.
+        self.detached, self.detached_repos = detached, tuple(detached_repos)
+        self.records = self.sync / "records" if detached or detached_repos else None
+        self.hook = tmp / "hooks" / "pre-commit"
 
     def run(self, *cmd, cwd=None, check=True, env=None):
         result = subprocess.run([str(c) for c in cmd], cwd=cwd, env=env or self.env, text=True,
@@ -94,12 +108,60 @@ class Sandbox:
         assert Path(self.run("git", "rev-parse", "--absolute-git-dir", cwd=path).stdout.strip()).resolve().is_relative_to(path.resolve())
         self.run("tasks", "init", "--prefix", prefix, cwd=path)
 
+    def code_repo(self, path, prefix):
+        """A detached project: a code checkout with no tasks/, paired with records under
+        the records repository. Its config is committed there at once: until it is in the
+        index, the hook refuses every record commit under <prefix>/."""
+        path.mkdir(parents=True)
+        self.run("git", "init", "-q", "-b", "main", path)
+        assert Path(self.run("git", "rev-parse", "--show-toplevel", cwd=path).stdout.strip()).resolve() == path.resolve()
+        assert Path(self.run("git", "rev-parse", "--absolute-git-dir", cwd=path).stdout.strip()).resolve().is_relative_to(path.resolve())
+        self.run("tasks", "init", "--prefix", prefix, "--records", self.records, cwd=path)
+        self.commit(self.records, f"{prefix} records")
+
+    def records_repo(self):
+        """The records repository, its first commit, and the box's own copy of the hook,
+        which a test may overwrite to make it fail; the tracked fixture is never edited."""
+        self.hook.parent.mkdir()
+        shutil.copy2(RECORDS_HOOK, self.hook)
+        self.records.mkdir(parents=True)
+        self.run("git", "init", "-q", "-b", "main", self.records)
+        assert Path(self.run("git", "rev-parse", "--show-toplevel", cwd=self.records).stdout.strip()).resolve() == self.records.resolve()
+        assert Path(self.run("git", "rev-parse", "--absolute-git-dir", cwd=self.records).stdout.strip()).resolve().is_relative_to(self.records.resolve())
+        self.run("git", "commit", "-q", "--allow-empty", "-m", "init", cwd=self.records)
+        self.run("git", "config", "core.hooksPath", self.hook.parent, cwd=self.records)
+
+    def is_detached(self, root):
+        """Whether `root` (the checkout or one of `repos`) keeps its records in the records repository."""
+        if root == self.checkout:
+            return self.detached
+        return root in self.repos and root.name in self.detached_repos
+
     def commit(self, root, message):
         self.run("git", "add", "-A", cwd=root)
         self.run("git", "commit", "-qm", message, cwd=root)
 
+    def commit_rename(self):
+        """The runbook's commit after apply. Detached: the records commit apply prints,
+        scoped to the old and new records directories, after which HEAD holds <new>/ and no
+        <old>/. In-tree: the new root, as the existing after-commit tests commit it."""
+        if not self.detached:
+            self.commit(self.new_root, "rename")
+            return
+        owned = (self.old, self.new)
+        self.run("git", "-C", self.records, "add", "-A", "--", *owned)
+        self.run("git", "-C", self.records, "commit", "-q", "-m",
+                 f"chore(tasks): rename {self.old} -> {self.new}", "--", *owned)
+        top = self.run("git", "-C", self.records, "ls-tree", "--name-only", "HEAD").stdout.split()
+        assert self.new in top and self.old not in top, top
+
     def build(self):
-        self.repo(self.checkout, "ai")
+        if self.records:
+            self.records_repo()
+        if self.detached:
+            self.code_repo(self.checkout, "ai")
+        else:
+            self.repo(self.checkout, "ai")
         (self.checkout / "tools").mkdir()
         for name in ("harness-links", "rename-cutover"):
             shutil.copy2(TOOLS / name, self.checkout / "tools" / name)
@@ -116,7 +178,11 @@ class Sandbox:
         (self.checkout / ".worktrees").symlink_to(f"../../.dropbox-work/{self.checkout.name}/.worktrees")
         self.commit(self.checkout, "init")
         for root in self.repos:
-            self.repo(root, root.name)
+            if self.is_detached(root):
+                self.code_repo(root, root.name)
+                (root / "README").write_text("x\n")
+            else:
+                self.repo(root, root.name)
             self.commit(root, "init")
         if self.hq:
             self.build_hq()
@@ -172,14 +238,17 @@ class Sandbox:
         self.cutover("link", "--snapshot", self.snapshot)
 
     def depend_on_checkout(self, root):
-        """A task in `root` that depends on a checkout task, both committed. Returns
-        (checkout id, dependent id)."""
+        """A task in `root` that depends on a checkout task, both committed: by this
+        helper for an in-tree side, by tasks itself for a detached one, whose record
+        writes commit themselves. Returns (checkout id, dependent id)."""
         target = task_id(self.run("tasks", "add", "depended on", "--process", "direct",
                                   cwd=self.checkout).stdout)
-        self.commit(self.checkout, "a task to depend on")
+        if not self.is_detached(self.checkout):
+            self.commit(self.checkout, "a task to depend on")
         dependent = task_id(self.run("tasks", "add", "depends", "--process", "direct", cwd=root).stdout)
         self.run("tasks", "dep", dependent, "--on", target, cwd=root)
-        self.commit(root, "depend on the checkout")
+        if not self.is_detached(root):
+            self.commit(root, "depend on the checkout")
         return target, dependent
 
     def fingerprint(self):
@@ -192,7 +261,13 @@ class Sandbox:
                 "worktrees": os.readlink(self.checkout / ".worktrees"),
                 "agents": os.path.realpath(self.tmp / "home" / ".agents"),
                 "modes": {rel: oct((self.checkout / rel).stat().st_mode) for rel in KEPT
-                          if (self.checkout / rel).exists()}}
+                          if (self.checkout / rel).exists()},
+                # A detached box's records, with its directories, so empty docs/specs and
+                # docs/plans count.
+                **({"records": tree(self.records),
+                    "records_dirs": sorted(str(p.relative_to(self.records)) for p in self.records.rglob("*")
+                                           if p.is_dir() and ".git" not in p.relative_to(self.records).parts)}
+                   if self.records else {})}
 
     def edit_trust(self):
         """What the runbook's step 4 does to the trust files at the new root."""
@@ -398,6 +473,32 @@ def test_save_refuses_a_detached_checkout(box):
     assert result.returncode == 1
     assert f"save: {code} keeps its records in {records}, outside it" in result.stderr
     assert not box.snapshot.exists()
+
+
+@pytest.mark.parametrize("detached, detached_repos", [(True, ()), (True, ("ops",)), (False, ("ops",))])
+def test_detached_sandbox_builds(tmp_path, detached, detached_repos):
+    """The fixture the detached tests stand on: each detached project's code checkout holds
+    no tasks/, its row is detached with records under sync/records, the fixture's own
+    record writes committed themselves, and the records repository's hook is installed."""
+    box = Sandbox(tmp_path, detached=detached, detached_repos=detached_repos).build()
+    rows = {Path(row["root"]).resolve(): row for row in
+            json.loads(box.run("tasks", "projects", "--json", cwd=box.checkout).stdout)["projects"]}
+    detached_roots = ([box.checkout] if detached else []) + [box.sync / n for n in detached_repos]
+    for root in detached_roots:
+        assert not (root / "tasks").exists()
+        row = rows[root.resolve()]
+        assert row["kind"] == "detached"
+        assert Path(row["records"]).resolve() == (box.records / row["prefix"]).resolve()
+    for root in {box.checkout, *box.repos} - set(detached_roots):
+        assert (root / "tasks" / ".config.toml").is_file()
+    assert box.run("git", "status", "--porcelain", "--untracked-files=all", "--ignored",
+                   cwd=box.records).stdout == ""
+    (box.records / "zz").mkdir()
+    (box.records / "zz" / "note.md").write_text("x\n")
+    box.run("git", "add", "zz", cwd=box.records)
+    result = box.run("git", "commit", "-qm", "zz", cwd=box.records, check=False)
+    assert result.returncode == 1
+    assert "pre-commit: zz/ has staged files but no tasks/.config.toml" in result.stderr
 
 
 def test_save_records_every_repository(box2):
@@ -1054,6 +1155,38 @@ def test_registry_view_reads_the_renamed_projects_locations_as_its_own(tmp_path)
     changes = cutover.registry_changes(cutover.registry_view(live, "tack", "hq"),
                                        cutover.registry_view(saved, "tack", "hq"))
     assert changes == ["locations.ops"]
+
+
+RECORDS_SAVED = ('[projects]\nai = "/c/ai"\nops = "/c/ops"\n'
+                 '[records]\nai = "/r/ai"\nops = "/r/ops"\n')
+
+
+def test_registry_view_reads_a_moved_records_key_as_the_renames_own(tmp_path):
+    # tasks rename moves a detached project's [records] key with its prefix.
+    cutover = load_cutover()
+    saved, live = tmp_path / "saved.toml", tmp_path / "live.toml"
+    saved.write_text(RECORDS_SAVED)
+    live.write_text('[projects]\nops = "/c/ops"\ntack = "/c/tack"\n'
+                    '[records]\nops = "/r/ops"\ntack = "/r/tack"\n')
+    assert cutover.registry_view(live, "ai", "tack") == cutover.registry_view(saved, "ai", "tack")
+    live.write_text(live.read_text().replace('ops = "/r/ops"', 'ops = "/r/elsewhere"'))
+    changes = cutover.registry_changes(cutover.registry_view(live, "ai", "tack"),
+                                       cutover.registry_view(saved, "ai", "tack"))
+    assert changes == ["records.ops"]
+
+
+@pytest.mark.parametrize("change", [
+    lambda t: t.replace('ops = "/r/ops"', 'ops = "/r/elsewhere"'),
+    lambda t: t.replace('ops = "/r/ops"\n', ""),
+    lambda t: t + 'zz = "/r/zz"\n',
+])
+def test_registry_view_sees_any_other_records_change(tmp_path, change):
+    cutover = load_cutover()
+    saved, live = tmp_path / "saved.toml", tmp_path / "live.toml"
+    saved.write_text(RECORDS_SAVED)
+    live.write_text(change(RECORDS_SAVED))
+    assert live.read_text() != RECORDS_SAVED
+    assert cutover.registry_view(live, "ai", "tack") != cutover.registry_view(saved, "ai", "tack")
 
 
 @pytest.mark.parametrize("change, named", [
