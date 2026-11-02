@@ -1,13 +1,15 @@
 ---
 id: hq-ea142a
 title: "rename-cutover detached: rollback restores the owned paths"
-status: todo
+status: doing
 priority: 3
 size: l
 complexity: high
 process: direct
+owner: feat/hq-5300fd-detached-rename
 created: 2026-11-02T14:57:10Z
-updated: 2026-11-02T14:57:26Z
+updated: 2026-11-02T17:15:04Z
+started: 2026-11-02T17:15:04Z
 depends: [hq-62ba95]
 parent: hq-5300fd
 tags: []
@@ -26,3 +28,5 @@ Contract: spec docs/specs/2026-11-02-detached-rename-cutover-design.md revision 
   provenance: {"harness_session":"claude-code:09b6f7cb-8595-42af-8bc2-4cea8a51e5c1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-02T14:57:26Z (feat/hq-5300fd-detached-rename): gate: scoped — step of hq-5300fd plan
   provenance: {"harness_session":"claude-code:09b6f7cb-8595-42af-8bc2-4cea8a51e5c1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-02T17:15:04Z (feat/hq-5300fd-detached-rename): started
+  provenance: {"harness_session":"claude-code:7104a322-b727-4975-8f34-3d210db837b3","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
