@@ -123,9 +123,12 @@ def project_kind(root, command):
     project's records sit in an overlay directory the cutover neither saves nor resets."""
     row = project_row(root, command)
     kind = row.get("kind")
-    if not row.get("reachable") or kind is None:
+    if not row.get("reachable"):
         raise Stop(f"{command}: {root} ({row['prefix']}) is unreachable: tasks projects cannot read its "
                    f"records, so its kind is unknown; make them readable first")
+    if kind is None:
+        raise Stop(f"{command}: {root} ({row['prefix']}) is reachable but tasks projects gives it no kind; "
+                   f"update tasks to one that reports kind (records-home) first")
     if kind == "linked":
         raise Stop(f"{command}: {root} is a linked project; this cutover renames and retargets only "
                    f"in-tree and detached projects")
@@ -172,8 +175,8 @@ def check_main_only(root):
 
 
 def check_records_repo(top, entry, old):
-    """A records repository the cutover owns paths in. `<old>/` holds nothing git does not
-    track, so every file there after the rename is the rename's; each `<p>/` has no tracked
+    """A records repository the cutover owns paths in. `<old>/` holds no untracked, ignored
+    or changed file, so every file there after the rename is the rename's; each `<p>/` has no tracked
     change; nothing is staged anywhere, since tasks defers every record commit while
     something is, which would leave `retarget --repo`'s writes uncommitted. Untracked files
     under `<p>/` and outside the owned paths are another session's, and left alone."""
@@ -182,8 +185,9 @@ def check_records_repo(top, entry, old):
         found = run("git", "-C", top, "status", "--porcelain", "--untracked-files=all", "--ignored",
                     "--", f"{old}/").splitlines()
         if found:
-            raise Stop(f"preconditions: {top} has files under {old}/ that git does not track: "
-                       f"{', '.join(found)}; move them aside first")
+            raise Stop(f"preconditions: {top} has untracked, ignored or changed files under {old}/: "
+                       f"{', '.join(line.strip() for line in found)}; every file there after the rename "
+                       f"must be the rename's, so commit, discard or move them aside first")
     for p in entry["prefixes"]:
         found = run("git", "-C", top, "status", "--porcelain", "--untracked-files=no",
                     "--", f"{p}/").splitlines()
@@ -259,6 +263,19 @@ def owned_paths(entry, old, new):
     return sorted(([f"{old}/", f"{new}/"] if entry["rename"] else []) + [f"{p}/" for p in entry["prefixes"]])
 
 
+def check_new_records_absent(top, records_root, new):
+    """`<records-root>/<new>` is where `tasks rename` writes: nothing may be there, not even a
+    dangling link (which `exists()` misses), and git may not still track `<new>/` in HEAD or
+    the index: rollback restores the owned paths from the saved head and checks them."""
+    path = records_root / new
+    if path.exists() or path.is_symlink():
+        raise Stop(f"save: {path} already exists")
+    for where, cmd in (("HEAD", ("ls-tree", "-r", "--name-only", "HEAD")), ("index", ("ls-files",))):
+        if run("git", "-C", top, *cmd, "--", f"{new}/").strip():
+            raise Stop(f"save: {top} still tracks {new}/ in its {where} although {path} is absent; "
+                       f"remove it from git (git rm -r --cached {new}/, then commit) first")
+
+
 def records_repos(checkout, repos, rows, new):
     """The records repositories of the detached snapshot projects, deduplicated, each with
     what it owns: `rename` when the checkout's records live there (`<old>/` and `<new>/`),
@@ -281,8 +298,7 @@ def records_repos(checkout, repos, rows, new):
         entry = records.setdefault(top, {"rename": False, "prefixes": []})
         if root == checkout:
             records_root = Path(row["records"]).resolve().parent
-            if (records_root / new).exists():
-                raise Stop(f"save: {records_root / new} already exists")
+            check_new_records_absent(top, records_root, new)
             entry["rename"] = True
             checkout_records = {"repo": str(top), "records_root": str(records_root)}
         else:

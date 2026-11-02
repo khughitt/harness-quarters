@@ -594,6 +594,17 @@ def test_save_refuses_an_unreachable_repo(box):
     refused(box, f"save: {box.ops.resolve()} (ops) is unreachable")
 
 
+def test_project_kind_names_a_reachable_row_without_a_kind(tmp_path, monkeypatch):
+    """A reachable row with no kind is not unreachable: tasks read its records but did not
+    say what kind of project it is."""
+    cutover = load_cutover()
+    monkeypatch.setattr(cutover, "project_row", lambda root, command: {"prefix": "ops", "reachable": True})
+    with pytest.raises(cutover.Stop) as stop:
+        cutover.project_kind(tmp_path, "save")
+    assert str(stop.value) == (f"save: {tmp_path} (ops) is reachable but tasks projects gives it no kind; "
+                               f"update tasks to one that reports kind (records-home) first")
+
+
 # Refusals on the records repository.
 
 
@@ -624,10 +635,15 @@ def test_save_refuses_a_records_repository_with_an_unmerged_branch(dbox):
                   f"branch lacks: feature")
 
 
+OLD_NOT_CLEAN = "has untracked, ignored or changed files under ai/"
+OLD_REMEDY = ("every file there after the rename must be the rename's, so commit, discard or move "
+              "them aside first")
+
+
 def test_save_refuses_an_untracked_file_under_old(dbox):
     (dbox.records / "ai" / "docs" / "specs" / "draft.md").write_text("x\n")
-    refused(dbox, f"preconditions: {dbox.records.resolve()} has files under ai/ that git does not "
-                  f"track: ?? ai/docs/specs/draft.md")
+    refused(dbox, f"preconditions: {dbox.records.resolve()} {OLD_NOT_CLEAN}: ?? ai/docs/specs/draft.md; "
+                  f"{OLD_REMEDY}")
 
 
 def test_save_refuses_an_ignored_file_under_old(dbox):
@@ -635,8 +651,19 @@ def test_save_refuses_an_ignored_file_under_old(dbox):
         f.write("*.tmp\n")
     (dbox.records / "ai" / "docs" / "plans" / "x.tmp").write_text("x\n")
     assert dbox.run("git", "status", "--porcelain", cwd=dbox.records).stdout == ""
-    refused(dbox, f"preconditions: {dbox.records.resolve()} has files under ai/ that git does not "
-                  f"track: !! ai/docs/plans/x.tmp")
+    refused(dbox, f"preconditions: {dbox.records.resolve()} {OLD_NOT_CLEAN}: !! ai/docs/plans/x.tmp; "
+                  f"{OLD_REMEDY}")
+
+
+def test_save_refuses_a_tracked_change_under_old(dbox):
+    """The same check sees a tracked edit, which its message and remedy cover too."""
+    spec = dbox.records / "ai" / "docs" / "specs" / "a.md"
+    spec.write_text("x\n")
+    dbox.run("git", "add", "ai/docs/specs/a.md", cwd=dbox.records)
+    dbox.run("git", "commit", "-qm", "an ai spec", cwd=dbox.records)
+    spec.write_text("changed\n")
+    refused(dbox, f"preconditions: {dbox.records.resolve()} {OLD_NOT_CLEAN}: M ai/docs/specs/a.md; "
+                  f"{OLD_REMEDY}")
 
 
 def test_save_refuses_a_tracked_change_under_p(dbox):
@@ -658,6 +685,29 @@ def test_save_refuses_a_staged_file_of_another_project(dbox):
 def test_save_refuses_when_the_new_records_directory_exists(dbox):
     (dbox.records / "tack").mkdir()
     refused(dbox, f"save: {(dbox.records / 'tack').resolve()} already exists")
+
+
+def test_save_refuses_a_dangling_link_at_the_new_records_directory(dbox):
+    (dbox.records / "tack").symlink_to("nowhere")
+    assert not (dbox.records / "tack").exists()
+    refused(dbox, f"save: {dbox.records.resolve() / 'tack'} already exists")
+
+
+@pytest.mark.parametrize("where", ["HEAD", "index"])
+def test_save_refuses_a_new_records_directory_git_still_tracks(dbox, where):
+    """tack/ gone from the working tree but still in HEAD or the index: tasks rename would
+    write over it, and rollback's restore of the owned paths would then fail its check."""
+    if where == "HEAD":
+        # Another detached project tack, committed through the hook, then deleted from disk.
+        dbox.code_repo(dbox.sync / "tackcode", "tack")
+    else:
+        (dbox.records / "tack").mkdir()
+        (dbox.records / "tack" / "x.md").write_text("x\n")
+        dbox.run("git", "add", "tack/x.md", cwd=dbox.records)
+    shutil.rmtree(dbox.records / "tack")
+    refused(dbox, f"save: {dbox.records.resolve()} still tracks tack/ in its {where} although "
+                  f"{(dbox.records / 'tack').resolve()} is absent; remove it from git "
+                  f"(git rm -r --cached tack/, then commit) first")
 
 
 def test_save_refuses_a_records_directory_not_directly_under_its_top_level(dbox):
@@ -1394,18 +1444,20 @@ def test_registry_view_reads_a_moved_records_key_as_the_renames_own(tmp_path):
     assert changes == ["records.ops"]
 
 
-@pytest.mark.parametrize("change", [
-    lambda t: t.replace('ops = "/r/ops"', 'ops = "/r/elsewhere"'),
-    lambda t: t.replace('ops = "/r/ops"\n', ""),
-    lambda t: t + 'zz = "/r/zz"\n',
+@pytest.mark.parametrize("change, named", [
+    (lambda t: t.replace('ops = "/r/ops"', 'ops = "/r/elsewhere"'), "records.ops"),
+    (lambda t: t.replace('ops = "/r/ops"\n', ""), "records.ops"),
+    (lambda t: t + 'zz = "/r/zz"\n', "records.zz"),
 ])
-def test_registry_view_sees_any_other_records_change(tmp_path, change):
+def test_registry_view_sees_any_other_records_change(tmp_path, change, named):
     cutover = load_cutover()
     saved, live = tmp_path / "saved.toml", tmp_path / "live.toml"
     saved.write_text(RECORDS_SAVED)
     live.write_text(change(RECORDS_SAVED))
     assert live.read_text() != RECORDS_SAVED
-    assert cutover.registry_view(live, "ai", "tack") != cutover.registry_view(saved, "ai", "tack")
+    live_view, saved_view = (cutover.registry_view(path, "ai", "tack") for path in (live, saved))
+    assert live_view != saved_view
+    assert cutover.registry_changes(live_view, saved_view) == [named]
 
 
 @pytest.mark.parametrize("change, named", [
