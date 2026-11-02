@@ -706,21 +706,27 @@ def test_save_refuses_a_dangling_link_at_the_new_records_directory(dbox):
     refused(dbox, f"save: {dbox.records.resolve() / 'tack'} already exists")
 
 
-@pytest.mark.parametrize("where", ["HEAD", "index"])
-def test_save_refuses_a_new_records_directory_git_still_tracks(dbox, where):
-    """tack/ gone from the working tree but still in HEAD or the index: tasks rename would
-    write over it, and rollback's restore of the owned paths would then fail its check."""
+@pytest.mark.parametrize("where, what", [("HEAD", "directory"), ("index", "directory"), ("index", "file")])
+def test_save_refuses_a_new_records_directory_git_still_tracks(dbox, where, what):
+    """tack gone from the working tree but still in HEAD or the index, as a directory or a
+    file: tasks rename would write over it, and rollback's restore of the owned paths would
+    then fail its check."""
     if where == "HEAD":
         # Another detached project tack, committed through the hook, then deleted from disk.
         dbox.code_repo(dbox.sync / "tackcode", "tack")
-    else:
+        shutil.rmtree(dbox.records / "tack")
+    elif what == "directory":
         (dbox.records / "tack").mkdir()
         (dbox.records / "tack" / "x.md").write_text("x\n")
         dbox.run("git", "add", "tack/x.md", cwd=dbox.records)
-    shutil.rmtree(dbox.records / "tack")
-    refused(dbox, f"save: {dbox.records.resolve()} still tracks tack/ in its {where} although "
+        shutil.rmtree(dbox.records / "tack")
+    else:
+        (dbox.records / "tack").write_text("x\n")
+        dbox.run("git", "add", "tack", cwd=dbox.records)
+        (dbox.records / "tack").unlink()
+    refused(dbox, f"save: {dbox.records.resolve()} still tracks tack in its {where} although "
                   f"{(dbox.records / 'tack').resolve()} is absent; remove it from git "
-                  f"(git rm -r --cached tack/, then commit) first")
+                  f"(git rm -r --cached tack, then commit) first")
 
 
 def test_save_refuses_a_records_directory_not_directly_under_its_top_level(dbox):
@@ -781,6 +787,21 @@ def test_save_refuses_a_records_directory_outside_any_git_repository(box):
     loose.mkdir()
     extra_detached(box, "qq", loose)
     refused(box, f"git -C {(loose / 'qq').resolve()} rev-parse --show-toplevel: fatal: not a git repository")
+
+
+def test_save_refuses_two_records_repositories_with_one_name(dbox):
+    """Rollback labels a records repository's patches and copies by its directory name, so
+    two named alike would share them."""
+    other = dbox.tmp / "elsewhere" / "records"
+    other.mkdir(parents=True)
+    dbox.run("git", "init", "-q", "-b", "main", other)
+    dbox.run("git", "commit", "-q", "--allow-empty", "-m", "init", cwd=other)
+    extra_detached(dbox, "zz", other)
+    dbox.commit(other, "zz records")
+    first, second = sorted((dbox.records.resolve(), other.resolve()))
+    refused(dbox, f"save: the records repositories {first} and {second} share the directory name records, "
+                  f"which rollback labels each one's patches and copies by; rename one of the directories "
+                  f"first")
 
 
 def test_save_records_every_repository(box2):
@@ -877,6 +898,13 @@ def test_retarget_writes_each_task_once(tmp_path, monkeypatch):
     ('{"id":"ops-1","warnings":["commit_failed: the hook refused"]}',
      "retarget: tasks edit ops-1 in {root} left its record uncommitted: commit_failed: the hook refused; "
      "no further task was edited; clear the cause, run `tasks commit` there, then rerun retarget --repo"),
+    ('{"id":"ops-1","warnings":["commit_unavailable: /r is not in a git repository (or git is missing); '
+     'left uncommitted: ops/tasks/ops-1.md"]}',
+     "retarget: tasks edit ops-1 in {root} left its record uncommitted: commit_unavailable: /r is not in a "
+     "git repository (or git is missing); left uncommitted: ops/tasks/ops-1.md; no further task was edited"),
+    ('{"id":"ops-1","warnings":[{"kind":"commit_failed"}]}',
+     "retarget: tasks edit ops-1 in {root} printed a warning that is not a string: {{'kind': 'commit_failed'}}; "
+     "no further task was edited"),
 ])
 def test_retarget_repo_stops_on_edit_output_it_cannot_trust(tmp_path, monkeypatch, edit_output, message):
     """Unparseable output is a stop, never "no warnings"; so is a failed record commit.
@@ -1136,6 +1164,23 @@ def test_apply_refuses_when_the_new_records_directory_exists(dbox, make):
     assert dbox.checkout.exists() and not dbox.new_root.exists()
     assert (dbox.records / "ai" / "tasks" / ".config.toml").is_file()
     assert projects_row(dbox, "ai")["kind"] == "detached"
+
+
+def test_apply_after_a_partial_apply_points_to_rollback(dbox):
+    """An apply that stopped after `tasks rename`, before the checkout moved: rerun, it finds
+    the renamed records at <new> and <old> gone. Those are the rename's, so it names
+    rollback, never moving them aside."""
+    before = dbox.fingerprint()
+    dbox.save()
+    dbox.run("tasks", "rename", "ai", "tack", cwd=dbox.checkout)
+    result = dbox.cutover("apply", "--snapshot", dbox.snapshot, check=False)
+    assert result.returncode == 1
+    records = dbox.records.resolve()
+    assert (f"apply: {records / 'tack'} already exists and {records / 'ai'} is gone: an earlier apply "
+            f"stopped after tasks rename moved ai's records there; they are the rename's, so do not move "
+            f"them aside: run rollback, then apply again") in result.stderr, result.stderr
+    assert dbox.checkout.exists() and not dbox.new_root.exists()
+    rolled_back(dbox, before)
 
 
 def commit_line(box):
@@ -1708,6 +1753,79 @@ def test_detached_rollback_stops_on_a_new_task_written_before_the_commit(dbox):
     hex_ = task_id(added).split("-", 1)[1]
     refused_rollback(dbox, f"rollback: {dbox.records.resolve()}: tack/tasks/tack-{hex_}.md {NOT_LEFTOVER}: "
                            f"the saved head has no ai/tasks/ai-{hex_}.md; move it aside first")
+
+
+@pytest.mark.parametrize("name", ["tack", "ai"])
+@pytest.mark.parametrize("make", ["link", "file"])
+def test_detached_rollback_stops_on_a_link_or_file_at_new_or_old(dbox, name, make):
+    """A link at <new> or <old> would carry the walk and the deletion of <new>/ elsewhere,
+    and a file there cannot be walked or deleted as a directory: rollback stops before any
+    mutation. After apply, tack/ holds the renamed records, moved aside here, and ai/ is gone."""
+    dbox.save()
+    dbox.apply()
+    path = dbox.records / name
+    if name == "tack":
+        os.rename(path, dbox.sync / "moved-tack")
+    if make == "link":
+        path.symlink_to(dbox.sync / "moved-tack" if name == "tack" else "nowhere")
+        what = "is a link"
+    else:
+        path.write_text("x\n")
+        what = "is not a directory"
+    refused_rollback(dbox, f"rollback: {dbox.records.resolve()}: {name} {what}; move it aside first")
+
+
+requires_permissions = pytest.mark.skipif(os.geteuid() == 0, reason="root reads a directory whatever its mode")
+
+
+@requires_permissions
+def test_detached_rollback_stops_on_a_directory_the_walk_cannot_read(dbox):
+    dbox.save()
+    dbox.apply()
+    unreadable = dbox.records / "tack" / "docs" / "specs"
+    unreadable.chmod(0)
+    try:
+        result = dbox.cutover("rollback", "--snapshot", dbox.snapshot, check=False)
+    finally:
+        unreadable.chmod(0o755)
+    assert result.returncode == 1
+    assert (f"rollback: cannot read the directory {dbox.records.resolve() / 'tack' / 'docs' / 'specs'} "
+            f"(Permission denied); make it readable or move it aside first") in result.stderr, result.stderr
+    assert dbox.new_root.exists() and not dbox.checkout.exists()
+    assert sorted(os.listdir(dbox.snapshot)) == ["config", "links.txt", "meta.json", "rename-cutover", "state"]
+
+
+def test_copy_leftovers_stops_when_its_directory_exists(tmp_path):
+    """Another rollback took the number between the choice and the copy."""
+    cutover = load_cutover()
+    (tmp_path / "a").mkdir()
+    (tmp_path / "a" / "x.md").write_text("x\n")
+    dest = tmp_path / "rollback-leftovers-1"
+    dest.mkdir()
+    with pytest.raises(cutover.Stop) as stop:
+        cutover.copy_leftovers(dest, [("checkout", tmp_path / "a", ["x.md"])])
+    assert str(stop.value) == (f"rollback: {dest} already exists, taken by another rollback since this one "
+                               f"chose it; nothing was reset or restored, so rerun rollback")
+
+
+@requires_permissions
+def test_reset_all_stops_on_a_leftover_it_cannot_read_before_any_reset(tmp_path, monkeypatch):
+    cutover = load_cutover()
+    calls = []
+    monkeypatch.setattr(cutover, "save_reset_patch", lambda *args, **kwargs: None)
+    monkeypatch.setattr(cutover, "run", lambda *cmd, cwd=None: calls.append(cmd))
+    leftover = tmp_path / "a" / "x.md"
+    leftover.parent.mkdir()
+    leftover.write_text("x\n")
+    leftover.chmod(0)
+    snap = tmp_path / "snap"
+    snap.mkdir()
+    with pytest.raises(cutover.Stop) as stop:
+        cutover.reset_all([(tmp_path / "a", "h1", "checkout")], snap, copies=[("checkout", tmp_path / "a", ["x.md"])])
+    assert str(stop.value).startswith(f"rollback: cannot copy {leftover} to "
+                                      f"{snap / 'rollback-leftovers-1' / 'checkout' / 'x.md'}: ")
+    assert str(stop.value).endswith("; nothing was reset or restored; clear the cause, then rerun rollback")
+    assert calls == []
 
 
 # The copies: every validated leftover is kept in the snapshot before it is deleted.

@@ -278,10 +278,12 @@ def check_new_records_absent(top, records_root, new):
     path = records_root / new
     if path.exists() or path.is_symlink():
         raise Stop(f"save: {path} already exists")
+    # The pathspec `<new>` without a slash: it matches a tracked file named <new> as well as
+    # a directory's contents.
     for where, cmd in (("HEAD", ("ls-tree", "-r", "--name-only", "HEAD")), ("index", ("ls-files",))):
-        if run("git", "-C", top, *cmd, "--", f"{new}/").strip():
-            raise Stop(f"save: {top} still tracks {new}/ in its {where} although {path} is absent; "
-                       f"remove it from git (git rm -r --cached {new}/, then commit) first")
+        if run("git", "-C", top, *cmd, "--", new).strip():
+            raise Stop(f"save: {top} still tracks {new} in its {where} although {path} is absent; "
+                       f"remove it from git (git rm -r --cached {new}, then commit) first")
 
 
 def records_repos(checkout, repos, rows, new):
@@ -311,6 +313,14 @@ def records_repos(checkout, repos, rows, new):
             checkout_records = {"repo": str(top), "records_root": str(records_root)}
         else:
             entry["prefixes"].append(row["prefix"])
+    by_name = {}
+    for top in records:
+        if top.name in by_name:
+            first, second = sorted((by_name[top.name], top))
+            raise Stop(f"save: the records repositories {first} and {second} share the directory name "
+                       f"{top.name}, which rollback labels each one's patches and copies by; rename one of "
+                       f"the directories first")
+        by_name[top.name] = top
     return records, checkout_records
 
 
@@ -587,11 +597,18 @@ def holds(root, where, path):
     return bool(git_files(root, where, [path]))
 
 
+def unreadable(error):
+    raise Stop(f"rollback: cannot read the directory {error.filename} ({error.strerror}); make it readable "
+               f"or move it aside first")
+
+
 def files_on_disk(directory):
     """Every file under `directory`, ignored or not, a link counted as a file and never
-    followed; empty when the directory is absent."""
+    followed; empty when the directory is absent. A directory it cannot read stops it."""
+    if not Path(directory).exists():
+        return []
     found = []
-    for parent, dirs, names in os.walk(directory):
+    for parent, dirs, names in os.walk(directory, onerror=unreadable):
         parent = Path(parent)
         for name in list(dirs):
             if (parent / name).is_symlink():
@@ -599,6 +616,17 @@ def files_on_disk(directory):
                 names.append(name)
         found += [parent / name for name in names]
     return found
+
+
+def check_owned_directory(root, name):
+    """An owned directory is absent or a real directory: through a link the walk, the
+    restore and the deletion of `<new>/` would reach elsewhere, and a file there cannot be
+    walked or deleted as one."""
+    path = Path(root) / name
+    if path.is_symlink():
+        raise Stop(f"rollback: {root}: {name} is a link; move it aside first")
+    if path.exists() and not path.is_dir():
+        raise Stop(f"rollback: {root}: {name} is not a directory; move it aside first")
 
 
 def validate_records_repos(meta):
@@ -618,6 +646,8 @@ def validate_records_repos(meta):
         if not renames_records(meta, entry):
             continue
         root, paths = Path(entry["root"]), [f"{old}/", f"{new}/"]
+        for name in (old, new):
+            check_owned_directory(root, name)
         known = git_files(root, "index", paths) | git_files(root, "HEAD", paths)
         saved = git_files(root, entry["head"], paths)
         known |= saved
@@ -680,12 +710,20 @@ def copy_leftovers(dest, copies):
     `dest` is created here, never reused: an existing one stops the copy."""
     if not any(paths for _, _, paths in copies):
         return
-    dest.mkdir()
+    try:
+        dest.mkdir()
+    except FileExistsError:
+        raise Stop(f"rollback: {dest} already exists, taken by another rollback since this one chose it; "
+                   f"nothing was reset or restored, so rerun rollback")
     for label, root, paths in copies:
         for path in paths:
-            target = dest / label / path
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(Path(root) / path, target, follow_symlinks=False)
+            source, target = Path(root) / path, dest / label / path
+            try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target, follow_symlinks=False)
+            except OSError as error:
+                raise Stop(f"rollback: cannot copy {source} to {target}: {error}; nothing was reset or "
+                           f"restored; clear the cause, then rerun rollback")
     print(f"rename-cutover: leftovers kept in {dest}", file=sys.stderr)
 
 
@@ -920,15 +958,19 @@ def write_rewrites(root, rewrites, check=None):
             check(task, output)
 
 
-UNCOMMITTED = ("commit_deferred:", "commit_failed:")
+# tasks names every record commit it did not make with a `commit_` warning:
+# `commit_deferred:`, `commit_failed:` and `commit_unavailable:` (the records directory is
+# not in a git repository, or git is missing), each followed by what it left uncommitted.
+UNCOMMITTED = "commit_"
 
 
 def committed_check(root):
     """A snapshot repository's edit must commit: a detached project's record commit is
     deferred while anything is staged in its records repository (which can happen after
-    save) and fails when the hook refuses it. Either would leave the record uncommitted for
-    verify to find later, so it stops the retarget here, naming tasks' warning. Output that
-    is not tasks' JSON report is a stop too, never read as "no warnings"."""
+    save) and fails when the hook refuses it; tasks cannot commit at all outside a git
+    repository. Each would leave the record uncommitted for verify to find later, so any
+    `commit_` warning stops the retarget here, naming it. Output that is not tasks' JSON
+    report, or a warning that is not a string, is a stop too, never read as "no warnings"."""
     def check(task, output):
         try:
             report = json.loads(output)
@@ -940,7 +982,10 @@ def committed_check(root):
             raise Stop(f"retarget: tasks edit {task} in {root} printed no warnings list: {output!r}; "
                        f"no further task was edited")
         for warning in warnings:
-            if isinstance(warning, str) and warning.startswith(UNCOMMITTED):
+            if not isinstance(warning, str):
+                raise Stop(f"retarget: tasks edit {task} in {root} printed a warning that is not a string: "
+                           f"{warning!r}; no further task was edited")
+            if warning.startswith(UNCOMMITTED):
                 raise Stop(f"retarget: tasks edit {task} in {root} left its record uncommitted: {warning}; "
                            f"no further task was edited; clear the cause, run `tasks commit` there, "
                            f"then rerun retarget --repo")
@@ -964,7 +1009,12 @@ def apply(args):
         raise Stop(f"apply: {Path(meta['storage_new']).parent} already exists")
     records = meta["checkout"]["records"]
     if records:
-        new_records = Path(records["records_root"]) / new
+        new_records, old_records = Path(records["records_root"]) / new, Path(records["records_root"]) / old
+        if (new_records.exists() or new_records.is_symlink()) and not (old_records.exists() or old_records.is_symlink()):
+            # save found <old> there and <new> absent: only tasks rename moves the one to the other.
+            raise Stop(f"apply: {new_records} already exists and {old_records} is gone: an earlier apply "
+                       f"stopped after tasks rename moved {old}'s records there; they are the rename's, so do "
+                       f"not move them aside: run rollback, then apply again")
         if new_records.exists() or new_records.is_symlink():
             raise Stop(f"apply: {new_records} already exists; tasks rename writes {new}'s records there, "
                        f"so move it aside first")
