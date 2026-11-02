@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-b2b50b-active-limit
 created: 2026-11-02T19:14:07Z
-updated: 2026-11-02T22:30:44Z
+updated: 2026-11-02T22:31:05Z
 started: 2026-11-02T20:22:25Z
 depends: []
 tags: [feedback, friction, "from:mm"]
@@ -64,3 +64,4 @@ Scope: choose and prepare a measured default active-time cutoff with the existin
 - 2026-11-02T22:29:21Z (fix/hq-b2b50b-active-limit): review: impl round 2 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
 - 2026-11-02T22:29:42Z (fix/hq-b2b50b-active-limit): attached: merge-review-report.md (1269 bytes): Fresh scoped review of merge 57b47cd by codex/gpt-6.1-sol: accepted, no findings
 - 2026-11-02T22:30:44Z (fix/hq-b2b50b-active-limit): attached: scratch-manifest-v2.json (1316 bytes): Complete ten-file integration scratch checkpoint; old manifest remains historical
+- 2026-11-02T22:31:05Z (fix/hq-b2b50b-active-limit): Integration verification: merged current main into branch at 57b47cd27c247090ee8bf9857f91e425fbbb333b; retained both README sections, automatic code/test merge. Combined focused 408 passed in 12.67 s; just test 2702 passed (268 agents + 2042 hook/tools + 391 parallel + 1 serial), exit 0, hook/tools 641.42 s and parallel 497.45 s. Both logs and fresh scoped review are attached. Mandatory hygiene passed; tasks check has no errors and the same four pre-existing undefined-tag warnings. No broad work skipped and no remote evidence used. Review round 2 accepted, no findings or declined behaviors. tt-report ran successfully before worktree removal; host-load found no surviving session processes. Fresh scan found no host bin symlink, user systemd unit or known Claude/Codex/relay config pointer into the worktree. Cleanup dispositions: discard regenerable Python/pytest caches; keep every tracked file by merge ancestry; scratch script/data/reviews and combined logs match attachments, pilot and superseded RED/GREEN/full logs may be discarded after successful integration because their results and relevant failures are recorded and no diagnosis remains. Retain both immutable scratch manifests as task attachments. No pushes; other owners work untouched. Closing session owns only same-turn approved integration and cleanup; no unmerged branch will remain.
