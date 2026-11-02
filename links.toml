@@ -62,6 +62,8 @@
 "~/.agents/skills/flow" = "flows:skills/flow"
 "~/.agents/skills/observability-and-instrumentation" = "lore:skills/observability-and-instrumentation"
 "~/.agents/skills/performance-optimization" = "lore:skills/performance-optimization"
+"~/.agents/skills/quarry" = "quarry:skills/quarry"
+"~/.agents/skills/quarry-biology" = "quarry:skills/quarry-biology"
 "~/.agents/skills/quick-add" = "ops:skills/quick-add"
 "~/.agents/skills/receiving-code-review" = "lore:vendor/superpowers/skills/receiving-code-review"
 "~/.agents/skills/references" = "lore:skills/references"
@@ -94,6 +96,8 @@ home = "~/.claude"
 "skills/curate-docs" = "lore:skills/curate-docs"
 "skills/scope" = "tasks:skills/scope"
 "skills/tasks" = "tasks:skills/tasks"
+"skills/quarry" = "quarry:skills/quarry"
+"skills/quarry-biology" = "quarry:skills/quarry-biology"
 "skills/quick-add" = "ops:skills/quick-add"
 
 [harness.claude-work]
