@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-b2b50b-active-limit
 created: 2026-11-02T19:14:07Z
-updated: 2026-11-02T21:10:09Z
+updated: 2026-11-02T21:10:32Z
 started: 2026-11-02T20:22:25Z
 depends: []
 tags: [feedback, friction, "from:mm"]
@@ -49,3 +49,4 @@ Scope: choose and prepare a measured default active-time cutoff with the existin
 - 2026-11-02T21:09:19Z (fix/hq-b2b50b-active-limit): attached: final-review-report.md (2125 bytes): Full read-only review by codex/gpt-6.1-sol of frozen tree dbc616b5; accepted with no findings
 - 2026-11-02T21:09:54Z (fix/hq-b2b50b-active-limit): attached: scratch-manifest.json (915 bytes): Complete seven-file scratch checkpoint after full verification and final review
 - 2026-11-02T21:10:09Z (fix/hq-b2b50b-active-limit): Verification: final just test passed 2675 tests (268 + 2015 + 391 + 1), exit 0; main hook/tool portion 685.90 s, parallel portion 549.54 s. Focused 132 passed; mandatory hygiene ops-check, ops-docs check, harness-facts check, git diff --check and pre-commit checks passed. tasks check has no errors and four pre-existing undefined-tag warnings (hq-1dce70, hq-53e9ea, hq-c899fb, hq-eeb4d6). No broad checks skipped and no remote test evidence used. Code commit aec828c4ad910e4ecf39c612f3022769251b425b has tree dbc616b5406d6c9d9b09363ad3b58a5e8e0bc555, exactly the reviewed snapshot. Full reviewer report is attached; review note deferred while code was staged was recovered with tasks commit. Ruling: accept reviewer declining to label historical tails valid/runaway. Why: aggregate replay cannot establish validity; report already discloses the 21.1 h corrective-work case. Cost: residual false pauses remain possible. No review fixes or deferred minors. Tooling friction filed as ops-a04cad (alternate-index snapshot directory diagnostic) and ops-7a345e (index-only restore refusal); standard index snapshot and normal commit completed safely.
+- 2026-11-02T21:10:32Z (fix/hq-b2b50b-active-limit): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-b2b50b","state":"kept","verification":"verified","purpose":"Reviewed and verified cutoff branch awaiting user approval for live activation","next_owner":"task:hq-b2b50b","cleanup_trigger":"After approved integration, verify ancestry, host pointers and ignored-file dispositions before removal"}
