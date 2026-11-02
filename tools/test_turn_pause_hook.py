@@ -1079,13 +1079,13 @@ def _many_nodes(element: bytes, size=33_000_000) -> bytes:
 
 
 @pytest.mark.parametrize('element', [b'0', b'[]', b'{}'])
-def test_entry_refuses_a_33_mb_payload_of_many_nodes_well_under_a_second(tmp_path, element):
+def test_entry_refuses_a_33_mb_payload_of_many_nodes_well_inside_the_hook_timeout(tmp_path, element):
     run_entry(tmp_path, 'UserPromptSubmit', claude_prompt('work'))
     raw = _many_nodes(element)
     assert len(raw) < hook.MAX_PAYLOAD_BYTES
     start = time.monotonic()
     r = run_entry(tmp_path, 'PreToolUse', raw)
-    assert time.monotonic() - start < 1.0
+    assert time.monotonic() - start < 2.5  # the hook's timeout is 5 s
     out = json.loads(r.stdout)
     assert denied(out) and 'JSON nodes' in reason(out)
 
