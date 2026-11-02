@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-b2b50b-active-limit
 created: 2026-11-02T19:14:07Z
-updated: 2026-11-02T20:28:31Z
+updated: 2026-11-02T20:34:14Z
 started: 2026-11-02T20:22:25Z
 depends: []
 tags: [feedback, friction, "from:mm"]
@@ -17,6 +17,12 @@ origin: user
 ---
 
 The user asked for this (their request): the 4 h active-time limit is too aggressive. It paused a valid subagent-driven plan execution partway through a task, while the session's other counters were far below their limits (about 59 of 500 calls, 7 of 30 spawns, 0 of 2 compactions). The user suggests something closer to 12 or 16 h. They want the implementer to choose the cutoff from historic session data, so that it catches the true outlier sessions without ending valid long-running ones. My reading: a session that only dispatches subagents and waits on them accrues active time while doing little itself, so wall-clock active time may be a weak signal compared with the call, spawn and compaction counters.
+
+Scope: choose and prepare a measured default active-time cutoff with the existing replay, preserving all counting rules and other defaults. Done when default, CLI output, long-turn pause boundary, budget scaling, and current user documentation agree, with full verification and review. Live activation requires approval. Evidence and recommendation: [ref:calibration]. Implementation starts in .worktrees/hq-b2b50b. The inference about weak wall-clock signals above is the filing agent's interpretation; the measured counter includes in-flight tool time and short gaps, not all elapsed wall time.
+
+## References
+
+- calibration (output, kind=report): docs/notes/2026-11-02-active-cutoff-report.md — historical comparison, decision and activation consequences
 
 ## Notes
 
