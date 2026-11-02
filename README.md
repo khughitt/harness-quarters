@@ -556,6 +556,15 @@ A first-line budget directive scales unnamed counts relative to the default:
 Changing the live limits file pauses existing turns with `limits-changed`; a new
 genuine user prompt starts a turn with the updated limits.
 
+### Parking from a worktree while paused
+
+Use `tasks -C .worktrees/<name> park <id> "next step" --waiting-on user --reason decision`
+when the authoritative task record is in a worktree. `tasks -C .worktrees/<name> note <id> "status"`
+also stays allowed after the pause's read grace is exhausted. Quote a directory that
+contains spaces. The directory selector preserves each closing subcommand's existing
+restrictions: records reads and attachments use grace, and `tasks show` needs `--no-fetch`.
+The pause still refuses `cd`, `env` wrappers and compound shell commands.
+
 ### Re-probing the turn-pause hook facts
 
 The hook facts the turn pause reads (`hook-*`, `model-tool-surface`, `codex-*`) come

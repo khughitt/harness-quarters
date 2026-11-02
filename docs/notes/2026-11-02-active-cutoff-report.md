@@ -1,7 +1,8 @@
 # Active-time cutoff calibration
 
-Type: report; hq-b2b50b. Proposed activation: 16 active hours, retaining 500 root
-calls, 30 tree spawns and 2 root compactions. Activation awaits user approval.
+Type: report; hq-b2b50b. Selected cutoff: 16 active hours, retaining 500 root
+calls, 30 tree spawns and 2 root compactions. The user approved activation on
+2026-11-02 after verification and independent review.
 
 ## Evidence
 

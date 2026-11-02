@@ -135,6 +135,33 @@ def test_shell_passes(cmd, klass):
     assert isinstance(v, Verdict) and v.klass == klass and v.reason
 
 
+@pytest.mark.parametrize('cmd, klass', [
+    ('tasks -C .worktrees/task park hq-123456 next', 'bookkeeping'),
+    ('tasks -C /srv/project/.worktrees/task note hq-123456 paused', 'bookkeeping'),
+    ('tasks -C "project worktree" note hq-123456 paused', 'bookkeeping'),
+    ('tasks -C . show hq-123456 --no-fetch', 'read'),
+    ('tasks -C . claims', 'read'),
+    ('tasks -C . list', 'read'),
+    ('tasks -C . attach hq-123456 log.txt', 'read'),
+    ('tasks -C . show hq-123456', 'refuse'),
+    ('tasks -C --no-fetch show hq-123456', 'refuse'),
+    ('tasks -C . start hq-123456', 'refuse'),
+    ('tasks -C . done hq-123456', 'refuse'),
+    ('tasks -C', 'refuse'),
+    ('tasks -C .', 'refuse'),
+    ('tasks -C "" park hq-123456 next', 'refuse'),
+    ('tasks -C -C park hq-123456 next', 'refuse'),
+    ('tasks -C . -C /srv/project park hq-123456 next', 'refuse'),
+    ('hq -C . pause status', 'refuse'),
+    ('cd .worktrees/task && tasks park hq-123456 next', 'refuse'),
+    ('env -C .worktrees/task tasks park hq-123456 next', 'refuse'),
+    ('tasks -C . park hq-123456 next && git status', 'refuse'),
+    ('tasks -C "$(touch marker)" park hq-123456 next', 'refuse'),
+])
+def test_tasks_directory_selector(cmd, klass):
+    assert shell(cmd, NOBODY).klass == klass
+
+
 # ---- shell validator: refusals -------------------------------------------------------
 
 GIT_AND_PROGRAMS = [
