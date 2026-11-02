@@ -17,6 +17,16 @@ assert their own message (I5); the in-tree leftover copy is tested (I6); the det
 fixture commits its config first and its helpers fit automatic record commits (I7);
 minors 1–11 folded in.
 
+Revision 3 (after plan review round 2, revise: Important 4, Minor 4): Task 5's guard
+tests name breaks that fail in their states (N1); each box gets its own copy of the
+hook, so a test can make it fail without editing the tracked fixture (N2); the
+misnamed-directory fixture moves the directory and edits the sandbox registry, with no
+fallback (N3); `commit()` stays loud and a `commit_rename()` helper plus a HEAD
+assertion keep after-commit tests honest (N4); the verify row test breaks `records`,
+the nested fixture creates its directory, the deferred-commit check runs after each
+edit, and the location refusals cover a `--repo` and a top level equal to the
+checkout (M1–M4).
+
 **Goal:** `tools/rename-cutover` saves, applies, retargets, links, verifies and rolls
 back a rename whose checkout or `--repo` repositories are detached tasks projects,
 restoring only the rename's own paths in the shared records repository.
@@ -78,8 +88,10 @@ Spec §4.6, §5 (fixture, `registry_view`).
 - [ ] Extend `Sandbox` with `detached=False` and `detached_repos=()`. Only a box with
   either set creates `sync/records`, so in-tree boxes and their fingerprints are
   unchanged:
-  - the records repository: `git init -b main`, an initial commit, `core.hooksPath`
-    pointing at `tools/fixtures/records-hook` (absolute path of the test's own tree);
+  - the records repository: `git init -b main`, an initial commit, and
+    `core.hooksPath` pointing at the box's own copy of the hook (`tmp/hooks/pre-commit`,
+    copied from `tools/fixtures/records-hook/pre-commit` with its mode). A test that
+    needs the hook to fail edits only that copy; the tracked fixture is never edited;
   - when `detached`, the checkout is a code checkout holding the tools, `links.toml`
     and `.worktrees` link as today but no `tasks/`; it is paired with `tasks init
     --prefix ai --records sync/records`, and `ai/tasks/.config.toml` (with the empty
@@ -89,9 +101,14 @@ Spec §4.6, §5 (fixture, `registry_view`).
     started and parked as today; each write commits itself (`[git] commit = true`);
   - each name in `detached_repos` is built the same way (code checkout, config
     committed, records under `sync/records/<name>`); other repos stay in-tree;
-  - `commit(root, message)` commits only when something is staged or untracked
-    (`git status --porcelain` non-empty), so it is a no-op on a detached code checkout
-    whose records committed themselves; `depend_on_checkout` uses it unchanged;
+  - `commit(root, message)` is unchanged and still fails when there is nothing to
+    commit, so a test that expected a commit learns it did not happen.
+    `depend_on_checkout` skips `commit` for a detached root (its records committed
+    themselves) and calls it for an in-tree root as today;
+  - `commit_rename()` runs, for a detached box, the records commit `apply` prints
+    (the scoped `add` and `commit` over `ai` and `tack`), then asserts that the records
+    repository's HEAD holds `tack/` and no `ai/`. Every after-commit test of a detached
+    box uses it, so none can silently run as a before-commit test;
   - `fingerprint()` adds, for a detached box, the records repository's files
     (excluding `.git`) and its sorted directory list, so empty `docs/specs` and
     `docs/plans` count.
@@ -139,16 +156,21 @@ Spec §4, §4.1.
     `main` lacks; an untracked file under `ai/`; an ignored file under `ai/` (ignore
     rule in the records repository's `.git/info/exclude`); a tracked change under
     `<p>/`; a staged file of another project; `sync/records/tack` existing; a records
-    directory not directly under the repository's top level (`init --records
-    sync/records/sub`, whose setup commit needs `--no-verify` because the hook refuses
-    `sub/` without a config at its top); a records directory not named for its prefix
-    (the directory moved and the registry's `[records]` value re-pointed with `tasks
-    init --prefix <p> --records … --force`, or, if tasks refuses that, the test states
-    the refusal and drops the case); a records repository inside the checkout (the
-    nested repository git-ignored in the checkout, so the clean check does not refuse
-    first); the snapshot inside the records repository; a records directory outside
-    any git repository (`git rev-parse` fails and `run` raises the `Stop`, asserted by
-    its message).
+    directory not directly under the repository's top level (`mkdir
+    sync/records/sub`, then `init --records sync/records/sub`, whose setup commit needs
+    `--no-verify` because the hook refuses `sub/` without a config at its top); a
+    records directory not named for its prefix (move `sync/records/<p>` to
+    `sync/records/other` and edit `[records] <p>` in the sandbox registry's text to
+    match, as `test_save_refuses_a_checkout_the_registry_does_not_map` edits the
+    registry; the round-2 reviewer's probe showed the row, the hook and `tasks check`
+    accept that layout); a records repository inside the checkout and one inside a
+    `--repo` (each nested repository git-ignored in its outer one, so the clean check
+    does not refuse first); a records directory whose repository's top level is the
+    checkout itself (records kept in a git-ignored subdirectory of the checkout, not
+    a repository of its own, so `git rev-parse --show-toplevel` from it answers the
+    checkout and the clean check does not refuse first); the snapshot inside the
+    records repository; a records directory outside any git repository (`git
+    rev-parse` fails and `run` raises the `Stop`, asserted by its message).
 - [ ] Implement in `save` and `preconditions`:
   - `project_row` keeps returning the row; a `project_kind(root, command)` helper
     refuses an unreachable row and a linked one with the spec's messages; the
@@ -185,9 +207,10 @@ Spec §4.2, §4.3, §4.4.
     a detached `--repo`;
   - `test_verify_fails_while_the_records_repository_holds_the_uncommitted_rename`;
   - `test_verify_fails_while_the_old_records_directory_exists`;
-  - `test_verify_fails_when_the_registry_names_another_checkout` (after the full
-    cutover, a `tasks init --prefix tack --records … --force` from a second clone
-    re-points the row; verify names the mismatch);
+  - `test_verify_fails_when_the_row_names_other_records` (after the full cutover,
+    copy `sync/records/tack` elsewhere and edit `[records] tack` in the sandbox
+    registry's text to name the copy, so the row still sits at the new root and
+    `project_row` finds it; verify names the `records` mismatch);
   - `test_verify_fails_on_a_tracked_change_under_p`;
   - `test_retarget_repo_stops_on_a_deferred_record_commit` (a staged file of another
     project, staged after save; `tasks edit` exits 0 with a `commit_deferred:` warning
@@ -198,11 +221,12 @@ Spec §4.2, §4.3, §4.4.
   - `apply`: the existing-directory check before `tasks rename`; `tasks init
     --prefix <new> --records <records_root> --force` for a detached checkout; print
     the commit line;
-  - `retarget_dependencies` (the `--repo` path): parse each `tasks edit`'s stdout as
-    JSON (a parse failure is a `Stop`) and raise `Stop` on a warning starting
-    `commit_deferred:` or `commit_failed:`. `write_rewrites` returns each edit's
-    output so the caller checks it; `retarget_forward` keeps today's behaviour, as
-    spec §4.3 says `--forward` is unchanged;
+  - `retarget_dependencies` (the `--repo` path): after each `tasks edit`, parse its
+    stdout as JSON (a parse failure is a `Stop`) and raise `Stop` on a warning
+    starting `commit_deferred:` or `commit_failed:`, before the next edit runs.
+    `write_rewrites` takes an optional per-edit `check(output)` that the `--repo` path
+    passes and `retarget_forward` does not, so `--forward` keeps today's behaviour, as
+    spec §4.3 says; the test asserts the second edit did not run;
   - `retarget --repo`: accept a detached snapshot repository (the refusal is gone with
     Task 2; the whole-cutover test asserts it);
   - `verify`: the row, absence and owned-path cleanliness checks of §4.4; `tasks
@@ -281,18 +305,23 @@ Spec §4.5 (step 2's differing-file copy, concurrent writers), §4.7, §5.
     rename's commit; the copy lands under `rollback-leftovers-<n>/` and the saved blob
     is restored);
   - `test_detached_rollback_retry_converges_after_a_stop_at_the_commit` (**guard** on
-    Task 4's walk: after the rename's commit, the records repository's hook is made to
-    fail once, so the first attempt stops at `commit_records` with `<old>/` restored
+    Task 4's two path sets and walk: after `commit_rename()`, the box's hook copy is
+    made to fail, so the first attempt stops at `commit_records` with `<old>/` restored
     and staged and `<new>/` dropped from the index; the test asserts that exit status,
-    message and state; then a file is written at `tack/tasks/tack-<hex>.md`, a path
-    only the current HEAD holds, and the retry exits 0, the file's bytes land under
-    `rollback-leftovers-<n>/` (RED for that part), and the fingerprint matches. Seen to
-    fail when the walk's exclusion drops the index);
+    message and state; the hook copy is restored; then a file is written at
+    `tack/tasks/tack-<hex>.md`, a path only the current HEAD holds, and the retry exits
+    0, the file's bytes land under `rollback-leftovers-<n>/` (RED for that part), and
+    the fingerprint matches. Seen to fail against each of two breaks: the restore set
+    including HEAD-only paths (the retry's `git restore -- tack/` matches nothing in its
+    source or the index and fails), and the walk excluding only the current HEAD (the
+    restored `ai/tasks/ai-<hex>.md` is walked, cannot be mapped under `<old>/`, and
+    stops the retry));
   - `test_detached_rollback_retry_converges_after_an_index_lock` (**guard**: a
     planted `index.lock` stops `git restore` before it changes anything, leaving the
-    checkout reset and the records repository untouched; the test asserts that state;
-    the lock is removed and the retry converges. Seen to fail when the restore set
-    includes paths only the current HEAD holds);
+    checkout reset and the records repository untouched; the test asserts git's lock
+    message and that state; the lock is removed and the retry converges. Seen to fail
+    when `restore_records` does not raise on git's failure: the first attempt then
+    goes on and its output lacks the lock message);
   - `test_detached_second_host_adopts_the_rename` (§4.7: `tasks rename ai tack
     --adopt` from the new root under a second registry; `[projects] tack` and
     `[records] tack` follow; the old id resolves; the first host's state is untouched;
