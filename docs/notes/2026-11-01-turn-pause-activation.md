@@ -20,14 +20,42 @@ Not covered by the merge: the Claude Code work home's untracked
    state (`codex/config.toml`, `[hooks.state."<path>:<event>:<group>:<handler>"]`).
    The new groups have none. After the merge, open one Codex session in each Codex
    home (personal and work), review the new turn-pause hooks and trust them;
-   otherwise Codex may skip them and the pause does not run there. The branch does
-   not edit `codex/config.toml`, which is live state.
+   otherwise Codex may skip them and the pause does not run there. Trust every
+   turn-pause hook group together in each Codex home: UserPromptSubmit, PreToolUse,
+   PostToolUse, Stop, SubagentStop, SubagentStart and SessionEnd. If PreToolUse is
+   trusted but UserPromptSubmit or SessionEnd is not, a crossed limit can never be
+   lifted by the user's reply. A later edit to one group's definition untrusts that
+   group alone, so recheck after any edit to the wiring. The branch does not edit
+   `codex/config.toml`, which is live state.
 2. lore-911121's rule (what a paused agent reports, and the count it keeps where
    the hook keeps none) activates after this lands; its notes carry the two text
    inputs from this branch (the goal clause and the scheduled-wake line).
-3. Rollback: revert the wiring commit (`feat(turn-pause): wire the hook into Claude
+3. Check each home after activation. In a fresh session of each home (personal and
+   work Claude Code, each Codex home) run `hq pause status` and confirm it shows a
+   turn. A hook that is silently skipped is the failure the feature exists to
+   prevent. Sessions started before the merge may stay uncovered until restarted:
+   Claude Code may snapshot hooks at session start (not probed). Hosts that share
+   the Dropbox checkout activate at the same moment.
+4. Rollback: revert the wiring commit (`feat(turn-pause): wire the hook into Claude
    Code and Codex homes`) on main. Existing state files under
    `~/.local/state/hq/pause/` can then be removed.
+
+## Recovery
+
+When the hook blocks everything (the package fails to load, a state file is
+unreadable, a pause cannot be lifted), an agent cannot fix it: the state path is
+protected and git needs a tool call. Run these in a terminal.
+
+- An unreadable state file: the refusal names it. Remove it, and the next prompt
+  starts a fresh turn: `rm ~/.local/state/hq/pause/<the named file>`. To clear all
+  turn state: `rm -r ~/.local/state/hq/pause/`.
+- A pause that cannot be lifted (the user's reply does not reach the hook, for
+  example an untrusted Codex group): remove the root's state file the same way,
+  then trust the missing groups.
+- The package fails to load, or anything else: full rollback: in the hq main
+  checkout, `git revert <wiring commit>`, where the wiring commit is
+  `feat(turn-pause): wire the hook into Claude Code and Codex homes`. Find it with
+  `git log --oneline --grep 'wire the hook'`.
 
 ## What changes for live sessions
 
@@ -43,8 +71,15 @@ Not covered by the merge: the Claude Code work home's untracked
 - Calls are refused at all times, not only while paused, when their input names
   the pause state directory, the limits file, `tools/turn_pause/facts.json` or the
   wiring files, including the home links (`~/.claude/settings.json` and the Codex
-  hooks files). That covers a plain `Read` of those files and edits through the
+  hooks files). The list holds the resolved checkout paths, not a symlinked home
+  spelling of the checkout, so a call that names a file by that spelling is not caught;
+  a limits edit made that way is still caught by the hash-change pause. That covers
+  a plain `Read` of those files by the listed paths and edits through the
   update-config skill, and edits to documents that contain the state path.
+- Waits for the user count as idle time for `AskUserQuestion`, `ExitPlanMode` and
+  Codex `request_user_input`. Permission prompts and Codex escalation approvals still
+  count as active while they wait, unless sessions run in bypass mode; a follow-up
+  covers it.
 - A PreToolUse payload over 32 MiB or with more than about 2 million JSON nodes is
   refused.
 - `hq pause status` and `hq pause limits` show counts and defaults; Codex
