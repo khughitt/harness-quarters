@@ -106,6 +106,15 @@
             "timeout": 600
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/hq/tools/turn-pause --harness claude-code UserPromptSubmit",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PreToolUse": [
@@ -116,6 +125,16 @@
             "type": "command",
             "command": "'/usr/bin/node' '/home/keith/.local/share/relay/v0.1.1/node_modules/relay/bin/relay.js' hook --harness claude-code --outer-ms 600000 --subscribers '/home/keith/.config/relay/subscribers.json' PreToolUse",
             "timeout": 600
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/hq/tools/turn-pause --harness claude-code PreToolUse",
+            "timeout": 5
           }
         ]
       }
@@ -167,6 +186,15 @@
             "timeout": 600
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/hq/tools/turn-pause --harness claude-code Stop",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "StopFailure": [
@@ -189,6 +217,15 @@
             "timeout": 60
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/hq/tools/turn-pause --harness claude-code SessionEnd",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -200,6 +237,16 @@
             "command": "~/d/ops/hooks/claude-posttooluse"
           }
         ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/hq/tools/turn-pause --harness claude-code PostToolUse",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PostToolUseFailure": [
@@ -209,6 +256,60 @@
           {
             "type": "command",
             "command": "~/d/ops/hooks/claude-posttooluse"
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/hq/tools/turn-pause --harness claude-code PostToolUseFailure",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/hq/tools/turn-pause --harness claude-code SubagentStop",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/hq/tools/turn-pause --harness claude-code PreCompact",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/hq/tools/turn-pause --harness claude-code PostCompact",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/d/hq/tools/turn-pause --harness claude-code SubagentStart",
+            "timeout": 5
           }
         ]
       }
