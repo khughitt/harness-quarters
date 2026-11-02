@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-b2b50b-active-limit
 created: 2026-11-02T19:14:07Z
-updated: 2026-11-02T21:12:02Z
+updated: 2026-11-02T22:06:17Z
 started: 2026-11-02T20:22:25Z
 depends: []
 tags: [feedback, friction, "from:mm"]
@@ -55,4 +55,6 @@ Scope: choose and prepare a measured default active-time cutoff with the existin
 - 2026-11-02T21:11:48Z (fix/hq-b2b50b-active-limit): retention checkpoint: observed 2026-11-02T21:11:48Z on titan; basis hq in-tree records . 6cb49d19674bc305d32ddce55bb5473aeea629aa:tasks/hq-b2b50b.md; retained by refs/heads/fix/hq-b2b50b-active-limit; this host: kept verified 2, kept unknown 0, released 0; changed 2. Rechecked all kept/verified items on this host: clean locked worktree, seven scratch files against the committed manifest, four committed attachments byte-for-byte. Unknown items: none. Other hosts retain their own dated observations. Next: user approves live activation; agent resumes, integrates and verifies evidence dispositions before cleanup.
   provenance: {"harness_session":"codex:01a19deb-d3a4-7b80-a260-fdc7e14f54ea","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-02T21:12:02Z (fix/hq-b2b50b-active-limit): parked (waiting on user, approval): User approve merging and activating hq aec828c4ad910e4ecf39c612f3022769251b425b (16 h default), after reading docs/notes/2026-11-02-active-cutoff-report.md in .worktrees/hq-b2b50b; agent then resumes there, reconciles main if moved, completes the task record, and merges fix/hq-b2b50b-active-limit from main. Existing turns need a fresh genuine prompt after limits-changed. Kept worktree and scratch remain owned by this open task; nothing is running.
+  provenance: {"harness_session":"codex:01a19deb-d3a4-7b80-a260-fdc7e14f54ea","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-02T22:06:17Z (fix/hq-b2b50b-active-limit): resumed
   provenance: {"harness_session":"codex:01a19deb-d3a4-7b80-a260-fdc7e14f54ea","harness_session_source":"CODEX_THREAD_ID"}
