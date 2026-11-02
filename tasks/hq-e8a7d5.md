@@ -4,7 +4,7 @@ title: "Re-probe Codex write_stdin, wait and exec_command arguments per version,
 status: idea
 priority: 2
 created: 2026-11-02T00:06:05Z
-updated: 2026-11-02T00:30:44Z
+updated: 2026-11-02T09:02:30Z
 depends: []
 tags: []
 source: "claude-code:536b5ebf-5753-4a8b-ac83-61dde5ef4c79"
@@ -19,3 +19,4 @@ Follow-up of hq-9aa713. Codex 0.166.0 fires no hook for the outer exec, nested w
 - 2026-11-02T00:06:05Z (add): created
   provenance: {"harness_session":"claude-code:536b5ebf-5753-4a8b-ac83-61dde5ef4c79","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
 - 2026-11-02T00:30:44Z (main): add: probe whether Codex sends PostToolUse for an allowed nested exec_command that fails (e.g. false), since Codex has no PostToolUseFailure; until then a failed call stays in flight until its agent's Stop (spec wording at hq-9aa713 branch)
+- 2026-11-02T09:02:30Z (main): owns retained turn-pause evidence handed over at hq-9aa713's close (host titan): $WORK_ROOT/hq/hq-fe672f (probe logs), hq-7203b2 (replay outputs), hq-77b422 (lifecycle runs), hq-9aa713 (raw ledger and task reports), each with its manifest file; the retained records are on those four tasks; disposal is this task's session's call when it closes
