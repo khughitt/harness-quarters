@@ -117,16 +117,33 @@ def project_row(root, command):
     raise Stop(f"{command}: no registered project has its root at {root}")
 
 
-def project_prefix(root, command):
-    """The prefix of a snapshot repository, which must hold its own records. A detached
-    project keeps them in a records repository the snapshot does not save: rollback could
-    not reset it, and a rename there moves its records directory, which tasks cannot yet
-    re-point the moved checkout at."""
+def project_kind(root, command):
+    """The row of a snapshot project this cutover renames or retargets in: reachable, and
+    in-tree or detached. An unreachable row has no kind (records-home §5.2). A linked
+    project's records sit in an overlay directory the cutover neither saves nor resets."""
     row = project_row(root, command)
-    if Path(row["records"]).resolve() != Path(root).resolve():
-        raise Stop(f"{command}: {root} keeps its records in {row['records']}, outside it; "
-                   f"this cutover saves and resets only the repositories it names")
-    return row["prefix"]
+    kind = row.get("kind")
+    if not row.get("reachable") or kind is None:
+        raise Stop(f"{command}: {root} ({row['prefix']}) is unreachable: tasks projects cannot read its "
+                   f"records, so its kind is unknown; make them readable first")
+    if kind == "linked":
+        raise Stop(f"{command}: {root} is a linked project; this cutover renames and retargets only "
+                   f"in-tree and detached projects")
+    if kind not in ("in-tree", "detached"):
+        raise Stop(f"{command}: {root} has kind {kind!r}, which this cutover does not know")
+    return row
+
+
+def records_repo(row):
+    """A detached project's records repository: the git top level of its records directory,
+    which records-home places directly under that top level and names for the prefix. The
+    owned paths (`<old>/`, `<new>/`, `<p>/`) are relative to it, so both must hold."""
+    records = Path(row["records"]).resolve()
+    top = Path(run("git", "-C", records, "rev-parse", "--show-toplevel").strip()).resolve()
+    if records.parent != top or records.name != row["prefix"]:
+        raise Stop(f"save: {row['prefix']}'s records directory {records} must be named {row['prefix']} "
+                   f"and sit directly under its repository's top level {top}")
+    return top
 
 
 def unmerged_branches(root):
@@ -138,9 +155,51 @@ def unmerged_branches(root):
             if name != current and run("git", "-C", root, "rev-list", "--count", f"HEAD..{name}").strip() != "0"]
 
 
-def preconditions(checkout, repos, tool):
+def check_main_only(root):
+    """On main, with no stash, one worktree and no unmerged branch: any of those could bring
+    old-prefix records back after the rename."""
+    if branch_of(root) != "refs/heads/main":
+        raise Stop(f"preconditions: {root} is on {branch_of(root) or '(detached)'}, not main")
+    if run("git", "-C", root, "stash", "list").strip():
+        raise Stop(f"preconditions: {root} has stashes; one popped after the rename could bring "
+                   f"old-prefix task files back")
+    if run("git", "-C", root, "worktree", "list", "--porcelain").count("\nworktree ") != 0:
+        raise Stop(f"preconditions: {root} has more than one worktree")
+    ahead = unmerged_branches(root)
+    if ahead:
+        raise Stop(f"preconditions: {root} has branches with commits its current branch lacks: "
+                   f"{', '.join(ahead)}")
+
+
+def check_records_repo(top, entry, old):
+    """A records repository the cutover owns paths in. `<old>/` holds nothing git does not
+    track, so every file there after the rename is the rename's; each `<p>/` has no tracked
+    change; nothing is staged anywhere, since tasks defers every record commit while
+    something is, which would leave `retarget --repo`'s writes uncommitted. Untracked files
+    under `<p>/` and outside the owned paths are another session's, and left alone."""
+    check_main_only(top)
+    if entry["rename"]:
+        found = run("git", "-C", top, "status", "--porcelain", "--untracked-files=all", "--ignored",
+                    "--", f"{old}/").splitlines()
+        if found:
+            raise Stop(f"preconditions: {top} has files under {old}/ that git does not track: "
+                       f"{', '.join(found)}; move them aside first")
+    for p in entry["prefixes"]:
+        found = run("git", "-C", top, "status", "--porcelain", "--untracked-files=no",
+                    "--", f"{p}/").splitlines()
+        if found:
+            raise Stop(f"preconditions: {top} has tracked changes under {p}/: "
+                       f"{', '.join(line.strip() for line in found)}; commit or discard them first")
+    staged = run("git", "-C", top, "diff", "--cached", "--name-only").splitlines()
+    if staged:
+        raise Stop(f"preconditions: {top} has staged changes ({', '.join(staged)}); tasks defers every "
+                   f"record commit while something is staged, so commit or unstage them first")
+
+
+def preconditions(checkout, rows, records, old, tool):
+    repos = [root for root in rows if root != checkout]
     claims = json.loads(run("tasks", "claims"))["claims"]
-    retargeted = {project_prefix(root, "preconditions") for root in repos}
+    retargeted = {rows[root]["prefix"] for root in repos}
     # A `tasks dep` write prunes dead claims from the project it writes in, and the guard
     # compares every other project's claims file byte for byte: a repository the cutover
     # retargets in must hold no claim at all, live or dead.
@@ -151,24 +210,18 @@ def preconditions(checkout, repos, tool):
     live = [c for c in claims if c.get("live")]
     if live:
         raise Stop("preconditions: live claim(s): " + ", ".join(c["id"] for c in live))
-    for root in (checkout, *repos):
+    # The cutover never writes in a detached --repo's code checkout: its writes land in the
+    # records repository, checked below.
+    for root in (checkout, *(r for r in repos if rows[r]["kind"] == "in-tree")):
         if porcelain(root):
             raise Stop(f"preconditions: {root} is not clean")
+    for top, entry in records.items():
+        check_records_repo(top, entry, old)
     for root in (checkout, *repos):
         if run("tasks", "check", cwd=root).strip():
             raise Stop(f"preconditions: tasks check reports findings in {root}; verify and rollback "
                        f"both require it clean, so resolve them first")
-    if branch_of(checkout) != "refs/heads/main":
-        raise Stop(f"preconditions: {checkout} is on {branch_of(checkout) or '(detached)'}, not main")
-    if run("git", "-C", checkout, "stash", "list").strip():
-        raise Stop(f"preconditions: {checkout} has stashes; one popped after the rename could bring "
-                   f"old-prefix task files back")
-    if run("git", "-C", checkout, "worktree", "list", "--porcelain").count("\nworktree ") != 0:
-        raise Stop(f"preconditions: {checkout} has more than one worktree")
-    ahead = unmerged_branches(checkout)
-    if ahead:
-        raise Stop(f"preconditions: {checkout} has branches with commits its current branch lacks: "
-                   f"{', '.join(ahead)}")
+    check_main_only(checkout)
     check = subprocess.run([str(tool), "--check"], text=True, capture_output=True)
     if check.returncode != 0:
         raise Stop(f"preconditions: link drift:\n{check.stdout}")
@@ -201,6 +254,42 @@ def validate_kept_destinations(meta):
             raise Stop(f"rollback: kept {entry['path']} is not a regular file; move it aside first")
 
 
+def owned_paths(entry, old, new):
+    """A records repository's owned paths, relative to its top level, sorted."""
+    return sorted(([f"{old}/", f"{new}/"] if entry["rename"] else []) + [f"{p}/" for p in entry["prefixes"]])
+
+
+def records_repos(checkout, repos, rows, new):
+    """The records repositories of the detached snapshot projects, deduplicated, each with
+    what it owns: `rename` when the checkout's records live there (`<old>/` and `<new>/`),
+    and the prefix of each detached --repo whose records do. A detached --repo contributes
+    only that: the cutover never writes in its code checkout. Also returns the checkout's
+    `records` entry for meta.json (None in-tree), without `dirs`, which save lists once
+    every check has passed. Every check here runs before the first mutation."""
+    records, checkout_records = {}, None
+    for root, row in rows.items():
+        if row["kind"] != "detached":
+            continue
+        top = records_repo(row)
+        for which, other in (("the checkout", checkout), *(("--repo", r) for r in repos)):
+            if top == other:
+                raise Stop(f"save: {row['prefix']}'s records repository is {which} {other}; "
+                           f"a records repository must lie outside every snapshot repository")
+            if other in top.parents:
+                raise Stop(f"save: {row['prefix']}'s records repository {top} lies inside {which} {other}; "
+                           f"a records repository must lie outside every snapshot repository")
+        entry = records.setdefault(top, {"rename": False, "prefixes": []})
+        if root == checkout:
+            records_root = Path(row["records"]).resolve().parent
+            if (records_root / new).exists():
+                raise Stop(f"save: {records_root / new} already exists")
+            entry["rename"] = True
+            checkout_records = {"repo": str(top), "records_root": str(records_root)}
+        else:
+            entry["prefixes"].append(row["prefix"])
+    return records, checkout_records
+
+
 def save(args):
     checkout, snap = Path(args.checkout).resolve(), Path(args.snapshot)
     if snap.exists():
@@ -215,10 +304,12 @@ def save(args):
     for path in (config, state):
         if path.is_symlink() or not path.is_dir():
             raise Stop(f"save: {path} must be a real directory: rollback replaces it whole")
+    rows = {root: project_kind(root, "save") for root in (checkout, *repos)}
     # `tasks rename` acts on whatever project --old names; it must be this checkout.
-    prefix = project_prefix(checkout, "save")
+    prefix = rows[checkout]["prefix"]
     if prefix != args.old:
         raise Stop(f"save: {checkout} has the prefix {prefix!r}, not --old {args.old!r}")
+    records, checkout_records = records_repos(checkout, repos, rows, args.new)
     worktrees = checkout / ".worktrees"
     link_text = os.readlink(worktrees) if worktrees.is_symlink() else None
     storage_old = (checkout / link_text).resolve() if link_text else None
@@ -226,19 +317,28 @@ def save(args):
                  **{f"repo {root}": root for root in repos}}
     if storage_old:
         protected["storage_old"] = storage_old
+    protected |= {f"records repository {top}": top for top in records}
     snap_resolved = snap.resolve()
     for which, path in protected.items():
         path = path.resolve()
         if snap_resolved == path or path in snap_resolved.parents:
             raise Stop(f"save: snapshot {snap} lies inside {which}")
     kept = kept_paths(checkout, args.keep)
-    preconditions(checkout, repos, tool)
+    preconditions(checkout, rows, records, args.old, tool)
     new_root = Path(args.new_root)
     new_root = new_root.parent.resolve() / new_root.name
     # work-link names a checkout's storage after the checkout's directory, not its prefix.
     storage_new = storage_old.parent.parent / new_root.name / storage_old.name if storage_old else None
+    if checkout_records:
+        # Rollback recreates each, so <old>/'s empty docs/specs and docs/plans come back.
+        repo = Path(checkout_records["repo"])
+        checkout_records["dirs"] = sorted(str(d.relative_to(repo)) for d in (repo / args.old).rglob("*")
+                                          if d.is_dir() and not d.is_symlink())
     meta = {
-        "checkout": record(checkout), "repos": [record(root) for root in repos],
+        "checkout": {**record(checkout), "records": checkout_records},
+        "repos": [{**record(root), "kind": rows[root]["kind"]} for root in repos],
+        "records_repos": [{**record(top), "owned": owned_paths(entry, args.old, args.new)}
+                          for top, entry in records.items()],
         "new_root": str(new_root), "old": args.old, "new": args.new, "link_tool": args.link_tool,
         "home": str(Path.home()), "config": str(config), "state": str(state),
         "worktrees_link": link_text,

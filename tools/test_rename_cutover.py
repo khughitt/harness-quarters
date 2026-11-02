@@ -433,48 +433,6 @@ def test_save_refuses_a_checkout_the_registry_does_not_map(box, tmp_path):
     assert not box.snapshot.exists()
 
 
-def detached(box, name):
-    """A project `name` whose records live in the records repository beside the checkouts,
-    committed there; its code checkout holds no tasks/."""
-    records = box.sync / "records"
-    if not records.exists():
-        records.mkdir()
-        box.run("git", "init", "-q", "-b", "main", records)
-        box.run("git", "commit", "-q", "--allow-empty", "-m", "init", cwd=records)
-    code = box.sync / name
-    code.mkdir()
-    box.run("git", "init", "-q", "-b", "main", code)
-    (code / "README").write_text("x\n")
-    box.commit(code, "init")
-    box.run("tasks", "init", "--prefix", name, "--records", records, cwd=code)
-    box.commit(records, f"{name} records")
-    return code, records / name
-
-
-def test_save_refuses_a_repository_whose_records_live_in_another(box):
-    """Rollback resets only the snapshot's repositories; a retarget in a detached project
-    commits in its records repository, which it would leave renamed."""
-    code, records = detached(box, "lore")
-    box.repos.append(code)
-    result = box.save(check=False)
-    assert result.returncode == 1
-    assert f"preconditions: {code} keeps its records in {records}, outside it" in result.stderr
-    assert not box.snapshot.exists()
-
-
-def test_save_refuses_a_detached_checkout(box):
-    code, records = detached(box, "lore")
-    (code / "tools").mkdir()
-    for name in ("harness-links", "rename-cutover"):
-        shutil.copy2(TOOLS / name, code / "tools" / name)
-    box.commit(code, "the tools")
-    box.checkout, box.old, box.new, box.new_root = code, "lore", "lore2", box.sync / "lore2"
-    result = box.save(check=False)
-    assert result.returncode == 1
-    assert f"save: {code} keeps its records in {records}, outside it" in result.stderr
-    assert not box.snapshot.exists()
-
-
 @pytest.mark.parametrize("detached, detached_repos", [(True, ()), (True, ("ops",)), (False, ("ops",))])
 def test_detached_sandbox_builds(tmp_path, detached, detached_repos):
     """The fixture the detached tests stand on: each detached project's code checkout holds
@@ -499,6 +457,267 @@ def test_detached_sandbox_builds(tmp_path, detached, detached_repos):
     result = box.run("git", "commit", "-qm", "zz", cwd=box.records, check=False)
     assert result.returncode == 1
     assert "pre-commit: zz/ has staged files but no tasks/.config.toml" in result.stderr
+
+
+# --- save: detached projects ----------------------------------------------------
+
+
+@pytest.fixture
+def dbox(tmp_path):
+    """A detached checkout and a detached --repo, ops, sharing the records repository."""
+    return Sandbox(tmp_path, detached=True, detached_repos=("ops",)).build()
+
+
+def load_meta(box):
+    return json.loads((box.snapshot / "meta.json").read_text())
+
+
+def head_of(box, root):
+    return box.run("git", "rev-parse", "HEAD", cwd=root).stdout.strip()
+
+
+def refused(box, message):
+    """save exits 1 naming `message`, and writes no snapshot."""
+    result = box.save(check=False)
+    assert result.returncode == 1, result.stdout
+    assert message in result.stderr, result.stderr
+    assert not box.snapshot.exists()
+
+
+def extra_detached(box, name, records_root):
+    """A detached --repo `name`, added to the box after its build, whose records tasks
+    places under `records_root`. Its code checkout has one commit; its records config is
+    left for the caller to commit, since where it may be committed is what each test varies."""
+    code = box.sync / name
+    code.mkdir()
+    box.run("git", "init", "-q", "-b", "main", code)
+    (code / "README").write_text("x\n")
+    box.commit(code, "init")
+    box.run("tasks", "init", "--prefix", name, "--records", records_root, cwd=code)
+    box.repos.append(code)
+    return code
+
+
+def nested_records_repo(box, outer):
+    """A records repository at <outer>/recs, git-ignored in `outer` so that outer's clean
+    check passes, holding the records of a detached --repo `nr`."""
+    with (outer / ".gitignore").open("a") as f:
+        f.write("recs/\n")
+    box.commit(outer, "ignore recs")
+    recs = outer / "recs"
+    recs.mkdir()
+    box.run("git", "init", "-q", "-b", "main", recs)
+    box.run("git", "commit", "-q", "--allow-empty", "-m", "init", cwd=recs)
+    extra_detached(box, "nr", recs)
+    box.commit(recs, "nr records")
+    return recs
+
+
+def test_save_accepts_a_detached_checkout_and_records_its_records_repository(tmp_path):
+    box = Sandbox(tmp_path, repos=("ops", "lore"), detached=True, detached_repos=("ops",)).build()
+    box.save()
+    meta = load_meta(box)
+    records = box.records.resolve()
+    assert meta["checkout"]["records"] == {
+        "repo": str(records), "records_root": str(records),
+        "dirs": ["ai/docs", "ai/docs/plans", "ai/docs/specs", "ai/tasks"]}
+    assert meta["records_repos"] == [{"root": str(records), "head": head_of(box, records),
+                                      "branch": "refs/heads/main", "owned": ["ai/", "ops/", "tack/"]}]
+    assert {Path(r["root"]).name: r["kind"] for r in meta["repos"]} == {"ops": "detached", "lore": "in-tree"}
+
+
+def test_save_with_an_in_tree_checkout_and_a_detached_repo_owns_only_p(tmp_path):
+    box = Sandbox(tmp_path, detached_repos=("ops",)).build()
+    box.save()
+    meta = load_meta(box)
+    records = box.records.resolve()
+    assert meta["checkout"]["records"] is None
+    assert meta["records_repos"] == [{"root": str(records), "head": head_of(box, records),
+                                      "branch": "refs/heads/main", "owned": ["ops/"]}]
+    assert [r["kind"] for r in meta["repos"]] == ["detached"]
+
+
+def test_save_accepts_a_dirty_detached_repo_code_checkout(dbox):
+    """The cutover never writes in a detached --repo's code checkout."""
+    (dbox.ops / "stray").write_text("x\n")
+    (dbox.ops / "README").write_text("edited\n")
+    dbox.save()
+
+
+def test_save_accepts_untracked_files_outside_the_owned_paths(dbox):
+    # Build every project before any draft: code_repo commits the whole records repository.
+    dbox.code_repo(dbox.sync / "zz", "zz")
+    (dbox.records / "zz" / "docs" / "specs" / "draft.md").write_text("another session's draft\n")
+    (dbox.records / "ops" / "docs" / "specs" / "draft.md").write_text("a draft in ops\n")
+    dbox.save()
+
+
+def linked(box):
+    """A linked project lnk: its records in an overlay directory, its code beside it. The
+    overlay is the registered root, so it holds the link tool save checks before the kind,
+    and the cutover's own copy, which `Sandbox.cutover` runs from the checkout."""
+    code = box.sync / "lnkcode"
+    code.mkdir()
+    box.run("git", "init", "-q", "-b", "main", code)
+    (code / "README").write_text("x\n")
+    box.commit(code, "init")
+    overlay = box.sync / "overlay"
+    overlay.mkdir()
+    box.run("tasks", "init", "--prefix", "lnk", "--checkout", code, cwd=overlay)
+    (overlay / "tools").mkdir()
+    for name in ("harness-links", "rename-cutover"):
+        shutil.copy2(TOOLS / name, overlay / "tools" / name)
+    return overlay
+
+
+LINKED = "is a linked project; this cutover renames and retargets only in-tree and detached projects"
+
+
+def test_save_refuses_a_linked_checkout(box):
+    overlay = linked(box)
+    box.checkout, box.old, box.new, box.new_root = overlay, "lnk", "lnk2", box.sync / "lnk2"
+    refused(box, f"save: {overlay.resolve()} {LINKED}")
+
+
+def test_save_refuses_a_linked_repo(box):
+    overlay = linked(box)
+    box.repos.append(overlay)
+    refused(box, f"save: {overlay.resolve()} {LINKED}")
+
+
+def test_save_refuses_an_unreachable_repo(box):
+    config = box.ops / "tasks" / ".config.toml"
+    config.rename(config.with_name("config.aside"))
+    row = next(r for r in json.loads(box.run("tasks", "projects", "--json", cwd=box.checkout).stdout)["projects"]
+               if r["prefix"] == "ops")
+    assert row["reachable"] is False and "kind" not in row
+    refused(box, f"save: {box.ops.resolve()} (ops) is unreachable")
+
+
+# Refusals on the records repository.
+
+
+def test_save_refuses_a_records_repository_off_main(dbox):
+    dbox.run("git", "checkout", "-qb", "side", cwd=dbox.records)
+    refused(dbox, f"preconditions: {dbox.records.resolve()} is on refs/heads/side, not main")
+
+
+def test_save_refuses_a_records_repository_with_a_stash(dbox):
+    (dbox.records / "README").write_text("x\n")
+    dbox.commit(dbox.records, "a top-level file")
+    (dbox.records / "README").write_text("stashed\n")
+    dbox.run("git", "stash", "-q", cwd=dbox.records)
+    refused(dbox, f"preconditions: {dbox.records.resolve()} has stashes")
+
+
+def test_save_refuses_a_records_repository_with_a_second_worktree(dbox):
+    dbox.run("git", "worktree", "add", "-q", dbox.tmp / "wt", cwd=dbox.records)
+    refused(dbox, f"preconditions: {dbox.records.resolve()} has more than one worktree")
+
+
+def test_save_refuses_a_records_repository_with_an_unmerged_branch(dbox):
+    dbox.run("git", "checkout", "-qb", "feature", cwd=dbox.records)
+    (dbox.records / "README").write_text("x\n")
+    dbox.commit(dbox.records, "unmerged")
+    dbox.run("git", "checkout", "-q", "main", cwd=dbox.records)
+    refused(dbox, f"preconditions: {dbox.records.resolve()} has branches with commits its current "
+                  f"branch lacks: feature")
+
+
+def test_save_refuses_an_untracked_file_under_old(dbox):
+    (dbox.records / "ai" / "docs" / "specs" / "draft.md").write_text("x\n")
+    refused(dbox, f"preconditions: {dbox.records.resolve()} has files under ai/ that git does not "
+                  f"track: ?? ai/docs/specs/draft.md")
+
+
+def test_save_refuses_an_ignored_file_under_old(dbox):
+    with (dbox.records / ".git" / "info" / "exclude").open("a") as f:
+        f.write("*.tmp\n")
+    (dbox.records / "ai" / "docs" / "plans" / "x.tmp").write_text("x\n")
+    assert dbox.run("git", "status", "--porcelain", cwd=dbox.records).stdout == ""
+    refused(dbox, f"preconditions: {dbox.records.resolve()} has files under ai/ that git does not "
+                  f"track: !! ai/docs/plans/x.tmp")
+
+
+def test_save_refuses_a_tracked_change_under_p(dbox):
+    spec = dbox.records / "ops" / "docs" / "specs" / "a.md"
+    spec.write_text("x\n")
+    dbox.commit(dbox.records, "an ops spec")
+    spec.write_text("changed\n")
+    refused(dbox, f"preconditions: {dbox.records.resolve()} has tracked changes under ops/: "
+                  f"M ops/docs/specs/a.md")
+
+
+def test_save_refuses_a_staged_file_of_another_project(dbox):
+    dbox.code_repo(dbox.sync / "zz", "zz")
+    (dbox.records / "zz" / "docs" / "specs" / "d.md").write_text("x\n")
+    dbox.run("git", "add", "zz/docs/specs/d.md", cwd=dbox.records)
+    refused(dbox, f"preconditions: {dbox.records.resolve()} has staged changes (zz/docs/specs/d.md)")
+
+
+def test_save_refuses_when_the_new_records_directory_exists(dbox):
+    (dbox.records / "tack").mkdir()
+    refused(dbox, f"save: {(dbox.records / 'tack').resolve()} already exists")
+
+
+def test_save_refuses_a_records_directory_not_directly_under_its_top_level(dbox):
+    (dbox.records / "sub").mkdir()
+    extra_detached(dbox, "nest", dbox.records / "sub")
+    # The only fixture that bypasses the hook: the layout under test is one the hook
+    # refuses (sub/ is staged with no tasks/.config.toml at its top), so it cannot be
+    # committed through it.
+    dbox.run("git", "add", "-A", cwd=dbox.records)
+    dbox.run("git", "commit", "-q", "--no-verify", "-m", "nest records", cwd=dbox.records)
+    records = (dbox.records / "sub" / "nest").resolve()
+    refused(dbox, f"save: nest's records directory {records} must be named nest and sit directly "
+                  f"under its repository's top level {dbox.records.resolve()}")
+
+
+def test_save_refuses_a_records_directory_not_named_for_its_prefix(dbox):
+    registry = dbox.tmp / "cfg" / "tasks" / "projects.toml"
+    dbox.run("git", "mv", "ops", "other", cwd=dbox.records)
+    # The registry first: the hook's tasks check reads the moved records through it.
+    registry.write_text(registry.read_text().replace(f'ops = "{dbox.records / "ops"}"',
+                                                     f'ops = "{dbox.records / "other"}"'))
+    dbox.run("git", "commit", "-qm", "move ops's records", cwd=dbox.records)
+    records = (dbox.records / "other").resolve()
+    refused(dbox, f"save: ops's records directory {records} must be named ops and sit directly "
+                  f"under its repository's top level {dbox.records.resolve()}")
+
+
+def test_save_refuses_a_records_repository_inside_the_checkout(box):
+    recs = nested_records_repo(box, box.checkout)
+    refused(box, f"save: nr's records repository {recs.resolve()} lies inside the checkout "
+                 f"{box.checkout.resolve()}")
+
+
+def test_save_refuses_a_records_repository_inside_a_repo(box):
+    recs = nested_records_repo(box, box.ops)
+    refused(box, f"save: nr's records repository {recs.resolve()} lies inside --repo {box.ops.resolve()}")
+
+
+def test_save_refuses_a_records_repository_that_is_the_checkout(box):
+    """pp's records at <checkout>/pp: their parent is the checkout's top level, so the
+    parent-and-name check passes and the location check refuses. No tasks are written in
+    pp: its records sit in a git-ignored path, so every record commit there fails."""
+    with (box.checkout / ".gitignore").open("a") as f:
+        f.write("pp/\n")
+    box.commit(box.checkout, "ignore pp")
+    extra_detached(box, "pp", box.checkout)
+    assert box.run("git", "status", "--porcelain", cwd=box.checkout).stdout == ""
+    refused(box, f"save: pp's records repository is the checkout {box.checkout.resolve()}")
+
+
+def test_save_refuses_a_snapshot_inside_the_records_repository(dbox):
+    dbox.snapshot = dbox.records / "snap"
+    refused(dbox, f"lies inside records repository {dbox.records.resolve()}")
+
+
+def test_save_refuses_a_records_directory_outside_any_git_repository(box):
+    loose = box.tmp / "loose"
+    loose.mkdir()
+    extra_detached(box, "qq", loose)
+    refused(box, f"git -C {(loose / 'qq').resolve()} rev-parse --show-toplevel: fatal: not a git repository")
 
 
 def test_save_records_every_repository(box2):
