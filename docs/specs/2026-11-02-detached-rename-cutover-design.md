@@ -1,6 +1,8 @@
 # rename-cutover for detached projects — design
 
-Task: hq-5300fd. Status: draft, revision 4 (2026-11-02).
+Task: hq-5300fd. Status: draft, revision 5 (2026-11-02), for the user's review.
+Spec review round 4 accepted revision 4; revision 5 adds its minor (a §5 test for the
+step-2 copy) and its note that the copy enumerates the saved head with `ls-tree`.
 
 Revision 4 (after spec review round 3, revise: Important 1, Minor 1): the restore
 and the commit take separate path sets, since `git restore` matches only its source
@@ -229,6 +231,8 @@ The order keeps every check before the first mutation, as today.
    nor the current HEAD, sits at a path the saved head holds, and differs from the
    saved blob (something recreated under `<old>/` after the rename's commit): the
    restore overwrites it and the patch, a diff of tracked content, does not hold it.
+   It ranges over every owned path, `<p>/` included, so it enumerates the saved
+   head's paths with `git ls-tree` rather than reusing step 1's walk.
 3. Mutations, in today's order, with the records repositories inserted after the
    reset of the checkout and the in-tree `--repo` repositories:
    - `git restore --source=<head> --staged --worktree -- <restorable owned paths>`,
@@ -319,6 +323,9 @@ and the tasks registry as the existing `Sandbox` does.
   that is not a leftover, and on an ignored file under `<new>/`.
 - rollback after the rename's commit removes a task committed in `p` since save and
   keeps it in the patch.
+- rollback after the rename's commit, with a file recreated with other bytes at an
+  `<old>/` path the saved head holds, copies it under `rollback-leftovers-<n>/` and
+  then restores the saved blob.
 - rollback retried after the rename's commit converges, from a stop at the commit
   (step 4) and from a stop inside step 3.
 - The second host's adoption (§4.7).
