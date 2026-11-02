@@ -1,15 +1,17 @@
 ---
 id: hq-b2b50b
 title: turn-pause's 4 h active-time limit stops valid long sessions; set the cutoff from historic session data
-status: doing
+status: done
 priority: 2
 size: s
 complexity: mid
 process: direct
 owner: fix/hq-b2b50b-active-limit
 created: 2026-11-02T19:14:07Z
-updated: 2026-11-02T22:31:46Z
+updated: 2026-11-02T22:32:00Z
 started: 2026-11-02T20:22:25Z
+completed: 2026-11-02T22:32:00Z
+closed: 2026-11-02T22:32:00Z
 depends: []
 tags: [feedback, friction, "from:mm"]
 agent: claude-code
@@ -68,4 +70,8 @@ Scope: choose and prepare a measured default active-time cutoff with the existin
 - 2026-11-02T22:31:26Z (fix/hq-b2b50b-active-limit): retained: {"host":"titan","kind":"worktree","path":".worktrees/hq-b2b50b","state":"kept","verification":"verified","purpose":"Approved same-turn integration, live default verification and checked worktree removal","next_owner":"session:codex:01a19deb-d3a4-7b80-a260-fdc7e14f54ea","cleanup_trigger":"After this turn integrates the approved branch and verifies attached copies and removal checks"}
 - 2026-11-02T22:31:27Z (fix/hq-b2b50b-active-limit): retained: {"host":"titan","kind":"scratch","path":"$WORK_ROOT/hq/hq-b2b50b","state":"kept","verification":"verified","purpose":"Approved same-turn integration followed by verified disposal of ten inventoried scratch files","next_owner":"session:codex:01a19deb-d3a4-7b80-a260-fdc7e14f54ea","cleanup_trigger":"After this turn integrates the approved branch and verifies attached copies and removal checks","manifest":".worktrees/hq-b2b50b/tasks/files/hq-b2b50b/scratch-manifest-v2.json","sha256":"3645cb7741b61427a4418c212cd4379f9fb9906e062876039d5ba580792d564e"}
 - 2026-11-02T22:31:46Z (fix/hq-b2b50b-active-limit): retention checkpoint: observed 2026-11-02T22:31:46Z on titan; basis hq in-tree records . a224ad6286081127bfa1ea5b88db184f6f950e1d:tasks/hq-b2b50b.md; retained by refs/heads/fix/hq-b2b50b-active-limit; this host: kept verified 2, kept unknown 0, released 0; changed 2. Rechecked the clean worktree, all ten scratch files against scratch-manifest-v2.json and all eight committed attachments byte-for-byte. Unknown items: none. Other hosts retain their own observations. Next: this closing session performs user-approved integration and checked removal in this turn.
+  provenance: {"harness_session":"codex:01a19deb-d3a4-7b80-a260-fdc7e14f54ea","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-02T22:32:00Z (fix/hq-b2b50b-active-limit): done
+  provenance: {"harness_session":"codex:01a19deb-d3a4-7b80-a260-fdc7e14f54ea","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-02T22:32:00Z (fix/hq-b2b50b-active-limit): Approved 16 h cutoff prepared for immediate local activation; merged current main, 408 focused and 2702 full-suite tests passed, both reviews accepted with no findings. All verification, retained evidence, same-turn integration ownership, cleanup dispositions and disclosures are recorded above.
   provenance: {"harness_session":"codex:01a19deb-d3a4-7b80-a260-fdc7e14f54ea","harness_session_source":"CODEX_THREAD_ID"}
