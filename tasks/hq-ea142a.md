@@ -7,7 +7,7 @@ size: l
 complexity: high
 process: direct
 created: 2026-11-02T14:57:10Z
-updated: 2026-11-02T14:57:17Z
+updated: 2026-11-02T14:57:26Z
 depends: [hq-62ba95]
 parent: hq-5300fd
 tags: []
@@ -23,4 +23,6 @@ Contract: spec docs/specs/2026-11-02-detached-rename-cutover-design.md revision 
 ## Notes
 
 - 2026-11-02T14:57:10Z (add): created
+  provenance: {"harness_session":"claude-code:09b6f7cb-8595-42af-8bc2-4cea8a51e5c1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-02T14:57:26Z (feat/hq-5300fd-detached-rename): gate: scoped — step of hq-5300fd plan
   provenance: {"harness_session":"claude-code:09b6f7cb-8595-42af-8bc2-4cea8a51e5c1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
