@@ -258,7 +258,7 @@ def save(args):
     print(f"saved {snap}")
 
 
-REGISTRY_TABLES = ("projects", "aliases", "groups", "locations")
+REGISTRY_TABLES = ("projects", "aliases", "groups", "locations", "records")
 
 
 def registry_view(path, old, new):
@@ -270,7 +270,8 @@ def registry_view(path, old, new):
     except the order of a group's members: tasks keeps them sorted and re-sorts on the
     rewrite, so both sides are compared sorted. The renamed project's location history,
     `[locations.<old>]` before and `[locations.<new>]` after, is its own as well: `tasks
-    rename` moves the table and `tasks init --force` appends the displaced root."""
+    rename` moves the table and `tasks init --force` appends the displaced root. So is a
+    detached project's `[records]` key, which `tasks rename` moves with the prefix."""
     data = tomllib.loads(path.read_text()) if path.exists() else {}
 
     def renamed(prefix):
@@ -280,8 +281,10 @@ def registry_view(path, old, new):
     aliases = {k: renamed(v) for k, v in data.get("aliases", {}).items() if k not in (old, new)}
     groups = {k: sorted(renamed(m) for m in members) for k, members in data.get("groups", {}).items()}
     locations = {k: v for k, v in data.get("locations", {}).items() if k not in (old, new)}
+    records = {k: v for k, v in data.get("records", {}).items() if k not in (old, new)}
     rest = {k: v for k, v in data.items() if k not in REGISTRY_TABLES}
-    return {**rest, "projects": projects, "aliases": aliases, "groups": groups, "locations": locations}
+    return {**rest, "projects": projects, "aliases": aliases, "groups": groups, "locations": locations,
+            "records": records}
 
 
 def registry_changes(live, saved):
