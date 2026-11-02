@@ -25,9 +25,10 @@ Not covered by the merge: the Claude Code work home's untracked
    turn-pause hook group together in each Codex home: UserPromptSubmit, PreToolUse,
    PostToolUse, Stop, SubagentStop, SubagentStart and SessionEnd. If PreToolUse is
    trusted but UserPromptSubmit is not, a crossed limit can never be lifted by the
-   user's reply (SessionEnd untrusted only leaves state behind for pruning). A later edit to one group's definition untrusts that
-   group alone, so recheck after any edit to the wiring. The branch does not edit
-   `codex/config.toml`, which is live state.
+   user's reply (SessionEnd untrusted only leaves state behind for pruning). A later
+   edit to one group's definition untrusts that group alone, so recheck after any
+   edit to the wiring. The branch does not edit `codex/config.toml`, which is live
+   state.
 2. lore-911121's rule (what a paused agent reports, and the count it keeps where
    the hook keeps none) activates after this lands; its notes carry the two text
    inputs from this branch (the goal clause and the scheduled-wake line).
@@ -35,14 +36,17 @@ Not covered by the merge: the Claude Code work home's untracked
    home and of each Codex home run `hq pause status` and confirm it shows a turn
    (work Claude Code joins once hq-8a11d6 wires it). In Codex `CODEX_THREAD_ID`
    makes the answer exact. In Claude Code use `hq pause status --session <id>` with
-   the id from `/status`, or start the check session in a directory no other session
-   uses: without an id the command picks the newest state for the directory, so any
-   hooked session there can falsely confirm. A hook that is silently skipped is the failure the feature exists to
-   prevent. Sessions started before the merge may stay uncovered until restarted:
+   the id from `/status`, or start the check session in a new, empty directory: without
+   an id the command picks the newest state for the directory, so any hooked session
+   there, or an old state file left by a session whose SessionEnd never fired, can
+   falsely confirm. A hook that is silently skipped is the failure the feature
+   exists to prevent. Sessions started before the merge may stay uncovered until restarted:
    Claude Code may snapshot hooks at session start (not probed). Hosts that share
    the Dropbox checkout activate at the same moment.
 4. Rollback: revert the wiring commit (`feat(turn-pause): wire the hook into Claude
-   Code and Codex homes`) on main. Existing state files under
+   Code and Codex homes`) with the portable `git -C` command in the Recovery
+   section, and restart each blocked session or accept the change in Claude Code's
+   `/hooks` (the caveat is there). Existing state files under
    `~/.local/state/hq/pause/` can then be removed.
 
 ## Recovery
@@ -63,7 +67,8 @@ protected and git needs a tool call. Run these in a terminal.
   (`feat(turn-pause): wire the hook into Claude Code and Codex homes`) in the
   checkout the home links point at:
   `git -C "$(dirname "$(dirname "$(readlink -f ~/.claude/settings.json)")")" revert --no-edit <sha>`.
-  Find the sha with `git log --oneline --grep 'wire the hook'` in that checkout.
+  Find the sha with
+  `git -C "$(dirname "$(dirname "$(readlink -f ~/.claude/settings.json)")")" log --oneline --grep 'wire the hook'`.
   `tools/turn-pause` stays in the checkout after a revert, so a running session that
   kept the hook (Claude Code may snapshot hooks at session start) keeps refusing:
   restart each blocked session, or accept the change in Claude Code's `/hooks`. A
