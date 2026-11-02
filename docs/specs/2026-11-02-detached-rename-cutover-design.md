@@ -1,6 +1,14 @@
 # rename-cutover for detached projects — design
 
-Task: hq-5300fd. Status: draft, revision 2 (2026-11-02).
+Task: hq-5300fd. Status: draft, revision 3 (2026-11-02).
+
+Revision 3 (after spec review round 2, revise: Important 2, Minor 4): the restore
+uses `git restore --source=<head> --staged --worktree`, which removes tracked files
+the saved head lacks and overwrites uncommitted changes (§4.5 step 3); the walk
+classifies only files absent from the index, the current HEAD and the saved head, so
+a retry after a stopped restore converges (§4.5 step 1); what the leftover copy keeps,
+the concurrent-writers paragraph, §4.2's commit-order reason and step 3's deletion
+wording are corrected.
 
 Revision 2 (after spec review round 1, revise: Critical 1, Important 5, Minor 7):
 the guard reads `[records]` as the rename's own (§4.6); rollback's records commit
@@ -153,8 +161,9 @@ rollback.
 - For a detached checkout, print the commit the runbook makes next, scoped to the
   rename's paths so another project's untracked draft is not swept in:
   `git -C <repo> add -A -- <old> <new> && git -C <repo> commit -m "…" -- <old> <new>`.
-  The runbook commits it before `retarget --repo`: a record commit in tasks defers
-  while anything is staged in its repository.
+  The runbook commits it before `retarget --repo` so the records repository's history
+  reads rename, then retarget; either order commits, since the printed command stages
+  and commits in one line.
 
 ### 4.3 retarget
 
@@ -186,7 +195,11 @@ The order keeps every check before the first mutation, as today.
    checkouts removed), `validate_leftovers` (in-tree repositories only),
    `validate_kept_destinations`, and the new `validate_records_repos`. For each records
    repository, it walks the filesystem under `<old>/` and `<new>/`, ignored files
-   included, and classifies every file that is not tracked at the current HEAD:
+   included, and classifies every file that is in none of the index, the current
+   HEAD and the saved head's tree. A file at one of those paths is either an original
+   the restore puts back or a tracked change the patch holds; leaving it out of the
+   walk is what lets a retry pass after an earlier rollback restored and staged
+   `<old>/` but stopped before its commit:
    - under `<new>/`: `<new>/<rest>` must map to an original `<old>/<rest'>` that
      exists at the saved head, where `rest'` is `rest` with the id mapping applied
      (`tasks/<new>-<hex>.md` to `tasks/<old>-<hex>.md`, `tasks/files/<new>-<hex>/…`
@@ -202,14 +215,20 @@ The order keeps every check before the first mutation, as today.
    <owned>` (label `records-<name>`, same never-overwrite naming). The validated
    leftovers (records and in-tree) are copied into the snapshot under
    `rollback-leftovers-<n>/<repository label>/<path>`, also before any mutation. A
-   note or task written to the renamed project after `apply` and before the commit is
-   such a leftover, so it is kept here rather than lost.
+   note written to an existing task of the renamed project after `apply` and before
+   the commit (refused by the hook, so untracked) is such a leftover, so it is kept
+   here rather than lost. A new task filed there in that window has no original at
+   the saved head, so step 1 stops rollback naming it, for the person to move aside.
 3. Mutations, in today's order, with the records repositories inserted after the
    reset of the checkout and the in-tree `--repo` repositories:
-   - `git checkout <head> -- <owned paths that exist at head>`;
-   - `git rm -r -q --ignore-unmatch -- ` each owned path the saved head lacks (in
-     practice `<new>/` once the rename was committed), then delete `<new>/` from
-     disk whole (every file in it was validated in step 1);
+   - `git restore --source=<head> --staged --worktree -- <known owned paths>`, where
+     the known owned paths are those the index, the current HEAD or the saved head
+     holds (a pathspec git knows nothing of fails the command). `restore` works
+     without overlay: it removes tracked files the saved head lacks (a task filed in
+     `p` since save, the committed `<new>/`) and overwrites uncommitted changes; the
+     patch holds both;
+   - delete `<new>/` from disk whole: what remains in it is untracked, and step 1
+     validated every such file;
    - delete the validated leftovers under `<old>/` and the directories they emptied;
    - recreate every directory in `checkout.records.dirs` that is missing, which
      restores `<old>/`'s empty `docs/specs` and `docs/plans`.
@@ -227,14 +246,14 @@ The order keeps every check before the first mutation, as today.
    paths with no tracked change; `git diff --quiet <head> -- <owned>`; and `tasks
    check` in every detached snapshot project.
 
-Concurrent writers: between the checkout in step 3 (which stages) and the commit in
-step 4, a `tasks` write in another project defers its record commit, and a git call
-of rollback's can meet another process's `index.lock`. Either stops rollback with
-git's message. A retry is the remedy and is idempotent from any stop: the checks
-pass again (the guard, the branches, and leftovers either still present or already
-removed), the patches take the next unused number, and the restore and commit
-converge on the saved head. The deferred writes commit at their project's next write
-or with `tasks commit`.
+Concurrent writers: between the restore in step 3 (which stages) and the commit in
+step 4, a `tasks` write in another project defers its record commit; that write stays
+uncommitted until its project's next write or `tasks commit`, and does not affect
+rollback. A git call of rollback's can meet another process's `index.lock`, which
+stops rollback with git's message. A retry is the remedy and converges from any stop:
+the checks pass again (the guard, the branches, and the walk, which skips files the
+earlier restore put in the index), the patches take the next unused number, and the
+restore and commit converge on the saved head.
 
 ### 4.6 What changes and what does not
 
@@ -285,7 +304,10 @@ and the tasks registry as the existing `Sandbox` does.
   commit (refused by the hook, so untracked) into the snapshot.
 - rollback stops before any mutation on an untracked file under `<new>/` or `<old>/`
   that is not a leftover, and on an ignored file under `<new>/`.
-- rollback retried after it stopped at the commit converges.
+- rollback after the rename's commit removes a task committed in `p` since save and
+  keeps it in the patch.
+- rollback retried after the rename's commit converges, from a stop at the commit
+  (step 4) and from a stop inside step 3.
 - The second host's adoption (§4.7).
 - The two tests that pin today's refusal are replaced by these.
 
