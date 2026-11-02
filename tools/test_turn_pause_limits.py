@@ -1,6 +1,8 @@
 """The limits file and how a budget directive scales it."""
 import hashlib
 
+import pytest
+
 from turn_pause import limits
 from turn_pause.limits import Limits
 from turn_pause.prompt import Budget
@@ -20,3 +22,13 @@ def test_budget_scales_unnamed(): assert limits.with_budget(Limits(14400, 500, 3
 def test_budget_named_overrides(): assert limits.with_budget(Limits(14400, 500, 30, 2), Budget(36000, 2000, 80, None)) == Limits(36000, 2000, 80, 5)
 
 def test_scaling_rounds_up(): assert limits.with_budget(Limits(14400, 500, 30, 2), Budget(14401, None, None, None)) == Limits(14401, 501, 31, 3)
+
+
+@pytest.mark.parametrize('field', ['active_seconds', 'calls', 'spawns', 'compactions'])
+@pytest.mark.parametrize('value', [0, -1])
+def test_load_refuses_a_non_positive_limit(tmp_path, field, value):
+    values = {**dict(active_seconds=14400, calls=500, spawns=30, compactions=2), field: value}
+    path = tmp_path / 'limits.toml'
+    path.write_text(''.join(f'{k} = {v}\n' for k, v in values.items()))
+    with pytest.raises(ValueError, match=field):
+        limits.load(path)

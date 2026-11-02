@@ -46,7 +46,12 @@ def load(path=DEFAULTS_FILE) -> tuple[Limits, str]:
     with open(path, 'rb') as f:
         raw = f.read()
     data = tomllib.loads(raw.decode())
-    return Limits(data['active_seconds'], data['calls'], data['spawns'], data['compactions']), sha256_hex(raw)
+    values = Limits(data['active_seconds'], data['calls'], data['spawns'], data['compactions'])
+    for name in Limits._fields:
+        value = getattr(values, name)
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise ValueError(f'{path}: {name} must be a positive integer, not {value!r}')
+    return values, sha256_hex(raw)
 
 
 def with_budget(defaults: Limits, budget) -> Limits:
