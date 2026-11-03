@@ -1,13 +1,15 @@
 ---
 id: hq-d33cdc
 title: Adopt shared broad-test policy and remote verification
-status: todo
+status: doing
 priority: 1
 size: m
 complexity: mid
 process: planned
+owner: main
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T10:13:26Z
+updated: 2026-11-03T10:19:41Z
+started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
 source: "tt-policy:hq"
@@ -42,3 +44,5 @@ After approved activation, commit .tt.toml with real broad target names, verify 
   provenance: {"harness_session":"codex:01a1874f-c2d8-7320-ae81-7114e37e343f","harness_session_source":"CODEX_THREAD_ID","origin":"agent"}
 - 2026-11-01T23:43:21Z (main): related: hq-b01c0f wraps hq's just test xdist step in host-budget and adds a budgeted test-one route (ops-4adbbe); keep the recipe split here compatible with it.
 - 2026-11-03T10:13:26Z (main): raised to P1 at the user's request (2026-11-03) so a following session picks it up; hq-414f8a skipped its full-suite baseline at the user's direction
+- 2026-11-03T10:19:41Z (main): started
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
