@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T10:21:04Z
+updated: 2026-11-03T10:21:07Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -52,3 +52,4 @@ After approved activation, commit .tt.toml with real broad target names, verify 
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T10:21:04Z (feat/hq-d33cdc-test-policy): gate: scoped — adopted
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-03T10:21:07Z (feat/hq-d33cdc-test-policy): Workspace: .worktrees/hq-d33cdc on feat/hq-d33cdc-test-policy, locked and hydrated with just setup. User explicitly waived baseline tests for this task, including implementation Setup; no baseline run or pass is claimed. Flow trial assigned flow on. Design/spec preparation only until human review; no code or external activation yet.
