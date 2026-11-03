@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T15:40:55Z
+updated: 2026-11-03T16:23:29Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -112,3 +112,4 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-03T15:40:53Z (feat/hq-d33cdc-test-policy): Execution workspace created on titan at $WORK_ROOT/hq/hq-d33cdc/plans/2026-11-03-test-execution-policy/; owner task:hq-d33cdc. Plan repository hq, docs/plans/2026-11-03-test-execution-policy.md, initial frozen revision 192a6e854a71be95a4660571ebb0490592825f00. Contents mutable and not checkpointed yet; task directory is a namespace. No worktree-local workspace.
 - 2026-11-03T15:40:55Z (feat/hq-d33cdc-test-policy): gate: planned — docs/plans/2026-11-03-test-execution-policy.md approved by Keith at frozen 192a6e854a71be95a4660571ebb0490592825f00; four scoped children none started
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-03T16:23:29Z (feat/hq-d33cdc-test-policy): Execution sequencing ruling is in the external progress ledger: prepare hq-b01c0f’s approved focused route before closing the interpreter prerequisite, because its verification exposed existing hq-36f6c6. Both records remain open until genuine shared verification. No policy change or new baseline exemption; no allowlist widening. Product scope remains the approved design.
