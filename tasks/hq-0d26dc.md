@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-25T02:28:24Z
-updated: 2026-11-03T15:42:18Z
+updated: 2026-11-03T15:42:21Z
 started: 2026-11-03T15:41:58Z
 depends: []
 tags: []
@@ -27,3 +27,4 @@ Where: justfile test recipe; tools/relay_cutover_bootstrap/hosts.py _send.
 - 2026-11-03T15:41:58Z (feat/hq-d33cdc-test-policy): started
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T15:42:18Z (feat/hq-d33cdc-test-policy): trial: flow-trial-1 — enrolled — flow on
+- 2026-11-03T15:42:21Z (feat/hq-d33cdc-test-policy): arm: flow-trial-1 — unit tack-0d26dc — flow on
