@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T11:31:29Z
+updated: 2026-11-03T11:35:42Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -96,3 +96,4 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-03T11:17:57Z (feat/hq-d33cdc-test-policy): gate: designed — docs/specs/2026-11-03-test-execution-policy-design.md approved by Keith at frozen da5e8ace1327c4eea5ce77c8e1a6355eb65d31af
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T11:31:29Z (feat/hq-d33cdc-test-policy): Planning findings: the published tasks CI candidate is fa58ab31acd757f59798537b6957e540fdccb9fb; the currently installed d4f2ed4 commit is not published (GitHub 422), so local and hosted task-CLI evidence must not be treated as equivalent. The plan requires the pinned-binary pilot. Self-review also found tt requires pytest- prefixed XML names; the plan now uses those names and tests that all reports are read. Updated instructions require external execution workspaces and retention 1; both are included, with no execution workspace created during planning. A read-only GET was wrongly blocked by relay-guard; reported as ops-0ec7c0 and completed through the profile’s named account without changing global auth state.
+- 2026-11-03T11:35:42Z (feat/hq-d33cdc-test-policy): review: plan round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
