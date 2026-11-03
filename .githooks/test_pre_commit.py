@@ -67,8 +67,47 @@ def world(tmp_path):
     return repo, env, tmp_path
 
 
-def run_hook(repo, env):
-    return subprocess.run([str(HOOK)], cwd=repo, env=env, text=True, capture_output=True)
+def run_hook(repo, env, *args):
+    return subprocess.run([str(HOOK), *args], cwd=repo, env=env, text=True, capture_output=True)
+
+
+def test_ci_mode_needs_no_registry_and_skips_only_ops_check(world):
+    repo, env, _ = world
+    (repo / "tools/ops-check").write_text("raise SystemExit(99)\n")
+    result = run_hook(repo, env, "--ci")
+    assert result.returncode == 0, result.stderr
+    assert run_hook(repo, env).returncode != 0
+
+
+def test_ci_mode_refuses_staged_local_state(world):
+    repo, env, _ = world
+    (repo / "local").mkdir()
+    (repo / "local/private.json").write_text("{}\n")
+    sh(repo, env, "git", "add", "-f", "local/private.json")
+    result = run_hook(repo, env, "--ci")
+    assert result.returncode != 0
+    assert "local/private.json" in result.stderr
+
+
+def test_ci_mode_still_checks_docs(world):
+    repo, env, _ = world
+    docs_stub(repo, "raise SystemExit(7)\n")
+    result = run_hook(repo, env, "--ci")
+    assert result.returncode != 0
+    assert "ops-docs check failed" in result.stderr
+
+
+def test_default_mode_still_runs_full_hygiene(world):
+    repo, env, _ = world
+    (repo / "tools/ops-check").write_text("raise SystemExit(99)\n")
+    result = run_hook(repo, env)
+    assert result.returncode != 0
+    assert "ops-check could not run" in result.stderr
+
+
+def test_unknown_mode_refuses(world):
+    repo, env, _ = world
+    assert run_hook(repo, env, "--unknown").returncode != 0
 
 
 def test_runs_the_docs_check_and_fails_with_its_output(world):

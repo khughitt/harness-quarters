@@ -65,6 +65,14 @@ def repo(tmp_path, monkeypatch):
         monkeypatch.delenv(key)
     for key, value in env.items():
         monkeypatch.setenv(key, value)
+    real_run = subprocess.run
+
+    def isolated_run(*args, **kwargs):
+        if kwargs.get("env") is None:
+            kwargs["env"] = env
+        return real_run(*args, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", isolated_run)
     subprocess.run(["git", "init", "-q", str(root)], check=True)
     monkeypatch.chdir(root)
     top = subprocess.run(["git", "rev-parse", "--show-toplevel"], check=True, text=True, capture_output=True)
@@ -93,6 +101,67 @@ def stage(root, text=None):
         path.write_text(text)
     subprocess.run(["git", "add", "facts/capabilities.toml"], cwd=root, check=True)
     return path
+
+
+def portable_hook(monkeypatch):
+    hook = load_hook()
+    monkeypatch.setattr(hook, "docs_check", lambda: 0)
+    monkeypatch.setattr(hook, "hygiene_check", lambda: pytest.fail("CI ran registry-dependent hygiene"))
+    return hook
+
+
+def test_ci_mode_checks_staged_facts_and_manifest(repo, monkeypatch, capsys):
+    hook = portable_hook(monkeypatch)
+    export, exports = hook.staged_tree, []
+
+    def counted(directory):
+        exports.append(directory)
+        return export(directory)
+
+    monkeypatch.setattr(hook, "staged_tree", counted)
+    assert hook.main(["--ci"]) == 0, capsys.readouterr().err
+    assert len(exports) == 1
+    good = (repo / "facts/capabilities.toml").read_text()
+    stage(repo, good.replace("schema = 1", "schema = 2"))
+    (repo / "facts/capabilities.toml").write_text(good)
+    manifest = hook.manifest_check
+    monkeypatch.setattr(hook, "manifest_check", lambda *a, **k: pytest.fail("facts failure did not short-circuit"))
+    assert hook.main(["--ci"]) == 1
+    assert "schema must be 1" in capsys.readouterr().err
+    assert len(exports) == 2
+    monkeypatch.setattr(hook, "manifest_check", manifest)
+    stage(repo, good)
+    git("config", "filter.harness-state.required", "false")
+    assert hook.main(["--ci"]) == 1
+    assert "filter.harness-state.required" in capsys.readouterr().err
+    assert len(exports) == 3
+
+
+@pytest.mark.parametrize("reader", ["tools/harness-facts", ".githooks/harness_state.py"])
+@pytest.mark.parametrize("operation", ["delete", "rename"])
+def test_ci_mode_refuses_deleted_or_renamed_reader(repo, monkeypatch, capsys, reader, operation):
+    hook = portable_hook(monkeypatch)
+    if operation == "delete":
+        git("rm", "-q", "--cached", reader)
+    else:
+        git("mv", reader, reader + "-moved")
+    assert hook.main(["--ci"]) == 1
+    assert reader + " is not staged" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("mode,expected", [([], ["local", "hygiene", "docs", "staged"]),
+                                          (["--ci"], ["local", "docs", "staged"])])
+def test_mode_order_and_short_circuit(monkeypatch, mode, expected):
+    hook, seen = load_hook(), []
+    for label, name in (("local", "local_layer"), ("hygiene", "hygiene_check"),
+                        ("docs", "docs_check"), ("staged", "staged_checks")):
+        monkeypatch.setattr(hook, name, lambda label=label: seen.append(label) or 0)
+    assert hook.main(mode) == 0
+    assert seen == expected
+    seen.clear()
+    monkeypatch.setattr(hook, "docs_check", lambda: seen.append("docs") or 1)
+    assert hook.main(mode) == 1
+    assert seen == expected[:-1]
 
 
 def test_a_broken_working_file_is_not_checked(repo):

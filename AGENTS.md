@@ -25,7 +25,11 @@ Use `just test-one <pytest arguments>` for focused tests; tt preserves arguments
 runner status through the budget. `just test-full` explicitly forces the broad route.
 The relay signal test stays serial; xdist reads the grant's worker count. `just ci-test`
 shares the suite but requires explicit positive PYTEST_XDIST_AUTO_NUM_WORKERS and never
-sets TT_FORCE. There is no configured hosted workflow or pre-push suite yet.
+sets TT_FORCE. Hosted verification is not activated yet. Both pre-push routes run
+mandatory `just check-hygiene` followed by `just test`; no outer composite is timed.
+The hook declares origin branches covered for the prepared workflow and warns on
+uncovered pushes when local policy skips tests; the declaration is not remote evidence.
+`just ci-hygiene` runs the portable subset without registry-dependent ops-check.
 See [test execution](docs/test-execution.md) for report retention and coverage checks.
 The pre-commit hook refuses staged paths under
 `local/`, then runs `tools/ops-check` over the working tree (the hygiene checks ops
@@ -42,6 +46,10 @@ record. A new attachment that carries host values follows the attachment fallbac
 lore `skills/references/retained-item-records.md`: keep the raw bytes under WORK_ROOT
 and attach a portable derivative. Never widen `.ops-check.toml` for an attachment.
 `just docs` regenerates the identity regions from `identity.toml`.
+
+The hook's explicit `--ci` mode retains staged-local-state refusal, docs validation
+and both staged checks over one export, omitting only ops-check. Full local checks
+remain mandatory in the default hook, `check-hygiene` and both pre-push routes.
 
 From main, `just link` previews home changes and `just link-check` checks convergence.
 `just mods` validates and tests the Claude Code mods when the Claude CLI is available.

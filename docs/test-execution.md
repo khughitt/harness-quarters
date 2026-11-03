@@ -9,6 +9,8 @@ verification is being prepared; it has not been activated or observed.
 | `just test-one <pytest arguments>` | Protected focused route through tt and host-budget; requires arguments |
 | `just test-full` | Sets TT_FORCE=1 for just test; records one broad run |
 | `just ci-test` | tt decides, then runs the same suite with explicit positive PYTEST_XDIST_AUTO_NUM_WORKERS |
+| `just check-hygiene` | Protected complete local pre-commit validation |
+| `just ci-hygiene` | Protected portable validation, recorded as hook-ci-hygiene |
 
 The hosted route sets neither force nor a local budget fallback. A hosted workflow
 must set TT_FORCE=1 itself. Both test and ci-test are the broad targets when policy
@@ -29,6 +31,29 @@ Local xdist uses the worker grant. The suite driver takes no selectors; focused
 selection belongs to test-one. The fixed suite ignores PYTEST_ADDOPTS so ambient
 selectors and worker flags cannot alter its inventory or partitions.
 Full local pre-commit hygiene remains mandatory.
+
+## Hygiene and push hooks
+
+The default pre-commit hook refuses staged local/ state, runs ops-check and
+ops-docs check against the working tree, then exports the staged tree once for
+harness-facts and harness_state.py validation. The staged manifest, attributes,
+cleaned config blobs and repository filter configuration are all checked.
+
+The explicit --ci mode omits only ops-check. It keeps staged-local-state refusal,
+guide identity validation and both staged checks over that same exporter. It
+needs no private sibling checkout or tasks registry. Cross-project references,
+layout, conflicts, scratch and vendored-copy hygiene remain full local checks;
+portable hygiene does not claim them as hosted coverage.
+
+Both hook-pre-push and hook-pre-push-fast compose check-hygiene then test, with
+no differently selected suite or outer composite timing. A hygiene failure stops
+before the broad request. The unchanged shared hook validates ref input, clears
+inherited Git-local variables, forwards the ref bytes and refuses a zero SSH
+keepalive. It declares origin and refs/heads/* to match the prepared all-branch
+workflow; tags and other remotes have no declared hosted suite. A policy-off
+uncovered push warns without forcing a local suite. These declarations are not
+proof that a remote job ran. Hosted verification and policy activation remain
+separate acceptance gates.
 
 ## Evidence
 

@@ -364,6 +364,12 @@ identities against full collection and preserves caller-owned reports on failure
 Hosted execution is being prepared; policy remains enabled and no hosted result is
 claimed. See [test execution](docs/test-execution.md) for commands and evidence.
 
+`just check-hygiene` runs the complete local pre-commit checks. The pre-push hook
+runs that mandatory hygiene and then requests the broad suite, for both gate routes.
+`just ci-hygiene` preserves staged-local-state refusal, guide identity checks and
+the shared staged fact/manifest export while omitting registry-dependent ops-check.
+Cross-project references and its other hygiene checks remain local coverage.
+
 ## Finding a past session
 
 `hq sessions` lists recent Claude Code, Codex and agy sessions from every home (`~/.claude`,

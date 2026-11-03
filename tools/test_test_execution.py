@@ -54,8 +54,13 @@ def world(tmp_path):
     for name in ("tt", "test-suite", "pytest_evidence.py"):
         if (ROOT / "tools" / name).exists():
             shutil.copy2(ROOT / "tools" / name, repo / "tools" / name)
+    if (ROOT / ".githooks/pre-push").exists():
+        shutil.copy2(ROOT / ".githooks/pre-push", repo / ".githooks/pre-push")
     executable(repo / "tools/harness-facts", "raise SystemExit(0)\n")
     marker = "with open(os.environ['MARKERS'], 'a') as out: out.write(json.dumps({ROW}) + '\\n')\n"
+    executable(repo / ".githooks/pre-commit", "import json,os,sys\n"
+               + marker.replace("{ROW}", "{'kind': 'hygiene', 'argv': sys.argv[1:], 'refs_hex': sys.stdin.buffer.read().hex()}")
+               + "raise SystemExit(int(os.environ.get('HYGIENE_STATUS', '0')))\n")
     executable(binaries / "host-budget", "import json,os,sys\n"
                + marker.replace("{ROW}", "{'kind': 'budget', 'argv': sys.argv[1:]}")
                + "assert sys.argv[1:3] == ['run', '--']\n"
@@ -83,7 +88,7 @@ def world(tmp_path):
             supplied.update(env or {})
             return subprocess.run([shutil.which("just"), "--justfile", str(repo / "justfile"),
                                    recipe, *args], cwd=repo, env=supplied,
-                                  capture_output=True, text=True, timeout=90)
+                                  input="", capture_output=True, text=True, timeout=90)
 
         def rows(self):
             path = Path(environment["TT_LOG"])
@@ -347,3 +352,81 @@ def test_copy_failure_preserves_existing_runner_failure(tmp_path, monkeypatch):
     monkeypatch.setattr(module["shutil"], "copyfile", fail_copy)
     assert module["main"]([]) == 17
     assert (evidence / "pytest-agents.xml").is_file()
+
+
+@pytest.mark.parametrize("recipe,target,args", [("check-hygiene", "check-hygiene", []),
+                                                ("ci-hygiene", "hook-ci-hygiene", ["--ci"])])
+def test_hygiene_routes_remain_protected(world, recipe, target, args):
+    world.policy(False)
+    result = world.run(recipe)
+    assert result.returncode == 0, result.stderr
+    marker, = world.markers()
+    assert marker["kind"] == "hygiene" and marker["argv"] == args
+    row, = world.rows()
+    assert row["target"] == target and row["execution"] == "ran"
+
+
+@pytest.mark.parametrize("recipe", ["hook-pre-push", "hook-pre-push-fast"])
+@pytest.mark.parametrize("failure", [False, True])
+def test_push_routes_always_check_hygiene_before_suite(world, recipe, failure):
+    world.policy(False)
+    result = world.run(recipe, env={"HYGIENE_STATUS": "9" if failure else "0"})
+    assert result.returncode == (9 if failure else 0), result.stderr
+    assert [m["kind"] for m in world.markers()] == ["hygiene"]
+    assert [r["target"] for r in world.rows()] == (["check-hygiene"] if failure else ["check-hygiene", "test"])
+    if not failure:
+        assert world.rows()[-1]["execution"] == "skipped"
+
+
+def push_spy(world):
+    real_just = shutil.which("just")
+    executable(Path(world.env["PATH"].split(os.pathsep)[0]) / "just", "import json,os,sys\n"
+               + "if sys.argv[1:2] != ['--evaluate']:\n"
+               + "    row={'kind':'gate','target':sys.argv[1], 'git_vars':[k for k in ('GIT_DIR','GIT_WORK_TREE','GIT_INDEX_FILE','GIT_PREFIX') if k in os.environ]}\n"
+               + "    with open(os.environ['MARKERS'],'a') as out: out.write(json.dumps(row)+'\\n')\n"
+               + f"os.execv({real_just!r}, [{real_just!r}, *sys.argv[1:]])\n")
+
+
+def push(world, remote, data, url="https://example.invalid/repo.git"):
+    hook = world.root / ".githooks/pre-push"
+    assert hook.is_file(), "shared push hook is missing"
+    environment = dict(world.env)
+    environment.update({"GIT_DIR": str(world.root / ".git"), "GIT_WORK_TREE": str(world.root),
+                        "GIT_INDEX_FILE": str(world.root / "unused-index"), "GIT_PREFIX": "fake/"})
+    return subprocess.run([str(hook), remote, url], cwd=world.root, env=environment,
+                          input=data.encode(), capture_output=True, timeout=30)
+
+
+def ref_line(remote_ref, deletion=False):
+    return f"refs/heads/local {('0' if deletion else '1') * 40} {remote_ref} {'2' * 40}\n"
+
+
+@pytest.mark.parametrize("remote,data,target,warn", [
+    ("origin", ref_line("refs/heads/feature/x"), "hook-pre-push-fast", False),
+    ("origin", ref_line("refs/heads/feature/x") + ref_line("refs/tags/v1"), "hook-pre-push", True),
+    ("origin", ref_line("refs/tags/v1"), "hook-pre-push", True),
+    ("elsewhere", ref_line("refs/heads/feature/x"), "hook-pre-push", True),
+    ("origin", "malformed refs\n\n", "hook-pre-push", True),
+    ("origin", ref_line("refs/heads/feature/x", deletion=True), "hook-pre-push-fast", False),
+])
+def test_pre_push_ref_routing_bytes_and_git_isolation(world, remote, data, target, warn):
+    world.policy(False)
+    push_spy(world)
+    result = push(world, remote, data)
+    assert result.returncode == 0, result.stderr.decode()
+    gate, hygiene = world.markers()
+    assert gate == {"kind": "gate", "target": target, "git_vars": []}
+    assert hygiene["kind"] == "hygiene" and hygiene["refs_hex"] == data.encode().hex()
+    assert (b"remote full-suite coverage is not declared" in result.stderr) == warn
+    assert [r["target"] for r in world.rows()] == ["check-hygiene", "test"]
+    assert world.rows()[-1]["execution"] == "skipped"
+
+
+def test_pre_push_refuses_zero_ssh_keepalive(world):
+    world.policy(False)
+    push_spy(world)
+    executable(Path(world.env["PATH"].split(os.pathsep)[0]) / "ssh", "print('serveraliveinterval 0')\n")
+    result = push(world, "origin", ref_line("refs/heads/feature/x"), "git@example.invalid:repo.git")
+    assert result.returncode != 0
+    assert b"no SSH keepalive" in result.stderr
+    assert world.markers() == [] and world.rows() == []

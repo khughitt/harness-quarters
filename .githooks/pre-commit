@@ -12,6 +12,7 @@ The staged tools/harness-facts must pass its own check over the staged tree, and
 (`filter.harness-state.clean`, `required = true`, `smudge = cat`) of the real repository,
 which a linked worktree shares. The tree is exported once for both.
 Installed by git config core.hooksPath .githooks.
+The explicit --ci mode runs the portable subset, omitting only ops-check's registry layer.
 """
 import os
 import pathlib
@@ -158,8 +159,10 @@ def staged_checks():
 
 
 def main(argv):
+    if argv == ["--ci"]:
+        return local_layer() or docs_check() or staged_checks()
     if argv:
-        return fail("pre-commit accepts no arguments")
+        return fail("pre-commit accepts no arguments or --ci")
     return local_layer() or hygiene_check() or docs_check() or staged_checks()
 
 

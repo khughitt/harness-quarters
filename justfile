@@ -1,3 +1,7 @@
+tt := "tools/tt"
+ci_remote := "origin"
+ci_suite_refs := "refs/heads/*"
+
 # Once per clone, and again after pulling a change to it: git hooks, the harness-state
 # filter (required, so a failing clean stops git rather than staging live picks, with the
 # identity smudge `cat` a required filter needs to check files out), and the untracked
@@ -23,11 +27,11 @@ link-check:
 
 # Policy decides before the local worker budget is requested.
 test:
-    tools/tt test -- host-budget run -- just _test-suite
+    {{tt}} test -- host-budget run -- just _test-suite
 
 # Hosted workers are explicit; only the workflow supplies TT_FORCE.
 ci-test:
-    tools/tt ci-test -- just _test-suite
+    {{tt}} ci-test -- just _test-suite
 
 [private]
 _test-suite:
@@ -39,7 +43,17 @@ test-full:
 # Focused tests retain argument boundaries and the host's worker budget.
 [positional-arguments]
 test-one +args:
-    tools/tt test-one -- host-budget run -- uv run -q --python /usr/bin/python3 --with pytest==9.2.0 --with pytest-xdist==3.8.0 pytest "$@"
+    {{tt}} test-one -- host-budget run -- uv run -q --python /usr/bin/python3 --with pytest==9.2.0 --with pytest-xdist==3.8.0 pytest "$@"
+
+check-hygiene:
+    {{tt}} check-hygiene -- .githooks/pre-commit
+
+ci-hygiene:
+    {{tt}} hook-ci-hygiene -- .githooks/pre-commit --ci
+
+hook-pre-push: check-hygiene test
+
+hook-pre-push-fast: check-hygiene test
 
 # Install the pinned pi (pi/package.json and its lock) under ~/.local/share/pi/<version>,
 # outside the synced checkout; pi/bin/pi runs it. pi needs no lifecycle scripts (its README).
