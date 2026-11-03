@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: feat/hq-d33cdc-test-policy
 created: 2026-11-01T23:42:58Z
-updated: 2026-11-03T16:23:31Z
+updated: 2026-11-03T16:38:30Z
 started: 2026-11-03T16:05:39Z
 depends: []
 tags: []
@@ -37,3 +37,4 @@ Done when `just test` and `just test-one` each run inside a background.slice sco
 - 2026-11-03T16:06:03Z (feat/hq-d33cdc-test-policy): arm: flow-trial-1 — unit tack-b01c0f — flow off
 - 2026-11-03T16:06:54Z (feat/hq-d33cdc-test-policy): Trial assigned flow off; no flow gates will be written for this prerequisite. Claimed for controlled verification preparation only while hq-0d26dc finishes; no budget recipe edit yet. Shared worktree .worktrees/hq-d33cdc and parent-owned external workspace. Existing documented route has no focused entry: the requested just test-one probe is RED with missing recipe (status 1); literal-argv/budget routing self-check is also RED for that same missing feature. Both check scripts/logs live in the open hq-d33cdc-owned workspace; no inherited environment is passed into their subprocess fixtures. The pending post-interpreter full suite will serve as this unchanged-code tree’s baseline before budget edits; no adoption waiver is claimed.
 - 2026-11-03T16:23:31Z (feat/hq-d33cdc-test-policy): Proceeding with the scoped budget/focused recipe implementation to enable bounded diagnosis of known hq-36f6c6, which blocked hq-0d26dc full verification. Last unchanged-before-budget full run: 268 agents passed, 2048 hook/tool passed, 1 known archive environment failure; no passing full baseline is claimed. Both prerequisites stay open until shared full verification succeeds. RED checks exist for missing test-one and literal argument forwarding; they run only the recipe boundary, not a guessed test runner.
+- 2026-11-03T16:38:30Z (feat/hq-d33cdc-test-policy): review: impl round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
