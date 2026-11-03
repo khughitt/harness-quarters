@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T15:40:53Z
+updated: 2026-11-03T15:40:55Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -110,3 +110,5 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-03T15:40:49Z (feat/hq-d33cdc-test-policy): review: plan round 2 — verdict: accept; findings: none; reviewer: human
 - 2026-11-03T15:40:51Z (feat/hq-d33cdc-test-policy): Keith approved frozen plan 192a6e854a71be95a4660571ebb0490592825f00 for inline executing-plans execution with independent flow reviews. Baseline waiver remains adoption-only; prerequisite task requirements remain separate. Workflow publication, observed coverage acceptance and policy activation still need their explicit later approvals.
 - 2026-11-03T15:40:53Z (feat/hq-d33cdc-test-policy): Execution workspace created on titan at $WORK_ROOT/hq/hq-d33cdc/plans/2026-11-03-test-execution-policy/; owner task:hq-d33cdc. Plan repository hq, docs/plans/2026-11-03-test-execution-policy.md, initial frozen revision 192a6e854a71be95a4660571ebb0490592825f00. Contents mutable and not checkpointed yet; task directory is a namespace. No worktree-local workspace.
+- 2026-11-03T15:40:55Z (feat/hq-d33cdc-test-policy): gate: planned — docs/plans/2026-11-03-test-execution-policy.md approved by Keith at frozen 192a6e854a71be95a4660571ebb0490592825f00; four scoped children none started
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
