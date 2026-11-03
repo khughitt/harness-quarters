@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: feat/hq-d33cdc-test-policy
 created: 2026-11-01T23:42:58Z
-updated: 2026-11-03T16:06:03Z
+updated: 2026-11-03T16:06:54Z
 started: 2026-11-03T16:05:39Z
 depends: []
 tags: []
@@ -35,3 +35,4 @@ Done when `just test` and `just test-one` each run inside a background.slice sco
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T16:06:01Z (feat/hq-d33cdc-test-policy): trial: flow-trial-1 — enrolled — flow off
 - 2026-11-03T16:06:03Z (feat/hq-d33cdc-test-policy): arm: flow-trial-1 — unit tack-b01c0f — flow off
+- 2026-11-03T16:06:54Z (feat/hq-d33cdc-test-policy): Trial assigned flow off; no flow gates will be written for this prerequisite. Claimed for controlled verification preparation only while hq-0d26dc finishes; no budget recipe edit yet. Shared worktree .worktrees/hq-d33cdc and parent-owned external workspace. Existing documented route has no focused entry: the requested just test-one probe is RED with missing recipe (status 1); literal-argv/budget routing self-check is also RED for that same missing feature. Both check scripts/logs live in the open hq-d33cdc-owned workspace; no inherited environment is passed into their subprocess fixtures. The pending post-interpreter full suite will serve as this unchanged-code tree’s baseline before budget edits; no adoption waiver is claimed.
