@@ -1,8 +1,9 @@
 # hq test execution policy and hosted verification
 
-Status: proposed for human review. Task: hq-d33cdc. Implementation and external
-activation have not started. This design does not authorize a push, workflow
-activation, account change, home relinking or global instruction change.
+Status: revised after spec round 2; proposed for human review. Task: hq-d33cdc.
+Implementation and external activation have not started. This design does not
+authorize a push, workflow activation, account change, home relinking or global
+instruction change.
 
 ## Intent and authority
 
@@ -38,8 +39,9 @@ pass is claimed. This exception does not change the policy of other tasks.
 - `just test` checks capability-fact validity, then runs four pytest invocations:
   agents; hooks/tools except the two relay-cutover files; those files under xdist
   except the signal test; and that signal test serially. Preserve this partition
-  and its selectors. There are 58 test modules in those trees by static inventory;
-  this is not a collected or executed test count.
+  and its selectors. Static inventory contains 57 test_*.py modules: agents/bin 2,
+  hooks 7 and tools 48; conftest.py is not a test module. This is not a collected
+  or executed test count.
 - The Python pre-commit hook already contains mandatory work only: staged local
   state refusal, working-tree ops-check and ops-docs, then capability and manifest
   checks against one exported staged tree. None becomes policy-skippable.
@@ -77,16 +79,18 @@ Adopt the latest landed `tools/tt` through ops's `bin/vendored adopt tt` from th
 worktree (or its documented `--into` form); keep its bytes and executable mode
 unchanged. Let the distributor refresh `tools/README.md` as it normally does.
 
-The only broad target is `test`. Do not invent lint/type workloads or a fast-suite
-selector. The proposed interfaces are:
+The broad targets are `test` and `ci-test`, the local and hosted entry points to
+the same suite. Do not invent lint/type workloads or a fast-suite selector. The
+proposed interfaces are:
 
 | Route | Behavior |
 | --- | --- |
 | `just test` | tt target test decides first; if running, use the local worker budget and the existing complete suite |
 | `just test-one <pytest arguments>` | protected tt target test-one, through host-budget, preserving argument boundaries and runner status; require arguments |
 | `just test-full` | untimed alias for `TT_FORCE=1 just test`; exactly one broad record |
-| `just check-hygiene` | protected tt target, executing the existing pre-commit validation path, including staged-tree checks |
-| `just ci-test` | explicit TT_FORCE=1, the same suite partitions, bounded hosted workers and no development-host allocator |
+| `just check-hygiene` | protected local tt target, executing the full existing pre-commit validation path, including staged-tree checks |
+| `just ci-hygiene` | protected tt target hook-ci-hygiene, running staged-local-state refusal, ops-docs check and staged-tree fact/manifest validation; no registry-dependent ops-check |
+| `just ci-test` | tt target ci-test decides first, then the same suite partitions with bounded hosted workers and no development-host allocator; does not set TT_FORCE |
 
 Keep one definition of the suite commands, shared between local and hosted entry
 points. Any internal recipe exists only to share that definition and is marked
@@ -98,6 +102,23 @@ without a budget. A policy skip launches neither a suite nor host-budget.
 Hosted execution is a separate explicit entry point: a standard runner has no
 configured host-budget policy or user manager. It sets two workers initially;
 missing local host-budget remains an error, with no automatic unbudgeted fallback.
+Only the workflow sets TT_FORCE=1 for hosted execution; ci-test never supplies
+its own override. With policy off, local ci-test without force records a skip
+and starts no unbudgeted child. With GITHUB_ACTIONS=true and no force it refuses,
+so forgetting the workflow setting cannot produce a green skipped or silently
+forced run. The local deliberate full-run route remains test-full, with its budget.
+
+The hosted hygiene subset reuses the existing hook's local_layer, docs_check and
+staged_checks validations, retaining their failure handling and single staged-tree
+export. It does not call the full pre-commit main path. Full check-hygiene stays
+mandatory in local pre-commit and pre-push behavior. The hosted entry point records
+under the protected hook-ci-hygiene target so neither suite classification can skip
+it. No change to the shared reference checker, registry stub or private ops checkout
+is needed. Cross-project reference validity, and ops-check's other checks, remain
+local evidence rather than claimed hosted coverage. In an isolated environment
+without the sibling registry, current ops-check reports eight missing references;
+the existing hook validations chosen for the portable subset pass. This observation
+establishes the boundary, not a completed hosted check.
 
 Reuse ops's existing pre-push template for ref validation and the uncovered-ref
 warning, rather than writing another ref/policy parser. Declare `ci_remote` as
@@ -114,7 +135,7 @@ separate activation approval, commit only the actual broad target classification
 
 ```toml
 automatic_broad = false
-broad_targets = ["test"]
+broad_targets = ["test", "ci-test"]
 ```
 
 tt owns validation and decisions. Focused checks and all mandatory work run with
@@ -140,13 +161,24 @@ system Python executable consistent with shebang-launched tools. No live harness
 API credential, desktop, host service or installed pi/relay runtime is required.
 Git fixtures use isolated config and allowlisted subprocess environments.
 
-Run `just setup`, mandatory hygiene and `just ci-test`. Set TT_FORCE=1 explicitly
-at job scope as well as in the CI entry point. Retain a finite job timeout chosen
-from the preparation pilot; the activation packet names that actual limit and
-the allowed number of remote attempts. Upload/retain test summaries with skip
-identities and reconcile the four runner reports against collected test identities;
-a nonzero aggregate alone cannot conceal omitted partitions. Do not suppress a
-failed prerequisite or discard a module to obtain a green run.
+Run `just setup`, `just ci-hygiene` and `just ci-test`. Set TT_FORCE=1 explicitly
+at workflow job scope, never inside ci-test or the shared suite definition. Retain
+a finite job timeout chosen from the preparation pilot; the activation packet
+names that actual limit and the allowed number of remote attempts.
+
+The workflow creates a caller-owned evidence directory outside tt's temporary
+TT_JUNIT_DIR and passes its location to the suite. Preserve four distinct reports
+(agents, hooks/tools, parallel relay and serial signal), their skip identities and
+the collected test inventory in that directory. The shared suite may write there
+directly or copy reports there before returning to tt; choose one route in the
+plan and use the same suite definition locally and remotely. Never upload from
+TT_JUNIT_DIR after tt exits: tt removes it in finally. Retain available reports on
+failure as well as success; absent/unrun partitions remain explicitly unverified.
+An evidence-write failure is a failed check, and report cleanup must not mask a
+suite failure. Upload the caller-owned evidence with an always-run workflow step
+and reconcile all four reports against collected identities before accepting
+coverage; a nonzero aggregate alone cannot conceal omitted partitions. Do not
+suppress a failed prerequisite or discard a module to obtain a green run.
 
 Known capability boundaries from current code:
 
@@ -185,16 +217,22 @@ not required. Unknown spend protection blocks that changed activation path.
    no broad rerun is implied by that waiver, and other mandatory checks still apply.
 3. Prove policy-on execution, focused execution, literal argument forwarding,
    skip-before-budget with no child, null skipped records, a forced child failure,
-   direct/nested hosted refusal without force, hook hygiene and failure propagation,
-   slash-branch coverage and uncovered/tag/other-remote warnings. Use temporary
-   policy-off fixtures until activation; do not switch the live checkout early.
+   and direct/nested hosted refusal without force for both test and ci-test. Pin
+   ci-test's local policy-off skip and absence of a recipe-level force override.
+   Prove full local hook hygiene, the portable CI subset with no registry/private
+   siblings, hygiene failure propagation, slash-branch coverage and
+   uncovered/tag/other-remote warnings. Retained partition reports must still exist
+   after tt exits on success and failure, and reconcile against collected identities.
+   Use temporary policy-off fixtures until activation; do not switch the live
+   checkout early.
 4. Before an extended run, exercise the prepared setup and verdict path on a small
    disposable case, including interpreter/tool availability and coverage reporting.
    Then verify the unchanged suite inventory. Record any full local execution as
    deliberate verification, never a baseline required by this task.
 5. Review the whole branch after merging any moved base. Prepare a concrete external
    packet: frozen workflow revision, exact refs/setup, reader delivery, local
-   evidence, expected usage, timeout/attempt bound, actual omissions and rollback.
+   evidence, expected usage, timeout/attempt bound, actual omissions, the portable
+   hosted hygiene boundary and rollback.
    The user approves publishing and remote invocation separately. Stop here if
    approval has not been given; code and policy remain enabled locally.
 6. After an approved hosted run completes with nonzero tests, reconcile counts and
