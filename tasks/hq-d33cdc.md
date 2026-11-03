@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T11:17:57Z
+updated: 2026-11-03T11:30:30Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -16,6 +16,7 @@ source: "tt-policy:hq"
 agent: codex
 origin: agent
 spec: docs/specs/2026-11-03-test-execution-policy-design.md
+plan: docs/plans/2026-11-03-test-execution-policy.md
 ---
 
 Adopt the approved shared test execution policy for this personal project after the ops pilot. Owner: the next hq implementer; Keith approves external activation. State: pending preparation, not offloaded. Shared authority: ops-8bfa85 (read its approved spec and plan with tasks doc); pilot prerequisite ops-68729d.
