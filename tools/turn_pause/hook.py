@@ -23,7 +23,7 @@ import time
 from . import adapters, counters, engine, notify
 from .engine import Decision
 from .events import Event
-from .limits import DEFAULTS_FILE, file_sha256, load, with_budget
+from .limits import DEFAULTS_FILE, duration, file_sha256, load, with_budget
 from .prompt import Budget, Malformed, is_genuine, parse_budget
 from .protect import MAX_NODES, TooManyNodes, too_many_nodes, touches_protected
 from .state import Store, Wakeup, state_path
@@ -82,11 +82,6 @@ HARNESS_NAMES = ('claude', 'codex')
 LIMITS_CHANGED = 'limits-changed'
 
 
-def hmm(seconds: float) -> str:
-    minutes = int(seconds) // 60
-    return f'{minutes // 60}:{minutes % 60:02d}'
-
-
 def _deny(reason: str) -> dict:
     return {'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'permissionDecision': 'deny',
                                    'permissionDecisionReason': reason}}
@@ -105,7 +100,7 @@ def _turn(rs: RootState):
 def _counts(rs: RootState) -> dict:
     t = _turn(rs)
     lim = t.limits
-    return dict(a=hmm(t.active), A=hmm(lim.active_seconds), c=t.calls, C=lim.calls, s=t.spawns,
+    return dict(a=duration(t.active), A=duration(lim.active_seconds), c=t.calls, C=lim.calls, s=t.spawns,
                 S=lim.spawns, k=t.compactions, K=lim.compactions)
 
 
@@ -121,7 +116,7 @@ def warning(rs: RootState, name: str) -> str:
     t = _turn(rs)
     used = t.active if name == 'active' else getattr(t, name)
     limit = t.limits.active_seconds if name == 'active' else getattr(t.limits, name)
-    shown = hmm if name == 'active' else (lambda v: str(int(v)))
+    shown = duration if name == 'active' else (lambda v: str(int(v)))
     return WARNING_TEXT.format(limit=name, n=int(used * 100 // limit) if limit > 0 else 100, used=shown(used), value=shown(limit))
 
 
@@ -259,7 +254,7 @@ def _prompt(rs: RootState, harness: str, payload: dict, now: float, limits_path,
         note = None
         if isinstance(budget, Budget):
             limits = with_budget(limits, budget)
-            note = BUDGET_TEXT.format(a=hmm(limits.active_seconds), c=limits.calls, s=limits.spawns,
+            note = BUDGET_TEXT.format(a=duration(limits.active_seconds), c=limits.calls, s=limits.spawns,
                                       k=limits.compactions)
         elif isinstance(budget, Malformed):
             note = MALFORMED_TEXT.format(reason=budget.reason)
