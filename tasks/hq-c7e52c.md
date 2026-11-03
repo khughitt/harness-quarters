@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-d33cdc-test-policy
 created: 2026-11-03T11:30:43Z
-updated: 2026-11-03T20:56:27Z
+updated: 2026-11-03T21:04:53Z
 started: 2026-11-03T20:26:12Z
 depends: [hq-b32d19]
 parent: hq-d33cdc
@@ -38,4 +38,6 @@ Await review and approval of the complete hq-d33cdc plan. Execute Task 4: Verify
 - 2026-11-03T20:55:34Z (feat/hq-d33cdc-test-policy): Approved single verification push succeeded (exit0) at8d140cce7ea4d6cec0ddf6953a7250f7ed89480b to origin refs/heads/feat/hq-d33cdc-test-policy. No retry, main update or policy-off change. Installed pre-push gate ran full hygiene and all2778 tests:268/52.96s,2118/927.30s,391/527.16s,1/3.43s; independent caller-owned evidence reconciliation2778collected/reported/executed, no skips/problems. Actual allocator6workers/background.slice captured in task-4-prepush-budget.json. Raw push log/status/start/end/SHA files retained in parent workspace. Shared remote configuration still original SSH and globally active gh account unchanged. First immediate run-list response has0 runs, not hosted proof; observing registration before judging outcome.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T20:56:27Z (feat/hq-d33cdc-test-policy): Hosted run41716936974 attempt1 now independently identified on pushed SHA8d140cce7ea4d6cec0ddf6953a7250f7ed89480b, eventpush, workflow.github/workflows/ci.yml. URL https://github.com/khughitt/harness-quarters/actions/runs/41716936974, job126199289441 labels[ubuntu-24.04]. Initial tool/system installation steps succeeded; pinned tasks build in progress. Raw run/jobs/check/ref metadata retained separately; first empty immediate run-list was registration lag, not a failed run. One tracked read-only gh run watch (70m bound,60s interval) owns observation; no rerun/second push. Policy stays absent/enabled; no hosted pass or accepted coverage claim.
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-03T21:04:53Z (feat/hq-d33cdc-test-policy): Hosted attempt1 completed failure on approved SHA8d140cce7ea4d6cec0ddf6953a7250f7ed89480b, run41716936974/job126199289441. Job20:55:01Z-21:02:57Z=7m56s; run window20:54:58Z-21:02:58Z=8m. Setup/build/hydration and portable hygiene succeeded; forced complete suite failed; always-run artifact upload succeeded. Watch ended1, no retry. Artifact13269109652 hq-tests-8d140cce7ea4d6cec0ddf6953a7250f7ed89480b-1,110866bytes,expiry2026-11-10T21:02:53Z. Creating parent-owned task-4-hosted-artifact-13269109652 and task-4-hosted-logs-41716936974 directories in existing external workspace for immutable raw download/extraction and diagnosis; contents mutable until checkpoint, owner hq-d33cdc, no independent child identity. Policy stays absent/enabled, hosted coverage unaccepted; retrieve and inspect failure before next-action disposition.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
