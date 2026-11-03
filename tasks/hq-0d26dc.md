@@ -1,13 +1,15 @@
 ---
 id: hq-0d26dc
 title: "Run the uv test segments under the tools' interpreter: uv's managed Python lacks os.pidfd_open"
-status: todo
+status: doing
 priority: 3
 size: xs
 complexity: low
 process: direct
+owner: feat/hq-d33cdc-test-policy
 created: 2026-10-25T02:28:24Z
-updated: 2026-11-03T15:41:56Z
+updated: 2026-11-03T15:41:58Z
+started: 2026-11-03T15:41:58Z
 depends: []
 tags: []
 source: hq-a7b473
@@ -19,3 +21,8 @@ Why: just test's uv segments (uv run -q --with pytest ...) pick a uv-managed CPy
 Done: the uv segments in the justfile run on /usr/bin/python3 (uv run --python /usr/bin/python3 ...), or an equivalent explicit pin; just test green; a one-line check (python -c 'import os; os.pidfd_open') under the recipe's interpreter succeeds.
 
 Where: justfile test recipe; tools/relay_cutover_bootstrap/hosts.py _send.
+
+## Notes
+
+- 2026-11-03T15:41:58Z (feat/hq-d33cdc-test-policy): started
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
