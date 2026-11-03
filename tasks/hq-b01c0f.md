@@ -1,13 +1,15 @@
 ---
 id: hq-b01c0f
 title: Run hq's test recipes under host-budget and give agents a budgeted test-one route
-status: todo
+status: doing
 priority: 1
 size: s
 complexity: low
 process: direct
+owner: feat/hq-d33cdc-test-policy
 created: 2026-11-01T23:42:58Z
-updated: 2026-11-01T23:42:58Z
+updated: 2026-11-03T16:05:39Z
+started: 2026-11-03T16:05:39Z
 depends: []
 tags: []
 agent: claude-code/claude-opus-5-5
@@ -29,3 +31,5 @@ Done when `just test` and `just test-one` each run inside a background.slice sco
 
 - 2026-11-01T23:42:58Z (add): created
   provenance: {"harness_session":"claude-code:029eacc3-b922-4a57-bd6b-7fcb7ca9ead1","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"user"}
+- 2026-11-03T16:05:39Z (feat/hq-d33cdc-test-policy): started
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
