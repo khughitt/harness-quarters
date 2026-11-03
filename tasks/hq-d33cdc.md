@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T11:09:01Z
+updated: 2026-11-03T11:09:34Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -83,3 +83,4 @@ After approved activation, commit .tt.toml with real broad target names, verify 
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T11:09:01Z (feat/hq-d33cdc-test-policy): parked (waiting on user, review): User reviews hq frozen da5e8ace1327c4eea5ce77c8e1a6355eb65d31af:docs/specs/2026-11-03-test-execution-policy-design.md in .worktrees/hq-d33cdc; round-2 findings are corrected and round 3 accepts with none. After human approval the agent resumes this worktree and writes the implementation plan for separate review. No code or activation started; baseline tests remain waived for this task.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-03T11:09:34Z (feat/hq-d33cdc-test-policy): Checkpoint correction: shell parameter expansion removed the colon and first t from the previous basis path. That locator was invalid; the next checkpoint supplies the verified full commit:path literally. Inventory and retention terms were unchanged.
