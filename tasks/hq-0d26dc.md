@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-25T02:28:24Z
-updated: 2026-11-03T15:43:33Z
+updated: 2026-11-03T15:48:52Z
 started: 2026-11-03T15:41:58Z
 depends: []
 tags: []
@@ -33,3 +33,4 @@ Where: justfile test recipe; tools/relay_cutover_bootstrap/hosts.py _send.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T15:43:33Z (feat/hq-d33cdc-test-policy): gate: implementing — .worktrees/hq-d33cdc shared with controller hq-d33cdc
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-03T15:48:52Z (feat/hq-d33cdc-test-policy): Root cause reproduced before edits: uv run -q --with pytest selects CPython 3.13.12 at the shared uv build cache, lacks os.pidfd_open, and the explicit import/access probe exits 1 with AttributeError (prereq-interpreter-red.log in the controller workspace). /usr/bin/python3 has the capability. Existing _send uses pidfd_open at hosts.py:625; only the three uv recipe calls need --python /usr/bin/python3. The independent full baseline is still running; 268 agent tests have passed, hook/tool run incomplete. No code edited.
