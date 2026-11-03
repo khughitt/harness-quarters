@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-d33cdc-test-policy
 created: 2026-11-03T11:30:43Z
-updated: 2026-11-03T22:54:19Z
+updated: 2026-11-03T22:56:46Z
 started: 2026-11-03T20:26:12Z
 depends: [hq-b32d19]
 parent: hq-d33cdc
@@ -65,4 +65,6 @@ Await review and approval of the complete hq-d33cdc plan. Execute Task 4: Verify
 - 2026-11-03T22:48:26Z (feat/hq-d33cdc-test-policy): Corrective commit954ad406156d12c6321747036e83d88df198bc5f is local/unpublished; HEAD covered flow753ad5e272a82d4e7091d71281cac7df80731b6d equals accepted review and full2781 gate. Actual first hosted run41716936974 remains failed7m56s at pushed8d140cce; setup/upload passed,80missing-work-link failures,14skips,392unrun. Current correction declares public history/work-link/attr and fixes only test-fixture input readiness; no test/assertion removed and no extra omission proposed. No remote retry, main merge, policy-off file or activation. This open child owns no independent retained item: parent hq-d33cdc owns locked shared worktree and complete persistent workspace, all raw hosted archives, source metadata, pilots, partial/failed/successful local attempts, review reports and immutable manifest versions. Source1 manifest and progress-checkpoint1 stay preserved; parent completes checkpoint2 before both parks. Ignored .ci-tools source/build/pinned-script cache and Python/pytest caches are regenerable, kept for approved retry reproduction, no deletion. Host-load session empty; no own check/reviewer/server/service survives. Shared account, remote and home pointers unchanged; other worktree hq-c66bee and four unrelated tag warnings untouched. feat/hq-d33cdc-test-policy remains unmerged in .worktrees/hq-d33cdc; controller integrates only under later explicit rollout approval. Next user action is approve one additional feature verification push of this frozen correction; controller then refreshes preflight and observes that exact completed run before separate coverage acceptance/activation gates. Task4 remains implementing, not verified/done.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T22:54:19Z (feat/hq-d33cdc-test-policy): parked (waiting on user, approval): User reviews docs/notes/2026-11-03-hq-test-policy-activation.md frozen at hq commit954ad406156d12c6321747036e83d88df198bc5f and approves one additional verification push of feat/hq-d33cdc-test-policy; controller resumes Task4, verifies retained inputs and refreshes named-account/public standard-runner/readers preflight, pushes once and inspects that exact completed hosted run before separate coverage-acceptance, activation and integration gates
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-03T22:56:46Z (feat/hq-d33cdc-test-policy): resumed
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
