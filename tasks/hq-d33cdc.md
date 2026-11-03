@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T10:29:20Z
+updated: 2026-11-03T10:29:22Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -67,3 +67,5 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-03T10:28:45Z (feat/hq-d33cdc-test-policy): parked (waiting on user, review): User reviews hq frozen 366e89c2f56cee6b9cd8918d62cb088960206bdc:docs/specs/2026-11-03-test-execution-policy-design.md in .worktrees/hq-d33cdc; after approval the agent resumes this worktree and prepares a separate implementation plan for human review. No code or activation has started. Baseline tests remain waived by the user for this task.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T10:29:20Z (feat/hq-d33cdc-test-policy): Checkpoint correction: the preceding checkpoint wrote a rounded future timestamp. Its observed time was actually 2026-11-03T10:28:41Z, from the immediately preceding filesystem/Git/host-load inspection. The next checkpoint supersedes that timestamp; inventory, basis and retention terms were unchanged.
+- 2026-11-03T10:29:22Z (feat/hq-d33cdc-test-policy): retention checkpoint: observed 2026-11-03T10:29:22Z on titan; basis hq in-tree . df7005d9adf0dd543c1a83568f42016184297a9d:tasks/hq-d33cdc.md; retained by feat/hq-d33cdc-test-policy; this host: kept verified 1, kept unknown 0, released 0; changed 0. Rechecked all kept/verified items on this host. Git and ignored-file inventories are clean, frozen spec unchanged, builder report committed and nonempty. No unknown items. Other hosts are outside this observation. Later task changes since the basis contain only checkpoint/park notes, no changed retention objects or evidence references. Next: human reviews the frozen design, then agent prepares the implementation plan.
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
