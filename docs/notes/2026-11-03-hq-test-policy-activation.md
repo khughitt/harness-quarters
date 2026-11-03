@@ -57,12 +57,18 @@ Full local check-hygiene remains protected and mandatory in commit/push hooks.
 The local release build reports tasks 0.4.0 (fa58ab31), SHA-256
 ee4dea224770eb40d35d049802a9832a1086f784e4c9d1d4d7013452b5fca7c0.
 The end-to-end fixture pilot passed both success and deliberate failure cases:
-2 passed in 8.95 seconds. It executed the actual workflow evidence-preparation
+2 passed in 8.25 seconds (retained attempt 3). It executed the actual workflow evidence-preparation
 shell, real portable staged validators, a real pinned tasks registry roundtrip,
 four miniature partitions, identity reconciliation, wrapper cleanup and surviving
 failure artifacts. Success collected/reported six cases, executed five and retained
 one intentional fixture skip. The failing fixture preserved setup and partial XML
-with nonzero status. Its earlier missing-authority fixture failure remains retained.
+with nonzero status. After the outer pytest process exited, the controller copied
+and reconciled 11 artifact files into caller-owned evidence outside pytest cleanup;
+a receipt records both cases and exact byte hashes. Earlier attempt 2 passed, but
+ambient failed-only pytest retention deleted its fixture artifacts; only its log
+remains. That lost attempt does not count as retained raw proof. Attempt 3 uses
+explicit all retention plus independent copied evidence. The earlier
+missing-authority fixture failure remains retained.
 This validates the local fixture path; runner apt, actions, Ubuntu runtime and a
 complete hosted run remain unverified.
 
@@ -166,6 +172,9 @@ unmerged feature policy nor an unobserved remote run retires latency obligations
 The open parent owns the locked .worktrees/hq-d33cdc and persistent workspace
 $WORK_ROOT/hq/hq-d33cdc/plans/2026-11-03-test-execution-policy/. Its progress.md
 holds rulings with Why/Cost, review rounds and task completions; raw logs, setup
-metadata, source-pin checks, pilot fixtures and report bytes remain there. The task
+metadata and source-pin checks remain there. The current pilot evidence is
+task-3-pilot-evidence-attempt-3/ (success/, failure/ and receipt.json), verified
+after the outer process exited; attempt-2 fixture bytes were lost as stated above.
+The task
 record binds their retention checkpoint. No raw host-specific output is published
 in this packet. The feature branch remains unmerged pending the rollout gates.
