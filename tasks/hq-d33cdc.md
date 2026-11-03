@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T10:21:07Z
+updated: 2026-11-03T10:23:33Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -53,3 +53,4 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-03T10:21:04Z (feat/hq-d33cdc-test-policy): gate: scoped — adopted
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T10:21:07Z (feat/hq-d33cdc-test-policy): Workspace: .worktrees/hq-d33cdc on feat/hq-d33cdc-test-policy, locked and hydrated with just setup. User explicitly waived baseline tests for this task, including implementation Setup; no baseline run or pass is claimed. Flow trial assigned flow on. Design/spec preparation only until human review; no code or external activation yet.
+- 2026-11-03T10:23:33Z (feat/hq-d33cdc-test-policy): Intent recovered with session-logs from codex:01a1874f-c2d8-7320-ae81-7114e37e343f: human ask at transcript line 15 preserves focused tests while reducing broad contention; line 108 asks for hosted suites, tt ownership, lore changes and latency disposition; lines 294 and 538 approve shared spec/plan with the hosted-refusal correction. This adoption task is agent-filed execution scope, not a new human request. Public hq and tasks/relay visibility observed via gh read-only; ops remains a private sibling dependency for two existing integration cases. Current main has no .tt.toml, tools/tt, CI workflow or pre-push hook. No test-latency or halt rows found. Design choices are the agent’s calls; human design review remains required.
