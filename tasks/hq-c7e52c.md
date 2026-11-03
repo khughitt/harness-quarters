@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-d33cdc-test-policy
 created: 2026-11-03T11:30:43Z
-updated: 2026-11-03T23:46:47Z
+updated: 2026-11-03T23:47:17Z
 started: 2026-11-03T20:26:12Z
 depends: [hq-b32d19]
 parent: hq-d33cdc
@@ -73,4 +73,6 @@ Await review and approval of the complete hq-d33cdc plan. Execute Task 4: Verify
 - 2026-11-03T22:58:09Z (feat/hq-d33cdc-test-policy): Verification-retry preflight passed: named khughitt token resolves khughitt, repository public/unarchived/enabled, Actions enabled/all, literal standard ubuntu-24.04 worker count2/timeout60 unchanged. Remote feature still8d140cce and remote main b679b8e8. Refreshed actual reader main revisions ops746d6489ce6c15bbead87dc4224f6c3e9aafbb53 and obs9a6f931754c19ee9c00866f59527f184b4eb338e; schema19 and skipped/null outcome filtering present, launch paths and delivered policy instructions verified. Global account unchanged. Corrective covered HEAD753ad5e272a82d4e7091d71281cac7df80731b6d matches accepted review. Both resumed records trial flow on. No host installation needed. Next execute precisely one approved push with installed pre-push hygiene/full gate and new caller-owned task-4-retry-prepush-suite-evidence, retaining exact SHA/status/logs; policy remains enabled and no further retry/activation authorized.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T23:46:47Z (feat/hq-d33cdc-test-policy): Approved additional verification push succeeded exit0 at855c814bc4805c7d682c81f847bcb79c7cc953c2 to origin feature branch. Installed hook full hygiene and2781 tests passed:268agents38.70s +2120hooks857.40s +392parallelrelay1954.83s +1serialsignal0.13s; independent caller coverage reconciles2781collected/reported/executed with no skips/problems. Host allocator1worker/background.slice observed; no extra baseline. New push logs/status/times/revision/caller evidence preserved under task-4-retry prefixes. This is the second authorized feature push, no further retry/main integration/coverage acceptance/activation. Locate and observe exact completed hosted run next.
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-03T23:47:17Z (feat/hq-d33cdc-test-policy): Exact retry hosted run41741765690 attempt1 identified at pushed855c814bc4805c7d682c81f847bcb79c7cc953c2, job126284742208, labels ubuntu-24.04, https://github.com/khughitt/harness-quarters/actions/runs/41741765690. Historical exact-SHA fetch and system capability/public work-link installation passed; tasks pinned release build running. Initial raw run/jobs API preserved. Tracked read-only watch session87872 has70m bound/60s interval, no remote retry. Policy enabled, current coverage unaccepted; inspect completed raw evidence before acceptance request.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
