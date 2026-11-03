@@ -2,12 +2,12 @@
 id: hq-d33cdc
 title: Adopt shared broad-test policy and remote verification
 status: todo
-priority: 2
+priority: 1
 size: m
 complexity: mid
 process: planned
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-01T23:43:21Z
+updated: 2026-11-03T10:13:25Z
 depends: [ops-68729d]
 tags: []
 source: "tt-policy:hq"
