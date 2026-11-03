@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T11:09:36Z
+updated: 2026-11-03T11:09:38Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -85,4 +85,6 @@ After approved activation, commit .tt.toml with real broad target names, verify 
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T11:09:34Z (feat/hq-d33cdc-test-policy): Checkpoint correction: shell parameter expansion removed the colon and first t from the previous basis path. That locator was invalid; the next checkpoint supplies the verified full commit:path literally. Inventory and retention terms were unchanged.
 - 2026-11-03T11:09:36Z (feat/hq-d33cdc-test-policy): retention checkpoint: observed 2026-11-03T11:09:36Z on titan; basis hq in-tree . a6b2dacfaf46e9d7489a2229596de450ce0419ee:tasks/hq-d33cdc.md; retained by feat/hq-d33cdc-test-policy; this host: kept verified 1, kept unknown 0, released 0; changed 0. Rechecked all kept/verified items on this host: locked worktree, clean Git/ignored inventory, frozen design and committed nonempty review reports. No unknown items. Other hosts are outside this observation. Subsequent notes since the basis concern checkpoint/park state only, with no changed item fields or evidence references. Next: human reviews frozen da5e8ace, then agent prepares the implementation plan.
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-03T11:09:38Z (feat/hq-d33cdc-test-policy): parked (waiting on user, review): User reviews hq frozen da5e8ace1327c4eea5ce77c8e1a6355eb65d31af:docs/specs/2026-11-03-test-execution-policy-design.md in .worktrees/hq-d33cdc. All round-2 findings corrected; fresh round 3 accepts with none. After human approval the agent prepares the implementation plan for separate review. No code/activation started; baseline waiver remains.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
