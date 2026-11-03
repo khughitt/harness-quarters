@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T10:28:45Z
+updated: 2026-11-03T10:29:20Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -66,3 +66,4 @@ After approved activation, commit .tt.toml with real broad target names, verify 
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T10:28:45Z (feat/hq-d33cdc-test-policy): parked (waiting on user, review): User reviews hq frozen 366e89c2f56cee6b9cd8918d62cb088960206bdc:docs/specs/2026-11-03-test-execution-policy-design.md in .worktrees/hq-d33cdc; after approval the agent resumes this worktree and prepares a separate implementation plan for human review. No code or activation has started. Baseline tests remain waived by the user for this task.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-03T10:29:20Z (feat/hq-d33cdc-test-policy): Checkpoint correction: the preceding checkpoint wrote a rounded future timestamp. Its observed time was actually 2026-11-03T10:28:41Z, from the immediately preceding filesystem/Git/host-load inspection. The next checkpoint supersedes that timestamp; inventory, basis and retention terms were unchanged.
