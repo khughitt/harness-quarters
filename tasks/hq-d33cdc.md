@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T11:17:55Z
+updated: 2026-11-03T11:17:57Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -92,3 +92,5 @@ After approved activation, commit .tt.toml with real broad target names, verify 
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T11:17:53Z (feat/hq-d33cdc-test-policy): review: spec round 4 — verdict: accept; findings: none; reviewer: gemini-4-argon
 - 2026-11-03T11:17:55Z (feat/hq-d33cdc-test-policy): Keith explicitly accepted frozen design da5e8ace1327c4eea5ce77c8e1a6355eb65d31af for planning in this turn. The supplied gemini-4-argon acceptance is recorded as round 4 in this task’s chronological review sequence; the existing round-3 report remains the prior codex/gpt-6.1-sol builder review and is not relabelled. Baseline waiver persists. Approval authorizes planning, not implementation, external activation or workflow publication.
+- 2026-11-03T11:17:57Z (feat/hq-d33cdc-test-policy): gate: designed — docs/specs/2026-11-03-test-execution-policy-design.md approved by Keith at frozen da5e8ace1327c4eea5ce77c8e1a6355eb65d31af
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
