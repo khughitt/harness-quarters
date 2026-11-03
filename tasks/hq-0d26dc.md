@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-25T02:28:24Z
-updated: 2026-11-03T15:43:31Z
+updated: 2026-11-03T15:43:33Z
 started: 2026-11-03T15:41:58Z
 depends: []
 tags: []
@@ -30,4 +30,6 @@ Where: justfile test recipe; tools/relay_cutover_bootstrap/hosts.py _send.
 - 2026-11-03T15:42:21Z (feat/hq-d33cdc-test-policy): arm: flow-trial-1 — unit tack-0d26dc — flow on
 - 2026-11-03T15:43:29Z (feat/hq-d33cdc-test-policy): Reusing the coordinated .worktrees/hq-d33cdc worktree, hydrated with just setup. Independent baseline is host-budget run -- timeout --signal=INT 1800 just test; tracked output is in the hq-d33cdc-owned external plan workspace as prereq-interpreter-baseline.log. Adoption’s baseline waiver does not apply here. No focused route exists yet; the documented full route is used. Scope is only the three uv recipe invocations; tools/relay_cutover_bootstrap/hosts.py _send and its callers consume os.pidfd_open unchanged.
 - 2026-11-03T15:43:31Z (feat/hq-d33cdc-test-policy): gate: scoped — adopted scoped interpreter recipe fix
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-03T15:43:33Z (feat/hq-d33cdc-test-policy): gate: implementing — .worktrees/hq-d33cdc shared with controller hq-d33cdc
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
