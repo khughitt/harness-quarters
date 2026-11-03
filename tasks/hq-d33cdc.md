@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: planned
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T10:13:25Z
+updated: 2026-11-03T10:13:26Z
 depends: [ops-68729d]
 tags: []
 source: "tt-policy:hq"
@@ -41,3 +41,4 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-10-29T13:45:47Z (add): created
   provenance: {"harness_session":"codex:01a1874f-c2d8-7320-ae81-7114e37e343f","harness_session_source":"CODEX_THREAD_ID","origin":"agent"}
 - 2026-11-01T23:43:21Z (main): related: hq-b01c0f wraps hq's just test xdist step in host-budget and adds a budgeted test-one route (ops-4adbbe); keep the recipe split here compatible with it.
+- 2026-11-03T10:13:26Z (main): raised to P1 at the user's request (2026-11-03) so a following session picks it up; hq-414f8a skipped its full-suite baseline at the user's direction
