@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+"""Run hq's four partitions and reconcile durable evidence against full collection."""
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+from xml.etree import ElementTree as ET
+
+SIGNAL = "test_signal_while_recording_start_cancels"
+PARTITIONS = (
+    ("agents", ("agents/bin",)),
+    ("hooks-tools", (".githooks", "tools", "--ignore=tools/test_relay_cutover_bootstrap.py",
+                     "--ignore=tools/test_relay_cutover_transport.py")),
+    ("relay-parallel", ("tools/test_relay_cutover_bootstrap.py", "tools/test_relay_cutover_transport.py",
+                        "-n", "auto", "-k", f"not {SIGNAL}")),
+    ("relay-signal", ("tools/test_relay_cutover_transport.py", "-k", SIGNAL)),
+)
+PYTEST = ("uv", "run", "-q", "--python", "/usr/bin/python3", "--with", "pytest==9.2.0",
+          "--with", "pytest-xdist==3.8.0", "pytest", "-p", "pytest_evidence", "-q", "-rs")
+
+
+def read_evidence(evidence: Path) -> dict:
+    result = {"collected": 0, "reported": 0, "executed": 0, "excluded_modules": [],
+              "skipped_modules": 0, "skips": [], "partitions": {}, "problems": []}
+    problems = result["problems"]
+    inventory_ids = set()
+    try:
+        inventory = json.loads((evidence / "inventory.json").read_text(encoding="utf-8"))
+        ids, modules, collection = (inventory[k] for k in ("nodeids", "modules", "collection_problems"))
+        if (not isinstance(ids, list) or not all(isinstance(n, str) and n for n in ids)
+                or len(ids) != len(set(ids)) or not isinstance(modules, list)
+                or not all(isinstance(n, str) and n for n in modules)
+                or len(modules) != len(set(modules)) or not isinstance(collection, list)):
+            raise ValueError("invalid inventory fields")
+        inventory_ids = set(ids)
+        result["collected"] = len(ids)
+        result["excluded_modules"] = sorted(set(modules) - {n.split("::")[0] for n in ids})
+        if result["excluded_modules"]:
+            problems.append("modules absent from collection: " + repr(result["excluded_modules"]))
+        skipped_modules = set()
+        for problem in collection:
+            if (not isinstance(problem, dict) or not isinstance(problem.get("nodeid"), str)
+                    or problem.get("outcome") not in ("skipped", "failed", "error")
+                    or not isinstance(problem.get("reason"), str)):
+                raise ValueError("invalid collection problem")
+            problems.append(f"collection {problem['outcome']} {problem['nodeid']}: {problem['reason']}")
+            if problem["outcome"] == "skipped":
+                skipped_modules.add(problem["nodeid"])
+        result["skipped_modules"] = len(skipped_modules)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        problems.append(f"cannot read inventory: {error}")
+
+    reported, executed, skips = set(), set(), {}
+    for name, _ in PARTITIONS:
+        identities = set()
+        try:
+            tree = ET.parse(evidence / f"pytest-{name}.xml")
+            for case in tree.iter("testcase"):
+                properties = [p.get("value") for p in case.findall("properties/property")
+                              if p.get("name") == "nodeid"]
+                if len(properties) != 1 or not properties[0]:
+                    raise ValueError("testcase lacks one nodeid property")
+                nodeid = properties[0]
+                identities.add(nodeid)
+                skipped = case.find("skipped")
+                if skipped is None:
+                    executed.add(nodeid)
+                else:
+                    skips[nodeid] = skipped.get("message") or skipped.text or "unspecified"
+            if not identities:
+                raise ValueError("empty partition report")
+            if reported & identities:
+                problems.append(f"partition overlap in {name}: {sorted(reported & identities)}")
+            reported.update(identities)
+        except (OSError, ET.ParseError, LookupError, ValueError) as error:
+            problems.append(f"cannot read {name} report: {error}")
+        result["partitions"][name] = len(identities)
+    result["reported"], result["executed"] = len(reported), len(executed)
+    result["skips"] = [{"nodeid": nodeid, "reason": skips[nodeid]} for nodeid in sorted(skips)]
+    if not inventory_ids or not executed:
+        problems.append("empty inventory or no tests executed")
+    if inventory_ids != reported:
+        problems.append(f"test identities differ: missing {sorted(inventory_ids - reported)}, "
+                        f"unexpected {sorted(reported - inventory_ids)}")
+    return result
+
+
+def verify_evidence(evidence: Path) -> dict:
+    result = read_evidence(evidence)
+    if result["problems"]:
+        raise ValueError("; ".join(result["problems"]))
+    return result
+
+
+def run_suite(root: Path, evidence: Path) -> int:
+    environment = dict(os.environ)
+    environment.pop("PYTEST_ADDOPTS", None)  # Ambient selectors must not shrink both inventory and execution.
+    environment["PYTHONPATH"] = str(root / "tools")
+    environment["HQ_TEST_EVIDENCE_DIR"] = str(evidence)
+    environment.pop("HQ_TEST_COLLECT_ONLY", None)
+    status = 0
+    try:
+        status = subprocess.run([str(root / "tools/harness-facts"), "check"], cwd=root,
+                                env=environment).returncode
+        if status == 0:
+            collect_env = {**environment, "HQ_TEST_COLLECT_ONLY": "1"}
+            status = subprocess.run([*PYTEST, "--collect-only", "agents/bin", ".githooks", "tools"],
+                                    cwd=root, env=collect_env).returncode
+        for name, args in PARTITIONS:
+            if status:
+                break
+            status = subprocess.run([*PYTEST, *args, f"--junitxml={evidence / f'pytest-{name}.xml'}"],
+                                    cwd=root, env=environment).returncode
+    except OSError as error:
+        print(f"test-suite: {error}", file=sys.stderr)
+        status = status or 1
+    finally:
+        try:
+            coverage = read_evidence(evidence)
+            (evidence / "coverage.json").write_text(json.dumps(coverage, indent=2) + "\n", encoding="utf-8")
+            if coverage["problems"]:
+                print("test-suite: " + "; ".join(coverage["problems"]), file=sys.stderr)
+                status = status or 1
+        except (OSError, ValueError) as error:
+            print(f"test-suite: cannot write evidence: {error}", file=sys.stderr)
+            status = status or 1
+    return status
+
+
+def main(argv):
+    if argv:
+        print("usage: test-suite (no selectors)", file=sys.stderr)
+        return 2
+    workers = os.environ.get("PYTEST_XDIST_AUTO_NUM_WORKERS", "")
+    if not workers.isascii() or not workers.isdecimal() or int(workers) <= 0:
+        print("test-suite: explicit positive PYTEST_XDIST_AUTO_NUM_WORKERS required", file=sys.stderr)
+        return 2
+    try:
+        timing = Path(os.environ["TT_JUNIT_DIR"])
+        evidence = Path(os.environ.get("HQ_TEST_EVIDENCE_DIR", str(timing)))
+        if not timing.is_absolute() or not evidence.is_absolute():
+            raise ValueError("evidence directories must be absolute")
+        evidence.mkdir(parents=True, exist_ok=True)
+        if any(evidence.iterdir()):
+            raise ValueError("evidence directory must be empty for a fresh attempt")
+    except (KeyError, OSError, ValueError) as error:
+        print(f"test-suite: {error}", file=sys.stderr)
+        return 2
+    status = 1
+    try:
+        status = run_suite(Path(__file__).resolve().parents[1], evidence.resolve())
+    except KeyboardInterrupt:
+        status = 130
+    finally:
+        if evidence.resolve() != timing.resolve():
+            for path in evidence.glob("pytest-*.xml"):
+                try:
+                    ET.parse(path)  # Interrupted XML is retained, but is not a finished timing report.
+                    shutil.copyfile(path, timing / path.name)
+                except (OSError, ET.ParseError, LookupError, ValueError) as error:
+                    print(f"test-suite: cannot copy completed report {path.name}: {error}", file=sys.stderr)
+                    status = status or 1
+    return status if status >= 0 else 128 - status
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

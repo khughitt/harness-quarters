@@ -354,6 +354,16 @@ instructions come from lore `instructions/AGENTS.md`, where ops renders the
 Projects block; ops-profile reads lore `profiles/`. The session archive timers
 consume hq's capture and prune tools. Lore owns the corpus and its block check.
 
+## Tests
+
+`just test` records the complete suite through tt and runs under the local host worker
+budget. `just test-one <pytest arguments>` runs focused tests with the same budget and
+literal argument forwarding; `just test-full` explicitly forces the broad route.
+The shared driver retains the existing four partitions, checks individual test
+identities against full collection and preserves caller-owned reports on failure.
+Hosted execution is being prepared; policy remains enabled and no hosted result is
+claimed. See [test execution](docs/test-execution.md) for commands and evidence.
+
 ## Finding a past session
 
 `hq sessions` lists recent Claude Code, Codex and agy sessions from every home (`~/.claude`,

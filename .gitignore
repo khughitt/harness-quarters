@@ -3,6 +3,9 @@ claude/plans/*
 !claude/plans/.gitkeep
 local/
 __pycache__/
+.tt/
+.pytest_cache/
+.ci-tools/
 # Session-log fixture homes keep native harness directory names that a global ignore may hide.
 !/tools/fixtures/session-logs/*/.claude
 !/tools/fixtures/session-logs/*/.claude-work

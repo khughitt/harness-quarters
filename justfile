@@ -21,20 +21,25 @@ link *args:
 link-check:
     tools/harness-links --check
 
-# The fact file's check, then the agents/bin, .githooks and tools tests. The two relay
-# cutover files run on parallel workers; their test that signals its own process while it
-# masks the signal runs alone, since another worker thread may take a process signal.
+# Policy decides before the local worker budget is requested.
 test:
-    tools/harness-facts check
-    host-budget run -- python3 -m pytest agents/bin -q
-    host-budget run -- uv run -q --python /usr/bin/python3 --with pytest pytest .githooks tools -q --ignore=tools/test_relay_cutover_bootstrap.py --ignore=tools/test_relay_cutover_transport.py
-    host-budget run -- uv run -q --python /usr/bin/python3 --with pytest --with pytest-xdist pytest tools/test_relay_cutover_bootstrap.py tools/test_relay_cutover_transport.py -q -n auto -k 'not test_signal_while_recording_start_cancels'
-    host-budget run -- uv run -q --python /usr/bin/python3 --with pytest pytest tools/test_relay_cutover_transport.py -q -k test_signal_while_recording_start_cancels
+    tools/tt test -- host-budget run -- just _test-suite
+
+# Hosted workers are explicit; only the workflow supplies TT_FORCE.
+ci-test:
+    tools/tt ci-test -- just _test-suite
+
+[private]
+_test-suite:
+    tools/test-suite
+
+test-full:
+    TT_FORCE=1 just test
 
 # Focused tests retain argument boundaries and the host's worker budget.
 [positional-arguments]
 test-one +args:
-    host-budget run -- uv run -q --python /usr/bin/python3 --with pytest --with pytest-xdist pytest "$@"
+    tools/tt test-one -- host-budget run -- uv run -q --python /usr/bin/python3 --with pytest==9.2.0 --with pytest-xdist==3.8.0 pytest "$@"
 
 # Install the pinned pi (pi/package.json and its lock) under ~/.local/share/pi/<version>,
 # outside the synced checkout; pi/bin/pi runs it. pi needs no lifecycle scripts (its README).

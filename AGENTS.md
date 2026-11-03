@@ -19,11 +19,15 @@ configured host; setup creates directories, not private settings.
 
 ## Gates
 
-Run `just test` before committing: it runs the agent-tool suite and the hook/tool suite.
-Use `just test-one <pytest arguments>` for focused tests; it preserves arguments and
-runs under the host worker budget, as do the full suite's test processes. The relay
-signal test stays serial; xdist reads its worker count from the budget grant.
-There is no CI or pre-push suite here. The pre-commit hook refuses staged paths under
+Run `just test` before committing: tt records the complete four-partition suite under
+the local host worker budget. Policy remains absent/enabled during hosted preparation.
+Use `just test-one <pytest arguments>` for focused tests; tt preserves arguments and
+runner status through the budget. `just test-full` explicitly forces the broad route.
+The relay signal test stays serial; xdist reads the grant's worker count. `just ci-test`
+shares the suite but requires explicit positive PYTEST_XDIST_AUTO_NUM_WORKERS and never
+sets TT_FORCE. There is no configured hosted workflow or pre-push suite yet.
+See [test execution](docs/test-execution.md) for report retention and coverage checks.
+The pre-commit hook refuses staged paths under
 `local/`, then runs `tools/ops-check` over the working tree (the hygiene checks ops
 projects share: guide references, conflicted copies, agent scratch, machine layout and
 adopted copies), then checks the guide identity regions with `tools/ops-docs check`, and
