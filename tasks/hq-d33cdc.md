@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T11:06:08Z
+updated: 2026-11-03T11:07:21Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -74,3 +74,4 @@ After approved activation, commit .tt.toml with real broad target names, verify 
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T11:03:29Z (feat/hq-d33cdc-test-policy): review: spec round 2 — verdict: revise; findings: Important 2, Minor 2; reviewer: gemini-4-argon
 - 2026-11-03T11:06:08Z (feat/hq-d33cdc-test-policy): Spec round 2 disposition: accepted all four findings as supported by the current tree. Important 1: an isolated allowlisted HOME/XDG/Git-config probe reproduced exactly eight reference failures from tools/ops-check; existing local_layer + docs_check + staged_checks passed in the same environment. Proposed CI subset uses these checks under protected hook-ci-hygiene, while full local hygiene remains mandatory; no checker semantics or private checkout changed. Important 2: tt execution_decision confirms the missing-force bypass; both test and ci-test are now broad in the design, and only the workflow sets force. Minor 3: static counts are 2 + 7 + 48 = 57, excluding conftest.py. Minor 4: tt finally deletes its JUnit directory, so the design now requires caller-owned evidence retained before return, with four distinct partitions and failure-path preservation. No deferred findings. Full supplied review saved in docs/notes/2026-11-03-hq-d33cdc-spec-round-2-report.md. These are design corrections only; no executable implementation or suite/baseline tests ran.
+- 2026-11-03T11:07:21Z (feat/hq-d33cdc-test-policy): Revised design frozen at da5e8ace1327c4eea5ce77c8e1a6355eb65d31af:docs/specs/2026-11-03-test-execution-policy-design.md; round-2 report is committed alongside it. Fresh builder re-review dispatched against those exact bytes, scoped to all four corrections and their policy boundaries. The original 366e89c2 revision and first builder report remain in branch ancestry; no amend/rebase or old report overwrite. Document hygiene, ops-docs and diff whitespace checks passed; tasks check still has zero errors and four pre-existing unrelated tag warnings. Planning and implementation remain unstarted pending human design approval.
