@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T22:44:54Z
+updated: 2026-11-03T22:48:29Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -137,4 +137,6 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-03T21:37:12Z (feat/hq-d33cdc-test-policy): review: impl round 4 — verdict: accept; findings: none; reviewer: codex/gpt-6-astra
 - 2026-11-03T22:11:43Z (feat/hq-d33cdc-test-policy): review: impl round 5 — verdict: accept; findings: none; reviewer: codex/gpt-6-astra
 - 2026-11-03T22:44:54Z (feat/hq-d33cdc-test-policy): Local corrective readiness verified:2781full tests plus focused/stability checks, hygiene/lint and independent CI/attr/process-readiness reviews accepted. Rulings with Why/Cost/revisions are in external progress.md, including public history/tool setup and fixture-readiness scope; none deferred as minor. Exact raw first failed hosted attempt and all local partial/failed/successful attempts remain preserved, with completed2781report hashes. First approved push8d140cce remains the only remote write; corrected workflow/test sources are local/unpublished, policy remains enabled and both adoption/Task4 open. Next action after commit/checkpoint is user review of concrete frozen retry packet and one additional verification-push approval, not coverage acceptance or activation.
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-03T22:48:29Z (feat/hq-d33cdc-test-policy): Park readiness: code954ad406156d12c6321747036e83d88df198bc5f and retry packet are reviewed, full2781 current tests/focused/regression/hygiene/lint passed; first remote8d140cce remains the only push and hosted41716936974 failed. No second run, accepted coverage, activation, main merge, account switch or local host pointer/service change. Task4 and parent stay open, stopped for one additional verification-push approval; nothing running. All rulings with Why/Cost/revision references and no deferred minors remain in external progress.md, with Task4 public-input and fixture-readiness scope explicit; this note names them. Complete retained current-host set is the locked worktree, evolving workspace and immutable manifest1 plus upcoming manifest2, parent-owned; raw ZIP/member hashes and all independent reports retained. Code branch feat/hq-d33cdc-test-policy remains unmerged at .worktrees/hq-d33cdc, controller integrates only after later rollout authorization. Other worktree and unrelated warnings/independent project record commits untouched. Current ignored caches/builds/pinned sources are regenerable and kept for retry, no removal. Checkpoint2 pins current workspace including previous historical payloads and a new immutable ledger copy; failed/interrupted/lost histories remain disclosed rather than replaced.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
