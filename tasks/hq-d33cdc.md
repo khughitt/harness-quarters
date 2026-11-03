@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T22:57:04Z
+updated: 2026-11-03T22:58:06Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -150,4 +150,6 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-03T22:56:24Z (feat/hq-d33cdc-test-policy): resumed
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T22:57:04Z (feat/hq-d33cdc-test-policy): User Yes in this turn approves exactly one additional verification push of the reviewed correction/packet954ad406156d12c6321747036e83d88df198bc5f and observation of that exact hosted run. No automatic further retry, coverage acceptance, activation, main integration or main push. All1188 checkpoint2 members and immutable manifests1/2 verified before reuse; current ledger bytes remain preserved by progress-checkpoint-2.md. Reusing hydrated locked worktree, adoption baseline waiver unchanged. Parent-owned workspace will gain new task-4-retry-* preflight/push/caller-evidence/API/raw-hosted files, mutable until next complete checkpoint; no child retained identities. User offered installation help only if needed; current local dependency route already exists, no host installation planned.
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-03T22:58:06Z (feat/hq-d33cdc-test-policy): Verification-retry preflight passed: named khughitt token resolves khughitt, repository public/unarchived/enabled, Actions enabled/all, literal standard ubuntu-24.04 worker count2/timeout60 unchanged. Remote feature still8d140cce and remote main b679b8e8. Refreshed actual reader main revisions ops746d6489ce6c15bbead87dc4224f6c3e9aafbb53 and obs9a6f931754c19ee9c00866f59527f184b4eb338e; schema19 and skipped/null outcome filtering present, launch paths and delivered policy instructions verified. Global account unchanged. Corrective covered HEAD753ad5e272a82d4e7091d71281cac7df80731b6d matches accepted review. Both resumed records trial flow on. No host installation needed. Next execute precisely one approved push with installed pre-push hygiene/full gate and new caller-owned task-4-retry-prepush-suite-evidence, retaining exact SHA/status/logs; policy remains enabled and no further retry/activation authorized.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
