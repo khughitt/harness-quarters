@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T20:25:51Z
+updated: 2026-11-03T20:28:23Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -130,4 +130,6 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-03T20:20:42Z (feat/hq-d33cdc-test-policy): parked (waiting on user, approval): User reviews frozen packet0cf37c0784de88a2df825b8f15b4a26cd3d98aa0 and approves one verification push of feat/hq-d33cdc-test-policy to origin; controller then starts hq-c7e52c, refreshes public standard-runner/account/reader preflight, pushes once and inspects completed hosted artifacts before separate coverage-acceptance and activation gates
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T20:25:51Z (feat/hq-d33cdc-test-policy): resumed
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-03T20:28:23Z (feat/hq-d33cdc-test-policy): User authorization: Yes in this session answers the explicit request to make the frozen packet0cf37c0784de88a2df825b8f15b4a26cd3d98aa0 single verification push to origin. Authorized scope is one push of feat/hq-d33cdc-test-policy and observation/retention of that exact hosted run; no automatic remote retry, accepted coverage, activation, main integration or later main push. Resumed after verifying all895 checkpoint1 entries, manifestcc97c6004e7c418e815aeaa91eba16c0eeb6a341a2e34e8531423e7658c93a73 and frozen packet. Existing hydrated locked worktree reused, adoption baseline waiver persists. Parent and Task4 trial-arm both flow on; no new setup route or dependency changes.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
