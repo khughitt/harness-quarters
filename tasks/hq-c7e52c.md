@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: direct
 created: 2026-11-03T11:30:43Z
-updated: 2026-11-03T11:30:43Z
+updated: 2026-11-03T11:30:45Z
 depends: [hq-b32d19]
 parent: hq-d33cdc
 tags: []
@@ -25,3 +25,5 @@ Await review and approval of the complete hq-d33cdc plan. Execute Task 4: Verify
 
 - 2026-11-03T11:30:43Z (add): created
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID","origin":"agent"}
+- 2026-11-03T11:30:45Z (feat/hq-d33cdc-test-policy): gate: scoped — step of hq-d33cdc plan Task 4; complete-plan approval required before starting
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
