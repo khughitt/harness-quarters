@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: feat/hq-d33cdc-test-policy
 created: 2026-11-01T23:42:58Z
-updated: 2026-11-03T16:06:01Z
+updated: 2026-11-03T16:06:03Z
 started: 2026-11-03T16:05:39Z
 depends: []
 tags: []
@@ -34,3 +34,4 @@ Done when `just test` and `just test-one` each run inside a background.slice sco
 - 2026-11-03T16:05:39Z (feat/hq-d33cdc-test-policy): started
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T16:06:01Z (feat/hq-d33cdc-test-policy): trial: flow-trial-1 — enrolled — flow off
+- 2026-11-03T16:06:03Z (feat/hq-d33cdc-test-policy): arm: flow-trial-1 — unit tack-b01c0f — flow off
