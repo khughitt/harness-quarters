@@ -3,9 +3,12 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
+import tempfile
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -43,7 +46,9 @@ home = "~/.codex"
 
 
 def run(*args, cwd=None):
-    return subprocess.run(["git", *args], cwd=cwd, check=True, text=True, capture_output=True)
+    with tempfile.TemporaryDirectory(prefix="harness-links-git-") as home:
+        return subprocess.run(["git", *args], cwd=cwd, env=isolated_env(Path(home)),
+                              check=True, text=True, capture_output=True)
 
 
 @pytest.fixture
@@ -58,6 +63,8 @@ def world(tmp_path):
     (root / "hooks" / "refresh").write_text("#!/bin/sh\n")
     (root / "AGENTS.md").write_text("# rules\n")
     run("init", "-q", str(root))
+    assert Path(run("-C", str(root), "rev-parse", "--show-toplevel").stdout.strip()) == root.resolve()
+    assert Path(run("-C", str(root), "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(root.resolve())
     run("-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t", "add", "-A")
     run("-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "init")
     home = tmp_path / "home"
@@ -66,9 +73,7 @@ def world(tmp_path):
 
 
 def link(root, home, *args, tool=None):
-    env = {**os.environ, "HOME": str(home), "XDG_CONFIG_HOME": str(home / ".config"),
-           "XDG_STATE_HOME": str(home / ".local/state")}
-    return subprocess.run([str(tool or root / "tools" / "harness-links"), *args], env=env,
+    return subprocess.run([str(tool or root / "tools" / "harness-links"), *args], env=isolated_env(home),
                           text=True, capture_output=True)
 
 
@@ -252,14 +257,14 @@ def test_local_target_resolves_like_any_other(world):
 
 
 def fresh_clone(tmp_path, home, repo=None):
-    """A clone of this checkout with the working manifest and tool. Every `<project>:`
-    target the manifest names gets a sibling under tmp_path holding those targets, copied
-    from the live project's registered root, and registered in `home`'s isolated registry:
-    the real manifest then resolves there as it does on a host."""
+    """Exercise the working hq manifest/tool with structural owner fixtures.
+    Authentic owner paths and fixture shapes are checked separately by the local integration."""
     checkout = Path(__file__).resolve().parent.parent
     repo = repo or checkout
     clone = tmp_path / "clone"
     run("clone", "-q", str(repo), str(clone))
+    assert Path(run("-C", str(clone), "rev-parse", "--show-toplevel").stdout.strip()) == clone.resolve()
+    assert Path(run("-C", str(clone), "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(clone.resolve())
     stage_project_targets(repo / "links.toml", tmp_path, home)
     # Exercise the working manifest and tool, including changes not committed yet.
     shutil.copy2(repo / "links.toml", clone / "links.toml")
@@ -292,23 +297,60 @@ def fresh_clone(tmp_path, home, repo=None):
     return clone
 
 
-def stage_project_targets(manifest, tmp_path, home):
-    """For each `<prefix>:<path>` target in the manifest, copy that path from the project's
-    live registered root into tmp_path/<prefix> and register it in home's registry."""
-    import json, re, tomllib
-    live = json.loads(subprocess.run(["tasks", "projects", "--paths", "--json"], text=True,
-                                     capture_output=True, check=True).stdout)
-    roots = {p["prefix"]: Path(p["root"]) for p in live["projects"]}
+def project_targets(manifest):
     data = tomllib.loads(manifest.read_text())
-    targets = list(data.get("required", {}).values())  # [directories] values are former link targets, never project targets
+    targets = list(data.get("required", {}).values())
     for table in data.get("harness", {}).values():
         targets += list(table.get("links", {}).values())
-    staged = set()
+    result = set()
     for target in targets:
-        m = re.fullmatch(r"([a-z][a-z0-9]*):(.+)", target)
-        if not m:
+        match = re.fullmatch(r"([a-z][a-z0-9]*):(.+)", target)
+        if not match:
             continue
-        prefix, rel = m.groups()
+        prefix, relative = match.groups()
+        path = Path(relative)
+        if path.is_absolute() or ".." in path.parts or not path.parts:
+            raise ValueError(f"owner fixture target must stay relative: {target}")
+        result.add((prefix, relative))
+    return sorted(result)
+
+
+def stage_project_targets(manifest, tmp_path, home):
+    """Portable structural data; never treat it as proof that a live owner path exists."""
+    directory_targets = {"flows:evals", "flows:flow", "lore:profiles", "lore:vendor"}
+    shapes = []
+    for prefix, relative in project_targets(manifest):
+        directory = (f"{prefix}:{relative}" in directory_targets
+                     or (relative.startswith(("skills/", "vendor/superpowers/skills/"))
+                         and not Path(relative).suffix))
+        if not directory and not (relative.startswith("bin/") or Path(relative).suffix):
+            raise ValueError(f"declare the owner fixture shape: {prefix}:{relative}")
+        shapes.append((prefix, relative, directory))
+    staged = set()
+    for prefix, relative, directory in shapes:
+        sibling = tmp_path / prefix
+        target = sibling / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if directory:
+            target.mkdir(exist_ok=True)
+            (target / "fixture.txt").write_text("structural fixture\n")
+        else:
+            target.write_text("structural fixture\n")
+        if prefix not in staged:
+            (sibling / "tasks").mkdir(exist_ok=True)
+            register(sibling, home, prefix)
+            staged.add(prefix)
+
+
+def copy_registered_project_targets(manifest, tmp_path, home, registry):
+    """Retain the authentic local owner-path validation used before CI adoption."""
+    environment = isolated_env(home)
+    environment["XDG_CONFIG_HOME"] = str(registry.parent.parent)
+    live = json.loads(subprocess.run(["tasks", "projects", "--paths", "--json"], env=environment,
+                                     text=True, capture_output=True, check=True).stdout)
+    roots = {p["prefix"]: Path(p["root"]) for p in live["projects"]}
+    staged = set()
+    for prefix, rel in project_targets(manifest):
         sibling = tmp_path / prefix
         src = roots[prefix] / rel
         dst = sibling / rel
@@ -323,9 +365,59 @@ def stage_project_targets(manifest, tmp_path, home):
             staged.add(prefix)
 
 
+def test_portable_owner_fixtures_do_not_read_live_registry(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    home.mkdir()
+    manifest = tmp_path / "links.toml"
+    manifest.write_text('[required]\n"~/.rules" = "lore:instructions/AGENTS.md"\n'
+                        '"~/.flow" = "flows:flow"\n"~/.skill" = "ops:skills/quick-add"\n')
+    real_run = subprocess.run
+
+    def no_live_query(args, *rest, **kwargs):
+        assert args[1:2] != ["projects"], "portable fixture queried the live registry"
+        return real_run(args, *rest, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", no_live_query)
+    stage_project_targets(manifest, tmp_path, home)
+    assert (tmp_path / "lore/instructions/AGENTS.md").is_file()
+    assert (tmp_path / "flows/flow").is_dir()
+    assert (tmp_path / "ops/skills/quick-add").is_dir()
+
+
+@pytest.mark.parametrize("target", ["lore:unclassified", "lore:../outside.md", "lore:/outside.md"])
+def test_owner_fixture_rejects_unknown_shape_and_escape(tmp_path, monkeypatch, target):
+    manifest = tmp_path / "links.toml"
+    manifest.write_text(f'[required]\n"~/.rules" = "{target}"\n')
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: pytest.fail("invalid target launched a process"))
+    with pytest.raises(ValueError):
+        stage_project_targets(manifest, tmp_path / "targets", tmp_path / "home")
+    assert not (tmp_path / "targets").exists()
+
+
+def test_registered_owner_targets_match_portable_fixture_shapes(tmp_path):
+    registry = (Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config")))
+                / "tasks/projects.toml")
+    if not registry.exists() and not registry.is_symlink():
+        pytest.skip("registered owner-target integration needs the local project registry")
+    assert registry.is_file(), "project registry is unreadable or broken"
+    home, fixture_home = tmp_path / "live-home", tmp_path / "fixture-home"
+    home.mkdir()
+    fixture_home.mkdir()
+    manifest = TOOL.parent.parent / "links.toml"
+    copy_registered_project_targets(manifest, tmp_path / "real", home, registry)
+    stage_project_targets(manifest, tmp_path / "portable", fixture_home)
+    for prefix, relative in project_targets(manifest):
+        real = tmp_path / "real" / prefix / relative
+        portable = tmp_path / "portable" / prefix / relative
+        assert real.exists()
+        assert real.is_dir() == portable.is_dir(), f"fixture shape differs for {prefix}:{relative}"
+
+
 def just_setup(clone):
     assert shutil.which("just"), "just is required for the setup tests"
-    return subprocess.run(["just", "setup"], cwd=clone, text=True, capture_output=True)
+    with tempfile.TemporaryDirectory(prefix="harness-links-setup-") as home:
+        return subprocess.run(["just", "setup"], cwd=clone, env=isolated_env(Path(home)),
+                              text=True, capture_output=True)
 
 
 def test_real_manifest_with_codex_needs_setup_first(tmp_path):
@@ -404,9 +496,7 @@ DIRECTORIES = '''
 
 
 def register(root, home, prefix):
-    env = {**os.environ, "HOME": str(home), "XDG_CONFIG_HOME": str(home / ".config"),
-           "XDG_STATE_HOME": str(home / ".local/state")}
-    result = subprocess.run(["tasks", "init", "--prefix", prefix], cwd=root, env=env,
+    result = subprocess.run(["tasks", "init", "--prefix", prefix], cwd=root, env=isolated_env(home),
                             text=True, capture_output=True)
     assert result.returncode == 0, result.stderr
 
@@ -629,6 +719,8 @@ def isolated_env(home):
     return {
         "PATH": f"{home / '.test-bin'}:{os.environ['PATH']}",
         "HOME": str(home),
+        "USER": "test",
+        "LC_ALL": "C.UTF-8",
         "XDG_CONFIG_HOME": str(home / ".config"),
         "XDG_STATE_HOME": str(home / ".local/state"),
         "GIT_CONFIG_NOSYSTEM": "1",
@@ -638,6 +730,7 @@ def isolated_env(home):
         "GIT_COMMITTER_NAME": "t",
         "GIT_COMMITTER_EMAIL": "t@example.invalid",
         "PYTHONDONTWRITEBYTECODE": "1",
+        "TASKS_FORMAT": os.environ.get("TASKS_FORMAT", "json"),
     }
 
 

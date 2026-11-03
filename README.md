@@ -361,8 +361,11 @@ budget. `just test-one <pytest arguments>` runs focused tests with the same budg
 literal argument forwarding; `just test-full` explicitly forces the broad route.
 The shared driver retains the existing four partitions, checks individual test
 identities against full collection and preserves caller-owned reports on failure.
-Hosted execution is being prepared; policy remains enabled and no hosted result is
-claimed. See [test execution](docs/test-execution.md) for commands and evidence.
+The pinned hosted workflow is prepared for all branch pushes, with portable hygiene,
+two workers and retained reports. Policy remains enabled; no hosted result or
+coverage acceptance is claimed. The proposed boundary has three named local-only
+integration checks. See [test execution](docs/test-execution.md) for commands,
+omissions and evidence.
 
 `just check-hygiene` runs the complete local pre-commit checks. The pre-push hook
 runs that mandatory hygiene and then requests the broad suite, for both gate routes.

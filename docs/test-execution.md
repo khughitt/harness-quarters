@@ -77,8 +77,29 @@ suite and never replace an existing runner failure. A cancelled or interrupted
 attempt is unverified. Retain caller-owned evidence for inspection; do not upload
 from TT_JUNIT_DIR after the wrapper returns.
 
-The proposed hosted boundary omits two sibling-dependent tests, one in each of
-tools/test_relay_subscribers.py and tools/test_agy_hooks.py, with no modules
-excluded. This is intended coverage awaiting an observed hosted run and user
-acceptance, not current hosted proof. The separate mods and live capability probes
-are outside just test.
+The prepared workflow uses ubuntu-24.04, two pytest workers and a finite 60-minute
+job limit. It pins uv 0.13.7, just 1.59.0, Node 26.13.0, Rust 1.99.1 and public
+tasks commit fa58ab31acd757f59798537b6957e540fdccb9fb. System Python, zsh and
+libatomic1 come from the runner; actual versions are recorded. The disposable
+runner installs tools at the exact /usr/bin paths its fixtures use. It runs setup,
+portable hygiene and the same complete suite, with TT_FORCE=1 at job scope.
+All branch pushes and manual dispatch are covered, with no duplicate PR trigger.
+
+The always-run artifact upload retains HQ_TEST_ARTIFACT_DIR for seven days. Its
+setup-report.txt records setup; the initially empty suite/ child is
+HQ_TEST_EVIDENCE_DIR and holds the inventory, coverage and four reports. A failed
+setup or partial run retains available evidence and remains unverified.
+
+The proposed hosted omissions are these exact integration checks:
+
+- tools/test_relay_subscribers.py::test_template_validates_against_registered_relay_budgets
+- tools/test_agy_hooks.py::test_relay_v030_agy_dispatch_with_rendered_subscribers_and_ops_relay_guard
+- tools/test_harness_links.py::test_registered_owner_targets_match_portable_fixture_shapes
+
+The third is an additional proposal beyond the approved design's two omissions.
+Portable owner fixtures exercise the existing link behavior tests without private
+checkouts; the added local integration check also copies the real registered
+targets and compares their shapes. No module is excluded. This boundary awaits
+an observed hosted run and user acceptance. The local preparation pilot exercises
+four miniature partitions and failure retention, not Ubuntu or hosted coverage.
+The separate mods and live capability probes are outside just test.

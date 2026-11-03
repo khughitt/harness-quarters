@@ -1,0 +1,121 @@
+name: hq verification
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      TT_FORCE: "1"
+      PYTEST_XDIST_AUTO_NUM_WORKERS: "2"
+      CARGO_BUILD_JOBS: "2"
+      GIT_CONFIG_NOSYSTEM: "1"
+      UV_PYTHON_DOWNLOADS: "never"
+    steps:
+      - name: Check out hq with history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prepare isolated configuration and evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_dir=$(mktemp -d "$RUNNER_TEMP/hq-evidence.XXXXXX")
+          mkdir "$artifact_dir/suite"
+          git_config=$(mktemp "$RUNNER_TEMP/hq-git-config.XXXXXX")
+          printf 'HQ_TEST_ARTIFACT_DIR=%s\nHQ_TEST_EVIDENCE_DIR=%s/suite\nGIT_CONFIG_GLOBAL=%s\n' \
+            "$artifact_dir" "$artifact_dir" "$git_config" >> "$GITHUB_ENV"
+          {
+            printf 'hq revision: %s\n' "$GITHUB_SHA"
+            cat /etc/os-release
+            /usr/bin/python3 --version
+          } > "$artifact_dir/setup-report.txt"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990
+        with:
+          version: "0.13.7"
+          enable-cache: false
+
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3
+        with:
+          just-version: "1.59.0"
+
+      - name: Install Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "26.13.0"
+          package-manager-cache: false
+
+      - name: Install system capabilities and exact fixture tool paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y zsh libatomic1
+          rustup toolchain install 1.99.1 --profile minimal --no-self-update
+          sudo install -m 755 "$(command -v uv)" /usr/bin/uv
+          sudo install -m 755 "$(command -v just)" /usr/bin/just
+          sudo install -m 755 "$(command -v node)" /usr/bin/node
+          printf '/usr/bin\n' >> "$GITHUB_PATH"
+
+      - name: Check out the published tasks pin
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: khughitt/tasks
+          ref: fa58ab31acd757f59798537b6957e540fdccb9fb
+          path: .ci-tools/tasks-src
+          persist-credentials: false
+
+      - name: Build tasks and record actual setup
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$HOME/.cargo/bin/cargo" +1.99.1 build --locked --release \
+            --manifest-path .ci-tools/tasks-src/Cargo.toml --target-dir .ci-tools/tasks-target
+          sudo install -m 755 .ci-tools/tasks-target/release/tasks /usr/bin/tasks
+          test "$(git -C .ci-tools/tasks-src rev-parse HEAD)" = fa58ab31acd757f59798537b6957e540fdccb9fb
+          test "$(command -v python3)" = /usr/bin/python3
+          {
+            /usr/bin/python3 -c 'import os,sys; os.pidfd_open; print(sys.executable, sys.version)'
+            /usr/bin/uv --version
+            /usr/bin/just --version
+            /usr/bin/node --version
+            /usr/bin/tasks --version
+            "$HOME/.cargo/bin/rustc" +1.99.1 --version
+            "$HOME/.cargo/bin/cargo" +1.99.1 --version
+            dpkg-query -W zsh libatomic1
+            git -C .ci-tools/tasks-src rev-parse HEAD
+          } >> "$HQ_TEST_ARTIFACT_DIR/setup-report.txt"
+
+      - name: Hydrate hq
+        run: just setup
+
+      - name: Run portable staged hygiene
+        run: just ci-hygiene
+
+      - name: Run the forced complete suite
+        run: just ci-test
+
+      - name: Retain verification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: hq-tests-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ env.HQ_TEST_ARTIFACT_DIR }}
+          retention-days: 7
+          if-no-files-found: error

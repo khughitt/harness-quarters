@@ -25,7 +25,10 @@ Use `just test-one <pytest arguments>` for focused tests; tt preserves arguments
 runner status through the budget. `just test-full` explicitly forces the broad route.
 The relay signal test stays serial; xdist reads the grant's worker count. `just ci-test`
 shares the suite but requires explicit positive PYTEST_XDIST_AUTO_NUM_WORKERS and never
-sets TT_FORCE. Hosted verification is not activated yet. Both pre-push routes run
+sets TT_FORCE. The prepared workflow sets it at job scope, uses two workers and retains
+setup and suite artifacts. Hosted coverage has not been observed or accepted; the
+three proposed integration omissions are listed in docs/test-execution.md.
+Both pre-push routes run
 mandatory `just check-hygiene` followed by `just test`; no outer composite is timed.
 The hook declares origin branches covered for the prepared workflow and warns on
 uncovered pushes when local policy skips tests; the declaration is not remote evidence.
