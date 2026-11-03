@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T10:27:41Z
+updated: 2026-11-03T10:27:43Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -59,3 +59,4 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-03T10:23:36Z (feat/hq-d33cdc-test-policy): Coordination: hq-b01c0f owns budgeted local test/test-one recipes; hq-0d26dc owns the explicit system-interpreter fix needed by pidfd paths. This design must preserve/reuse their resulting behavior and coordinate any shared justfile edits before implementation. Neither record is closed by this preparation. Ops tt is version 10 at landed 646c7cf7c08e11e8adcf43ddf844a3f059162735; obs skip reader delivery is recorded on done obs-a171dd and present in its current tree. Live tt-report and tt-latency resolve to ops main. Baseline waiver does not waive focused implementation tests or mandatory hygiene.
 - 2026-11-03T10:26:37Z (feat/hq-d33cdc-test-policy): Frozen design 366e89c2f56cee6b9cd8918d62cb088960206bdc:docs/specs/2026-11-03-test-execution-policy-design.md dispatched for a fresh read-only builder check. Mandatory document checks passed: ops-check, ops-docs check and diff whitespace; tasks check has zero errors and four pre-existing undefined-tag warnings on unrelated records. No code or baseline tests ran. Design proposes shared tt, budget-preserving local routes, explicit hosted route, shared pre-push coverage handling, and acceptance of two named sibling-dependent skips subject to actual remote counts. Human spec review follows; no implementation plan written yet.
 - 2026-11-03T10:27:37Z (feat/hq-d33cdc-test-policy): review: spec round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
+- 2026-11-03T10:27:43Z (feat/hq-d33cdc-test-policy): Builder round 1 accepted frozen 366e89c2 with no findings; full report persisted by the controller in docs/notes/2026-11-03-hq-d33cdc-builder-report.md because no plan workspace existed. Reviewer identity was verified in its own turn. Report existence and nonzero size confirmed. No rulings or deferred minors arose. No implementation code, hosted execution or account changes. The design remains the frozen reviewed revision.
