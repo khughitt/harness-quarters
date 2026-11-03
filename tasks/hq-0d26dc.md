@@ -8,9 +8,9 @@ complexity: low
 process: direct
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-25T02:28:24Z
-updated: 2026-11-03T16:17:38Z
+updated: 2026-11-03T16:28:22Z
 started: 2026-11-03T15:41:58Z
-depends: []
+depends: [hq-4c5506]
 tags: []
 source: hq-a7b473
 agent: claude-code/claude-opus-5-5
