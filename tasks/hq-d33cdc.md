@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T10:20:48Z
+updated: 2026-11-03T10:21:04Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -49,4 +49,6 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-03T10:20:05Z (main): trial: flow-trial-1 — enrolled — flow on
 - 2026-11-03T10:20:07Z (main): arm: flow-trial-1 — unit tack-d33cdc — flow on
 - 2026-11-03T10:20:48Z (feat/hq-d33cdc-test-policy): resumed
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-03T10:21:04Z (feat/hq-d33cdc-test-policy): gate: scoped — adopted
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
