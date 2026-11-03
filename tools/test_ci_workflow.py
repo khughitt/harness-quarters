@@ -13,6 +13,9 @@ from test_test_execution import miniature_suite, world
 
 ROOT = Path(__file__).resolve().parents[1]
 TASKS_PIN = "fa58ab31acd757f59798537b6957e540fdccb9fb"
+HISTORICAL_PIN = "6b434eb206c4464c062137e3600dcd303a543f68"
+DOTFILES_PIN = "2a686c0c4915ba0daae9f6455cfe45233780fc33"
+WORK_LINK_SHA256 = "6400d9a8431d3af3777d5038716d4322d283ebd127c574c06d7516dd1a784ff4"
 ACTIONS = {
     "actions/checkout": "3d3c42e5aac5ba805825da76410c181273ba90b1",
     "astral-sh/setup-uv": "11f9893b081a58869d3b5fccaea48c9e9e46f990",
@@ -71,6 +74,25 @@ def test_history_and_checkout_credentials():
     text = workflow()
     assert "fetch-depth: 0" in text
     assert text.count("persist-credentials: false") == 2
+
+
+def test_pinned_historical_commit_is_fetched_beyond_advertised_history():
+    text = workflow()
+    assert ("git fetch --no-tags --no-recurse-submodules "
+            f"https://github.com/khughitt/harness-quarters.git {HISTORICAL_PIN}") in text
+    assert f'git rev-parse "{HISTORICAL_PIN}^{{commit}}"' in text
+    assert text.index("Fetch pinned historical test commit") < text.index("just ci-test")
+
+
+def test_public_work_link_is_pinned_verified_and_installed():
+    text = workflow()
+    assert f"https://raw.githubusercontent.com/khughitt/dotfiles/{DOTFILES_PIN}/bin/work-link" in text
+    assert WORK_LINK_SHA256 in text and "sha256sum --check --status" in text
+    assert 'sudo install -m 755 "$RUNNER_TEMP/work-link" /usr/bin/work-link' in text
+    assert "sha256sum /usr/bin/work-link" in text
+    packages = next(line for line in text.splitlines() if "apt-get install" in line)
+    versions = next(line for line in text.splitlines() if "dpkg-query -W" in line)
+    assert "attr" in packages.split() and "attr" in versions.split()
 
 
 def test_disposable_config_and_separate_setup_evidence():

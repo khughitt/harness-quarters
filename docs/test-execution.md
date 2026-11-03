@@ -1,7 +1,7 @@
 # Test execution
 
-The execution policy is currently absent, so broad tests run locally. Hosted
-verification is being prepared; it has not been activated or observed.
+The execution policy is currently absent, so broad tests run locally. The first
+hosted verification failed; coverage has not been accepted and policy is not activated.
 
 | Command | Behavior |
 | --- | --- |
@@ -80,7 +80,14 @@ from TT_JUNIT_DIR after the wrapper returns.
 The prepared workflow uses ubuntu-24.04, two pytest workers and a finite 60-minute
 job limit. It pins uv 0.13.7, just 1.59.0, Node 26.13.0, Rust 1.99.1 and public
 tasks commit fa58ab31acd757f59798537b6957e540fdccb9fb. System Python, zsh and
-libatomic1 come from the runner; actual versions are recorded. The disposable
+libatomic1 come from the runner; actual versions are recorded. Setup explicitly
+fetches historical commit 6b434eb206c4464c062137e3600dcd303a543f68, which the
+rollback tests need but advertised branch history does not contain. It installs
+public work-link from dotfiles commit 2a686c0c4915ba0daae9f6455cfe45233780fc33,
+checking SHA-256 6400d9a8431d3af3777d5038716d4322d283ebd127c574c06d7516dd1a784ff4.
+The runner explicitly installs and reports attr, required by work-link's worktree
+storage route, together with curl for the verified download.
+These setup corrections await an authorized verification retry. The disposable
 runner installs tools at the exact /usr/bin paths its fixtures use. It runs setup,
 portable hygiene and the same complete suite, with TT_FORCE=1 at job scope.
 All branch pushes and manual dispatch are covered, with no duplicate PR trigger.

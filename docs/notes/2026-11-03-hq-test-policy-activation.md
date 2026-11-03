@@ -1,8 +1,9 @@
 # Hosted verification and policy activation packet
 
-Status: preparation only. No verification push, hosted result, accepted coverage or
-policy activation exists. The policy file is absent and local broad testing remains
-enabled. Owner: hq-d33cdc; preparation: hq-b32d19; activation: hq-c7e52c.
+Status: one authorized verification push and failed hosted attempt completed.
+Coverage is unaccepted, and no activation exists. The policy file is absent and
+local broad testing remains enabled. Owner: hq-d33cdc; preparation: hq-b32d19;
+activation: hq-c7e52c. A local setup correction awaits a separately approved retry.
 
 ## Frozen inputs and requested next action
 
@@ -10,12 +11,16 @@ Design: da5e8ace1327c4eea5ce77c8e1a6355eb65d31af,
 docs/specs/2026-11-03-test-execution-policy-design.md.
 Plan: 192a6e854a71be95a4660571ebb0490592825f00,
 docs/plans/2026-11-03-test-execution-policy.md.
-Preparation code/workflow revision: c4a93f3a58a67451ec34cd605b74470e0251551e.
+Original preparation code/workflow revision: c4a93f3a58a67451ec34cd605b74470e0251551e.
+The first verification push was authorized from packet revision
+0cf37c0784de88a2df825b8f15b4a26cd3d98aa0. The retry correction is the workflow
+in this packet's next frozen revision, named in its approval request.
 The packet's own frozen revision is the commit named in the approval request.
 
-Recommend authorizing one verification push of the reviewed preparation branch
+Recommend authorizing one additional verification push of the corrected branch
 feat/hq-d33cdc-test-policy to origin, so actual hosted coverage can be inspected.
-This request does not authorize activation, automatic retries, account changes or
+The first approved push is spent. This new request does not authorize activation,
+automatic further retries, account changes or
 paid runner substitution. A failed, cancelled or incomplete run leaves policy
 enabled and returns for disposition. Later coverage acceptance is a separate gate.
 
@@ -37,8 +42,11 @@ ci-test itself supplies neither force nor the development-host allocator.
 | Node | 26.13.0 |
 | Rust / Cargo | 1.99.1, locked release build |
 | tasks | public fa58ab31acd757f59798537b6957e540fdccb9fb |
+| historical hook commit | public 6b434eb206c4464c062137e3600dcd303a543f68, explicitly fetched |
+| work-link | public dotfiles 2a686c0c4915ba0daae9f6455cfe45233780fc33 |
+| work-link SHA-256 | 6400d9a8431d3af3777d5038716d4322d283ebd127c574c06d7516dd1a784ff4 |
 | Python | runner /usr/bin/python3; pidfd_open checked, uv downloads disabled |
-| zsh / libatomic1 | runner apt repositories; installed versions recorded |
+| zsh / libatomic1 / curl / attr | runner apt repositories; installed versions recorded |
 | actions/checkout | 3d3c42e5aac5ba805825da76410c181273ba90b1 |
 | astral-sh/setup-uv | 11f9893b081a58869d3b5fccaea48c9e9e46f990 |
 | extractions/setup-just | 53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 |
@@ -51,6 +59,48 @@ the disposable runner. GIT_CONFIG_GLOBAL is a temporary runner-owned file and
 GIT_CONFIG_NOSYSTEM=1. No private sibling checkout or fabricated project registry
 is installed. Run order is just setup, just ci-hygiene, then just ci-test.
 Full local check-hygiene remains protected and mandatory in commit/push hooks.
+
+The explicit historical fetch is needed even with fetch-depth=0: the still-public
+pinned object is outside current advertised ancestry. The published work-link
+script is hash-checked before installation; no private checkout or fixture
+replacement is introduced. Its bytes match the locally deployed tool. Anonymous
+exact-SHA acquisition was proven from an isolated empty Git repository, and a
+focused rename case passed with the public tool under the worktree's ignored bin.
+The attr package is explicitly installed and reported because work-link needs its
+command when ensuring worktree administration storage; host availability alone
+does not establish that runner prerequisite.
+
+## Observed first hosted attempt
+
+The single approved push succeeded at
+8d140cce7ea4d6cec0ddf6953a7250f7ed89480b. Its installed local pre-push hook
+passed all 2,778 tests and full hygiene, with exact identity reconciliation.
+[Run 41716936974](https://github.com/khughitt/harness-quarters/actions/runs/41716936974)
+attempt 1 then failed on that exact SHA. The standard ubuntu-24.04 job ran for
+7m56s (20:55:01–21:02:57 UTC); setup, pinned builds, hydration, portable hygiene
+and failure-artifact upload succeeded. Only the forced suite step failed.
+
+The retained artifact collected 2,778 cases across 59 modules, reported 2,386
+and executed 2,372 unique identities, including 80 failures. All 80 failures are
+rename-cutover cases whose apply command cannot find work-link. Fourteen cases
+skipped: the three proposed integrations plus eleven historical hook cases whose
+6b434eb object is absent. Agents passed; hooks/tools failed; 392 relay cases were
+unrun, and only the two completed partitions have XML. No module was excluded or
+skipped during collection. This is failed, incomplete coverage, never acceptance.
+
+Artifact 13269109652 and the complete run logs were downloaded as immutable ZIPs
+and safely extracted into the parent workspace. The artifact expires on GitHub at
+2026-11-10T21:02:53Z; local raw copies are retained independently. The local
+workflow correction addresses both observed setup omissions, preserving all
+existing tests and the original three proposed integration omissions. Its actual
+hosted result remains unverified until a new push is authorized and completed.
+
+The local full gate also reproduced a pre-existing relay test-fixture startup
+race: a child was classified before its supplied environment was fully visible.
+The shared fixture readiness helper now waits for every expected child environment
+entry before the original assertions, with a deterministic regression test. The
+production process reader and home classification behavior are unchanged; no
+assertion or case is removed. Current local verification is recorded on hq-c7e52c.
 
 ## Pilot and verification limits
 
@@ -145,9 +195,11 @@ after checking gh auth status; do not switch the globally active account.
 
 ## Conditional activation and rollback
 
-Proposed total: one feature verification push, then one main activation push only
+Original proposal: one feature verification push, then one main activation push only
 after observed coverage acceptance and explicit activation authorization. No remote
-retry is included. The first approval covers only the verification push above.
+retry was included, and that verification approval is now spent. This packet
+requests one additional feature verification push only; the remaining coverage,
+activation, integration and main-publication gates remain separate.
 
 After accepted coverage and activation authorization, first integrate the reviewed
 preparation into main while policy is absent/enabled and record its actual enabled

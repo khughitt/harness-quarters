@@ -362,8 +362,8 @@ literal argument forwarding; `just test-full` explicitly forces the broad route.
 The shared driver retains the existing four partitions, checks individual test
 identities against full collection and preserves caller-owned reports on failure.
 The pinned hosted workflow is prepared for all branch pushes, with portable hygiene,
-two workers and retained reports. Policy remains enabled; no hosted result or
-coverage acceptance is claimed. The proposed boundary has three named local-only
+two workers and retained reports. Policy remains enabled; the first hosted run
+failed and its coverage is unaccepted. The proposed boundary has three named local-only
 integration checks. See [test execution](docs/test-execution.md) for commands,
 omissions and evidence.
 

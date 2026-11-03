@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T20:28:23Z
+updated: 2026-11-03T22:44:54Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -132,4 +132,9 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-03T20:25:51Z (feat/hq-d33cdc-test-policy): resumed
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T20:28:23Z (feat/hq-d33cdc-test-policy): User authorization: Yes in this session answers the explicit request to make the frozen packet0cf37c0784de88a2df825b8f15b4a26cd3d98aa0 single verification push to origin. Authorized scope is one push of feat/hq-d33cdc-test-policy and observation/retention of that exact hosted run; no automatic remote retry, accepted coverage, activation, main integration or later main push. Resumed after verifying all895 checkpoint1 entries, manifestcc97c6004e7c418e815aeaa91eba16c0eeb6a341a2e34e8531423e7658c93a73 and frozen packet. Existing hydrated locked worktree reused, adoption baseline waiver persists. Parent and Task4 trial-arm both flow on; no new setup route or dependency changes.
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-03T21:29:11Z (feat/hq-d33cdc-test-policy): review: impl round 3 — verdict: revise; findings: Important 1; reviewer: codex/gpt-6-astra
+- 2026-11-03T21:37:12Z (feat/hq-d33cdc-test-policy): review: impl round 4 — verdict: accept; findings: none; reviewer: codex/gpt-6-astra
+- 2026-11-03T22:11:43Z (feat/hq-d33cdc-test-policy): review: impl round 5 — verdict: accept; findings: none; reviewer: codex/gpt-6-astra
+- 2026-11-03T22:44:54Z (feat/hq-d33cdc-test-policy): Local corrective readiness verified:2781full tests plus focused/stability checks, hygiene/lint and independent CI/attr/process-readiness reviews accepted. Rulings with Why/Cost/revisions are in external progress.md, including public history/tool setup and fixture-readiness scope; none deferred as minor. Exact raw first failed hosted attempt and all local partial/failed/successful attempts remain preserved, with completed2781report hashes. First approved push8d140cce remains the only remote write; corrected workflow/test sources are local/unpublished, policy remains enabled and both adoption/Task4 open. Next action after commit/checkpoint is user review of concrete frozen retry packet and one additional verification-push approval, not coverage acceptance or activation.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}

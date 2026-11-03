@@ -26,7 +26,7 @@ runner status through the budget. `just test-full` explicitly forces the broad r
 The relay signal test stays serial; xdist reads the grant's worker count. `just ci-test`
 shares the suite but requires explicit positive PYTEST_XDIST_AUTO_NUM_WORKERS and never
 sets TT_FORCE. The prepared workflow sets it at job scope, uses two workers and retains
-setup and suite artifacts. Hosted coverage has not been observed or accepted; the
+setup and suite artifacts. Hosted coverage has not been accepted; the
 three proposed integration omissions are listed in docs/test-execution.md.
 Both pre-push routes run
 mandatory `just check-hygiene` followed by `just test`; no outer composite is timed.

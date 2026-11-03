@@ -22,6 +22,7 @@ import tempfile
 import threading
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -869,12 +870,33 @@ def _until(predicate, seconds=20.0):
     raise AssertionError("condition not reached in time")
 
 
-def _execed(*processes):
-    """Wait until each process just started has its new image: Popen returns while exec is still
-    setting it up, and until then /proc reads its argv and environment as empty and its comm as
-    the parent's. Each process must have been given a non-empty environment."""
-    _until(lambda: all(Path(f"/proc/{process.pid}/{name}").read_bytes()
-                       for process in processes for name in ("cmdline", "environ")))
+def _execed(*processes, environments):
+    """Wait for every supplied fixture environment entry; nonempty /proc data can arrive first."""
+    assert len(processes) == len(environments) and all(environments)
+    expected = [{os.fsencode(f"{key}={value}") for key, value in environment.items()}
+                for environment in environments]
+    _until(lambda: all(
+        Path(f"/proc/{process.pid}/cmdline").read_bytes()
+        and entries <= set(Path(f"/proc/{process.pid}/environ").read_bytes().split(b"\0"))
+        for process, entries in zip(processes, expected)))
+
+
+def test_execed_waits_for_all_expected_environment_entries(monkeypatch):
+    original = Path.read_bytes
+    environment_reads = []
+
+    def read(path):
+        if str(path) == "/proc/123/cmdline":
+            return b"/usr/bin/sleep\x0030\x00"
+        if str(path) == "/proc/123/environ":
+            environment_reads.append(None)
+            return (b"PATH=/usr/bin\x00" if len(environment_reads) == 1 else
+                    b"PATH=/usr/bin\x00CODEX_HOME=/fixture/other\x00")
+        return original(path)
+
+    monkeypatch.setattr(Path, "read_bytes", read)
+    _execed(SimpleNamespace(pid=123), environments=[{"CODEX_HOME": "/fixture/other"}])
+    assert len(environment_reads) >= 2
 
 
 def _digest(path):
@@ -2308,10 +2330,11 @@ def test_operation_records_are_private_and_explained(world):
 
 def test_process_table_reads_only_the_hold_key(tmp_path):
     env = explicit_env(tmp_path, FIXTURE_ENV_SECRET=ENV_SECRET)
-    held = subprocess.Popen(["/usr/bin/sleep", "30"], env={**env, "DISABLE_UPDATES": "1"})
+    held_env = {**env, "DISABLE_UPDATES": "1"}
+    held = subprocess.Popen(["/usr/bin/sleep", "30"], env=held_env)
     plain = subprocess.Popen(["/usr/bin/sleep", "30"], env=env)
     try:
-        _execed(held, plain)
+        _execed(held, plain, environments=[held_env, env])
         rows = {row["pid"]: row for row in inventory._process_rows()}
         assert rows[held.pid]["argv"] == ["/usr/bin/sleep", "30"]
         assert rows[held.pid]["comm"] == "sleep"
@@ -2339,10 +2362,11 @@ def test_session_home_reads_only_the_home_key(world, tmp_path):
              ("codex", {"CODEX_HOME": str(home / ".codex")}, "personal"),
              ("codex", {"CODEX_HOME": str(home / ".codex-link")}, "work"),
              ("codex", {"CODEX_HOME": str(tmp_path / ".codex-work")}, "other")]
-    processes = [subprocess.Popen(["/usr/bin/sleep", "30"], env={**env, **variables})
-                 for _, variables, _ in cases]
+    environments = [{**env, **variables} for _, variables, _ in cases]
+    processes = [subprocess.Popen(["/usr/bin/sleep", "30"], env=environment)
+                 for environment in environments]
     try:
-        _execed(*processes)
+        _execed(*processes, environments=environments)
         context = {"home": str(home)}
         found = [smoke.session_home(context, harness, process.pid)
                  for (harness, _, _), process in zip(cases, processes)]
