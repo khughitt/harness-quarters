@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T22:56:24Z
+updated: 2026-11-03T22:57:04Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -148,4 +148,6 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-03T22:54:21Z (feat/hq-d33cdc-test-policy): parked (waiting on user, approval): User reviews docs/notes/2026-11-03-hq-test-policy-activation.md frozen at hq commit954ad406156d12c6321747036e83d88df198bc5f and approves one additional verification push of feat/hq-d33cdc-test-policy; controller resumes Task4, verifies retained inputs and refreshes named-account/public standard-runner/readers preflight, pushes once and inspects that exact completed hosted run before separate coverage-acceptance, activation and integration gates
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T22:56:24Z (feat/hq-d33cdc-test-policy): resumed
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-03T22:57:04Z (feat/hq-d33cdc-test-policy): User Yes in this turn approves exactly one additional verification push of the reviewed correction/packet954ad406156d12c6321747036e83d88df198bc5f and observation of that exact hosted run. No automatic further retry, coverage acceptance, activation, main integration or main push. All1188 checkpoint2 members and immutable manifests1/2 verified before reuse; current ledger bytes remain preserved by progress-checkpoint-2.md. Reusing hydrated locked worktree, adoption baseline waiver unchanged. Parent-owned workspace will gain new task-4-retry-* preflight/push/caller-evidence/API/raw-hosted files, mutable until next complete checkpoint; no child retained identities. User offered installation help only if needed; current local dependency route already exists, no host installation planned.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
