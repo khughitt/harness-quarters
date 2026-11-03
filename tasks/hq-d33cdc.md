@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T11:36:47Z
+updated: 2026-11-03T15:40:28Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -104,4 +104,6 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-03T11:36:45Z (feat/hq-d33cdc-test-policy): retention checkpoint: observed 2026-11-03T11:36:45Z on titan; basis hq in-tree . c8c8ec10200adb10252ed2a8ec7a9dc8d2d294fd:tasks/hq-d33cdc.md; retained by feat/hq-d33cdc-test-policy; this host: kept verified 1, kept unknown 0, released 0; changed 1. Rechecked all kept/verified items on this host: locked worktree, clean Git/ignored inventory, approved frozen spec, frozen plan and committed nonempty review reports. The changed worktree purpose is recorded as retention 1; historical unversioned notes remain unchanged. No unknown items. Other hosts are outside this observation. No external execution workspace or retained scratch/evidence exists yet. Next: human reviews frozen complete plan 192a6e85, then agent executes inline under the approved scope.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T11:36:47Z (feat/hq-d33cdc-test-policy): parked (waiting on user, review): User reviews hq frozen 192a6e854a71be95a4660571ebb0490592825f00:docs/plans/2026-11-03-test-execution-policy.md in .worktrees/hq-d33cdc. After approval the agent resumes this worktree, coordinates the existing interpreter/budget prerequisites and executes the four steps inline with independent reviews. No implementation or external activation has started; adoption baseline waiver persists.
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-03T15:40:28Z (feat/hq-d33cdc-test-policy): resumed
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
