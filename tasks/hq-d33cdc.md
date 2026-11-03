@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T18:42:24Z
+updated: 2026-11-03T20:08:58Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -118,3 +118,4 @@ After approved activation, commit .tt.toml with real broad target names, verify 
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T18:07:49Z (feat/hq-d33cdc-test-policy): Task 1 hq-b8c340 closed in ab47003d178b74bb580b9418d24e9cf835daf436, covered tree bb264c4f44be1ce96e6900562e8697dad0ad0e8d. Full commit verification passed 2738 with collected=reported=executed, four partitions, no skips/omissions/problems, after preserving two incomplete attempts. Independent correction review accepted (task-1-fix-review-report.md, 6527 bytes) and mandatory hygiene passed. Explicit external plan-task-done then passed 29 focused tests in 22.21s and recorded Task 1 completion in the parent-owned ledger, with BASE a0d7770dbee03e35991f59916015871664395c7e. Policy remains absent/enabled, baseline waiver honored, no remote result or push. Main is still an ancestor. Continuing Task 2; no user action required.
 - 2026-11-03T18:42:24Z (feat/hq-d33cdc-test-policy): Task 2 hq-561c81 closed in 9a9c78a5cf7e45adfe8bc3840a3f78a06b6bf258, covered tree d3c25d61b3149a931d79fddc95a1ccc6c7bdbe5e. Full2763 passed with exact all-root identity coverage and no skips/problems; focused94, guard RED11 to GREEN11, independent accept/no findings (task-2-review-report.md, 8371 bytes) and actual local/portable/empty-registry hygiene all passed. Explicit external plan-task-done then passed94 in68.37s and recorded completion. Policy remains absent/enabled; hook boundary is unmerged, so its enabled-regime integration event is still pending. No push or remote result. Main remains ancestor. Continuing Task 3 workflow preparation and concrete activation packet; publication/coverage/activation still require their separate user gates.
+- 2026-11-03T20:08:58Z (feat/hq-d33cdc-test-policy): review: impl round 1 — verdict: revise; findings: Important 1; reviewer: codex/gpt-6-astra
