@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T11:03:29Z
+updated: 2026-11-03T11:06:06Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -39,6 +39,7 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 
 - front-door (input, required, kind=configuration): justfile
 - builder-review (context, kind=review): docs/notes/2026-11-03-hq-d33cdc-builder-report.md
+- spec-review-2 (context, kind=review): docs/notes/2026-11-03-hq-d33cdc-spec-round-2-report.md
 
 ## Notes
 
