@@ -52,7 +52,7 @@ from . import adapters, counters, engine, hook
 from .counters import COUNTS
 from .engine import Decision
 from .events import Event
-from .limits import DEFAULTS_FILE, load, with_budget
+from .limits import DEFAULTS_FILE, duration, load, with_budget
 from .prompt import Budget, parse_budget
 from .record import Frozen, Record
 from .state import RootState
@@ -564,7 +564,7 @@ def report(turns: list[Turn], window: tuple[float, float] | None, limits_path, l
         lines.append(f'window: every record of the stores read (--all); limits {limits_path} sha256 {sha}')
         starts = [t.start for t in turns]
         days = (max(starts) - min(starts)) / 86400 if len(starts) > 1 else 0.0
-    lines.append(f'limits: active {hook.hmm(limits.active_seconds)}, calls {limits.calls}, spawns {limits.spawns}, '
+    lines.append(f'limits: active {duration(limits.active_seconds)}, calls {limits.calls}, spawns {limits.spawns}, '
                  f'compactions {limits.compactions}')
     by_harness = {h: [t for t in turns if t.harness == h] for h in adapters.HARNESSES}
     lines.append(f'turns: {len(turns)} (' + ', '.join(f'{h} {len(v)}' for h, v in by_harness.items()) + ')')
@@ -598,13 +598,13 @@ def report(turns: list[Turn], window: tuple[float, float] | None, limits_path, l
         lines.append(f'{head}: no turn in the window; rollout: {where}')
     for t in mine:
         s = t.state
-        whole = (f'whole turn active {hook.hmm(s.active)}, calls {s.calls}, spawns {s.spawns}, '
+        whole = (f'whole turn active {duration(s.active)}, calls {s.calls}, spawns {s.spawns}, '
                  f'compactions {s.compactions}')
         if t.pause is None:
             lines.append(f'{head}: turn {iso(t.start)}: not paused; {whole}')
         else:
             p = t.pause
-            lines.append(f'{head}: turn {iso(t.start)}: paused at {iso(p.t)} by {p.limit} (active {hook.hmm(p.active)}, '
+            lines.append(f'{head}: turn {iso(t.start)}: paused at {iso(p.t)} by {p.limit} (active {duration(p.active)}, '
                          f'calls {p.calls}, spawns {p.spawns}, compactions {p.compactions}); {whole}')
     lines.append('codex converter: ' + ', '.join(f'{k} {v}' for k, v in sorted(stats.items())))
     if problems:

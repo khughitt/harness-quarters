@@ -259,7 +259,7 @@ def test_cli_reports_turns_pauses_and_the_controller_over_a_window(tmp_path):
     assert 'per limit: active 0, calls 2, spawns 0, compactions 0' in text
     assert 'per harness: claude-code 1 (calls 1), codex 1 (calls 1)' in text
     assert (f'sun-fbaf80 controller codex:{CODEX_ID}: turn 2026-10-10T12:00:01Z: paused at '
-            '2026-10-10T12:00:05Z by calls (active 0:00, calls 3, spawns 0, compactions 0)') in text
+            '2026-10-10T12:00:05Z by calls (active 0h00m, calls 3, spawns 0, compactions 0)') in text
     assert index.read_bytes() == before
 
 

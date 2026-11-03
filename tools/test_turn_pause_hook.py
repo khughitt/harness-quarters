@@ -351,7 +351,7 @@ def test_501st_root_call_is_denied_with_the_root_text_after_one_warning(tmp_path
         assert context(out) == expected, i
     out = d.bash('ls')
     assert denied(out)
-    assert reason(out) == ROOT_TEXT.format(limit='calls', a='0:08', A='16:00', c=501, C=500,
+    assert reason(out) == ROOT_TEXT.format(limit='calls', a='0h08m', A='16h00m', c=501, C=500,
                                            s=0, S=30, k=0, K=2)
     assert 'stop the work you already started: interrupt your subagents and the sessions you launched' in reason(out)
     assert 'If another agent launched this session, park any claim --waiting-on agent' in reason(out)
@@ -365,7 +365,7 @@ def test_long_turn_continues_through_sixteen_hours_then_pauses(tmp_path, notices
     assert d.bash('long-job') is None  # an in-flight call keeps the wait active
     assert d.bash('ls', dt=4 * 3600) is None
     out = d.bash('ls', dt=8 * 3600 - 1)
-    assert context(out) == WARNING_TEXT.format(limit='active', n=75, used='12:00', value='16:00')
+    assert context(out) == WARNING_TEXT.format(limit='active', n=75, used='12h00m', value='16h00m')
     assert d.bash('ls', dt=4 * 3600) is None
     assert d.state().turn.active == 16 * 3600
     out = d.bash('ls', dt=1)
@@ -470,7 +470,7 @@ def test_continue_ends_the_pause_resets_counters_and_sets_no_budget(tmp_path, no
 def test_budget_directive_scales_from_default(tmp_path, hours, calls, spawns, compactions):
     d = Driver(tmp_path, 'claude-code')
     out = d.prompt(f'budget: {hours}h\nRun the whole migration.')
-    assert context(out) == BUDGET_TEXT.format(a=f'{hours}:00', c=calls, s=spawns, k=compactions)
+    assert context(out) == BUDGET_TEXT.format(a=f'{hours}h00m', c=calls, s=spawns, k=compactions)
     assert d.state().turn.limits == Limits(hours * 3600, calls, spawns, compactions)
 
 
@@ -509,8 +509,8 @@ def test_changed_limits_file_pauses_with_limits_changed_and_notifies(tmp_path, n
     write_limits(d.limits, calls=5000)
     out = d.bash('ls')
     assert denied(out)
-    assert reason(out) == LIMITS_CHANGED_TEXT.format(a='0:00', A='16:00', c=2, C=500, s=0, S=30, k=0, K=2)
-    assert reason(out).startswith('turn paused: the turn limits file changed mid-turn (active 0:00 of 16:00, '
+    assert reason(out) == LIMITS_CHANGED_TEXT.format(a='0h00m', A='16h00m', c=2, C=500, s=0, S=30, k=0, K=2)
+    assert reason(out).startswith('turn paused: the turn limits file changed mid-turn (active 0h00m of 16h00m, '
                                   'calls 2/500, spawns 0/30, compactions 0/2). Start nothing new and stop')
     assert d.state().paused == 'limits-changed'
     assert len(notices) == 1

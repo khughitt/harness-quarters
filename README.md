@@ -544,7 +544,8 @@ line passes no `protocolVersion`; if it does, that option's value is the revisio
 ### Turn-pause limits
 
 `hq pause limits` shows the current defaults: 16 active hours, 500 root tool calls,
-30 tree spawns and 2 compactions per turn. The next hooked call after a limit is
+30 tree spawns and 2 compactions per turn. It and `hq pause status` write active time
+with its units (`16h00m`, `0h16m`); `--json` gives seconds. The next hooked call after a limit is
 exceeded pauses the turn. Activity includes time with a tool in flight, including
 subagent work; it is not CPU time. Codex compactions are not counted by the hook.
 The [cutoff calibration](docs/notes/2026-11-02-active-cutoff-report.md) records the

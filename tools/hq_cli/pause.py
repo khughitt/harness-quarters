@@ -49,11 +49,6 @@ def find(store: Store, session: str | None, env, cwd: str):
     return None, f"a state for cwd {cwd!r}"
 
 
-def clock(seconds: float) -> str:
-    minutes = int(seconds) // 60
-    return f"{minutes // 60}:{minutes % 60:02d}"
-
-
 def notify_text(state) -> str:
     if state.notify_error:
         return "error: " + " ".join(state.notify_error.split())
@@ -85,7 +80,7 @@ def status(args, env) -> str:
         return json.dumps(data)
     compactions = (f"{turn.compactions}/{lim.compactions}" if kept["compactions"]
                    else f"-/{lim.compactions} (count your own)")
-    return (f"active {clock(turn.active)}/{clock(lim.active_seconds)} calls {turn.calls}/{lim.calls} "
+    return (f"active {limits.duration(turn.active)}/{limits.duration(lim.active_seconds)} calls {turn.calls}/{lim.calls} "
             f"spawns {turn.spawns}/{lim.spawns} compactions {compactions} "
             f"paused:{state.paused or 'no'} budget:{state.budget_note or 'none'} notify:{notify_text(state)}")
 
@@ -94,7 +89,7 @@ def show_limits(args) -> str:
     lim, _ = limits.load(limits.DEFAULTS_PATH)
     if args.json:
         return json.dumps(lim._asdict())
-    return (f"active {clock(lim.active_seconds)} calls {lim.calls} spawns {lim.spawns} "
+    return (f"active {limits.duration(lim.active_seconds)} calls {lim.calls} spawns {lim.spawns} "
             f"compactions {lim.compactions}")
 
 

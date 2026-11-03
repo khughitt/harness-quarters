@@ -31,6 +31,12 @@ class Limits(Frozen):
     __slots__ = _fields = ('active_seconds', 'calls', 'spawns', 'compactions')
 
 
+def duration(seconds: float) -> str:
+    """Active time with its units named (16h00m), never a bare h:mm an agent could read as minutes."""
+    minutes = int(seconds) // 60
+    return f'{minutes // 60}h{minutes % 60:02d}m'
+
+
 def sha256_hex(data: bytes) -> str:
     return sha256(data).hexdigest()
 

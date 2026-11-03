@@ -44,3 +44,8 @@ def test_load_names_the_file_for_a_syntax_error_or_a_missing_key(tmp_path, text,
     with pytest.raises(ValueError) as error:
         limits.load(path)
     assert str(path) in str(error.value) and field in str(error.value)
+
+
+@pytest.mark.parametrize('seconds, text', [(0, '0h00m'), (59.9, '0h00m'), (960, '0h16m'), (4320, '1h12m'),
+                                           (57600, '16h00m'), (360000, '100h00m')])
+def test_duration_names_its_units(seconds, text): assert limits.duration(seconds) == text
