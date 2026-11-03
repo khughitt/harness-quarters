@@ -26,10 +26,15 @@ link-check:
 # masks the signal runs alone, since another worker thread may take a process signal.
 test:
     tools/harness-facts check
-    python3 -m pytest agents/bin -q
-    uv run -q --with pytest pytest .githooks tools -q --ignore=tools/test_relay_cutover_bootstrap.py --ignore=tools/test_relay_cutover_transport.py
-    uv run -q --with pytest --with pytest-xdist pytest tools/test_relay_cutover_bootstrap.py tools/test_relay_cutover_transport.py -q -n auto -k 'not test_signal_while_recording_start_cancels'
-    uv run -q --with pytest pytest tools/test_relay_cutover_transport.py -q -k test_signal_while_recording_start_cancels
+    host-budget run -- python3 -m pytest agents/bin -q
+    host-budget run -- uv run -q --python /usr/bin/python3 --with pytest pytest .githooks tools -q --ignore=tools/test_relay_cutover_bootstrap.py --ignore=tools/test_relay_cutover_transport.py
+    host-budget run -- uv run -q --python /usr/bin/python3 --with pytest --with pytest-xdist pytest tools/test_relay_cutover_bootstrap.py tools/test_relay_cutover_transport.py -q -n auto -k 'not test_signal_while_recording_start_cancels'
+    host-budget run -- uv run -q --python /usr/bin/python3 --with pytest pytest tools/test_relay_cutover_transport.py -q -k test_signal_while_recording_start_cancels
+
+# Focused tests retain argument boundaries and the host's worker budget.
+[positional-arguments]
+test-one +args:
+    host-budget run -- uv run -q --python /usr/bin/python3 --with pytest --with pytest-xdist pytest "$@"
 
 # Install the pinned pi (pi/package.json and its lock) under ~/.local/share/pi/<version>,
 # outside the synced checkout; pi/bin/pi runs it. pi needs no lifecycle scripts (its README).

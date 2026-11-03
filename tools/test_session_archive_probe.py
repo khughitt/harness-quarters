@@ -19,8 +19,7 @@ def test_codex_stub_children_use_minimal_environment(stub_codex, tmp_path, home,
     seen = []
 
     def inspect(environment):
-        if environment is None:
-            return
+        assert environment is not None, "subprocess environment must be explicit"
         unexpected = set(environment) - allowed
         assert not unexpected
         assert environment["HOME"] == str(home)
@@ -41,14 +40,20 @@ def test_codex_stub_children_use_minimal_environment(stub_codex, tmp_path, home,
     monkeypatch.setenv("STUB_CODEX_VERSION", "codex-cli 9.9.9")
     monkeypatch.setattr(subprocess, "run", run)
     monkeypatch.setattr(subprocess, "Popen", popen)
+    environment = {
+        "PATH": os.defpath, "HOME": str(home), "USER": "test", "LC_ALL": "C.UTF-8",
+        "OPENAI_API_KEY": "test-invalid", "ANTHROPIC_API_KEY": "test-invalid",
+        "STUB_CODEX_VERSION": "codex-cli 9.9.9",
+    }
     native = subprocess.run([sys.executable, "-c", (
         "import json,os; print(json.dumps({'keys': sorted(os.environ), "
         "'fake': os.environ.get('OPENAI_API_KEY') == 'test-invalid', "
-        "'home': os.environ.get('HOME')}))")], capture_output=True, text=True, check=True)
+        "'home': os.environ.get('HOME')}))")], env=environment,
+        capture_output=True, text=True, check=True)
     observed = json.loads(native.stdout)
     assert not (set(observed["keys"]) - allowed)
     assert observed["fake"] and observed["home"] == str(home)
-    assert codex_version(str(stub_codex)) == "codex-cli 9.9.9"
+    assert codex_version(str(stub_codex), env=environment) == "codex-cli 9.9.9"
     result = probe_codex(str(stub_codex), tmp_path / "work", lenient_open_inodes)
     assert result.passed
     assert prune.run_codex_delete(str(stub_codex), home / ".codex", "test-thread", 5)

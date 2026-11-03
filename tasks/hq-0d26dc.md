@@ -1,15 +1,17 @@
 ---
 id: hq-0d26dc
 title: "Run the uv test segments under the tools' interpreter: uv's managed Python lacks os.pidfd_open"
-status: doing
+status: done
 priority: 3
 size: xs
 complexity: low
 process: direct
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-25T02:28:24Z
-updated: 2026-11-03T16:38:28Z
+updated: 2026-11-03T16:55:10Z
 started: 2026-11-03T15:41:58Z
+completed: 2026-11-03T16:55:10Z
+closed: 2026-11-03T16:55:10Z
 depends: [hq-4c5506]
 tags: []
 source: hq-a7b473
@@ -39,3 +41,11 @@ Where: justfile test recipe; tools/relay_cutover_bootstrap/hosts.py _send.
 - 2026-11-03T16:11:40Z (feat/hq-d33cdc-test-policy): review: impl round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
 - 2026-11-03T16:17:38Z (feat/hq-d33cdc-test-policy): Post-change suite stopped at a known archive-fixture assertion: test_codex_stub_children_use_minimal_environment reports unexpected COLUMNS/LINES in a native child. 268 agents passed, then 2048 hooks/tools passed and 1 failed; relay stages were not reached. This is not a green suite. Existing hq-36f6c6 tracks exactly this unresolved terminal-key boundary, including prior unchanged-code failures. Investigating its recorded path before deciding repair; no allowlist widened and no production archive behavior changed.
 - 2026-11-03T16:38:28Z (feat/hq-d33cdc-test-policy): review: impl round 2 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
+- 2026-11-03T16:54:58Z (feat/hq-d33cdc-test-policy): Verification: fresh combined timeout --signal=INT 1800 just test exited 0 against flow tree 8b962aae04222e06e758c8233cc38f739de068cc: 268 agents (28.36s), 2049 hooks/tools (843.94s), 391 parallel relay (397.71s), 1 serial signal (0.20s), 2709 total passed. Mandatory .githooks/pre-commit exited 0; staged and working fingerprints match, git diff --check passes, tasks check has zero errors and four pre-existing unrelated tag warnings. Focused evidence: archive module 8 passed with explicit-env RED to GREEN, literal argv/budget self-check passed, real budget probe 1 passed. Full runner observed through host-load plus proc/systemd: active background.slice, both worker grants 16, nice 10. Raw logs, frozen patch, diagnosis and independent accept/no-findings report (codex/gpt-6.1-sol) remain under the open hq-d33cdc-owned external workspace. No broad verification was skipped for these independent prerequisites; adoption baseline waiver was not applied here. No remote evidence or hosted claim. Retained accounting: this record owns no independent worktree, scratch or off-tree item; shared .worktrees/hq-d33cdc and all external evidence are owned by open hq-d33cdc. host-load --section session reports nothing left running. No host pointer changes or pushes, no other work modified. Branch feat/hq-d33cdc-test-policy remains unmerged in .worktrees/hq-d33cdc for controller hq-d33cdc to integrate after the approved plan and separate external gates.
+- 2026-11-03T16:54:59Z (feat/hq-d33cdc-test-policy): gate: verified tree:8b962aae04222e06e758c8233cc38f739de068cc — checks: capability RED to GREEN and just test 2709 passed and pre-commit passed; review: none; reviewer: codex/gpt-6.1-sol
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-03T16:54:59Z (feat/hq-d33cdc-test-policy): retro: Capability-level RED exposed the interpreter defect while the earlier managed-Python suite stayed green. Presence-only tracing located readline native writes, so explicit fake environments fixed the fixture without widening its contract. The host-load liveness discrepancy is separately reported as ops-a6f75a.
+- 2026-11-03T16:55:10Z (feat/hq-d33cdc-test-policy): done
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-03T16:55:10Z (feat/hq-d33cdc-test-policy): System interpreter provides pidfd_open and combined suite passed 2709 tests, independent review accepted
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}

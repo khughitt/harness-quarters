@@ -20,6 +20,9 @@ configured host; setup creates directories, not private settings.
 ## Gates
 
 Run `just test` before committing: it runs the agent-tool suite and the hook/tool suite.
+Use `just test-one <pytest arguments>` for focused tests; it preserves arguments and
+runs under the host worker budget, as do the full suite's test processes. The relay
+signal test stays serial; xdist reads its worker count from the budget grant.
 There is no CI or pre-push suite here. The pre-commit hook refuses staged paths under
 `local/`, then runs `tools/ops-check` over the working tree (the hygiene checks ops
 projects share: guide references, conflicted copies, agent scratch, machine layout and
