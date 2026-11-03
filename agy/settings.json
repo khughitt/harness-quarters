@@ -7,8 +7,8 @@
   },
   "showFeedbackSurvey": false,
   "statusLine": {
-    "type": "",
-    "command": "",
-    "enabled": false
+    "type": "command",
+    "command": "~/d/familiar/bin/familiar statusline",
+    "enabled": true
   }
 }

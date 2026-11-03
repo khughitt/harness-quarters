@@ -151,3 +151,10 @@ def test_statusline_unchanged():
         'type': 'command', 'command': '~/d/familiar/bin/familiar statusline',
         'refreshInterval': 2,
     }
+
+
+def test_agy_statusline():
+    assert json.loads((ROOT / 'agy/settings.json').read_text())['statusLine'] == {
+        'type': 'command', 'command': '~/d/familiar/bin/familiar statusline',
+        'enabled': True,
+    }
