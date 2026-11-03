@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-03T20:20:42Z
+updated: 2026-11-03T20:25:51Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -128,4 +128,6 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-03T20:20:02Z (feat/hq-d33cdc-test-policy): retention checkpoint: observed 2026-11-03T20:20:02Z on titan; basis hq in-tree . 672c142e81021170ef007b37f3000d986ae0c027:tasks/hq-d33cdc.md; retained by refs/heads/feat/hq-d33cdc-test-policy; this host: kept verified 3, kept unknown 0, released 0; changed 3. Rechecked all kept/verified identities on this host: locked worktree with clean tracked state and ignored regenerable source/build/cache inventory, complete895-entry workspace manifest including hidden entries and four literal symlink targets, immutable180492-byte manifest hash, and preserved progress-checkpoint-1.md. No unknown items; other hosts retain their own dated observations. Lost pilot attempt2 raw bytes are disclosed historical loss, replaced by accepted independently verified attempt3 evidence, never reconstructed. Manifest is retained off-tree as immutable raw evidence with its own record. Next: user approves the one verification push in frozen packet0cf37c07; controller refreshes preflight, starts hq-c7e52c and observes exact hosted coverage before separate acceptance/activation gates.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-03T20:20:42Z (feat/hq-d33cdc-test-policy): parked (waiting on user, approval): User reviews frozen packet0cf37c0784de88a2df825b8f15b4a26cd3d98aa0 and approves one verification push of feat/hq-d33cdc-test-policy to origin; controller then starts hq-c7e52c, refreshes public standard-runner/account/reader preflight, pushes once and inspects completed hosted artifacts before separate coverage-acceptance and activation gates
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-03T20:25:51Z (feat/hq-d33cdc-test-policy): resumed
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
