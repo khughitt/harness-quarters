@@ -1,15 +1,17 @@
 ---
 id: hq-bef306
 title: Update tasks record and resolution contract citations
-status: doing
+status: done
 priority: 1
 size: xs
 complexity: low
 process: direct
 owner: docs/hq-bef306-tasks-citations
 created: 2026-11-04T20:11:24Z
-updated: 2026-11-04T20:27:42Z
+updated: 2026-11-04T20:28:10Z
 started: 2026-11-04T20:12:09Z
+completed: 2026-11-04T20:28:10Z
+closed: 2026-11-04T20:28:10Z
 depends: []
 tags: []
 source: tasks-813e86
@@ -42,3 +44,8 @@ Narrow producer work for tasks-813e86 Task 5: update the tasks record-home and p
 - 2026-11-04T20:27:40Z (docs/hq-bef306-tasks-citations): gate: verified tree:766a16eb0aa89e3c34b377bb336306db2019f02d — checks: just check-hygiene pass and git diff --check pass and comment-only no behavior test obligation under policy-off; review: none; reviewer: codex/gpt-6.1-sol
   provenance: {"harness_session":"codex:01a1a7c8-be1e-70f2-8f58-4cfc952a4551","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T20:27:42Z (docs/hq-bef306-tasks-citations): retro: The narrowed producer diff preserved every guard while replacing current-contract pointers. Independent review found four additional shorthand citations in the same files, and one batched correction plus scoped re-review closed them.
+- 2026-11-04T20:28:08Z (docs/hq-bef306-tasks-citations): Verified covered tree 766a16eb0aa89e3c34b377bb336306db2019f02d at corrective code e35602cc33fcaa4ff3d33e871b2487d7aefddff7; independent round2 accepts all four fixes, mandatory hygiene and diff checks pass, no behavior tests needed for comments. Broad suite skipped by valid automatic_broad=false; no remote evidence. Known local retained set is this locked worktree only; current ignored/status inventory empty (setup-created empty local directories are regenerable), no execution workspace in-tree. Parent tasks-813e86 owns reports and source evidence. Code/index/covered fingerprints equal; same-turn disposal follows local integration. No home link, host pointer, detached process or push. Branch docs/hq-bef306-tasks-citations in .worktrees/hq-bef306 is reviewed for controller git merge --no-ff into personal main.
+- 2026-11-04T20:28:10Z (docs/hq-bef306-tasks-citations): done
+  provenance: {"harness_session":"codex:01a1a7c8-be1e-70f2-8f58-4cfc952a4551","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T20:28:10Z (docs/hq-bef306-tasks-citations): Reviewed record-layout citations preserve consumer guards
+  provenance: {"harness_session":"codex:01a1a7c8-be1e-70f2-8f58-4cfc952a4551","harness_session_source":"CODEX_THREAD_ID"}
