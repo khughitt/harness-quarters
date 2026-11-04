@@ -1,14 +1,14 @@
 ---
 id: hq-cc91d4
 title: Persist bounded atomic root records and explicit offline migration
-status: todo
+status: doing
 priority: 2
 size: m
 complexity: high
 process: direct
 owner: fix/hq-2dd09b
 created: 2026-11-04T11:51:34Z
-updated: 2026-11-04T16:53:16Z
+updated: 2026-11-04T16:53:18Z
 started: 2026-11-04T12:41:25Z
 depends: [hq-5a461d]
 parent: hq-e10b76
@@ -43,3 +43,5 @@ Execute Task 3 of the proposed shared turn-pause plan, frozen in hq at 3c29183b0
 - 2026-11-04T12:54:14Z (fix/hq-2dd09b): Prepared versioned atomic records, bounded history primitives and explicit offline conversion at f2f704f2; 239 focused tests pass; mandatory hygiene passes; broad suite omitted by policy. No live migration, activation, push or independent retained items. Evidence and ledger owned by open controller hq-c58737 in its external plan workspace; branch fix/hq-2dd09b remains unmerged pending separate live activation approval.
   provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T16:28:54Z (fix/hq-2dd09b): Original Task3 completion at f2f704f2 remains recorded. Proposed plan revision2 is frozen at hq34357c02e62c0d7d64197312834f41bf8e04caf6:docs/plans/2026-11-04-turn-pause-reliability.md. After its human approval agent reopens this record with edit --status todo then start, preserves original BASE/history, and executes only unchecked Steps8–12 for required prompt_guards, helpers and converter/privacy tests. Task4 still owns the known late-wake RED until integration; no concerns task or compatibility reader is proposed. This note changes no completion evidence or execution authorization.
+- 2026-11-04T16:53:18Z (fix/hq-2dd09b): resumed
+  provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
