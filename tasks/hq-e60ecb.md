@@ -8,7 +8,7 @@ complexity: high
 process: direct
 owner: fix/hq-2dd09b
 created: 2026-11-04T11:51:39Z
-updated: 2026-11-04T17:46:04Z
+updated: 2026-11-04T17:46:08Z
 started: 2026-11-04T12:54:16Z
 depends: [hq-cc91d4]
 parent: hq-e10b76
@@ -50,3 +50,7 @@ Execute Task 4 of the proposed shared turn-pause plan, frozen in hq at 3c29183b0
 - 2026-11-04T16:59:22Z (fix/hq-2dd09b): resumed
   provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T17:39:30Z (fix/hq-2dd09b): attached: latency-full-45d430de.json (1547 bytes): Failed50ms gate at code45d430de:1000 serial/4000 concurrent samples per harness, full128-event records; all counter/bounds assertions passed.
+- 2026-11-04T17:46:08Z (fix/hq-2dd09b): Task4 correctness implemented at45d430de23fb3c9fff38600a055c966b50b897ee: turns/warnings/pauses/notification outcomes, retained end with private guards, bounded maintenance and isolated measurer. Focused command tools/test_turn_pause_hook.py tools/test_turn_pause_history.py tools/test_turn_pause_state.py tools/test_turn_pause_prompt.py tools/test_turn_pause_migrate.py tools/test_turn_pause_replay.py through just test-one passed324 tests in26.49s; this also turns the prior late-wake regression GREEN. Mandatory hygiene/diff pass. Broad suite deliberately skipped under validated policy; no remote evidence.
+- 2026-11-04T17:46:08Z (fix/hq-2dd09b): Full latency gate FAILED, not a pass: Claude serial/concurrent p99=128.65/406.51ms; Codex=166.57/206.44ms, versus50ms. SerialN1000/concurrentN4000 each harness;128 events retained; every counter/bounds/inflight assertion passed, initial worker grant16. Result published as files:latency-full-45d430de.json and raw copy preserved by controller. No idle-host baseline/continuous contention evidence; cause is not isolated between storage and host effects.
+- 2026-11-04T17:46:08Z (fix/hq-2dd09b): An initial measurer invocation bypassed the entry shebang -S; the sitecustomize regression was RED1 then GREEN1 after direct-entry correction. Initial pilot remains diagnostic only. Corrected pilot was read before the authorized full run; all gate/statistical caveats and decisions are in the controller ledger, with Ruling/Why/Cost. No target, event bound, schema or persistence change was made to obtain a pass.
+- 2026-11-04T17:46:08Z (fix/hq-2dd09b): Approved plan34357c02 Task4 Step6 returns a latency failure to design review. Frozen verification report hq46c0c32133e1efb2ae1fb02c58629acf8b546df5:docs/notes/2026-11-04-turn-pause-latency-gate-report.md recommends keeping50ms/128 events and one approximately25min controlled idle-host baseline/candidate diagnostic before choosing changes. Task4 stays incomplete; no plan-task-done4 or Task5 start. Fresh whole-branch review, obs handoff and separate activation remain pending.
