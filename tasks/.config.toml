@@ -20,3 +20,7 @@ skills = "Skill definitions and the tooling around them."
 
 [git]
 commit = true
+
+[needs.quiet]
+meaning = "Idle host for controlled latency measurements"
+exclusive = true
