@@ -8,7 +8,7 @@ complexity: high
 process: direct
 owner: fix/hq-2dd09b
 created: 2026-11-04T11:51:34Z
-updated: 2026-11-04T12:41:25Z
+updated: 2026-11-04T12:41:47Z
 started: 2026-11-04T12:41:25Z
 depends: [hq-5a461d]
 parent: hq-e10b76
@@ -33,3 +33,4 @@ Execute Task 3 of the proposed shared turn-pause plan, frozen in hq at 3c29183b0
   provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T12:41:25Z (fix/hq-2dd09b): started
   provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T12:41:47Z (fix/hq-2dd09b): arm: flow-trial-1 — unit tack-2dd09b — flow off
