@@ -725,7 +725,8 @@ def _git(records: Path, *args: str) -> str:
 def task_copies(records: Path) -> tuple[list[Path], list[Path]]:
     """Every tasks/ directory holding this project's records: each worktree of the
     repository holding `records`, at the records directory's place in it, as tasks
-    enumerates sibling copies (records-home design §3.1). In-tree, that is the root and
+    enumerates sibling copies (tasks docs/project-operations.md, Layout and adoption).
+    In-tree, that is the root and
     each of its worktrees; a detached project's records repository keeps no worktrees,
     so it is the one copy under `records`."""
     listing = _git(records, "worktree", "list", "--porcelain")

@@ -10,7 +10,7 @@ person, at the first check that fails.
 
 The renamed project is the checkout; the other repositories are the ones the cutover
 retargets in. Each may be an in-tree or a detached tasks project (tasks
-docs/specs/2026-10-22-records-home-design.md); a detached project's records live in a
+docs/project-operations.md, Layout and adoption); a detached project's records live in a
 records repository outside every snapshot repository, where the cutover owns `<old>/` and
 `<new>/` (the checkout's) and `<p>/` (each detached repository's). Rollback resets the
 checkout and the in-tree repositories, never a detached repository's code checkout, and
@@ -137,7 +137,7 @@ def project_row(root, command):
 
 def project_kind(root, command):
     """The row of a snapshot project this cutover renames or retargets in: reachable, and
-    in-tree or detached. An unreachable row has no kind (records-home §5.2). A linked
+    in-tree or detached. An unreachable row has no kind because its config was not read. A linked
     project's records sit in an overlay directory the cutover neither saves nor resets."""
     row = project_row(root, command)
     kind = row.get("kind")
@@ -157,7 +157,7 @@ def project_kind(root, command):
 
 def records_repo(row):
     """A detached project's records repository: the git top level of its records directory,
-    which records-home places directly under that top level and names for the prefix. The
+    which this cutover requires directly under that top level and named for the prefix. The
     owned paths (`<old>/`, `<new>/`, `<p>/`) are relative to it, so both must hold."""
     records = Path(row["records"]).resolve()
     top = Path(run("git", "-C", records, "rev-parse", "--show-toplevel").strip()).resolve()
