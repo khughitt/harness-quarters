@@ -34,8 +34,8 @@ CLAUDE_ROOT = '7f0c44c1-4c1f-40da-9a15-aa0917fa0728'
 CODEX_ROOT = '01a19737-5420-7280-9b27-80cdf4ba57c6'
 
 ROOT_TEXT = (
-    'turn paused: {limit} over its limit (active {a} of {A}, calls {c}/{C}, spawns {s}/{S}, '
-    'compactions {k}/{K}). Start nothing new and stop the work you already started: interrupt '
+    'turn paused: {limit} over its limit (active {a} of {A}, root calls {c}/{C}, tree spawns {s}/{S}, '
+    'root compactions {k}/{K}). Start nothing new and stop the work you already started: interrupt '
     'your subagents and the sessions you launched, stop your background calls and processes, '
     'and set any active goal of yours to paused. Then write the pause report the turn-pause '
     'rule describes, park your task --waiting-on user --reason decision, and end your turn. If '
@@ -48,10 +48,14 @@ CHILD_TEXT = (
     'for your controller, and return a short status (done, left, running). Do not write a '
     'pause report.')
 LIMITS_CHANGED_TEXT = (
-    'turn paused: the turn limits file changed mid-turn (active {a} of {A}, calls {c}/{C}, spawns {s}/{S}, '
-    'compactions {k}/{K}). ' + ROOT_TEXT[ROOT_TEXT.index('Start nothing new'):])
-WARNING_TEXT = 'turn-pause: {limit} at {n}% ({used} of {value}). Finish a coherent step and prepare your report.'
-BUDGET_TEXT = 'turn-pause: budget for this turn: active {a}, {c} calls, {s} spawns, {k} compactions.'
+    'turn paused: the turn limits file changed mid-turn (active {a} of {A}, root calls {c}/{C}, tree spawns {s}/{S}, '
+    'root compactions {k}/{K}). ' + ROOT_TEXT[ROOT_TEXT.index('Start nothing new'):])
+WARNING_TEXT = ('turn-pause: warning only: {limit} at {n}% ({used} of {value}). '
+                'Continue authorized work; this is not a pause or a new approval gate. '
+                'Give a concise status update and prepare to stop only if a limit is exceeded '
+                'or a genuine human gate is reached. hq pause status is the authoritative hook snapshot; '
+                'do not add worker calls to root calls. Exact limits are allowed, including the root compaction limit.')
+BUDGET_TEXT = 'turn-pause: budget for this turn: active {a}, {c} root calls, {s} tree spawns, {k} root compactions.'
 MALFORMED_TEXT = ('turn-pause: the first line looks like a budget but does not parse ({reason}); '
                   'the default limits apply. Mention it in your next report; do not stop for it.')
 WAKE_TEXT = ('turn-pause: this prompt matches a pending scheduled prompt and was read as a scheduled '
@@ -341,13 +345,35 @@ def test_cron_prompt_is_a_wake_until_a_stop_no_longer_lists_it(tmp_path):
 
 # --- pause ----------------------------------------------------------------------------
 
+@pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+def test_warning_allows_work_at_the_limit_and_excludes_worker_calls(tmp_path, notices, harness):
+    d = Driver(tmp_path, harness)
+    write_limits(d.limits, calls=4)
+    d.prompt('execute the authorized plan')
+    for _ in range(6):
+        assert not denied(d.bash('worker-check', agent='worker-1'))
+    assert d.state().turn.calls == 0
+    for _ in range(2):
+        assert not denied(d.bash('check'))
+    out = d.bash('check')
+    assert not denied(out)
+    assert 'warning only: root calls at 75%' in context(out)
+    assert 'Continue authorized work' in context(out)
+    assert 'not a pause or a new approval gate' in context(out)
+    assert d.state().paused is None
+    assert not denied(d.bash('check'))  # exactly four root calls
+    assert d.state().paused is None
+    assert denied(d.bash('check'))
+    assert d.state().paused == 'calls'
+
+
 def test_501st_root_call_is_denied_with_the_root_text_after_one_warning(tmp_path, notices):
     d = Driver(tmp_path, 'claude-code')
     d.prompt('a long job')
     for i in range(1, 501):
         out = d.bash('ls')
         assert not denied(out), i
-        expected = WARNING_TEXT.format(limit='calls', n=75, used=375, value=500) if i == 375 else None
+        expected = WARNING_TEXT.format(limit='root calls', n=75, used=375, value=500) if i == 375 else None
         assert context(out) == expected, i
     out = d.bash('ls')
     assert denied(out)
@@ -365,7 +391,7 @@ def test_long_turn_continues_through_sixteen_hours_then_pauses(tmp_path, notices
     assert d.bash('long-job') is None  # an in-flight call keeps the wait active
     assert d.bash('ls', dt=4 * 3600) is None
     out = d.bash('ls', dt=8 * 3600 - 1)
-    assert context(out) == WARNING_TEXT.format(limit='active', n=75, used='12h00m', value='16h00m')
+    assert context(out) == WARNING_TEXT.format(limit='active time', n=75, used='12h00m', value='16h00m')
     assert d.bash('ls', dt=4 * 3600) is None
     assert d.state().turn.active == 16 * 3600
     out = d.bash('ls', dt=1)
@@ -511,7 +537,7 @@ def test_changed_limits_file_pauses_with_limits_changed_and_notifies(tmp_path, n
     assert denied(out)
     assert reason(out) == LIMITS_CHANGED_TEXT.format(a='0h00m', A='16h00m', c=2, C=500, s=0, S=30, k=0, K=2)
     assert reason(out).startswith('turn paused: the turn limits file changed mid-turn (active 0h00m of 16h00m, '
-                                  'calls 2/500, spawns 0/30, compactions 0/2). Start nothing new and stop')
+                                  'root calls 2/500, tree spawns 0/30, root compactions 0/2). Start nothing new and stop')
     assert d.state().paused == 'limits-changed'
     assert len(notices) == 1
     assert denied(d.bash('touch y'))

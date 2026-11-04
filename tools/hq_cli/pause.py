@@ -15,6 +15,12 @@ from turn_pause.state import StateError, Store, state_dir  # noqa: E402
 
 HARNESSES = ("claude-code", "codex")
 COUNTS = ("calls", "spawns", "compactions")
+GUIDANCE = ("Calls count root attempts only; spawns count the whole tree; compactions count the root. "
+            "Active time includes in-flight worker tools. Use the hook snapshot for counted metrics; "
+            "keep unhooked counts separate. A warning calls for a concise status update and preparation "
+            "while authorized work continues; it is not a pause or a new approval gate. "
+            "A count pauses the turn only when strictly above its limit; reaching a limit is allowed. "
+            "Other genuine human gates still apply.")
 
 
 class PauseError(Exception):
@@ -23,13 +29,14 @@ class PauseError(Exception):
 
 def add_parser(commands) -> None:
     pause = commands.add_parser("pause", help="show the turn pause counters and limits",
-                                description="Turn pause: counters and limits for the current root session.")
+                                description="Turn pause: counters and limits for the current root session. " + GUIDANCE)
     sub = pause.add_subparsers(dest="pause_command", required=True)
-    status = sub.add_parser("status", help="this tree's counts, limits, pause and notification state")
+    status = sub.add_parser("status", help="this tree's counts, limits, pause and notification state",
+                            description=GUIDANCE)
     status.add_argument("--session", help="root or worker session id (default: $CODEX_THREAD_ID, "
                                           "else the newest state for the current directory)")
     status.add_argument("--json", action="store_true")
-    show = sub.add_parser("limits", help="the default turn limits")
+    show = sub.add_parser("limits", help="the default turn limits", description=GUIDANCE)
     show.add_argument("--json", action="store_true")
 
 
@@ -80,8 +87,8 @@ def status(args, env) -> str:
         return json.dumps(data)
     compactions = (f"{turn.compactions}/{lim.compactions}" if kept["compactions"]
                    else f"-/{lim.compactions} (count your own)")
-    return (f"active {limits.duration(turn.active)}/{limits.duration(lim.active_seconds)} calls {turn.calls}/{lim.calls} "
-            f"spawns {turn.spawns}/{lim.spawns} compactions {compactions} "
+    return (f"active {limits.duration(turn.active)}/{limits.duration(lim.active_seconds)} root calls {turn.calls}/{lim.calls} "
+            f"tree spawns {turn.spawns}/{lim.spawns} root compactions {compactions} "
             f"paused:{state.paused or 'no'} budget:{state.budget_note or 'none'} notify:{notify_text(state)}")
 
 
@@ -89,8 +96,8 @@ def show_limits(args) -> str:
     lim, _ = limits.load(limits.DEFAULTS_PATH)
     if args.json:
         return json.dumps(lim._asdict())
-    return (f"active {limits.duration(lim.active_seconds)} calls {lim.calls} spawns {lim.spawns} "
-            f"compactions {lim.compactions}")
+    return (f"active {limits.duration(lim.active_seconds)} root calls {lim.calls} tree spawns {lim.spawns} "
+            f"root compactions {lim.compactions}")
 
 
 def run(args) -> int:

@@ -12,7 +12,7 @@ from turn_pause.counters import TurnState
 from turn_pause.state import Store, state_path
 
 TOOL = Path(__file__).resolve().parent / "hq"
-LINE = "active 1h12m/16h00m calls 140/500 spawns 3/30 compactions 0/2 paused:no budget:none notify:ok"
+LINE = "active 1h12m/16h00m root calls 140/500 tree spawns 3/30 root compactions 0/2 paused:no budget:none notify:ok"
 
 
 @pytest.fixture
@@ -131,6 +131,6 @@ def test_status_state_without_turn_is_an_error(home):
 def test_limits_text_and_json(home):
     text = hq(home, "limits")
     assert text.returncode == 0, text.stderr
-    assert text.stdout.strip() == "active 16h00m calls 500 spawns 30 compactions 2"
+    assert text.stdout.strip() == "active 16h00m root calls 500 tree spawns 30 root compactions 2"
     data = json.loads(hq(home, "limits", "--json").stdout)
     assert data == {"active_seconds": 57600, "calls": 500, "spawns": 30, "compactions": 2}

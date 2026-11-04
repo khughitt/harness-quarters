@@ -49,8 +49,8 @@ MAX_PAYLOAD_BYTES = 32 * 1024 * 1024
 OUTPUT_EVENTS = ('PreToolUse', 'UserPromptSubmit')
 
 ROOT_TEXT = (
-    'turn paused: {limit} over its limit (active {a} of {A}, calls {c}/{C}, spawns {s}/{S}, '
-    'compactions {k}/{K}). Start nothing new and stop the work you already started: interrupt '
+    'turn paused: {limit} over its limit (active {a} of {A}, root calls {c}/{C}, tree spawns {s}/{S}, '
+    'root compactions {k}/{K}). Start nothing new and stop the work you already started: interrupt '
     'your subagents and the sessions you launched, stop your background calls and processes, '
     'and set any active goal of yours to paused. Then write the pause report the turn-pause '
     'rule describes, park your task --waiting-on user --reason decision, and end your turn. If '
@@ -62,10 +62,14 @@ CHILD_TEXT = (
     'already started (your background calls and processes), park any claim --waiting-on agent '
     'for your controller, and return a short status (done, left, running). Do not write a '
     'pause report.')
-LIMITS_CHANGED_HEAD = ('turn paused: the turn limits file changed mid-turn (active {a} of {A}, calls {c}/{C}, '
-                       'spawns {s}/{S}, compactions {k}/{K}). ')
-WARNING_TEXT = 'turn-pause: {limit} at {n}% ({used} of {value}). Finish a coherent step and prepare your report.'
-BUDGET_TEXT = 'turn-pause: budget for this turn: active {a}, {c} calls, {s} spawns, {k} compactions.'
+LIMITS_CHANGED_HEAD = ('turn paused: the turn limits file changed mid-turn (active {a} of {A}, root calls {c}/{C}, '
+                       'tree spawns {s}/{S}, root compactions {k}/{K}). ')
+WARNING_TEXT = ('turn-pause: warning only: {limit} at {n}% ({used} of {value}). '
+                'Continue authorized work; this is not a pause or a new approval gate. '
+                'Give a concise status update and prepare to stop only if a limit is exceeded '
+                'or a genuine human gate is reached. hq pause status is the authoritative hook snapshot; '
+                'do not add worker calls to root calls. Exact limits are allowed, including the root compaction limit.')
+BUDGET_TEXT = 'turn-pause: budget for this turn: active {a}, {c} root calls, {s} tree spawns, {k} root compactions.'
 MALFORMED_TEXT = ('turn-pause: the first line looks like a budget but does not parse ({reason}); '
                   'the default limits apply. Mention it in your next report; do not stop for it.')
 WAKE_TEXT = ('turn-pause: this prompt matches a pending scheduled prompt and was read as a scheduled '
@@ -117,7 +121,9 @@ def warning(rs: RootState, name: str) -> str:
     used = t.active if name == 'active' else getattr(t, name)
     limit = t.limits.active_seconds if name == 'active' else getattr(t.limits, name)
     shown = duration if name == 'active' else (lambda v: str(int(v)))
-    return WARNING_TEXT.format(limit=name, n=int(used * 100 // limit) if limit > 0 else 100, used=shown(used), value=shown(limit))
+    label = {'active': 'active time', 'calls': 'root calls', 'spawns': 'tree spawns',
+             'compactions': 'root compactions'}[name]
+    return WARNING_TEXT.format(limit=label, n=int(used * 100 // limit) if limit > 0 else 100, used=shown(used), value=shown(limit))
 
 
 def protected_paths(store_dir, limits_path, env: Mapping[str, str]) -> list[str]:
@@ -348,8 +354,8 @@ def _last_wakeup(rs: RootState, text) -> Wakeup | None:
 
 def _notice(rs: RootState, harness: str, root: str, limit: str) -> tuple[str, str]:
     c = _counts(rs)
-    body = (f'{harness} session {root} in {rs.cwd or "an unknown directory"}: active {c["a"]} of {c["A"]}, calls {c["c"]}/{c["C"]}, '
-            f'spawns {c["s"]}/{c["S"]}, compactions {c["k"]}/{c["K"]}. Reply in the session to resume.')
+    body = (f'{harness} session {root} in {rs.cwd or "an unknown directory"}: active {c["a"]} of {c["A"]}, root calls {c["c"]}/{c["C"]}, '
+            f'tree spawns {c["s"]}/{c["S"]}, root compactions {c["k"]}/{c["K"]}. Reply in the session to resume.')
     return f'turn paused ({limit})', body
 
 
