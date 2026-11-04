@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/hq-bef306-tasks-citations
 created: 2026-11-04T20:11:24Z
-updated: 2026-11-04T20:26:53Z
+updated: 2026-11-04T20:26:55Z
 started: 2026-11-04T20:12:09Z
 depends: []
 tags: []
@@ -38,3 +38,4 @@ Narrow producer work for tasks-813e86 Task 5: update the tasks record-home and p
 - 2026-11-04T20:20:43Z (docs/hq-bef306-tasks-citations): review: impl round 1 — verdict: revise; findings: Important 1; reviewer: codex/gpt-6.1-sol
 - 2026-11-04T20:20:46Z (docs/hq-bef306-tasks-citations): Actual source-change review of a9a2fff12af1d1c9f6ca3392cf55018cdb24b95e..393d50218e9b0511aabaa8109ec465dc5f76a149 found four missed current tasks records-home comments. Full nonempty 9500-byte report is producer-round-1-report.md in parent workspace. Runtime feature-label error text remains unchanged: it names no historical path/section and gives no instruction to read one. Batch all four citation corrections, preserve all guards, rerun mandatory hygiene and get one scoped corrective re-review.
 - 2026-11-04T20:26:53Z (docs/hq-bef306-tasks-citations): review: impl round 2 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
+- 2026-11-04T20:26:55Z (docs/hq-bef306-tasks-citations): Scoped corrective review accepted exact 393d50218e9b0511aabaa8109ec465dc5f76a149..e35602cc33fcaa4ff3d33e871b2487d7aefddff7; producer-round-2-report.md persisted/nonempty 7228 bytes in parent workspace. All four missed comment references resolved; runtime feature label and unrelated hq sources unchanged. Saved hygiene passed, no repeated suite/custody work. Declined full-migration/integration and bookkeeping remain controller duties; no unresolved actionable finding.
