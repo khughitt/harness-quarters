@@ -589,6 +589,14 @@ A first-line budget directive scales unnamed counts relative to the default:
 Changing the live limits file pauses existing turns with `limits-changed`; a new
 genuine user prompt starts a turn with the updated limits.
 
+A counter-triggered pause does not authorize changing a goal's status. Stop owned
+work, and pause an active goal only when the user explicitly requested its pause.
+If an active goal lacks that request, leave its status unchanged, name it in the
+pause report and include the needed user authorization in the decision request.
+With no active goal, no goal authorization is needed. The paused hook permits
+`update_goal` with only `status: paused` for an authorized pause; that permission
+does not supply the user's authorization or permit completing the goal.
+
 ### Parking from a worktree while paused
 
 Use `tasks -C .worktrees/<name> park <id> "next step" --waiting-on user --reason decision`
