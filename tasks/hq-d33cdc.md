@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-04T00:10:34Z
+updated: 2026-11-04T00:13:50Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -163,4 +163,6 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-04T00:10:30Z (feat/hq-d33cdc-test-policy): retention checkpoint: observed 2026-11-04T00:10:30Z on titan; basis hq in-tree . 3dc354392240abffffe28c8f58036b234eefeb02:tasks/hq-d33cdc.md; retained by refs/heads/feat/hq-d33cdc-test-policy; this host: kept verified 5, kept unknown 0, released 0; changed 3. Rechecked all kept/verified identities on this host: locked clean-tracked worktree with inspected regenerable ignored inputs/caches; complete1254-entry workspace manifest3,238910bytes,SHA2564629c60d2196418ced3e69e7d4209dad21538024a9c244e144219c314c0aa65c; independent immutable manifests1/2 rehashed and preserved. All previous payload members remain exact; prior mutable progress.md versions recover through immutable progress-checkpoint-1.md and progress-checkpoint-2.md, current equals progress-checkpoint-3.md. No unknown identities; other hosts remain outside this observation and retain their own dated evidence. Exact raw successful hosted41741765690 at855c814bc4805c7d682c81f847bcb79c7cc953c2 and33receipt hashes verified, full four-report coverage2778passed/3named skips; first failed run preserved. No policy-off or activation. Next: user accepts observed coverage in frozen packet9b9c88ee6044a7af386919e10133c25b6b790e2a, then controller prepares/reviews concrete policy-off change before separate activation/integration/publication authorization.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T00:10:34Z (feat/hq-d33cdc-test-policy): parked (waiting on user, review): User reviews observed hosted coverage in docs/notes/2026-11-03-hq-test-policy-activation.md frozen at hq9b9c88ee6044a7af386919e10133c25b6b790e2a and accepts all three named local integration skips, including added owner-target validation; controller then verifies retained inputs and prepares/independently reviews concrete policy-off change before requesting separate activation, main integration and publication approval
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T00:13:50Z (feat/hq-d33cdc-test-policy): resumed
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
