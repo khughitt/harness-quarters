@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: main
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-04T01:51:47Z
+updated: 2026-11-04T02:13:30Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -198,4 +198,6 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-04T01:51:07Z (main): Merged-main verification passed: protected focused106/78.80s on actual registered main; local/portable hygiene and diffcheck each0, exact reviewedcoveredflow36ebfcf12a06dc8c0c98f566ae6928536b06ed1b unchanged. Both claims resumed on main/trialflowon. Registered-main inventories show0open test-latency,0halt and0done/dropped test-latency records; therefore no host/target obligations or halts to retire and no performance-verification claim. Raw inventory JSON preserved. Next exactly one approved main push, normal installed hygiene plus policy skip locally, then explicit workflow-forced completed hosted result; no local broad rerun solely for integration.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T01:51:47Z (main): Approved single main push succeeded exit0 at74492240c223e4ad939b6506e77b5fc118e64ab9. Installed local prepush hygiene ran1.558s/exit0, broad request skipped by valid policy in0.018s with null outcomes, copied exact shared-log rows preserved. Skip is not a pass/sample. Shared account/remote/home pointers unchanged, no retries. Main off policy published; final forced hosted outcome still owed, inspect exact run next.
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T02:13:30Z (main): Final forced main verification succeeded: run41756877253 attempt1/job126334946832 at74492240c223e4ad939b6506e77b5fc118e64ab9, https://github.com/khughitt/harness-quarters/actions/runs/41756877253, standardubuntu24.04,19m25s (01:51:27Z-02:10:52Z). Published source .tt.toml is disabled and raw suite-step log contains TT_FORCE1; all setup/hygiene/forcedsuite/upload steps passed. Independent controller inventory/XML reconciliation2781collected/reported across59modules,2778executed/passed, exactly3acceptedlocalintegration skips, fourreports, zero failures/errors/exclusions/skippedmodules/problems. Artifact13289382560 expires2026-11-11T02:10:48Z; raw101348byte artifact ZIP and147412byte logs ZIP CRC/extraction/hash checked, all33receipt files rehashed, retained in parent workspace with reconciliation.json. Final registered-main inventories remain0latency/0halt; no timing obligations to retire, not performance-verified. One approved main push spent, no further remote write or retry. Fresh independent rollout-evidence review follows before closure; parent/Task4 remain open.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
