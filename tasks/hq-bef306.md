@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/hq-bef306-tasks-citations
 created: 2026-11-04T20:11:24Z
-updated: 2026-11-04T20:27:40Z
+updated: 2026-11-04T20:27:42Z
 started: 2026-11-04T20:12:09Z
 depends: []
 tags: []
@@ -41,3 +41,4 @@ Narrow producer work for tasks-813e86 Task 5: update the tasks record-home and p
 - 2026-11-04T20:26:55Z (docs/hq-bef306-tasks-citations): Scoped corrective review accepted exact 393d50218e9b0511aabaa8109ec465dc5f76a149..e35602cc33fcaa4ff3d33e871b2487d7aefddff7; producer-round-2-report.md persisted/nonempty 7228 bytes in parent workspace. All four missed comment references resolved; runtime feature label and unrelated hq sources unchanged. Saved hygiene passed, no repeated suite/custody work. Declined full-migration/integration and bookkeeping remain controller duties; no unresolved actionable finding.
 - 2026-11-04T20:27:40Z (docs/hq-bef306-tasks-citations): gate: verified tree:766a16eb0aa89e3c34b377bb336306db2019f02d — checks: just check-hygiene pass and git diff --check pass and comment-only no behavior test obligation under policy-off; review: none; reviewer: codex/gpt-6.1-sol
   provenance: {"harness_session":"codex:01a1a7c8-be1e-70f2-8f58-4cfc952a4551","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T20:27:42Z (docs/hq-bef306-tasks-citations): retro: The narrowed producer diff preserved every guard while replacing current-contract pointers. Independent review found four additional shorthand citations in the same files, and one batched correction plus scoped re-review closed them.
