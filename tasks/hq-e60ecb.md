@@ -8,7 +8,7 @@ complexity: high
 process: direct
 owner: fix/hq-2dd09b
 created: 2026-11-04T11:51:39Z
-updated: 2026-11-04T17:39:30Z
+updated: 2026-11-04T17:46:04Z
 started: 2026-11-04T12:54:16Z
 depends: [hq-cc91d4]
 parent: hq-e10b76
@@ -26,6 +26,7 @@ Execute Task 4 of the proposed shared turn-pause plan, frozen in hq at 3c29183b0
 ## References
 
 - guard-spec (input, required, kind=spec): docs/specs/2026-11-04-turn-pause-ended-prompt-guards-design.md — required ended-root matching before state initialization
+- latency-report (output, kind=report): docs/notes/2026-11-04-turn-pause-latency-gate-report.md — failed50ms gate and recommended controlled diagnostic
 
 ## Notes
 
