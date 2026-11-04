@@ -1,0 +1,188 @@
+{
+  "window": [
+    "2026-11-01T00:00:00Z",
+    "2026-11-04T04:00:00Z"
+  ],
+  "pilot": true,
+  "roots": 3,
+  "files": 174,
+  "candidates": {
+    "current-30": 30,
+    "higher-60": 60,
+    "higher-90": 90,
+    "warning-only": 9223372036854775807
+  },
+  "cases": [
+    {
+      "case": "fam",
+      "harness": "claude-code",
+      "root": "f5ed2d6a-dc73-443e-ac25-c0a4357da4cb",
+      "cutoff": "2026-11-02T14:04:40Z",
+      "out_of_window_control": false,
+      "results": {
+        "current-30": {
+          "turn_start": "2026-11-02T11:29:08Z",
+          "active_hours": 2.5912,
+          "root_calls": 140,
+          "tree_spawns": 31,
+          "hook_compactions": 0,
+          "remaining_spawns": -1,
+          "first_pause": {
+            "reason": "spawns",
+            "active_hours": 2.5526,
+            "root_calls": 127,
+            "tree_spawns": 31
+          }
+        },
+        "higher-60": {
+          "turn_start": "2026-11-02T11:29:08Z",
+          "active_hours": 2.5912,
+          "root_calls": 140,
+          "tree_spawns": 31,
+          "hook_compactions": 0,
+          "remaining_spawns": 29,
+          "first_pause": null
+        },
+        "higher-90": {
+          "turn_start": "2026-11-02T11:29:08Z",
+          "active_hours": 2.5912,
+          "root_calls": 140,
+          "tree_spawns": 31,
+          "hook_compactions": 0,
+          "remaining_spawns": 59,
+          "first_pause": null
+        },
+        "warning-only": {
+          "turn_start": "2026-11-02T11:29:08Z",
+          "active_hours": 2.5912,
+          "root_calls": 140,
+          "tree_spawns": 31,
+          "hook_compactions": 0,
+          "remaining_spawns": null,
+          "first_pause": null
+        }
+      }
+    },
+    {
+      "case": "spawn-tasks",
+      "harness": "codex",
+      "root": "01a1a368-49dd-7552-84a0-019d41d3bc0e",
+      "cutoff": "2026-11-04T02:21:26Z",
+      "out_of_window_control": false,
+      "results": {
+        "current-30": {
+          "turn_start": "2026-11-03T21:54:50Z",
+          "active_hours": 4.4429,
+          "root_calls": 326,
+          "tree_spawns": 30,
+          "hook_compactions": 0,
+          "remaining_spawns": 0,
+          "first_pause": null
+        },
+        "higher-60": {
+          "turn_start": "2026-11-03T21:54:50Z",
+          "active_hours": 4.4429,
+          "root_calls": 326,
+          "tree_spawns": 30,
+          "hook_compactions": 0,
+          "remaining_spawns": 30,
+          "first_pause": null
+        },
+        "higher-90": {
+          "turn_start": "2026-11-03T21:54:50Z",
+          "active_hours": 4.4429,
+          "root_calls": 326,
+          "tree_spawns": 30,
+          "hook_compactions": 0,
+          "remaining_spawns": 60,
+          "first_pause": null
+        },
+        "warning-only": {
+          "turn_start": "2026-11-03T21:54:50Z",
+          "active_hours": 4.4429,
+          "root_calls": 326,
+          "tree_spawns": 30,
+          "hook_compactions": 0,
+          "remaining_spawns": null,
+          "first_pause": null
+        }
+      }
+    },
+    {
+      "case": "known-runaway",
+      "harness": "codex",
+      "root": "01a18943-2b9d-7e50-926f-b74169571349",
+      "cutoff": "2026-11-01T00:00:00Z",
+      "out_of_window_control": true,
+      "results": {
+        "current-30": {
+          "turn_start": "2026-10-30T01:51:58Z",
+          "active_hours": 41.643,
+          "root_calls": 1801,
+          "tree_spawns": 82,
+          "hook_compactions": 0,
+          "remaining_spawns": -52,
+          "first_pause": {
+            "reason": "calls",
+            "active_hours": 9.8567,
+            "root_calls": 501,
+            "tree_spawns": 28
+          }
+        },
+        "higher-60": {
+          "turn_start": "2026-10-30T01:51:58Z",
+          "active_hours": 41.643,
+          "root_calls": 1801,
+          "tree_spawns": 82,
+          "hook_compactions": 0,
+          "remaining_spawns": -22,
+          "first_pause": {
+            "reason": "calls",
+            "active_hours": 9.8567,
+            "root_calls": 501,
+            "tree_spawns": 28
+          }
+        },
+        "higher-90": {
+          "turn_start": "2026-10-30T01:51:58Z",
+          "active_hours": 41.643,
+          "root_calls": 1801,
+          "tree_spawns": 82,
+          "hook_compactions": 0,
+          "remaining_spawns": 8,
+          "first_pause": {
+            "reason": "calls",
+            "active_hours": 9.8567,
+            "root_calls": 501,
+            "tree_spawns": 28
+          }
+        },
+        "warning-only": {
+          "turn_start": "2026-10-30T01:51:58Z",
+          "active_hours": 41.643,
+          "root_calls": 1801,
+          "tree_spawns": 82,
+          "hook_compactions": 0,
+          "remaining_spawns": null,
+          "first_pause": {
+            "reason": "calls",
+            "active_hours": 9.8567,
+            "root_calls": 501,
+            "tree_spawns": 28
+          }
+        }
+      }
+    }
+  ],
+  "converter": {
+    "function calls": 1513,
+    "unrecorded nested clock__curr_time": 49,
+    "nested closed at completion": 7838,
+    "exec_command yielded, open until Stop": 574,
+    "exec_command yielded, ended by write_stdin": 221,
+    "nested calls": 8638,
+    "exec_command yielded inside its cell, open until Stop": 5
+  },
+  "problems": {},
+  "elapsed_seconds": 18.23
+}
