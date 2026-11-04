@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: fix/hq-2dd09b
 created: 2026-11-02T23:54:03Z
-updated: 2026-11-04T10:49:39Z
+updated: 2026-11-04T10:51:58Z
 started: 2026-11-04T10:27:21Z
 depends: []
 parent: hq-2dd09b
@@ -38,3 +38,5 @@ User requested fixing this after accepting audit hq-7fb9d5. Align root refusal t
 - 2026-11-04T10:28:55Z (fix/hq-2dd09b): Verification: RED focused hook refusal/goal allowlist run failed 2 tests and passed 1 (88 deselected); GREEN just test-one tools/test_turn_pause_hook.py tools/test_turn_pause_allowlist.py tools/test_hq_pause.py -q passed 374 tests. Mandatory just check-hygiene passed. No broad suite by valid policy; no remote evidence. No goal status was changed, no host pointer repointed, and no activation performed.
 - 2026-11-04T10:31:33Z (fix/hq-2dd09b): review: impl round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
 - 2026-11-04T10:49:39Z (fix/hq-2dd09b): Accepted implementation and semantic review cover no active goal, unauthorized active goal and explicit user pause; supporting report docs/notes/2026-11-04-warnings-goals-r1-report.md and integration disclosures docs/notes/2026-11-04-turn-pause-handoff.md. No goal status was changed. Shared locked .worktrees/hq-2dd09b is retained by open hq-c58737; no independent scratch/evidence. Branch fix/hq-2dd09b remains unmerged pending separate user live activation approval; no pushes, services or host-pointer changes. Focused hook/allowlist/CLI374 tests passed, broad work deliberately omitted under policy, mandatory hygiene passed, remote evidence absent.
+- 2026-11-04T10:51:58Z (fix/hq-2dd09b): parked (waiting on user, approval): User authorizes live activation of reviewed hq codef7259d9098f66ed2e60fa14f9aeb22824f2ba53d; agent then refreshes main/checks and integrates fix/hq-2dd09b from .worktrees/hq-2dd09b. Shared design approval alone does not authorize activation; see docs/notes/2026-11-04-turn-pause-handoff.md.
+  provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
