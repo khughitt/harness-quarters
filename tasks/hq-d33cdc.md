@@ -1,15 +1,17 @@
 ---
 id: hq-d33cdc
 title: Adopt shared broad-test policy and remote verification
-status: doing
+status: done
 priority: 1
 size: m
 complexity: mid
 process: planned
 owner: main
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-04T02:32:18Z
+updated: 2026-11-04T02:32:21Z
 started: 2026-11-03T10:19:41Z
+completed: 2026-11-04T02:32:21Z
+closed: 2026-11-04T02:32:21Z
 depends: [ops-68729d]
 tags: []
 source: "tt-policy:hq"
@@ -221,4 +223,8 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-04T02:30:25Z (main): retained: {"version":1,"host":"titan","kind":"evidence","path":"$WORK_ROOT/hq/hq-d33cdc/retention-manifest-4.json","state":"released","verification":"verified","purpose":"Ownership transferred in place under the same kind/path to existing open task ops-56aab7; all exact bytes remain, receiver objects committed and rehashed at ops detached ops ea8a3bf29d56ff983821598cc12e6e8164add5b3:ops/tasks/ops-56aab7.md retained by refs/heads/main; complete workspace pinned by manifest5 SHA25612a9b3683b6fb56753a1a74350cb98f6b7c5c796b354305fe832840d2286e740, no raw deletion","next_owner":"none","cleanup_trigger":"none"}
 - 2026-11-04T02:30:25Z (main): retained: {"version":1,"host":"titan","kind":"evidence","path":"$WORK_ROOT/hq/hq-d33cdc/retention-manifest-5.json","state":"released","verification":"verified","purpose":"Ownership transferred in place under the same kind/path to existing open task ops-56aab7; all exact bytes remain, receiver objects committed and rehashed at ops detached ops ea8a3bf29d56ff983821598cc12e6e8164add5b3:ops/tasks/ops-56aab7.md retained by refs/heads/main; complete workspace pinned by manifest5 SHA25612a9b3683b6fb56753a1a74350cb98f6b7c5c796b354305fe832840d2286e740, no raw deletion","next_owner":"none","cleanup_trigger":"none"}
 - 2026-11-04T02:32:18Z (main): Final retained-item closeout observed 2026-11-04T02:32:18Z on titan: kept0, unknown0, released7 across the complete parent inventory; no empty checkpoint written. Integrated worktree/branch physically removed after recorded fresh checks and timing harvest. Six raw identities (complete1380-entry workspace plus independent immutable manifests1-5) transferred in place, receiver-first, to existing open ops-56aab7; receiver committed basis ops detached ops ea8a3bf29d56ff983821598cc12e6e8164add5b3:ops/tasks/ops-56aab7.md, all member/manifest bytes rehashed before source releases. No raw deletion; all snapshots/reviews/failed histories retained. Finalmanifest5 SHA25612a9b3683b6fb56753a1a74350cb98f6b7c5c796b354305fe832840d2286e740, source checkpoint basis d2bdf7ea1b097be848519c2f208c187a732cde14 remains reachable on refs/heads/main; all earlier valid bases also on main after feature deletion. No other host identity exists in this task. Original execution plan path remains historical, current frozen plan/ledger remain discoverable from this task and receiver. AllRulings/Why/Cost/revision references and no deferred minors are preserved in final progress.md/checkpoint5 and named in this record. All runtime/main hosted/reporting gates complete, Task4done; no surviving own process/check/reviewer, no host pointer/service/account/billing change or host install. This session made exactly one approved main push at74492240c223e4ad939b6506e77b5fc118e64ab9; later closing commits contain only two task records and remain local. No task branch is left unmerged; featurebranchdeleted, pre-existing other worktree/branch untouched. No new approval or scheduler remains. Adoption baseline waived; remote3localintegration omissions remain accepted limits, not passes; no timing obligation/performance verification claimed.
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T02:32:21Z (main): done
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T02:32:21Z (main): Activated on main0d55fd7e and published74492240; forced main run41756877253 passed2778 with3accepted integration skips, final review accepts. All4steps done, raw ownership transferred toops-56aab7, integrated worktree/branch removed.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
