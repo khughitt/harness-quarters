@@ -7,8 +7,8 @@ size: m
 complexity: mid
 process: direct
 created: 2026-11-04T10:13:23Z
-updated: 2026-11-04T10:14:50Z
-depends: [lore-296a0f]
+updated: 2026-11-04T10:15:11Z
+depends: [lore-296a0f, obs-1450e7]
 tags: []
 source: hq-7fb9d5
 agent: codex
