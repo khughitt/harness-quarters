@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-11-04T09:38:45Z
-updated: 2026-11-04T09:54:55Z
+updated: 2026-11-04T09:54:57Z
 started: 2026-11-04T09:38:57Z
 depends: []
 tags: []
@@ -49,3 +49,4 @@ Review Claude Code and Codex sessions from November 1–4 for range-limit interr
   provenance: {"harness_session":"codex:01a1a5e8-1e43-71c3-a5b1-6386809e007f","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T09:54:55Z (main): gate: verified tree:36ebfcf12a06dc8c0c98f566ae6928536b06ed1b — checks: seven existing-engine case replays and 34 original source-record comparisons and nine committed attachment byte checks and just check-hygiene passed; review: none; reviewer: codex/gpt-6.1-sol
   provenance: {"harness_session":"codex:01a1a5e8-1e43-71c3-a5b1-6386809e007f","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T09:54:57Z (main): retro: Comparing actual hook status with the agent explanation separated threshold policy from warning, unit and counter-scope errors; a pause-only census would have missed five of seven cases. Read-only source snippets and the existing replay were enough; no new monitor or policy was needed for this audit. Tooling follow-ups: hq-1942a1 and lore-83be38.
