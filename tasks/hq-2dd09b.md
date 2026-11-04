@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: direct
 created: 2026-11-04T10:13:23Z
-updated: 2026-11-04T10:13:23Z
+updated: 2026-11-04T10:14:45Z
 depends: []
 tags: []
 source: hq-7fb9d5
@@ -20,6 +20,10 @@ The user accepted the seven-case audit and requested actionable work to address 
 Evidence: completed audit hq-7fb9d5 and its independently accepted interruption-audit-report.md attachment. Four stops exhausted no configured limit; three were driven by policy during progressing plans. This is not a claim of a population-wide 100% false-positive rate.
 
 This goal collects hq fixes and cross-project guidance/reporting prerequisites; each implementation task has its own verification. Preserve the existing 16-hour/root-call guard until a reviewed replacement is approved. Creating these tasks does not authorize live hook/global-instruction activation, host services, pushes or PRs. The one-week reassessment remains separately eligible even when fixes are incomplete.
+
+## References
+
+- audit (input, required, kind=report): tasks/files/hq-7fb9d5/interruption-audit-report.md — accepted seven-case assessment and recommendations
 
 ## Notes
 
