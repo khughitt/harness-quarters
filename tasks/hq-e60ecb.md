@@ -8,7 +8,7 @@ complexity: high
 process: direct
 owner: fix/hq-2dd09b
 created: 2026-11-04T11:51:39Z
-updated: 2026-11-04T17:52:08Z
+updated: 2026-11-04T18:37:59Z
 started: 2026-11-04T12:54:16Z
 depends: [hq-cc91d4]
 parent: hq-e10b76
@@ -55,4 +55,8 @@ Execute Task 4 of the proposed shared turn-pause plan, frozen in hq at 3c29183b0
 - 2026-11-04T17:46:08Z (fix/hq-2dd09b): An initial measurer invocation bypassed the entry shebang -S; the sitecustomize regression was RED1 then GREEN1 after direct-entry correction. Initial pilot remains diagnostic only. Corrected pilot was read before the authorized full run; all gate/statistical caveats and decisions are in the controller ledger, with Ruling/Why/Cost. No target, event bound, schema or persistence change was made to obtain a pass.
 - 2026-11-04T17:46:08Z (fix/hq-2dd09b): Approved plan34357c02 Task4 Step6 returns a latency failure to design review. Frozen verification report hq46c0c32133e1efb2ae1fb02c58629acf8b546df5:docs/notes/2026-11-04-turn-pause-latency-gate-report.md recommends keeping50ms/128 events and one approximately25min controlled idle-host baseline/candidate diagnostic before choosing changes. Task4 stays incomplete; no plan-task-done4 or Task5 start. Fresh whole-branch review, obs handoff and separate activation remain pending.
 - 2026-11-04T17:52:08Z (fix/hq-2dd09b): parked (waiting on user, review): User reviews frozen hq46c0c32133e1efb2ae1fb02c58629acf8b546df5:docs/notes/2026-11-04-turn-pause-latency-gate-report.md and the recommended25min controlled idle-host baseline/candidate diagnostic. Code45d430de passes324 focused tests but fails50ms p99 in all four full-buffer cases; no latency pass or Task4 completion. After the required review agent follows only the approved disposition, with128 events/50ms unchanged unless separately redesigned. Shared worktree/evidence are verified under open controller hq-c58737; no independently owned retained items or surviving processes. Task5 and branch/activation reviews remain pending.
+  provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T18:37:59Z (fix/hq-2dd09b): User approved the controlled baseline/candidate diagnostic disposition in frozen hq46c0c32133e1efb2ae1fb02c58629acf8b546df5:docs/notes/2026-11-04-turn-pause-latency-gate-report.md, and explicitly said the idle-host comparison must be added to the quiet queue for execution later. This is authorization for that bounded diagnostic when the host is available, not a passing latency verdict or activation approval. No benchmark is to run this turn.
+  provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T18:37:59Z (fix/hq-2dd09b): Queue estimate25min, needs idle: preparation/native-width format-specific fixtures and both pilots5min, paired measurements15–18min, analysis2–5min; adjust estimate from pilots before extended runs. Previous candidate run at45d430de passed324 focused tests but failed every50ms p99 case (128.65/406.51 and166.57/206.44ms), with no controlled idle baseline/continuous contention evidence. An earlier site-startup invocation defect was corrected with RED/GREEN; preserve original invalid pilot as diagnostic only.
   provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
