@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-11-03T11:30:43Z
-updated: 2026-11-04T01:48:19Z
+updated: 2026-11-04T01:48:31Z
 started: 2026-11-03T20:26:12Z
 depends: [hq-b32d19]
 parent: hq-d33cdc
@@ -103,4 +103,6 @@ Await review and approval of the complete hq-d33cdc plan. Execute Task 4: Verify
 - 2026-11-04T01:46:38Z (feat/hq-d33cdc-test-policy): User Yes in this turn authorizes the reviewed frozen rolloutbeea972e54acb9f9793880e1b2c1e4e4b9780478: integrate enabled preparation79140b92527cff5bdae81cc508d669c9b04588c3 into main, record actual enabled event, integrate reviewed policy-off source, record actual disabled event and make exactly one main verification push with installed hygiene hook; observe its exact forced hosted result and retire only disabled registered-main timing obligations. No automatic remote retry/account/billing change/paid runner. All1297 manifest4 members and immutable manifests1-4 verified before reuse; existing hydrated locked worktree, adoption baseline waiver unchanged. Current public/named khughitt/standard ubuntu24.04/reader/instruction preflight passed, reader bytes equal reviewed versions, global account unchanged. Parent-owned new task-4-main-* rollout/API/push/evidence files join external workspace, mutable until next checkpoint; no child identities. Prior ledger exact bytes preserved by progress-checkpoint-4.md. Main clean at66129586 and still ancestor; enabled event will be recorded on feature before final fast-forward so no record-only divergence is introduced.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T01:48:19Z (main): resumed
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T01:48:31Z (main): Authorized two-stage local integration completed: main first fast-forwarded to enabled preparation79140b92527cff5bdae81cc508d669c9b04588c3 at2026-11-04T01:46:40Z, then reviewed disabled policy at0d55fd7ef32542a47ff705d8ff0745d0388da2eb at2026-11-04T01:47:52Z. Exact policy event times come from main reflog, with separate raw receipts. Reviewed coveredflow36ebfcf12a06dc8c0c98f566ae6928536b06ed1b remains unchanged. Task records/claims moving to registered main after merge; original worktree branch is integrated and retained, no host pointer changed. Main .tt.toml valid automatic_broad=false,broad_targets=[test,ci-test]; broad obligations may now be retired only after explicit per-record/host/target inspection, never as performance-verified. Final main hosted result still owed, no push yet. Run policy-appropriate focused integration and mandatory hygiene before the approved single main push.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
