@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: direct
 created: 2026-11-04T10:13:23Z
-updated: 2026-11-04T10:15:11Z
+updated: 2026-11-04T10:15:29Z
 depends: [lore-296a0f, obs-1450e7]
 tags: []
 source: hq-7fb9d5
@@ -30,3 +30,4 @@ This goal collects hq fixes and cross-project guidance/reporting prerequisites; 
 - 2026-11-04T10:13:23Z (add): created
   provenance: {"harness_session":"codex:01a1a5e8-1e43-71c3-a5b1-6386809e007f","harness_session_source":"CODEX_THREAD_ID","origin":"user"}
 - 2026-11-04T10:14:47Z (main): concerns: hq-7fb9d5 extension — implement the accepted audit recommendations and make future interruption rates reviewable; the completed audit itself is not defective.
+- 2026-11-04T10:15:29Z (main): Filed hq warning text hq-51209b, lore guidance lore-296a0f, spawn policy hq-704fe5, hq history hq-e10b76, obs reporting obs-1450e7; reused hq-c58737 for read-only diagnostics/pointer audits and hq-5dc59c for goal authorization. Independent check-in hq-b9d356 is deferred until2026-11-11 with no completion dependencies. Broader obs-59789b scope remains preserved.
