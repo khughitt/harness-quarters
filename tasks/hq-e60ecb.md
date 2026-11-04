@@ -1,13 +1,15 @@
 ---
 id: hq-e60ecb
 title: Record lifecycle transitions and retain ended history safely
-status: todo
+status: doing
 priority: 2
 size: m
 complexity: high
 process: direct
+owner: fix/hq-2dd09b
 created: 2026-11-04T11:51:39Z
-updated: 2026-11-04T12:32:33Z
+updated: 2026-11-04T12:54:16Z
+started: 2026-11-04T12:54:16Z
 depends: [hq-cc91d4]
 parent: hq-e10b76
 tags: []
@@ -28,4 +30,6 @@ Execute Task 4 of the proposed shared turn-pause plan, frozen in hq at 3c29183b0
 - 2026-11-04T11:51:41Z (fix/hq-2dd09b): parked (waiting on user, review): User reviews frozen plan hq3c29183b042929a43619ab2b780527fad82dd307:docs/plans/2026-11-04-turn-pause-reliability.md; after approval the agent executes this step in .worktrees/hq-2dd09b using native inline execution unless the user overrides. Live activation is separate.
   provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T12:32:33Z (fix/hq-2dd09b): parked (waiting on agent, dependency): Agent executes approved Task 4 inline in .worktrees/hq-2dd09b after its preceding dependency completes; shared workspace is owned by hq-c58737. No user execution approval remains pending; activation is separate.
+  provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T12:54:16Z (fix/hq-2dd09b): started
   provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
