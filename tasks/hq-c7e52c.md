@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-11-03T11:30:43Z
-updated: 2026-11-04T02:22:14Z
+updated: 2026-11-04T02:22:16Z
 started: 2026-11-03T20:26:12Z
 depends: [hq-b32d19]
 parent: hq-d33cdc
@@ -123,3 +123,4 @@ Await review and approval of the complete hq-d33cdc plan. Execute Task 4: Verify
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T02:22:14Z (main): gate: verified tree:36ebfcf12a06dc8c0c98f566ae6928536b06ed1b — checks: final helper42 passed and merged-main106 passed and hygiene0 and forced main CI41756877253 2778 passed 3 accepted integration skips and raw33file hashes verified; review: important addressed attr dependency declared, important addressed rollback state assertions removed; reviewer: codex/gpt-6-astra
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T02:22:16Z (main): retro: Exact inventory/report identities and raw archives made hosted acceptance reviewable. Shared fixture inputs preserved local integrations while naming hosted omissions; permanent deployment-state assertions obstructed rollback and were removed. Existing flows-bf6d89 records the auto-commit closing-sequence mismatch.
