@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-11-04T09:38:45Z
-updated: 2026-11-04T09:53:37Z
+updated: 2026-11-04T09:54:19Z
 started: 2026-11-04T09:38:57Z
 depends: []
 tags: []
@@ -17,6 +17,11 @@ origin: user
 ---
 
 Review Claude Code and Codex sessions from November 1–4 for range-limit interruptions, classify validity against the recorded work and counters, recover earlier duration/turn/token baselines, and assess existing hq/obs monitoring. Investigation only; do not change limits or live wiring.
+
+## References
+
+- report (output, kind=report): files:interruption-audit-report.md — seven cases, recovered baselines, monitoring gaps and recommendations
+- review (output, kind=review): files:audit-review-report.md — independent acceptance and raw-record cross-check
 
 ## Notes
 
