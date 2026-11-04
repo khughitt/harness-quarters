@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: main
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-04T01:47:58Z
+updated: 2026-11-04T01:48:28Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -192,3 +192,4 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-04T01:47:50Z (feat/hq-d33cdc-test-policy): policy: enabled at 2026-11-04T01:46:40Z revision 79140b92527cff5bdae81cc508d669c9b04588c3
 - 2026-11-04T01:47:58Z (main): resumed
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T01:48:28Z (main): policy: disabled at 2026-11-04T01:47:52Z revision 0d55fd7ef32542a47ff705d8ff0745d0388da2eb
