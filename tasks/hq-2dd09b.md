@@ -7,12 +7,13 @@ size: m
 complexity: mid
 process: direct
 created: 2026-11-04T10:13:23Z
-updated: 2026-11-04T11:30:21Z
+updated: 2026-11-04T11:55:12Z
 depends: [lore-296a0f, obs-1450e7]
 tags: []
 source: hq-7fb9d5
 agent: codex
 origin: user
+plan: docs/plans/2026-11-04-turn-pause-reliability.md
 ---
 
 The user accepted the seven-case audit and requested actionable work to address its gaps. Keep safeguards against true runaway execution while ordinary authorized implementation continues. First milestone: warning/counter semantics are consistent across hook and guidance, a measured spawn-policy revision is prepared, and durable event history can distinguish enforced pauses from agent-initiated stops.
@@ -24,6 +25,7 @@ This goal collects hq fixes and cross-project guidance/reporting prerequisites; 
 ## References
 
 - audit (input, required, kind=report): tasks/files/hq-7fb9d5/interruption-audit-report.md — accepted seven-case assessment and recommendations
+- plan-review (context, kind=review): docs/notes/2026-11-04-reliability-plan-self-review-report.md — plan self-review, coverage and execution recommendation
 
 ## Notes
 
