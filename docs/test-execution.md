@@ -1,20 +1,22 @@
 # Test execution
 
-The execution policy is currently absent, so broad tests run locally. The first
-hosted verification failed; coverage has not been accepted and policy is not activated.
+The invoking checkout's `.tt.toml` sets `automatic_broad = false` with
+`broad_targets = ["test", "ci-test"]`. Run fresh focused checks for changed behavior
+and mandatory hygiene; broad suites run deliberately or in the hosted workflow.
+Only a landed policy in registered main retires its local broad latency obligations.
 
 | Command | Behavior |
 | --- | --- |
-| `just test` | tt decides, then host-budget runs the complete suite |
+| `just test` | Records a policy skip before requesting host-budget or starting tests |
 | `just test-one <pytest arguments>` | Protected focused route through tt and host-budget; requires arguments |
 | `just test-full` | Sets TT_FORCE=1 for just test; records one broad run |
-| `just ci-test` | tt decides, then runs the same suite with explicit positive PYTEST_XDIST_AUTO_NUM_WORKERS |
+| `just ci-test` | Skips locally; with TT_FORCE=1 runs the same suite with explicit positive PYTEST_XDIST_AUTO_NUM_WORKERS |
 | `just check-hygiene` | Protected complete local pre-commit validation |
 | `just ci-hygiene` | Protected portable validation, recorded as hook-ci-hygiene |
 
 The hosted route sets neither force nor a local budget fallback. A hosted workflow
-must set TT_FORCE=1 itself. Both test and ci-test are the broad targets when policy
-is eventually activated. A policy skip starts neither a runner nor host-budget,
+must set TT_FORCE=1 itself. Both test and ci-test are broad targets. A policy skip
+starts neither a runner nor host-budget,
 records null outcomes, and supplies no correctness evidence. A hosted would-be
 skip without force is an error, including through nested wrappers.
 
@@ -77,7 +79,7 @@ suite and never replace an existing runner failure. A cancelled or interrupted
 attempt is unverified. Retain caller-owned evidence for inspection; do not upload
 from TT_JUNIT_DIR after the wrapper returns.
 
-The prepared workflow uses ubuntu-24.04, two pytest workers and a finite 60-minute
+The workflow uses ubuntu-24.04, two pytest workers and a finite 60-minute
 job limit. It pins uv 0.13.7, just 1.59.0, Node 26.13.0, Rust 1.99.1 and public
 tasks commit fa58ab31acd757f59798537b6957e540fdccb9fb. System Python, zsh and
 libatomic1 come from the runner; actual versions are recorded. Setup explicitly
@@ -87,8 +89,8 @@ public work-link from dotfiles commit 2a686c0c4915ba0daae9f6455cfe45233780fc33,
 checking SHA-256 6400d9a8431d3af3777d5038716d4322d283ebd127c574c06d7516dd1a784ff4.
 The runner explicitly installs and reports attr, required by work-link's worktree
 storage route, together with curl for the verified download.
-These setup corrections await an authorized verification retry. The disposable
-runner installs tools at the exact /usr/bin paths its fixtures use. It runs setup,
+These setup corrections passed hosted verification. The disposable runner installs
+tools at the exact /usr/bin paths its fixtures use. It runs setup,
 portable hygiene and the same complete suite, with TT_FORCE=1 at job scope.
 All branch pushes and manual dispatch are covered, with no duplicate PR trigger.
 
@@ -97,16 +99,18 @@ setup-report.txt records setup; the initially empty suite/ child is
 HQ_TEST_EVIDENCE_DIR and holds the inventory, coverage and four reports. A failed
 setup or partial run retains available evidence and remains unverified.
 
-The proposed hosted omissions are these exact integration checks:
+The accepted hosted omissions are these exact local integration checks:
 
 - tools/test_relay_subscribers.py::test_template_validates_against_registered_relay_budgets
 - tools/test_agy_hooks.py::test_relay_v030_agy_dispatch_with_rendered_subscribers_and_ops_relay_guard
 - tools/test_harness_links.py::test_registered_owner_targets_match_portable_fixture_shapes
 
-The third is an additional proposal beyond the approved design's two omissions.
+The third was accepted alongside the original two after inspecting successful
+run41741765690 at855c814bc4805c7d682c81f847bcb79c7cc953c2.
 Portable owner fixtures exercise the existing link behavior tests without private
 checkouts; the added local integration check also copies the real registered
-targets and compares their shapes. No module is excluded. This boundary awaits
-an observed hosted run and user acceptance. The local preparation pilot exercises
+targets and compares their shapes. No module is excluded. All three pass locally;
+their registry-dependent behavior remains outside hosted coverage. The local
+preparation pilot exercises
 four miniature partitions and failure retention, not Ubuntu or hosted coverage.
 The separate mods and live capability probes are outside just test.

@@ -14,6 +14,13 @@ ROOT = Path(__file__).resolve().parents[1]
 REPORTS = ("agents", "hooks-tools", "relay-parallel", "relay-signal")
 
 
+@pytest.mark.parametrize("target", ["test", "ci-test"])
+def test_checkout_policy_skips_broad_entry_points(target):
+    tt = runpy.run_path(str(ROOT / "tools/tt"))
+    policy = tt["read_policy"](ROOT)
+    assert tt["execution_decision"](target, policy, {}) == ("skipped", "policy-disabled")
+
+
 def executable(path, text):
     path.write_text("#!/usr/bin/env python3\n" + text)
     path.chmod(0o755)

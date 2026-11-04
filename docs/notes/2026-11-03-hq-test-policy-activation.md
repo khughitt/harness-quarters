@@ -1,10 +1,10 @@
 # Hosted verification and policy activation packet
 
-Status: both authorized verification pushes completed. The second hosted run
-passed with 2,778 tests and exactly three local integration skips. Coverage awaits
-user acceptance; no activation exists. The policy file is absent and local broad
-testing remains enabled. Owner: hq-d33cdc; preparation: hq-b32d19; activation:
-hq-c7e52c.
+Status: hosted coverage is accepted, including all three local integration skips.
+The worktree now prepares `.tt.toml` with automatic broad runs disabled; registered
+main remains enabled. Activation, main integration and publication await explicit
+authorization after independent review. Owner: hq-d33cdc; preparation: hq-b32d19;
+activation: hq-c7e52c.
 
 ## Frozen inputs and requested next action
 
@@ -17,13 +17,14 @@ The first verification push was authorized from packet revision
 0cf37c0784de88a2df825b8f15b4a26cd3d98aa0. The second was authorized from
 954ad406156d12c6321747036e83d88df198bc5f and published as
 855c814bc4805c7d682c81f847bcb79c7cc953c2; their covered source is identical.
-The packet's own frozen revision is the commit named in the acceptance request.
+The user accepted the observed coverage in packet revision
+9b9c88ee6044a7af386919e10133c25b6b790e2a, including the added third integration
+omission. The packet's next frozen revision is named in the activation request.
 
-Recommend accepting the observed hosted coverage described below, including all
-three named local integration skips. Both single-push approvals are spent.
-Acceptance permits preparation and review of the policy-off change; activation,
-main integration and publication still require their later explicit authorization.
-No further remote retry, account change or paid runner substitution is authorized.
+Recommend authorizing the reviewed conditional rollout below: integrate the
+enabled preparation, then the policy-off change, and make one main verification
+push. Both previous single-push approvals are spent. No rollout, main push, further
+remote retry, account change or paid runner substitution is authorized yet.
 
 ## Prepared execution
 
@@ -126,11 +127,11 @@ problem exists. The 59 collected test modules are represented.
 | relay parallel | 392 | 392 | 0 |
 | relay signal | 1 | 1 | 0 |
 
-The only skips are the three exact nodeids in **Proposed hosted coverage
+The only skips are the three exact nodeids in **Accepted hosted coverage
 boundary** below: relay subscriber budget validation, agy dispatch through the
 registered ops relay guard, and authentic registered owner-target shape validation.
-All require the local tasks project registry. The added third omission needs
-explicit acceptance alongside the original two. Those three checks passed in the
+All require the local tasks project registry. The user accepted the added third omission
+alongside the original two. Those three checks passed in the
 current local 2,781-test run, but their live local integration is outside hosted
 coverage. No module is omitted, and no further omission is proposed.
 
@@ -144,10 +145,10 @@ all skip identities and zero failures/errors, verified setup pins and rehashed a
 33 retained raw/API/archive member files against the receipt. Immutable raw evidence
 and reconciliation are discoverable from hq-c7e52c and hq-d33cdc.
 
-Requested decision: accept this observed boundary, including all three local
-integration skips, so the controller can prepare and independently review the
-policy-off change. Policy remains enabled until that later activation is approved
-and integrated. Acceptance here does not authorize a push or main integration.
+Coverage decision: the user accepted this observed boundary, including all three
+local integration skips, after reading frozen packet9b9c88ee. That acceptance
+authorizes policy-off preparation and review; it does not authorize a push or main
+integration. The branch-local policy is not activation in registered main.
 
 ## Pilot and verification limits
 
@@ -178,13 +179,13 @@ Initial preparation production suite: 2,778 passed (268 agents, 2,118 hooks/tool
 391 parallel
 relay and one serial signal test), with collected=reported=executed=2,778, four
 reports and no skips, excluded modules or reconciliation problems. No extra
-adoption baseline was run, as requested. Policy remains enabled.
+adoption baseline was run, as requested. Policy was enabled during preparation.
 
 The 60-minute limit replaces the provisional 30 minutes because an actual local
 two-worker full run exceeded 30 minutes before relay verification finished. It is
 a finite bound, not a prediction of hosted duration; a hosted timeout is unverified.
 
-## Proposed hosted coverage boundary
+## Accepted hosted coverage boundary
 
 Expected module exclusions: zero. Three exact local integration checks may skip:
 
@@ -192,13 +193,13 @@ Expected module exclusions: zero. Three exact local integration checks may skip:
 2. tools/test_agy_hooks.py::test_relay_v030_agy_dispatch_with_rendered_subscribers_and_ops_relay_guard
 3. tools/test_harness_links.py::test_registered_owner_targets_match_portable_fixture_shapes
 
-The third is an additional proposal beyond the design's two omissions. Existing
+The third is an accepted addition beyond the design's two omissions. Existing
 functional harness-link tests now use portable structural owner fixtures; the new
 local check preserves authentic registered target copying and shape validation.
 All 61 link tests passed locally, including that authentic check. An isolated
 registry run of the entire module plus the other two integration nodes produced
-60 passed and precisely these three skips, with no module excluded. This is local
-boundary evidence, not acceptance of hosted coverage. Missing history, unexpected
+60 passed and precisely these three skips, with no module excluded. That local boundary evidence and the completed second hosted run support the
+recorded acceptance. Missing history, unexpected
 skips (including permission/root behavior), extra omissions or failed collection
 need explicit disposition before activation. Mods and live capability probes
 remain outside the declared suite.
@@ -216,8 +217,8 @@ The controller must record the completed run's exact revision, outcome, duration
 nonzero unique execution count, every test/module skip and any excluded module;
 all four reports must reconcile against the same collected identities. Retrieve
 and durably retain raw evidence before the hosted retention window closes. A
-queued, cancelled, zero-test or incomplete attempt is unverified. User acceptance
-must explicitly cover the observed boundary, including the third proposed omission.
+queued, cancelled, zero-test or incomplete attempt is unverified. User acceptance explicitly covers the observed second-run boundary, including
+the third omission; a changed boundary needs its own disposition.
 
 ## Reader delivery, visibility and spend
 
@@ -243,24 +244,44 @@ after checking gh auth status; do not switch the globally active account.
 
 ## Conditional activation and rollback
 
-Original proposal: one feature verification push, then one main activation push only
-after observed coverage acceptance and explicit activation authorization. A second
-feature verification push was separately approved and completed successfully. Both
-approvals are spent; this packet now requests coverage acceptance only. Activation,
-integration and main publication remain separate gates.
+Both feature verification pushes and coverage acceptance are complete. The next
+request is authorization of this concrete rollout after independent review:
 
-After accepted coverage, prepare and review .tt.toml with automatic_broad=false
-and broad_targets=["test", "ci-test"], update current docs, and prove focused
-execution, both normal skips, no budget child on skips, hosted missing-force refusal
-and forced failure propagation. Merge any moved base before review. Present the
-concrete frozen activation for the later authorization. After that authorization,
-first integrate the reviewed preparation into main while policy is absent/enabled
-and record its actual enabled regime timestamp/revision. Then integrate the
-reviewed activation and make the separately authorized main push, whose forced
-completed reports must also reconcile. Record actual disabled
-time and landed revision; inspect every registered-main latency host/target and
-retire only disabled timing obligations, never as performance-verified. Keep
-unrelated halts/diagnosis and report status to ops-39bff6 with ops-56aab7 linked.
+1. Refresh the named khughitt account, public visibility, standard runner, delivered
+   policy instructions and actual timing readers. Stop if spend protection changes.
+2. Integrate preparation commit79140b92527cff5bdae81cc508d669c9b04588c3 into
+   main while policy is absent/enabled; record the actual enabled timestamp and
+   revision. This brings the reviewed workflow and push hook into main.
+3. Integrate the reviewed policy-off revision named in the approval request. Its
+   `.tt.toml` has automatic_broad=false and broad_targets=["test", "ci-test"].
+   Record the actual disabled timestamp/revision on the adoption task.
+4. Make exactly one main push to origin with the installed mandatory hygiene hook,
+   then inspect that exact completed forced hosted run and retain/reconcile all
+   reports. No automatic remote retry is included. A failed, cancelled, incomplete
+   or missing run remains unresolved and returns for disposition.
+5. From registered main inspect every latency host/target, retire only disabled
+   obligations with the landed revision, preserve unrelated halts/diagnosis and
+   report status to ops-39bff6 with existing ops-56aab7 linked.
+
+This authorization would change the live main checkout's hooks and test cadence.
+No home routing, service, account or billing configuration change is included.
+
+Prepared local evidence: the actual checkout policy tests first failed twice
+because both broad targets ran by default, then passed with the exact policy file.
+The protected focused route passed 74 tests covering policy, suite evidence,
+workflow and pre-commit behavior. Existing fixture checks prove real focused
+execution, forced child status17 propagation and surviving success/failure reports.
+Six separate real-checkout smoke commands prove both normal broad skips, direct
+hosted missing-force refusal for each target and nested hosted refusal for each.
+Both skips recorded null outcomes and started no host-budget child. Mandatory local
+and portable hygiene passed over the staged activation, and diff checking passed.
+
+No broad suite is rerun solely for this policy-off preparation. The accepted hosted
+inventory had 2,781 identities; the two new actual-checkout policy cases make the
+next expected inventory 2,783, with the same three accepted local integration skips.
+Only the final completed main run can establish its actual count and outcome.
+No latency obligation is retired from an unmerged branch, and retirement never
+claims performance verification.
 
 Rollback restores automatic_broad=true and the enabled local cadence, with focused
 checks and mandatory hygiene plus policy-required broad checks. Record the actual

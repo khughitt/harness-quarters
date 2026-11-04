@@ -19,18 +19,19 @@ configured host; setup creates directories, not private settings.
 
 ## Gates
 
-Run `just test` before committing: tt records the complete four-partition suite under
-the local host worker budget. Policy remains absent/enabled during hosted preparation.
-Use `just test-one <pytest arguments>` for focused tests; tt preserves arguments and
-runner status through the budget. `just test-full` explicitly forces the broad route.
+The checkout's `.tt.toml` disables automatic broad runs for `test` and `ci-test`.
+Run fresh `just test-one <pytest arguments>` checks for changed behavior and mandatory
+`just check-hygiene` before committing. A policy skip is not a test pass.
+The focused route preserves arguments and runner status through the host budget.
+`TT_FORCE=1 just test` or `just test-full` deliberately runs the complete suite.
 The relay signal test stays serial; xdist reads the grant's worker count. `just ci-test`
 shares the suite but requires explicit positive PYTEST_XDIST_AUTO_NUM_WORKERS and never
-sets TT_FORCE. The prepared workflow sets it at job scope, uses two workers and retains
-setup and suite artifacts. Hosted coverage has not been accepted; the
-three proposed integration omissions are listed in docs/test-execution.md.
+sets TT_FORCE. The workflow sets it at job scope, uses two workers and retains
+setup and suite artifacts. Accepted hosted coverage has exactly the three local
+integration omissions listed in docs/test-execution.md; none excludes a module.
 Both pre-push routes run
 mandatory `just check-hygiene` followed by `just test`; no outer composite is timed.
-The hook declares origin branches covered for the prepared workflow and warns on
+The hook declares origin branches covered for the workflow and warns on
 uncovered pushes when local policy skips tests; the declaration is not remote evidence.
 `just ci-hygiene` runs the portable subset without registry-dependent ops-check.
 See [test execution](docs/test-execution.md) for report retention and coverage checks.

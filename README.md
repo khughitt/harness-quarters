@@ -356,15 +356,17 @@ consume hq's capture and prune tools. Lore owns the corpus and its block check.
 
 ## Tests
 
-`just test` records the complete suite through tt and runs under the local host worker
-budget. `just test-one <pytest arguments>` runs focused tests with the same budget and
-literal argument forwarding; `just test-full` explicitly forces the broad route.
+The checkout's `.tt.toml` disables automatic broad runs for `test` and `ci-test`.
+Use `just test-one <pytest arguments>` for fresh focused checks under the local host
+worker budget, with literal argument forwarding, and always run `just check-hygiene`.
+`TT_FORCE=1 just test` or `just test-full` deliberately runs the complete suite;
+a normal broad skip is not a test pass.
 The shared driver retains the existing four partitions, checks individual test
 identities against full collection and preserves caller-owned reports on failure.
-The pinned hosted workflow is prepared for all branch pushes, with portable hygiene,
-two workers and retained reports. Policy remains enabled; the first hosted run
-failed and its coverage is unaccepted. The proposed boundary has three named local-only
-integration checks. See [test execution](docs/test-execution.md) for commands,
+The pinned hosted workflow forces the full suite on all branch pushes, with portable
+hygiene, two workers and retained reports. Accepted hosted coverage has three named
+local integration omissions and excludes no module.
+See [test execution](docs/test-execution.md) for commands,
 omissions and evidence.
 
 `just check-hygiene` runs the complete local pre-commit checks. The pre-push hook
