@@ -517,7 +517,8 @@ def test_malformed_budget_adds_its_context_once(tmp_path):
 def test_a_zero_limit_never_raises_on_a_pre_tool_use(tmp_path, zero):
     d = Driver(tmp_path, 'claude-code')
     d.prompt('work')
-    with d.store.locked('claude-code', CLAUDE_ROOT) as rs:
+    with d.store.locked('claude-code', CLAUDE_ROOT) as record:
+        rs = record.state
         rs.turn.limits = Limits(**{**rs.turn.limits._asdict(), zero: 0})
     out = d.bash('ls')
     assert 'could not judge' not in (reason(out) if denied(out) else '')

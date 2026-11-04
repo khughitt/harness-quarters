@@ -9,7 +9,10 @@ from __future__ import annotations
 import contextlib
 import fcntl
 import json
+import math
 import os
+import stat
+import time
 
 from .counters import TurnState
 from .limits import Limits
@@ -32,6 +35,19 @@ class RootState(Record):
     _defaults = {'paused': None, 'harness_pid': None, 'cwd': None, 'notified': False, 'notify_error': None,
                  'budget_note': None}
     _factories = {'grace_used': dict, 'workers': set, 'worker_names': set, 'cron_jobs': dict, 'wakeups': list}
+
+
+class RootRecord(Record):
+    __slots__ = _fields = ('version', 'harness', 'root', 'generation', 'created_at', 'turn_serial',
+                           'event_serial', 'state', 'ended_at', 'events', 'dropped_count', 'dropped_through')
+    _defaults = {'version': 1, 'turn_serial': 0, 'event_serial': 0, 'state': None,
+                 'ended_at': None, 'dropped_count': 0, 'dropped_through': None}
+    _factories = {'events': list}
+
+
+def new_record(harness: str, root: str, now: float) -> RootRecord:
+    return RootRecord(harness=harness, root=root, generation=os.urandom(16).hex(),
+                      created_at=now, state=RootState(harness, root, None))
 
 
 def state_path(env: Mapping[str, str] = os.environ) -> str:
@@ -57,11 +73,20 @@ def _check(value, kind, what):
 
 
 def _num(value, what):
-    return float(_check(value, (int, float), what))
+    result = float(_check(value, (int, float), what))
+    if not math.isfinite(result) or result < 0:
+        raise ValueError(f'{what} must be finite and nonnegative')
+    return result
 
 
 def _opt(value, kind, what):
     return None if value is None else _check(value, kind, what)
+
+
+def _integer(value, what, minimum=0):
+    if _check(value, int, what) < minimum:
+        raise ValueError(f'{what} must be at least {minimum}')
+    return value
 
 
 def _strs(value, what):
@@ -86,7 +111,7 @@ def _turn_from_dict(t: dict) -> TurnState:
     lim = _check(t['limits'], dict, 'turn.limits')
     if set(lim) != set(Limits._fields):
         raise KeyError(f'turn.limits fields differ: {sorted(lim)}')
-    limits = Limits(**{k: _check(v, int, f'turn.limits.{k}') for k, v in lim.items()})
+    limits = Limits(**{k: _integer(v, f'turn.limits.{k}') for k, v in lim.items()})
     in_flight = _check(t['in_flight'], dict, 'turn.in_flight')
     for k, v in in_flight.items():
         _check(k, str, 'turn.in_flight key')
@@ -100,9 +125,9 @@ def _turn_from_dict(t: dict) -> TurnState:
         limits=limits,
         limits_sha=_check(t['limits_sha'], str, 'turn.limits_sha'),
         active=_num(t['active'], 'turn.active'),
-        calls=_check(t['calls'], int, 'turn.calls'),
-        spawns=_check(t['spawns'], int, 'turn.spawns'),
-        compactions=_check(t['compactions'], int, 'turn.compactions'),
+        calls=_integer(t['calls'], 'turn.calls'),
+        spawns=_integer(t['spawns'], 'turn.spawns'),
+        compactions=_integer(t['compactions'], 'turn.compactions'),
         last_t=None if t['last_t'] is None else _num(t['last_t'], 'turn.last_t'),
         in_flight=dict(in_flight),
         tools=dict(tools),
@@ -111,8 +136,8 @@ def _turn_from_dict(t: dict) -> TurnState:
     )
 
 
-def _to_json(st: RootState) -> str:
-    return json.dumps({
+def state_dict(st: RootState) -> dict:
+    return {
         'harness': st.harness, 'root': st.root,
         'turn': None if st.turn is None else json.loads(st.turn.to_json()),
         'paused': st.paused, 'grace_used': st.grace_used,
@@ -121,11 +146,13 @@ def _to_json(st: RootState) -> str:
         'wakeups': [[w.text, w.not_before, w.not_after] for w in st.wakeups],
         'harness_pid': st.harness_pid, 'cwd': st.cwd, 'notified': st.notified,
         'notify_error': st.notify_error, 'budget_note': st.budget_note,
-    })
+    }
 
 
-def _from_json(text: str) -> RootState:
-    d = _check(json.loads(text), dict, 'state')
+def state_from_dict(d: dict) -> RootState:
+    _check(d, dict, 'state')
+    if set(d) != set(RootState._fields):
+        raise ValueError('active state fields differ')
     turn = d['turn']
     wakeups = []
     for w in _check(d['wakeups'], list, 'wakeups'):
@@ -153,6 +180,95 @@ def _from_json(text: str) -> RootState:
     )
 
 
+def _unique(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError('duplicate JSON key')
+        result[key] = value
+    return result
+
+
+def _constant(value):
+    raise ValueError('non-JSON numeric constant')
+
+
+def parse_json(text: str):
+    return json.loads(text, object_pairs_hook=_unique, parse_constant=_constant)
+
+
+def record_json(record: RootRecord) -> str:
+    from .history import encode
+    data = record._asdict()
+    data['state'] = None if record.state is None else state_dict(record.state)
+    return encode(data)
+
+
+def parse_record(text: str) -> RootRecord:
+    from .history import MAX_BYTES, MAX_EVENTS, encode, validate_event
+    d = _check(parse_json(text), dict, 'root record')
+    if 'version' not in d:
+        raise ValueError('unversioned pause state needs explicit offline migration')
+    if type(d['version']) is not int or d['version'] != 1:
+        raise ValueError('unsupported pause record version')
+    if set(d) != set(RootRecord._fields):
+        raise ValueError('root record fields differ')
+    for name in ('harness', 'root', 'generation'):
+        if not _check(d[name], str, name):
+            raise ValueError(f'{name} must not be empty')
+    if len(d['generation']) != 32 or any(c not in '0123456789abcdef' for c in d['generation']):
+        raise ValueError('invalid root generation')
+    for name in ('turn_serial', 'event_serial', 'dropped_count'):
+        if _check(d[name], int, name) < 0:
+            raise ValueError(f'{name} must be nonnegative')
+    d['created_at'] = _num(d['created_at'], 'created_at')
+    for name in ('ended_at', 'dropped_through'):
+        if d[name] is not None:
+            d[name] = _num(d[name], name)
+    d['state'] = None if d['state'] is None else state_from_dict(d['state'])
+    if d['state'] is not None and (d['state'].harness, d['state'].root) != (d['harness'], d['root']):
+        raise ValueError('active state identity differs')
+    events = _check(d['events'], list, 'events')
+    if len(events) > MAX_EVENTS or len(encode(events).encode()) > MAX_BYTES:
+        raise ValueError('history exceeds its bounds')
+    previous = d['dropped_count']
+    for event in events:
+        validate_event(event)
+        if (event['harness'], event['root'], event['generation']) != (d['harness'], d['root'], d['generation']):
+            raise ValueError('history identity differs')
+        if event['sequence'] != previous + 1 or event['turn'] > d['turn_serial']:
+            raise ValueError('invalid history sequence/turn')
+        previous = event['sequence']
+    if previous != d['event_serial']:
+        raise ValueError('history serial differs')
+    return RootRecord(**d)
+
+
+def write_atomic(path: str, data: bytes) -> None:
+    """One durable replacement, also used by the explicit offline converter."""
+    temporary = None
+    try:
+        temporary = f'{path}.{os.getpid()}.{os.urandom(6).hex()}.tmp'
+        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC, 0o600)
+        with os.fdopen(fd, 'wb') as output:
+            output.write(data)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, path)
+        temporary = None
+        directory = os.open(os.path.dirname(path), os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    except OSError as error:
+        raise StateError(f'cannot write {path}: {error}') from error
+    finally:
+        if temporary is not None:
+            with contextlib.suppress(OSError):
+                os.unlink(temporary)
+
+
 class Store:
     def __init__(self, dir):
         self.dir = os.fspath(dir)
@@ -166,9 +282,12 @@ class Store:
     def _path(self, name: str) -> str:
         return os.path.join(self.dir, name)
 
-    def _load(self, path: str) -> RootState | None:
+    def _load(self, path: str) -> RootRecord | None:
         try:
-            with open(path, 'rb') as f:
+            fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK)
+            with os.fdopen(fd, 'rb') as f:
+                if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):
+                    raise StateError(f'not a regular pause record: {path}')
                 text = f.read().decode()
         except FileNotFoundError:
             return None
@@ -177,28 +296,15 @@ class Store:
         except UnicodeDecodeError as e:
             raise StateError(f'cannot parse {path}: {e}') from e
         try:
-            return _from_json(text)
+            record = parse_record(text)
+            if os.path.basename(path) != self._stem(record.harness, record.root) + '.json':
+                raise ValueError('record filename and identity differ')
+            return record
         except Exception as e:  # any malformed content must refuse, never escape raw
             raise StateError(f'cannot parse {path}: {type(e).__name__}: {e}') from e
 
-    def _write(self, path: str, st: RootState) -> None:
-        tmp = None
-        try:
-            name = f'{path}.{os.getpid()}.{os.urandom(6).hex()}.tmp'
-            fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC, 0o600)
-            tmp = name
-            with os.fdopen(fd, 'w') as f:
-                f.write(_to_json(st))
-                f.flush()
-                os.fsync(f.fileno())
-            os.replace(tmp, path)
-            tmp = None
-        except OSError as e:
-            raise StateError(f'cannot write {path}: {e}') from e
-        finally:
-            if tmp is not None:
-                with contextlib.suppress(OSError):
-                    os.unlink(tmp)
+    def _write(self, path: str, record: RootRecord) -> None:
+        write_atomic(path, record_json(record).encode())
 
     @contextlib.contextmanager
     def _flocked(self, stem: str) -> Iterator[str]:
@@ -232,15 +338,22 @@ class Store:
                 os.close(fd)
 
     @contextlib.contextmanager
-    def locked(self, harness: str, root: str) -> Iterator[RootState]:
+    def locked(self, harness: str, root: str, *, create: bool = True) -> Iterator[RootRecord | None]:
         stem = self._stem(harness, root)
         path = self._path(f'{stem}.json')
         with self._flocked(stem):
-            st = self._load(path) or RootState(harness, root, None)
-            yield st
-            self._write(path, st)
+            record = self._load(path)
+            if record is None and create:
+                record = new_record(harness, root, time.time())
+            yield record
+            if record is not None:
+                self._write(path, record)
 
     def read(self, harness: str, root: str) -> RootState | None:
+        record = self.read_record(harness, root)
+        return None if record is None else record.state
+
+    def read_record(self, harness: str, root: str) -> RootRecord | None:
         return self._load(self._path(f'{self._stem(harness, root)}.json'))
 
     def _files(self) -> list[str]:
@@ -255,7 +368,8 @@ class Store:
     def latest_for_cwd(self, cwd: str) -> tuple[str, str] | None:
         best = None
         for path in self._files():
-            st = self._load(path)
+            record = self._load(path)
+            st = None if record is None else record.state
             if st is None or st.cwd != cwd:
                 continue
             mtime = os.stat(path).st_mtime
@@ -265,7 +379,8 @@ class Store:
 
     def root_for_agent(self, harness: str, agent_id: str) -> str | None:
         for path in self._files():
-            st = self._load(path)
+            record = self._load(path)
+            st = None if record is None else record.state
             if st is not None and st.harness == harness and agent_id in st.workers:
                 return st.root
         return None

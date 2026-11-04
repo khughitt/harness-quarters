@@ -29,7 +29,8 @@ def store(home):
 def seed(home, harness, root, cwd="/work/a", workers=(), calls=140, **fields):
     defaults, _ = limits_mod.load()
     turn = TurnState(started=1.0, limits=defaults, limits_sha="x", active=4320.0, calls=calls, spawns=3)
-    with store(home).locked(harness, root) as st:
+    with store(home).locked(harness, root) as record:
+        st = record.state
         st.turn, st.cwd, st.workers = turn, cwd, set(workers)
         st.notified = True
         for key, value in fields.items():
@@ -121,7 +122,8 @@ def test_status_no_state_by_cwd_names_cwd(home):
 
 
 def test_status_state_without_turn_is_an_error(home):
-    with store(home).locked("claude-code", "s1") as st:
+    with store(home).locked("claude-code", "s1") as record:
+        st = record.state
         st.cwd = "/x"
     result = hq(home, "status", "--session", "s1")
     assert result.returncode == 1 and result.stdout == ""

@@ -1,0 +1,5 @@
+#!/usr/bin/env python3
+"""Explicit offline converter; not a hook or automatic recovery fallback."""
+from turn_pause.migrate import main
+
+raise SystemExit(main())

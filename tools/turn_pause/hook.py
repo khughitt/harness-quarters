@@ -392,7 +392,8 @@ def _decide(harness, event, payload, now, store, limits_path, env, oversized):
         return None
     limits_sha = file_sha256(limits_path) if event == 'PreToolUse' else None
     pause = None
-    with store.locked(harness, root) as rs:
+    with store.locked(harness, root) as record:
+        rs = record.state
         if rs.harness_pid is None:
             rs.harness_pid = find_harness_pid(os.getppid())
         if rs.turn is None:
@@ -415,7 +416,8 @@ def _decide(harness, event, payload, now, store, limits_path, env, oversized):
     if pause is not None:
         error = notify.send(*pause, env=env, agent=f'{harness}:{root}', cwd=cwd)
         if error is not None:
-            with store.locked(harness, root) as rs:
+            with store.locked(harness, root) as record:
+                rs = record.state
                 rs.notify_error = error
     if problems:
         raise ValueError(f'{event}: state written, records skipped: ' + '; '.join(problems))

@@ -1,0 +1,13 @@
+{
+  "harness": "codex", "root": "r1",
+  "turn": {
+    "started": 1.0, "limits": {"active_seconds": 57600, "calls": 500, "spawns": 30, "compactions": 2},
+    "limits_sha": "abc", "active": 120.0, "calls": 333, "spawns": 31, "compactions": 0,
+    "last_t": 122.0, "in_flight": {"c1": null}, "tools": {"c1": "Bash"},
+    "spawn_keys": ["w1"], "warned": ["spawns"]
+  },
+  "paused": "spawns", "grace_used": {"root": 4}, "workers": ["w1"], "worker_names": ["w1"],
+  "cron_jobs": {"j1": "synthetic wake"}, "wakeups": [["synthetic wake", 200.0, 300.0]],
+  "harness_pid": 42, "cwd": "/portable/work", "notified": true, "notify_error": null,
+  "budget_note": null
+}

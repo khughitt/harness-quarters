@@ -25,7 +25,8 @@ def test_state_dir_uses_xdg_then_home(tmp_path):
 
 def test_round_trip(tmp_path):
     store = Store(tmp_path)
-    with store.locked('claude', 'r1') as st:
+    with store.locked('claude', 'r1') as record:
+        st = record.state
         st.turn = turn()
         st.turn.in_flight['c1'] = None
         st.turn.spawn_keys.add('k')
@@ -45,7 +46,8 @@ def test_round_trip(tmp_path):
     assert got == want
     assert got.turn.in_flight == {'c1': None}
     assert isinstance(got.wakeups[0], Wakeup)
-    with store.locked('claude', 'r1') as st:
+    with store.locked('claude', 'r1') as record:
+        st = record.state
         assert st == want
 
 
@@ -54,14 +56,16 @@ def test_read_missing_is_none(tmp_path):
 
 
 def test_fresh_state_on_first_lock(tmp_path):
-    with Store(tmp_path).locked('codex', 'r') as st:
+    with Store(tmp_path).locked('codex', 'r') as record:
+        st = record.state
         assert (st.harness, st.root, st.turn) == ('codex', 'r', None)
 
 
 def test_exception_in_body_does_not_write(tmp_path):
     store = Store(tmp_path)
     with pytest.raises(RuntimeError):
-        with store.locked('claude', 'r') as st:
+        with store.locked('claude', 'r') as record:
+            st = record.state
             st.paused = 'calls'
             raise RuntimeError
     assert store.read('claude', 'r') is None
@@ -69,14 +73,16 @@ def test_exception_in_body_does_not_write(tmp_path):
 
 def test_parallel_updates_do_not_lose_counts(tmp_path):
     store = Store(tmp_path)
-    with store.locked('claude', 'r') as st:
+    with store.locked('claude', 'r') as record:
+        st = record.state
         st.turn = turn()
     errors = []
 
     def work():
         try:
             for _ in range(50):
-                with store.locked('claude', 'r') as st:
+                with store.locked('claude', 'r') as record:
+                    st = record.state
                     st.turn.calls += 1
         except Exception as e:  # pragma: no cover
             errors.append(e)
@@ -102,7 +108,8 @@ def test_write_replaces_atomically(tmp_path):
     with store.locked('claude', 'r'):
         pass
     inode = (tmp_path / 'claude-r.json').stat().st_ino
-    with store.locked('claude', 'r') as st:
+    with store.locked('claude', 'r') as record:
+        st = record.state
         st.paused = 'calls'
     assert (tmp_path / 'claude-r.json').stat().st_ino != inode
 
@@ -142,7 +149,7 @@ def test_wrong_types_in_complete_file_raise(tmp_path, field, bad):
     text = path.read_text()
     import json
     d = json.loads(text)
-    d[field] = json.loads(bad)
+    d['state'][field] = json.loads(bad)
     path.write_text(json.dumps(d))
     with pytest.raises(StateError, match=str(path)):
         store.read('claude', 'r')
@@ -159,11 +166,12 @@ def test_wrong_types_in_complete_file_raise(tmp_path, field, bad):
 def test_wrong_types_in_turn_raise(tmp_path, path, bad):
     import json
     store = Store(tmp_path)
-    with store.locked('claude', 'r') as st:
+    with store.locked('claude', 'r') as record:
+        st = record.state
         st.turn = turn()
     file = tmp_path / 'claude-r.json'
     d = json.loads(file.read_text())
-    target = d['turn']
+    target = d['state']['turn']
     for k in path[:-1]:
         target = target[k]
     target[path[-1]] = json.loads(bad)
@@ -189,7 +197,8 @@ def test_read_only_directory_raises_state_error(tmp_path):
 def test_fresh_directory_is_created_private(tmp_path):
     d = tmp_path / 'missing' / 'deeper'
     store = Store(d)
-    with store.locked('claude', 'r') as st:
+    with store.locked('claude', 'r') as record:
+        st = record.state
         st.paused = 'calls'
     assert store.read('claude', 'r').paused == 'calls'
     assert (d.stat().st_mode & 0o777) == 0o700
@@ -259,7 +268,8 @@ def test_latest_for_cwd_picks_newest(tmp_path):
     store = Store(tmp_path)
     for harness, root, cwd, mt in [('claude', 'a', '/p', 100), ('codex', 'b', '/p', 300),
                                    ('claude', 'c', '/p', 200), ('claude', 'd', '/q', 400)]:
-        with store.locked(harness, root) as st:
+        with store.locked(harness, root) as record:
+            st = record.state
             st.cwd = cwd
         os.utime(tmp_path / f'{harness}-{root}.json', (mt, mt))
     assert store.latest_for_cwd('/p') == ('codex', 'b')
@@ -268,11 +278,14 @@ def test_latest_for_cwd_picks_newest(tmp_path):
 
 def test_root_for_agent(tmp_path):
     store = Store(tmp_path)
-    with store.locked('codex', 'root1') as st:
+    with store.locked('codex', 'root1') as record:
+        st = record.state
         st.workers.add('w1')
-    with store.locked('codex', 'root2') as st:
+    with store.locked('codex', 'root2') as record:
+        st = record.state
         st.workers.add('w2')
-    with store.locked('claude', 'root3') as st:
+    with store.locked('claude', 'root3') as record:
+        st = record.state
         st.workers.add('w1')
     assert store.root_for_agent('codex', 'w2') == 'root2'
     assert store.root_for_agent('codex', 'w1') == 'root1'
@@ -284,20 +297,23 @@ def test_remove_waits_for_holder_and_waiter_does_not_lose_update(tmp_path):
     W and a later C never hold the lock together."""
     import time
     store = Store(tmp_path)
-    with store.locked('claude', 'r') as st:
+    with store.locked('claude', 'r') as record:
+        st = record.state
         st.turn = turn()
     inside = []
     overlap = []
     started = threading.Event()
 
     def holder():
-        with store.locked('claude', 'r') as st:
+        with store.locked('claude', 'r') as record:
+            st = record.state
             started.set()
             time.sleep(0.3)
             st.turn.calls += 1
 
     def bump():
-        with store.locked('claude', 'r') as st:
+        with store.locked('claude', 'r') as record:
+            st = record.state
             inside.append(1)
             if len(inside) > 1:
                 overlap.append(1)
@@ -326,7 +342,8 @@ def test_remove_waits_for_holder_and_waiter_does_not_lose_update(tmp_path):
 def test_remove_does_not_unlink_while_lock_held(tmp_path):
     import time
     store = Store(tmp_path)
-    with store.locked('claude', 'r') as st:
+    with store.locked('claude', 'r') as record:
+        st = record.state
         st.paused = 'calls'
     done = threading.Event()
 
@@ -353,7 +370,8 @@ def test_prune_rechecks_idle_under_lock(tmp_path):
     path = tmp_path / 'claude-r.json'
     age(path, now, 8)
     out = []
-    with store.locked('claude', 'r') as st:
+    with store.locked('claude', 'r') as record:
+        st = record.state
         st.paused = 'calls'
         t = threading.Thread(target=lambda: out.append(store.prune(now)))
         t.start()
@@ -407,7 +425,7 @@ def test_wakeup_message_names_the_field(tmp_path):
         pass
     path = tmp_path / 'claude-r.json'
     d = json.loads(path.read_text())
-    d['wakeups'] = [['x', 'b', 1]]
+    d['state']['wakeups'] = [['x', 'b', 1]]
     path.write_text(json.dumps(d))
     with pytest.raises(StateError, match='wakeup not_before must be int/float, not str'):
         store.read('claude', 'r')
