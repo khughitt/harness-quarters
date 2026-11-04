@@ -1,17 +1,15 @@
 ---
 id: hq-cc91d4
 title: Persist bounded atomic root records and explicit offline migration
-status: done
+status: todo
 priority: 2
 size: m
 complexity: high
 process: direct
 owner: fix/hq-2dd09b
 created: 2026-11-04T11:51:34Z
-updated: 2026-11-04T16:28:54Z
+updated: 2026-11-04T16:53:16Z
 started: 2026-11-04T12:41:25Z
-completed: 2026-11-04T12:54:14Z
-closed: 2026-11-04T12:54:14Z
 depends: [hq-5a461d]
 parent: hq-e10b76
 tags: []
