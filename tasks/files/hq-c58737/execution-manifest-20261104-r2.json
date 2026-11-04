@@ -1,0 +1,135 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "baseline-readers.log",
+      "type": "file",
+      "sha256": "56a95bcb45d931bf9bd1fd0378f2884916091b0c1239e71bb12f8850c15bd14c"
+    },
+    {
+      "path": "plan-path",
+      "type": "file",
+      "sha256": "472816fdc5d620731ae198d6525c1a43a8ed4fb76acccdced36be8f7bc926a09"
+    },
+    {
+      "path": "progress-before-plan-r2-b38962e5cc98.md",
+      "type": "file",
+      "sha256": "b38962e5cc9830e8afdc2092f5c570cedb07d3be7123a96d0c40554b111f92ce"
+    },
+    {
+      "path": "progress.md",
+      "type": "file",
+      "sha256": "883947a141187a544c4bc988f44734303bc1a99ea31f4eabf45cf74e150f918d"
+    },
+    {
+      "path": "task-1-base",
+      "type": "file",
+      "sha256": "03f2403aa9be52cda5180123320aecd108f1d4e33dac28935e882ee6d98f791f"
+    },
+    {
+      "path": "task-1-brief-1c42c62673e79518887bc5a9608a4d8a52bf98456082734c5b753a4bc2fd48e2.md",
+      "type": "file",
+      "sha256": "6e8ed66b0207a4587fd9154fbce1a0351b24594fc52ba87607f7f92acad46538"
+    },
+    {
+      "path": "task-1-tests-hZv7oC.log",
+      "type": "file",
+      "sha256": "a89d2e5e9f1d957c5f6cb3ae80c61e3b2613c010461511876b9a9e5c4706dc88"
+    },
+    {
+      "path": "task-2-base",
+      "type": "file",
+      "sha256": "679519afdfe2bb28325c0e47fa8e49ebdb4fc39f03281818c12a2153bf5dd11d"
+    },
+    {
+      "path": "task-2-brief-1c42c62673e79518887bc5a9608a4d8a52bf98456082734c5b753a4bc2fd48e2.md",
+      "type": "file",
+      "sha256": "1c445d4a4aefb8397231d4f88957b72499b155b8d3545d1f3cc2f7c1fa5a57df"
+    },
+    {
+      "path": "task-2-tests-VG4Wzw.log",
+      "type": "file",
+      "sha256": "bfa06738aa34709a59a383fa87d8cfe06982ad668b151438de59b32d7046c1a1"
+    },
+    {
+      "path": "task-3-base",
+      "type": "file",
+      "sha256": "1cd24d02be656bc14464741b6dceb011db5213caadd60f2fefe59e9c5a88a4a8"
+    },
+    {
+      "path": "task-3-brief-1c42c62673e79518887bc5a9608a4d8a52bf98456082734c5b753a4bc2fd48e2.md",
+      "type": "file",
+      "sha256": "48f31cbe6fbd54e0846aa0bfcaea5ee9b041db632ede66ab05e407dcd694ebb5"
+    },
+    {
+      "path": "task-3-tests-II2vyk.log",
+      "type": "file",
+      "sha256": "a98c2da22c4c4a6fc6725f8b50ec784ddb738d063f989809982da8ed8b92235e"
+    },
+    {
+      "path": "task-4-base",
+      "type": "file",
+      "sha256": "4d5fe9e5ce6caba39caaa4f908e58d365215b8a0eee9b364b7c5699b47361129"
+    },
+    {
+      "path": "task-4-brief-1c42c62673e79518887bc5a9608a4d8a52bf98456082734c5b753a4bc2fd48e2.md",
+      "type": "file",
+      "sha256": "d6b37fdf901e1c645658da1997c1f14a7df5b3fcd0061054b54fc720a4003afc"
+    },
+    {
+      "path": "task1-green.log",
+      "type": "file",
+      "sha256": "99d81347ad80b19574b9db9a78a23e52d7662b903b8ae361e473bfb936bffaec"
+    },
+    {
+      "path": "task1-red.log",
+      "type": "file",
+      "sha256": "ee575f5c165a64d13f9f67108f855ca0c83b20f800b62907fb918ee54a118095"
+    },
+    {
+      "path": "task2-green.log",
+      "type": "file",
+      "sha256": "28ca4dcdede0a658bb56c0faa4462b27fb6e50cfc618065fffba31032bdd6ab2"
+    },
+    {
+      "path": "task2-red.log",
+      "type": "file",
+      "sha256": "bae8e8a6fa54b613bfdc28d5dd893f1b303037376add1c1557e5290d5ebe3064"
+    },
+    {
+      "path": "task3-green-attempt1.log",
+      "type": "file",
+      "sha256": "cd990b1e12075dfab655e9de8fbfbef5d762783342fff427e5248397f5a6b28c"
+    },
+    {
+      "path": "task3-green.log",
+      "type": "file",
+      "sha256": "4d1506cdbc9921e2a463a9e9ea3146cdb1a615f45f0f3b63dbab35acb595a05c"
+    },
+    {
+      "path": "task3-hygiene.log",
+      "type": "file",
+      "sha256": "0b9f46e972417f698f2a042656c73e67cb90e0b4f6af198f89e2be0fd75b2cb7"
+    },
+    {
+      "path": "task3-red.log",
+      "type": "file",
+      "sha256": "23d140adbdec54e959214f640d64bab7bae2351c25bee1d7d27fe2f3795e666d"
+    },
+    {
+      "path": "task3-validation-red.log",
+      "type": "file",
+      "sha256": "d6bc0ed746bb42dd7bb353f9e7b3bfc0463a30ee86bdce14fadbc45397110c8f"
+    },
+    {
+      "path": "task4-blocker-hygiene.log",
+      "type": "file",
+      "sha256": "0b9f46e972417f698f2a042656c73e67cb90e0b4f6af198f89e2be0fd75b2cb7"
+    },
+    {
+      "path": "task4-ended-wake-red.log",
+      "type": "file",
+      "sha256": "271ef615f916fc2f86cd9c3f97ce5d8ae4a869f1fc754e83e5db595283a83ff4"
+    }
+  ]
+}
