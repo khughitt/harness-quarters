@@ -1,9 +1,10 @@
 # Hosted verification and policy activation packet
 
-Status: one authorized verification push and failed hosted attempt completed.
-Coverage is unaccepted, and no activation exists. The policy file is absent and
-local broad testing remains enabled. Owner: hq-d33cdc; preparation: hq-b32d19;
-activation: hq-c7e52c. A local setup correction awaits a separately approved retry.
+Status: both authorized verification pushes completed. The second hosted run
+passed with 2,778 tests and exactly three local integration skips. Coverage awaits
+user acceptance; no activation exists. The policy file is absent and local broad
+testing remains enabled. Owner: hq-d33cdc; preparation: hq-b32d19; activation:
+hq-c7e52c.
 
 ## Frozen inputs and requested next action
 
@@ -13,16 +14,16 @@ Plan: 192a6e854a71be95a4660571ebb0490592825f00,
 docs/plans/2026-11-03-test-execution-policy.md.
 Original preparation code/workflow revision: c4a93f3a58a67451ec34cd605b74470e0251551e.
 The first verification push was authorized from packet revision
-0cf37c0784de88a2df825b8f15b4a26cd3d98aa0. The retry correction is the workflow
-in this packet's next frozen revision, named in its approval request.
-The packet's own frozen revision is the commit named in the approval request.
+0cf37c0784de88a2df825b8f15b4a26cd3d98aa0. The second was authorized from
+954ad406156d12c6321747036e83d88df198bc5f and published as
+855c814bc4805c7d682c81f847bcb79c7cc953c2; their covered source is identical.
+The packet's own frozen revision is the commit named in the acceptance request.
 
-Recommend authorizing one additional verification push of the corrected branch
-feat/hq-d33cdc-test-policy to origin, so actual hosted coverage can be inspected.
-The first approved push is spent. This new request does not authorize activation,
-automatic further retries, account changes or
-paid runner substitution. A failed, cancelled or incomplete run leaves policy
-enabled and returns for disposition. Later coverage acceptance is a separate gate.
+Recommend accepting the observed hosted coverage described below, including all
+three named local integration skips. Both single-push approvals are spent.
+Acceptance permits preparation and review of the policy-off change; activation,
+main integration and publication still require their later explicit authorization.
+No further remote retry, account change or paid runner substitution is authorized.
 
 ## Prepared execution
 
@@ -90,10 +91,10 @@ skipped during collection. This is failed, incomplete coverage, never acceptance
 
 Artifact 13269109652 and the complete run logs were downloaded as immutable ZIPs
 and safely extracted into the parent workspace. The artifact expires on GitHub at
-2026-11-10T21:02:53Z; local raw copies are retained independently. The local
-workflow correction addresses both observed setup omissions, preserving all
+2026-11-10T21:02:53Z; local raw copies are retained independently. The workflow
+correction addresses both observed setup omissions, preserving all
 existing tests and the original three proposed integration omissions. Its actual
-hosted result remains unverified until a new push is authorized and completed.
+hosted result is recorded in the completed second attempt below.
 
 The local full gate also reproduced a pre-existing relay test-fixture startup
 race: a child was classified before its supplied environment was fully visible.
@@ -101,6 +102,52 @@ The shared fixture readiness helper now waits for every expected child environme
 entry before the original assertions, with a deterministic regression test. The
 production process reader and home classification behavior are unchanged; no
 assertion or case is removed. Current local verification is recorded on hq-c7e52c.
+
+## Observed second hosted attempt and coverage decision
+
+The separately approved second push succeeded at
+855c814bc4805c7d682c81f847bcb79c7cc953c2. Its installed local hook passed all
+2,781 tests and full hygiene before publication. No additional baseline was run.
+[Run 41741765690](https://github.com/khughitt/harness-quarters/actions/runs/41741765690)
+attempt 1 then completed successfully on that exact revision. The standard
+ubuntu-24.04 job ran for **19m21s**, from 2026-11-03T23:46:28Z to
+2026-11-04T00:05:49Z. Every setup, build, hydration, portable hygiene, forced
+suite and artifact step passed. No user installation was needed.
+
+All four reports reconcile against one inventory: **2,781 collected and reported,
+2,778 executed and passed, three skipped**. No failure, error, excluded module,
+skipped module, missing identity, duplicate partition identity or reconciliation
+problem exists. The 59 collected test modules are represented.
+
+| Partition | Reported | Passed | Skipped |
+| --- | ---: | ---: | ---: |
+| agents | 268 | 268 | 0 |
+| hooks/tools | 2,120 | 2,117 | 3 |
+| relay parallel | 392 | 392 | 0 |
+| relay signal | 1 | 1 | 0 |
+
+The only skips are the three exact nodeids in **Proposed hosted coverage
+boundary** below: relay subscriber budget validation, agy dispatch through the
+registered ops relay guard, and authentic registered owner-target shape validation.
+All require the local tasks project registry. The added third omission needs
+explicit acceptance alongside the original two. Those three checks passed in the
+current local 2,781-test run, but their live local integration is outside hosted
+coverage. No module is omitted, and no further omission is proposed.
+
+Artifact 13282592504, named
+hq-tests-855c814bc4805c7d682c81f847bcb79c7cc953c2-1, contains setup evidence,
+inventory, coverage and all four XML reports. Its GitHub retention expires at
+2026-11-11T00:05:45Z. The 101,119-byte artifact ZIP and 147,403-byte complete
+logs ZIP were downloaded, CRC-checked and safely extracted in the parent-owned
+workspace. The controller independently re-read inventory/XML coverage, checked
+all skip identities and zero failures/errors, verified setup pins and rehashed all
+33 retained raw/API/archive member files against the receipt. Immutable raw evidence
+and reconciliation are discoverable from hq-c7e52c and hq-d33cdc.
+
+Requested decision: accept this observed boundary, including all three local
+integration skips, so the controller can prepare and independently review the
+policy-off change. Policy remains enabled until that later activation is approved
+and integrated. Acceptance here does not authorize a push or main integration.
 
 ## Pilot and verification limits
 
@@ -119,15 +166,16 @@ ambient failed-only pytest retention deleted its fixture artifacts; only its log
 remains. That lost attempt does not count as retained raw proof. Attempt 3 uses
 explicit all retention plus independent copied evidence. The earlier
 missing-authority fixture failure remains retained.
-This validates the local fixture path; runner apt, actions, Ubuntu runtime and a
-complete hosted run remain unverified.
+This validates the local fixture path only. Runner apt, actions, Ubuntu runtime
+and the complete hosted path are established separately by the second run above.
 
 Changed behavior: 71 focused tests passed in 60.74 seconds with the published tasks
 build on the command PATH; after byte-exact restoration of 11 targeted faults,
 all 71 passed again in 45.82 seconds. The exact-key pilot rejects the malformed
 configuration export that a coarse substring check alone accepts. Actionlint and
 both actual hygiene routes passed.
-Full production suite: 2,778 passed (268 agents, 2,118 hooks/tools, 391 parallel
+Initial preparation production suite: 2,778 passed (268 agents, 2,118 hooks/tools,
+391 parallel
 relay and one serial signal test), with collected=reported=executed=2,778, four
 reports and no skips, excluded modules or reconciliation problems. No extra
 adoption baseline was run, as requested. Policy remains enabled.
@@ -196,19 +244,20 @@ after checking gh auth status; do not switch the globally active account.
 ## Conditional activation and rollback
 
 Original proposal: one feature verification push, then one main activation push only
-after observed coverage acceptance and explicit activation authorization. No remote
-retry was included, and that verification approval is now spent. This packet
-requests one additional feature verification push only; the remaining coverage,
-activation, integration and main-publication gates remain separate.
+after observed coverage acceptance and explicit activation authorization. A second
+feature verification push was separately approved and completed successfully. Both
+approvals are spent; this packet now requests coverage acceptance only. Activation,
+integration and main publication remain separate gates.
 
-After accepted coverage and activation authorization, first integrate the reviewed
-preparation into main while policy is absent/enabled and record its actual enabled
-regime timestamp/revision. Then prepare and review .tt.toml with
-automatic_broad=false and broad_targets=["test", "ci-test"], update current docs,
-and prove focused execution, both normal skips, no budget child on skips, hosted
-missing-force refusal and forced failure propagation. Merge any moved base before
-review. Integrate the reviewed activation and make the separately authorized main
-push, whose forced completed reports must also reconcile. Record actual disabled
+After accepted coverage, prepare and review .tt.toml with automatic_broad=false
+and broad_targets=["test", "ci-test"], update current docs, and prove focused
+execution, both normal skips, no budget child on skips, hosted missing-force refusal
+and forced failure propagation. Merge any moved base before review. Present the
+concrete frozen activation for the later authorization. After that authorization,
+first integrate the reviewed preparation into main while policy is absent/enabled
+and record its actual enabled regime timestamp/revision. Then integrate the
+reviewed activation and make the separately authorized main push, whose forced
+completed reports must also reconcile. Record actual disabled
 time and landed revision; inspect every registered-main latency host/target and
 retire only disabled timing obligations, never as performance-verified. Keep
 unrelated halts/diagnosis and report status to ops-39bff6 with ops-56aab7 linked.
