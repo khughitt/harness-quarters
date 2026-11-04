@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: main
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-04T02:32:21Z
+updated: 2026-11-04T02:33:59Z
 started: 2026-11-03T10:19:41Z
 completed: 2026-11-04T02:32:21Z
 closed: 2026-11-04T02:32:21Z
@@ -227,4 +227,6 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-04T02:32:21Z (main): done
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T02:32:21Z (main): Activated on main0d55fd7e and published74492240; forced main run41756877253 passed2778 with3accepted integration skips, final review accepts. All4steps done, raw ownership transferred toops-56aab7, integrated worktree/branch removed.
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T02:33:59Z (main): Final verification correction: taskscheck remains0errors/5warnings after closure: the record-growth advisory on this audit history persists, alongside4preexisting unrelated tagwarnings. Earlier transient wording did not mean it was resolved by done. No history archival/rewrite was performed; exact notes, checkpoint bases and raw receiver evidence remain preserved. Policy/runtime verification is complete, both tasks done/unclaimed, source bytes match published main, only closing task-record commits remain local and host-load reports no session process.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
