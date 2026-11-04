@@ -105,3 +105,35 @@ def test_migration_cli_emits_receipt_only_to_stdout(tmp_path):
     assert run.returncode == 0, run.stderr
     assert json.loads(run.stdout)['complete']
     assert not (dst / 'receipt.json').exists()
+
+
+def test_prompt_guards_conversion_preserves_active_state(tmp_path):
+    src, raw = source(tmp_path)
+    dst = tmp_path / 'converted'
+    assert convert(str(src), str(dst), to_version=1, now=100)['complete']
+    path = dst / 'codex-r1.json'
+    data = json.loads(path.read_bytes())
+    assert data['prompt_guards'] == {'cron': [], 'wakeups': []}
+    assert data['state'] == json.loads(raw)
+    with Store(dst).locked('codex', 'r1') as record:
+        record.state = None
+        record.ended_at = 101
+        record.prompt_guards = {'cron': ['a' * 64], 'wakeups': []}
+    before = path.read_bytes()
+    result = convert(str(dst), str(tmp_path / 'export'), to_version=0, now=102)
+    assert result['complete'] and result['skipped_ended'] == ['codex-r1.json']
+    assert path.read_bytes() == before
+
+
+def test_prototype_v1_export_is_refused_without_repair(tmp_path):
+    src, _ = source(tmp_path)
+    dst = tmp_path / 'converted'
+    assert convert(str(src), str(dst), to_version=1, now=100)['complete']
+    path = dst / 'codex-r1.json'
+    data = json.loads(path.read_bytes())
+    data.pop('prompt_guards', None)
+    path.write_text(json.dumps(data))
+    before = path.read_bytes()
+    out = tmp_path / 'export'
+    assert not convert(str(dst), str(out), to_version=0, now=101)['complete']
+    assert not out.exists() and path.read_bytes() == before

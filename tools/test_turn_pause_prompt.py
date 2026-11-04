@@ -53,3 +53,50 @@ def test_budget_oversized_count_is_malformed():
 def test_budget_unicode_digits_are_malformed():
     assert isinstance(prompt.parse_budget('budget: ٣h'), Malformed)
     assert isinstance(prompt.parse_budget('budget: 2h, ٣ calls'), Malformed)
+
+
+X_DIGEST = '2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881'
+
+
+def test_prompt_guards_empty_factory_does_not_share_containers():
+    a, b = prompt.empty_guards(), prompt.empty_guards()
+    a['cron'].append(X_DIGEST)
+    a['wakeups'].append([X_DIGEST, 100, 200])
+    assert b == {'cron': [], 'wakeups': []}
+
+
+def test_capture_guards_normalizes_without_mutating_state():
+    from turn_pause.state import RootState, Wakeup, state_dict
+    import copy
+    state = RootState('codex', 'r1', None)
+    state.cron_jobs = {'one': ' x ', 'two': 'x'}
+    state.wakeups = [Wakeup(' x ', 100, 200), Wakeup('x', 100, 200)]
+    before = copy.deepcopy(state_dict(state))
+    assert prompt.capture_guards(state) == {'cron': [X_DIGEST], 'wakeups': [[X_DIGEST, 100, 200]]}
+    assert state_dict(state) == before
+
+
+@pytest.mark.parametrize('now,want,remaining', [(99, 'turn', 1), (100, 'wake', 0),
+                                               (200, 'wake', 0), (201, 'turn', 0)])
+def test_guarded_prompt_kind_windows_and_precedence(now, want, remaining):
+    guards = {'cron': [], 'wakeups': [[X_DIGEST, 100, 200]]}
+    assert prompt.guarded_prompt_kind(guards, ' x ', now) == want
+    assert len(guards['wakeups']) == remaining
+
+
+def test_guarded_prompt_matches_wake_before_persistent_cron():
+    guards = {'cron': [X_DIGEST], 'wakeups': [[X_DIGEST, 100, 200]]}
+    assert prompt.guarded_prompt_kind(guards, 'x', 100) == 'wake'
+    assert guards == {'cron': [X_DIGEST], 'wakeups': []}
+    assert prompt.guarded_prompt_kind(guards, 'x', 101) == 'wake'
+    assert guards == {'cron': [X_DIGEST], 'wakeups': []}
+    assert prompt.guarded_prompt_kind(guards, 'different', 101) == 'turn'
+
+
+def test_guarded_prompt_uses_utf8_and_only_strip_normalization():
+    from hashlib import sha256
+    digest = sha256('é'.encode('utf-8')).hexdigest()
+    guards = {'cron': [digest], 'wakeups': []}
+    assert prompt.guarded_prompt_kind(guards, '\u2003é\n', 1) == 'wake'
+    assert prompt.guarded_prompt_kind(guards, 'É', 1) == 'turn'
+    assert prompt.guarded_prompt_kind(guards, 'e\u0301', 1) == 'turn'

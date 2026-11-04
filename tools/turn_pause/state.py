@@ -17,6 +17,7 @@ import time
 from .counters import TurnState
 from .limits import Limits
 from .record import Record
+from .prompt import empty_guards
 
 IDLE_SECONDS = 7 * 86400
 
@@ -39,10 +40,11 @@ class RootState(Record):
 
 class RootRecord(Record):
     __slots__ = _fields = ('version', 'harness', 'root', 'generation', 'created_at', 'turn_serial',
-                           'event_serial', 'state', 'ended_at', 'events', 'dropped_count', 'dropped_through')
+                           'event_serial', 'state', 'ended_at', 'events', 'dropped_count', 'dropped_through',
+                           'prompt_guards')
     _defaults = {'version': 1, 'turn_serial': 0, 'event_serial': 0, 'state': None,
                  'ended_at': None, 'dropped_count': 0, 'dropped_through': None}
-    _factories = {'events': list}
+    _factories = {'events': list, 'prompt_guards': empty_guards}
 
 
 def new_record(harness: str, root: str, now: float) -> RootRecord:
@@ -213,6 +215,7 @@ def parse_record(text: str) -> RootRecord:
         raise ValueError('unsupported pause record version')
     if set(d) != set(RootRecord._fields):
         raise ValueError('root record fields differ')
+    _validate_guards(d['prompt_guards'])
     for name in ('harness', 'root', 'generation'):
         if not _check(d[name], str, name):
             raise ValueError(f'{name} must not be empty')
@@ -242,6 +245,33 @@ def parse_record(text: str) -> RootRecord:
     if previous != d['event_serial']:
         raise ValueError('history serial differs')
     return RootRecord(**d)
+
+
+def _validate_guards(value) -> None:
+    _check(value, dict, 'prompt_guards')
+    if set(value) != {'cron', 'wakeups'}:
+        raise ValueError('prompt_guards fields differ')
+
+    def digest(key):
+        if not isinstance(key, str) or len(key) != 64 or any(c not in '0123456789abcdef' for c in key):
+            raise ValueError('invalid prompt_guards digest')
+
+    cron = _check(value['cron'], list, 'prompt_guards.cron')
+    for key in cron:
+        digest(key)
+    if cron != sorted(set(cron)):
+        raise ValueError('prompt_guards.cron must be sorted and unique')
+    wakeups = _check(value['wakeups'], list, 'prompt_guards.wakeups')
+    for row in wakeups:
+        if not isinstance(row, list) or len(row) != 3:
+            raise ValueError('invalid prompt_guards wake row')
+        digest(row[0])
+        before = _num(row[1], 'prompt_guards.not_before')
+        after = _num(row[2], 'prompt_guards.not_after')
+        if before > after:
+            raise ValueError('reversed prompt_guards window')
+    if wakeups != [list(row) for row in sorted(set(tuple(row) for row in wakeups))]:
+        raise ValueError('prompt_guards.wakeups must be sorted and unique')
 
 
 def write_atomic(path: str, data: bytes) -> None:

@@ -4,6 +4,16 @@ Type: reference. The protected-path guard permits validated filesystem reads
 without permitting writes or changing pause state. Read-only history commands
 will be documented here when their implementation is available.
 
+The prepared version-1 root envelope requires private `prompt_guards` metadata
+with sorted unique cron digests and wake rows `[digest, not_before, not_after]`.
+Digests are lowercase SHA-256 of stripped UTF-8 prompt text; they are matching
+fingerprints, not anonymization, and permit guesses for short prompts. They stay
+in private mode-0700/0600 storage and outside event snapshots/public handoff.
+End/resume integration is still a subsequent execution step. Its reviewed rule
+retains known schedules while a root is ended, then clears guards on genuine
+resume; prior jobs need fresh native evidence afterward. Expired wake windows
+and evicted root records cannot establish earlier provenance.
+
 The prepared default allows 60 tree spawns, with a warning at 45. Reaching 60
 remains allowed; the next hooked decision after 61 spawns pauses the tree.
 Explicit agent budgets override proportional scaling. Existing 16-hour,

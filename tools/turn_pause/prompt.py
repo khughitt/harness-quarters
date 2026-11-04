@@ -31,6 +31,31 @@ def is_genuine(text: str, harness: str) -> bool:
     return True
 
 
+def empty_guards() -> dict:
+    return {'cron': [], 'wakeups': []}
+
+
+def _guard_digest(text: str) -> str:
+    import hashlib  # only ending state or matching an ended prompt needs hashing
+    return hashlib.sha256(text.strip().encode('utf-8')).hexdigest()
+
+
+def capture_guards(state) -> dict:
+    return {'cron': sorted({_guard_digest(text) for text in state.cron_jobs.values()}),
+            'wakeups': [list(row) for row in sorted({(_guard_digest(w.text), w.not_before, w.not_after)
+                                                    for w in state.wakeups})]}
+
+
+def guarded_prompt_kind(guards: dict, text: str, now: float) -> str:
+    guards['wakeups'] = [row for row in guards['wakeups'] if row[2] >= now]
+    digest = _guard_digest(text)
+    for i, (key, before, after) in enumerate(guards['wakeups']):
+        if key == digest and before <= now <= after:
+            del guards['wakeups'][i]
+            return 'wake'
+    return 'wake' if digest in guards['cron'] else 'turn'
+
+
 def typed_text(text: str) -> str:
     """The text with every pasted_content block removed."""
     return _PASTED_BLOCK.sub('', text)

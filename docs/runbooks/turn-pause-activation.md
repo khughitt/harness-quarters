@@ -10,6 +10,15 @@ focused correctness, mandatory hygiene, the full-buffer latency gate and final
 whole-branch review. Account for all retained worktrees/evidence on the executing
 host. Keep the controller task open until activation and evidence disposition.
 
+The unreleased version-1 envelope requires `prompt_guards` with exactly `cron`
+and `wakeups` lists. Legacy conversion initializes both empty while preserving
+the complete active dictionary; end/idle clearing later captures fingerprints.
+An earlier synthetic prototype-v1 envelope without that field is unsupported.
+Recreate synthetic test data; never silently repair a live store. If any real
+prototype-v1 activation is discovered, stop for a migration decision before
+conversion or cutover. Guards remain private matching metadata, never public
+history, and their hashes do not anonymize short prompt text.
+
 Identify the real installed launcher and its registered main checkout before
 handoff. Leave every shared launcher/config include pointing to main. Test the
 worktree only by its explicit entry path and synthetic environment overrides.

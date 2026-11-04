@@ -192,3 +192,44 @@ def test_record_storage_is_private_and_has_no_temporary_residue(tmp_path):
     assert directory.stat().st_mode & 0o777 == 0o700
     assert (directory / 'codex-r1.json').stat().st_mode & 0o777 == 0o600
     assert not list(directory.glob('*.tmp'))
+
+
+def test_prompt_guards_start_empty_and_reject_prototype_shape(tmp_path):
+    store = Store(tmp_path)
+    assert seeded(store).prompt_guards == {'cron': [], 'wakeups': []}
+    with store.locked('codex', 'r1') as record:
+        record.prompt_guards = {'cron': ['a' * 64], 'wakeups': [['b' * 64, 100, 200]]}
+        add(record)
+    got = store.read_record('codex', 'r1')
+    assert got.prompt_guards == {'cron': ['a' * 64], 'wakeups': [['b' * 64, 100, 200]]}
+    assert 'prompt_guards' not in json.dumps(got.events)
+    assert 'a' * 64 not in json.dumps(got.events)
+    path = tmp_path / 'codex-r1.json'
+    data = json.loads(path.read_bytes())
+    del data['prompt_guards']
+    path.write_text(json.dumps(data))
+    with pytest.raises(StateError):
+        store.read_record('codex', 'r1')
+
+
+@pytest.mark.parametrize('bad', [None, [], {}, {'cron': [], 'wakeups': [], 'extra': []},
+    {'cron': 'a' * 64, 'wakeups': []}, {'cron': [True], 'wakeups': []},
+    {'cron': ['a' * 63], 'wakeups': []}, {'cron': ['A' * 64], 'wakeups': []},
+    {'cron': ['z' * 64], 'wakeups': []}, {'cron': ['a' * 64] * 2, 'wakeups': []},
+    {'cron': ['b' * 64, 'a' * 64], 'wakeups': []}, {'cron': [], 'wakeups': {}},
+    {'cron': [], 'wakeups': ['bad']}, {'cron': [], 'wakeups': [['a' * 64, 1]]},
+    *[{'cron': [], 'wakeups': [['a' * 64, v, 2]]}
+      for v in (True, -1, float('nan'), float('inf'), 3)],
+    {'cron': [], 'wakeups': [['a' * 64, 1, False]]},
+    {'cron': [], 'wakeups': [['a' * 64, 1, 2]] * 2},
+    {'cron': [], 'wakeups': [['b' * 64, 1, 2], ['a' * 64, 1, 2]]},
+])
+def test_prompt_guards_reject_invalid_shapes(tmp_path, bad):
+    store = Store(tmp_path)
+    assert seeded(store).prompt_guards == {'cron': [], 'wakeups': []}
+    path = tmp_path / 'codex-r1.json'
+    data = json.loads(path.read_bytes())
+    data['prompt_guards'] = bad
+    path.write_text(json.dumps(data))
+    with pytest.raises(StateError, match='prompt_guards'):
+        store.read_record('codex', 'r1')
