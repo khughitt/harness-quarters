@@ -1,13 +1,15 @@
 ---
 id: hq-bef306
 title: Update tasks record and resolution contract citations
-status: todo
+status: doing
 priority: 1
 size: xs
 complexity: low
 process: direct
+owner: docs/hq-bef306-tasks-citations
 created: 2026-11-04T20:11:24Z
-updated: 2026-11-04T20:11:24Z
+updated: 2026-11-04T20:12:09Z
+started: 2026-11-04T20:12:09Z
 depends: []
 tags: []
 source: tasks-813e86
@@ -21,3 +23,5 @@ Narrow producer work for tasks-813e86 Task 5: update the tasks record-home and p
 
 - 2026-11-04T20:11:24Z (add): created
   provenance: {"harness_session":"codex:01a1a7c8-be1e-70f2-8f58-4cfc952a4551","harness_session_source":"CODEX_THREAD_ID","origin":"agent"}
+- 2026-11-04T20:12:09Z (docs/hq-bef306-tasks-citations): started
+  provenance: {"harness_session":"codex:01a1a7c8-be1e-70f2-8f58-4cfc952a4551","harness_session_source":"CODEX_THREAD_ID"}
