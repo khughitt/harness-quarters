@@ -103,6 +103,48 @@ def child(tmp_path):
 
 # ---- shell validator: passes -------------------------------------------------------
 
+@pytest.mark.parametrize('command', [
+    'cat -n /srv/config', 'head -n 5 /srv/config', 'tail -c 10 /srv/config',
+    'wc -l /srv/config', 'ls -la /srv', "readlink -f '/srv/bin/tool with spaces' /srv/unit",
+])
+def test_protected_read_accepts_only_filesystem_readers(command):
+    assert allowlist.protected_read('codex', 'Bash', {'command': command})
+
+
+@pytest.mark.parametrize('command', [
+    'tasks attach x /srv/config', 'tasks note x /srv/config', 'hq pause status', 'kill 123',
+    'touch /srv/config', 'cat /srv/config > /srv/out', 'cat /srv/config; touch /srv/out',
+    'sed -n 1p /srv/config', 'tail -f /srv/config', 'env cat /srv/config',
+    'cat $(echo /srv/config)', 'readlink /srv/config', 'readlink -f',
+    'readlink -f -n /srv/config', 'readlink -f ~/bin/tool', 'readlink -f /srv/bin/*',
+    '/bin/cat /srv/config', 'readlink -f -- /srv/config',
+])
+def test_protected_read_rejects_side_effects_and_expansion(command):
+    assert not allowlist.protected_read('codex', 'Bash', {'command': command})
+
+
+@pytest.mark.parametrize('extra', [
+    {'description': 1}, {'timeout': True}, {'timeout': '1000'}, {'shell': '/bin/sh'},
+    {'login': True}, {'tty': True}, {'workdir': '/srv'}, {'run_in_background': False},
+    {'dangerouslyDisableSandbox': False}, {'unknown': 'value'},
+])
+def test_protected_bash_metadata_rejects_unknown_or_wrong_types(extra):
+    assert not allowlist.protected_read('codex', 'Bash', {'command': 'cat /srv/config', **extra})
+
+
+@pytest.mark.parametrize('tool,operand', [('Read', 'file_path'), ('Grep', 'pattern'), ('Glob', 'pattern')])
+def test_protected_native_reader_requires_known_tool_and_operand(tool, operand):
+    assert allowlist.protected_read('claude-code', tool, {operand: '/srv/config'})
+    assert not allowlist.protected_read('codex', tool, {operand: '/srv/config'})
+    assert not allowlist.protected_read('claude-code', tool, {operand: 1})
+    assert not allowlist.protected_read('claude-code', 'Edit', {'file_path': '/srv/config'})
+
+
+def test_readlink_requires_f_and_literal_operands_in_paused_shell():
+    assert shell('readlink -f /srv/bin/tool', NOBODY).klass == 'read'
+    assert shell('readlink -f -n /srv/bin/tool', NOBODY).klass == 'refuse'
+
+
 SHELL_PASSES = [
     ('tasks park lore-1 "next"', 'bookkeeping'),
     ('tasks note x "y"', 'bookkeeping'),

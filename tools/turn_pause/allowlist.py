@@ -45,6 +45,7 @@ READERS = {
     'tail': {'-n', '-c'},
     'wc': {'-l', '-c', '-w'},
     'ls': {'-l', '-a', '-la', '-al'},
+    'readlink': {'-f'},
 }
 HOST_LOAD = ('host-load', '--section', 'session')
 SIGNALS = {'-TERM', '-INT', '-KILL', '-HUP'}
@@ -123,8 +124,8 @@ def _scan(cmd: str) -> str | None:
     return None
 
 
-def shell(cmd: str, owned: Owned) -> Verdict:
-    """The shell validator: one simple command of an allowlisted program and options."""
+def _argv(cmd: str) -> list[str] | Verdict:
+    """Literal argv after the common shell expansion and program-name checks."""
     if len(cmd) > MAX_TEXT:
         return _refuse(f'shell command is {len(cmd)} characters; the limit while paused is {MAX_TEXT}')
     bad = _scan(cmd)
@@ -144,6 +145,37 @@ def shell(cmd: str, owned: Owned) -> Verdict:
         return _refuse(f'{_show(prog)}: no environment assignment is allowed while paused')
     if '/' in prog:
         return _refuse(f'{_show(prog)}: the program must be a bare name, not a path')
+    return argv
+
+
+def protected_read(harness: str, tool: str, tool_input: dict) -> bool:
+    """Only known filesystem readers can exempt a protected-path match."""
+    if not isinstance(tool_input, dict):
+        return False
+    if harness == 'claude-code' and tool in CLAUDE_READERS:
+        operand = 'file_path' if tool == 'Read' else 'pattern'
+        return isinstance(tool_input.get(operand), str)
+    if harness not in CONTROLS or tool != 'Bash':
+        return False
+    if not set(tool_input) <= {'command', 'description', 'timeout'}:
+        return False
+    if not isinstance(tool_input.get('command'), str):
+        return False
+    if 'description' in tool_input and not isinstance(tool_input['description'], str):
+        return False
+    if 'timeout' in tool_input and type(tool_input['timeout']) is not int:
+        return False
+    argv = _argv(tool_input['command'])
+    return (isinstance(argv, list) and argv[0] in READERS
+            and _reader(argv[0], argv[1:]).klass == 'read')
+
+
+def shell(cmd: str, owned: Owned) -> Verdict:
+    """The shell validator: one simple command of an allowlisted program and options."""
+    argv = _argv(cmd)
+    if isinstance(argv, Verdict):
+        return argv
+    prog = argv[0]
     if prog == 'kill':
         return _kill(argv[1:], owned)
     if prog in ('tasks', 'hq'):
@@ -156,6 +188,10 @@ def shell(cmd: str, owned: Owned) -> Verdict:
 
 
 def _reader(prog: str, words: list[str]) -> Verdict:
+    if prog == 'readlink':
+        if len(words) < 2 or words[0] != '-f' or any(not w or w.startswith('-') for w in words[1:]):
+            return _refuse('readlink requires -f followed by literal non-option path operands')
+        return Verdict('read', 'readlink resolves literal paths')
     i = 0
     while i < len(words):
         word = words[i]

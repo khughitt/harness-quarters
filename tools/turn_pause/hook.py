@@ -78,8 +78,11 @@ MALFORMED_TEXT = ('turn-pause: the first line looks like a budget but does not p
 WAKE_TEXT = ('turn-pause: this prompt matches a pending scheduled prompt and was read as a scheduled '
              'wake, not a new turn; if the user typed it, ask them to rephrase.')
 PROTECTED_TEXT = ('turn-pause: this call names a protected path (the pause state, the turn limits or '
-                  'the hook wiring), so it is refused. Do not edit or read them; hq pause status and '
-                  'hq pause limits show what they hold.')
+                  'the hook wiring) without a validated read, so it is refused. Mutations remain '
+                  'prohibited. Inspect with native Read/Grep/Glob or a single cat/head/tail/wc/ls '
+                  'or readlink -f command using concrete expanded absolute or checkout-relative '
+                  'paths, without tilde, globs, composition or extra execution fields. Paused reads '
+                  'spend read grace; hq pause status and hq pause limits remain available.')
 NODES_TEXT = (f'turn-pause: the tool input has more than {MAX_NODES} JSON nodes, more than any real tool '
               'input needs and more than the hook can check in time, so the call is refused. Split the '
               'work into smaller calls.')
@@ -217,7 +220,9 @@ class Judge:
                 return Decision(False, _deny(refusal(rs, ev.agent)), limit)
         try:
             if touches_protected(tool_input, self.protected):
-                return Decision(False, _deny(PROTECTED_TEXT), None)
+                from .allowlist import protected_read  # parse only a protected-path match
+                if not protected_read(self.harness, ev.tool, tool_input):
+                    return Decision(False, _deny(PROTECTED_TEXT), None)
         except TooManyNodes:
             return Decision(False, _deny(NODES_TEXT), None)
         if rs.paused is not None:

@@ -562,6 +562,46 @@ def test_a_call_naming_a_protected_path_is_denied_before_any_pause(tmp_path, tar
     assert d.state().paused is None
 
 
+@pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+@pytest.mark.parametrize('paused', [False, True])
+def test_protected_bash_read_accepts_real_metadata_and_spends_grace(tmp_path, notices, harness, paused):
+    d = Driver(tmp_path, harness)
+    if paused:
+        d.pause_on_calls()
+    else:
+        d.prompt('inspect configuration')
+    data = dict(fixture('claude-code-subagent-bash-denied.json', 'PreToolUse', 'Bash')['tool_input'])
+    data.update(command='cat ' + shlex.quote(str(d.limits)), timeout=1000)
+    count = 25 if paused else 1
+    for _ in range(count):
+        out, _ = d.pre('Bash', data)
+        assert not denied(out)
+    assert d.state().paused == ('calls' if paused else None)
+    if paused:
+        assert d.state().grace_used['root'] == 25
+        assert denied(d.pre('Bash', data)[0])
+
+
+@pytest.mark.parametrize('tool,operand', [('Read', 'file_path'), ('Grep', 'pattern'), ('Glob', 'pattern')])
+def test_protected_native_read_allows_inspection_without_clearing_pause(tmp_path, notices, tool, operand):
+    d = Driver(tmp_path, 'claude-code')
+    d.pause_on_calls()
+    data = {operand: str(d.limits)}
+    if tool == 'Grep':
+        data['path'] = str(d.limits)
+    assert not denied(d.pre(tool, data)[0])
+    assert d.state().paused == 'calls' and d.state().grace_used['root'] == 1
+
+
+@pytest.mark.parametrize('command', ['touch {path}', 'cat {path} > /srv/out',
+                                    'tasks attach hq-123456 {path}', 'tasks note hq-123456 {path}',
+                                    'cat {path}; touch /srv/out'])
+def test_protected_side_effects_stay_denied(tmp_path, command):
+    d = Driver(tmp_path, 'codex')
+    d.prompt('inspect')
+    assert denied(d.bash(command.format(path=shlex.quote(str(d.limits)))))
+
+
 def test_state_error_is_a_deny_naming_the_state_file(tmp_path):
     d = Driver(tmp_path, 'claude-code')
     d.prompt('work')

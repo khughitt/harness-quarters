@@ -599,6 +599,10 @@ does not supply the user's authorization or permit completing the goal.
 
 ### Parking from a worktree while paused
 
+Validated protected-path inspection and literal host-pointer checks follow the
+[diagnostics guide](docs/turn-pause-history.md). Reads do not lift a pause or
+authorize mutation.
+
 Use `tasks -C .worktrees/<name> park <id> "next step" --waiting-on user --reason decision`
 when the authoritative task record is in a worktree. `tasks -C .worktrees/<name> note <id> "status"`
 also stays allowed after the pause's read grace is exhausted. Quote a directory that
