@@ -7,12 +7,12 @@ size: xs
 complexity: low
 process: direct
 created: 2026-11-02T23:54:03Z
-updated: 2026-11-04T10:15:19Z
+updated: 2026-11-04T10:16:38Z
 depends: []
 parent: hq-2dd09b
 tags: [feedback, friction, "from:lore"]
 agent: codex
-origin: agent
+origin: user
 ---
 
 The root turn-pause refusal says to set any active goal to paused. The available goal tool permits that status only on an explicit user request, so a counter-triggered pause alone cannot authorize the call. Align the refusal with that authorization boundary or obtain a standing user grant; the agent guidance will report the needed user action rather than call a prohibited operation.
