@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-11-03T11:30:43Z
-updated: 2026-11-04T02:19:40Z
+updated: 2026-11-04T02:20:25Z
 started: 2026-11-03T20:26:12Z
 depends: [hq-b32d19]
 parent: hq-d33cdc
@@ -116,4 +116,6 @@ Await review and approval of the complete hq-d33cdc plan. Execute Task 4: Verify
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T02:18:58Z (main): review: impl round 6 — verdict: accept; findings: none; reviewer: codex/gpt-6-astra
 - 2026-11-04T02:19:40Z (main): Final main-evidence review accepted: childimpl6/parentimpl8, codex/gpt-6-astra, published74492240c223e4ad939b6506e77b5fc118e64ab9 and coveredflow36ebfcf12a06dc8c0c98f566ae6928536b06ed1b. task-4-main-evidence-review-report.md13746bytes write/nonempty/read verified. Independent33hashes/2archives/API/exactsourceforce/2781identities2778passes3acceptedskips/59modules verified; no findings/minors. Independent576record tag inspection and rawqueries show no latency/halt duty, not performance-verified. No broad rerun or new remote operation. Review allows closure after plan-helper/final focused, flow/retro, reporting and verified receiver-first retention transfer/cleanup. Same live-probe/future-risk declined judgments keep prior ledger rulings; new cleanup/closing-record judgment will be discharged by observed actions before done. One main push spent; only task-record commits after published744remain local and must be disclosed. All runtime/reference bytes remain identical to reviewed/published source.
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T02:20:25Z (main): Completion-helper first invocation from main with relative plan path refused exit2 before check/log/ledger mutation: workspace identity remains correctly bound to the original worktree plan file. Verified recorded plan-path exists and is byte-identical to main approved plan; rerunning from main with that exact absolute plan argument preserves identity, workspace and current-main verification. No migration/fallback or source change. Raw refusal receipt task-4-main-plan-completion-first-attempt.json retained.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
