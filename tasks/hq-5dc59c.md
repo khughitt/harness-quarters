@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: fix/hq-2dd09b
 created: 2026-11-02T23:54:03Z
-updated: 2026-11-04T10:28:55Z
+updated: 2026-11-04T10:31:33Z
 started: 2026-11-04T10:27:21Z
 depends: []
 parent: hq-2dd09b
@@ -36,3 +36,4 @@ User requested fixing this after accepting audit hq-7fb9d5. Align root refusal t
 - 2026-11-04T10:27:43Z (fix/hq-2dd09b): arm: flow-trial-1 — unit tack-2dd09b — flow off
 - 2026-11-04T10:28:25Z (fix/hq-2dd09b): Direct fix shares the hydrated .worktrees/hq-2dd09b worktree. Caller search found ROOT_TEXT used by refusal() for threshold and limits-changed refusals; paused update_goal cancellation is already allowed only with status paused and does not confer user authorization. Baseline hook/allowlist behavior from the warning task remains passing. RED focused refusal/update_goal check: 2 failed, 1 passed, 88 deselected, specifically the unconditional goal instruction. Fix changes instructions and current README, preserving the authorization-neutral allowlist. Semantic review must exercise no active goal, active unauthorized goal and explicit user pause. Live activation remains gated.
 - 2026-11-04T10:28:55Z (fix/hq-2dd09b): Verification: RED focused hook refusal/goal allowlist run failed 2 tests and passed 1 (88 deselected); GREEN just test-one tools/test_turn_pause_hook.py tools/test_turn_pause_allowlist.py tools/test_hq_pause.py -q passed 374 tests. Mandatory just check-hygiene passed. No broad suite by valid policy; no remote evidence. No goal status was changed, no host pointer repointed, and no activation performed.
+- 2026-11-04T10:31:33Z (fix/hq-2dd09b): review: impl round 1 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
