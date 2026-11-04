@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "pilot": false,
+  "workers": 16,
+  "target_p99_ms": 50,
+  "cases": [
+    {
+      "harness": "claude-code",
+      "case": "serial",
+      "samples": 1000,
+      "p50_ms": 42.54236199994921,
+      "p99_ms": 128.6539200000334,
+      "counts": [
+        {
+          "root": "bench-0",
+          "calls": 1000,
+          "events": 128
+        }
+      ],
+      "passed": false
+    },
+    {
+      "harness": "claude-code",
+      "case": "concurrent",
+      "samples": 4000,
+      "p50_ms": 50.14387500068551,
+      "p99_ms": 406.5079650008556,
+      "counts": [
+        {
+          "root": "bench-0",
+          "calls": 1000,
+          "events": 128
+        },
+        {
+          "root": "bench-1",
+          "calls": 1000,
+          "events": 128
+        }
+      ],
+      "passed": false
+    },
+    {
+      "harness": "codex",
+      "case": "serial",
+      "samples": 1000,
+      "p50_ms": 98.39406500032055,
+      "p99_ms": 166.5744519996224,
+      "counts": [
+        {
+          "root": "bench-0",
+          "calls": 1000,
+          "events": 128
+        }
+      ],
+      "passed": false
+    },
+    {
+      "harness": "codex",
+      "case": "concurrent",
+      "samples": 4000,
+      "p50_ms": 66.45139000011113,
+      "p99_ms": 206.43592499982333,
+      "counts": [
+        {
+          "root": "bench-0",
+          "calls": 1000,
+          "events": 128
+        },
+        {
+          "root": "bench-1",
+          "calls": 1000,
+          "events": 128
+        }
+      ],
+      "passed": false
+    }
+  ],
+  "status": "failed"
+}
