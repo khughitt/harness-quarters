@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/hq-bef306-tasks-citations
 created: 2026-11-04T20:11:24Z
-updated: 2026-11-04T20:28:10Z
+updated: 2026-11-04T20:29:44Z
 started: 2026-11-04T20:12:09Z
 completed: 2026-11-04T20:28:10Z
 closed: 2026-11-04T20:28:10Z
@@ -49,3 +49,4 @@ Narrow producer work for tasks-813e86 Task 5: update the tasks record-home and p
   provenance: {"harness_session":"codex:01a1a7c8-be1e-70f2-8f58-4cfc952a4551","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T20:28:10Z (docs/hq-bef306-tasks-citations): Reviewed record-layout citations preserve consumer guards
   provenance: {"harness_session":"codex:01a1a7c8-be1e-70f2-8f58-4cfc952a4551","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T20:29:44Z (main): Reviewed source and flow closeout merged into main at 076ee69e2eac58b7f5dc0149889c344c53c3aa05. tt-report exit 0 before disposal; fresh ignored/status inventory empty, setup-created empty local directories regenerable, no in-tree plan workspace. Known launcher/hook/helper/user-unit scan found no pointer into the tree. Unlocked/removed only .worktrees/hq-bef306; branch kept merged, parent keeps reports, no retained local child item survives. No push or home relink. First merge raced an auto-committing task note; ancestry/status check detected that the done commit was not included, so the remaining metadata was merged and main now reports done with no claim.
