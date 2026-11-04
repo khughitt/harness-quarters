@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: main
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-04T01:48:28Z
+updated: 2026-11-04T01:48:30Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -193,3 +193,5 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-04T01:47:58Z (main): resumed
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T01:48:28Z (main): policy: disabled at 2026-11-04T01:47:52Z revision 0d55fd7ef32542a47ff705d8ff0745d0388da2eb
+- 2026-11-04T01:48:30Z (main): Authorized two-stage local integration completed: main first fast-forwarded to enabled preparation79140b92527cff5bdae81cc508d669c9b04588c3 at2026-11-04T01:46:40Z, then reviewed disabled policy at0d55fd7ef32542a47ff705d8ff0745d0388da2eb at2026-11-04T01:47:52Z. Exact policy event times come from main reflog, with separate raw receipts. Reviewed coveredflow36ebfcf12a06dc8c0c98f566ae6928536b06ed1b remains unchanged. Task records/claims moving to registered main after merge; original worktree branch is integrated and retained, no host pointer changed. Main .tt.toml valid automatic_broad=false,broad_targets=[test,ci-test]; broad obligations may now be retired only after explicit per-record/host/target inspection, never as performance-verified. Final main hosted result still owed, no push yet. Run policy-appropriate focused integration and mandatory hygiene before the approved single main push.
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
