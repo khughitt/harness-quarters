@@ -26,7 +26,7 @@ from .events import Event
 from .limits import DEFAULTS_FILE, duration, file_sha256, load, with_budget
 from .prompt import Budget, Malformed, is_genuine, parse_budget
 from .protect import MAX_NODES, TooManyNodes, too_many_nodes, touches_protected
-from .state import Store, Wakeup, state_path
+from .state import RootState, Store, Wakeup, state_path
 
 CHECKOUT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 # The hook wiring in this checkout, and the harness home files that link to it
@@ -257,12 +257,17 @@ def _never(rs: RootState, ev: Event) -> Decision:
 
 
 def _prompt(rs: RootState, harness: str, payload: dict, now: float, limits_path, agent: str | None,
-            oversized: bool) -> dict | None:
+            oversized: bool, record, counted: bool) -> dict | None:
+    from . import history
     text = payload.get('prompt')
     if not isinstance(text, str):
         raise ValueError('UserPromptSubmit payload has no prompt string')
     kind = engine.prompt_kind(rs, harness, text, now, agent)
     if kind == 'turn':
+        before = history.snapshot(rs, compactions_counted=counted)
+        if before is None and record.ended_at is not None:
+            before = next((e['snapshot'] for e in reversed(record.events)
+                           if e['turn'] == record.turn_serial and e['snapshot'] is not None), None)
         limits, sha = load(limits_path)
         budget = None if oversized else parse_budget(text)
         note = None
@@ -273,7 +278,16 @@ def _prompt(rs: RootState, harness: str, payload: dict, now: float, limits_path,
         elif isinstance(budget, Malformed):
             note = MALFORMED_TEXT.format(reason=budget.reason)
         engine.start_turn(rs, now, limits, sha, note)
+        history.start_turn(record, now, origin='genuine_user', before=before,
+                           after=history.snapshot(rs, compactions_counted=counted))
+        record.ended_at = None
+        from .prompt import empty_guards
+        record.prompt_guards = empty_guards()
         return None if note is None else _context('UserPromptSubmit', note)
+    if rs.turn is None:
+        engine.start_turn(rs, now, *load(limits_path))
+        history.start_turn(record, now, origin='implicit', before=None,
+                           after=history.snapshot(rs, compactions_counted=counted))
     engine.feed(rs, [Event(now, agent, 'tick')], _never)
     if kind == 'wake' and is_genuine(text, harness):
         return _context('UserPromptSubmit', WAKE_TEXT)
@@ -382,43 +396,78 @@ def decide(harness: str, event: str, payload: dict, now: float, store: Store, li
 
 
 def _decide(harness, event, payload, now, store, limits_path, env, oversized):
+    from . import history
     facts = adapters.load_facts()
     root, events = adapters.normalize(harness, event, payload, now, facts)
     agent = adapters.agent_of(payload)
+    counted = bool(facts.compact_events.get(harness))
     if event == 'SessionEnd':
         if agent is None:
-            store.remove(harness, root)
-            store.prune(now)
+            store.end(harness, root, now, compactions_counted=counted)
+            store.prune(now, compactions_counted={h: bool(v) for h, v in facts.compact_events.items()})
         return None
     limits_sha = file_sha256(limits_path) if event == 'PreToolUse' else None
     pause = None
     with store.locked(harness, root) as record:
         rs = record.state
+        if rs is None:
+            if event == 'UserPromptSubmit':
+                from .prompt import guarded_prompt_kind
+                text = payload.get('prompt')
+                if not isinstance(text, str):
+                    raise ValueError('UserPromptSubmit payload has no prompt string')
+                if agent is not None or not is_genuine(text, harness):
+                    return None
+                if guarded_prompt_kind(record.prompt_guards, text, now) == 'wake':
+                    return _context('UserPromptSubmit', WAKE_TEXT)
+                rs = record.state = RootState(harness, root, None)
+            elif event == 'PreToolUse':
+                return _deny('turn-pause: root session ended; a genuine root prompt is required to resume.')
+            else:
+                return None
         if rs.harness_pid is None:
             rs.harness_pid = find_harness_pid(os.getppid())
-        if rs.turn is None:
+        if rs.turn is None and event != 'UserPromptSubmit':
             engine.start_turn(rs, now, *load(limits_path))
+            history.start_turn(record, now, origin='implicit', before=None,
+                               after=history.snapshot(rs, compactions_counted=counted))
         output = None
         allowed = False
         if event == 'UserPromptSubmit':
-            output = _prompt(rs, harness, payload, now, limits_path, agent, oversized)
+            output = _prompt(rs, harness, payload, now, limits_path, agent, oversized, record, counted)
         elif event == 'PreToolUse':
+            warned = set(rs.turn.warned)
             protected = protected_paths(store.dir, limits_path, env)
             decision = engine.feed(rs, events, Judge(harness, payload, limits_sha, protected))
             output, allowed = decision.output, decision.allow
+            snap = history.snapshot(rs, compactions_counted=counted)
+            for metric in sorted(rs.turn.warned - warned):
+                history.append_event(record, 'warning', now, reason=metric, snapshot=snap)
             if decision.paused is not None and not rs.notified:
                 rs.notified = True
-                pause = _notice(rs, harness, root, decision.paused)
+                notice = dict(outcome='pending', error_code=None, desktop='unknown', relay='unknown',
+                              receipt='unknown', pause_sequence=record.event_serial + 1)
+                transition = history.append_event(record, 'enforced_pause', now, reason=decision.paused,
+                                                  snapshot=snap, notification=notice)
+                pause = (_notice(rs, harness, root, decision.paused), record.generation,
+                         record.turn_serial, transition['sequence'], snap)
         else:
             engine.feed(rs, events, _never)
         problems = _record(rs, harness, event, payload, now, allowed)
         cwd = rs.cwd
     if pause is not None:
-        error = notify.send(*pause, env=env, agent=f'{harness}:{root}', cwd=cwd)
-        if error is not None:
-            with store.locked(harness, root) as record:
-                rs = record.state
-                rs.notify_error = error
+        message, generation, turn, sequence, snap = pause
+        error = notify.send(*message, env=env, agent=f'{harness}:{root}', cwd=cwd)
+        with store.locked(harness, root, create=False) as record:
+            if record is None or record.generation != generation:
+                print('turn-pause: notification outcome unknown; original root generation unavailable', file=sys.stderr)
+            else:
+                notice = dict(outcome='error' if error else 'attempted', error_code='notify_failed' if error else None,
+                              desktop='unknown', relay='unknown', receipt='unknown', pause_sequence=sequence)
+                history.append_event(record, 'notification', now, reason=None, snapshot=snap,
+                                     notification=notice, turn=turn)
+                if record.state is not None and record.turn_serial == turn:
+                    record.state.notify_error = error
     if problems:
         raise ValueError(f'{event}: state written, records skipped: ' + '; '.join(problems))
     return output

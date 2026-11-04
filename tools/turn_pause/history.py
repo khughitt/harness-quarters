@@ -111,3 +111,12 @@ def append_event(record, kind: str, now: float, *, reason: str | None,
         record.dropped_count += 1
         record.dropped_through = max(record.dropped_through or 0, old['at'])
     return event
+
+
+def start_turn(record, now: float, *, origin: str, before: dict | None, after: dict) -> None:
+    if origin == 'genuine_user' and record.turn_serial:
+        resumed = record.ended_at is not None or (before is not None and before['paused'] is not None)
+        append_event(record, 'turn_resume' if resumed else 'turn_reset', now,
+                     reason='genuine_user', snapshot=before)
+    record.turn_serial += 1
+    append_event(record, 'turn_start', now, reason=origin, snapshot=after)

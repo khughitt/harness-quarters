@@ -874,6 +874,194 @@ def test_history_late_scheduled_wake_cannot_resume_after_session_end(tmp_path):
     assert d.state() is None, 'a late unmarked wake must not create a new human turn'
 
 
+@pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+@pytest.mark.parametrize('implicit', [False, True])
+def test_history_initial_turn_and_reset(tmp_path, harness, implicit):
+    d = Driver(tmp_path, harness)
+    d.bash('ls') if implicit else d.prompt('work')
+    record = d.store.read_record(harness, d.root)
+    assert record.turn_serial == 1
+    assert [(e['kind'], e['reason']) for e in record.events] == [
+        ('turn_start', 'implicit' if implicit else 'genuine_user')]
+    d.prompt('next')
+    record = d.store.read_record(harness, d.root)
+    assert record.turn_serial == 2
+    assert [e['kind'] for e in record.events] == ['turn_start', 'turn_reset', 'turn_start']
+    assert record.events[1]['snapshot']['calls']['used'] == int(implicit)
+
+
+@pytest.mark.parametrize('harness,metric,value', [('codex', 'active', 43200), ('codex', 'calls', 375),
+                                                ('codex', 'spawns', 45), ('claude-code', 'compactions', 2)])
+def test_history_first_warning_only(tmp_path, harness, metric, value):
+    d = Driver(tmp_path, harness)
+    d.prompt('work')
+    with d.store.locked(harness, d.root) as record:
+        setattr(record.state.turn, metric, value)
+    d.bash('ls')
+    d.bash('ls')
+    record = d.store.read_record(harness, d.root)
+    warnings = [e for e in record.events if e['kind'] == 'warning']
+    assert len(warnings) == 1 and warnings[0]['reason'] == metric
+
+
+@pytest.mark.parametrize('harness,metric,value', [('codex', 'active', 57601), ('codex', 'calls', 500),
+    ('codex', 'spawns', 61), ('claude-code', 'compactions', 3), ('codex', 'limits-changed', 0)])
+def test_history_pause_transition_is_atomic_and_not_repeated(tmp_path, harness, metric, value):
+    d = Driver(tmp_path, harness)
+    d.prompt('work')
+    if metric == 'limits-changed':
+        d.limits.write_text(d.limits.read_text() + '\n# changed\n')
+    else:
+        with d.store.locked(harness, d.root) as record:
+            setattr(record.state.turn, metric, value)
+    assert denied(d.bash('touch /srv/x'))
+    assert denied(d.bash('touch /srv/x'))
+    record = d.store.read_record(harness, d.root)
+    pauses = [e for e in record.events if e['kind'] == 'enforced_pause']
+    assert len(pauses) == 1 and pauses[0]['reason'] == metric == record.state.paused
+    assert pauses[0]['notification']['outcome'] == 'pending'
+    notice = [e for e in record.events if e['kind'] == 'notification']
+    assert len(notice) == 1 and notice[0]['notification']['receipt'] == 'unknown'
+
+
+@pytest.mark.parametrize('end', [False, True])
+def test_history_notification_after_reset_or_end_names_original_turn(tmp_path, monkeypatch, end):
+    d = Driver(tmp_path, 'claude-code')
+    def deliver(*args, **kwargs):
+        if end:
+            d('SessionEnd', claude_bare('SessionEnd'))
+        else:
+            d.prompt('new human turn')
+        return 'PRIVATE_NOTIFY_ERROR'
+    monkeypatch.setattr(notify, 'send', deliver)
+    d.pause_on_calls()
+    record = d.store.read_record(d.harness, d.root)
+    event = record.events[-1]
+    assert event['kind'] == 'notification' and event['turn'] == 1
+    assert event['notification']['error_code'] == 'notify_failed'
+    assert 'PRIVATE_NOTIFY_ERROR' not in json.dumps(record.events)
+    assert record.state is None if end else record.state.notify_error is None
+
+
+@pytest.mark.parametrize('replace', [False, True])
+def test_history_notification_missing_generation_does_not_resurrect(tmp_path, monkeypatch, capsys, replace):
+    d = Driver(tmp_path, 'codex')
+    def deliver(*args, **kwargs):
+        d.store.remove(d.harness, d.root)
+        if replace:
+            d.prompt('new generation')
+        return 'PRIVATE_NOTIFY_ERROR'
+    monkeypatch.setattr(notify, 'send', deliver)
+    d.pause_on_calls()
+    record = d.store.read_record(d.harness, d.root)
+    assert (record is None) if not replace else all(e['kind'] != 'notification' for e in record.events)
+    assert 'unknown' in capsys.readouterr().err
+
+
+@pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+@pytest.mark.parametrize('idle', [False, True])
+def test_history_ended_guards_restart_resume_and_worker_isolation(tmp_path, harness, idle):
+    from turn_pause.state import Wakeup
+    d = Driver(tmp_path, harness)
+    d.prompt('work')
+    with d.store.locked(harness, d.root) as record:
+        record.state.cron_jobs = {'cron': 'known cron'}
+        record.state.wakeups = [Wakeup('one shot', d.t, d.t + 100)]
+    maker = claude_bare if harness == 'claude-code' else codex_bare
+    if idle:
+        path = Path(d.store.dir) / f'{harness}-{d.root}.json'
+        os.utime(path, (d.t - 8 * 86400, d.t - 8 * 86400))
+        d.store.prune(d.t, compactions_counted={'claude-code': True, 'codex': False})
+    else:
+        d('SessionEnd', maker('SessionEnd'))
+    d.store = Store(d.store.dir)
+    before = d.store.read_record(harness, d.root)
+    assert before.state is None and before.prompt_guards['wakeups']
+    d('UserPromptSubmit', maker('UserPromptSubmit', prompt='one shot', agent_id='worker'))
+    d.prompt('<system-reminder>one shot</system-reminder>')
+    assert d.store.read_record(harness, d.root).prompt_guards == before.prompt_guards
+    assert context(d.prompt('one shot')) == WAKE_TEXT
+    assert context(d.prompt('known cron')) == WAKE_TEXT
+    assert denied(d.bash('ls', agent='worker'))
+    ended = d.store.read_record(harness, d.root)
+    assert ended.state is None and ended.turn_serial == 1 and ended.ended_at == before.ended_at
+    d.prompt('different genuine prompt')
+    resumed = d.store.read_record(harness, d.root)
+    assert resumed.state is not None and resumed.turn_serial == 2 and resumed.ended_at is None
+    assert resumed.prompt_guards == {'cron': [], 'wakeups': []}
+    assert [e['kind'] for e in resumed.events][-2:] == ['turn_resume', 'turn_start']
+
+
+def test_history_directory_fsync_failure_keeps_committed_pause_unknown(tmp_path, monkeypatch):
+    import stat
+    d = Driver(tmp_path, 'codex')
+    d.prompt('work')
+    with d.store.locked(d.harness, d.root) as record:
+        record.state.turn.calls = 500
+    real = os.fsync
+    def fail_directory(fd):
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise OSError('synthetic directory fsync failure')
+        real(fd)
+    monkeypatch.setattr(os, 'fsync', fail_directory)
+    assert denied(d.bash('ls'))
+    record = d.store.read_record(d.harness, d.root)
+    assert record.state.paused == 'calls'
+    assert record.events[-1]['kind'] == 'enforced_pause'
+    assert record.events[-1]['notification']['outcome'] == 'pending'
+
+
+@pytest.mark.parametrize('end_first', [False, True])
+def test_history_end_resume_guards_commit_in_serial_order(tmp_path, monkeypatch, end_first):
+    from contextlib import contextmanager
+    d = Driver(tmp_path, 'codex')
+    d.prompt('work')
+    with d.store.locked(d.harness, d.root) as record:
+        record.state.cron_jobs = {'job': 'known cron'}
+    acquired, proceed = threading.Event(), threading.Event()
+    real = d.store._flocked
+    @contextmanager
+    def ordered(stem):
+        with real(stem) as lock:
+            if threading.current_thread().name == 'winner' and stem == f'{d.harness}-{d.root}':
+                acquired.set()
+                assert proceed.wait(5)
+            yield lock
+    monkeypatch.setattr(d.store, '_flocked', ordered)
+    failures = []
+    def run(ending):
+        try:
+            d('SessionEnd', codex_bare('SessionEnd')) if ending else d.prompt('new human prompt')
+        except Exception as error:
+            failures.append(error)
+    first = threading.Thread(name='winner', target=run, args=(end_first,))
+    second = threading.Thread(name='second', target=run, args=(not end_first,))
+    first.start()
+    assert acquired.wait(5)
+    second.start()
+    proceed.set()
+    first.join(5); second.join(5)
+    assert not first.is_alive() and not second.is_alive() and not failures
+    record = d.store.read_record(d.harness, d.root)
+    assert record.turn_serial == 2
+    if end_first:
+        assert record.state is not None and record.prompt_guards == {'cron': [], 'wakeups': []}
+    else:
+        assert record.state is None and len(record.prompt_guards['cron']) == 1
+
+
+def test_measurement_call_honors_entry_site_disabled_startup(tmp_path):
+    from measure_turn_pause import call
+    env = make_env(tmp_path)
+    probe = tmp_path / 'site-probe'
+    probe.mkdir()
+    (probe / 'sitecustomize.py').write_text("raise RuntimeError('SITE_STARTUP_MUST_BE_DISABLED')\n")
+    env['PYTHONPATH'] = str(probe)
+    elapsed = call('claude-code', 'PreToolUse', claude_pre('Bash', {'command': 'ls'}, 'c1'),
+                   DEFAULTS_PATH, env)
+    assert elapsed > 0
+
+
 def test_post_tool_use_failure_closes_the_call(tmp_path):
     d = Driver(tmp_path, 'claude-code')
     d.prompt('work')

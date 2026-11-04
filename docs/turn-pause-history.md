@@ -9,10 +9,21 @@ with sorted unique cron digests and wake rows `[digest, not_before, not_after]`.
 Digests are lowercase SHA-256 of stripped UTF-8 prompt text; they are matching
 fingerprints, not anonymization, and permit guesses for short prompts. They stay
 in private mode-0700/0600 storage and outside event snapshots/public handoff.
-End/resume integration is still a subsequent execution step. Its reviewed rule
-retains known schedules while a root is ended, then clears guards on genuine
+Ending a root clears active counters while retaining its known schedules and
+bounded transition history. SessionEnd and seven-day idle clearing capture the
+guards atomically with the closing event. The hook rejects late tool calls until
+a genuine root prompt resumes; worker/injected text cannot consume wake guards.
+The reviewed rule retains known schedules while a root is ended, then clears guards on genuine
 resume; prior jobs need fresh native evidence afterward. Expired wake windows
 and evicted root records cannot establish earlier provenance.
+
+Each real turn has a persistent generation/turn identity. Its first warning,
+prepared pause, aggregate notification outcome, reset/resume and end are recorded
+with scoped counter snapshots. A committed pause is a prepared refusal, not
+proof that the harness obeyed or the person saw a notice. Delivery/receipt remains
+unknown. Ended records expire lazily after30days or beyond512 roots; maintenance
+affects at most32 records per pass and reports remaining cleanup debt. Repeated
+maintenance does not refresh an already-ended record.
 
 The prepared default allows 60 tree spawns, with a warning at 45. Reaching 60
 remains allowed; the next hooked decision after 61 spawns pauses the tree.

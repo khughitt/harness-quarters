@@ -20,6 +20,9 @@ from .record import Record
 from .prompt import empty_guards
 
 IDLE_SECONDS = 7 * 86400
+ENDED_SECONDS = 30 * 86400
+MAX_ENDED = 512
+MAX_MAINTENANCE = 32
 
 
 class StateError(Exception):
@@ -445,18 +448,78 @@ class Store:
     def remove(self, harness: str, root: str) -> None:
         self._delete_locked(self._stem(harness, root), None)
 
-    def prune(self, now: float, max_idle: float = IDLE_SECONDS) -> list[str]:
-        """Remove states idle longer than max_idle (by file mtime, re-checked under the
-        lock); return their stems."""
-        removed = []
+    @staticmethod
+    def _end_record(record, now, compactions_counted, reason):
+        from .history import append_event, snapshot
+        from .prompt import capture_guards
+        closing = snapshot(record.state, compactions_counted=compactions_counted)
+        record.prompt_guards = capture_guards(record.state)
+        if record.turn_serial:
+            append_event(record, 'session_end', now, reason=reason, snapshot=closing)
+        record.state = None
+        record.ended_at = now
+
+    def end(self, harness: str, root: str, now: float, *,
+            compactions_counted: bool, reason: str = 'session_end') -> bool:
+        stem = self._stem(harness, root)
+        path = self._path(stem + '.json')
+        with self._flocked(stem):
+            record = self._load(path)
+            if record is None or record.state is None:
+                return False
+            self._end_record(record, now, compactions_counted, reason)
+            self._write(path, record)
+            return True
+
+    def _eligible(self, now):
+        idle, ended = [], []
         for path in self._files():
-            try:
-                idle = now - os.stat(path).st_mtime
-            except FileNotFoundError:
+            record = self._load(path)
+            if record is None:
                 continue
-            except OSError as e:
-                raise StateError(f'cannot stat {path}: {e}') from e
-            stem = os.path.basename(path)[:-len('.json')]
-            if idle > max_idle and self._delete_locked(stem, max_idle, now):
-                removed.append(stem)
-        return removed
+            if record.state is None:
+                if record.ended_at is None:
+                    raise StateError('ended pause record has no ended_at')
+                ended.append((record.ended_at, path, record.generation))
+            else:
+                try:
+                    mtime = os.stat(path).st_mtime
+                except FileNotFoundError:
+                    continue
+                if now - mtime > IDLE_SECONDS:
+                    idle.append((mtime, path, record.generation))
+        ended.sort()
+        excess = max(0, len(ended) - MAX_ENDED)
+        deletions = [row for i, row in enumerate(ended)
+                     if i < excess or now - row[0] > ENDED_SECONDS]
+        return sorted(idle), deletions, len(ended)
+
+    def retention(self, now: float) -> dict:
+        idle, deletions, ended = self._eligible(now)
+        return dict(idle_seconds=IDLE_SECONDS, ended_seconds=ENDED_SECONDS,
+                    max_ended=MAX_ENDED, max_mutations=MAX_MAINTENANCE,
+                    ended_roots=ended, cleanup_debt=len(idle) + len(deletions))
+
+    def prune(self, now: float, *, compactions_counted: dict[str, bool]) -> dict:
+        cleared = deleted = 0
+        with self._flocked('.catalog'):
+            idle, deletions, _ = self._eligible(now)
+            candidates = [(False, row) for row in idle] + [(True, row) for row in deletions]
+            for deleting, (when, path, generation) in candidates[:MAX_MAINTENANCE]:
+                stem = os.path.basename(path)[:-5]
+                with self._flocked(stem) as lock:
+                    record = self._load(path)
+                    if record is None or record.generation != generation:
+                        continue
+                    if deleting:
+                        if record.state is not None or record.ended_at != when:
+                            continue
+                        self._unlink(path)
+                        self._unlink(lock)
+                        deleted += 1
+                    elif record.state is not None and now - os.stat(path).st_mtime > IDLE_SECONDS:
+                        self._end_record(record, now, compactions_counted.get(record.harness, False), 'idle')
+                        self._write(path, record)
+                        cleared += 1
+            debt = self.retention(now)['cleanup_debt']
+        return dict(affected=cleared + deleted, cleared=cleared, deleted=deleted, cleanup_debt=debt)

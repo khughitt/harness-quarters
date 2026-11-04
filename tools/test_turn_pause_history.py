@@ -233,3 +233,86 @@ def test_prompt_guards_reject_invalid_shapes(tmp_path, bad):
     path.write_text(json.dumps(data))
     with pytest.raises(StateError, match='prompt_guards'):
         store.read_record('codex', 'r1')
+
+
+def test_history_session_end_retention_uses_end_time_and_never_refreshes(tmp_path):
+    store = Store(tmp_path)
+    seeded(store)
+    assert store.end('codex', 'r1', 100, compactions_counted=False)
+    path = tmp_path / 'codex-r1.json'
+    os.utime(path, (100, 100))
+    before = path.stat().st_mtime_ns
+    assert not store.end('codex', 'r1', 200, compactions_counted=False)
+    result = store.prune(100 + 29 * 86400, compactions_counted={'codex': False})
+    assert result['affected'] == 0 and path.stat().st_mtime_ns == before
+    assert store.read('codex', 'r1') is None
+    assert store.read_record('codex', 'r1').events[-1]['kind'] == 'session_end'
+    # A late outcome changes mtime, not retention eligibility.
+    os.utime(path, None)
+    assert store.prune(101 + 30 * 86400, compactions_counted={'codex': False})['deleted'] == 1
+    assert store.read_record('codex', 'r1') is None
+
+
+def test_history_prune_bounds_capacity_and_reports_unique_debt(tmp_path):
+    store = Store(tmp_path)
+    for i in range(550):
+        record = seeded(store, str(i))
+        assert store.end('codex', str(i), i + 1, compactions_counted=False)
+    fresh = seeded(store, 'active')
+    first = store.prune(1000, compactions_counted={'codex': False})
+    assert first['affected'] == first['deleted'] == 32 and first['cleanup_debt'] == 6
+    assert store.read_record('codex', '0') is None
+    assert store.read_record('codex', '549') is not None
+    assert store.read_record('codex', 'active').generation == fresh.generation
+    assert store.prune(1000, compactions_counted={'codex': False})['deleted'] == 6
+    assert store.retention(1000)['cleanup_debt'] == 0
+
+
+def test_history_no_turn_end_has_no_fabricated_event(tmp_path):
+    store = Store(tmp_path)
+    with store.locked('codex', 'empty'):
+        pass
+    assert store.end('codex', 'empty', 1, compactions_counted=False)
+    record = store.read_record('codex', 'empty')
+    assert record.state is None and record.turn_serial == 0 and record.events == []
+
+
+def test_history_prune_rechecks_resumed_root_under_lock(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+    store = Store(tmp_path)
+    active = seeded(store).state
+    store.end('codex', 'r1', 1, compactions_counted=False)
+    waiting = threading.Event()
+    real = store._flocked
+    @contextmanager
+    def observed(stem):
+        if threading.current_thread().name == 'cleanup' and stem == 'codex-r1':
+            waiting.set()
+        with real(stem) as lock:
+            yield lock
+    monkeypatch.setattr(store, '_flocked', observed)
+    results = []
+    with store.locked('codex', 'r1') as record:
+        worker = threading.Thread(name='cleanup', target=lambda: results.append(
+            store.prune(32 * 86400, compactions_counted={'codex': False})))
+        worker.start()
+        assert waiting.wait(5)
+        record.state, record.ended_at = active, None
+        record.prompt_guards = {'cron': [], 'wakeups': []}
+    worker.join(5)
+    assert not worker.is_alive() and results[0]['deleted'] == 0
+    assert store.read('codex', 'r1') is not None
+
+
+def test_history_failed_end_preserves_active_state_and_guards(tmp_path, monkeypatch):
+    store = Store(tmp_path)
+    seeded(store)
+    with store.locked('codex', 'r1') as record:
+        record.state.cron_jobs = {'job': 'PRIVATE_SCHEDULE'}
+    before = (tmp_path / 'codex-r1.json').read_bytes()
+    def fail(*args):
+        raise OSError('synthetic replacement failure')
+    monkeypatch.setattr(os, 'replace', fail)
+    with pytest.raises(StateError):
+        store.end('codex', 'r1', 2, compactions_counted=False)
+    assert (tmp_path / 'codex-r1.json').read_bytes() == before

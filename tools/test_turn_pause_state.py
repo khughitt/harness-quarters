@@ -249,10 +249,11 @@ def test_prune_by_idle_time(tmp_path):
             pass
     age(tmp_path / 'claude-old.json', now, 8)
     age(tmp_path / 'claude-young.json', now, 6)
-    assert store.prune(now) == ['claude-old']
+    assert store.prune(now, compactions_counted={})['cleared'] == 1
     assert store.read('claude', 'old') is None
     assert store.read('claude', 'young') is not None
-    assert not (tmp_path / 'claude-old.lock').exists()
+    assert (tmp_path / 'claude-old.lock').exists()
+    assert store.read_record('claude', 'old').state is None
 
 
 def test_remove(tmp_path):
@@ -373,12 +374,12 @@ def test_prune_rechecks_idle_under_lock(tmp_path):
     with store.locked('claude', 'r') as record:
         st = record.state
         st.paused = 'calls'
-        t = threading.Thread(target=lambda: out.append(store.prune(now)))
+        t = threading.Thread(target=lambda: out.append(store.prune(now, compactions_counted={})))
         t.start()
         time.sleep(0.2)
     os.utime(path, (now, now))
     t.join()
-    assert out == [[]]
+    assert len(out) == 1 and out[0]['affected'] == 0
     assert store.read('claude', 'r').paused == 'calls'
 
 
