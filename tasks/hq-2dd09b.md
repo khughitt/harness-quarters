@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: direct
 created: 2026-11-04T10:13:23Z
-updated: 2026-11-04T10:48:14Z
+updated: 2026-11-04T10:51:22Z
 depends: [lore-296a0f, obs-1450e7]
 tags: []
 source: hq-7fb9d5
@@ -35,3 +35,4 @@ This goal collects hq fixes and cross-project guidance/reporting prerequisites; 
 - 2026-11-04T10:23:11Z (main): trial: flow-trial-1 — enrolled — flow off
 - 2026-11-04T10:23:13Z (main): arm: flow-trial-1 — unit tack-2dd09b — flow off
 - 2026-11-04T10:48:14Z (fix/hq-2dd09b): Prepared hq-51209b/hq-5dc59c implementations accepted at f7259d9098f66ed2e60fa14f9aeb22824f2ba53d, plus shared spec for hq-c58737/hq-704fe5/hq-e10b76 frozen at95773e6eb742a3a4884126de9b93538be3676d84, accepted by independent builder. Full review reports and required scope rulings/Why/Cost, verification, retained evidence, trade-offs, exclusions and integration instructions are in .worktrees/hq-2dd09b/docs/notes/2026-11-04-turn-pause-handoff.md. No deferred minors; no plan ledger exists yet. Direct fixes await live activation approval, planned tasks await human design review before writing-plans. lore-296a0f matching guidance prepared in its own worktree; obs-1450e7 implementation still depends on the future history producer. Goal remains open; November11 reassessment unchanged.
+- 2026-11-04T10:51:22Z (fix/hq-2dd09b): Closing process observation on titan: host-load --section session reported nothing left running. All three reviewers returned complete reports; no command/session remains running. Both branches remain unmerged and inactive: hq fix/hq-2dd09b in .worktrees/hq-2dd09b and lore fix/lore-296a0f in its .worktrees/lore-296a0f. The agent integrates each only after user live activation approval. Immediate next user action is the frozen shared design review; no implementation plan or planned-feature code has started. Task-specific parks name these distinct gates.
