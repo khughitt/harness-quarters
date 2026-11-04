@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-04T00:18:45Z
+updated: 2026-11-04T00:28:13Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -170,3 +170,4 @@ After approved activation, commit .tt.toml with real broad target names, verify 
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T00:18:45Z (feat/hq-d33cdc-test-policy): Activation preparation frozen at0bbb4afceb27a22d4dc2c95884f9c2ceae774c4a, covered flowf46ac1d5d5d1fa1ecce49d177080e78fa720add4. Actual invoking-checkout tests RED2 default execution -> GREEN within74focused tests/41.24s after exact .tt.toml automatic_broad=false,broad_targets=[test,ci-test]. Real-checkout six-command smoke proves2null-outcome/no-budget skips,2direct hosted refusals and2nested hosted refusals. Existing fixture cases preserve forced17 failure and real focused execution. Staged local/portable hygiene and diffcheck each0. Baseline deliberately omitted; no broad rerun after valid branch policy-off, prior accepted hosted evidence retained. Registered main661295864cfbfe167a94020be9a9db9af600b94d still ancestor and enabled; no moved-base merge needed. Preparation anchor79140b92527cff5bdae81cc508d669c9b04588c3 remains without policy. Full branch fresh review covers prerequisites/preparation/corrections/accepted raw hosted coverage and final local policy-off change; remote activation/main merge/push still unapproved and future-gated. No completed Task4/parent claim.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T00:28:13Z (feat/hq-d33cdc-test-policy): review: impl round 6 — verdict: revise; findings: Important 1; reviewer: codex/gpt-6-astra
