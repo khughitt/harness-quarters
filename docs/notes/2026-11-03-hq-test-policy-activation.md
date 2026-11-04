@@ -266,22 +266,28 @@ request is authorization of this concrete rollout after independent review:
 This authorization would change the live main checkout's hooks and test cadence.
 No home routing, service, account or billing configuration change is included.
 
-Prepared local evidence: the actual checkout policy tests first failed twice
-because both broad targets ran by default, then passed with the exact policy file.
-The protected focused route passed 74 tests covering policy, suite evidence,
-workflow and pre-commit behavior. Existing fixture checks prove real focused
-execution, forced child status17 propagation and surviving success/failure reports.
+Prepared local evidence includes real-checkout skips and hosted refusals plus
+functional policy fixtures. The initial actual-checkout policy assertions first
+failed twice under default execution, then passed within a 74-test focused run.
+Independent review reproduced that those assertions also rejected the supported
+policy-on rollback. They were removed; their exact source and RED/GREEN evidence
+remain retained. The functional tests exercise enabled, absent and disabled policy
+without requiring the deployment to remain in one state.
+
 Six separate real-checkout smoke commands prove both normal broad skips, direct
 hosted missing-force refusal for each target and nested hosted refusal for each.
-Both skips recorded null outcomes and started no host-budget child. Mandatory local
-and portable hygiene passed over the staged activation, and diff checking passed.
+Both skips recorded null outcomes and started no host-budget child. Existing
+fixture checks prove real focused execution, forced child status17 propagation
+and surviving success/failure reports. Corrective verification passed 42 tests
+with policy enabled, 42 with policy absent and 106 focused tests in the final
+policy-off checkout. Local and portable staged hygiene and diff checks passed;
+raw results are recorded on hq-c7e52c before the scoped review.
 
-No broad suite is rerun solely for this policy-off preparation. The accepted hosted
-inventory had 2,781 identities; the two new actual-checkout policy cases make the
-next expected inventory 2,783, with the same three accepted local integration skips.
-Only the final completed main run can establish its actual count and outcome.
-No latency obligation is retired from an unmerged branch, and retirement never
-claims performance verification.
+No broad suite is rerun solely for policy-off preparation or corrective review.
+The next expected inventory remains 2,781 identities with the same three accepted
+local integration skips. Only the final completed main run can establish its actual
+count and outcome. No latency obligation is retired from an unmerged branch, and
+retirement never claims performance verification.
 
 Rollback restores automatic_broad=true and the enabled local cadence, with focused
 checks and mandatory hygiene plus policy-required broad checks. Record the actual
