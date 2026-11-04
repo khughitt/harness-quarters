@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-d33cdc-test-policy
 created: 2026-11-03T11:30:43Z
-updated: 2026-11-04T00:14:11Z
+updated: 2026-11-04T00:14:45Z
 started: 2026-11-03T20:26:12Z
 depends: [hq-b32d19]
 parent: hq-d33cdc
@@ -83,4 +83,6 @@ Await review and approval of the complete hq-d33cdc plan. Execute Task 4: Verify
 - 2026-11-04T00:10:32Z (feat/hq-d33cdc-test-policy): parked (waiting on user, review): User reviews observed hosted coverage in docs/notes/2026-11-03-hq-test-policy-activation.md frozen at hq9b9c88ee6044a7af386919e10133c25b6b790e2a and accepts all three named local integration skips, including added owner-target validation; controller then verifies retained inputs and prepares/independently reviews concrete policy-off change before requesting separate activation, main integration and publication approval
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T00:14:11Z (feat/hq-d33cdc-test-policy): resumed
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T00:14:45Z (feat/hq-d33cdc-test-policy): User Accept in this turn explicitly accepts the observed hosted coverage in frozen packet9b9c88ee6044a7af386919e10133c25b6b790e2a: successful run41741765690 at855c814bc4805c7d682c81f847bcb79c7cc953c2,2778passed/3named local integration skips, including additional registered owner-target validation. This satisfies coverage acceptance only and authorizes preparing/reviewing the policy-off change as proposed; activation, main integration and publication remain separate later approval. Manifest3 all1254 members and manifests1/2/3 reverified before reuse; existing hydrated locked tree reused, baseline waiver unchanged. Main66129586 remains ancestor. New task-4-activation-* focused/regression/smoke/review artifacts will join parent-owned external workspace, mutable until next checkpoint; no independent child retained identity. Prior ledger preserved at progress-checkpoint-3.md.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
