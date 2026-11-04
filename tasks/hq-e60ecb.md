@@ -8,7 +8,7 @@ complexity: high
 process: direct
 owner: fix/hq-2dd09b
 created: 2026-11-04T11:51:39Z
-updated: 2026-11-04T12:54:38Z
+updated: 2026-11-04T13:04:01Z
 started: 2026-11-04T12:54:16Z
 depends: [hq-cc91d4]
 parent: hq-e10b76
@@ -34,3 +34,5 @@ Execute Task 4 of the proposed shared turn-pause plan, frozen in hq at 3c29183b0
 - 2026-11-04T12:54:16Z (fix/hq-2dd09b): started
   provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T12:54:38Z (fix/hq-2dd09b): arm: flow-trial-1 — unit tack-2dd09b — flow off
+- 2026-11-04T13:04:01Z (fix/hq-2dd09b): parked (waiting on user, review): User reviews the proposed schema addendum frozen in hq907404308e3172de57f81a9175ef7da46f0c988d:docs/specs/2026-11-04-turn-pause-ended-prompt-guards-design.md; after approval agent writes/freeze-reviews the plan update and resumes Task4 inline. Reproduction is intentionally RED; no lifecycle implementation written. Shared retained worktree and25-member execution workspace are verified and owned by open hq-c58737; no independent retained items or surviving processes.
+  provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
