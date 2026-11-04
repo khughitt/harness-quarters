@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-04T01:45:33Z
+updated: 2026-11-04T01:46:36Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -186,4 +186,6 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-04T00:39:09Z (feat/hq-d33cdc-test-policy): parked (waiting on user, approval): User reviews frozen hqbeea972e54acb9f9793880e1b2c1e4e4b9780478 docs/notes/2026-11-03-hq-test-policy-activation.md and authorizes two-stage main integration/activation and exactly one main verification push; controller then refreshes retained inputs/account/public standard-runner/readers preflight, integrates enabled preparation79140b92527cff5bdae81cc508d669c9b04588c3 then reviewed policy-off source, observes and reconciles exact forced main hosted result before registered-main-only latency retirement and closure
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T01:45:33Z (feat/hq-d33cdc-test-policy): resumed
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T01:46:36Z (feat/hq-d33cdc-test-policy): User Yes in this turn authorizes the reviewed frozen rolloutbeea972e54acb9f9793880e1b2c1e4e4b9780478: integrate enabled preparation79140b92527cff5bdae81cc508d669c9b04588c3 into main, record actual enabled event, integrate reviewed policy-off source, record actual disabled event and make exactly one main verification push with installed hygiene hook; observe its exact forced hosted result and retire only disabled registered-main timing obligations. No automatic remote retry/account/billing change/paid runner. All1297 manifest4 members and immutable manifests1-4 verified before reuse; existing hydrated locked worktree, adoption baseline waiver unchanged. Current public/named khughitt/standard ubuntu24.04/reader/instruction preflight passed, reader bytes equal reviewed versions, global account unchanged. Parent-owned new task-4-main-* rollout/API/push/evidence files join external workspace, mutable until next checkpoint; no child identities. Prior ledger exact bytes preserved by progress-checkpoint-4.md. Main clean at66129586 and still ancestor; enabled event will be recorded on feature before final fast-forward so no record-only divergence is introduced.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
