@@ -5,6 +5,8 @@ color = "#2f9fb1"
 scope = "Harness homes and the declared links that install the agent surface, harness settings and hook wiring, capability facts, state hygiene, the session archive, and the session-logs skill with its tools."
 
 [tags]
+rename-cutover = "Project-prefix rename cutover, rollback, and operator guidance."
+tests = "Existing tests and their assertions or execution failures."
 cross-project = "One piece of a goal that spans projects; its siblings live in the other projects."
 docs = "Guides and reference documents, and the checks that keep them true."
 flow = "Agent workflow experiments: distilled superpowers, explicit state machine, agent pairing."
