@@ -125,7 +125,7 @@ def link_report(tool):
 
 def project_row(root, command):
     """The `tasks projects` row registered at `root`: its prefix, and `records`, where its
-    task records live (tasks docs/specs/2026-10-22-records-home-design.md §3.1)."""
+    task records live (tasks docs/project-operations.md, Layout and adoption)."""
     root = Path(root).resolve()
     # Run where the root is: tasks reads the working directory, which a moved checkout
     # may have left behind in the caller's shell.
@@ -1243,7 +1243,8 @@ def verify(args):
     hex_ = sample_task(project_row(new_root, "verify")["records"], new)
     run("tasks", "show", f"{old}-{hex_}", cwd=new_root)
     # The registry's location history: the old id, the old root and a path under the old
-    # storage all answer the new prefix (tasks docs/specs/2026-10-06-project-resolution-design.md §4).
+    # storage all answer the new prefix (tasks docs/project-operations.md,
+    # Detached pairing and relocation).
     probes = [f"{old}-{hex_}", meta["checkout"]["root"]]
     if meta["storage_old"]:
         probes.append(str(Path(meta["storage_old"]) / "a-worktree"))

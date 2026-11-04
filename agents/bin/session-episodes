@@ -693,10 +693,9 @@ class TaskRecord:
 def resolve_ids(names: list[str], env: dict) -> tuple[dict[str, Path], dict[str, str]]:
     """Ask `tasks resolve` once about every id and prefix: the records directory of each
     project they resolve to, by live prefix, and each name's canonical form (an id, or a
-    live prefix). Records sit in the code checkout only for an in-tree project (tasks
-    docs/specs/2026-10-22-records-home-design.md §3.1).
-    An id written under a retired prefix follows its alias (tasks
-    docs/specs/2026-10-06-project-resolution-design.md §3). A name that does not resolve
+    live prefix). Records sit in the code checkout only for an in-tree project;
+    retired prefixes follow their aliases (tasks docs/project-operations.md,
+    Layout and adoption). A name that does not resolve
     is left out, so its anchor counts as unregistered."""
     if not names:
         return {}, {}
