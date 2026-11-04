@@ -9,7 +9,7 @@ process: direct
 needs: [quiet]
 owner: fix/hq-2dd09b
 created: 2026-11-04T11:51:39Z
-updated: 2026-11-04T18:40:53Z
+updated: 2026-11-04T18:40:55Z
 started: 2026-11-04T12:54:16Z
 depends: [hq-cc91d4]
 parent: hq-e10b76
@@ -62,4 +62,6 @@ Execute Task 4 of the proposed shared turn-pause plan, frozen in hq at 3c29183b0
 - 2026-11-04T18:37:59Z (fix/hq-2dd09b): Queue estimate25min, needs idle: preparation/native-width format-specific fixtures and both pilots5min, paired measurements15–18min, analysis2–5min; adjust estimate from pilots before extended runs. Previous candidate run at45d430de passed324 focused tests but failed every50ms p99 case (128.65/406.51 and166.57/206.44ms), with no controlled idle baseline/continuous contention evidence. An earlier site-startup invocation defect was corrected with RED/GREEN; preserve original invalid pilot as diagnostic only.
   provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T18:38:05Z (fix/hq-2dd09b): parked (waiting on user, quiet; idle, 25 min): When an idle host is handed over, agent resumes the approved comparison in .worktrees/hq-2dd09b: verify report46c0c321, canonical inputs and base freshness; prepare separate main/candidate formats and native-width fixtures and run both pilots5min; paired serial/concurrent measurements15–18min; analysis2–5min. Estimated25min, desktop may remain up. Prior candidate failed50ms p99 in all four cases (128.65/406.51 and166.57/206.44ms), cause unisolated; site-startup measurer defect was already fixed. Follow the report disposition, preserving50ms/128 events and stopping for any further design change. No live state or launcher changes; no activation. Shared retained items belong to hq-c58737; no independent scratch or surviving process.
+  provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T18:40:55Z (fix/hq-2dd09b): parked (waiting on user, quiet; idle, 25 min): When an idle host is handed over, agent starts hq-e60ecb in .worktrees/hq-2dd09b and acquires its exclusive quiet need; verify report46c0c321, canonical input hashes and base freshness; prepare separate main/candidate formats with native-width fixtures and inspect both pilots5min; paired serial/concurrent measurements15–18min; analysis2–5min. Estimate25min, desktop may remain up. Previous candidate failed50ms p99 in all four cases; storage/host cause unisolated, invocation defect fixed. Keep50ms/128 events; no live state, launcher, architecture or activation changes. Shared retained items belong to hq-c58737; no independent scratch or running process.
   provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
