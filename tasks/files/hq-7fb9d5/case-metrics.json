@@ -1,0 +1,195 @@
+[
+  {
+    "case": "mm",
+    "harness": "claude-code",
+    "session": "c67f4b5f-818d-4533-83b0-172009b992c2",
+    "cutoff": "2026-11-02T19:10:25Z",
+    "root_path": "/home/keith/.claude/projects/-mnt-ssd-Dropbox-multiple-myeloma/c67f4b5f-818d-4533-83b0-172009b992c2.jsonl",
+    "child_files": 16,
+    "turn_start": "2026-11-02T15:05:32Z",
+    "active_hours": 4.0806,
+    "calls": 59,
+    "spawns": 7,
+    "counted_compactions": 0,
+    "pause": {
+      "t": 1793646520.888,
+      "limit": "active",
+      "call_id": "toolu_01P1ARoy3timHQFiP4r6hKCT",
+      "agent": "a7aa75bc57c665645",
+      "active": 14588.857000112534,
+      "calls": 47,
+      "spawns": 7,
+      "compactions": 0
+    },
+    "last_usage": null
+  },
+  {
+    "case": "fam",
+    "harness": "claude-code",
+    "session": "f5ed2d6a-dc73-443e-ac25-c0a4357da4cb",
+    "cutoff": "2026-11-02T14:04:40Z",
+    "root_path": "/home/keith/.claude/projects/-mnt-ssd-Dropbox-familiar/f5ed2d6a-dc73-443e-ac25-c0a4357da4cb.jsonl",
+    "child_files": 31,
+    "turn_start": "2026-11-02T11:29:08Z",
+    "active_hours": 2.5912,
+    "calls": 140,
+    "spawns": 31,
+    "counted_compactions": 0,
+    "pause": {
+      "t": 1793628137.522,
+      "limit": "spawns",
+      "call_id": "toolu_01CngSUEgXmGE8zaYRMRoXy9",
+      "agent": "abcf4444b2198514a",
+      "active": 9189.200999975204,
+      "calls": 127,
+      "spawns": 31,
+      "compactions": 0
+    },
+    "last_usage": null
+  },
+  {
+    "case": "minutes",
+    "harness": "codex",
+    "session": "01a19f20-a422-75b0-8476-0ed9ba0dd8c9",
+    "cutoff": "2026-11-03T09:57:35Z",
+    "root_path": "/home/keith/.codex/sessions/2026/11/02/rollout-2026-11-02T20-57-58-01a19f20-a422-75b0-8476-0ed9ba0dd8c9.jsonl",
+    "child_files": 5,
+    "turn_start": "2026-11-03T09:39:44Z",
+    "active_hours": 0.2971,
+    "calls": 52,
+    "spawns": 0,
+    "counted_compactions": 0,
+    "pause": null,
+    "last_usage": {
+      "line": 835,
+      "timestamp": "2026-11-03T09:57:33.705Z",
+      "total": {
+        "input_tokens": 13835550,
+        "cached_input_tokens": 13380608,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 64359,
+        "reasoning_output_tokens": 13297,
+        "total_tokens": 13899909
+      }
+    },
+    "turn_input_tokens_delta": 5026472,
+    "turn_output_tokens_delta": 23295,
+    "distinct_usage_updates_in_turn": 45
+  },
+  {
+    "case": "warning-tasks",
+    "harness": "codex",
+    "session": "01a1a10b-15de-7a00-81ba-4469c83141b8",
+    "cutoff": "2026-11-03T21:28:45Z",
+    "root_path": "/home/keith/.codex/sessions/2026/11/03/rollout-2026-11-03T05-53-40-01a1a10b-15de-7a00-81ba-4469c83141b8.jsonl",
+    "child_files": 5,
+    "turn_start": "2026-11-03T15:38:37Z",
+    "active_hours": 5.8352,
+    "calls": 415,
+    "spawns": 1,
+    "counted_compactions": 0,
+    "pause": null,
+    "last_usage": {
+      "line": 4697,
+      "timestamp": "2026-11-03T21:28:44.071Z",
+      "total": {
+        "input_tokens": 102696593,
+        "cached_input_tokens": 100736256,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 657288,
+        "reasoning_output_tokens": 424239,
+        "total_tokens": 103353881
+      }
+    },
+    "turn_input_tokens_delta": 91569195,
+    "turn_output_tokens_delta": 590789,
+    "distinct_usage_updates_in_turn": 386
+  },
+  {
+    "case": "combined",
+    "harness": "codex",
+    "session": "01a1a10b-15de-7a00-81ba-4469c83141b8",
+    "cutoff": "2026-11-04T01:11:20Z",
+    "root_path": "/home/keith/.codex/sessions/2026/11/03/rollout-2026-11-03T05-53-40-01a1a10b-15de-7a00-81ba-4469c83141b8.jsonl",
+    "child_files": 5,
+    "turn_start": "2026-11-03T21:50:48Z",
+    "active_hours": 3.3415,
+    "calls": 445,
+    "spawns": 3,
+    "counted_compactions": 0,
+    "pause": null,
+    "last_usage": {
+      "line": 7713,
+      "timestamp": "2026-11-04T01:11:17.485Z",
+      "total": {
+        "input_tokens": 167891048,
+        "cached_input_tokens": 165150464,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 963257,
+        "reasoning_output_tokens": 620428,
+        "total_tokens": 168854305
+      }
+    },
+    "turn_input_tokens_delta": 65194455,
+    "turn_output_tokens_delta": 305969,
+    "distinct_usage_updates_in_turn": 307
+  },
+  {
+    "case": "spawn-tasks",
+    "harness": "codex",
+    "session": "01a1a368-49dd-7552-84a0-019d41d3bc0e",
+    "cutoff": "2026-11-04T02:21:26Z",
+    "root_path": "/home/keith/.codex/sessions/2026/11/03/rollout-2026-11-03T16-54-43-01a1a368-49dd-7552-84a0-019d41d3bc0e.jsonl",
+    "child_files": 30,
+    "turn_start": "2026-11-03T21:54:50Z",
+    "active_hours": 4.4429,
+    "calls": 326,
+    "spawns": 30,
+    "counted_compactions": 0,
+    "pause": null,
+    "last_usage": {
+      "line": 2960,
+      "timestamp": "2026-11-04T02:21:24.329Z",
+      "total": {
+        "input_tokens": 71718626,
+        "cached_input_tokens": 70706304,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 190083,
+        "reasoning_output_tokens": 121909,
+        "total_tokens": 71908709
+      }
+    },
+    "turn_input_tokens_delta": 71718626,
+    "turn_output_tokens_delta": 190083,
+    "distinct_usage_updates_in_turn": 315
+  },
+  {
+    "case": "warning-dots",
+    "harness": "codex",
+    "session": "01a1a0ca-e9f8-7e91-9095-4e88cd515d24",
+    "cutoff": "2026-11-04T03:23:25Z",
+    "root_path": "/home/keith/.codex/sessions/2026/11/03/rollout-2026-11-03T04-43-35-01a1a0ca-e9f8-7e91-9095-4e88cd515d24.jsonl",
+    "child_files": 13,
+    "turn_start": "2026-11-03T23:54:47Z",
+    "active_hours": 3.4762,
+    "calls": 388,
+    "spawns": 1,
+    "counted_compactions": 0,
+    "pause": null,
+    "last_usage": {
+      "line": 10021,
+      "timestamp": "2026-11-04T03:23:21.425Z",
+      "total": {
+        "input_tokens": 227591534,
+        "cached_input_tokens": 225335808,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 1161474,
+        "reasoning_output_tokens": 732446,
+        "total_tokens": 228753008
+      }
+    },
+    "turn_input_tokens_delta": 69472332,
+    "turn_output_tokens_delta": 356429,
+    "distinct_usage_updates_in_turn": 312
+  }
+]

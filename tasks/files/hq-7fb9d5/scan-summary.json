@@ -1,0 +1,13 @@
+{
+  "since": "2026-11-01T00:00:00Z",
+  "files": 854,
+  "files_by_harness": {
+    "claude-code": 656,
+    "codex": 198
+  },
+  "matches": 488,
+  "matched_files": 138,
+  "bytes": 1077536733,
+  "seconds": 119.44,
+  "parse_errors_on_matching_lines": []
+}
