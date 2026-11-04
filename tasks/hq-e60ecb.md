@@ -6,9 +6,10 @@ priority: 2
 size: m
 complexity: high
 process: direct
+needs: [quiet]
 owner: fix/hq-2dd09b
 created: 2026-11-04T11:51:39Z
-updated: 2026-11-04T18:38:05Z
+updated: 2026-11-04T18:40:53Z
 started: 2026-11-04T12:54:16Z
 depends: [hq-cc91d4]
 parent: hq-e10b76
