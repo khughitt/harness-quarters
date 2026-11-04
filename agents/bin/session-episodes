@@ -693,10 +693,9 @@ class TaskRecord:
 def resolve_ids(names: list[str], env: dict) -> tuple[dict[str, Path], dict[str, str]]:
     """Ask `tasks resolve` once about every id and prefix: the records directory of each
     project they resolve to, by live prefix, and each name's canonical form (an id, or a
-    live prefix). Records sit in the code checkout only for an in-tree project (tasks
-    docs/specs/2026-10-22-records-home-design.md §3.1).
-    An id written under a retired prefix follows its alias (tasks
-    docs/specs/2026-10-06-project-resolution-design.md §3). A name that does not resolve
+    live prefix). Records sit in the code checkout only for an in-tree project;
+    retired prefixes follow their aliases (tasks docs/project-operations.md,
+    Layout and adoption). A name that does not resolve
     is left out, so its anchor counts as unregistered."""
     if not names:
         return {}, {}
@@ -726,7 +725,8 @@ def _git(records: Path, *args: str) -> str:
 def task_copies(records: Path) -> tuple[list[Path], list[Path]]:
     """Every tasks/ directory holding this project's records: each worktree of the
     repository holding `records`, at the records directory's place in it, as tasks
-    enumerates sibling copies (records-home design §3.1). In-tree, that is the root and
+    enumerates sibling copies (tasks docs/project-operations.md, Layout and adoption).
+    In-tree, that is the root and
     each of its worktrees; a detached project's records repository keeps no worktrees,
     so it is the one copy under `records`."""
     listing = _git(records, "worktree", "list", "--porcelain")
