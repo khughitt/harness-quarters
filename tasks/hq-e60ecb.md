@@ -8,7 +8,7 @@ complexity: high
 process: direct
 owner: fix/hq-2dd09b
 created: 2026-11-04T11:51:39Z
-updated: 2026-11-04T13:04:01Z
+updated: 2026-11-04T16:14:05Z
 started: 2026-11-04T12:54:16Z
 depends: [hq-cc91d4]
 parent: hq-e10b76
@@ -35,4 +35,8 @@ Execute Task 4 of the proposed shared turn-pause plan, frozen in hq at 3c29183b0
   provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T12:54:38Z (fix/hq-2dd09b): arm: flow-trial-1 — unit tack-2dd09b — flow off
 - 2026-11-04T13:04:01Z (fix/hq-2dd09b): parked (waiting on user, review): User reviews the proposed schema addendum frozen in hq907404308e3172de57f81a9175ef7da46f0c988d:docs/specs/2026-11-04-turn-pause-ended-prompt-guards-design.md; after approval agent writes/freeze-reviews the plan update and resumes Task4 inline. Reproduction is intentionally RED; no lifecycle implementation written. Shared retained worktree and25-member execution workspace are verified and owned by open hq-c58737; no independent retained items or surviving processes.
+  provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T16:14:05Z (fix/hq-2dd09b): review: spec round 1 — verdict: accept; findings: none; reviewer: human
+  provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T16:14:05Z (fix/hq-2dd09b): This round1 belongs to the new ended-prompt-guard addendum, not the original spec. User explicitly replied Approve to the request naming frozen hq907404308e3172de57f81a9175ef7da46f0c988d:docs/specs/2026-11-04-turn-pause-ended-prompt-guards-design.md, SHA256009789ceebccd691d2022335192ce38b8745d0bac285ed4d22fb964c45449130. Frozen bytes reverified. Approval authorizes preparing the separately reviewed implementation-plan update; native inline method and separate activation gate remain unchanged.
   provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
