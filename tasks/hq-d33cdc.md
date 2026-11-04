@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-d33cdc-test-policy
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-04T00:32:48Z
+updated: 2026-11-04T00:36:16Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -173,3 +173,4 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-04T00:28:13Z (feat/hq-d33cdc-test-policy): review: impl round 6 — verdict: revise; findings: Important 1; reviewer: codex/gpt-6-astra
 - 2026-11-04T00:32:48Z (feat/hq-d33cdc-test-policy): Important rollback coupling corrected atbeea972e54acb9f9793880e1b2c1e4e4b9780478, covered flow36ebfcf12a06dc8c0c98f566ae6928536b06ed1b. Reproduction actualautomatic_broad=true RED2 with original checkout-state tests. Removed only that parametrized deployment-state assertion, preserving original source/raw RED/GREEN. Functional checks GREEN42/27.32s with actualpolicytrue, GREEN42/27.09s with policy absent, then exactoff restored and finalfocused106/78.43s passed. Local/portable staged hygiene and diffcheck0, actual commit hook passed. No production wrapper/driver/workflow or hosted boundary change; inventory returns2781. Corrective round1 requires fresh scoped review next; no broad rerun because invoking checkout policy is valid off. Registered main remains enabled/ancestor, no merge/push/latency retirement authorized. Review Declined-to-judge dispositions are explicit ledger Ruling lines with Why/Cost/references; no minors deferred.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T00:36:16Z (feat/hq-d33cdc-test-policy): review: impl round 7 — verdict: accept; findings: none; reviewer: codex/gpt-6-astra
