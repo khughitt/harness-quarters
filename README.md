@@ -565,7 +565,7 @@ line passes no `protocolVersion`; if it does, that option's value is the revisio
 ### Turn-pause limits
 
 `hq pause limits` shows the current defaults: 16 active hours, 500 root tool calls,
-30 tree spawns and 2 root compactions per turn. It and `hq pause status` write active time
+60 tree spawns and 2 root compactions per turn. It and `hq pause status` write active time
 with its units (`16h00m`, `0h16m`); `--json` gives seconds. The next hooked call after a limit is
 exceeded pauses the turn. Activity includes time with a tool in flight, including
 subagent work; it is not CPU time. Codex compactions are not counted by the hook.
@@ -577,15 +577,16 @@ the hook cannot count them.
 
 The 75% warning asks for a concise status update and preparation while authorized
 work continues. It is not a pause, a request for a new budget, or a new approval
-gate. Stop on an actual crossed limit or another genuine human gate. Reaching an
+gate. The spawn warning occurs at 45 of 60. Stop on an actual crossed limit or
+another genuine human gate. Reaching an
 exact limit is allowed: two root compactions under the default allowance remain
 within range; the third exceeds it. Do not add reviewers' calls to the root count.
 The [cutoff calibration](docs/notes/2026-11-02-active-cutoff-report.md) records the
 historical comparison and its limits; duration alone cannot prove a runaway.
 
 A first-line budget directive scales unnamed counts relative to the default:
-`budget: 12h` gives 375 calls, 23 spawns and 2 compactions, while `budget: 48h` gives
-1,500 calls, 90 spawns and 6 compactions. Named counts override scaling.
+`budget: 12h` gives 375 calls, 45 spawns and 2 compactions, while `budget: 48h` gives
+1,500 calls, 180 spawns and 6 compactions. Named counts override scaling.
 Changing the live limits file pauses existing turns with `limits-changed`; a new
 genuine user prompt starts a turn with the updated limits.
 

@@ -8,7 +8,14 @@ from turn_pause.limits import Limits
 from turn_pause.prompt import Budget
 
 
-def test_defaults_file(): assert limits.load()[0] == Limits(57600, 500, 30, 2)
+def test_defaults_file(): assert limits.load()[0] == Limits(57600, 500, 60, 2)
+
+
+def test_default_spawn_budgets_scale_and_named_agents_override():
+    defaults = limits.load()[0]
+    assert limits.with_budget(defaults, Budget(43200, None, None, None)).spawns == 45
+    assert limits.with_budget(defaults, Budget(172800, None, None, None)).spawns == 180
+    assert limits.with_budget(defaults, Budget(43200, None, 17, None)).spawns == 17
 
 def test_load_returns_file_sha256():
     assert limits.load()[1] == hashlib.sha256(limits.DEFAULTS_PATH.read_bytes()).hexdigest()

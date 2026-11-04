@@ -1,7 +1,9 @@
 # Default per-turn limits for hq's turn pause.
 # Spec: docs/specs/2026-11-01-turn-pause-design.md; values approved 2026-11-01.
 # Active cutoff recalibrated in hq-b2b50b: docs/notes/2026-11-02-active-cutoff-report.md.
+# Spawn headroom: approved docs/specs/2026-11-04-turn-pause-reliability-design.md;
+# this prepared change still requires separate live activation approval.
 active_seconds = 57600
 calls = 500
-spawns = 30
+spawns = 60
 compactions = 2

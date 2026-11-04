@@ -4,6 +4,13 @@ Type: reference. The protected-path guard permits validated filesystem reads
 without permitting writes or changing pause state. Read-only history commands
 will be documented here when their implementation is available.
 
+The prepared default allows 60 tree spawns, with a warning at 45. Reaching 60
+remains allowed; the next hooked decision after 61 spawns pauses the tree.
+Explicit agent budgets override proportional scaling. Existing 16-hour,
+500-root-call and two-root-compaction safeguards remain unchanged. Larger valid
+plans can still cross 60; the measurement and its limits are retained on
+hq-704fe5. Activation of a prepared default is a separate user-approved step.
+
 ## Inspecting protected paths
 
 Claude's native Read/Grep/Glob tools can inspect files. Both harnesses can use a

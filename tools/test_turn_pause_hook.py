@@ -381,7 +381,7 @@ def test_501st_root_call_is_denied_with_the_root_text_after_one_warning(tmp_path
     out = d.bash('ls')
     assert denied(out)
     assert reason(out) == ROOT_TEXT.format(limit='calls', a='0h08m', A='16h00m', c=501, C=500,
-                                           s=0, S=30, k=0, K=2)
+                                           s=0, S=60, k=0, K=2)
     assert 'stop the work you already started: interrupt your subagents and the sessions you launched' in reason(out)
     assert 'If another agent launched this session, park any claim --waiting-on agent' in reason(out)
     assert d.state().paused == 'calls' and len(notices) == 1
@@ -495,7 +495,7 @@ def test_continue_ends_the_pause_resets_counters_and_sets_no_budget(tmp_path, no
     assert st.budget_note is None and st.notified is False
 
 
-@pytest.mark.parametrize('hours, calls, spawns, compactions', [(12, 375, 23, 2), (48, 1500, 90, 6)])
+@pytest.mark.parametrize('hours, calls, spawns, compactions', [(12, 375, 45, 2), (48, 1500, 180, 6)])
 def test_budget_directive_scales_from_default(tmp_path, hours, calls, spawns, compactions):
     d = Driver(tmp_path, 'claude-code')
     out = d.prompt(f'budget: {hours}h\nRun the whole migration.')
@@ -538,9 +538,9 @@ def test_changed_limits_file_pauses_with_limits_changed_and_notifies(tmp_path, n
     write_limits(d.limits, calls=5000)
     out = d.bash('ls')
     assert denied(out)
-    assert reason(out) == LIMITS_CHANGED_TEXT.format(a='0h00m', A='16h00m', c=2, C=500, s=0, S=30, k=0, K=2)
+    assert reason(out) == LIMITS_CHANGED_TEXT.format(a='0h00m', A='16h00m', c=2, C=500, s=0, S=60, k=0, K=2)
     assert reason(out).startswith('turn paused: the turn limits file changed mid-turn (active 0h00m of 16h00m, '
-                                  'root calls 2/500, tree spawns 0/30, root compactions 0/2). Start nothing new and stop')
+                                  'root calls 2/500, tree spawns 0/60, root compactions 0/2). Start nothing new and stop')
     assert d.state().paused == 'limits-changed'
     assert len(notices) == 1
     assert denied(d.bash('touch y'))
@@ -644,14 +644,28 @@ def test_claude_refused_agent_call_spawns_nothing(tmp_path, notices):
 
 # --- Codex ----------------------------------------------------------------------------
 
-def test_codex_31_spawns_count_31_calls_and_spawns_then_the_tree_pauses(tmp_path, notices):
-    d = Driver(tmp_path, 'codex')
+@pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+@pytest.mark.parametrize('worker', [False, True])
+def test_default_spawns_warn_at_45_allow_60_then_pause_after_61(tmp_path, notices, harness, worker):
+    d = Driver(tmp_path, harness)
     d.prompt('fan out')
-    for i in range(31):
-        assert not denied(d('PreToolUse', codex_spawn(f'w{i}', d.call_id()))), i
-        d('SubagentStart', codex_subagent_start(f'01a19708-0000-0000-0000-{i:012d}'))
+    for i in range(61):
+        agent = 'parent-worker' if worker else None
+        if harness == 'codex':
+            pre = codex_spawn(f'w{i}', d.call_id(), agent=agent)
+        else:
+            data = fixture('claude-code-subagent-bash-denied.json', 'PreToolUse', 'Agent')['tool_input']
+            pre = claude_pre('Agent', data, d.call_id(), agent=agent)
+        out = d('PreToolUse', pre)
+        assert not denied(out), i
+        if i == 45:
+            assert context(out) == WARNING_TEXT.format(limit='tree spawns', n=75, used=45, value=60)
+        if harness == 'codex':
+            d('SubagentStart', codex_subagent_start(f'01a19708-0000-0000-0000-{i:012d}'))
+        if i == 59:
+            assert d.state().turn.spawns == 60 and d.state().paused is None
     st = d.state()
-    assert st.turn.calls == 31 and st.turn.spawns == 31
+    assert st.turn.calls == (0 if worker else 61) and st.turn.spawns == 61
     out = d.bash('ls', agent='01a19708-0000-0000-0000-000000000003')
     assert denied(out)
     assert d.state().paused == 'spawns'
