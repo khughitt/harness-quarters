@@ -7,7 +7,7 @@ size: xs
 complexity: low
 process: direct
 created: 2026-11-02T23:54:03Z
-updated: 2026-11-04T10:15:17Z
+updated: 2026-11-04T10:15:19Z
 depends: []
 parent: hq-2dd09b
 tags: [feedback, friction, "from:lore"]
@@ -27,3 +27,5 @@ User requested fixing this after accepting audit hq-7fb9d5. Align root refusal t
 
 - 2026-11-02T23:54:03Z (feedback): created
   provenance: {"harness_session":"codex:01a19eab-55ff-7ce1-a9ea-059b29926cd2","harness_session_source":"CODEX_THREAD_ID","origin":"agent"}
+- 2026-11-04T10:15:19Z (main): scope: scoped; user explicitly requested fixes after accepting the audit in this session. Original feedback preserved; current protection/refusal behavior verified by hq-7fb9d5 with source records and transcripts. No implementation or live activation performed.
+  provenance: {"harness_session":"codex:01a1a5e8-1e43-71c3-a5b1-6386809e007f","harness_session_source":"CODEX_THREAD_ID"}
