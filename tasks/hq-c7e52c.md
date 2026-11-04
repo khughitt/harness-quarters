@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-11-03T11:30:43Z
-updated: 2026-11-04T02:22:12Z
+updated: 2026-11-04T02:22:14Z
 started: 2026-11-03T20:26:12Z
 depends: [hq-b32d19]
 parent: hq-d33cdc
@@ -120,4 +120,6 @@ Await review and approval of the complete hq-d33cdc plan. Execute Task 4: Verify
 - 2026-11-04T02:20:25Z (main): Completion-helper first invocation from main with relative plan path refused exit2 before check/log/ledger mutation: workspace identity remains correctly bound to the original worktree plan file. Verified recorded plan-path exists and is byte-identical to main approved plan; rerunning from main with that exact absolute plan argument preserves identity, workspace and current-main verification. No migration/fallback or source change. Raw refusal receipt task-4-main-plan-completion-first-attempt.json retained.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T02:22:12Z (main): Final Task4 verification accounting: focused final helper42passed26.32s on registered main, merged-main106passed78.80s, functional rollback42on/42absent and off106 retained. Mandatory local/portable hygiene and diffcheck0 plus actual prepush hygiene0. Broad local suite deliberately omitted under validoff; actual prepush skip0.018s has null outcomes and is not a pass/sample; adoption baseline waived. Remote evidence exactmain74492240c223e4ad939b6506e77b5fc118e64ab9 run41756877253 success19m25s,2778passes3acceptedskips/all4reports/59modules/no exclusions. Independent final raw review accepts/no findings; all required rulings and no minors in parent progress.md. No latency/halt duties exist to retire. Parent hq-d33cdc remains open owner of integrated worktree, complete external workspace and all immutable manifests until observed cleanup/transfer toops-56aab7; child owns no independent item. One approved main push made; later task-only commits remain local. No surviving own process/check/reviewer, host pointer/service/account/billing change, or host installation; other worktree/independent project changes untouched.
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T02:22:14Z (main): gate: verified tree:36ebfcf12a06dc8c0c98f566ae6928536b06ed1b — checks: final helper42 passed and merged-main106 passed and hygiene0 and forced main CI41756877253 2778 passed 3 accepted integration skips and raw33file hashes verified; review: important addressed attr dependency declared, important addressed rollback state assertions removed; reviewer: codex/gpt-6-astra
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
