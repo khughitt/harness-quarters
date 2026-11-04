@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: feat/hq-d33cdc-test-policy
 created: 2026-11-03T11:30:43Z
-updated: 2026-11-04T00:14:45Z
+updated: 2026-11-04T00:18:43Z
 started: 2026-11-03T20:26:12Z
 depends: [hq-b32d19]
 parent: hq-d33cdc
@@ -85,4 +85,6 @@ Await review and approval of the complete hq-d33cdc plan. Execute Task 4: Verify
 - 2026-11-04T00:14:11Z (feat/hq-d33cdc-test-policy): resumed
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T00:14:45Z (feat/hq-d33cdc-test-policy): User Accept in this turn explicitly accepts the observed hosted coverage in frozen packet9b9c88ee6044a7af386919e10133c25b6b790e2a: successful run41741765690 at855c814bc4805c7d682c81f847bcb79c7cc953c2,2778passed/3named local integration skips, including additional registered owner-target validation. This satisfies coverage acceptance only and authorizes preparing/reviewing the policy-off change as proposed; activation, main integration and publication remain separate later approval. Manifest3 all1254 members and manifests1/2/3 reverified before reuse; existing hydrated locked tree reused, baseline waiver unchanged. Main66129586 remains ancestor. New task-4-activation-* focused/regression/smoke/review artifacts will join parent-owned external workspace, mutable until next checkpoint; no independent child retained identity. Prior ledger preserved at progress-checkpoint-3.md.
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T00:18:43Z (feat/hq-d33cdc-test-policy): Activation preparation frozen at0bbb4afceb27a22d4dc2c95884f9c2ceae774c4a, covered flowf46ac1d5d5d1fa1ecce49d177080e78fa720add4. Actual invoking-checkout tests RED2 default execution -> GREEN within74focused tests/41.24s after exact .tt.toml automatic_broad=false,broad_targets=[test,ci-test]. Real-checkout six-command smoke proves2null-outcome/no-budget skips,2direct hosted refusals and2nested hosted refusals. Existing fixture cases preserve forced17 failure and real focused execution. Staged local/portable hygiene and diffcheck each0. Baseline deliberately omitted; no broad rerun after valid branch policy-off, prior accepted hosted evidence retained. Registered main661295864cfbfe167a94020be9a9db9af600b94d still ancestor and enabled; no moved-base merge needed. Preparation anchor79140b92527cff5bdae81cc508d669c9b04588c3 remains without policy. Full branch fresh review covers prerequisites/preparation/corrections/accepted raw hosted coverage and final local policy-off change; remote activation/main merge/push still unapproved and future-gated. No completed Task4/parent claim.
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
