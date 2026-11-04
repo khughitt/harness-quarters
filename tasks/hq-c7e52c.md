@@ -6,9 +6,9 @@ priority: 1
 size: m
 complexity: mid
 process: direct
-owner: feat/hq-d33cdc-test-policy
+owner: main
 created: 2026-11-03T11:30:43Z
-updated: 2026-11-04T01:46:38Z
+updated: 2026-11-04T01:48:19Z
 started: 2026-11-03T20:26:12Z
 depends: [hq-b32d19]
 parent: hq-d33cdc
@@ -101,4 +101,6 @@ Await review and approval of the complete hq-d33cdc plan. Execute Task 4: Verify
 - 2026-11-04T01:45:56Z (feat/hq-d33cdc-test-policy): resumed
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T01:46:38Z (feat/hq-d33cdc-test-policy): User Yes in this turn authorizes the reviewed frozen rolloutbeea972e54acb9f9793880e1b2c1e4e4b9780478: integrate enabled preparation79140b92527cff5bdae81cc508d669c9b04588c3 into main, record actual enabled event, integrate reviewed policy-off source, record actual disabled event and make exactly one main verification push with installed hygiene hook; observe its exact forced hosted result and retire only disabled registered-main timing obligations. No automatic remote retry/account/billing change/paid runner. All1297 manifest4 members and immutable manifests1-4 verified before reuse; existing hydrated locked worktree, adoption baseline waiver unchanged. Current public/named khughitt/standard ubuntu24.04/reader/instruction preflight passed, reader bytes equal reviewed versions, global account unchanged. Parent-owned new task-4-main-* rollout/API/push/evidence files join external workspace, mutable until next checkpoint; no child identities. Prior ledger exact bytes preserved by progress-checkpoint-4.md. Main clean at66129586 and still ancestor; enabled event will be recorded on feature before final fast-forward so no record-only divergence is introduced.
+  provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T01:48:19Z (main): resumed
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
