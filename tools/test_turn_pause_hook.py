@@ -859,6 +859,21 @@ def test_session_end_removes_the_root_state(tmp_path):
     assert d.state() is None
 
 
+def test_history_late_scheduled_wake_cannot_resume_after_session_end(tmp_path):
+    """The captured wake is ordinary prompt text with no provenance marker."""
+    d = Driver(tmp_path, 'claude-code')
+    d.prompt('work')
+    wake = fixture('claude-code-ScheduleWakeup.json', 'UserPromptSubmit')
+    text = wake['prompt']
+    d('Stop', claude_stop([{'id': 'portable-wake', 'prompt': text}]))
+    before = d.state()
+    assert engine.prompt_kind(before, d.harness, text, d.t, None) == 'wake'
+    d('SessionEnd', claude_bare('SessionEnd', reason='other'))
+    assert d.state() is None
+    d('UserPromptSubmit', wake)
+    assert d.state() is None, 'a late unmarked wake must not create a new human turn'
+
+
 def test_post_tool_use_failure_closes_the_call(tmp_path):
     d = Driver(tmp_path, 'claude-code')
     d.prompt('work')
