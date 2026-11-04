@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: main
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-04T02:26:09Z
+updated: 2026-11-04T02:29:00Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -210,3 +210,5 @@ After approved activation, commit .tt.toml with real broad target names, verify 
 - 2026-11-04T02:26:07Z (main): gate: verified tree:36ebfcf12a06dc8c0c98f566ae6928536b06ed1b — checks: merged-main focused106 passed and final helper42 passed and hygiene0 and forced main CI41756877253 2778 passed 3 accepted local integration skips and raw33file hashes verified; review: important addressed ambient selector ignored by full suite, important addressed caller owned pilot evidence preserved, important addressed attr dependency declared, important addressed rollback state assertions removed; reviewer: codex/gpt-6-astra
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T02:26:09Z (main): retro: One shared suite with original node identities exposed hidden hosted prerequisites without dropping tests. Caller-owned raw evidence and independent reviews made coverage acceptance auditable; state-coupled policy tests were removed to preserve configuration rollback. Existing ops-a6f75a, ops-942e99 and flows-bf6d89 record tooling friction; no duplicate regret review or scheduler.
+- 2026-11-04T02:29:00Z (main): retained: {"version":1,"host":"titan","kind":"scratch","path":"$WORK_ROOT/hq/hq-d33cdc/plans/2026-11-03-test-execution-policy","state":"kept","verification":"verified","manifest":"$WORK_ROOT/hq/hq-d33cdc/retention-manifest-5.json","sha256":"12a9b3683b6fb56753a1a74350cb98f6b7c5c796b354305fe832840d2286e740","purpose":"Complete immutable final hq adoption execution proof, all hosted/local histories, raw reports, ledgers and independent reviews retained pending committed receiver-first transfer to existing ops-56aab7","next_owner":"task:hq-d33cdc","cleanup_trigger":"After verified receiving objects and exact payloads are committed on ops-56aab7, transfer source ownership in place without deleting raw evidence"}
+- 2026-11-04T02:29:00Z (main): retained: {"version":1,"host":"titan","kind":"evidence","path":"$WORK_ROOT/hq/hq-d33cdc/retention-manifest-5.json","state":"kept","verification":"verified","sha256":"12a9b3683b6fb56753a1a74350cb98f6b7c5c796b354305fe832840d2286e740","purpose":"Immutable final manifest5 for1380-entry adoption proof, preserving all previous manifest members and every progress-checkpoint1-5 ledger version; transfer with complete workspace","next_owner":"task:hq-d33cdc","cleanup_trigger":"After verified receiving manifest object is committed on ops-56aab7, transfer source ownership in place without deleting this immutable manifest"}
