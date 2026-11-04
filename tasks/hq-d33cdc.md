@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: main
 created: 2026-10-29T13:45:47Z
-updated: 2026-11-04T02:26:07Z
+updated: 2026-11-04T02:26:09Z
 started: 2026-11-03T10:19:41Z
 depends: [ops-68729d]
 tags: []
@@ -209,3 +209,4 @@ After approved activation, commit .tt.toml with real broad target names, verify 
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T02:26:07Z (main): gate: verified tree:36ebfcf12a06dc8c0c98f566ae6928536b06ed1b — checks: merged-main focused106 passed and final helper42 passed and hygiene0 and forced main CI41756877253 2778 passed 3 accepted local integration skips and raw33file hashes verified; review: important addressed ambient selector ignored by full suite, important addressed caller owned pilot evidence preserved, important addressed attr dependency declared, important addressed rollback state assertions removed; reviewer: codex/gpt-6-astra
   provenance: {"harness_session":"codex:01a1a0e6-b178-7e10-aacc-34aa3af75b7c","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T02:26:09Z (main): retro: One shared suite with original node identities exposed hidden hosted prerequisites without dropping tests. Caller-owned raw evidence and independent reviews made coverage acceptance auditable; state-coupled policy tests were removed to preserve configuration rollback. Existing ops-a6f75a, ops-942e99 and flows-bf6d89 record tooling friction; no duplicate regret review or scheduler.
