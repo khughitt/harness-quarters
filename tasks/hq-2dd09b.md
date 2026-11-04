@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: direct
 created: 2026-11-04T10:13:23Z
-updated: 2026-11-04T10:23:13Z
+updated: 2026-11-04T10:48:14Z
 depends: [lore-296a0f, obs-1450e7]
 tags: []
 source: hq-7fb9d5
@@ -34,3 +34,4 @@ This goal collects hq fixes and cross-project guidance/reporting prerequisites; 
 - 2026-11-04T10:17:03Z (main): Filing verification: seven executable corrective tasks are todo with explicit size, complexity and process: hq-51209b and lore-296a0f for warning/counter semantics, hq-704fe5 for measured spawn policy, hq-e10b76 and obs-1450e7 for history/reporting, reused hq-c58737 for read-only diagnostics/pointer audits, reused hq-5dc59c for goal authorization. Existing hq-5aa005 feedback waits on the shared protected-path fix; original feedback bodies remain intact. hq-b9d356 is an independent todo deferred until November 11, 2026, with no dependencies or parent hiding it behind completion. Current hq/lore/obs task checks all exit0 with zero errors; warnings5/14/3 are retained rather than silently fixed. No implementation, branch, worktree, scratch, host pointer, service, push or live policy activation occurred; tasks remain open for future execution. Process observation: host-load --section session reported nothing left running. The check-in is a dated tracker task, not an automatic notification.
 - 2026-11-04T10:23:11Z (main): trial: flow-trial-1 — enrolled — flow off
 - 2026-11-04T10:23:13Z (main): arm: flow-trial-1 — unit tack-2dd09b — flow off
+- 2026-11-04T10:48:14Z (fix/hq-2dd09b): Prepared hq-51209b/hq-5dc59c implementations accepted at f7259d9098f66ed2e60fa14f9aeb22824f2ba53d, plus shared spec for hq-c58737/hq-704fe5/hq-e10b76 frozen at95773e6eb742a3a4884126de9b93538be3676d84, accepted by independent builder. Full review reports and required scope rulings/Why/Cost, verification, retained evidence, trade-offs, exclusions and integration instructions are in .worktrees/hq-2dd09b/docs/notes/2026-11-04-turn-pause-handoff.md. No deferred minors; no plan ledger exists yet. Direct fixes await live activation approval, planned tasks await human design review before writing-plans. lore-296a0f matching guidance prepared in its own worktree; obs-1450e7 implementation still depends on the future history producer. Goal remains open; November11 reassessment unchanged.
