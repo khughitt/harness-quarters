@@ -317,11 +317,13 @@ def project_targets(manifest):
 
 def stage_project_targets(manifest, tmp_path, home):
     """Portable structural data; never treat it as proof that a live owner path exists."""
-    directory_targets = {"flows:evals", "flows:flow", "lore:profiles", "lore:vendor"}
+    directory_targets = {"flows:evals", "flows:flow", "lore:profiles", "lore:vendor",
+                         "lore:vendor/agent-skills/references"}
     shapes = []
     for prefix, relative in project_targets(manifest):
         directory = (f"{prefix}:{relative}" in directory_targets
-                     or (relative.startswith(("skills/", "vendor/superpowers/skills/"))
+                     or (relative.startswith(("skills/", "vendor/superpowers/skills/",
+                                               "vendor/agent-skills/skills/"))
                          and not Path(relative).suffix))
         if not directory and not (relative.startswith("bin/") or Path(relative).suffix):
             raise ValueError(f"declare the owner fixture shape: {prefix}:{relative}")
