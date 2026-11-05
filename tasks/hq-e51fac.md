@@ -1,13 +1,15 @@
 ---
 id: hq-e51fac
 title: Make automatic compaction advisory in turn-pause hook and CLI
-status: todo
+status: doing
 priority: 1
 size: s
 complexity: mid
 process: direct
+owner: main
 created: 2026-11-05T00:36:12Z
-updated: 2026-11-05T00:36:12Z
+updated: 2026-11-05T00:36:32Z
+started: 2026-11-05T00:36:32Z
 depends: []
 parent: hq-2dd09b
 tags: []
@@ -29,3 +31,4 @@ Where: tools/turn_pause/counters.py, tools/turn_pause/hook.py, tools/hq_cli/paus
 
 - 2026-11-05T00:36:12Z (add): created
   provenance: {"origin":"user"}
+- 2026-11-05T00:36:32Z (main): started
