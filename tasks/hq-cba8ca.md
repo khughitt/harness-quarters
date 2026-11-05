@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-11-05T09:58:20Z
-updated: 2026-11-05T11:25:00Z
+updated: 2026-11-05T11:26:00Z
 started: 2026-11-05T11:24:36Z
 depends: [ops-b4b162]
 tags: []
@@ -32,3 +32,4 @@ Done: focused RED-to-GREEN proves private-records evidence works with the old op
   provenance: {"harness_session":"codex:01a1ab05-ce9a-72d1-890e-c01268ef1193","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-05T11:24:58Z (main): trial: flow-trial-1 — enrolled — flow off
 - 2026-11-05T11:25:00Z (main): arm: flow-trial-1 — unit tack-cba8ca — flow off
+- 2026-11-05T11:26:00Z (fix/hq-cba8ca-records-evidence): Execution begins under approved ops inline plan Task 4, flow-trial-1 arm flow off. Created and locked .worktrees/hq-cba8ca on fix/hq-cba8ca-records-evidence at 1d0752c0; physical host-local storage on titan. just setup completed before tests/edits. This task owns that worktree through review/integration/disposal. Parent ops-7f0b75 owns shared execution workspace /mnt/ssd3/work/ops/ops-7f0b75/plans/public-docs-curation, where narrow test/review evidence for its deletion gate will be kept; no duplicate child workspace. Main preexisting agy/settings.json change is untouched; no host links or runtime are changed. Relevant focused baseline follows; broad baseline omitted under validated policy-off.
