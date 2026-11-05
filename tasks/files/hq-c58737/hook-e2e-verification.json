@@ -1,0 +1,352 @@
+{
+  "hook_bin": "<HQ_ROOT>/tools/turn-pause",
+  "claude_read_protected_stdout": "{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"turn-pause could not judge this call, so it is refused: ValueError: hook payload has no tool_use_id string\"}}\n",
+  "codex_readlink_protected_stdout": "{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"turn-pause could not judge this call, so it is refused: ValueError: hook payload has no tool_use_id string\"}}\n",
+  "history": {
+    "version": 1,
+    "observed_at": 1793911208.542735,
+    "host": "titan",
+    "coverage": {
+      "status": "available",
+      "scope": "local_store",
+      "observation": "per_root_atomic",
+      "store_exists": true,
+      "roots_observed": 2,
+      "active_roots": 1,
+      "ended_roots": 1,
+      "created_at_min": 1793911208.298089,
+      "retained_event_min_at": 1793911208.2977939,
+      "retained_event_max_at": 1793911208.4026864,
+      "dropped_events": 0,
+      "dropped_through_max": null,
+      "unobserved_roots": 0,
+      "disappeared_files": 0
+    },
+    "window": {
+      "session": null,
+      "harness": null,
+      "since": null,
+      "until": null,
+      "since_at": null,
+      "until_at": null,
+      "limit": 50
+    },
+    "events": [
+      {
+        "version": 1,
+        "harness": "codex",
+        "root": "e2e-codex-1",
+        "generation": "a06e70e6e985fa7aa0a1ee229f7cf63c",
+        "turn": 1,
+        "sequence": 1,
+        "host": "titan",
+        "at": 1793911208.4026864,
+        "kind": "turn_start",
+        "reason": "genuine_user",
+        "snapshot": {
+          "limits_sha": "2a5e91e408b84f0c86a00add8f6ed57502789ce90c4d8f8164df479e7a91daf6",
+          "paused": null,
+          "counted": {
+            "active": true,
+            "calls": true,
+            "spawns": true,
+            "compactions": false
+          },
+          "scopes": {
+            "active": "tree_active_seconds",
+            "calls": "root_attempts",
+            "spawns": "tree_started",
+            "compactions": "root"
+          },
+          "active": {
+            "used": 0.0,
+            "limit": 57600
+          },
+          "calls": {
+            "used": 0,
+            "limit": 500
+          },
+          "spawns": {
+            "used": 0,
+            "limit": 60
+          },
+          "compactions": {
+            "used": null,
+            "limit": 2
+          }
+        },
+        "notification": null,
+        "source": "hook"
+      },
+      {
+        "version": 1,
+        "harness": "claude-code",
+        "root": "e2e-claude-1",
+        "generation": "80d00e53b6d425593bf0a95647097652",
+        "turn": 1,
+        "sequence": 2,
+        "host": "titan",
+        "at": 1793911208.365655,
+        "kind": "session_end",
+        "reason": "session_end",
+        "snapshot": {
+          "limits_sha": "2a5e91e408b84f0c86a00add8f6ed57502789ce90c4d8f8164df479e7a91daf6",
+          "paused": null,
+          "counted": {
+            "active": true,
+            "calls": true,
+            "spawns": true,
+            "compactions": true
+          },
+          "scopes": {
+            "active": "tree_active_seconds",
+            "calls": "root_attempts",
+            "spawns": "tree_started",
+            "compactions": "root"
+          },
+          "active": {
+            "used": 0.0,
+            "limit": 57600
+          },
+          "calls": {
+            "used": 0,
+            "limit": 500
+          },
+          "spawns": {
+            "used": 0,
+            "limit": 60
+          },
+          "compactions": {
+            "used": 0,
+            "limit": 2
+          }
+        },
+        "notification": null,
+        "source": "hook"
+      },
+      {
+        "version": 1,
+        "harness": "claude-code",
+        "root": "e2e-claude-1",
+        "generation": "80d00e53b6d425593bf0a95647097652",
+        "turn": 1,
+        "sequence": 1,
+        "host": "titan",
+        "at": 1793911208.2977939,
+        "kind": "turn_start",
+        "reason": "genuine_user",
+        "snapshot": {
+          "limits_sha": "2a5e91e408b84f0c86a00add8f6ed57502789ce90c4d8f8164df479e7a91daf6",
+          "paused": null,
+          "counted": {
+            "active": true,
+            "calls": true,
+            "spawns": true,
+            "compactions": true
+          },
+          "scopes": {
+            "active": "tree_active_seconds",
+            "calls": "root_attempts",
+            "spawns": "tree_started",
+            "compactions": "root"
+          },
+          "active": {
+            "used": 0.0,
+            "limit": 57600
+          },
+          "calls": {
+            "used": 0,
+            "limit": 500
+          },
+          "spawns": {
+            "used": 0,
+            "limit": 60
+          },
+          "compactions": {
+            "used": 0,
+            "limit": 2
+          }
+        },
+        "notification": null,
+        "source": "hook"
+      }
+    ],
+    "truncated": false,
+    "retention": {
+      "idle_seconds": 604800,
+      "ended_seconds": 2592000,
+      "max_ended": 512,
+      "max_events_per_root": 128,
+      "max_bytes_per_root": 131072,
+      "max_maintenance_mutations": 32,
+      "ended_roots": 1,
+      "dropped_count": 0,
+      "dropped_through": null,
+      "dropped_roots": []
+    },
+    "cleanup_debt": 0,
+    "diagnostics": []
+  },
+  "list": {
+    "version": 1,
+    "observed_at": 1793911208.6448278,
+    "host": "titan",
+    "coverage": {
+      "status": "available",
+      "scope": "local_store",
+      "observation": "per_root_atomic",
+      "store_exists": true,
+      "roots_observed": 2,
+      "active_roots": 1,
+      "ended_roots": 1,
+      "created_at_min": 1793911208.298089,
+      "retained_event_min_at": 1793911208.2977939,
+      "retained_event_max_at": 1793911208.4026864,
+      "dropped_events": 0,
+      "dropped_through_max": null,
+      "unobserved_roots": 0,
+      "disappeared_files": 0
+    },
+    "window": {
+      "session": null,
+      "harness": null,
+      "since": null,
+      "until": null,
+      "since_at": null,
+      "until_at": null,
+      "limit": 50
+    },
+    "summaries": [
+      {
+        "harness": "codex",
+        "root": "e2e-codex-1",
+        "generation": "a06e70e6e985fa7aa0a1ee229f7cf63c",
+        "turn": 1,
+        "host": "titan",
+        "started_at": 1793911208.4026864,
+        "origin": "genuine_user",
+        "ended_at": null,
+        "end_kind": null,
+        "end_reason": null,
+        "first_event_at": 1793911208.4026864,
+        "last_event_at": 1793911208.4026864,
+        "last_sequence": 1,
+        "event_count": 1,
+        "event_kinds": [
+          "turn_start"
+        ],
+        "warnings": [],
+        "enforced_pause": null,
+        "notification": null,
+        "snapshot": {
+          "limits_sha": "2a5e91e408b84f0c86a00add8f6ed57502789ce90c4d8f8164df479e7a91daf6",
+          "paused": null,
+          "counted": {
+            "active": true,
+            "calls": true,
+            "spawns": true,
+            "compactions": false
+          },
+          "scopes": {
+            "active": "tree_active_seconds",
+            "calls": "root_attempts",
+            "spawns": "tree_started",
+            "compactions": "root"
+          },
+          "active": {
+            "used": 0.0,
+            "limit": 57600
+          },
+          "calls": {
+            "used": 0,
+            "limit": 500
+          },
+          "spawns": {
+            "used": 0,
+            "limit": 60
+          },
+          "compactions": {
+            "used": null,
+            "limit": 2
+          }
+        },
+        "root_active": true,
+        "root_ended_at": null,
+        "truncated": false
+      },
+      {
+        "harness": "claude-code",
+        "root": "e2e-claude-1",
+        "generation": "80d00e53b6d425593bf0a95647097652",
+        "turn": 1,
+        "host": "titan",
+        "started_at": 1793911208.2977939,
+        "origin": "genuine_user",
+        "ended_at": 1793911208.365655,
+        "end_kind": "session_end",
+        "end_reason": "session_end",
+        "first_event_at": 1793911208.2977939,
+        "last_event_at": 1793911208.365655,
+        "last_sequence": 2,
+        "event_count": 2,
+        "event_kinds": [
+          "turn_start",
+          "session_end"
+        ],
+        "warnings": [],
+        "enforced_pause": null,
+        "notification": null,
+        "snapshot": {
+          "limits_sha": "2a5e91e408b84f0c86a00add8f6ed57502789ce90c4d8f8164df479e7a91daf6",
+          "paused": null,
+          "counted": {
+            "active": true,
+            "calls": true,
+            "spawns": true,
+            "compactions": true
+          },
+          "scopes": {
+            "active": "tree_active_seconds",
+            "calls": "root_attempts",
+            "spawns": "tree_started",
+            "compactions": "root"
+          },
+          "active": {
+            "used": 0.0,
+            "limit": 57600
+          },
+          "calls": {
+            "used": 0,
+            "limit": 500
+          },
+          "spawns": {
+            "used": 0,
+            "limit": 60
+          },
+          "compactions": {
+            "used": 0,
+            "limit": 2
+          }
+        },
+        "root_active": false,
+        "root_ended_at": 1793911208.365655,
+        "truncated": false
+      }
+    ],
+    "truncated": false,
+    "retention": {
+      "idle_seconds": 604800,
+      "ended_seconds": 2592000,
+      "max_ended": 512,
+      "max_events_per_root": 128,
+      "max_bytes_per_root": 131072,
+      "max_maintenance_mutations": 32,
+      "ended_roots": 1,
+      "dropped_count": 0,
+      "dropped_through": null,
+      "dropped_roots": []
+    },
+    "cleanup_debt": 0,
+    "diagnostics": []
+  }
+}
