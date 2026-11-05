@@ -6,27 +6,79 @@ write makes its own exclusive temp file rather than importing tempfile.
 """
 from __future__ import annotations
 
-import contextlib
 import fcntl
-import json
-import math
 import os
 import stat
 import time
 
 from .counters import TurnState
 from .limits import Limits
-from .record import Record
-from .prompt import empty_guards
+from .record import Record, jencode_compact as _ENCODE, jloads_strict
 
 IDLE_SECONDS = 7 * 86400
 ENDED_SECONDS = 30 * 86400
 MAX_ENDED = 512
 MAX_MAINTENANCE = 32
+MAX_EVENTS = 128
+MAX_BYTES = 131072
+
+
+class _CM:
+    __slots__ = ('_gen',)
+
+    def __init__(self, gen):
+        self._gen = gen
+
+    def __enter__(self):
+        return next(self._gen)
+
+    def __exit__(self, exc_type, exc, tb):
+        if exc_type is None:
+            try:
+                next(self._gen)
+            except StopIteration:
+                return False
+            raise RuntimeError('generator did not stop')
+        try:
+            self._gen.throw(exc_type() if exc is None else exc)
+        except StopIteration as e:
+            return e is not exc
+        except BaseException as e:
+            if e is exc:
+                return False
+            raise
+        raise RuntimeError('generator did not stop after throw()')
+
+
+def _contextmanager(fn):
+    def helper(*args, **kwargs):
+        return _CM(fn(*args, **kwargs))
+    return helper
+
+
+def _empty_guards() -> dict:
+    return {'cron': [], 'wakeups': []}
 
 
 class StateError(Exception):
     """A state file is unreadable, unparsable or unwritable; the hook refuses the call."""
+
+
+class _LazyEvents:
+    __slots__ = ('raw', 'ctx', 'path')
+
+    def __init__(self, raw: str, ctx: tuple, path: str | None = None):
+        self.raw = raw
+        self.ctx = ctx
+        self.path = path
+
+    def load(self) -> list[dict]:
+        try:
+            return _validate_events(parse_json(self.raw), *self.ctx)
+        except Exception as e:
+            if self.path is not None:
+                raise StateError(f'cannot parse {self.path}: {type(e).__name__}: {e}') from e
+            raise
 
 
 class Wakeup(Record):
@@ -47,7 +99,17 @@ class RootRecord(Record):
                            'prompt_guards')
     _defaults = {'version': 1, 'turn_serial': 0, 'event_serial': 0, 'state': None,
                  'ended_at': None, 'dropped_count': 0, 'dropped_through': None}
-    _factories = {'events': list, 'prompt_guards': empty_guards}
+    _factories = {'events': list, 'prompt_guards': _empty_guards}
+
+    def __getattribute__(self, name: str):
+        val = object.__getattribute__(self, name)
+        if type(val) is _LazyEvents:
+            val = val.load()
+            object.__setattr__(self, name, val)
+        return val
+
+    def __reduce__(self):
+        return (type(self), self._astuple())
 
 
 def new_record(harness: str, root: str, now: float) -> RootRecord:
@@ -79,7 +141,7 @@ def _check(value, kind, what):
 
 def _num(value, what):
     result = float(_check(value, (int, float), what))
-    if not math.isfinite(result) or result < 0:
+    if not (0.0 <= result < float('inf')):
         raise ValueError(f'{what} must be finite and nonnegative')
     return result
 
@@ -144,7 +206,7 @@ def _turn_from_dict(t: dict) -> TurnState:
 def state_dict(st: RootState) -> dict:
     return {
         'harness': st.harness, 'root': st.root,
-        'turn': None if st.turn is None else json.loads(st.turn.to_json()),
+        'turn': None if st.turn is None else st.turn.to_dict(),
         'paused': st.paused, 'grace_used': st.grace_used,
         'workers': sorted(st.workers), 'worker_names': sorted(st.worker_names),
         'cron_jobs': st.cron_jobs,
@@ -185,33 +247,67 @@ def state_from_dict(d: dict) -> RootState:
     )
 
 
-def _unique(pairs):
-    result = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError('duplicate JSON key')
-        result[key] = value
-    return result
-
-
-def _constant(value):
-    raise ValueError('non-JSON numeric constant')
+_EVENTS_MARKER = '},"events":['
 
 
 def parse_json(text: str):
-    return json.loads(text, object_pairs_hook=_unique, parse_constant=_constant)
+    return jloads_strict(text)
 
 
 def record_json(record: RootRecord) -> str:
-    from .history import encode
-    data = record._asdict()
-    data['state'] = None if record.state is None else state_dict(record.state)
-    return encode(data)
+    raw_ev = object.__getattribute__(record, 'events')
+    header = {
+        'version': record.version,
+        'harness': record.harness,
+        'root': record.root,
+        'generation': record.generation,
+        'created_at': record.created_at,
+        'turn_serial': record.turn_serial,
+        'event_serial': record.event_serial,
+        'state': None if record.state is None else state_dict(record.state),
+        'ended_at': record.ended_at,
+        'dropped_count': record.dropped_count,
+        'dropped_through': record.dropped_through,
+        'prompt_guards': record.prompt_guards,
+    }
+    prefix = _ENCODE(header)
+    if type(raw_ev) is _LazyEvents:
+        return f'{prefix[:-1]},"events":{raw_ev.raw}}}'
+    return f'{prefix[:-1]},"events":{_ENCODE(raw_ev)}}}'
 
 
-def parse_record(text: str) -> RootRecord:
-    from .history import MAX_BYTES, MAX_EVENTS, encode, validate_event
-    d = _check(parse_json(text), dict, 'root record')
+def _validate_events(events, harness, root, generation, turn_serial, event_serial, dropped_count) -> list[dict]:
+    from .history import validate_event
+    events = _check(events, list, 'events')
+    if len(events) > MAX_EVENTS or len(_ENCODE(events).encode()) > MAX_BYTES:
+        raise ValueError('history exceeds its bounds')
+    previous = dropped_count
+    ident = (harness, root, generation)
+    for event in events:
+        validate_event(event)
+        if (event['harness'], event['root'], event['generation']) != ident:
+            raise ValueError('history identity differs')
+        if event['sequence'] != previous + 1 or event['turn'] > turn_serial:
+            raise ValueError('invalid history sequence/turn')
+        previous = event['sequence']
+    if previous != event_serial:
+        raise ValueError('history serial differs')
+    return events
+
+
+def parse_record(text: str, *, lazy_events: bool = False, path: str | None = None) -> RootRecord:
+    raw_candidate = None
+    d = None
+    if lazy_events and text.endswith(']}'):
+        idx = text.rfind(_EVENTS_MARKER)
+        guards_idx = text.rfind(',"prompt_guards":{"cron":')
+        if guards_idx != -1 and idx > guards_idx and (len(text) - idx) > 2048:
+            raw_candidate = text[idx + len(_EVENTS_MARKER) - 1:-1]
+            if len(raw_candidate.encode()) > MAX_BYTES:
+                raise ValueError('history exceeds its bounds')
+            d = _check(parse_json(text[:idx + 1] + ',"events":[]}'), dict, 'root record')
+    if d is None:
+        d = _check(parse_json(text), dict, 'root record')
     if 'version' not in d:
         raise ValueError('unversioned pause state needs explicit offline migration')
     if type(d['version']) is not int or d['version'] != 1:
@@ -234,19 +330,19 @@ def parse_record(text: str) -> RootRecord:
     d['state'] = None if d['state'] is None else state_from_dict(d['state'])
     if d['state'] is not None and (d['state'].harness, d['state'].root) != (d['harness'], d['root']):
         raise ValueError('active state identity differs')
-    events = _check(d['events'], list, 'events')
-    if len(events) > MAX_EVENTS or len(encode(events).encode()) > MAX_BYTES:
-        raise ValueError('history exceeds its bounds')
-    previous = d['dropped_count']
-    for event in events:
-        validate_event(event)
-        if (event['harness'], event['root'], event['generation']) != (d['harness'], d['root'], d['generation']):
-            raise ValueError('history identity differs')
-        if event['sequence'] != previous + 1 or event['turn'] > d['turn_serial']:
-            raise ValueError('invalid history sequence/turn')
-        previous = event['sequence']
-    if previous != d['event_serial']:
-        raise ValueError('history serial differs')
+    ctx = (d['harness'], d['root'], d['generation'], d['turn_serial'], d['event_serial'], d['dropped_count'])
+    if raw_candidate is not None:
+        count = d['event_serial'] - d['dropped_count']
+        prefix = (f'{{"version":1,"harness":{_ENCODE(d["harness"])},"root":{_ENCODE(d["root"])},'
+                  f'"generation":{_ENCODE(d["generation"])},"turn":')
+        if (0 < count <= MAX_EVENTS
+                and raw_candidate.count(prefix) == count
+                and raw_candidate.count(',"source":"hook"}') == count):
+            d['events'] = _LazyEvents(raw_candidate, ctx, path)
+            return RootRecord(**d)
+        d['events'] = _validate_events(parse_json(raw_candidate), *ctx)
+        return RootRecord(**d)
+    d['events'] = _validate_events(d['events'], *ctx)
     return RootRecord(**d)
 
 
@@ -277,29 +373,35 @@ def _validate_guards(value) -> None:
         raise ValueError('prompt_guards.wakeups must be sorted and unique')
 
 
-def write_atomic(path: str, data: bytes) -> None:
+def write_atomic(path: str, data: bytes, *, sync_dir: bool = True) -> None:
     """One durable replacement, also used by the explicit offline converter."""
     temporary = None
     try:
         temporary = f'{path}.{os.getpid()}.{os.urandom(6).hex()}.tmp'
         fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC, 0o600)
-        with os.fdopen(fd, 'wb') as output:
-            output.write(data)
-            output.flush()
-            os.fsync(output.fileno())
+        try:
+            view = memoryview(data)
+            while view:
+                view = view[os.write(fd, view):]
+            os.fsync(fd)
+        finally:
+            os.close(fd)
         os.replace(temporary, path)
         temporary = None
-        directory = os.open(os.path.dirname(path), os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
-        try:
-            os.fsync(directory)
-        finally:
-            os.close(directory)
+        if sync_dir:
+            directory = os.open(os.path.dirname(path), os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
     except OSError as error:
         raise StateError(f'cannot write {path}: {error}') from error
     finally:
         if temporary is not None:
-            with contextlib.suppress(OSError):
+            try:
                 os.unlink(temporary)
+            except OSError:
+                pass
 
 
 class Store:
@@ -315,13 +417,22 @@ class Store:
     def _path(self, name: str) -> str:
         return os.path.join(self.dir, name)
 
-    def _load(self, path: str) -> RootRecord | None:
+    def _load(self, path: str, *, lazy_events: bool = False) -> RootRecord | None:
         try:
             fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK)
-            with os.fdopen(fd, 'rb') as f:
-                if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):
+            try:
+                st = os.fstat(fd)
+                if not stat.S_ISREG(st.st_mode):
                     raise StateError(f'not a regular pause record: {path}')
-                text = f.read().decode()
+                chunks = []
+                while True:
+                    chunk = os.read(fd, max(65536, st.st_size + 1))
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                text = (chunks[0] if len(chunks) == 1 else b''.join(chunks)).decode()
+            finally:
+                os.close(fd)
         except FileNotFoundError:
             return None
         except OSError as e:
@@ -329,29 +440,34 @@ class Store:
         except UnicodeDecodeError as e:
             raise StateError(f'cannot parse {path}: {e}') from e
         try:
-            record = parse_record(text)
+            record = parse_record(text, lazy_events=lazy_events, path=path)
             if os.path.basename(path) != self._stem(record.harness, record.root) + '.json':
                 raise ValueError('record filename and identity differ')
             return record
         except Exception as e:  # any malformed content must refuse, never escape raw
             raise StateError(f'cannot parse {path}: {type(e).__name__}: {e}') from e
 
-    def _write(self, path: str, record: RootRecord) -> None:
-        write_atomic(path, record_json(record).encode())
+    def _write(self, path: str, record: RootRecord, *, sync_dir: bool = True) -> None:
+        write_atomic(path, record_json(record).encode(), sync_dir=sync_dir)
 
-    @contextlib.contextmanager
+    @_contextmanager
     def _flocked(self, stem: str) -> Iterator[str]:
         """Hold the exclusive lock on <stem>.lock. The lock file may be unlinked by remove
         and prune while held, so after flock the fd must still be the file at that path;
         otherwise a newer lock file exists and we retry on it."""
         lock = self._path(f'{stem}.lock')
-        try:
-            os.makedirs(self.dir, mode=0o700, exist_ok=True)
-        except OSError as e:
-            raise StateError(f'cannot create state directory {self.dir}: {e}') from e
         while True:
             try:
                 fd = os.open(lock, os.O_CREAT | os.O_RDWR | os.O_CLOEXEC, 0o600)
+            except FileNotFoundError:
+                try:
+                    os.makedirs(self.dir, mode=0o700, exist_ok=True)
+                except OSError as e:
+                    raise StateError(f'cannot create state directory {self.dir}: {e}') from e
+                try:
+                    fd = os.open(lock, os.O_CREAT | os.O_RDWR | os.O_CLOEXEC, 0o600)
+                except OSError as e:
+                    raise StateError(f'cannot open lock {lock}: {e}') from e
             except OSError as e:
                 raise StateError(f'cannot open lock {lock}: {e}') from e
             try:
@@ -370,20 +486,23 @@ class Store:
             finally:
                 os.close(fd)
 
-    @contextlib.contextmanager
+    @_contextmanager
     def locked(self, harness: str, root: str, *, create: bool = True) -> Iterator[RootRecord | None]:
         stem = self._stem(harness, root)
         path = self._path(f'{stem}.json')
         with self._flocked(stem):
-            record = self._load(path)
-            if record is None and create:
+            record = self._load(path, lazy_events=True)
+            creating = record is None
+            if creating and create:
                 record = new_record(harness, root, time.time())
+            before = None if record is None else (record.turn_serial, record.event_serial, record.ended_at)
             yield record
             if record is not None:
-                self._write(path, record)
+                sync_dir = creating or (record.turn_serial, record.event_serial, record.ended_at) != before
+                self._write(path, record, sync_dir=sync_dir)
 
     def read(self, harness: str, root: str) -> RootState | None:
-        record = self.read_record(harness, root)
+        record = self._load(self._path(f'{self._stem(harness, root)}.json'), lazy_events=True)
         return None if record is None else record.state
 
     def read_record(self, harness: str, root: str) -> RootRecord | None:
@@ -401,7 +520,7 @@ class Store:
     def latest_for_cwd(self, cwd: str) -> tuple[str, str] | None:
         best = None
         for path in self._files():
-            record = self._load(path)
+            record = self._load(path, lazy_events=True)
             st = None if record is None else record.state
             if st is None or st.cwd != cwd:
                 continue
@@ -412,7 +531,7 @@ class Store:
 
     def root_for_agent(self, harness: str, agent_id: str) -> str | None:
         for path in self._files():
-            record = self._load(path)
+            record = self._load(path, lazy_events=True)
             st = None if record is None else record.state
             if st is not None and st.harness == harness and agent_id in st.workers:
                 return st.root

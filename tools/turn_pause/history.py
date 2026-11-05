@@ -14,38 +14,50 @@ REASONS = {'turn_start': {'genuine_user', 'implicit'},
            'enforced_pause': {'active', 'calls', 'spawns', 'compactions', 'limits-changed'},
            'notification': {None}, 'turn_reset': {'genuine_user'},
            'turn_resume': {'genuine_user'}, 'session_end': {'session_end', 'idle'}}
-EVENT_FIELDS = {'version', 'harness', 'root', 'generation', 'turn', 'sequence', 'host',
-                'at', 'kind', 'reason', 'snapshot', 'notification', 'source'}
+EVENT_FIELDS = frozenset({'version', 'harness', 'root', 'generation', 'turn', 'sequence', 'host',
+                          'at', 'kind', 'reason', 'snapshot', 'notification', 'source'})
+SNAP_FIELDS = frozenset({*SCOPES, 'limits_sha', 'paused', 'counted', 'scopes'})
+PAUSE_REASONS = frozenset(REASONS['enforced_pause'] | {None})
+SCOPE_KEYS = frozenset(SCOPES)
+PAIR_KEYS = frozenset({'used', 'limit'})
+NOTICE_KEYS = frozenset({'outcome', 'error_code', 'desktop', 'relay', 'receipt', 'pause_sequence'})
+OUTCOMES = frozenset({'pending', 'attempted', 'error', 'unknown'})
+ERROR_CODES = frozenset({None, 'notify_failed'})
+_ENCODE = json.JSONEncoder(ensure_ascii=False, separators=(',', ':'), allow_nan=False).encode
+_HOST = os.uname().nodename
 
 
 def encode(value) -> str:
-    return json.dumps(value, ensure_ascii=False, separators=(',', ':'), allow_nan=False)
+    return _ENCODE(value)
 
 
 def _number(value, name, *, positive=False, integer=False):
-    types = (int,) if integer else (int, float)
-    if (type(value) not in types or (not integer and not math.isfinite(value))
-            or value < 0 or (positive and value == 0)):
+    t = type(value)
+    if integer:
+        if t is not int or value < 0 or (positive and value == 0):
+            raise ValueError(f'{name} must be a finite {"positive" if positive else "nonnegative"} number')
+    elif t not in (int, float) or not math.isfinite(value) or value < 0 or (positive and value == 0):
         raise ValueError(f'{name} must be a finite {"positive" if positive else "nonnegative"} number')
 
 
 def validate_snapshot(data):
     if data is None:
         return
-    if not isinstance(data, dict) or set(data) != {*SCOPES, 'limits_sha', 'paused', 'counted', 'scopes'}:
+    if type(data) is not dict or len(data) != 8 or data.keys() != SNAP_FIELDS:
         raise ValueError('invalid history snapshot fields')
-    if data['scopes'] != SCOPES or not isinstance(data['limits_sha'], str):
+    if data['scopes'] != SCOPES or type(data['limits_sha']) is not str:
         raise ValueError('invalid snapshot scope or limits digest')
-    if data['paused'] not in REASONS['enforced_pause'] | {None}:
+    if data['paused'] not in PAUSE_REASONS:
         raise ValueError('invalid snapshot pause reason')
     counted = data['counted']
-    if (not isinstance(counted, dict) or set(counted) != set(SCOPES)
-            or any(type(v) is not bool for v in counted.values())
-            or not all(counted[n] for n in ('active', 'calls', 'spawns'))):
+    if (type(counted) is not dict or len(counted) != 4 or counted.keys() != SCOPE_KEYS
+            or type(counted['active']) is not bool or type(counted['calls']) is not bool
+            or type(counted['spawns']) is not bool or type(counted['compactions']) is not bool
+            or not (counted['active'] and counted['calls'] and counted['spawns'])):
         raise ValueError('invalid metric countability')
-    for name in SCOPES:
+    for name in ('active', 'calls', 'spawns', 'compactions'):
         pair = data[name]
-        if not isinstance(pair, dict) or set(pair) != {'used', 'limit'}:
+        if type(pair) is not dict or len(pair) != 2 or pair.keys() != PAIR_KEYS:
             raise ValueError('invalid metric fields')
         _number(pair['limit'], f'{name}.limit', integer=True)
         if counted[name]:
@@ -55,27 +67,27 @@ def validate_snapshot(data):
 
 
 def validate_event(event):
-    if not isinstance(event, dict) or set(event) != EVENT_FIELDS:
+    if type(event) is not dict or len(event) != 13 or event.keys() != EVENT_FIELDS:
         raise ValueError('invalid history event fields')
     if type(event['version']) is not int or event['version'] != 1 or event['source'] != 'hook':
         raise ValueError('unsupported history event version/source')
     for name in ('harness', 'root', 'generation', 'host'):
-        if not isinstance(event[name], str) or not event[name] or len(event[name].encode()) > 255:
+        val = event[name]
+        if type(val) is not str or not val or (len(val) > 63 and len(val.encode()) > 255):
             raise ValueError(f'invalid history {name}')
-    for name in ('turn', 'sequence'):
-        _number(event[name], name, positive=True, integer=True)
+    _number(event['turn'], 'turn', positive=True, integer=True)
+    _number(event['sequence'], 'sequence', positive=True, integer=True)
     _number(event['at'], 'event.at')
     kind = event['kind']
-    if not isinstance(kind, str) or kind not in REASONS or event['reason'] not in REASONS[kind]:
+    if type(kind) is not str or kind not in REASONS or event['reason'] not in REASONS[kind]:
         raise ValueError('invalid history kind/reason')
     validate_snapshot(event['snapshot'])
     notice = event['notification']
     if notice is not None:
-        if (not isinstance(notice, dict)
-                or set(notice) != {'outcome', 'error_code', 'desktop', 'relay', 'receipt', 'pause_sequence'}
-                or notice['outcome'] not in {'pending', 'attempted', 'error', 'unknown'}
-                or notice['error_code'] not in {None, 'notify_failed'}
-                or any(notice[n] != 'unknown' for n in ('desktop', 'relay', 'receipt'))):
+        if (type(notice) is not dict or len(notice) != 6 or notice.keys() != NOTICE_KEYS
+                or notice['outcome'] not in OUTCOMES
+                or notice['error_code'] not in ERROR_CODES
+                or notice['desktop'] != 'unknown' or notice['relay'] != 'unknown' or notice['receipt'] != 'unknown'):
             raise ValueError('invalid notification outcome')
         _number(notice['pause_sequence'], 'pause_sequence', positive=True, integer=True)
 
@@ -84,14 +96,17 @@ def snapshot(state, *, compactions_counted: bool) -> dict | None:
     if state is None or state.turn is None:
         return None
     turn = state.turn
-    data = {'limits_sha': turn.limits_sha, 'paused': state.paused,
-            'counted': {n: n != 'compactions' or compactions_counted for n in SCOPES},
-            'scopes': dict(SCOPES)}
-    for name in SCOPES:
-        data[name] = {'used': (turn.active if name == 'active' else getattr(turn, name))
-                      if data['counted'][name] else None,
-                      'limit': turn.limits.active_seconds if name == 'active' else getattr(turn.limits, name)}
-    return data
+    limits = turn.limits
+    return {
+        'limits_sha': turn.limits_sha,
+        'paused': state.paused,
+        'counted': {'active': True, 'calls': True, 'spawns': True, 'compactions': bool(compactions_counted)},
+        'scopes': dict(SCOPES),
+        'active': {'used': turn.active, 'limit': limits.active_seconds},
+        'calls': {'used': turn.calls, 'limit': limits.calls},
+        'spawns': {'used': turn.spawns, 'limit': limits.spawns},
+        'compactions': {'used': turn.compactions if compactions_counted else None, 'limit': limits.compactions},
+    }
 
 
 def append_event(record, kind: str, now: float, *, reason: str | None,
@@ -99,7 +114,7 @@ def append_event(record, kind: str, now: float, *, reason: str | None,
                  turn: int | None = None) -> dict:
     event = dict(version=1, harness=record.harness, root=record.root, generation=record.generation,
                  turn=record.turn_serial if turn is None else turn, sequence=record.event_serial + 1,
-                 host=os.uname().nodename, at=now, kind=kind, reason=reason,
+                 host=_HOST, at=now, kind=kind, reason=reason,
                  snapshot=snapshot, notification=notification, source='hook')
     validate_event(event)
     if len(encode([event]).encode()) > MAX_BYTES:

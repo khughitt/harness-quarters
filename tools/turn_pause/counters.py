@@ -1,9 +1,7 @@
 """Turn counters: active time with in-flight calls, root calls, tree spawns, compactions."""
-import json
-
 from .events import USER_WAIT_TOOLS, Event
 from .limits import Limits
-from .record import Record
+from .record import Record, jdumps, jloads
 
 IDLE_GAP_SECONDS = 600
 WARN_FRACTION = (3, 4)
@@ -17,18 +15,21 @@ class TurnState(Record):
     _defaults = {'active': 0.0, 'calls': 0, 'spawns': 0, 'compactions': 0, 'last_t': None}
     _factories = {'in_flight': dict, 'tools': dict, 'spawn_keys': set, 'warned': set}
 
-    def to_json(self) -> str:
+    def to_dict(self) -> dict:
         data = self._asdict()
         data['limits'] = self.limits._asdict()
         data['in_flight'] = dict(self.in_flight)
         data['tools'] = dict(self.tools)
         data['spawn_keys'] = sorted(self.spawn_keys)
         data['warned'] = sorted(self.warned)
-        return json.dumps(data)
+        return data
+
+    def to_json(self) -> str:
+        return jdumps(self.to_dict())
 
     @classmethod
     def from_json(cls, text: str) -> 'TurnState':
-        data = json.loads(text)
+        data = jloads(text)
         data['limits'] = Limits(**data['limits'])
         data['spawn_keys'] = set(data['spawn_keys'])
         data['warned'] = set(data['warned'])

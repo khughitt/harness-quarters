@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from . import counters
 from .counters import TurnState
-from .prompt import is_genuine
 from .record import Frozen
 
 # A ScheduleWakeup prompt is pending from a minute before its fire time to ten after.
@@ -71,6 +70,7 @@ def prompt_kind(rs: RootState, harness: str, text: str, now: float, agent: str |
             return 'wake'
     if any(p.strip() == said for p in rs.cron_jobs.values()):
         return 'wake'
+    from .prompt import is_genuine
     if not is_genuine(text, harness):
         return 'injected'
     return 'turn'

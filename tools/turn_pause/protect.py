@@ -44,6 +44,11 @@ def touches_protected(tool_input: dict, paths: Sequence[Path]) -> bool:
     """Whether any string in the input names a protected path, in full or with ~.
     A string match: it raises the bar, it is not a sandbox. Raises TooManyNodes past
     MAX_NODES."""
+    # One search per needle over all strings joined by NUL, which no path contains, so a
+    # match never spans two strings: linear, and fast on multi-megabyte inputs.
+    text = '\0'.join(_strings(tool_input))
+    if not text or (os.sep not in text and '~' not in text and all(os.sep in str(p) for p in paths)):
+        return False
     home = os.path.expanduser('~')
     needles = set()
     for path in paths:
@@ -52,9 +57,6 @@ def touches_protected(tool_input: dict, paths: Sequence[Path]) -> bool:
             needles.add(form)
             if form.startswith(home + os.sep):
                 needles.add('~' + form[len(home):])
-    # One search per needle over all strings joined by NUL, which no path contains, so a
-    # match never spans two strings: linear, and fast on multi-megabyte inputs.
-    text = '\0'.join(_strings(tool_input))
     return any(needle in text for needle in needles)
 
 

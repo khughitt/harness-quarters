@@ -316,3 +316,27 @@ def test_history_failed_end_preserves_active_state_and_guards(tmp_path, monkeypa
     with pytest.raises(StateError):
         store.end('codex', 'r1', 2, compactions_counted=False)
     assert (tmp_path / 'codex-r1.json').read_bytes() == before
+
+
+def test_history_lazy_events_roundtrip_and_corrupt_tail_refusal(tmp_path):
+    import copy
+    import pickle
+    store = Store(tmp_path)
+    seeded(store)
+    with store.locked('codex', 'r1') as record:
+        for i in range(128):
+            add(record, float(10 + i))
+    with store.locked('codex', 'r1') as record:
+        record.state.turn.calls += 1
+    got = store.read_record('codex', 'r1')
+    assert len(got.events) == 128 and got.state.turn.calls == 1
+    with store.locked('codex', 'r1') as record:
+        assert copy.deepcopy(record) == got
+        assert pickle.loads(pickle.dumps(record)) == got
+    path = tmp_path / 'codex-r1.json'
+    path.write_text(path.read_text().replace('"reason":"calls"', '"reason":"invalid"', 1))
+    with pytest.raises(StateError):
+        store.read_record('codex', 'r1')
+    with pytest.raises(StateError):
+        with store.locked('codex', 'r1') as record:
+            _ = len(record.events)

@@ -7,7 +7,6 @@ uses DEFAULTS_FILE, a str.
 """
 from __future__ import annotations
 
-import math
 import os
 
 from .record import Frozen
@@ -42,8 +41,17 @@ def sha256_hex(data: bytes) -> str:
 
 
 def file_sha256(path) -> str:
-    with open(path, 'rb') as f:
-        return sha256_hex(f.read())
+    fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC)
+    try:
+        chunks = []
+        while True:
+            chunk = os.read(fd, 65536)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        return sha256_hex(chunks[0] if len(chunks) == 1 else b''.join(chunks))
+    finally:
+        os.close(fd)
 
 
 def load(path=DEFAULTS_FILE) -> tuple[Limits, str]:
@@ -68,6 +76,7 @@ def load(path=DEFAULTS_FILE) -> tuple[Limits, str]:
 
 def with_budget(defaults: Limits, budget) -> Limits:
     """Scale unnamed limits by budget.seconds over the default; named counts override."""
+    import math
     from fractions import Fraction
     factor = Fraction(budget.seconds, defaults.active_seconds)
 

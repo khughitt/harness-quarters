@@ -9,7 +9,6 @@ The heavy imports are local to send(), which runs only when a pause fires.
 """
 from __future__ import annotations
 
-import json
 import os
 import time
 
@@ -49,6 +48,7 @@ def _desktop(title: str, body: str, env: Mapping[str, str]) -> str | None:
 
 
 def _relay(title: str, body: str, env: Mapping[str, str], agent: str | None, cwd: str | None) -> str | None:
+    import json
     import socket
     import uuid
     deadline = time.monotonic() + TIMEOUT

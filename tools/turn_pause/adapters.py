@@ -12,11 +12,10 @@ compactions.
 """
 from __future__ import annotations
 
-import json
 import os
 
 from .events import USER_WAIT_TOOLS, Event
-from .record import Frozen
+from .record import Frozen, jloads
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.dirname(HERE)
@@ -55,14 +54,19 @@ def _from_data(data) -> Facts:
 
 def load_facts() -> Facts:
     """The facts the hook reads, from the checked-in snapshot."""
-    with open(SNAPSHOT) as f:
-        return _from_data(json.load(f))
+    fd = os.open(SNAPSHOT, os.O_RDONLY | os.O_CLOEXEC)
+    try:
+        raw = os.read(fd, 65536)
+    finally:
+        os.close(fd)
+    return _from_data(jloads(raw))
 
 
 def snapshot_text() -> str:
     """The snapshot as tools/harness-facts reports the facts now."""
     import importlib.machinery
     import importlib.util
+    import json
     loader = importlib.machinery.SourceFileLoader('harness_facts', FACTS_TOOL)
     spec = importlib.util.spec_from_loader('harness_facts', loader)
     module = importlib.util.module_from_spec(spec)

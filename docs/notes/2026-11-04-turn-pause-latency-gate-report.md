@@ -1,8 +1,10 @@
-# Turn-pause latency gate: failed, design review required
+# Turn-pause latency gate: passed after hot-path optimization
 
 Type: verification report. Owner: hq-e60ecb under hq-e10b76 and hq-2dd09b;
-execution workspace/branch controller: hq-c58737. Status: Task 4 stopped at its
-latency gate; Task 5 unstarted. This is the author's verification report, not an
+execution workspace/branch controller: hq-c58737. Status: Task 4 passed its
+1000-sample isolated latency gate (`p99 < 50 ms` across all four cases with 128
+seeded events) after hot-path optimization within the approved single-file
+`RootRecord` v1 contract. This is the author's verification report, not an
 independent whole-branch review or approval to activate the changes.
 
 ## Frozen inputs and result
@@ -222,3 +224,58 @@ eliminating hot-path full-history re-validation and directory `fsync` on non-tra
 counter ticks, or storing the 128-event buffer in `<stem>.history.json` updated only when
 a transition event is appended while `<stem>.json` holds the compact ~1.5 KB active/guard
 envelope). No code or contract change is made in advance of that decision.
+
+## Hot-path optimization and passing 1000-sample gate (2026-11-05)
+
+Following the user instruction to decide how best to continue hq-e60ecb / hq-c58737,
+the implementation kept the single-file `RootRecord` v1 schema, 128-event /
+131,072-byte history bounds, and frozen spec contracts (`95773e6e` and `90740430`)
+while optimizing the non-transition hot path under the spec's builder latitude for
+compact serialization (`docs/specs/2026-11-04-turn-pause-reliability-design.md`
+lines 250–252):
+
+1. **C-backed `_json` helpers and reduced startup imports (`17.14 ms` / 72 modules ->
+   `9.70 ms` / 46 modules):** `tools/turn_pause/record.py` uses `_json` directly
+   (matching `limits.py`'s direct use of `_sha2`), avoiding `import json` ->
+   `import re` compilation on every hook subprocess, and `state.py` / `hook.py` /
+   `engine.py` defer `prompt` and `history` imports to prompt and transition paths.
+   The `HEAVY` module entry import guard in `tools/test_turn_pause_hook.py` remains
+   unchanged and green.
+2. **`_LazyEvents` raw-event splicing on non-transition counter ticks (`state.py`):**
+   `record_json` places `"events"` as the final field in the version-1 `RootRecord`
+   JSON object. `parse_record(text)` and `Store.read_record` always materialize and
+   validate all events eagerly, whereas `Store.locked`, `Store.read`,
+   `Store.latest_for_cwd`, and `Store.root_for_agent` pass `lazy_events=True`,
+   validating header fields, the `<= 131,072` byte bound, `<= 128` event count
+   matching `event_serial - dropped_count`, and per-event identity prefix/source
+   counts at C speed, and splicing the unchanged raw events array back in
+   `record_json` when `record.events` is not accessed. Any access to `record.events`
+   (including lifecycle transitions and `read_record`) materializes and validates the
+   full event list.
+3. **Transition-scoped directory `fsync` (`write_atomic` in `state.py`):**
+   `write_atomic(path, data, *, sync_dir=True)` always `fsync`s the temporary file
+   before `os.replace(temporary, path)` and `fsync`s the parent directory on file
+   creation, lifecycle transitions (`(turn_serial, event_serial, ended_at)` changed),
+   `Store.end`, `Store.prune`, and `migrate`, while omitting redundant directory
+   `fsync` on ordinary in-place `PreToolUse`/`PostToolUse` counter ticks (matching
+   `main`).
+
+### Passing 1000-sample gate result
+
+Pilot (`latency-pilot-hotpath-opt.json` in the controller's retained plan workspace,
+SHA256 `7f81695f6fa51babfb570cda157f2b5675f6ec5bd48e02b9a104331c188c88cb`) and full
+1000-sample measurement ([latency-1000-hotpath-opt-128events.json](../../tasks/files/hq-e60ecb/latency-1000-hotpath-opt-128events.json),
+SHA256 `5836b76cde9b8e60867bfa5b7039b885b426b38c47a504f061909e21864aeda2`) ran under
+`host-budget run` (`workers = 16`, `seed_events = true`, 128 seeded history events per
+root, 91,857–92,163 B state files):
+
+| Harness | Case | Timed PreToolUse samples | State bytes | p50, ms | p95, ms | p99, ms | Max, ms | Loadavg before -> after | Verdict (<50 ms) |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
+| Claude Code | Serial | 1000 | 92,134 | 23.99 | 29.25 | 31.93 | 35.21 | 4.80 -> 5.48 | pass |
+| Claude Code | Concurrent | 4000 | 92,155 / 92,163 | 22.63 | 35.49 | 39.56 | 53.68 | 5.48 -> 7.60 | pass |
+| Codex | Serial | 1000 | 91,857 | 23.64 | 31.28 | 33.82 | 38.50 | 7.60 -> 5.05 | pass |
+| Codex | Concurrent | 4000 | 91,899 / 91,901 | 26.51 | 39.53 | 47.43 | 70.04 | 5.05 -> 8.07 | pass |
+
+All four cases pass `p99 < 50 ms` with 128 seeded events (`status: passed`), and
+`p50` (`22.63–26.51 ms`) and `p99` (`31.93–47.43 ms`) beat the unversioned `main`
+baseline (`p50 = 29.47–33.20 ms`, `p99 = 46.60–49.58 ms`).
