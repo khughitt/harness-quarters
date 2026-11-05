@@ -131,8 +131,13 @@ def _cross_host(seen):
     return found
 
 
-def _controller_helpers():
-    return inventory._helpers({"hq": str(window.CHECKOUT), "home": str(hosts._home())})
+def _controller_helpers(observed):
+    # Both host inventories bind private evidence; the controller independently hashes its code.
+    if observed is None:
+        return None
+    evidence = {f"ops:{name}": observed["members"].get(f"ops:{name}")
+                for name in inventory.EVIDENCE}
+    return inventory.helper_fingerprints(window.CHECKOUT, evidence)
 
 
 def _sessions(report):
@@ -233,7 +238,7 @@ def prepare(controller_session: str) -> dict:
                          "native session ID, a lowercase UUID")
         root = _root()
         _open(root)
-        controller, seen = _controller_helpers(), {}
+        seen = {}
         for host in HOST_ORDER:
             observed = _observe(host, active=None, complete=False,
                                 titan_head=_titan_base(seen))
@@ -243,6 +248,7 @@ def prepare(controller_session: str) -> dict:
                              log=observed["log"], blockers=observed["blockers"])
             seen[host] = observed
         manifest = seen["titan"]["manifest"]
+        controller = _controller_helpers(seen["titan"]["inventory"]["helpers"])
         crossing = _cross_host(seen) + [
             f"controller: helpers: {drift} in the controller checkout {window.CHECKOUT}"
             for drift in _helper_drift(manifest["helpers"], controller)]
@@ -304,7 +310,8 @@ def check(prepared: dict, *, opened: dict | None = None) -> dict:
         blockers += seen[host]["blockers"] + _drift(host, prepared, seen[host])
     blockers += _cross_host(seen)
     blockers += [f"controller: helpers: {drift} in the controller checkout {window.CHECKOUT}"
-                 for drift in _helper_drift(prepared["helpers"], _controller_helpers())]
+                 for drift in _helper_drift(prepared["helpers"],
+                                            _controller_helpers(seen["titan"]["inventory"]["helpers"]))]
     return {"eligible": not blockers, "blockers": blockers,
             "prepared_sha256": prepared_sha256(prepared),
             "logs": {host: seen[host]["log"] for host in HOST_ORDER},
