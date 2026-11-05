@@ -4,8 +4,8 @@ title: Assess project-colored task identifiers in Antigravity assistant output
 status: idea
 priority: 2
 created: 2026-11-05T11:39:22Z
-updated: 2026-11-05T14:17:22Z
-depends: []
+updated: 2026-11-05T14:17:24Z
+depends: [hq-7826fd]
 parent: hq-49ed70
 tags: [feedback, idea, "from:lore"]
 agent: codex
