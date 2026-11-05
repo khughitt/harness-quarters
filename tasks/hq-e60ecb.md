@@ -9,7 +9,7 @@ process: direct
 needs: [quiet]
 owner: fix/hq-2dd09b
 created: 2026-11-04T11:51:39Z
-updated: 2026-11-05T03:19:13Z
+updated: 2026-11-05T10:02:14Z
 started: 2026-11-04T12:54:16Z
 depends: [hq-cc91d4]
 parent: hq-e10b76
@@ -72,3 +72,4 @@ Execute Task 4 of the proposed shared turn-pause plan, frozen in hq at 3c29183b0
 - 2026-11-05T03:19:10Z (fix/hq-2dd09b): run: 47 min (est 25, idle); prep 17, measurements 16, analysis 14; failed: candidate p99 59.59-69.04 ms (128 events) and 53.91-64.47 ms (1 event) exceed 50 ms gate on idle host while main passes at 46.60-49.58 ms
 - 2026-11-05T03:19:11Z (fix/hq-2dd09b): Controlled idle-host diagnostic complete at hq fb3337d3d583db592481b5c09466476cced7c6af:docs/notes/2026-11-04-turn-pause-latency-gate-report.md (SHA256 0866da1c9e413ca1f9da5a08d7b763001d0e618ff7e37016836555877909e2f2) after merging advanced main (4971a8c4) at 0a8907a4 (685 passed in 29.69s; 324 passed in 26.84s; check-hygiene clean). Portable 1000-sample results are attached (latency-1000-main.json, latency-1000-candidate-128events.json, latency-1000-candidate-1event.json); raw outputs remain in hq-c58737's 59-member workspace. Component breakdown isolates +1.43-1.59 ms per-write directory fsync in write_atomic and +4.81 ms CPU + 0.48 ms file fsync per 128-event (92 KB) JSON parse/validate/re-encode/write on top of main's 29.5 ms p50 / 46.60-49.58 ms p99 baseline (27.01 ms python3 -S + hook import + 1.85 ms file fsync).
 - 2026-11-05T03:19:13Z (fix/hq-2dd09b): parked (waiting on user, decision): User reviews the controlled idle-host latency diagnostic and design-revision recommendation in hq fb3337d3d583db592481b5c09466476cced7c6af:docs/notes/2026-11-04-turn-pause-latency-gate-report.md (SHA256 0866da1c9e413ca1f9da5a08d7b763001d0e618ff7e37016836555877909e2f2) and decides whether to revise hot-path history persistence (e.g., touching the 128-event history only on lifecycle transition events and omitting directory fsync / full-history revalidation on ordinary PreToolUse/PostToolUse counter ticks); after approval agent updates the spec/plan and resumes Task 4 in .worktrees/hq-2dd09b. Shared worktree and 59-member workspace remain retained under open hq-c58737; no surviving processes or host pointer changes.
+- 2026-11-05T10:02:14Z (fix/hq-2dd09b): resumed
