@@ -35,7 +35,7 @@ CODEX_ROOT = '01a19737-5420-7280-9b27-80cdf4ba57c6'
 
 ROOT_TEXT = (
     'turn paused: {limit} over its limit (active {a} of {A}, calls {c}/{C}, spawns {s}/{S}, '
-    'compactions {k}/{K}). Start nothing new and stop the work you already started: interrupt '
+    'compactions {k}/{K} (advisory)). Start nothing new and stop the work you already started: interrupt '
     'your subagents and the sessions you launched, stop your background calls and processes, '
     'and set any active goal of yours to paused. Then write the pause report the turn-pause '
     'rule describes, park your task --waiting-on user --reason decision, and end your turn. If '
@@ -49,7 +49,7 @@ CHILD_TEXT = (
     'pause report.')
 LIMITS_CHANGED_TEXT = (
     'turn paused: the turn limits file changed mid-turn (active {a} of {A}, calls {c}/{C}, spawns {s}/{S}, '
-    'compactions {k}/{K}). ' + ROOT_TEXT[ROOT_TEXT.index('Start nothing new'):])
+    'compactions {k}/{K} (advisory)). ' + ROOT_TEXT[ROOT_TEXT.index('Start nothing new'):])
 WARNING_TEXT = 'turn-pause: {limit} at {n}% ({used} of {value}). Finish a coherent step and prepare your report.'
 COMPACTION_WARNING_TEXT = (
     'turn-pause: compactions at {used} of {value} (advisory). Compaction does not pause the turn; '
@@ -514,7 +514,7 @@ def test_changed_limits_file_pauses_with_limits_changed_and_notifies(tmp_path, n
     assert denied(out)
     assert reason(out) == LIMITS_CHANGED_TEXT.format(a='0h00m', A='16h00m', c=2, C=500, s=0, S=30, k=0, K=2)
     assert reason(out).startswith('turn paused: the turn limits file changed mid-turn (active 0h00m of 16h00m, '
-                                  'calls 2/500, spawns 0/30, compactions 0/2). Start nothing new and stop')
+                                  'calls 2/500, spawns 0/30, compactions 0/2 (advisory)). Start nothing new and stop')
     assert d.state().paused == 'limits-changed'
     assert len(notices) == 1
     assert denied(d.bash('touch y'))

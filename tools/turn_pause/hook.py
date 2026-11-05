@@ -50,7 +50,7 @@ OUTPUT_EVENTS = ('PreToolUse', 'UserPromptSubmit')
 
 ROOT_TEXT = (
     'turn paused: {limit} over its limit (active {a} of {A}, calls {c}/{C}, spawns {s}/{S}, '
-    'compactions {k}/{K}). Start nothing new and stop the work you already started: interrupt '
+    'compactions {k}/{K} (advisory)). Start nothing new and stop the work you already started: interrupt '
     'your subagents and the sessions you launched, stop your background calls and processes, '
     'and set any active goal of yours to paused. Then write the pause report the turn-pause '
     'rule describes, park your task --waiting-on user --reason decision, and end your turn. If '
@@ -63,7 +63,7 @@ CHILD_TEXT = (
     'for your controller, and return a short status (done, left, running). Do not write a '
     'pause report.')
 LIMITS_CHANGED_HEAD = ('turn paused: the turn limits file changed mid-turn (active {a} of {A}, calls {c}/{C}, '
-                       'spawns {s}/{S}, compactions {k}/{K}). ')
+                       'spawns {s}/{S}, compactions {k}/{K} (advisory)). ')
 WARNING_TEXT = 'turn-pause: {limit} at {n}% ({used} of {value}). Finish a coherent step and prepare your report.'
 COMPACTION_WARNING_TEXT = (
     'turn-pause: compactions at {used} of {value} (advisory). Compaction does not pause the turn; '
@@ -354,7 +354,7 @@ def _last_wakeup(rs: RootState, text) -> Wakeup | None:
 def _notice(rs: RootState, harness: str, root: str, limit: str) -> tuple[str, str]:
     c = _counts(rs)
     body = (f'{harness} session {root} in {rs.cwd or "an unknown directory"}: active {c["a"]} of {c["A"]}, calls {c["c"]}/{c["C"]}, '
-            f'spawns {c["s"]}/{c["S"]}, compactions {c["k"]}/{c["K"]}. Reply in the session to resume.')
+            f'spawns {c["s"]}/{c["S"]}, compactions {c["k"]}/{c["K"]} (advisory). Reply in the session to resume.')
     return f'turn paused ({limit})', body
 
 
