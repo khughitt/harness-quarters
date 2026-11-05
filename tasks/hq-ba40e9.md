@@ -4,7 +4,7 @@ title: "Probe whether a Codex compaction fires a hook, to give Codex a compactio
 status: idea
 priority: 2
 created: 2026-11-02T00:06:03Z
-updated: 2026-11-02T00:06:03Z
+updated: 2026-11-05T01:34:52Z
 depends: []
 tags: []
 source: "claude-code:536b5ebf-5753-4a8b-ac83-61dde5ef4c79"
@@ -18,3 +18,4 @@ Follow-up of hq-9aa713. Task 1 left Codex hook-compact-event unknown: two isolat
 
 - 2026-11-02T00:06:03Z (add): created
   provenance: {"harness_session":"claude-code:536b5ebf-5753-4a8b-ac83-61dde5ef4c79","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
+- 2026-11-05T01:34:52Z (main): Context update from hq-1942a1 and hq-e51fac: automatic compactions are now advisory-only in turn-pause (hq pause status prints 'compactions -/2 (advisory, unhooked)' rather than '(count your own)', and counters.crossed checks only active, calls, and spawns). If this probe later shows a Codex compaction hook event fires, wiring it feeds the advisory compaction counter and one-time warning rather than a hard pause; offline Codex rollout transcripts already record compaction boundaries as type='compacted' and event_msg payload.type='context_compacted'.
