@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-11-05T09:58:20Z
-updated: 2026-11-05T11:26:00Z
+updated: 2026-11-05T11:32:50Z
 started: 2026-11-05T11:24:36Z
 depends: [ops-b4b162]
 tags: []
@@ -33,3 +33,4 @@ Done: focused RED-to-GREEN proves private-records evidence works with the old op
 - 2026-11-05T11:24:58Z (main): trial: flow-trial-1 — enrolled — flow off
 - 2026-11-05T11:25:00Z (main): arm: flow-trial-1 — unit tack-cba8ca — flow off
 - 2026-11-05T11:26:00Z (fix/hq-cba8ca-records-evidence): Execution begins under approved ops inline plan Task 4, flow-trial-1 arm flow off. Created and locked .worktrees/hq-cba8ca on fix/hq-cba8ca-records-evidence at 1d0752c0; physical host-local storage on titan. just setup completed before tests/edits. This task owns that worktree through review/integration/disposal. Parent ops-7f0b75 owns shared execution workspace /mnt/ssd3/work/ops/ops-7f0b75/plans/public-docs-curation, where narrow test/review evidence for its deletion gate will be kept; no duplicate child workspace. Main preexisting agy/settings.json change is untouched; no host links or runtime are changed. Relevant focused baseline follows; broad baseline omitted under validated policy-off.
+- 2026-11-05T11:32:50Z (fix/hq-cba8ca-records-evidence): Relevant baseline: 50 passed, 343 deselected in 99.40s via just test-one tools/test_relay_cutover_bootstrap.py tools/test_relay_cutover_transport.py -k inventory-or-manifest-or-dry_copy (actual quoted expression in parent hq-baseline.log). Broad baseline deliberately omitted by validated policy-off. Private-path RED: 6 failed before implementation; initial GREEN 6 passed. Caller scan additionally found tools/relay-cutover evidence() reads a computed old path; bootstrap inventory invokes it, so it is included with its own tests as a necessary consumer correction. Shared reply/path validation will preserve the standalone bounded runner and bootstrap owned-child route; no new option, live bootstrap, host pointer or activation. Parent ledger records Why/Cost and revision references.
