@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "operation_id": "73b1c5a5770788adae080f0a30042da0",
+  "host": "titan",
+  "inputs": [
+    {
+      "task": "hq-c58737",
+      "basis": {
+        "project": "hq",
+        "layout": "in-tree",
+        "records_subdir": ".",
+        "commit": "a76c127aba15ef128be8bd7cf7396293ce133652",
+        "task_path": "tasks/hq-c58737.md",
+        "retained_ref": "refs/heads/main"
+      }
+    }
+  ],
+  "declarations": [
+    {
+      "kind": "scratch",
+      "path": "$WORK_ROOT/hq/hq-c58737/plans/turn-pause-reliability/",
+      "purpose": "Preserve execution ledger, prior versions, and correctness/latency/review evidence until goal closeout",
+      "cleanup_trigger": "After hq-2dd09b and obs-1450e7 close, recheck every manifest member before workspace disposal"
+    },
+    {
+      "kind": "evidence",
+      "path": "$WORK_ROOT/hq/hq-c58737/activation-20261105/",
+      "purpose": "Preserve pre-activation v0 live-state backup, migration receipt, and post-cutover CLI/hook verification outputs across rollback eligibility and goal closeout",
+      "cleanup_trigger": "After hq-2dd09b and hq-b9d356 close, verify disposition before removing raw backup and receipts"
+    }
+  ],
+  "preserved_previous": [],
+  "resolutions": [
+    {
+      "bad": {
+        "basis": {
+          "project": "hq",
+          "layout": "in-tree",
+          "records_subdir": ".",
+          "commit": "a76c127aba15ef128be8bd7cf7396293ce133652",
+          "task_path": "tasks/hq-c58737.md",
+          "retained_ref": "refs/heads/main"
+        },
+        "ordinal": 31
+      },
+      "declarations": [
+        {
+          "kind": "scratch",
+          "path": "$WORK_ROOT/hq/hq-c58737/plans/turn-pause-reliability/",
+          "purpose": "Preserve execution ledger, prior versions, and correctness/latency/review evidence until goal closeout",
+          "cleanup_trigger": "After hq-2dd09b and obs-1450e7 close, recheck every manifest member before workspace disposal"
+        }
+      ],
+      "reason": "Corrected historical worktree-relative manifest path to canonical attachment location"
+    },
+    {
+      "bad": {
+        "basis": {
+          "project": "hq",
+          "layout": "in-tree",
+          "records_subdir": ".",
+          "commit": "a76c127aba15ef128be8bd7cf7396293ce133652",
+          "task_path": "tasks/hq-c58737.md",
+          "retained_ref": "refs/heads/main"
+        },
+        "ordinal": 51
+      },
+      "declarations": [
+        {
+          "kind": "scratch",
+          "path": "$WORK_ROOT/hq/hq-c58737/plans/turn-pause-reliability/",
+          "purpose": "Preserve execution ledger, prior versions, and correctness/latency/review evidence until goal closeout",
+          "cleanup_trigger": "After hq-2dd09b and obs-1450e7 close, recheck every manifest member before workspace disposal"
+        }
+      ],
+      "reason": "Corrected historical worktree-relative manifest path to canonical attachment location"
+    },
+    {
+      "bad": {
+        "basis": {
+          "project": "hq",
+          "layout": "in-tree",
+          "records_subdir": ".",
+          "commit": "a76c127aba15ef128be8bd7cf7396293ce133652",
+          "task_path": "tasks/hq-c58737.md",
+          "retained_ref": "refs/heads/main"
+        },
+        "ordinal": 64
+      },
+      "declarations": [
+        {
+          "kind": "scratch",
+          "path": "$WORK_ROOT/hq/hq-c58737/plans/turn-pause-reliability/",
+          "purpose": "Preserve execution ledger, prior versions, and correctness/latency/review evidence until goal closeout",
+          "cleanup_trigger": "After hq-2dd09b and obs-1450e7 close, recheck every manifest member before workspace disposal"
+        }
+      ],
+      "reason": "Corrected historical worktree-relative manifest path to canonical attachment location"
+    },
+    {
+      "bad": {
+        "basis": {
+          "project": "hq",
+          "layout": "in-tree",
+          "records_subdir": ".",
+          "commit": "a76c127aba15ef128be8bd7cf7396293ce133652",
+          "task_path": "tasks/hq-c58737.md",
+          "retained_ref": "refs/heads/main"
+        },
+        "ordinal": 73
+      },
+      "declarations": [
+        {
+          "kind": "scratch",
+          "path": "$WORK_ROOT/hq/hq-c58737/plans/turn-pause-reliability/",
+          "purpose": "Preserve execution ledger, prior versions, and correctness/latency/review evidence until goal closeout",
+          "cleanup_trigger": "After hq-2dd09b and obs-1450e7 close, recheck every manifest member before workspace disposal"
+        }
+      ],
+      "reason": "Corrected historical worktree-relative manifest path to canonical attachment location"
+    },
+    {
+      "bad": {
+        "basis": {
+          "project": "hq",
+          "layout": "in-tree",
+          "records_subdir": ".",
+          "commit": "a76c127aba15ef128be8bd7cf7396293ce133652",
+          "task_path": "tasks/hq-c58737.md",
+          "retained_ref": "refs/heads/main"
+        },
+        "ordinal": 81
+      },
+      "declarations": [
+        {
+          "kind": "scratch",
+          "path": "$WORK_ROOT/hq/hq-c58737/plans/turn-pause-reliability/",
+          "purpose": "Preserve execution ledger, prior versions, and correctness/latency/review evidence until goal closeout",
+          "cleanup_trigger": "After hq-2dd09b and obs-1450e7 close, recheck every manifest member before workspace disposal"
+        }
+      ],
+      "reason": "Corrected historical worktree-relative manifest path to canonical attachment location"
+    }
+  ]
+}
