@@ -4,8 +4,8 @@ title: "Probe whether a Codex compaction fires a hook, to give Codex a compactio
 status: idea
 priority: 2
 created: 2026-11-02T00:06:03Z
-updated: 2026-11-05T02:15:41Z
-depends: []
+updated: 2026-11-05T02:15:43Z
+depends: [hq-a5a449]
 parent: hq-8f5670
 tags: [hooks]
 source: "claude-code:536b5ebf-5753-4a8b-ac83-61dde5ef4c79"
