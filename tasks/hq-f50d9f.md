@@ -1,15 +1,17 @@
 ---
 id: hq-f50d9f
 title: Expose read-only history/list and the obs handoff
-status: doing
+status: done
 priority: 2
 size: m
 complexity: mid
 process: direct
 owner: fix/hq-2dd09b
 created: 2026-11-04T11:51:44Z
-updated: 2026-11-05T11:06:26Z
+updated: 2026-11-05T11:23:46Z
 started: 2026-11-05T11:06:26Z
+completed: 2026-11-05T11:23:46Z
+closed: 2026-11-05T11:23:46Z
 depends: [hq-e60ecb]
 parent: hq-e10b76
 tags: []
@@ -36,3 +38,5 @@ Execute Task 5 of the proposed shared turn-pause plan, frozen in hq at 3c29183b0
 - 2026-11-04T12:32:37Z (fix/hq-2dd09b): parked (waiting on agent, dependency): Agent executes approved Task 5 inline in .worktrees/hq-2dd09b after its preceding dependency completes; shared workspace is owned by hq-c58737. No user execution approval remains pending; activation is separate.
   provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-05T11:06:26Z (fix/hq-2dd09b): started
+- 2026-11-05T11:23:46Z (fix/hq-2dd09b): done
+- 2026-11-05T11:23:46Z (fix/hq-2dd09b): Task 5 complete at 3a377ba7cf377ba79b0d633c7067be8cf0484454: implemented read-only hq pause history and hq pause list in tools/hq_cli/pause.py, classified hq pause history|list as grace-spending reads in tools/turn_pause/allowlist.py (preserving status|limits as bookkeeping), created portable A-G and control handoff fixtures in tools/fixtures/turn-pause/history/obs-handoff-cases.json (SHA256 2f5e852c72c73348e55de29a4addde85b2af5001bc01689398aa1b9f61d43deb), updated docs/turn-pause-history.md, docs/runbooks/turn-pause-activation.md, and README.md, and recorded the frozen schema/fixture revision on obs-1450e7. Passed 383 focused tests (task-5-tests-WpqB9c.log) and 702 tests across all 11 turn-pause test modules (task5-green.log) plus mandatory just check-hygiene. Full ledger in /mnt/ssd3/work/hq/hq-c58737/plans/turn-pause-reliability/progress.md owned by open controller hq-c58737.
