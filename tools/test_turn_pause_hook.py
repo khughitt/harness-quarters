@@ -51,7 +51,10 @@ LIMITS_CHANGED_TEXT = (
     'turn paused: the turn limits file changed mid-turn (active {a} of {A}, calls {c}/{C}, spawns {s}/{S}, '
     'compactions {k}/{K}). ' + ROOT_TEXT[ROOT_TEXT.index('Start nothing new'):])
 WARNING_TEXT = 'turn-pause: {limit} at {n}% ({used} of {value}). Finish a coherent step and prepare your report.'
-BUDGET_TEXT = 'turn-pause: budget for this turn: active {a}, {c} calls, {s} spawns, {k} compactions.'
+COMPACTION_WARNING_TEXT = (
+    'turn-pause: compactions at {used} of {value} (advisory). Compaction does not pause the turn; '
+    'continue authorized work while active, calls and spawns remain within their limits.')
+BUDGET_TEXT = 'turn-pause: budget for this turn: active {a}, {c} calls, {s} spawns, {k} compactions (advisory).'
 MALFORMED_TEXT = ('turn-pause: the first line looks like a budget but does not parse ({reason}); '
                   'the default limits apply. Mention it in your next report; do not stop for it.')
 WAKE_TEXT = ('turn-pause: this prompt matches a pending scheduled prompt and was read as a scheduled '
@@ -739,6 +742,21 @@ def test_claude_compaction_counts_once_and_the_summarizer_stop_changes_nothing(t
     st = d.state()
     assert st.turn.compactions == 1
     assert st.workers == workers and child['tool_use_id'] in st.turn.in_flight
+
+
+def test_claude_third_compaction_warns_once_as_advisory_and_never_pauses(tmp_path, notices):
+    d = Driver(tmp_path, 'claude-code')
+    d.prompt('work')
+    for _ in range(2):
+        assert d('PostCompact', claude_bare('PostCompact', trigger='auto', compact_summary='...')) is None
+    out = d.bash('ls')
+    assert not denied(out)
+    assert context(out) == COMPACTION_WARNING_TEXT.format(used=2, value=2)
+    assert d('PostCompact', claude_bare('PostCompact', trigger='auto', compact_summary='...')) is None
+    out = d.bash('ls')
+    assert out is None
+    st = d.state()
+    assert st.turn.compactions == 3 and st.paused is None and notices == []
 
 
 # --- notification and state -----------------------------------------------------------

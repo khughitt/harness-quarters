@@ -12,7 +12,7 @@ from turn_pause.counters import TurnState
 from turn_pause.state import Store, state_path
 
 TOOL = Path(__file__).resolve().parent / "hq"
-LINE = "active 1h12m/16h00m calls 140/500 spawns 3/30 compactions 0/2 paused:no budget:none notify:ok"
+LINE = "active 1h12m/16h00m calls 140/500 spawns 3/30 compactions 0/2 (advisory) paused:no budget:none notify:ok"
 
 
 @pytest.fixture
@@ -48,7 +48,7 @@ def test_status_for_codex_root(home):
     seed(home, "codex", "r1")
     result = hq(home, "status", thread="r1")
     assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == LINE.replace("compactions 0/2", "compactions -/2 (count your own)")
+    assert result.stdout.strip() == LINE.replace("compactions 0/2 (advisory)", "compactions -/2 (advisory, unhooked)")
 
 
 def test_status_for_worker_prints_its_roots_counts(home):
@@ -131,6 +131,6 @@ def test_status_state_without_turn_is_an_error(home):
 def test_limits_text_and_json(home):
     text = hq(home, "limits")
     assert text.returncode == 0, text.stderr
-    assert text.stdout.strip() == "active 16h00m calls 500 spawns 30 compactions 2"
+    assert text.stdout.strip() == "active 16h00m calls 500 spawns 30 compactions 2 (advisory)"
     data = json.loads(hq(home, "limits", "--json").stdout)
     assert data == {"active_seconds": 57600, "calls": 500, "spawns": 30, "compactions": 2}

@@ -145,7 +145,7 @@ def test_refused_call_then_long_idle_counts_nothing():
     assert s.in_flight == {}
 
 
-def test_crossing_is_strictly_above():
+def test_crossing_is_strictly_above_for_enforced_counts_and_compactions_never_cross():
     s = new()
     for i in range(500):
         counters.attempt(s, ev(i, 'tool_start', None, f'c{i}', 'Bash'))
@@ -153,9 +153,13 @@ def test_crossing_is_strictly_above():
     counters.attempt(s, ev(500, 'tool_start', None, 'c500', 'Bash'))
     assert counters.crossed(s) == 'calls'
     s2 = new()
-    for i in range(3):
+    for i in range(10):
         counters.apply(s2, ev(i, 'compact'))
-    assert counters.crossed(s2) == 'compactions'
+    assert s2.compactions == 10
+    assert counters.crossed(s2) is None
+    assert counters.due_warnings(s2) == ['compactions']
+    s2.warned.add('compactions')
+    assert counters.due_warnings(s2) == []
 
 
 def test_warning_once_per_limit():

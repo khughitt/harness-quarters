@@ -65,7 +65,10 @@ CHILD_TEXT = (
 LIMITS_CHANGED_HEAD = ('turn paused: the turn limits file changed mid-turn (active {a} of {A}, calls {c}/{C}, '
                        'spawns {s}/{S}, compactions {k}/{K}). ')
 WARNING_TEXT = 'turn-pause: {limit} at {n}% ({used} of {value}). Finish a coherent step and prepare your report.'
-BUDGET_TEXT = 'turn-pause: budget for this turn: active {a}, {c} calls, {s} spawns, {k} compactions.'
+COMPACTION_WARNING_TEXT = (
+    'turn-pause: compactions at {used} of {value} (advisory). Compaction does not pause the turn; '
+    'continue authorized work while active, calls and spawns remain within their limits.')
+BUDGET_TEXT = 'turn-pause: budget for this turn: active {a}, {c} calls, {s} spawns, {k} compactions (advisory).'
 MALFORMED_TEXT = ('turn-pause: the first line looks like a budget but does not parse ({reason}); '
                   'the default limits apply. Mention it in your next report; do not stop for it.')
 WAKE_TEXT = ('turn-pause: this prompt matches a pending scheduled prompt and was read as a scheduled '
@@ -117,6 +120,8 @@ def warning(rs: RootState, name: str) -> str:
     used = t.active if name == 'active' else getattr(t, name)
     limit = t.limits.active_seconds if name == 'active' else getattr(t.limits, name)
     shown = duration if name == 'active' else (lambda v: str(int(v)))
+    if name == 'compactions':
+        return COMPACTION_WARNING_TEXT.format(used=shown(used), value=shown(limit))
     return WARNING_TEXT.format(limit=name, n=int(used * 100 // limit) if limit > 0 else 100, used=shown(used), value=shown(limit))
 
 
