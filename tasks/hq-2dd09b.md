@@ -1,13 +1,15 @@
 ---
 id: hq-2dd09b
 title: Reduce premature turn-pause interruptions and make stop events reviewable
-status: todo
+status: doing
 priority: 2
 size: m
 complexity: mid
 process: direct
+owner: main
 created: 2026-11-04T10:13:23Z
-updated: 2026-11-04T17:46:13Z
+updated: 2026-11-05T20:47:09Z
+started: 2026-11-05T20:47:09Z
 depends: [lore-296a0f, obs-1450e7]
 tags: []
 source: hq-7fb9d5
@@ -42,3 +44,4 @@ This goal collects hq fixes and cross-project guidance/reporting prerequisites; 
 - 2026-11-04T11:55:22Z (fix/hq-2dd09b): Design approval is recorded; current human gate is plan review, replacing the old design-review next action. Plan and self-review links are in the document inventory. Execution is stopped before Task1 until human plan approval; no checks remain running. Unmerged branch fix/hq-2dd09b remains in .worktrees/hq-2dd09b, owned for retention by hq-c58737, and fix/lore-296a0f remains in lore .worktrees/lore-296a0f. Agent integrates either with git merge of its branch in main only after separate user live activation approval. Those direct-fix activation parks remain unchanged. host-load --section session reported nothing left running; other task-record changes were merged from main, not edited. No new external workspace or off-tree evidence was created.
 - 2026-11-04T13:02:42Z (fix/hq-2dd09b): Approved inline execution completed Tasks1–3: diagnostics f7e5b618, cap60 29c7142e, atomic versioned storage/offline converter f2f704f2; focused411/162/239 tests and mandatory hygiene pass. Task4 stopped on reproduced ended scheduled-wake design conflict; proposed addendum frozen at907404308e3172de57f81a9175ef7da46f0c988d:docs/specs/2026-11-04-turn-pause-ended-prompt-guards-design.md. Human reviews this schema revision, then agent writes/freeze-reviews the plan update and resumes Tasks4–5. No latency gate or whole-branch review yet. Worktree fix/hq-2dd09b and external execution evidence are retained by open controller hq-c58737. Matching lore branch remains independently owned and unmerged; no push, PR, live conversion, host pointer or global change. Original milestone remains open, including obs-1450e7 and November11 reassessment hq-b9d356.
 - 2026-11-04T17:46:13Z (fix/hq-2dd09b): Revision2 execution completed Task3 guard continuation and prepared Task4 lifecycle at45d430de, with324 focused tests passing. The full50ms p99 gate failed in all four cases; scope/cause limits and recommended controlled diagnostics are frozen in report46c0c32133e1efb2ae1fb02c58629acf8b546df5:docs/notes/2026-11-04-turn-pause-latency-gate-report.md. Task4 stopped at required design review; Task5, obs handoff, whole-branch review and live activation remain open. Both hq/lore branches remain unmerged and the November11 reassessment remains independently eligible.
+- 2026-11-05T20:47:09Z (main): started
