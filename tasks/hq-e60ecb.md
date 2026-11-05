@@ -1,7 +1,7 @@
 ---
 id: hq-e60ecb
 title: Record lifecycle transitions and retain ended history safely
-status: doing
+status: done
 priority: 2
 size: m
 complexity: high
@@ -9,8 +9,10 @@ process: direct
 needs: [quiet]
 owner: fix/hq-2dd09b
 created: 2026-11-04T11:51:39Z
-updated: 2026-11-05T11:00:20Z
+updated: 2026-11-05T11:06:24Z
 started: 2026-11-04T12:54:16Z
+completed: 2026-11-05T11:06:24Z
+closed: 2026-11-05T11:06:24Z
 depends: [hq-cc91d4]
 parent: hq-e10b76
 tags: []
@@ -74,3 +76,5 @@ Execute Task 4 of the proposed shared turn-pause plan, frozen in hq at 3c29183b0
 - 2026-11-05T03:19:13Z (fix/hq-2dd09b): parked (waiting on user, decision): User reviews the controlled idle-host latency diagnostic and design-revision recommendation in hq fb3337d3d583db592481b5c09466476cced7c6af:docs/notes/2026-11-04-turn-pause-latency-gate-report.md (SHA256 0866da1c9e413ca1f9da5a08d7b763001d0e618ff7e37016836555877909e2f2) and decides whether to revise hot-path history persistence (e.g., touching the 128-event history only on lifecycle transition events and omitting directory fsync / full-history revalidation on ordinary PreToolUse/PostToolUse counter ticks); after approval agent updates the spec/plan and resumes Task 4 in .worktrees/hq-2dd09b. Shared worktree and 59-member workspace remain retained under open hq-c58737; no surviving processes or host pointer changes.
 - 2026-11-05T10:02:14Z (fix/hq-2dd09b): resumed
 - 2026-11-05T11:00:20Z (fix/hq-2dd09b): attached: latency-1000-hotpath-opt-128events.json (2805 bytes): 1000-sample isolated latency gate pass with 128 seeded events after hot-path optimization (status: passed, all 4 cases p99 < 50 ms)
+- 2026-11-05T11:06:24Z (fix/hq-2dd09b): done
+- 2026-11-05T11:06:24Z (fix/hq-2dd09b): Task 4 complete at 97b2c670c4effdf54a1d3c4d8c4bd2aec438da4b: lifecycle transitions, retained ended history, prompt guards, bounded maintenance, and hot-path optimization (_LazyEvents raw-event splicing + C _json helpers + transition-scoped directory fsync). Passed 325 focused tests (task-4-tests-b7N41V.log), 646 tests across all turn-pause modules, mandatory just check-hygiene, and the 1000-sample isolated latency gate (tasks/files/hq-e60ecb/latency-1000-hotpath-opt-128events.json, SHA256 5836b76cde9b8e60867bfa5b7039b885b426b38c47a504f061909e21864aeda2: claude-code serial p99=31.93ms, concurrent p99=39.56ms; codex serial p99=33.82ms, concurrent p99=47.43ms; all < 50ms). Full ledger and rulings in /mnt/ssd3/work/hq/hq-c58737/plans/turn-pause-reliability/progress.md owned by open controller hq-c58737.
