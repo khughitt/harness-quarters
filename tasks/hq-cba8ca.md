@@ -1,15 +1,17 @@
 ---
 id: hq-cba8ca
 title: Read relay bootstrap probe evidence from ops private records
-status: doing
+status: done
 priority: 0
 size: s
 complexity: mid
 process: direct
 owner: main
 created: 2026-11-05T09:58:20Z
-updated: 2026-11-05T12:13:50Z
+updated: 2026-11-05T12:13:52Z
 started: 2026-11-05T11:24:36Z
+completed: 2026-11-05T12:13:52Z
+closed: 2026-11-05T12:13:52Z
 depends: [ops-b4b162]
 tags: []
 source: ops-7f0b75
@@ -41,3 +43,7 @@ Done: focused RED-to-GREEN proves private-records evidence works with the old op
 - 2026-11-05T12:13:16Z (main): resumed
   provenance: {"harness_session":"codex:01a1ab05-ce9a-72d1-890e-c01268ef1193","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-05T12:13:50Z (main): retained: {"version":1,"host":"titan","kind":"worktree","path":".worktrees/hq-cba8ca","state":"released","verification":"verified","purpose":"Accepted branch merged into main with exact reviewed tools/docs; tt-report harvested timings, regenerable pytest/bytecode caches discarded, pointer/workspace checks passed; worktree removed and merged branch deleted","next_owner":"none","cleanup_trigger":"none"}
+- 2026-11-05T12:13:52Z (main): done
+  provenance: {"harness_session":"codex:01a1ab05-ce9a-72d1-890e-c01268ef1193","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-05T12:13:52Z (main): Accepted private-records correction integrated at f08b92d429dd5afe2b9d7a9465f4d64ad1bff5fe; subsequent note-only merge 58evidence is recorded in main ancestry (use Git for exact tip). Focused scope 461+1 affected tests passed; mandatory hygiene passed; broad suite deliberately omitted under policy-off; no remote evidence or live activation. Parent ops-7f0b75 owns logs/review/ledger, including deferred Minor M1; no other retained child items remain. Own worktree and merged branch removed after clean/cache/pointer/tt-report checks; no process survives, nothing pushed; unrelated agy/settings.json preserved.
+  provenance: {"harness_session":"codex:01a1ab05-ce9a-72d1-890e-c01268ef1193","harness_session_source":"CODEX_THREAD_ID"}
