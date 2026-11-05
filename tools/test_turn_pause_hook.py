@@ -1072,7 +1072,7 @@ def test_history_end_resume_guards_commit_in_serial_order(tmp_path, monkeypatch,
 
 
 def test_measurement_call_honors_entry_site_disabled_startup(tmp_path):
-    from measure_turn_pause import call
+    from measure_turn_pause import NATIVE_ROOTS, NATIVE_WORKERS, call, measure, native_call_id
     env = make_env(tmp_path)
     probe = tmp_path / 'site-probe'
     probe.mkdir()
@@ -1081,6 +1081,13 @@ def test_measurement_call_honors_entry_site_disabled_startup(tmp_path):
     elapsed = call('claude-code', 'PreToolUse', claude_pre('Bash', {'command': 'ls'}, 'c1'),
                    DEFAULTS_PATH, env)
     assert elapsed > 0
+    assert all(len(root) == 36 for roots in NATIVE_ROOTS.values() for root in roots)
+    assert len(NATIVE_WORKERS['claude-code'][0]) == 17 and len(NATIVE_WORKERS['codex'][0]) == 36
+    assert len(native_call_id('claude-code', NATIVE_ROOTS['claude-code'][0], False, 0)) == 30
+    assert len(native_call_id('codex', NATIVE_ROOTS['codex'][0], True, 0)) == 41
+    case = measure('claude-code', False, 1, tmp_path)
+    assert case['counts'][0]['root'] == NATIVE_ROOTS['claude-code'][0]
+    assert case['counts'][0]['calls'] == 1 and case['counts'][0]['events'] == 128
 
 
 def test_post_tool_use_failure_closes_the_call(tmp_path):
