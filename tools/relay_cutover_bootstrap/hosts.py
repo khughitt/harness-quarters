@@ -52,10 +52,11 @@ SSH_OPTIONS = ("-4", "-o", "BatchMode=yes")
 ENTRY = "exec /usr/bin/python3 -B ~/d/hq/tools/relay-cutover-host"
 ENTRY_PATH = "d/hq/tools/relay-cutover-host"
 ROOT = ".local/state/hq/relay-cutover"
-# System executables by explicit path; tests replace entries at this Python boundary.
+# System executables by path; tasks resolves on the executing host's child PATH.
+# Tests replace entries at this Python boundary.
 TOOLS = {"python3": "/usr/bin/python3", "ssh": "/usr/bin/ssh", "npm": "/usr/bin/npm",
          "node": "/usr/bin/node", "git": "/usr/bin/git", "systemctl": "/usr/bin/systemctl",
-         "niri": "/usr/bin/niri"}
+         "niri": "/usr/bin/niri", "tasks": "tasks"}
 SYSTEM_PATH = ("/usr/bin", "/bin")
 # The relay runtime root under HOME, whose runtime's identity the cutover hashes. relay/bin/relay
 # takes its root from RELAY_INSTALL_ROOT, so every child gets this one (`_child_env`).

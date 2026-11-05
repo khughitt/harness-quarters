@@ -126,11 +126,19 @@ class Sandbox:
         version = "2.1.302 (Claude Code)" if harness == "claude-code" else "codex-cli 0.163.0"
         self.script(self.bin / ("claude" if harness == "claude-code" else "codex"),
                     "import sys\nassert sys.argv[1:] == ['--version']\nprint(" + repr(version) + ")\n")
-        evidence = self.home / "d/ops/docs/runbooks" / f"relay-guard-evidence-{harness}.json"
+        evidence = self.home / "private-records/ops/docs/runbooks" / f"relay-guard-evidence-{harness}.json"
         write_json(evidence, {"schema": 1, "harness": harness, "version": version,
                               "probes": [{"event": "PreToolUse", "reply": reply,
                                           "outerMs": 600000, "passed": True}
                                          for reply in ("refuse", "context")]})
+        ops = self.home / "d/ops"
+        ops.mkdir(parents=True, exist_ok=True)
+        reply = {"project": {"prefix": "ops", "checkout": str(ops),
+                             "records": str(self.home / "private-records/ops")},
+                 "holds_records": False, "warnings": []}
+        self.script(self.bin / "tasks", "import sys\nassert sys.argv[1:] == "
+                    + repr(["where", str(ops), "--json"]) + "\nprint("
+                    + repr(json.dumps(reply)) + ")\n")
         return runtime, subscribers, evidence
 
     def images(self):
@@ -264,6 +272,22 @@ def test_subscribers_reports_content_drift(box):
     result = box.call("preflight", "--harness", "claude-code")
     assert result.code == 1 and "relay-cutover: subscribers:" in result.err
     assert "content" in result.err
+
+
+def test_evidence_uses_private_records_without_old_code_files(box):
+    box.ready()
+    assert not (box.home / "d/ops/docs").exists()
+    result = box.call("preflight", "--harness", "claude-code")
+    assert result.code == 0, result.err
+
+
+@pytest.mark.parametrize("reply", ("not JSON", '{"project": null}',
+                                   '{"project": {"prefix": "ops", "records": "relative"}}'))
+def test_evidence_rejects_invalid_records_reply(box, reply):
+    box.ready()
+    box.script(box.bin / "tasks", "print(" + repr(reply) + ")\n")
+    result = box.call("preflight", "--harness", "claude-code")
+    assert result.code == 1 and "ops-records" in result.err
 
 
 def test_evidence_reports_version_mismatch(box):

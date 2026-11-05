@@ -13,6 +13,9 @@ import sys
 import tempfile
 from pathlib import Path
 
+from relay_cutover_bootstrap.inventory import records_directory
+from relay_cutover_bootstrap.state import Stop as RecordsStop
+
 ROOT = Path(__file__).resolve().parent.parent
 GUARD = {"type": "command", "command": "~/d/ops/hooks/claude-pretooluse"}
 
@@ -97,7 +100,12 @@ def evidence(harness):
     if binary is None:
         print(f"relay-cutover: evidence: {harness} absent")
         return
-    path = Path.home() / "d/ops/docs/runbooks" / f"relay-guard-evidence-{harness}.json"
+    ops = Path.home() / "d/ops"
+    try:
+        records = records_directory(run("tasks", "where", ops, "--json").encode(), ops)
+    except RecordsStop as error:
+        raise Stop(str(error)) from None
+    path = records / "docs/runbooks" / f"relay-guard-evidence-{harness}.json"
     recorded = load_json(path)
     version = run(binary, "--version").strip()
     if recorded.get("harness") != harness or recorded.get("version") != version:
