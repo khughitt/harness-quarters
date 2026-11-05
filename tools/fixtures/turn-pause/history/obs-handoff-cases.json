@@ -1,0 +1,1190 @@
+{
+  "version": 1,
+  "description": "Portable turn-pause transition and external evidence handoff cases (A-G audit equivalents plus control cases) for hq-e10b76 and obs-1450e7.",
+  "schema": {
+    "hook_events": "turn_pause.history event v1 rows (separate from external evidence)",
+    "task_evidence": "stamped task lifecycle/park rows with qualified_session, enclosing_turn, task_id, at, evidence_type, source_locator, and range_stop metadata",
+    "session_evidence": "transcript/episode rows with qualified_session, enclosing_turn, task_id, at, evidence_type, source_locator, and range_stop metadata",
+    "expected": "classification vector for obs-1450e7 (category, subcategory, interruption, continuation, reason, notes)"
+  },
+  "cases": [
+    {
+      "id": "A",
+      "label": "Enforced spawn pause during multi-step plan execution (fam-f5f24c equivalent)",
+      "harness": "claude-code",
+      "root": "f5ed2d6a-dc73-443e-ac25-c0a4357da4cb",
+      "generation": "11111111111111111111111111111111",
+      "created_at": 1793618948.0,
+      "ended_at": null,
+      "hook_events": [
+        {
+          "version": 1,
+          "harness": "claude-code",
+          "root": "f5ed2d6a-dc73-443e-ac25-c0a4357da4cb",
+          "generation": "11111111111111111111111111111111",
+          "turn": 1,
+          "sequence": 1,
+          "host": "host-alpha",
+          "at": 1793618948.0,
+          "kind": "turn_start",
+          "reason": "genuine_user",
+          "snapshot": {
+            "limits_sha": "a000000000000000000000000000000000000000000000000000000000000001",
+            "paused": null,
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": true},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 0.0, "limit": 14400},
+            "calls": {"used": 0, "limit": 500},
+            "spawns": {"used": 0, "limit": 30},
+            "compactions": {"used": 0, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        },
+        {
+          "version": 1,
+          "harness": "claude-code",
+          "root": "f5ed2d6a-dc73-443e-ac25-c0a4357da4cb",
+          "generation": "11111111111111111111111111111111",
+          "turn": 1,
+          "sequence": 2,
+          "host": "host-alpha",
+          "at": 1793626000.0,
+          "kind": "warning",
+          "reason": "spawns",
+          "snapshot": {
+            "limits_sha": "a000000000000000000000000000000000000000000000000000000000000001",
+            "paused": null,
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": true},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 7052.0, "limit": 14400},
+            "calls": {"used": 98, "limit": 500},
+            "spawns": {"used": 23, "limit": 30},
+            "compactions": {"used": 0, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        },
+        {
+          "version": 1,
+          "harness": "claude-code",
+          "root": "f5ed2d6a-dc73-443e-ac25-c0a4357da4cb",
+          "generation": "11111111111111111111111111111111",
+          "turn": 1,
+          "sequence": 3,
+          "host": "host-alpha",
+          "at": 1793628137.5,
+          "kind": "enforced_pause",
+          "reason": "spawns",
+          "snapshot": {
+            "limits_sha": "a000000000000000000000000000000000000000000000000000000000000001",
+            "paused": "spawns",
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": true},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 9189.2, "limit": 14400},
+            "calls": {"used": 129, "limit": 500},
+            "spawns": {"used": 31, "limit": 30},
+            "compactions": {"used": 0, "limit": 2}
+          },
+          "notification": {
+            "outcome": "pending",
+            "error_code": null,
+            "desktop": "unknown",
+            "relay": "unknown",
+            "receipt": "unknown",
+            "pause_sequence": 3
+          },
+          "source": "hook"
+        },
+        {
+          "version": 1,
+          "harness": "claude-code",
+          "root": "f5ed2d6a-dc73-443e-ac25-c0a4357da4cb",
+          "generation": "11111111111111111111111111111111",
+          "turn": 1,
+          "sequence": 4,
+          "host": "host-alpha",
+          "at": 1793628138.0,
+          "kind": "notification",
+          "reason": null,
+          "snapshot": {
+            "limits_sha": "a000000000000000000000000000000000000000000000000000000000000001",
+            "paused": "spawns",
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": true},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 9189.2, "limit": 14400},
+            "calls": {"used": 129, "limit": 500},
+            "spawns": {"used": 31, "limit": 30},
+            "compactions": {"used": 0, "limit": 2}
+          },
+          "notification": {
+            "outcome": "attempted",
+            "error_code": null,
+            "desktop": "unknown",
+            "relay": "unknown",
+            "receipt": "unknown",
+            "pause_sequence": 3
+          },
+          "source": "hook"
+        }
+      ],
+      "task_evidence": [
+        {
+          "qualified_session": "claude-code:f5ed2d6a-dc73-443e-ac25-c0a4357da4cb",
+          "enclosing_turn": {"generation": "11111111111111111111111111111111", "turn": 1, "started_at": 1793618948.0, "ended_at": null},
+          "task_id": "fam-f5f24c",
+          "at": 1793628180.0,
+          "evidence_type": "task_park",
+          "waiting_on": "user",
+          "park_reason": "decision",
+          "range_stop": true,
+          "range_reason": "enforced_spawns_limit",
+          "source_locator": "tasks:fam-f5f24c#note-4"
+        }
+      ],
+      "session_evidence": [
+        {
+          "qualified_session": "claude-code:f5ed2d6a-dc73-443e-ac25-c0a4357da4cb",
+          "enclosing_turn": {"generation": "11111111111111111111111111111111", "turn": 1, "started_at": 1793618948.0, "ended_at": null},
+          "task_id": "fam-f5f24c",
+          "at": 1793628137.5,
+          "evidence_type": "hook_refusal_observed",
+          "range_stop": true,
+          "range_reason": "spawns",
+          "source_locator": "session:claude-code:f5ed2d6a-dc73-443e-ac25-c0a4357da4cb#L1076"
+        }
+      ],
+      "expected": {
+        "category": "enforced_pause",
+        "subcategory": "spawns_limit",
+        "interruption": true,
+        "continuation": "stopped",
+        "reason": "spawns",
+        "notes": "Hook committed enforced_pause on 31/30 spawns; corroborated by session refusal and stamped task park."
+      }
+    },
+    {
+      "id": "B",
+      "label": "Enforced active-time pause under old 4-hour threshold (mm-f202b2 equivalent)",
+      "harness": "claude-code",
+      "root": "c67f4b5f-818d-4533-83b0-172009b992c2",
+      "generation": "22222222222222222222222222222222",
+      "created_at": 1793631932.0,
+      "ended_at": null,
+      "hook_events": [
+        {
+          "version": 1,
+          "harness": "claude-code",
+          "root": "c67f4b5f-818d-4533-83b0-172009b992c2",
+          "generation": "22222222222222222222222222222222",
+          "turn": 1,
+          "sequence": 1,
+          "host": "host-alpha",
+          "at": 1793631932.0,
+          "kind": "turn_start",
+          "reason": "genuine_user",
+          "snapshot": {
+            "limits_sha": "a000000000000000000000000000000000000000000000000000000000000001",
+            "paused": null,
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": true},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 0.0, "limit": 14400},
+            "calls": {"used": 0, "limit": 500},
+            "spawns": {"used": 0, "limit": 30},
+            "compactions": {"used": 0, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        },
+        {
+          "version": 1,
+          "harness": "claude-code",
+          "root": "c67f4b5f-818d-4533-83b0-172009b992c2",
+          "generation": "22222222222222222222222222222222",
+          "turn": 1,
+          "sequence": 2,
+          "host": "host-alpha",
+          "at": 1793642800.0,
+          "kind": "warning",
+          "reason": "active",
+          "snapshot": {
+            "limits_sha": "a000000000000000000000000000000000000000000000000000000000000001",
+            "paused": null,
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": true},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 10868.0, "limit": 14400},
+            "calls": {"used": 36, "limit": 500},
+            "spawns": {"used": 5, "limit": 30},
+            "compactions": {"used": 0, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        },
+        {
+          "version": 1,
+          "harness": "claude-code",
+          "root": "c67f4b5f-818d-4533-83b0-172009b992c2",
+          "generation": "22222222222222222222222222222222",
+          "turn": 1,
+          "sequence": 3,
+          "host": "host-alpha",
+          "at": 1793646520.9,
+          "kind": "enforced_pause",
+          "reason": "active",
+          "snapshot": {
+            "limits_sha": "a000000000000000000000000000000000000000000000000000000000000001",
+            "paused": "active",
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": true},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 14588.9, "limit": 14400},
+            "calls": {"used": 48, "limit": 500},
+            "spawns": {"used": 7, "limit": 30},
+            "compactions": {"used": 0, "limit": 2}
+          },
+          "notification": {
+            "outcome": "pending",
+            "error_code": null,
+            "desktop": "unknown",
+            "relay": "unknown",
+            "receipt": "unknown",
+            "pause_sequence": 3
+          },
+          "source": "hook"
+        },
+        {
+          "version": 1,
+          "harness": "claude-code",
+          "root": "c67f4b5f-818d-4533-83b0-172009b992c2",
+          "generation": "22222222222222222222222222222222",
+          "turn": 1,
+          "sequence": 4,
+          "host": "host-alpha",
+          "at": 1793646521.2,
+          "kind": "notification",
+          "reason": null,
+          "snapshot": {
+            "limits_sha": "a000000000000000000000000000000000000000000000000000000000000001",
+            "paused": "active",
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": true},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 14588.9, "limit": 14400},
+            "calls": {"used": 48, "limit": 500},
+            "spawns": {"used": 7, "limit": 30},
+            "compactions": {"used": 0, "limit": 2}
+          },
+          "notification": {
+            "outcome": "attempted",
+            "error_code": null,
+            "desktop": "unknown",
+            "relay": "unknown",
+            "receipt": "unknown",
+            "pause_sequence": 3
+          },
+          "source": "hook"
+        }
+      ],
+      "task_evidence": [
+        {
+          "qualified_session": "claude-code:c67f4b5f-818d-4533-83b0-172009b992c2",
+          "enclosing_turn": {"generation": "22222222222222222222222222222222", "turn": 1, "started_at": 1793631932.0, "ended_at": null},
+          "task_id": "mm-f202b2",
+          "at": 1793646625.0,
+          "evidence_type": "task_park",
+          "waiting_on": "user",
+          "park_reason": "decision",
+          "range_stop": true,
+          "range_reason": "enforced_active_limit",
+          "source_locator": "tasks:mm-f202b2#note-6"
+        }
+      ],
+      "session_evidence": [
+        {
+          "qualified_session": "claude-code:c67f4b5f-818d-4533-83b0-172009b992c2",
+          "enclosing_turn": {"generation": "22222222222222222222222222222222", "turn": 1, "started_at": 1793631932.0, "ended_at": null},
+          "task_id": "mm-f202b2",
+          "at": 1793646520.9,
+          "evidence_type": "hook_refusal_observed",
+          "range_stop": true,
+          "range_reason": "active",
+          "source_locator": "session:claude-code:c67f4b5f-818d-4533-83b0-172009b992c2#L483"
+        }
+      ],
+      "expected": {
+        "category": "enforced_pause",
+        "subcategory": "active_limit",
+        "interruption": true,
+        "continuation": "stopped",
+        "reason": "active",
+        "notes": "Hook committed enforced_pause at 14588.9s > 14400s limit."
+      }
+    },
+    {
+      "id": "C",
+      "label": "Pre-enforcement self-stop from misreading 0:16/16:00 as 16 minutes (lore-a8b553 / obs-50bfe3 equivalent)",
+      "harness": "codex",
+      "root": "01a19f20-a422-75b0-8476-0ed9ba0dd8c9",
+      "generation": "33333333333333333333333333333333",
+      "created_at": 1793698784.0,
+      "ended_at": null,
+      "hook_events": [
+        {
+          "version": 1,
+          "harness": "codex",
+          "root": "01a19f20-a422-75b0-8476-0ed9ba0dd8c9",
+          "generation": "33333333333333333333333333333333",
+          "turn": 1,
+          "sequence": 1,
+          "host": "host-alpha",
+          "at": 1793698784.0,
+          "kind": "turn_start",
+          "reason": "genuine_user",
+          "snapshot": {
+            "limits_sha": "b000000000000000000000000000000000000000000000000000000000000002",
+            "paused": null,
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": false},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 0.0, "limit": 57600},
+            "calls": {"used": 0, "limit": 500},
+            "spawns": {"used": 0, "limit": 30},
+            "compactions": {"used": null, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        }
+      ],
+      "task_evidence": [
+        {
+          "qualified_session": "codex:01a19f20-a422-75b0-8476-0ed9ba0dd8c9",
+          "enclosing_turn": {"generation": "33333333333333333333333333333333", "turn": 1, "started_at": 1793698784.0, "ended_at": null},
+          "task_id": "obs-50bfe3",
+          "at": 1793699855.0,
+          "evidence_type": "task_park",
+          "waiting_on": "user",
+          "park_reason": "decision",
+          "range_stop": true,
+          "range_reason": "unit_interpretation_error",
+          "source_locator": "tasks:obs-50bfe3#note-3"
+        }
+      ],
+      "session_evidence": [
+        {
+          "qualified_session": "codex:01a19f20-a422-75b0-8476-0ed9ba0dd8c9",
+          "enclosing_turn": {"generation": "33333333333333333333333333333333", "turn": 1, "started_at": 1793698784.0, "ended_at": null},
+          "task_id": "obs-50bfe3",
+          "at": 1793699853.7,
+          "evidence_type": "assistant_pause_report",
+          "range_stop": true,
+          "range_reason": "unit_interpretation_error",
+          "source_locator": "session:codex:01a19f20-a422-75b0-8476-0ed9ba0dd8c9#L833"
+        }
+      ],
+      "expected": {
+        "category": "pre_enforcement_self_stop",
+        "subcategory": "unit_interpretation_error",
+        "interruption": true,
+        "continuation": "stopped",
+        "reason": "active",
+        "notes": "No hook warning or pause; external stamped task park and session report show self-stop at 16m of 16h."
+      }
+    },
+    {
+      "id": "D",
+      "label": "Warning-driven self-stop at 406/500 calls after 375/500 warning (tasks-4ef22d turn 1 equivalent)",
+      "harness": "codex",
+      "root": "01a1a10b-15de-7a00-81ba-4469c83141b8",
+      "generation": "44444444444444444444444444444444",
+      "created_at": 1793720317.0,
+      "ended_at": null,
+      "hook_events": [
+        {
+          "version": 1,
+          "harness": "codex",
+          "root": "01a1a10b-15de-7a00-81ba-4469c83141b8",
+          "generation": "44444444444444444444444444444444",
+          "turn": 1,
+          "sequence": 1,
+          "host": "host-alpha",
+          "at": 1793720317.0,
+          "kind": "turn_start",
+          "reason": "genuine_user",
+          "snapshot": {
+            "limits_sha": "b000000000000000000000000000000000000000000000000000000000000002",
+            "paused": null,
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": false},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 0.0, "limit": 57600},
+            "calls": {"used": 0, "limit": 500},
+            "spawns": {"used": 0, "limit": 30},
+            "compactions": {"used": null, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        },
+        {
+          "version": 1,
+          "harness": "codex",
+          "root": "01a1a10b-15de-7a00-81ba-4469c83141b8",
+          "generation": "44444444444444444444444444444444",
+          "turn": 1,
+          "sequence": 2,
+          "host": "host-alpha",
+          "at": 1793739800.0,
+          "kind": "warning",
+          "reason": "calls",
+          "snapshot": {
+            "limits_sha": "b000000000000000000000000000000000000000000000000000000000000002",
+            "paused": null,
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": false},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 19200.0, "limit": 57600},
+            "calls": {"used": 375, "limit": 500},
+            "spawns": {"used": 1, "limit": 30},
+            "compactions": {"used": null, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        }
+      ],
+      "task_evidence": [
+        {
+          "qualified_session": "codex:01a1a10b-15de-7a00-81ba-4469c83141b8",
+          "enclosing_turn": {"generation": "44444444444444444444444444444444", "turn": 1, "started_at": 1793720317.0, "ended_at": 1793742648.0},
+          "task_id": "tasks-4ef22d",
+          "at": 1793741325.0,
+          "evidence_type": "task_park",
+          "waiting_on": "user",
+          "park_reason": "decision",
+          "range_stop": true,
+          "range_reason": "warning_treated_as_gate",
+          "source_locator": "tasks:tasks-4ef22d#note-8"
+        }
+      ],
+      "session_evidence": [
+        {
+          "qualified_session": "codex:01a1a10b-15de-7a00-81ba-4469c83141b8",
+          "enclosing_turn": {"generation": "44444444444444444444444444444444", "turn": 1, "started_at": 1793720317.0, "ended_at": 1793742648.0},
+          "task_id": "tasks-4ef22d",
+          "at": 1793741324.0,
+          "evidence_type": "assistant_pause_report",
+          "range_stop": true,
+          "range_reason": "warning_treated_as_gate",
+          "source_locator": "session:codex:01a1a10b-15de-7a00-81ba-4469c83141b8#L4695"
+        }
+      ],
+      "expected": {
+        "category": "pre_enforcement_self_stop",
+        "subcategory": "warning_stop",
+        "interruption": true,
+        "continuation": "stopped",
+        "reason": "calls",
+        "notes": "Hook emitted calls warning at 375/500 and never paused; agent self-stopped at 406/500."
+      }
+    },
+    {
+      "id": "E",
+      "label": "Counter-scope self-stop adding worker calls 445+57=502 to root calls (tasks-4ef22d turn 2 equivalent)",
+      "harness": "codex",
+      "root": "01a1a10b-15de-7a00-81ba-4469c83141b8",
+      "generation": "44444444444444444444444444444444",
+      "created_at": 1793720317.0,
+      "ended_at": null,
+      "hook_events": [
+        {
+          "version": 1,
+          "harness": "codex",
+          "root": "01a1a10b-15de-7a00-81ba-4469c83141b8",
+          "generation": "44444444444444444444444444444444",
+          "turn": 1,
+          "sequence": 3,
+          "host": "host-alpha",
+          "at": 1793742648.0,
+          "kind": "turn_reset",
+          "reason": "genuine_user",
+          "snapshot": {
+            "limits_sha": "b000000000000000000000000000000000000000000000000000000000000002",
+            "paused": null,
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": false},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 21006.7, "limit": 57600},
+            "calls": {"used": 415, "limit": 500},
+            "spawns": {"used": 1, "limit": 30},
+            "compactions": {"used": null, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        },
+        {
+          "version": 1,
+          "harness": "codex",
+          "root": "01a1a10b-15de-7a00-81ba-4469c83141b8",
+          "generation": "44444444444444444444444444444444",
+          "turn": 2,
+          "sequence": 4,
+          "host": "host-alpha",
+          "at": 1793742648.0,
+          "kind": "turn_start",
+          "reason": "genuine_user",
+          "snapshot": {
+            "limits_sha": "b000000000000000000000000000000000000000000000000000000000000002",
+            "paused": null,
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": false},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 0.0, "limit": 57600},
+            "calls": {"used": 0, "limit": 500},
+            "spawns": {"used": 0, "limit": 30},
+            "compactions": {"used": null, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        },
+        {
+          "version": 1,
+          "harness": "codex",
+          "root": "01a1a10b-15de-7a00-81ba-4469c83141b8",
+          "generation": "44444444444444444444444444444444",
+          "turn": 2,
+          "sequence": 5,
+          "host": "host-alpha",
+          "at": 1793752000.0,
+          "kind": "warning",
+          "reason": "calls",
+          "snapshot": {
+            "limits_sha": "b000000000000000000000000000000000000000000000000000000000000002",
+            "paused": null,
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": false},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 9352.0, "limit": 57600},
+            "calls": {"used": 375, "limit": 500},
+            "spawns": {"used": 3, "limit": 30},
+            "compactions": {"used": null, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        }
+      ],
+      "task_evidence": [
+        {
+          "qualified_session": "codex:01a1a10b-15de-7a00-81ba-4469c83141b8",
+          "enclosing_turn": {"generation": "44444444444444444444444444444444", "turn": 2, "started_at": 1793742648.0, "ended_at": null},
+          "task_id": "tasks-4ef22d",
+          "at": 1793754680.0,
+          "evidence_type": "task_park",
+          "waiting_on": "user",
+          "park_reason": "decision",
+          "range_stop": true,
+          "range_reason": "worker_calls_added_to_root",
+          "source_locator": "tasks:tasks-4ef22d#note-12"
+        }
+      ],
+      "session_evidence": [
+        {
+          "qualified_session": "codex:01a1a10b-15de-7a00-81ba-4469c83141b8",
+          "enclosing_turn": {"generation": "44444444444444444444444444444444", "turn": 2, "started_at": 1793742648.0, "ended_at": null},
+          "task_id": "tasks-4ef22d",
+          "at": 1793754677.5,
+          "evidence_type": "assistant_pause_report",
+          "range_stop": true,
+          "range_reason": "worker_calls_added_to_root",
+          "source_locator": "session:codex:01a1a10b-15de-7a00-81ba-4469c83141b8#L7711"
+        }
+      ],
+      "expected": {
+        "category": "pre_enforcement_self_stop",
+        "subcategory": "counter_scope_error",
+        "interruption": true,
+        "continuation": "stopped",
+        "reason": "calls",
+        "notes": "Root calls were 445/500 (unpaused); agent added 57 worker calls to claim 502/500 and self-stopped."
+      }
+    },
+    {
+      "id": "F",
+      "label": "Proactive spawn-cap stop at 30/30 before 31st whole-branch reviewer (tasks-e16bbe equivalent)",
+      "harness": "codex",
+      "root": "01a1a368-49dd-7552-84a0-019d41d3bc0e",
+      "generation": "55555555555555555555555555555555",
+      "created_at": 1793742890.0,
+      "ended_at": null,
+      "hook_events": [
+        {
+          "version": 1,
+          "harness": "codex",
+          "root": "01a1a368-49dd-7552-84a0-019d41d3bc0e",
+          "generation": "55555555555555555555555555555555",
+          "turn": 1,
+          "sequence": 1,
+          "host": "host-alpha",
+          "at": 1793742890.0,
+          "kind": "turn_start",
+          "reason": "genuine_user",
+          "snapshot": {
+            "limits_sha": "b000000000000000000000000000000000000000000000000000000000000002",
+            "paused": null,
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": false},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 0.0, "limit": 57600},
+            "calls": {"used": 0, "limit": 500},
+            "spawns": {"used": 0, "limit": 30},
+            "compactions": {"used": null, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        },
+        {
+          "version": 1,
+          "harness": "codex",
+          "root": "01a1a368-49dd-7552-84a0-019d41d3bc0e",
+          "generation": "55555555555555555555555555555555",
+          "turn": 1,
+          "sequence": 2,
+          "host": "host-alpha",
+          "at": 1793755000.0,
+          "kind": "warning",
+          "reason": "spawns",
+          "snapshot": {
+            "limits_sha": "b000000000000000000000000000000000000000000000000000000000000002",
+            "paused": null,
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": false},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 12110.0, "limit": 57600},
+            "calls": {"used": 240, "limit": 500},
+            "spawns": {"used": 23, "limit": 30},
+            "compactions": {"used": null, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        }
+      ],
+      "task_evidence": [
+        {
+          "qualified_session": "codex:01a1a368-49dd-7552-84a0-019d41d3bc0e",
+          "enclosing_turn": {"generation": "55555555555555555555555555555555", "turn": 1, "started_at": 1793742890.0, "ended_at": null},
+          "task_id": "tasks-e16bbe",
+          "at": 1793758886.0,
+          "evidence_type": "task_park",
+          "waiting_on": "user",
+          "park_reason": "decision",
+          "range_stop": true,
+          "range_reason": "proactive_spawn_cap_at_30_of_30",
+          "source_locator": "tasks:tasks-e16bbe#note-15"
+        }
+      ],
+      "session_evidence": [
+        {
+          "qualified_session": "codex:01a1a368-49dd-7552-84a0-019d41d3bc0e",
+          "enclosing_turn": {"generation": "55555555555555555555555555555555", "turn": 1, "started_at": 1793742890.0, "ended_at": null},
+          "task_id": "tasks-e16bbe",
+          "at": 1793758884.3,
+          "evidence_type": "assistant_pause_report",
+          "range_stop": true,
+          "range_reason": "proactive_spawn_cap_at_30_of_30",
+          "source_locator": "session:codex:01a1a368-49dd-7552-84a0-019d41d3bc0e#L2958"
+        }
+      ],
+      "expected": {
+        "category": "pre_enforcement_self_stop",
+        "subcategory": "proactive_threshold_stop",
+        "interruption": true,
+        "continuation": "stopped",
+        "reason": "spawns",
+        "notes": "Hook reached 30/30 spawns without enforced_pause; controller stopped proactively before spawning 31st reviewer."
+      }
+    },
+    {
+      "id": "G",
+      "label": "Warning-driven self-stop at 388/500 calls after 375/500 warning (dots-ec778d equivalent)",
+      "harness": "codex",
+      "root": "01a1a0ca-e9f8-7e91-9095-4e88cd515d24",
+      "generation": "66666666666666666666666666666666",
+      "created_at": 1793750087.0,
+      "ended_at": null,
+      "hook_events": [
+        {
+          "version": 1,
+          "harness": "codex",
+          "root": "01a1a0ca-e9f8-7e91-9095-4e88cd515d24",
+          "generation": "66666666666666666666666666666666",
+          "turn": 1,
+          "sequence": 1,
+          "host": "host-alpha",
+          "at": 1793750087.0,
+          "kind": "turn_start",
+          "reason": "genuine_user",
+          "snapshot": {
+            "limits_sha": "b000000000000000000000000000000000000000000000000000000000000002",
+            "paused": null,
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": false},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 0.0, "limit": 57600},
+            "calls": {"used": 0, "limit": 500},
+            "spawns": {"used": 0, "limit": 30},
+            "compactions": {"used": null, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        },
+        {
+          "version": 1,
+          "harness": "codex",
+          "root": "01a1a0ca-e9f8-7e91-9095-4e88cd515d24",
+          "generation": "66666666666666666666666666666666",
+          "turn": 1,
+          "sequence": 2,
+          "host": "host-alpha",
+          "at": 1793761800.0,
+          "kind": "warning",
+          "reason": "calls",
+          "snapshot": {
+            "limits_sha": "b000000000000000000000000000000000000000000000000000000000000002",
+            "paused": null,
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": false},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 11713.0, "limit": 57600},
+            "calls": {"used": 375, "limit": 500},
+            "spawns": {"used": 1, "limit": 30},
+            "compactions": {"used": null, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        }
+      ],
+      "task_evidence": [
+        {
+          "qualified_session": "codex:01a1a0ca-e9f8-7e91-9095-4e88cd515d24",
+          "enclosing_turn": {"generation": "66666666666666666666666666666666", "turn": 1, "started_at": 1793750087.0, "ended_at": null},
+          "task_id": "dots-ec778d",
+          "at": 1793762605.0,
+          "evidence_type": "task_park",
+          "waiting_on": "user",
+          "park_reason": "decision",
+          "range_stop": true,
+          "range_reason": "warning_stop",
+          "source_locator": "tasks:dots-ec778d#note-9"
+        }
+      ],
+      "session_evidence": [
+        {
+          "qualified_session": "codex:01a1a0ca-e9f8-7e91-9095-4e88cd515d24",
+          "enclosing_turn": {"generation": "66666666666666666666666666666666", "turn": 1, "started_at": 1793750087.0, "ended_at": null},
+          "task_id": "dots-ec778d",
+          "at": 1793762601.4,
+          "evidence_type": "assistant_pause_report",
+          "range_stop": true,
+          "range_reason": "warning_stop",
+          "source_locator": "session:codex:01a1a0ca-e9f8-7e91-9095-4e88cd515d24#L10019"
+        }
+      ],
+      "expected": {
+        "category": "pre_enforcement_self_stop",
+        "subcategory": "warning_stop",
+        "interruption": true,
+        "continuation": "stopped",
+        "reason": "calls",
+        "notes": "Hook warned at 375/500 calls; agent self-stopped at 388/500."
+      }
+    },
+    {
+      "id": "control_warning_continued",
+      "label": "Warning at 75% calls followed by observed continued work and normal completion",
+      "harness": "claude-code",
+      "root": "77777777-1111-4111-8111-111111111111",
+      "generation": "77777777777777777777777777777777",
+      "created_at": 1793770000.0,
+      "ended_at": 1793774000.0,
+      "hook_events": [
+        {
+          "version": 1,
+          "harness": "claude-code",
+          "root": "77777777-1111-4111-8111-111111111111",
+          "generation": "77777777777777777777777777777777",
+          "turn": 1,
+          "sequence": 1,
+          "host": "host-alpha",
+          "at": 1793770000.0,
+          "kind": "turn_start",
+          "reason": "genuine_user",
+          "snapshot": {
+            "limits_sha": "c000000000000000000000000000000000000000000000000000000000000003",
+            "paused": null,
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": true},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 0.0, "limit": 57600},
+            "calls": {"used": 0, "limit": 500},
+            "spawns": {"used": 0, "limit": 60},
+            "compactions": {"used": 0, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        },
+        {
+          "version": 1,
+          "harness": "claude-code",
+          "root": "77777777-1111-4111-8111-111111111111",
+          "generation": "77777777777777777777777777777777",
+          "turn": 1,
+          "sequence": 2,
+          "host": "host-alpha",
+          "at": 1793773000.0,
+          "kind": "warning",
+          "reason": "calls",
+          "snapshot": {
+            "limits_sha": "c000000000000000000000000000000000000000000000000000000000000003",
+            "paused": null,
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": true},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 3000.0, "limit": 57600},
+            "calls": {"used": 375, "limit": 500},
+            "spawns": {"used": 12, "limit": 60},
+            "compactions": {"used": 1, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        },
+        {
+          "version": 1,
+          "harness": "claude-code",
+          "root": "77777777-1111-4111-8111-111111111111",
+          "generation": "77777777777777777777777777777777",
+          "turn": 1,
+          "sequence": 3,
+          "host": "host-alpha",
+          "at": 1793774000.0,
+          "kind": "session_end",
+          "reason": "session_end",
+          "snapshot": {
+            "limits_sha": "c000000000000000000000000000000000000000000000000000000000000003",
+            "paused": null,
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": true},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 3890.0, "limit": 57600},
+            "calls": {"used": 442, "limit": 500},
+            "spawns": {"used": 18, "limit": 60},
+            "compactions": {"used": 1, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        }
+      ],
+      "task_evidence": [
+        {
+          "qualified_session": "claude-code:77777777-1111-4111-8111-111111111111",
+          "enclosing_turn": {"generation": "77777777777777777777777777777777", "turn": 1, "started_at": 1793770000.0, "ended_at": 1793774000.0},
+          "task_id": "hq-111111",
+          "at": 1793773950.0,
+          "evidence_type": "task_done",
+          "waiting_on": null,
+          "park_reason": null,
+          "range_stop": false,
+          "range_reason": null,
+          "source_locator": "tasks:hq-111111#note-5"
+        }
+      ],
+      "session_evidence": [
+        {
+          "qualified_session": "claude-code:77777777-1111-4111-8111-111111111111",
+          "enclosing_turn": {"generation": "77777777777777777777777777777777", "turn": 1, "started_at": 1793770000.0, "ended_at": 1793774000.0},
+          "task_id": "hq-111111",
+          "at": 1793773960.0,
+          "evidence_type": "continued_execution_and_completion",
+          "range_stop": false,
+          "range_reason": null,
+          "source_locator": "session:claude-code:77777777-1111-4111-8111-111111111111#L920"
+        }
+      ],
+      "expected": {
+        "category": "continued_after_warning",
+        "subcategory": "completed_within_budget",
+        "interruption": false,
+        "continuation": "continued",
+        "reason": "calls",
+        "notes": "Warning at 375/500 calls was followed by 67 additional root calls and normal task completion; not an interruption."
+      }
+    },
+    {
+      "id": "control_ordinary_gate",
+      "label": "Ordinary spec/plan approval or human review gate park with no range stop",
+      "harness": "codex",
+      "root": "88888888-2222-4222-8222-222222222222",
+      "generation": "88888888888888888888888888888888",
+      "created_at": 1793780000.0,
+      "ended_at": null,
+      "hook_events": [
+        {
+          "version": 1,
+          "harness": "codex",
+          "root": "88888888-2222-4222-8222-222222222222",
+          "generation": "88888888888888888888888888888888",
+          "turn": 1,
+          "sequence": 1,
+          "host": "host-alpha",
+          "at": 1793780000.0,
+          "kind": "turn_start",
+          "reason": "genuine_user",
+          "snapshot": {
+            "limits_sha": "c000000000000000000000000000000000000000000000000000000000000003",
+            "paused": null,
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": false},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 0.0, "limit": 57600},
+            "calls": {"used": 0, "limit": 500},
+            "spawns": {"used": 0, "limit": 60},
+            "compactions": {"used": null, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        }
+      ],
+      "task_evidence": [
+        {
+          "qualified_session": "codex:88888888-2222-4222-8222-222222222222",
+          "enclosing_turn": {"generation": "88888888888888888888888888888888", "turn": 1, "started_at": 1793780000.0, "ended_at": null},
+          "task_id": "hq-222222",
+          "at": 1793780900.0,
+          "evidence_type": "task_park",
+          "waiting_on": "user",
+          "park_reason": "decision",
+          "range_stop": false,
+          "range_reason": null,
+          "source_locator": "tasks:hq-222222#note-3"
+        }
+      ],
+      "session_evidence": [
+        {
+          "qualified_session": "codex:88888888-2222-4222-8222-222222222222",
+          "enclosing_turn": {"generation": "88888888888888888888888888888888", "turn": 1, "started_at": 1793780000.0, "ended_at": null},
+          "task_id": "hq-222222",
+          "at": 1793780905.0,
+          "evidence_type": "spec_review_handoff",
+          "range_stop": false,
+          "range_reason": null,
+          "source_locator": "session:codex:88888888-2222-4222-8222-222222222222#L140"
+        }
+      ],
+      "expected": {
+        "category": "ordinary_human_gate",
+        "subcategory": "spec_or_plan_approval",
+        "interruption": false,
+        "continuation": "awaiting_user_gate",
+        "reason": null,
+        "notes": "Ordinary decision/review park without range-stop evidence is never counted as a turn-pause interruption."
+      }
+    },
+    {
+      "id": "control_genuine_resume",
+      "label": "Enforced pause followed by genuine user prompt resuming the session",
+      "harness": "claude-code",
+      "root": "99999999-3333-4333-8333-333333333333",
+      "generation": "99999999999999999999999999999999",
+      "created_at": 1793790000.0,
+      "ended_at": null,
+      "hook_events": [
+        {
+          "version": 1,
+          "harness": "claude-code",
+          "root": "99999999-3333-4333-8333-333333333333",
+          "generation": "99999999999999999999999999999999",
+          "turn": 1,
+          "sequence": 1,
+          "host": "host-alpha",
+          "at": 1793790000.0,
+          "kind": "turn_start",
+          "reason": "genuine_user",
+          "snapshot": {
+            "limits_sha": "c000000000000000000000000000000000000000000000000000000000000003",
+            "paused": null,
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": true},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 0.0, "limit": 57600},
+            "calls": {"used": 0, "limit": 500},
+            "spawns": {"used": 0, "limit": 60},
+            "compactions": {"used": 0, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        },
+        {
+          "version": 1,
+          "harness": "claude-code",
+          "root": "99999999-3333-4333-8333-333333333333",
+          "generation": "99999999999999999999999999999999",
+          "turn": 1,
+          "sequence": 2,
+          "host": "host-alpha",
+          "at": 1793795000.0,
+          "kind": "enforced_pause",
+          "reason": "calls",
+          "snapshot": {
+            "limits_sha": "c000000000000000000000000000000000000000000000000000000000000003",
+            "paused": "calls",
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": true},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 5000.0, "limit": 57600},
+            "calls": {"used": 501, "limit": 500},
+            "spawns": {"used": 10, "limit": 60},
+            "compactions": {"used": 0, "limit": 2}
+          },
+          "notification": {
+            "outcome": "pending",
+            "error_code": null,
+            "desktop": "unknown",
+            "relay": "unknown",
+            "receipt": "unknown",
+            "pause_sequence": 2
+          },
+          "source": "hook"
+        },
+        {
+          "version": 1,
+          "harness": "claude-code",
+          "root": "99999999-3333-4333-8333-333333333333",
+          "generation": "99999999999999999999999999999999",
+          "turn": 1,
+          "sequence": 3,
+          "host": "host-alpha",
+          "at": 1793796000.0,
+          "kind": "turn_resume",
+          "reason": "genuine_user",
+          "snapshot": {
+            "limits_sha": "c000000000000000000000000000000000000000000000000000000000000003",
+            "paused": "calls",
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": true},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 5010.0, "limit": 57600},
+            "calls": {"used": 504, "limit": 500},
+            "spawns": {"used": 10, "limit": 60},
+            "compactions": {"used": 0, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        },
+        {
+          "version": 1,
+          "harness": "claude-code",
+          "root": "99999999-3333-4333-8333-333333333333",
+          "generation": "99999999999999999999999999999999",
+          "turn": 2,
+          "sequence": 4,
+          "host": "host-alpha",
+          "at": 1793796000.0,
+          "kind": "turn_start",
+          "reason": "genuine_user",
+          "snapshot": {
+            "limits_sha": "c000000000000000000000000000000000000000000000000000000000000003",
+            "paused": null,
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": true},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 0.0, "limit": 57600},
+            "calls": {"used": 0, "limit": 500},
+            "spawns": {"used": 0, "limit": 60},
+            "compactions": {"used": 0, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        }
+      ],
+      "task_evidence": [],
+      "session_evidence": [
+        {
+          "qualified_session": "claude-code:99999999-3333-4333-8333-333333333333",
+          "enclosing_turn": {"generation": "99999999999999999999999999999999", "turn": 2, "started_at": 1793796000.0, "ended_at": null},
+          "task_id": "hq-333333",
+          "at": 1793796000.0,
+          "evidence_type": "genuine_user_prompt",
+          "range_stop": false,
+          "range_reason": null,
+          "source_locator": "session:claude-code:99999999-3333-4333-8333-333333333333#L510"
+        }
+      ],
+      "expected": {
+        "category": "genuine_user_resume",
+        "subcategory": "resumed_after_enforced_pause",
+        "interruption": true,
+        "continuation": "resumed_by_user",
+        "reason": "calls",
+        "notes": "Turn 1 paused on calls (501/500) and was resumed at turn 2 by a genuine user prompt."
+      }
+    },
+    {
+      "id": "control_missing_conflicting",
+      "label": "Warning with absent external evidence, unstamped park, and ambiguous multi-session join stay unknown",
+      "harness": "codex",
+      "root": "aaaaaaaa-4444-4444-8444-444444444444",
+      "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "created_at": 1793800000.0,
+      "ended_at": null,
+      "hook_events": [
+        {
+          "version": 1,
+          "harness": "codex",
+          "root": "aaaaaaaa-4444-4444-8444-444444444444",
+          "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "turn": 1,
+          "sequence": 1,
+          "host": "host-alpha",
+          "at": 1793800000.0,
+          "kind": "turn_start",
+          "reason": "genuine_user",
+          "snapshot": {
+            "limits_sha": "c000000000000000000000000000000000000000000000000000000000000003",
+            "paused": null,
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": false},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 0.0, "limit": 57600},
+            "calls": {"used": 0, "limit": 500},
+            "spawns": {"used": 0, "limit": 60},
+            "compactions": {"used": null, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        },
+        {
+          "version": 1,
+          "harness": "codex",
+          "root": "aaaaaaaa-4444-4444-8444-444444444444",
+          "generation": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "turn": 1,
+          "sequence": 2,
+          "host": "host-alpha",
+          "at": 1793803000.0,
+          "kind": "warning",
+          "reason": "spawns",
+          "snapshot": {
+            "limits_sha": "c000000000000000000000000000000000000000000000000000000000000003",
+            "paused": null,
+            "counted": {"active": true, "calls": true, "spawns": true, "compactions": false},
+            "scopes": {"active": "tree_active_seconds", "calls": "root_attempts", "spawns": "tree_started", "compactions": "root"},
+            "active": {"used": 3000.0, "limit": 57600},
+            "calls": {"used": 180, "limit": 500},
+            "spawns": {"used": 45, "limit": 60},
+            "compactions": {"used": null, "limit": 2}
+          },
+          "notification": null,
+          "source": "hook"
+        }
+      ],
+      "task_evidence": [
+        {
+          "qualified_session": null,
+          "enclosing_turn": null,
+          "task_id": "hq-444444",
+          "at": 1793803500.0,
+          "evidence_type": "unstamped_task_park",
+          "waiting_on": "user",
+          "park_reason": "decision",
+          "range_stop": null,
+          "range_reason": "ambiguous_ wording_without_session_stamp",
+          "source_locator": "tasks:hq-444444#note-2"
+        }
+      ],
+      "session_evidence": [],
+      "expected": {
+        "category": "unknown",
+        "subcategory": "missing_or_ambiguous_evidence",
+        "interruption": null,
+        "continuation": "unknown",
+        "reason": "spawns",
+        "notes": "Warning alone without session transcript or stamped task evidence never infers self-stop or continuation."
+      }
+    }
+  ]
+}

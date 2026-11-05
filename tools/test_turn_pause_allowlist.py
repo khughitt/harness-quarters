@@ -145,12 +145,26 @@ def test_readlink_requires_f_and_literal_operands_in_paused_shell():
     assert shell('readlink -f -n /srv/bin/tool', NOBODY).klass == 'refuse'
 
 
+def test_pause_history_and_list_spend_read_grace_while_status_and_limits_stay_bookkeeping():
+    assert shell('hq pause status', NOBODY).klass == 'bookkeeping'
+    assert shell('hq pause limits', NOBODY).klass == 'bookkeeping'
+    assert shell('hq pause history', NOBODY).klass == 'read'
+    assert shell('hq pause list', NOBODY).klass == 'read'
+    assert shell('hq pause unknown', NOBODY).klass == 'refuse'
+    assert not allowlist.protected_read('codex', 'Bash', {'command': 'hq pause history'})
+    assert not allowlist.protected_read('codex', 'Bash', {'command': 'hq pause list'})
+
+
 SHELL_PASSES = [
     ('tasks park lore-1 "next"', 'bookkeeping'),
     ('tasks note x "y"', 'bookkeeping'),
     ('tasks park lore-1 "next" --waiting-on user --reason decision', 'bookkeeping'),
     ('hq pause status', 'bookkeeping'),
     ('hq pause limits', 'bookkeeping'),
+    ('hq pause history', 'read'),
+    ('hq pause history --session r1 --harness codex --json -n 10', 'read'),
+    ('hq pause list', 'read'),
+    ('hq pause list --since 2026-11-04T00:00:00Z --until 2026-11-05T00:00:00Z --json', 'read'),
     ('tasks show x --no-fetch', 'read'),
     ('tasks claims', 'read'),
     ('tasks list', 'read'),

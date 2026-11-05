@@ -46,7 +46,9 @@ worktree only by its explicit entry path and synthetic environment overrides.
    before relying on directory rename. Do not run old code against v1 state or
    new code against old state, and do not reset counters to avoid migration.
 5. Recheck main's launcher resolution, storage modes and active snapshots before
-   resuming. A changed default-limit digest can legitimately give old turns a
+   resuming, and run read-only `hq pause history --json` and `hq pause list --json`
+   to confirm version-1 store readability, `coverage.status`, and `cleanup_debt`
+   without mutating state. A changed default-limit digest can legitimately give old turns a
    limits-changed pause; a new genuine user prompt starts with new defaults.
    Verify one host/profile end-to-end and both distinct Claude/Codex hook paths
    under the approved window. Observe notification attempts separately from

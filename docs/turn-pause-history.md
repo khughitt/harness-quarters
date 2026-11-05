@@ -1,8 +1,9 @@
 # Turn-pause diagnostics and history
 
 Type: reference. The protected-path guard permits validated filesystem reads
-without permitting writes or changing pause state. Read-only history commands
-will be documented here when their implementation is available.
+without permitting writes or changing pause state, and `hq pause history` /
+`hq pause list` expose read-only transition history and turn summaries from the
+local store.
 
 The prepared version-1 root envelope requires private `prompt_guards` metadata
 with sorted unique cron digests and wake rows `[digest, not_before, not_after]`.
@@ -31,6 +32,63 @@ Explicit agent budgets override proportional scaling. Existing 16-hour,
 500-root-call and two-root-compaction safeguards remain unchanged. Larger valid
 plans can still cross 60; the measurement and its limits are retained on
 hq-704fe5. Activation of a prepared default is a separate user-approved step.
+
+## Read-only history and turn summaries
+
+Inspect local transition records and root/turn summaries with:
+
+```text
+hq pause history [--session ROOT] [--harness claude-code|codex]
+                 [--since RFC 3339] [--until RFC 3339] [-n N] [--json]
+hq pause list    [--session ROOT] [--harness claude-code|codex]
+                 [--since RFC 3339] [--until RFC 3339] [-n N] [--json]
+```
+
+- **Selection and window.** Omitting `--session` queries all locally available
+  root records without `CODEX_THREAD_ID` or current-directory fallback.
+  `--session ROOT` selects a root session id (live worker resolution remains on
+  `hq pause status`). `--since` and `--until` require RFC 3339 timestamps with an
+  explicit UTC offset (`Z` or `[+-]HH:MM`) and form a half-open `[since, until)`
+  interval. `-n N` bounds returned rows (`1..1000`, default `50`). Invalid
+  ranges, naive timestamps, malformed JSON, or unsupported record versions fail
+  with exit status `1`.
+- **Read-only boundary.** Neither command creates the state directory, rewrites
+  records, reads session transcripts, or runs document providers. While a turn is
+  paused, `hq pause history` and `hq pause list` are classified as `read` and
+  spend the 25-read grace, whereas `hq pause status` and `hq pause limits` remain
+  `bookkeeping`.
+- **Ordering and summaries.** `hq pause history` orders events newest-first by
+  `(at, harness, root, generation, turn, sequence)`. `hq pause list` emits one
+  `(harness, root, generation, turn)` summary per observed turn, ordered by the
+  turn's last retained event (`last_event_at`, then identity and `last_sequence`).
+  Summaries report `started_at` and `ended_at` (nullable when truncated or still
+  open), `origin`, `end_kind`, `end_reason`, `event_count`, `event_kinds`,
+  `warnings`, `enforced_pause`, `notification`, `snapshot`, `root_active`,
+  `root_ended_at`, and `truncated`. Roots with no observed turn produce no
+  fabricated summary and are reported in `coverage.unobserved_roots` and
+  `diagnostics`.
+- **Version-1 JSON envelope and obs handoff.** `--json` outputs `version` (`1`),
+  `observed_at` (UTC epoch seconds), `host`, `coverage` (`status`:
+  `available` | `partial` | `unavailable`, `scope: "local_store"`,
+  `observation: "per_root_atomic"`, root/event bounds, `dropped_events`,
+  `unobserved_roots`, `disappeared_files`), `window`, `events` or `summaries`,
+  `truncated`, `retention` (`30` days / `512` ended roots / `128` events /
+  `131072` bytes / `32` maintenance mutations and dropped metadata),
+  `cleanup_debt`, and `diagnostics`. A missing store directory yields
+  `coverage.status == "unavailable"` with empty rows, never proof of zero
+  interruptions.
+- **Consumer correlation rules (obs-1450e7).** Portable handoff fixtures in
+  `tools/fixtures/turn-pause/history/obs-handoff-cases.json` keep hook transition
+  events (`hook_events`) separate from external `task_evidence` and
+  `session_evidence` arrays across audit equivalents A–G and control cases.
+  Consumers derive pre-enforcement self-stops outside hooks by joining stamped
+  task parks and session evidence to the qualified session and enclosing genuine
+  human turn (`generation`, `turn`, and time bounds). Ordinary approval/review
+  decision parks and warnings followed by continued execution are not
+  interruptions; missing transcripts, unstamped parks, or ambiguous joins remain
+  `unknown`, and absence of a self-stop record never proves continuation. Private
+  `prompt_guards`, raw schedule text, and `cwd` never appear in public snapshots
+  or handoff fixtures.
 
 ## Inspecting protected paths
 

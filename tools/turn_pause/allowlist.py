@@ -34,10 +34,12 @@ class Owned(Frozen):
     __slots__ = _fields = ('worker_names', 'cron_jobs', 'harness_pid')
 
 
-# Shell programs. `hq pause` passes only as `hq pause status|limits` (ledger ruling R2);
-# `tasks show` only with --no-fetch, since it otherwise runs a document provider.
+# Shell programs. `hq pause` passes as `hq pause status|limits` (bookkeeping) or
+# `hq pause history|list` (read); `tasks show` only with --no-fetch, since it otherwise
+# runs a document provider.
 BOOKKEEPING = {('tasks', 'park'), ('tasks', 'note'), ('hq', 'pause')}
 HQ_PAUSE = {'status', 'limits'}
+HQ_PAUSE_READS = {'history', 'list'}
 RECORD_READS = {('tasks', 'show'), ('tasks', 'claims'), ('tasks', 'list'), ('tasks', 'attach')}
 READERS = {
     'cat': {'-n'},
@@ -216,9 +218,14 @@ def _records(argv: list[str]) -> Verdict:
             return _refuse('tasks -C needs a non-empty directory before a closing subcommand')
         argv = [argv[0], *argv[3:]]
     pair = (argv[0], argv[1] if len(argv) > 1 else '')
+    if pair == ('hq', 'pause'):
+        sub = argv[2] if len(argv) >= 3 else ''
+        if sub in HQ_PAUSE:
+            return Verdict('bookkeeping', 'hq pause')
+        if sub in HQ_PAUSE_READS:
+            return Verdict('read', f'hq pause {sub}')
+        return _refuse('hq pause passes only as hq pause status, limits, history or list')
     if pair in BOOKKEEPING:
-        if pair == ('hq', 'pause') and (len(argv) < 3 or argv[2] not in HQ_PAUSE):
-            return _refuse('hq pause passes only as hq pause status or hq pause limits')
         return Verdict('bookkeeping', ' '.join(pair))
     if pair in RECORD_READS:
         if pair == ('tasks', 'show') and '--no-fetch' not in argv[2:]:

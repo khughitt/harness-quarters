@@ -575,7 +575,10 @@ Root calls count tool-call attempts by the controller; worker calls never spend
 that allowance. Spawns count the whole tree, and compactions count only the root.
 Use `hq pause status --json` as the authoritative hook snapshot for counted metrics;
 keep manually counted, unhooked metrics separate. JSON compactions are `null` when
-the hook cannot count them.
+the hook cannot count them. `hq pause history` and `hq pause list` expose read-only
+transition events and per-turn summaries across local root records (`--session`,
+`--harness`, `--since`, `--until`, `-n`, `--json`; see the
+[diagnostics guide](docs/turn-pause-history.md)).
 
 The 75% warning asks for a concise status update and preparation while authorized
 work continues. It is not a pause, a request for a new budget, or a new approval
@@ -609,7 +612,9 @@ Use `tasks -C .worktrees/<name> park <id> "next step" --waiting-on user --reason
 when the authoritative task record is in a worktree. `tasks -C .worktrees/<name> note <id> "status"`
 also stays allowed after the pause's read grace is exhausted. Quote a directory that
 contains spaces. The directory selector preserves each closing subcommand's existing
-restrictions: records reads and attachments use grace, and `tasks show` needs `--no-fetch`.
+restrictions: records reads, `hq pause history`, `hq pause list`, and attachments use
+grace (`hq pause status` and `hq pause limits` remain bookkeeping), and `tasks show`
+needs `--no-fetch`.
 The pause still refuses `cd`, `env` wrappers and compound shell commands.
 
 ### Re-probing the turn-pause hook facts
