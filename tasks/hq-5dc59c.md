@@ -6,9 +6,9 @@ priority: 2
 size: xs
 complexity: low
 process: direct
-owner: fix/hq-2dd09b
+owner: main
 created: 2026-11-02T23:54:03Z
-updated: 2026-11-05T20:34:15Z
+updated: 2026-11-05T20:41:57Z
 started: 2026-11-04T10:27:21Z
 depends: []
 parent: hq-2dd09b
@@ -41,3 +41,4 @@ User requested fixing this after accepting audit hq-7fb9d5. Align root refusal t
 - 2026-11-04T10:51:58Z (fix/hq-2dd09b): parked (waiting on user, approval): User authorizes live activation of reviewed hq codef7259d9098f66ed2e60fa14f9aeb22824f2ba53d; agent then refreshes main/checks and integrates fix/hq-2dd09b from .worktrees/hq-2dd09b. Shared design approval alone does not authorize activation; see docs/notes/2026-11-04-turn-pause-handoff.md.
   provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-05T20:34:15Z (fix/hq-2dd09b): resumed
+- 2026-11-05T20:41:57Z (main): resumed
