@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-e51fac
 created: 2026-11-05T00:36:12Z
-updated: 2026-11-05T00:59:29Z
+updated: 2026-11-05T00:59:31Z
 started: 2026-11-05T00:36:32Z
 depends: []
 parent: hq-2dd09b
@@ -38,3 +38,4 @@ Where: tools/turn_pause/counters.py, tools/turn_pause/hook.py, tools/hq_cli/paus
 - 2026-11-05T00:38:40Z (fix/hq-e51fac): Hydrated .worktrees/hq-e51fac with just setup; focused baseline just test-one tools/test_turn_pause_counters.py tools/test_turn_pause_hook.py tools/test_turn_pause_limits.py tools/test_turn_pause_replay.py tools/test_hq_pause.py passed (161 passed in 15.61s); broad test suite deliberately omitted under validated .tt.toml policy. Paired lore guidance task filed as lore-d27b9c.
 - 2026-11-05T00:53:27Z (fix/hq-e51fac): review: impl round 1 — verdict: revise; findings: 1 minor (label compactions as advisory in ROOT_TEXT, LIMITS_CHANGED_HEAD and _notice in tools/turn_pause/hook.py); reviewer: agy/gemini
 - 2026-11-05T00:59:29Z (fix/hq-e51fac): attached: advisory-compaction-r2-report.md (3057 bytes): Accepted Round 2 code review report for hq-e51fac (af5c57ef) and lore-d27b9c (05be4622)
+- 2026-11-05T00:59:31Z (fix/hq-e51fac): retained: {"version":1,"host":"titan","kind":"worktree","path":".worktrees/hq-e51fac","state":"kept","verification":"verified","purpose":"Preserve reviewed advisory-compaction hook and CLI changes across user live-activation approval","next_owner":"task:hq-e51fac","cleanup_trigger":"After user-approved live hook activation and integration into main, verify evidence and all worktree removal conditions"}
