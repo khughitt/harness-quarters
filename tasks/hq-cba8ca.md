@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-11-05T09:58:20Z
-updated: 2026-11-05T12:13:04Z
+updated: 2026-11-05T12:13:16Z
 started: 2026-11-05T11:24:36Z
 depends: [ops-b4b162]
 tags: []
@@ -38,3 +38,5 @@ Done: focused RED-to-GREEN proves private-records evidence works with the old op
 - 2026-11-05T12:11:41Z (fix/hq-cba8ca-records-evidence): review: impl round 1 — verdict: accept; findings: Minor 1; reviewer: codex/gpt-6-astra
 - 2026-11-05T12:12:25Z (fix/hq-cba8ca-records-evidence): Independent review accepted with no Critical/Important findings. Report /mnt/ssd3/work/ops/ops-7f0b75/plans/public-docs-curation/hq-cba8ca-round-1-report.md (8772 bytes), frozen 10cd3b13..8d2698bc. Minor M1 deferred in parent ops-7f0b75 ledger: bootstrap caches its own records lookup but nested standalone preflight resolves independently; runbook wording/test scope overstate one lookup. Parent owns disposition; no new runtime mechanism justified. All live deployment/adoption judgments remain outside this review.
 - 2026-11-05T12:13:04Z (fix/hq-cba8ca-records-evidence): Accepted H integrated by local merge f08b92d429dd5afe2b9d7a9465f4d64ad1bff5fe on main; reviewed 8d2698bc is ancestor and tools/docs byte-identical. Disposing own clean locked worktree: .pytest_cache/ and tools/relay_cutover_bootstrap/__pycache__/ are regenerable test caches and may be discarded. No submodules or local .superpowers/sdd workspace; parent external workspace/ledger remains owned by open ops-7f0b75. Host-pointer inspection of ~/bin, ~/.local/bin, user units and known harness config includes found no reference into worktree. Session host-load: nothing left running. No push or live activation; main preexisting agy/settings.json change untouched.
+- 2026-11-05T12:13:16Z (main): resumed
+  provenance: {"harness_session":"codex:01a1ab05-ce9a-72d1-890e-c01268ef1193","harness_session_source":"CODEX_THREAD_ID"}
