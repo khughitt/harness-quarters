@@ -13,6 +13,7 @@
 
 [required]
 "~/.config/AGENTS.md" = "lore:instructions/AGENTS.md"
+"~/.config/ponytail/config.json" = "ponytail/config.json"
 "~/.local/bin/harness-state-refresh" = ".githooks/harness-state-refresh"
 "~/.local/bin/hq" = "tools/hq"
 "~/.local/bin/pi" = "pi/bin/pi"

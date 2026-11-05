@@ -252,7 +252,10 @@ MIT licensed; see `LICENSE`.
 - `agents/skills/session-logs/`: the retained skill. `agents/bin/`: session-episodes,
   wake-judge and their tests. Profile fragments and
   the remaining skill corpus live in lore.
-- `claude/`, `codex/` and `agy/`: per-harness settings, hooks and skill registries. Each
+- `claude/`, `codex/`, `agy/` and `ponytail/`: per-harness settings, hooks, skill registries and
+  plugin defaults (`ponytail/config.json` links to `~/.config/ponytail/config.json` with
+  `"defaultMode": "off"`, keeping Ponytail's skills available without automatic `SessionStart` or
+  `SubagentStart` footer injection). Each
   home's settings and hooks files are symlinks to them: `~/.claude` and `~/.codex` to the
   plain files, `~/.codex-work` to `codex/work/hooks.json`, `~/.gemini/antigravity-cli` to
   `agy/settings.json`, and `~/.gemini/config` to `agy/hooks.json`, `agy/skills.json`
