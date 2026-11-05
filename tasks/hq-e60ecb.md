@@ -9,7 +9,7 @@ process: direct
 needs: [quiet]
 owner: fix/hq-2dd09b
 created: 2026-11-04T11:51:39Z
-updated: 2026-11-05T03:15:31Z
+updated: 2026-11-05T03:15:32Z
 started: 2026-11-04T12:54:16Z
 depends: [hq-cc91d4]
 parent: hq-e10b76
@@ -68,3 +68,4 @@ Execute Task 4 of the proposed shared turn-pause plan, frozen in hq at 3c29183b0
 - 2026-11-05T02:29:32Z (fix/hq-2dd09b): resumed
 - 2026-11-05T03:15:29Z (fix/hq-2dd09b): attached: latency-1000-main.json (2802 bytes): 1000-sample idle-host baseline latency result for main (portable derivative; raw in WORK_ROOT)
 - 2026-11-05T03:15:31Z (fix/hq-2dd09b): attached: latency-1000-candidate-128events.json (2836 bytes): 1000-sample idle-host candidate latency result with 128 events (portable derivative; raw in WORK_ROOT)
+- 2026-11-05T03:15:32Z (fix/hq-2dd09b): attached: latency-1000-candidate-1event.json (2821 bytes): 1000-sample idle-host candidate latency result with 1 event (portable derivative; raw in WORK_ROOT)
