@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "pilot": false,
+  "workers": 16,
+  "target_p99_ms": 50,
+  "seed_events": false,
+  "cases": [
+    {
+      "harness": "claude-code",
+      "case": "serial",
+      "samples": 1000,
+      "p50_ms": 29.46632800012594,
+      "p95_ms": 44.64090599503834,
+      "p99_ms": 46.60180099745048,
+      "max_ms": 47.90882900124416,
+      "mean_ms": 32.90474784903927,
+      "loadavg_before": "0.39 0.44 0.61 1/772 607312",
+      "loadavg_after": "0.96 0.60 0.65 1/771 610219",
+      "counts": [
+        {
+          "root": "7f0c44c1-4c1f-40da-9a15-aa0917fa0728",
+          "calls": 1000,
+          "events": 0,
+          "state_bytes": 732
+        }
+      ],
+      "passed": true
+    },
+    {
+      "harness": "claude-code",
+      "case": "concurrent",
+      "samples": 4000,
+      "p50_ms": 30.49815299891634,
+      "p95_ms": 41.89369399682619,
+      "p99_ms": 47.96073199395323,
+      "max_ms": 52.13987600291148,
+      "mean_ms": 32.87648252208783,
+      "loadavg_before": "0.96 0.60 0.65 1/771 610221",
+      "loadavg_after": "3.28 1.35 0.91 1/769 618929",
+      "counts": [
+        {
+          "root": "7f0c44c1-4c1f-40da-9a15-aa0917fa0728",
+          "calls": 1000,
+          "events": 0,
+          "state_bytes": 755
+        },
+        {
+          "root": "7f0c44c1-4c1f-40da-9a15-aa0917fa0729",
+          "calls": 1000,
+          "events": 0,
+          "state_bytes": 755
+        }
+      ],
+      "passed": true
+    },
+    {
+      "harness": "codex",
+      "case": "serial",
+      "samples": 1000,
+      "p50_ms": 29.507806000765413,
+      "p95_ms": 44.28239199478412,
+      "p99_ms": 46.80006600392517,
+      "max_ms": 49.09245599992573,
+      "mean_ms": 32.83253208499809,
+      "loadavg_before": "3.28 1.35 0.91 1/769 618930",
+      "loadavg_after": "1.89 1.31 0.93 1/768 621652",
+      "counts": [
+        {
+          "root": "01a19737-5420-7280-9b27-80cdf4ba57c6",
+          "calls": 1000,
+          "events": 0,
+          "state_bytes": 720
+        }
+      ],
+      "passed": true
+    },
+    {
+      "harness": "codex",
+      "case": "concurrent",
+      "samples": 4000,
+      "p50_ms": 33.19638299581129,
+      "p95_ms": 42.65319700061809,
+      "p99_ms": 49.576384997635614,
+      "max_ms": 93.1796370059601,
+      "mean_ms": 34.63576624529742,
+      "loadavg_before": "1.89 1.31 0.93 1/768 621654",
+      "loadavg_after": "3.86 2.02 1.20 1/765 630364",
+      "counts": [
+        {
+          "root": "01a19737-5420-7280-9b27-80cdf4ba57c6",
+          "calls": 1000,
+          "events": 0,
+          "state_bytes": 762
+        },
+        {
+          "root": "01a19737-5420-7280-9b27-80cdf4ba57c7",
+          "calls": 1000,
+          "events": 0,
+          "state_bytes": 762
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "status": "passed",
+  "variant": "main-unversioned"
+}
