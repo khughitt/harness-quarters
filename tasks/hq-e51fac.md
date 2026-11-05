@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-11-05T00:36:12Z
-updated: 2026-11-05T01:54:28Z
+updated: 2026-11-05T01:54:30Z
 started: 2026-11-05T00:36:32Z
 depends: []
 parent: hq-2dd09b
@@ -44,3 +44,4 @@ Where: tools/turn_pause/counters.py, tools/turn_pause/hook.py, tools/hq_cli/paus
 - 2026-11-05T01:01:19Z (fix/hq-e51fac): Retention checkpoint at park: hq-e51fac record committed at 865104c63570501ed3c1e90d59f32170c4a8b4c8 on fix/hq-e51fac (reviewed code commit af5c57ef28ba568bacc9032d0e885217c4c64128); complete local retained set is locked worktree .worktrees/hq-e51fac (recorded above); ignored/untracked state is setup-generated .venv, local/codex/rules and caches; no scratch, off-tree evidence, host-pointer changes, or surviving processes.
 - 2026-11-05T01:01:21Z (fix/hq-e51fac): parked (waiting on user, approval): User authorizes live activation of reviewed hq-e51fac (af5c57ef28ba568bacc9032d0e885217c4c64128); agent then refreshes main/checks and merges fix/hq-e51fac from .worktrees/hq-e51fac into main.
 - 2026-11-05T01:54:28Z (main): resumed
+- 2026-11-05T01:54:30Z (main): retained: {"version":1,"host":"titan","kind":"worktree","path":".worktrees/hq-e51fac","state":"released","verification":"verified","purpose":"Removed .worktrees/hq-e51fac and deleted merged branch fix/hq-e51fac (6e25be8afabf78032a0cb44937af542964e5faa1) after passing all worktree, ignored-file (caches/setup dirs regenerable), tt-report and host-pointer removal checks","next_owner":"none","cleanup_trigger":"none"}
