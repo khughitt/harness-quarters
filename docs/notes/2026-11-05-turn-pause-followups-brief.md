@@ -67,9 +67,9 @@ observation; a missing observation is not permission to invent a fallback.
 
 - Reuse hq-2dd09b as the goal; hq-f96f58 is the P2, small, mid-complexity, direct
   local evidence review. It wakes hq-a639e4, which stays an idea dependent on it.
-- hq-14bab1: propose dropping the duplicate because hq-c58737 and its completed
+- hq-14bab1: dropped with user approval on 2026-11-05 because hq-c58737 and its completed
   branch step hq-cc91d4 cover explicit migration and activation/rollback guidance.
-  Keep the proposal pending; do not imply that migration has been activated.
+  The drop does not imply that migration has been activated.
 - hq-33ad66: shelve until 2026-12-05, revisiting earlier for a measured normal-call
   latency breach or a user report of noticeable hook delay. Prefer local
   optimization before reconsidering a separately approved service.
