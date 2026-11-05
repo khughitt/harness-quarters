@@ -1,13 +1,15 @@
 ---
 id: hq-f50d9f
 title: Expose read-only history/list and the obs handoff
-status: todo
+status: doing
 priority: 2
 size: m
 complexity: mid
 process: direct
+owner: fix/hq-2dd09b
 created: 2026-11-04T11:51:44Z
-updated: 2026-11-04T16:28:52Z
+updated: 2026-11-05T11:06:26Z
+started: 2026-11-05T11:06:26Z
 depends: [hq-e60ecb]
 parent: hq-e10b76
 tags: []
@@ -33,3 +35,4 @@ Execute Task 5 of the proposed shared turn-pause plan, frozen in hq at 3c29183b0
   provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-04T12:32:37Z (fix/hq-2dd09b): parked (waiting on agent, dependency): Agent executes approved Task 5 inline in .worktrees/hq-2dd09b after its preceding dependency completes; shared workspace is owned by hq-c58737. No user execution approval remains pending; activation is separate.
   provenance: {"harness_session":"codex:01a1a613-e49a-78d0-a8ab-b3e6a5217919","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-05T11:06:26Z (fix/hq-2dd09b): started
