@@ -6,9 +6,9 @@ priority: 1
 size: s
 complexity: mid
 process: direct
-owner: fix/hq-e51fac
+owner: main
 created: 2026-11-05T00:36:12Z
-updated: 2026-11-05T01:01:21Z
+updated: 2026-11-05T01:54:28Z
 started: 2026-11-05T00:36:32Z
 depends: []
 parent: hq-2dd09b
@@ -43,3 +43,4 @@ Where: tools/turn_pause/counters.py, tools/turn_pause/hook.py, tools/hq_cli/paus
 - 2026-11-05T00:59:35Z (fix/hq-e51fac): Final preparation: advisory-compaction implementation af5c57ef28ba568bacc9032d0e885217c4c64128 accepted with no findings in Round 2 by agy/gemini; Round 1 report committed at docs/notes/2026-11-04-advisory-compaction-r1-report.md and Round 2 report attached at tasks/files/hq-e51fac/advisory-compaction-r2-report.md. Focused tests (just test-one tools/test_turn_pause_counters.py tools/test_turn_pause_hook.py tools/test_turn_pause_limits.py tools/test_turn_pause_replay.py tools/test_hq_pause.py: 162 passed in 13.87s) and mandatory just check-hygiene, git diff --check, and tasks check passed; broad suite deliberately omitted under validated .tt.toml policy; no remote evidence. Branch fix/hq-e51fac remains unmerged in .worktrees/hq-e51fac (independent of .worktrees/hq-2dd09b so it is not blocked by hq-e60ecb's 25-minute idle-host latency diagnostic); agent integrates with git merge fix/hq-e51fac in main only after explicit live activation approval. Paired lore guidance lore-d27b9c is independently accepted at 05be4622e7f20c2c8463f182b6455e460476154e in lore .worktrees/lore-d27b9c. Complete local retained set for hq-e51fac is this locked worktree (.worktrees/hq-e51fac, with setup-generated local/codex/rules); no scratch, off-tree evidence, host-pointer changes, or surviving processes.
 - 2026-11-05T01:01:19Z (fix/hq-e51fac): Retention checkpoint at park: hq-e51fac record committed at 865104c63570501ed3c1e90d59f32170c4a8b4c8 on fix/hq-e51fac (reviewed code commit af5c57ef28ba568bacc9032d0e885217c4c64128); complete local retained set is locked worktree .worktrees/hq-e51fac (recorded above); ignored/untracked state is setup-generated .venv, local/codex/rules and caches; no scratch, off-tree evidence, host-pointer changes, or surviving processes.
 - 2026-11-05T01:01:21Z (fix/hq-e51fac): parked (waiting on user, approval): User authorizes live activation of reviewed hq-e51fac (af5c57ef28ba568bacc9032d0e885217c4c64128); agent then refreshes main/checks and merges fix/hq-e51fac from .worktrees/hq-e51fac into main.
+- 2026-11-05T01:54:28Z (main): resumed
