@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-11-05T09:58:20Z
-updated: 2026-11-05T11:24:58Z
+updated: 2026-11-05T11:25:00Z
 started: 2026-11-05T11:24:36Z
 depends: [ops-b4b162]
 tags: []
@@ -31,3 +31,4 @@ Done: focused RED-to-GREEN proves private-records evidence works with the old op
 - 2026-11-05T11:24:36Z (main): started
   provenance: {"harness_session":"codex:01a1ab05-ce9a-72d1-890e-c01268ef1193","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-05T11:24:58Z (main): trial: flow-trial-1 — enrolled — flow off
+- 2026-11-05T11:25:00Z (main): arm: flow-trial-1 — unit tack-cba8ca — flow off
