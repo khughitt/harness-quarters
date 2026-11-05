@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-11-04T10:13:23Z
-updated: 2026-11-05T20:48:42Z
+updated: 2026-11-05T20:49:14Z
 started: 2026-11-05T20:47:09Z
 depends: [lore-296a0f, obs-1450e7]
 tags: []
@@ -58,3 +58,4 @@ This goal collects hq fixes and cross-project guidance/reporting prerequisites; 
 - 2026-11-05T20:47:48Z (main): retention checkpoint: {"version":1,"operation":{"coordinator":"hq-2dd09b","operation_id":"558f2739c65932d1168a9ab33e3e1d6a"},"observed_at":"2026-11-05T20:47:48Z","host":"titan","observer":"agy:173e89b9-7ec6-450d-adf2-d188986d9ec5","basis":{"project":"hq","layout":"in-tree","records_subdir":".","commit":"88a39486ef13727301f9d9e7e0dcb13bd442443e","task_path":"tasks/hq-2dd09b.md","retained_ref":"refs/heads/main"},"scope":{"mode":"all_known_kept_on_host","host":"titan","other_hosts":"outside_observation"},"counts":{"kept_verified":2,"kept_unknown":0,"released":0},"changed":0,"actions":[],"complete":true}
 - 2026-11-05T20:47:48Z (main): retention operation: {"version":1,"key":{"coordinator":"hq-2dd09b","operation_id":"558f2739c65932d1168a9ab33e3e1d6a"},"phase":"completed","request":{"type":"attachment","task":"hq-2dd09b","name":"retained-op-558f2739c65932d1168a9ab33e3e1d6a.request.json","sha256":"cdf351358a84bf8727ea92c73c982f3bc5ba717577e14b55176675751a1c3d85"},"input_bases":[{"task":"hq-2dd09b","basis":{"project":"hq","layout":"in-tree","records_subdir":".","commit":"0bed1d0af56aa3383c4aebe21b2922a8e833e711","task_path":"tasks/hq-2dd09b.md","retained_ref":"refs/heads/main"}}],"host":"titan","at":"2026-11-05T20:47:48Z","observer":"agy:173e89b9-7ec6-450d-adf2-d188986d9ec5","outputs":{"outcome":"verified","publications":[{"task":"hq-2dd09b","phase":"intent","basis":{"project":"hq","layout":"in-tree","records_subdir":".","commit":"ad338d675a4f605bf3efc65e1f2310ca1c6fdfdf","task_path":"tasks/hq-2dd09b.md","retained_ref":"refs/heads/main"}},{"task":"hq-2dd09b","phase":"items_published","basis":{"project":"hq","layout":"in-tree","records_subdir":".","commit":"88a39486ef13727301f9d9e7e0dcb13bd442443e","task_path":"tasks/hq-2dd09b.md","retained_ref":"refs/heads/main"}}],"checkpoint":24},"diagnostics":[]}
 - 2026-11-05T20:48:42Z (main): resumed
+- 2026-11-05T20:49:14Z (main): parked (waiting on agent, dependency): All hq and lore children (hq-51209b, hq-5dc59c, hq-c58737, hq-704fe5, hq-e10b76, and lore-296a0f) are merged to main, live-activated, and closed. Goal hq-2dd09b holds transferred custody of $WORK_ROOT/hq/hq-c58737/plans/turn-pause-reliability/ and $WORK_ROOT/hq/hq-c58737/activation-20261105/ (kept_verified=2 on titan) and waits on cross-project dependency obs-1450e7 before goal closeout.
