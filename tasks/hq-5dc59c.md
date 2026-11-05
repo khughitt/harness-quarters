@@ -1,15 +1,17 @@
 ---
 id: hq-5dc59c
 title: Respect explicit user authorization when a paused agent has an active goal
-status: doing
+status: done
 priority: 2
 size: xs
 complexity: low
 process: direct
 owner: main
 created: 2026-11-02T23:54:03Z
-updated: 2026-11-05T20:48:36Z
+updated: 2026-11-05T20:49:06Z
 started: 2026-11-04T10:27:21Z
+completed: 2026-11-05T20:49:06Z
+closed: 2026-11-05T20:49:06Z
 depends: []
 parent: hq-2dd09b
 tags: [feedback, friction, "from:lore"]
@@ -43,3 +45,5 @@ User requested fixing this after accepting audit hq-7fb9d5. Align root refusal t
 - 2026-11-05T20:34:15Z (fix/hq-2dd09b): resumed
 - 2026-11-05T20:41:57Z (main): resumed
 - 2026-11-05T20:48:36Z (main): resumed
+- 2026-11-05T20:49:06Z (main): done
+- 2026-11-05T20:49:06Z (main): Activated explicit user goal-authorization handling during paused turns on main at d65274fe1839f334d7c44879808a251f8389f32f. Verification: 702 passed across all 11 turn-pause and hq pause test modules on main, mandatory just check-hygiene passed, live v1 store migrated and E2E Claude/Codex hook paths verified. Deviations: none. Disclosures: pushes=none; surviving_processes=none; others_work=untouched (.worktrees/hq-c66bee untouched); branch fix/hq-2dd09b merged to main and deleted; worktree .worktrees/hq-2dd09b removed after full disposal checks.
