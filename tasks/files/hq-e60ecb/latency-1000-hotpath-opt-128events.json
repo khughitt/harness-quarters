@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "pilot": false,
+  "workers": 16,
+  "target_p99_ms": 50,
+  "seed_events": true,
+  "cases": [
+    {
+      "harness": "claude-code",
+      "case": "serial",
+      "samples": 1000,
+      "p50_ms": 23.994748000404797,
+      "p95_ms": 29.24678799990943,
+      "p99_ms": 31.93166500022926,
+      "max_ms": 35.206107999329106,
+      "mean_ms": 24.2767175470035,
+      "loadavg_before": "4.80 6.40 5.74 6/3119 817613",
+      "loadavg_after": "5.48 6.29 5.74 3/3123 823935",
+      "counts": [
+        {
+          "root": "7f0c44c1-4c1f-40da-9a15-aa0917fa0728",
+          "calls": 1000,
+          "events": 128,
+          "state_bytes": 92134
+        }
+      ],
+      "passed": true
+    },
+    {
+      "harness": "claude-code",
+      "case": "concurrent",
+      "samples": 4000,
+      "p50_ms": 22.63210999990406,
+      "p95_ms": 35.48799100008182,
+      "p99_ms": 39.556041999276204,
+      "max_ms": 53.678959999160725,
+      "mean_ms": 24.780308535245695,
+      "loadavg_before": "5.48 6.29 5.74 2/3123 823940",
+      "loadavg_after": "7.60 6.81 5.96 8/3135 836121",
+      "counts": [
+        {
+          "root": "7f0c44c1-4c1f-40da-9a15-aa0917fa0728",
+          "calls": 1000,
+          "events": 128,
+          "state_bytes": 92155
+        },
+        {
+          "root": "7f0c44c1-4c1f-40da-9a15-aa0917fa0729",
+          "calls": 1000,
+          "events": 128,
+          "state_bytes": 92163
+        }
+      ],
+      "passed": true
+    },
+    {
+      "harness": "codex",
+      "case": "serial",
+      "samples": 1000,
+      "p50_ms": 23.64158199998201,
+      "p95_ms": 31.28315900084999,
+      "p99_ms": 33.8183569992907,
+      "max_ms": 38.497186999848054,
+      "mean_ms": 24.470547154997803,
+      "loadavg_before": "7.60 6.81 5.96 4/3137 836187",
+      "loadavg_after": "5.05 6.19 5.79 3/3126 841849",
+      "counts": [
+        {
+          "root": "01a19737-5420-7280-9b27-80cdf4ba57c6",
+          "calls": 1000,
+          "events": 128,
+          "state_bytes": 91857
+        }
+      ],
+      "passed": true
+    },
+    {
+      "harness": "codex",
+      "case": "concurrent",
+      "samples": 4000,
+      "p50_ms": 26.510897000662226,
+      "p95_ms": 39.53126200030965,
+      "p99_ms": 47.43499799951678,
+      "max_ms": 70.0355729995863,
+      "mean_ms": 27.99534118949509,
+      "loadavg_before": "5.05 6.19 5.79 3/3133 841871",
+      "loadavg_after": "8.07 6.88 6.07 10/3167 856091",
+      "counts": [
+        {
+          "root": "01a19737-5420-7280-9b27-80cdf4ba57c6",
+          "calls": 1000,
+          "events": 128,
+          "state_bytes": 91899
+        },
+        {
+          "root": "01a19737-5420-7280-9b27-80cdf4ba57c7",
+          "calls": 1000,
+          "events": 128,
+          "state_bytes": 91901
+        }
+      ],
+      "passed": true
+    }
+  ],
+  "status": "passed"
+}
