@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-11-05T09:58:20Z
-updated: 2026-11-05T12:13:52Z
+updated: 2026-11-05T12:14:13Z
 started: 2026-11-05T11:24:36Z
 completed: 2026-11-05T12:13:52Z
 closed: 2026-11-05T12:13:52Z
@@ -47,3 +47,4 @@ Done: focused RED-to-GREEN proves private-records evidence works with the old op
   provenance: {"harness_session":"codex:01a1ab05-ce9a-72d1-890e-c01268ef1193","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-05T12:13:52Z (main): Accepted private-records correction integrated at f08b92d429dd5afe2b9d7a9465f4d64ad1bff5fe; subsequent note-only merge 58evidence is recorded in main ancestry (use Git for exact tip). Focused scope 461+1 affected tests passed; mandatory hygiene passed; broad suite deliberately omitted under policy-off; no remote evidence or live activation. Parent ops-7f0b75 owns logs/review/ledger, including deferred Minor M1; no other retained child items remain. Own worktree and merged branch removed after clean/cache/pointer/tt-report checks; no process survives, nothing pushed; unrelated agy/settings.json preserved.
   provenance: {"harness_session":"codex:01a1ab05-ce9a-72d1-890e-c01268ef1193","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-05T12:14:13Z (main): Correction to done-note wording: the note-only integration merge is b35319431dd12a4511f2c571df199388873e6a13; the text 58evidence was a transcription error, not a Git identifier. Accepted code integration H remains f08b92d429dd5afe2b9d7a9465f4d64ad1bff5fe. Main ancestry preserves the complete task/review record.
