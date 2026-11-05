@@ -1,13 +1,15 @@
 ---
 id: hq-cba8ca
 title: Read relay bootstrap probe evidence from ops private records
-status: todo
+status: doing
 priority: 0
 size: s
 complexity: mid
 process: direct
+owner: main
 created: 2026-11-05T09:58:20Z
-updated: 2026-11-05T10:56:11Z
+updated: 2026-11-05T11:24:36Z
+started: 2026-11-05T11:24:36Z
 depends: [ops-b4b162]
 tags: []
 source: ops-7f0b75
@@ -26,3 +28,5 @@ Done: focused RED-to-GREEN proves private-records evidence works with the old op
 - 2026-11-05T09:58:20Z (add): created
   provenance: {"harness_session":"codex:01a1ab05-ce9a-72d1-890e-c01268ef1193","harness_session_source":"CODEX_THREAD_ID","origin":"agent"}
 - 2026-11-05T10:56:11Z (main): Verified private evidence is now available: records archive A a83536d369734fcf0cb2ad6b8c876e8f7d5dadb3 (export tip 237520159d6201b4b14f2aed0d2a4cba64852c34), paths relative to ops records directory: docs/runbooks/relay-guard-evidence-claude-code.json SHA-256 8e124ab9c6504744d4ed17ca8d0619a9f553486573dacce2d648457c83bb5b84; docs/runbooks/relay-guard-evidence-codex.json SHA-256 bc2c280243f4562d93ffc2b43bbb01cca3832b278af376489f6e7e3a327fd04a. All historical/current archive bytes verified, and records-migrate find_import tuple unchanged. Ops code files still exist and must stay until this task supplies accepted integrated consumer proof. Resolve the executing host records location explicitly; no source-copy fallback and no live cutover/host installation. Archive step ops-b4b162 is closing after receipt verification.
+- 2026-11-05T11:24:36Z (main): started
+  provenance: {"harness_session":"codex:01a1ab05-ce9a-72d1-890e-c01268ef1193","harness_session_source":"CODEX_THREAD_ID"}
