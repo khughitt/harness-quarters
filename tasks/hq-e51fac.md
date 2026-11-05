@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-e51fac
 created: 2026-11-05T00:36:12Z
-updated: 2026-11-05T00:38:40Z
+updated: 2026-11-05T00:53:27Z
 started: 2026-11-05T00:36:32Z
 depends: []
 parent: hq-2dd09b
@@ -36,3 +36,4 @@ Where: tools/turn_pause/counters.py, tools/turn_pause/hook.py, tools/hq_cli/paus
 - 2026-11-05T00:36:56Z (fix/hq-e51fac): resumed
 - 2026-11-05T00:38:38Z (fix/hq-e51fac): arm: flow-trial-1 — unit tack-2dd09b — flow off
 - 2026-11-05T00:38:40Z (fix/hq-e51fac): Hydrated .worktrees/hq-e51fac with just setup; focused baseline just test-one tools/test_turn_pause_counters.py tools/test_turn_pause_hook.py tools/test_turn_pause_limits.py tools/test_turn_pause_replay.py tools/test_hq_pause.py passed (161 passed in 15.61s); broad test suite deliberately omitted under validated .tt.toml policy. Paired lore guidance task filed as lore-d27b9c.
+- 2026-11-05T00:53:27Z (fix/hq-e51fac): review: impl round 1 — verdict: revise; findings: 1 minor (label compactions as advisory in ROOT_TEXT, LIMITS_CHANGED_HEAD and _notice in tools/turn_pause/hook.py); reviewer: agy/gemini
