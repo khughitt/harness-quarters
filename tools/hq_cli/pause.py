@@ -85,8 +85,8 @@ def status(args, env) -> str:
             data[name] = {"used": used, "limit": getattr(lim, name)}
         data.update(paused=state.paused, budget=state.budget_note, notify=notify_text(state))
         return json.dumps(data)
-    compactions = (f"{turn.compactions}/{lim.compactions}" if kept["compactions"]
-                   else f"-/{lim.compactions} (count your own)")
+    compactions = (f"{turn.compactions}/{lim.compactions} (advisory)" if kept["compactions"]
+                   else f"-/{lim.compactions} (advisory, unhooked)")
     return (f"active {limits.duration(turn.active)}/{limits.duration(lim.active_seconds)} root calls {turn.calls}/{lim.calls} "
             f"tree spawns {turn.spawns}/{lim.spawns} root compactions {compactions} "
             f"paused:{state.paused or 'no'} budget:{state.budget_note or 'none'} notify:{notify_text(state)}")
@@ -97,7 +97,7 @@ def show_limits(args) -> str:
     if args.json:
         return json.dumps(lim._asdict())
     return (f"active {limits.duration(lim.active_seconds)} root calls {lim.calls} tree spawns {lim.spawns} "
-            f"root compactions {lim.compactions}")
+            f"root compactions {lim.compactions} (advisory)")
 
 
 def run(args) -> int:

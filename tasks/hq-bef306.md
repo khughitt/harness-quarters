@@ -1,0 +1,54 @@
+---
+id: hq-bef306
+title: Update tasks record and resolution contract citations
+status: done
+priority: 1
+size: xs
+complexity: low
+process: direct
+owner: docs/hq-bef306-tasks-citations
+created: 2026-11-04T20:11:24Z
+updated: 2026-11-04T20:59:25Z
+started: 2026-11-04T20:12:09Z
+completed: 2026-11-04T20:28:10Z
+closed: 2026-11-04T20:28:10Z
+depends: []
+tags: []
+source: tasks-813e86
+agent: codex
+origin: agent
+---
+
+Narrow producer work for tasks-813e86 Task 5: update the tasks record-home and project-resolution references in agents/bin/session-episodes and tools/rename-cutover to current public contract or self-contained invariant; preserve unrelated hq historical citations, parsing and behavior. Mandatory hygiene and one independent actual-diff review before local integration, no push or home relinking. Parent tasks-813e86 owns review workspace.
+
+## Notes
+
+- 2026-11-04T20:11:24Z (add): created
+  provenance: {"harness_session":"codex:01a1a7c8-be1e-70f2-8f58-4cfc952a4551","harness_session_source":"CODEX_THREAD_ID","origin":"agent"}
+- 2026-11-04T20:12:09Z (docs/hq-bef306-tasks-citations): started
+  provenance: {"harness_session":"codex:01a1a7c8-be1e-70f2-8f58-4cfc952a4551","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T20:12:31Z (docs/hq-bef306-tasks-citations): trial: flow-trial-1 — enrolled — flow on
+- 2026-11-04T20:12:33Z (docs/hq-bef306-tasks-citations): arm: flow-trial-1 — unit tack-bef306 — flow on
+- 2026-11-04T20:12:35Z (docs/hq-bef306-tasks-citations): Created and locked .worktrees/hq-bef306 on titan, owner hq-bef306, purpose reviewed documentation citation source change; cleanup after reviewed local integration. just setup succeeded using declared route; no home links applied. Valid policy-off and comment-only changes create no focused/full suite baseline obligation; mandatory hygiene still required. Parent tasks-813e86 owns off-tree review workspace.
+- 2026-11-04T20:12:47Z (docs/hq-bef306-tasks-citations): trial: flow-trial-1 — enrolled — flow on
+- 2026-11-04T20:12:49Z (docs/hq-bef306-tasks-citations): arm: flow-trial-1 — unit tack-bef306 — flow on
+- 2026-11-04T20:13:31Z (docs/hq-bef306-tasks-citations): gate: scoped — adopted from direct task body and approved parent cutover plan
+  provenance: {"harness_session":"codex:01a1a7c8-be1e-70f2-8f58-4cfc952a4551","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T20:13:33Z (docs/hq-bef306-tasks-citations): gate: implementing .worktrees/hq-bef306 — direct comment-only producer change in the existing locked task worktree
+  provenance: {"harness_session":"codex:01a1a7c8-be1e-70f2-8f58-4cfc952a4551","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T20:13:35Z (docs/hq-bef306-tasks-citations): Trial flow arm resolved on enrollment check during initial citation edits; state adopted at the current implementing phase. No past gate or verification was backfilled. All source edits are comments/docstrings only; no live-store reader behavior changed, so fresh live-store sweep and behavior tests are not applicable. Mandatory hygiene passed before independent source-change review.
+- 2026-11-04T20:20:43Z (docs/hq-bef306-tasks-citations): review: impl round 1 — verdict: revise; findings: Important 1; reviewer: codex/gpt-6.1-sol
+- 2026-11-04T20:20:46Z (docs/hq-bef306-tasks-citations): Actual source-change review of a9a2fff12af1d1c9f6ca3392cf55018cdb24b95e..393d50218e9b0511aabaa8109ec465dc5f76a149 found four missed current tasks records-home comments. Full nonempty 9500-byte report is producer-round-1-report.md in parent workspace. Runtime feature-label error text remains unchanged: it names no historical path/section and gives no instruction to read one. Batch all four citation corrections, preserve all guards, rerun mandatory hygiene and get one scoped corrective re-review.
+- 2026-11-04T20:26:53Z (docs/hq-bef306-tasks-citations): review: impl round 2 — verdict: accept; findings: none; reviewer: codex/gpt-6.1-sol
+- 2026-11-04T20:26:55Z (docs/hq-bef306-tasks-citations): Scoped corrective review accepted exact 393d50218e9b0511aabaa8109ec465dc5f76a149..e35602cc33fcaa4ff3d33e871b2487d7aefddff7; producer-round-2-report.md persisted/nonempty 7228 bytes in parent workspace. All four missed comment references resolved; runtime feature label and unrelated hq sources unchanged. Saved hygiene passed, no repeated suite/custody work. Declined full-migration/integration and bookkeeping remain controller duties; no unresolved actionable finding.
+- 2026-11-04T20:27:40Z (docs/hq-bef306-tasks-citations): gate: verified tree:766a16eb0aa89e3c34b377bb336306db2019f02d — checks: just check-hygiene pass and git diff --check pass and comment-only no behavior test obligation under policy-off; review: none; reviewer: codex/gpt-6.1-sol
+  provenance: {"harness_session":"codex:01a1a7c8-be1e-70f2-8f58-4cfc952a4551","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T20:27:42Z (docs/hq-bef306-tasks-citations): retro: The narrowed producer diff preserved every guard while replacing current-contract pointers. Independent review found four additional shorthand citations in the same files, and one batched correction plus scoped re-review closed them.
+- 2026-11-04T20:28:08Z (docs/hq-bef306-tasks-citations): Verified covered tree 766a16eb0aa89e3c34b377bb336306db2019f02d at corrective code e35602cc33fcaa4ff3d33e871b2487d7aefddff7; independent round2 accepts all four fixes, mandatory hygiene and diff checks pass, no behavior tests needed for comments. Broad suite skipped by valid automatic_broad=false; no remote evidence. Known local retained set is this locked worktree only; current ignored/status inventory empty (setup-created empty local directories are regenerable), no execution workspace in-tree. Parent tasks-813e86 owns reports and source evidence. Code/index/covered fingerprints equal; same-turn disposal follows local integration. No home link, host pointer, detached process or push. Branch docs/hq-bef306-tasks-citations in .worktrees/hq-bef306 is reviewed for controller git merge --no-ff into personal main.
+- 2026-11-04T20:28:10Z (docs/hq-bef306-tasks-citations): done
+  provenance: {"harness_session":"codex:01a1a7c8-be1e-70f2-8f58-4cfc952a4551","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T20:28:10Z (docs/hq-bef306-tasks-citations): Reviewed record-layout citations preserve consumer guards
+  provenance: {"harness_session":"codex:01a1a7c8-be1e-70f2-8f58-4cfc952a4551","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-04T20:29:44Z (main): Reviewed source and flow closeout merged into main at 076ee69e2eac58b7f5dc0149889c344c53c3aa05. tt-report exit 0 before disposal; fresh ignored/status inventory empty, setup-created empty local directories regenerable, no in-tree plan workspace. Known launcher/hook/helper/user-unit scan found no pointer into the tree. Unlocked/removed only .worktrees/hq-bef306; branch kept merged, parent keeps reports, no retained local child item survives. No push or home relink. First merge raced an auto-committing task note; ancestry/status check detected that the done commit was not included, so the remaining metadata was merged and main now reports done with no claim.
+- 2026-11-04T20:30:45Z (main): Accounting correction: the final disposal command accidentally ran git status --ignored in main, so its printed ignored entries belonged to main and were not removed or dispositioned by this task. The target worktree had been separately observed with empty ignored/status inventory after its last source/hygiene writes (the preceding tt-report plus explicit target status call), and no new source or scratch operation ran there afterward. Removal proceeded on that earlier target observation, not a refreshed disposal-time inventory; no claim of a fresh target observation is made. All needed evidence was and remains in the parent workspace; main ignored contents and other worktrees remain untouched.
+- 2026-11-04T20:59:25Z (main): retro: Source review found shorthand references that exact-path replacement missed; one batched fix and scoped re-review preserved executable code. Tooling lesson recorded as positive feedback lore-084609; source-review reports remain on tasks-813e86.

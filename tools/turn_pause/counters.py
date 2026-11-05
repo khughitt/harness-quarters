@@ -8,6 +8,7 @@ from .record import Record
 IDLE_GAP_SECONDS = 600
 WARN_FRACTION = (3, 4)
 COUNTS = ('active', 'calls', 'spawns', 'compactions')
+PAUSE_COUNTS = ('active', 'calls', 'spawns')
 
 
 class TurnState(Record):
@@ -101,8 +102,8 @@ def _limit(state: TurnState, name: str) -> int:
 
 
 def crossed(state: TurnState) -> str | None:
-    """The first count strictly above its limit."""
-    for name in COUNTS:
+    """The first enforced count strictly above its limit; compactions are advisory."""
+    for name in PAUSE_COUNTS:
         if _count(state, name) > _limit(state, name):
             return name
     return None
