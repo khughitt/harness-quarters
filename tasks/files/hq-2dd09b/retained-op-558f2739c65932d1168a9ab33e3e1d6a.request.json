@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "operation_id": "558f2739c65932d1168a9ab33e3e1d6a",
+  "host": "titan",
+  "inputs": [
+    {
+      "task": "hq-2dd09b",
+      "basis": {
+        "project": "hq",
+        "layout": "in-tree",
+        "records_subdir": ".",
+        "commit": "0bed1d0af56aa3383c4aebe21b2922a8e833e711",
+        "task_path": "tasks/hq-2dd09b.md",
+        "retained_ref": "refs/heads/main"
+      }
+    }
+  ],
+  "declarations": [],
+  "preserved_previous": [],
+  "resolutions": []
+}
