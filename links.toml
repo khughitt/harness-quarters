@@ -27,7 +27,6 @@
 # Installed as one symlink per entry: a search rooted at this surface needs -L (rg, fd, find) or should run in the owner checkout the entry resolves to.
 # The aggregate surface: each entry targets its owner. Adding or removing a skill or a
 # tool is a line here; a removed one moves to [retired] with its target.
-"~/.agents/.skill-lock.json" = "lore:.skill-lock.json"
 "~/.agents/evals" = "flows:evals"
 "~/.agents/flow" = "flows:flow"
 "~/.agents/profiles" = "lore:profiles"
@@ -163,3 +162,7 @@ home = "~/.gemini/config"
 "AGENTS.md" = "lore:instructions/AGENTS.md"
 "hooks.json" = "agy/hooks.json"
 "skills.json" = "agy/skills.json"
+
+# Obsolete installer metadata; Git submodules pin the served upstream sources.
+[retired]
+"~/.agents/.skill-lock.json" = "lore:.skill-lock.json"
