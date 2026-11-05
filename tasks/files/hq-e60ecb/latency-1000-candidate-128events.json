@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "pilot": false,
+  "workers": 16,
+  "target_p99_ms": 50,
+  "seed_events": true,
+  "cases": [
+    {
+      "harness": "claude-code",
+      "case": "serial",
+      "samples": 1000,
+      "p50_ms": 42.902020999463275,
+      "p95_ms": 55.7391850015847,
+      "p99_ms": 59.961234001093544,
+      "max_ms": 67.00581400218653,
+      "mean_ms": 44.598342386809236,
+      "loadavg_before": "3.86 2.02 1.20 1/765 630389",
+      "loadavg_after": "1.84 1.80 1.20 1/758 633124",
+      "counts": [
+        {
+          "root": "7f0c44c1-4c1f-40da-9a15-aa0917fa0728",
+          "calls": 1000,
+          "events": 128,
+          "state_bytes": 92118
+        }
+      ],
+      "passed": false
+    },
+    {
+      "harness": "claude-code",
+      "case": "concurrent",
+      "samples": 4000,
+      "p50_ms": 46.427973997197114,
+      "p95_ms": 59.887855997658335,
+      "p99_ms": 69.03891600086354,
+      "max_ms": 98.6412440033746,
+      "mean_ms": 47.61104963649632,
+      "loadavg_before": "1.84 1.80 1.20 1/758 633126",
+      "loadavg_after": "4.19 2.63 1.55 1/762 646270",
+      "counts": [
+        {
+          "root": "7f0c44c1-4c1f-40da-9a15-aa0917fa0728",
+          "calls": 1000,
+          "events": 128,
+          "state_bytes": 92156
+        },
+        {
+          "root": "7f0c44c1-4c1f-40da-9a15-aa0917fa0729",
+          "calls": 1000,
+          "events": 128,
+          "state_bytes": 92151
+        }
+      ],
+      "passed": false
+    },
+    {
+      "harness": "codex",
+      "case": "serial",
+      "samples": 1000,
+      "p50_ms": 41.75057800603099,
+      "p95_ms": 54.8291400045855,
+      "p99_ms": 59.59182199876523,
+      "max_ms": 64.86646799748996,
+      "mean_ms": 43.33218277287233,
+      "loadavg_before": "4.19 2.63 1.55 1/762 646271",
+      "loadavg_after": "2.03 2.31 1.54 2/762 648993",
+      "counts": [
+        {
+          "root": "01a19737-5420-7280-9b27-80cdf4ba57c6",
+          "calls": 1000,
+          "events": 128,
+          "state_bytes": 91859
+        }
+      ],
+      "passed": false
+    },
+    {
+      "harness": "codex",
+      "case": "concurrent",
+      "samples": 4000,
+      "p50_ms": 46.2291229996481,
+      "p95_ms": 57.85330299841007,
+      "p99_ms": 64.55918900610413,
+      "max_ms": 187.64525699953083,
+      "mean_ms": 47.49429265124854,
+      "loadavg_before": "2.03 2.31 1.54 1/762 648995",
+      "loadavg_after": "5.09 3.28 1.97 2/763 658706",
+      "counts": [
+        {
+          "root": "01a19737-5420-7280-9b27-80cdf4ba57c6",
+          "calls": 1000,
+          "events": 128,
+          "state_bytes": 91893
+        },
+        {
+          "root": "01a19737-5420-7280-9b27-80cdf4ba57c7",
+          "calls": 1000,
+          "events": 128,
+          "state_bytes": 91893
+        }
+      ],
+      "passed": false
+    }
+  ],
+  "status": "failed",
+  "variant": "candidate-v1-128events"
+}
