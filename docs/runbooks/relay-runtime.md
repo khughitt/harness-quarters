@@ -66,6 +66,19 @@ then plan with its own installer on copies:
 /usr/bin/node "$HOME/.local/share/relay/<version>/node_modules/relay/bin/relay.js" install --harness codex --json --node /usr/bin/node --subscribers "$HOME/.config/relay/subscribers.json" --evidence FILE --target COPY
 ```
 
+Probe evidence is private ops records, not a file under the ops code checkout.
+On each executing host, `tasks where <ops-code-checkout> --json` must resolve the
+ops project and its absolute `project.records` directory outside that checkout.
+The bootstrap inventory, target identity checks and installer use
+records-relative docs/runbooks/relay-guard-evidence-<harness>.json. Resolution is
+bound once per host operation so its hash checks and installer share the path.
+The reviewed manifest’s logical `ops:docs/runbooks/...` member keys stay unchanged;
+they identify the evidence, not its physical storage root. The standalone
+`tools/relay-cutover preflight` uses the same reply/path validator.
+Missing/invalid resolution or evidence refuses readiness; no code-root fallback
+exists. A digest mismatch still requires refreshed, reviewed evidence. This
+storage cutover changes no live harness or bootstrap-window authorization.
+
 COPY is an absolute path ending in `/hooks.json` (any other name fails as `relay
 operation failed`). Without `--apply` nothing is written; confirm the planned
 `after` text differs from the current image only in the runtime directory. A

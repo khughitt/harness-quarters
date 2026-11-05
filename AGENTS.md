@@ -63,8 +63,9 @@ The generated global Projects block is checked by lore.
 
 - `links.toml` and `tools/harness-links`: real harness homes, declared home links and
   their reconciliation through the tasks project registry.
-- `claude/`, `codex/`, `agy/` and `local/`: harness settings, hooks, skills registries and
-  untracked host state. `agy/hooks.json` routes lifecycle and `before-tool` events through
+- `claude/`, `codex/`, `agy/`, `ponytail/` and `local/`: harness settings, hooks, skills registries,
+  plugin defaults (`ponytail/config.json` sets `defaultMode` to `"off"` so Ponytail's skills stay
+  available without `SessionStart`/`SubagentStart` footer injection) and untracked host state. `agy/hooks.json` routes lifecycle and `before-tool` events through
   `relay`, while `agy/hook` heals detached `agy` settings files and adapts `SessionStart`
   (profile, capture-notice) and `Stop` (claim-guard until ops-33cef9 lands). `claude/mods/` holds
   Claude Code function-hook plugins; `claude/probes/` the probes behind Claude Code facts.

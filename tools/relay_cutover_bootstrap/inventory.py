@@ -264,15 +264,64 @@ def _git_auth(context, env, blockers):
     return report
 
 
-def _helpers(context):
-    hq, ops = Path(context["hq"]), Path(context["home"]) / "d/ops"
+def records_directory(output, ops):
+    """Validate tasks where's binding to the requested checkout and its private records."""
+    try:
+        reply = hosts._decode(output)
+        project = reply.get("project") if isinstance(reply, dict) else None
+        if not isinstance(project, dict) or project.get("prefix") != "ops":
+            raise ValueError()
+        checkout, raw = project.get("checkout"), project.get("records")
+        if (not isinstance(checkout, str) or not Path(checkout).is_absolute()
+                or Path(checkout).resolve() != ops.resolve()
+                or not isinstance(raw, str) or "\0" in raw or not Path(raw).is_absolute()):
+            raise ValueError()
+        records = Path(raw).resolve()
+        if not records.is_dir() or records == ops.resolve() or ops.resolve() in records.parents:
+            raise ValueError()
+    except (ValueError, OSError, RecursionError, Stop):
+        raise Stop("ops-records: tasks where did not resolve a private ops records directory; "
+                   "nothing was written") from None
+    return records
+
+
+def evidence_path(context, harness):
+    """Resolve once per host operation so checks and installer use the same private path."""
+    relative = f"docs/runbooks/relay-guard-evidence-{harness}.json"
+    if relative not in EVIDENCE:
+        raise Stop("ops-records: unsupported evidence harness")
+    if "_ops_records" not in context:
+        ops = Path(context["home"]) / "d/ops"
+        try:
+            result = _probe(context, "ops-records", [hosts.TOOLS["tasks"], "where", ops, "--json"],
+                            hosts._child_env(context))
+        except OSError:
+            raise Stop("ops-records: tasks where could not start; nothing was written") from None
+        if result.returncode != 0:
+            raise Stop("ops-records: tasks where failed; see the private log; nothing was written")
+        context["_ops_records"] = records_directory(result.stdout, ops)
+    path = context["_ops_records"] / relative
+    if not path.is_file():
+        raise Stop(f"ops-records: the {harness} private evidence file is missing; nothing was written")
+    return path
+
+
+def helper_fingerprints(hq, evidence):
+    """Hash this checkout's helpers beside already observed evidence digests."""
+    hq = Path(hq)
     package = hq / "tools/relay_cutover_bootstrap"
     members = {f"hq:{name}": _file_sha256(hq / name) for name in HELPERS}
     members.update({f"hq:tools/relay_cutover_bootstrap/{path.name}": _file_sha256(path)
                     for path in sorted(package.glob("*.py"))})
-    members.update({f"ops:{name}": _file_sha256(ops / name) for name in EVIDENCE})
+    members.update(evidence)
     return {"members": members,
             "package_sha256": hosts.helper_digest(package) if package.is_dir() else None}
+
+
+def _helpers(context):
+    evidence = {f"ops:{name}": _file_sha256(evidence_path(context, harness))
+                for name, harness in zip(EVIDENCE, ("claude-code", "codex"))}
+    return helper_fingerprints(context["hq"], evidence)
 
 
 def _resolve(link, family, pattern):

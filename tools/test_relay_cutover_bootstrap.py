@@ -2171,7 +2171,7 @@ class TestRun:
             assert (_option(call, "--harness"), _option(call, "--retire"),
                     _option(call, "--node")) == (harness, "familiar", "/usr/bin/node")
             assert _option(call, "--evidence") == str(
-                home / f"d/ops/docs/runbooks/relay-guard-evidence-{harness}.json")
+                home / f"private-records/ops/docs/runbooks/relay-guard-evidence-{harness}.json")
             assert _option(call, "--subscribers") == str(home / ".config/relay/subscribers.json")
             assert _option(call, "--target") == str(world.target("titan", call["target_id"]))
         guards = [call for call in observed(world, "relay-cutover") if "ledger" in call]
@@ -2210,7 +2210,7 @@ class TestRun:
             os.path.realpath(home / "d/hq/relay/bin/relay")}
         for call in europa:
             assert _option(call, "--evidence") == str(
-                home / "d/ops/docs/runbooks/relay-guard-evidence-claude-code.json")
+                home / "private-records/ops/docs/runbooks/relay-guard-evidence-claude-code.json")
             assert _option(call, "--subscribers") == str(home / ".config/relay/subscribers.json")
             assert Path(_option(call, "--target")).is_relative_to(world.root("europa") / "dry")
         sealed = migrated.window["sealed"]["inputs"]["hosts"]
@@ -2406,7 +2406,7 @@ def _restage(world):
 
 
 def _europa_evidence(world):
-    path = world.home("europa") / "d/ops/docs/runbooks/relay-guard-evidence-claude-code.json"
+    path = world.home("europa") / "private-records/ops/docs/runbooks/relay-guard-evidence-claude-code.json"
     path.write_text(json.dumps({"harness": "claude-code", "version": "2.1.999"}) + "\n")
 
 
@@ -5516,7 +5516,7 @@ def test_selected_evidenced_version_can_advance_before_window(cutover):
     assert not (cutover_root(cutover) / window.PREPARED).exists()
     for host in HOSTS:
         transport._write(cutover.home(host) /
-                         "d/ops/docs/runbooks/relay-guard-evidence-claude-code.json",
+                         "private-records/ops/docs/runbooks/relay-guard-evidence-claude-code.json",
                          json.dumps({"harness": "claude-code", "version": "2.1.305"}) + "\n")
     cutover.pins["claude_version"] = "2.1.305 (Claude Code)"
     cutover.write_manifest(generation="g2")

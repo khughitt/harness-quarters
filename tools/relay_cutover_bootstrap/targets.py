@@ -168,7 +168,7 @@ def _install(context, label, harness, target, *extra):
     home = Path(context["home"])
     argv = [os.path.realpath(Path(context["hq"]) / INSTALLER), "install", "--harness", harness,
             "--subscribers", home / SUBSCRIBERS, "--target", target, "--retire", "familiar",
-            "--evidence", home / "d/ops" / EVIDENCE.format(harness=harness), "--node", NODE,
+            "--evidence", inventory.evidence_path(context, harness), "--node", NODE,
             *extra]
     return hosts._run_child(context, label, argv, env=_env(context), timeout=CHILD_SECONDS)
 
@@ -205,12 +205,12 @@ def identities(context, manifest, harness):
              "runtime": inventory._file_sha256(
                  home / RUNTIME.format(version=inputs.PINS["relay_version"])),
              "subscribers": inventory._file_sha256(home / SUBSCRIBERS),
-             "evidence": inventory._file_sha256(home / "d/ops" / evidence)}
+             "evidence": inventory._file_sha256(inventory.evidence_path(context, harness))}
     members = manifest["helpers"]["members"]
     for name, member, what in (
             ("installer", f"hq:{INSTALLER}", f"~/d/hq/{INSTALLER}"),
             ("relay_cutover", f"hq:{RELAY_CUTOVER}", f"~/d/hq/{RELAY_CUTOVER}"),
-            ("evidence", f"ops:{evidence}", f"the {harness} evidence ~/d/ops/{evidence}")):
+            ("evidence", f"ops:{evidence}", f"the {harness} private-records evidence")):
         if found[name] is None or found[name] != members.get(member):
             raise Stop(f"{what} is not the reviewed manifest's bytes; nothing was written"
                        + ("; refresh and review the evidence first" if name == "evidence"

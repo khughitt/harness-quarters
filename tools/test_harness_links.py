@@ -274,6 +274,8 @@ def fresh_clone(tmp_path, home, repo=None):
     shutil.copytree(repo / ".githooks", clone / ".githooks", dirs_exist_ok=True)
     shutil.copytree(repo / "relay", clone / "relay", dirs_exist_ok=True)
     shutil.copytree(repo / "codex/work", clone / "codex/work", dirs_exist_ok=True)
+    if (repo / "ponytail").exists():
+        shutil.copytree(repo / "ponytail", clone / "ponytail", dirs_exist_ok=True)
     if (repo / "agy").exists():
         shutil.copytree(repo / "agy", clone / "agy", dirs_exist_ok=True)
         agy_settings = clone / "agy/settings.json"
@@ -317,11 +319,13 @@ def project_targets(manifest):
 
 def stage_project_targets(manifest, tmp_path, home):
     """Portable structural data; never treat it as proof that a live owner path exists."""
-    directory_targets = {"flows:evals", "flows:flow", "lore:profiles", "lore:vendor"}
+    directory_targets = {"flows:evals", "flows:flow", "lore:profiles", "lore:vendor",
+                         "lore:vendor/agent-skills/references"}
     shapes = []
     for prefix, relative in project_targets(manifest):
         directory = (f"{prefix}:{relative}" in directory_targets
-                     or (relative.startswith(("skills/", "vendor/superpowers/skills/"))
+                     or (relative.startswith(("skills/", "vendor/superpowers/skills/",
+                                               "vendor/agent-skills/skills/"))
                          and not Path(relative).suffix))
         if not directory and not (relative.startswith("bin/") or Path(relative).suffix):
             raise ValueError(f"declare the owner fixture shape: {prefix}:{relative}")
@@ -466,6 +470,19 @@ def test_real_manifest_links_agy_and_agy_config_when_homes_exist(tmp_path):
                      for entry in entries]
     assert resolved_dirs == [home / ".agents/skills"]
     assert any(resolved_dirs[0].iterdir())
+    assert link(clone, home, "--check").returncode == 0
+
+
+def test_real_manifest_links_ponytail_config_with_default_mode_off(tmp_path):
+    home = tmp_path / "home"
+    (home / ".claude").mkdir(parents=True)
+    clone = fresh_clone(tmp_path, home)
+    applied = link(clone, home, "--apply")
+    assert applied.returncode == 0, applied.stderr
+    ponytail_config = home / ".config/ponytail/config.json"
+    assert ponytail_config.is_symlink()
+    assert ponytail_config.resolve() == (clone / "ponytail/config.json").resolve()
+    assert json.loads(ponytail_config.read_text()) == {"defaultMode": "off"}
     assert link(clone, home, "--check").returncode == 0
 
 
@@ -1023,6 +1040,8 @@ def test_fresh_clone_strips_live_agy_picks_from_dirty_source_checkout(tmp_path):
     shutil.copytree(checkout / ".githooks", dirty_source / ".githooks", dirs_exist_ok=True)
     shutil.copytree(checkout / "relay", dirty_source / "relay", dirs_exist_ok=True)
     shutil.copytree(checkout / "codex/work", dirty_source / "codex/work", dirs_exist_ok=True)
+    if (checkout / "ponytail").exists():
+        shutil.copytree(checkout / "ponytail", dirty_source / "ponytail", dirs_exist_ok=True)
     shutil.copytree(checkout / "agy", dirty_source / "agy", dirs_exist_ok=True)
     source_settings = json.loads((dirty_source / "agy/settings.json").read_text())
     (dirty_source / "agy/settings.json").write_text(

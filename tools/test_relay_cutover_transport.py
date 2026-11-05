@@ -327,6 +327,28 @@ def linger(mode):
                                  "args": args, "mode": mode}) + "\n")
 
 
+if NAME == "tasks":
+    observe()
+    reply = behavior.get("records_resolver", "ok")
+    if reply == "fail":
+        print("fixture resolver failed @SECRET@", file=sys.stderr)
+        sys.exit(1)
+    if reply == "invalid":
+        print("not JSON @SECRET@")
+        sys.exit(0)
+    home = os.environ["HOME"]
+    project = {"prefix": "ops", "checkout": os.path.join(home, "d/ops"),
+               "records": os.path.join(home, "private-records/ops")}
+    if reply == "relative":
+        project["records"] = "relative/ops"
+    if reply == "code":
+        project["records"] = project["checkout"]
+    if reply == "no-project":
+        project = None
+    print(json.dumps({"project": project, "holds_records": False, "warnings": []}))
+    sys.exit(0)
+
+
 if NAME == "claude":
     observe(hold=os.environ.get("DISABLE_UPDATES"), config_dir=os.environ.get("CLAUDE_CONFIG_DIR"),
             grandchild=grandchild_hold(), keys=sorted(os.environ))
@@ -1219,7 +1241,7 @@ class World:
         self._paths(tmp_path)
         self.fixture.mkdir()
         tools = {}
-        for name in ("node", "git", "systemctl", "niri"):
+        for name in ("node", "git", "systemctl", "niri", "tasks"):
             tools[name] = str(self._tool(self.fixture / "usr/bin" / name, name))
         npm = self._tool(self.fixture / "usr/lib/node_modules/npm/bin/npm-cli.js", "npm")
         _write(npm.parents[1] / "package.json", json.dumps({"version": "12.2.1"}))
@@ -1291,6 +1313,7 @@ class World:
         for name, value in self.config["timing"].items():
             monkeypatch.setattr(hosts, name, value)
         monkeypatch.setitem(hosts.TOOLS, "ssh", str(self.ssh))
+        monkeypatch.setitem(hosts.TOOLS, "tasks", self.config["tools"]["tasks"])
         for name in ("fixture-step", "fixture-short", "fixture-boundary"):
             monkeypatch.setitem(operations.OPERATIONS, name, hosts.Operation(
                 run=_never, deadline=60, mutation=True,
@@ -1324,6 +1347,10 @@ class World:
         runtime = self.tmp / host / "run"
         tools = home / "d/hq/tools"
         tools.mkdir(parents=True)
+        (home / "d/ops").mkdir()
+        for harness in ("claude-code", "codex"):
+            _write(home / f"private-records/ops/docs/runbooks/relay-guard-evidence-{harness}.json",
+                   json.dumps({"harness": harness}) + "\n")
         (tools / "relay_cutover_bootstrap").symlink_to(PACKAGE, target_is_directory=True)
         _write(tools / "relay-cutover-host", self._fill(FIXTURE_ENTRY), 0o755)
         _write(tools / "relay-cutover", self._fill(FIXTURE_PREFLIGHT), 0o755)
@@ -1495,7 +1522,7 @@ class World:
                 "relay": "git+https://github.com/khughitt/relay.git#v0.1.1"}}) + "\n")
             _write(hq / "relay/package-lock.json", "{}\n")
             for harness in ("claude-code", "codex"):
-                _write(home / f"d/ops/docs/runbooks/relay-guard-evidence-{harness}.json",
+                _write(home / f"private-records/ops/docs/runbooks/relay-guard-evidence-{harness}.json",
                        json.dumps({"harness": harness}) + "\n")
             self.write_filter(keys, hosts=(host,))
             for target_id, image in LIVE.items():
@@ -1569,7 +1596,9 @@ class World:
                 targets[target_id][role] = member
         manifest = {
             "schema": 1, "generation": generation, "pins": dict(self.pins),
-            "helpers": inventory._helpers({"hq": str(home / "d/hq"), "home": str(home)}),
+            "helpers": inventory.helper_fingerprints(home / "d/hq", {
+                f"ops:{name}": _digest(home / "private-records/ops" / name)
+                for name in inventory.EVIDENCE}),
             "hosts": {host: {"toolchain": self.toolchain(), "absence_reason": None}
                       for host in self.config["hosts"]},
             "targets": targets}
@@ -2115,6 +2144,66 @@ def test_claude_hold_env_is_scoped(world):
 # --- inventory -------------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize("reply", ("fail", "invalid", "relative", "code", "no-project"))
+def test_inventory_refuses_unusable_private_records(world, reply):
+    world.stage_cutover()
+    world.behave("titan", records_resolver=reply)
+    response = world.request("titan", "inventory", {})
+    assert response["status"] == "completed"
+    assert any("ops-records" in reason for reason in response["result"]["blockers"])
+    assert not [call for call in world.lines("observed") if call["tool"] == "installer"]
+    assert OUTPUT_SECRET not in json.dumps(response)
+
+
+def test_inventory_uses_private_evidence_without_old_code_files(world):
+    world.stage_cutover()
+    assert not (world.home("titan") / "d/ops/docs").exists()
+    response = world.request("titan", "inventory", {})
+    result = response["result"]
+    assert response["status"] == "completed" and result["blockers"] == []
+    for harness in ("claude-code", "codex"):
+        relative = f"docs/runbooks/relay-guard-evidence-{harness}.json"
+        assert result["helpers"]["members"]["ops:" + relative] == _digest(
+            world.home("titan") / "private-records/ops" / relative)
+    lookups = [call for call in world.lines("observed") if call["tool"] == "tasks"]
+    assert len(lookups) == 1
+    assert lookups[0]["args"] == ["where", str(world.home("titan") / "d/ops"), "--json"]
+
+
+def test_missing_records_resolver_is_a_typed_refusal(tmp_path, monkeypatch):
+    def missing(*args, **kwargs):
+        raise FileNotFoundError("fixture tasks unavailable")
+    monkeypatch.setattr(inventory, "_probe", missing)
+    with pytest.raises(Stop, match="ops-records"):
+        inventory.evidence_path({"home": str(tmp_path)}, "claude-code")
+
+
+@pytest.mark.parametrize("fault", ("fail", "invalid", "relative", "code", "no-project",
+                                   "missing-evidence", "digest-mismatch"))
+def test_private_evidence_refusals_precede_target_writes(world, fault):
+    world.stage_cutover()
+    path = world.home("titan") / "private-records/ops/docs/runbooks/relay-guard-evidence-claude-code.json"
+    if fault == "missing-evidence":
+        path.unlink()
+    elif fault == "digest-mismatch":
+        path.write_text('{"harness":"claude-code","changed":true}\n')
+    else:
+        world.behave("titan", records_resolver=fault)
+    before = {name: world.target("titan", name).read_bytes() for name in TARGET_PATHS}
+    response = _dry(world, "claude", 1)
+    assert response["status"] == "failed"
+    if fault == "digest-mismatch":
+        assert "reviewed manifest" in response["error"]
+    elif fault == "missing-evidence":
+        assert "private evidence file is missing" in response["error"]
+    else:
+        assert "ops-records" in response["error"]
+    assert {name: world.target("titan", name).read_bytes() for name in TARGET_PATHS} == before
+    assert not (world.root("titan") / "dry").exists()
+    assert not [call for call in world.lines("observed") if call["tool"] == "installer"]
+    assert OUTPUT_SECRET not in json.dumps(response)
+
+
 def test_inventory_reports_unheld_claude(world):
     home = world.home("titan")
     claude = os.path.realpath(home / ".local/bin/claude")
@@ -2278,7 +2367,7 @@ def test_entry_and_system_tools_are_fixed():
     assert hosts.ENTRY == FIXED and hosts.SSH_OPTIONS == ("-4", "-o", "BatchMode=yes")
     assert hosts.TOOLS == {"python3": "/usr/bin/python3", "ssh": "/usr/bin/ssh",
                            "npm": "/usr/bin/npm", "node": "/usr/bin/node", "git": "/usr/bin/git",
-                           "systemctl": "/usr/bin/systemctl", "niri": "/usr/bin/niri"}
+                           "systemctl": "/usr/bin/systemctl", "niri": "/usr/bin/niri", "tasks": "tasks"}
     assert set(hosts.HOSTS) == {"titan", "europa"}
 
 
@@ -2836,13 +2925,19 @@ def test_dry_copy_keeps_installer_bytes(world, target_id):
     installs = [call for call in world.lines("observed") if call["tool"] == "installer"]
     assert [(call["apply"], call["args"][call["args"].index("--target") + 1])
             for call in installs] == [(False, str(copy)), (True, str(copy))]
+    harness = "codex" if target_id.startswith("codex") else "claude-code"
+    evidence = world.home("titan") / f"private-records/ops/docs/runbooks/relay-guard-evidence-{harness}.json"
+    assert all(call["args"][call["args"].index("--evidence") + 1] == str(evidence)
+               for call in installs)
+    assert result["identities"]["evidence"] == _digest(evidence)
+    assert len([call for call in world.lines("observed") if call["tool"] == "tasks"]) == 1
     # One dry run per target and window.
     again = _dry(world, target_id, 2)
     assert again["status"] == "failed" and "already" in again["error"]
 
 
 def _evidence_changed(world):
-    path = world.home("titan") / "d/ops/docs/runbooks/relay-guard-evidence-claude-code.json"
+    path = world.home("titan") / "private-records/ops/docs/runbooks/relay-guard-evidence-claude-code.json"
     path.write_text(json.dumps({"harness": "claude-code", "version": "2.1.999"}) + "\n")
 
 
