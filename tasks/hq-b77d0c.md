@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: main
 created: 2026-11-06T01:17:05Z
-updated: 2026-11-06T01:17:36Z
+updated: 2026-11-06T01:17:38Z
 started: 2026-11-06T01:17:12Z
 depends: []
 tags: []
@@ -25,3 +25,4 @@ The user asks to reduce root-directory clutter by grouping harness-specific file
 - 2026-11-06T01:17:12Z (main): started
   provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-06T01:17:36Z (main): trial: flow-trial-1 — enrolled — flow off
+- 2026-11-06T01:17:38Z (main): arm: flow-trial-1 — unit tack-b77d0c — flow off
