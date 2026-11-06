@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "operation_id": "bb8f0bdffd3b4200b5aa5dadce76f6df",
+  "host": "titan",
+  "inputs": [
+    {
+      "task": "hq-b77d0c",
+      "basis": {
+        "project": "hq",
+        "layout": "in-tree",
+        "records_subdir": ".",
+        "commit": "163872fd369e9df15d8a1361fff5d7d8511d039b",
+        "task_path": "tasks/hq-b77d0c.md",
+        "retained_ref": "refs/heads/main"
+      }
+    },
+    {
+      "task": "hq-b08a11",
+      "basis": {
+        "project": "hq",
+        "layout": "in-tree",
+        "records_subdir": ".",
+        "commit": "163872fd369e9df15d8a1361fff5d7d8511d039b",
+        "task_path": "tasks/hq-b08a11.md",
+        "retained_ref": "refs/heads/main"
+      }
+    }
+  ],
+  "items": [
+    {
+      "host": "titan",
+      "kind": "evidence",
+      "path": "$WORK_ROOT/hq/hq-b77d0c/plans/harness-layout-before-activation"
+    },
+    {
+      "host": "titan",
+      "kind": "scratch",
+      "path": "$WORK_ROOT/hq/hq-b77d0c/plans/harness-layout"
+    }
+  ],
+  "purpose": "Retain exact harness layout recovery and execution evidence through ordinary-use confirmation, then inspect each item for safe retirement",
+  "cleanup_trigger": "After one week of ordinary use with no reported regression, preserve ledger/review outcomes and any needed private recovery bytes before deciding disposal"
+}
