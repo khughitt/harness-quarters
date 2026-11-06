@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: refactor/hq-b77d0c-harness-layout
 created: 2026-11-06T01:17:05Z
-updated: 2026-11-06T01:51:51Z
+updated: 2026-11-06T02:10:10Z
 started: 2026-11-06T01:17:12Z
 depends: []
 tags: []
@@ -56,4 +56,6 @@ The user asks to reduce root-directory clutter by grouping harness-specific file
 - 2026-11-06T01:51:49Z (refactor/hq-b77d0c-harness-layout): retention checkpoint: observed 2026-11-06T01:51:32Z on titan; basis hq in-tree records . commit e6e6efc363b79e7950642e7b031c816af9f9cc37:tasks/hq-b77d0c.md; retained by refactor/hq-b77d0c-harness-layout; this host: kept verified 1, kept unknown 0, released 0; changed 0. Rechecked all kept/verified items on this host: locked task worktree exists with clean Git/ignored status and both committed documents present. No scratch or off-tree evidence created. No unknown items. Other hosts are outside this observation. Next: user reviews the revised frozen design, then controller writes the implementation plan.
 - 2026-11-06T01:51:49Z (refactor/hq-b77d0c-harness-layout): Park disclosures: revised design and full relayed review are committed; all five findings have recorded dispositions. Nothing pushed; no process survives (fresh host-load --section session reported nothing left running). No live links, host pointers, runtime files or main edits changed; other task worktree untouched. Branch refactor/hq-b77d0c-harness-layout remains unmerged at .worktrees/hq-b77d0c. Controller resumes after user review of d1399577ffe0fd65feaaa4393332e4f8b3f26498, then prepares the plan; eventual live-surface merge and relinking await a concrete activation approval. No claimed runtime test evidence for this documentation amendment.
 - 2026-11-06T01:51:51Z (refactor/hq-b77d0c-harness-layout): parked (waiting on user, review): User: review the amended design at .worktrees/hq-b77d0c/docs/specs/2026-11-05-harness-layout-design.md, frozen at d1399577ffe0fd65feaaa4393332e4f8b3f26498. Controller: after approval prepare the implementation plan with all five review dispositions bound; keep live activation separately gated.
+  provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-06T02:10:10Z (refactor/hq-b77d0c-harness-layout): resumed
   provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
