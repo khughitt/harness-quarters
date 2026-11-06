@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: refactor/hq-b77d0c-harness-layout
 created: 2026-11-06T02:19:55Z
-updated: 2026-11-06T09:22:49Z
+updated: 2026-11-06T09:22:51Z
 started: 2026-11-06T09:22:25Z
 depends: [hq-7930ee]
 parent: hq-b77d0c
@@ -33,3 +33,4 @@ Execute Task 2 only after Task 1 has passed final review and the user has separa
   provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-06T09:22:33Z (refactor/hq-b77d0c-harness-layout): User approved the frozen activation request in this session on 2026-11-06: main merge, specified state/link changes, conditional recovery and Titan/Europa no-settings-writer window. Created Titan private snapshot directory $WORK_ROOT/hq/hq-b77d0c/activation-initiating-2026-11-06 (mode700), owner task:hq-fd490e; contents mutable, checkpoint at park/done. Main base and frozen helper/runbook verified; retained parent workspace matches its recorded complete manifest. No harness setting changes made by the controller; the transition runs within this approved window.
 - 2026-11-06T09:22:49Z (refactor/hq-b77d0c-harness-layout): arm: flow-trial-1 — unit tack-b77d0c — flow off
+- 2026-11-06T09:22:51Z (refactor/hq-b77d0c-harness-layout): Created Europa private snapshot directory $WORK_ROOT/hq/hq-b77d0c/activation-adopting-2026-11-06 via the controller SSH operation (mode700), owner task:hq-fd490e. Remote command exited0; contents mutable and will be checkpointed on Europa at the operational boundary. This is a snapshot, not an activated host. Both hosts remain within the approved no-settings-writer window.
