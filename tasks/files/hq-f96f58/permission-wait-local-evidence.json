@@ -1,0 +1,707 @@
+{
+  "schema": 1,
+  "kind": "selected-local-evidence",
+  "task": "hq-f96f58",
+  "observed_at": "2026-11-06T00:47:26.144819+00:00",
+  "scope": "Existing local files and installed definitions only. Projections are not full raw captures; no live permission probe was run.",
+  "code_basis": "5a7be0168a9098aa7216de50ff512c83e5a293bc",
+  "versions": {
+    "claude-code": "2.1.318",
+    "codex": "0.166.0"
+  },
+  "current_code": [
+    {
+      "path": "tools/turn_pause/events.py",
+      "sha256": "038e6c332f690a0cae88179e19ba50c08bd0321b1ffd2e59f0c905d8833e4e8a"
+    },
+    {
+      "path": "tools/turn_pause/adapters.py",
+      "sha256": "27f584541855d5b06554693f31f81306209dd3ca2b0d2fa748c681c458b5853e"
+    },
+    {
+      "path": "tools/turn_pause/counters.py",
+      "sha256": "2eecdf9533717c99712d1f18bea207293fd567b890a2baba8a59f5e5fa11cf20"
+    },
+    {
+      "path": "codex/hooks.json",
+      "sha256": "ce3c6dda8c030c334f172d6fb89a8d663cbb5a638a2babce550e481b84daf7db"
+    },
+    {
+      "path": "claude/settings.json",
+      "sha256": "238bcc02c515ca8805d751fd1f5391ce39ff418a3c71030f09f56e9c70d318f5"
+    }
+  ],
+  "retained_probe_census": [
+    {
+      "path": "$WORK_ROOT/hq/hq-fe672f/claude-compact-1/hooks.jsonl",
+      "sha256": "3ffc380310f01a40a688dc3af2a312f2ebd98d6818b3012763bff69c64ef8f01",
+      "events": {
+        "SessionStart": 3,
+        "UserPromptSubmit": 1,
+        "Stop": 1,
+        "SessionEnd": 2,
+        "PreCompact": 1,
+        "SubagentStop": 1,
+        "PostCompact": 1
+      },
+      "permission_request_count": 0
+    },
+    {
+      "path": "$WORK_ROOT/hq/hq-fe672f/claude-cron-1/hooks.jsonl",
+      "sha256": "c422eead0d283f532e04b95a686496d07834d8dd81b67a87d1b5108bf483d0f2",
+      "events": {
+        "SessionStart": 1,
+        "UserPromptSubmit": 3,
+        "PreToolUse": 6,
+        "PostToolUse": 5,
+        "SubagentStart": 1,
+        "SubagentStop": 1,
+        "Stop": 3,
+        "SessionEnd": 1
+      },
+      "permission_request_count": 0
+    },
+    {
+      "path": "$WORK_ROOT/hq/hq-fe672f/claude-cron-2/hooks.jsonl",
+      "sha256": "dc6cc1f14016ca4fae6880d59f42ff7a4279fa4c0e7ddda86b81d1b2ce4a5131",
+      "events": {
+        "SessionStart": 1,
+        "UserPromptSubmit": 2,
+        "PreToolUse": 5,
+        "PostToolUse": 5,
+        "Stop": 2,
+        "SessionEnd": 1
+      },
+      "permission_request_count": 0
+    },
+    {
+      "path": "$WORK_ROOT/hq/hq-fe672f/claude-main-1/hooks.jsonl",
+      "sha256": "17fff67ff372e594fd2dcc8f6fe62239fb2ee7d1d568b8386ca2062b448417fe",
+      "events": {
+        "SessionStart": 1,
+        "UserPromptSubmit": 3,
+        "PreToolUse": 8,
+        "PostToolUse": 5,
+        "SubagentStart": 1,
+        "Stop": 3,
+        "SubagentStop": 1,
+        "SessionEnd": 1
+      },
+      "permission_request_count": 0
+    },
+    {
+      "path": "$WORK_ROOT/hq/hq-fe672f/claude-surface-1/hooks.jsonl",
+      "sha256": "1a931f13de0d75647ce10f3162cee99b2dadec4971c26fe605438e4ec801eaa7",
+      "events": {
+        "SessionStart": 1,
+        "UserPromptSubmit": 1,
+        "Stop": 1,
+        "SessionEnd": 1
+      },
+      "permission_request_count": 0
+    },
+    {
+      "path": "$WORK_ROOT/hq/hq-fe672f/claude-surface-2/hooks.jsonl",
+      "sha256": "911ef6b761c2b50837106f2d14f81d4f87055bb85b390f137dc77d7a9058dd68",
+      "events": {
+        "SessionStart": 2,
+        "UserPromptSubmit": 2,
+        "Stop": 2,
+        "SessionEnd": 2,
+        "PreToolUse": 1,
+        "PostToolUse": 1
+      },
+      "permission_request_count": 0
+    },
+    {
+      "path": "$WORK_ROOT/hq/hq-fe672f/codex-all-tools-1/hooks.jsonl",
+      "sha256": "bca352560b66244f8b07156e59928c802ec1c5eee65e0cfa9d371ac5be0a8ef0",
+      "events": {
+        "SessionStart": 1,
+        "UserPromptSubmit": 1,
+        "PreToolUse": 17,
+        "PostToolUse": 3,
+        "SubagentStart": 1,
+        "SubagentStop": 1,
+        "Stop": 1,
+        "SessionEnd": 1
+      },
+      "permission_request_count": 0
+    },
+    {
+      "path": "$WORK_ROOT/hq/hq-fe672f/codex-all-tools-2/hooks.jsonl",
+      "sha256": "da558ad00b054a99e7a2b88a732e64a79cf443b103160a73f1b9b8f59fd97343",
+      "events": {
+        "SessionStart": 1,
+        "UserPromptSubmit": 1,
+        "PreToolUse": 2,
+        "Stop": 1,
+        "SessionEnd": 1
+      },
+      "permission_request_count": 0
+    },
+    {
+      "path": "$WORK_ROOT/hq/hq-fe672f/codex-cancel-1/hooks.jsonl",
+      "sha256": "bb44c73fdc96e943f4bbbe826e0940abda8da91cbe85bb567fa18db0974cc97f",
+      "events": {
+        "SessionStart": 1,
+        "UserPromptSubmit": 1,
+        "PreToolUse": 6,
+        "PostToolUse": 5,
+        "SubagentStart": 1,
+        "SubagentStop": 1,
+        "Stop": 1,
+        "SessionEnd": 1
+      },
+      "permission_request_count": 0
+    },
+    {
+      "path": "$WORK_ROOT/hq/hq-fe672f/codex-compact-1/hooks.jsonl",
+      "sha256": "38a2df8430f33c91b7e5dbd2bd384bedfd8ea67de762b87e624ccf75039eb598",
+      "events": {
+        "SessionStart": 1,
+        "UserPromptSubmit": 1,
+        "PreToolUse": 1,
+        "PostToolUse": 1,
+        "Stop": 1,
+        "SessionEnd": 1
+      },
+      "permission_request_count": 0
+    },
+    {
+      "path": "$WORK_ROOT/hq/hq-fe672f/codex-compact-2/hooks.jsonl",
+      "sha256": "ee6e365547cdef6f0ebe06b7c5b192c6c683bc070b093a8610afd58270eaa6a5",
+      "events": {
+        "SessionStart": 1,
+        "UserPromptSubmit": 1,
+        "PreToolUse": 1,
+        "PostToolUse": 1,
+        "Stop": 1,
+        "SessionEnd": 1
+      },
+      "permission_request_count": 0
+    },
+    {
+      "path": "$WORK_ROOT/hq/hq-fe672f/codex-goal-1/hooks.jsonl",
+      "sha256": "d1a425f0710647624fe9920046dc8d8cc4d31328d4187debf3d43aac4feba2d2",
+      "events": {
+        "SessionStart": 1,
+        "UserPromptSubmit": 1,
+        "PreToolUse": 1,
+        "PostToolUse": 1,
+        "Stop": 1,
+        "SessionEnd": 1
+      },
+      "permission_request_count": 0
+    },
+    {
+      "path": "$WORK_ROOT/hq/hq-fe672f/codex-goal-tui-1/hooks.jsonl",
+      "sha256": "d337cfdfa6494ea9784558ce0381fcf492ef768f4fa067d85c59e08d31a0a7a7",
+      "events": {
+        "SessionStart": 1,
+        "UserPromptSubmit": 1,
+        "PreToolUse": 2,
+        "PostToolUse": 2,
+        "Stop": 2
+      },
+      "permission_request_count": 0
+    },
+    {
+      "path": "$WORK_ROOT/hq/hq-fe672f/codex-main-1/hooks.jsonl",
+      "sha256": "d189c62bf0002c511d39e1e333ffbcf91ad5d560f1638a8d32a102241c463dad",
+      "events": {
+        "SessionStart": 1,
+        "UserPromptSubmit": 1,
+        "PreToolUse": 9,
+        "PostToolUse": 5,
+        "SubagentStart": 1,
+        "SubagentStop": 1,
+        "Stop": 1,
+        "SessionEnd": 1
+      },
+      "permission_request_count": 0
+    },
+    {
+      "path": "$WORK_ROOT/hq/hq-fe672f/codex-mcp-deny-1/hooks.jsonl",
+      "sha256": "7932d5f4983bc1ee5e1df86f62cce6a1828f3d56a800e190e03d17714f999432",
+      "events": {
+        "SessionStart": 1,
+        "UserPromptSubmit": 1,
+        "PreToolUse": 1,
+        "Stop": 1,
+        "SessionEnd": 1
+      },
+      "permission_request_count": 0
+    },
+    {
+      "path": "$WORK_ROOT/hq/hq-fe672f/codex-nested-1/hooks.jsonl",
+      "sha256": "77764a52009c220bddede57a7c40f1f6a24605773cbc99dd974153b457a15c82",
+      "events": {
+        "SessionStart": 1,
+        "UserPromptSubmit": 1,
+        "Stop": 1,
+        "SessionEnd": 1
+      },
+      "permission_request_count": 0
+    },
+    {
+      "path": "$WORK_ROOT/hq/hq-fe672f/codex-spawn-1/hooks.jsonl",
+      "sha256": "0ef8180c30021c4a03b8fec9bad3eb4d18b1476fd65af40babb752219aeb19cc",
+      "events": {
+        "SessionStart": 1,
+        "UserPromptSubmit": 1,
+        "PreToolUse": 2,
+        "PostToolUse": 2,
+        "SubagentStart": 1,
+        "SubagentStop": 1,
+        "Stop": 1,
+        "SessionEnd": 1
+      },
+      "permission_request_count": 0
+    },
+    {
+      "path": "$WORK_ROOT/hq/hq-fe672f/codex-spawn-direct-1/hooks.jsonl",
+      "sha256": "66d03634a696ac4aac055c875410357436ea9a261a93f59e8a60cffc8e9fc8a8",
+      "events": {
+        "SessionStart": 1,
+        "UserPromptSubmit": 1,
+        "PreToolUse": 7,
+        "PostToolUse": 7,
+        "SubagentStart": 4,
+        "SubagentStop": 4,
+        "Stop": 1,
+        "SessionEnd": 1
+      },
+      "permission_request_count": 0
+    },
+    {
+      "path": "$WORK_ROOT/hq/hq-fe672f/codex-surface-1/hooks.jsonl",
+      "sha256": "e473e0c8c858dfa35209b1b1a9790bedeed0cc8bc59f972aaac5254cdd2b1580",
+      "events": {
+        "SessionStart": 1,
+        "UserPromptSubmit": 1,
+        "Stop": 1,
+        "SessionEnd": 1
+      },
+      "permission_request_count": 0
+    }
+  ],
+  "ordinary_hook_sequences": [
+    {
+      "path": "$WORK_ROOT/hq/hq-fe672f/claude-main-1/hooks.jsonl",
+      "sha256": "17fff67ff372e594fd2dcc8f6fe62239fb2ee7d1d568b8386ca2062b448417fe",
+      "classification": "Ordinary execution/concurrent-child or running-command cancellation, not a permission-wait sequence.",
+      "records": [
+        {
+          "line": 4,
+          "hook_observer_timestamp": 1793534857.6317718,
+          "denied": false,
+          "payload_fields": {
+            "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "tool_use_id": "toolu_017GraDhLghQo9HwmPNhM7Aa",
+            "tool_input": {
+              "command": "echo probe-shell",
+              "description": "Echo probe-shell marker"
+            }
+          }
+        },
+        {
+          "line": 5,
+          "hook_observer_timestamp": 1793534857.9991543,
+          "denied": false,
+          "payload_fields": {
+            "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_use_id": "toolu_017GraDhLghQo9HwmPNhM7Aa",
+            "duration_ms": 126,
+            "tool_input": {
+              "command": "echo probe-shell",
+              "description": "Echo probe-shell marker"
+            }
+          }
+        },
+        {
+          "line": 13,
+          "hook_observer_timestamp": 1793534868.357505,
+          "denied": false,
+          "payload_fields": {
+            "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+            "agent_id": "a1dcefde924075f89",
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "tool_use_id": "toolu_01P5N8EnaYvVHP5o9wRasQtr",
+            "tool_input": {
+              "command": "echo child-shell",
+              "description": "Print child-shell string"
+            }
+          }
+        },
+        {
+          "line": 14,
+          "hook_observer_timestamp": 1793534868.365354,
+          "denied": false,
+          "payload_fields": {
+            "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "tool_use_id": "toolu_01VC28qoYcU7XmGzfEF3YQAS",
+            "tool_input": {
+              "command": "sleep 5; echo bg-done",
+              "description": "Wait 5 seconds then echo bg-done",
+              "run_in_background": true
+            }
+          }
+        },
+        {
+          "line": 15,
+          "hook_observer_timestamp": 1793534868.6201696,
+          "denied": false,
+          "payload_fields": {
+            "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_use_id": "toolu_01VC28qoYcU7XmGzfEF3YQAS",
+            "duration_ms": 15,
+            "tool_input": {
+              "command": "sleep 5; echo bg-done",
+              "description": "Wait 5 seconds then echo bg-done",
+              "run_in_background": true
+            }
+          }
+        },
+        {
+          "line": 16,
+          "hook_observer_timestamp": 1793534868.6534317,
+          "denied": false,
+          "payload_fields": {
+            "session_id": "c61610a9-425b-40cf-b06b-0df43ef0a5c5",
+            "agent_id": "a1dcefde924075f89",
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_use_id": "toolu_01P5N8EnaYvVHP5o9wRasQtr",
+            "duration_ms": 81,
+            "tool_input": {
+              "command": "echo child-shell",
+              "description": "Print child-shell string"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "path": "$WORK_ROOT/hq/hq-fe672f/codex-main-1/hooks.jsonl",
+      "sha256": "d189c62bf0002c511d39e1e333ffbcf91ad5d560f1638a8d32a102241c463dad",
+      "classification": "Ordinary execution/concurrent-child or running-command cancellation, not a permission-wait sequence.",
+      "records": [
+        {
+          "line": 4,
+          "hook_observer_timestamp": 1793535090.8648672,
+          "denied": false,
+          "payload_fields": {
+            "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "tool_use_id": "exec-686eaa3f-45fd-4ead-8bd1-39bbc719fa36",
+            "tool_input": {
+              "command": "echo probe-shell"
+            }
+          }
+        },
+        {
+          "line": 5,
+          "hook_observer_timestamp": 1793535091.0254843,
+          "denied": false,
+          "payload_fields": {
+            "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_use_id": "exec-686eaa3f-45fd-4ead-8bd1-39bbc719fa36",
+            "tool_input": {
+              "command": "echo probe-shell"
+            }
+          }
+        },
+        {
+          "line": 15,
+          "hook_observer_timestamp": 1793535108.665324,
+          "denied": false,
+          "payload_fields": {
+            "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+            "agent_id": "01a19705-c95f-75f0-8825-f91e61654554",
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "tool_use_id": "exec-5f54b746-173a-4175-a343-b9c05478f05b",
+            "tool_input": {
+              "command": "echo worker-shell"
+            }
+          }
+        },
+        {
+          "line": 16,
+          "hook_observer_timestamp": 1793535108.7918007,
+          "denied": false,
+          "payload_fields": {
+            "session_id": "01a19705-5abb-7043-9543-6eabfd49bd79",
+            "agent_id": "01a19705-c95f-75f0-8825-f91e61654554",
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_use_id": "exec-5f54b746-173a-4175-a343-b9c05478f05b",
+            "tool_input": {
+              "command": "echo worker-shell"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "path": "$WORK_ROOT/hq/hq-fe672f/codex-cancel-1/hooks.jsonl",
+      "sha256": "bb44c73fdc96e943f4bbbe826e0940abda8da91cbe85bb567fa18db0974cc97f",
+      "classification": "Ordinary execution/concurrent-child or running-command cancellation, not a permission-wait sequence.",
+      "records": [
+        {
+          "line": 5,
+          "hook_observer_timestamp": 1793538368.2745426,
+          "denied": false,
+          "payload_fields": {
+            "session_id": "01a19737-5420-7280-9b27-80cdf4ba57c6",
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "tool_use_id": "exec-44c3196d-924b-4a7a-bca3-813f64e17e9c",
+            "tool_input": {
+              "command": "sleep 30; echo late"
+            }
+          }
+        },
+        {
+          "line": 6,
+          "hook_observer_timestamp": 1793538372.4415007,
+          "denied": false,
+          "payload_fields": {
+            "session_id": "01a19737-5420-7280-9b27-80cdf4ba57c6",
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_use_id": "exec-44c3196d-924b-4a7a-bca3-813f64e17e9c",
+            "tool_input": {
+              "command": "sleep 30; echo late"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "claude_permission_smoke": {
+    "path": "$HOME/.claude/projects/-tmp-relay-smoke-DGxEN3/f169ae86-8c59-45c9-bc98-15c77deab001.jsonl",
+    "sha256": "d83d8cafc60f30615d3a4f97361b085719f26fae08452b7d54504f02534eac02",
+    "harness_version": "2.1.304 per manual-mode-asks-for-sleep capability fact",
+    "records": [
+      {
+        "line": 93,
+        "timestamp": "2026-10-22T11:17:35.379Z",
+        "block": {
+          "type": "tool_use",
+          "id": "toolu_01VqaGnuDZ7epgeaPKzQ7Qci",
+          "name": "Bash",
+          "input": {
+            "command": "touch approval.marker && sleep 7",
+            "description": "Create approval marker then wait 7 seconds"
+          }
+        }
+      },
+      {
+        "line": 95,
+        "timestamp": "2026-10-22T11:18:19.533Z",
+        "block": {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01VqaGnuDZ7epgeaPKzQ7Qci",
+          "content": "(Bash completed with no output)",
+          "is_error": false
+        }
+      }
+    ],
+    "limit": "Tool request and successful result bracket 44.154 seconds, including execution. No approval-resolution timestamp appears in these records. The fact independently records that this command prompted."
+  },
+  "facts_read_through_harness_facts": {
+    "manual-mode-asks-for-sleep": {
+      "claude-code": {
+        "fact": "manual-mode-asks-for-sleep",
+        "harness": "claude-code",
+        "type": "boolean",
+        "status": "probed",
+        "value": false,
+        "version": "2.1.304",
+        "date": "2026-10-22",
+        "evidence": "hq-f27918",
+        "note": "The primary host's Claude personal smoke f169ae86 (transcript permissionMode default; no allow rule in the home's settings names sleep): Bash 'sleep 7' ran with no permission dialog, while 'touch approval.marker && sleep 7' in the same session asked. A command meant to raise a permission prompt needs more than a plain sleep; a file write did it here. Which other commands run unasked, and why, was not probed."
+      },
+      "codex": {
+        "fact": "manual-mode-asks-for-sleep",
+        "harness": "codex",
+        "type": "boolean",
+        "status": "unknown"
+      }
+    },
+    "hook-posttooluse": {
+      "claude-code": {
+        "fact": "hook-posttooluse",
+        "harness": "claude-code",
+        "type": "boolean",
+        "status": "probed",
+        "value": true,
+        "version": "2.1.316",
+        "date": "2026-11-01",
+        "evidence": "hq-fe672f",
+        "note": "Run main: PostToolUse fired for each allowed Bash, Write and Agent call, root and subagent, with tool_response and duration_ms; none fired for a denied call."
+      },
+      "codex": {
+        "fact": "hook-posttooluse",
+        "harness": "codex",
+        "type": "boolean",
+        "status": "probed",
+        "value": true,
+        "version": "0.166.0",
+        "date": "2026-11-01",
+        "evidence": "hq-fe672f",
+        "note": "Run main and spawn-direct: PostToolUse fired for each allowed nested exec_command (Bash) and apply_patch call and for spawn_agent and wait_agent, root and worker; none for a denied call and none for the outer exec. A yielded exec_command gets no PostToolUse at the yield: in run cancel it came when nested write_stdin ended the process (exit 130), with an empty tool_response; in run all-tools a yielded process that ended on its own got none at all. An empty Bash tool_response is no sign of a yield: a completed true gives the same empty string (fixture codex-exec_command-yield.json). Nested write_stdin and the wait tool get none."
+      }
+    },
+    "hook-agent-id-on-child-calls": {
+      "claude-code": {
+        "fact": "hook-agent-id-on-child-calls",
+        "harness": "claude-code",
+        "type": "boolean",
+        "status": "probed",
+        "value": true,
+        "version": "2.1.316",
+        "date": "2026-11-01",
+        "evidence": "hq-fe672f",
+        "note": "Run main: the background subagent's Bash PreToolUse and PostToolUse carried agent_id (also agent_type general-purpose) and the root's session_id; the root's calls carry no agent_id. SubagentStart and SubagentStop carry the same agent_id, which equals the Agent tool_response's agentId."
+      },
+      "codex": {
+        "fact": "hook-agent-id-on-child-calls",
+        "harness": "codex",
+        "type": "boolean",
+        "status": "probed",
+        "value": true,
+        "version": "0.166.0",
+        "date": "2026-11-01",
+        "evidence": "hq-fe672f",
+        "note": "Run main: the worker's nested exec_command PreToolUse and PostToolUse (tool_name Bash) carried agent_id (the worker's thread id, agent_type default) and the root's session_id; the root's calls carry no agent_id. The spawn_agent tool_response names only the task name (/root/probe_worker), so the id first appears at SubagentStart. No hook payload in any run links a task_name to an agent_id: spawn_agent's tool_input carries the bare task_name and its PostToolUse response /root/<task_name>, interrupt_agent, send_message and followup_task take the name as target, and SubagentStart carries agent_id with no name. The worker rollout that SubagentStart's transcript_path names holds the link in its first line (session_meta source.subagent.thread_spawn.agent_path /root/<task_name>), read after the run; whether it is there when SubagentStart fires is not shown. Fixture: tools/fixtures/turn-pause/hooks/codex-spawn_agent.json."
+      }
+    },
+    "hook-unhooked-tools": {
+      "claude-code": {
+        "fact": "hook-unhooked-tools",
+        "harness": "claude-code",
+        "type": "set",
+        "status": "probed",
+        "value": [],
+        "version": "2.1.316",
+        "date": "2026-11-01",
+        "evidence": "hq-fe672f",
+        "note": "Every tool claude/probes/turn-pause-probe.py runs main, cron and cron2 called (Agent, Bash, CronCreate, CronDelete, ScheduleWakeup, ToolSearch, Write, and subagents' Bash) fired PreToolUse. Tools not called are not covered."
+      },
+      "codex": {
+        "fact": "hook-unhooked-tools",
+        "harness": "codex",
+        "type": "set",
+        "status": "probed",
+        "value": [
+          "exec",
+          "exec.write_stdin",
+          "wait"
+        ],
+        "version": "0.166.0",
+        "date": "2026-11-01",
+        "evidence": "hq-fe672f",
+        "note": "exec: no hook in any run. Run cancel: tools.write_stdin({session_id: 83217, chars: \"\\u0003\"}) inside exec interrupted a running exec_command session (exit_code 130), and wait({cell_id: \"5\", terminate: true}) terminated a running exec cell (Script terminated); neither fired any hook event. Both stop work unseen, and write_stdin can also send arbitrary input to a running session unseen. Fixtures: tools/fixtures/turn-pause/hooks/codex-write_stdin.json and codex-wait.json (no records). Runs all-tools and all-tools-rest found no other unhooked tool among those called (every tool in hook-tool-names fired PreToolUse); request_plugin_install and image_gen__imagegen were not called."
+      }
+    }
+  },
+  "claude_installed_definitions": {
+    "path": "$HOME/.local/share/claude/versions/2.1.318",
+    "sha256": "708c77b204db30086ff6f1ed34577bda03e1be74ced80557cbf7b54249ebf0bd",
+    "classification": "Installed source/schema/help declarations; no runtime permission-event observation.",
+    "excerpts": [
+      {
+        "byte_offset": 282537311,
+        "byte_length": 1620,
+        "text": "N=p(()=>u({session_id:o(),transcript_path:o(),cwd:o(),prompt_id:o().optional().describe(\"UUID correlating a user prompt with all subsequent events until the next prompt. Same value emitted on OpenTelemetry events as the `prompt.id` attribute, so hook output can be joined to OTel events at prompt grain. Absent until the first user input of the process lifetime.\"),permission_mode:o().optional(),agent_id:o().optional().describe(\"Subagent identifier. Present only when the hook fires from within a subagent (e.g., a tool called by an AgentTool worker). Absent for the main thread, even in --agent sessions. Use this field (not agent_type) to distinguish subagent calls from main-thread calls.\"),agent_type:o().optional().describe('Agent type name (e.g., \"general-purpose\", \"code-reviewer\"). Present when the hook fires from within a subagent (alongside agent_id), or on the main thread of a session started with --agent (without agent_id).'),effort:u({level:o().describe('Active effort level for the current turn (e.g., \"low\", \"medium\", \"high\", \"xhigh\", \"max\"), after any silent downgrade for the selected model. Also exposed to hook commands and Bash as the CLAUDE_EFFORT env var.')}).optional().describe(\"Reasoning effort applied to the current turn. Same shape as StatusLineCommandInput.effort. Present for hooks that fire within a tool-use context (PreToolUse, PostToolUse, Stop, SubagentStop, etc.) on a model that supports the effort parameter; absent for session-lifecycle hooks and models without effort support.\")})),VK=p(()=>N().and(u({hook_event_name:T(\"PreToolUse\"),tool_name:o(),tool_input:oe(),tool_use_id:"
+      },
+      {
+        "byte_offset": 282538986,
+        "byte_length": 240,
+        "text": "hook_event_name:T(\"PermissionRequest\"),tool_name:o(),tool_input:oe(),permission_suggestions:A(Qt()).optional(),mcp_server:Je().optional()}))),GK=p(()=>N().and(u({hook_event_name:T(\"PostToolUse\"),tool_name:o(),tool_input:oe(),tool_response:o"
+      },
+      {
+        "byte_offset": 293637080,
+        "byte_length": 250,
+        "text": "hook_event_name:\"PermissionRequest\",tool_name:e,tool_input:r,permission_suggestions:y,...nse(e,s)};yield*AM({session:s.session,hookInput:H,toolUseID:n,matchQuery:e,signal:S,timeoutMs:w,toolUseContext:s})}function nse(e,n){let r=vn(n.options.tools,e)?"
+      },
+      {
+        "byte_offset": 282539148,
+        "byte_length": 380,
+        "text": "hook_event_name:T(\"PostToolUse\"),tool_name:o(),tool_input:oe(),tool_response:oe(),tool_use_id:o(),duration_ms:E().optional().describe(\"Tool execution time in milliseconds. Excludes permission-prompt and hook time.\"),mcp_server:Je().optional()}))),HK=p(()=>N().and(u({hook_event_name:T(\"PostToolUseFailure\"),tool_name:o(),tool_input:oe(),tool_use_id:o(),error:o(),is_interrupt:O()."
+      },
+      {
+        "byte_offset": 311741299,
+        "byte_length": 450,
+        "text": "PermissionDenied:{summary:\"After auto mode denies a tool call\",description:`Input to command is JSON with tool_name, tool_input, tool_use_id, and reason.\nReturn {\"hookSpecificOutput\":{\"hookEventName\":\"PermissionDenied\",\"retry\":true}} to tell the model it may retry.\nExit code 0 - stdout shown in transcript mode (ctrl+o)\nOther exit codes - show stderr to user only`,matcherMetadata:{values:e}},Notification:{summary:\"When notifications are sent\",desc"
+      }
+    ],
+    "limit": "PermissionRequest schema and constructor omit tool_use_id while embedded help claims it. Internal dispatcher receives toolUseID separately; actual command-hook payload correlation remains unestablished."
+  },
+  "codex_installed_definitions": {
+    "path": "$HOME/.codex/packages/standalone/releases/0.166.0-x86_64-unknown-linux-musl/bin/codex",
+    "sha256": "b8a11fedf24b2dfb59a70c9e52b030f9a508dcd49cd2dd0d41956f4c785156b8",
+    "classification": "Installed event-name strings; declarations, not observed event delivery.",
+    "hook_event_names_excerpt": {
+      "byte_offset": 260616519,
+      "byte_length": 220,
+      "text": "HookEventsTomlPreModelRequestPreToolUsePermissionRequestPostToolUsePreCompactPostCompactSessionStartSessionEndSubagentStartSubagentStopInterrupttask_idtaskIdencrypted_task_idencryptedTaskIdmax_concurrent_threads_per_sess"
+    }
+  },
+  "codex_retained_generated_protocol": [
+    {
+      "path": "$WORK_ROOT/relay/relay-a27e7c/reproof-0.166.0/protocol-0.166.0/v2/CommandExecutionRequestApprovalParams.ts",
+      "sha256": "531eaecb38d8c93ed389ada2482f6e2d7d6fa5351adf423706bf6e6eeddf60dc",
+      "classification": "Retained generated protocol declaration labelled 0.166.0, not a captured permission request/reply.",
+      "text": "// GENERATED CODE! DO NOT MODIFY BY HAND!\n\n// This file was generated by [ts-rs](https://github.com/Aleph-Alpha/ts-rs). Do not edit this file manually.\nimport type { LegacyAppPathString } from \"../LegacyAppPathString\";\nimport type { AdditionalPermissionProfile } from \"./AdditionalPermissionProfile\";\nimport type { CommandAction } from \"./CommandAction\";\nimport type { CommandExecutionApprovalDecision } from \"./CommandExecutionApprovalDecision\";\nimport type { CommandExecutionApprovalKind } from \"./CommandExecutionApprovalKind\";\nimport type { ExecPolicyAmendment } from \"./ExecPolicyAmendment\";\nimport type { NetworkApprovalContext } from \"./NetworkApprovalContext\";\nimport type { NetworkPolicyAmendment } from \"./NetworkPolicyAmendment\";\n\nexport type CommandExecutionRequestApprovalParams = {\n/**\n * Kind of action under review. Defaults to `command` for older servers.\n */\nkind: CommandExecutionApprovalKind, threadId: string, turnId: string, itemId: string,\n/**\n * Unix timestamp (in milliseconds) when this approval request started.\n */\nstartedAtMs: number,\n/**\n * Unique identifier for this specific approval callback.\n *\n * For regular shell/unified_exec approvals, this is null.\n *\n * For zsh-exec-bridge subcommand approvals, multiple callbacks can belong to\n * one parent `itemId`, so `approvalId` is a distinct opaque callback id\n * (a UUID) used to disambiguate routing.\n * Stdin approvals also use a distinct callback id; inspect `kind` to distinguish them.\n */\napprovalId?: string | null,\n/**\n * Environment in which the command will run.\n */\nenvironmentId: string | null,\n/**\n * Optional explanatory reason (e.g. request for network access).\n */\nreason?: string | null,\n/**\n * Optional context for a managed-network approval prompt.\n */\nnetworkApprovalContext?: NetworkApprovalContext | null,\n/**\n * The command to be executed.\n */\ncommand?: string | null,\n/**\n * The command's working directory.\n */\ncwd?: LegacyAppPathString | null,\n/**\n * Best-effort parsed command actions for friendly display.\n */\ncommandActions?: Array<CommandAction> | null,\n/**\n * Optional additional permissions requested for this command.\n */\nadditionalPermissions?: AdditionalPermissionProfile | null,\n/**\n * Optional proposed execpolicy amendment to allow similar commands without prompting.\n */\nproposedExecpolicyAmendment?: ExecPolicyAmendment | null,\n/**\n * Optional proposed network policy amendments (allow/deny host) for future requests.\n */\nproposedNetworkPolicyAmendments?: Array<NetworkPolicyAmendment> | null,\n/**\n * Ordered list of decisions the client may present for this prompt.\n */\navailableDecisions?: Array<CommandExecutionApprovalDecision> | null, };\n"
+    },
+    {
+      "path": "$WORK_ROOT/relay/relay-a27e7c/reproof-0.166.0/protocol-0.166.0/v2/CommandExecutionRequestApprovalResponse.ts",
+      "sha256": "454ceee4decc66a9c070273d4344fa8a0187732cd884b8b60edda3a17766aa95",
+      "classification": "Retained generated protocol declaration labelled 0.166.0, not a captured permission request/reply.",
+      "text": "// GENERATED CODE! DO NOT MODIFY BY HAND!\n\n// This file was generated by [ts-rs](https://github.com/Aleph-Alpha/ts-rs). Do not edit this file manually.\nimport type { CommandExecutionApprovalDecision } from \"./CommandExecutionApprovalDecision\";\n\nexport type CommandExecutionRequestApprovalResponse = { decision: CommandExecutionApprovalDecision, };\n"
+    },
+    {
+      "path": "$WORK_ROOT/relay/relay-a27e7c/reproof-0.166.0/protocol-0.166.0/v2/CommandExecutionApprovalDecision.ts",
+      "sha256": "9283d7206bc8df353c4fcc9a14682b5f69f7f288d666f975356762ed49d5bc6b",
+      "classification": "Retained generated protocol declaration labelled 0.166.0, not a captured permission request/reply.",
+      "text": "// GENERATED CODE! DO NOT MODIFY BY HAND!\n\n// This file was generated by [ts-rs](https://github.com/Aleph-Alpha/ts-rs). Do not edit this file manually.\nimport type { ExecPolicyAmendment } from \"./ExecPolicyAmendment\";\nimport type { NetworkPolicyAmendment } from \"./NetworkPolicyAmendment\";\n\nexport type CommandExecutionApprovalDecision = \"accept\" | \"acceptForSession\" | { \"acceptWithExecpolicyAmendment\": { execpolicy_amendment: ExecPolicyAmendment, } } | { \"applyNetworkPolicyAmendment\": { network_policy_amendment: NetworkPolicyAmendment, } } | \"decline\" | \"cancel\";\n"
+    },
+    {
+      "path": "$WORK_ROOT/relay/relay-a27e7c/reproof-0.166.0/protocol-0.166.0/v2/ServerRequestResolvedNotification.ts",
+      "sha256": "e428ba289071d7b2e04cedc8b3cd7e6adbe57409dbbc333c38178b316f122ec5",
+      "classification": "Retained generated protocol declaration labelled 0.166.0, not a captured permission request/reply.",
+      "text": "// GENERATED CODE! DO NOT MODIFY BY HAND!\n\n// This file was generated by [ts-rs](https://github.com/Aleph-Alpha/ts-rs). Do not edit this file manually.\nimport type { RequestId } from \"../RequestId\";\n\nexport type ServerRequestResolvedNotification = { threadId: string, requestId: RequestId, };\n"
+    }
+  ],
+  "codex_historical_hook_source": {
+    "path": "$WORK_ROOT/relay/relay-a27e7c/production/subscription-source-core__src__hook_runtime.rs",
+    "sha256": "d0544d1f180a1f33e59af86aadcb89e207031276d9644a1f6e9a3711cf0797c7",
+    "version": "0.165.0",
+    "recorded_sha256_matches": true,
+    "lines": "266-306",
+    "text": "// PermissionRequest hooks share the same preview/start/completed event flow as\n// other hook types, but they return an optional decision instead of mutating\n// tool input or post-run state.\npub(crate) async fn run_permission_request_hooks(\n    sess: &Arc<Session>,\n    review_context: &GuardianReviewContext,\n    run_id_suffix: &str,\n    payload: PermissionRequestPayload,\n    target_environment: &str,\n) -> Option<PermissionRequestDecision> {\n    let turn_context = review_context.turn();\n    let request = PermissionRequestRequest {\n        session_id: sess.session_id().into(),\n        turn_id: turn_context.sub_id.clone(),\n        subagent: thread_spawn_subagent_hook_context(sess, turn_context),\n        cwd: tool_hook_cwd(review_context.environments(), turn_context).to_path_buf(),\n        transcript_path: sess.hook_transcript_path().await,\n        model: review_context.model_info.slug.clone(),\n        permission_mode: hook_permission_mode(review_context.approval_policy),\n        tool_name: payload.tool_name.name().to_string(),\n        matcher_aliases: payload.tool_name.matcher_aliases().to_vec(),\n        run_id_suffix: run_id_suffix.to_string(),\n        tool_input: payload.tool_input,\n    };\n    let hooks = with_tool_environment_hooks(\n        sess,\n        turn_context,\n        review_context.environments(),\n        &[target_environment],\n    );\n    let preview_runs = hooks.preview_permission_request(&request);\n    emit_hook_started_events(sess, turn_context, preview_runs).await;\n\n    let PermissionRequestOutcome {\n        hook_events,\n        decision,\n    } = hooks.run_permission_request(request).await;\n    emit_hook_completed_events(sess, turn_context, hook_events).await;\n\n    decision\n}",
+    "limit": "0.165.0 historical source only. Hook-start/completed describes hook execution, not human approval resolution; cannot establish 0.166.0 permission end or current payload."
+  },
+  "missing_observations": [
+    "Actual PermissionRequest command-hook payload and stable call correlation on installed versions.",
+    "Timestamp and event emitted at user approval before execution; terminal result alone is too late.",
+    "User denial and Esc/turn/session cancellation cleanup for the pending call.",
+    "Concurrent agent/call and parent-wrapper accounting while another permission is pending."
+  ]
+}
