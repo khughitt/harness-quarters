@@ -1,13 +1,13 @@
 ---
 id: hq-fd490e
 title: Activate the reviewed layout and account for adoption
-status: blocked
+status: todo
 priority: 2
 size: s
 complexity: mid
 process: direct
 created: 2026-11-06T02:19:55Z
-updated: 2026-11-06T04:50:57Z
+updated: 2026-11-06T09:22:23Z
 depends: [hq-7930ee]
 parent: hq-b77d0c
 tags: []
