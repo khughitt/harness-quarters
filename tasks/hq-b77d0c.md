@@ -6,9 +6,9 @@ priority: 2
 size: m
 complexity: mid
 process: planned
-owner: main
+owner: refactor/hq-b77d0c-harness-layout
 created: 2026-11-06T01:17:05Z
-updated: 2026-11-06T01:17:38Z
+updated: 2026-11-06T01:17:52Z
 started: 2026-11-06T01:17:12Z
 depends: []
 tags: []
@@ -26,3 +26,5 @@ The user asks to reduce root-directory clutter by grouping harness-specific file
   provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-06T01:17:36Z (main): trial: flow-trial-1 — enrolled — flow off
 - 2026-11-06T01:17:38Z (main): arm: flow-trial-1 — unit tack-b77d0c — flow off
+- 2026-11-06T01:17:52Z (refactor/hq-b77d0c-harness-layout): resumed
+  provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
