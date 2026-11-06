@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "operation_id": "aff8b30262bf4646918768ddc94ec579",
+  "host": "titan",
+  "inputs": [
+    {
+      "task": "hq-fd490e",
+      "basis": {
+        "project": "hq",
+        "layout": "in-tree",
+        "records_subdir": ".",
+        "commit": "15a7af0163271c1b58907a8db968e19ca7fa9dff",
+        "task_path": "tasks/hq-fd490e.md",
+        "retained_ref": "refs/heads/main"
+      }
+    }
+  ],
+  "declarations": [
+    {
+      "kind": "scratch",
+      "path": "$WORK_ROOT/hq/hq-b77d0c/activation-initiating-2026-11-06-attempt2",
+      "purpose": "Private verified successful activation snapshots and exact operator outputs; preserves original settings and recovery evidence",
+      "cleanup_trigger": "After ordinary use confirms no layout regression, inspect recovery need and preserve required evidence before disposal"
+    }
+  ]
+}
