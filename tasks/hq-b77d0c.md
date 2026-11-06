@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: refactor/hq-b77d0c-harness-layout
 created: 2026-11-06T01:17:05Z
-updated: 2026-11-06T02:51:37Z
+updated: 2026-11-06T03:18:50Z
 started: 2026-11-06T01:17:12Z
 depends: []
 tags: []
@@ -84,4 +84,6 @@ The user asks to reduce root-directory clutter by grouping harness-specific file
 - 2026-11-06T02:51:35Z (refactor/hq-b77d0c-harness-layout): retention checkpoint: observed 2026-11-06T02:51:12Z on titan; basis hq in-tree records . commit af51f0810bd2982efb18702e7d015b9712cd1972:tasks/hq-b77d0c.md; retained by refactor/hq-b77d0c-harness-layout; this host: kept verified 1, kept unknown 0, released 0; changed 0. Rechecked all kept/verified items: locked worktree, clean Git/ignored state, frozen plan and saved review documents. No task scratch or off-tree evidence exists; per-run temporary diagnostic fixtures were removed. Other hosts are outside this observation; unknown items none. Next: user approves the unchanged plan, then controller starts Task 1.
 - 2026-11-06T02:51:35Z (refactor/hq-b77d0c-harness-layout): Park disclosures: independent review accepted and its one actionable note reconciled with local evidence, with the final whole-branch review still owed after implementation. Nothing pushed; no surviving process per fresh host-load. Main's settings, host links, runtime code and the other worktree remain untouched. Branch refactor/hq-b77d0c-harness-layout is unmerged at .worktrees/hq-b77d0c; controller implements after user plan approval and integrates only after the separate live authorization. Nothing is running in the background.
 - 2026-11-06T02:51:37Z (refactor/hq-b77d0c-harness-layout): parked (waiting on user, review): User: approve the unchanged implementation plan and inline execution at .worktrees/hq-b77d0c/docs/plans/2026-11-05-harness-layout.md, frozen at 432432185328918540402a4f7ebc00820b7642de. Controller: then unblock/start hq-7930ee and execute with the recorded patch-boundary rehearsal cases. Live activation hq-fd490e remains separately gated.
+  provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-06T03:18:50Z (refactor/hq-b77d0c-harness-layout): resumed
   provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
