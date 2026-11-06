@@ -1,15 +1,17 @@
 ---
 id: hq-fd490e
 title: Activate the reviewed layout and account for adoption
-status: doing
+status: done
 priority: 2
 size: s
 complexity: mid
 process: direct
 owner: main
 created: 2026-11-06T02:19:55Z
-updated: 2026-11-06T10:28:26Z
+updated: 2026-11-06T10:39:32Z
 started: 2026-11-06T09:22:25Z
+completed: 2026-11-06T10:39:32Z
+closed: 2026-11-06T10:39:32Z
 depends: [hq-7930ee]
 parent: hq-b77d0c
 tags: []
@@ -80,3 +82,7 @@ Execute Task 2 only after Task 1 has passed final review and the user has separa
 - 2026-11-06T10:28:26Z (main): retained: {"version":1,"host":"europa","kind":"scratch","path":"$WORK_ROOT/hq/hq-b77d0c/activation-adopting-2026-11-06","state":"released","verification":"verified","purpose":"Transferred to hq-b08a11; custody transferred and bytes remain in place","next_owner":"none","cleanup_trigger":"none"}
 - 2026-11-06T10:28:26Z (main): retained: {"version":1,"host":"europa","kind":"scratch","path":"$WORK_ROOT/hq/hq-b77d0c/activation-adopting-2026-11-06-attempt2","state":"released","verification":"verified","purpose":"Transferred to hq-b08a11; custody transferred and bytes remain in place","next_owner":"none","cleanup_trigger":"none"}
 - 2026-11-06T10:28:26Z (main): Manual Europa transfer completed after receiver publication and fresh controller SSH re-verification of all3 identities and complete directory member sets. Both snapshots and the external attempt1 manifest remain at their recorded locations; no raw evidence moved or deleted. Redundant generated attempt2 manifest request copy matched the published attachment before removal. Receiver hq-b08a11 owns ongoing retention.
+- 2026-11-06T10:39:32Z (main): done
+  provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-06T10:39:32Z (main): Activated independently accepted runtime 062f7131a59dc81fb22148b05a11741e5642853a on Titan and Europa. Both hosts converge on native links, preserve picks/trust/private settings and Codex hook bytes, and have no old root directories. Unfiltered agentMode:auto remains the original unstaged edit under harnesses/agy/settings.json. Existing filter intentionally does not restore tui.screen_reader_detection_done; all other parsed config fields preserved. Fresh live checks and bounded verification rulings are in docs/notes/2026-11-06-harness-layout-activation-report.md and the execution ledger owned by hq-b08a11. No runtime edits during activation; policy-off broad suite deliberately not rerun, no remote CI or paid probe claim. All retained identities released to hq-b08a11, whose final Titan checkpoint 64d93f68cbc244d38d00fb94b5d2ee0a verifies5 and Europa manual checkpoint verifies3; no unknown or remaining source-owned item. No rollback needed. Pre-existing Europa hostname hygiene finding ops-fe7738 prevented remote record commits; records published from Titan with normal checks, no bypass. host-load --section session: nothing left running. Nothing pushed; no unmerged rollout branch. Other work untouched.
+  provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
