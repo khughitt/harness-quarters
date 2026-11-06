@@ -1,0 +1,1 @@
+{"host":"titan","observed_at":"2026-11-06T04:51:50Z","operation":{"coordinator":"hq-b77d0c","operation_id":"85fdbcb7da8f4e12b4723e54a0464b8d"},"version":1,"worktrees":[{"identity":{"host":"titan","kind":"worktree","path":".worktrees/hq-b77d0c"},"status_porcelain_z":"!! .githooks/__pycache__/\u0000!! .pytest_cache/\u0000!! tools/relay_cutover_bootstrap/__pycache__/\u0000"}]}
