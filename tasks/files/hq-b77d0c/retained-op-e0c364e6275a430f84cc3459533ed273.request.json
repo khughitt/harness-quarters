@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "operation_id": "e0c364e6275a430f84cc3459533ed273",
+  "host": "titan",
+  "inputs": [
+    {
+      "task": "hq-b77d0c",
+      "basis": {
+        "project": "hq",
+        "layout": "in-tree",
+        "records_subdir": ".",
+        "commit": "44a8241792c0ca781cce46a2cefcd44cecce3224",
+        "task_path": "tasks/hq-b77d0c.md",
+        "retained_ref": "refs/heads/refactor/hq-b77d0c-harness-layout"
+      }
+    }
+  ],
+  "declarations": [
+    {
+      "kind": "worktree",
+      "path": ".worktrees/hq-b77d0c",
+      "purpose": "Accepted harness layout and complete task history; approved activation stopped before merge, awaiting a fresh no-writer window",
+      "cleanup_trigger": "After successful activation and host adoption, preserve rulings and evidence, run timing/ignored-file/host-pointer checks, then consider removal"
+    },
+    {
+      "kind": "scratch",
+      "path": "$WORK_ROOT/hq/hq-b77d0c/plans/harness-layout",
+      "purpose": "Current execution/review ledger and build evidence including activation attempt1 guard refusal and next action",
+      "cleanup_trigger": "After activation and all adoption, preserve required ledger/review evidence on task records before disposing of the workspace"
+    },
+    {
+      "kind": "evidence",
+      "path": "$WORK_ROOT/hq/hq-b77d0c/plans/harness-layout-before-activation",
+      "purpose": "Immutable exact workspace generation backing the pre-activation checkpoint; all prior member bytes preserved before progress ledger update",
+      "cleanup_trigger": "When no needed checkpoint or review relies on this generation, verify its durable replacement and disposition before removal"
+    }
+  ],
+  "preserved_previous": [
+    {
+      "identity": {
+        "host": "titan",
+        "kind": "scratch",
+        "path": "$WORK_ROOT/hq/hq-b77d0c/plans/harness-layout"
+      },
+      "artifact": {
+        "type": "directory",
+        "host": "titan",
+        "path": "$WORK_ROOT/hq/hq-b77d0c/plans/harness-layout-before-activation",
+        "manifest": {
+          "type": "git",
+          "basis": {
+            "project": "hq",
+            "layout": "in-tree",
+            "records_subdir": ".",
+            "commit": "bfecade51140c97618aa7b4fdda767e9aed3c3e6",
+            "task_path": "tasks/hq-b77d0c.md",
+            "retained_ref": "refs/heads/refactor/hq-b77d0c-harness-layout"
+          },
+          "path": "tasks/files/hq-b77d0c/retained-manifest-0ffda638797acf6fe698b5a754cec5536589763c3417e23392d32a8047eb2c0b.json",
+          "sha256": "0ffda638797acf6fe698b5a754cec5536589763c3417e23392d32a8047eb2c0b"
+        }
+      }
+    }
+  ]
+}

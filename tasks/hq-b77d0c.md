@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: refactor/hq-b77d0c-harness-layout
 created: 2026-11-06T01:17:05Z
-updated: 2026-11-06T09:32:40Z
+updated: 2026-11-06T09:33:55Z
 started: 2026-11-06T01:17:12Z
 depends: []
 tags: []
@@ -108,3 +108,5 @@ The user asks to reduce root-directory clutter by grouping harness-specific file
   provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-06T09:30:38Z (refactor/hq-b77d0c-harness-layout): Preserved the exact prior execution-workspace generation before ledger update at Titan $WORK_ROOT/hq/hq-b77d0c/plans/harness-layout-before-activation, owner task:hq-b77d0c. Every prior member matches committed manifest 0ffda638797acf6fe698b5a754cec5536589763c3417e23392d32a8047eb2c0b at bfecade51140c97618aa7b4fdda767e9aed3c3e6 (tasks/files/hq-b77d0c/retained-manifest-0ffda638797acf6fe698b5a754cec5536589763c3417e23392d32a8047eb2c0b.json). Keep this immutable version while the previous retention checkpoint needs exact bytes; no deletion is authorized. The mutable ledger now advances to approved activation stopped on a changed-input guard, pending a fresh no-writer window.
 - 2026-11-06T09:32:40Z (refactor/hq-b77d0c-harness-layout): Created temporary checkpoint request at Titan $WORK_ROOT/hq/hq-b77d0c/hq-b77d0c-checkpoint-request.json outside inventoried containers, owned by hq-b77d0c for this accounting boundary; populate with a fresh basis, publish through tasks retained checkpoint, verify exact committed bytes, then discard the redundant request copy.
+- 2026-11-06T09:33:54Z (refactor/hq-b77d0c-harness-layout): attached: retained-op-e0c364e6275a430f84cc3459533ed273.request.json (2615 bytes)
+- 2026-11-06T09:33:54Z (refactor/hq-b77d0c-harness-layout): retention operation: {"version":1,"key":{"coordinator":"hq-b77d0c","operation_id":"e0c364e6275a430f84cc3459533ed273"},"phase":"intent","request":{"type":"attachment","task":"hq-b77d0c","name":"retained-op-e0c364e6275a430f84cc3459533ed273.request.json","sha256":"6bd8add4a3877de0c293eabe92f0c16f70fe9fc88346a40f727e7c3c77c1c820"},"input_bases":[{"task":"hq-b77d0c","basis":{"project":"hq","layout":"in-tree","records_subdir":".","commit":"44a8241792c0ca781cce46a2cefcd44cecce3224","task_path":"tasks/hq-b77d0c.md","retained_ref":"refs/heads/refactor/hq-b77d0c-harness-layout"}}],"host":"titan","at":"2026-11-06T09:33:54Z","observer":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","outputs":{},"diagnostics":[]}
