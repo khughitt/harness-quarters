@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: refactor/hq-b77d0c-harness-layout
 created: 2026-11-06T01:17:05Z
-updated: 2026-11-06T04:47:48Z
+updated: 2026-11-06T04:49:50Z
 started: 2026-11-06T01:17:12Z
 depends: []
 tags: []
@@ -91,3 +91,4 @@ The user asks to reduce root-directory clutter by grouping harness-specific file
 - 2026-11-06T03:18:52Z (refactor/hq-b77d0c-harness-layout): User explicitly approved the implementation plan and inline execution in this session. Binding plan: hq commit 432432185328918540402a4f7ebc00820b7642de:docs/plans/2026-11-05-harness-layout.md. Begin Task 1 hq-7930ee with the accepted plan-review ruling; Task 2 live activation hq-fd490e remains separately gated.
 - 2026-11-06T03:19:23Z (refactor/hq-b77d0c-harness-layout): Execution workspace created on titan at $WORK_ROOT/hq/hq-b77d0c/plans/harness-layout/, owned by task:hq-b77d0c for inline execution of docs/plans/2026-11-05-harness-layout.md frozen at 432432185328918540402a4f7ebc00820b7642de in hq. Contents mutable and not yet checkpointed; spec and plan remain in the code worktree. No child owns this container.
 - 2026-11-06T04:47:48Z (refactor/hq-b77d0c-harness-layout): review: impl round 1 — verdict: accept; findings: minor 2; reviewer: codex/gpt-6-astra
+- 2026-11-06T04:49:50Z (refactor/hq-b77d0c-harness-layout): Final review accepted runtime 062f7131a59dc81fb22148b05a11741e5642853a (base 71a4934294f055d42c1cf9dae8290937656fc934), verified reviewer codex/gpt-6-astra; report $WORK_ROOT/hq/hq-b77d0c/plans/harness-layout/final-r1-report.md verified present/nonempty (6955 bytes). Two minor (deferred) findings remain: README.md:321 private paths incorrectly prefixed with harnesses/, and adding-a-harness.md:141,155,160,488 templates still use root-level paths. No Critical/Important or corrective round. Every declined-to-judge disposition and original/implementation Ruling with Why, Cost and revisions is in progress.md in that workspace. Task1 evidence is task-1-evidence.md there; final completion 45 passed/115 deselected. Activation request: docs/notes/2026-11-06-harness-layout-activation.md; live approval and confirmed shared-host no-writer window remain outstanding.
