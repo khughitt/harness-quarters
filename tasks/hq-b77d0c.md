@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: refactor/hq-b77d0c-harness-layout
 created: 2026-11-06T01:17:05Z
-updated: 2026-11-06T01:48:09Z
+updated: 2026-11-06T01:51:27Z
 started: 2026-11-06T01:17:12Z
 depends: []
 tags: []
@@ -18,6 +18,10 @@ spec: docs/specs/2026-11-05-harness-layout-design.md
 ---
 
 The user asks to reduce root-directory clutter by grouping harness-specific files under harnesses/ and external skills/integrations under external/, illustrating agy, claude, codex, crush, opencode, pi and ponytail. Prepare a short design for review, then a reviewed implementation plan. Preserve existing harness behavior, live selections and private state. Treat the example as a repository layout change; current session-log stores remain in native harness homes. Candidate moves are agy/, claude/, codex/, pi/ and ponytail/; inspect all operational path consumers and home-link activation before implementation. No new harness integration is requested.
+
+## References
+
+- spec-r1-review (context, kind=review): docs/notes/2026-11-05-harness-layout-spec-r1-report.md — relayed agy review of the original frozen design
 
 ## Notes
 
