@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: refactor/hq-b77d0c-harness-layout
 created: 2026-11-06T01:17:05Z
-updated: 2026-11-06T01:19:52Z
+updated: 2026-11-06T01:19:54Z
 started: 2026-11-06T01:17:12Z
 depends: []
 tags: []
@@ -35,4 +35,6 @@ The user asks to reduce root-directory clutter by grouping harness-specific file
 - 2026-11-06T01:19:33Z (refactor/hq-b77d0c-harness-layout): Verification: just check-hygiene and git diff --check passed. tasks check had no errors and one existing record_growth warning for hq-c58737. Focused runtime tests and baseline deliberately deferred until implementation; this turn only drafted documentation. Broad tests not run under automatic_broad=false. No remote evidence claimed.
 - 2026-11-06T01:19:33Z (refactor/hq-b77d0c-harness-layout): Park disclosures: nothing pushed; no process survives (host-load --section session reported nothing left running). No live links or host pointers repointed. Existing main edits in agy/settings.json and codex/config.toml and the other task worktree were untouched. Branch refactor/hq-b77d0c-harness-layout remains unmerged at .worktrees/hq-b77d0c; controller continues after user design review, then prepares the plan for review. Eventual live-surface integration requires explicit activation approval and a tested merge/relink sequence. Current task retained set is this locked worktree only; no scratch or off-tree evidence created. Git status, including ignored entries, was empty; setup-created empty local/codex/rules directories remain regenerable.
 - 2026-11-06T01:19:52Z (refactor/hq-b77d0c-harness-layout): retention checkpoint: observed 2026-11-06T01:19:41Z on titan; basis hq in-tree records . commit 33bbb7a61e84448b15c942706667729209979982:tasks/hq-b77d0c.md; retained by refactor/hq-b77d0c-harness-layout; this host: kept verified 1, kept unknown 0, released 0; changed 1. Rechecked all kept/verified items on this host. No unknown items. Other hosts are outside this observation. Next: user reviews the frozen design, then controller prepares the implementation plan.
+  provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-06T01:19:54Z (refactor/hq-b77d0c-harness-layout): parked (waiting on user, review): User: review the frozen design at .worktrees/hq-b77d0c/docs/specs/2026-11-05-harness-layout-design.md (revision in task note). Controller: incorporate any corrections, then use writing-plans to prepare the implementation plan for review in this same worktree.
   provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
