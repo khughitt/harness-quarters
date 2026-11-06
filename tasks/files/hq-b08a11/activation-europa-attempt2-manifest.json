@@ -1,0 +1,429 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "agy-base.json",
+      "type": "file",
+      "sha256": "08e517ddba735383aab7c49adf2f955511e316ffe65b71da2046ae3daf2c7baa"
+    },
+    {
+      "path": "align-agy.py",
+      "type": "file",
+      "sha256": "339938cee33a5321b898b5f2f692034fdf6afc2c275770915256008c19973a6c"
+    },
+    {
+      "path": "carry-paths.txt",
+      "type": "file",
+      "sha256": "02b9aa767fc46da684eec7fe16831590d076b9c98d221c60d13c0bc98b505575"
+    },
+    {
+      "path": "checkpoint-0.json",
+      "type": "file",
+      "sha256": "6c7ab0310a8d4199db4f05f40f7f9d221ff71ae8d95d3d180c42e9146ed77a06"
+    },
+    {
+      "path": "checkpoint-1.json",
+      "type": "file",
+      "sha256": "cb0e49a819c6e435867340c5f8bd8712a2c6e6a751a7d0dbb458ee0547e57a7c"
+    },
+    {
+      "path": "checkpoint0-native.json",
+      "type": "file",
+      "sha256": "af0336d2c9509ee81fda44c1d5a183a8fcb8d64fd0b0bd2f224f9fbd78786aef"
+    },
+    {
+      "path": "checkpoint1-check.stderr",
+      "type": "file",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "checkpoint1-check.stdout",
+      "type": "file",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "checkpoint1-save.stderr",
+      "type": "file",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "checkpoint1-save.stdout",
+      "type": "file",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "compare-patches.py",
+      "type": "file",
+      "sha256": "1be127f78793723f49c4638d71be1164aaa71429ff4345a60435da4dc362c926"
+    },
+    {
+      "path": "discard-paths.txt",
+      "type": "file",
+      "sha256": "1ea1bcca370959c2531e2ac7e08e9053c614c088dd952a3024e1737fd8b627b2"
+    },
+    {
+      "path": "guard.py",
+      "type": "file",
+      "sha256": "1c33a0064ed14cd8ddc4c050ed9f749a0bb3c2b8ef7e029a35e50fd66b19c969"
+    },
+    {
+      "path": "inventory.json",
+      "type": "file",
+      "sha256": "887c661feb44b182db6f9843d024de4cdfae869f5deb8621e4328445634874a2"
+    },
+    {
+      "path": "link-apply.stderr",
+      "type": "file",
+      "sha256": "3f6e745f60c90bdd132b97db8da67d2f695d650a5daf6129f421a912edf7a3cb"
+    },
+    {
+      "path": "link-apply.stdout",
+      "type": "file",
+      "sha256": "baef3b73d2f7abc984245d7f1e084405cfc5d05a9acefd4e21661931455df661"
+    },
+    {
+      "path": "link-check.stderr",
+      "type": "file",
+      "sha256": "3be5b1305f262349430db0ea1b109718593a4c708f2aa7531b79955dc7666804"
+    },
+    {
+      "path": "link-check.stdout",
+      "type": "file",
+      "sha256": "a3035e8bb83bcc3d76732e4acbae713a2c7b5b3e9f44391f1e158caeb0bb0650"
+    },
+    {
+      "path": "native-inputs-unchanged.stderr",
+      "type": "file",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "native-inputs-unchanged.stdout",
+      "type": "file",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "operations.log",
+      "type": "file",
+      "sha256": "a46cfa4fedc822afc5f8fa0641c838f7ca11a887782477713d8b458ae5558525"
+    },
+    {
+      "path": "picks-sync.stderr",
+      "type": "file",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "picks-sync.stdout",
+      "type": "file",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "raw-before",
+      "type": "directory"
+    },
+    {
+      "path": "raw-before/agy",
+      "type": "directory"
+    },
+    {
+      "path": "raw-before/agy/settings.json",
+      "type": "file",
+      "sha256": "edef24cfdd814b8a3097ee6d7e559ebe0fb8a4b592c27363a9d3520e3ae12edc"
+    },
+    {
+      "path": "raw-before/claude",
+      "type": "directory"
+    },
+    {
+      "path": "raw-before/claude/mods",
+      "type": "directory"
+    },
+    {
+      "path": "raw-before/claude/mods/cli-pane",
+      "type": "directory"
+    },
+    {
+      "path": "raw-before/claude/mods/cli-pane/.claude-plugin",
+      "type": "directory"
+    },
+    {
+      "path": "raw-before/claude/mods/cli-pane/.claude-plugin/types",
+      "type": "directory"
+    },
+    {
+      "path": "raw-before/claude/mods/cli-pane/.claude-plugin/types/.gitignore",
+      "type": "file",
+      "sha256": "cdbcae15105d6b781e620813c79c7e868740d4e9cc53ce6f5fcbbc12387adf4b"
+    },
+    {
+      "path": "raw-before/claude/mods/cli-pane/.claude-plugin/types/claude-code",
+      "type": "directory"
+    },
+    {
+      "path": "raw-before/claude/mods/cli-pane/.claude-plugin/types/claude-code/index.d.ts",
+      "type": "file",
+      "sha256": "042ff9743dc3fee570ff699e51ebc1071252c3eec6116294a72bf0568e5aed37"
+    },
+    {
+      "path": "raw-before/claude/mods/cli-pane/.claude-plugin/types/claude-code-mcp",
+      "type": "directory"
+    },
+    {
+      "path": "raw-before/claude/mods/cli-pane/.claude-plugin/types/claude-code-mcp/index.d.ts",
+      "type": "file",
+      "sha256": "d6080b6cf72842b1de66a4d57c7743077d3c6ef826871450e9adeacadc1a6594"
+    },
+    {
+      "path": "raw-before/claude/mods/cli-pane/.claude-plugin/types/claude-code-tools",
+      "type": "directory"
+    },
+    {
+      "path": "raw-before/claude/mods/cli-pane/.claude-plugin/types/claude-code-tools/index.d.ts",
+      "type": "file",
+      "sha256": "988168f92c87f9dafed33fe83730abea1d79eed0eec72e26d342b64f2405e4ea"
+    },
+    {
+      "path": "raw-before/claude/mods/cli-pane/.claude-plugin/types/tsconfig.json",
+      "type": "file",
+      "sha256": "75aed92a02defcb18af89f4d6f834c976945c28b7e09b0090776eb73c90953f2"
+    },
+    {
+      "path": "raw-before/claude/mods/cli-pane/tsconfig.json",
+      "type": "file",
+      "sha256": "4087cf0ba92fde503ed0e7c56f37bcb26ad0c085873f10219d0336c0f19b5a8f"
+    },
+    {
+      "path": "raw-before/claude/settings.json",
+      "type": "file",
+      "sha256": "238bcc02c515ca8805d751fd1f5391ce39ff418a3c71030f09f56e9c70d318f5"
+    },
+    {
+      "path": "raw-before/codex",
+      "type": "directory"
+    },
+    {
+      "path": "raw-before/codex/config.toml",
+      "type": "file",
+      "sha256": "206487741f87dad6d48451ff851b757de30eed01f2d810b4adf9b92ef6fd805d"
+    },
+    {
+      "path": "raw-before/local",
+      "type": "directory"
+    },
+    {
+      "path": "raw-before/local/claude",
+      "type": "directory"
+    },
+    {
+      "path": "raw-before/local/claude/settings.work.json",
+      "type": "file",
+      "sha256": "0b25934d95613b993ce2d9387aea5852614cddeef3d3baa1e0d092d5b014381d"
+    },
+    {
+      "path": "raw-before/local/codex",
+      "type": "directory"
+    },
+    {
+      "path": "raw-before/local/codex/config.work.toml",
+      "type": "file",
+      "sha256": "2c8f75ac0b85a1739ff0e0df1ac1c8e762583ded85b2d1ab1b454c5c571d745a"
+    },
+    {
+      "path": "raw-before/local/codex/trust.toml",
+      "type": "file",
+      "sha256": "d669a356f55f0f4aa1166b125591805d60cd60a0bab845bea90ac8dc42483383"
+    },
+    {
+      "path": "raw-before/local/live-picks-agy.json",
+      "type": "file",
+      "sha256": "3903f3c77c15d89756cf723f25b18c7fd0266645852bb6a823c68d70ecffac6e"
+    },
+    {
+      "path": "raw-before/local/live-picks-pi.json",
+      "type": "file",
+      "sha256": "8c10632e9ea361977d207aa71416fe5e56f98d9bfdf1fb1da8371b91261aaeec"
+    },
+    {
+      "path": "raw-before/local/live-picks.json",
+      "type": "file",
+      "sha256": "6421b2742cf61ea17196683ccc29f79148e0176695712c3b3c39ecacf34c2723"
+    },
+    {
+      "path": "raw-before/pi",
+      "type": "directory"
+    },
+    {
+      "path": "raw-before/pi/settings.json",
+      "type": "file",
+      "sha256": "cecd4fdd863bfb611e74708dc4d457cc8c7384ce5fbcefbf0522700a22e54a9c"
+    },
+    {
+      "path": "raw-synced",
+      "type": "directory"
+    },
+    {
+      "path": "raw-synced/harnesses",
+      "type": "directory"
+    },
+    {
+      "path": "raw-synced/harnesses/agy",
+      "type": "directory"
+    },
+    {
+      "path": "raw-synced/harnesses/agy/settings.json",
+      "type": "file",
+      "sha256": "edef24cfdd814b8a3097ee6d7e559ebe0fb8a4b592c27363a9d3520e3ae12edc"
+    },
+    {
+      "path": "raw-synced/harnesses/claude",
+      "type": "directory"
+    },
+    {
+      "path": "raw-synced/harnesses/claude/mods",
+      "type": "directory"
+    },
+    {
+      "path": "raw-synced/harnesses/claude/mods/cli-pane",
+      "type": "directory"
+    },
+    {
+      "path": "raw-synced/harnesses/claude/mods/cli-pane/.claude-plugin",
+      "type": "directory"
+    },
+    {
+      "path": "raw-synced/harnesses/claude/mods/cli-pane/.claude-plugin/types",
+      "type": "directory"
+    },
+    {
+      "path": "raw-synced/harnesses/claude/mods/cli-pane/.claude-plugin/types/.gitignore",
+      "type": "file",
+      "sha256": "cdbcae15105d6b781e620813c79c7e868740d4e9cc53ce6f5fcbbc12387adf4b"
+    },
+    {
+      "path": "raw-synced/harnesses/claude/mods/cli-pane/.claude-plugin/types/claude-code",
+      "type": "directory"
+    },
+    {
+      "path": "raw-synced/harnesses/claude/mods/cli-pane/.claude-plugin/types/claude-code/index.d.ts",
+      "type": "file",
+      "sha256": "042ff9743dc3fee570ff699e51ebc1071252c3eec6116294a72bf0568e5aed37"
+    },
+    {
+      "path": "raw-synced/harnesses/claude/mods/cli-pane/.claude-plugin/types/claude-code-mcp",
+      "type": "directory"
+    },
+    {
+      "path": "raw-synced/harnesses/claude/mods/cli-pane/.claude-plugin/types/claude-code-mcp/index.d.ts",
+      "type": "file",
+      "sha256": "d6080b6cf72842b1de66a4d57c7743077d3c6ef826871450e9adeacadc1a6594"
+    },
+    {
+      "path": "raw-synced/harnesses/claude/mods/cli-pane/.claude-plugin/types/claude-code-tools",
+      "type": "directory"
+    },
+    {
+      "path": "raw-synced/harnesses/claude/mods/cli-pane/.claude-plugin/types/claude-code-tools/index.d.ts",
+      "type": "file",
+      "sha256": "988168f92c87f9dafed33fe83730abea1d79eed0eec72e26d342b64f2405e4ea"
+    },
+    {
+      "path": "raw-synced/harnesses/claude/mods/cli-pane/.claude-plugin/types/tsconfig.json",
+      "type": "file",
+      "sha256": "75aed92a02defcb18af89f4d6f834c976945c28b7e09b0090776eb73c90953f2"
+    },
+    {
+      "path": "raw-synced/harnesses/claude/mods/cli-pane/tsconfig.json",
+      "type": "file",
+      "sha256": "4087cf0ba92fde503ed0e7c56f37bcb26ad0c085873f10219d0336c0f19b5a8f"
+    },
+    {
+      "path": "raw-synced/harnesses/claude/settings.json",
+      "type": "file",
+      "sha256": "3ecf8e4f5c711499cb8f79a8c9b209f7ba2601bb5df62a56d89de5efe295f06a"
+    },
+    {
+      "path": "raw-synced/harnesses/codex",
+      "type": "directory"
+    },
+    {
+      "path": "raw-synced/harnesses/codex/config.toml",
+      "type": "file",
+      "sha256": "c1a51dbf767ab2d90c60127f94dd2f488a2a22028e0fffcae731de35e8ba4e95"
+    },
+    {
+      "path": "raw-synced/harnesses/pi",
+      "type": "directory"
+    },
+    {
+      "path": "raw-synced/harnesses/pi/settings.json",
+      "type": "file",
+      "sha256": "cecd4fdd863bfb611e74708dc4d457cc8c7384ce5fbcefbf0522700a22e54a9c"
+    },
+    {
+      "path": "raw-synced/local",
+      "type": "directory"
+    },
+    {
+      "path": "raw-synced/local/claude",
+      "type": "directory"
+    },
+    {
+      "path": "raw-synced/local/claude/settings.work.json",
+      "type": "file",
+      "sha256": "0b25934d95613b993ce2d9387aea5852614cddeef3d3baa1e0d092d5b014381d"
+    },
+    {
+      "path": "raw-synced/local/codex",
+      "type": "directory"
+    },
+    {
+      "path": "raw-synced/local/codex/config.work.toml",
+      "type": "file",
+      "sha256": "2c8f75ac0b85a1739ff0e0df1ac1c8e762583ded85b2d1ab1b454c5c571d745a"
+    },
+    {
+      "path": "raw-synced/local/codex/trust.toml",
+      "type": "file",
+      "sha256": "d669a356f55f0f4aa1166b125591805d60cd60a0bab845bea90ac8dc42483383"
+    },
+    {
+      "path": "raw-synced/local/live-picks-agy.json",
+      "type": "file",
+      "sha256": "bb81205fd0c53ccd6e79c01fd67f813f5b74fbabce3617385f408a2411f6a041"
+    },
+    {
+      "path": "raw-synced/local/live-picks-pi.json",
+      "type": "file",
+      "sha256": "0a141abf0d027e22595b6de8547dc916fff80fb8ffe28dac37786d0f98542643"
+    },
+    {
+      "path": "raw-synced/local/live-picks.json",
+      "type": "file",
+      "sha256": "f8df761137c758b9f0305ad43f16f4db316081acd87bb7110a51cb5067c86908"
+    },
+    {
+      "path": "repair-anchors.py",
+      "type": "file",
+      "sha256": "1943a552af9586a4be226693de6b8b659a7c8028b0c4df6ffa963f5dd06068fa"
+    },
+    {
+      "path": "runtime-paths.txt",
+      "type": "file",
+      "sha256": "4310d8d830c6149c7ea80026635cb9c598e60a4f3caca10598c22eddbb1d46c0"
+    },
+    {
+      "path": "trust-sync.stderr",
+      "type": "file",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "trust-sync.stdout",
+      "type": "file",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "verified.json",
+      "type": "file",
+      "sha256": "e8855cbb5c4cc2b991c85737a79c199f205b3f403ffc3d83207989ee7f86bb5d"
+    }
+  ]
+}
