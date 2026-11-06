@@ -6,9 +6,9 @@ priority: 2
 size: s
 complexity: mid
 process: direct
-owner: refactor/hq-b77d0c-harness-layout
+owner: main
 created: 2026-11-06T02:19:55Z
-updated: 2026-11-06T10:04:15Z
+updated: 2026-11-06T10:17:38Z
 started: 2026-11-06T09:22:25Z
 depends: [hq-7930ee]
 parent: hq-b77d0c
@@ -57,3 +57,5 @@ Execute Task 2 only after Task 1 has passed final review and the user has separa
   provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-06T10:03:51Z (refactor/hq-b77d0c-harness-layout): User said Ready, renewing the approved Titan/Europa no-settings-writer window. Created fresh Titan snapshot container $WORK_ROOT/hq/hq-b77d0c/activation-initiating-2026-11-06-attempt2, mode700, owner task:hq-fd490e. Prior attempt1 bytes verified against its committed complete manifest and preserved unchanged; copied only exact tested snippets and input lists. Main on both hosts still approved BEFORE. This fresh attempt will capture then execute the same accepted runtime in one bounded operator command; no new implementation scope.
 - 2026-11-06T10:04:15Z (refactor/hq-b77d0c-harness-layout): Created fresh Europa snapshot container $WORK_ROOT/hq/hq-b77d0c/activation-adopting-2026-11-06-attempt2 via SSH, mode700, owner task:hq-fd490e; prior attempt1 remains immutable. Both containers are mutable until operational checkpoint; user Ready renewed the no-writer window.
+- 2026-11-06T10:17:38Z (main): resumed
+  provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
