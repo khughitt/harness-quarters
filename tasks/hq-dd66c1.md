@@ -4,8 +4,8 @@ title: "Friends: a bridge for triggering sub-agents that run in another harness 
 status: dropped
 priority: 2
 created: 2026-09-16T15:57:15Z
-updated: 2026-10-15T13:06:36Z
-depends: [crew-ba0a02]
+updated: 2026-11-06T12:25:45Z
+depends: [band-ba0a02]
 parent: hq-67d253
 tags: [quick-add, skills, flow]
 source: "mindful:thought:34328bb6f74e4517bb0c5a2569ade36b"
