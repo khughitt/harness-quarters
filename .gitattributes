@@ -1,4 +1,4 @@
-claude/settings*.json filter=harness-state
-codex/config*.toml filter=harness-state
-pi/settings*.json filter=harness-state
-agy/settings*.json filter=harness-state
+harnesses/claude/settings*.json filter=harness-state
+harnesses/codex/config*.toml filter=harness-state
+harnesses/pi/settings*.json filter=harness-state
+harnesses/agy/settings*.json filter=harness-state

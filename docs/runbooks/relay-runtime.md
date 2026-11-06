@@ -45,9 +45,9 @@ undo an upgrade. Keep the store intact and use a release that understands it.
 
 The standalone pin does not rewrite installed hooks: those use absolute runtime
 paths, and each harness's hook images move under their own approval. Claude Code's
-(`claude/settings.json`), Codex's (`codex/hooks.json`, `codex/work/hooks.json`) and
-Antigravity CLI's (`agy/hooks.json`) all name v0.3.0, so every relayed runtime accepts
-snapshots and subscriber configs naming `agy`. In `agy/hooks.json`, each relay handler
+(`harnesses/claude/settings.json`), Codex's (`harnesses/codex/hooks.json`, `harnesses/codex/work/hooks.json`) and
+Antigravity CLI's (`harnesses/agy/hooks.json`) all name v0.3.0, so every relayed runtime accepts
+snapshots and subscriber configs naming `agy`. In `harnesses/agy/hooks.json`, each relay handler
 raises `"timeout": 60` paired with `--outer-ms 60000` so `ops-guard` (30 s) and
 `familiar-agy` (2 s) fit inside relay's 37 s subscriber budget. `tools/test_relay_wiring.py`
 holds each file's version. Keep every installation a hook image names.
@@ -94,7 +94,7 @@ Codex then asks to re-trust each changed hook. Review it in each home from a
 `--no-daemon` launch with no bypass flag (`--dangerously-bypass-approvals-and-sandbox`,
 `--dangerously-bypass-hook-trust`): `codex --no-daemon` for the personal home, `cow`
 for the work home. Codex writes its own trust and nobody edits trust hashes. The
-personal home's new `[hooks.state]` hashes land in tracked `codex/config.toml`;
+personal home's new `[hooks.state]` hashes land in tracked `harnesses/codex/config.toml`;
 commit that change after the review. The work home's land in untracked
 `local/codex/config.work.toml`. A rollback stops Codex the same way and reverts the
 merge, which returns both the images and the CLI pin to their previous versions;

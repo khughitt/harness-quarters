@@ -1,10 +1,10 @@
-"""claude/probes/subagent-write-probe.py classification: what a stream-json transcript and
+"""harnesses/claude/probes/subagent-write-probe.py classification: what a stream-json transcript and
 the probe directory say about each name, and the verdict they add up to."""
 import importlib.util
 import json
 from pathlib import Path
 
-PROBE = Path(__file__).resolve().parent.parent / "claude" / "probes" / "subagent-write-probe.py"
+PROBE = Path(__file__).resolve().parent.parent / "harnesses/claude" / "probes" / "subagent-write-probe.py"
 spec = importlib.util.spec_from_file_location("subagent_write_probe", PROBE)
 probe = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(probe)

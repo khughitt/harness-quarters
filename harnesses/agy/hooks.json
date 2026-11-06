@@ -4,7 +4,7 @@
     "SessionStart": [
       {
         "type": "command",
-        "command": "~/d/hq/agy/hook SessionStart ~/d/lore/hooks/claude-profile ~/d/ops/hooks/capture-notice"
+        "command": "~/d/hq/harnesses/agy/hook SessionStart ~/d/lore/hooks/claude-profile ~/d/ops/hooks/capture-notice"
       },
       {
         "type": "command",
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/d/hq/agy/hook PreToolUse"
+            "command": "~/d/hq/harnesses/agy/hook PreToolUse"
           }
         ]
       },
@@ -36,7 +36,7 @@
     "Stop": [
       {
         "type": "command",
-        "command": "~/d/hq/agy/hook Stop"
+        "command": "~/d/hq/harnesses/agy/hook Stop"
       },
       {
         "type": "command",

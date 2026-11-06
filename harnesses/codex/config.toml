@@ -54,8 +54,8 @@ mode = "limited"
 "npmjs.com" = "allow"
 
 # The worker defaults start an unbudgeted runner small (pytest -n auto, cargo, nextest,
-# Go); host-budget run overwrites them with its grant. Kept equal to claude/settings.json
-# env and pi/bin/pi (tools/test_worker_defaults.py).
+# Go); host-budget run overwrites them with its grant. Kept equal to harnesses/claude/settings.json
+# env and harnesses/pi/bin/pi (tools/test_worker_defaults.py).
 [shell_environment_policy]
 set = { TASKS_FORMAT = "json", TASKS_AGENT = "codex", PYTEST_XDIST_AUTO_NUM_WORKERS = "4", CARGO_BUILD_JOBS = "4", RUST_TEST_THREADS = "4", NEXTEST_TEST_THREADS = "4", GOMAXPROCS = "4" }
 

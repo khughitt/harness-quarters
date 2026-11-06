@@ -1,4 +1,4 @@
-"""Unit and integration tests for agy/hook and agy/hooks.json."""
+"""Unit and integration tests for harnesses/agy/hook and harnesses/agy/hooks.json."""
 import json
 import os
 from pathlib import Path
@@ -9,8 +9,8 @@ import tomllib
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-HOOK = ROOT / "agy" / "hook"
-HOOKS_JSON = ROOT / "agy" / "hooks.json"
+HOOK = ROOT / "harnesses/agy" / "hook"
+HOOKS_JSON = ROOT / "harnesses/agy" / "hooks.json"
 CONV_ID = "1e9adf4a-ae3b-4261-896c-648dd48c3388"
 SUB_ID = "abb9b545-1003-45c7-9ddf-07a269c1ff5c"
 
@@ -108,7 +108,7 @@ def test_hooks_json_declares_session_start_pre_tool_use_and_stop():
     assert session_start[0]["type"] == "command"
     ss_parts = session_start[0]["command"].split()
     assert len(ss_parts) == 4
-    assert ss_parts[0].endswith("/hq/agy/hook")
+    assert ss_parts[0].endswith("/hq/harnesses/agy/hook")
     assert ss_parts[1] == "SessionStart"
     assert ss_parts[2].endswith("/lore/hooks/claude-profile")
     assert ss_parts[3].endswith("/ops/hooks/capture-notice")
@@ -134,7 +134,7 @@ def test_hooks_json_declares_session_start_pre_tool_use_and_stop():
     assert_relay_handler(stop[2], "Stop")
 
     manifest = tomllib.loads((ROOT / "links.toml").read_text())
-    assert manifest["harness"]["agy-config"]["links"]["hooks.json"] == "agy/hooks.json"
+    assert manifest["harness"]["agy-config"]["links"]["hooks.json"] == "harnesses/agy/hooks.json"
 
 
 def test_session_start_combines_profile_and_capture_notice_into_inject_steps(tmp_path):
@@ -271,7 +271,7 @@ def test_pre_tool_use_emits_empty_stdout_noop_and_rejects_extra_args(tmp_path):
 
     extra = run_hook(["PreToolUse", "unexpected-guard-arg"], payload, cwd=tmp_path, HOME=tmp_path)
     assert extra.returncode == 2
-    assert "usage: agy/hook PreToolUse" in extra.stderr
+    assert "usage: harnesses/agy/hook PreToolUse" in extra.stderr
 
 
 def test_relay_v030_agy_dispatch_with_rendered_subscribers_and_ops_relay_guard(tmp_path):
@@ -712,25 +712,25 @@ def make_agy_checkout(tmp_path: Path):
     for name in ("harness-state-clean", "harness_state.py", "codex-trust", "live-picks", "harness-state-refresh"):
         shutil.copy2(ROOT / ".githooks" / name, repo / ".githooks" / name)
     shutil.copy2(ROOT / "harnesses.toml", repo / "harnesses.toml")
-    (repo / "agy").mkdir()
-    shutil.copy2(HOOK, repo / "agy" / "hook")
+    (repo / "harnesses/agy").mkdir(parents=True)
+    shutil.copy2(HOOK, repo / "harnesses/agy" / "hook")
     for folder in ("claude", "codex", "pi"):
-        (repo / folder).mkdir()
+        (repo / "harnesses" / folder).mkdir()
     (repo / "local" / "codex").mkdir(parents=True)
     (repo / ".gitattributes").write_text(
-        "claude/settings*.json filter=harness-state\n"
-        "codex/config*.toml filter=harness-state\n"
-        "pi/settings*.json filter=harness-state\n"
-        "agy/settings*.json filter=harness-state\n"
+        "harnesses/claude/settings*.json filter=harness-state\n"
+        "harnesses/codex/config*.toml filter=harness-state\n"
+        "harnesses/pi/settings*.json filter=harness-state\n"
+        "harnesses/agy/settings*.json filter=harness-state\n"
     )
     (repo / ".gitignore").write_text("local/\n__pycache__/\n")
-    (repo / "claude" / "settings.json").write_text('{"theme": "dark-ansi"}\n')
-    (repo / "codex" / "config.toml").write_text("[features]\nhooks = true\n")
-    (repo / "pi" / "settings.json").write_text('{"theme": "system"}\n')
-    (repo / "agy" / "settings.json").write_text(
+    (repo / "harnesses/claude" / "settings.json").write_text('{"theme": "dark-ansi"}\n')
+    (repo / "harnesses/codex" / "config.toml").write_text("[features]\nhooks = true\n")
+    (repo / "harnesses/pi" / "settings.json").write_text('{"theme": "system"}\n')
+    (repo / "harnesses/agy" / "settings.json").write_text(
         json.dumps({"allowNonWorkspaceAccess": True, "permissions": {"allow": ["command(tasks)"]}}, indent=2) + "\n"
     )
-    (repo / "agy" / "hooks.json").write_text("{}\n")
+    (repo / "harnesses/agy" / "hooks.json").write_text("{}\n")
 
     env = clean_env(
         HOME=home,
@@ -764,9 +764,9 @@ def make_agy_checkout(tmp_path: Path):
 
     (home / ".gemini" / "antigravity-cli").mkdir(parents=True)
     (home / ".gemini" / "config").mkdir(parents=True)
-    (home / ".gemini" / "config" / "hooks.json").symlink_to(repo / "agy" / "hooks.json")
+    (home / ".gemini" / "config" / "hooks.json").symlink_to(repo / "harnesses/agy" / "hooks.json")
     link = home / ".gemini" / "antigravity-cli" / "settings.json"
-    link.symlink_to(repo / "agy" / "settings.json")
+    link.symlink_to(repo / "harnesses/agy" / "settings.json")
     return repo, home, link, env
 
 
@@ -801,10 +801,10 @@ assert Path({str(link)!r}).is_symlink()
 sys.stdout.write("profile: personal\\n")
 """,
         )
-        argv = [str(repo / "agy" / "hook"), "SessionStart", str(delegate)]
+        argv = [str(repo / "harnesses/agy" / "hook"), "SessionStart", str(delegate)]
         payload = {"conversationId": CONV_ID, "workspacePaths": [str(workspace)]}
     else:
-        argv = [str(repo / "agy" / "hook"), "PreToolUse"]
+        argv = [str(repo / "harnesses/agy" / "hook"), "PreToolUse"]
         payload = {
             "conversationId": CONV_ID,
             "workspacePaths": [str(workspace)],
@@ -825,10 +825,10 @@ sys.stdout.write("profile: personal\\n")
         assert json.loads(res.stdout) == {"injectSteps": [{"systemMessage": {"systemMessage": "profile: personal"}}]}
     else:
         assert res.stdout == ""
-    assert link.is_symlink() and link.resolve() == (repo / "agy" / "settings.json").resolve()
-    assert json.loads((repo / "agy" / "settings.json").read_text())["model"] == "Gemini 4 Argon (High)"
+    assert link.is_symlink() and link.resolve() == (repo / "harnesses/agy" / "settings.json").resolve()
+    assert json.loads((repo / "harnesses/agy" / "settings.json").read_text())["model"] == "Gemini 4 Argon (High)"
     assert json.loads((repo / "local" / "live-picks-agy.json").read_text()) == {
-        "agy/settings.json": {
+        "harnesses/agy/settings.json": {
             "state": "set",
             "values": {"model": "Gemini 4 Argon (High)", "trustedWorkspaces": ["/work/a", "/work/b"]},
         }
@@ -858,7 +858,7 @@ sys.exit(99)
     silent = write_script(tmp_path / "silent", "import sys; sys.exit(0)")
 
     ss = subprocess.run(
-        [str(repo / "agy" / "hook"), "SessionStart", str(silent)],
+        [str(repo / "harnesses/agy" / "hook"), "SessionStart", str(silent)],
         input=json.dumps({"conversationId": CONV_ID, "workspacePaths": [str(workspace)]}),
         cwd=str(tmp_path),
         env=env,
@@ -867,7 +867,7 @@ sys.exit(99)
         timeout=10,
     )
     pt = subprocess.run(
-        [str(repo / "agy" / "hook"), "PreToolUse"],
+        [str(repo / "harnesses/agy" / "hook"), "PreToolUse"],
         input=json.dumps(
             {
                 "conversationId": CONV_ID,
@@ -896,10 +896,10 @@ def test_session_start_and_pre_tool_use_do_not_fail_when_detached_refresh_errors
 
     if event == "SessionStart":
         delegate = write_script(tmp_path / "profile-stub", 'import sys; sys.stdout.write("profile: personal\\n")')
-        argv = [str(repo / "agy" / "hook"), "SessionStart", str(delegate)]
+        argv = [str(repo / "harnesses/agy" / "hook"), "SessionStart", str(delegate)]
         payload = {"conversationId": CONV_ID, "workspacePaths": [str(workspace)]}
     else:
-        argv = [str(repo / "agy" / "hook"), "PreToolUse"]
+        argv = [str(repo / "harnesses/agy" / "hook"), "PreToolUse"]
         payload = {
             "conversationId": CONV_ID,
             "workspacePaths": [str(workspace)],

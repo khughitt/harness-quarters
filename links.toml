@@ -13,10 +13,10 @@
 
 [required]
 "~/.config/AGENTS.md" = "lore:instructions/AGENTS.md"
-"~/.config/ponytail/config.json" = "ponytail/config.json"
+"~/.config/ponytail/config.json" = "external/ponytail/config.json"
 "~/.local/bin/harness-state-refresh" = ".githooks/harness-state-refresh"
 "~/.local/bin/hq" = "tools/hq"
-"~/.local/bin/pi" = "pi/bin/pi"
+"~/.local/bin/pi" = "harnesses/pi/bin/pi"
 "~/.local/bin/relay" = "relay/bin/relay"
 "~/.local/bin/session-archive" = "tools/session-archive"
 "~/.config/systemd/user/session-archive-capture.service" = "systemd/user/session-archive-capture.service"
@@ -88,11 +88,11 @@
 home = "~/.claude"
 [harness.claude.links]
 "CLAUDE.md" = "lore:instructions/AGENTS.md"
-"settings.json" = "claude/settings.json"
-"agents" = "claude/agents"
-"commands" = "claude/commands"
-"mods" = "claude/mods"
-"plans" = "claude/plans"
+"settings.json" = "harnesses/claude/settings.json"
+"agents" = "harnesses/claude/agents"
+"commands" = "harnesses/claude/commands"
+"mods" = "harnesses/claude/mods"
+"plans" = "harnesses/claude/plans"
 "skills/flow" = "flows:skills/flow"
 "skills/session-logs" = "agents/skills/session-logs"
 "skills/curate" = "tasks:skills/curate"
@@ -118,14 +118,14 @@ home = "~/.claude-work"
 [harness.claude-work.links]
 "CLAUDE.md" = "lore:instructions/AGENTS.md"
 "settings.json" = "local/claude/settings.work.json"
-"statusline-command.sh" = "claude/statusline-command.sh"
+"statusline-command.sh" = "harnesses/claude/statusline-command.sh"
 
 [harness.codex]
 home = "~/.codex"
 [harness.codex.links]
 "AGENTS.md" = "lore:instructions/AGENTS.md"
-"config.toml" = "codex/config.toml"
-"hooks.json" = "codex/hooks.json"
+"config.toml" = "harnesses/codex/config.toml"
+"hooks.json" = "harnesses/codex/hooks.json"
 "rules" = "local/codex/rules"
 
 [harness.codex-work]
@@ -133,7 +133,7 @@ home = "~/.codex-work"
 [harness.codex-work.links]
 "AGENTS.md" = "lore:instructions/AGENTS.md"
 "config.toml" = "local/codex/config.work.toml"
-"hooks.json" = "codex/work/hooks.json"
+"hooks.json" = "harnesses/codex/work/hooks.json"
 
 [harness.opencode]
 home = "~/.config/opencode.local"
@@ -145,8 +145,8 @@ home = "~/.config/opencode.local"
 home = "~/.pi/agent"
 [harness.pi.links]
 "AGENTS.md" = "lore:instructions/AGENTS.md"
-"settings.json" = "pi/settings.json"
-"extensions/harness-state.ts" = "pi/extensions/harness-state.ts"
+"settings.json" = "harnesses/pi/settings.json"
+"extensions/harness-state.ts" = "harnesses/pi/extensions/harness-state.ts"
 
 # Antigravity CLI's app-data home and global customization home.
 [harness.agy]
@@ -154,14 +154,14 @@ home = "~/.gemini/antigravity-cli"
 adopt = ["settings.json"]
 anchors = ["~/.gemini/config/hooks.json", "~/.gemini/config/skills.json"]
 [harness.agy.links]
-"settings.json" = "agy/settings.json"
+"settings.json" = "harnesses/agy/settings.json"
 
 [harness.agy-config]
 home = "~/.gemini/config"
 [harness.agy-config.links]
 "AGENTS.md" = "lore:instructions/AGENTS.md"
-"hooks.json" = "agy/hooks.json"
-"skills.json" = "agy/skills.json"
+"hooks.json" = "harnesses/agy/hooks.json"
+"skills.json" = "harnesses/agy/skills.json"
 
 # Obsolete installer metadata; Git submodules pin the served upstream sources.
 [retired]

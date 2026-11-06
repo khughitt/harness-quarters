@@ -952,9 +952,9 @@ PINS = {"relay_version": "0.1.1", "relay_commit": "4ceec5d2ad22b136b37ee360e7a4e
         "familiar_merge_tree": "f492e3437577c4b79db379e4cc1fb6771f35b3bb",
         "familiar_theme": THEME_PIN, "claude_version": "2.1.304 (Claude Code)",
         "codex_version": "codex-cli 0.163.0"}
-TARGET_PATHS = {"claude": "d/hq/claude/settings.json",
+TARGET_PATHS = {"claude": "d/hq/harnesses/claude/settings.json",
                 "claude-work": "d/hq/local/claude/settings.work.json",
-                "codex": "d/hq/codex/hooks.json", "codex-work": "d/hq/codex/work/hooks.json"}
+                "codex": "d/hq/harnesses/codex/hooks.json", "codex-work": "d/hq/harnesses/codex/work/hooks.json"}
 MEMBERS = {
     "claude": {"before": "prep/claude.source.json", "after": "images/claude/settings.json",
                "artifact": "prep/claude.json"},

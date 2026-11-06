@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Probe the pi CLI's RPC mode (pi --mode rpc) through pi/bin/pi, for the facts the pi
+"""Probe the pi CLI's RPC mode (pi --mode rpc) through harnesses/pi/bin/pi, for the facts the pi
 harness carries in facts/capabilities.toml. Each check prints one JSON line: the check,
 its outcome (true, false or inconclusive) and the raw observations it rests on.
 
@@ -8,7 +8,7 @@ pi still reads the host's ~/.agents/skills, so its skills join the prompt and th
 list the child-conversations check prints.
 Needs ANTHROPIC_API_KEY; the model is anthropic/claude-haiku-5-5. Spend is a few cents.
 
-    pi/probes/rpc-probe.py [--keep]     # --keep leaves the temporary directory for reading
+    harnesses/pi/probes/rpc-probe.py [--keep]     # --keep leaves the temporary directory for reading
 """
 import ctypes
 import json

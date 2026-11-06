@@ -22,7 +22,7 @@ import stat
 import subprocess
 import sys
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 TIMEOUT_S = 10
 CLAIM_FIELDS = ("id", "prefix", "session", "live", "host", "worktree")
 NON_BLOCKING_REASONS = frozenset({
@@ -374,14 +374,14 @@ def _is_retry(stdin_text):
 
 def main(argv, stdin, stdout, env):
     if not argv:
-        sys.stderr.write("usage: agy/hook <SessionStart|PreToolUse|Stop> ...\n")
+        sys.stderr.write("usage: harnesses/agy/hook <SessionStart|PreToolUse|Stop> ...\n")
         return 2
     sub = argv[0]
     raw = stdin.read()
 
     if sub == "SessionStart":
         if len(argv) < 2:
-            sys.stderr.write("usage: agy/hook SessionStart <hook> [<hook> ...]\n")
+            sys.stderr.write("usage: harnesses/agy/hook SessionStart <hook> [<hook> ...]\n")
             return 2
         try:
             reply = handle_session_start(argv[1:], raw, env)
@@ -400,7 +400,7 @@ def main(argv, stdin, stdout, env):
 
     if sub == "PreToolUse":
         if len(argv) != 1:
-            sys.stderr.write("usage: agy/hook PreToolUse\n")
+            sys.stderr.write("usage: harnesses/agy/hook PreToolUse\n")
             return 2
         try:
             handle_pre_tool_use(env)
@@ -409,7 +409,7 @@ def main(argv, stdin, stdout, env):
         return 0
 
     if sub == "Stop":
-        parser = argparse.ArgumentParser(prog="agy/hook Stop")
+        parser = argparse.ArgumentParser(prog="harnesses/agy/hook Stop")
         parser.add_argument("--tasks", default="tasks")
         parser.add_argument("--facts-file", default=None)
         try:
@@ -432,7 +432,7 @@ def main(argv, stdin, stdout, env):
             stdout.write(json.dumps({"decision": "continue", "reason": f"{verdict}\n{OWNER_LINE}"}))
         return 0
 
-    sys.stderr.write(f"agy/hook: unknown event {sub!r}\n")
+    sys.stderr.write(f"harnesses/agy/hook: unknown event {sub!r}\n")
     return 2
 
 

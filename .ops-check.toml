@@ -1,11 +1,11 @@
 layout_allowed = [
   # Host configuration by design: harness homes read these absolute paths literally.
-  "claude/settings.json",
-  "codex/config.toml",
-  "codex/hooks.json",
-  "codex/work/hooks.json",
-  "agy/hooks.json",
-  "agy/settings.json",
+  "harnesses/claude/settings.json",
+  "harnesses/codex/config.toml",
+  "harnesses/codex/hooks.json",
+  "harnesses/codex/work/hooks.json",
+  "harnesses/agy/hooks.json",
+  "harnesses/agy/settings.json",
   # The relay cutover tool, its tests, runbook and window plan carry the fixed fleet
   # names and deployment paths. Remove these with the tool if hq-7e81ed retires it.
   "tools/relay-cutover",

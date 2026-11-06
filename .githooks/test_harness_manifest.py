@@ -112,9 +112,9 @@ def test_shipped_manifest_loads_and_matches_gitattributes_and_git_check_attr(tmp
 
     repo, env = init_repo(tmp_path)
     shutil.copy(REPO / ".gitattributes", repo / ".gitattributes")
-    positive = ["claude/settings.json", "claude/settings.work.json", "codex/config.toml",
-                "codex/config.work.toml", "pi/settings.json", "agy/settings.json"]
-    negative = ["claude/settings/nested.json", "harnesses.toml", "links.toml", "codex/hooks.json"]
+    positive = ["harnesses/claude/settings.json", "harnesses/claude/settings.work.json", "harnesses/codex/config.toml",
+                "harnesses/codex/config.work.toml", "harnesses/pi/settings.json", "harnesses/agy/settings.json"]
+    negative = ["harnesses/claude/settings/nested.json", "harnesses.toml", "links.toml", "harnesses/codex/hooks.json"]
     for path in positive + negative:
         out = git(repo, env, "check-attr", "filter", "--", path).stdout
         filtered = out.strip().endswith(": filter: harness-state")
@@ -145,10 +145,10 @@ VIOLATIONS = {
     "glob-doublestar": replaced('"a/s*.json"', '"a/**.json"'),
     "glob-two-star": replaced('"a/s*.json"', '"a/*s*.json"'),
     "config-not-in-glob": replaced('config = "a/s.json"', 'config = "a/t.json"'),
-    "dup-config": SHIPPED + '\n[harnesses.dup.live_state]\nconfig = "pi/settings.json"\n'
-                  'filter_glob = "pi/settings.json"\nformat = "json"\nclean_keys = ["k"]\n',
-    "dup-glob": SHIPPED + '\n[harnesses.dup.live_state]\nconfig = "pi/settings.json"\n'
-                'filter_glob = "pi/settings*.json"\nformat = "json"\nclean_keys = ["k"]\n',
+    "dup-config": SHIPPED + '\n[harnesses.dup.live_state]\nconfig = "harnesses/pi/settings.json"\n'
+                  'filter_glob = "harnesses/pi/settings.json"\nformat = "json"\nclean_keys = ["k"]\n',
+    "dup-glob": SHIPPED + '\n[harnesses.dup.live_state]\nconfig = "harnesses/pi/settings.json"\n'
+                'filter_glob = "harnesses/pi/settings*.json"\nformat = "json"\nclean_keys = ["k"]\n',
     "glob-overlap": JSON_ENTRY + '''
 [harnesses.b.live_state]
 config = "a/s-x.json"
@@ -196,7 +196,7 @@ EXPECTED = {
     "glob-two-star": "at most one '*' per '/' segment",
     "config-not-in-glob": "does not match filter_glob",
     "dup-config": "is used by both pi and dup",
-    "dup-glob": "filter_glob 'pi/settings*.json' is used by both pi and dup",
+    "dup-glob": "filter_glob 'harnesses/pi/settings*.json' is used by both pi and dup",
     "glob-overlap": "overlaps 'a/s-x*.json'",
     "bad-regex-table": "is not a valid regex",
     "bad-regex-clean-tables": "is not a valid regex",
@@ -341,15 +341,15 @@ def test_cli_check_reports_filter_config_through_isolated_subprocess(tmp_path):
 
 def test_non_object_json_is_reported_cleanly(tmp_path):
     manifest = hs.load_manifest()
-    (tmp_path / "pi").mkdir()
-    (tmp_path / "pi" / "settings.json").write_text("[]")
-    with pytest.raises(hs.ManifestError, match="pi/settings.json"):
+    (tmp_path / "harnesses/pi").mkdir(parents=True)
+    (tmp_path / "harnesses/pi" / "settings.json").write_text("[]")
+    with pytest.raises(hs.ManifestError, match="harnesses/pi/settings.json"):
         hs.check_clean_tree(manifest, tmp_path)
     (tmp_path / "cli").mkdir()
     repo, env = scratch_checkout(tmp_path / "cli", "[]")
     result = run_check(repo, env)
     assert result.returncode == 2 and "Traceback" not in result.stderr
-    assert "pi/settings.json" in result.stderr and "harness-state: " in result.stderr
+    assert "harnesses/pi/settings.json" in result.stderr and "harness-state: " in result.stderr
 
 
 def scratch_checkout(tmp_path, pi_text):
@@ -358,10 +358,10 @@ def scratch_checkout(tmp_path, pi_text):
     shutil.copy(HOOKS / "harness_state.py", repo / ".githooks" / "harness_state.py")
     shutil.copy(REPO / "harnesses.toml", repo / "harnesses.toml")
     shutil.copy(REPO / ".gitattributes", repo / ".gitattributes")
-    (repo / "claude").mkdir()
-    (repo / "claude" / "settings.json").write_text('{\n  "theme": "dark"\n}\n')
-    (repo / "pi").mkdir()
-    (repo / "pi" / "settings.json").write_text(pi_text)
+    (repo / "harnesses/claude").mkdir(parents=True)
+    (repo / "harnesses/claude" / "settings.json").write_text('{\n  "theme": "dark"\n}\n')
+    (repo / "harnesses/pi").mkdir(parents=True)
+    (repo / "harnesses/pi" / "settings.json").write_text(pi_text)
     git(repo, env, "config", "filter.harness-state.clean", hs.EXPECTED_CLEAN_FILTER)
     git(repo, env, "config", "filter.harness-state.required", "true")
     git(repo, env, "config", "filter.harness-state.smudge", "cat")
@@ -379,24 +379,24 @@ def test_check_clean_tree_refuses_unfiltered_blob_and_names_renormalize(tmp_path
     repo, env = scratch_checkout(tmp_path, leaked)
     result = run_check(repo, env)
     assert result.returncode == 2
-    assert "pi/settings.json" in result.stderr
-    assert "git add --renormalize pi/settings.json" in result.stderr
+    assert "harnesses/pi/settings.json" in result.stderr
+    assert "git add --renormalize harnesses/pi/settings.json" in result.stderr
     assert result.stderr.startswith("harness-state: ")
     assert "Traceback" not in result.stderr
-    (repo / "pi" / "settings.json").write_text('{\n  "theme": "system"\n}\n')
+    (repo / "harnesses/pi" / "settings.json").write_text('{\n  "theme": "system"\n}\n')
     result = run_check(repo, env)
     assert result.returncode == 0, result.stderr
 
 
 def test_check_clean_tree_in_process_ignores_worktrees_and_git(tmp_path):
     manifest = hs.load_manifest()
-    (tmp_path / "pi").mkdir()
-    (tmp_path / "pi" / "settings.json").write_text('{\n  "theme": "x"\n}\n')
-    (tmp_path / ".worktrees" / "w" / "pi").mkdir(parents=True)
-    (tmp_path / ".worktrees" / "w" / "pi" / "settings.json").write_text('{"deviceId": "s"}')
+    (tmp_path / "harnesses/pi").mkdir(parents=True)
+    (tmp_path / "harnesses/pi" / "settings.json").write_text('{\n  "theme": "x"\n}\n')
+    (tmp_path / ".worktrees" / "w" / "harnesses/pi").mkdir(parents=True)
+    (tmp_path / ".worktrees" / "w" / "harnesses/pi" / "settings.json").write_text('{"deviceId": "s"}')
     hs.check_clean_tree(manifest, tmp_path)
-    (tmp_path / "pi" / "settings.json").write_text('{"deviceId": "s"}')
-    with pytest.raises(hs.ManifestError, match="git add --renormalize pi/settings.json"):
+    (tmp_path / "harnesses/pi" / "settings.json").write_text('{"deviceId": "s"}')
+    with pytest.raises(hs.ManifestError, match="git add --renormalize harnesses/pi/settings.json"):
         hs.check_clean_tree(manifest, tmp_path)
 
 
@@ -457,47 +457,47 @@ def test_required_filter_fails_closed_on_broken_manifest_without_leaking_picks(t
     for name in ("justfile", "harnesses.toml", ".gitattributes"):
         shutil.copy(REPO / name, repo / name)
     (repo / ".gitignore").write_text("local/\n__pycache__/\n")
-    for folder in ("claude", "pi", "notes"):
-        (repo / folder).mkdir()
-    (repo / "claude/settings.json").write_text('{\n  "theme": "dark"\n}\n')
-    (repo / "pi/settings.json").write_text('{\n  "theme": "system"\n}\n')
+    for folder in ("harnesses/claude", "harnesses/pi", "notes"):
+        (repo / folder).mkdir(parents=True)
+    (repo / "harnesses/claude/settings.json").write_text('{\n  "theme": "dark"\n}\n')
+    (repo / "harnesses/pi/settings.json").write_text('{\n  "theme": "system"\n}\n')
     setup = subprocess.run(["just", "setup"], cwd=repo, env=env, text=True, capture_output=True)
     assert setup.returncode == 0, setup.stderr
     assert git(repo, env, "config", "--get", "filter.harness-state.required").stdout.strip() == "true"
     git(repo, env, "add", "-A")
     git(repo, env, "commit", "-q", "--no-verify", "-m", "init")
 
-    (repo / "pi/settings.json").write_text(
+    (repo / "harnesses/pi/settings.json").write_text(
         '{\n  "theme": "system",\n  "deviceId": "dev-1",\n  "trackingId": "track-1"\n}\n')
-    (repo / "claude/settings.json").write_text('{\n  "theme": "dark",\n  "model": "opus"\n}\n')
+    (repo / "harnesses/claude/settings.json").write_text('{\n  "theme": "dark",\n  "model": "opus"\n}\n')
     (repo / "harnesses.toml").write_text("schema = [\n")
-    for path in ("pi/settings.json", "claude/settings.json"):
+    for path in ("harnesses/pi/settings.json", "harnesses/claude/settings.json"):
         added = git(repo, env, "add", "--", path, check=False)
         assert added.returncode != 0, path
         assert "harness-state-clean" in added.stderr
     assert git(repo, env, "diff", check=False).returncode != 0
-    for path in ("pi/settings.json", "claude/settings.json"):
+    for path in ("harnesses/pi/settings.json", "harnesses/claude/settings.json"):
         blob = staged(repo, env, path)
         assert not any(leak in blob for leak in ("dev-1", "track-1", "opus")), blob
 
     git(repo, env, "checkout", "--", "harnesses.toml")      # the recovery: required stays set
-    for path in ("pi/settings.json", "claude/settings.json"):
+    for path in ("harnesses/pi/settings.json", "harnesses/claude/settings.json"):
         assert git(repo, env, "add", "--", path, check=False).returncode == 0
-    assert staged(repo, env, "pi/settings.json") == '{\n  "theme": "system"\n}\n'
-    assert staged(repo, env, "claude/settings.json") == '{\n  "theme": "dark"\n}\n'
+    assert staged(repo, env, "harnesses/pi/settings.json") == '{\n  "theme": "system"\n}\n'
+    assert staged(repo, env, "harnesses/claude/settings.json") == '{\n  "theme": "dark"\n}\n'
 
     # A deleted manifest fails closed the same way.
-    (repo / "pi/settings.json").write_text(
+    (repo / "harnesses/pi/settings.json").write_text(
         '{\n  "theme": "system",\n  "deviceId": "dev-2",\n  "trackingId": "track-2"\n}\n')
     (repo / "harnesses.toml").unlink()
-    added = git(repo, env, "add", "--", "pi/settings.json", check=False)
+    added = git(repo, env, "add", "--", "harnesses/pi/settings.json", check=False)
     assert added.returncode != 0
     assert "harness-state-clean" in added.stderr and "harnesses.toml" in added.stderr
-    blob = staged(repo, env, "pi/settings.json")
+    blob = staged(repo, env, "harnesses/pi/settings.json")
     assert not any(leak in blob for leak in ("dev-2", "track-2")), blob
     git(repo, env, "checkout", "--", "harnesses.toml")
-    assert git(repo, env, "add", "--", "pi/settings.json", check=False).returncode == 0
-    assert staged(repo, env, "pi/settings.json") == '{\n  "theme": "system"\n}\n'
+    assert git(repo, env, "add", "--", "harnesses/pi/settings.json", check=False).returncode == 0
+    assert staged(repo, env, "harnesses/pi/settings.json") == '{\n  "theme": "system"\n}\n'
 
     # A .toml path no filter_glob declares, routed through the filter, is refused unstaged.
     with (repo / ".gitattributes").open("a") as attributes:
@@ -562,8 +562,10 @@ def test_branch_switch_across_pre_manifest_and_post_manifest_commits_with_requir
     for current in HOOKS.iterdir():
         if current.is_file() and not current.name.startswith("test_"):
             shutil.copy2(current, hooks / current.name)
-    shutil.copy(REPO / "harnesses.toml", repo / "harnesses.toml")
-    shutil.copy(REPO / ".gitattributes", repo / ".gitattributes")
+            # This historical test isolates manifest adoption, not the later layout move.
+            (hooks / current.name).write_text(current.read_text().replace("harnesses/", ""))
+    for name in ("harnesses.toml", ".gitattributes"):
+        (repo / name).write_text((REPO / name).read_text().replace("harnesses/", ""))
     write_tracked("post-manifest")
     git(repo, env, "add", "-A")
     git(repo, env, "commit", "-q", "--no-verify", "-m", "post-manifest")

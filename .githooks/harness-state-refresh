@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Harness refresh: clear git's size-only "modified" mark on tracked harness configs.
 
-A model or effort switch rewrites `claude/settings*.json`, `codex/config*.toml`,
-`pi/settings*.json` or `agy/settings*.json` through the homes' symlinks (or, for agy's
+A model or effort switch rewrites `harnesses/claude/settings*.json`, `harnesses/codex/config*.toml`,
+`harnesses/pi/settings*.json` or `harnesses/agy/settings*.json` through the homes' symlinks (or, for agy's
 atomic saves, replaces `~/.gemini/antigravity-cli/settings.json` with a regular file that
-`live-picks` adopts back into `agy/settings.json` and relinks). The harness-state
+`live-picks` adopts back into `harnesses/agy/settings.json` and relinks). The harness-state
 clean filter keeps those keys out of the index, but git calls a file modified when its size
 differs from the index entry without running the filter, so `git status` shows `M` on a file
 whose filtered diff is empty. Staging such a file writes the blob already in the index and

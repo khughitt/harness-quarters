@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+"""Rekey only the saved selections affected by the harness directory move.
+
+Run against an explicit main checkout during the approved no-writer window.
+Preview writes nothing. Apply replaces each changed record atomically, not all
+records as a transaction; retain snapshots and inspect any partial apply before retry.
+"""
+import argparse
+import fcntl
+import json
+import os
+from pathlib import Path
+import stat
+import subprocess
+import sys
+import tempfile
+
+MOVES = {
+    'local/live-picks.json': {'claude/settings.json': 'harnesses/claude/settings.json',
+                              'codex/config.toml': 'harnesses/codex/config.toml'},
+    'local/live-picks-pi.json': {'pi/settings.json': 'harnesses/pi/settings.json'},
+    'local/live-picks-agy.json': {'agy/settings.json': 'harnesses/agy/settings.json'},
+}
+
+
+class Refused(ValueError):
+    """An input is ambiguous or changed; no further replacements are allowed."""
+
+
+def remap_record(record: dict, moves: dict[str, str]) -> dict:
+    if not isinstance(record, dict):
+        raise Refused('record must be a JSON object')
+    if set(record) - (moves.keys() | set(moves.values())):
+        raise Refused('record contains an unknown config key')
+    if any(old in record and new in record for old, new in moves.items()):
+        raise Refused('record contains both old and new config keys')
+    return {moves.get(key, key): value for key, value in record.items()}
+
+
+def unique(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise Refused('record contains duplicate JSON keys')
+        result[key] = value
+    return result
+
+
+def invalid_constant(_):
+    raise Refused('record contains a non-JSON number')
+
+
+def read(path):
+    """Read regular files without following a record symlink, including dangling links."""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except FileNotFoundError:
+        return None
+    with os.fdopen(fd, 'rb') as stream:
+        info = os.fstat(stream.fileno())
+        if not stat.S_ISREG(info.st_mode):
+            raise Refused(f'{path.name}: not a regular file')
+        return stream.read(), stat.S_IMODE(info.st_mode)
+
+
+def main_root(root):
+    root = root.resolve(strict=True)
+    # Git's ambient GIT_DIR/WORK_TREE/INDEX must not redirect this explicit root.
+    environment = {'PATH': os.defpath, 'GIT_CONFIG_GLOBAL': '/dev/null', 'GIT_CONFIG_NOSYSTEM': '1'}
+    def git(*args):
+        result = subprocess.run(['git', '-C', str(root), 'rev-parse', *args], env=environment,
+                                text=True, capture_output=True, check=True)
+        return Path(result.stdout.strip()).resolve()
+    if git('--show-toplevel') != root or git('--absolute-git-dir') != git('--path-format=absolute', '--git-common-dir'):
+        raise Refused('root must be the main checkout itself, not a subdirectory or linked worktree')
+    local = root / 'local'
+    if local.is_symlink() or not local.is_dir():
+        raise Refused('local/ must be a real directory in the main checkout')
+    return root
+
+
+def migrate(root, direction, apply):
+    root = main_root(Path(root))
+    # An existing lock is required so even preview has no filesystem side effects.
+    try:
+        fd = os.open(root / 'local/harness-state.lock', os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except FileNotFoundError:
+        raise Refused('state lock is missing; run live-picks sync before the transition') from None
+    with os.fdopen(fd, 'rb') as lock:
+        if not stat.S_ISREG(os.fstat(lock.fileno()).st_mode):
+            raise Refused('state lock is not a regular file')
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        pending = []
+        for name, forward in MOVES.items():
+            moves = forward if direction == 'forward' else {v: k for k, v in forward.items()}
+            path = root / name
+            original = read(path)
+            if original is None:
+                continue
+            try:
+                record = json.loads(original[0], object_pairs_hook=unique, parse_constant=invalid_constant)
+                mapped = remap_record(record, moves)
+            except (ValueError, UnicodeError, RecursionError) as error:
+                # JSONDecodeError embeds source content; never print that exception.
+                message = str(error) if isinstance(error, Refused) else 'record is not valid JSON'
+                raise Refused(f'{name}: {message}') from None
+            if mapped != record:
+                pending.append((path, name, original, mapped, moves))
+        # Every record has been validated before the first replacement.
+        for path, name, original, mapped, moves in pending:
+            keys = ', '.join(f'{old} -> {new}' for old, new in moves.items() if old in json.loads(original[0]))
+            if not apply:
+                print(f'would rekey {name}: {keys}')
+                continue
+            fd, temporary = tempfile.mkstemp(dir=path.parent, prefix=f'.{path.name}.')
+            try:
+                with os.fdopen(fd, 'w') as out:
+                    json.dump(mapped, out, indent=2, ensure_ascii=False, allow_nan=False)
+                    out.write('\n'); out.flush(); os.fsync(out.fileno())
+                os.chmod(temporary, original[1])
+                if path.parent.resolve() != root / 'local' or read(path) != original:
+                    raise Refused(f'{name}: changed after validation; stop and inspect snapshots and prior rekey lines')
+                os.replace(temporary, path)
+                print(f'rekeyed {name}: {keys}', flush=True)
+            finally:
+                Path(temporary).unlink(missing_ok=True)
+        if not pending:
+            print('no record keys need changing')
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--root', required=True, type=Path)
+    parser.add_argument('--direction', required=True, choices=['forward', 'reverse'])
+    parser.add_argument('--apply', action='store_true')
+    args = parser.parse_args()
+    try:
+        migrate(args.root, args.direction, args.apply)
+    except (Refused, OSError, subprocess.CalledProcessError) as error:
+        message = 'cannot verify the explicit Git root' if isinstance(error, subprocess.CalledProcessError) else str(error)
+        print(f'harness-layout-picks: {message}; any earlier rekeyed records remain changed', file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

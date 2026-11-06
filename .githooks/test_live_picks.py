@@ -17,10 +17,10 @@ import pytest
 HOOKS = Path(__file__).parent
 HOOK_FILES = ("harness-state-clean", "harness_state.py", "codex-trust", "live-picks",
               "harness-state-refresh", "post-checkout", "post-merge", "post-rewrite")
-CLAUDE = "claude/settings.json"
-CODEX = "codex/config.toml"
-PI = "pi/settings.json"
-AGY = "agy/settings.json"
+CLAUDE = "harnesses/claude/settings.json"
+CODEX = "harnesses/codex/config.toml"
+PI = "harnesses/pi/settings.json"
+AGY = "harnesses/agy/settings.json"
 PI_BASE = {"lastChangelogVersion": "1.1.0", "theme": "system"}
 PI_VALUES = {"defaultProvider": "anthropic", "defaultModel": "claude-opus-5-5",
              "defaultThinkingLevel": "high"}
@@ -36,9 +36,30 @@ PICK_LINES = ['model = "gpt-6.1-sol"\n', 'model_reasoning_effort = "high"\n']
 A = '[projects."/work/a"]\ntrust_level = "trusted"\n'
 
 
+PROCESS_HOME = None
+
+
+@pytest.fixture(scope="module", autouse=True)
+def isolated_process_home(tmp_path_factory):
+    global PROCESS_HOME
+    PROCESS_HOME = tmp_path_factory.mktemp("live-picks-home")
+    yield
+    PROCESS_HOME = None
+
+
+def child_env():
+    assert PROCESS_HOME is not None
+    return {"PATH": os.environ["PATH"], "HOME": str(PROCESS_HOME),
+            "XDG_CONFIG_HOME": str(PROCESS_HOME / ".config"),
+            "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_AUTHOR_NAME": "fixture", "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+            "GIT_COMMITTER_NAME": "fixture", "GIT_COMMITTER_EMAIL": "fixture@example.invalid",
+            "PYTHONDONTWRITEBYTECODE": "1"}
+
+
 def git(repo, *args, check=True):
     return subprocess.run(["git", "-C", str(repo), *args], check=check, text=True,
-                          capture_output=True)
+                          capture_output=True, env=child_env())
 
 
 def write_claude(repo, **settings):
@@ -55,28 +76,37 @@ def write_agy(repo, **settings):
 
 
 @pytest.fixture
-def repo(tmp_path):
+def repo(tmp_path, request, monkeypatch):
     """A main checkout shaped like this one: the filter, the hooks, both configs, local/."""
+    historical = "pre_pi_hooks" in request.fixturenames
+    if historical:
+        # Keep pinned historical hooks and their layout authentic. These tests exercise
+        # pick/manifest rollback; the separate layout rehearsal covers directory rollback.
+        for name in ("CLAUDE", "CODEX", "PI", "AGY"):
+            monkeypatch.setitem(globals(), name, globals()[name].removeprefix("harnesses/"))
     repo = tmp_path / "hq"
     (repo / ".githooks").mkdir(parents=True)
     for name in HOOK_FILES:
         shutil.copy2(HOOKS / name, repo / ".githooks" / name)
     shutil.copy2(HOOKS.parent / "harnesses.toml", repo / "harnesses.toml")
-    (repo / "claude").mkdir()
-    (repo / "codex").mkdir()
-    (repo / "pi").mkdir()
-    (repo / "agy").mkdir()
+    for config in (CLAUDE, CODEX, PI, AGY):
+        (repo / config).parent.mkdir(parents=True, exist_ok=True)
     (repo / "local" / "codex").mkdir(parents=True)
-    (repo / ".gitattributes").write_text("claude/settings*.json filter=harness-state\n"
-                                         "codex/config*.toml filter=harness-state\n"
-                                         "pi/settings*.json filter=harness-state\n"
-                                         "agy/settings*.json filter=harness-state\n")
+    (repo / ".gitattributes").write_text("harnesses/claude/settings*.json filter=harness-state\n"
+                                         "harnesses/codex/config*.toml filter=harness-state\n"
+                                         "harnesses/pi/settings*.json filter=harness-state\n"
+                                         "harnesses/agy/settings*.json filter=harness-state\n")
     (repo / ".gitignore").write_text("local/\n__pycache__/\n")
+    if historical:
+        for path in [repo / "harnesses.toml", repo / ".gitattributes", *[repo / ".githooks" / n for n in HOOK_FILES]]:
+            path.write_text(path.read_text().replace("harnesses/", ""))
     write_claude(repo)
     (repo / CODEX).write_text(BASE)
     write_pi(repo)
     write_agy(repo)
     git(tmp_path, "init", "-q", "-b", "main", str(repo))
+    assert Path(git(repo, "rev-parse", "--show-toplevel").stdout.strip()) == repo.resolve()
+    assert Path(git(repo, "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(repo.resolve())
     git(repo, "config", "filter.harness-state.clean", ".githooks/harness-state-clean %f")
     git(repo, "config", "filter.harness-state.required", "true")
     git(repo, "config", "filter.harness-state.smudge", "cat")
@@ -91,7 +121,7 @@ def repo(tmp_path):
 def picks(repo, *args):
     """Run live-picks as the hooks do: by path, from another directory."""
     return subprocess.run([str(repo / ".githooks" / "live-picks"), *args], cwd=repo.parent,
-                          text=True, capture_output=True)
+                          text=True, capture_output=True, env=child_env())
 
 
 def record_path(repo):
@@ -113,7 +143,7 @@ def codex(repo):
 
 def clean(repo, name, text):
     return subprocess.run([str(repo / ".githooks" / "harness-state-clean"), name],
-                          input=text, check=True, text=True, capture_output=True).stdout
+                          input=text, check=True, text=True, capture_output=True, env=child_env()).stdout
 
 
 def status(repo):
@@ -273,11 +303,11 @@ def test_a_sync_that_changes_nothing_writes_nothing(repo):
 
 @pytest.mark.parametrize("text", [
     "{", "[]", '{"other.json": {"state": "default"}}',
-    '{"claude/settings.json": {"state": "maybe"}}',
-    '{"claude/settings.json": {"state": "set", "values": {"theme": "x"}}}',
-    '{"claude/settings.json": {"state": "default", "values": {}}}',
-    '{"codex/config.toml": {"state": "set", "lines": ["theme = 1\\n"]}}',
-    '{"codex/config.toml": {"state": "set", "lines": ["model = \\"x\\""]}}',
+    '{"harnesses/claude/settings.json": {"state": "maybe"}}',
+    '{"harnesses/claude/settings.json": {"state": "set", "values": {"theme": "x"}}}',
+    '{"harnesses/claude/settings.json": {"state": "default", "values": {}}}',
+    '{"harnesses/codex/config.toml": {"state": "set", "lines": ["theme = 1\\n"]}}',
+    '{"harnesses/codex/config.toml": {"state": "set", "lines": ["model = \\"x\\""]}}',
 ])
 def test_an_invalid_record_is_refused_and_left_alone(repo, text):
     record_path(repo).write_text(text)
@@ -299,7 +329,7 @@ def test_an_unparsable_file_is_refused_and_the_other_still_restored(repo):
     result = picks(repo, "restore")
 
     assert result.returncode != 0
-    assert "claude/settings.json does not parse" in result.stderr
+    assert "harnesses/claude/settings.json does not parse" in result.stderr
     assert (repo / CLAUDE).read_text() == "{\n"
     assert codex(repo)["model"] == "gpt-6.1-sol"
 
@@ -364,7 +394,7 @@ def test_a_filesystem_error_fails_cleanly(repo):
 
 
 def test_forget_of_a_file_it_does_not_own_is_refused(repo):
-    result = picks(repo, "forget", "claude/settings.work.json")
+    result = picks(repo, "forget", "harnesses/claude/settings.work.json")
 
     assert result.returncode != 0
     assert "forget takes" in result.stderr
@@ -375,7 +405,7 @@ def test_concurrent_syncs_of_both_tools_keep_trust_and_the_pick(repo):
     save(repo, **{CODEX: CODEX_SET})
     tools = ("codex-trust", "live-picks") * 6
     runs = [subprocess.Popen([str(repo / ".githooks" / tool), "sync"],
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=child_env())
             for tool in tools]
 
     for run in runs:
@@ -414,7 +444,7 @@ def test_a_missing_owned_file_is_named(repo):
     result = picks(repo, "capture")
 
     assert result.returncode != 0
-    assert "codex/config.toml is missing" in result.stderr
+    assert "harnesses/codex/config.toml is missing" in result.stderr
 
 
 @pytest.mark.parametrize("args", [(), ("prune",), ("capture", "--all"), ("capture", "--explicit"), ("hook", "pre-push"),
@@ -734,7 +764,7 @@ def test_git_wrappers_keep_zero_status_when_pick_launch_fails(repo, hook, damage
         tool.write_text("#!/bin/sh\necho 'live-picks: startup failed' >&2\nexit 1\n")
 
     result = subprocess.run([str(repo / ".githooks" / hook)], cwd=repo,
-                            input="old new\n", text=True, capture_output=True)
+                            input="old new\n", text=True, capture_output=True, env=child_env())
 
     assert result.returncode == 0, result.stderr
     assert "live-picks" in result.stderr
@@ -759,7 +789,7 @@ def refresh(repo):
     """Run the refresh as a harness hook does: from another directory, payload on stdin."""
     return subprocess.run([str(repo / ".githooks" / "harness-state-refresh")],
                           cwd=repo.parent, input=json.dumps({"hook_event_name": "Stop"}),
-                          text=True, capture_output=True)
+                          text=True, capture_output=True, env=child_env())
 
 
 def index_lock(repo):
@@ -942,7 +972,7 @@ def test_a_failed_capture_fails_the_hook_after_the_other_steps(repo):
     result = refresh(repo)
 
     assert result.returncode != 0
-    assert "claude/settings.json does not parse" in result.stderr
+    assert "harnesses/claude/settings.json does not parse" in result.stderr
     assert codex(repo)["model"] == "gpt-6.1-sol"
     assert "/work/a" in codex(repo)["projects"]
 
@@ -1111,10 +1141,10 @@ def test_pi_missing_record_restores_nothing(repo):
 @pytest.mark.parametrize("operation", ["capture", "restore", "sync"])
 @pytest.mark.parametrize("text", [
     "{", "[]", '{"other.json": {"state": "default"}}',
-    '{"claude/settings.json": {"state": "default"}}',
-    '{"pi/settings.json": {"state": "maybe"}}',
-    '{"pi/settings.json": {"state": "set", "values": {"deviceId": "private"}}}',
-    '{"pi/settings.json": {"state": "default", "values": {}}}',
+    '{"harnesses/claude/settings.json": {"state": "default"}}',
+    '{"harnesses/pi/settings.json": {"state": "maybe"}}',
+    '{"harnesses/pi/settings.json": {"state": "set", "values": {"deviceId": "private"}}}',
+    '{"harnesses/pi/settings.json": {"state": "default", "values": {}}}',
 ])
 def test_invalid_pi_record_is_refused_independently(repo, text, operation):
     saved_both(repo)
@@ -1503,7 +1533,7 @@ def pre_pi_hooks():
     found.check_returncode()
     return {name: subprocess.run(
         ["git", "-C", str(HOOKS.parent), "show", f"{PRE_PI_COMMIT}:.githooks/{name}"],
-        check=True, capture_output=True).stdout for name in HOOK_FILES}
+        check=True, capture_output=True, env=child_env()).stdout for name in HOOK_FILES}
 
 
 def pinned_blob(scratch, path):
@@ -1532,7 +1562,7 @@ def owned_process(command):
     previous = signal.signal(signal.SIGTERM, interrupted)
     try:
         with subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE, text=True, start_new_session=True) as run:
+                              stderr=subprocess.PIPE, text=True, start_new_session=True, env=child_env()) as run:
             try:
                 yield run
             finally:
@@ -1871,10 +1901,10 @@ def anchor_agy_home(repo, tmp_path):
     (home / ".gemini/config").mkdir(parents=True)
     assert Path(isolated_git(repo, home, "rev-parse", "--show-toplevel").stdout.strip()).resolve() == repo.resolve()
     assert repo.resolve() in Path(isolated_git(repo, home, "rev-parse", "--absolute-git-dir").stdout.strip()).resolve().parents
-    hooks = repo / "agy/hooks.json"
+    hooks = repo / "harnesses/agy/hooks.json"
     if not hooks.exists():
         hooks.write_text("{}\n")
-        isolated_git(repo, home, "add", "agy/hooks.json")
+        isolated_git(repo, home, "add", "harnesses/agy/hooks.json")
         isolated_git(repo, home, "commit", "-q", "-m", "track agy hooks")
     (home / ".gemini/config/hooks.json").symlink_to(hooks)
     link = home / ".gemini/antigravity-cli/settings.json"

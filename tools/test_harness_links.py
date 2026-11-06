@@ -273,22 +273,20 @@ def fresh_clone(tmp_path, home, repo=None):
     shutil.copy2(TOOL, clone / "tools/harness-links")
     shutil.copytree(repo / ".githooks", clone / ".githooks", dirs_exist_ok=True)
     shutil.copytree(repo / "relay", clone / "relay", dirs_exist_ok=True)
-    shutil.copytree(repo / "codex/work", clone / "codex/work", dirs_exist_ok=True)
-    if (repo / "ponytail").exists():
-        shutil.copytree(repo / "ponytail", clone / "ponytail", dirs_exist_ok=True)
-    if (repo / "agy").exists():
-        shutil.copytree(repo / "agy", clone / "agy", dirs_exist_ok=True)
-        agy_settings = clone / "agy/settings.json"
-        if agy_settings.exists():
-            cleaned = subprocess.run(
-                [sys.executable, "-B", str(clone / ".githooks/harness-state-clean"), "agy/settings.json"],
-                input=agy_settings.read_text(),
-                env=isolated_env(home),
-                text=True,
-                capture_output=True,
-                check=True,
-            )
-            agy_settings.write_text(cleaned.stdout)
+    # Clone history can still have the old layout while the working candidate has moved.
+    # These are owned fixture paths, after both Git containment assertions above.
+    for old in ("agy", "claude", "codex", "pi", "ponytail", "harnesses", "external"):
+        if (clone / old).exists():
+            shutil.rmtree(clone / old)
+    for directory in ("harnesses", "external"):
+        shutil.copytree(repo / directory, clone / directory)
+    shutil.copy2(repo / ".gitattributes", clone / ".gitattributes")
+    agy_settings = clone / "harnesses/agy/settings.json"
+    cleaned = subprocess.run(
+        [sys.executable, "-B", str(clone / ".githooks/harness-state-clean"), "harnesses/agy/settings.json"],
+        input=agy_settings.read_text(), env=isolated_env(home), text=True,
+        capture_output=True, check=True)
+    agy_settings.write_text(cleaned.stdout)
     # A public clone needs the submodule and sibling skill checkouts. Use the local
     # sources in these fixtures so the tests require neither network nor live writes.
     main = Path(run("-C", str(checkout), "worktree", "list", "--porcelain").stdout.splitlines()[0][9:])
@@ -296,6 +294,10 @@ def fresh_clone(tmp_path, home, repo=None):
         if path.is_symlink():
             shutil.copytree((main / "agents/skills" / path.name).resolve(), path.resolve(),
                             dirs_exist_ok=True)
+    # The candidate layout must be tracked, including before its first real commit,
+    # so adoption's index-stat refresh can be checked against a clean fixture index.
+    run("-C", str(clone), "add", "-A")
+    run("-C", str(clone), "-c", "core.hooksPath=/dev/null", "commit", "--allow-empty", "-qm", "fixture candidate")
     return clone
 
 
@@ -458,11 +460,11 @@ def test_real_manifest_links_agy_and_agy_config_when_homes_exist(tmp_path):
     clone = fresh_clone(tmp_path, home)
     applied = link(clone, home, "--apply")
     assert applied.returncode == 0, applied.stderr
-    assert (home / ".gemini/antigravity-cli/settings.json").resolve() == (clone / "agy/settings.json").resolve()
+    assert (home / ".gemini/antigravity-cli/settings.json").resolve() == (clone / "harnesses/agy/settings.json").resolve()
     assert (home / ".gemini/config/AGENTS.md").resolve() == (tmp_path / "lore/instructions/AGENTS.md").resolve()
-    assert (home / ".gemini/config/hooks.json").resolve() == (clone / "agy/hooks.json").resolve()
+    assert (home / ".gemini/config/hooks.json").resolve() == (clone / "harnesses/agy/hooks.json").resolve()
     skills_manifest = home / ".gemini/config/skills.json"
-    assert skills_manifest.resolve() == (clone / "agy/skills.json").resolve()
+    assert skills_manifest.resolve() == (clone / "harnesses/agy/skills.json").resolve()
     entries = json.loads(skills_manifest.read_text())["entries"]
     assert entries and all(not entry["path"].startswith("~") and not os.path.isabs(entry["path"])
                            for entry in entries)
@@ -481,7 +483,7 @@ def test_real_manifest_links_ponytail_config_with_default_mode_off(tmp_path):
     assert applied.returncode == 0, applied.stderr
     ponytail_config = home / ".config/ponytail/config.json"
     assert ponytail_config.is_symlink()
-    assert ponytail_config.resolve() == (clone / "ponytail/config.json").resolve()
+    assert ponytail_config.resolve() == (clone / "external/ponytail/config.json").resolve()
     assert json.loads(ponytail_config.read_text()) == {"defaultMode": "off"}
     assert link(clone, home, "--check").returncode == 0
 
@@ -782,7 +784,7 @@ def test_real_manifest_adopts_agy_replaced_settings_on_anchored_host_and_clears_
     assert isolated_link(clone, home, "--apply").returncode == 0
 
     settings_link = home / ".gemini/antigravity-cli/settings.json"
-    base = json.loads((clone / "agy/settings.json").read_text())
+    base = json.loads((clone / "harnesses/agy/settings.json").read_text())
     tmp = settings_link.with_name(".settings.json.agy-tmp")
     tmp.write_text(
         json.dumps(
@@ -810,10 +812,10 @@ def test_real_manifest_adopts_agy_replaced_settings_on_anchored_host_and_clears_
     applied = isolated_link(clone, home, "--apply")
     assert applied.returncode == 0, applied.stderr
     assert settings_link.is_symlink()
-    assert settings_link.resolve() == (clone / "agy/settings.json").resolve()
-    assert json.loads((clone / "agy/settings.json").read_text())["model"] == "Gemini 4 Argon (High)"
+    assert settings_link.resolve() == (clone / "harnesses/agy/settings.json").resolve()
+    assert json.loads((clone / "harnesses/agy/settings.json").read_text())["model"] == "Gemini 4 Argon (High)"
     assert json.loads((clone / "local/live-picks-agy.json").read_text()) == {
-        "agy/settings.json": {
+        "harnesses/agy/settings.json": {
             "state": "set",
             "values": {
                 "model": "Gemini 4 Argon (High)",
@@ -822,7 +824,7 @@ def test_real_manifest_adopts_agy_replaced_settings_on_anchored_host_and_clears_
         }
     }
     assert isolated_link(clone, home, "--check").returncode == 0
-    assert isolated_git(clone, home, "status", "--porcelain", "--", "agy/settings.json").stdout == ""
+    assert isolated_git(clone, home, "status", "--porcelain", "--", "harnesses/agy/settings.json").stdout == ""
 
     tmp2 = settings_link.with_name(".settings.json.agy-tmp2")
     tmp2.write_text(
@@ -844,7 +846,7 @@ def test_real_manifest_adopts_agy_replaced_settings_on_anchored_host_and_clears_
     assert applied2.returncode == 0, applied2.stderr
     assert settings_link.is_symlink()
     assert isolated_link(clone, home, "--check").returncode == 0
-    assert isolated_git(clone, home, "status", "--porcelain", "--", "agy/settings.json").stdout == " M agy/settings.json\n"
+    assert isolated_git(clone, home, "status", "--porcelain", "--", "harnesses/agy/settings.json").stdout == " M harnesses/agy/settings.json\n"
 
 
 def first_run_host(tmp_path, settings):
@@ -885,9 +887,9 @@ def test_real_manifest_adopts_a_first_run_agy_file_before_linking_its_anchors(tm
         "showFeedbackSurvey": False,
         "trustedWorkspaces": ["/work/dotfiles"],
     })
-    tracked = json.loads((clone / "agy/settings.json").read_text())
-    # The clone tracks this checkout's HEAD; its working agy/ may hold uncommitted edits.
-    diff_before = isolated_git(clone, home, "diff", "--", "agy/settings.json").stdout
+    tracked = json.loads((clone / "harnesses/agy/settings.json").read_text())
+    # The clone tracks this checkout's HEAD; its working harnesses/agy/ may hold uncommitted edits.
+    diff_before = isolated_git(clone, home, "diff", "--", "harnesses/agy/settings.json").stdout
 
     report = isolated_link(clone, home)
     assert report.returncode == 0, report.stderr
@@ -899,22 +901,22 @@ def test_real_manifest_adopts_a_first_run_agy_file_before_linking_its_anchors(tm
 
     applied = isolated_link(clone, home, "--apply")
     assert applied.returncode == 0, applied.stderr
-    assert first_run.is_symlink() and first_run.resolve() == (clone / "agy/settings.json").resolve()
-    assert (home / ".gemini/config/hooks.json").resolve() == (clone / "agy/hooks.json").resolve()
-    assert json.loads((clone / "agy/settings.json").read_text()) == {
+    assert first_run.is_symlink() and first_run.resolve() == (clone / "harnesses/agy/settings.json").resolve()
+    assert (home / ".gemini/config/hooks.json").resolve() == (clone / "harnesses/agy/hooks.json").resolve()
+    assert json.loads((clone / "harnesses/agy/settings.json").read_text()) == {
         **tracked,
         "trustedWorkspaces": ["/work/dotfiles"],
         "seasonalThemesOptIn": "halloween-2026",
     }
     assert json.loads((clone / "local/live-picks-agy.json").read_text()) == {
-        "agy/settings.json": {
+        "harnesses/agy/settings.json": {
             "state": "set",
             "values": {"trustedWorkspaces": ["/work/dotfiles"], "seasonalThemesOptIn": "halloween-2026"},
         }
     }
     check = isolated_link(clone, home, "--check")
     assert check.returncode == 0, check.stdout
-    assert isolated_git(clone, home, "diff", "--", "agy/settings.json").stdout == diff_before
+    assert isolated_git(clone, home, "diff", "--", "harnesses/agy/settings.json").stdout == diff_before
 
 
 def test_real_manifest_refuses_a_first_run_agy_file_holding_untracked_settings(tmp_path):
@@ -923,7 +925,7 @@ def test_real_manifest_refuses_a_first_run_agy_file_holding_untracked_settings(t
         "trustedWorkspaces": ["/first-run"],
     })
     raw = first_run.read_text()
-    tracked_before = (clone / "agy/settings.json").read_bytes()
+    tracked_before = (clone / "harnesses/agy/settings.json").read_bytes()
 
     report = isolated_link(clone, home)
     assert states(report)["~/.gemini/antigravity-cli/settings.json"] == "adopt"
@@ -932,7 +934,7 @@ def test_real_manifest_refuses_a_first_run_agy_file_holding_untracked_settings(t
     assert applied.returncode == 1
     assert "queuedMessages" in applied.stderr and "nothing written" in applied.stderr
     assert not first_run.is_symlink() and first_run.read_text() == raw
-    assert (clone / "agy/settings.json").read_bytes() == tracked_before
+    assert (clone / "harnesses/agy/settings.json").read_bytes() == tracked_before
     assert not (clone / "local/live-picks-agy.json").exists()
     for link in AGY_ANCHOR_LINKS:
         path = home / link.removeprefix("~/")
@@ -943,7 +945,7 @@ def test_real_manifest_refuses_a_first_run_agy_file_holding_untracked_settings(t
 def test_real_manifest_refuses_a_first_run_agy_file_while_an_anchor_holds_something_else(tmp_path, conflict):
     clone, home, first_run = first_run_host(tmp_path, {"trustedWorkspaces": ["/first-run"]})
     raw = first_run.read_text()
-    tracked_before = (clone / "agy/settings.json").read_bytes()
+    tracked_before = (clone / "harnesses/agy/settings.json").read_bytes()
     anchor = home / ".gemini/config/hooks.json"
     if conflict == "file":
         anchor.write_text("{}\n")
@@ -962,7 +964,7 @@ def test_real_manifest_refuses_a_first_run_agy_file_while_an_anchor_holds_someth
     applied = isolated_link(clone, home, "--apply")
     assert applied.returncode == 1
     assert not first_run.is_symlink() and first_run.read_text() == raw
-    assert (clone / "agy/settings.json").read_bytes() == tracked_before
+    assert (clone / "harnesses/agy/settings.json").read_bytes() == tracked_before
     assert not (home / ".gemini/config/skills.json").exists()
 
 
@@ -1039,12 +1041,13 @@ def test_fresh_clone_strips_live_agy_picks_from_dirty_source_checkout(tmp_path):
     shutil.copy2(checkout / "harnesses.toml", dirty_source / "harnesses.toml")
     shutil.copytree(checkout / ".githooks", dirty_source / ".githooks", dirs_exist_ok=True)
     shutil.copytree(checkout / "relay", dirty_source / "relay", dirs_exist_ok=True)
-    shutil.copytree(checkout / "codex/work", dirty_source / "codex/work", dirs_exist_ok=True)
-    if (checkout / "ponytail").exists():
-        shutil.copytree(checkout / "ponytail", dirty_source / "ponytail", dirs_exist_ok=True)
-    shutil.copytree(checkout / "agy", dirty_source / "agy", dirs_exist_ok=True)
-    source_settings = json.loads((dirty_source / "agy/settings.json").read_text())
-    (dirty_source / "agy/settings.json").write_text(
+    assert Path(run("-C", str(dirty_source), "rev-parse", "--show-toplevel").stdout.strip()) == dirty_source.resolve()
+    assert Path(run("-C", str(dirty_source), "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(dirty_source.resolve())
+    for directory in ("harnesses", "external"):
+        shutil.copytree(checkout / directory, dirty_source / directory, dirs_exist_ok=True)
+    shutil.copy2(checkout / ".gitattributes", dirty_source / ".gitattributes")
+    source_settings = json.loads((dirty_source / "harnesses/agy/settings.json").read_text())
+    (dirty_source / "harnesses/agy/settings.json").write_text(
         json.dumps(
             {
                 **source_settings,
@@ -1065,6 +1068,6 @@ def test_fresh_clone_strips_live_agy_picks_from_dirty_source_checkout(tmp_path):
     case_dir.mkdir()
     clone = fresh_clone(case_dir, home, repo=dirty_source)
 
-    cloned_settings = json.loads((clone / "agy/settings.json").read_text())
+    cloned_settings = json.loads((clone / "harnesses/agy/settings.json").read_text())
     assert not (set(cloned_settings) & {"model", "effort", "effortByBase", "trustedWorkspaces"})
-    assert isolated_git(clone, home, "status", "--porcelain", "--", "agy/settings.json").stdout == ""
+    assert isolated_git(clone, home, "status", "--porcelain", "--", "harnesses/agy/settings.json").stdout == ""

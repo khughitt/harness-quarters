@@ -1,4 +1,4 @@
-"""pi/bin/pi against a fake pinned install under a temporary install root."""
+"""harnesses/pi/bin/pi against a fake pinned install under a temporary install root."""
 import json
 import os
 import subprocess
@@ -7,9 +7,9 @@ from pathlib import Path
 import pytest
 
 CHECKOUT = Path(__file__).resolve().parent.parent
-LAUNCHER = CHECKOUT / "pi" / "bin" / "pi"
-PIN = CHECKOUT / "pi"
-VERSION = json.loads((CHECKOUT / "pi" / "package.json").read_text())["dependencies"]["@earendil-works/pi-coding-agent"]
+LAUNCHER = CHECKOUT / "harnesses/pi" / "bin" / "pi"
+PIN = CHECKOUT / "harnesses/pi"
+VERSION = json.loads((CHECKOUT / "harnesses/pi" / "package.json").read_text())["dependencies"]["@earendil-works/pi-coding-agent"]
 
 FAKE = """#!/usr/bin/env bash
 printf '%s\\n' "$@"
@@ -51,7 +51,7 @@ def test_refuses_an_install_that_does_not_match_the_lock(installed):
     (installed / VERSION / "package-lock.json").write_text("{}")
     result = run(installed, "--version")
     assert result.returncode == 127
-    assert "does not match pi/package-lock.json" in result.stderr
+    assert "does not match harnesses/pi/package-lock.json" in result.stderr
     assert "just pi-install" in result.stderr
 
 
@@ -60,7 +60,7 @@ def test_refuses_an_install_that_does_not_match_the_lock(installed):
 def test_refuses_updating_pi_itself(installed, args):
     result = run(installed, *args)
     assert result.returncode == 2
-    assert "pi/package.json" in result.stderr
+    assert "harnesses/pi/package.json" in result.stderr
     assert result.stdout == ""
 
 

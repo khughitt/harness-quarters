@@ -65,7 +65,7 @@ schema = 1
 [harnesses.claude-code]
 
 [harnesses.codex.live_state]
-config = "codex/config.toml"
+config = "harnesses/codex/config.toml"
 
 [harnesses.opencode]
 '''

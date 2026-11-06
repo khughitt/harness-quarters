@@ -557,7 +557,7 @@ def test_a_call_naming_a_protected_path_is_denied_before_any_pause(tmp_path, tar
     d.prompt('work')
     path = {'limits': d.limits,
             'state': state_dir(d.env) / f'claude-code-{CLAUDE_ROOT}.json',
-            'wiring': CHECKOUT / 'codex' / 'hooks.json',
+            'wiring': CHECKOUT / 'harnesses/codex/hooks.json',
             'home-link': Path(d.env['HOME']) / '.claude' / 'settings.json',
             'facts': Path(adapters.SNAPSHOT)}[target]
     out, _ = d.pre('Edit', {'file_path': str(path), 'old_string': '500', 'new_string': '5000'})
@@ -1515,3 +1515,18 @@ def test_frozen_records_copy_deepcopy_and_pickle(tmp_path):
     st = d.state()
     for twin in (copy.deepcopy(st), pickle.loads(pickle.dumps(st))):
         assert twin == st
+
+
+@pytest.mark.parametrize('path', ['harnesses/claude/settings.json', 'harnesses/codex/hooks.json',
+                                  'harnesses/codex/work/hooks.json', 'local/claude/settings.work.json'])
+@pytest.mark.parametrize('shell', [False, True])
+def test_relocated_wiring_is_protected(tmp_path, path, shell):
+    d = Driver(tmp_path, 'claude-code')
+    d.prompt('work')
+    target = str(CHECKOUT / path)
+    if shell:
+        out = d.bash('touch ' + shlex.quote(target))
+    else:
+        out, _ = d.pre('Write', {'file_path': target, 'content': '{}'})
+    assert denied(out)
+    assert 'protected' in reason(out)

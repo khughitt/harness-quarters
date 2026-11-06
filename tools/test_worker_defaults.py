@@ -38,19 +38,19 @@ def assert_leaves_alone(env):
 
 
 def test_claude_settings_set_the_defaults():
-    env = json.loads((ROOT / "claude" / "settings.json").read_text())["env"]
+    env = json.loads((ROOT / "harnesses/claude" / "settings.json").read_text())["env"]
     assert worker_view(env) == DEFAULTS
     assert_leaves_alone(env)
 
 
 def test_codex_shell_policy_sets_the_defaults():
-    config = tomllib.loads((ROOT / "codex" / "config.toml").read_text())
+    config = tomllib.loads((ROOT / "harnesses/codex" / "config.toml").read_text())
     env = config["shell_environment_policy"]["set"]
     assert worker_view(env) == DEFAULTS
     assert_leaves_alone(env)
 
 
-VERSION = json.loads((ROOT / "pi" / "package.json").read_text())["dependencies"]["@earendil-works/pi-coding-agent"]
+VERSION = json.loads((ROOT / "harnesses/pi" / "package.json").read_text())["dependencies"]["@earendil-works/pi-coding-agent"]
 FAKE = "#!/usr/bin/env bash\nenv\n"
 
 
@@ -61,14 +61,14 @@ def installed(tmp_path):
     bin_dir.mkdir(parents=True)
     (bin_dir / "pi").write_text(FAKE)
     (bin_dir / "pi").chmod(0o755)
-    (root / VERSION / "package-lock.json").write_bytes((ROOT / "pi" / "package-lock.json").read_bytes())
+    (root / VERSION / "package-lock.json").write_bytes((ROOT / "harnesses/pi" / "package-lock.json").read_bytes())
     home = tmp_path / "home"
     home.mkdir()
     return {"PATH": os.environ["PATH"], "HOME": str(home), "PI_INSTALL_ROOT": str(root)}
 
 
 def pi_env(env):
-    result = subprocess.run([str(ROOT / "pi" / "bin" / "pi")], env=env, capture_output=True, text=True)
+    result = subprocess.run([str(ROOT / "harnesses/pi" / "bin" / "pi")], env=env, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     return dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
 

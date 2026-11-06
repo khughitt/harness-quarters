@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-FILES = ['claude/settings.json', 'codex/hooks.json', 'codex/work/hooks.json', 'agy/hooks.json']
+FILES = ['harnesses/claude/settings.json', 'harnesses/codex/hooks.json', 'harnesses/codex/work/hooks.json', 'harnesses/agy/hooks.json']
 # Hook upgrades have a separate approval gate from the CLI pin, per harness; routing agy
 # through relay v0.3.0 moves every relayed harness to v0.3.0 so snapshots and subscribers
 # naming agy are accepted across Claude Code, Codex, and agy.
@@ -36,7 +36,7 @@ def parse_relay_command(command, version):
 
 def hook_entries(file):
     doc = json.loads((ROOT / file).read_text())
-    if file == 'agy/hooks.json':
+    if file == 'harnesses/agy/hooks.json':
         hq = doc['hq']
         entries = []
         for event, items in hq.items():
@@ -130,9 +130,9 @@ def test_native_entries_kept_in_order(file):
         }
     elif file == FILES[3]:
         assert native == {
-            'SessionStart': ['~/d/hq/agy/hook SessionStart ~/d/lore/hooks/claude-profile ~/d/ops/hooks/capture-notice'],
-            'PreToolUse': ['~/d/hq/agy/hook PreToolUse'],
-            'Stop': ['~/d/hq/agy/hook Stop', '~/.local/bin/harness-state-refresh'],
+            'SessionStart': ['~/d/hq/harnesses/agy/hook SessionStart ~/d/lore/hooks/claude-profile ~/d/ops/hooks/capture-notice'],
+            'PreToolUse': ['~/d/hq/harnesses/agy/hook PreToolUse'],
+            'Stop': ['~/d/hq/harnesses/agy/hook Stop', '~/.local/bin/harness-state-refresh'],
         }
     else:
         session_start = ['~/d/lore/hooks/claude-profile']
@@ -154,7 +154,7 @@ def test_statusline_unchanged():
 
 
 def test_agy_statusline():
-    assert json.loads((ROOT / 'agy/settings.json').read_text())['statusLine'] == {
+    assert json.loads((ROOT / 'harnesses/agy/settings.json').read_text())['statusLine'] == {
         'type': 'command', 'command': '~/d/familiar/bin/familiar statusline',
         'enabled': True,
     }

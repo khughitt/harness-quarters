@@ -43,11 +43,11 @@ the two newer keys; backing them out, only to roll back to such hooks, unsets bo
 `harnesses.toml` declares, for each tracked live config, the path glob the filter takes
 (`.gitattributes` routes exactly those globs to it, and nothing else), the keys and
 tables it strips, and the pick units `live-picks` saves. The filter keeps `model`,
-`modelSettings` and `effortLevel` in `claude/settings*.json`,
-the top-level `model` and `model_reasoning_effort` in `codex/config*.toml`,
-`defaultProvider`, `defaultModel` and `defaultThinkingLevel` in `pi/settings*.json`
+`modelSettings` and `effortLevel` in `harnesses/claude/settings*.json`,
+the top-level `model` and `model_reasoning_effort` in `harnesses/codex/config*.toml`,
+`defaultProvider`, `defaultModel` and `defaultThinkingLevel` in `harnesses/pi/settings*.json`
 (with pi's installation ids, `deviceId` and `trackingId`), and `model`, `effort`,
-`effortByBase`, `trustedWorkspaces` and `seasonalThemesOptIn` in `agy/settings*.json` out
+`effortByBase`, `trustedWorkspaces` and `seasonalThemesOptIn` in `harnesses/agy/settings*.json` out
 of the index: model and effort picks (and agy's trusted workspace list and seasonal theme
 opt-in) write into the live files (the homes symlink here), and they are session or host
 state, not configuration. agy's other settings-UI writes are configuration and are
@@ -70,9 +70,9 @@ refuses it until `git add --renormalize <path>` stages it through the filter.
 
 The working tree keeps the harness's last pick, and a checkout of the file drops it.
 `.githooks/live-picks` puts it back. At every turn end it saves the picks from
-`claude/settings.json` and `codex/config.toml` in local/live-picks.json,
-`pi/settings.json` in the separate local/live-picks-pi.json record, and
-`agy/settings.json` in local/live-picks-agy.json. The
+`harnesses/claude/settings.json` and `harnesses/codex/config.toml` in local/live-picks.json,
+`harnesses/pi/settings.json` in the separate local/live-picks-pi.json record, and
+`harnesses/agy/settings.json` in local/live-picks-agy.json. The
 `post-checkout`, `post-merge` and `post-rewrite` hooks restore it right after a git
 command drops it, in the main checkout only, and the next turn end restores it where
 no hook runs (the commands listed below for trust). Each picker's fields are one unit:
@@ -84,8 +84,8 @@ Codex's model and effort together; pi's default model (`defaultProvider`,
 any of its fields is never touched, so a newer pick always wins, and a pick of one
 Claude, pi or agy picker keeps the other's saved value. A unit holding none is ambiguous,
 so only an explicit act resets the saved pick:
-`.githooks/live-picks forget claude/settings.json` (or `codex/config.toml`,
-`pi/settings.json` or `agy/settings.json`), which resets every unit of that file and
+`.githooks/live-picks forget harnesses/claude/settings.json` (or `harnesses/codex/config.toml`,
+`harnesses/pi/settings.json` or `harnesses/agy/settings.json`), which resets every unit of that file and
 removes them from it.
 Claude's `/model` Default clears its fields and the next turn end may
 restore the saved pick; use `forget` for a deliberate reset. PostModelSwitch fires
@@ -95,19 +95,19 @@ not a capture point. The tested Codex picker actions kept both model fields; use
 by atomic rename over the home link, an anchored host (one whose `~/.gemini/config`
 hooks or skills link already targets this checkout) reads any regular file there during
 `capture`, adopts its picks and any tracked `/config` or `permissions` edits back into
-`agy/settings.json`, and restores the symlink on `restore`, `hook` and `forget` (a host
+`harnesses/agy/settings.json`, and restores the symlink on `restore`, `hook` and `forget` (a host
 not anchored yet adopts a first-run file through `just link --apply` instead; see Home
 links). A
 Claude or Codex pick made since the last turn end is not saved yet; a git command in
 that window brings back the one before (for agy, `hook` captures a detached regular file
-before restoring onto the newly checked-out `agy/settings.json`).
+before restoring onto the newly checked-out `harnesses/agy/settings.json`).
 
-The pi extension `pi/extensions/harness-state.ts` calls the same refresh after `model_select` and
+The pi extension `harnesses/pi/extensions/harness-state.ts` calls the same refresh after `model_select` and
 `thinking_level_select` (yielding for the settings write), at `agent_settled` and at
 `session_shutdown`. Setting the current model or thinking level as the default can
 emit no event: that default is saved at the next turn end or exit. A Git rewrite in
 that window restores the previous saved default; set it again or use
-`.githooks/live-picks forget pi/settings.json` to reset both units to the automatic
+`.githooks/live-picks forget harnesses/pi/settings.json` to reset both units to the automatic
 default. Runs are serialised, with a 10-second limit followed by one second for
 process-group termination. Picker and turn-end handlers return without waiting;
 shutdown awaits the current run and one final run, delaying exit by at most about
@@ -125,9 +125,9 @@ Codex preservation continues. pi then keeps defaults only until a Git rewrite dr
 them.
 
 Codex's project trust, the
-`[projects."<path>"]` tables it adds to `codex/config*.toml`, is host state and stays
+`[projects."<path>"]` tables it adds to `harnesses/codex/config*.toml`, is host state and stays
 out of the index the same way. So any git command that writes a new blob of
-`codex/config.toml` over the live file drops the whole list, on every host at once,
+`harnesses/codex/config.toml` over the live file drops the whole list, on every host at once,
 since the checkout is shared through Dropbox. `.githooks/codex-trust` puts it back. At
 every turn end the Stop hook below saves the live tables into
 local/codex/trust.toml, never removing one, and inserts the ones the live file lacks
@@ -142,15 +142,15 @@ then asks again. While the main checkout is on a branch older than these hooks,
 nothing restores the list until the checkout switches back. A table Codex added since
 the last turn end is not saved yet. local/codex/trust.toml is machine-owned: capture rewrites it whole, so a comment
 added by hand is lost. Restoring also takes group and other access off the live
-`codex/config.toml`, which a checkout rewrites with the umask's mode. Nothing prunes the
+`harnesses/codex/config.toml`, which a checkout rewrites with the umask's mode. Nothing prunes the
 saved copy: to forget a directory, run `.githooks/codex-trust forget <path>`, which
 deletes its table from both files.
 
 Since the local layer kept trust out of the index (2026-09,
 `docs/specs/2026-09-28-local-layer-design.md`), worktrees and branches made
-before it show `codex/config*.toml` as modified, because their blobs still carry
+before it show `harnesses/codex/config*.toml` as modified, because their blobs still carry
 trust tables, and a rebase there can stop on them.
-`git checkout -- codex/config.toml` in a worktree is safe, since worktree copies
+`git checkout -- harnesses/codex/config.toml` in a worktree is safe, since worktree copies
 are not live. It drops Codex's bookkeeping the same way:
 `screen_reader_detection_done` under `[tui]`, the whole
 `[tui.model_availability_nux]` table, and `last_updated` / `last_revision` under
@@ -162,7 +162,7 @@ One residual: git decides "modified" from the file's size before it runs the
 filter, so a switch whose value changes length leaves the file marked `M` in
 `git status` (and `git diff-index`) until the next `git add` of it — `git diff`
 is content-true. A Stop hook in Claude, Codex and agy (`.githooks/harness-state-refresh`,
-wired in `claude/settings*.json`, `codex/hooks*.json` and `agy/hooks.json` through the
+wired in `harnesses/claude/settings*.json`, `harnesses/codex/hooks*.json` and `harnesses/agy/hooks.json` through the
 `~/.local/bin` link in `links.toml`) stages each harness config
 whose filtered diff is empty, so the mark clears at the end of the turn that made
 it; pi's extension calls the same refresh at the events above. It skips while another
@@ -252,23 +252,24 @@ MIT licensed; see `LICENSE`.
 - `agents/skills/session-logs/`: the retained skill. `agents/bin/`: session-episodes,
   wake-judge and their tests. Profile fragments and
   the remaining skill corpus live in lore.
-- `claude/`, `codex/`, `agy/` and `ponytail/`: per-harness settings, hooks, skill registries and
-  plugin defaults (`ponytail/config.json` links to `~/.config/ponytail/config.json` with
-  `"defaultMode": "off"`, keeping Ponytail's skills available without automatic `SessionStart` or
-  `SubagentStart` footer injection). Each
-  home's settings and hooks files are symlinks to them: `~/.claude` and `~/.codex` to the
-  plain files, `~/.codex-work` to `codex/work/hooks.json`, `~/.gemini/antigravity-cli` to
-  `agy/settings.json`, and `~/.gemini/config` to `agy/hooks.json`, `agy/skills.json`
+- `harnesses/claude/`, `harnesses/codex/`, `harnesses/agy/`: harness settings, hooks
+  and skill registries. Each home's settings and hooks files are symlinks to them: `~/.claude` and `~/.codex` to the
+  plain files, `~/.codex-work` to `harnesses/codex/work/hooks.json`, `~/.gemini/antigravity-cli` to
+  `harnesses/agy/settings.json`, and `~/.gemini/config` to `harnesses/agy/hooks.json`, `harnesses/agy/skills.json`
   (pointing `agy` at `~/.agents/skills` via `{"path": "../../.agents/skills"}`; `agy`
-  does not expand `~/` in `skills.json`) and lore's `AGENTS.md`. `agy/hooks.json` routes
-  `SessionStart`, `PreToolUse` and `Stop` through `relay`, while `agy/hook` heals detached
+  does not expand `~/` in `skills.json`) and lore's `AGENTS.md`. `harnesses/agy/hooks.json` routes
+  `SessionStart`, `PreToolUse` and `Stop` through `relay`, while `harnesses/agy/hook` heals detached
   `agy` settings saves and adapts `SessionStart` (lore's profile hook, ops's capture
   notice) and `Stop` (a one-shot `agy` claim check until ops-33cef9 lands).
-- `claude/mods/`: Claude Code function-hook plugins, linked as `~/.claude/mods` and
-  loaded by `CLAUDE_CODE_PLUGIN_DIRS` in `claude/settings.json`. `cli-pane` adds
+- `external/ponytail/config.json`: external integration defaults, linked to
+  `~/.config/ponytail/config.json`. `"defaultMode": "off"` keeps Ponytail skills
+  available without automatic `SessionStart` or `SubagentStart` footer injection.
+  Installed plugin packages remain in their harness-managed caches.
+- `harnesses/claude/mods/`: Claude Code function-hook plugins, linked as `~/.claude/mods` and
+  loaded by `CLAUDE_CODE_PLUGIN_DIRS` in `harnesses/claude/settings.json`. `cli-pane` adds
   `/tas <id>` and `/m <id>`, which show `tasks show` and `mindful show` output in a
   pane that never enters the conversation (see "Claude Code mods" below).
-- `claude/probes/`: probes behind Claude Code facts. `subagent-write-probe.py` runs
+- `harnesses/claude/probes/`: probes behind Claude Code facts. `subagent-write-probe.py` runs
   `claude -p` on haiku in a temporary directory, without user settings or mods, has one
   subagent per file name try a Write, and prints each name's prediction and outcome
   (`subagent-write-refused`). Rerun it after a Claude Code upgrade: `true` refreshes the
@@ -281,18 +282,18 @@ MIT licensed; see `LICENSE`.
   needs `strace` and `tmux`, and at least 15 minutes of token life. Rerun it after a
   Claude Code upgrade: `true` or `false` is the entry's value for that version, and
   `inconclusive` changes nothing in the file.
-- `pi/`: the pinned pi install. `package.json` and its lock pin the CLI and the
+- `harnesses/pi/`: the pinned pi install. `package.json` and its lock pin the CLI and the
   pi-durable SDK to one version; `just pi-install` installs it under
-  `~/.local/share/pi/<version>`, outside the synced checkout, and `pi/bin/pi`, linked as
+  `~/.local/share/pi/<version>`, outside the synced checkout, and `harnesses/pi/bin/pi`, linked as
   `~/.local/bin/pi`, runs it. The launcher refuses an install whose lock differs from
   the pin, and refuses `pi update` when it would update pi itself; model catalog and
   package updates pass through. The home is `~/.pi/agent`, which links lore's
-  instructions, `pi/settings.json` and `pi/extensions/harness-state.ts`, and reads
+  instructions, `harnesses/pi/settings.json` and `harnesses/pi/extensions/harness-state.ts`, and reads
   `~/.agents/skills` itself. On a new host, `mkdir -p ~/.pi/agent` and `just link --apply` before pi's first run. pi's first
   interactive run otherwise writes `settings.json` there as a real file, which `just
   link --apply` refuses (applying no link at all while one is refused): move it aside,
-  carry any configuration it holds into `pi/settings.json`, then apply. pi writes the
-  settings file in place, so `/settings` changes land in `pi/settings.json`; its default
+  carry any configuration it holds into `harnesses/pi/settings.json`, then apply. pi writes the
+  settings file in place, so `/settings` changes land in `harnesses/pi/settings.json`; its default
   model and thinking level and its installation ids are filtered out of the index, and
   auth.json, trust.json, models-store.json and sessions/ stay in the home. The
   checkout is shared between hosts, so they share one `deviceId` (the host id pi sends
@@ -305,7 +306,7 @@ MIT licensed; see `LICENSE`.
   direct` then has its tools unreachable even from codemode, with no warning. A run
   that limits the built-ins and still needs such a server's tools names them too:
   `--tools 'read,grep,mcp__<server>__*'` (quoted: zsh refuses an unmatched glob). pi 1.1.0's `--help` says plain names keep MCP
-  tools; track earendil-works/pi#10634. `pi/probes/` holds the probes behind the pi
+  tools; track earendil-works/pi#10634. `harnesses/pi/probes/` holds the probes behind the pi
   facts (see "Re-probing pi" below).
 - [Pinned relay runtime](docs/runbooks/relay-runtime.md): installing and upgrading the
   standalone launcher, isolated rehearsals, and durable inbox recovery limits.
@@ -317,7 +318,7 @@ MIT licensed; see `LICENSE`.
   routing, live-state hygiene, capability facts, profile and command and claim guards,
   relay, ancestry and provenance, session discovery and archiving, and rollout order.
 - `local/`: untracked, and carried between hosts by Dropbox, not git. It holds
-  claude/settings.work.json, codex/config.work.toml and codex/rules/, the files
+  harnesses/claude/settings.work.json, harnesses/codex/config.work.toml and harnesses/codex/rules/, the files
   a home links to that the repository must not publish. The `~/.claude-work`,
   `~/.codex-work` and `~/.codex/rules` links point into it
   (`docs/specs/2026-09-28-local-layer-design.md`).
@@ -455,7 +456,7 @@ order and the `--harness` choices follow the registry.
 
 ## Codex claim guard
 
-`codex/hooks.json` and `codex/work/hooks.json` register ops's claim guard once on
+`harnesses/codex/hooks.json` and `harnesses/codex/work/hooks.json` register ops's claim guard once on
 root `Stop` and once on worker `SubagentStop`. `links.toml` routes them to the
 personal and work homes respectively. The worker event uses `agent_id` to select
 its own claim; shared root metadata does not grant foreign closure authority.
@@ -464,18 +465,18 @@ Codex `/hooks` in each native home.
 
 ## Antigravity CLI hooks
 
-`agy/hooks.json`, linked as `~/.gemini/config/hooks.json`, wires `SessionStart`,
-`PreToolUse` and `Stop` through both `agy/hook` and `relay` (`v0.3.0`, with handler
+`harnesses/agy/hooks.json`, linked as `~/.gemini/config/hooks.json`, wires `SessionStart`,
+`PreToolUse` and `Stop` through both `harnesses/agy/hook` and `relay` (`v0.3.0`, with handler
 `timeout` `60` paired with `--outer-ms 60000`): `SessionStart` and `PreToolUse`
-(`run_command`) first run `agy/hook` to trigger `.githooks/harness-state-refresh`
+(`run_command`) first run `harnesses/agy/hook` to trigger `.githooks/harness-state-refresh`
 whenever `~/.gemini/antigravity-cli/settings.json` has been replaced by a regular file so
 startup trust and mid-turn `/model`, `/effort` or `/config` saves sync back and relink
 before commands run (emitting empty stdout on `PreToolUse` so `agy` keeps its own
-permission prompts); `SessionStart` in `agy/hook` also runs lore's profile hook and ops's
+permission prompts); `SessionStart` in `harnesses/agy/hook` also runs lore's profile hook and ops's
 capture notice in `workspacePaths[0]` and injects their text as a `systemMessage`;
 `relay` publishes the `agy:<conversationId>` session row, dispatches `SessionStart`,
 `PreToolUse` (`*`) and `Stop` to `familiar-agy`, and translates `run_command` to `Bash`
-for ops's `relay-guard` (`ops-guard`), failing closed; and `Stop` runs `agy/hook`'s
+for ops's `relay-guard` (`ops-guard`), failing closed; and `Stop` runs `harnesses/agy/hook`'s
 one-shot `agy:<conversationId>` live task claim check (allowing stops while `fullyIdle`
 is `false` under `agy`'s probed `controller-wake`, until ops-33cef9 lands) alongside
 `harness-state-refresh` and `relay`.
@@ -534,21 +535,21 @@ inconclusive run is recorded on its task and changes nothing in the file.
 pi has two runtimes with different guarantees, declared as two harnesses: `pi` is the
 CLI and its RPC mode (`pi --mode rpc`), and `pi-durable` is the SDK's durable `Harness`,
 which the CLI does not use. A feature shown for one is never an entry for the other.
-Each fact's `version` is the pinned package version. A change to `pi/package.json` is a
+Each fact's `version` is the pinned package version. A change to `harnesses/pi/package.json` is a
 new epoch: run `just pi-install`, then the RPC and durable probes below, and update
 every pi entry in one commit before anything relies on the new version unattended.
 The first interactive run on the new pin shows its changelog and writes the new `lastChangelogVersion` into
-`pi/settings.json`, a tracked change: commit it, or a merge that touches the file stops
-on it. Also rerun `pi/probes/extension-probe.py` and its tests in
+`harnesses/pi/settings.json`, a tracked change: commit it, or a merge that touches the file stops
+on it. Also rerun `harnesses/pi/probes/extension-probe.py` and its tests in
 `tools/test_pi_extension_probe.py`: capture relies on picker event ordering and
 settings writes, not just the RPC facts. The extension probe uses a scratch agent
 directory, a dummy provider and a private tmux server for its picker checks; it makes
 no API requests or live-home changes. Start with `--check P1a` as a pilot, then run all
 checks and retain their JSON observations on the evidence task.
 
-- `pi/probes/rpc-probe.py` drives `pi/bin/pi --mode rpc` in a temporary agent directory
-  with a local MCP server (`pi/probes/mcp-probe-server.py`).
-- `pi/probes/durable-probe.mjs` drives the SDK; its header says how to run it against
+- `harnesses/pi/probes/rpc-probe.py` drives `harnesses/pi/bin/pi --mode rpc` in a temporary agent directory
+  with a local MCP server (`harnesses/pi/probes/mcp-probe-server.py`).
+- `harnesses/pi/probes/durable-probe.mjs` drives the SDK; its header says how to run it against
   the pinned install.
 
 Both probes need `ANTHROPIC_API_KEY`, use the cheapest Anthropic model, and print one
@@ -623,7 +624,7 @@ The pause still refuses `cd`, `env` wrappers and compound shell commands.
 ### Re-probing the turn-pause hook facts
 
 The hook facts the turn pause reads (`hook-*`, `model-tool-surface`, `codex-*`) come
-from `claude/probes/turn-pause-probe.py` and `codex/probes/turn-pause-probe.py`. After
+from `harnesses/claude/probes/turn-pause-probe.py` and `harnesses/codex/probes/turn-pause-probe.py`. After
 a Claude Code or Codex upgrade, run each case into a fresh directory under the task's
 scratch (`run <case> <dir>`, then `summarize <dir>`) and refresh that harness's entries
 in one commit:
@@ -674,9 +675,9 @@ file through an old skill link into this checkout does not count as convergence.
 
 ## Claude Code mods
 
-`claude/mods/<name>/` holds Claude Code function-hook plugins. `~/.claude/mods` links
-to `claude/mods` (`just link --apply`), and `CLAUDE_CODE_PLUGIN_DIRS` in the `env`
-block of `claude/settings.json` names each mod folder to load. On a host without the
+`harnesses/claude/mods/<name>/` holds Claude Code function-hook plugins. `~/.claude/mods` links
+to `harnesses/claude/mods` (`just link --apply`), and `CLAUDE_CODE_PLUGIN_DIRS` in the `env`
+block of `harnesses/claude/settings.json` names each mod folder to load. On a host without the
 link, sessions start normally, just without the mods. A new mod needs its folder
 added to that variable, separated by `:`.
 
@@ -693,7 +694,7 @@ invocation. Very long output is cut to what a pane can draw, with a line saying 
 many lines were left out.
 
 The engine writes .claude-plugin/types/ and tsconfig.json into each mod folder
-when it loads one, and the mod's `.gitignore` covers them. `tsc -p claude/mods/<name>`
+when it loads one, and the mod's `.gitignore` covers them. `tsc -p harnesses/claude/mods/<name>`
 then type-checks it, and `just mods` runs `claude plugin validate` and
 `claude plugin test` on every mod.
 
@@ -702,3 +703,6 @@ then type-checks it, and `just mods` runs `claude plugin validate` and
 This project was `tack` until 2026-10, and `ai` before 2026-09. Old `tack-<hex>` and
 `ai-<hex>` task ids resolve through the tasks aliases, and `tasks resolve` maps the old
 directories and their worktree storage to `hq`.
+
+For the one-time transition from the former root directories, use the reviewed
+[state-preserving layout activation runbook](docs/runbooks/harness-layout.md).

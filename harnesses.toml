@@ -4,24 +4,24 @@
 schema = 1
 
 [harnesses.agy.live_state]
-config = "agy/settings.json"
-filter_glob = "agy/settings*.json"
+config = "harnesses/agy/settings.json"
+filter_glob = "harnesses/agy/settings*.json"
 format = "json"
 clean_keys = ["model", "effort", "effortByBase", "trustedWorkspaces", "seasonalThemesOptIn"]
 picks_record = "local/live-picks-agy.json"
 pick_units = [["model"], ["effort", "effortByBase"], ["trustedWorkspaces"], ["seasonalThemesOptIn"]]
 
 [harnesses.claude-code.live_state]
-config = "claude/settings.json"
-filter_glob = "claude/settings*.json"
+config = "harnesses/claude/settings.json"
+filter_glob = "harnesses/claude/settings*.json"
 format = "json"
 clean_keys = ["model", "modelSettings", "effortLevel"]
 picks_record = "local/live-picks.json"
 pick_units = [["model", "modelSettings"], ["effortLevel"]]
 
 [harnesses.codex.live_state]
-config = "codex/config.toml"
-filter_glob = "codex/config*.toml"
+config = "harnesses/codex/config.toml"
+filter_glob = "harnesses/codex/config*.toml"
 format = "toml"
 clean_keys = [
   { table = "", keys = ["model", "model_reasoning_effort"] },
@@ -36,8 +36,8 @@ pick_units = [["model", "model_reasoning_effort"]]
 [harnesses.opencode]
 
 [harnesses.pi.live_state]
-config = "pi/settings.json"
-filter_glob = "pi/settings*.json"
+config = "harnesses/pi/settings.json"
+filter_glob = "harnesses/pi/settings*.json"
 format = "json"
 clean_keys = ["defaultProvider", "defaultModel", "defaultThinkingLevel", "deviceId", "trackingId"]
 unrestored_keys = ["deviceId", "trackingId"]

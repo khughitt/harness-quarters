@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Keep Codex project trust across git commands that overwrite codex/config.toml.
+"""Keep Codex project trust across git commands that overwrite harnesses/codex/config.toml.
 
 The harness-state clean filter keeps Codex's [projects."<path>"] trust tables out of
-the index, so a git command that writes a new blob of codex/config.toml over the live
+the index, so a git command that writes a new blob of harnesses/codex/config.toml over the live
 file drops them. This tool saves them in local/codex/trust.toml, untracked and carried
 between hosts by Dropbox, and puts back the ones a checkout dropped:
 
@@ -23,7 +23,7 @@ and exits 0: git ends a checkout with the hook's status, and a switch that worke
 exit 1. The next turn end retries. restore also takes group and other access off the live
 file: a checkout writes it with the umask's mode, and Codex's config is private.
 Every operation holds local/harness-state.lock, the host lock live-picks also takes. The tool works on the checkout
-it lives in and refuses a linked worktree, whose codex/config.toml is not live. Design:
+it lives in and refuses a linked worktree, whose harnesses/codex/config.toml is not live. Design:
 docs/specs/2026-09-29-codex-trust-restore-design.md.
 """
 import contextlib
@@ -44,7 +44,7 @@ except (ImportError, SyntaxError) as error:
 CHECKOUT = harness_state.Checkout("codex-trust")
 HERE = harness_state.HERE
 REPO = harness_state.REPO
-LIVE_NAME = "codex/config.toml"
+LIVE_NAME = "harnesses/codex/config.toml"
 SAVED_NAME = "local/codex/trust.toml"
 LIVE = REPO / LIVE_NAME
 SAVED = REPO / SAVED_NAME
@@ -228,7 +228,7 @@ rebasing = CHECKOUT.rebasing
 
 @contextlib.contextmanager
 def locked():
-    """Hold the host lock live-picks shares: both rewrite codex/config.toml."""
+    """Hold the host lock live-picks shares: both rewrite harnesses/codex/config.toml."""
     if not SAVED.parent.is_dir():
         fail("local/codex/ is missing; run `just setup`")
     if not LIVE.is_file():

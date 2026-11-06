@@ -27,7 +27,7 @@ file is copied. The live access token reaches the runs only in their environment
 into the scratch home. The probe refuses to start with under 15 minutes of token life.
 The model is claude-haiku-5-5 and the spend is a few cents.
 
-    claude/probes/successor-link-probe.py [--keep]   # --keep leaves the directory for reading
+    harnesses/claude/probes/successor-link-probe.py [--keep]   # --keep leaves the directory for reading
 
 The directory (traces, transcripts, debug logs) is kept whenever the outcome is neither true
 nor false. On exit, SIGTERM or SIGHUP, every process carrying this run's marker variable is

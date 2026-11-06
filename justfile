@@ -55,16 +55,16 @@ hook-pre-push: check-hygiene test
 
 hook-pre-push-fast: check-hygiene test
 
-# Install the pinned pi (pi/package.json and its lock) under ~/.local/share/pi/<version>,
-# outside the synced checkout; pi/bin/pi runs it. pi needs no lifecycle scripts (its README).
+# Install the pinned pi (harnesses/pi/package.json and its lock) under ~/.local/share/pi/<version>,
+# outside the synced checkout; harnesses/pi/bin/pi runs it. pi needs no lifecycle scripts (its README).
 # Rerun the pi probes after a version change.
 pi-install:
     #!/usr/bin/env bash
     set -euo pipefail
-    version=$(node -p "require('./pi/package.json').dependencies['@earendil-works/pi-coding-agent']")
+    version=$(node -p "require('./harnesses/pi/package.json').dependencies['@earendil-works/pi-coding-agent']")
     dest="${PI_INSTALL_ROOT:-$HOME/.local/share/pi}/$version"
     mkdir -p "$dest"
-    cp pi/package.json pi/package-lock.json "$dest/"
+    cp harnesses/pi/package.json harnesses/pi/package-lock.json "$dest/"
     npm ci --prefix "$dest" --ignore-scripts --no-fund --no-audit
 
 # Install the pinned relay outside the synced checkout; relay/bin/relay runs it. The system
@@ -95,6 +95,6 @@ relay-subscribers:
     install -d -m 700 "$HOME/.config/relay"
     install -m 600 "$rendered" "$dest"
 
-# Validate and test each Claude Code mod under claude/mods (needs the claude CLI).
+# Validate and test each Claude Code mod under harnesses/claude/mods (needs the claude CLI).
 mods:
-    for mod in claude/mods/*/; do claude plugin validate "$mod" && claude plugin test "$mod" || exit 1; done
+    for mod in harnesses/claude/mods/*/; do claude plugin validate "$mod" && claude plugin test "$mod" || exit 1; done

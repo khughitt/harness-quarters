@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# The pinned pi: runs the install `just pi-install` made for the version in pi/package.json.
+# The pinned pi: runs the install `just pi-install` made for the version in harnesses/pi/package.json.
 # An upgrade is a change to that file, and a new epoch for facts/capabilities.toml: rerun
-# the probes under pi/probes before relying on the new version.
+# the probes under harnesses/pi/probes before relying on the new version.
 set -euo pipefail
 pin="$(dirname "$(readlink -f "$0")")/.."
 version=$(node -p 'require(process.argv[1]).dependencies["@earendil-works/pi-coding-agent"]' "$pin/package.json")
@@ -22,7 +22,7 @@ updates_pi() {
     [[ -z $target ]]
 }
 if [[ ${1-} == update ]] && updates_pi "${@:2}"; then
-    echo "pi: this install is pinned; upgrade by editing pi/package.json in hq, then just pi-install" >&2
+    echo "pi: this install is pinned; upgrade by editing harnesses/pi/package.json in hq, then just pi-install" >&2
     exit 2
 fi
 if [[ ! -x $dir/node_modules/.bin/pi ]]; then
@@ -30,13 +30,13 @@ if [[ ! -x $dir/node_modules/.bin/pi ]]; then
     exit 127
 fi
 if ! cmp -s "$dir/package-lock.json" "$pin/package-lock.json"; then
-    echo "pi: the install at $dir does not match pi/package-lock.json: run just pi-install in the hq checkout" >&2
+    echo "pi: the install at $dir does not match harnesses/pi/package-lock.json: run just pi-install in the hq checkout" >&2
     exit 127
 fi
 export PI_SKIP_VERSION_CHECK=1
 # Start an unbudgeted runner small (pytest -n auto, cargo, nextest, Go); host-budget run
 # overwrites these with its grant, and a value pi was given is kept. Kept equal to
-# claude/settings.json env and codex/config.toml (tools/test_worker_defaults.py).
+# harnesses/claude/settings.json env and harnesses/codex/config.toml (tools/test_worker_defaults.py).
 for var in PYTEST_XDIST_AUTO_NUM_WORKERS CARGO_BUILD_JOBS RUST_TEST_THREADS NEXTEST_TEST_THREADS GOMAXPROCS; do
     export "$var=${!var:-4}"
 done

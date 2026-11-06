@@ -1,6 +1,6 @@
 .worktrees
-claude/plans/*
-!claude/plans/.gitkeep
+harnesses/claude/plans/*
+!harnesses/claude/plans/.gitkeep
 local/
 __pycache__/
 .tt/

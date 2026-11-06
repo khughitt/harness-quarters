@@ -28,10 +28,10 @@ def load_hook():
 CLEAN_FILTER = ".githooks/harness-state-clean %f"
 # Clean tracked configs: what the filter stages from them is their own bytes.
 TRACKED = {
-    "claude/settings.json": json.dumps({"theme": "dark-ansi"}, indent=2) + "\n",
-    "codex/config.toml": "[features]\nhooks = true\n",
-    "pi/settings.json": json.dumps({"theme": "system"}, indent=2) + "\n",
-    "agy/settings.json": json.dumps({"allowNonWorkspaceAccess": True}, indent=2) + "\n",
+    "harnesses/claude/settings.json": json.dumps({"theme": "dark-ansi"}, indent=2) + "\n",
+    "harnesses/codex/config.toml": "[features]\nhooks = true\n",
+    "harnesses/pi/settings.json": json.dumps({"theme": "system"}, indent=2) + "\n",
+    "harnesses/agy/settings.json": json.dumps({"allowNonWorkspaceAccess": True}, indent=2) + "\n",
 }
 
 
@@ -290,8 +290,8 @@ def test_removed_mirror_command_is_refused(repo, capsys):
 
 OVERLAP = """
 [harnesses.extra.live_state]
-config = "agy/settings-x.json"
-filter_glob = "agy/settings-x*.json"
+config = "harnesses/agy/settings-x.json"
+filter_glob = "harnesses/agy/settings-x*.json"
 format = "json"
 clean_keys = ["k"]
 """
@@ -308,7 +308,7 @@ def stage_manifest(old, new):
 def stage_attributes():
     path = Path(".gitattributes")
     path.write_text("".join(line for line in path.read_text().splitlines(keepends=True)
-                            if not line.startswith("pi/")))
+                            if not line.startswith("harnesses/pi/")))
     git("add", ".gitattributes")
 
 
@@ -321,7 +321,7 @@ STAGED_VIOLATIONS = {
                   "pick_units plus unrestored_keys"),
     "overlap": (lambda: stage_manifest("[harnesses.opencode]", OVERLAP.lstrip() + "\n[harnesses.opencode]"),
                 "overlaps"),
-    "gitattributes-drift": (stage_attributes, ".gitattributes lacks `pi/settings*.json"),
+    "gitattributes-drift": (stage_attributes, ".gitattributes lacks `harnesses/pi/settings*.json"),
     "required-unset": (lambda: git("config", "--unset", "filter.harness-state.required"),
                        "filter.harness-state.required"),
     "smudge-unset": (lambda: git("config", "--unset", "filter.harness-state.smudge"),
@@ -355,9 +355,9 @@ def test_staged_live_state_and_gitattributes_violations_are_refused(repo, capsys
 def test_already_leaked_staged_settings_blob_is_refused_until_renormalized(repo, capsys):
     for key in ("required", "clean", "smudge"):
         git("config", "--unset", f"filter.harness-state.{key}")
-    Path("pi/settings.json").write_text(json.dumps({"theme": "system", "deviceId": "leaked-id"}, indent=2) + "\n")
-    git("add", "pi/settings.json")                  # no filter ran: the raw blob is staged
-    assert "leaked-id" in subprocess.run(["git", "show", ":pi/settings.json"], check=True, text=True,
+    Path("harnesses/pi/settings.json").write_text(json.dumps({"theme": "system", "deviceId": "leaked-id"}, indent=2) + "\n")
+    git("add", "harnesses/pi/settings.json")                  # no filter ran: the raw blob is staged
+    assert "leaked-id" in subprocess.run(["git", "show", ":harnesses/pi/settings.json"], check=True, text=True,
                                          capture_output=True).stdout
     git("config", "filter.harness-state.clean", CLEAN_FILTER)    # then just setup runs
     git("config", "filter.harness-state.required", "true")
@@ -365,14 +365,14 @@ def test_already_leaked_staged_settings_blob_is_refused_until_renormalized(repo,
     hook = load_hook()
     assert hook.manifest_check() == 1
     err = capsys.readouterr().err
-    assert "pi/settings.json" in err and "git add --renormalize pi/settings.json" in err, err
+    assert "harnesses/pi/settings.json" in err and "git add --renormalize harnesses/pi/settings.json" in err, err
     assert hook.staged_checks() == 1
     capsys.readouterr()
 
-    git("add", "--renormalize", "pi/settings.json")
+    git("add", "--renormalize", "harnesses/pi/settings.json")
 
     assert hook.manifest_check() == 0, capsys.readouterr().err
     assert hook.staged_checks() == 0, capsys.readouterr().err
-    staged = subprocess.run(["git", "show", ":pi/settings.json"], check=True, text=True,
+    staged = subprocess.run(["git", "show", ":harnesses/pi/settings.json"], check=True, text=True,
                             capture_output=True).stdout
     assert "leaked-id" not in staged and json.loads(staged) == {"theme": "system"}

@@ -15,7 +15,7 @@ import pytest
 HOOKS = Path(__file__).parent
 HOOK_FILES = ("harness-state-clean", "harness_state.py", "codex-trust", "live-picks", "harness-state-refresh",
               "post-checkout", "post-merge", "post-rewrite")
-CONFIG = "codex/config.toml"
+CONFIG = "harnesses/codex/config.toml"
 BASE = "[features]\nhooks = true\n"
 TUI = "[tui]\nx = 1\n"
 A = '[projects."/work/a"]\ntrust_level = "trusted"\n'
@@ -47,18 +47,18 @@ def repo(tmp_path):
     for name in HOOK_FILES:
         shutil.copy2(HOOKS / name, repo / ".githooks" / name)
     shutil.copy2(HOOKS.parent / "harnesses.toml", repo / "harnesses.toml")
-    (repo / "codex").mkdir()
-    (repo / "claude").mkdir()
-    (repo / "pi").mkdir()
-    (repo / "agy").mkdir()
-    (repo / "pi/settings.json").write_text('{"lastChangelogVersion": "1.1.0", "theme": "system"}\n')
-    (repo / "agy/settings.json").write_text('{"allowNonWorkspaceAccess": true}\n')
-    (repo / "claude" / "settings.json").write_text('{\n  "theme": "dark-ansi"\n}\n')
+    (repo / "harnesses/codex").mkdir(parents=True)
+    (repo / "harnesses/claude").mkdir(parents=True)
+    (repo / "harnesses/pi").mkdir(parents=True)
+    (repo / "harnesses/agy").mkdir(parents=True)
+    (repo / "harnesses/pi/settings.json").write_text('{"lastChangelogVersion": "1.1.0", "theme": "system"}\n')
+    (repo / "harnesses/agy/settings.json").write_text('{"allowNonWorkspaceAccess": true}\n')
+    (repo / "harnesses/claude" / "settings.json").write_text('{\n  "theme": "dark-ansi"\n}\n')
     (repo / "local" / "codex").mkdir(parents=True)
-    (repo / ".gitattributes").write_text("claude/settings*.json filter=harness-state\n"
-                                         "codex/config*.toml filter=harness-state\n"
-                                         "pi/settings*.json filter=harness-state\n"
-                                         "agy/settings*.json filter=harness-state\n")
+    (repo / ".gitattributes").write_text("harnesses/claude/settings*.json filter=harness-state\n"
+                                         "harnesses/codex/config*.toml filter=harness-state\n"
+                                         "harnesses/pi/settings*.json filter=harness-state\n"
+                                         "harnesses/agy/settings*.json filter=harness-state\n")
     (repo / ".gitignore").write_text("local/\n__pycache__/\n")
     (repo / CONFIG).write_text(BASE)
     git(repo, "config", "filter.harness-state.clean", ".githooks/harness-state-clean %f")

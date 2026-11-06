@@ -5,11 +5,11 @@ The harness-state clean filter keeps the picks out of the index. Which config ea
 harness picks in, the keys its pickers write, how they group into units and which
 record under local/ saves them come from harnesses.toml (`[harnesses.<name>.live_state]`
 entries with `picks_record` and `pick_units`): today Claude's `model`, `modelSettings`
-and `effortLevel` in claude/settings.json and the top-level `model` and
-`model_reasoning_effort` in codex/config.toml, saved in local/live-picks.json; pi's
-`defaultProvider`, `defaultModel` and `defaultThinkingLevel` in pi/settings.json, saved in
+and `effortLevel` in harnesses/claude/settings.json and the top-level `model` and
+`model_reasoning_effort` in harnesses/codex/config.toml, saved in local/live-picks.json; pi's
+`defaultProvider`, `defaultModel` and `defaultThinkingLevel` in harnesses/pi/settings.json, saved in
 local/live-picks-pi.json; agy's `model`, `effort`, `effortByBase`, `trustedWorkspaces` and
-`seasonalThemesOptIn` in agy/settings.json, saved in local/live-picks-agy.json. A git command that writes a new
+`seasonalThemesOptIn` in harnesses/agy/settings.json, saved in local/live-picks-agy.json. A git command that writes a new
 blob of a file over the live one drops the pick, and the harness runs on its default.
 The records are untracked and carried between hosts by Dropbox; this tool puts the
 picks back:
@@ -36,11 +36,11 @@ captures through its extension after picker events, at turn end and at shutdown.
 Because agy saves `~/.gemini/antigravity-cli/settings.json` by atomic rename over the
 home link when persisting picks or `/config` edits, an anchored host whose
 `~/.gemini/config` links point into this checkout also reads any regular file there
-during capture and adopts it back into `agy/settings.json`, restoring the symlink on
+during capture and adopts it back into `harnesses/agy/settings.json`, restoring the symlink on
 restore, hook and forget. A host not anchored yet can hold a first-run file agy wrote
 before this checkout linked its home: it never held the tracked config, so `first-run`
 (run by `tools/harness-links --apply` before it links the anchors) keeps
-`agy/settings.json` as the base, refuses any key outside the live state that the config
+`harnesses/agy/settings.json` as the base, refuses any key outside the live state that the config
 does not already hold, takes the pick units only that file holds, adds its new list items
 to a held list pick (trustedWorkspaces), and relinks. It refuses while agy runs, since a
 session still holding the first-run settings would save them over the new link.
@@ -92,12 +92,12 @@ SYNOPSIS = ("usage: live-picks capture | restore | sync | first-run | forget <fi
 # The record field that holds a set pick, by config format.
 FIELD = {"json": "values", "toml": "lines"}
 # agy's home adoption: an anchored host's agy home link, replaced by a regular file.
-AGY_CONFIG = "agy/settings.json"
+AGY_CONFIG = "harnesses/agy/settings.json"
 AGY_HOME = Path(".gemini/antigravity-cli")
 AGY_LINK = AGY_HOME / "settings.json"
 AGY_ANCHORS = (
-    (Path(".gemini/config/hooks.json"), Path("agy/hooks.json")),
-    (Path(".gemini/config/skills.json"), Path("agy/skills.json")),
+    (Path(".gemini/config/hooks.json"), Path("harnesses/agy/hooks.json")),
+    (Path(".gemini/config/skills.json"), Path("harnesses/agy/skills.json")),
 )
 
 

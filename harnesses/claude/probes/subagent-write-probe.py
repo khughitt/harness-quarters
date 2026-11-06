@@ -14,7 +14,7 @@ settings only (no user hooks, skills, MCP servers or mods), and the session dire
 Claude Code creates for it is removed; the model is claude-haiku-5-5 and
 the spend is a few cents.
 
-    claude/probes/subagent-write-probe.py [--keep]   # --keep leaves the directory for reading
+    harnesses/claude/probes/subagent-write-probe.py [--keep]   # --keep leaves the directory for reading
 
 The directory (transcript.jsonl, stderr.txt) is kept whenever the outcome is not true.
 """

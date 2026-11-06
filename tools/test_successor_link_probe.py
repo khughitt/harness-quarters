@@ -1,10 +1,10 @@
-"""claude/probes/successor-link-probe.py analysis: what an strace of a resume says about a
+"""harnesses/claude/probes/successor-link-probe.py analysis: what an strace of a resume says about a
 successor's linked subagent transcript, and the verdict a set of runs adds up to."""
 import importlib.util
 import os
 from pathlib import Path
 
-PROBE = Path(__file__).resolve().parent.parent / "claude" / "probes" / "successor-link-probe.py"
+PROBE = Path(__file__).resolve().parent.parent / "harnesses/claude" / "probes" / "successor-link-probe.py"
 spec = importlib.util.spec_from_file_location("successor_link_probe", PROBE)
 probe = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(probe)

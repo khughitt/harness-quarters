@@ -49,9 +49,9 @@ from pathlib import Path
 from . import hosts, inventory, quiesce, state
 from .state import Stop
 
-TARGETS = {"claude": "d/hq/claude/settings.json",
+TARGETS = {"claude": "d/hq/harnesses/claude/settings.json",
            "claude-work": "d/hq/local/claude/settings.work.json",
-           "codex": "d/hq/codex/hooks.json", "codex-work": "d/hq/codex/work/hooks.json"}
+           "codex": "d/hq/harnesses/codex/hooks.json", "codex-work": "d/hq/harnesses/codex/work/hooks.json"}
 CLAUDE_TARGETS = ("claude", "claude-work")
 FILTER = ".githooks/harness-state-clean"
 FILTER_MEMBER = "hq:" + FILTER

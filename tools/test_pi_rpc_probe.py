@@ -1,4 +1,4 @@
-"""pi/probes/rpc-probe.py cleanup: a copy of the probe beside a fake pi, stopped by a
+"""harnesses/pi/probes/rpc-probe.py cleanup: a copy of the probe beside a fake pi, stopped by a
 signal or by an exception. Every process it caused must be gone before its temporary
 directory is: pi, a child in pi's group, and a child in its own session, as pi's bash
 tool runs commands."""
@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-PROBES = Path(__file__).resolve().parent.parent / "pi" / "probes"
+PROBES = Path(__file__).resolve().parent.parent / "harnesses/pi" / "probes"
 
 # --version answers. RPC mode starts a child in its group and a detached one, records
 # pid, group and both children, then either never answers (silent) or answers every

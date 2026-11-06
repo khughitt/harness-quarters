@@ -1,6 +1,6 @@
 """Mechanics shared by the tools that keep host state in this checkout's live harness configs.
 
-codex-trust and live-picks both rewrite codex/config.toml, so they take one host lock,
+codex-trust and live-picks both rewrite harnesses/codex/config.toml, so they take one host lock,
 local/harness-state.lock, around every read-modify-write of a live file or a saved copy.
 Separate locks would let a trust restore and a pick restore read the same starting file
 and each overwrite the other's insert. Each tool works on the checkout it lives in and

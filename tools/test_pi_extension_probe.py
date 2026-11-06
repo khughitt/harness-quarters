@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-EXTENSION = ROOT / "pi" / "extensions" / "harness-state.ts"
+EXTENSION = ROOT / "harnesses/pi" / "extensions" / "harness-state.ts"
 DRIVER = r'''
 const { default: extension } = await import(process.env.EXTENSION);
 const handlers = {}, warnings = [];

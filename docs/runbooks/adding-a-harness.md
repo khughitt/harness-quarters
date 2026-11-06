@@ -47,7 +47,7 @@ limits:
 - `agy`: split homes, a skills manifest, workspace trust and anchored atomic-save
   settings adoption in `live-picks` and `links.toml` (3.1), relay dispatch on
   `SessionStart`, `PreToolUse` and `Stop` (`ops-guard` and `familiar-agy`), and a
-  local adapter hook (`agy/hook`) for detached `settings.json` healing, `SessionStart`
+  local adapter hook (`harnesses/agy/hook`) for detached `settings.json` healing, `SessionStart`
   `injectSteps` wrapping and a one-shot `Stop` claim check until native `claim-guard`
   and `SessionStart` support land (ops-33cef9, hq-c59809).
 - `claude-code`, `codex`: every layer, through relay.
@@ -72,9 +72,9 @@ done
 
 The second pattern catches what the first cannot without a quote or the full slug: bare
 TOML keys (`claude = "~/.claude"` in `<ops-checkout>/profiles.toml`, `[harness.claude]`
-in `links.toml`) and path-shaped constants (`"claude/settings.json"` in
-`harnesses.toml` and the hook tests, `"codex/config.toml"` in `.githooks/codex-trust`,
-`"agy/settings.json"` in `.githooks/live-picks`).
+in `links.toml`) and path-shaped constants (`"harnesses/claude/settings.json"` in
+`harnesses.toml` and the hook tests, `"harnesses/codex/config.toml"` in `.githooks/codex-trust`,
+`"harnesses/agy/settings.json"` in `.githooks/live-picks`).
 
 Hits run to hundreds in the larger repositories, mostly tests. Group them by file and
 classify each site before editing it:
@@ -101,9 +101,9 @@ rejects the new harness until it is extended. A hit inside a two-way branch
 | relay `test/fixtures/ancestry.json` (and `handles.json`) | byte copy in `<tasks-checkout>/tests/fixtures/relay/`, pinned to a relay revision in its README | copy the file from the newer relay revision and update that revision in one tasks commit | tasks tests only |
 | `<relay-checkout>` source | the CLI pin in `relay/package.json` and `relay/package-lock.json`; each harness's hook images name a fixed versioned runtime path | `just relay-install` into the versioned root on this host **before** merging the pin, on other hosts as soon as it syncs; hook images (the tracked hook configs) move per harness in their own hq merge, under their own approval ([Pinned relay runtime](relay-runtime.md)) | CLI pin and hook images: both on merge, on every host sharing the checkout. The launcher exits 127, and a hook image's command cannot start, where the version it names is not installed: every host installs a hook image's version before the image merge; for the CLI pin, other hosts install as soon as the pin merge syncs |
 | `relay/subscribers.template.json` | rendered to `~/.config/relay/subscribers.json`, one file read by **every** relayed harness's hook images | `just relay-subscribers` (with `FORCE=1` over a different file) on each host | per host, at render. A file naming a harness outside a runtime's closed list fails to load in that runtime, which then denies every refusable event (see section 6, Subscribers) |
-| hook scripts in `<ops-checkout>/hooks`, `<lore-checkout>/hooks`, `agy/hook` | invoked by path from the tracked hook configs and the subscriber file | none | on merge to each owner's main |
+| hook scripts in `<ops-checkout>/hooks`, `<lore-checkout>/hooks`, `harnesses/agy/hook` | invoked by path from the tracked hook configs and the subscriber file | none | on merge to each owner's main |
 | `links.toml` | home links on each host | `just link --apply` from `<hq-checkout>` main on each host | per host, at apply |
-| tracked harness settings (`claude/settings.json`, `codex/*.toml`, `agy/settings.json`, …) | read through home links | none | on merge to main, while the link still resolves |
+| tracked harness settings (`harnesses/claude/settings.json`, `harnesses/codex/*.toml`, `harnesses/agy/settings.json`, …) | read through home links | none | on merge to main, while the link still resolves |
 
 ## 2. Home routing and surface delivery (`hq`, `lore`)
 
@@ -151,7 +151,7 @@ home = "~/.<harness>"
   `hooks.json` and `skills.json`). A separate work home gets its own group
   (`[harness.<name>-work]`).
 - **Pinned CLI runtime (optional)**: when `hq` pins and launches the harness itself (as
-  `pi/package.json` + `pi/bin/pi` and `relay/package.json` + `relay/bin/relay` do), add
+  `harnesses/pi/package.json` + `harnesses/pi/bin/pi` and `relay/package.json` + `relay/bin/relay` do), add
   `"~/.local/bin/<tool>" = "<name>/bin/<tool>"` under `[required]` and a
   `just <name>-install` recipe that installs with `npm ci --ignore-scripts` under
   `~/.local/share/<name>/<version>`, outside the synced checkout. The launcher reads
@@ -167,7 +167,7 @@ into its owning checkout (`lore`, including its Superpowers submodule, `flows`, 
 `ops`, `hq`). Deliver that surface by the lightest route the harness supports:
 
 1. **Native `~/.agents/skills` discovery** (`codex`, `pi`): nothing to link.
-2. **Directory manifest** (`agy`): link a tracked manifest such as `agy/skills.json`
+2. **Directory manifest** (`agy`): link a tracked manifest such as `harnesses/agy/skills.json`
    containing `{"entries": [{"path": "../../.agents/skills"}]}` (`agy` resolves relative
    entries against the manifest directory `~/.gemini/config` and rejects unexpanded
    `~/`).
@@ -198,9 +198,9 @@ mapping tables.
   scans tracked files for `$HOME`, the hostname, `$WORK_ROOT`, every registered
   checkout path, their parent sync directory, and home-relative aliases resolving into
   them. Add a tracked harness config or hook file to `layout_allowed` only when the
-  harness reads literal host paths at runtime (`claude/settings.json`,
-  `codex/config.toml`, `codex/hooks.json`, `codex/work/hooks.json`,
-  `agy/settings.json`). Never widen `.ops-check.toml` for documentation or task
+  harness reads literal host paths at runtime (`harnesses/claude/settings.json`,
+  `harnesses/codex/config.toml`, `harnesses/codex/hooks.json`, `harnesses/codex/work/hooks.json`,
+  `harnesses/agy/settings.json`). Never widen `.ops-check.toml` for documentation or task
   attachments.
 
 ### First-run ordering
@@ -258,8 +258,8 @@ A harness that replaces the link needs an explicit synchronization contract befo
 live-state layer counts as selected: for `agy`, `.githooks/live-picks` checks an
 in-checkout anchor link (`~/.gemini/config/hooks.json` or `skills.json`), reads any
 detached regular `~/.gemini/antigravity-cli/settings.json` during `capture`, adopts its
-picks and tracked settings back into `agy/settings.json` while atomically restoring the
-symlink on `restore`, `hook` and `forget`, `agy/hook` runs `harness-state-refresh` on
+picks and tracked settings back into `harnesses/agy/settings.json` while atomically restoring the
+symlink on `restore`, `hook` and `forget`, `harnesses/agy/hook` runs `harness-state-refresh` on
 `SessionStart` and `PreToolUse` when the file is regular, and `[harness.agy]` declares
 `adopt = ["settings.json"]` with `anchors` in `links.toml` so `just link-check` flags an
 unhealed zero-turn replacement and `just link --apply` converges it via `live-picks sync`
@@ -289,10 +289,10 @@ pick_units = [["model"], ["effort"]]
 
 - `config` and `filter_glob` are directory-qualified, outside `local/`, and `config`
   matches `filter_glob`. The glob's only wildcard is `*`, at most one per `/` segment,
-  and it never crosses `/` (`claude/settings*.json` does not take
-  `claude/settings/nested.json`), as in `.gitattributes`. No two entries share a
-  `config` or `filter_glob`, and no two globs can match one path (`agy/settings*.json`
-  and `agy/settings-x*.json` are refused together).
+  and it never crosses `/` (`harnesses/claude/settings*.json` does not take
+  `harnesses/claude/settings/nested.json`), as in `.gitattributes`. No two entries share a
+  `config` or `filter_glob`, and no two globs can match one path (`harnesses/agy/settings*.json`
+  and `harnesses/agy/settings-x*.json` are refused together).
 - `clean_keys` lists what the filter strips. For JSON, top-level keys. For TOML, a list
   of `{ table = "<regex>", keys = [...] }` rules, where `table` is a regex the table
   header must fully match and `""` is the top level before the first header.
@@ -393,19 +393,19 @@ replaced requires the adoption adapter in `live-picks` and `links.toml` (3.1, 3.
 Trigger `~/.local/bin/harness-state-refresh` (a `[required]` link, so hook configs
 never hardcode `<hq-checkout>`) from whichever lifecycle hook the harness provides:
 
-- **`Stop` command hook** (`claude/settings.json`, `codex/hooks.json`,
-  `codex/work/hooks.json`, `agy/hooks.json`): drains stdin, writes nothing to stdout,
+- **`Stop` command hook** (`harnesses/claude/settings.json`, `harnesses/codex/hooks.json`,
+  `harnesses/codex/work/hooks.json`, `harnesses/agy/hooks.json`): drains stdin, writes nothing to stdout,
   and refreshes at the end of every turn.
-- **In-process extension** (`pi/extensions/harness-state.ts`): schedules a refresh via
+- **In-process extension** (`harnesses/pi/extensions/harness-state.ts`): schedules a refresh via
   `setImmediate` after `model_select` and `thinking_level_select` (so the harness's
   own write lands first), plus on `agent_settled` and `session_shutdown`.
 
 ### 3.6 Workspace trust preservation
 
-- **Single JSON key** (`agy/settings.json`'s `trustedWorkspaces`): declare it in
+- **Single JSON key** (`harnesses/agy/settings.json`'s `trustedWorkspaces`): declare it in
   `clean_keys` and as its own pick unit, `["trustedWorkspaces"]`. `live-picks first-run`
   adds a first-run file's new trusted workspaces to the held list rather than replacing it.
-- **Dynamic TOML tables per directory** (`codex/config.toml`'s `[projects."<path>"]`):
+- **Dynamic TOML tables per directory** (`harnesses/codex/config.toml`'s `[projects."<path>"]`):
   drop them through `clean_tables` and name that pattern as `trust_table`. Saving and
   restoring them is a helper of its own, not a manifest entry: `.githooks/codex-trust`
   serves `codex` alone (it reads `trust_table` from the `codex` entry), persisting tables
@@ -485,7 +485,7 @@ inside `<hq-checkout>`.
   `agents/bin/wake-judge`; add a `judge_<name>` function and register it in its
   `JUDGES` table.
 - **A fact only this harness has** (as the `pi` facts point at
-  `pi/probes/extension-probe.py`): place the probe under `<name>/probes/` and set
+  `harnesses/pi/probes/extension-probe.py`): place the probe under `<name>/probes/` and set
   `probe` on the fact.
 - **A shared fact with no probe yet**: write one that every harness can run, or keep
   the harness-specific procedure in the evidence task and leave `probe` unset.
@@ -527,7 +527,7 @@ harnesses differ on four axes:
 
 | Axis | Claude Code and Codex | Antigravity (`agy`) |
 | --- | --- | --- |
-| Config structure | `{"hooks": {"<Event>": [{"matcher": "...", "hooks": [{"type": "command", "command": "...", "timeout": ...}]}]}}` in `claude/settings.json` or `codex/hooks.json` | Top-level hook names in `agy/hooks.json`: `{"<hook-name>": {"enabled": true, "Stop": [{"type": "command", "command": "..."}], "PreToolUse": [{"matcher": "...", "hooks": [...]}]}}` (flat handler lists on `SessionStart`, `PreInvocation`, `PostInvocation`, `Stop`; `matcher` + `hooks` groups only on `PreToolUse` and `PostToolUse`) |
+| Config structure | `{"hooks": {"<Event>": [{"matcher": "...", "hooks": [{"type": "command", "command": "...", "timeout": ...}]}]}}` in `harnesses/claude/settings.json` or `harnesses/codex/hooks.json` | Top-level hook names in `harnesses/agy/hooks.json`: `{"<hook-name>": {"enabled": true, "Stop": [{"type": "command", "command": "..."}], "PreToolUse": [{"matcher": "...", "hooks": [...]}]}}` (flat handler lists on `SessionStart`, `PreInvocation`, `PostInvocation`, `Stop`; `matcher` + `hooks` groups only on `PreToolUse` and `PostToolUse`) |
 | Stdin payload keys | `snake_case`: `session_id`, `transcript_path`, `cwd`, `hook_event_name`, `stop_hook_active`, `agent_id`, `tool_name`, `tool_input`, `background_tasks`; ops hooks also read `model`, `to_model`, `scratchpad_dir` and `session_crons` where Claude Code sends them | Protojson `camelCase`: `conversationId`, `workspacePaths`, `transcriptPath`, `artifactDirectoryPath`, `modelName`, `toolCall.name`, `toolCall.args`, `fullyIdle` (and further Stop fields recorded in the facts notes) |
 | Shell tool | `Bash` with `tool_input.command` | `run_command` with `toolCall.args.CommandLine` |
 | Stdout contract | `SessionStart`: plain text injected into context. `Stop`: `{"decision": "block", "reason": "..."}` blocks; empty stdout allows | Empty stdout is a no-op, **but** non-empty stdout must be event-shaped JSON: `SessionStart` / `PreInvocation` need `{"injectSteps": [{"systemMessage": {"systemMessage": "..."}}]}`, and `Stop` blocks with `{"decision": "continue", "reason": "..."}` |
@@ -537,16 +537,16 @@ Consequences:
 - **Adapter hooks for JSON-stdout harnesses**: do not wire plain-text `claude-profile`
   or `capture-notice` to a harness that parses `SessionStart` stdout as JSON, or emit
   `"decision": "block"` where only `"continue"` holds the turn. Write one adapter hook
-  in the harness's directory, as `agy/hook` does: it heals detached `settings.json`
+  in the harness's directory, as `harnesses/agy/hook` does: it heals detached `settings.json`
   files on `SessionStart` and `PreToolUse` (emitting empty stdout on `PreToolUse` so
   `agy` keeps its permission flow), wraps `claude-profile` and `capture-notice` output
   in `injectSteps`, and runs a one-shot Stop claim check until claim-guard supports agy
-  natively (ops-33cef9), while `agy/hooks.json` routes `SessionStart`, `PreToolUse` (`*`)
+  natively (ops-33cef9), while `harnesses/agy/hooks.json` routes `SessionStart`, `PreToolUse` (`*`)
   and `Stop` through `relay` (`v0.3.0`). Its tests are `tools/test_agy_hooks.py` and
   the agy cases in `tools/test_claim_guard_wiring.py`,
   `tools/test_capture_notice_wiring.py` and `tools/test_relay_wiring.py`.
 - **Interactive hook trust (Codex)**: Codex hashes every hook command per home. Any
-  edit to `codex/hooks.json` or `codex/work/hooks.json` lands with no Codex TUI or
+  edit to `harnesses/codex/hooks.json` or `harnesses/codex/work/hooks.json` lands with no Codex TUI or
   `codex app-server` running, followed by an interactive `/hooks` review in each home
   under `--no-daemon` ([Pinned relay runtime](relay-runtime.md)).
 

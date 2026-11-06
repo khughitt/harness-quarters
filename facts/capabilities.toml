@@ -248,7 +248,7 @@ note = "request_user_input_async is recorded as an agentMessage with delivery as
 [facts.subagent-write-refused]
 type = "set"
 description = "The file basenames, as case-insensitive globs, for which the harness's file-write tool refuses a write by a subagent while the main agent may write them."
-probe = "claude/probes/subagent-write-probe.py"
+probe = "harnesses/claude/probes/subagent-write-probe.py"
 
 [facts.subagent-write-refused.harness.claude-code]
 status = "probed"
@@ -465,7 +465,7 @@ note = "After a subagent run the root's pi.usage held 1518 tokens, exactly its o
 [facts.pi-extension-symlink-load]
 type = "boolean"
 description = "pi discovers an extension through a symlink in the agent extensions directory."
-probe = "pi/probes/extension-probe.py"
+probe = "harnesses/pi/probes/extension-probe.py"
 
 [facts.pi-extension-symlink-load.harness.pi]
 status = "probed"
@@ -478,7 +478,7 @@ note = "P1a: scratch PI_CODING_AGENT_DIR, symlinked extension, closed RPC stdin;
 [facts.pi-shutdown-awaits-handlers]
 type = "boolean"
 description = "pi awaits asynchronous session_shutdown extension handlers before exiting."
-probe = "pi/probes/extension-probe.py"
+probe = "harnesses/pi/probes/extension-probe.py"
 
 [facts.pi-shutdown-awaits-handlers.harness.pi]
 status = "probed"
@@ -491,7 +491,7 @@ note = "P1a-c: shutdown refresh completes; TERM-ignoring group and leader-exits-
 [facts.pi-default-write-before-deferred-select-handler]
 type = "boolean"
 description = "pi's default settings write precedes a select handler deferred with setImmediate."
-probe = "pi/probes/extension-probe.py"
+probe = "harnesses/pi/probes/extension-probe.py"
 
 [facts.pi-default-write-before-deferred-select-handler.harness.pi]
 status = "probed"
@@ -504,7 +504,7 @@ note = "P2 changed: headless tmux starts on A/medium; saving B reads B/medium in
 [facts.pi-unchanged-default-emits-select]
 type = "boolean"
 description = "Saving the current runtime model or thinking level as the default emits a select event."
-probe = "pi/probes/extension-probe.py"
+probe = "harnesses/pi/probes/extension-probe.py"
 
 [facts.pi-unchanged-default-emits-select.harness.pi]
 status = "probed"
@@ -517,7 +517,7 @@ note = "P2 unchanged: file A/medium, CLI B/high. Save current thinking high firs
 [facts.resume-reads-linked-subagent]
 type = "boolean"
 description = "Resuming a session reads a subagent transcript that the session's subagents directory holds as a symbolic link into another session."
-probe = "claude/probes/successor-link-probe.py"
+probe = "harnesses/claude/probes/successor-link-probe.py"
 
 [facts.resume-reads-linked-subagent.harness.claude-code]
 status = "probed"
@@ -530,7 +530,7 @@ note = "Hand-made pair of ordinary sessions: O ran one background agent to compl
 [facts.hook-deny-all-tools]
 type = "boolean"
 description = "A PreToolUse hook's deny (permissionDecision deny) refuses the call and shows its reason to the model, for every tool the runtime offers its model: spawn, wait, shell, file-write and, for Codex, the outer code-mode exec."
-probe = "claude/probes/turn-pause-probe.py"
+probe = "harnesses/claude/probes/turn-pause-probe.py"
 
 [facts.hook-deny-all-tools.harness.claude-code]
 status = "probed"
@@ -551,7 +551,7 @@ note = "Headless isolated runs (codex/probes/turn-pause-probe.py). No PreToolUse
 [facts.hook-prompt-text]
 type = "boolean"
 description = "UserPromptSubmit carries the typed prompt text, unchanged, in its prompt field."
-probe = "claude/probes/turn-pause-probe.py"
+probe = "harnesses/claude/probes/turn-pause-probe.py"
 
 [facts.hook-prompt-text.harness.claude-code]
 status = "probed"
@@ -572,7 +572,7 @@ note = "The run main UserPromptSubmit payload's prompt equalled the codex exec p
 [facts.hook-agent-id-on-child-calls]
 type = "boolean"
 description = "A child's (subagent's or worker's) tool-call hook payloads carry an agent_id distinct from anything on the root's calls, and the root's session_id."
-probe = "claude/probes/turn-pause-probe.py"
+probe = "harnesses/claude/probes/turn-pause-probe.py"
 
 [facts.hook-agent-id-on-child-calls.harness.claude-code]
 status = "probed"
@@ -593,7 +593,7 @@ note = "Run main: the worker's nested exec_command PreToolUse and PostToolUse (t
 [facts.model-tool-surface]
 type = "set"
 description = "The tool names the runtime offers its model, read from the session's own tool list, under an isolated configuration with no configured MCP servers or plugins. Codex tools reachable only inside code-mode exec are written exec.<name>; MCP tools an account provides are left out and counted in the note."
-probe = "claude/probes/turn-pause-probe.py"
+probe = "harnesses/claude/probes/turn-pause-probe.py"
 
 [facts.model-tool-surface.harness.claude-code]
 status = "probed"
@@ -614,7 +614,7 @@ note = "codex/probes/turn-pause-probe.py run surface: the rollout's additional_t
 [facts.codex-spawn-evidence]
 type = "set"
 description = "The hook events that observed every worker that actually started exactly once: SubagentStart, or the spawn_agent PreToolUse."
-probe = "codex/probes/turn-pause-probe.py"
+probe = "harnesses/codex/probes/turn-pause-probe.py"
 
 [facts.codex-spawn-evidence.harness.codex]
 status = "probed"
@@ -627,7 +627,7 @@ note = "run spawn (the specified probe): the exec whose loop spawns three worker
 [facts.hook-posttooluse]
 type = "boolean"
 description = "A PostToolUse hook fires when a tool call returns."
-probe = "claude/probes/turn-pause-probe.py"
+probe = "harnesses/claude/probes/turn-pause-probe.py"
 
 [facts.hook-posttooluse.harness.claude-code]
 status = "probed"
@@ -648,7 +648,7 @@ note = "Run main and spawn-direct: PostToolUse fired for each allowed nested exe
 [facts.hook-compact-event]
 type = "set"
 description = "The compaction hook events that fire for a command hook: PreCompact, PostCompact, both, or none."
-probe = "claude/probes/turn-pause-probe.py"
+probe = "harnesses/claude/probes/turn-pause-probe.py"
 
 [facts.hook-compact-event.harness.claude-code]
 status = "probed"
@@ -665,7 +665,7 @@ note = "Two runs with model_auto_compact_token_limit 20000 did not compact: in t
 [facts.hook-subagent-start]
 type = "boolean"
 description = "A SubagentStart hook fires when a subagent or worker starts, carrying its agent_id."
-probe = "claude/probes/turn-pause-probe.py"
+probe = "harnesses/claude/probes/turn-pause-probe.py"
 
 [facts.hook-subagent-start.harness.claude-code]
 status = "probed"
@@ -686,7 +686,7 @@ note = "Runs main, spawn and spawn-direct: SubagentStart fired once per started 
 [facts.hook-stop-carries-agent]
 type = "boolean"
 description = "Stop and SubagentStop identify which agent stopped: SubagentStop carries the child's agent_id, and Stop the root's session alone."
-probe = "claude/probes/turn-pause-probe.py"
+probe = "harnesses/claude/probes/turn-pause-probe.py"
 
 [facts.hook-stop-carries-agent.harness.claude-code]
 status = "probed"
@@ -707,7 +707,7 @@ note = "Runs main and spawn-direct: each SubagentStop carried the worker's agent
 [facts.hook-prompt-on-wake]
 type = "boolean"
 description = "UserPromptSubmit fires when a child's completion wakes the controller without human input, carrying the wake notification as its prompt."
-probe = "claude/probes/turn-pause-probe.py"
+probe = "harnesses/claude/probes/turn-pause-probe.py"
 
 [facts.hook-prompt-on-wake.harness.claude-code]
 status = "probed"
@@ -724,7 +724,7 @@ note = "Not probed on 0.166.0: codex exec ends the session at the root's Stop, a
 [facts.codex-exec-nested-pretooluse]
 type = "boolean"
 description = "Codex fires PreToolUse for each tool called inside a code-mode exec, rather than once for the exec."
-probe = "codex/probes/turn-pause-probe.py"
+probe = "harnesses/codex/probes/turn-pause-probe.py"
 
 [facts.codex-exec-nested-pretooluse.harness.codex]
 status = "probed"
@@ -737,7 +737,7 @@ note = "Run main: each exec that called tools.exec_command produced one PreToolU
 [facts.hook-tool-names]
 type = "set"
 description = "How a hook names each tool the probes called, written <model-facing name>=<hook tool_name>; Codex tools reached inside code-mode exec are written exec.<name>. A tool that fired no hook is in hook-unhooked-tools instead."
-probe = "codex/probes/turn-pause-probe.py"
+probe = "harnesses/codex/probes/turn-pause-probe.py"
 
 [facts.hook-tool-names.harness.claude-code]
 status = "probed"
@@ -758,7 +758,7 @@ note = "Runs main, spawn-direct, cancel and mcp-deny. Collaboration function too
 [facts.hook-unhooked-tools]
 type = "set"
 description = "Tools the probes called that fired no hook event at all (no PreToolUse, no PostToolUse), so a hook can neither see nor refuse them. Names as in hook-tool-names."
-probe = "codex/probes/turn-pause-probe.py"
+probe = "harnesses/codex/probes/turn-pause-probe.py"
 
 [facts.hook-unhooked-tools.harness.claude-code]
 status = "probed"
@@ -779,7 +779,7 @@ note = "exec: no hook in any run. Run cancel: tools.write_stdin({session_id: 832
 [facts.hook-prompt-on-goal-turn]
 type = "boolean"
 description = "A turn the runtime starts on its own to continue an active goal fires UserPromptSubmit."
-probe = "codex/probes/turn-pause-probe.py"
+probe = "harnesses/codex/probes/turn-pause-probe.py"
 
 [facts.hook-prompt-on-goal-turn.harness.codex]
 status = "probed"
@@ -792,7 +792,7 @@ note = "codex/probes/turn-pause-probe.py run goal-tui (interactive interface in 
 [facts.hook-prompt-on-scheduled-wake]
 type = "boolean"
 description = "A turn started by work the session scheduled for itself (Claude Code ScheduleWakeup or CronCreate) fires UserPromptSubmit, carrying the scheduled prompt."
-probe = "claude/probes/turn-pause-probe.py"
+probe = "harnesses/claude/probes/turn-pause-probe.py"
 
 [facts.hook-prompt-on-scheduled-wake.harness.claude-code]
 status = "probed"

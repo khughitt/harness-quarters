@@ -19,8 +19,8 @@ ALL_TOOLS = ('PreToolUse', 'PostToolUse', 'PostToolUseFailure')
 # SessionEnd row); every other turn-pause entry declares 5 s.
 TIMEOUTS = {('codex', 'SessionEnd'): 3}
 DEFAULT_TIMEOUT = 5
-CASES = [('claude/settings.json', 'claude-code'), ('codex/hooks.json', 'codex'),
-         ('codex/work/hooks.json', 'codex')]
+CASES = [('harnesses/claude/settings.json', 'claude-code'), ('harnesses/codex/hooks.json', 'codex'),
+         ('harnesses/codex/work/hooks.json', 'codex')]
 
 
 def entries(file, event):

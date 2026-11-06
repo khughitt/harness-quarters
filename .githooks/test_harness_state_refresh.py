@@ -8,9 +8,9 @@ from pathlib import Path
 import pytest
 
 HOOKS = Path(__file__).parent
-SETTINGS = "claude/settings.json"
-PI_SETTINGS = "pi/settings.json"
-AGY_SETTINGS = "agy/settings.json"
+SETTINGS = "harnesses/claude/settings.json"
+PI_SETTINGS = "harnesses/pi/settings.json"
+AGY_SETTINGS = "harnesses/agy/settings.json"
 
 
 def child_env(repo):
@@ -38,21 +38,21 @@ def repo(tmp_path):
     """A checkout shaped like this one: the filter, the refresh, codex-trust, and filtered configs."""
     repo = tmp_path / "ai"
     (repo / ".githooks").mkdir(parents=True)
-    (repo / "claude").mkdir()
-    (repo / "codex").mkdir()
-    (repo / "pi").mkdir()
-    (repo / "agy").mkdir()
+    (repo / "harnesses/claude").mkdir(parents=True)
+    (repo / "harnesses/codex").mkdir(parents=True)
+    (repo / "harnesses/pi").mkdir(parents=True)
+    (repo / "harnesses/agy").mkdir(parents=True)
     (repo / "local" / "codex").mkdir(parents=True)
     for name in ("harness-state-clean", "harness-state-refresh", "codex-trust",
                  "harness_state.py", "live-picks"):
         shutil.copy2(HOOKS / name, repo / ".githooks" / name)
     shutil.copy2(HOOKS.parent / "harnesses.toml", repo / "harnesses.toml")
-    (repo / ".gitattributes").write_text("claude/settings*.json filter=harness-state\n"
-                                         "codex/config*.toml filter=harness-state\n"
-                                         "pi/settings*.json filter=harness-state\n"
-                                         "agy/settings*.json filter=harness-state\n")
+    (repo / ".gitattributes").write_text("harnesses/claude/settings*.json filter=harness-state\n"
+                                         "harnesses/codex/config*.toml filter=harness-state\n"
+                                         "harnesses/pi/settings*.json filter=harness-state\n"
+                                         "harnesses/agy/settings*.json filter=harness-state\n")
     (repo / ".gitignore").write_text("local/\n__pycache__/\n")
-    (repo / "codex" / "config.toml").write_text("[features]\nhooks = true\n")
+    (repo / "harnesses/codex" / "config.toml").write_text("[features]\nhooks = true\n")
     git(repo, "init", "-q")
     assert Path(git(repo, "rev-parse", "--show-toplevel").stdout.strip()) == repo.resolve()
     assert Path(git(repo, "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(repo.resolve())
@@ -173,10 +173,10 @@ def test_an_agy_replaced_regular_file_is_adopted_relinked_and_unmarked(repo, tmp
         "GIT_COMMITTER_EMAIL": "t@example.invalid",
         "PYTHONDONTWRITEBYTECODE": "1",
     }
-    (repo / "agy/hooks.json").write_text("{}\n")
-    subprocess.run(["git", "-C", str(repo), "add", "agy/hooks.json"], env=env, check=True)
+    (repo / "harnesses/agy/hooks.json").write_text("{}\n")
+    subprocess.run(["git", "-C", str(repo), "add", "harnesses/agy/hooks.json"], env=env, check=True)
     subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "hooks"], env=env, check=True)
-    (home / ".gemini/config/hooks.json").symlink_to(repo / "agy/hooks.json")
+    (home / ".gemini/config/hooks.json").symlink_to(repo / "harnesses/agy/hooks.json")
     link = home / ".gemini/antigravity-cli/settings.json"
     link.write_text(json.dumps({
         "allowNonWorkspaceAccess": True,

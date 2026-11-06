@@ -63,12 +63,14 @@ The generated global Projects block is checked by lore.
 
 - `links.toml` and `tools/harness-links`: real harness homes, declared home links and
   their reconciliation through the tasks project registry.
-- `claude/`, `codex/`, `agy/`, `ponytail/` and `local/`: harness settings, hooks, skills registries,
-  plugin defaults (`ponytail/config.json` sets `defaultMode` to `"off"` so Ponytail's skills stay
-  available without `SessionStart`/`SubagentStart` footer injection) and untracked host state. `agy/hooks.json` routes lifecycle and `before-tool` events through
-  `relay`, while `agy/hook` heals detached `agy` settings files and adapts `SessionStart`
-  (profile, capture-notice) and `Stop` (claim-guard until ops-33cef9 lands). `claude/mods/` holds
-  Claude Code function-hook plugins; `claude/probes/` the probes behind Claude Code facts.
+- `harnesses/claude/`, `harnesses/codex/`, `harnesses/agy/`: harness settings, hooks
+  and skill registries. `harnesses/agy/hooks.json` routes lifecycle and `before-tool` events through
+  `relay`, while `harnesses/agy/hook` heals detached `agy` settings files and adapts `SessionStart`
+  (profile, capture-notice) and `Stop` (claim-guard until ops-33cef9 lands). `harnesses/claude/mods/` holds
+  Claude Code function-hook plugins; `harnesses/claude/probes/` the probes behind Claude Code facts.
+- `external/ponytail/`: external integration defaults; `defaultMode` stays `"off"`.
+  Installed plugin caches remain harness-managed. `local/` keeps untracked host state.
+  The one-time move uses [the activation runbook](docs/runbooks/harness-layout.md).
 - `harnesses.toml`: the declared harnesses (`[harnesses.<name>]`) and, for each tracked
   live config, its `[harnesses.<name>.live_state]`: path, filter glob, the keys and tables
   the clean filter strips, and the pick units `live-picks` saves. `.gitattributes` routes
@@ -81,8 +83,8 @@ The generated global Projects block is checked by lore.
   declared harness names from `[harnesses]` in `harnesses.toml`.
 - `agents/skills/session-logs/`: session-store guidance. `agents/bin/` keeps
   session-episodes, wake-judge and their tests.
-- `pi/`: the pinned pi install (`just pi-install`), its launcher, the `settings.json`
-  its home links to, the pick-preserving `pi/extensions/harness-state.ts`, and the probes
+- `harnesses/pi/`: the pinned pi install (`just pi-install`), its launcher, the `settings.json`
+  its home links to, the pick-preserving `harnesses/pi/extensions/harness-state.ts`, and the probes
   behind the `pi` and `pi-durable` facts. A version change reruns the probes (README.md).
 - `relay/`: the pinned relay runtime (`just relay-install`) and its launcher.
 - `tools/session-archive` and `systemd/user/`: transcript capture and pruning.
