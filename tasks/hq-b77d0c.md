@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: refactor/hq-b77d0c-harness-layout
 created: 2026-11-06T01:17:05Z
-updated: 2026-11-06T09:21:26Z
+updated: 2026-11-06T09:30:38Z
 started: 2026-11-06T01:17:12Z
 depends: []
 tags: []
@@ -106,3 +106,4 @@ The user asks to reduce root-directory clutter by grouping harness-specific file
   provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-06T09:21:26Z (refactor/hq-b77d0c-harness-layout): resumed
   provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-06T09:30:38Z (refactor/hq-b77d0c-harness-layout): Preserved the exact prior execution-workspace generation before ledger update at Titan $WORK_ROOT/hq/hq-b77d0c/plans/harness-layout-before-activation, owner task:hq-b77d0c. Every prior member matches committed manifest 0ffda638797acf6fe698b5a754cec5536589763c3417e23392d32a8047eb2c0b at bfecade51140c97618aa7b4fdda767e9aed3c3e6 (tasks/files/hq-b77d0c/retained-manifest-0ffda638797acf6fe698b5a754cec5536589763c3417e23392d32a8047eb2c0b.json). Keep this immutable version while the previous retention checkpoint needs exact bytes; no deletion is authorized. The mutable ledger now advances to approved activation stopped on a changed-input guard, pending a fresh no-writer window.
