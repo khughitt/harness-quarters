@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "operation_id": "64d93f68cbc244d38d00fb94b5d2ee0a",
+  "host": "titan",
+  "inputs": [
+    {
+      "task": "hq-b08a11",
+      "basis": {
+        "project": "hq",
+        "layout": "in-tree",
+        "records_subdir": ".",
+        "commit": "6a7cbc11e022538e71ba582e19ac73a35af5c895",
+        "task_path": "tasks/hq-b08a11.md",
+        "retained_ref": "refs/heads/main"
+      }
+    }
+  ],
+  "declarations": [
+    {
+      "kind": "evidence",
+      "path": "$WORK_ROOT/hq/hq-b77d0c/plans/harness-layout-before-completion",
+      "purpose": "Exact prior execution workspace generation preserved before final successful-activation ledger update",
+      "cleanup_trigger": "After no needed historical checkpoint relies on this generation, verify durable replacement and decide disposition"
+    }
+  ],
+  "preserved_previous": [
+    {
+      "identity": {
+        "host": "titan",
+        "kind": "scratch",
+        "path": "$WORK_ROOT/hq/hq-b77d0c/plans/harness-layout"
+      },
+      "artifact": {
+        "type": "directory",
+        "host": "titan",
+        "path": "$WORK_ROOT/hq/hq-b77d0c/plans/harness-layout-before-completion",
+        "manifest": {
+          "type": "git",
+          "basis": {
+            "project": "hq",
+            "layout": "in-tree",
+            "records_subdir": ".",
+            "commit": "6a7cbc11e022538e71ba582e19ac73a35af5c895",
+            "task_path": "tasks/hq-b08a11.md",
+            "retained_ref": "refs/heads/main"
+          },
+          "path": "tasks/files/hq-b08a11/retained-manifest-2cb6cb1c2915717009f9143fb419c915d30dc5aac19be989549bd5a5e4f224c0.json",
+          "sha256": "2cb6cb1c2915717009f9143fb419c915d30dc5aac19be989549bd5a5e4f224c0"
+        }
+      }
+    }
+  ]
+}
