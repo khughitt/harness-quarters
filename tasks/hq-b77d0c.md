@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: refactor/hq-b77d0c-harness-layout
 created: 2026-11-06T01:17:05Z
-updated: 2026-11-06T02:21:43Z
+updated: 2026-11-06T02:21:45Z
 started: 2026-11-06T01:17:12Z
 depends: []
 tags: []
@@ -23,6 +23,7 @@ The user asks to reduce root-directory clutter by grouping harness-specific file
 ## References
 
 - spec-r1-review (context, kind=review): docs/notes/2026-11-05-harness-layout-spec-r1-report.md — relayed agy review of the original frozen design
+- plan-r1-review (context, kind=review): docs/notes/2026-11-05-harness-layout-plan-r1-report.md — author self-review of the frozen implementation plan
 
 ## Notes
 
