@@ -1,13 +1,13 @@
 ---
 id: hq-fd490e
 title: Activate the reviewed layout and account for adoption
-status: todo
+status: blocked
 priority: 2
 size: s
 complexity: mid
 process: direct
 created: 2026-11-06T02:19:55Z
-updated: 2026-11-06T02:19:55Z
+updated: 2026-11-06T02:20:08Z
 depends: [hq-7930ee]
 parent: hq-b77d0c
 tags: []
@@ -24,3 +24,5 @@ Execute Task 2 only after Task 1 has passed final review and the user has separa
 
 - 2026-11-06T02:19:55Z (add): created
   provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID","origin":"agent"}
+- 2026-11-06T02:20:08Z (refactor/hq-b77d0c-harness-layout): Await parent plan approval, accepted build, and explicit live activation authorization; controller unblocks at that gate.
+  provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
