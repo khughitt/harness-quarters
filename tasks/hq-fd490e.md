@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: refactor/hq-b77d0c-harness-layout
 created: 2026-11-06T02:19:55Z
-updated: 2026-11-06T09:32:38Z
+updated: 2026-11-06T09:33:20Z
 started: 2026-11-06T09:22:25Z
 depends: [hq-7930ee]
 parent: hq-b77d0c
@@ -42,3 +42,5 @@ Execute Task 2 only after Task 1 has passed final review and the user has separa
 - 2026-11-06T09:32:36Z (refactor/hq-b77d0c-harness-layout): retention checkpoint: observed 2026-11-06T09:30:40.436810Z on europa; basis hq in-tree . c602c89f147413ba9bb3fcd0b7ce63097911ec93:tasks/hq-fd490e.md; retained by refs/heads/refactor/hq-b77d0c-harness-layout; this host: kept verified 2, kept unknown 0, released 0; changed 2. This controller observed through SSH and rechecked all kept/verified items on Europa, including the complete 43-entry snapshot and external manifest; exact manifest copy is attached. Other hosts are outside this observation. Next: retain attempt1 and wait for a fresh no-settings-writer window before new snapshot/activation.
   provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-06T09:32:38Z (refactor/hq-b77d0c-harness-layout): Created temporary checkpoint request at Titan $WORK_ROOT/hq/hq-b77d0c/hq-fd490e-checkpoint-request.json outside inventoried containers, owned by hq-fd490e for this accounting boundary; populate with a fresh basis, publish through tasks retained checkpoint, verify exact committed bytes, then discard the redundant request copy.
+- 2026-11-06T09:33:19Z (refactor/hq-b77d0c-harness-layout): attached: retained-op-ca97ceebb85c4fe79460d7f164aa17b3.request.json (879 bytes)
+- 2026-11-06T09:33:19Z (refactor/hq-b77d0c-harness-layout): retention operation: {"version":1,"key":{"coordinator":"hq-fd490e","operation_id":"ca97ceebb85c4fe79460d7f164aa17b3"},"phase":"intent","request":{"type":"attachment","task":"hq-fd490e","name":"retained-op-ca97ceebb85c4fe79460d7f164aa17b3.request.json","sha256":"5a7551b3de58f902dcf9a51f7956093478f6125443ab1d8133f0be21be051b97"},"input_bases":[{"task":"hq-fd490e","basis":{"project":"hq","layout":"in-tree","records_subdir":".","commit":"e6123953cb0bc58efc8fec898b6e99a81c6c247f","task_path":"tasks/hq-fd490e.md","retained_ref":"refs/heads/refactor/hq-b77d0c-harness-layout"}}],"host":"titan","at":"2026-11-06T09:33:19Z","observer":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","outputs":{},"diagnostics":[]}

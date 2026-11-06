@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "operation_id": "ca97ceebb85c4fe79460d7f164aa17b3",
+  "host": "titan",
+  "inputs": [
+    {
+      "task": "hq-fd490e",
+      "basis": {
+        "project": "hq",
+        "layout": "in-tree",
+        "records_subdir": ".",
+        "commit": "e6123953cb0bc58efc8fec898b6e99a81c6c247f",
+        "task_path": "tasks/hq-fd490e.md",
+        "retained_ref": "refs/heads/refactor/hq-b77d0c-harness-layout"
+      }
+    }
+  ],
+  "declarations": [
+    {
+      "kind": "scratch",
+      "path": "$WORK_ROOT/hq/hq-b77d0c/activation-initiating-2026-11-06",
+      "purpose": "Private pre-migration snapshots, exact tested operator snippets and evidence of attempt1 guard refusal before live mutation",
+      "cleanup_trigger": "After successful activation and all host adoption, preserve needed recovery evidence and inspect every retained version before disposal"
+    }
+  ]
+}
