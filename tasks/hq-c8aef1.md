@@ -6,7 +6,7 @@ priority: 2
 reviewed: true
 reviewed_at: 2026-10-29T18:42:08Z
 created: 2026-10-25T11:03:11Z
-updated: 2026-10-29T18:42:08Z
+updated: 2026-11-06T02:16:13Z
 depends: [obs-02e88b, obs-d98663, hq-c4c026]
 parent: hq-cff824
 tags: [feedback, gap, "from:obs"]
@@ -30,3 +30,7 @@ Action: recovering the user's original ask behind an agent-held task. Worked aro
 - 2026-10-26T09:47:19Z (main): partial answer now exists in obs (Stage A, 062b73e, reachable only by explicit path before readout): session_logs.py search --task <id> --sessions lists sessions with stamped or command evidence; show <record ref> prints the turn with its trigger. 'The human turn just before filing' still needs composition (obs-c5c599 trace).
 - 2026-10-29T18:42:08Z (main): scope: briefed; revalidated unchanged and unclaimed before first write; checked hq 7a07ad3, obs beae367 and the amended reader contract e4f3d69. Consumed completed obs-02e88b (six-case join study, merge 5b012ee) and obs-d98663 (reader merge 062b73e): search/show and paired evidence are delivered, while filing-occurrence binding, historical unstamped fallback and older-request interpretation remain design work. Updated the existing shared handoff in 67d3082; preserved captured body, absent source, P2, parent and satisfied dependency edges. Added existing-goal child hq-c4c026 (P2/m/high/planned) and its dependency/wake instruction, separate from obs-a19f59's indexed trace and obs-f3c099's occurrence projection; no duplicate research or new goal. origin: stage 1 unavailable (no creation occurrence note/stamp; no claim that a transcript is absent); stage 2 not applicable (no origin_session); origin remains unknown. brief: docs/notes/2026-10-25-task-origin-lookup-brief.md. Verification: just test passed 1793 tests (231 agents, 1170 hooks/tools, 391 parallel relay, 1 isolated relay); tasks check and git diff --check clean. Record maintenance only; no runtime, skill, link or measurement change; the trial/readout and date-specific rollout gates remain.
   provenance: {"harness_session":"codex:01a188e9-adb7-7061-abd2-4d81fbf33dd1","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-06T02:16:13Z (feedback): feedback from obs: Task session lookup needs cross-harness continuations as well as stamped originating sessions
+  provenance: {"harness_session":"codex:01a1ae9a-5c57-7af3-a18a-37abc0c49337","harness_session_source":"CODEX_THREAD_ID","origin":"agent"}
+- 2026-11-06T02:16:13Z (feedback): detail from obs: A read-only retrospective recovered older controller and worker sessions from task provenance, but the later human continuation and final completion lacked harness_session stamps in the task notes. Locating the relevant continuation required bounded inspection of tool-call inputs across another supported harness; it contained the decisive human request and approval. The lookup work should report missing provenance and distinguish controller, worker, review-only and unrelated scoping sessions rather than treating every mention as execution. Preserve native human question-tool replies as intent evidence as well as ordinary user messages.
+  provenance: {"harness_session":"codex:01a1ae9a-5c57-7af3-a18a-37abc0c49337","harness_session_source":"CODEX_THREAD_ID"}
