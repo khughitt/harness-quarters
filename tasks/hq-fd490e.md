@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: refactor/hq-b77d0c-harness-layout
 created: 2026-11-06T02:19:55Z
-updated: 2026-11-06T09:29:04Z
+updated: 2026-11-06T09:31:17Z
 started: 2026-11-06T09:22:25Z
 depends: [hq-7930ee]
 parent: hq-b77d0c
@@ -35,3 +35,4 @@ Execute Task 2 only after Task 1 has passed final review and the user has separa
 - 2026-11-06T09:22:49Z (refactor/hq-b77d0c-harness-layout): arm: flow-trial-1 — unit tack-b77d0c — flow off
 - 2026-11-06T09:22:51Z (refactor/hq-b77d0c-harness-layout): Created Europa private snapshot directory $WORK_ROOT/hq/hq-b77d0c/activation-adopting-2026-11-06 via the controller SSH operation (mode700), owner task:hq-fd490e. Remote command exited0; contents mutable and will be checkpointed on Europa at the operational boundary. This is a snapshot, not an activated host. Both hosts remain within the approved no-settings-writer window.
 - 2026-11-06T09:29:04Z (refactor/hq-b77d0c-harness-layout): Activation attempt1 stopped by the approved runbook guard before codex-trust/live-picks capture, record rekey, merge or any home-link change. Titan agy/settings.json had identical bytes (SHA256 edef24cfdd814b8a3097ee6d7e559ebe0fb8a4b592c27363a9d3520e3ae12edc) and mode0644 but mtime changed from1793956963632115865 to1793957090838494916 after checkpoint0; parsed settings also identical. Exact writer is unestablished; active agy processes exist, but process presence is not attribution. Both file versions and metadata are retained in the Titan snapshot (raw-before/agy/settings.json, agy-at-guard-refusal.json, guard-refusal.json). Europa checkpoint comparison found no changed input; its absent probe caches are recorded absence, not a failure. Main remains approved BEFORE, only original agentMode diff; all links old. The guard requires a fresh no-settings-writer window before continuation; no retry or rebaseline was attempted. User activation authorization persists; only the quiescent window needs renewal.
+- 2026-11-06T09:31:17Z (refactor/hq-b77d0c-harness-layout): attached: activation-europa-attempt1-manifest.json (6127 bytes): Complete Europa snapshot manifest observed by controller over SSH after guard refusal; raw private snapshot stays on Europa; 43 entries, no omitted metadata
