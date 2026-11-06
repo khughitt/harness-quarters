@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "operation_id": "85fdbcb7da8f4e12b4723e54a0464b8d",
+  "host": "titan",
+  "inputs": [
+    {
+      "task": "hq-b77d0c",
+      "basis": {
+        "project": "hq",
+        "layout": "in-tree",
+        "records_subdir": ".",
+        "commit": "caef4da400cdcb8e1eb873ac4291e6919f7dd5df",
+        "task_path": "tasks/hq-b77d0c.md",
+        "retained_ref": "refs/heads/refactor/hq-b77d0c-harness-layout"
+      }
+    }
+  ],
+  "declarations": [
+    {
+      "kind": "worktree",
+      "path": ".worktrees/hq-b77d0c",
+      "purpose": "Reviewed harness layout build awaiting separately approved activation; implementation and record history retained",
+      "cleanup_trigger": "After approved activation and all host adoption are settled, preserve review ledger/evidence and perform host-pointer, ignored-file and timing checks before removal"
+    },
+    {
+      "kind": "scratch",
+      "path": "$WORK_ROOT/hq/hq-b77d0c/plans/harness-layout",
+      "purpose": "Complete execution ledger, frozen review package/report, test logs and activation preparation evidence",
+      "cleanup_trigger": "After activation/adoption and review rulings/minors are durably preserved on their tasks, inspect and disposition every entry before removal"
+    }
+  ]
+}
