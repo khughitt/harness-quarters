@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: refactor/hq-b77d0c-harness-layout
 created: 2026-11-06T02:19:55Z
-updated: 2026-11-06T09:32:36Z
+updated: 2026-11-06T09:32:38Z
 started: 2026-11-06T09:22:25Z
 depends: [hq-7930ee]
 parent: hq-b77d0c
@@ -41,3 +41,4 @@ Execute Task 2 only after Task 1 has passed final review and the user has separa
 - 2026-11-06T09:31:50Z (refactor/hq-b77d0c-harness-layout): Europa observation supplied by this controller through SSH at 2026-11-06T09:30:40.436810Z: complete snapshot directory enumerated and hashed (43 entries), symlinks not followed, manifest kept outside container; exact manifest bytes retrieved and verified against attached copy. Manual remote checkpoint is used because the current task records are in the Titan code worktree while Europa main deliberately remains BEFORE; no new worktree or live merge was made for bookkeeping. Current child retained set on Europa is exactly the snapshot directory and its manifest; no unknown items or launched processes. Titan snapshot is separately checkpointed locally.
 - 2026-11-06T09:32:36Z (refactor/hq-b77d0c-harness-layout): retention checkpoint: observed 2026-11-06T09:30:40.436810Z on europa; basis hq in-tree . c602c89f147413ba9bb3fcd0b7ce63097911ec93:tasks/hq-fd490e.md; retained by refs/heads/refactor/hq-b77d0c-harness-layout; this host: kept verified 2, kept unknown 0, released 0; changed 2. This controller observed through SSH and rechecked all kept/verified items on Europa, including the complete 43-entry snapshot and external manifest; exact manifest copy is attached. Other hosts are outside this observation. Next: retain attempt1 and wait for a fresh no-settings-writer window before new snapshot/activation.
   provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-06T09:32:38Z (refactor/hq-b77d0c-harness-layout): Created temporary checkpoint request at Titan $WORK_ROOT/hq/hq-b77d0c/hq-fd490e-checkpoint-request.json outside inventoried containers, owned by hq-fd490e for this accounting boundary; populate with a fresh basis, publish through tasks retained checkpoint, verify exact committed bytes, then discard the redundant request copy.
