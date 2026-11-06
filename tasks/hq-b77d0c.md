@@ -6,9 +6,9 @@ priority: 2
 size: m
 complexity: mid
 process: planned
-owner: refactor/hq-b77d0c-harness-layout
+owner: main
 created: 2026-11-06T01:17:05Z
-updated: 2026-11-06T10:02:09Z
+updated: 2026-11-06T10:17:14Z
 started: 2026-11-06T01:17:12Z
 depends: []
 tags: []
@@ -121,4 +121,6 @@ The user asks to reduce root-directory clutter by grouping harness-specific file
 - 2026-11-06T09:36:28Z (refactor/hq-b77d0c-harness-layout): parked (waiting on user, approval): User: confirm a fresh no-settings-writer window on Titan and Europa, then controller/operator starts hq-fd490e and retries the approved activation with new immutable snapshots. Approval of package b0c044f11ef8c4c43487ab9688a05055d7529d09 remains valid; no new implementation approval is needed. Attempt1 stopped before capture/merge/rekey/link changes because Titan agy/settings.json mtime changed despite identical bytes/mode. Exact writer unknown; preserve refusal evidence, never rebaseline the failed checkpoint. Main remains71a4934294f055d42c1cf9dae8290937656fc934, only original agentMode diff; accepted runtime062f7131a59dc81fb22148b05a11741e5642853a unchanged. Task1 done; Task2 parked on this fresh-window gate. Branch refactor/hq-b77d0c-harness-layout remains unmerged at .worktrees/hq-b77d0c; controller/operator owns integration after the window. Parent checkpoint e0c364e6275a430f84cc3459533ed273 verified3 kept identities: locked worktree, updated execution workspace, immutable pre-activation workspace copy preserving exact old checkpoint bytes. Child owns two hosts snapshots and Europa manifest, with separate completed accounting. Current queries complete/zero diagnostics, request copies matched committed bytes before deletion; no workspace mutation after checkpoint. Current ledger progress.md has attempt1 and next action; task-1-evidence.md and final-r1-report.md keep passing focused evidence, policy-off broad omission and two deferred documentation minors. No runtime edits/tests this operational attempt, no remote model calls, no push, no changed host pointers, no surviving launched processes; host-load reports nothing running. Other worktree/ongoing sessions untouched. The typed window question is pending, no id returned; unrelated host activity need not stop.
   provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-06T10:02:09Z (refactor/hq-b77d0c-harness-layout): resumed
+  provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-06T10:17:14Z (main): resumed
   provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
