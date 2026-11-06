@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-11-06T02:19:55Z
-updated: 2026-11-06T10:17:38Z
+updated: 2026-11-06T10:20:31Z
 started: 2026-11-06T09:22:25Z
 depends: [hq-7930ee]
 parent: hq-b77d0c
@@ -59,3 +59,4 @@ Execute Task 2 only after Task 1 has passed final review and the user has separa
 - 2026-11-06T10:04:15Z (refactor/hq-b77d0c-harness-layout): Created fresh Europa snapshot container $WORK_ROOT/hq/hq-b77d0c/activation-adopting-2026-11-06-attempt2 via SSH, mode700, owner task:hq-fd490e; prior attempt1 remains immutable. Both containers are mutable until operational checkpoint; user Ready renewed the no-writer window.
 - 2026-11-06T10:17:38Z (main): resumed
   provenance: {"harness_session":"codex:01a1ae6a-b6e7-7e32-bff6-a39714dc9d75","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-06T10:20:31Z (main): Attempt2 activated accepted runtime062f7131a59dc81fb22148b05a11741e5642853a on main, then Europa adopted. Both just link-check results exit0; all old roots absent, saved record values unchanged apart from four path keys, project trust and private bytes equal, hooks and hook trust preserved, agentMode remains sole unstaged diff. Titan facts/manifest/hygiene and normalized patch equality pass. Private verified.json and operations.log under each attempt2 snapshot bind results. An overstrict operator comparison found only preexisting unrestored Codex screen_reader_detection_done stripped; correcting that assertion to the existing manifest/README contract verified every other parsed value, without changing runtime code. Europa Ponytail path was absent, not a changed link: tested guard confirmed unchanged absence, declared tool created it and retired its owned obsolete skill-lock link under existing manifest policy. All other link changes match the planned16. Shared no-writer window may end. Record-only descendants integrated; remaining work is custody and worktree cleanup, not live activation.
