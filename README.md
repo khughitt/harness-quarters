@@ -318,8 +318,9 @@ MIT licensed; see `LICENSE`.
   routing, live-state hygiene, capability facts, profile and command and claim guards,
   relay, ancestry and provenance, session discovery and archiving, and rollout order.
 - `local/`: untracked, and carried between hosts by Dropbox, not git. It holds
-  harnesses/claude/settings.work.json, harnesses/codex/config.work.toml and harnesses/codex/rules/, the files
-  a home links to that the repository must not publish. The `~/.claude-work`,
+  local/claude/settings.work.json, local/codex/config.work.toml and
+  local/codex/rules/, the files a home links to that the repository must not publish.
+  The `~/.claude-work`,
   `~/.codex-work` and `~/.codex/rules` links point into it
   (`docs/specs/2026-09-28-local-layer-design.md`).
 - `tools/session-archive` and `systemd/user/`: daily capture of agent transcripts (Claude

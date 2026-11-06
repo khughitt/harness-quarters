@@ -138,8 +138,8 @@ resolves through `tasks projects --paths --json`:
 home = "~/.<harness>"
 [harness.<name>.links]
 "AGENTS.md" = "lore:instructions/AGENTS.md"
-"settings.json" = "<name>/settings.json"
-"hooks.json" = "<name>/hooks.json"
+"settings.json" = "harnesses/<name>/settings.json"
+"hooks.json" = "harnesses/<name>/hooks.json"
 ```
 
 - **Global instructions**: always target `lore:instructions/AGENTS.md` under the
@@ -152,12 +152,14 @@ home = "~/.<harness>"
   (`[harness.<name>-work]`).
 - **Pinned CLI runtime (optional)**: when `hq` pins and launches the harness itself (as
   `harnesses/pi/package.json` + `harnesses/pi/bin/pi` and `relay/package.json` + `relay/bin/relay` do), add
-  `"~/.local/bin/<tool>" = "<name>/bin/<tool>"` under `[required]` and a
+  `"~/.local/bin/<tool>" = "harnesses/<name>/bin/<tool>"` under `[required]` and a
   `just <name>-install` recipe that installs with `npm ci --ignore-scripts` under
   `~/.local/share/<name>/<version>`, outside the synced checkout. The launcher reads
   the pin from the checkout each time it runs, so a pin change takes effect on merge:
   install it on this host before merging and on each other host as soon as it syncs.
-- A new tracked `<name>/` directory is also described in hq's `AGENTS.md` Layout and in
+  Harness-specific pins and launchers belong under `harnesses/<name>/`; the shared
+  relay runtime stays under `relay/`.
+- A new tracked `harnesses/<name>/` directory is also described in hq's `AGENTS.md` Layout and in
   `README.md`.
 
 ### Skills delivery
@@ -223,7 +225,7 @@ refusal aborts the whole `--apply` pass with no partial writes.
    ```
 
 3. If a first run already created a real `settings.json` or `config.toml` in the home,
-   move it aside, copy any settings worth keeping into the tracked `<name>/...` file,
+   move it aside, copy any settings worth keeping into the tracked `harnesses/<name>/...` file,
    then rerun `just link --apply`.
 
 ## 3. Live-state and session-state hygiene (`hq`)
@@ -278,8 +280,8 @@ live config is a bare `[harnesses.<name>]` table (`opencode`, `pi-durable`).
 
 ```toml
 [harnesses.<name>.live_state]
-config = "<name>/settings.json"          # the file the home links to
-filter_glob = "<name>/settings*.json"     # every tracked variant the filter takes
+config = "harnesses/<name>/settings.json"      # the file the home links to
+filter_glob = "harnesses/<name>/settings*.json" # every tracked variant the filter takes
 format = "json"                           # or "toml"
 clean_keys = ["model", "effort", "installId"]
 unrestored_keys = ["installId"]
@@ -324,7 +326,7 @@ the filter config, and the pre-commit hook runs it over the staged tree (3.3).
 Add exactly the declared `filter_glob`, once:
 
 ```gitattributes
-<name>/settings*.json filter=harness-state
+harnesses/<name>/settings*.json filter=harness-state
 ```
 
 `.gitattributes` and `harnesses.toml` must agree both ways: a declared glob without its
@@ -485,7 +487,7 @@ inside `<hq-checkout>`.
   `agents/bin/wake-judge`; add a `judge_<name>` function and register it in its
   `JUDGES` table.
 - **A fact only this harness has** (as the `pi` facts point at
-  `harnesses/pi/probes/extension-probe.py`): place the probe under `<name>/probes/` and set
+  `harnesses/pi/probes/extension-probe.py`): place the probe under `harnesses/<name>/probes/` and set
   `probe` on the fact.
 - **A shared fact with no probe yet**: write one that every harness can run, or keep
   the harness-specific procedure in the evidence task and leave `probe` unset.
@@ -931,7 +933,7 @@ transcript does not name its own working directory).
 | Discovery | all | section 1 search | every hit classified on the onboarding task |
 | Home routing and instructions | `hq` (`lore` upstream for Superpowers notes) | `links.toml`, `justfile`, `.ops-check.toml`, `AGENTS.md`, `README.md` | `tools/ops-check`, `just link`, `just link-check` on main after apply |
 | Live-state hygiene | `hq` | `harnesses.toml`, `.gitattributes`, optional trust helper or adoption adapter, `just setup` on every host | `just test`, `.githooks/harness_state.py check`; link survives a harness save; clean `git status` after a turn |
-| Capability facts and probes | `hq` | `harnesses.toml`, `facts/capabilities.toml`, `agents/bin/wake-judge` `JUDGES`, `<name>/probes/`, `README.md` | `tools/harness-facts check`, `list --pretty` |
-| Profile, command guard, claim guard | `lore`, `ops`, `relay`, `hq` | `<name>/hooks.json` or adapter hook, `<ops-checkout>/bin/ops-profile`, `profiles.toml`, `hooks/relay-guard`, `hooks/claim-guard`, `bin/relay-guard-probe`, `relay/subscribers.template.json`, `tools/test_*_wiring.py` | owners' tests; three-case guard evidence; held-once Stop |
+| Capability facts and probes | `hq` | `harnesses.toml`, `facts/capabilities.toml`, `agents/bin/wake-judge` `JUDGES`, `harnesses/<name>/probes/`, `README.md` | `tools/harness-facts check`, `list --pretty` |
+| Profile, command guard, claim guard | `lore`, `ops`, `relay`, `hq` | `harnesses/<name>/hooks.json` or adapter hook, `<ops-checkout>/bin/ops-profile`, `profiles.toml`, `hooks/relay-guard`, `hooks/claim-guard`, `bin/relay-guard-probe`, `relay/subscribers.template.json`, `tools/test_*_wiring.py` | owners' tests; three-case guard evidence; held-once Stop |
 | CLI vocabulary, relay, ancestry, provenance | `ops`, `relay`, `tasks`, `obs`, `familiar`, `hq` | `<ops-checkout>/cli.toml`, `bin/tt`, `bin/tt-report`, `keys.toml`; `<relay-checkout>/src/`, `bin/relay.js`; `<tasks-checkout>/src/relay/`, `src/provenance.rs`, `src/claims.rs`, fixture copy; `<obs-checkout>/{record,join,tt_runs}.py`; `<fam-checkout>/src/` if selected; `relay/package*.json` | owners' tests including conformance; distinct identities for concurrent sessions; stamped notes join |
 | Sessions, archive, `obs` | `hq`, `obs` | `tools/hq_cli/`, `tools/hq.toml`, `tools/session_archive/`, `agents/skills/session-logs/SKILL.md`, `agents/bin/session-episodes`, `<obs-checkout>/<name>_adapter.py`, `stores.py` and the registries discovery finds | `just test`, `hq sessions`, obs tests, live `obs index` |
