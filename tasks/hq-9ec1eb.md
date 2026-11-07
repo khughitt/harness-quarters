@@ -2,15 +2,16 @@
 id: hq-9ec1eb
 title: Prune AGENTS.md by the provenance audit; per-model variants only where the answer differs by model
 status: todo
-priority: "2"
+priority: 2
 size: m
 complexity: mid
 process: direct
 created: 2026-09-12T16:11:20Z
-updated: 2026-09-16T15:51:35Z
+updated: 2026-11-07T22:00:00Z
 depends: []
 tags: [quick-add, skills]
 source: "mindful:thought:8e45d49e001c4e5eb9b00f159dc60e87"
+origin: mixed
 ---
 
 Why: every session on every project loads AGENTS.md (~1170 words of rules) and the tasks skill (~3270 words). The provenance audit (doc/instruction-provenance.md, ai-45934e) found that only two rules have post-rule recurrence on a current model (attribution, design docs) and that in both cases the hook is the working guard, not the prose; the largest bullets spend most of their words on mechanics a tool or hook already owns, or on text duplicated between bullets. Removing that costs no guard by construction, so it needs no experiment. Rules with no recorded failure are a different case: dropping one is a hypothesis, and only a measure (ai-9dfba9, ops-8fdaf6) can test it.
