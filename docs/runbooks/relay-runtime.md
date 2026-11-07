@@ -66,7 +66,9 @@ then plan with its own installer on copies:
 /usr/bin/node "$HOME/.local/share/relay/<version>/node_modules/relay/bin/relay.js" install --harness codex --json --node /usr/bin/node --subscribers "$HOME/.config/relay/subscribers.json" --evidence FILE --target COPY
 ```
 
-Probe evidence is private ops records, not a file under the ops code checkout.
+`<version>` keeps the `v` prefix (the pin's tag, such as `v0.3.0`), and `FILE` is the
+resolved ops records path `<ops-records>/docs/runbooks/relay-guard-evidence-codex.json`
+below. Probe evidence is private ops records, not a file under the ops code checkout.
 On each executing host, `tasks where <ops-code-checkout> --json` must resolve the
 ops project and its absolute `project.records` directory outside that checkout.
 The bootstrap inventory, target identity checks and installer use
@@ -91,16 +93,23 @@ bytes.
 Land the images with no Codex process running. Close every session, run
 `codex app-server daemon stop` for the personal home (`CODEX_HOME` unset) and
 `CODEX_HOME="$HOME/.codex-work" codex app-server daemon stop` for the work home, then
-confirm `pgrep -a codex` prints nothing; stop on a survivor rather than killing it.
+confirm `pgrep -a codex` prints nothing. A `codex-trust` line in `pgrep -a codex` is a
+hook finishing; check again once it exits. If the only survivor is
+`codex app-server daemon pid-update-loop`, `daemon stop` does not end it once the
+daemon itself has exited (`notRunning`), so end that leftover updater with `SIGTERM`
+after user confirmation; stop on any other survivor rather than killing it.
 Codex then asks to re-trust each changed hook. Review it in each home from a
 `--no-daemon` launch with no bypass flag (`--dangerously-bypass-approvals-and-sandbox`,
-`--dangerously-bypass-hook-trust`): `codex --no-daemon` for the personal home, `cow`
-for the work home. Codex writes its own trust and nobody edits trust hashes. The
-personal home's new `[hooks.state]` hashes land in tracked `harnesses/codex/config.toml`;
-commit that change after the review. The work home's land in untracked
-`local/codex/config.work.toml`. A rollback stops Codex the same way and reverts the
-merge, which returns both the images and the CLI pin to their previous versions;
-Codex then asks again, and the same review writes the old hashes back in both homes.
+`--dangerously-bypass-hook-trust`): `codex --no-daemon` for the personal home
+(`CODEX_HOME` unset), `cow` for the work home. Codex writes its own trust and nobody
+edits trust hashes. The personal home's new `[hooks.state]` hashes land in tracked
+`harnesses/codex/config.toml`; commit that change after the review. The work home's
+land in untracked `local/codex/config.work.toml`. A rollback stops Codex the same way
+and reverts the pin-and-images commit (or runs `git revert -m 1 <merge>`, noting that a
+whole-merge revert also reverts any runbook and task-record changes in the merge),
+which returns both the images and the CLI pin to their previous versions; Codex then
+asks again, and the same review writes the old hashes back in both homes. Commit the
+personal home's restored `[hooks.state]` hashes in `harnesses/codex/config.toml` too.
 Restore no trust from a copy: the work file holds other live settings.
 
 The historical [operator cutover](relay-cutover.md) describes the v0.1.1 hook
