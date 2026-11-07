@@ -545,6 +545,53 @@ Probe both kinds before touching `controller-wake`:
 A refresh edits `version`, `date`, `evidence` and the values in one commit. An
 inconclusive run is recorded on its task and changes nothing in the file.
 
+### Re-probing the answer-* facts
+
+The `answer-hook-terminal`, `answer-defer-managed`, `answer-server-terminal`,
+`answer-server-managed` and `answer-async-question` facts are probed with disposable
+scratch scripts outside the repository; probe code is never committed here.
+
+Isolate each harness from live homes and running sessions before probing:
+
+- **Terminal sessions.** Run interactive TUI probes on a private detached tmux socket
+  (`tmux -L <probe-name>`) with an empty config so live sessions and bindings stay
+  untouched, and kill that server when done.
+- **Claude Code.** Pass `--settings` pointing to a scratch settings file for hook wiring
+  (or run under a temporary `CLAUDE_CONFIG_DIR`), and for headless `answer-defer-managed`
+  runs include `--permission-prompt-tool` so the question tool is offered.
+- **Codex.** Point `CODEX_HOME` at a temporary directory so the probe gets its own config,
+  session store and app-server daemon socket; copy credentials into the scratch home only
+  for the run and delete the copied auth file before removing the scratch directory.
+- **OpenCode.** Point `XDG_CONFIG_HOME`, `XDG_DATA_HOME` and `XDG_STATE_HOME` at temporary
+  directories and start the TUI with `--server` so form routes hit only the scratch server.
+- **agy.** Run with a temporary home or config directory and scratch hook script so live
+  settings and presence state are not touched.
+
+For each `(fact, harness)` route under test, exercise four cases and record the observed
+behaviour in `note`:
+
+1. **Delayed answer.** Deliver the answer only after several minutes (lifting any default
+   hook timeout explicitly) to confirm the waiting call does not expire early and the turn
+   continues with the delivered answer.
+2. **Restart while pending.** Close and resume the session, or restart the harness server
+   or daemon while a question is pending, and check whether the pending tool call stays
+   answerable, is re-asked under a new identifier, or is dropped.
+3. **Duplicate answer.** Send a second answer to the same pending question and record
+   whether it is rejected, ignored without error, or misrouted.
+4. **Withdrawal or cancellation.** Dismiss the question from the terminal (`Esc` or
+   closing the TUI) or cancel it through the server API, and record whether the hook or
+   pending form settles cleanly and how the transcript records the cancelled call.
+
+Set `status = "probed"` with `value = true` when the route delivers an outside answer to
+the waiting question and the same turn continues with that answer (or, for
+`answer-async-question`, the question ends the turn without blocking and the outside
+answer arrives as a new turn that answers it). Set `status = "probed"` with
+`value = false` when the route is exercised and shown unable to answer the question (for
+example, the tool is absent or refuses, the hook decision is unsupported, or modified
+arguments still block on the TUI card). Leave `status = "unknown"` (with no `value`,
+`version`, `date` or `evidence`) when the route was not exercised or the run was
+inconclusive.
+
 ### Re-probing pi
 
 pi has two runtimes with different guarantees, declared as two harnesses: `pi` is the
