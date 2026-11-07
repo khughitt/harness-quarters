@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/hq-ed4ea4-reprobe-background-output
 created: 2026-10-08T23:32:28Z
-updated: 2026-11-07T15:33:51Z
+updated: 2026-11-07T15:34:16Z
 started: 2026-11-07T15:33:49Z
 depends: []
 tags: []
@@ -22,3 +22,4 @@ README 'Re-probing a fact' asks a did-not-wake verdict to show from the child's 
 - 2026-10-09T01:29:29Z (main): Triage: scoped from feedback report into a README procedure fix.
 - 2026-11-07T15:33:49Z (main): started
 - 2026-11-07T15:33:51Z (docs/hq-ed4ea4-reprobe-background-output): resumed
+- 2026-11-07T15:34:16Z (docs/hq-ed4ea4-reprobe-background-output): trial: flow-trial-1 — enrolled — flow off
