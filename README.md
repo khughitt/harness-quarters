@@ -351,7 +351,11 @@ MIT licensed; see `LICENSE`.
   documents moved to lore and flows stay as references for closed tasks.
 - `tools/ops-docs` and `tools/ops-check`: vendored from ops; change them there.
 - `.ops-check.toml`: the paths the layout check lets carry host values. The six harness
-  settings and hooks files hold absolute paths their homes read literally. The relay
+  settings and hooks files hold absolute paths their homes read literally (or, for
+  `harnesses/agy/settings.json`, stripped `trustedWorkspaces` paths written in place;
+  `harnesses/pi/settings.json` stays checked because `/settings` writes no path keys,
+  pi's project trust lives in ~/.pi/agent/trust.json, and any path-valued setting
+  written there is not stripped by the clean filter). The relay
   cutover tool, its tests, runbook and window plan use fixed fleet names and deployment
   paths; hq-7e81ed removes those entries if it retires the tool. The capture-notice,
   claim-guard and relay wiring tests assert the exact deployed hook strings and are

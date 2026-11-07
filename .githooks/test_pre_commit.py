@@ -227,6 +227,20 @@ def test_shipped_ops_check_config_allows_live_agy_trusted_workspaces(world):
     assert result.returncode == 0, result.stderr
 
 
+def test_shipped_ops_check_config_keeps_pi_settings_checked_for_layout_values(world):
+    repo, env, _ = world
+    shutil.copyfile(OPS_CHECK.parent.parent / ".ops-check.toml", repo / ".ops-check.toml")
+    (repo / "harnesses/pi").mkdir(parents=True)
+    (repo / "harnesses/pi" / "settings.json").write_text(
+        f'{{"theme": "system", "sessionDir": "{env["HOME"]}/sessions"}}\n'
+    )
+    sh(repo, env, "git", "add", ".ops-check.toml", "harnesses/pi/settings.json")
+    result = run_hook(repo, env)
+    assert result.returncode == 1
+    assert "harnesses/pi/settings.json" in result.stderr
+    assert "machine layout" in result.stderr
+
+
 def test_pre_commit_runs_from_linked_worktree_and_enforces_shared_filter_config(world):
     repo, env, tmp_path = world
     worktree = tmp_path / "linked"
