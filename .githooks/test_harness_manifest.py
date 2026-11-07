@@ -122,6 +122,15 @@ def test_shipped_manifest_loads_and_matches_gitattributes_and_git_check_attr(tmp
         assert filtered == matched == (path in positive), path
 
 
+def test_every_harness_stores_adapter_slug_is_declared_in_manifest():
+    sys.path.insert(0, str(REPO / "tools"))
+    import harness_stores
+
+    declared = set(hs.load_manifest().harnesses)
+    slugs = {adapter.slug for adapter in harness_stores.ADAPTERS}
+    assert slugs and slugs <= declared
+
+
 def replaced(old, new, base=JSON_ENTRY):
     assert old in base
     return base.replace(old, new)

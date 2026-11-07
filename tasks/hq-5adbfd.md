@@ -1,15 +1,17 @@
 ---
 id: hq-5adbfd
 title: Test that every tools/harness_stores adapter slug is declared in harnesses.toml
-status: doing
+status: done
 priority: 2
 size: xs
 complexity: low
 process: direct
 owner: test/hq-5adbfd-adapter-slug-manifest
 created: 2026-11-01T18:59:57Z
-updated: 2026-11-07T11:12:00Z
+updated: 2026-11-07T11:12:04Z
 started: 2026-11-07T11:05:04Z
+completed: 2026-11-07T11:12:04Z
+closed: 2026-11-07T11:12:04Z
 depends: [hq-2eba07]
 tags: []
 origin: agent
@@ -32,3 +34,5 @@ Follow-up from hq-2eba07's final whole-branch review (minor 1, named risk a). to
 - 2026-11-07T11:11:56Z (test/hq-5adbfd-adapter-slug-manifest): review detail: round 1 on tree 075763d84ff09e280cf51fa0fcae1366acc28d10 by session:agy:3e77d93f-1466-472d-b90a-9193b81b214e accepted with 0 findings. Reviewer label recorded as bare agy because timeout 2 relay model --harness agy --pretty exited 2 on hq's pinned relay v0.3.0.
 - 2026-11-07T11:11:58Z (test/hq-5adbfd-adapter-slug-manifest): gate: verified tree:075763d84ff09e280cf51fa0fcae1366acc28d10 — checks: just test-one tools/test_harness_stores.py .githooks/test_harness_manifest.py 62 passed (both slug tests seen failing RED against synthetic undeclared-slug break) and just check-hygiene exit 0 and tasks check exit 0; review: none; reviewer: agy
 - 2026-11-07T11:12:00Z (test/hq-5adbfd-adapter-slug-manifest): retro: Checking both harnesses.toml directly in tools/test_harness_stores.py and hs.load_manifest().harnesses in .githooks/test_harness_manifest.py while replacing os.environ['PATH'] with a literal key-by-key env closed the manifest slug parity gap and env-hygiene debt in one pass.
+- 2026-11-07T11:12:04Z (test/hq-5adbfd-adapter-slug-manifest): done
+- 2026-11-07T11:12:04Z (test/hq-5adbfd-adapter-slug-manifest): Asserted that every tools/harness_stores.ADAPTERS slug is declared in harnesses.toml ([harnesses.<slug>]) both directly in tools/test_harness_stores.py (alongside tools/harness-facts list, replacing os.environ['PATH'] with a literal key-by-key PATH) and via hs.load_manifest().harnesses in .githooks/test_harness_manifest.py. Verification: RED observed for both tests against a synthetic undeclared-slug break (2 failed) -> GREEN just test-one tools/test_harness_stores.py .githooks/test_harness_manifest.py (62 passed), just check-hygiene exit 0, tasks check exit 0, and fresh-context review round 1 accept with 0 findings by session:agy:3e77d93f-1466-472d-b90a-9193b81b214e at tree 075763d84ff09e280cf51fa0fcae1366acc28d10. Broad suite deliberately omitted under validated policy-off (.tt.toml automatic_broad = false). Disclosures: nothing pushed; no paid API calls; host pointers unchanged; merging test/hq-5adbfd-adapter-slug-manifest locally into main under personal profile and removing .worktrees/hq-5adbfd in this turn.

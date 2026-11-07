@@ -1,8 +1,8 @@
 """The session-store adapter registry."""
 import json
-import os
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 TOOLS = Path(__file__).resolve().parent
@@ -14,10 +14,12 @@ from hq_cli import cli, color, launch  # noqa: E402
 
 
 def test_every_adapter_slug_is_a_declared_harness(tmp_path):
-    clean_env = {"PATH": os.environ["PATH"], "HOME": str(tmp_path)}
+    manifest = tomllib.loads((TOOLS.parent / "harnesses.toml").read_text())["harnesses"]
+    clean_env = {"PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": str(tmp_path)}
     declared = json.loads(subprocess.run([str(TOOLS / "harness-facts"), "list"], capture_output=True,
                                          text=True, check=True, env=clean_env).stdout)["harnesses"]
-    assert {a.slug for a in harness_stores.ADAPTERS} <= set(declared)
+    slugs = {a.slug for a in harness_stores.ADAPTERS}
+    assert slugs and slugs <= set(manifest) == set(declared)
 
 
 def test_aliases_and_slugs_are_unique():
