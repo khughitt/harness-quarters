@@ -3,7 +3,7 @@
 Cross-harness reference for integration layers in `hq`, hook dispatch in `relay`,
 selected probed behaviour in `facts/capabilities.toml`, and session-store coverage.
 For step-by-step onboarding and enumeration discovery across repositories, see
-[Adding an agent harness](runbooks/adding-a-harness.md). For the full 45-fact table
+[Adding an agent harness](runbooks/adding-a-harness.md). For the full 52-fact table
 across all six declared harness slugs, run `tools/harness-facts list --pretty`.
 
 ## 1. Integration layers across harnesses
@@ -74,7 +74,7 @@ Read capability facts only through `tools/harness-facts` (`~/.agents/bin/harness
 never by parsing `facts/capabilities.toml` directly:
 
 ```sh
-tools/harness-facts list --pretty          # full 45-fact table across all 6 declared slugs
+tools/harness-facts list --pretty          # full 52-fact table across all 6 declared slugs
 tools/harness-facts list                   # full machine-readable JSON
 tools/harness-facts get <fact> <harness>   # single (fact, harness) JSON entry
 ```
@@ -103,6 +103,8 @@ In every table below:
 | `hook-subagent-start` (`boolean`) | `true` (`v2.1.316`, `2026-11-01`, `hq-fe672f`) | `true` (`v0.166.0`, `2026-11-01`, `hq-fe672f`) | `unknown` | `unknown` | `unknown` | `unknown` |
 | `hook-agent-id-on-child-calls` (`boolean`) | `true` (`v2.1.316`, `2026-11-01`, `hq-fe672f`) | `true` (`v0.166.0`, `2026-11-01`, `hq-fe672f`) | `unknown` | `unknown` | `unknown` | `unknown` |
 | `hook-stop-carries-agent` (`boolean`) | `true` (`v2.1.316`, `2026-11-01`, `hq-fe672f`) | `true` (`v0.166.0`, `2026-11-01`, `hq-fe672f`) | `unknown` | `unknown` | `unknown` | `unknown` |
+| `hook-payload-model` (`boolean`) | `false` (`v2.1.316`, `2026-11-01`, `hq-fe672f; hq-d5a56c; hq-f51af7`) | `true` (`v0.162.1`, `2026-10-14`, `hq-1bd166`) | `unknown` | `unknown` | `unknown` | `unknown` |
+| `hook-child-thread-id` (`boolean`) | `true` (`v2.1.316`, `2026-11-01`, `hq-fe672f`) | `true` (`v0.162.1`, `2026-10-14`, `hq-1bd166`) | `unknown` | `unknown` | `unknown` | `unknown` |
 | `hook-compact-event` (`set`) | `["PostCompact", "PreCompact"]` (`v2.1.316`, `2026-11-01`, `hq-fe672f`) | `unknown` | `unknown` | `unknown` | `unknown` | `unknown` |
 | `codex-spawn-evidence` (`set`) | `unknown` | `["PreToolUse", "SubagentStart"]` (`v0.166.0`, `2026-11-01`, `hq-fe672f`) | `unknown` | `unknown` | `unknown` | `unknown` |
 | `codex-exec-nested-pretooluse` (`boolean`) | `unknown` | `true` (`v0.166.0`, `2026-11-01`, `hq-fe672f`) | `unknown` | `unknown` | `unknown` | `unknown` |
@@ -112,7 +114,7 @@ Additional `hq-fe672f` turn-pause hook facts (`hook-prompt-text`, `hook-prompt-o
 `hook-prompt-on-goal-turn`, `hook-prompt-on-scheduled-wake`, `model-tool-surface`, and
 `hook-tool-names`) are listed in full by `tools/harness-facts list --pretty`.
 
-### 3.2 Question and answer routing
+### 3.2 Question, answer, and TUI notification routing
 
 | Fact (`type`) | `claude-code` | `codex` | `agy` | `pi` | `pi-durable` | `opencode` |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -121,6 +123,9 @@ Additional `hq-fe672f` turn-pause hook facts (`hook-prompt-text`, `hook-prompt-o
 | `answer-server-terminal` (`boolean`) | `unknown` | `true` (`v0.162.1`, `2026-10-11`, `hq-d85ede`) | `unknown` | `unknown` | `unknown` | `true` (`v2.0.26`, `2026-10-11`, `hq-d85ede`) |
 | `answer-server-managed` (`boolean`) | `unknown` | `true` (`v0.162.1`, `2026-10-11`, `hq-d85ede`) | `unknown` | `unknown` | `unknown` | `true` (`v2.0.26`, `2026-10-11`, `hq-d85ede`) |
 | `answer-async-question` (`boolean`) | `unknown` | `true` (`v0.162.1`, `2026-10-11`, `hq-d85ede`) | `false` (`v1.4.12`, `2026-10-31`, `hq-e72097`) | `unknown` | `unknown` | `unknown` |
+| `tui-notifications-allowlist` (`boolean`) | `unknown` | `true` (`v0.163.0`, `2026-10-16`, `hq-1ec500; docs/notes/2026-10-15-agent-attention-brief.md`) | `unknown` | `unknown` | `unknown` | `unknown` |
+| `tui-notifications-unfocused-only` (`boolean`) | `unknown` | `true` (`v0.163.0`, `2026-10-16`, `hq-1ec500; docs/notes/2026-10-15-agent-attention-brief.md`) | `unknown` | `unknown` | `unknown` | `unknown` |
+| `tui-notifications-tmux-dcs-wrap` (`boolean`) | `unknown` | `true` (`v0.163.0`, `2026-10-16`, `hq-1ec500; docs/notes/2026-10-15-agent-attention-brief.md`) | `unknown` | `unknown` | `unknown` | `unknown` |
 
 ### 3.3 Headless durability, MCP stdio, and live-pick mechanics (`pi` vs `pi-durable` and others)
 
@@ -141,6 +146,8 @@ conversations, and turn resumption after process death:
 | `mcp-stdio-revisions` (`set`) | `unknown` | `unknown` | `["2025-11-25", "2026-07-28"]` (`v1.4.12`, `2026-10-31`, `hq-e72097`) | `["2025-11-25"]` (`v1.1.0`, `2026-10-11`, `hq-57132d; hq-501726; sci-b40b23`) | `unknown` | `unknown` |
 | `model-pick-event` (`boolean`) | `false` (`v2.1.296`, `2026-10-10`, `hq-f51af7`) | `unknown` | `unknown` | `unknown` | `unknown` | `unknown` |
 | `model-reset-clears-pick` (`boolean`) | `true` (`v2.1.296`, `2026-10-10`, `hq-f51af7`) | `false` (`v0.162.1`, `2026-10-10`, `hq-f51af7`) | `unknown` | `unknown` | `unknown` | `unknown` |
+| `model-env-var` (`boolean`) | `unknown` | `false` (`v0.162.1`, `2026-10-14`, `hq-1bd166`) | `unknown` | `unknown` | `unknown` | `unknown` |
+| `thread-id-rollout-model` (`boolean`) | `unknown` | `true` (`v0.162.1`, `2026-10-14`, `hq-1bd166`) | `unknown` | `unknown` | `unknown` | `unknown` |
 | `pi-extension-symlink-load` (`boolean`) | `unknown` | `unknown` | `unknown` | `true` (`v1.1.0`, `2026-10-15`, `hq-24416e`) | `unknown` | `unknown` |
 | `pi-shutdown-awaits-handlers` (`boolean`) | `unknown` | `unknown` | `unknown` | `true` (`v1.1.0`, `2026-10-15`, `hq-24416e`) | `unknown` | `unknown` |
 | `pi-default-write-before-deferred-select-handler` (`boolean`) | `unknown` | `unknown` | `unknown` | `true` (`v1.1.0`, `2026-10-15`, `hq-24416e`) | `unknown` | `unknown` |
