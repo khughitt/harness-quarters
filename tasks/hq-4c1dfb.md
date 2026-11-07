@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: fix/hq-4c1dfb-hook-reporting
 created: 2026-11-01T19:26:16Z
-updated: 2026-11-07T12:00:05Z
+updated: 2026-11-07T12:00:29Z
 started: 2026-11-07T12:00:05Z
 depends: []
 tags: [hooks]
@@ -22,3 +22,4 @@ Deferred from hq-2eba07's reviews (ledger attached there). On the live hook surf
 - 2026-11-01T19:26:16Z (add): created
   provenance: {"harness_session":"claude-code:fdf3b32f-5e63-4593-bba2-4e994bcdf1eb","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
 - 2026-11-07T12:00:05Z (fix/hq-4c1dfb-hook-reporting): started
+- 2026-11-07T12:00:29Z (fix/hq-4c1dfb-hook-reporting): trial: flow-trial-1 — enrolled — flow off
