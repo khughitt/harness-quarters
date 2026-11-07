@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: fix/hq-4c1dfb-hook-reporting
 created: 2026-11-01T19:26:16Z
-updated: 2026-11-07T12:11:39Z
+updated: 2026-11-07T12:12:06Z
 started: 2026-11-07T12:00:05Z
 completed: 2026-11-07T12:11:39Z
 closed: 2026-11-07T12:11:39Z
@@ -32,3 +32,4 @@ Deferred from hq-2eba07's reviews (ledger attached there). On the live hook surf
 - 2026-11-07T12:11:37Z (fix/hq-4c1dfb-hook-reporting): scope-drift: none
 - 2026-11-07T12:11:39Z (fix/hq-4c1dfb-hook-reporting): done
 - 2026-11-07T12:11:39Z (fix/hq-4c1dfb-hook-reporting): Landed in 4530e9aa on fix/hq-4c1dfb-hook-reporting: moved harness-state-clean stdin UTF-8 decode inside ValueError handler; changed pre-commit staged_checks() to run both facts_check and manifest_check over one export; stripped staged-tree-* temporary paths from with_staged_tree() export error messages. Verified RED (4 failed) -> GREEN ('just test-one .githooks/test_harness_state_clean.py .githooks/test_pre_commit_facts.py .githooks/test_pre_commit.py': 84 passed in 43.89s) and mandatory 'just check-hygiene' (exit 0).
+- 2026-11-07T12:12:06Z (main): Merged fix/hq-4c1dfb-hook-reporting (4530e9aa) to main via fast-forward; ran tt-report (focused test-one: 2 runs, 84 passed; check-hygiene: 1 pass; broad test skipped per .tt.toml policy); verified only regenerable local/ directories and __pycache__/.pytest_cache existed in worktree, no host pointers resolved into .worktrees/hq-4c1dfb, and removed worktree and branch. Nothing pushed; no surviving processes.
