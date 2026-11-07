@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/hq-87db7d-recovery-caveat
 created: 2026-11-01T19:26:17Z
-updated: 2026-11-07T11:27:25Z
+updated: 2026-11-07T11:27:27Z
 started: 2026-11-07T11:26:30Z
 depends: []
 tags: [docs]
@@ -27,3 +27,4 @@ Deferred from hq-2eba07's reviews. README and the adding-a-harness runbook say t
 - 2026-11-07T11:26:58Z (docs/hq-87db7d-recovery-caveat): arm: flow-trial-1 — unit tack-87db7d — flow on
 - 2026-11-07T11:27:23Z (docs/hq-87db7d-recovery-caveat): gate: scoped — adopted
 - 2026-11-07T11:27:25Z (docs/hq-87db7d-recovery-caveat): gate: implementing .worktrees/hq-87db7d
+- 2026-11-07T11:27:27Z (docs/hq-87db7d-recovery-caveat): baseline: documentation-only scope (AGENTS.md, docs/specs/2026-11-01-harness-manifest-design.md, README.md, and justfile comment) under validated policy-off (.tt.toml automatic_broad = false); no focused or broad test obligation.
