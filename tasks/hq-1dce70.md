@@ -1,15 +1,17 @@
 ---
 id: hq-1dce70
 title: Tighten weak and brittle assertions left in the harness manifest tests
-status: doing
+status: done
 priority: 2
 size: s
 complexity: low
 process: direct
 owner: test/hq-1dce70-manifest-test-assertions
 created: 2026-11-01T19:26:19Z
-updated: 2026-11-07T12:20:25Z
+updated: 2026-11-07T12:20:27Z
 started: 2026-11-07T12:12:22Z
+completed: 2026-11-07T12:20:27Z
+closed: 2026-11-07T12:20:27Z
 depends: []
 tags: [tests]
 origin: agent
@@ -28,3 +30,5 @@ Deferred from hq-2eba07's reviews. (1) The clean-only refresh test asserts no lo
 - 2026-11-07T12:20:21Z (test/hq-1dce70-manifest-test-assertions): flow-trial-1: flow off (unit tack-1dce70)
 - 2026-11-07T12:20:23Z (test/hq-1dce70-manifest-test-assertions): rework: none
 - 2026-11-07T12:20:25Z (test/hq-1dce70-manifest-test-assertions): scope-drift: none
+- 2026-11-07T12:20:27Z (test/hq-1dce70-manifest-test-assertions): done
+- 2026-11-07T12:20:27Z (test/hq-1dce70-manifest-test-assertions): Tightened harness manifest test assertions across .githooks/test_harness_state_refresh.py (exact live-picks* byte snapshot before/after clean-only refresh; renamed filter required/smudge test), .githooks/test_harness_state_clean.py (TOML parse/serialize instead of string splitting on harnesses.toml), .githooks/test_pre_commit.py and .githooks/test_pre_commit_facts.py (filter.harness-state.required = false coverage), and .githooks/test_live_picks.py (assert local/harness-state.lock is never created on broken-manifest CLI/hook runs), and added -p no:httpbin to justfile and tools/test-suite. Verified with 'just test-one' (24 passed in 33.64s, no flasgger warning) and mandatory 'just check-hygiene' (exit 0).
