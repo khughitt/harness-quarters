@@ -85,6 +85,9 @@ def repo(tmp_path, request, monkeypatch):
         for name in ("CLAUDE", "CODEX", "PI", "AGY"):
             monkeypatch.setitem(globals(), name, globals()[name].removeprefix("harnesses/"))
     repo = tmp_path / "hq"
+    git(tmp_path, "init", "-q", "-b", "main", str(repo))
+    assert Path(git(repo, "rev-parse", "--show-toplevel").stdout.strip()) == repo.resolve()
+    assert Path(git(repo, "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(repo.resolve())
     (repo / ".githooks").mkdir(parents=True)
     for name in HOOK_FILES:
         shutil.copy2(HOOKS / name, repo / ".githooks" / name)
@@ -104,9 +107,6 @@ def repo(tmp_path, request, monkeypatch):
     (repo / CODEX).write_text(BASE)
     write_pi(repo)
     write_agy(repo)
-    git(tmp_path, "init", "-q", "-b", "main", str(repo))
-    assert Path(git(repo, "rev-parse", "--show-toplevel").stdout.strip()) == repo.resolve()
-    assert Path(git(repo, "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(repo.resolve())
     git(repo, "config", "filter.harness-state.clean", ".githooks/harness-state-clean %f")
     git(repo, "config", "filter.harness-state.required", "true")
     git(repo, "config", "filter.harness-state.smudge", "cat")
@@ -421,6 +421,8 @@ def test_concurrent_syncs_of_both_tools_keep_trust_and_the_pick(repo):
 def test_a_linked_worktree_is_refused(repo, tmp_path):
     other = tmp_path / "other"
     git(repo, "worktree", "add", "-q", "-b", "other", str(other))
+    assert Path(git(other, "rev-parse", "--show-toplevel").stdout.strip()) == other.resolve()
+    assert Path(git(other, "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(repo.resolve())
     (other / "local").mkdir()
 
     result = picks(other, "capture")
@@ -703,6 +705,8 @@ def test_hooks_leave_a_linked_worktree_alone(repo, tmp_path, command):
     picked(repo)
     other = tmp_path / "other"
     git(repo, "worktree", "add", "-q", "-b", "mine", str(other), "main")
+    assert Path(git(other, "rev-parse", "--show-toplevel").stdout.strip()) == other.resolve()
+    assert Path(git(other, "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(repo.resolve())
     if command == "checkout --":
         (other / CLAUDE).write_text('{"theme": "x"}\n')
         result = git(other, "checkout", "-q", "--", CLAUDE)
@@ -1286,6 +1290,8 @@ def test_broken_manifest_hook_exits_zero_with_retry_while_cli_fails_and_bad_args
     isolated_git(repo, home, "switch", "-q", "main")
     other = tmp_path / "other"
     isolated_git(repo, home, "worktree", "add", "-q", "-b", "mine", str(other), "main")
+    assert Path(isolated_git(other, home, "rev-parse", "--show-toplevel").stdout.strip()) == other.resolve()
+    assert Path(isolated_git(other, home, "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(repo.resolve())
     # Age every tracked file and refresh the index while the manifest is valid, so the
     # switch below finds each filtered config stat-clean and only the hooks read the
     # broken manifest, never the clean filter.
@@ -2341,3 +2347,29 @@ def test_unimportable_harness_state_hook_exits_zero_with_retry_while_cli_fails(
     assert cli.stderr.startswith("live-picks: cannot load .githooks/harness_state.py: ")
     for result in (hook, cli):
         assert "Traceback" not in result.stderr
+
+
+def test_git_helper_and_pre_pi_hooks_ignore_caller_git_routing_and_config(repo, pre_pi_hooks, tmp_path, monkeypatch):
+    decoy = tmp_path / "decoy"
+    git(tmp_path, "init", "-q", "-b", "main", str(decoy))
+    assert Path(git(decoy, "rev-parse", "--show-toplevel").stdout.strip()) == decoy.resolve()
+    assert Path(git(decoy, "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(decoy.resolve())
+    (decoy / "decoy.txt").write_text("clean\n")
+    git(decoy, "add", "decoy.txt")
+    git(decoy, "commit", "-q", "-m", "decoy")
+    decoy_head = git(decoy, "rev-parse", "HEAD").stdout.strip()
+    caller_config = tmp_path / "caller.gitconfig"
+    caller_config.write_text("[fixture]\ncontaminated = true\n")
+    monkeypatch.setenv("GIT_DIR", str(decoy / ".git"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(decoy))
+    monkeypatch.setenv("GIT_INDEX_FILE", str(decoy / ".git/index"))
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(caller_config))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "0")
+    monkeypatch.setenv("HQ_TEST_CREDENTIAL", "secret-token")
+
+    assert Path(git(repo, "rev-parse", "--show-toplevel").stdout.strip()) == repo.resolve()
+    assert git(repo, "config", "--get", "fixture.contaminated", check=False).returncode == 1
+    assert set(pre_pi_hooks) == set(HOOK_FILES)
+    assert git(decoy, "rev-parse", "HEAD").stdout.strip() == decoy_head
+    assert git(decoy, "status", "--porcelain").stdout == ""
+

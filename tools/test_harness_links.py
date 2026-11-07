@@ -55,6 +55,9 @@ def run(*args, cwd=None):
 def world(tmp_path):
     """A checkout with the tool and targets, and an empty HOME with a Claude home only."""
     root = tmp_path / "checkout"
+    run("init", "-q", str(root))
+    assert Path(run("-C", str(root), "rev-parse", "--show-toplevel").stdout.strip()) == root.resolve()
+    assert Path(run("-C", str(root), "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(root.resolve())
     (root / "tools").mkdir(parents=True)
     shutil.copy2(TOOL, root / "tools" / "harness-links")
     (root / "links.toml").write_text(MANIFEST)
@@ -62,9 +65,6 @@ def world(tmp_path):
     (root / "hooks").mkdir()
     (root / "hooks" / "refresh").write_text("#!/bin/sh\n")
     (root / "AGENTS.md").write_text("# rules\n")
-    run("init", "-q", str(root))
-    assert Path(run("-C", str(root), "rev-parse", "--show-toplevel").stdout.strip()) == root.resolve()
-    assert Path(run("-C", str(root), "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(root.resolve())
     run("-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t", "add", "-A")
     run("-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "init")
     home = tmp_path / "home"
@@ -209,6 +209,8 @@ def test_refuses_from_a_worktree(world, tmp_path):
     root, home = world
     wt = tmp_path / "wt"
     run("-C", str(root), "worktree", "add", "-q", str(wt))
+    assert Path(run("-C", str(wt), "rev-parse", "--show-toplevel").stdout.strip()) == wt.resolve()
+    assert Path(run("-C", str(wt), "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(root.resolve())
     result = link(root, home, tool=wt / "tools" / "harness-links")
     assert result.returncode == 2
     assert "not a worktree" in result.stderr
@@ -1066,12 +1068,12 @@ def test_fresh_clone_strips_live_agy_picks_from_dirty_source_checkout(tmp_path):
     checkout = Path(__file__).resolve().parent.parent
     dirty_source = tmp_path / "dirty-source"
     run("clone", "-q", str(checkout), str(dirty_source))
+    assert Path(run("-C", str(dirty_source), "rev-parse", "--show-toplevel").stdout.strip()) == dirty_source.resolve()
+    assert Path(run("-C", str(dirty_source), "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(dirty_source.resolve())
     shutil.copy2(checkout / "links.toml", dirty_source / "links.toml")
     shutil.copy2(checkout / "harnesses.toml", dirty_source / "harnesses.toml")
     shutil.copytree(checkout / ".githooks", dirty_source / ".githooks", dirs_exist_ok=True)
     shutil.copytree(checkout / "relay", dirty_source / "relay", dirs_exist_ok=True)
-    assert Path(run("-C", str(dirty_source), "rev-parse", "--show-toplevel").stdout.strip()) == dirty_source.resolve()
-    assert Path(run("-C", str(dirty_source), "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(dirty_source.resolve())
     for directory in ("harnesses", "external"):
         shutil.copytree(checkout / directory, dirty_source / directory, dirs_exist_ok=True)
     committed_agy_tree(checkout, dirty_source, home)
@@ -1099,3 +1101,30 @@ def test_fresh_clone_strips_live_agy_picks_from_dirty_source_checkout(tmp_path):
     assert cloned_settings == source_settings
     assert not (set(cloned_settings) & {"model", "effort", "effortByBase", "trustedWorkspaces"})
     assert isolated_git(clone, home, "status", "--porcelain", "--", "harnesses/agy/settings.json").stdout == ""
+
+
+def test_run_helper_ignores_caller_git_routing_and_config(world, tmp_path, monkeypatch):
+    root, home = world
+    decoy = tmp_path / "decoy"
+    run("init", "-q", str(decoy))
+    assert Path(run("-C", str(decoy), "rev-parse", "--show-toplevel").stdout.strip()) == decoy.resolve()
+    assert Path(run("-C", str(decoy), "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(decoy.resolve())
+    (decoy / "decoy.txt").write_text("clean\n")
+    run("-C", str(decoy), "add", "decoy.txt")
+    run("-C", str(decoy), "commit", "-qm", "decoy")
+    decoy_head = run("-C", str(decoy), "rev-parse", "HEAD").stdout.strip()
+    caller_config = tmp_path / "caller.gitconfig"
+    caller_config.write_text("[fixture]\ncontaminated = true\n")
+    monkeypatch.setenv("GIT_DIR", str(decoy / ".git"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(decoy))
+    monkeypatch.setenv("GIT_INDEX_FILE", str(decoy / ".git/index"))
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(caller_config))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "0")
+    monkeypatch.setenv("HQ_TEST_CREDENTIAL", "secret-token")
+
+    assert Path(run("-C", str(root), "rev-parse", "--show-toplevel").stdout.strip()) == root.resolve()
+    with pytest.raises(subprocess.CalledProcessError):
+        run("-C", str(root), "config", "--get", "fixture.contaminated")
+    assert run("-C", str(decoy), "rev-parse", "HEAD").stdout.strip() == decoy_head
+    assert run("-C", str(decoy), "status", "--porcelain").stdout == ""
+
