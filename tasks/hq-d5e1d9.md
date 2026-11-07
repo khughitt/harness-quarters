@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: test/hq-d5e1d9-isolated-agy-settings
 created: 2026-11-01T19:15:14Z
-updated: 2026-11-07T11:25:13Z
+updated: 2026-11-07T11:25:15Z
 started: 2026-11-07T11:16:01Z
 depends: []
 tags: []
@@ -27,3 +27,4 @@ tools/test_harness_links.py test_real_manifest_adopts_agy_replaced_settings_on_a
 - 2026-11-07T11:16:30Z (test/hq-d5e1d9-isolated-agy-settings): arm: flow-trial-1 — unit tack-d5e1d9 — flow off
 - 2026-11-07T11:18:36Z (test/hq-d5e1d9-isolated-agy-settings): baseline: focused baseline under validated policy-off (.tt.toml automatic_broad = false, flow-trial-1 arm: flow off, unit tack-d5e1d9): just test-one tools/test_harness_links.py (62 passed); broad suite deliberately omitted.
 - 2026-11-07T11:25:13Z (test/hq-d5e1d9-isolated-agy-settings): review: impl round 1 — verdict: accept; findings: none; reviewer: agy
+- 2026-11-07T11:25:15Z (test/hq-d5e1d9-isolated-agy-settings): review detail: round 1 on commit 61d9874c9d0b6e80fea96721ccfe43baf4628014 (tree 10903253cd87b616a9755ac1e240dc12b3c7e7bf) by session:agy:7e06a670-8b3b-4d92-bcd1-ff986821d753 accepted with 0 findings. Reviewer label recorded as bare agy because timeout 2 relay model --harness agy --pretty exited 2 on hq's pinned relay v0.3.0.
