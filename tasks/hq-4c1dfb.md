@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: fix/hq-4c1dfb-hook-reporting
 created: 2026-11-01T19:26:16Z
-updated: 2026-11-07T12:11:35Z
+updated: 2026-11-07T12:11:37Z
 started: 2026-11-07T12:00:05Z
 depends: []
 tags: [hooks]
@@ -27,3 +27,4 @@ Deferred from hq-2eba07's reviews (ledger attached there). On the live hook surf
 - 2026-11-07T12:11:31Z (fix/hq-4c1dfb-hook-reporting): Focused baseline (policy-off checkout, .tt.toml automatic_broad = false): ran 'just test-one .githooks/test_harness_state_clean.py .githooks/test_pre_commit_facts.py' before code changes (63 passed in 38.57s); deliberately omitted broad 'just test' / 'just ci-test' per .tt.toml policy.
 - 2026-11-07T12:11:33Z (fix/hq-4c1dfb-hook-reporting): flow-trial-1: flow off (unit tack-4c1dfb)
 - 2026-11-07T12:11:35Z (fix/hq-4c1dfb-hook-reporting): rework: none
+- 2026-11-07T12:11:37Z (fix/hq-4c1dfb-hook-reporting): scope-drift: none
