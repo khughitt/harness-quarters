@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: direct
 created: 2026-10-15T19:39:21Z
-updated: 2026-11-07T22:00:04Z
+updated: 2026-11-07T22:00:06Z
 depends: []
 tags: []
 agent: claude-code/claude-opus-5-5
@@ -33,3 +33,4 @@ Where: links.toml [harness.pi]; .gitattributes; .githooks/harness-state-clean, l
 - 2026-10-15T19:43:58Z (main): trial: flow-trial-1 — enrolled — flow on
 - 2026-10-15T19:43:58Z (main): arm: flow-trial-1 — unit tack-aa9b44 — flow on
 - 2026-10-15T20:10:04Z (main): correction from hq-61a47e's review: pi writes defaultProvider/defaultModel and defaultThinkingLevel only when a model or level is set as the default (persist); cycling writes neither. pi also writes deviceId/trackingId (installation ids, now filtered) and enabledModels/hideThinkingBlock outside /settings (tracked). lastChangelogVersion is tracked, not filtered.
+- 2026-11-07T22:00:06Z (main): origin backfill (tasks-0dfdf9): stage 1 unavailable (created 2026-10-15 before tasks-053e89); traced via claude-code:4755fb2b-3aa7-43c2-a934-dea7764bf575 L10/L106 user prompt asking to manage Pi configuration in hq combined with agent 2026-10-12-pi-harness-brief.md scope -> origin=mixed
