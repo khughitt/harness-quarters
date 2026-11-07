@@ -1,13 +1,15 @@
 ---
 id: hq-8fa4d9
 title: "Record Codex TUI notification behaviour as capability facts: allowlist filtering, unfocused-only default, tmux DCS wrapping"
-status: todo
+status: doing
 priority: 3
 size: xs
 complexity: low
 process: direct
+owner: main
 created: 2026-10-17T02:58:29Z
-updated: 2026-10-17T02:58:30Z
+updated: 2026-11-07T16:10:24Z
+started: 2026-11-07T16:10:24Z
 depends: []
 tags: [hooks]
 source: hq-1ec500
@@ -19,3 +21,4 @@ The live acceptance in docs/notes/2026-10-15-agent-attention-brief.md (Live Code
 ## Notes
 
 - 2026-10-17T02:58:29Z (main): concerns: hq-1ec500 extension — the acceptance evidence lives only in a note; capability facts make it re-probed on version change
+- 2026-11-07T16:10:24Z (main): started
