@@ -2,7 +2,7 @@ tt := "tools/tt"
 ci_remote := "origin"
 ci_suite_refs := "refs/heads/*"
 
-# Once per clone, and again after pulling a change to it: git hooks, the harness-state
+# Once per clone, and again after pulling a change to the recipe: git hooks, the harness-state
 # filter (required, so a failing clean stops git rather than staging live picks, with the
 # identity smudge `cat` a required filter needs to check files out), and the untracked
 # local/ directories a public clone needs. Work configs under local/ come from another host.

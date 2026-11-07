@@ -641,7 +641,10 @@ import path with no `runpy` cycles:
    is broken and `required = true`, `git add`, `git diff`, and `git status` (when a
    filtered settings file's working-tree stat differs from the index) fail closed instead
    of staging or diffing unfiltered picks. Recovery requires only fixing `harnesses.toml`
-   (e.g. `git checkout -- harnesses.toml`); never unset `filter.harness-state.required`.
+   (e.g. `git checkout -- harnesses.toml`, or during a merge or rebase resolving the
+   conflict or running `git merge --abort` / `git rebase --abort` because
+   `git checkout -- harnesses.toml` fails on an unmerged path); never unset
+   `filter.harness-state.required`.
    If an existing clone has not re-run `just setup` after pulling (or holds a differently
    spelled `filter.harness-state.clean` command such as a stale absolute path), both
    `harness-state-refresh` (at the next turn end) and `pre-commit` (at the next commit)
@@ -745,7 +748,8 @@ import path with no `runpy` cycles:
   - `AGENTS.md` (Layout and Gates), `README.md`, and
     `docs/runbooks/adding-a-harness.md` (§3.2–3.5 and §4): document `harnesses.toml`,
     `filter.harness-state.required = true` (`just setup`), recovery from a broken
-    manifest (`git checkout -- harnesses.toml`), and staged `harness_state.py check`
+    manifest (`git checkout -- harnesses.toml`, or resolving/aborting during a merge or
+    rebase), and staged `harness_state.py check`
     validation in `pre-commit`.
 
 ## 6. Agent calls and builder latitude

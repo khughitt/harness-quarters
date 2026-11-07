@@ -55,9 +55,11 @@ tracked, `showFeedbackSurvey` and `statusLine` included. A fresh home
 therefore runs each harness's default model and effort until the first pick.
 
 While `harnesses.toml` is broken (bad TOML, or an entry its validation refuses), the
-filter fails, and so does every git command that runs it on a changed config: nothing
-unfiltered is staged. Restore the manifest (`git checkout -- harnesses.toml`, or fix
-it); never unset `filter.harness-state.required` to get past it. The same refusal
+filter fails, and so does every git command that runs it on a changed config (including
+an unrelated `git add` within about a second of an index write, when git re-filters
+racily clean configs): nothing unfiltered is staged. Restore the manifest
+(`git checkout -- harnesses.toml`, or fix it); never unset
+`filter.harness-state.required` to get past it. The same refusal
 follows a live config that is not valid JSON (a trailing comma, JSONC) or a
 `.githooks/harness_state.py` that will not import: the filter prints
 `harness-state-clean: <path>: <problem>` (or `cannot load .githooks/harness_state.py`)

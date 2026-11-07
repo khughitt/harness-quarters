@@ -108,7 +108,9 @@ file is hq's project guide; home links to global instructions target lore.
   hooks preserve their contract; avoid stashing or overwriting main's harness configs
   merely to clear a modified marker. See README.md for the recovery behavior. While
   `harnesses.toml` is broken, git commands that run the filter fail closed: restore the
-  manifest (`git checkout -- harnesses.toml`), never unset `filter.harness-state.required`.
+  manifest (`git checkout -- harnesses.toml`, or during a merge or rebase resolve the
+  conflict or run `git merge --abort` / `git rebase --abort`), never unset
+  `filter.harness-state.required`.
 - Enable session-archive timers only on a host with its archive configuration and
   backup destination. Archive tests must use temporary stores rather than live logs.
 - Read a capability fact through `tools/harness-facts` (`get`, `list`, or its `lookup`
