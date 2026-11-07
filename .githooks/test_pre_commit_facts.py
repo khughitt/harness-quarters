@@ -124,17 +124,40 @@ def test_ci_mode_checks_staged_facts_and_manifest(repo, monkeypatch, capsys):
     good = (repo / "facts/capabilities.toml").read_text()
     stage(repo, good.replace("schema = 1", "schema = 2"))
     (repo / "facts/capabilities.toml").write_text(good)
-    manifest = hook.manifest_check
-    monkeypatch.setattr(hook, "manifest_check", lambda *a, **k: pytest.fail("facts failure did not short-circuit"))
+    stage_manifest("'tui\\.model_availability_nux'", "'tui\\.model_(availability'")
     assert hook.main(["--ci"]) == 1
-    assert "schema must be 1" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "schema must be 1" in err
+    assert "not a valid regex" in err
     assert len(exports) == 2
-    monkeypatch.setattr(hook, "manifest_check", manifest)
     stage(repo, good)
+    stage_manifest("'tui\\.model_(availability'", "'tui\\.model_availability_nux'")
     git("config", "filter.harness-state.required", "false")
     assert hook.main(["--ci"]) == 1
     assert "filter.harness-state.required" in capsys.readouterr().err
     assert len(exports) == 3
+
+
+def test_staged_tree_export_failure_strips_temporary_directory_path(repo, monkeypatch, capsys):
+    hook = load_hook()
+    real_git = hook.git
+
+    def failing_git(*args, env=None):
+        if "checkout-index" in args:
+            prefix = next(arg.removeprefix("--prefix=") for arg in args if arg.startswith("--prefix="))
+            raise subprocess.CalledProcessError(
+                128, ["git", *args], stderr=f"fatal: unable to create file {prefix}facts/capabilities.toml\n"
+            )
+        return real_git(*args, env=env)
+
+    monkeypatch.setattr(hook, "git", failing_git)
+    assert hook.staged_checks() == 1
+    err = capsys.readouterr().err
+    assert "could not export the staged tree" in err
+    assert "checkout-index" in err
+    assert "facts/capabilities.toml" in err
+    assert "staged-tree-" not in err
+    assert "Traceback" not in err
 
 
 @pytest.mark.parametrize("reader", ["tools/harness-facts", ".githooks/harness_state.py"])

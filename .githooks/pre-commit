@@ -98,10 +98,17 @@ def staged_tree(directory):
 def with_staged_tree(check):
     """Run check(tree) over an export of the tree this commit will hold, then remove it."""
     with tempfile.TemporaryDirectory(prefix="staged-tree-") as directory:
+        real_dir = os.path.realpath(directory)
         try:
-            tree = staged_tree(os.path.realpath(directory))     # the readers name resolved paths
+            tree = staged_tree(real_dir)                        # the readers name resolved paths
         except subprocess.CalledProcessError as error:
-            return fail(f"could not export the staged tree: `{' '.join(error.cmd)}`: {error.stderr.strip()}")
+            cmd = " ".join(arg for arg in error.cmd if not arg.startswith("--prefix="))
+            detail = (error.stderr or "").strip()
+            for prefix in (f"{real_dir}/tree/", f"{directory}/tree/", f"{real_dir}/",
+                           f"{directory}/", real_dir, directory):
+                cmd = cmd.replace(prefix, "")
+                detail = detail.replace(prefix, "")
+            return fail(f"could not export the staged tree: `{cmd}`: {detail}")
         return check(tree)
 
 
@@ -155,7 +162,7 @@ def manifest_check(tree=None, git_dir=None):
 def staged_checks():
     """Both staged-tree checks over one export of the tree."""
     git_dir = real_git_dir()
-    return with_staged_tree(lambda tree: facts_check(tree) or manifest_check(tree, git_dir=git_dir))
+    return with_staged_tree(lambda tree: facts_check(tree) | manifest_check(tree, git_dir=git_dir))
 
 
 def main(argv):

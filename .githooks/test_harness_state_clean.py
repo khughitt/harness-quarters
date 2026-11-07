@@ -271,6 +271,19 @@ def test_unusable_json_input_exits_with_a_named_message_not_a_traceback(text):
     assert "Traceback" not in result.stderr
 
 
+@pytest.mark.parametrize("path", ["harnesses/claude/settings.json", "harnesses/codex/config.toml"])
+def test_non_utf8_stdin_bytes_exit_with_a_named_message_not_a_traceback(tmp_path, path):
+    result = subprocess.run([str(FILTER), path], input=b'{"model": "\xff"}\n',
+                            capture_output=True, env=child_env(tmp_path))
+    stderr = result.stderr.decode("utf-8", errors="replace")
+
+    assert result.returncode != 0
+    assert result.stdout == b""
+    assert stderr.startswith(f"harness-state-clean: {path}: ")
+    assert "fix the file, then retry" in stderr
+    assert "Traceback" not in stderr
+
+
 @pytest.mark.parametrize("damage", ["conflict", "syntax", "missing"])
 def test_unimportable_harness_state_module_exits_with_a_named_message(tmp_path, damage):
     hooks = tmp_path / ".githooks"

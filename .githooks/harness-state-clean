@@ -45,13 +45,14 @@ def main(argv):
     if len(argv) != 2:
         sys.exit("harness-state-clean: usage: harness-state-clean <path>  (stdin -> stdout)")
     path = argv[1]
-    text = sys.stdin.read()
     matches = [spec for spec in MANIFEST.live_state if spec.filter_re.fullmatch(path)]
     if not matches:
         sys.exit(f"harness-state-clean: {path} is not a harness config; check .gitattributes")
     try:
+        text = (sys.stdin.buffer.read().decode("utf-8")
+                if hasattr(sys.stdin, "buffer") else sys.stdin.read())
         cleaned = harness_state.clean_for_spec(matches[0], text)
-    except ValueError as error:  # includes json.JSONDecodeError and the non-object refusal
+    except ValueError as error:  # includes UnicodeDecodeError, json.JSONDecodeError and the non-object refusal
         sys.exit(f"harness-state-clean: {path}: {error}; fix the file, then retry")
     sys.stdout.write(cleaned)
 
