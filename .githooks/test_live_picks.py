@@ -322,6 +322,30 @@ def test_an_invalid_record_is_refused_and_left_alone(repo, text):
     assert (repo / CLAUDE).read_text() == before
 
 
+def test_a_non_utf8_record_names_the_record_and_recovery_action(repo):
+    raw = b"\xff\xfe\n"
+    record_path(repo).write_bytes(raw)
+    write_claude(repo, model="opus")
+    before = (repo / CLAUDE).read_text()
+
+    synced = picks(repo, "sync")
+    forgot = picks(repo, "forget", CLAUDE)
+    hook = picks(repo, "hook", "post-merge")
+
+    for result in (synced, forgot):
+        assert result.returncode != 0
+        assert "live-picks: local/live-picks.json" in result.stderr
+        assert "fix or delete it" in result.stderr
+        assert "Traceback" not in result.stderr
+    assert hook.returncode == 0
+    assert "live-picks: local/live-picks.json" in hook.stderr
+    assert "fix or delete it" in hook.stderr
+    assert "the next turn end retries" in hook.stderr
+    assert "Traceback" not in hook.stderr
+    assert record_path(repo).read_bytes() == raw
+    assert (repo / CLAUDE).read_text() == before
+
+
 def test_an_unparsable_file_is_refused_and_the_other_still_restored(repo):
     saved_both(repo)
     (repo / CLAUDE).write_text("{\n")

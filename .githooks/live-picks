@@ -209,7 +209,7 @@ def read_record(record_name, specs):
         return {}
     try:
         record = json.loads(path.read_text())
-    except json.JSONDecodeError as error:
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise Refused(f"{record_name} is not valid JSON: {error}; fix or delete it") from None
     if not isinstance(record, dict):
         raise Refused(f"{record_name} is not an object; fix or delete it")
