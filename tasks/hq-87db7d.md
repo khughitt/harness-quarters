@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/hq-87db7d-recovery-caveat
 created: 2026-11-01T19:26:17Z
-updated: 2026-11-07T11:31:53Z
+updated: 2026-11-07T11:31:56Z
 started: 2026-11-07T11:26:30Z
 depends: []
 tags: [docs]
@@ -31,3 +31,4 @@ Deferred from hq-2eba07's reviews. README and the adding-a-harness runbook say t
 - 2026-11-07T11:31:49Z (docs/hq-87db7d-recovery-caveat): review: impl round 1 — verdict: accept; findings: none; reviewer: agy
 - 2026-11-07T11:31:51Z (docs/hq-87db7d-recovery-caveat): review detail: round 1 on tree 5133ff5760cc90fdccd7e4088593ca7d2e3be757 by session:agy:6aba736f-10bf-493f-8ca6-562704a50395 accepted with 0 findings. Reviewer label recorded as bare agy because timeout 2 relay model --harness agy --pretty exited 2 on hq's pinned relay v0.3.0.
 - 2026-11-07T11:31:53Z (docs/hq-87db7d-recovery-caveat): gate: verified tree:5133ff5760cc90fdccd7e4088593ca7d2e3be757 — checks: just check-hygiene exit 0 and tasks check exit 0; review: none; reviewer: agy
+- 2026-11-07T11:31:56Z (docs/hq-87db7d-recovery-caveat): retro: Updating AGENTS.md, docs/specs/2026-11-01-harness-manifest-design.md, justfile, and README.md together aligned every broken-manifest recovery and setup-recipe passage with the adding-a-harness runbook.
