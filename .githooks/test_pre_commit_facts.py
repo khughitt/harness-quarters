@@ -60,7 +60,7 @@ def repo(tmp_path, monkeypatch):
 
     def isolated_run(*args, **kwargs):
         if kwargs.get("env") is None:
-            kwargs["env"] = env
+            kwargs["env"] = dict(os.environ)
         return real_run(*args, **kwargs)
 
     monkeypatch.setattr(subprocess, "run", isolated_run)
@@ -208,6 +208,62 @@ def test_the_staged_blob_is_what_is_checked(repo, capsys):
     stage(repo, good.replace("schema = 1", "schema = 2"))
     (repo / "facts" / "capabilities.toml").write_text(good)        # the working tree is fixed; the index is not
     assert load_hook().facts_check() == 1
+    assert "may already be in HEAD" in capsys.readouterr().err
+
+
+def test_facts_check_and_real_commits_follow_the_committed_index(repo, tmp_path, monkeypatch, capsys):
+    good = (repo / "facts" / "capabilities.toml").read_text()
+    bad = good.replace("schema = 1", "schema = 2")
+    alt = tmp_path / "alternate.index"
+    shutil.copyfile(repo / ".git" / "index", alt)
+    with monkeypatch.context() as m:
+        m.setenv("GIT_INDEX_FILE", str(alt))
+        stage(repo, bad)
+        (repo / "facts" / "capabilities.toml").write_text(good)
+        assert "schema = 1" in subprocess.run(
+            ["git", "show", ":facts/capabilities.toml"],
+            env={**os.environ, "GIT_INDEX_FILE": str(repo / ".git" / "index")},
+            check=True, text=True, capture_output=True,
+        ).stdout
+        assert load_hook().facts_check() == 1
+        assert "schema must be 1" in capsys.readouterr().err
+
+    shutil.copy(HOOK, repo / ".githooks" / "pre-commit")
+    for stub in ("tools/ops-check", "tools/ops-docs"):
+        path = repo / stub
+        path.write_text("#!/usr/bin/env python3\nimport sys\nsys.exit(0)\n")
+        path.chmod(0o755)
+    git("config", "core.hooksPath", ".githooks")
+    git("config", "commit.gpgsign", "false")
+    head_before = subprocess.run(["git", "rev-parse", "HEAD"], check=True, text=True,
+                                 capture_output=True).stdout.strip()
+
+    # git commit -a builds a temporary index in GIT_INDEX_FILE while .git/index stays valid.
+    (repo / "facts" / "capabilities.toml").write_text(bad)
+    commit_all = subprocess.run(["git", "commit", "-a", "-m", "unstaged invalid facts"],
+                                text=True, capture_output=True)
+    assert commit_all.returncode != 0
+    assert "schema must be 1" in commit_all.stderr
+    assert subprocess.run(["git", "rev-parse", "HEAD"], check=True, text=True,
+                          capture_output=True).stdout.strip() == head_before
+
+    # git commit <path> builds a temporary index from HEAD + <path> while .git/index holds bad facts.
+    stage(repo, bad)
+    (repo / "facts" / "capabilities.toml").write_text(good)
+    (repo / "harnesses" / "codex" / "config.toml").write_text("[features]\nhooks = false\n")
+    partial = subprocess.run(["git", "commit", "harnesses/codex/config.toml", "-m", "partial commit"],
+                             text=True, capture_output=True)
+    assert partial.returncode == 0, partial.stderr
+    assert "schema = 2" in subprocess.run(["git", "show", ":facts/capabilities.toml"],
+                                          check=True, text=True, capture_output=True).stdout
+
+
+def test_missing_index_file_fails_cleanly_without_traceback(repo, capsys):
+    (repo / ".git" / "index").unlink()
+    assert load_hook().staged_checks() == 1
+    err = capsys.readouterr().err
+    assert "no git index file exists yet" in err
+    assert "Traceback" not in err
 
 
 def test_a_valid_value_change_needs_no_consumer_mirror(repo, monkeypatch):

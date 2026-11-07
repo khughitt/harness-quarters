@@ -101,6 +101,8 @@ def with_staged_tree(check):
         real_dir = os.path.realpath(directory)
         try:
             tree = staged_tree(real_dir)                        # the readers name resolved paths
+        except FileNotFoundError:
+            return fail("could not export the staged tree: no git index file exists yet")
         except subprocess.CalledProcessError as error:
             cmd = " ".join(arg for arg in error.cmd if not arg.startswith("--prefix="))
             detail = (error.stderr or "").strip()
@@ -131,8 +133,9 @@ def facts_check(tree=None):
     done = subprocess.run([sys.executable, str(tool), "check"], text=True, capture_output=True)
     if done.returncode:
         sys.stderr.write(done.stderr.replace(f"{tree}/", ""))
-        return fail(f"the staged tree does not pass its own `{FACTS_TOOL} check`; fix what it "
-                    f"names, and if {FACTS} moved, stage the reader's default with it")
+        return fail(f"the staged tree does not pass its own `{FACTS_TOOL} check` (the fault may "
+                    f"already be in HEAD); fix what it names, and if {FACTS} moved, stage the "
+                    f"reader's default with it")
     return 0
 
 
