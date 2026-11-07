@@ -1186,6 +1186,27 @@ def test_invalid_old_record_does_not_prevent_pi_preservation(repo, operation):
         assert pi_settings(repo) == {**PI_BASE, **PI_VALUES, "defaultThinkingLevel": "low"}
 
 
+@pytest.mark.parametrize("operation", ["capture", "restore", "sync"])
+@pytest.mark.parametrize("entry", [PI_SET, {"state": "default"}])
+def test_pi_entry_in_old_record_is_rejected_and_does_not_prevent_pi_preservation(repo, operation, entry):
+    text = json.dumps({PI: entry})
+    record_path(repo).write_text(text)
+    save_pi(repo)
+    write_pi(repo, defaultThinkingLevel="low")
+
+    result = picks(repo, operation)
+
+    assert result.returncode != 0
+    assert "local/live-picks.json" in result.stderr
+    assert "not a file this record owns" in result.stderr
+    assert record_path(repo).read_text() == text
+    if operation in ("capture", "sync"):
+        assert json.loads(pi_record_path(repo).read_text())[PI]["values"] == {
+            **PI_VALUES, "defaultThinkingLevel": "low"}
+    if operation in ("restore", "sync"):
+        assert pi_settings(repo) == {**PI_BASE, **PI_VALUES, "defaultThinkingLevel": "low"}
+
+
 @pytest.mark.parametrize("changed", [CLAUDE, PI])
 def test_capture_rewrites_only_the_record_whose_content_changed(repo, changed):
     write_claude(repo, model="opus")
