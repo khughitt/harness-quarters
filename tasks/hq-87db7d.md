@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/hq-87db7d-recovery-caveat
 created: 2026-11-01T19:26:17Z
-updated: 2026-11-07T11:26:32Z
+updated: 2026-11-07T11:26:56Z
 started: 2026-11-07T11:26:30Z
 depends: []
 tags: [docs]
@@ -23,3 +23,4 @@ Deferred from hq-2eba07's reviews. README and the adding-a-harness runbook say t
   provenance: {"harness_session":"claude-code:fdf3b32f-5e63-4593-bba2-4e994bcdf1eb","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
 - 2026-11-07T11:26:30Z (main): started
 - 2026-11-07T11:26:32Z (docs/hq-87db7d-recovery-caveat): resumed
+- 2026-11-07T11:26:56Z (docs/hq-87db7d-recovery-caveat): trial: flow-trial-1 — enrolled — flow on
