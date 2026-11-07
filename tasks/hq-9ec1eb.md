@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: direct
 created: 2026-09-12T16:11:20Z
-updated: 2026-11-07T22:00:00Z
+updated: 2026-11-07T22:00:02Z
 depends: []
 tags: [quick-add, skills]
 source: "mindful:thought:8e45d49e001c4e5eb9b00f159dc60e87"
@@ -28,3 +28,4 @@ Source: mindful:thought:8e45d49e001c4e5eb9b00f159dc60e87
 
 - 2026-09-16T14:23:33Z (main): Input landed: doc/instruction-provenance.md (ai-45934e) ranks 13 removal candidates by words saved; the per-model question stays open until the hook log carries a model field (ops task filed from ai-45934e).
 - 2026-09-16T15:51:35Z (main): scope: scoped; rewritten as a direct goal over the audit's removal list — four mechanical children (ai-341dcc, ai-443e72, ai-4a90a7, ai-7349c4 which waits on ops-09a86b) whose check is by construction, plus the removal-experiment idea ai-53cc68 waiting on the measure (ai-9dfba9, ops-8fdaf6, ops-acd029); the evals dependency moved from the goal to that child. The tasks-skill trim is tasks-9a9ef3, not a child.
+- 2026-11-07T22:00:02Z (main): origin backfill (tasks-0dfdf9): stage 1 unavailable (created 2026-09-12 before tasks-053e89); traced via mindful:thought:8e45d49e001c4e5eb9b00f159dc60e87 human thought by keith on skill usage audit combined with agent ai-45934e provenance audit in 2026-10-02-skill-pruning-brief.md -> origin=mixed
