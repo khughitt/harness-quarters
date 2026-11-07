@@ -1,13 +1,15 @@
 ---
 id: hq-d5e1d9
 title: Make harness-links agy tests independent of the checkout's live agy/settings.json
-status: todo
+status: doing
 priority: 2
 size: xs
 complexity: low
 process: direct
+owner: main
 created: 2026-11-01T19:15:14Z
-updated: 2026-11-01T19:15:14Z
+updated: 2026-11-07T11:16:01Z
+started: 2026-11-07T11:16:01Z
 depends: []
 tags: []
 origin: agent
@@ -19,3 +21,4 @@ tools/test_harness_links.py test_real_manifest_adopts_agy_replaced_settings_on_a
 
 - 2026-11-01T19:15:14Z (add): created
   provenance: {"harness_session":"claude-code:fdf3b32f-5e63-4593-bba2-4e994bcdf1eb","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
+- 2026-11-07T11:16:01Z (main): started
