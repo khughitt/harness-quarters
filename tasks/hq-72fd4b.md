@@ -4,10 +4,11 @@ title: "The declared harness surface matches what each host runs, and says when 
 status: todo
 priority: 2
 created: 2026-10-08T10:19:02Z
-updated: 2026-10-08T10:19:02Z
+updated: 2026-11-07T21:59:52Z
 depends: []
 tags: []
 source: docs/notes/2026-10-08-declared-surface-drift-brief.md
+origin: agent
 ---
 
 Why: the residue's surface audit (hq-dcb11a) and the rename (hq-8b7a28) left four places where a host's harness surface differs from, or can silently drift from, what hq declares: a stray Codex skill on the second host, a work Claude home without the skills its instructions assume, hook commands that break on a lore or ops rename, and capability facts probed on harness versions no longer installed.
