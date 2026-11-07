@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/hq-305ede-isolated-claude-home
 created: 2026-10-14T10:43:34Z
-updated: 2026-11-07T16:35:56Z
+updated: 2026-11-07T16:37:40Z
 started: 2026-11-07T16:34:48Z
 depends: []
 parent: hq-40a8d0
@@ -35,3 +35,4 @@ Original capture: Isolated Claude first-run onboarding can leave an initial comm
 - 2026-11-07T16:35:16Z (docs/hq-305ede-isolated-claude-home): arm: flow-trial-1 — unit tack-305ede — flow on
 - 2026-11-07T16:35:54Z (docs/hq-305ede-isolated-claude-home): gate: scoped — adopted
 - 2026-11-07T16:35:56Z (docs/hq-305ede-isolated-claude-home): gate: implementing .worktrees/hq-305ede
+- 2026-11-07T16:37:40Z (docs/hq-305ede-isolated-claude-home): review: subagent 44926849-1300-4fef-9416-e81a9d639fd6 — Verdict: accept (findings: none)
