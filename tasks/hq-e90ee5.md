@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/hq-e90ee5-pre-push-citation
 created: 2026-11-05T11:40:40Z
-updated: 2026-11-07T12:40:04Z
+updated: 2026-11-07T12:41:17Z
 started: 2026-11-07T12:38:27Z
 completed: 2026-11-07T12:40:04Z
 closed: 2026-11-07T12:40:04Z
@@ -35,3 +35,4 @@ Done: each named current match has a valid subject/private locator or explicit h
 - 2026-11-07T12:40:02Z (docs/hq-e90ee5-pre-push-citation): scope-drift: none
 - 2026-11-07T12:40:04Z (docs/hq-e90ee5-pre-push-citation): done
 - 2026-11-07T12:40:04Z (docs/hq-e90ee5-pre-push-citation): Replaced historical 'Design: ops docs/specs/2026-09-28-test-ci-act-design.md §3.3.' citation on line 14 of .githooks/pre-push with current subject reference 'Reference: ops docs/tooling.md' matching ops/.githooks/pre-push (historical spec archived in ops private records commit a83536d369734fcf0cb2ad6b8c876e8f7d5dadb3 under ops/docs/specs/2026-09-28-test-ci-act-design.md). Verified with 'just test-one tools/test_test_execution.py -k test_pre_push' (7 passed) and mandatory 'just check-hygiene' (exit 0).
+- 2026-11-07T12:41:17Z (main): Merged docs/hq-e90ee5-pre-push-citation (9318a4d9) to main via fast-forward; ran tt-report (focused test-one: 2 runs, 7 passed; check-hygiene: 1 pass; broad test skipped per .tt.toml policy); verified only regenerable local/ directories and __pycache__/.pytest_cache existed in worktree, no host pointers resolved into .worktrees/hq-e90ee5, and removed worktree and branch. Nothing pushed; no surviving processes (verified via host-load --section session).
