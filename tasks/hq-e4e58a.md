@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-10-07T19:31:44Z
-updated: 2026-11-07T10:55:24Z
+updated: 2026-11-07T10:55:47Z
 started: 2026-11-07T10:55:24Z
 depends: []
 tags: []
@@ -20,3 +20,4 @@ Why: the rename's rehearsal could not exercise the census/report join before obs
 ## Notes
 
 - 2026-11-07T10:55:24Z (main): started
+- 2026-11-07T10:55:47Z (main): trial: flow-trial-1 — enrolled — flow off
