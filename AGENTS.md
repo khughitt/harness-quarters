@@ -35,7 +35,8 @@ The hook declares origin branches covered for the workflow and warns on
 uncovered pushes when local policy skips tests; the declaration is not remote evidence.
 `just ci-hygiene` runs the portable subset without registry-dependent ops-check.
 See [test execution](docs/test-execution.md) for report retention and coverage checks.
-The pre-commit hook refuses staged paths under
+The pre-commit hook (and `.githooks/pre-merge-commit`, which delegates to it on clean
+non-fast-forward merges) refuses staged paths under
 `local/`, then runs `tools/ops-check` over the working tree (the hygiene checks ops
 projects share: guide references, conflicted copies, agent scratch, machine layout and
 adopted copies), then checks the guide identity regions with `tools/ops-docs check`, and

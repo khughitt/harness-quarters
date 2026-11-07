@@ -173,7 +173,8 @@ while staging only real changes. Do not `git stash` these files to get past it: 
 equals `HEAD`, so `stash pop` brings back the file without its model pick until the next turn end restores it.
 Their tests run with `just test`.
 
-The pre-commit hook refuses any staged path under `local/`, which only `git add -f`
+The pre-commit hook (and `.githooks/pre-merge-commit`, which delegates to it on clean
+non-fast-forward merges) refuses any staged path under `local/`, which only `git add -f`
 can stage. Lore checks the generated Projects block in its global instructions,
 including the staged copy at commit time. Change the owning project's
 `identity.toml` (or its table in ops's identity mirror, until it adopts), then run
@@ -190,9 +191,10 @@ WORK_ROOT, a registered checkout or its parent directory, or a banned value from
 ops/ops-check.toml) follows the attachment
 fallback in lore `skills/references/retained-item-records.md`: the raw bytes stay under
 WORK_ROOT, owned by a task, and a portable derivative is attached. `.ops-check.toml` is
-never widened for an attachment. Thirteen pre-commit tests cover the local-layer
-refusal, the hygiene check, the guide check and the filter config from a linked
-worktree; `just test` runs them.
+never widened for an attachment. `.githooks/test_pre_commit.py` and
+`.githooks/test_pre_commit_facts.py` cover the local-layer refusal, the hygiene and
+guide checks, the staged-tree export and clean non-fast-forward merge checks, and the
+filter config from a linked worktree; `just test` runs them.
 
 The same hook runs `tools/ops-docs check`, vendored from ops: the identity regions at
 the top of this file and of `AGENTS.md` are generated from `identity.toml`, and
