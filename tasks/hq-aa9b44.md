@@ -7,10 +7,11 @@ size: m
 complexity: mid
 process: direct
 created: 2026-10-15T19:39:21Z
-updated: 2026-10-15T20:10:04Z
+updated: 2026-11-07T22:00:04Z
 depends: []
 tags: []
 agent: claude-code/claude-opus-5-5
+origin: mixed
 ---
 
 Why: the user wants to customize pi's base configuration and experiment in interactive mode with it versioned in hq, as claude/ and codex/ are. Today [harness.pi] in links.toml links only AGENTS.md into ~/.pi/agent; settings.json there is a plain file pi created (holding only lastChangelogVersion), and keybindings.json, mcp.json, models.json, APPEND_SYSTEM.md/SYSTEM.md, extensions/, prompts/ and themes/ are absent.
