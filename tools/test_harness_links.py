@@ -256,6 +256,25 @@ def test_local_target_resolves_like_any_other(world):
     assert (home / ".work" / "settings.json").resolve() == (root / "local" / "work.json").resolve()
 
 
+def committed_agy_tree(repo, dest, home):
+    """Copy committed blobs under harnesses/agy/ from repo's HEAD into dest."""
+    paths = isolated_git(repo, home, "ls-tree", "-r", "--name-only", "HEAD", "--", "harnesses/agy").stdout.splitlines()
+    for rel in paths:
+        target = dest / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        blob = subprocess.run(
+            ["git", "-C", str(repo), "show", f"HEAD:{rel}"],
+            env=isolated_env(home),
+            check=True,
+            capture_output=True,
+        ).stdout
+        target.write_bytes(blob)
+    for entry in isolated_git(repo, home, "ls-files", "-s", "--", "harnesses/agy").stdout.splitlines():
+        mode, _, _, rel = entry.split(None, 3)
+        if mode == "100755":
+            (dest / rel).chmod(0o755)
+
+
 def fresh_clone(tmp_path, home, repo=None):
     """Exercise the working hq manifest/tool with structural owner fixtures.
     Authentic owner paths and fixture shapes are checked separately by the local integration."""
@@ -280,13 +299,8 @@ def fresh_clone(tmp_path, home, repo=None):
             shutil.rmtree(clone / old)
     for directory in ("harnesses", "external"):
         shutil.copytree(repo / directory, clone / directory)
+    committed_agy_tree(repo, clone, home)
     shutil.copy2(repo / ".gitattributes", clone / ".gitattributes")
-    agy_settings = clone / "harnesses/agy/settings.json"
-    cleaned = subprocess.run(
-        [sys.executable, "-B", str(clone / ".githooks/harness-state-clean"), "harnesses/agy/settings.json"],
-        input=agy_settings.read_text(), env=isolated_env(home), text=True,
-        capture_output=True, check=True)
-    agy_settings.write_text(cleaned.stdout)
     # A public clone needs the submodule and sibling skill checkouts. Use the local
     # sources in these fixtures so the tests require neither network nor live writes.
     main = Path(run("-C", str(checkout), "worktree", "list", "--porcelain").stdout.splitlines()[0][9:])
@@ -298,6 +312,17 @@ def fresh_clone(tmp_path, home, repo=None):
     # so adoption's index-stat refresh can be checked against a clean fixture index.
     run("-C", str(clone), "add", "-A")
     run("-C", str(clone), "-c", "core.hooksPath=/dev/null", "commit", "--allow-empty", "-qm", "fixture candidate")
+    agy_settings = clone / "harnesses/agy/settings.json"
+    source_agy = (
+        (repo / "harnesses/agy/settings.json").read_text()
+        if repo != checkout
+        else agy_settings.read_text()
+    )
+    cleaned = subprocess.run(
+        [sys.executable, "-B", str(clone / ".githooks/harness-state-clean"), "harnesses/agy/settings.json"],
+        input=source_agy, env=isolated_env(home), text=True,
+        capture_output=True, check=True)
+    agy_settings.write_text(cleaned.stdout)
     return clone
 
 
@@ -1034,6 +1059,10 @@ def test_adopt_manifest_validation_and_apply_refusal_on_corrupt_or_directory(wor
 def test_fresh_clone_strips_live_agy_picks_from_dirty_source_checkout(tmp_path):
     import json
 
+    home = tmp_path / "home"
+    (home / ".gemini/antigravity-cli").mkdir(parents=True)
+    (home / ".gemini/config").mkdir(parents=True)
+
     checkout = Path(__file__).resolve().parent.parent
     dirty_source = tmp_path / "dirty-source"
     run("clone", "-q", str(checkout), str(dirty_source))
@@ -1045,6 +1074,7 @@ def test_fresh_clone_strips_live_agy_picks_from_dirty_source_checkout(tmp_path):
     assert Path(run("-C", str(dirty_source), "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(dirty_source.resolve())
     for directory in ("harnesses", "external"):
         shutil.copytree(checkout / directory, dirty_source / directory, dirs_exist_ok=True)
+    committed_agy_tree(checkout, dirty_source, home)
     shutil.copy2(checkout / ".gitattributes", dirty_source / ".gitattributes")
     source_settings = json.loads((dirty_source / "harnesses/agy/settings.json").read_text())
     (dirty_source / "harnesses/agy/settings.json").write_text(
@@ -1061,13 +1091,11 @@ def test_fresh_clone_strips_live_agy_picks_from_dirty_source_checkout(tmp_path):
         + "\n"
     )
 
-    home = tmp_path / "home"
-    (home / ".gemini/antigravity-cli").mkdir(parents=True)
-    (home / ".gemini/config").mkdir(parents=True)
     case_dir = tmp_path / "case"
     case_dir.mkdir()
     clone = fresh_clone(case_dir, home, repo=dirty_source)
 
     cloned_settings = json.loads((clone / "harnesses/agy/settings.json").read_text())
+    assert cloned_settings == source_settings
     assert not (set(cloned_settings) & {"model", "effort", "effortByBase", "trustedWorkspaces"})
     assert isolated_git(clone, home, "status", "--porcelain", "--", "harnesses/agy/settings.json").stdout == ""
