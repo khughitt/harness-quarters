@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: feat/hq-6b2c2b-pre-merge-commit
 created: 2026-10-15T08:03:38Z
-updated: 2026-11-07T16:47:39Z
+updated: 2026-11-07T16:47:41Z
 started: 2026-11-07T16:40:18Z
 depends: []
 tags: []
@@ -31,3 +31,4 @@ Out of scope: --no-verify commits, which no hook can see.
 - 2026-11-07T16:41:13Z (feat/hq-6b2c2b-pre-merge-commit): gate: scoped — adopted
 - 2026-11-07T16:41:15Z (feat/hq-6b2c2b-pre-merge-commit): gate: implementing .worktrees/hq-6b2c2b
 - 2026-11-07T16:47:39Z (feat/hq-6b2c2b-pre-merge-commit): review: impl round 1 — verdict: accept; findings: none; reviewer: agy/subagent
+- 2026-11-07T16:47:41Z (feat/hq-6b2c2b-pre-merge-commit): gate: verified tree:f9703222172dc4199299e854a3171912a2406d37 — checks: just test-one .githooks/test_pre_commit_facts.py .githooks/test_pre_commit.py -n auto (57 passed), just check-hygiene exit 0; review: none; reviewer: agy/subagent session:agy:ea546a60-3279-4ce1-b021-2afbc815a462
