@@ -518,11 +518,16 @@ module it loads from a file, so a consumer that must leave this checkout untouch
 
 ### Re-probing a fact
 
-A probe run for one child kind (a subagent, a background command) has three outcomes:
+A probe run for one child kind (a subagent, a background command) has three outcomes.
+For a background command, redirect its output to a file under the probe's scratch dir
+and append an exit-status line with a timestamp
+(`cmd > out 2>&1; echo "exit $? $(date -Is)" >> out`), so the run stays judgeable after
+a terminal indicator disappears:
 
 - **Woke.** `agents/bin/wake-judge` prints `PASS` for the run's transcript.
 - **Did not wake.** A bounded negative observation, recorded on the evidence task with
-  the transcript's path: the controller's turn ended, the child's own output shows it
+  the transcript's path (and, for a background command, that output file's path next to
+  the transcript): the controller's turn ended, the child's own output shows it
   finished, and no controller turn began in the 170 seconds after that. A judge `FAIL`
   is not this observation: the judge also fails on a transcript it cannot classify, and
   it knows no Codex completion form.
