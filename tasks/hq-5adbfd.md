@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: test/hq-5adbfd-adapter-slug-manifest
 created: 2026-11-01T18:59:57Z
-updated: 2026-11-07T11:08:12Z
+updated: 2026-11-07T11:11:54Z
 started: 2026-11-07T11:05:04Z
 depends: [hq-2eba07]
 tags: []
@@ -28,3 +28,4 @@ Follow-up from hq-2eba07's final whole-branch review (minor 1, named risk a). to
 - 2026-11-07T11:08:07Z (test/hq-5adbfd-adapter-slug-manifest): gate: scoped — adopted
 - 2026-11-07T11:08:09Z (test/hq-5adbfd-adapter-slug-manifest): gate: implementing .worktrees/hq-5adbfd
 - 2026-11-07T11:08:12Z (test/hq-5adbfd-adapter-slug-manifest): baseline: focused baseline under validated policy-off (.tt.toml automatic_broad = false): just test-one .githooks/test_harness_manifest.py tools/test_hq_sessions.py (201 passed) and just test-one tools/test_harness_stores.py (8 passed); broad suite deliberately omitted.
+- 2026-11-07T11:11:54Z (test/hq-5adbfd-adapter-slug-manifest): review: impl round 1 — verdict: accept; findings: none; reviewer: agy
