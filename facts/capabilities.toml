@@ -939,3 +939,80 @@ version = "0.163.0"
 date = 2026-10-16
 evidence = "hq-1ec500; docs/notes/2026-10-15-agent-attention-brief.md"
 note = "In interactive TUI sessions recorded under script in a private detached tmux server on Codex 0.163.0 with `KITTY_WINDOW_ID` set: sessions 1 and 2 unset `TMUX` but left `TMUX_PANE` set, and the TUI still detected tmux and wrapped each OSC 9 notification in a tmux DCS passthrough; session 3 unset both `TMUX` and `TMUX_PANE` and emitted the bare OSC 9 sequence that Kitty receives outside tmux."
+
+
+[facts.hook-payload-model]
+type = "boolean"
+description = "Hook payloads carry the session's active model across lifecycle and tool events, and per agent in children."
+
+[facts.hook-payload-model.harness.codex]
+status = "probed"
+value = true
+version = "0.162.1"
+date = 2026-10-14
+evidence = "hq-1bd166"
+note = "Probed under codex exec in a scratch CODEX_HOME (--dangerously-bypass-hook-trust), with a model switch by exec resume -m and a multi-agent v2 child spawned on another model: SessionStart, UserPromptSubmit, PreToolUse, SubagentStart, SubagentStop and Stop payloads carried model matching the running model before and after the switch and per agent in the child (the child's PreToolUse reported gpt-6-astra while the parent's reported gpt-6-luna; confirmed on 0.166.0 in hq-fe672f). The binary's SessionEnd schema has no model field."
+
+[facts.hook-payload-model.harness.claude-code]
+status = "probed"
+value = false
+version = "2.1.316"
+date = 2026-11-01
+evidence = "hq-fe672f; hq-d5a56c; hq-f51af7"
+note = "In headless runs of harnesses/claude/probes/turn-pause-probe.py (runs main and cron), UserPromptSubmit, PreToolUse (root and subagent), PostToolUse, SubagentStart, SubagentStop and Stop payloads carry no model key (tools/fixtures/turn-pause/hooks/claude-code-subagent-bash-denied.json, tools/fixtures/turn-pause/hooks/claude-code-CronCreate.json); only SessionStart (model) and PostModelSwitch (to_model, before the settings write) carry the root session's model."
+
+
+[facts.hook-child-thread-id]
+type = "boolean"
+description = "Hook payloads on a child's events identify the child's own thread and transcript separately from the root session."
+
+[facts.hook-child-thread-id.harness.codex]
+status = "probed"
+value = true
+version = "0.162.1"
+date = 2026-10-14
+evidence = "hq-1bd166"
+note = "Probed under codex exec in a scratch CODEX_HOME (--dangerously-bypass-hook-trust) with a multi-agent v2 child: the child's hook payloads carry session_id (the root session's id) and agent_id (the child's own thread id). Their transcript_path names the child's rollout except at SubagentStop, where transcript_path names the parent's rollout and agent_transcript_path names the child's (confirmed on 0.166.0 in hq-fe672f)."
+
+[facts.hook-child-thread-id.harness.claude-code]
+status = "probed"
+value = true
+version = "2.1.316"
+date = 2026-11-01
+evidence = "hq-fe672f"
+note = "In headless runs of harnesses/claude/probes/turn-pause-probe.py (runs main and cron), SubagentStart, the subagent's PreToolUse and PostToolUse, and SubagentStop carry agent_id (the subagent's id) alongside the root's session_id; SubagentStop also carries agent_transcript_path pointing to the subagent's transcript while transcript_path points to the root's (tools/fixtures/turn-pause/hooks/claude-code-subagent-bash-denied.json)."
+
+
+[facts.model-env-var]
+type = "boolean"
+description = "The harness natively exports an environment variable carrying the session's active model to shell commands."
+
+[facts.model-env-var.harness.codex]
+status = "probed"
+value = false
+version = "0.162.1"
+date = 2026-10-14
+evidence = "hq-1bd166"
+note = "Probed under codex exec in top-level and multi-agent v2 child turns: the shell environment exposes CODEX_THREAD_ID, CODEX_SESSION_ID, CODEX_VERSION and (when set for the run) CODEX_HOME, plus any static config policy exports (TASKS_AGENT=codex), with no native variable carrying the session's model, and the 0.162.1 binary names no model environment variable."
+
+[facts.model-env-var.harness.claude-code]
+status = "unknown"
+note = "Not probed: Claude Code shell commands receive TASKS_MODEL and TASKS_AGENT from the claude-provenance SessionStart and PostModelSwitch hook via CLAUDE_ENV_FILE (hq-d5a56c); whether Claude Code exports a native model variable without a hook was not probed."
+
+
+[facts.thread-id-rollout-model]
+type = "boolean"
+description = "A shell command inside a tool call can resolve its session's active model from the transcript keyed by its own thread id, before and after a model switch and in a child."
+
+[facts.thread-id-rollout-model.harness.codex]
+status = "probed"
+value = true
+version = "0.162.1"
+date = 2026-10-14
+evidence = "hq-1bd166"
+note = "Probed under codex exec in 2 top-level turns (before and after exec resume -m model switch) and 2 multi-agent v2 child turns spawned on another model (14 turns across all probed rollouts): CODEX_THREAD_ID names the calling agent's own rollout under ${CODEX_HOME:-$HOME/.codex}/sessions/*/*/*/rollout-*-<thread>.jsonl (whereas CODEX_SESSION_ID in a child names the root session and resolves the parent's model), and the rollout's last turn_context.payload.model matches the running model in every tool call (session_meta base_instructions.provenance.model is creation-time and stale after a switch or in a child). Valid only inside a tool call after the turn's turn_context is written, not from SessionStart or UserPromptSubmit hooks in the post-switch window, and archived rollouts sit under archived_sessions/."
+
+[facts.thread-id-rollout-model.harness.claude-code]
+status = "unknown"
+note = "Not probed: Claude Code shell commands receive TASKS_MODEL and TASKS_AGENT from the claude-provenance SessionStart and PostModelSwitch hook via CLAUDE_ENV_FILE (hq-d5a56c); resolving a session's or subagent's model from its transcript by thread id from inside a shell command was not probed."
+

@@ -440,6 +440,21 @@ def test_the_shipped_file_is_valid_and_holds_the_three_facts():
         assert entry["version"] == "0.163.0"
         assert entry["date"] == "2026-10-16"
         assert "docs/notes/2026-10-15-agent-attention-brief.md" in entry["evidence"]
+    for fact, expected in (
+        ("hook-payload-model", True),
+        ("hook-child-thread-id", True),
+        ("model-env-var", False),
+        ("thread-id-rollout-model", True),
+    ):
+        entry = facts.lookup(fact, "codex")
+        assert entry["value"] is expected
+        assert entry["version"] == "0.162.1"
+        assert entry["date"] == "2026-10-14"
+        assert entry["evidence"] == "hq-1bd166"
+    assert facts.lookup("hook-payload-model", "claude-code")["value"] is False
+    assert facts.lookup("hook-child-thread-id", "claude-code")["value"] is True
+    assert facts.lookup("model-env-var", "claude-code")["status"] == "unknown"
+    assert facts.lookup("thread-id-rollout-model", "claude-code")["status"] == "unknown"
 
 
 def test_every_shipped_note_names_the_probe_mode():
@@ -468,4 +483,13 @@ def test_every_shipped_note_names_the_probe_mode():
         "tui-notifications-tmux-dcs-wrap",
     ):
         assert "interactive TUI" in facts.lookup(fact, "codex")["note"], fact
+    for fact in (
+        "hook-payload-model",
+        "hook-child-thread-id",
+        "model-env-var",
+        "thread-id-rollout-model",
+    ):
+        assert "codex exec" in facts.lookup(fact, "codex")["note"], fact
+    for fact in ("hook-payload-model", "hook-child-thread-id"):
+        assert "headless" in facts.lookup(fact, "claude-code")["note"], fact
     assert "headless daemon" not in facts.lookup("controller-wake-kinds", "agy")["note"]
