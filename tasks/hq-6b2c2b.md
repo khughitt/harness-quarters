@@ -1,13 +1,15 @@
 ---
 id: hq-6b2c2b
 title: Run hq's pre-commit checks on clean non-fast-forward merges with a pre-merge-commit hook
-status: todo
+status: doing
 priority: 3
 size: xs
 complexity: low
 process: direct
+owner: main
 created: 2026-10-15T08:03:38Z
-updated: 2026-10-15T08:03:38Z
+updated: 2026-11-07T16:40:18Z
+started: 2026-11-07T16:40:18Z
 depends: []
 tags: []
 source: hq-3cdd68
@@ -19,3 +21,7 @@ git runs pre-commit for ordinary commits and for a conflicted merge resolved wit
 Approach: add .githooks/pre-merge-commit that runs pre-commit's checks (local/ refusal, the docs check, and the staged-tree facts check); git documents pre-merge-commit as taking no arguments, and the index it sees holds the merge result. Test: a clean --no-ff merge that deletes a probe, and one that deletes the fact file, are refused, and a valid clean merge passes. Confirm that `just setup`'s core.hooksPath already covers the new hook, and that the existing post-merge hook is unaffected.
 
 Out of scope: --no-verify commits, which no hook can see.
+
+## Notes
+
+- 2026-11-07T16:40:18Z (main): started
