@@ -6,9 +6,9 @@ priority: 3
 size: xs
 complexity: low
 process: direct
-owner: main
+owner: test/hq-ee69d9-codex-guard-matcher
 created: 2026-10-08T23:10:34Z
-updated: 2026-11-07T15:27:30Z
+updated: 2026-11-07T15:27:33Z
 started: 2026-11-07T15:27:30Z
 depends: []
 tags: []
@@ -28,3 +28,4 @@ Done: both real source files pass; a controlled restrictive matcher mutation fai
 
 - 2026-10-08T23:10:34Z (main): concerns: tasks-56b450 extension — protect the verified unrestricted worker registration against future matcher regressions.
 - 2026-11-07T15:27:30Z (main): started
+- 2026-11-07T15:27:33Z (test/hq-ee69d9-codex-guard-matcher): resumed
