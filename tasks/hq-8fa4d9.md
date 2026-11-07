@@ -6,9 +6,9 @@ priority: 3
 size: xs
 complexity: low
 process: direct
-owner: main
+owner: feat/hq-8fa4d9-codex-tui-notification-facts
 created: 2026-10-17T02:58:29Z
-updated: 2026-11-07T16:10:24Z
+updated: 2026-11-07T16:10:26Z
 started: 2026-11-07T16:10:24Z
 depends: []
 tags: [hooks]
@@ -22,3 +22,4 @@ The live acceptance in docs/notes/2026-10-15-agent-attention-brief.md (Live Code
 
 - 2026-10-17T02:58:29Z (main): concerns: hq-1ec500 extension — the acceptance evidence lives only in a note; capability facts make it re-probed on version change
 - 2026-11-07T16:10:24Z (main): started
+- 2026-11-07T16:10:26Z (feat/hq-8fa4d9-codex-tui-notification-facts): resumed
