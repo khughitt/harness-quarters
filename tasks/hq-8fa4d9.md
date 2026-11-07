@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: feat/hq-8fa4d9-codex-tui-notification-facts
 created: 2026-10-17T02:58:29Z
-updated: 2026-11-07T16:10:50Z
+updated: 2026-11-07T16:10:52Z
 started: 2026-11-07T16:10:24Z
 depends: []
 tags: [hooks]
@@ -24,3 +24,4 @@ The live acceptance in docs/notes/2026-10-15-agent-attention-brief.md (Live Code
 - 2026-11-07T16:10:24Z (main): started
 - 2026-11-07T16:10:26Z (feat/hq-8fa4d9-codex-tui-notification-facts): resumed
 - 2026-11-07T16:10:50Z (feat/hq-8fa4d9-codex-tui-notification-facts): trial: flow-trial-1 — enrolled — flow off
+- 2026-11-07T16:10:52Z (feat/hq-8fa4d9-codex-tui-notification-facts): arm: flow-trial-1 — unit tack-8fa4d9 — flow off
