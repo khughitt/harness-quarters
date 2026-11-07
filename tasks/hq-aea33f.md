@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: test/hq-aea33f-staged-facts-index
 created: 2026-10-15T02:02:42Z
-updated: 2026-11-07T16:09:41Z
+updated: 2026-11-07T16:09:43Z
 started: 2026-11-07T16:00:43Z
 depends: []
 tags: []
@@ -32,3 +32,4 @@ Also deferred from the same review, optional here: the refusal could note that t
 - 2026-11-07T16:02:45Z (test/hq-aea33f-staged-facts-index): gate: scoped — adopted
 - 2026-11-07T16:02:47Z (test/hq-aea33f-staged-facts-index): gate: implementing .worktrees/hq-aea33f
 - 2026-11-07T16:09:41Z (test/hq-aea33f-staged-facts-index): review: impl round 1 — verdict: accept; findings: none; reviewer: agy
+- 2026-11-07T16:09:43Z (test/hq-aea33f-staged-facts-index): gate: verified tree:563315741856631b2b1f9db8d7f5a3260de996c9 — checks: just test-one .githooks/test_pre_commit_facts.py .githooks/test_pre_commit.py -n auto (56 passed), just check-hygiene; review: none; reviewer: agy
