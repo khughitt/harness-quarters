@@ -1,15 +1,17 @@
 ---
 id: hq-305ede
 title: "Document how to prepare, verify and clean up an isolated Claude Code home for probes and experiments"
-status: doing
+status: done
 priority: 3
 size: xs
 complexity: low
 process: direct
 owner: docs/hq-305ede-isolated-claude-home
 created: 2026-10-14T10:43:34Z
-updated: 2026-11-07T16:39:37Z
+updated: 2026-11-07T16:39:39Z
 started: 2026-11-07T16:34:48Z
+completed: 2026-11-07T16:39:39Z
+closed: 2026-11-07T16:39:39Z
 depends: []
 parent: hq-40a8d0
 tags: [feedback, gap, "from:trans"]
@@ -39,3 +41,5 @@ Original capture: Isolated Claude first-run onboarding can leave an initial comm
 - 2026-11-07T16:37:42Z (docs/hq-305ede-isolated-claude-home): gate: verified tree:f0fe0e485cc74f34fa5af6e0eb45d2cbe5727396 — checks: python3 tools/ops-check exit 0, python3 tools/ops-docs check exit 0, just check-hygiene exit 0, just test exit 0 (policy skip); review: none; reviewer: 44926849-1300-4fef-9416-e81a9d639fd6
 - 2026-11-07T16:39:35Z (docs/hq-305ede-isolated-claude-home): review: impl round 1 — verdict: accept; findings: none; reviewer: agy/subagent
 - 2026-11-07T16:39:37Z (docs/hq-305ede-isolated-claude-home): gate: verified tree:f0fe0e485cc74f34fa5af6e0eb45d2cbe5727396 — checks: python3 tools/ops-check exit 0, python3 tools/ops-docs check exit 0, just check-hygiene exit 0, just test exit 0 (policy skip); review: none; reviewer: agy/subagent session:agy:44926849-1300-4fef-9416-e81a9d639fd6
+- 2026-11-07T16:39:39Z (docs/hq-305ede-isolated-claude-home): done
+- 2026-11-07T16:39:39Z (docs/hq-305ede-isolated-claude-home): Added 'Isolated Claude Code homes' to README.md covering the /.claude.json config path (observed on Claude Code 2.1.296, where a sibling .claude.json is ignored), seeding only needed onboarding/account fields at that path, finishing or pre-seeding onboarding and verifying a real transcript and tool call before treating a seed prompt as run (recording the single 2026-10-14 observation on 2.1.296 as operational guidance rather than a capability fact), and removing /.claude.json, its preference backups, and copied credentials after all owned processes stop. Documentation-only task in policy-off checkout; broad test baseline omitted by policy. Verified with python3 tools/ops-check, python3 tools/ops-docs check, just check-hygiene, and just test (policy skip). Dispositions: nothing pushed; no surviving processes; others' work untouched; branch merged to local main and worktree removed.
