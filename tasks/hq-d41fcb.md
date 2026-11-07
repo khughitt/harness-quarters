@@ -1,13 +1,15 @@
 ---
 id: hq-d41fcb
 title: Tighten the relay runtime runbook's Codex hook move steps
-status: todo
+status: doing
 priority: 3
 size: xs
 complexity: low
 process: direct
+owner: main
 created: 2026-10-26T15:15:29Z
-updated: 2026-10-26T15:15:29Z
+updated: 2026-11-07T15:36:36Z
+started: 2026-11-07T15:36:36Z
 depends: []
 tags: []
 source: hq-101302
@@ -21,3 +23,4 @@ Deferred minors from hq-101302's round 3 review of docs/runbooks/relay-runtime.m
 
 - 2026-10-26T15:15:29Z (add): created
   provenance: {"harness_session":"claude-code:dd3a0041-6ef0-48cf-a0c1-b98a68b02b56","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
+- 2026-11-07T15:36:36Z (main): started
