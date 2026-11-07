@@ -430,6 +430,16 @@ def test_the_shipped_file_is_valid_and_holds_the_three_facts():
     assert facts.lookup("answer-hook-terminal", "agy")["value"] is False
     assert facts.lookup("answer-defer-managed", "agy")["value"] is False
     assert facts.lookup("answer-async-question", "agy")["value"] is False
+    for fact in (
+        "tui-notifications-allowlist",
+        "tui-notifications-unfocused-only",
+        "tui-notifications-tmux-dcs-wrap",
+    ):
+        entry = facts.lookup(fact, "codex")
+        assert entry["value"] is True
+        assert entry["version"] == "0.163.0"
+        assert entry["date"] == "2026-10-16"
+        assert "docs/notes/2026-10-15-agent-attention-brief.md" in entry["evidence"]
 
 
 def test_every_shipped_note_names_the_probe_mode():
@@ -452,4 +462,10 @@ def test_every_shipped_note_names_the_probe_mode():
         ("mcp-stdio-revisions", "headless"),
     ):
         assert expected_mode in facts.lookup(fact, "agy")["note"], fact
+    for fact in (
+        "tui-notifications-allowlist",
+        "tui-notifications-unfocused-only",
+        "tui-notifications-tmux-dcs-wrap",
+    ):
+        assert "interactive TUI" in facts.lookup(fact, "codex")["note"], fact
     assert "headless daemon" not in facts.lookup("controller-wake-kinds", "agy")["note"]

@@ -900,3 +900,42 @@ note = "The archive spec does not state completeness for Claude Code, and it was
 [facts.session-archive-complete.harness.codex]
 status = "unknown"
 note = "The archive spec does not state completeness for Codex, and it was not checked."
+
+
+[facts.tui-notifications-allowlist]
+type = "boolean"
+description = "The interactive terminal interface honours a `[tui] notifications` allowlist, suppressing unlisted notification types (such as `agent-turn-complete`) while still emitting listed ones."
+
+[facts.tui-notifications-allowlist.harness.codex]
+status = "probed"
+value = true
+version = "0.163.0"
+date = 2026-10-16
+evidence = "hq-1ec500; docs/notes/2026-10-15-agent-attention-brief.md"
+note = "In three fresh interactive TUI sessions recorded under script in a private detached tmux server on Codex 0.163.0 (TUI client 0.163.0, shared background server 0.162.1) with `notifications = [\"approval-requested\", \"plan-mode-prompt\", \"async-question\"]` and `KITTY_WINDOW_ID` set, ordinary turn completions (`agent-turn-complete`) stayed silent while unfocused (`CSI O`), whereas `request_user_input_async` emitted `async-question` (`Question: ...`) and both `request_user_input` in Plan mode and the plan implementation prompt emitted `plan-mode-prompt` (`Plan mode prompt: ...`). Exec/edit approvals (unreachable under `approval_policy = \"never\"`) and server-initiated MCP elicitation (`approval-requested`) were not exercised in the live TUI and remain unknown there."
+
+
+[facts.tui-notifications-unfocused-only]
+type = "boolean"
+description = "By default, the interactive terminal interface sends desktop notifications only while the terminal is unfocused, starting with the focus flag true until a focus-lost sequence (`CSI O`) arrives."
+
+[facts.tui-notifications-unfocused-only.harness.codex]
+status = "probed"
+value = true
+version = "0.163.0"
+date = 2026-10-16
+evidence = "hq-1ec500; docs/notes/2026-10-15-agent-attention-brief.md"
+note = "In interactive TUI sessions recorded under script in a private detached tmux server on Codex 0.163.0 (with `focus-events` off so only injected sequences changed the focus flag), the terminal started focused and each unfocused check first injected `CSI O`. After injecting `CSI I` (focus gained) in session 2, `request_user_input_async` registered on screen and moved the session to blocked while emitting no OSC 9 notification, whereas the same tool emitted OSC 9 when unfocused (`CSI O`) in sessions 1 and 3."
+
+
+[facts.tui-notifications-tmux-dcs-wrap]
+type = "boolean"
+description = "The interactive terminal interface wraps OSC 9 notifications in a tmux DCS passthrough sequence whenever `TMUX` or `TMUX_PANE` is set in the environment, and emits bare OSC 9 only when both are unset."
+
+[facts.tui-notifications-tmux-dcs-wrap.harness.codex]
+status = "probed"
+value = true
+version = "0.163.0"
+date = 2026-10-16
+evidence = "hq-1ec500; docs/notes/2026-10-15-agent-attention-brief.md"
+note = "In interactive TUI sessions recorded under script in a private detached tmux server on Codex 0.163.0 with `KITTY_WINDOW_ID` set: sessions 1 and 2 unset `TMUX` but left `TMUX_PANE` set, and the TUI still detected tmux and wrapped each OSC 9 notification in a tmux DCS passthrough; session 3 unset both `TMUX` and `TMUX_PANE` and emitted the bare OSC 9 sequence that Kitty receives outside tmux."
