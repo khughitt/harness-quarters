@@ -313,6 +313,10 @@ MIT licensed; see `LICENSE`.
 - [Relay operator cutover](docs/runbooks/relay-cutover.md): the record of the completed
   2026-10-22 window. The cutover tool is retired pending deletion (hq-7e81ed).
   Relay upgrades follow the [pinned relay runtime runbook](docs/runbooks/relay-runtime.md).
+- [Harness capability and integration matrix](docs/harness-capabilities.md): overview of
+  integration layers, relay hook-dispatch separation, selected probed behaviour, and
+  session-store coverage across `claude-code`, `codex`, `agy`, `pi`, `pi-durable`,
+  `opencode`, and Crush.
 - [Adding an agent harness](docs/runbooks/adding-a-harness.md): onboarding a new harness
   layer by layer, starting from a search for existing harness enumerations: home
   routing, live-state hygiene, capability facts, profile and command and claim guards,
@@ -489,7 +493,9 @@ and separately the harness version, date and record the value rests on. An entry
 `probed` or `unknown`; a harness with no entry is unknown. The harnesses are the ones
 `harnesses.toml` declares. "The harness does not do
 this" is a probed value. "Nobody has looked" is `unknown`, and no reader may turn it
-into a default.
+into a default. See [docs/harness-capabilities.md](docs/harness-capabilities.md) for a
+curated cross-harness comparison of integration layers, relay dispatch, selected probed
+behaviours, and session-store coverage.
 
 Read it only through `tools/harness-facts`, installed as `~/.agents/bin/harness-facts`:
 
