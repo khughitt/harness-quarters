@@ -24,8 +24,9 @@ B = '[projects."/work/b"]\ntrust_level = "trusted"\n'
 
 def child_env(repo):
     home = repo.parent / "subprocess-home"
-    return {"PATH": os.environ["PATH"], "HOME": str(home),
-            "GIT_CONFIG_GLOBAL": str(home / ".gitconfig"), "GIT_CONFIG_NOSYSTEM": "1"}
+    return {"PATH": os.environ["PATH"], "HOME": str(home), "XDG_CONFIG_HOME": str(home / ".config"),
+            "GIT_CONFIG_GLOBAL": str(home / ".gitconfig"), "GIT_CONFIG_NOSYSTEM": "1",
+            "PYTHONDONTWRITEBYTECODE": "1"}
 
 
 def git(repo, *args, check=True):
@@ -278,6 +279,8 @@ def test_restore_keeps_a_home_link_and_the_file_mode(repo, tmp_path):
 def test_a_linked_worktree_is_refused(repo, tmp_path):
     other = tmp_path / "other"
     git(repo, "worktree", "add", "-q", "-b", "other", str(other))
+    assert Path(git(other, "rev-parse", "--show-toplevel").stdout.strip()) == other.resolve()
+    assert Path(git(other, "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(repo.resolve())
     (other / "local" / "codex").mkdir(parents=True)
 
     result = trust(other, "capture")
@@ -548,6 +551,8 @@ def test_a_linked_worktree_is_left_alone(repo, tmp_path, command):
     trusted(repo, A)
     other = tmp_path / "other"
     git(repo, "worktree", "add", "-q", str(other), "side")
+    assert Path(git(other, "rev-parse", "--show-toplevel").stdout.strip()) == other.resolve()
+    assert Path(git(other, "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(repo.resolve())
     other_config = other / CONFIG
     if command == "checkout --":
         other_config.write_text("[notice]\nx = 1\n\n" + other_config.read_text())
@@ -674,7 +679,12 @@ def test_codex_trust_waits_for_the_host_lock_live_picks_shares(repo):
 
 
 def test_children_use_a_fixture_home_and_ignore_caller_config_and_credentials(repo):
-    probe = 'import os; assert "HQ_TEST_CREDENTIAL" not in os.environ; print(os.path.expanduser("~"))'
+    probe = (
+        'import os; assert "HQ_TEST_CREDENTIAL" not in os.environ; '
+        'assert os.environ.get("XDG_CONFIG_HOME") == os.path.expanduser("~/.config"); '
+        'assert os.environ.get("PYTHONDONTWRITEBYTECODE") == "1"; '
+        'print(os.path.expanduser("~"))'
+    )
     command = f"!{shlex.quote(sys.executable)} -c {shlex.quote(probe)}"
 
     result = git(repo, "-c", f"alias.fixture-env={command}", "fixture-env")
@@ -737,6 +747,8 @@ def test_broken_manifest_hook_exits_zero_while_cli_fails(repo, tmp_path):
 
     linked = tmp_path / "linked"
     git(repo, "worktree", "add", "-q", str(linked))
+    assert Path(git(linked, "rev-parse", "--show-toplevel").stdout.strip()) == linked.resolve()
+    assert Path(git(linked, "rev-parse", "--absolute-git-dir").stdout.strip()).is_relative_to(repo.resolve())
     (linked / "harnesses.toml").write_text("schema = [\n")
     silent = subprocess.run([str(linked / ".githooks" / "codex-trust"), "hook", "post-merge"],
                             cwd=tmp_path, text=True, capture_output=True, env=child_env(repo))

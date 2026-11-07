@@ -232,6 +232,7 @@ def test_pre_commit_runs_from_linked_worktree_and_enforces_shared_filter_config(
     worktree = tmp_path / "linked"
     sh(repo, env, "git", "worktree", "add", "-q", "-b", "side", str(worktree))
     assert Path(sh(worktree, env, "git", "rev-parse", "--show-toplevel").strip()) == worktree.resolve()
+    assert Path(sh(worktree, env, "git", "rev-parse", "--absolute-git-dir").strip()).is_relative_to(repo.resolve())
     docs_stub(worktree)                              # the stub is untracked; the worktree needs its own
     (worktree / "notes.md").write_text("a clean doc change\n")
     sh(worktree, env, "git", "add", "notes.md")

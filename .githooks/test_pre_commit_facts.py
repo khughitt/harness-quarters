@@ -44,15 +44,6 @@ def repo(tmp_path, monkeypatch):
     environment is rebuilt key by key: HOME, XDG_CONFIG_HOME and the global git config under
     tmp_path, and no inherited GIT_* variable."""
     root = tmp_path / "repo"
-    facts = tomllib.loads((CHECKOUT / "facts" / "capabilities.toml").read_text())["facts"]
-    probes = {fact["probe"] for fact in facts.values() if "probe" in fact}
-    for name in ("tools/harness-facts", "facts/capabilities.toml", "harnesses.toml", ".gitattributes",
-                 ".githooks/harness_state.py", ".githooks/harness-state-clean", *sorted(probes)):
-        (root / name).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(CHECKOUT / name, root / name)
-    for name, text in TRACKED.items():
-        (root / name).parent.mkdir(parents=True, exist_ok=True)
-        (root / name).write_text(text)
     home = tmp_path / "home"
     home.mkdir()
     (tmp_path / "gitconfig").touch()
@@ -80,6 +71,15 @@ def repo(tmp_path, monkeypatch):
                              capture_output=True)
     assert Path(top.stdout.strip()) == root.resolve()
     assert Path(git_dir.stdout.strip()).is_relative_to(root.resolve())
+    facts = tomllib.loads((CHECKOUT / "facts" / "capabilities.toml").read_text())["facts"]
+    probes = {fact["probe"] for fact in facts.values() if "probe" in fact}
+    for name in ("tools/harness-facts", "facts/capabilities.toml", "harnesses.toml", ".gitattributes",
+                 ".githooks/harness_state.py", ".githooks/harness-state-clean", *sorted(probes)):
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(CHECKOUT / name, root / name)
+    for name, text in TRACKED.items():
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        (root / name).write_text(text)
     subprocess.run(["git", "config", "filter.harness-state.clean", CLEAN_FILTER], check=True)
     subprocess.run(["git", "config", "filter.harness-state.required", "true"], check=True)
     subprocess.run(["git", "config", "filter.harness-state.smudge", "cat"], check=True)
