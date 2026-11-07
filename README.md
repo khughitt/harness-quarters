@@ -592,6 +592,31 @@ arguments still block on the TUI card). Leave `status = "unknown"` (with no `val
 `version`, `date` or `evidence`) when the route was not exercised or the run was
 inconclusive.
 
+### Isolated Claude Code homes
+
+Probes and experiments that run Claude Code in a scratch home set `CLAUDE_CONFIG_DIR` to a
+temporary directory so live state is untouched:
+
+- **Config path.** With `CLAUDE_CONFIG_DIR` set, Claude Code reads and writes its
+  preferences at $CLAUDE_CONFIG_DIR/.claude.json inside the override directory (observed
+  on Claude Code 2.1.296; `docs/notes/2026-10-15-session-discovery-contract.md`,
+  `docs/notes/2026-10-15-headless-workers-brief.md`). A sibling .claude.json next to
+  `CLAUDE_CONFIG_DIR` (mirroring the default home's ~/.claude.json layout) is ignored on
+  launch and leaves the generated file inside `CLAUDE_CONFIG_DIR` untouched on cleanup.
+- **Seeding.** Seed only the onboarding and account preference fields the run needs at
+  $CLAUDE_CONFIG_DIR/.claude.json rather than copying a full live preference file.
+- **Onboarding and seed-prompt verification.** Finish or pre-seed first-run onboarding
+  before relying on a command-line seed prompt, and confirm that a real session transcript
+  and expected tool call exist before treating the prompt as run. In a single 2026-10-14
+  interactive observation on Claude Code 2.1.296 with a fresh private `CLAUDE_CONFIG_DIR`,
+  first-run onboarding screens (theme, terms, directory trust and the permission-mode
+  notice) preceded an idle session with no transcript or tool call until the same prompt
+  was entered again; that run-specific observation is recorded here as operational
+  guidance rather than a capability fact until a dedicated probe reproduces it.
+- **Cleanup.** After every process owned by the probe or experiment has stopped, remove
+  $CLAUDE_CONFIG_DIR/.claude.json and its generated preference backups along with any
+  copied credentials before removing the scratch directory.
+
 ### Re-probing pi
 
 pi has two runtimes with different guarantees, declared as two harnesses: `pi` is the
