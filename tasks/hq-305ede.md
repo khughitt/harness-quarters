@@ -6,9 +6,9 @@ priority: 3
 size: xs
 complexity: low
 process: direct
-owner: main
+owner: docs/hq-305ede-isolated-claude-home
 created: 2026-10-14T10:43:34Z
-updated: 2026-11-07T16:34:48Z
+updated: 2026-11-07T16:34:50Z
 started: 2026-11-07T16:34:48Z
 depends: []
 parent: hq-40a8d0
@@ -30,3 +30,4 @@ Original capture: Isolated Claude first-run onboarding can leave an initial comm
 - 2026-10-14T12:59:05Z (feedback): detail from trans: The bounded slice restored the endpoint/process state and removed copied credentials, but generated private preferences and backups remained. Those files were removed manually after verifying all owned processes had stopped. Experiment supervisor now seeds only allowed onboarding/account fields at the actual config path and removes that file plus its preference backups; focused checks cover normal expiry, hangup and restoration failure.
 - 2026-10-15T13:05:20Z (main): scope: scoped; todo P3 xs low direct; retitled to its outcome and body rewritten (why/done/where) with the original capture kept; parented under goal hq-40a8d0; guidance in README, not a capability fact, until a probe reproduces the unsubmitted prompt; checked against trans docs/runbooks/phone-inbox.md and hq's session-discovery contract; brief: docs/notes/2026-10-15-headless-workers-brief.md
 - 2026-11-07T16:34:48Z (main): started
+- 2026-11-07T16:34:50Z (docs/hq-305ede-isolated-claude-home): resumed
