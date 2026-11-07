@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/hq-d41fcb-relay-runbook-codex-steps
 created: 2026-10-26T15:15:29Z
-updated: 2026-11-07T15:37:04Z
+updated: 2026-11-07T15:37:07Z
 started: 2026-11-07T15:36:36Z
 depends: []
 tags: []
@@ -26,3 +26,4 @@ Deferred minors from hq-101302's round 3 review of docs/runbooks/relay-runtime.m
 - 2026-11-07T15:36:36Z (main): started
 - 2026-11-07T15:36:39Z (docs/hq-d41fcb-relay-runbook-codex-steps): resumed
 - 2026-11-07T15:37:04Z (docs/hq-d41fcb-relay-runbook-codex-steps): trial: flow-trial-1 — enrolled — flow off
+- 2026-11-07T15:37:07Z (docs/hq-d41fcb-relay-runbook-codex-steps): arm: flow-trial-1 — unit tack-d41fcb — flow off
