@@ -7,6 +7,8 @@ Everything runs in a temporary agent directory and session directory, never ~/.p
 pi still reads the host's ~/.agents/skills, so its skills join the prompt and the command
 list the child-conversations check prints.
 Needs ANTHROPIC_API_KEY; the model is anthropic/claude-haiku-5-5. Spend is a few cents.
+A change in pi, node, bwrap, rg or fd is also a new epoch for autonomy's row E24
+analyst check (autonomy-2e2519), to be rerun and re-attached.
 
     harnesses/pi/probes/rpc-probe.py [--keep]     # --keep leaves the temporary directory for reading
 """

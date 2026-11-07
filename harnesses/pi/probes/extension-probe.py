@@ -5,6 +5,8 @@ Uses scratch PI_CODING_AGENT_DIR settings, a symlinked extension, and a local du
 provider. No prompts or API requests. P2 uses a private, detached tmux server;
 finally/signal cleanup kills that server and every spawned process, then reaps them.
 Run with --keep to retain scratch evidence, or --check P1a for the smallest pilot.
+A change in pi, node, bwrap, rg or fd is also a new epoch for autonomy's row E24
+analyst check (autonomy-2e2519), to be rerun and re-attached.
 """
 import argparse
 import ctypes

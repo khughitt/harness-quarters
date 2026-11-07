@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # The pinned pi: runs the install `just pi-install` made for the version in harnesses/pi/package.json.
-# An upgrade is a change to that file, and a new epoch for facts/capabilities.toml: rerun
-# the probes under harnesses/pi/probes before relying on the new version.
+# An upgrade is a change to that file, and a new epoch for facts/capabilities.toml and
+# autonomy's row E24 analyst check (autonomy-2e2519): rerun the probes under
+# harnesses/pi/probes, and rerun and re-attach autonomy's E24 check on any pi, node,
+# bwrap, rg or fd change before relying on the new version.
 set -euo pipefail
 pin="$(dirname "$(readlink -f "$0")")/.."
 version=$(node -p 'require(process.argv[1]).dependencies["@earendil-works/pi-coding-agent"]' "$pin/package.json")

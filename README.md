@@ -551,7 +551,10 @@ CLI and its RPC mode (`pi --mode rpc`), and `pi-durable` is the SDK's durable `H
 which the CLI does not use. A feature shown for one is never an entry for the other.
 Each fact's `version` is the pinned package version. A change to `harnesses/pi/package.json` is a
 new epoch: run `just pi-install`, then the RPC and durable probes below, and update
-every pi entry in one commit before anything relies on the new version unattended.
+every pi entry in one commit before anything relies on the new version unattended. A
+change in pi, node, bwrap, rg or fd is also a new epoch for autonomy's row E24 analyst
+check (autonomy-2e2519; `docs/notes/2026-10-15-headless-workers-brief.md`), to be rerun
+and re-attached.
 The first interactive run on the new pin shows its changelog and writes the new `lastChangelogVersion` into
 `harnesses/pi/settings.json`, a tracked change: commit it, or a merge that touches the file stops
 on it. Also rerun `harnesses/pi/probes/extension-probe.py` and its tests in

@@ -15,6 +15,8 @@
 // probe could not decide; "false" means it was shown not to work.
 //
 // The script re-spawns itself (argv[2] = child mode) for real process restarts.
+// A change in pi, node, bwrap, rg or fd is also a new epoch for autonomy's row E24
+// analyst check (autonomy-2e2519), to be rerun and re-attached.
 
 import { spawn } from "node:child_process";
 import { appendFileSync, existsSync, mkdtempSync, readFileSync } from "node:fs";

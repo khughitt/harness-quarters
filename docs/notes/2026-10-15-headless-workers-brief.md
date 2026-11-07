@@ -151,6 +151,14 @@ permission-policy work until it cannot meet a concrete authorized capture need.
 
 ## Analyst launch qualification (hq-a99924, 2026-10-31)
 
+**Update (2026-10-31, autonomy-2e2519):** `autonomy analyst` (envelope design
+decision 14) now exists as the supported confined analyst launch, and row E24's
+scripted-upstream tool-denial check passed on the target host with pi 1.1.0,
+node 26.5.0, bubblewrap 0.13.1, rg 15.2.0 and fd 10.5.0 (evidence attached to
+autonomy-2e2519 as `e24-check-<host>.txt`). One deviation from the recipe below:
+the root grep glob is `!{proc,etc,usr,dev}` rather than `!{proc,etc,usr}`,
+because `rg` exits 2 on `/dev/tty` under `bwrap --new-session`.
+
 One read-only pass: code and records only. No model call, no launch, no private
 input, key or world read. Every boundary statement below comes from reading code
 and docs. The scripted check below has not run, and the earlier probes are not a
