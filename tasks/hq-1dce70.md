@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: test/hq-1dce70-manifest-test-assertions
 created: 2026-11-01T19:26:19Z
-updated: 2026-11-07T12:12:47Z
+updated: 2026-11-07T12:20:19Z
 started: 2026-11-07T12:12:22Z
 depends: []
 tags: [tests]
@@ -24,3 +24,4 @@ Deferred from hq-2eba07's reviews. (1) The clean-only refresh test asserts no lo
 - 2026-11-07T12:12:22Z (test/hq-1dce70-manifest-test-assertions): started
 - 2026-11-07T12:12:46Z (test/hq-1dce70-manifest-test-assertions): trial: flow-trial-1 — enrolled — flow off
 - 2026-11-07T12:12:47Z (test/hq-1dce70-manifest-test-assertions): arm: flow-trial-1 — unit tack-1dce70 — flow off
+- 2026-11-07T12:20:19Z (test/hq-1dce70-manifest-test-assertions): Focused baseline (policy-off checkout, .tt.toml automatic_broad = false): ran 'just test-one' on the 6 affected test modules before edits (21 passed in 27.02s); deliberately omitted broad 'just test' / 'just ci-test' per .tt.toml policy.
