@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/hq-305ede-isolated-claude-home
 created: 2026-10-14T10:43:34Z
-updated: 2026-11-07T16:34:50Z
+updated: 2026-11-07T16:35:14Z
 started: 2026-11-07T16:34:48Z
 depends: []
 parent: hq-40a8d0
@@ -31,3 +31,4 @@ Original capture: Isolated Claude first-run onboarding can leave an initial comm
 - 2026-10-15T13:05:20Z (main): scope: scoped; todo P3 xs low direct; retitled to its outcome and body rewritten (why/done/where) with the original capture kept; parented under goal hq-40a8d0; guidance in README, not a capability fact, until a probe reproduces the unsubmitted prompt; checked against trans docs/runbooks/phone-inbox.md and hq's session-discovery contract; brief: docs/notes/2026-10-15-headless-workers-brief.md
 - 2026-11-07T16:34:48Z (main): started
 - 2026-11-07T16:34:50Z (docs/hq-305ede-isolated-claude-home): resumed
+- 2026-11-07T16:35:14Z (docs/hq-305ede-isolated-claude-home): trial: flow-trial-1 — enrolled — flow on
