@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: test/hq-1dce70-manifest-test-assertions
 created: 2026-11-01T19:26:19Z
-updated: 2026-11-07T12:12:46Z
+updated: 2026-11-07T12:12:47Z
 started: 2026-11-07T12:12:22Z
 depends: []
 tags: [tests]
@@ -23,3 +23,4 @@ Deferred from hq-2eba07's reviews. (1) The clean-only refresh test asserts no lo
   provenance: {"harness_session":"claude-code:fdf3b32f-5e63-4593-bba2-4e994bcdf1eb","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
 - 2026-11-07T12:12:22Z (test/hq-1dce70-manifest-test-assertions): started
 - 2026-11-07T12:12:46Z (test/hq-1dce70-manifest-test-assertions): trial: flow-trial-1 — enrolled — flow off
+- 2026-11-07T12:12:47Z (test/hq-1dce70-manifest-test-assertions): arm: flow-trial-1 — unit tack-1dce70 — flow off
