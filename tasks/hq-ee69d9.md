@@ -1,13 +1,15 @@
 ---
 id: hq-ee69d9
 title: Reject restrictive claim-guard matchers in both Codex wiring regressions
-status: todo
+status: doing
 priority: 3
 size: xs
 complexity: low
 process: direct
+owner: main
 created: 2026-10-08T23:10:34Z
-updated: 2026-10-10T19:57:18Z
+updated: 2026-11-07T15:27:30Z
+started: 2026-11-07T15:27:30Z
 depends: []
 tags: []
 source: "tasks-56b450:deferred-minor:matcher"
@@ -25,3 +27,4 @@ Done: both real source files pass; a controlled restrictive matcher mutation fai
 ## Notes
 
 - 2026-10-08T23:10:34Z (main): concerns: tasks-56b450 extension — protect the verified unrestricted worker registration against future matcher regressions.
+- 2026-11-07T15:27:30Z (main): started
