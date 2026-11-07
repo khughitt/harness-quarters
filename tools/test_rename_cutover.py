@@ -2126,27 +2126,96 @@ def test_move_back_stops_when_neither_storage_dir_exists(tmp_path):
         cutover.move_back(meta_for(checkout, tmp_path / "tack", storage_old, storage_new, "../../dw/ai/.worktrees"))
 
 
-def test_save_reset_patch_never_overwrites_an_earlier_patch(tmp_path):
+def test_save_reset_patch_never_overwrites_an_earlier_patch(tmp_path, monkeypatch):
     cutover = load_cutover()
-    root = tmp_path / "repo"
-    root.mkdir()
-    git = ["git", "-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t"]
-    subprocess.run(["git", "init", "-q", str(root)], check=True)
-    (root / "a.txt").write_text("zero\n")
-    subprocess.run([*git, "add", "-A"], check=True)
-    subprocess.run([*git, "commit", "-qm", "init"], check=True)
-    head = subprocess.run([*git, "rev-parse", "HEAD"], check=True, text=True, capture_output=True).stdout.strip()
-    snap = tmp_path / "snap"
-    snap.mkdir()
-    (root / "a.txt").write_text("one\n")
-    cutover.save_reset_patch(root, head, snap, "ai")
-    first = snap / "rollback-ai-1.patch"
-    first_content = first.read_text()
-    assert "one" in first_content
-    (root / "a.txt").write_text("two\n")
-    cutover.save_reset_patch(root, head, snap, "ai")
-    assert first.read_text() == first_content
-    assert "two" in (snap / "rollback-ai-2.patch").read_text()
+    for name in ("decoy-home", "decoy-cfg", "decoy-state", "home", "cfg", "state"):
+        (tmp_path / name).mkdir()
+    decoy_env = {
+        "PATH": os.environ["PATH"],
+        "HOME": str(tmp_path / "decoy-home"),
+        "USER": "test",
+        "XDG_CONFIG_HOME": str(tmp_path / "decoy-cfg"),
+        "XDG_STATE_HOME": str(tmp_path / "decoy-state"),
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CEILING_DIRECTORIES": str(tmp_path),
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@t",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@t",
+    }
+    decoy = tmp_path / "decoy"
+    decoy.mkdir()
+    decoy_index = tmp_path / "decoy.index"
+    subprocess.run(["git", "init", "-q", "-b", "main", str(decoy)], env=decoy_env, check=True)
+    assert Path(subprocess.run(["git", "-C", str(decoy), "rev-parse", "--show-toplevel"],
+                               env=decoy_env, check=True, text=True, capture_output=True).stdout.strip()).resolve() == decoy.resolve()
+    assert Path(subprocess.run(["git", "-C", str(decoy), "rev-parse", "--absolute-git-dir"],
+                               env=decoy_env, check=True, text=True, capture_output=True).stdout.strip()).resolve().is_relative_to(decoy.resolve())
+    (decoy / "decoy.txt").write_text("stay\n")
+    subprocess.run(["git", "-C", str(decoy), "add", "-A"], env=decoy_env, check=True)
+    subprocess.run(["git", "-C", str(decoy), "commit", "-qm", "decoy init"], env=decoy_env, check=True)
+    shutil.copy2(decoy / ".git" / "index", decoy_index)
+    decoy_head = subprocess.run(["git", "-C", str(decoy), "rev-parse", "HEAD"],
+                                env=decoy_env, check=True, text=True, capture_output=True).stdout.strip()
+    decoy_index_bytes = decoy_index.read_bytes()
+
+    monkeypatch.setenv("GIT_DIR", str(decoy / ".git"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(decoy))
+    monkeypatch.setenv("GIT_INDEX_FILE", str(decoy_index))
+
+    fixture_env = {
+        "PATH": os.environ["PATH"],
+        "HOME": str(tmp_path / "home"),
+        "USER": "test",
+        "XDG_CONFIG_HOME": str(tmp_path / "cfg"),
+        "XDG_STATE_HOME": str(tmp_path / "state"),
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CEILING_DIRECTORIES": str(tmp_path),
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@t",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@t",
+    }
+    saved_environ = dict(os.environ)
+    try:
+        os.environ.clear()
+        os.environ.update(fixture_env)
+        root = tmp_path / "repo"
+        root.mkdir()
+        git = ["git", "-C", str(root)]
+        subprocess.run(["git", "init", "-q", "-b", "main", str(root)], env=fixture_env, check=True)
+        assert Path(subprocess.run([*git, "rev-parse", "--show-toplevel"],
+                                   env=fixture_env, check=True, text=True, capture_output=True).stdout.strip()).resolve() == root.resolve()
+        assert Path(subprocess.run([*git, "rev-parse", "--absolute-git-dir"],
+                                   env=fixture_env, check=True, text=True, capture_output=True).stdout.strip()).resolve().is_relative_to(root.resolve())
+        (root / "a.txt").write_text("zero\n")
+        subprocess.run([*git, "add", "-A"], env=fixture_env, check=True)
+        subprocess.run([*git, "commit", "-qm", "init"], env=fixture_env, check=True)
+        head = subprocess.run([*git, "rev-parse", "HEAD"], env=fixture_env, check=True, text=True, capture_output=True).stdout.strip()
+        snap = tmp_path / "snap"
+        snap.mkdir()
+        (root / "a.txt").write_text("one\n")
+        cutover.save_reset_patch(root, head, snap, "ai")
+        first = snap / "rollback-ai-1.patch"
+        first_content = first.read_text()
+        assert "one" in first_content
+        (root / "a.txt").write_text("two\n")
+        cutover.save_reset_patch(root, head, snap, "ai")
+        assert first.read_text() == first_content
+        assert "two" in (snap / "rollback-ai-2.patch").read_text()
+    finally:
+        os.environ.clear()
+        os.environ.update(saved_environ)
+
+    assert os.environ.get("GIT_DIR") == str(decoy / ".git")
+    assert subprocess.run(["git", "-C", str(decoy), "rev-parse", "HEAD"],
+                          env=decoy_env, check=True, text=True, capture_output=True).stdout.strip() == decoy_head
+    assert subprocess.run(["git", "-C", str(decoy), "status", "--porcelain", "--untracked-files=all"],
+                          env=decoy_env, check=True, text=True, capture_output=True).stdout == ""
+    assert not (decoy / "a.txt").exists()
+    assert decoy_index.read_bytes() == decoy_index_bytes
 
 
 # --- the second host ----------------------------------------------------------
