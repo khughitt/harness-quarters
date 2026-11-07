@@ -3,7 +3,7 @@
 Path placeholders name main checkouts or their parent directories. Substitute paths
 from `tasks projects --paths --pretty` before using command examples.
 
-Status: draft for review, revision 2, 2026-10-24.
+Status: accepted (revision 2 at d593f18), 2026-10-24.
 - **Revision 1** (28ed52b) went through a fresh-context agent review: 2 important
   findings and 13 minor.
 - **Revision 2** addresses all of them:

@@ -186,7 +186,8 @@ machine layout and adopted copies). It reads the tracked files in the working tr
 the staged blobs, so a finding in any tracked file refuses every commit, record commits
 from `tasks` included, until it is fixed, and a crash or a malformed `.ops-check.toml`
 refuses too. A new attachment that carries host values (a hostname, the home directory,
-WORK_ROOT, a registered checkout or its parent directory) follows the attachment
+WORK_ROOT, a registered checkout or its parent directory, or a banned value from
+ops/ops-check.toml) follows the attachment
 fallback in lore `skills/references/retained-item-records.md`: the raw bytes stay under
 WORK_ROOT, owned by a task, and a portable derivative is attached. `.ops-check.toml` is
 never widened for an attachment. Thirteen pre-commit tests cover the local-layer

@@ -12,7 +12,7 @@ The sample is purposive: include all six native child origins and the one work-h
 
 The audit contains no origin in `archived_sessions` and no origin whose source is now missing. Consequently **A01 and M01 are separate store-state controls**, selected by the lowest matching indexed file ID. They are not two more audited origins. A01 checks a natively archived Codex rollout; M01 checks an unavailable Claude file with retained index metadata. Neither qualifies replayed backup retrieval.
 
-Queries used a SQLite backup-API snapshot taken **19:17:38–19:18:06 UTC**, opened read-only. It contains schema 15, 25,086 file rows and 26,537 session rows. The latest complete index run ended **19:02:27 UTC**. The source checkout was obs commit `6c81c8056aa00ecaf796226e3d056d7e946a1b72`, with no working changes. No indexing or replay command ran. Europa was checked only for an index at its configured `$XDG_STATE_HOME/obs/index.sqlite` (default `~/.local/state/obs/index.sqlite`): none existed. Other remote paths and stores were not searched.
+Queries used a SQLite backup-API snapshot taken **19:17:38–19:18:06 UTC**, opened read-only. It contains schema 15, 25,086 file rows and 26,537 session rows. The latest complete index run ended **19:02:27 UTC**. The source checkout was obs commit `6c81c8056aa00ecaf796226e3d056d7e946a1b72`, with no working changes. No indexing or replay command ran. The second host was checked only for an index at its configured `$XDG_STATE_HOME/obs/index.sqlite` (default `~/.local/state/obs/index.sqlite`): none existed. Other remote paths and stores were not searched.
 
 ## Results
 
@@ -24,7 +24,7 @@ Queries used a SQLite backup-API snapshot taken **19:17:38–19:18:06 UTC**, ope
 | Pruned/missing source | M01 resolves an absent file with retained metadata and non-null `missing_since_ms`, alongside a readable alternate file for the same ID. There are 739 missing rows. | Availability is per file. A missing mark neither makes the whole session unavailable nor locates a backup copy. |
 | Replayed archive copy | Schema 15 supports `files.read_path`; the implemented replay route is documented and had prior acceptance evidence. | **Zero snapshot rows have `read_path`.** Replayed-copy retrieval was not observed here. |
 | Report/task → filing output | The raw paired result for O13, an audit `created-output` anchor, contains the report ID. The index has its call ID and size/timing metadata. | The index does not store arbitrary input/output text or a feedback-filing edge. All 20 anchors have zero matching `task_commands` rows for the report. |
-| Other host | Europa has no index at its configured state path. | Local absence cannot establish cross-host absence. |
+| Other host | The second host has no index at its configured state path. | Local absence cannot establish cross-host absence. |
 
 The snapshot has 6,232 Claude-personal file rows (669 marked missing), 935 Claude-work (70 missing), 16,640 Codex-personal live-store rows, 594 Codex-personal native-archive rows and 685 Codex-work live-store rows. No row belongs to the work Codex archive. These are indexed file counts, not counts of unique conversations or proof that every current file was indexed.
 

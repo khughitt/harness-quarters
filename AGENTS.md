@@ -46,7 +46,8 @@ still holds what the filter strips (fix with `git add --renormalize <path>`), an
 when the repository's filter config is not what `just setup` writes (`clean`,
 `required = true`, `smudge = cat`; read from the shared config in a linked worktree too). A record commit
 that the hygiene checks refuse means a finding somewhere in the working tree, not in the
-record. A new attachment that carries host values follows the attachment fallback in
+task record (for an attach commit, its own attached file under tasks/files can be the
+finding). A new attachment that carries host values follows the attachment fallback in
 lore `skills/references/retained-item-records.md`: keep the raw bytes under WORK_ROOT
 and attach a portable derivative. Never widen `.ops-check.toml` for an attachment.
 `just docs` regenerates the identity regions from `identity.toml`.

@@ -41,7 +41,7 @@ implementation plan is attached to hq-c411df.
   anchoring still needs transcript content. The snapshot had 739 missing files and
   no populated `read_path`: replayed-copy retrieval was unobserved. Native archive
   A01 and missing-file M01 were separate controls, not audited-origin successes.
-  M01 also has a readable alternate for the same session ID. Europa had no index at
+  M01 also has a readable alternate for the same session ID. The second host had no index at
   its configured path; this does not establish cross-host absence.
 - **Root-row defect resolved, hq-1adbfe / obs-b99310.** Probe case O10 historically
   returned a root and three child files with phantom parent-ID rows. obs fix
