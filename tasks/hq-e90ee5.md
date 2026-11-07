@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/hq-e90ee5-pre-push-citation
 created: 2026-11-05T11:40:40Z
-updated: 2026-11-07T12:38:52Z
+updated: 2026-11-07T12:39:57Z
 started: 2026-11-07T12:38:27Z
 depends: [ops-713299]
 tags: [docs]
@@ -27,3 +27,4 @@ Done: each named current match has a valid subject/private locator or explicit h
 - 2026-11-07T12:38:27Z (docs/hq-e90ee5-pre-push-citation): started
 - 2026-11-07T12:38:50Z (docs/hq-e90ee5-pre-push-citation): trial: flow-trial-1 — enrolled — flow off
 - 2026-11-07T12:38:52Z (docs/hq-e90ee5-pre-push-citation): arm: flow-trial-1 — unit tack-e90ee5 — flow off
+- 2026-11-07T12:39:57Z (docs/hq-e90ee5-pre-push-citation): Focused baseline (policy-off checkout, .tt.toml automatic_broad = false): ran 'just test-one tools/test_test_execution.py -k test_pre_push' before edits (7 passed in 2.62s); deliberately omitted broad 'just test' / 'just ci-test' per .tt.toml policy.
