@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/hq-87db7d-recovery-caveat
 created: 2026-11-01T19:26:17Z
-updated: 2026-11-07T11:31:59Z
+updated: 2026-11-07T11:32:06Z
 started: 2026-11-07T11:26:30Z
 completed: 2026-11-07T11:31:59Z
 closed: 2026-11-07T11:31:59Z
@@ -36,3 +36,4 @@ Deferred from hq-2eba07's reviews. README and the adding-a-harness runbook say t
 - 2026-11-07T11:31:56Z (docs/hq-87db7d-recovery-caveat): retro: Updating AGENTS.md, docs/specs/2026-11-01-harness-manifest-design.md, justfile, and README.md together aligned every broken-manifest recovery and setup-recipe passage with the adding-a-harness runbook.
 - 2026-11-07T11:31:59Z (docs/hq-87db7d-recovery-caveat): done
 - 2026-11-07T11:31:59Z (docs/hq-87db7d-recovery-caveat): Added the mid-merge/rebase recovery caveat for a broken harnesses.toml (resolve the conflict or run git merge --abort / git rebase --abort because git checkout -- harnesses.toml fails on an unmerged path; never unset filter.harness-state.required) to AGENTS.md Rules and docs/specs/2026-11-01-harness-manifest-design.md (§5.5.1 and §5.6), updated justfile line 5 from 'after pulling a change to it' to 'after pulling a change to the recipe', and noted the racy-clean git add refilter case in README.md's broken-manifest paragraph. Verification: just check-hygiene exit 0, tasks check exit 0, and fresh-context review round 1 accept with 0 findings by session:agy:6aba736f-10bf-493f-8ca6-562704a50395 at tree 5133ff5760cc90fdccd7e4088593ca7d2e3be757. Broad test suite deliberately omitted under validated policy-off (.tt.toml automatic_broad = false) and documentation-only scope. Disclosures: nothing pushed; no paid API calls; host pointers unchanged; merging docs/hq-87db7d-recovery-caveat locally into main under personal profile and removing .worktrees/hq-87db7d in this turn.
+- 2026-11-07T11:32:06Z (main): post-merge & cleanup: fast-forwarded main to 4261f154 with AGENTS.md, README.md, docs/specs/2026-11-01-harness-manifest-design.md, and justfile; tt-report exit 0; zero ignored files (except empty local/codex/rules from just setup, discarded), zero .superpowers/sdd workspaces, and zero host pointers into .worktrees/hq-87db7d; unlocked and removed .worktrees/hq-87db7d and deleted branch docs/hq-87db7d-recovery-caveat (zero kept items on this host).
