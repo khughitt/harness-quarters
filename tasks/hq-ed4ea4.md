@@ -1,13 +1,15 @@
 ---
 id: hq-ed4ea4
 title: "Re-probing procedure: the background child writes its final output and exit status to a file, so a Codex run stays judgeable after its terminal indicator disappears"
-status: todo
+status: doing
 priority: 3
 size: xs
 complexity: low
 process: direct
+owner: main
 created: 2026-10-08T23:32:28Z
-updated: 2026-10-09T01:29:31Z
+updated: 2026-11-07T15:33:49Z
+started: 2026-11-07T15:33:49Z
 depends: []
 tags: []
 agent: codex
@@ -18,3 +20,4 @@ README 'Re-probing a fact' asks a did-not-wake verdict to show from the child's 
 ## Notes
 
 - 2026-10-09T01:29:29Z (main): Triage: scoped from feedback report into a README procedure fix.
+- 2026-11-07T15:33:49Z (main): started
