@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: test/hq-ee69d9-codex-guard-matcher
 created: 2026-10-08T23:10:34Z
-updated: 2026-11-07T15:27:59Z
+updated: 2026-11-07T15:33:00Z
 started: 2026-11-07T15:27:30Z
 depends: []
 tags: []
@@ -31,3 +31,4 @@ Done: both real source files pass; a controlled restrictive matcher mutation fai
 - 2026-11-07T15:27:33Z (test/hq-ee69d9-codex-guard-matcher): resumed
 - 2026-11-07T15:27:57Z (test/hq-ee69d9-codex-guard-matcher): trial: flow-trial-1 — enrolled — flow off
 - 2026-11-07T15:27:59Z (test/hq-ee69d9-codex-guard-matcher): arm: flow-trial-1 — unit tack-ee69d9 — flow off
+- 2026-11-07T15:33:00Z (test/hq-ee69d9-codex-guard-matcher): trial-arm: flow-trial-1: flow off (unit tack-ee69d9). Focused baseline before edits: just test-one tools/test_claim_guard_wiring.py (3 passed; broad suite deliberately omitted per .tt.toml automatic_broad = false). RED check: just test-one tools/test_claim_guard_wiring.py failed (12 failed, 3 passed: DID NOT RAISE AssertionError) when test_restrictive_codex_claim_guard_matcher_is_rejected mutated group['matcher'] on Stop and SubagentStop in harnesses/codex/hooks.json and harnesses/codex/work/hooks.json before assert_codex_guard_groups enforced the no-matcher group contract.
