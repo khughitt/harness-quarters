@@ -70,11 +70,13 @@ Probe evidence is private ops records, not a file under the ops code checkout.
 On each executing host, `tasks where <ops-code-checkout> --json` must resolve the
 ops project and its absolute `project.records` directory outside that checkout.
 The bootstrap inventory, target identity checks and installer use
-records-relative docs/runbooks/relay-guard-evidence-<harness>.json. Resolution is
-bound once per host operation so its hash checks and installer share the path.
+records-relative docs/runbooks/relay-guard-evidence-<harness>.json. Each bootstrap
+host operation caches its own resolution in the operation context so its inventory
+hash checks or target identity checks and installer share that path; standalone
+`tools/relay-cutover preflight` subprocesses (including those the real inventory
+invokes per harness) resolve independently with the same reply/path validator.
 The reviewed manifest’s logical `ops:docs/runbooks/...` member keys stay unchanged;
-they identify the evidence, not its physical storage root. The standalone
-`tools/relay-cutover preflight` uses the same reply/path validator.
+they identify the evidence, not its physical storage root.
 Missing/invalid resolution or evidence refuses readiness; no code-root fallback
 exists. A digest mismatch still requires refreshed, reviewed evidence. This
 storage cutover changes no live harness or bootstrap-window authorization.

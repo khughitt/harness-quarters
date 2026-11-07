@@ -286,7 +286,8 @@ def records_directory(output, ops):
 
 
 def evidence_path(context, harness):
-    """Resolve once per host operation so checks and installer use the same private path."""
+    """Resolve once per bootstrap operation context so its checks and installer share the
+    private path; standalone preflight subprocesses resolve independently."""
     relative = f"docs/runbooks/relay-guard-evidence-{harness}.json"
     if relative not in EVIDENCE:
         raise Stop("ops-records: unsupported evidence harness")

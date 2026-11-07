@@ -535,7 +535,9 @@ elif NAME == "niri":
 
 FIXTURE_PREFLIGHT = r'''
 """Stands in for tools/relay-cutover's preflight, whose no-live reads the fixture process
-table and the held probes still alive. Every other command is the real helper's, run on this
+table and the held probes still alive and whose runtime/subscribers/evidence verdicts come
+from the host's fixture behavior (without running the standalone preflight evidence reader's
+own tasks where lookup). Every other command is the real helper's, run on this
 fixture home: the familiar checks on its miniature history, guard retirement and verify; its
 observation is written once it exits, with its exit status. A guard retirement into a window's
 live directory records that window's ledger as it stood before the helper ran."""
@@ -2165,6 +2167,9 @@ def test_inventory_uses_private_evidence_without_old_code_files(world):
         relative = f"docs/runbooks/relay-guard-evidence-{harness}.json"
         assert result["helpers"]["members"]["ops:" + relative] == _digest(
             world.home("titan") / "private-records/ops" / relative)
+    # Bootstrap's own helper hashing caches one lookup in context; FIXTURE_PREFLIGHT
+    # returns canned preflight verdicts rather than running the standalone preflight
+    # subprocesses' independent tasks where lookups.
     lookups = [call for call in world.lines("observed") if call["tool"] == "tasks"]
     assert len(lookups) == 1
     assert lookups[0]["args"] == ["where", str(world.home("titan") / "d/ops"), "--json"]
