@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: test/hq-ee69d9-codex-guard-matcher
 created: 2026-10-08T23:10:34Z
-updated: 2026-11-07T15:27:57Z
+updated: 2026-11-07T15:27:59Z
 started: 2026-11-07T15:27:30Z
 depends: []
 tags: []
@@ -30,3 +30,4 @@ Done: both real source files pass; a controlled restrictive matcher mutation fai
 - 2026-11-07T15:27:30Z (main): started
 - 2026-11-07T15:27:33Z (test/hq-ee69d9-codex-guard-matcher): resumed
 - 2026-11-07T15:27:57Z (test/hq-ee69d9-codex-guard-matcher): trial: flow-trial-1 — enrolled — flow off
+- 2026-11-07T15:27:59Z (test/hq-ee69d9-codex-guard-matcher): arm: flow-trial-1 — unit tack-ee69d9 — flow off
