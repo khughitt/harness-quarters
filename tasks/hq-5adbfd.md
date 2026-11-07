@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: test/hq-5adbfd-adapter-slug-manifest
 created: 2026-11-01T18:59:57Z
-updated: 2026-11-07T11:11:58Z
+updated: 2026-11-07T11:12:00Z
 started: 2026-11-07T11:05:04Z
 depends: [hq-2eba07]
 tags: []
@@ -31,3 +31,4 @@ Follow-up from hq-2eba07's final whole-branch review (minor 1, named risk a). to
 - 2026-11-07T11:11:54Z (test/hq-5adbfd-adapter-slug-manifest): review: impl round 1 — verdict: accept; findings: none; reviewer: agy
 - 2026-11-07T11:11:56Z (test/hq-5adbfd-adapter-slug-manifest): review detail: round 1 on tree 075763d84ff09e280cf51fa0fcae1366acc28d10 by session:agy:3e77d93f-1466-472d-b90a-9193b81b214e accepted with 0 findings. Reviewer label recorded as bare agy because timeout 2 relay model --harness agy --pretty exited 2 on hq's pinned relay v0.3.0.
 - 2026-11-07T11:11:58Z (test/hq-5adbfd-adapter-slug-manifest): gate: verified tree:075763d84ff09e280cf51fa0fcae1366acc28d10 — checks: just test-one tools/test_harness_stores.py .githooks/test_harness_manifest.py 62 passed (both slug tests seen failing RED against synthetic undeclared-slug break) and just check-hygiene exit 0 and tasks check exit 0; review: none; reviewer: agy
+- 2026-11-07T11:12:00Z (test/hq-5adbfd-adapter-slug-manifest): retro: Checking both harnesses.toml directly in tools/test_harness_stores.py and hs.load_manifest().harnesses in .githooks/test_harness_manifest.py while replacing os.environ['PATH'] with a literal key-by-key env closed the manifest slug parity gap and env-hygiene debt in one pass.
