@@ -1,13 +1,15 @@
 ---
 id: hq-e90ee5
 title: Adopt current ops documentation citations
-status: todo
+status: doing
 priority: 2
 size: s
 complexity: low
 process: direct
+owner: docs/hq-e90ee5-pre-push-citation
 created: 2026-11-05T11:40:40Z
-updated: 2026-11-05T11:40:40Z
+updated: 2026-11-07T12:38:27Z
+started: 2026-11-07T12:38:27Z
 depends: [ops-713299]
 tags: [docs]
 source: ops-7f0b75
@@ -22,3 +24,4 @@ Done: each named current match has a valid subject/private locator or explicit h
 ## Notes
 
 - 2026-11-05T11:40:40Z (add): created
+- 2026-11-07T12:38:27Z (docs/hq-e90ee5-pre-push-citation): started
