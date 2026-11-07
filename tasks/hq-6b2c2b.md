@@ -6,9 +6,9 @@ priority: 3
 size: xs
 complexity: low
 process: direct
-owner: main
+owner: feat/hq-6b2c2b-pre-merge-commit
 created: 2026-10-15T08:03:38Z
-updated: 2026-11-07T16:40:18Z
+updated: 2026-11-07T16:40:20Z
 started: 2026-11-07T16:40:18Z
 depends: []
 tags: []
@@ -25,3 +25,4 @@ Out of scope: --no-verify commits, which no hook can see.
 ## Notes
 
 - 2026-11-07T16:40:18Z (main): started
+- 2026-11-07T16:40:20Z (feat/hq-6b2c2b-pre-merge-commit): resumed
