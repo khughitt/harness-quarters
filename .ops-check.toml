@@ -1,5 +1,10 @@
 layout_allowed = [
-  # Host configuration by design: harness homes read these absolute paths literally.
+  # Host configuration by design: harness homes read these absolute paths literally
+  # (or, for agy/settings.json, write stripped live trustedWorkspaces paths in place).
+  # harnesses/pi/settings.json stays checked: /settings writes no path keys, pi's
+  # project trust lives in ~/.pi/agent/trust.json, and any path written to sessionDir,
+  # shellPath, packages, extensions, skills, prompts or themes is not stripped by the
+  # clean filter and would be committed if allowed here.
   "harnesses/claude/settings.json",
   "harnesses/codex/config.toml",
   "harnesses/codex/hooks.json",
