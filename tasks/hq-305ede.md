@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/hq-305ede-isolated-claude-home
 created: 2026-10-14T10:43:34Z
-updated: 2026-11-07T16:39:35Z
+updated: 2026-11-07T16:39:37Z
 started: 2026-11-07T16:34:48Z
 depends: []
 parent: hq-40a8d0
@@ -38,3 +38,4 @@ Original capture: Isolated Claude first-run onboarding can leave an initial comm
 - 2026-11-07T16:37:40Z (docs/hq-305ede-isolated-claude-home): review: subagent 44926849-1300-4fef-9416-e81a9d639fd6 — Verdict: accept (findings: none)
 - 2026-11-07T16:37:42Z (docs/hq-305ede-isolated-claude-home): gate: verified tree:f0fe0e485cc74f34fa5af6e0eb45d2cbe5727396 — checks: python3 tools/ops-check exit 0, python3 tools/ops-docs check exit 0, just check-hygiene exit 0, just test exit 0 (policy skip); review: none; reviewer: 44926849-1300-4fef-9416-e81a9d639fd6
 - 2026-11-07T16:39:35Z (docs/hq-305ede-isolated-claude-home): review: impl round 1 — verdict: accept; findings: none; reviewer: agy/subagent
+- 2026-11-07T16:39:37Z (docs/hq-305ede-isolated-claude-home): gate: verified tree:f0fe0e485cc74f34fa5af6e0eb45d2cbe5727396 — checks: python3 tools/ops-check exit 0, python3 tools/ops-docs check exit 0, just check-hygiene exit 0, just test exit 0 (policy skip); review: none; reviewer: agy/subagent session:agy:44926849-1300-4fef-9416-e81a9d639fd6
