@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/hq-e90ee5-pre-push-citation
 created: 2026-11-05T11:40:40Z
-updated: 2026-11-07T12:38:27Z
+updated: 2026-11-07T12:38:50Z
 started: 2026-11-07T12:38:27Z
 depends: [ops-713299]
 tags: [docs]
@@ -25,3 +25,4 @@ Done: each named current match has a valid subject/private locator or explicit h
 
 - 2026-11-05T11:40:40Z (add): created
 - 2026-11-07T12:38:27Z (docs/hq-e90ee5-pre-push-citation): started
+- 2026-11-07T12:38:50Z (docs/hq-e90ee5-pre-push-citation): trial: flow-trial-1 — enrolled — flow off
