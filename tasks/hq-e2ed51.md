@@ -4,7 +4,7 @@ title: Stop the reviewer and Codex skill-path file-not-found streams
 status: todo
 priority: 2
 created: 2026-09-27T11:20:54Z
-updated: 2026-11-07T22:00:12Z
+updated: 2026-11-07T22:00:14Z
 depends: [obs-18b8eb]
 tags: [obs, skills]
 source: "lore:docs/notes/2026-09-27-path-mistakes-brief.md"
@@ -21,3 +21,4 @@ Most file-not-found errors in the obs report (2026-09-26 §2–3) are not the wo
 - 2026-09-27T12:20:56Z (main): filed claude-plugins-official#6320 (worktree-removal race); +1 on #4960 and #4693
 - 2026-09-27T12:24:15Z (main): commented on claude-code#96860: reviews bill ANTHROPIC_API_KEY over the subscription when both exist
 - 2026-09-27T13:05:55Z (main): Both fixes are in (reviewer disabled 8d701d6; skills flattened f4f1a94, 86c3c77). Verify and close when obs-18b8eb's path-relation labels show reviewer and Codex skill-path file-not-found near zero after 2026-09-27.
+- 2026-11-07T22:00:14Z (main): origin backfill (tasks-0dfdf9): stage 1 unavailable (created 2026-09-27 before tasks-053e89); traced via claude-code:46017b38-f086-4c7d-9fb8-333582689636 L247 agent scope/decomposition/audit filing (source lore:docs/notes/2026-09-27-path-mistakes-brief.md) -> origin=agent
