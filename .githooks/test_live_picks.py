@@ -1300,6 +1300,8 @@ def test_broken_manifest_hook_exits_zero_with_retry_while_cli_fails_and_bad_args
         os.utime(repo / name, (past, past))
     isolated_git(repo, home, "update-index", "-q", "--really-refresh")
     assert isolated_git(repo, home, "diff-files", "--name-only").stdout == ""
+    (repo / "local/harness-state.lock").unlink(missing_ok=True)
+    (other / "local/harness-state.lock").unlink(missing_ok=True)
     damage_manifest(repo / "harnesses.toml", damage)
     damage_manifest(other / "harnesses.toml", damage)
 
@@ -1310,6 +1312,8 @@ def test_broken_manifest_hook_exits_zero_with_retry_while_cli_fails_and_bad_args
            for args in (("capture",), ("sync",), ("forget", CLAUDE))}
     bogus = isolated_picks(repo, home, "bogus")
 
+    assert not (repo / "local/harness-state.lock").exists()
+    assert not (other / "local/harness-state.lock").exists()
     for result in (hook, switched):
         assert result.returncode == 0, result.stderr
         assert "live-picks: " in result.stderr

@@ -240,7 +240,28 @@ def namespace(script, home):
     return json.loads(result.stdout)
 
 
+def _toml_value(value):
+    if isinstance(value, dict):
+        return "{ " + ", ".join(f"{k} = {_toml_value(v)}" for k, v in value.items()) + " }"
+    if isinstance(value, list):
+        return "[" + ", ".join(_toml_value(item) for item in value) + "]"
+    return json.dumps(value)
+
+
+def _dump_manifest(parsed):
+    lines = [f"schema = {parsed['schema']}\n"]
+    for name, table in parsed["harnesses"].items():
+        if "live_state" not in table:
+            lines.append(f"[harnesses.{name}]")
+            continue
+        lines.append(f"[harnesses.{name}.live_state]")
+        for key, value in table["live_state"].items():
+            lines.append(f"{key} = {_toml_value(value)}")
+    return "\n".join(lines) + "\n"
+
+
 def test_runpy_exposes_cleaners_and_binds_claude_json_keys_without_silent_fallback(tmp_path):
+    import tomllib
     home = tmp_path / "home"
     home.mkdir()
     found = namespace(FILTER, home)
@@ -251,11 +272,11 @@ def test_runpy_exposes_cleaners_and_binds_claude_json_keys_without_silent_fallba
     (scratch / ".githooks").mkdir(parents=True)
     for name in ("harness-state-clean", "harness_state.py"):
         shutil.copy2(FILTER.parent / name, scratch / ".githooks" / name)
-    manifest = (FILTER.parent.parent / "harnesses.toml").read_text()
-    assert "[harnesses.claude-code.live_state]" in manifest
-    head, rest = manifest.split("[harnesses.claude-code.live_state]")
-    tail = rest.split("\n[harnesses.", 1)[1]
-    (scratch / "harnesses.toml").write_text(head + "[harnesses.claude-code]\n\n[harnesses." + tail)
+    parsed = tomllib.loads((FILTER.parent.parent / "harnesses.toml").read_text())
+    assert tomllib.loads(_dump_manifest(parsed)) == parsed
+    assert "live_state" in parsed["harnesses"]["claude-code"]
+    parsed["harnesses"]["claude-code"].pop("live_state")
+    (scratch / "harnesses.toml").write_text(_dump_manifest(parsed))
     found = namespace(scratch / ".githooks" / "harness-state-clean", home)
     assert found["bound"] is False
 

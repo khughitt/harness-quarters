@@ -18,7 +18,7 @@ PARTITIONS = (
     ("relay-signal", ("tools/test_relay_cutover_transport.py", "-k", SIGNAL)),
 )
 PYTEST = ("uv", "run", "-q", "--python", "/usr/bin/python3", "--with", "pytest==9.2.0",
-          "--with", "pytest-xdist==3.8.0", "pytest", "-p", "pytest_evidence", "-q", "-rs")
+          "--with", "pytest-xdist==3.8.0", "pytest", "-p", "no:httpbin", "-p", "pytest_evidence", "-q", "-rs")
 
 
 def read_evidence(evidence: Path) -> dict:

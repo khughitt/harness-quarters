@@ -243,6 +243,11 @@ def test_pre_commit_runs_from_linked_worktree_and_enforces_shared_filter_config(
     assert result.returncode == 1
     assert "filter.harness-state.required" in result.stderr and "just setup" in result.stderr
 
+    sh(repo, env, "git", "config", "filter.harness-state.required", "false")
+    result = run_hook(worktree, env)
+    assert result.returncode == 1
+    assert "filter.harness-state.required" in result.stderr and "just setup" in result.stderr
+
     sh(repo, env, "git", "config", "filter.harness-state.required", "true")
     sh(repo, env, "git", "config", "--unset", "filter.harness-state.smudge")
     result = run_hook(worktree, env)

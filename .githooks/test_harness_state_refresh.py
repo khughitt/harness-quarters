@@ -234,6 +234,9 @@ def test_clean_only_harness_is_filtered_and_refreshed_end_to_end(repo, tmp_path)
     (repo / "extra/settings.json").write_text(json.dumps({"theme": "x"}, indent=2) + "\n")
     git(repo, "add", "-A")
     git(repo, "commit", "-q", "-m", "extra")
+    assert refresh(repo, cwd=tmp_path).returncode == 0
+    before = {path.name: path.read_bytes() for path in (repo / "local").glob("live-picks*")}
+    assert list(before) == ["live-picks.json"]
     (repo / "extra/settings.json").write_text(json.dumps({"theme": "x", "pick": "a"}, indent=2) + "\n")
     assert marked(repo, "extra/settings.json")
 
@@ -242,13 +245,12 @@ def test_clean_only_harness_is_filtered_and_refreshed_end_to_end(repo, tmp_path)
     assert result.returncode == 0, result.stderr
     assert not marked(repo, "extra/settings.json")
     assert json.loads(git(repo, "show", "HEAD:extra/settings.json").stdout) == {"theme": "x"}
-    assert sorted(path.name for path in (repo / "local").glob("live-picks*")
-                  if "extra" in path.name) == []
+    assert {path.name: path.read_bytes() for path in (repo / "local").glob("live-picks*")} == before
 
 
 @pytest.mark.parametrize("key, value", [("required", None), ("required", "false"),
                                         ("smudge", None), ("smudge", "cat -u")])
-def test_refresh_refuses_when_filter_required_is_unset_or_false(repo, tmp_path, key, value):
+def test_refresh_refuses_when_filter_required_or_smudge_is_invalid(repo, tmp_path, key, value):
     write_settings(repo, model="claude-sonnet-5")
     assert marked(repo)
     if value is None:

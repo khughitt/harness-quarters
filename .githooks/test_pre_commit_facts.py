@@ -347,6 +347,8 @@ STAGED_VIOLATIONS = {
     "gitattributes-drift": (stage_attributes, ".gitattributes lacks `harnesses/pi/settings*.json"),
     "required-unset": (lambda: git("config", "--unset", "filter.harness-state.required"),
                        "filter.harness-state.required"),
+    "required-false": (lambda: git("config", "filter.harness-state.required", "false"),
+                       "filter.harness-state.required"),
     "smudge-unset": (lambda: git("config", "--unset", "filter.harness-state.smudge"),
                      "filter.harness-state.smudge"),
     "manifest-deleted": (lambda: git("rm", "-q", "--cached", "harnesses.toml"), "harnesses.toml"),

@@ -136,7 +136,9 @@ def test_focused_args_are_literal(world):
     result = world.run("test-one", *args)
     assert result.returncode == 0, result.stderr
     assert [m["kind"] for m in world.markers()] == ["budget", "runner"]
-    assert world.markers()[-1]["argv"][-len(args):] == args
+    runner_argv = world.markers()[-1]["argv"]
+    assert runner_argv[runner_argv.index("pytest") + 1:runner_argv.index("pytest") + 3] == ["-p", "no:httpbin"]
+    assert runner_argv[-len(args):] == args
     assert world.rows()[-1]["target"] == "test-one"
     assert world.rows()[-1]["execution"] == "ran"
 

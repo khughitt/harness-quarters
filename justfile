@@ -43,7 +43,7 @@ test-full:
 # Focused tests retain argument boundaries and the host's worker budget.
 [positional-arguments]
 test-one +args:
-    {{tt}} test-one -- host-budget run -- uv run -q --python /usr/bin/python3 --with pytest==9.2.0 --with pytest-xdist==3.8.0 pytest "$@"
+    {{tt}} test-one -- host-budget run -- uv run -q --python /usr/bin/python3 --with pytest==9.2.0 --with pytest-xdist==3.8.0 pytest -p no:httpbin "$@"
 
 check-hygiene:
     {{tt}} check-hygiene -- .githooks/pre-commit
