@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: test/hq-5adbfd-adapter-slug-manifest
 created: 2026-11-01T18:59:57Z
-updated: 2026-11-07T11:12:04Z
+updated: 2026-11-07T11:12:36Z
 started: 2026-11-07T11:05:04Z
 completed: 2026-11-07T11:12:04Z
 closed: 2026-11-07T11:12:04Z
@@ -36,3 +36,4 @@ Follow-up from hq-2eba07's final whole-branch review (minor 1, named risk a). to
 - 2026-11-07T11:12:00Z (test/hq-5adbfd-adapter-slug-manifest): retro: Checking both harnesses.toml directly in tools/test_harness_stores.py and hs.load_manifest().harnesses in .githooks/test_harness_manifest.py while replacing os.environ['PATH'] with a literal key-by-key env closed the manifest slug parity gap and env-hygiene debt in one pass.
 - 2026-11-07T11:12:04Z (test/hq-5adbfd-adapter-slug-manifest): done
 - 2026-11-07T11:12:04Z (test/hq-5adbfd-adapter-slug-manifest): Asserted that every tools/harness_stores.ADAPTERS slug is declared in harnesses.toml ([harnesses.<slug>]) both directly in tools/test_harness_stores.py (alongside tools/harness-facts list, replacing os.environ['PATH'] with a literal key-by-key PATH) and via hs.load_manifest().harnesses in .githooks/test_harness_manifest.py. Verification: RED observed for both tests against a synthetic undeclared-slug break (2 failed) -> GREEN just test-one tools/test_harness_stores.py .githooks/test_harness_manifest.py (62 passed), just check-hygiene exit 0, tasks check exit 0, and fresh-context review round 1 accept with 0 findings by session:agy:3e77d93f-1466-472d-b90a-9193b81b214e at tree 075763d84ff09e280cf51fa0fcae1366acc28d10. Broad suite deliberately omitted under validated policy-off (.tt.toml automatic_broad = false). Disclosures: nothing pushed; no paid API calls; host pointers unchanged; merging test/hq-5adbfd-adapter-slug-manifest locally into main under personal profile and removing .worktrees/hq-5adbfd in this turn.
+- 2026-11-07T11:12:36Z (main): post-merge & cleanup: fast-forwarded main to 102f173e with tools/test_harness_stores.py and .githooks/test_harness_manifest.py; tt-report exit 0; ignored files in .worktrees/hq-5adbfd were only regenerable .pytest_cache and __pycache__ directories (discarded) plus empty local/codex/rules from just setup (discarded); zero .superpowers/sdd workspaces and zero host pointers into .worktrees/hq-5adbfd; unlocked and removed .worktrees/hq-5adbfd and deleted branch test/hq-5adbfd-adapter-slug-manifest (zero kept items on this host).
