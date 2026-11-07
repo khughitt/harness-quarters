@@ -73,9 +73,9 @@ observation; a missing observation is not permission to invent a fallback.
   mid-complexity, direct follow-up research task under hq-2dd09b to run separately
   authorized isolated manual permission-wait probes on Claude Code and Codex; it
   wakes hq-a639e4, which stays an idea dependent on it.
-- hq-5aa005: proposed for drop on 2026-11-06 after hq-c58737 landed read-only
-  protected-path inspections (`f7e5b618`) and merged to `main` (`d65274fe`), with
-  the live host-pointer audit verified during `.worktrees/hq-2dd09b` removal.
+- hq-5aa005: dropped with user approval on 2026-11-07 after hq-c58737 landed
+  read-only protected-path inspections (`f7e5b618`) and merged to `main` (`d65274fe`),
+  with the live host-pointer audit verified during `.worktrees/hq-2dd09b` removal.
 - hq-14bab1: dropped with user approval on 2026-11-05 because hq-c58737 and its completed
   branch step hq-cc91d4 cover explicit migration and activation/rollback guidance.
   The drop does not imply that migration has been activated.
