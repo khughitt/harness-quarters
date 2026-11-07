@@ -1,15 +1,17 @@
 ---
 id: hq-4c1dfb
 title: Close remaining traceback and reporting gaps in harness-state hooks
-status: doing
+status: done
 priority: 2
 size: s
 complexity: low
 process: direct
 owner: fix/hq-4c1dfb-hook-reporting
 created: 2026-11-01T19:26:16Z
-updated: 2026-11-07T12:11:37Z
+updated: 2026-11-07T12:11:39Z
 started: 2026-11-07T12:00:05Z
+completed: 2026-11-07T12:11:39Z
+closed: 2026-11-07T12:11:39Z
 depends: []
 tags: [hooks]
 origin: agent
@@ -28,3 +30,5 @@ Deferred from hq-2eba07's reviews (ledger attached there). On the live hook surf
 - 2026-11-07T12:11:33Z (fix/hq-4c1dfb-hook-reporting): flow-trial-1: flow off (unit tack-4c1dfb)
 - 2026-11-07T12:11:35Z (fix/hq-4c1dfb-hook-reporting): rework: none
 - 2026-11-07T12:11:37Z (fix/hq-4c1dfb-hook-reporting): scope-drift: none
+- 2026-11-07T12:11:39Z (fix/hq-4c1dfb-hook-reporting): done
+- 2026-11-07T12:11:39Z (fix/hq-4c1dfb-hook-reporting): Landed in 4530e9aa on fix/hq-4c1dfb-hook-reporting: moved harness-state-clean stdin UTF-8 decode inside ValueError handler; changed pre-commit staged_checks() to run both facts_check and manifest_check over one export; stripped staged-tree-* temporary paths from with_staged_tree() export error messages. Verified RED (4 failed) -> GREEN ('just test-one .githooks/test_harness_state_clean.py .githooks/test_pre_commit_facts.py .githooks/test_pre_commit.py': 84 passed in 43.89s) and mandatory 'just check-hygiene' (exit 0).
