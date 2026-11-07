@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: test/hq-d5e1d9-isolated-agy-settings
 created: 2026-11-01T19:15:14Z
-updated: 2026-11-07T11:16:28Z
+updated: 2026-11-07T11:16:30Z
 started: 2026-11-07T11:16:01Z
 depends: []
 tags: []
@@ -24,3 +24,4 @@ tools/test_harness_links.py test_real_manifest_adopts_agy_replaced_settings_on_a
 - 2026-11-07T11:16:01Z (main): started
 - 2026-11-07T11:16:03Z (test/hq-d5e1d9-isolated-agy-settings): resumed
 - 2026-11-07T11:16:28Z (test/hq-d5e1d9-isolated-agy-settings): trial: flow-trial-1 — enrolled — flow off
+- 2026-11-07T11:16:30Z (test/hq-d5e1d9-isolated-agy-settings): arm: flow-trial-1 — unit tack-d5e1d9 — flow off
