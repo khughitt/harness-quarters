@@ -14,6 +14,8 @@ from pathlib import Path
 import pytest
 
 HOOK = Path(__file__).with_name("pre-commit")
+PRE_MERGE_HOOK = Path(__file__).with_name("pre-merge-commit")
+POST_MERGE_HOOK = Path(__file__).with_name("post-merge")
 CHECKOUT = HOOK.parent.parent
 
 
@@ -457,3 +459,83 @@ def test_already_leaked_staged_settings_blob_is_refused_until_renormalized(repo,
     staged = subprocess.run(["git", "show", ":harnesses/pi/settings.json"], check=True, text=True,
                             capture_output=True).stdout
     assert "leaked-id" not in staged and json.loads(staged) == {"theme": "system"}
+
+
+def test_clean_no_ff_merges_are_checked_by_pre_merge_commit(repo):
+    assert PRE_MERGE_HOOK.is_file() and os.access(PRE_MERGE_HOOK, os.X_OK)
+    for src, dst in ((HOOK, repo / ".githooks" / "pre-commit"),
+                     (PRE_MERGE_HOOK, repo / ".githooks" / "pre-merge-commit"),
+                     (POST_MERGE_HOOK, repo / ".githooks" / "post-merge")):
+        shutil.copy(src, dst)
+        dst.chmod(0o755)
+    post_merge_log = repo / "post-merge-calls.log"
+    for helper in ("codex-trust", "live-picks"):
+        stub = repo / ".githooks" / helper
+        stub.write_text(
+            "#!/usr/bin/env python3\n"
+            "import pathlib, sys\n"
+            f"with open({str(post_merge_log)!r}, 'a') as f:\n"
+            f"    f.write({helper!r} + ' ' + ' '.join(sys.argv[1:]) + '\\n')\n"
+        )
+        stub.chmod(0o755)
+    for stub in ("tools/ops-check", "tools/ops-docs"):
+        path = repo / stub
+        path.write_text("#!/usr/bin/env python3\nimport sys\nsys.exit(0)\n")
+        path.chmod(0o755)
+    git("config", "core.hooksPath", ".githooks")
+    git("config", "commit.gpgsign", "false")
+    base_branch = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                                 check=True, text=True, capture_output=True).stdout.strip()
+    text = (repo / "facts" / "capabilities.toml").read_text()
+    probe = sorted(fact["probe"] for fact in tomllib.loads(text)["facts"].values() if "probe" in fact)[0]
+
+    # Branch 1 deletes a probe (bypassing pre-commit on the branch commit itself).
+    git("checkout", "-q", "-b", "delete-probe")
+    git("rm", "-q", probe)
+    git("commit", "-q", "--no-verify", "-m", "delete probe")
+    git("checkout", "-q", base_branch)
+
+    # Branch 2 deletes facts/capabilities.toml.
+    git("checkout", "-q", "-b", "delete-facts")
+    git("rm", "-q", "facts/capabilities.toml")
+    git("commit", "-q", "--no-verify", "-m", "delete facts")
+    git("checkout", "-q", base_branch)
+
+    # Branch 3 makes a valid change that passes pre-commit.
+    git("checkout", "-q", "-b", "valid-change")
+    (repo / "harnesses" / "codex" / "config.toml").write_text("[features]\nhooks = false\n")
+    git("add", "harnesses/codex/config.toml")
+    git("commit", "-q", "-m", "valid change")
+    git("checkout", "-q", base_branch)
+
+    base_head = subprocess.run(["git", "rev-parse", "HEAD"], check=True, text=True,
+                               capture_output=True).stdout.strip()
+
+    merge_probe = subprocess.run(["git", "merge", "--no-ff", "delete-probe", "-m", "merge delete-probe"],
+                                 text=True, capture_output=True)
+    assert merge_probe.returncode != 0
+    assert f"probe {probe} is not a file" in merge_probe.stderr
+    assert not post_merge_log.exists()
+    git("merge", "--abort")
+    assert subprocess.run(["git", "rev-parse", "HEAD"], check=True, text=True,
+                          capture_output=True).stdout.strip() == base_head
+
+    merge_facts = subprocess.run(["git", "merge", "--no-ff", "delete-facts", "-m", "merge delete-facts"],
+                                 text=True, capture_output=True)
+    assert merge_facts.returncode != 0
+    assert "facts/capabilities.toml: No such file" in merge_facts.stderr
+    assert not post_merge_log.exists()
+    git("merge", "--abort")
+    assert subprocess.run(["git", "rev-parse", "HEAD"], check=True, text=True,
+                          capture_output=True).stdout.strip() == base_head
+
+    merge_valid = subprocess.run(["git", "merge", "--no-ff", "valid-change", "-m", "merge valid-change"],
+                                 text=True, capture_output=True)
+    assert merge_valid.returncode == 0, merge_valid.stderr
+    assert subprocess.run(["git", "rev-parse", "HEAD"], check=True, text=True,
+                          capture_output=True).stdout.strip() != base_head
+    assert post_merge_log.read_text().splitlines() == [
+        "codex-trust hook post-merge",
+        "live-picks hook post-merge",
+    ]
+

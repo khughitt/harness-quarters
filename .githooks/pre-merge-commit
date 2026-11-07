@@ -1,0 +1,6 @@
+#!/bin/sh
+# Run the pre-commit checks on the merge result staged in the index before git
+# records a clean non-fast-forward merge commit (a conflicted merge runs
+# pre-commit when resolved with `git commit`). Installed by `just setup`'s
+# `core.hooksPath .githooks`; `post-merge` still runs after a successful merge.
+exec "$(dirname "$0")/pre-commit"
