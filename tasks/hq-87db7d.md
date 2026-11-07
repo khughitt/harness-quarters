@@ -1,13 +1,15 @@
 ---
 id: hq-87db7d
 title: "Add the mid-merge recovery caveat to AGENTS.md, the harness manifest spec and justfile"
-status: todo
+status: doing
 priority: 2
 size: xs
 complexity: low
 process: direct
+owner: main
 created: 2026-11-01T19:26:17Z
-updated: 2026-11-01T19:26:17Z
+updated: 2026-11-07T11:26:30Z
+started: 2026-11-07T11:26:30Z
 depends: []
 tags: [docs]
 origin: agent
@@ -19,3 +21,4 @@ Deferred from hq-2eba07's reviews. README and the adding-a-harness runbook say t
 
 - 2026-11-01T19:26:17Z (add): created
   provenance: {"harness_session":"claude-code:fdf3b32f-5e63-4593-bba2-4e994bcdf1eb","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
+- 2026-11-07T11:26:30Z (main): started
