@@ -7,11 +7,12 @@ size: s
 complexity: low
 process: direct
 created: 2026-10-20T16:04:22Z
-updated: 2026-10-26T13:09:41Z
+updated: 2026-11-07T22:00:08Z
 depends: [obs-d98663, obs-f5710b, hq-19580c, obs-081ded]
 tags: [session-logs]
 source: docs/notes/2026-10-20-session-store-reach-brief.md
 agent: claude-code
+origin: agent
 ---
 
 Why: Scope and audit agents need a supported way to find a session behind a report, follow its parent thread, recover its runtime model and read retained live or archived evidence. The original coverage gap still exists in the installed session-episodes reader and skill, but research and reader design are complete. This goal now coordinates delivery and verifies the result; it does not commission another reader design.
