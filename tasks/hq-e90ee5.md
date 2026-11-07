@@ -1,15 +1,17 @@
 ---
 id: hq-e90ee5
 title: Adopt current ops documentation citations
-status: doing
+status: done
 priority: 2
 size: s
 complexity: low
 process: direct
 owner: docs/hq-e90ee5-pre-push-citation
 created: 2026-11-05T11:40:40Z
-updated: 2026-11-07T12:40:02Z
+updated: 2026-11-07T12:40:04Z
 started: 2026-11-07T12:38:27Z
+completed: 2026-11-07T12:40:04Z
+closed: 2026-11-07T12:40:04Z
 depends: [ops-713299]
 tags: [docs]
 source: ops-7f0b75
@@ -31,3 +33,5 @@ Done: each named current match has a valid subject/private locator or explicit h
 - 2026-11-07T12:39:59Z (docs/hq-e90ee5-pre-push-citation): flow-trial-1: flow off (unit tack-e90ee5)
 - 2026-11-07T12:40:00Z (docs/hq-e90ee5-pre-push-citation): rework: none
 - 2026-11-07T12:40:02Z (docs/hq-e90ee5-pre-push-citation): scope-drift: none
+- 2026-11-07T12:40:04Z (docs/hq-e90ee5-pre-push-citation): done
+- 2026-11-07T12:40:04Z (docs/hq-e90ee5-pre-push-citation): Replaced historical 'Design: ops docs/specs/2026-09-28-test-ci-act-design.md §3.3.' citation on line 14 of .githooks/pre-push with current subject reference 'Reference: ops docs/tooling.md' matching ops/.githooks/pre-push (historical spec archived in ops private records commit a83536d369734fcf0cb2ad6b8c876e8f7d5dadb3 under ops/docs/specs/2026-09-28-test-ci-act-design.md). Verified with 'just test-one tools/test_test_execution.py -k test_pre_push' (7 passed) and mandatory 'just check-hygiene' (exit 0).
