@@ -11,14 +11,24 @@ ROOT = Path(__file__).resolve().parents[1]
 COMMAND = '~/d/ops/hooks/claim-guard --harness codex'
 
 
-@pytest.mark.parametrize('file,home', [('hooks.json', 'codex'),
-                                     ('work/hooks.json', 'codex-work')])
-def test_both_codex_homes_guard_root_and_worker(file, home):
-    hooks = json.loads((ROOT / 'harnesses/codex' / file).read_text())['hooks']
+def assert_codex_guard_groups(hooks):
     for event in ('Stop', 'SubagentStop'):
         commands = [h['command'] for group in hooks.get(event, [])
                     for h in group['hooks'] if h['type'] == 'command']
         assert commands.count(COMMAND) == 1
+        guard_groups = [
+            group for group in hooks.get(event, [])
+            if any(h.get('type') == 'command' and h.get('command') == COMMAND
+                   for h in group['hooks'])
+        ]
+        assert guard_groups == [{'hooks': [{'type': 'command', 'command': COMMAND}]}]
+
+
+@pytest.mark.parametrize('file,home', [('hooks.json', 'codex'),
+                                     ('work/hooks.json', 'codex-work')])
+def test_both_codex_homes_guard_root_and_worker(file, home):
+    hooks = json.loads((ROOT / 'harnesses/codex' / file).read_text())['hooks']
+    assert_codex_guard_groups(hooks)
     others = [h['command'] for group in hooks['Stop'] for h in group['hooks']
               if h['command'] != COMMAND
               and '/turn-pause ' not in h['command']]  # pinned by test_turn_pause_wiring.py
@@ -27,6 +37,21 @@ def test_both_codex_homes_guard_root_and_worker(file, home):
     assert parse_relay_command(others[1], HOOK_VERSIONS[f'harnesses/codex/{file}']) == ('codex', 600000, 'Stop')
     manifest = tomllib.loads((ROOT / 'links.toml').read_text())
     assert manifest['harness'][home]['links']['hooks.json'] == f'harnesses/codex/{file}'
+
+
+@pytest.mark.parametrize('file', ['hooks.json', 'work/hooks.json'])
+@pytest.mark.parametrize('event', ['Stop', 'SubagentStop'])
+@pytest.mark.parametrize('matcher', ['worker', 'Bash', '*'])
+def test_restrictive_codex_claim_guard_matcher_is_rejected(file, event, matcher):
+    hooks = json.loads((ROOT / 'harnesses/codex' / file).read_text())['hooks']
+    guard_groups = [
+        group for group in hooks[event]
+        if any(h.get('command') == COMMAND for h in group['hooks'])
+    ]
+    assert len(guard_groups) == 1
+    guard_groups[0]['matcher'] = matcher
+    with pytest.raises(AssertionError):
+        assert_codex_guard_groups(hooks)
 
 
 def test_agy_home_guards_pretooluse_and_stop():
