@@ -6,9 +6,9 @@ priority: 3
 size: xs
 complexity: low
 process: direct
-owner: main
+owner: test/hq-aea33f-staged-facts-index
 created: 2026-10-15T02:02:42Z
-updated: 2026-11-07T16:00:43Z
+updated: 2026-11-07T16:01:45Z
 started: 2026-11-07T16:00:43Z
 depends: []
 tags: []
@@ -25,3 +25,5 @@ Also deferred from the same review, optional here: the refusal could note that t
 ## Notes
 
 - 2026-11-07T16:00:43Z (main): started
+- 2026-11-07T16:01:45Z (test/hq-aea33f-staged-facts-index): resumed
+- 2026-11-07T16:01:45Z (test/hq-aea33f-staged-facts-index): took over Unix session (owner main, stale)
