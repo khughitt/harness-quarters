@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/hq-ed4ea4-reprobe-background-output
 created: 2026-10-08T23:32:28Z
-updated: 2026-11-07T15:35:29Z
+updated: 2026-11-07T15:36:17Z
 started: 2026-11-07T15:33:49Z
 completed: 2026-11-07T15:35:29Z
 closed: 2026-11-07T15:35:29Z
@@ -29,3 +29,4 @@ README 'Re-probing a fact' asks a did-not-wake verdict to show from the child's 
 - 2026-11-07T15:35:27Z (docs/hq-ed4ea4-reprobe-background-output): trial-arm: flow-trial-1: flow off (unit tack-ed4ea4). Documentation-only change under validated .tt.toml automatic_broad = false creates no test obligation.
 - 2026-11-07T15:35:29Z (docs/hq-ed4ea4-reprobe-background-output): done
 - 2026-11-07T15:35:29Z (docs/hq-ed4ea4-reprobe-background-output): Updated README.md 'Re-probing a fact' so a background command probe redirects its output to a file under the probe's scratch dir and appends a timestamped exit-status line (cmd > out 2>&1; echo "exit $? $(date -Is)" >> out), and the evidence note records that file's path next to the transcript so a Codex run remains judgeable after its terminal indicator disappears. Verification: focused tests none (documentation-only change); mandatory check just check-hygiene (passed); broad suite just test skipped per .tt.toml automatic_broad = false; remote evidence: none (nothing pushed). Disclosures: host-load --section session reports nothing left running; no task scratch or off-tree evidence created; branch docs/hq-ed4ea4-reprobe-background-output merging fast-forward to local main and worktree .worktrees/hq-ed4ea4 (no ignored files) being removed after tt-report.
+- 2026-11-07T15:36:17Z (main): Merged docs/hq-ed4ea4-reprobe-background-output fast-forward to local main (code commit 0d0d20e1), harvested timings with tt-report, removed worktree .worktrees/hq-ed4ea4 (no ignored files), and deleted branch docs/hq-ed4ea4-reprobe-background-output.
