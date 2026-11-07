@@ -1,15 +1,17 @@
 ---
 id: hq-e4e58a
 title: Check the flow trial's census/report join live after the rename to hq
-status: doing
+status: done
 priority: 2
 size: xs
 complexity: low
 process: direct
 owner: main
 created: 2026-10-07T19:31:44Z
-updated: 2026-11-07T10:55:49Z
+updated: 2026-11-07T11:04:29Z
 started: 2026-11-07T10:55:24Z
+completed: 2026-11-07T11:04:29Z
+closed: 2026-11-07T11:04:29Z
 depends: []
 tags: []
 agent: claude-code/claude-opus-5-5
@@ -22,3 +24,5 @@ Why: the rename's rehearsal could not exercise the census/report join before obs
 - 2026-11-07T10:55:24Z (main): started
 - 2026-11-07T10:55:47Z (main): trial: flow-trial-1 — enrolled — flow off
 - 2026-11-07T10:55:49Z (main): arm: flow-trial-1 — unit tack-e4e58a — flow off
+- 2026-11-07T11:04:29Z (main): done
+- 2026-11-07T11:04:29Z (main): Verified live census/report join for flow-trial-1 on 2026-11-07 after the rename to hq (flow-trial-1 arm: flow off, unit tack-e4e58a). Ran ~/.agents/bin/trial-arm census flow-trial-1 (164 census units, 381 member tasks) and uv run --directory <obs-checkout> python obs.py outcomes report --json --since 2026-10-05 --until 2027-01-10 --cohort --units (282 complete-window report rows) on the same day: they share 52 exact task strings across census members and obs rows, including 31 hq- tasks (e.g., hq-09055e, hq-0affe4, hq-0c2a33, hq-13bd17, hq-23abd5, hq-3464bc, hq-358811, hq-39ea31, hq-421a85, hq-4ea672). ~/.agents/bin/trial-verdict <flows-checkout>/evals/trials/flow-trial-1.md --validate --census <census.json> < <report.json> printed 'inputs valid: 164 census units, 52 obs rows for their members' and exited 0. Read-only verification and task-record maintenance only (no worktree or repository code/doc edits; temporary census/report JSON files in /tmp removed). Verification: just check-hygiene exit 0 and tasks check exit 0. Disclosures: nothing pushed; no paid API calls; host-load --section session reported nothing left running; main live harnesses/agy/settings.json edit untouched.
