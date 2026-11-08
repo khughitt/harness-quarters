@@ -8,8 +8,9 @@ complexity: mid
 process: direct
 defer: 2026-11-30
 created: 2026-10-19T11:56:10Z
-updated: 2026-10-19T12:06:42Z
+updated: 2026-11-08T16:16:23Z
 depends: []
+related: [ops-630a87]
 tags: []
 source: ops-630a87 boundary-proposal-r3.md A7
 agent: claude-code/claude-opus-5-5
@@ -20,3 +21,4 @@ Why: rewriting session stores after a checkout move is part of their file lifecy
 ## Notes
 
 - 2026-10-19T12:06:42Z (main): The 2026-11-30 deferral is the date to reassess this step against flow-trial-1, not an authorization: nothing that affects treatment or measurement lands before readout (2027-02-16) (owner review 2026-10-19).
+- 2026-11-08T16:16:23Z (main): Trial gate re-scoped 2026-11-08 at the user's request (flows records docs/notes/2026-11-08-flow-trial-1-gate-scope.md, superseding ops-630a87 change 5's wait-for-readout for flow-trial-1): no readout wait for treatment, since the change reaches both randomized arms alike. It sits on or near the verdict's measurement path, so before landing run the record's outcome-blind equivalence check (old vs new code, trial-arm census flow-trial-1 and obs --json outcomes report --cohort --units each piped straight to sha256sum, unread); equal digests land, unequal ones wait for read_on.
