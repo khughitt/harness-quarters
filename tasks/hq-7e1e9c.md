@@ -6,9 +6,9 @@ priority: 3
 size: s
 complexity: low
 process: direct
-defer: 2026-11-30
+defer: 2026-11-09
 created: 2026-10-27T14:17:56Z
-updated: 2026-11-08T16:16:07Z
+updated: 2026-11-08T16:16:16Z
 depends: []
 related: [ops-630a87]
 parent: hq-7e81ed
