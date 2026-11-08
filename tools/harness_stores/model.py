@@ -41,6 +41,7 @@ class Adapter:
     notes_segment: Callable[[dict[str, int]], str | None]
     exclusion_reasons: tuple[str, ...]
     resume_argv: Callable[[Session, list[str]], list[str]]
+    short_id: Callable[[str], str]           # the id column: eight characters that tell rows apart
     archive_sources: Callable[[Path], tuple]
     episode_env: str              # environment variable overriding the episode root
     episode_root: Callable[[Path], Path]   # default episode root under a user home

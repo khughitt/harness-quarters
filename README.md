@@ -434,7 +434,8 @@ that alone names a conversation's workspace and title, with the transcript under
 `tools/harness_stores/`, registered in `tools/harness_stores/__init__.py`; the display
 order and the `--harness` choices follow the registry.
 
-- **Rows.** Harness, home (`personal` or `work`), short id, age, place (marked
+- **Rows.** Harness, home (`personal` or `work`), short id (the first eight characters;
+  for Codex the last eight, since a UUIDv7 id starts with its timestamp), age, place (marked
   `cwd missing` when the directory is gone, which is common for removed worktrees), and
   a label: the Codex thread's name or title, or the Claude session's first prompt.
   Recency is the Claude transcript's mtime and Codex's `recency_at_ms`.
@@ -469,7 +470,7 @@ order and the `--harness` choices follow the registry.
   threads with an empty preview are always hidden, as Codex's own visible-thread
   indexes leave them out; most subagent threads are among them.
 - **Footer.** One line counting what the sources show: Claude history lines skipped
-  (without `sessionId`, malformed), and sessions excluded: Claude sessions whose
+  (without `sessionId`, malformed; a blank line is no record and is not counted), and sessions excluded: Claude sessions whose
   transcript is gone, agy conversations that are subagents (`parent_conversation_id` set),
   whose transcript is gone or that name no workspace, and Codex threads with a preview that are non-interactive
   (subagents and `exec`) or whose rollout is gone. Most Codex subagent threads have no
@@ -487,10 +488,12 @@ order and the `--harness` choices follow the registry.
   list rather than empty it.
 - **Launch.** Claude runs `claude <flags> --resume <id>`, Codex `codex <flags> resume
   <id>`, agy `agy <flags> --conversation <id>` (agy has one home and no work-home
-  variable). A work row sets `CLAUDE_CONFIG_DIR` or `CODEX_HOME` to its home; a personal row
-  unsets both (`CLAUDE_CONFIG_DIR=~/.claude` would read a different `.claude.json`).
+  variable). A work row sets `CLAUDE_CONFIG_DIR` or `CODEX_HOME` to its home and keeps the
+  caller's other variable, as the `clw` and `cowor` aliases do; a personal row unsets both
+  (`CLAUDE_CONFIG_DIR=~/.claude` would read a different `.claude.json`).
   The cwd and the transcript are rechecked just before launch, and a gone one refuses
-  with its path; nothing is launched elsewhere. Per-home flags live in `tools/hq.toml`
+  with its path; nothing is launched elsewhere. A closed stdout or stderr (a pipe whose
+  reader has gone) refuses the launch with `nothing launched` and exit 1. Per-home flags live in `tools/hq.toml`
   (the user's `cl`, `clw`, `cor` and `cowor` aliases); a home missing there is an
   error. `HQ_CONFIG` points at another file, for tests.
 

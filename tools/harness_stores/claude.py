@@ -59,6 +59,8 @@ def read_claude(home: Home, archived: bool = False) -> tuple[list[Session], dict
     if lines[-1] == "":
         lines.pop()   # the final newline
     for line in lines:
+        if not line.strip():
+            continue   # a blank line is no record, so not a malformed one
         try:
             record = json.loads(line)
         except json.JSONDecodeError:
@@ -117,6 +119,6 @@ def archive_sources(user_home: Path) -> tuple:
 ADAPTER = Adapter(
     slug="claude-code", alias="claude", colour=color.CLAUDE, home_variable="CLAUDE_CONFIG_DIR",
     homes=homes, list_sessions=read_claude, notes_segment=notes_segment,
-    exclusion_reasons=("transcript gone",), resume_argv=resume_argv,
+    exclusion_reasons=("transcript gone",), resume_argv=resume_argv, short_id=lambda sid: sid[:8],
     archive_sources=archive_sources, episode_env="SESSION_LOGS_CLAUDE",
     episode_root=lambda user_home: user_home / ".claude" / "projects")

@@ -2,6 +2,7 @@
 import argparse
 import os
 import re
+import select
 import shutil
 import subprocess
 import sys
@@ -186,7 +187,7 @@ def format_rows(shown: list[Session], places: dict[str, projects.Place | None], 
         cells = [
             painter.paint(s.home.harness, *row, painter.fg(harness_stores.by_alias(s.home.harness).colour)) + pad(s.home.harness, 6),
             painter.paint(s.home.kind, *row, *kind) + pad(s.home.kind, 8),
-            painter.paint(printable(s.id[:8]), *row, color.DIM),
+            painter.paint(printable(harness_stores.by_alias(s.home.harness).short_id(s.id)), *row, color.DIM),
             pad(when, 10) + painter.paint(when, *row, painter.age(seconds)),
             cwd + pad(place, width),
             painter.paint(label(s.label), *row),
@@ -223,6 +224,23 @@ def pick(lines: list[str], footer: str, painted: bool) -> int:
     return int(answer) - 1
 
 
+def broken(stream) -> bool:
+    """Whether the stream's reader has gone: poll reports POLLERR on a pipe without a reader
+    and POLLHUP on a socket whose peer closed (a pipe's write end never reports POLLHUP)."""
+    poller = select.poll()
+    poller.register(stream.fileno(), 0)
+    return any(event & (select.POLLERR | select.POLLHUP) for _, event in poller.poll(0))
+
+
+def silence_broken() -> bool:
+    """Point each closed output at /dev/null, so later writes and the exit flush cannot
+    raise; the other output keeps what it holds. Whether any output was closed."""
+    closed = [stream for stream in (sys.stdout, sys.stderr) if stream is not None and broken(stream)]
+    for stream in closed:
+        os.dup2(os.open(os.devnull, os.O_WRONLY), stream.fileno())
+    return bool(closed)
+
+
 def sessions_command(args) -> int:
     user_home = Path.home()
     config = Path(os.environ.get("HQ_CONFIG", DEFAULT_CONFIG))
@@ -241,6 +259,8 @@ def sessions_command(args) -> int:
     if not shown:
         raise UsageError(f"no sessions to pick ({footer})")
     chosen = pick(lines, painter.paint(footer, color.DIM), painter.depth is not None)
+    if broken(sys.stdout) or broken(sys.stderr):   # fzf writes neither: a dead one shows only here
+        raise BrokenPipeError("output closed before the launch")
     launch.launch(shown[chosen], flags, config)
     return 0   # not reached: launch replaces this process
 
@@ -254,10 +274,12 @@ def main(argv: list[str]) -> int:
         sys.stdout.flush()   # inside the try: a short listing is otherwise written at exit
         return code
     except (UsageError, SourceError, projects.ProjectError, launch.LaunchError) as error:
+        silence_broken()   # rows already printed into a closed pipe would fail the exit flush
         print(f"hq: {error}", file=sys.stderr)
         return 1
     except BrokenPipeError:
-        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        if not silence_broken():
+            raise   # neither output is a closed pipe: not the reader going away
         if args.interactive:
             print("hq: output closed before the launch; nothing launched", file=sys.stderr)
             return 1

@@ -111,5 +111,6 @@ ADAPTER = Adapter(
     slug="codex", alias="codex", colour=color.CODEX, home_variable="CODEX_HOME",
     homes=homes, list_sessions=read_codex, notes_segment=lambda notes: None,
     exclusion_reasons=("non-interactive", "transcript gone"), resume_argv=resume_argv,
+    short_id=lambda tid: tid[-8:],   # a UUIDv7 starts with its timestamp; the tail is random
     archive_sources=archive_sources, episode_env="SESSION_LOGS_CODEX",
     episode_root=lambda user_home: user_home / ".codex" / "sessions")

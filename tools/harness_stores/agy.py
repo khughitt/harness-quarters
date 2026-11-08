@@ -131,6 +131,6 @@ def archive_sources(user_home: Path) -> tuple["Source", ...]:
 ADAPTER = Adapter(
     slug="agy", alias="agy", colour=color.AGY, home_variable=None,
     homes=homes, list_sessions=lambda home, archived: read_agy(home), notes_segment=lambda notes: None,
-    exclusion_reasons=("non-interactive", "transcript gone", "no workspace"), resume_argv=resume_argv,
+    exclusion_reasons=("non-interactive", "transcript gone", "no workspace"), resume_argv=resume_argv, short_id=lambda sid: sid[:8],
     archive_sources=archive_sources, episode_env="SESSION_LOGS_AGY",
     episode_root=lambda user_home: homes(user_home)[0].path)

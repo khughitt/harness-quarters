@@ -5,6 +5,7 @@ import os
 import pty
 import re
 import shutil
+import socket
 import sqlite3
 import subprocess
 import sys
@@ -268,9 +269,17 @@ def test_codex_rows_label_with_name_else_title(env):
     codex_db(env.home / ".codex", [thread(env.home / ".codex", TID, project, name="Named thread"),
                                    thread(env.home / ".codex", TID2, project, age_s=60, title="Titled  thread")])
     first, second = rows(env.run("sessions"))
-    assert first.split()[:3] == ["codex", "personal", TID[:8]]
+    assert first.split()[:3] == ["codex", "personal", TID[-8:]]
     assert "Named thread" in first and "a title" not in first
     assert "Titled thread" in second
+
+
+def test_codex_short_id_is_the_random_tail_not_the_timestamp_head(env):
+    project = env.project("beta")
+    twins = ["019e0000-0000-7000-8000-0000000000f1", "019e0000-0000-7000-8000-0000000000f2"]
+    codex_db(env.home / ".codex", [thread(env.home / ".codex", tid, project, age_s=i)
+                                   for i, tid in enumerate(twins)])
+    assert [row.split()[2] for row in rows(env.run("sessions"))] == [tid[-8:] for tid in twins]
 
 
 def test_codex_work_row(env):
@@ -708,6 +717,14 @@ def test_line_separator_inside_a_prompt_keeps_the_line_whole(env):
     assert "0 without sessionId, 0 malformed" in footer(result)
 
 
+def test_blank_history_lines_are_skipped_not_malformed(env):
+    claude_session(env.home / ".claude", SID, env.project("alpha"))
+    history(env.home / ".claude", "", "   ", "\t")
+    result = env.run("sessions")
+    assert len(rows(result)) == 1
+    assert "0 without sessionId, 0 malformed" in footer(result)
+
+
 def test_claude_relative_project_is_a_malformed_line(env):
     history(env.home / ".claude", {"display": "x", "timestamp": NOW_MS, "project": "rel/dir", "sessionId": SID})
     transcript(env.home / ".claude", SID)
@@ -758,6 +775,87 @@ def test_pick_into_a_closed_pipe_fails_and_says_nothing_launched(env):
     result = run_closed(env, "sessions", "-i", input="1\n")
     assert result.returncode == 1
     assert "nothing launched" in result.stderr
+
+
+def test_bad_answer_after_rows_into_a_closed_pipe_exits_1_without_a_traceback(env):
+    claude_session(env.home / ".claude", SID, env.project("alpha"))
+    result = run_closed(env, "sessions", "-i", input="x\n")
+    assert result.returncode == 1
+    assert "no session picked" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+def test_closed_stderr_keeps_the_rows_and_launches_nothing(env):
+    claude_session(env.home / ".claude", SID, env.project("alpha"))
+    read, write = os.pipe()
+    os.close(read)
+    try:
+        result = subprocess.run([sys.executable, str(TOOL), "sessions", "-i"], stdout=subprocess.PIPE,
+                                stderr=write, input="1\n", text=True,
+                                env={"HOME": str(env.home), "PATH": str(env.bin)})
+    finally:
+        os.close(write)
+    assert result.returncode == 1
+    assert SID[:8] in result.stdout
+    assert '"tool"' not in result.stdout
+
+
+def test_listing_into_a_closed_socket_exits_quietly(env):
+    claude_session(env.home / ".claude", SID, env.project("alpha"))
+    ours, theirs = socket.socketpair()
+    ours.close()
+    try:
+        result = subprocess.run([sys.executable, str(TOOL), "sessions"], stdout=theirs.fileno(),
+                                stderr=subprocess.PIPE, text=True,
+                                env={"HOME": str(env.home), "PATH": str(env.bin)})
+    finally:
+        theirs.close()
+    assert result.returncode == 0 and result.stderr == ""
+
+
+def test_fzf_pick_into_a_closed_socket_refuses_before_launch(env):
+    claude_session(env.home / ".claude", SID, env.project("alpha"))
+    env.script("fzf", FZF_STUB.format(python=sys.executable))
+    marker = env.root / "launched"
+    env.script("claude", f"#!{sys.executable}\nopen({str(marker)!r}, 'w').close()\n")
+    ours, theirs = socket.socketpair()
+    ours.close()
+    try:
+        result = subprocess.run([sys.executable, str(TOOL), "sessions", "-i"], stdout=theirs.fileno(),
+                                stderr=subprocess.PIPE, text=True,
+                                env={"HOME": str(env.home), "PATH": str(env.bin), "FZF_PICK": "1"})
+    finally:
+        theirs.close()
+    assert result.returncode == 1
+    assert "nothing launched" in result.stderr
+    assert not marker.exists()
+
+
+def test_error_with_stderr_closed_at_startup_still_exits_1(env):
+    claude_session(env.home / ".claude", SID, env.project("alpha"))
+    result = subprocess.run([sys.executable, str(TOOL), "sessions", "-i"], stdout=subprocess.PIPE,
+                            stderr=subprocess.DEVNULL, input="x\n", text=True, env={"HOME": str(env.home), "PATH": str(env.bin)},
+                            preexec_fn=lambda: os.close(2))
+    assert result.returncode == 1
+    assert "hq: no session picked" in result.stdout   # print(file=None) falls back to stdout
+
+
+def test_fzf_pick_into_a_closed_pipe_refuses_before_launch(env):
+    claude_session(env.home / ".claude", SID, env.project("alpha"))
+    env.script("fzf", FZF_STUB.format(python=sys.executable))
+    marker = env.root / "launched"
+    env.script("claude", f"#!{sys.executable}\nopen({str(marker)!r}, 'w').close()\n")
+    read, write = os.pipe()
+    os.close(read)
+    try:
+        result = subprocess.run([sys.executable, str(TOOL), "sessions", "-i"], stdout=write,
+                                stderr=subprocess.PIPE, text=True,
+                                env={"HOME": str(env.home), "PATH": str(env.bin), "FZF_PICK": "1"})
+    finally:
+        os.close(write)
+    assert result.returncode == 1
+    assert "nothing launched" in result.stderr
+    assert not marker.exists()
 
 
 # --- fail early ---------------------------------------------------------------------------
@@ -837,6 +935,13 @@ def test_launch_claude_work_sets_claude_config_dir(env):
     assert out["cwd"] == str(project)
 
 
+def test_launch_claude_work_keeps_the_callers_codex_home(env):
+    claude_session(env.home / ".claude-work", SID, env.project("alpha"))
+    out = launched(env.run("sessions", "-i", input="1\n", CODEX_HOME="/y"))
+    assert out["CLAUDE_CONFIG_DIR"] == str(env.home / ".claude-work")
+    assert out["CODEX_HOME"] == "/y"
+
+
 def test_launch_codex_personal_puts_flags_before_resume(env):
     project = env.project("beta")
     codex_db(env.home / ".codex", [thread(env.home / ".codex", TID, project)])
@@ -854,13 +959,20 @@ def test_launch_codex_work_sets_codex_home(env):
     assert out["CODEX_HOME"] == str(env.home / ".codex-work")
 
 
+def test_launch_codex_work_keeps_the_callers_claude_config_dir(env):
+    codex_db(env.home / ".codex-work", [thread(env.home / ".codex-work", TID, env.project("beta"))])
+    out = launched(env.run("sessions", "-i", input="1\n", CLAUDE_CONFIG_DIR="/x"))
+    assert out["CODEX_HOME"] == str(env.home / ".codex-work")
+    assert out["CLAUDE_CONFIG_DIR"] == "/x"
+
+
 def test_numbered_prompt_picks_by_row_number(env):
     populate_all(env)
     listing = rows(env.run("sessions"))
     second = listing[1].split()
     out = launched(env.run("sessions", "-i", input="2\n"))
     assert out["tool"] == second[0]
-    assert any(arg.startswith(second[2]) for arg in out["argv"])
+    assert any(second[2] in arg for arg in out["argv"])
 
 
 @pytest.mark.parametrize("answer", ["", "0", "9", "x"])
@@ -878,7 +990,7 @@ def test_fzf_picks_when_on_path(env):
     third = listing[2].split()
     out = launched(env.run("sessions", "-i", FZF_PICK="3"))
     assert out["tool"] == third[0]
-    assert any(arg.startswith(third[2]) for arg in out["argv"])
+    assert any(third[2] in arg for arg in out["argv"])
 
 
 def test_fzf_cancel_launches_nothing(env):

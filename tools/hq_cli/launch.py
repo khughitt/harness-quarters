@@ -34,7 +34,8 @@ def argv(session: Session, flags: list[str]) -> list[str]:
 
 
 def environment(session: Session, base: dict[str, str]) -> dict[str, str]:
-    """A work row names its home; a personal row unsets every adapter's variable, since setting
+    """A work row names its home and keeps the caller's other variables, as the user's own
+    work aliases do; a personal row unsets every adapter's variable, since setting
     CLAUDE_CONFIG_DIR=~/.claude would read a different .claude.json than ~/.claude.json."""
     env = dict(base)
     if session.home.kind == "work":
