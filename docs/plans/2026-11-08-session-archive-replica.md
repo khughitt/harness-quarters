@@ -58,8 +58,11 @@ Spec: §3.1 ("Same physical disk", the refusal list).
 - `replica.disks_of(path, sysfs_root=Path("/sys")) -> frozenset[str]`: `st_dev` of `path`
   → `<sysfs_root>/dev/block/<major>:<minor>` → `realpath`; if the directory has a
   `partition` file, the whole disk is its parent directory's name; if it has a non-empty
-  `slaves/`, recurse into each entry (`<sysfs_root>/class/block/<name>`); otherwise the
-  device's own name. Major 0 or a missing entry gives the empty set. An unreadable entry
+  `slaves/`, recurse into each entry; otherwise the device's own name. Every device
+  directory, including each `slaves/<name>` entry, is `realpath`ed before the `partition`
+  check and before reading its parent's name: in real sysfs those entries are symlinks
+  into `.../block/<disk>/<part>`, and the unresolved parent of `class/block/sdb1` is
+  `block`, not `sdb`. Major 0 or a missing entry gives the empty set. An unreadable entry
   raises `ReplicaGateError`. Why recursive slaves: LVM or LUKS over the archive's disk must
   not pass as a different disk.
 - `replica.check_replica(cfg, disks) -> ReplicaInfo` (`disks` is the resolver; the CLI
@@ -70,7 +73,9 @@ Spec: §3.1 ("Same physical disk", the refusal list).
 - Tests (core file): fake sysfs trees under `tmp_path`, with `st_dev` supplied through a
   stat function parameter on `disks_of` (default `os.stat`): plain disk, partition → parent,
   dm over a partition → parent disk, two partitions of one disk intersect, major 0 → empty,
-  unreadable `slaves/` → error. Gate: each refusal with its message, and nothing created
+  unreadable `slaves/` → error. The fake tree mirrors real sysfs: partitions live at
+  `devices/…/block/<disk>/<part>/`, and `dev/block/<maj:min>`, `class/block/<name>` and
+  `slaves/<name>` are symlinks to them, so a missing `realpath` fails the dm case. Gate: each refusal with its message, and nothing created
   under the replica root.
 
 ### Task 3: replicate
@@ -90,6 +95,10 @@ Spec: §3.2, §3.3, §3.5.
   `lstat` shows a regular file with that size and `mtime_ns`; otherwise `copy_hashed` from
   the archive file (no-follow), compare size and sha256 with the row, `os.utime` to the row's
   `mtime_ns`, rename into place. Directories created with `mkdir_synced`.
+- Durability before publish: after every file and `receipt.json` are in place, `fsync_dir`
+  every directory under `<stamp>.partial`, bottom up, and the partial itself.
+  `mkdir_synced` syncs a new directory's entry in its parent only when it is created,
+  before files are linked or renamed into it, so it does not cover them.
 - Completeness, receipt, publish (`rename` partial → stamp, `fsync` `generations/`, new
   symlink under a temporary name renamed over `current`, `fsync` replica root), retention
   (keep the newest seven by stamp; never the one `current` names) exactly as §3.3.
@@ -139,10 +148,12 @@ Spec: §3, §3.1 (resolver attribute), §3.5, §5 (fixture route).
   scratch; record a `verify-replica` run; print and exit likewise.
 - Tests (CLI file):
   - In process: monkeypatch `HOME` (and the `XDG_*` keys `run_tool` sets) to `tmp_path`
-    and `cli.DISKS` to a resolver giving each root its own disk; build the fixture archive;
-    `cli.main(["replicate"])`, `cli.main(["verify-replica"])`, `cli.main(["status"])` all
-    exit 0 and print JSON whose counts match. This is the spec's small end-to-end fixture
-    route.
+    and `cli.DISKS` to a resolver giving each root its own disk; build the fixture archive
+    with `cli.main(["capture"])` over fixture source homes, so the manifest holds the
+    passing `capture` run that `status` requires; then `cli.main(["replicate"])`,
+    `cli.main(["verify-replica"])`, `cli.main(["status"])` all exit 0 and print JSON whose
+    counts match. This is the spec's small end-to-end fixture route. Task 6 extends the
+    `status` step to assert on its `replica` object.
   - Subprocess (`run_tool`): fixture archive and replica on one filesystem → `replicate`
     exits 2 with the same-disk message, and nothing appears under `generations/`.
   - Boundary: with `replica_root` pointing at a missing directory, `capture` exits 0; with
@@ -185,11 +196,15 @@ Spec: §3.6, §3.7, §4.
 - Check `docs/` for another reference document describing the archive's commands and
   update it if one exists; the 2026-09-30 spec is a decision record and is not edited.
 
-### Task 8: Activation on the primary host
+## Activation on the primary host (separate rollout task hq-405212)
 
-Spec: §4. Operational; runs only after the final whole-branch review accepts and the
-branch is merged to main. Each numbered step below needs the user's approval when it is
-reached; plan approval grants none of them.
+Spec: §4. Not a step of this plan: hq-adfed6 verifies and closes on its branch after Tasks
+1–7 and the final whole-branch review, and the branch merges to main. Rollout task
+hq-405212 depends on hq-adfed6 and runs on main; ops-7b325c's closeout depends on it.
+Why separate: the operational steps wait on approvals and two scheduled timer runs, which
+must not hold the code branch open (plan review round 1). The archive design's prune
+rollout, hq-624351, follows the same split. Each numbered step below needs the user's
+approval when it is reached; plan approval grants none of them.
 
 1. Read-only preflight: `findmnt` both mounts, `disks_of` on both roots through
    `python3 -c` from main's `tools/`, free space on the replica mount.
