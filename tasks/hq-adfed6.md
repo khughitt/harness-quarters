@@ -1,13 +1,15 @@
 ---
 id: hq-adfed6
 title: Keep a recoverable second copy of the session archive on another physical drive
-status: todo
+status: doing
 priority: 1
 size: m
 complexity: mid
 process: planned
+owner: main
 created: 2026-10-29T19:10:37Z
-updated: 2026-10-29T19:10:37Z
+updated: 2026-11-08T02:03:40Z
+started: 2026-11-08T02:03:40Z
 depends: []
 tags: []
 source: ops-7b325c
@@ -33,3 +35,5 @@ Boundary: this is archive redundancy, not a new retention engine, changes to pru
 
 - 2026-10-29T19:10:37Z (add): created
   provenance: {"harness_session":"codex:01a1890f-0da2-7732-a4ba-e64c6a17d627","harness_session_source":"CODEX_THREAD_ID","origin":"agent"}
+- 2026-11-08T02:03:40Z (main): started
+  provenance: {"harness_session":"claude-code:e67b959b-22b0-46a4-8c00-24ed459c426d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
