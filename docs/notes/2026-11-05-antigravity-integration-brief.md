@@ -97,6 +97,16 @@ P2, small, mid complexity and direct process. Research completion updates this
 brief and adds a finding with `--no-reviewed` to its waiting idea before integration.
 No implementation or separate design task is filed yet.
 
+Dispositions after the 2026-11-08 scope pass:
+
+- hq-32317f is scoped as the implementation task: the `harnesses/agy/bin/agy`
+  launcher, its `links.toml` entry and the four focused tests in Section 7, with the
+  one-time binary move and `just link --apply` from main as a host step the user
+  approves at the time.
+- hq-db39da is proposed for drop: Section 8 answers its assessment. Inline coloring
+  is unsupported in `agy` `1.5.3`; statusline coloring is recorded on prism-fd46ae,
+  which owns renderer work.
+
 ## Worker-default route findings (hq-a29f17)
 
 Inspected on installed `agy` `1.5.3` (`~/.local/bin/agy`, ELF BuildID
