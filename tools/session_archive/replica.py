@@ -6,8 +6,8 @@ import os
 import shutil
 import sqlite3
 import stat as stat_mod
-from dataclasses import dataclass
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable
 
@@ -16,6 +16,8 @@ from .manifest import FILENAME, Manifest, Version
 
 MARKER = ".session-archive-replica"
 KEEP_GENERATIONS = 7
+REPLICA_STALE = timedelta(hours=48)
+VERIFY_STALE = timedelta(days=35)
 
 
 class ReplicaGateError(config.HostGateError):
@@ -480,5 +482,76 @@ def verify_replica(replica_root: Path, scratch_dir: Path) -> dict:
     if failures:
         raise VerifyFailed(report)
     return report
+
+
+def _parse_stamp(stamp: str) -> datetime:
+    return datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+
+
+def replica_status(replica_root: Path, manifest: Manifest, now: datetime) -> dict:
+    reasons: list[str] = []
+    generation: str | None = None
+    receipt: dict | None = None
+
+    try:
+        has_root = replica_root.is_dir() and (replica_root / MARKER).is_file()
+    except OSError:
+        has_root = False
+
+    if not has_root:
+        reasons.append("replica directory or marker is missing")
+    else:
+        current_link = replica_root / "current"
+        try:
+            has_current = current_link.is_symlink() and current_link.is_dir()
+            if has_current:
+                generation = Path(os.readlink(current_link)).name
+        except OSError:
+            has_current = False
+
+        if not has_current:
+            reasons.append("current generation is missing")
+        else:
+            receipt_path = current_link / "receipt.json"
+            try:
+                parsed = json.loads(receipt_path.read_text(encoding="utf-8"))
+                if not isinstance(parsed, dict) or not isinstance(parsed.get("finished_at"), str):
+                    raise ValueError("missing finished_at")
+                finished_dt = _parse_stamp(parsed["finished_at"])
+                receipt = parsed
+            except (OSError, ValueError):
+                reasons.append("receipt.json is unreadable")
+            else:
+                if now - finished_dt > REPLICA_STALE:
+                    reasons.append("current generation receipt is older than 48 hours")
+
+    last_replicate = manifest.last_run("replicate")
+    if last_replicate is not None and not last_replicate.ok:
+        reasons.append("last replicate run failed")
+
+    last_verify = manifest.last_run("verify-replica")
+    if last_verify is not None and not last_verify.ok:
+        reasons.append("last verify-replica run failed")
+
+    last_verify_ok = manifest.last_run("verify-replica", ok_only=True)
+    verify_fresh = False
+    if last_verify_ok is not None:
+        try:
+            verify_fresh = now - _parse_stamp(last_verify_ok.finished_at) <= VERIFY_STALE
+        except ValueError:
+            verify_fresh = False
+    if not verify_fresh:
+        reasons.append("no passing verify-replica run within 35 days")
+
+    ok = not reasons
+    return {
+        "generation": generation,
+        "receipt": receipt,
+        "replicate": asdict(last_replicate) if last_replicate else None,
+        "verify_replica": asdict(last_verify) if last_verify else None,
+        "ok": ok,
+        "reasons": reasons,
+    }
+
 
 

@@ -119,7 +119,7 @@ def cmd_status(cfg, table, args) -> int:
         manifest = Manifest.open_readonly(cfg.archive_root)
         try:
             report, ok = status.status_report(manifest, [source.home for source in table],
-                                              datetime.now(timezone.utc))
+                                              CLOCK(), replica_root=cfg.replica_root)
         finally:
             manifest.close()
     except (sqlite3.Error, OSError, ValueError) as error:

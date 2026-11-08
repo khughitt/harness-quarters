@@ -66,6 +66,12 @@ def test_cli_in_process_e2e_capture_replicate_verify_and_status(
     st_out = json.loads(capsys.readouterr().out)
     assert st_out["ok"] is True
     assert st_out["archive_bytes"] == rep_out["bytes_copied"]
+    assert st_out["replica"]["ok"] is True
+    assert st_out["replica"]["generation"] == rep_out["generation"]
+    assert st_out["replica"]["receipt"]["rows"] == rep_out["rows"]
+    assert st_out["replica"]["replicate"]["ok"] is True
+    assert st_out["replica"]["verify_replica"]["ok"] is True
+    assert st_out["replica"]["reasons"] == []
 
 
 def test_cli_subprocess_same_disk_refused(tmp_path, home, archive):

@@ -8,6 +8,7 @@ import pytest
 import harness_stores
 from datetime import datetime, timedelta, timezone
 
+from session_archive import replica
 from session_archive.capture import capture_file
 from session_archive.manifest import FILENAME, Manifest, Run
 from session_archive.quarantine import QUARANTINE
@@ -166,3 +167,137 @@ def test_status_reports_malformed_manifest(home, archive, manifest, field, value
     assert result.returncode == 1 and report["ok"] is False
     assert report["error"].startswith(error_kind + ":")
     assert not result.stderr
+
+
+def _seed_healthy_replica(tmp_path, archive, manifest, receipt_ago=timedelta(hours=2)):
+    run(manifest, "capture", timedelta(hours=1))
+    run(manifest, "replicate", receipt_ago, ok=True)
+    run(manifest, "verify-replica", timedelta(days=10), ok=True)
+    rep = tmp_path / "replica"
+    rep.mkdir(exist_ok=True)
+    (rep / replica.MARKER).touch()
+    gen_name = "20261001T100000.000000Z"
+    gen_dir = rep / "generations" / gen_name
+    gen_dir.mkdir(parents=True, exist_ok=True)
+    receipt = {
+        "generation": gen_name,
+        "archive_root": str(archive),
+        "replica_root": str(rep),
+        "archive_disks": ["sdc"],
+        "replica_disks": ["sdb"],
+        "started_at": stamp(receipt_ago),
+        "finished_at": stamp(receipt_ago),
+        "rows": 0,
+        "files_copied": 0,
+        "bytes_copied": 0,
+        "files_linked": 0,
+        "bytes_linked": 0,
+        "verified": True,
+    }
+    (gen_dir / "receipt.json").write_text(json.dumps(receipt))
+    current = rep / "current"
+    if current.is_symlink() or current.exists():
+        current.unlink()
+    current.symlink_to(f"generations/{gen_name}")
+    return rep, gen_dir
+
+
+def test_status_unconfigured_replica_omits_replica_key(manifest, tmp_path):
+    run(manifest, "capture", timedelta(hours=1))
+    report, ok = status_report(manifest, [tmp_path], NOW)
+    assert ok is True
+    assert "replica" not in report
+
+
+def test_status_healthy_replica_and_restored_archive_with_no_replicate_rows(
+    tmp_path, archive, manifest
+):
+    rep, _ = _seed_healthy_replica(tmp_path, archive, manifest)
+    report, ok = status_report(manifest, [tmp_path], NOW, replica_root=rep)
+    assert ok is True
+    assert report["replica"]["ok"] is True
+    assert report["replica"]["reasons"] == []
+    assert report["replica"]["generation"] == "20261001T100000.000000Z"
+    assert report["replica"]["receipt"]["verified"] is True
+    assert report["replica"]["replicate"]["ok"] is True
+    assert report["replica"]["verify_replica"]["ok"] is True
+
+    # Restored archive: no replicate rows in manifest, but fresh receipt and passing verify-replica
+    with manifest.conn:
+        manifest.conn.execute("DELETE FROM runs WHERE kind = 'replicate'")
+    report2, ok2 = status_report(manifest, [tmp_path], NOW, replica_root=rep)
+    assert ok2 is True
+    assert report2["replica"]["ok"] is True
+    assert report2["replica"]["replicate"] is None
+    assert report2["replica"]["reasons"] == []
+
+
+def test_status_replica_each_unhealthy_reason_preserves_archive_report(
+    tmp_path, archive, manifest
+):
+    rep, gen_dir = _seed_healthy_replica(tmp_path, archive, manifest)
+
+    # 1. Missing replica directory
+    report, ok = status_report(manifest, [tmp_path], NOW, replica_root=tmp_path / "missing-rep")
+    assert not ok and not report["replica"]["ok"]
+    assert any("missing" in r for r in report["replica"]["reasons"])
+    assert report["capture"]["ok"] is True
+
+    # 2. Missing marker file
+    (rep / replica.MARKER).unlink()
+    report, ok = status_report(manifest, [tmp_path], NOW, replica_root=rep)
+    assert not ok and not report["replica"]["ok"]
+    assert any("marker" in r for r in report["replica"]["reasons"])
+    assert report["capture"]["ok"] is True
+    (rep / replica.MARKER).touch()
+
+    # 3. Missing current symlink
+    (rep / "current").unlink()
+    report, ok = status_report(manifest, [tmp_path], NOW, replica_root=rep)
+    assert not ok and not report["replica"]["ok"]
+    assert any("current" in r for r in report["replica"]["reasons"])
+    assert report["capture"]["ok"] is True
+    (rep / "current").symlink_to(f"generations/{gen_dir.name}")
+
+    # 4. Unreadable/corrupt receipt.json
+    saved_receipt = (gen_dir / "receipt.json").read_text()
+    (gen_dir / "receipt.json").write_text("{not valid json")
+    report, ok = status_report(manifest, [tmp_path], NOW, replica_root=rep)
+    assert not ok and not report["replica"]["ok"]
+    assert any("receipt" in r for r in report["replica"]["reasons"])
+    assert report["capture"]["ok"] is True
+    (gen_dir / "receipt.json").write_text(saved_receipt)
+
+    # 5. Receipt finished_at older than 48 hours
+    stale_receipt = json.loads(saved_receipt)
+    stale_receipt["finished_at"] = stamp(timedelta(hours=48, microseconds=1))
+    (gen_dir / "receipt.json").write_text(json.dumps(stale_receipt))
+    report, ok = status_report(manifest, [tmp_path], NOW, replica_root=rep)
+    assert not ok and not report["replica"]["ok"]
+    assert any("48 hours" in r for r in report["replica"]["reasons"])
+    (gen_dir / "receipt.json").write_text(saved_receipt)
+
+    # 6. Last replicate run failed (even though receipt is fresh)
+    run(manifest, "replicate", timedelta(minutes=30), ok=False, run_id="rep-fail")
+    report, ok = status_report(manifest, [tmp_path], NOW, replica_root=rep)
+    assert not ok and not report["replica"]["ok"]
+    assert any("last replicate" in r for r in report["replica"]["reasons"])
+    with manifest.conn:
+        manifest.conn.execute("DELETE FROM runs WHERE run_id = 'rep-fail'")
+
+    # 7. Last verify-replica run failed
+    run(manifest, "verify-replica", timedelta(days=1), ok=False, run_id="ver-fail")
+    report, ok = status_report(manifest, [tmp_path], NOW, replica_root=rep)
+    assert not ok and not report["replica"]["ok"]
+    assert any("last verify-replica" in r for r in report["replica"]["reasons"])
+    with manifest.conn:
+        manifest.conn.execute("DELETE FROM runs WHERE run_id = 'ver-fail'")
+
+    # 8. No passing verify-replica within 35 days
+    with manifest.conn:
+        manifest.conn.execute("DELETE FROM runs WHERE kind = 'verify-replica'")
+    run(manifest, "verify-replica", timedelta(days=35, microseconds=1), ok=True, run_id="ver-old")
+    report, ok = status_report(manifest, [tmp_path], NOW, replica_root=rep)
+    assert not ok and not report["replica"]["ok"]
+    assert any("35 days" in r for r in report["replica"]["reasons"])
+
