@@ -6,6 +6,7 @@ Inside each helper process a fixture module stands in at the Python boundary for
 name, the process table and the system tools (npm, node, git, systemctl, niri), so nothing
 here contacts a real host, user bus, desktop, harness home or cutover root. The fake ssh
 closes pipes without sending any signal; cancellation is tested separately."""
+import contextlib
 import functools
 import hashlib
 import itertools
@@ -1146,11 +1147,12 @@ class Dropbox:
     shared files (the four settings targets and familiar's source, never its host-local
     node_modules) onto Europa. Familiar's source waits while Titan's Git is mid-operation and
     while `hold()` is false; objects land before the working tree and refs land last, so a
-    partial mirror reads as not yet synchronized."""
+    partial mirror reads as not yet synchronized. A cycle holds `lock`, which a fixture write
+    standing for an already delivered change takes too, so no cycle interleaves with one."""
 
     def __init__(self, world, hold=None):
         self.titan, self.europa, self.hold = world.home("titan"), world.home("europa"), hold
-        self.mirrored, self.stopped = [], threading.Event()
+        self.mirrored, self.stopped, self.lock = [], threading.Event(), threading.Lock()
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
 
@@ -1202,10 +1204,11 @@ class Dropbox:
 
     def _run(self):
         while not self.stopped.wait(0.02):
-            try:
-                self._cycle()
-            except (OSError, ValueError):
-                continue
+            with self.lock:
+                try:
+                    self._cycle()
+                except (OSError, ValueError):
+                    continue
 
     def close(self):
         self.stopped.set()
@@ -1617,10 +1620,12 @@ class World:
         return self.home(host) / TARGET_PATHS[target_id]
 
     def write_target(self, target_id, value, hosts=("titan", "europa")):
-        """Write one shared target on every host, as Dropbox would synchronize it."""
+        """Write one shared target on every host, as Dropbox would synchronize it: a running
+        fixture Dropbox mirrors nothing in between."""
         data = value if isinstance(value, bytes) else _encode_json(value)
-        for host in hosts:
-            self.target(host, target_id).write_bytes(data)
+        with self.dropbox.lock if self.dropbox is not None else contextlib.nullcontext():
+            for host in hosts:
+                self.target(host, target_id).write_bytes(data)
         return data
 
     def member(self, host, target_id, role):
@@ -1780,6 +1785,47 @@ def _blocker_kinds(response):
 
 def _private(path):
     return stat.S_IMODE(os.lstat(path).st_mode)
+
+
+# --- the fixture Dropbox ---------------------------------------------------------------------
+
+
+def test_write_target_never_interleaves_with_the_dropbox_mirror(tmp_path, monkeypatch):
+    """A fixture write stands for a change Dropbox already delivered to both hosts, so a mirror
+    cycle that read Titan before it cannot land that older copy on Europa after it (hq-457348:
+    test_partial_finish_keeps_original_timers saw Europa's target lag under xdist load). The
+    cycle is paused right after it reads Titan's target, and the write runs meanwhile."""
+    world = World(tmp_path, monkeypatch)
+    world.stage_cutover()
+    world.write_target("claude", b"old\n")
+    new = b"new\n"
+    titan = world.target("titan", "claude")
+    read, release = threading.Event(), threading.Event()
+
+    class Paused(type(titan)):
+        def read_bytes(self):
+            data = super().read_bytes()
+            if not read.is_set():
+                read.set()
+                release.wait(5)
+            return data
+
+    files = Dropbox._files
+    monkeypatch.setattr(Dropbox, "_files", staticmethod(lambda home: {
+        name: Paused(path) if path == titan else path for name, path in files(home).items()}))
+    dropbox = world.start_dropbox()
+    try:
+        assert read.wait(5)
+        writer = threading.Thread(target=world.write_target, args=("claude", new))
+        writer.start()
+        writer.join(0.2)
+        release.set()
+        writer.join(5)
+        dropbox.close()   # the paused cycle has finished: Europa holds what it left
+        assert world.target("europa", "claude").read_bytes() == new
+    finally:
+        release.set()
+        world.close()
 
 
 # --- transport and schema -----------------------------------------------------------------
