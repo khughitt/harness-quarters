@@ -91,7 +91,7 @@ Inspected on installed `agy` `1.5.3` (`~/.local/bin/agy`, ELF BuildID
 `50b5b6c0ca95a2a401f0c806222ecaa6`) and the bundled `agy-customizations` /
 `antigravity_guide` skill docs:
 
-1. **No native settings environment surface in `agy` `1.5.3`**:
+1. **No native settings environment surface in `agy` `1.5.3` (Observed)**:
    - Reflection metadata for `google3/third_party/jetski/cli/types/types.CliSetting`
      (the struct backing `~/.gemini/antigravity-cli/settings.json` and `--settings`)
      defines 37 exported JSON keys (`colorScheme`, `altScreenMode`, `trustedWorkspaces`,
@@ -111,7 +111,7 @@ Inspected on installed `agy` `1.5.3` (`~/.local/bin/agy`, ELF BuildID
      (`0x9bc3f40`) is a 5-byte stub (`xor %eax,%eax; xor %ebx,%ebx; ret`) that
      unconditionally returns `""`.
 
-2. **No native hook environment-injection channel**:
+2. **No native hook environment-injection channel (Observed)**:
    - Per `agy-customizations/docs/hooks.md`, `SessionStart` returns only
      `{"injectSteps": [...]}` (conversation trajectory messages; no `CLAUDE_ENV_FILE`
      equivalent).
@@ -121,7 +121,7 @@ Inspected on installed `agy` `1.5.3` (`~/.local/bin/agy`, ELF BuildID
      and mutating `CommandLine` via `overwrite` injects a hook-rewrite notice into
      every tool result.
 
-3. **Tool-shell environment inheritance (`NewLocalTerminal`)**:
+3. **Tool-shell environment inheritance (`NewLocalTerminal`) (Observed)**:
    - Disassembly of `google3/third_party/jetski/terminal/terminal.NewLocalTerminal`
      (`0x7e71b40..0x7e72480`) and `(*RunCommandHandler).Handle` (`0x91b9360..0x91bbba0`)
      shows that `run_command` builds the child shell environment from `syscall.Environ()`
@@ -132,45 +132,59 @@ Inspected on installed `agy` `1.5.3` (`~/.local/bin/agy`, ELF BuildID
      process environment: only `PAGER`, `PATH` (prepended with
      `~/.gemini/antigravity-cli/bin`), `TERM`, and `_` are modified, while
      `ANTIGRAVITY_*` and `GIT_EDITOR` / `GIT_PAGER` / `HGEDITOR` / `JJ_EDITOR` /
-     `JJ_PAGER` are added. Any `WORKER_VARS` exported before `exec`ing the `agy` binary
+     `JJ_PAGER` are added. Any `DEFAULTS` keys exported before `exec`ing the `agy` binary
      therefore reach every `run_command` shell unchanged.
 
-4. **Supported route (`harnesses/agy/bin/agy` launcher wrapper) and updater safety**:
+4. **Supported route (`harnesses/agy/bin/agy` launcher wrapper), precedence, and updater safety (Observed in isolated prototype; Inferred for live home-linked activation)**:
    - Place an `hq`-owned bash launcher at `harnesses/agy/bin/agy` (declared in
      `links.toml` under `[required]` as `"~/.local/bin/agy" = "harnesses/agy/bin/agy"`,
-     matching `"~/.local/bin/pi" = "harnesses/pi/bin/pi"`) that exports defaults only
-     when unset or empty and `exec`s the real ELF binary at
+     matching `"~/.local/bin/pi" = "harnesses/pi/bin/pi"`) that checks the target binary,
+     exports `DEFAULTS` only when unset or empty, and `exec`s the real ELF binary at
      `bin="${AGY_BIN:-$HOME/.local/share/agy/agy}"`:
      ```bash
+     #!/usr/bin/env bash
+     set -euo pipefail
+     bin="${AGY_BIN:-$HOME/.local/share/agy/agy}"
+     if [[ ! -x $bin ]]; then
+         echo "agy: binary not found at $bin; move the installed agy binary there or set AGY_BIN" >&2
+         exit 127
+     fi
      for var in PYTEST_XDIST_AUTO_NUM_WORKERS CARGO_BUILD_JOBS RUST_TEST_THREADS NEXTEST_TEST_THREADS GOMAXPROCS; do
          export "$var=${!var:-4}"
      done
      exec "$bin" "$@"
      ```
-   - **Precedence**:
-     - Unset or empty in the caller -> exported as `4` for all five `WORKER_VARS`
-       (`PYTEST_XDIST_AUTO_NUM_WORKERS`, `CARGO_BUILD_JOBS`, `RUST_TEST_THREADS`,
-       `NEXTEST_TEST_THREADS`, `GOMAXPROCS`).
-     - Explicit caller override (`PYTEST_XDIST_AUTO_NUM_WORKERS=2 agy ...`) ->
-       preserved by `${!var:-4}`.
-     - `host-budget run` inside a tool shell -> overwrites the inherited `4` in its
-       budgeted child environment with `HOST_BUDGET_GRANT_WORKERS` /
-       `HOST_BUDGET_GRANT_CARGO_BUILD_JOBS` and sets `LIBRARY_VARS` to `1`.
-     - `LIBRARY_VARS` (`OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS`, `OMP_NUM_THREADS`,
-       `RAYON_NUM_THREADS`, `POLARS_MAX_THREADS`, `NUMEXPR_MAX_THREADS`,
-       `TOKIO_WORKER_THREADS`) and `GRANT_VARS` (`HOST_BUDGET_*`) -> untouched by
-       `harnesses/agy/bin/agy`.
-     - Note: exporting `GOMAXPROCS=4` before `exec`ing `agy` also caps the `agy` Go
-       process itself to 4 OS threads unless the caller sets `GOMAXPROCS`.
-   - **Interaction with `agy update`, background auto-update, and `agentapi`**:
+   - **Precedence (Observed on isolated wrapper prototype and `host-budget` source)**:
+     - Unset or empty in the caller -> exported as `4` for all five `DEFAULTS` keys in
+       `tools/test_worker_defaults.py` (`PYTEST_XDIST_AUTO_NUM_WORKERS`,
+       `CARGO_BUILD_JOBS`, `RUST_TEST_THREADS`, `NEXTEST_TEST_THREADS`, `GOMAXPROCS`).
+     - Explicit caller override (`CARGO_BUILD_JOBS=12 agy ...`) -> preserved by
+       `${!var:-4}`.
+     - `host-budget run` inside a tool shell -> `host-budget`'s `job_environment(n, threads)`
+       (`os.execvpe(..., {**os.environ, **job_environment(...)})`) overwrites the
+       inherited `4` on all five `DEFAULTS` keys with `str(n)` (or `"1"` under
+       `--threads`), sets `GRANT_VARS` (`OPS_BUDGET=str(n)`, `OPS_WORKERS=str(n)` or
+       `"1"`), and sets all seven `LIBRARY_VARS` (`OMP_NUM_THREADS`,
+       `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS`, `NUMEXPR_NUM_THREADS`,
+       `NUMBA_NUM_THREADS`, `RAYON_NUM_THREADS`, `POLARS_MAX_THREADS`) to `"1"` (or
+       `str(n)` under `--threads`).
+     - `LIBRARY_VARS` (`OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`, `MKL_NUM_THREADS`,
+       `NUMEXPR_NUM_THREADS`, `NUMBA_NUM_THREADS`, `RAYON_NUM_THREADS`,
+       `POLARS_MAX_THREADS`) and `GRANT_VARS` (`OPS_BUDGET`, `OPS_WORKERS`) -> untouched
+       by `harnesses/agy/bin/agy`, matching `assert_leaves_alone(env)` in
+       `tools/test_worker_defaults.py`.
+     - Note (Inferred): exporting `GOMAXPROCS=4` before `exec`ing `agy` also caps the
+       `agy` Go process itself to 4 OS threads unless the caller sets `GOMAXPROCS`.
+   - **Interaction with `agy update`, background auto-update, and `agentapi` (Observed in binary disassembly; Inferred for live updater runs)**:
      - Disassembly of `updater.triggerUpdateShared` (`0xa4a7ed6`),
        `updater.runUpdateShared` (`0xa4a98e5`), and `GetAgentAPIShellInjection`
        (`0x838ce0f`) shows that all three resolve the binary path via Go's
        `os.Executable()` (`0x6e2d920`, which reads `/proc/self/exe` on Linux) without
        using `argv[0]`.
-     - Because `harnesses/agy/bin/agy` is a `#!/usr/bin/env bash` script that `exec`s
-       `~/.local/share/agy/agy`, `/proc/self/exe` points to `~/.local/share/agy/agy`.
-       Both foreground (`agy update`) and background auto-updates swap
+     - Inferred from `/proc/self/exe` semantics: because `harnesses/agy/bin/agy` is a
+       `#!/usr/bin/env bash` script that `exec`s `~/.local/share/agy/agy`,
+       `/proc/self/exe` points to `~/.local/share/agy/agy`. Both foreground
+       (`agy update`) and background auto-updates swap
        `~/.local/share/agy/agy.new` -> `~/.local/share/agy/agy` in place and leave the
        `~/.local/bin/agy` symlink intact, and `GetAgentAPIShellInjection` writes
        `exec "$HOME/.local/share/agy/agy" agentapi "$@"` to
@@ -180,15 +194,27 @@ Inspected on installed `agy` `1.5.3` (`~/.local/bin/agy`, ELF BuildID
        `tools/harness-links` refuses to overwrite a regular file at `~/.local/bin/agy`).
 
 5. **Focused test specification for `hq-32317f` (`tools/test_worker_defaults.py`)**:
-   - Add `test_agy_launcher_defaults_and_preserves_caller_env(tmp_path)` alongside
-     `test_pi_launcher_defaults_and_preserves_caller_env`:
-     - Create an executable stub at `tmp_path / "agy"` that prints `sys.argv[1:]` and
-       `dict(os.environ)` as JSON.
-     - Run `ROOT / "harnesses/agy/bin/agy"` with `AGY_BIN=str(stub)` and a clean
-       environment (all `WORKER_VARS`, `LIBRARY_VARS`, and `GRANT_VARS` stripped):
-       assert all five `WORKER_VARS` equal `"4"`, all `LIBRARY_VARS` and `GRANT_VARS`
-       are absent, and arguments are forwarded verbatim.
-     - Re-run with `PYTEST_XDIST_AUTO_NUM_WORKERS="2"` and `GOMAXPROCS="6"` in `env`:
-       assert those two keep `"2"` and `"6"` while the remaining three `WORKER_VARS`
-       equal `"4"`.
-     - Run with `AGY_BIN=str(tmp_path / "missing")`: assert exit code `127` and a diagnostic on `stderr`.
+   - Add an `agy_installed(tmp_path)` fixture and `agy_env(env)` helper alongside
+     `installed` / `pi_env`, plus four focused tests using existing `DEFAULTS`,
+     `LIBRARY_VARS`, `GRANT_VARS`, `worker_view(env)`, and `assert_leaves_alone(env)`:
+     - `test_agy_launcher_sets_the_defaults(agy_installed)` (mirrors
+       `test_pi_launcher_sets_the_defaults`): run `ROOT / "harnesses/agy/bin/agy"` with
+       `AGY_BIN` pointing at a `FAKE` (`#!/usr/bin/env bash\nenv\n`) stub and a clean
+       environment; assert `worker_view(env) == DEFAULTS` and `assert_leaves_alone(env)`
+       (all seven `LIBRARY_VARS` and both `GRANT_VARS` (`OPS_BUDGET`, `OPS_WORKERS`)
+       absent).
+     - `test_agy_launcher_keeps_a_value_it_was_given(agy_installed)` (mirrors
+       `test_pi_launcher_keeps_a_value_it_was_given`): run with
+       `{**agy_installed, "CARGO_BUILD_JOBS": "12"}`; assert
+       `env["CARGO_BUILD_JOBS"] == "12"` and
+       `worker_view(env) == {**DEFAULTS, "CARGO_BUILD_JOBS": "12"}`.
+     - `test_agy_launcher_yields_to_host_budget_override(agy_installed)`: start from
+       `base = agy_env(agy_installed)` (where all five `DEFAULTS` are `"4"` and
+       `LIBRARY_VARS` / `GRANT_VARS` are unset) and overlay a `host-budget` grant
+       environment (`OPS_BUDGET="8"`, `OPS_WORKERS="8"`, all five `DEFAULTS` keys set to
+       `"8"`, and all seven `LIBRARY_VARS` set to `"1"`); assert `worker_view(merged)`
+       has `"8"` for all five keys, `merged["OPS_BUDGET"] == "8"`,
+       `merged["OPS_WORKERS"] == "8"`, and all seven `LIBRARY_VARS` equal `"1"`.
+     - `test_agy_launcher_fails_closed_when_binary_missing(tmp_path)`: run
+       `ROOT / "harnesses/agy/bin/agy"` with `AGY_BIN=str(tmp_path / "missing")`; assert
+       `returncode == 127` and a diagnostic on `stderr`.
