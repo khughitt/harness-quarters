@@ -8,12 +8,12 @@ complexity: mid
 process: planned
 owner: feat/hq-adfed6-archive-replica
 created: 2026-10-29T19:10:37Z
-updated: 2026-11-08T12:39:14Z
+updated: 2026-11-08T12:41:39Z
 started: 2026-11-08T02:03:40Z
 completed: 2026-11-08T12:39:14Z
 closed: 2026-11-08T12:39:14Z
 depends: []
-related: [hq-c58737, hq-405212]
+related: [hq-c58737, hq-405212, hq-c66bee]
 tags: []
 source: ops-7b325c
 agent: codex
@@ -96,3 +96,6 @@ Boundary: this is archive redundancy, not a new retention engine, changes to pru
 - 2026-11-08T12:39:12Z (feat/hq-adfed6-archive-replica): retention checkpoint: observed 2026-11-08T12:38:51Z on titan; basis hq (in-tree, .) 53ea586381251fa98c2606729331fdeeefbac341:tasks/hq-adfed6.md; retained by refs/heads/feat/hq-adfed6-archive-replica; this host: kept verified 1, kept unknown 0, released 2; changed 3. Rechecked all kept/verified items on this host (clean worktree .worktrees/hq-adfed6; 40-entry Manifest 1 and external execution workspace transferred to open follow-up hq-405212 at 6d1e775237b4e135521a2d8768b9b37d7edc198c; observer attribution unknown under --stamp on agy); unknown items remain unverified with actions in basis. Other hosts retain their own dated observations. Next: close hq-adfed6, merge feat/hq-adfed6-archive-replica into main, and remove and release .worktrees/hq-adfed6.
 - 2026-11-08T12:39:14Z (feat/hq-adfed6-archive-replica): done
 - 2026-11-08T12:39:14Z (feat/hq-adfed6-archive-replica): Implemented session-archive replica subcommands (replicate, verify-replica), disk/mount gate (check_replica, disks_of), status replica health reporting, systemd units/links, and README/runbook restore documentation across Tasks 1-7; 472 focused tests and whole-branch review passed.
+- 2026-11-08T12:41:39Z (main): tt: fast/full by agents: 0.00; bypasses: 43; tool-call minutes containing bypasses: 25.5 (0 unknown)
+- 2026-11-08T12:41:39Z (main): retained: {"version":1,"host":"titan","kind":"worktree","path":".worktrees/hq-adfed6","state":"released","verification":"verified","purpose":"Removed .worktrees/hq-adfed6 and deleted merged branch feat/hq-adfed6-archive-replica after fast-forward merge into main at f80ed09c, verified checkpoint basis ancestry on main, tt-report exit 0, clean git status, discarding regenerable caches (.pytest_cache and __pycache__), and 0 host pointers into the worktree; external plan workspace transferred to open follow-up hq-405212","next_owner":"none","cleanup_trigger":"none"}
+- 2026-11-08T12:41:39Z (main): closeout: Fast-forwarded main to f80ed09c with Tasks 1-7 (hq-4bff46, hq-dba11e, hq-a16a3a, hq-f3d66a, hq-98889c, hq-d1a549, hq-82694d) and whole-branch review acceptance (covered tree 2021682b8cb990f946f739685350a8cd07c82c9a; 472 focused tests passed; mandatory just check-hygiene passed; broad suite deliberately omitted per .tt.toml automatic_broad = false; no remote evidence). Added dependency ops-7b325c -> hq-405212. All 3 retained identities on hq-adfed6 are released (0 kept items remain on hq-adfed6; no empty checkpoint added); external execution workspace $WORK_ROOT/hq/hq-adfed6/plans/session-archive-replica and its 40-entry Manifest 1 ($WORK_ROOT/hq/hq-adfed6/session-archive-replica.manifest.json, sha256 8c07a171e5b8d8f8c44eed154941265f92416659e4531103f6491e9ac8d9fa3c) are kept and verified under open rollout task hq-405212. Disclosures: nothing pushed; no surviving session processes (host-load --section session: session kitty-198873-0.scope: nothing left running); no live links or systemd timers activated (tracked by hq-405212 with per-step user approval); main's pre-existing M harnesses/agy/settings.json and sibling worktree hq-c66bee untouched; worktree .worktrees/hq-adfed6 unlocked and removed and merged branch feat/hq-adfed6-archive-replica deleted.
