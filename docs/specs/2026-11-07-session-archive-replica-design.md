@@ -1,6 +1,7 @@
 # Session archive replica: a verified second copy on another physical drive
 
-Status: draft for human review, 2026-11-07. Task: hq-adfed6 (closeout ops-7b325c).
+Status: revision 2 for review, 2026-11-08, addressing spec review round 1 (agy, on
+`1a09a6e3`: three important and three minor findings). Task: hq-adfed6 (closeout ops-7b325c).
 Builds on [the session archive design](2026-09-30-session-archive-design.md) ("the archive
 design" below), whose invariants it keeps.
 
@@ -52,8 +53,12 @@ One optional key in the host config `~/.config/session-archive/config.toml`:
 replica_root = "<a directory on a different physical disk>"
 ```
 
-`replicate` and `verify-replica` refuse, exiting 2 with a message naming the problem
-(the archive design's host-gate convention), when:
+`load_config` only parses the key: absent means `replica_root = None`, present must be a
+string (otherwise exit 2, as for the other keys). It does not touch the replica directory,
+so an unmounted replica disk never stops capture, prune or promote.
+
+`replicate` and `verify-replica` then check the replica themselves and refuse, exiting 2
+with a message naming the problem (the archive design's host-gate convention), when:
 
 - `replica_root` is absent from the config: "no replica is configured on this host";
 - the directory does not exist ("is the replica disk mounted?");
@@ -67,12 +72,24 @@ disk is unmounted, the marker is missing, so a run never writes onto the root fi
 different `st_dev`. Each root's `st_dev` resolves through `/sys/dev/block/<major>:<minor>`
 to the set of whole disks under it: a partition resolves to its parent disk; a device-mapper
 or md device resolves recursively through `slaves/`. The run refuses when the two sets
-intersect, or when either set is empty or cannot be read. This is a pure function over a
-lookup of sysfs, so the tests run it on fixtures. On the primary host today, the archive
-is on `sdc` and the candidate replica on `sdb`.
+intersect, or when either set is empty or cannot be read. A tmpfs or other virtual
+filesystem (major 0, no sysfs entry) resolves to the empty set and is refused. On the
+primary host today, the archive is on `sdc` and the candidate replica on `sdb`.
 
-Capture, prune, promote and status ignore `replica_root`, apart from status's report
-(§3.6).
+The check is two parts so tests can reach both. `disks_of(path, sysfs_root)` is a pure
+function of a path's `st_dev` and a sysfs tree; its unit tests build fake sysfs trees. The
+replica commands receive the resolver as a parameter; the CLI passes the real one, held
+as a module attribute in `cli.py`. Temporary fixture roots share one filesystem, so the
+real resolver correctly refuses them; the CLI fixture route (§5) runs `cli.main` in
+process with that attribute replaced by a resolver that gives each root its own disk.
+No environment variable or option exposes the override.
+
+**Live source roots.** `main()` checks the live source table (`check_sources`) before
+every command today. `replicate` and `verify-replica` read only the archive and the
+replica, so `main()` skips that check for them: a missing harness home must not stop a
+backup of what is already archived.
+
+Capture, prune and promote ignore `replica_root`. Status reports on it (§3.6).
 
 ### 3.2 Replica layout
 
@@ -80,14 +97,18 @@ Capture, prune, promote and status ignore `replica_root`, apart from status's re
 <replica_root>/
   .session-archive-replica       marker (by hand)
   generations/
-    20261108T060012Z/            one verified generation
+    20261108T060012.345678Z/     one verified generation
       manifest.sqlite            consistent snapshot of the archive manifest
       claude/…  codex/…  versions/…   every file that manifest describes, at its archive path
       receipt.json               what this generation is and how it was verified
-    20261109T060008Z/
+    20261109T060008.012345Z/
     …
-  current -> generations/20261109T060008Z     the newest verified generation
+  current -> generations/20261109T060008.012345Z     the newest verified generation
 ```
+
+A stamp is the run's UTC start to the microsecond, taken from a clock the core receives as
+a parameter (as `capture_file` takes `now`). A stamp that already exists, as a generation
+or a partial, fails the run rather than reusing the directory.
 
 A generation is a complete, self-contained archive: copied to an empty disk with
 `.session-archive-root` added, it is an archive root that `session-archive status` opens.
@@ -109,20 +130,24 @@ during the copy:
 2. **Snapshot the manifest** into `<stamp>.partial/manifest.sqlite` with SQLite's online
    backup API, then open the copy read-only and run `PRAGMA integrity_check`. The archive's
    journal mode is `delete`; the backup API gives a consistent database regardless of
-   journal state, where a plain file copy could miss a hot journal.
+   journal state, where a plain file copy could miss a hot journal. Read the rows, then
+   close the connection, so SQLite leaves no sidecar file in the partial.
 3. **Populate.** For every row of the snapshot (every mirror and `versions/` entry), at its
    archive path (`archived_file` in the archive code):
-   - If the previous verified generation (`current`) holds that path and its own manifest
-     has the same row (source, relpath, location, size, `mtime_ns`, sha256), hard-link the
-     file from `current`. That file was verified when its generation was made.
+   - If the previous verified generation (`current`) has the same row in its own manifest
+     (source, relpath, location, size, `mtime_ns`, sha256), and `lstat` of its file there
+     shows a regular file with that size and `mtime_ns`, hard-link the file from `current`.
+     That file was verified when its generation was made.
    - Otherwise copy it from the archive with a no-follow open, hashing while copying, set
      its mtime to the row's, and `fsync` it. The hash must equal the row's sha256 and the
      size the row's size.
-4. **Check completeness.** Every snapshot row has a file of its recorded size in the
-   partial. No other files exist besides `manifest.sqlite` and `receipt.json`.
+4. **Check completeness.** Every snapshot row has a regular file of its recorded size and
+   `mtime_ns` in the partial, and the partial holds no other file besides
+   `manifest.sqlite`.
 5. **Write `receipt.json`**: the archive root, the replica root, the whole disks each
-   resolved to, the run's start and end, the row count, bytes copied, bytes linked, files
-   copied and linked, and `verified: true`. `fsync` every new directory, then the receipt.
+   resolved to, `started_at` and `finished_at` (UTC, the manifest's format), the row count,
+   bytes and files copied, bytes and files linked, and `verified: true`. `fsync` every new
+   directory, then the receipt.
 6. **Publish.** Rename `<stamp>.partial` to `<stamp>`, `fsync` `generations/`, then point
    `current` at it by creating a new symlink under a temporary name and renaming it over
    `current` (atomic), and `fsync` the replica root.
@@ -165,9 +190,12 @@ A restore check that reads the replica alone, never a live harness home:
 3. Read and hash every file the manifest describes in `current`, comparing its sha256 and
    size with the row. All of them, not a sample: at about 40 GB this is minutes of reads on
    the replica disk once a month, and a sample would miss isolated bit rot.
-4. Parse each `.jsonl` file's lines as JSON, counting lines that do not parse. Transcripts
-   may legitimately end with a partial line or hold lines a harness wrote malformed, so the
-   count is reported, not a failure; a hash match already proves the bytes.
+4. For every row whose `relpath` ends in `.jsonl` (mirror and `versions/` rows alike),
+   split the file's bytes on newlines and decode each line with `json.loads`, counting
+   lines that do not parse, including a line that is not valid UTF-8 (a multi-byte
+   sequence cut at the end of the file). Transcripts may legitimately end with a partial
+   line or hold lines a harness wrote malformed, so the count is reported, not a failure;
+   a hash match already proves the bytes.
 5. Record a `verify-replica` run in the archive manifest and print the JSON report. Any
    hash, size, missing-file or integrity failure exits 1.
 
@@ -190,11 +218,24 @@ keep their non-blocking behaviour.
   land on every host and are enabled on none until activation (§4).
 
 `session-archive status` gains a `replica` object when `replica_root` is configured: the
-current generation's stamp and receipt, the last `replicate` and `verify-replica` runs, and
-its health. Status exits 1 (unhealthy) when a replica is configured and:
+current generation's stamp and receipt, the last `replicate` and `verify-replica` runs,
+`ok`, and, when not ok, the reasons. Status exits 1 (unhealthy) when a replica is
+configured and any of these holds:
 
-- the newest verified generation is more than 48 hours old, the capture threshold; or
+- the replica directory or its marker is missing (the disk is unmounted), `current` is
+  missing, or its `receipt.json` cannot be read;
+- the receipt's `finished_at` is more than 48 hours old, the capture threshold. Age comes
+  from the receipt on the replica disk, not from the `runs` table: a generation restored
+  into a new archive carries a manifest snapshotted before its own run was recorded;
+- the last `replicate` run in the manifest failed. This is immediate, as for prune: a
+  failure such as a primary hash mismatch repeats every day until a person looks, so
+  waiting out the 48 hours would only delay the signal. No `replicate` row at all (a
+  restored archive) does not count against it;
 - the last `verify-replica` run failed, or none has passed in the last 35 days.
+
+Reading the replica never raises out of status: a missing or unreadable path becomes a
+reason in the `replica` object, and the archive part of the report is printed as before.
+Without `replica_root`, the report has no `replica` key and health is unchanged.
 
 A failed run also leaves its unit failed in `systemctl --user --failed`. That is the same
 reporting capture has today. Nothing pushes a notification; a desktop or phone alert on unit
@@ -233,8 +274,13 @@ All on temporary archive and replica roots built by the existing test helpers, w
 subprocess environments built key by key and a fake sysfs for the disk check:
 
 - Mount checks: missing key, missing directory, missing marker, the same disk (two
-  partitions of one fake disk), a device-mapper replica over the archive's disk, and an
-  unreadable sysfs entry: each exits 2 with its message, and nothing is written.
+  partitions of one fake disk), a device-mapper replica over the archive's disk, a
+  virtual filesystem with no sysfs entry, and an unreadable sysfs entry: each refuses with
+  its message, and nothing is written. Through the real CLI in a subprocess, fixture
+  roots on one filesystem exit 2 as the same disk.
+- Boundaries: with a configured but missing replica directory, capture still runs; with a
+  live source root missing, `replicate` and `verify-replica` still run while capture
+  exits 2.
 - First generation: every row's file present with its hash, `current` points at it, the
   receipt counts match, and the generation opens with `status` when given an archive marker.
 - Second generation after a capture that appended to one transcript and added a version:
@@ -244,18 +290,26 @@ subprocess environments built key by key and a fake sysfs for the disk check:
   generation appears, `current` is unchanged.
 - Interruption: a failure injected between populate and publish leaves a partial and the
   old `current`; the next run removes the partial and publishes.
-- Retention: after nine runs, seven generations remain, and the files of the oldest kept
-  one still verify.
+- Retention: after nine runs with an injected clock, seven generations remain, and the
+  files of the oldest kept one still verify. A clock that repeats a stamp fails the run.
+- Linking: a file in `current` whose size or mtime no longer matches its row is copied
+  from the archive instead of linked.
 - Lock: a held lock makes the run wait, then exit 75 when the wait expires (a short wait
   in the test).
 - `verify-replica`: passes on a good generation; fails on a flipped byte, a truncated
-  file, a missing file and a damaged manifest copy; reports unparseable JSONL lines
-  without failing.
-- `status`: healthy with a fresh generation and a recent passing check; unhealthy when
-  either is stale or the check failed; no `replica` object when unconfigured.
+  file, a missing file and a damaged manifest copy; reports unparseable JSONL lines,
+  including a cut UTF-8 sequence at end of file and a `versions/` transcript, without
+  failing.
+- `status`: healthy with a fresh generation and a recent passing check; unhealthy, with a
+  reason and the archive report intact, for each condition in §3.6 (unmounted replica,
+  missing `current`, unreadable receipt, stale receipt, failed last replicate, failed or
+  missing check); healthy on a restored archive with no `replicate` rows; no `replica`
+  key when unconfigured.
 
 Before the first live copy, the small fixture route runs end to end: `replicate`, then
-`verify-replica`, then `status`, through the CLI on a fixture archive.
+`verify-replica`, then `status`, through `cli.main` in process on a fixture archive with
+the resolver replaced (§3.1). The first live `replicate` (§4 step 2) is the first run of
+the real resolver on real disks.
 
 Test execution follows this checkout's policy: focused `just test-one` runs for the changed
 behaviour and `just check-hygiene` before commits.
