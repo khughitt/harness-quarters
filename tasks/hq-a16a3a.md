@@ -7,7 +7,7 @@ size: m
 complexity: mid
 process: direct
 created: 2026-11-08T10:24:53Z
-updated: 2026-11-08T10:24:53Z
+updated: 2026-11-08T10:24:55Z
 depends: []
 parent: hq-adfed6
 tags: [session-archive]
@@ -23,3 +23,5 @@ Scope: plan docs/plans/2026-11-08-session-archive-replica.md, section 'Task 3: r
 
 - 2026-11-08T10:24:53Z (add): created
   provenance: {"harness_session":"claude-code:e67b959b-22b0-46a4-8c00-24ed459c426d","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
+- 2026-11-08T10:24:55Z (feat/hq-adfed6-archive-replica): gate: scoped — step of hq-adfed6 plan
+  provenance: {"harness_session":"claude-code:e67b959b-22b0-46a4-8c00-24ed459c426d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
