@@ -6,9 +6,9 @@ priority: 3
 size: xs
 complexity: low
 process: direct
-owner: main
+owner: docs/hq-d2cc36-agy-session-id
 created: 2026-11-08T12:56:34Z
-updated: 2026-11-08T16:33:34Z
+updated: 2026-11-08T16:33:36Z
 started: 2026-11-08T16:33:34Z
 depends: []
 related: [relay-7b8340]
@@ -25,4 +25,6 @@ hq docs/runbooks/adding-a-harness.md says agy exports no native session id. agy 
 - 2026-11-08T12:56:34Z (add): created
   provenance: {"harness_session":"claude-code:791569f1-2567-4c3f-a61f-77b15d2ce4f1","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
 - 2026-11-08T16:33:34Z (main): started
+  provenance: {"harness_session":"claude-code:51fffea7-6ed5-4a54-b2d7-3a0f02c1306a","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-08T16:33:36Z (docs/hq-d2cc36-agy-session-id): resumed
   provenance: {"harness_session":"claude-code:51fffea7-6ed5-4a54-b2d7-3a0f02c1306a","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
