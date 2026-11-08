@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: main
 created: 2026-10-29T19:10:37Z
-updated: 2026-11-08T02:04:04Z
+updated: 2026-11-08T02:04:06Z
 started: 2026-11-08T02:03:40Z
 depends: []
 tags: []
@@ -38,3 +38,4 @@ Boundary: this is archive redundancy, not a new retention engine, changes to pru
 - 2026-11-08T02:03:40Z (main): started
   provenance: {"harness_session":"claude-code:e67b959b-22b0-46a4-8c00-24ed459c426d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-08T02:04:04Z (main): trial: flow-trial-1 — enrolled — flow on
+- 2026-11-08T02:04:06Z (main): arm: flow-trial-1 — unit tack-adfed6 — flow on
