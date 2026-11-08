@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-adfed6-archive-replica
 created: 2026-10-29T19:10:37Z
-updated: 2026-11-08T02:08:38Z
+updated: 2026-11-08T10:06:56Z
 started: 2026-11-08T02:03:40Z
 depends: []
 tags: []
@@ -48,4 +48,6 @@ Boundary: this is archive redundancy, not a new retention engine, changes to pru
   provenance: {"harness_session":"claude-code:e67b959b-22b0-46a4-8c00-24ed459c426d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-08T02:08:33Z (feat/hq-adfed6-archive-replica): design draft committed 1a09a6e3 on feat/hq-adfed6-archive-replica: docs/specs/2026-11-07-session-archive-replica-design.md; manifest-driven Python replicate into hard-linked dated generations under the archive lock, monthly full-hash verify-replica, status staleness; rsync in place and rsync --link-dest rejected (spec 3.3); no new CLI options, session-archive is outside ops cli.toml inventory; read-only host facts: archive on sdc 38G 37135 rows journal_mode delete, candidate replica mount on sdb 2.2T free
 - 2026-11-08T02:08:38Z (feat/hq-adfed6-archive-replica): parked (waiting on user, review): User reviews the design at .worktrees/hq-adfed6/docs/specs/2026-11-07-session-archive-replica-design.md (commit 1a09a6e3); on approval the agent records gate designed and writes the implementation plan
+  provenance: {"harness_session":"claude-code:e67b959b-22b0-46a4-8c00-24ed459c426d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-08T10:06:56Z (feat/hq-adfed6-archive-replica): resumed
   provenance: {"harness_session":"claude-code:e67b959b-22b0-46a4-8c00-24ed459c426d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
