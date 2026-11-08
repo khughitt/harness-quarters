@@ -8,8 +8,9 @@ complexity: low
 process: direct
 defer: 2026-11-30
 created: 2026-10-27T14:17:56Z
-updated: 2026-10-27T14:17:56Z
+updated: 2026-11-08T16:16:07Z
 depends: []
+related: [ops-630a87]
 parent: hq-7e81ed
 tags: []
 agent: claude-code/claude-opus-5-5
@@ -35,3 +36,4 @@ Done: the paths are gone, just test passes, and the pre-commit checks pass. grep
 
 - 2026-10-27T14:17:56Z (add): created
   provenance: {"harness_session":"claude-code:250666f1-b992-451b-81cc-31d0ea638ce6","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
+- 2026-11-08T16:16:07Z (main): Trial gate re-scoped 2026-11-08 at the user's request (flows records docs/notes/2026-11-08-flow-trial-1-gate-scope.md, superseding ops-630a87 change 5's wait-for-readout for flow-trial-1): this step neither reaches the two arms differently nor touches the verdict's inputs (trial-arm census, obs outcomes report), so it no longer waits for readout. Land it on its own merits.
