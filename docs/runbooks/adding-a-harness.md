@@ -748,15 +748,29 @@ the same change that widens its parser.
 - Lifecycle transitions and `tasks note --stamp` record
   `provenance: {"harness_session": "<name>:<id>", "harness_session_source": "<ENV_VAR>"}`
   when the harness exports a native session variable to child shells
-  (`CLAUDE_CODE_SESSION_ID`; `CODEX_THREAD_ID` or `CODEX_SESSION_ID`).
-- For a new verified variable, extend `validate`, `validate_session_key`,
-  `resolve_from` and (for a separate worker root variable) `resolve_root_from` in
-  `src/provenance.rs`, and in lockstep `<obs-checkout>/join.py`: `<name>` in
-  `HARNESSES` and `"<ENV_VAR>": "<name>"` in the `SOURCES` dict. Otherwise `obs index`
-  fails on the first stamped note from that harness: the task is reported on stderr,
-  counted as failed, outcomes are skipped, and the run exits 1 with `index_failed`.
+  (`CLAUDE_CODE_SESSION_ID`; `CODEX_THREAD_ID` or `CODEX_SESSION_ID`;
+  `ANTIGRAVITY_CONVERSATION_ID` for `agy`, read only when neither Claude Code nor Codex
+  variable is present, and equal to the hook payload's `conversationId`, subagents
+  included).
+- A new verified variable rolls out readers before writers, because every host that
+  syncs records validates provenance on every scan: one stamp an older binary refuses
+  breaks `prime`, `list`, `show` and `check` there.
+  1. Readers: extend `validate` and `validate_session_key` in `src/provenance.rs`,
+     keeping `resolve_from` and `--origin-session` input closed to the new prefix.
+  2. Install that tasks build on every host and CI job that parses records, and land
+     `<obs-checkout>/join.py`: `<name>` in `HARNESSES` and `"<ENV_VAR>": "<name>"` in
+     the `SOURCES` dict. Without it `obs index` fails on the first stamped note from
+     that harness: the task is reported on stderr, counted as failed, outcomes are
+     skipped, and the run exits 1 with `index_failed`.
+  3. Writers: open `resolve_from` (and, for a separate worker root variable,
+     `resolve_root_from`) and `--origin-session` input.
+
+  `agy` is the precedent: tasks-b42efc's design
+  (`docs/specs/2026-11-08-agy-session-identity-design.md` in the tasks records) shipped
+  the reader half, gated the writer on every host's install and obs's `join.py`, then
+  shipped the writer.
 - `TASKS_SESSION` and `TASKS_SESSION_PID` are claim-ownership overrides, never
-  provenance. When a harness exports no native session ID (`agy`, `pi` without an
+  provenance. When a harness exports no native session ID (`pi` without an
   extension), `--stamp` omits `provenance`; report session attribution as absent rather
   than inventing one.
 
