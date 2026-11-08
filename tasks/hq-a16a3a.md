@@ -1,15 +1,17 @@
 ---
 id: hq-a16a3a
 title: "replicate: verified hard-linked generations"
-status: doing
+status: done
 priority: 1
 size: m
 complexity: mid
 process: direct
 owner: feat/hq-adfed6-archive-replica
 created: 2026-11-08T10:24:53Z
-updated: 2026-11-08T11:43:00Z
+updated: 2026-11-08T11:43:15Z
 started: 2026-11-08T11:28:02Z
+completed: 2026-11-08T11:43:15Z
+closed: 2026-11-08T11:43:15Z
 depends: []
 parent: hq-adfed6
 tags: []
@@ -37,3 +39,4 @@ Scope: plan docs/plans/2026-11-08-session-archive-replica.md, section 'Task 3: r
 - 2026-11-08T11:43:00Z (feat/hq-adfed6-archive-replica): - just check-hygiene: exit 0 (all hygiene, docs, facts, and harness_state checks passed)
 - 2026-11-08T11:43:00Z (feat/hq-adfed6-archive-replica): retro: clean; 1 impl review round (accept); 0 rework; 0 drift.
 - 2026-11-08T11:43:00Z (feat/hq-adfed6-archive-replica): closeout: Implemented Manifest.all_versions in tools/session_archive/manifest.py and ReplicateFailed/replicate in tools/session_archive/replica.py with tests in tools/test_session_archive_replica.py at commit 0fbf2fb165568005078b60d863f7c67b73f9d57f. Nothing pushed; no surviving processes; shared worktree .worktrees/hq-adfed6 remains active on branch feat/hq-adfed6-archive-replica for parent hq-adfed6.
+- 2026-11-08T11:43:15Z (feat/hq-adfed6-archive-replica): done
