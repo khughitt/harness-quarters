@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-adfed6-archive-replica
 created: 2026-10-29T19:10:37Z
-updated: 2026-11-08T10:23:20Z
+updated: 2026-11-08T10:24:42Z
 started: 2026-11-08T02:03:40Z
 depends: []
 tags: []
@@ -16,6 +16,7 @@ source: ops-7b325c
 agent: codex
 origin: agent
 spec: docs/specs/2026-11-07-session-archive-replica-design.md
+plan: docs/plans/2026-11-08-session-archive-replica.md
 ---
 
 Why: ops-7b325c preserves the P1 request for a second copy of the coding-agent session archive on a different physical drive. Hq owns session-archive and its user units. Scope evidence on 2026-10-29: hq c88e5c5; tools/session_archive/cli.py takes config.archive_lock for capture, prune, promote and probe-codex; config.py uses an exclusive flock on the archive .lock; the capture timer is 04:00, not 04:01. The primary archive contains the five source trees, versions/ and manifest.sqlite. The candidate secondary mount is a separate physical disk with about 2.3 TiB available; its proposed agent-sessions destination does not exist. Its host-specific location is in the source task's preserved capture.
