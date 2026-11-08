@@ -178,6 +178,7 @@ host routing during the proposed research. Keep original report bodies and P2.
   agent-targeted detached questions (`to: { kind: 'agent', agentId }`), `--to`
   filtering/agent answer attribution, and `relay` hook `additionalContext` delivery
   at tool/turn boundaries.
+  Handed to relay as relay-f11acb (2026-11-08).
 - The reader treats the actual asynchronous answer wrapper in L593 as injected,
   so a human-only query missed the user's request. obs-4c11a5 owns that newly
   reported classifier gap; it is related evidence, not a prerequisite for contact.
@@ -197,6 +198,13 @@ host routing during the proposed research. Keep original report bodies and P2.
   delivery rather than a parallel bridge or reader in hq.
   hq-ba1758's three historical exchanges concern recurring payload failures;
   reuse its context without expanding or duplicating that study.
+- relay-f11acb (idea, filed 2026-11-08 by the scope pass on hq-e15558) carries the
+  study's proposed extension (agent-targeted detached questions, `--to` filtering and
+  agent answer attribution, hook-boundary delivery, an explicit idle-wake boundary)
+  to relay's owner for review. hq-e15558 stays `briefed` and depends on it. The user's
+  recorded ask (L593) chose direct agent-to-agent support over person-mediated
+  contact, so the remaining choice is relay's contract shape, not whether to build it.
+  Once relay ships a subscriber, hq wires it into the harness hooks.
 - On completion each follow-up updates this brief and runs
   `tasks note <waiting-idea> --no-reviewed "<finding and evidence>"` before
   its result branch merges. Neither report is fulfilled merely by filing work.

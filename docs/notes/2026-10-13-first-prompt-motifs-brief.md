@@ -454,7 +454,7 @@ records this result and its limits, then wakes hq-1459f0.
 | Task | Current next action | Ideas it wakes |
 | --- | --- | --- |
 | hq-83c787 | Done: recorded the 7d/14d/28d inspection counts, denominators and method limits; recommends stopping on motif-classification tooling now while hq-7be4e4 proceeds independently | hq-1459f0 |
-| hq-1459f0 | Woken by hq-83c787: reconsider whether an outcome/error study is wanted for obs/flows or leave unscheduled while hq-7be4e4 designs the review preview | — |
+| hq-1459f0 | Drop proposed 2026-11-08: hq-83c787 labelled the recurring motifs, and obs-b2cedd (sourced from hq-83c787) owns the rule-based intent and outcome labels that test whether motifs predict session shape and tool errors; the copied-modifier and free-form semantic kinds were noted on obs-b2cedd | — |
 | hq-268cc2 | Done: one historical match, two misbound mappings, 41 unavailable identities; separate artifact checks required | hq-2d8e81 |
 | hq-2b3929 | Done: 3/3 observed cases gave validated historical drafts, 3/3 derived variants blocked as frozen; recommends a narrow print-only preview that starts from the artifact path | hq-2d8e81 |
 | hq-7be4e4 | Design the print-only preview from this brief; obtain review of the frozen design, record the recommendation and wake the idea | hq-2d8e81 |
