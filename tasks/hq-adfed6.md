@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-adfed6-archive-replica
 created: 2026-10-29T19:10:37Z
-updated: 2026-11-08T10:08:14Z
+updated: 2026-11-08T10:08:16Z
 started: 2026-11-08T02:03:40Z
 depends: []
 tags: []
@@ -53,3 +53,5 @@ Boundary: this is archive redundancy, not a new retention engine, changes to pru
   provenance: {"harness_session":"claude-code:e67b959b-22b0-46a4-8c00-24ed459c426d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-08T10:06:58Z (feat/hq-adfed6-archive-replica): review: spec round 1 — verdict: revise; findings: important 3, minor 3; reviewer: agy
 - 2026-11-08T10:08:14Z (feat/hq-adfed6-archive-replica): spec revision 2 at e46d5e87bdda51a54b3279661cfe20a6de2053c1 addresses round 1: I1 main skips check_sources for replicate and verify-replica, I2 load_config parses replica_root only and status reports replica health without raising (receipt finished_at age, failed last replicate unhealthy at once, no row on restored archive tolerated), I3 disks_of resolver injected via cli module attribute, in-process CLI fixture route, real resolver refuses same-filesystem fixtures in subprocess; minors: microsecond stamps from injected clock with collision refusal, connection closed and lstat before link, per-line bytes json.loads on every .jsonl row incl versions
+- 2026-11-08T10:08:16Z (feat/hq-adfed6-archive-replica): parked (waiting on user, review): User (or a reviewer the user names) reviews spec revision 2 at .worktrees/hq-adfed6/docs/specs/2026-11-07-session-archive-replica-design.md, commit e46d5e87bdda51a54b3279661cfe20a6de2053c1; on approval the agent records gate designed and writes the implementation plan
+  provenance: {"harness_session":"claude-code:e67b959b-22b0-46a4-8c00-24ed459c426d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
