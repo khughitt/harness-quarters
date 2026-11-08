@@ -7,7 +7,7 @@ size: xs
 complexity: low
 process: direct
 created: 2026-10-31T08:53:39Z
-updated: 2026-10-31T08:53:39Z
+updated: 2026-11-08T16:17:28Z
 depends: []
 tags: []
 source: docs/notes/2026-10-31-session-evidence-contact-brief.md
@@ -29,3 +29,4 @@ Where: [ref:brief], hq-d8a38c, hq-e15558 and existing obs-55431b. This is a smal
 
 - 2026-10-31T08:53:39Z (add): created
   provenance: {"harness_session":"codex:01a1911c-b523-7f30-be2c-d617dca80c03","harness_session_source":"CODEX_THREAD_ID","origin":"agent"}
+- 2026-11-08T16:17:28Z (main): Trial gate re-scoped 2026-11-08 (flows records docs/notes/2026-11-08-flow-trial-1-gate-scope.md): when this work reaches landing, judge it by that rule (arm-differential treatment changes wait; verdict-input changes need the outcome-blind equivalence check; everything else lands) rather than a blanket wait for the 2027-02-16 readout.
