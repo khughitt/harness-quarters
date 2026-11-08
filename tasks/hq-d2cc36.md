@@ -1,13 +1,15 @@
 ---
 id: hq-d2cc36
 title: "Correct adding-a-harness runbook: agy exports ANTIGRAVITY_CONVERSATION_ID as its native session id"
-status: todo
+status: doing
 priority: 3
 size: xs
 complexity: low
 process: direct
+owner: main
 created: 2026-11-08T12:56:34Z
-updated: 2026-11-08T12:56:34Z
+updated: 2026-11-08T16:33:34Z
+started: 2026-11-08T16:33:34Z
 depends: []
 related: [relay-7b8340]
 tags: []
@@ -22,3 +24,5 @@ hq docs/runbooks/adding-a-harness.md says agy exports no native session id. agy 
 
 - 2026-11-08T12:56:34Z (add): created
   provenance: {"harness_session":"claude-code:791569f1-2567-4c3f-a61f-77b15d2ce4f1","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
+- 2026-11-08T16:33:34Z (main): started
+  provenance: {"harness_session":"claude-code:51fffea7-6ed5-4a54-b2d7-3a0f02c1306a","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
