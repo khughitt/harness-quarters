@@ -17,6 +17,7 @@ from . import capture, config, inputs, probe, prune, status
 from .manifest import FILENAME, Manifest, Run, utc_now
 
 LOCKED = frozenset({"capture", "prune", "promote", "probe-codex"})
+REPLICA = frozenset({"replicate", "verify-replica"})
 CODEX = "codex"
 
 
@@ -149,12 +150,15 @@ def main(argv) -> int:
     args = build_parser().parse_args(argv)
     try:
         cfg = config.load_config(config_path())
-        table = harness_stores.archive_sources(Path.home())
-        captured = CapturedSources(cfg.archive_root)
-        try:
-            skipped = config.check_sources(table, captured)
-        finally:
-            captured.close()
+        if args.command in REPLICA:
+            table, skipped = (), {}
+        else:
+            table = harness_stores.archive_sources(Path.home())
+            captured = CapturedSources(cfg.archive_root)
+            try:
+                skipped = config.check_sources(table, captured)
+            finally:
+                captured.close()
         with config.archive_lock(cfg.archive_root) if args.command in LOCKED else nullcontext():
             if args.command == "capture":
                 return cmd_capture(cfg, table, args, skipped)

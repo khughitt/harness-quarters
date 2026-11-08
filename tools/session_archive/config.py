@@ -1,6 +1,7 @@
 """Host gate, the fixed source table, and the archive lock (spec §3.1–3.2)."""
 import fcntl
 import os
+import time
 import tomllib
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -59,6 +60,7 @@ class Config:
     archive_root: Path
     obs_command: tuple[str, ...]
     uninspectable_ok: tuple[str, ...]   # comm names whose open files may go uninspected
+    replica_root: Path | None = None
 
 
 def load_config(path: Path) -> Config:
@@ -84,7 +86,11 @@ def load_config(path: Path) -> Config:
     allowed = data.get("uninspectable_ok", [])
     if not (isinstance(allowed, list) and all(isinstance(name, str) for name in allowed)):
         raise HostGateError(f"{path}: uninspectable_ok must be a list of strings")
-    return Config(root, tuple(os.path.expanduser(part) for part in command), tuple(allowed))
+    replica = data.get("replica_root")
+    if replica is not None and not isinstance(replica, str):
+        raise HostGateError(f"{path}: replica_root must be a string")
+    replica_root = Path(os.path.expanduser(replica)) if replica is not None else None
+    return Config(root, tuple(os.path.expanduser(part) for part in command), tuple(allowed), replica_root)
 
 
 def check_sources(table, captured: Callable[[str], bool]) -> dict[str, str]:
@@ -108,13 +114,19 @@ def check_sources(table, captured: Callable[[str], bool]) -> dict[str, str]:
 
 
 @contextmanager
-def archive_lock(root: Path):
+def archive_lock(root: Path, wait: float = 0.0):
     fd = os.open(root / ".lock", os.O_RDWR | os.O_CREAT, 0o600)
     try:
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            raise LockHeld(f"another session-archive run holds {root / '.lock'}") from None
+        deadline = time.monotonic() + wait
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise LockHeld(f"another session-archive run holds {root / '.lock'}") from None
+                time.sleep(min(0.02, remaining))
         yield
     finally:
         os.close(fd)

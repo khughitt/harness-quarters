@@ -180,3 +180,53 @@ def test_symlinked_home_aborts(tmp_path):
     source = Source("x", "x", link, link / "root", None)
     with pytest.raises(config.HostGateError, match="symlink"):
         config.check_sources([source], lambda name: False)
+
+
+def test_replica_root_is_optional_typed_and_not_statted(tmp_path, archive, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    path = tmp_path / "config.toml"
+    base = f'archive_root = "{archive}"\nobs_command = ["obs"]\n'
+    path.write_text(base)
+    assert config.load_config(path).replica_root is None
+
+    absent_replica = tmp_path / "unmounted" / "replica"
+    path.write_text(base + 'replica_root = "~/replica-dir"\n')
+    loaded = config.load_config(path)
+    assert loaded.replica_root == (tmp_path / "home" / "replica-dir")
+    assert not loaded.replica_root.exists()
+
+    path.write_text(base + f'replica_root = "{absent_replica}"\n')
+    assert config.load_config(path).replica_root == absent_replica
+
+    path.write_text(base + "replica_root = 123\n")
+    with pytest.raises(config.HostGateError, match="replica_root must be a string"):
+        config.load_config(path)
+
+
+def test_archive_lock_waits_for_release_and_times_out(archive):
+    import threading
+    import time
+
+    fd = os.open(archive / ".lock", os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+        with pytest.raises(config.LockHeld):
+            with config.archive_lock(archive, wait=0.06):
+                pass
+
+        def release_soon():
+            time.sleep(0.04)
+            fcntl.flock(fd, fcntl.LOCK_UN)
+
+        releaser = threading.Thread(target=release_soon)
+        releaser.start()
+        try:
+            with config.archive_lock(archive, wait=0.5):
+                with pytest.raises(BlockingIOError):
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        finally:
+            releaser.join()
+    finally:
+        os.close(fd)
+
