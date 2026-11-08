@@ -1,15 +1,17 @@
 ---
 id: hq-dba11e
 title: Replica disk resolver and gate
-status: doing
+status: done
 priority: 1
 size: s
 complexity: mid
 process: direct
 owner: feat/hq-adfed6-archive-replica
 created: 2026-11-08T10:24:48Z
-updated: 2026-11-08T11:27:27Z
+updated: 2026-11-08T11:27:43Z
 started: 2026-11-08T11:19:36Z
+completed: 2026-11-08T11:27:43Z
+closed: 2026-11-08T11:27:43Z
 depends: []
 parent: hq-adfed6
 tags: []
@@ -40,3 +42,4 @@ Scope: plan docs/plans/2026-11-08-session-archive-replica.md, section 'Task 2: D
 - 2026-11-08T11:27:27Z (feat/hq-adfed6-archive-replica): retro: clean; 1 impl review round (accept); 0 rework; 0 drift.
 - 2026-11-08T11:27:27Z (feat/hq-adfed6-archive-replica): ---
 - 2026-11-08T11:27:27Z (feat/hq-adfed6-archive-replica): closeout: Implemented tools/session_archive/replica.py (MARKER, ReplicaGateError, ReplicaInfo, disks_of, check_replica) and unit tests in tools/test_session_archive_replica.py at commit 6b2a81e4fbed9b0a170179a3f8b91f30c1ec7feb. Nothing pushed; no surviving processes; shared worktree .worktrees/hq-adfed6 remains active on branch feat/hq-adfed6-archive-replica for parent hq-adfed6.
+- 2026-11-08T11:27:43Z (feat/hq-adfed6-archive-replica): done
