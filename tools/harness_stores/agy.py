@@ -40,7 +40,10 @@ def parse_time(path: Path, cid: str, value) -> int:
 
 
 def workspace(path: Path, cid: str, value) -> str | None:
-    """The first workspace URI as a local path; None when the conversation has none."""
+    """The first workspace URI as a local path; None for an empty list, or for '', which agy
+    writes for a session started with no workspace (its SessionStart has no workspacePaths)."""
+    if value == "":
+        return None
     try:
         uris = json.loads(value) if isinstance(value, str) else None
     except json.JSONDecodeError:
