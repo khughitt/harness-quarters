@@ -1091,6 +1091,17 @@ def test_agy_workspace_uri_is_percent_decoded(env):
     assert str(project) in rows(env.run("sessions", "--harness", "agy"))[0]
 
 
+def test_agy_empty_string_workspace_is_no_workspace(env):
+    """agy writes workspace_uris = '' (not '[]') for a session started with no workspace;
+    its SessionStart payload then has no workspacePaths."""
+    home, project = env.home / ".gemini" / "antigravity-cli", env.project("alpha")
+    agy_db(home, [agy_row(home, AID, None, workspace_uris=""), agy_row(home, AID2, project)])
+    result = env.run("sessions", "--harness", "agy")
+    assert result.returncode == 0, result.stderr
+    assert len(rows(result)) == 1
+    assert "agy 0 non-interactive, 0 transcript gone, 1 no workspace" in footer(result)
+
+
 def test_agy_row_without_workspace_is_excluded_and_never_matches_here(env):
     home, project = env.home / ".gemini" / "antigravity-cli", env.project("alpha")
     agy_db(home, [agy_row(home, AID, None), agy_row(home, AID2, project)])
@@ -1123,7 +1134,8 @@ def test_agy_schema_drift_is_an_error_naming_the_file(env, column):
 
 
 @pytest.mark.parametrize("field, value", [("workspace_uris", "not json"), ("workspace_uris", '"a string"'),
-                                          ("workspace_uris", "[1]"), ("last_modified_time", "yesterday"),
+                                          ("workspace_uris", "[1]"), ("workspace_uris", " "),
+                                          ("workspace_uris", "null"), ("last_modified_time", "yesterday"),
                                           ("last_modified_time", "2026-11-01 13:20:56"),
                                           ("conversation_id", ""), ("parent_conversation_id", None)])
 def test_agy_unexpected_value_is_an_error_naming_the_file(env, field, value):
