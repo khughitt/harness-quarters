@@ -1,0 +1,23 @@
+---
+id: hq-fc34cb
+title: "hq sessions: a unix-socket stdout whose reader did shutdown(SHUT_RD) is not detected as closed"
+status: todo
+priority: 3
+size: xs
+complexity: low
+process: direct
+created: 2026-11-08T16:53:53Z
+updated: 2026-11-08T16:53:53Z
+depends: []
+tags: []
+source: hq-d9d059
+agent: claude-code/claude-opus-5-5
+origin: agent
+---
+
+Deferred minor from hq-d9d059's round-2 review (tools/hq_cli/cli.py broken()/main): poll on a unix socket whose peer did shutdown(SHUT_RD) shows neither POLLERR nor POLLHUP, yet writes fail with EPIPE, so the BrokenPipeError branch re-raises (exit 120 with a traceback) where the pre-hq-d9d059 code dup2'd /dev/null over stdout unconditionally and exited quietly. Suggested fix: when a BrokenPipeError arrives and broken() detects neither output, silence stdout (the old assumption) rather than re-raise; a socketpair test with the reader's SHUT_RD, seen to fail first.
+
+## Notes
+
+- 2026-11-08T16:53:53Z (add): created
+  provenance: {"harness_session":"claude-code:51fffea7-6ed5-4a54-b2d7-3a0f02c1306a","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
