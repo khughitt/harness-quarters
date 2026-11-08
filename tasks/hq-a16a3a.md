@@ -7,10 +7,10 @@ size: m
 complexity: mid
 process: direct
 created: 2026-11-08T10:24:53Z
-updated: 2026-11-08T10:24:55Z
+updated: 2026-11-08T10:25:28Z
 depends: []
 parent: hq-adfed6
-tags: [session-archive]
+tags: []
 agent: claude-code/claude-opus-5-5
 origin: agent
 plan: docs/plans/2026-11-08-session-archive-replica.md
