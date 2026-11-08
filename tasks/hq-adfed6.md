@@ -8,10 +8,10 @@ complexity: mid
 process: planned
 owner: feat/hq-adfed6-archive-replica
 created: 2026-10-29T19:10:37Z
-updated: 2026-11-08T10:37:42Z
+updated: 2026-11-08T10:38:45Z
 started: 2026-11-08T02:03:40Z
 depends: []
-related: [hq-c58737]
+related: [hq-c58737, hq-405212]
 tags: []
 source: ops-7b325c
 agent: codex
@@ -68,3 +68,4 @@ Boundary: this is archive redundancy, not a new retention engine, changes to pru
 - 2026-11-08T10:37:40Z (feat/hq-adfed6-archive-replica): resumed
   provenance: {"harness_session":"claude-code:e67b959b-22b0-46a4-8c00-24ed459c426d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-08T10:37:42Z (feat/hq-adfed6-archive-replica): review: plan round 1 — verdict: revise; findings: important 1, minor 3; reviewer: agy
+- 2026-11-08T10:38:45Z (feat/hq-adfed6-archive-replica): plan revision 2 at 35c43a9f477d9b8aabe5803743e4ea5446679388: Task 8 becomes the separate rollout task hq-405212 (unparented, depends on hq-adfed6; ops-7b325c dep added after merge), sysfs realpath of slaves and fake-tree symlinks, explicit fsync_dir of every partial directory before publish, fixture route builds the archive with cli capture so status has its capture run
