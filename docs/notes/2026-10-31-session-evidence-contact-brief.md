@@ -50,7 +50,8 @@ running, independently owned task session without human relay**:
 1. **Targeting and liveness discovery (supported):** Task lifecycle notes record
    `provenance.harness_session` (`<harness>:<sessionId>`), and `relay list --json` /
    `$STATE/agents.json` (`docs/registry.md`) indexes live rows by `agentId`
-   (`<harness>:<sessionId>`) with `state` (`working`, `waiting`, `idle`, `blocked`),
+   (`<harness>:<sessionId>`) with `state` (`idle`, `working`, `needs-input`,
+   `needs-approval`, `done`, `error`),
    `cwd`, `projectKey` and `process` (`Handle`). A controller can resolve and verify
    an active independent owner's `agentId`.
 2. **Envelope validation versus inbox admission (blocked at admission):**
@@ -87,7 +88,7 @@ running, independently owned task session without human relay**:
      `src/serve/codex/delivery.js`) only deliver an `AnswerBody` back to an agent
      already blocked inside its own outbound user question (`AskUserQuestion` or
      `item/tool/requestUserInput` in plan mode while `presence === 'away'`).
-   - `relay hook` (`src/dispatch.js`) runs static `$STATE/subscribers.json` guards and
+   - `relay hook` (`src/dispatch.js`) runs static `subscribersPath` (`$XDG_CONFIG_HOME/relay/subscribers.json`, `src/bus/paths.js:16`) guards and
      observers on the target session's own lifecycle/tool events, never querying
      `$STATE/inbox/` for inbound messages addressed to that session's `agentId`.
    - CLI resume (`claude -p --resume <uuid>`, `codex exec resume <threadId>`) cannot
