@@ -1,13 +1,15 @@
 ---
 id: hq-4bff46
 title: "Replica config key, lock wait and live-source boundary"
-status: todo
+status: doing
 priority: 1
 size: s
 complexity: low
 process: direct
+owner: feat/hq-adfed6-archive-replica
 created: 2026-11-08T10:24:44Z
-updated: 2026-11-08T10:25:24Z
+updated: 2026-11-08T11:11:42Z
+started: 2026-11-08T11:11:42Z
 depends: []
 parent: hq-adfed6
 tags: []
@@ -25,3 +27,4 @@ Scope: plan docs/plans/2026-11-08-session-archive-replica.md, section 'Task 1: C
   provenance: {"harness_session":"claude-code:e67b959b-22b0-46a4-8c00-24ed459c426d","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
 - 2026-11-08T10:24:47Z (feat/hq-adfed6-archive-replica): gate: scoped — step of hq-adfed6 plan
   provenance: {"harness_session":"claude-code:e67b959b-22b0-46a4-8c00-24ed459c426d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-08T11:11:42Z (feat/hq-adfed6-archive-replica): started
