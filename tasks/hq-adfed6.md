@@ -8,7 +8,7 @@ complexity: mid
 process: planned
 owner: feat/hq-adfed6-archive-replica
 created: 2026-10-29T19:10:37Z
-updated: 2026-11-08T10:48:21Z
+updated: 2026-11-08T11:09:46Z
 started: 2026-11-08T02:03:40Z
 depends: []
 related: [hq-c58737, hq-405212]
@@ -78,3 +78,4 @@ Boundary: this is archive redundancy, not a new retention engine, changes to pru
   provenance: {"harness_session":"claude-code:e67b959b-22b0-46a4-8c00-24ed459c426d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-08T10:48:21Z (feat/hq-adfed6-archive-replica): parked (waiting on agent, session): Next agent, in a fresh session: open .worktrees/hq-adfed6 (branch feat/hq-adfed6-archive-replica, plan 35c43a9f), run execution Setup (plan workspace under WORK_ROOT/hq/hq-adfed6/plans/session-archive-replica/, focused baseline just test-one over tools/test_session_archive_*.py per the policy-off checkout), then tasks start hq-4bff46 and execute Tasks 1-7 per the plan; rollout hq-405212 waits for the merge. Retained: only this worktree; no scratch, process or host pointer.
   provenance: {"harness_session":"claude-code:e67b959b-22b0-46a4-8c00-24ed459c426d","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-08T11:09:46Z (feat/hq-adfed6-archive-replica): resumed
