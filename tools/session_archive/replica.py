@@ -1,5 +1,6 @@
 """Session archive replica: disk resolution, replica gate, daily replicate, and monthly verify-replica
 (spec docs/specs/2026-11-07-session-archive-replica-design.md)."""
+import hashlib
 import json
 import os
 import shutil
@@ -27,6 +28,15 @@ class ReplicateFailed(Exception):
     def __init__(self, report: dict):
         self.report = report
         super().__init__(report.get("error", "replicate failed"))
+
+
+class VerifyFailed(Exception):
+    """A verify-replica restore check failed."""
+
+    def __init__(self, report: dict):
+        self.report = report
+        failures = report.get("failures") or []
+        super().__init__(failures[0] if failures else report.get("error", "verify-replica failed"))
 
 
 @dataclass(frozen=True)
@@ -368,4 +378,107 @@ def replicate(
         raise
     except (OSError, sqlite3.Error) as error:
         raise fail(f"{type(error).__name__}: {error}") from None
+
+
+def verify_replica(replica_root: Path, scratch_dir: Path) -> dict:
+    current_link = replica_root / "current"
+    failures: list[str] = []
+    unparseable: dict[str, int] = {}
+
+    if not current_link.is_symlink() or not current_link.is_dir():
+        report = {
+            "generation": None,
+            "rows": 0,
+            "bytes_read": 0,
+            "failures": ["current generation symlink is missing"],
+            "unparseable": unparseable,
+        }
+        raise VerifyFailed(report)
+
+    generation = Path(os.readlink(current_link)).name
+    current_dir = Path(os.path.realpath(current_link))
+
+    try:
+        copied_manifest = capture.copy_hashed(current_dir / FILENAME, scratch_dir, None)
+        try:
+            os.replace(copied_manifest.tmp, scratch_dir / FILENAME)
+        finally:
+            copied_manifest.tmp.unlink(missing_ok=True)
+        scratch_manifest = Manifest.open_readonly(scratch_dir)
+        try:
+            integrity = scratch_manifest.conn.execute("PRAGMA integrity_check").fetchall()
+            if integrity != [("ok",)]:
+                failures.append(f"manifest integrity_check failed: {integrity}")
+                rows: list[Version] = []
+            else:
+                rows = scratch_manifest.all_versions()
+        finally:
+            scratch_manifest.close()
+    except (OSError, sqlite3.Error) as error:
+        failures.append(f"manifest copy in scratch failed: {type(error).__name__}: {error}")
+        rows = []
+
+    bytes_read = 0
+    for version in rows:
+        file_path = capture.archived_file(current_dir, version)
+        rel = file_path.relative_to(current_dir).as_posix()
+        try:
+            st = os.lstat(file_path)
+        except OSError as error:
+            failures.append(f"{rel}: missing or unreadable: {error}")
+            continue
+        if not stat_mod.S_ISREG(st.st_mode):
+            failures.append(f"{rel}: not a regular file")
+            continue
+
+        is_jsonl = version.relpath.endswith(".jsonl")
+        digest = hashlib.sha256()
+        size = 0
+        bad_lines = 0
+        buf = b""
+        try:
+            with os.fdopen(capture.open_nofollow(file_path), "rb") as handle:
+                while chunk := handle.read(capture.CHUNK):
+                    digest.update(chunk)
+                    size += len(chunk)
+                    if is_jsonl:
+                        buf += chunk
+                        parts = buf.split(b"\n")
+                        buf = parts.pop()
+                        for line in parts:
+                            if line:
+                                try:
+                                    json.loads(line)
+                                except ValueError:
+                                    bad_lines += 1
+            if is_jsonl and buf:
+                try:
+                    json.loads(buf)
+                except ValueError:
+                    bad_lines += 1
+        except OSError as error:
+            failures.append(f"{rel}: read error: {error}")
+            continue
+
+        bytes_read += size
+        if size != version.size:
+            failures.append(f"{rel}: size mismatch (expected {version.size}, got {size})")
+        elif digest.hexdigest() != version.sha256:
+            failures.append(
+                f"{rel}: sha256 mismatch (expected {version.sha256}, got {digest.hexdigest()})"
+            )
+        if is_jsonl and bad_lines > 0:
+            unparseable[rel] = bad_lines
+
+    report = {
+        "generation": generation,
+        "rows": len(rows),
+        "bytes_read": bytes_read,
+        "failures": failures,
+        "unparseable": unparseable,
+    }
+    if failures:
+        raise VerifyFailed(report)
+    return report
+
 

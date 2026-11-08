@@ -401,3 +401,100 @@ def test_replicate_copies_instead_of_linking_when_current_file_mtime_or_size_cha
     assert (gen2 / rel_tool).stat().st_ino != gen1_tool.stat().st_ino
     assert (gen2 / rel_tool).read_bytes() == b"result"
 
+
+def test_verify_replica_passes_and_counts_unparseable_jsonl_and_versions(
+    tmp_path, home, archive, manifest
+):
+    sources = harness_stores.archive_sources(home)
+    by_name = {s.name: s.root for s in sources}
+    claude_main = claude_session(by_name["claude"])
+    codex_file = codex_rollout(by_name["codex"], data=b'{"ok":1}\n')
+
+    # Initial capture so codex_file is mirrored
+    _, ok = capture.capture_run(archive, manifest, sources)
+    assert ok
+
+    # Append a cut UTF-8 tail to claude_main (mirror) and diverge codex_file into versions/ with an unparseable line
+    write(claude_main, b'{"a":1}\n{"truncated_utf8": "' + b"\xc3", age_days=10)
+    write(codex_file, b'{"rewritten":1}\nnot-json\n', age_days=10)
+    _, ok = capture.capture_run(archive, manifest, sources)
+    assert ok
+
+    rep = tmp_path / "replica"
+    rep.mkdir()
+    (rep / replica.MARKER).touch()
+    rep_report = replica.replicate(archive, rep, manifest, DISKS, now=lambda: T0)
+
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    v_report = replica.verify_replica(rep, scratch)
+
+    assert (scratch / FILENAME).is_file()
+    assert v_report["generation"] == rep_report["generation"]
+    assert v_report["rows"] == 5
+    assert v_report["bytes_read"] == rep_report["bytes_copied"]
+    assert v_report["failures"] == []
+
+    # Both the mirror transcript with cut UTF-8 and the versions/ transcript with malformed JSON are counted
+    unparseable = v_report["unparseable"]
+    assert unparseable[f"claude/-p/{claude_main.name}"] == 1
+    version_keys = [k for k in unparseable if k.startswith("versions/codex/")]
+    assert len(version_keys) == 1
+    assert unparseable[version_keys[0]] == 1
+
+
+def test_verify_replica_fails_on_flipped_byte_truncated_missing_and_corrupt_manifest(
+    tmp_path, home, archive, manifest
+):
+    claude_main, _ = _seed_archive(home, archive, manifest, T0)
+    rep = tmp_path / "replica"
+    rep.mkdir()
+    (rep / replica.MARKER).touch()
+    r1 = replica.replicate(archive, rep, manifest, DISKS, now=lambda: T0)
+    gen_dir = rep / "generations" / r1["generation"]
+    rel_main = f"claude/-p/{claude_main.name}"
+    target_file = gen_dir / rel_main
+    original_bytes = target_file.read_bytes()
+
+    # 1. Flipped byte (same size, wrong sha256)
+    target_file.write_bytes(b'{"a":9}\n')
+    scratch1 = tmp_path / "scratch1"
+    scratch1.mkdir()
+    with pytest.raises(replica.VerifyFailed, match=rel_main) as exc_info:
+        replica.verify_replica(rep, scratch1)
+    assert any(rel_main in f and "sha256" in f for f in exc_info.value.report["failures"])
+
+    # 2. Truncated file (wrong size)
+    target_file.write_bytes(b'{"a"')
+    scratch2 = tmp_path / "scratch2"
+    scratch2.mkdir()
+    with pytest.raises(replica.VerifyFailed, match=rel_main) as exc_info:
+        replica.verify_replica(rep, scratch2)
+    assert any(rel_main in f and "size" in f for f in exc_info.value.report["failures"])
+
+    # 3. Missing file
+    target_file.unlink()
+    scratch3 = tmp_path / "scratch3"
+    scratch3.mkdir()
+    with pytest.raises(replica.VerifyFailed, match=rel_main) as exc_info:
+        replica.verify_replica(rep, scratch3)
+    assert any(rel_main in f for f in exc_info.value.report["failures"])
+
+    # Restore file and verify it passes again
+    target_file.write_bytes(original_bytes)
+    scratch_ok = tmp_path / "scratch_ok"
+    scratch_ok.mkdir()
+    assert replica.verify_replica(rep, scratch_ok)["failures"] == []
+
+    # 4. Corrupted manifest header bytes
+    manifest_file = gen_dir / FILENAME
+    raw_manifest = bytearray(manifest_file.read_bytes())
+    raw_manifest[:16] = b"corrupt-header!!"
+    manifest_file.write_bytes(bytes(raw_manifest))
+    scratch4 = tmp_path / "scratch4"
+    scratch4.mkdir()
+    with pytest.raises(replica.VerifyFailed, match="manifest") as exc_info:
+        replica.verify_replica(rep, scratch4)
+    assert exc_info.value.report["failures"]
+
+
