@@ -273,7 +273,9 @@ MIT licensed; see `LICENSE`.
   does not expand `~/` in `skills.json`) and lore's `AGENTS.md`. `harnesses/agy/hooks.json` routes
   `SessionStart`, `PreToolUse` and `Stop` through `relay`, while `harnesses/agy/hook` heals detached
   `agy` settings saves and adapts `SessionStart` (lore's profile hook, ops's capture
-  notice) and `Stop` (a one-shot `agy` claim check until ops-33cef9 lands).
+  notice) and `Stop` (a one-shot `agy` claim check until ops-33cef9 lands), and
+  `harnesses/agy/bin/agy`, linked as `~/.local/bin/agy`, sets the runner worker defaults
+  before execing `~/.local/share/agy/agy`.
 - `external/ponytail/config.json`: external integration defaults, linked to
   `~/.config/ponytail/config.json`. `"defaultMode": "off"` keeps Ponytail skills
   available without automatic `SessionStart` or `SubagentStart` footer injection.

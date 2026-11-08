@@ -68,11 +68,11 @@ The generated global Projects block is checked by lore.
 - `links.toml` and `tools/harness-links`: real harness homes, declared home links and
   their reconciliation through the tasks project registry. Links to the global
   instructions, profiles and general skill corpus target lore.
-- `harnesses/claude/`, `harnesses/codex/`, `harnesses/agy/`: harness settings, hooks
-  and skill registries. `harnesses/agy/hooks.json` routes lifecycle and `before-tool` events through
-  `relay`, while `harnesses/agy/hook` heals detached `agy` settings files and adapts `SessionStart`
-  (profile, capture-notice) and `Stop` (claim-guard until ops-33cef9 lands). `harnesses/claude/mods/` holds
-  Claude Code function-hook plugins; `harnesses/claude/probes/` the probes behind Claude Code facts.
+- `harnesses/claude/`, `harnesses/codex/`, `harnesses/agy/`: harness settings, hooks,
+  skill registries and `harnesses/agy/bin/agy`. `harnesses/agy/hooks.json` routes lifecycle and `before-tool`
+  events through `relay`, while `harnesses/agy/hook` heals detached `agy` settings files and adapts
+  `SessionStart` (profile, capture-notice) and `Stop` (claim-guard until ops-33cef9 lands). `harnesses/claude/mods/`
+  holds Claude Code function-hook plugins; `harnesses/claude/probes/` the probes behind Claude Code facts.
 - `external/ponytail/`: external integration defaults; `defaultMode` stays `"off"`.
   Installed plugin caches remain harness-managed. `local/` keeps untracked host state.
   The one-time move uses [the activation runbook](docs/runbooks/harness-layout.md).

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# The agy launcher: sets the runner worker defaults before execing the installed binary.
+# Start an unbudgeted runner small (pytest -n auto, cargo, nextest, Go); host-budget run
+# overwrites these with its grant, and a value agy was given is kept. Kept equal to
+# harnesses/claude/settings.json env, harnesses/codex/config.toml and harnesses/pi/bin/pi
+# (tools/test_worker_defaults.py).
+set -euo pipefail
+bin="${AGY_BIN:-$HOME/.local/share/agy/agy}"
+if [[ -d $bin || ! -x $bin ]]; then
+    echo "agy: binary not found at $bin; move the installed agy binary there or set AGY_BIN" >&2
+    exit 127
+fi
+for var in PYTEST_XDIST_AUTO_NUM_WORKERS CARGO_BUILD_JOBS RUST_TEST_THREADS NEXTEST_TEST_THREADS GOMAXPROCS; do
+    export "$var=${!var:-4}"
+done
+exec "$bin" "$@"
