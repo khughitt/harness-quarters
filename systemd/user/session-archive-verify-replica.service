@@ -1,0 +1,10 @@
+# Design: docs/specs/2026-11-07-session-archive-replica-design.md, in the repository that holds this unit.
+[Unit]
+Description=Verify the current session archive replica generation in scratch
+
+[Service]
+Type=oneshot
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/python3 %h/.local/bin/session-archive verify-replica
+Nice=10
+IOSchedulingClass=idle

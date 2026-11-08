@@ -337,7 +337,8 @@ MIT licensed; see `LICENSE`.
   summaries database; agy's per-conversation databases and spilled step outputs are not
   captured, see the `session-archive-complete` fact) to a
   backup disk, and a monthly prune of what the archive and obs verifiably hold
-  (`docs/specs/2026-09-30-session-archive-design.md`). Prune requires contract-2
+  (`docs/specs/2026-09-30-session-archive-design.md`,
+  `docs/specs/2026-11-07-session-archive-replica-design.md`). Prune requires contract-2
   readiness, matching live device/inode, and equality of the live, archive read-back
   and indexed-byte SHA-256 digests. Its live rollout remains gated separately.
   Linked on every host; the
@@ -345,6 +346,23 @@ MIT licensed; see `LICENSE`.
   Never `systemctl --user reenable` a timer: its disable half removes the unit link
   `just link` declares, and its enable half then finds no unit. If it already ran,
   `just link --apply` and then `systemctl --user enable` the timer.
+
+  When `replica_root` is set in `~/.config/session-archive/config.toml` to a directory
+  marked with `.session-archive-replica` on a different physical disk from `archive_root`,
+  `session-archive replicate` (`session-archive-replicate.timer`, daily at `06:00`) snapshots
+  the manifest and copies or hard-links every archived file into a verified dated generation
+  under `<replica_root>/generations/`, points `<replica_root>/current` at the newest verified
+  generation, and retains the newest seven generations. `session-archive verify-replica`
+  (`session-archive-verify-replica.timer`, monthly on the 15th at `06:30`) copies
+  `<replica_root>/current/manifest.sqlite` into a scratch directory, checks its integrity, and hashes every
+  file `<replica_root>/current` describes against its row. `session-archive status` reports replica health
+  when `replica_root` is configured. To test a restore in scratch by hand, copy `<replica_root>/current/`
+  (`cp -a <replica_root>/current/. <scratch_dir>/`), write `.session-archive-root`, and run
+  `session-archive status` against a scratch config pointing there. After losing the primary
+  archive disk, mount the replacement, run `cp -a <replica_root>/current/. <new_archive_root>/`,
+  write `.session-archive-root`, and run `session-archive status` followed by
+  `session-archive capture` (unchanged files are skipped and sessions updated since the
+  generation are captured fresh from the live homes).
 - `tools/hq`, `tools/hq_cli/` and `tools/hq.toml`: the `hq` command, linked as
   `~/.local/bin/hq`; `hq sessions` lists and resumes agent sessions (see "Finding a
   past session" below).

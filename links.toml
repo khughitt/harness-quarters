@@ -23,6 +23,10 @@
 "~/.config/systemd/user/session-archive-capture.timer" = "systemd/user/session-archive-capture.timer"
 "~/.config/systemd/user/session-archive-prune.service" = "systemd/user/session-archive-prune.service"
 "~/.config/systemd/user/session-archive-prune.timer" = "systemd/user/session-archive-prune.timer"
+"~/.config/systemd/user/session-archive-replicate.service" = "systemd/user/session-archive-replicate.service"
+"~/.config/systemd/user/session-archive-replicate.timer" = "systemd/user/session-archive-replicate.timer"
+"~/.config/systemd/user/session-archive-verify-replica.service" = "systemd/user/session-archive-verify-replica.service"
+"~/.config/systemd/user/session-archive-verify-replica.timer" = "systemd/user/session-archive-verify-replica.timer"
 
 # Installed as one symlink per entry: a search rooted at this surface needs -L (rg, fd, find) or should run in the owner checkout the entry resolves to.
 # The aggregate surface: each entry targets its owner. Adding or removing a skill or a

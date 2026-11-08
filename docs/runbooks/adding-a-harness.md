@@ -833,7 +833,9 @@ transcript does not name its own working directory).
    mirror rotates it. `capture` walks regular files under `Source.root`, skips files
    mutated mid-copy (`"busy"`), and keeps non-append rewrites under `versions/`
    (`"diverged"`).
-2. `check_sources()` runs before every `session-archive` command and aborts the whole
+2. `check_sources()` runs before every `session-archive` command that touches live
+   stores (`replicate` and `verify-replica` read only the archive and replica and skip it)
+   and aborts the whole
    run (`EX_HOST`), for every harness, if any source's home or root is a symlink, or if
    a root is missing and the source is either required or already captured (an optional
    source whose root is absent and never captured is skipped). Once a required `Source`
