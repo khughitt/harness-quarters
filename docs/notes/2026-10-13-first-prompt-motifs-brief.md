@@ -2,8 +2,9 @@
 
 Scoping handoff, 2026-10-13. Idea: hq-1459f0. Goal and research ids are in §6.
 
-Updated 2026-10-25 from the owner's completed inspection, the first dry run and the
-validated-draft experiment and the preview design scoping decision.
+Updated 2026-11-08 from the completed 7-day, 14-day and 28-day inspections recorded on
+hq-83c787, the dry-run and validated-draft experiments (hq-268cc2, hq-2b3929), and the
+preview design scoping decision (hq-7be4e4).
 This is a scope handoff, not a design or implementation approval. The owner requests no further session
 collection. Historical evidence and the original pilot proposal remain below;
 the dated updates distinguish the supplied result from unperformed validation.
@@ -109,6 +110,65 @@ Limits to carry forward without collecting more sessions:
 - `hq sessions` uses Claude prompt-history display text and Codex thread names or
   titles, with 60-character display labels and activity-based ordering. Its earlier
   listing cannot substitute for opening-time, transcript-based evidence.
+
+### Refined 7-day, 14-day and 28-day windows, 2026-10-25
+
+The follow-up inspection attached on hq-83c787 (`tasks/files/hq-83c787/first-prompts-summary.json`,
+`tasks/files/hq-83c787/summary-14d.json`, `tasks/files/hq-83c787/summary-28d.json` and
+`tasks/files/hq-83c787/windows-refined.txt`) widens the rule-based scan to 14 and 28 days
+and excludes test/smoke sessions by prompt shape as well as temporary working directory:
+
+| Window | In-mtime files | Subagent | Non-interactive | Opened before window | No timed record | No human turn | Kept | Non-test kept | Test excluded |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 7 days | 1,368 | 376 | 506 | 15 | 23 | 4 | 444 | 409 | 35 |
+| 14 days | 3,124 | 1,616 | 521 | 18 | 36 | 5 | 928 | 872 | 56 |
+| 28 days | 6,060 | 3,575 | 614 | 6 | 82 | 12 | 1,771 | 1,685 | 86 |
+
+`mtime_before_window` excluded 23,274 (7d), 21,536 (14d) and 18,600 (28d) older files;
+`claude_fork_copy`, `codex_fork` and `missing_root` remained 0 in all three windows.
+Note the two denominator differences in the 7-day window: the JSON exclusions plus kept
+sum to 1,368 rather than the narrative's 1,374 recently modified files, and adding
+prompt-shape test detection removes 35 test sessions (409 non-test) rather than the
+cwd-only 24 (420 non-test).
+
+Across the non-test populations, the refined 12-bucket breakdown is:
+
+| Opening bucket | 7d (`n = 409`) | 14d (`n = 872`) | 28d (`n = 1,685`) |
+| --- | ---: | ---: | ---: |
+| `take` | 116 (28.4%) | 228 (26.1%) | 435 (25.8%) |
+| `review` | 76 (18.6%) | 190 (21.8%) | 429 (25.5%) |
+| `scope` | 107 (26.2%) | 198 (22.7%) | 297 (17.6%) |
+| `next` | 45 (11.0%) | 111 (12.7%) | 210 (12.5%) |
+| `execute` | 22 (5.4%) | 46 (5.3%) | 105 (6.2%) |
+| `question` | 17 (4.2%) | 46 (5.3%) | 86 (5.1%) |
+| `idea` | 10 (2.4%) | 16 (1.8%) | 23 (1.4%) |
+| `relayed-status` | 0 (0.0%) | 5 (0.6%) | 16 (0.9%) |
+| `quiet-window` | 0 (0.0%) | 0 (0.0%) | 8 (0.5%) |
+| `reply` | 3 (0.7%) | 4 (0.5%) | 6 (0.4%) |
+| `other-skill` | 3 (0.7%) | 3 (0.3%) | 5 (0.3%) |
+| `other` | 10 (2.4%) | 25 (2.9%) | 65 (3.9%) |
+
+Findings from the 28-day window:
+
+- The five core workflow intents (`take`, `review`, `scope`, `next`, `execute`) account
+  for 1,476 of 1,685 non-test sessions (87.6 percent; 83.3 percent of all 1,771 kept
+  sessions).
+- `review` rises from 18.6 percent in the 7-day window to 25.5 percent over 28 days
+  (essentially tied with `take` at 25.8 percent), while `scope` drops from 26.2 percent
+  to 17.6 percent, showing that the 7-day slice captured an unusually heavy scoping week.
+- Weekly volume was steady at 403 to 457 kept sessions across the four complete weeks
+  (`2026-09-28`: 435 total / 409 non-test; `2026-10-05`: 457 / 447; `2026-10-12`:
+  403 / 390; `2026-10-19`: 427 / 392; plus partial week `2026-09-21`: 49 / 47).
+- Counting Claude `<command-name>` skill wrappers as the opening human turn explains 16
+  of the 186 one-turn sessions in the 7-day narrative as a skill invocation followed by
+  one approval reply (two human turns total).
+- Configuration slash commands in the 28-day window (`/clear` 229, `/model` 89,
+  `/effort` 41) act as session modifiers rather than opening intents.
+- Pasted/continuation openings separate into `relayed-status` (16 sessions in 28d where
+  a status report or handoff was pasted across sessions/harnesses, relevant to
+  hq-ba1758), `quiet-window` (8 operational window prompts) and `reply` (6 bare
+  approval or continuation replies). Raw `windows-refined.txt` stays under WORK_ROOT
+  ownership of hq-c5fd83; the attached copy on hq-83c787 normalizes workspace paths.
 
 ### Dry-run follow-through, 2026-10-24
 
@@ -287,9 +347,17 @@ without automatic deletion.
 
 ## Alternatives
 
-Current lean: hq-83c787 records the inspection's useful findings and limits;
-independently, hq-7be4e4 designs the narrow print-only preview recommended by the
-completed experiments. Compare starting from the request's artifact path against
+Completed recommendation from hq-83c787: stop on motif-classification tooling now
+(build neither a `session-episodes first-prompts` deterministic subcommand nor a
+model-judged store-wide taxonomy, and do not run the 150-session two-half study
+given the no-more-collection decision). Keep hq-1459f0 as an unscheduled idea unless
+obs later requires an outcome-linked study of duration, task/spec rates and tool
+errors (`is_error` / `exit_code`), because the rule-based inspection establishes
+recurring opening forms (87.6 percent in `take`, `review`, `scope`, `next` and
+`execute` over 28 days) and supports the separate review-prompt preview design
+(hq-7be4e4), but does not establish predictive validity for either obs error
+stratification or flows pattern derivation. Compare starting the review preview from
+the request's artifact path against
 pre-filling the task's latest handoff and stopping with today's manual requests.
 Reject the latest-handoff default: C02's was a superseded plan review. Prefer a
 reviewed design over another collection or immediate implementation because the
@@ -324,9 +392,16 @@ Historical alternatives, retained as context rather than new work orders:
 
 Current follow-through:
 
-- hq-83c787 records the supplied inspection, the denominator and method limits, and
-  what it supports. No additional population collection or duration/error study is
-  required by this scope pass. Predictive validity remains unknown.
+- Answered by hq-83c787 for the supplied 7-day, 14-day and 28-day inspections: five
+  workflow intents (`take`, `review`, `scope`, `next`, `execute`) account for 87.6
+  percent of non-test openings over 28 days (`1,476 / 1,685`), opening slash commands
+  such as `/scope` are motif signals while `/clear`, `/model` and `/effort` are
+  configuration modifiers, and copied/continuation openings separate into
+  `relayed-status` (16 in 28d, informing hq-ba1758), `quiet-window` (8) and `reply` (6).
+  No additional population collection or duration/error study is required by this scope
+  pass. Predictive validity for session duration, task/spec completion and tool errors
+  (`is_error`, `exit_code`) remains unmeasured, so neither obs error stratification nor
+  flows pattern derivation is supported yet.
 - Answered by hq-2b3929 for the three retained historical cases. The spec drafts
   kept the request's intent. C02's implementation draft lost the closing report's
   final verification counts. Task identity, revision and kind corrections stayed
@@ -338,14 +413,18 @@ Current follow-through:
   No population-wide resolver coverage is established.
 - A live launch and the final choice of supported actions remain later decisions.
 
-Original research questions, not answered by the inspection:
+Original research questions, partially answered by the inspection:
 
 - Which motifs recur, and does "copied" combine with the others or stand as its own
-  kind? Answered by hq-83c787.
+  kind? Answered by hq-83c787 for the rule-based 7d/14d/28d windows (without a 75/75
+  frozen-taxonomy validation): five task-workflow motifs dominate (`take`, `review`,
+  `scope`, `next`, `execute`), while copying/continuation is an orthogonal attribute
+  that also produces distinct continuation openings (`relayed-status` and `reply`).
 - Do motifs line up with session shape (human-turn count, duration, whether a task is
   started or a spec or plan is written) and with the tool errors a session meets?
-  Answered by hq-83c787, using Claude Code's `is_error` and Codex's `exit_code`, which
-  both stores record.
+  Unanswered by the supplied inspection: turn-count summaries were reported for 7d,
+  but per-motif duration, task/spec/plan rates and tool-error distributions
+  (Claude Code `is_error`, Codex `exit_code`) were not measured.
 
 Decided by the owner, 2026-10-13:
 
@@ -374,8 +453,8 @@ records this result and its limits, then wakes hq-1459f0.
 
 | Task | Current next action | Ideas it wakes |
 | --- | --- | --- |
-| hq-83c787 | Record the supplied inspection and its limits without more collection | hq-1459f0 |
-| hq-1459f0 | Reconsider the motif/tooling idea after the result is recorded | — |
+| hq-83c787 | Done: recorded the 7d/14d/28d inspection counts, denominators and method limits; recommends stopping on motif-classification tooling now while hq-7be4e4 proceeds independently | hq-1459f0 |
+| hq-1459f0 | Woken by hq-83c787: reconsider whether an outcome/error study is wanted for obs/flows or leave unscheduled while hq-7be4e4 designs the review preview | — |
 | hq-268cc2 | Done: one historical match, two misbound mappings, 41 unavailable identities; separate artifact checks required | hq-2d8e81 |
 | hq-2b3929 | Done: 3/3 observed cases gave validated historical drafts, 3/3 derived variants blocked as frozen; recommends a narrow print-only preview that starts from the artifact path | hq-2d8e81 |
 | hq-7be4e4 | Design the print-only preview from this brief; obtain review of the frozen design, record the recommendation and wake the idea | hq-2d8e81 |
