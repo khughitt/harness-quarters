@@ -19,11 +19,14 @@ can use project colors. This brief prepares evidence gathering, not activation.
   `harnesses/agy/skills.json`), with no agy launcher; `harnesses/agy/settings.json`
   declares no worker environment. Section 7 below records the completed `1.5.3`
   investigation for hq-a29f17.
-- `harnesses/agy/settings.json` configures familiar's statusline (b864334a). That
-  configuration does not prove inline reply styling or statusline truecolor rendering.
+- `harnesses/agy/settings.json` configures familiar's statusline (b864334a). Section 8
+  below records the `1.5.3` rendering call-path trace for hq-7826fd across inline
+  assistant replies, hooks/plugins, statusline output, and tool output.
 - hq-db39da's filing session contains the user's question about shared task colors
   and a supplied assessment claiming ANSI stripping. The filing agent explicitly
-  left the rendering claims unverified. Binary symbol names do not prove a call path.
+  left the rendering claims unverified. Binary symbol names do not prove a call path;
+  Section 8 traces the actual `1.5.3` call graph from `render.(*itemRenderer).render`
+  and `model.StatusLineModel.Render`.
 - prism-fd46ae already owns renderer implementation across harnesses. The attached
   `reply-color-findings.md` on lore-587c8a covers four other harnesses, not agy;
   it distinguishes source findings from unrun probes. No overlapping open agy
@@ -63,9 +66,17 @@ those unrelated questions dependencies. Renderer implementation remains with pri
   `harnesses/pi/bin/pi`), linked from `~/.local/bin/agy` in `links.toml` and `exec`ing
   the real binary at `${AGY_BIN:-$HOME/.local/share/agy/agy}` (see Worker-default route
   findings below).
-- Can the installed renderer color bare ids inline through a supported extension?
-  If not, what can the statusline actually render? Answer: documentation/source
-  tracing and, only where possible, a headless fixture with canned text.
+- **Resolved (`hq-7826fd`, `agy` `1.5.3`)**: Can the installed renderer color bare ids
+  inline through a supported extension? If not, what can the statusline actually render?
+  Answer: `agy` `1.5.3` has no supported inline extension or theme hook that can color
+  bare `<prefix>-<6 hex>` task IDs per project prefix in assistant replies without
+  polluting stored model context (plugins are declarative bundles; Goldmark+Glamour
+  strips HTML via `bluemonday.NewPolicy`; `PostInvocation` `injectSteps` can only append
+  a separate step, not rewrite the planner response step). Separate truecolor ANSI SGR
+  (`\x1b[38;2;R;G;Bm`) is supported on the custom `statusLine.command` surface
+  (`model.StatusLineModel.RenderCustom`), which passes stdout lines directly into the
+  TUI view without Glamour rendering or ANSI stripping and stays out of stored model
+  context (see Task-id color surface findings below).
 
 Research excludes paid model calls, live desktop use and home changes. If a claim
 cannot be settled locally without these, record it as unknown and describe the
@@ -77,8 +88,9 @@ smallest additional check and its authorization needs; do not build a new runner
   the two research tasks are its children; their original bodies and sources stay intact.
 - hq-a29f17 (completed) determined the supported worker-default route (`harnesses/agy/bin/agy`
   wrapper + `links.toml` entry + `tools/test_worker_defaults.py` coverage) and woke hq-32317f.
-- hq-7826fd determines supported color surfaces and wakes hq-db39da; resulting
-  renderer implementation remains prism-fd46ae.
+- hq-7826fd (completed) determined the `agy` `1.5.3` color surfaces across inline
+  assistant replies, hooks/plugins, statusline output, and tool output, and woke
+  hq-db39da; resulting renderer implementation remains prism-fd46ae.
 
 Each original idea waits only on its own research result. Both investigations are
 P2, small, mid complexity and direct process. Research completion updates this
@@ -218,3 +230,128 @@ Inspected on installed `agy` `1.5.3` (`~/.local/bin/agy`, ELF BuildID
      - `test_agy_launcher_fails_closed_when_binary_missing(tmp_path)`: run
        `ROOT / "harnesses/agy/bin/agy"` with `AGY_BIN=str(tmp_path / "missing")`; assert
        `returncode == 127` and a diagnostic on `stderr`.
+
+## Task-id color surface findings (hq-7826fd)
+
+Inspected on installed `agy` `1.5.3` (`~/.local/bin/agy`, ELF BuildID
+`50b5b6c0ca95a2a401f0c806222ecaa6`, `.gopclntab` at file offset `0x1714500`, `.text`
+base `0x6d15080`) and the bundled `agy-customizations` documentation
+(`docs/plugins.md`, `docs/hooks.md`, `docs/json_configs.md`), structured to match
+`reply-color-findings.md` on lore-587c8a:
+
+### Summary comparison row for `agy` `1.5.3`
+
+| Surface | `agy` `1.5.3` finding | Evidence status |
+|---|---|---|
+| Raw SGR in assistant text | Passes into Goldmark + Glamour `ansi.renderText` (`0x9f63980..0x9f64520`), which wraps each text token via `charmbracelet/x/ansi.Style.Styled` (`0x9f640ec`, appending `\x1b[0m` reset after styled tokens) and word-wraps via `lipgloss.Wrap` (`0x9f76bc3`); also stored verbatim in the conversation trajectory (`CORTEX_STEP_TYPE_PLANNER_RESPONSE`), violating the stored-context boundary | Call path **Observed** in disassembly; exact terminal visual interaction with `Style.Styled` resets **Inferred** (not live-probed in TUI); disqualified by stored-context constraint regardless |
+| Markdown elements with colour | Headings, bold, italic, links, inline code, blockquotes, lists, alerts, and fenced code blocks styled by `render.glamourStyleForScheme` (`0xa057ca0..0xa058620`) | **Observed** |
+| HTML / span markup | Stripped to plain text: Goldmark `ast.RawHTML` and `ast.HTMLBlock` route in `ansi.(*ANSIRenderer).NewElement` (`0x9f6c0b3`, `0x9f6c2b3`) through `ansi.RenderContext.SanitizeHTML` (`0x9f6b9e0..0x9f6ba80`), which calls `bluemonday.(*Policy).Sanitize` (`0x9f6ba0e`, initialized via empty `bluemonday.NewPolicy` at `0x9f771c0` in `ansi.NewRenderer`) followed by `strings.TrimSpace` (`0x9f6ba20`) and `html.UnescapeString` (`0x9f6ba25`) | **Observed** |
+| Theme RGB | Fixed scheme-wide palette (`types.ColorScheme`) in `settings.json`, customizable only via 5 seed colors (`customThemeSeedsLight` / `customThemeSeedsDark`: `background`, `primary`, `foregroundOverride`, `primaryForegroundOverride`, `codeForegroundOverride`); no per-regex or per-prefix token scope | **Observed** |
+| Display-only rewrite of reply text | None inline: plugins (`docs/plugins.md`, `docs/json_configs.md`) bundle only declarative `skills/`, `rules/`, `hooks/hooks.json`, and `mcp_config.json`, with no markdown transformer or message-renderer API. `PostInvocation` (`hooks.NewPostInvocationHook.func1` at `0x87083e0..0x8708ae0`) receives `modelOutput` via `hookutils.GetLastModelOutputAndThinking` (`0x8708560` -> `0x86ffbc0`), and its `injectSteps` `systemMessage` (`hooks.buildSystemMessageStep` at `0x8705040..0x87055c0`) can set `metadata.user_markdown` (`docs/hooks.md:324-327`), but that appends a new step rendered through the same Glamour pipeline rather than rewriting the assistant reply in place | **Observed** |
+| Tool/shell ANSI | `run_command` stdout routes through `render.renderCommandOutput` (`0xa086c60..0xa087ba0`) -> `render.renderOutputLines` (`0xa085aa0..0xa0864e0`), which wraps lines with ANSI-aware `muesli/reflow/wordwrap.(*WordWrap)` (`render.WrapLine` at `0xa085260..0xa085440`) and renders each line via `lipgloss.Style.Render` (`0xa085cd7`, `0xa085f20`, `0xa085fce`, `0xa086285`). Tool output is also recorded in tool-result trajectory steps when invoked by the agent | Call path **Observed** |
+| Other coloured surfaces | Custom `statusLine.command` (`store.(*StatusLineRunner).run` at `0xa189440..0xa189b80` -> `model.StatusLineModel.RenderCustom` at `0xa407740..0xa407960` -> `model.StatusLineModel.Render` at `0xa408220..0xa408520`) passes command stdout lines directly into the TUI view via `strings.Join` (`0xa407920`, `0xa4084cb`) without Glamour rendering or ANSI stripping (`render.TruncateAnsiLine` at `0xa0465e0..0xa046700` uses ANSI-aware `lipgloss.Width` at `0xa046621` and `muesli/reflow/truncate.BytesWithTail` at `0xa046682`), completely outside stored model context | **Observed** |
+
+### Detailed rendering path trace (`agy` `1.5.3`)
+
+1. **Inline assistant reply rendering path (`google3/third_party/jetski/cli/render/render`) (Observed)**:
+   - Disassembly of `render.(*itemRenderer).render` (`0xa064460..0xa066360`) ->
+     `render.stepContentShared` (`0xa0810c0`) -> `render.stepContent`
+     (`0xa0811a0..0xa084580`) shows that `CORTEX_STEP_TYPE_PLANNER_RESPONSE` steps invoke
+     `render.renderPlannerBody` (`0xa05ee00..0xa05f180`, called at `0xa082a21` and
+     `0xa082aca`).
+   - `render.renderPlannerBody` calls `render.Markdown` (`0xa0586a0..0xa0587c0`) ->
+     `render.(*markdownCache).render` (`0xa05cd60..0xa05cee0`) ->
+     `render.renderMarkdownUncached` (`0xa0587c0..0xa059cc0`) -> `render.glamourRender`
+     (`0xa059cc0..0xa059fa0`), which constructs a Goldmark + Glamour v2 renderer via
+     `glamour.NewTermRenderer` (`0x9f8c2a0`, calling `goldmark.New` at `0x9f089a0` and
+     `glamour/v2/ansi.NewRenderer` at `0x9f77180`) and renders the reply via
+     `glamour.(*TermRenderer).RenderBytes` (`0x9f8c660`).
+   - Why inline project-colored task IDs are unsupported in `agy` `1.5.3`:
+     - **No display-only extension API (Observed)**: Unlike `pi`
+       (`pi.registerMarkdownTransformer`) or Claude Code (`AssistantMessage` mod),
+       `agy` `1.5.3` plugins and hooks expose no callback or extension point on
+       `render.renderPlannerBody` or `render.Markdown`.
+     - **HTML color markup is stripped (Observed)**: `ansi.NewRenderer` (`0x9f77180`)
+       initializes a zero-tag `bluemonday.NewPolicy()` (`0x9f771c0`). When Goldmark
+       emits `ast.RawHTML` or `ast.HTMLBlock`, `ansi.(*ANSIRenderer).NewElement`
+       (`0x9f6c0b3`, `0x9f6c2b3`) routes the node to `ansi.RenderContext.SanitizeHTML`
+       (`0x9f6b9e0..0x9f6ba80`), where `bluemonday.(*Policy).Sanitize` (`0x9f6ba0e`)
+       strips `<span style="color:...">` and `<font color="...">` tags down to unstyled
+       text.
+     - **Markdown elements cannot color bare task IDs per project prefix (Observed)**:
+       `render.glamourStyleForScheme` (`0xa057ca0..0xa058620`) assigns one scheme-wide
+       color per Markdown element type (such as inline code or links). Furthermore,
+       lore-587c8a requires task IDs (`<prefix>-<6 hex>`) to stay bare outside backticks
+       and links. Bold status verdicts (`**done**`, `**blocked**`) and structural spacing
+       work natively through Goldmark `ast.Emphasis` rendering and require no extension.
+     - **Model-emitted raw SGR violates the stored-context constraint (Observed
+       constraint; Inferred Glamour reset interaction)**: Having the model emit raw
+       `\x1b[38;2;R;G;Bm` sequences in assistant replies stores those escape bytes in
+       the conversation transcript (`CORTEX_STEP_TYPE_PLANNER_RESPONSE`) re-sent to the
+       model on subsequent turns, violating the requirement to keep display styling out
+       of stored model context. In addition, `ansi.renderText` (`0x9f63980..0x9f64520`)
+       applies `charmbracelet/x/ansi.Style.Styled` (`0x9f640ec`) per text token with a
+       trailing `\x1b[0m` reset.
+
+2. **Hook `injectSteps` / `metadata.user_markdown` surface (Observed call path; Unknown whether Glamour preserves raw SGR in `user_markdown` without a live turn)**:
+   - `hooks.NewPostInvocationHook.func1` (`0x87083e0..0x8708ae0`) calls
+     `hookutils.GetLastModelOutputAndThinking` (`0x8708560` -> `0x86ffbc0`) and populates
+     `PostInvocationHookArgs` (`hooks.proto` descriptor at `0x63d1cec`: `invocationNum`,
+     `initialNumSteps`, `modelOutput`, `modelThinking`, plus `HookArgsCommon`; note that
+     `agy-customizations/docs/hooks.md:348` omits `modelOutput` and `modelThinking` from
+     its example JSON even though the binary populates them).
+   - A `PostInvocation` hook can return `injectSteps` with a `systemMessage` step whose
+     `metadata.user_markdown` (or `renderInfo.markdown` in `hooks.buildSystemMessageStep`
+     at `0x8705040..0x87055c0`) displays an extra UI block after the turn while keeping
+     `systemMessage.systemMessage` empty (`""`) in model context (`docs/hooks.md:324-327`).
+   - However, this surface **cannot** color bare task IDs inline in the assistant reply
+     itself (it appends a separate step below the turn), and `user_markdown` is rendered
+     through the same Goldmark + Glamour pipeline where `bluemonday` strips HTML tags.
+     Whether raw ANSI SGR bytes inside `metadata.user_markdown` survive Glamour's
+     `ansi.Style.Styled` token resets in a live TUI session is **Unknown** without a
+     model-turn probe, and even if they did, duplicating task IDs into a second footer
+     step does not provide inline reply coloring.
+
+3. **Statusline surface (`statusLine.command` in `harnesses/agy/settings.json`) (Observed)**:
+   - `store.(*StatusLineRunner).run` (`0xa189440..0xa189b80`) serializes
+     `types.StatusLineData` (`sessionId`, `StepCount`, `model`, `workspace`, `git`,
+     `tokens`, `cost`, `duration`, `mcp`, `vimMode`) to JSON (`0xa1895f1`), pipes it to
+     `/bin/sh -c <statusLine.command>` (`0xa1896d9..0xa189839`), trims trailing `\r\n`
+     (`0xa189912`), and splits stdout on `\n` (`0xa18992c`).
+   - `model.StatusLineModel.RenderCustom` (`0xa407740..0xa407960`) reads
+     `(*StatusLineRunner).Output()` (`0xa40776a` -> `0xa1890a0`), prepends `Padding()`
+     blank lines (`0xa4077c8` -> `0xa189260`), and joins the lines with `"\n"`
+     (`0xa407920` -> `strings.Join`) with **no** Glamour pass and **no** ANSI sanitizer.
+     `model.StatusLineModel.Render` (`0xa408220..0xa408520`) joins `RenderBuiltIn` and
+     `RenderCustom` with `"\n"` (`0xa4084cb`) directly into the Bubble Tea TUI view, and
+     width truncation (`render.TruncateAnsiLine` at `0xa0465e0..0xa046700`) uses
+     ANSI-aware `lipgloss.Width` (`0xa046621`) and `muesli/reflow/truncate.BytesWithTail`
+     (`0xa046682`).
+   - Therefore, `statusLine.command` (currently `familiar statusline --harness agy` in
+     `harnesses/agy/settings.json`) supports truecolor SGR (`\x1b[38;2;R;G;Bm...\x1b[0m`)
+     derived from public `tasks projects --json` `color` hex values (`#RRGGBB`) without
+     touching stored model context.
+
+4. **Smallest additional check if runtime confirmation of `metadata.user_markdown` is ever wanted**:
+   - Because `agy` `1.5.3` has no local mock-model flag (its language server speaks to
+     Google Cloud Code / JetSki backend endpoints), testing `PostInvocation`
+     `metadata.user_markdown` rendering in the TUI requires an authenticated single-turn
+     `agy` invocation in a disposable workspace with a temporary `PostInvocation` hook
+     returning `{"injectSteps":[{"systemMessage":{"systemMessage":"","metadata":{"user_markdown":"\u001b[38;2;115;169;255mhq-7826fd\u001b[0m"}}}]}`
+     inside a private `tmux` session captured with `tmux capture-pane -e`. That check
+     requires user authorization for a live model turn and cannot enable inline reply
+     coloring regardless, so it is not recommended.
+
+### Recommendation for `hq-db39da` and `prism-fd46ae`
+
+1. **Inline assistant replies in `agy` `1.5.3`**: Do **not** attempt inline task-id
+   coloring in Antigravity assistant replies. Keep bare `<prefix>-<6 hex>` task IDs,
+   bold verdicts (`**done**`, `**blocked**`), and spacing as plain Markdown per
+   lore-587c8a; revisit inline coloring for Antigravity only if a future `agy` release
+   adds a display-only markdown/message renderer hook (analogous to `pi`'s
+   `registerMarkdownTransformer` or Claude Code's `AssistantMessage` mod).
+2. **Statusline (`statusLine.command`)**: If project-colored task IDs are wanted on
+   Antigravity's statusline (for example, coloring the active task/branch badge in
+   `familiar statusline --harness agy` using `tasks projects --json` RGB values), route
+   that implementation through prism-fd46ae / familiar rather than adding a parallel
+   renderer in `hq`.
