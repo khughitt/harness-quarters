@@ -13,11 +13,14 @@ from pathlib import Path
 
 import harness_stores
 
-from . import capture, config, inputs, probe, prune, status
+from . import capture, config, inputs, probe, prune, replica, status
 from .manifest import FILENAME, Manifest, Run, utc_now
 
 LOCKED = frozenset({"capture", "prune", "promote", "probe-codex"})
 REPLICA = frozenset({"replicate", "verify-replica"})
+REPLICA_LOCK_WAIT = 7200.0
+DISKS = replica.disks_of
+CLOCK = lambda: datetime.now(timezone.utc)
 CODEX = "codex"
 
 
@@ -36,6 +39,8 @@ def build_parser() -> argparse.ArgumentParser:
     promote.add_argument("source")
     promote.add_argument("relpath")
     sub.add_parser("probe-codex", help="check Codex lock and delete behaviour in a throwaway home")
+    sub.add_parser("replicate", help="copy the archive into a verified generation on the replica disk")
+    sub.add_parser("verify-replica", help="check the current replica generation in scratch")
     return parser
 
 
@@ -123,8 +128,61 @@ def cmd_status(cfg, table, args) -> int:
     return 0 if ok else 1
 
 
+def _clock_stamp() -> str:
+    return CLOCK().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+def cmd_replicate(cfg, table, args) -> int:
+    disks = replica.check_replica(cfg, DISKS)
+    with config.archive_lock(cfg.archive_root, wait=REPLICA_LOCK_WAIT):
+        manifest = Manifest.open(cfg.archive_root)
+        try:
+            started = _clock_stamp()
+            try:
+                report = replica.replicate(cfg.archive_root, cfg.replica_root, manifest, disks, now=CLOCK)
+                ok = True
+                started = report.get("started_at", started)
+                finished = report.get("finished_at", _clock_stamp())
+            except replica.ReplicateFailed as error:
+                report, ok = error.report, False
+                started = report.get("started_at", started)
+                finished = _clock_stamp()
+            try:
+                manifest.record_run(Run(uuid.uuid4().hex, "replicate", "apply", started, finished, ok, report))
+            except (sqlite3.Error, OSError):
+                if ok:
+                    raise
+        finally:
+            manifest.close()
+    print(json.dumps(report, sort_keys=True))
+    return 0 if ok else 1
+
+
+def cmd_verify_replica(cfg, table, args) -> int:
+    replica.check_replica(cfg, DISKS)
+    with config.archive_lock(cfg.archive_root, wait=REPLICA_LOCK_WAIT):
+        manifest = Manifest.open(cfg.archive_root)
+        try:
+            started = _clock_stamp()
+            try:
+                with tempfile.TemporaryDirectory(prefix="session-archive-verify-") as scratch:
+                    report = replica.verify_replica(cfg.replica_root, Path(scratch))
+                ok = True
+            except replica.VerifyFailed as error:
+                report, ok = error.report, False
+            except (OSError, sqlite3.Error) as error:
+                report, ok = {"error": f"{type(error).__name__}: {error}", "failures": [str(error)]}, False
+            finished = _clock_stamp()
+            manifest.record_run(Run(uuid.uuid4().hex, "verify-replica", "apply", started, finished, ok, report))
+        finally:
+            manifest.close()
+    print(json.dumps(report, sort_keys=True))
+    return 0 if ok else 1
+
+
 COMMANDS = {"promote": cmd_promote, "probe-codex": cmd_probe_codex,
-            "prune": cmd_prune, "status": cmd_status}
+            "prune": cmd_prune, "status": cmd_status,
+            "replicate": cmd_replicate, "verify-replica": cmd_verify_replica}
 
 
 class CapturedSources:

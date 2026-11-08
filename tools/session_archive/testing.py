@@ -24,12 +24,21 @@ def age(path: Path, days: float) -> None:
     os.utime(path, ns=(stamp, stamp))
 
 
-def write_config(home: Path, archive: Path, obs_command=("true",), uninspectable_ok=()) -> Path:
+def write_config(
+    home: Path,
+    archive: Path,
+    obs_command=("true",),
+    uninspectable_ok=(),
+    replica: Path | None = None,
+) -> Path:
     path = home / ".config" / "session-archive" / "config.toml"
     path.parent.mkdir(parents=True, exist_ok=True)
     command = ", ".join(f'"{part}"' for part in obs_command)
     allowed = ", ".join(f'"{name}"' for name in uninspectable_ok)
-    path.write_text(f'archive_root = "{archive}"\nobs_command = [{command}]\nuninspectable_ok = [{allowed}]\n')
+    extra = f'replica_root = "{replica}"\n' if replica is not None else ""
+    path.write_text(
+        f'archive_root = "{archive}"\nobs_command = [{command}]\nuninspectable_ok = [{allowed}]\n{extra}'
+    )
     return path
 
 
