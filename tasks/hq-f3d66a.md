@@ -1,15 +1,17 @@
 ---
 id: hq-f3d66a
 title: "verify-replica: full-hash restore check"
-status: doing
+status: done
 priority: 1
 size: s
 complexity: low
 process: direct
 owner: feat/hq-adfed6-archive-replica
 created: 2026-11-08T10:24:57Z
-updated: 2026-11-08T11:51:56Z
+updated: 2026-11-08T11:52:17Z
 started: 2026-11-08T11:43:30Z
+completed: 2026-11-08T11:52:17Z
+closed: 2026-11-08T11:52:17Z
 depends: []
 parent: hq-adfed6
 tags: []
@@ -37,3 +39,4 @@ Scope: plan docs/plans/2026-11-08-session-archive-replica.md, section 'Task 4: v
 - 2026-11-08T11:51:56Z (feat/hq-adfed6-archive-replica): - just check-hygiene: exit 0 (all hygiene, docs, facts, and harness_state checks passed)
 - 2026-11-08T11:51:56Z (feat/hq-adfed6-archive-replica): retro: clean; 1 impl review round (accept); 0 rework; 0 drift.
 - 2026-11-08T11:51:56Z (feat/hq-adfed6-archive-replica): closeout: Implemented VerifyFailed and verify_replica in tools/session_archive/replica.py with tests in tools/test_session_archive_replica.py at commit 09c61f9f025162e4e16b49e42f8f0719a6716427. Nothing pushed; no surviving processes; shared worktree .worktrees/hq-adfed6 remains active on branch feat/hq-adfed6-archive-replica for parent hq-adfed6.
+- 2026-11-08T11:52:17Z (feat/hq-adfed6-archive-replica): done
