@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: docs/hq-d2cc36-agy-session-id
 created: 2026-11-08T12:56:34Z
-updated: 2026-11-08T16:34:01Z
+updated: 2026-11-08T16:34:03Z
 started: 2026-11-08T16:33:34Z
 depends: []
 related: [relay-7b8340]
@@ -29,3 +29,4 @@ hq docs/runbooks/adding-a-harness.md says agy exports no native session id. agy 
 - 2026-11-08T16:33:36Z (docs/hq-d2cc36-agy-session-id): resumed
   provenance: {"harness_session":"claude-code:51fffea7-6ed5-4a54-b2d7-3a0f02c1306a","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-08T16:34:01Z (docs/hq-d2cc36-agy-session-id): trial: flow-trial-1 — enrolled — flow off
+- 2026-11-08T16:34:03Z (docs/hq-d2cc36-agy-session-id): arm: flow-trial-1 — unit tack-d2cc36 — flow off
