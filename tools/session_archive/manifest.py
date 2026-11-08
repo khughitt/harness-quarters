@@ -77,6 +77,11 @@ class Manifest:
             f"SELECT {COLUMNS} FROM versions WHERE source = ? AND relpath = ? {NEWEST}", (source, relpath))
         return [Version(*row) for row in cursor]
 
+    def all_versions(self) -> list[Version]:
+        cursor = self.conn.execute(
+            f"SELECT {COLUMNS} FROM versions ORDER BY source, relpath, location")
+        return [Version(*row) for row in cursor]
+
     def mirror(self, source: str, relpath: str) -> Version | None:
         row = self.conn.execute(
             f"SELECT {COLUMNS} FROM versions WHERE source = ? AND relpath = ? AND location = ?",
