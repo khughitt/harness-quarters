@@ -3,7 +3,6 @@ import importlib.machinery
 import importlib.util
 import json
 import os
-import shlex
 import shutil
 import stat
 import subprocess
@@ -28,6 +27,194 @@ def load_cutover():
     module = importlib.util.module_from_spec(spec)
     loader.exec_module(module)
     return module
+
+
+@pytest.mark.parametrize("args", [
+    ("--project", "tack"),
+    ("--project", "tack", "tasks/.config.toml", "-m", "chore(tasks): relocate tack checkout"),
+])
+def test_commit_tasks_forces_json(monkeypatch, tmp_path, args):
+    cutover, calls = load_cutover(), []
+    monkeypatch.setenv("TASKS_FORMAT", "pretty")
+
+    def run(*cmd, cwd=None):
+        calls.append((cmd, cwd))
+        return '{"committed": 1, "paths": ["tasks/.config.toml"], "warnings": []}'
+
+    monkeypatch.setattr(cutover, "run", run)
+    cutover.commit_tasks(tmp_path, *args)
+    assert calls == [(("tasks", "--json", "commit", *args), tmp_path)]
+
+
+@pytest.mark.parametrize("relocate", [False, True])
+def test_commit_tasks_surfaces_warnings(monkeypatch, tmp_path, capsys, relocate):
+    cutover = load_cutover()
+    warnings = [
+        'predecessor config is in a separate repository; run `tasks commit --project old tasks/.config.toml -m "chore(tasks): update successor"` there',
+        'recovered staged changes left uncommitted; run `tasks commit` after reviewing them',
+    ]
+    calls = []
+
+    def run(*cmd, cwd=None):
+        calls.append(cmd)
+        return json.dumps({"committed": 1, "paths": ["tasks/.config.toml"], "warnings": warnings})
+
+    monkeypatch.setattr(cutover, "run", run)
+    args = ("tasks/.config.toml", "-m", "chore(tasks): relocate tack checkout") if relocate else ()
+    cutover.commit_tasks(tmp_path, "--project", "tack", *args)
+    err = capsys.readouterr().err
+    assert all(warning in err for warning in warnings)
+    assert "tasks --json commit --project tack" in err
+    assert len(calls) == 1                     # instructions were printed, not run
+
+
+@pytest.mark.parametrize("output", ["bad", "[]", "{}", '{"warnings": null}',
+                                         '{"warnings": "bad"}', '{"warnings": [1]}'])
+def test_commit_tasks_rejects_malformed_reports(monkeypatch, tmp_path, output):
+    cutover = load_cutover()
+    monkeypatch.setattr(cutover, "run", lambda *cmd, **kwargs: output)
+    with pytest.raises(cutover.Stop, match="commit"):
+        cutover.commit_tasks(tmp_path, "--project", "tack")
+
+
+@pytest.mark.parametrize("key", ["source", "target", "root"])
+@pytest.mark.parametrize("value", [7, [], {}])
+def test_guard_inventory_types(tmp_path, key, value):
+    cutover = load_cutover()
+    data = {"source": '"ai"', "target": '"tack"', "root": json.dumps(str(tmp_path))}
+    data[key] = json.dumps(value)
+    path = tmp_path / "inventory.toml"
+    path.write_text("\n".join(f"{k} = {v}" for k, v in data.items()))
+    meta = {"old": "ai", "new": "tack", "checkout": {"root": str(tmp_path)}}
+    with pytest.raises(cutover.Stop, match="inventory"):
+        cutover.validate_inventory(path, meta)
+
+
+def test_guard_preserves_unchanged_saved_inventory(tmp_path):
+    cutover = load_cutover()
+    config, state, snap = tmp_path / "config", tmp_path / "state", tmp_path / "snap"
+    for directory in (config, state / "rename", snap / "config", snap / "state" / "rename"):
+        directory.mkdir(parents=True)
+    text = 'source = "foreign"\ntarget = "other"\nroot = "/elsewhere"\n'
+    live, saved = state / "rename/ai.toml", snap / "state/rename/ai.toml"
+    live.write_text(text)
+    saved.write_text(text)
+    meta = {"old": "ai", "new": "tack", "config": str(config), "state": str(state),
+            "checkout": {"root": str(tmp_path / "checkout")}}
+    cutover.guard(meta, snap)
+    assert live.read_text() == text
+    live.unlink()
+    cutover.guard(meta, snap)                  # removed original state can be restored too
+    live.write_text(text + "changed = true\n")
+    with pytest.raises(cutover.Stop, match="inventory"):
+        cutover.guard(meta, snap)
+
+
+@pytest.mark.parametrize("detached", [False, True])
+def test_apply_commits_before_move(tmp_path, detached):
+    box = Sandbox(tmp_path, detached=detached).build()
+    box.save()
+    if detached:
+        (box.records / "another-project-draft.md").write_text("keep me\n")
+    # A real hook checks each commit's filesystem boundary, without changing the tool.
+    hookdir = tmp_path / "boundary-hooks"
+    hookdir.mkdir()
+    hook = hookdir / "pre-commit"
+    count = tmp_path / "commit-count"
+    hook.write_text("#!/usr/bin/python3\nfrom pathlib import Path\n"
+                    f"count = Path({str(count)!r})\n"
+                    "n = int(count.read_text()) if count.exists() else 0\n"
+                    f"assert Path({str(box.checkout)!r}).exists() == (n == 0)\n"
+                    f"assert Path({str(box.new_root)!r}).exists() == (n != 0)\n"
+                    "count.write_text(str(n + 1))\n")
+    hook.chmod(0o755)
+    box.run("git", "config", "core.hooksPath", hookdir,
+            cwd=box.records if detached else box.checkout)
+    box.env["TASKS_FORMAT"] = "pretty"
+    result = box.apply()
+    assert count.read_text() == ("2" if detached else "1")
+    assert "git -C " not in result.stdout
+    assert not (tmp_path / "state/tasks/rename-commit/tack.toml").exists()
+    root = box.records if detached else box.new_root
+    assert box.run("git", "status", "--porcelain", cwd=root).stdout == (
+        "?? another-project-draft.md\n" if detached else "")
+    if detached:
+        paths = box.run("git", "show", "--format=", "--name-only", "HEAD", cwd=root).stdout.split()
+        assert paths == ["tack/tasks/.config.toml"]
+
+
+def test_apply_refuses_receipt_left_after_success(box, monkeypatch):
+    box.save()
+    cutover = load_cutover()
+    monkeypatch.setattr(cutover, "check_environment", lambda *args: None)
+    monkeypatch.setattr(cutover, "run", lambda *cmd, cwd=None: box.run(*cmd, cwd=cwd).stdout)
+    monkeypatch.setattr(cutover, "commit_tasks", lambda *args: None)
+    with pytest.raises(cutover.Stop, match="receipt"):
+        cutover.apply(cutover.argparse.Namespace(snapshot=box.snapshot))
+    assert box.checkout.exists() and not box.new_root.exists()
+
+
+@pytest.mark.parametrize("detached", [False, True])
+def test_later_bare_commit_after_cutover(tmp_path, detached):
+    box = Sandbox(tmp_path, detached=detached).build()
+    box.save()
+    box.apply()
+    records = box.records / "tack" if detached else box.new_root
+    task = next((records / "tasks").glob("tack-*.md"))
+    task.write_text(task.read_text() + "\n")
+    result = box.run("tasks", "--json", "commit", "--project", "tack", cwd=box.new_root)
+    assert json.loads(result.stdout)["committed"] == 1
+    assert not (tmp_path / "state/tasks/rename-commit/tack.toml").exists()
+
+
+@pytest.mark.parametrize("boundary", ["receipt", "relocation"])
+def test_apply_hook_refusal_rolls_back(dbox, boundary):
+    before = dbox.fingerprint()
+    dbox.save()
+    original = dbox.hook.read_text()
+    condition = "True" if boundary == "receipt" else f"Path({str(dbox.new_root)!r}).is_dir()"
+    dbox.hook.write_text("#!/usr/bin/env python3\nfrom pathlib import Path\nimport sys\n"
+                         f"if {condition}:\n print('receipt-test-refusal', file=sys.stderr)\n sys.exit(1)\n"
+                         + original.split("\n", 1)[1])
+    result = dbox.cutover("apply", "--snapshot", dbox.snapshot, check=False)
+    assert result.returncode == 1 and "receipt-test-refusal" in result.stderr
+    receipt = dbox.tmp / "state/tasks/rename-commit/tack.toml"
+    assert dbox.checkout.exists() == (boundary == "receipt")
+    assert dbox.new_root.exists() == (boundary == "relocation")
+    assert receipt.exists() == (boundary == "receipt")
+    dbox.hook.write_text(original)
+    rolled_back(dbox, before)
+
+
+@pytest.mark.parametrize("command", ["save", "apply", "verify"])
+@pytest.mark.parametrize("kind", ["unreadable", "symlink", "directory"])
+def test_receipt_presence_refused(box, command, kind):
+    if command != "save":
+        box.save()
+    if command == "verify":
+        box.forward()
+    receipt = box.tmp / "state/tasks/rename-commit/tack.toml"
+    receipt.parent.mkdir(parents=True, exist_ok=True)
+    if receipt.exists():
+        receipt.unlink()
+    if kind == "symlink":
+        receipt.symlink_to("missing")
+    elif kind == "directory":
+        receipt.mkdir()
+    else:
+        receipt.write_text("unreadable original receipt\n")
+        receipt.chmod(0)
+    result = box.save(check=False) if command == "save" else box.cutover(
+        command, "--snapshot", box.snapshot, check=False)
+    assert result.returncode == 1
+    assert "receipt" in result.stderr and str(receipt) in result.stderr
+    assert receipt.exists() or receipt.is_symlink()
+    if command == "save":
+        assert not box.snapshot.exists()
+    if command == "apply":
+        assert box.checkout.exists() and not box.new_root.exists()
+    if kind == "unreadable":
+        receipt.chmod(0o600)
 
 
 def task_id(output):
@@ -103,8 +290,6 @@ class Sandbox:
         self.detached, self.detached_repos = detached, tuple(detached_repos)
         self.records = self.sync / "records" if detached or detached_repos else None
         self.hook = tmp / "hooks" / "pre-commit"
-        # apply's stdout, which carries the records commit commit_rename() runs.
-        self.applied = None
 
     def run(self, *cmd, cwd=None, check=True, env=None):
         result = subprocess.run([str(c) for c in cmd], cwd=cwd, env=env or self.env, text=True,
@@ -153,23 +338,6 @@ class Sandbox:
         self.run("git", "add", "-A", cwd=root)
         self.run("git", "commit", "-qm", message, cwd=root)
 
-    def commit_rename(self):
-        """The runbook's commit after apply, run once per cutover. Detached: the one records
-        commit line apply printed (`apply()` or `forward()` keeps its stdout), run as
-        printed through the box's hook, after which HEAD holds <new>/ and no <old>/; a
-        second call fails, since the line is consumed. In-tree: the new root, as the
-        existing after-commit tests commit it."""
-        if not self.detached:
-            self.commit(self.new_root, "rename")
-            return
-        assert self.applied is not None, "commit_rename() runs once, after apply"
-        lines = [line.strip() for line in self.applied.splitlines() if line.strip().startswith("git -C ")]
-        assert len(lines) == 1, self.applied
-        self.applied = None
-        self.run("bash", "-c", lines[0], cwd=self.tmp)
-        top = self.run("git", "-C", self.records, "ls-tree", "--name-only", "HEAD").stdout.split()
-        assert self.new in top and self.old not in top, top
-
     def build(self):
         if self.records:
             self.records_repo()
@@ -207,7 +375,7 @@ class Sandbox:
     def build_hq(self):
         """The earlier rename, done in place; the group; the two trust files."""
         self.run("tasks", "rename", "ai", "tack", cwd=self.checkout)
-        self.commit(self.checkout, "the earlier rename")
+        self.run("tasks", "--json", "commit", "--project", "tack", cwd=self.checkout)
         self.run("tasks", "group", "set", "agent-layer", "tack", *(r.name for r in self.repos))
         # The live checkout's filter keeps trust tables out of commits; this one keeps
         # out any line starting with "trust".
@@ -246,13 +414,10 @@ class Sandbox:
         return self.cutover(*self.save_args(), check=check)
 
     def apply(self):
-        """apply, its stdout kept for commit_rename()."""
-        result = self.cutover("apply", "--snapshot", self.snapshot)
-        self.applied = result.stdout
-        return result
+        return self.cutover("apply", "--snapshot", self.snapshot)
 
     def forward(self):
-        """The whole cutover up to the runbook's commits: apply, retarget everywhere, link."""
+        """The whole cutover: apply commits its writes, retarget everywhere, then link."""
         self.apply()
         for root in self.repos:
             self.cutover("retarget", "--snapshot", self.snapshot, "--repo", root)
@@ -1191,13 +1356,7 @@ def test_apply_after_a_partial_apply_points_to_rollback(dbox):
     rolled_back(dbox, before)
 
 
-def commit_line(box):
-    repo = shlex.quote(str(box.records.resolve()))
-    return (f"git -C {repo} add -A -- ai tack && git -C {repo} commit -m "
-            f"'chore(tasks): rename ai -> tack' -- ai tack")
-
-
-def test_apply_repoints_a_detached_checkout_and_prints_the_records_commit(dbox):
+def test_apply_repoints_a_detached_checkout_and_commits_the_records(dbox):
     dbox.save()
     result = dbox.apply()
     row = projects_row(dbox, "tack")
@@ -1208,10 +1367,9 @@ def test_apply_repoints_a_detached_checkout_and_prints_the_records_commit(dbox):
     # [checkout] path is relative to the records directory.
     config = tomllib.loads((dbox.records / "tack" / "tasks" / ".config.toml").read_text())
     assert (dbox.records / "tack" / config["checkout"]["path"]).resolve() == dbox.new_root.resolve()
-    assert commit_line(dbox) in [line.strip() for line in result.stdout.splitlines()]
-    # Printed, not run: the rename is still uncommitted in the records repository.
-    assert "?? tack/tasks/.config.toml" in dbox.run("git", "status", "--porcelain", "--untracked-files=all",
-                                                    cwd=dbox.records).stdout
+    assert "git -C " not in result.stdout
+    assert dbox.run("git", "status", "--porcelain", "--untracked-files=all", cwd=dbox.records).stdout == ""
+
 
 
 @pytest.mark.parametrize("detached", [True, False], ids=["detached-checkout", "in-tree-checkout"])
@@ -1222,8 +1380,7 @@ def test_the_whole_detached_cutover_retargets_links_and_verifies(tmp_path, detac
     target, dependent = box.depend_on_checkout(box.ops)
     box.save()
     applied = box.apply()
-    assert ("git -C " in applied.stdout) == detached
-    box.commit_rename()
+    assert "git -C " not in applied.stdout
     result = box.cutover("retarget", "--snapshot", box.snapshot, "--repo", box.ops)
     assert f"retarget: {dependent}: {target} -> tack-{target.split('-', 1)[1]}" in result.stdout
     assert box.run("tasks", "check", cwd=box.ops).stdout == ""
@@ -1240,7 +1397,6 @@ def detached_cutover(box):
     """The whole forward cutover of a detached box, the rename committed."""
     box.save()
     box.apply()
-    box.commit_rename()
     for root in box.repos:
         box.cutover("retarget", "--snapshot", box.snapshot, "--repo", root)
     box.cutover("link", "--snapshot", box.snapshot)
@@ -1252,15 +1408,13 @@ def verify_refused(box, message):
     assert message in result.stderr, result.stderr
 
 
-def test_verify_fails_while_the_records_repository_holds_the_uncommitted_rename(dbox):
+def test_verify_fails_while_the_records_repository_holds_uncommitted_config(dbox):
     dbox.save()
     dbox.forward()
-    verify_refused(dbox, f"verify: {dbox.records.resolve()} has uncommitted changes under ai/: "
-                         f"D ai/tasks/.config.toml")
-    # The <old>/ deletions committed alone still leave <new>/ untracked.
-    dbox.run("git", "commit", "-qm", "the old half", "--", "ai", cwd=dbox.records)
+    config = dbox.records / "tack/tasks/.config.toml"
+    config.write_text(config.read_text() + "\n# later edit\n")
     verify_refused(dbox, f"verify: {dbox.records.resolve()} has uncommitted changes under tack/: "
-                         f"?? tack/tasks/.config.toml")
+                         f"M tack/tasks/.config.toml")
 
 
 def test_verify_fails_while_the_old_records_directory_exists(dbox):
@@ -1301,7 +1455,6 @@ def test_retarget_repo_stops_on_a_deferred_record_commit(dbox):
     dependents = [dbox.depend_on_checkout(dbox.ops)[1] for _ in range(2)]
     dbox.save()
     dbox.apply()
-    dbox.commit_rename()
     (dbox.records / "zz" / "docs" / "specs" / "d.md").write_text("x\n")
     dbox.run("git", "add", "zz/docs/specs/d.md", cwd=dbox.records)
 
@@ -1341,7 +1494,6 @@ def test_rollback_after_commit_restores_everything(box2):
     before = box2.fingerprint()
     box2.save()
     box2.forward()
-    box2.commit(box2.new_root, "rename")
     for root in box2.repos:
         box2.commit(root, "retarget")
     box2.cutover("rollback", "--snapshot", box2.snapshot)
@@ -1483,8 +1635,8 @@ def test_rollback_tolerates_empty_foreign_claims_files(box):
 def test_rollback_copies_in_tree_leftovers_into_the_snapshot(box):
     """The in-tree leftovers are deleted after the reset; their bytes are kept first."""
     box.save()
-    box.forward()
-    renamed = {p.name: p.read_bytes() for p in (box.new_root / "tasks").glob("tack-*.md")}
+    box.run("tasks", "rename", "ai", "tack", cwd=box.checkout)
+    renamed = {p.name: p.read_bytes() for p in (box.checkout / "tasks").glob("tack-*.md")}
     assert len(renamed) == 2
     box.cutover("rollback", "--snapshot", box.snapshot)
     copies = box.snapshot / "rollback-leftovers-1" / "checkout" / "tasks"
@@ -1566,8 +1718,7 @@ def test_detached_rollback_before_commit_restores_everything(dbox):
     dbox.depend_on_checkout(dbox.ops)
     before = dbox.fingerprint()
     dbox.save()
-    dbox.apply()
-    dbox.cutover("link", "--snapshot", dbox.snapshot)
+    dbox.run("tasks", "rename", "ai", "tack", cwd=dbox.checkout)
     head = head_of(dbox, dbox.records)
     rolled_back(dbox, before)
     # Nothing owned differed from HEAD once restored, so nothing was committed.
@@ -1579,7 +1730,6 @@ def test_detached_rollback_after_commit_restores_everything(dbox):
     before = dbox.fingerprint()
     dbox.save()
     dbox.apply()
-    dbox.commit_rename()
     dbox.cutover("link", "--snapshot", dbox.snapshot)
     rolled_back(dbox, before)
     assert dbox.run("git", "log", "-1", "--format=%s", cwd=dbox.records).stdout.strip() == REVERT
@@ -1590,7 +1740,8 @@ def test_detached_rollback_after_a_retarget_without_the_renames_commit(dbox):
     dbox.depend_on_checkout(dbox.ops)
     before = dbox.fingerprint()
     dbox.save()
-    dbox.forward()
+    dbox.run("tasks", "rename", "ai", "tack", cwd=dbox.checkout)
+    dbox.cutover("retarget", "--snapshot", dbox.snapshot, "--repo", dbox.ops)
     rolled_back(dbox, before)
     last = dbox.run("git", "log", "-1", "--name-only", "--format=%s", cwd=dbox.records).stdout.split("\n")
     assert last[0] == REVERT and all(p.startswith("ops/") for p in last[1:] if p), last
@@ -1610,7 +1761,6 @@ def test_rollback_with_an_in_tree_checkout_and_a_detached_repo_restores_p(tmp_pa
     before = box.fingerprint()
     box.save()
     box.apply()
-    box.commit_rename()
     box.cutover("retarget", "--snapshot", box.snapshot, "--repo", box.ops)
     box.cutover("link", "--snapshot", box.snapshot)
     rolled_back(box, before)
@@ -1627,7 +1777,6 @@ def test_detached_rollback_keeps_another_projects_commit_and_draft(dbox):
     before = dbox.fingerprint()
     dbox.save()
     dbox.apply()
-    dbox.commit_rename()
     added = task_id(dbox.run("tasks", "add", "zz work", "--process", "direct", cwd=dbox.sync / "zz").stdout)
     drafts = {"zz/docs/specs/draft.md": b"zz's draft\n", "ops/docs/specs/draft.md": b"a draft in ops\n"}
     for rel, text in drafts.items():
@@ -1652,7 +1801,6 @@ def test_detached_rollback_removes_a_task_filed_in_p_since_save_and_patches_it(d
     before = dbox.fingerprint()
     dbox.save()
     dbox.apply()
-    dbox.commit_rename()
     filed = task_id(dbox.run("tasks", "add", "filed since save", "--process", "direct", cwd=dbox.ops).stdout)
     assert (dbox.records / "ops" / "tasks" / f"{filed}.md").is_file()
     rolled_back(dbox, before)
@@ -1752,11 +1900,11 @@ def test_detached_rollback_stops_on_an_ignored_file_under_new(dbox):
 
 
 def test_detached_rollback_stops_on_a_new_task_written_before_the_commit(dbox):
-    """A task filed after apply and before the rename's commit: the hook refuses its record
+    """A task filed after rename and before its commit: the hook refuses its record
     commit, and it has no original to restore, so the person moves it aside."""
     dbox.save()
-    dbox.apply()
-    added = dbox.run("tasks", "add", "filed before the commit", "--process", "direct", cwd=dbox.new_root).stdout
+    dbox.run("tasks", "rename", "ai", "tack", cwd=dbox.checkout)
+    added = dbox.run("tasks", "add", "filed before the commit", "--process", "direct", cwd=dbox.checkout).stdout
     assert "commit_failed:" in added
     hex_ = task_id(added).split("-", 1)[1]
     refused_rollback(dbox, f"rollback: {dbox.records.resolve()}: tack/tasks/tack-{hex_}.md {NOT_LEFTOVER}: "
@@ -1843,8 +1991,8 @@ def test_detached_rollback_copies_a_note_written_before_the_commit(dbox):
     hex_ = checkout_ids(dbox)[0].split("-", 1)[1]
     before = dbox.fingerprint()
     dbox.save()
-    dbox.apply()
-    noted = dbox.run("tasks", "note", f"tack-{hex_}", "a note before the commit", cwd=dbox.new_root).stdout
+    dbox.run("tasks", "rename", "ai", "tack", cwd=dbox.checkout)
+    noted = dbox.run("tasks", "note", f"tack-{hex_}", "a note before the commit", cwd=dbox.checkout).stdout
     assert "commit_failed:" in noted
     rolled_back(dbox, before)
     copy = dbox.snapshot / "rollback-leftovers-1" / f"records-{dbox.records.name}" / "tack" / "tasks" / f"tack-{hex_}.md"
@@ -1856,7 +2004,7 @@ def test_detached_rollback_takes_one_new_leftovers_directory_per_attempt(dbox):
     the retry copies again, into the next number, and converges."""
     before = dbox.fingerprint()
     dbox.save()
-    dbox.apply()
+    dbox.run("tasks", "rename", "ai", "tack", cwd=dbox.checkout)
     renamed = {str(p.relative_to(dbox.records)): p.read_bytes()
                for p in (dbox.records / "tack").rglob("*") if p.is_file()}
     assert len(renamed) == 3
@@ -1894,7 +2042,6 @@ def test_detached_rollback_copies_a_file_recreated_under_old_after_the_commit(db
     before = dbox.fingerprint()
     dbox.save()
     dbox.apply()
-    dbox.commit_rename()
     recreated = dbox.records / rel
     recreated.parent.mkdir(parents=True)
     recreated.write_text("recreated with other bytes\n")
@@ -1944,7 +2091,6 @@ def test_detached_rollback_retry_converges_after_a_stop_at_the_commit(dbox):
     before = dbox.fingerprint()
     dbox.save()
     dbox.apply()
-    dbox.commit_rename()
     hook, mode = dbox.hook.read_bytes(), stat.S_IMODE(dbox.hook.stat().st_mode)
     dbox.hook.write_text("#!/bin/sh\necho the-test-hook-refuses >&2\nexit 1\n")
     dbox.hook.chmod(0o755)
@@ -1977,7 +2123,6 @@ def test_detached_rollback_retry_converges_after_an_index_lock(dbox):
     before = dbox.fingerprint()
     dbox.save()
     dbox.apply()
-    dbox.commit_rename()
     head = head_of(dbox, dbox.records)
     lock = dbox.records / ".git" / "index.lock"
     lock.write_text("")
@@ -2063,7 +2208,7 @@ def test_rollback_after_a_completed_rename_restores_without_its_receipt(box):
     reads it as this rename's own, and restoring the saved state removes it."""
     before = box.fingerprint()
     box.save()
-    box.cutover("apply", "--snapshot", box.snapshot)
+    box.run("tasks", "rename", "ai", "tack", cwd=box.checkout)
     receipt = box.tmp / "state" / "tasks" / "rename-commit" / "tack.toml"
     assert receipt.exists()
     box.cutover("rollback", "--snapshot", box.snapshot)
@@ -2073,12 +2218,12 @@ def test_rollback_after_a_completed_rename_restores_without_its_receipt(box):
 
 def test_guard_rejects_a_receipt_for_another_root(box):
     box.save()
-    box.cutover("apply", "--snapshot", box.snapshot)
+    box.run("tasks", "rename", "ai", "tack", cwd=box.checkout)
     receipt = box.tmp / "state" / "tasks" / "rename-commit" / "tack.toml"
     receipt.write_text(receipt.read_text().replace(f'"{box.checkout}"', f'"{box.checkout}-other"'))
     result = box.cutover("rollback", "--snapshot", box.snapshot, check=False)
     assert result.returncode == 1 and "inventory" in result.stderr and "rename-commit" in result.stderr
-    assert receipt.exists() and box.new_root.exists()   # nothing was moved back
+    assert receipt.exists() and box.checkout.exists()   # nothing was moved back
 
 
 def test_guard_stops_on_a_nonempty_foreign_claims_file(box):
@@ -2266,7 +2411,6 @@ def test_second_host_adopts_the_rename(box):
 
     box.save()
     box.forward()
-    box.commit(box.new_root, "rename")
 
     def first_host():
         return {str(p): p.read_bytes() for d in ("cfg", "state") for p in sorted((box.tmp / d).rglob("*"))
@@ -2390,7 +2534,6 @@ def test_this_renames_rollback_after_commit_restores_the_trust_files(hq):
     hq.save()
     hq.forward()
     hq.edit_trust()
-    hq.commit(hq.new_root, "rename")
     for root in hq.repos:
         hq.commit(root, "retarget")
     hq.cutover("rollback", "--snapshot", hq.snapshot)
@@ -2404,7 +2547,6 @@ def test_this_renames_second_host_adopts(hq):
     (hq.tmp / "state2").mkdir()
     hq.save()
     hq.forward()
-    hq.commit(hq.new_root, "rename")
     hq.run("tasks", "rename", "tack", "hq", "--adopt", cwd=hq.new_root, env=second)
     registry = (hq.tmp / "cfg2" / "tasks" / "projects.toml").read_text()
     assert f'hq = "{hq.new_root}"' in registry

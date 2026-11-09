@@ -16,10 +16,12 @@ records repository outside every snapshot repository, where the cutover owns `<o
 checkout and the in-tree repositories, never a detached repository's code checkout, and
 in a records repository restores only the owned paths, leaving every other project's
 records there alone (docs/specs/2026-11-02-detached-rename-cutover-design.md). `apply`
-renames and moves (for a detached checkout it prints the records commit the runbook
-runs), `retarget` fixes dependencies on retired ids in one of them or, with `--forward`,
+renames, commits through the tasks receipt, moves and commits a detached config's new
+checkout path. `retarget` fixes dependencies on retired ids in one of them or, with `--forward`,
 in every project outside them, `link` applies the home links, and `verify` checks the
-result: the runbook commits between them.
+result; the runbook commits its own later edits. Receipt consumption before the move
+follows docs/specs/2026-11-09-rename-receipt-design.md: a refused receipt commit stops
+before moving, while a refused config commit stops after moving; either can roll back.
 
 The other host, once its sync has delivered the moved checkout (and the committed records
 repository), runs `tasks rename <old> <new> --adopt` in the new root; no `init` follows.
@@ -29,7 +31,6 @@ import filecmp
 import json
 import os
 import re
-import shlex
 import shutil
 import stat
 import subprocess
@@ -47,6 +48,35 @@ def run(*cmd, cwd=None):
     if result.returncode != 0:
         raise Stop(f"{' '.join(map(str, cmd))}: {(result.stderr or result.stdout).strip()}")
     return result.stdout
+
+
+def commit_tasks(root, *args):
+    """Commit via tasks, preserving successful warnings and their recovery instructions."""
+    command = ("tasks", "--json", "commit", *args)
+    output = run(*command, cwd=root)
+    label = " ".join(command)
+    try:
+        report = json.loads(output)
+    except json.JSONDecodeError as error:
+        raise Stop(f"apply: {label} printed invalid JSON ({error}): {output!r}")
+    warnings = report.get("warnings") if isinstance(report, dict) else None
+    if not isinstance(warnings, list) or any(not isinstance(w, str) for w in warnings):
+        raise Stop(f"apply: {label} printed no valid warnings list: {output!r}")
+    for warning in warnings:
+        print(f"apply: {label}: {warning}", file=sys.stderr)
+
+
+def check_receipt_absent(state, new, command):
+    """Presence alone refuses a receipt; do not read or overwrite another rename's state."""
+    receipt = Path(state) / "rename-commit" / f"{new}.toml"
+    try:
+        receipt.lstat()
+    except FileNotFoundError:
+        return
+    except OSError as error:
+        raise Stop(f"{command}: cannot inspect rename receipt {receipt}: {error}")
+    raise Stop(f"{command}: rename receipt {receipt} remains; resolve its owning rename before "
+               "continuing; for this saved cutover, use rollback before retrying")
 
 
 def xdg(name, default):
@@ -345,6 +375,7 @@ def save(args):
     if not tool.is_file():
         raise Stop(f"save: no link tool at {tool}")
     config, state = xdg("XDG_CONFIG_HOME", ".config") / "tasks", xdg("XDG_STATE_HOME", ".local/state") / "tasks"
+    check_receipt_absent(state, args.new, "save")
     for path in (config, state):
         if path.is_symlink() or not path.is_dir():
             raise Stop(f"save: {path} must be a real directory: rollback replaces it whole")
@@ -452,12 +483,12 @@ def validate_inventory(path, meta):
     when its source, target and root are exactly this rename's."""
     try:
         data = tomllib.loads(path.read_text())
-    except tomllib.TOMLDecodeError as error:
+    except (OSError, tomllib.TOMLDecodeError) as error:
         raise Stop(f"guard: {path} is not a readable rename inventory: {error}")
     expected = {"source": meta["old"], "target": meta["new"], "root": meta["checkout"]["root"]}
     for key, value in expected.items():
         found = data.get(key)
-        same = found is not None and (Path(found).resolve() == Path(value).resolve() if key == "root" else found == value)
+        same = isinstance(found, str) and (Path(found).resolve() == Path(value).resolve() if key == "root" else found == value)
         if not same:
             raise Stop(f"guard: {path} is a rename inventory for {key} {found!r}, not {value!r}")
 
@@ -485,8 +516,12 @@ def guard(meta, snap):
         raise Stop(f"guard: the registry changed outside {old}/{new}: {', '.join(registry_changes(live, saved))}")
     own = {f"claims/{p}.{ext}" for p in (old, new) for ext in ("toml", "lock")}
     for rel in (f"rename/{old}.toml", f"rename-commit/{new}.toml"):
-        if (state / rel).exists():
-            validate_inventory(state / rel, meta)
+        current, original = state / rel, snap / "state" / rel
+        if current.exists():
+            if not original.is_file() or not filecmp.cmp(current, original, shallow=False):
+                validate_inventory(current, meta)
+            own.add(rel)
+        elif original.exists():
             own.add(rel)
     for live_root, saved_root, skip in ((config, snap / "config", {"projects.toml", "projects.lock"}),
                                         (state, snap / "state", own)):
@@ -1091,7 +1126,10 @@ def apply(args):
         if new_records.exists() or new_records.is_symlink():
             raise Stop(f"apply: {new_records} already exists; tasks rename writes {new}'s records there, "
                        f"so move it aside first")
+    check_receipt_absent(meta["state"], new, "apply")
     run("tasks", "rename", old, new, cwd=checkout)
+    commit_tasks(checkout, "--project", new)
+    check_receipt_absent(meta["state"], new, "apply")
     os.rename(checkout, new_root)
     if meta["storage_old"]:
         os.rename(Path(meta["storage_old"]).parent, Path(meta["storage_new"]).parent)
@@ -1099,14 +1137,11 @@ def apply(args):
         run("work-link", "--root", new_root.parent, "--ensure", ".worktrees", cwd=new_root)
     if records:
         run("tasks", "init", "--prefix", new, "--records", records["records_root"], "--force", cwd=new_root)
+        commit_tasks(new_root, "--project", new, "tasks/.config.toml", "-m",
+                     f"chore(tasks): relocate {new} checkout")
     else:
         run("tasks", "init", "--prefix", new, "--force", cwd=new_root)
     print(f"applied: {old} -> {new} at {new_root}")
-    if records:
-        # Scoped to the rename's own paths, so another project's untracked draft stays out.
-        repo, message = shlex.quote(records["repo"]), shlex.quote(f"chore(tasks): rename {old} -> {new}")
-        print(f"commit the rename in the records repository {records['repo']} before retarget --repo:")
-        print(f"  git -C {repo} add -A -- {old} {new} && git -C {repo} commit -m {message} -- {old} {new}")
 
 
 def record_forward(snap, root):
@@ -1234,6 +1269,7 @@ def verify_records(meta):
 def verify(args):
     meta = load_meta(args.snapshot)
     check_environment("verify", meta)
+    check_receipt_absent(meta["state"], meta["new"], "verify")
     new_root, old, new = Path(meta["new_root"]), meta["old"], meta["new"]
     check = subprocess.run([str(link_tool(new_root, meta)), "--check"], text=True, capture_output=True)
     if check.returncode != 0:
