@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-ecee7e-hostkit-fixture
 created: 2026-11-09T17:08:30Z
-updated: 2026-11-09T18:53:34Z
+updated: 2026-11-09T18:53:36Z
 started: 2026-11-09T18:40:50Z
 depends: []
 tags: [testing]
@@ -43,3 +43,4 @@ Verification: just test-one tools/test_rename_cutover.py shows no failure naming
   provenance: {"harness_session":"claude-code:007a9370-10d2-4c63-86e7-81dd708478cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-09T18:43:08Z (fix/hq-ecee7e-hostkit-fixture): gate: implementing .worktrees/hq-ecee7e
   provenance: {"harness_session":"claude-code:007a9370-10d2-4c63-86e7-81dd708478cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-09T18:53:36Z (fix/hq-ecee7e-hostkit-fixture): scope narrowed: with the fixture config, 38 of 83 failures pass; the other 45 all fail on rename-cutover's guard refusing state/tasks/rename-commit/<new>.toml, a receipt tasks 98c2383 added. That is a tool defect beyond this fixture fix, filed as hq-0f7499. Run: 45 failed, 135 passed, 0 mentions of work-link.
