@@ -85,6 +85,13 @@ class Sandbox:
         for d in ("home", "cfg", "state"):
             (tmp / d).mkdir()
         self.sync = tmp / "sync"
+        # apply runs the host's work-link. Hostkit's reads its anchor name and sync-ignore
+        # xattr from this file and refuses without them; the retired dotfiles copy CI pins
+        # hardcodes the same two values and ignores the file. --root overrides sync_root.
+        (tmp / "cfg" / "hostkit").mkdir()
+        (tmp / "cfg" / "hostkit" / "config.toml").write_text(
+            f'[storage]\nsync_root = {json.dumps(str(self.sync))}\nanchor_name = ".dropbox-work"\n\n'
+            '[sync]\nignore_xattr = "com.dropbox.ignored"\n')
         self.hq = hq
         self.old, self.new = ("tack", "hq") if hq else ("ai", "tack")
         self.checkout, self.new_root = self.sync / self.old, self.sync / self.new

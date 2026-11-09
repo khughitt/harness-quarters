@@ -1,17 +1,20 @@
 ---
 id: hq-ecee7e
 title: "rename-cutover tests fail locally against hostkit's work-link, which needs storage.anchor_name and sync.ignore_xattr config"
-status: doing
+status: done
 priority: 2
 size: s
 complexity: mid
 process: direct
 owner: fix/hq-ecee7e-hostkit-fixture
 created: 2026-11-09T17:08:30Z
-updated: 2026-11-09T18:59:09Z
+updated: 2026-11-09T18:59:27Z
 started: 2026-11-09T18:40:50Z
+completed: 2026-11-09T18:59:26Z
+closed: 2026-11-09T18:59:26Z
 depends: []
 tags: [testing]
+model: claude-opus-5-5
 agent: claude-code/claude-opus-5-5
 origin: mixed
 ---
@@ -48,3 +51,8 @@ Verification: just test-one tools/test_rename_cutover.py shows no failure naming
 - 2026-11-09T18:58:57Z (fix/hq-ecee7e-hostkit-fixture): gate: verified tree:3213eb8db1a420b7f0e9880f23a256c0eab2f1ad — checks: just test-one tools/test_rename_cutover.py gave 45 failed 135 passed with zero failures naming work-link and every failure naming the rename-commit receipt owned by hq-0f7499 (baseline before the fix 83 failed 97 passed all on work-link config as the targeted break), just check-hygiene passed, broad suite skipped by tt policy; review: minor addressed sync_root now escaped with json.dumps; reviewer: claude-code/claude-opus-5-5
   provenance: {"harness_session":"claude-code:007a9370-10d2-4c63-86e7-81dd708478cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-09T18:59:09Z (fix/hq-ecee7e-hostkit-fixture): retro: the first fix only uncovered a second, unrelated drift (the tasks rename-commit receipt) that the work-link failure had hidden. Grouping failures by message after the first fix showed the split right away and kept this task bounded. A test sandbox that calls host tools should supply each tool's config, so a change to a host tool's config contract shows up as a fixture gap, not a mystery.
+- 2026-11-09T18:59:26Z (fix/hq-ecee7e-hostkit-fixture): retained: worktree .worktrees/hq-ecee7e removed after merge (ignored files are setup-hydrated local/ and caches, regenerable); session scratch (task body drafts, two focused-run logs) discarded as regenerable; no WORK_ROOT task directory; no processes left running; nothing pushed
+- 2026-11-09T18:59:26Z (fix/hq-ecee7e-hostkit-fixture): done
+  provenance: {"harness_session":"claude-code:007a9370-10d2-4c63-86e7-81dd708478cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-09T18:59:26Z (fix/hq-ecee7e-hostkit-fixture): rename-cutover Sandbox writes a test-owned hostkit work-link config; no test fails on work-link config, remaining 45 failures are the rename-commit receipt drift owned by hq-0f7499
+  provenance: {"harness_session":"claude-code:007a9370-10d2-4c63-86e7-81dd708478cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
