@@ -226,7 +226,9 @@ class World:
         self.git('rm', '-q', '--', *FILES)
         for name in self.names:
             target = moved(name) if name in FILES else name
-            self.put(target, (ROOT / target).read_bytes())
+            # The move renames the configs unchanged; later config commits would shift
+            # the carried patch's hunks, which the runbook's comparison rightly refuses.
+            self.put(target, self.old(name) if name in CONFIGS else (ROOT / target).read_bytes())
         self.put('links.toml', fixture_links((ROOT / 'links.toml').read_text()).encode())
         self.put('docs/notes/review.md', b'review history must survive rollback\n')
         self.git('add', '-A'); self.git('commit', '-qm', 'candidate layout')
