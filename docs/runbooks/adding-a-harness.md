@@ -121,7 +121,7 @@ Existing consumers also use short keys:
   `codex`, `codex-work`, `opencode`, `pi`, `agy`, `agy-config`).
 - `tools/hq_cli/`, `<ops-checkout>/bin/ops-profile`, `<ops-checkout>/bin/tt`
   (`agent_of`), `<ops-checkout>/bin/tt-report`, `<ops-checkout>/bin/harness-remap`,
-  `<ops-checkout>/bin/obs-index` and `<obs-checkout>/tt_runs.py` (`AGENTS`) key
+  `<ops-checkout>/bin/obs-index` and `<obs-checkout>/src/obs/timing/tt_runs.py` (`AGENTS`) key
   Claude Code as `claude`.
 
 For a new harness, use one slug everywhere unless a split home needs `<slug>-config` or
@@ -600,7 +600,7 @@ malformed command input is refused. For a relayed harness, also extend
 1. **`bin/ops-profile`**:
    - Add `"<agent-key>": ("<HOME_ENV_VAR>", "~/.<default-home>")` to `HARNESS`. Keep
      `<agent-key>` identical to the key `tt.agent_of(env)` returns (`home_of()` indexes
-     `HARNESS` with it) and to the key in `<obs-checkout>/tt_runs.py` `AGENTS`.
+     `HARNESS` with it) and to the key in `<obs-checkout>/src/obs/timing/tt_runs.py` `AGENTS`.
    - Add `<agent-key> = "..."` to **every** `[home.<profile-home>]` table in
      `profiles.toml`: `config_problems()` rejects a profile config unless every home
      declares a path for every `HARNESS` key.
@@ -686,7 +686,7 @@ the same change that widens its parser.
 
 ### Relay consumers
 
-- **`<obs-checkout>/record.py` `HARNESSES`**: add `<name>` whenever relay publishes
+- **`<obs-checkout>/src/obs/observer/envelopes.py` `HARNESSES`**: add `<name>` whenever relay publishes
   envelopes for it. Otherwise `obs ingest` rejects them, printing only
   `{"event": "obs-ingest-failed", "error": "ValueError"}`.
 - **Subscribers (`hq`)**: `relay/subscribers.template.json` scopes `ops-guard` to
@@ -758,7 +758,7 @@ the same change that widens its parser.
   1. Readers: extend `validate` and `validate_session_key` in `src/provenance.rs`,
      keeping `resolve_from` and `--origin-session` input closed to the new prefix.
   2. Install that tasks build on every host and CI job that parses records, and land
-     `<obs-checkout>/join.py`: `<name>` in `HARNESSES` and `"<ENV_VAR>": "<name>"` in
+     `<obs-checkout>/src/obs/work/join.py`: `<name>` in `HARNESSES` and `"<ENV_VAR>": "<name>"` in
      the `SOURCES` dict. Without it `obs index` fails on the first stamped note from
      that harness: the task is reported on stderr, counted as failed, outcomes are
      skipped, and the run exits 1 with `index_failed`.
@@ -794,8 +794,8 @@ Register the same key, in the same change, in every reader:
 - `HARNESS` in `<ops-checkout>/bin/ops-profile` (section 5);
 - `AGENTS` in `<ops-checkout>/bin/tt-report`, which otherwise counts the harness's runs
   as malformed and skips them without warning;
-- `AGENTS` in `<obs-checkout>/tt_runs.py` (`{'claude': 'claude-code', 'codex':
-  'codex', …}`), with the target slug in `<obs-checkout>/join.py` `HARNESSES`; a slug
+- `AGENTS` in `<obs-checkout>/src/obs/timing/tt_runs.py` (`{'claude': 'claude-code', 'codex':
+  'codex', …}`), with the target slug in `<obs-checkout>/src/obs/work/join.py` `HARNESSES`; a slug
   missing there makes `tt_runs` classify the record as malformed;
 - `HARNESSES` in `<ops-checkout>/bin/harness-remap`, `INTERACTIVE` in
   `<ops-checkout>/bin/obs-index`, and the tasks-tui launch bindings in
@@ -882,17 +882,23 @@ transcript does not name its own working directory).
    `tool-result-call-ids`, `session-metadata-marks-headless`, `transcript-self-describing`
    and `session-archive-complete` (section 4). A `false` is an answer; an unprobed
    value is `unknown`.
-4. **`<obs-checkout>`**: implement `<name>_adapter.py` (session metadata, turns, usage,
-   tool and shell calls, skill reads, hook runs, turn-end reasons, truncation markers)
-   and register it in `stores.py` (`ADAPTERS`, `SKILL_COVERAGE`, `store_roots()` with an
-   `OBS_<NAME>_...` override so tests never read live homes, `_paths()`, `_peek_cwd()`,
-   `_initial_state()`). Discovery (section 1) finds the remaining registries; among
-   them are `index.py`, `obs.py` (with `main()`'s default harness list kept equal to
-   `stores.ADAPTERS`), the `session_logs*.py` pipeline (or an explicit exclusion in
-   `session_logs_place.roots()`), `dashboard.py`, `catalog.py`, `hook_report.py`,
-   `tt_report.py` (`TOOLS` shell-tool names), `index_state.py`, `baseline.py`,
-   `sweep.py`, `task_activity.py` and `stores.run()`'s Codex-only branches,
-   `tools/archive_replay_rehearsal.py`, `tools/retention_readiness.py`, the README's
+4. **`<obs-checkout>`**: implement `src/obs/harness/<name>.py` (session metadata, turns,
+   usage, tool and shell calls, skill reads, hook runs, turn-end reasons, truncation
+   markers; a leading underscore when no module outside `harness/` imports it, as for
+   `_claude.py`) and register it in `src/obs/harness/stores.py` (`ADAPTERS`,
+   `SKILL_COVERAGE`, `store_roots()` with an `OBS_<NAME>_...` override so tests never
+   read live homes, `paths()`, `peek_cwd()`) and `src/obs/collect/pipeline.py`
+   (`initial_state()`). Discovery (section 1) finds the remaining registries; among
+   them are `src/obs/index/db.py`, `src/obs/cli.py` (`--harness` choices) and
+   `src/obs/commands/index.py` (the default harness list, kept equal to
+   `harness.stores.ADAPTERS`), the `src/obs/session_logs/` pipeline
+   (or an explicit exclusion in `session_logs/_place.py` `roots()`),
+   `src/obs/dashboard/snapshot.py`, `src/obs/drift/_catalog.py`,
+   `src/obs/reports/_hooks.py`, `src/obs/timing/tt_report.py` (`TOOLS` shell-tool
+   names), `src/obs/index/readiness.py`, `src/obs/outcomes/baseline.py`,
+   `src/obs/drift/sweep.py`, `src/obs/work/activity.py` and
+   `collect/pipeline.py` `run()`'s Codex-only branches,
+   `scripts/archive_replay_rehearsal.py`, `scripts/retention_readiness.py`, the README's
    `--harness` text, and tests that pass a fixed harness list to `stores.run` or assert
    exact skills coverage.
 5. Run the adapter against the real local store (`obs index`) and verify `tt_runs`
@@ -951,5 +957,5 @@ transcript does not name its own working directory).
 | Live-state hygiene | `hq` | `harnesses.toml`, `.gitattributes`, optional trust helper or adoption adapter, `just setup` on every host | `just test`, `.githooks/harness_state.py check`; link survives a harness save; clean `git status` after a turn |
 | Capability facts and probes | `hq` | `harnesses.toml`, `facts/capabilities.toml`, `agents/bin/wake-judge` `JUDGES`, `harnesses/<name>/probes/`, `README.md` | `tools/harness-facts check`, `list --pretty` |
 | Profile, command guard, claim guard | `lore`, `ops`, `relay`, `hq` | `harnesses/<name>/hooks.json` or adapter hook, `<ops-checkout>/bin/ops-profile`, `profiles.toml`, `hooks/relay-guard`, `hooks/claim-guard`, `bin/relay-guard-probe`, `relay/subscribers.template.json`, `tools/test_*_wiring.py` | owners' tests; three-case guard evidence; held-once Stop |
-| CLI vocabulary, relay, ancestry, provenance | `ops`, `relay`, `tasks`, `obs`, `familiar`, `hq` | `<ops-checkout>/cli.toml`, `bin/tt`, `bin/tt-report`, `keys.toml`; `<relay-checkout>/src/`, `bin/relay.js`; `<tasks-checkout>/src/relay/`, `src/provenance.rs`, `src/claims.rs`, fixture copy; `<obs-checkout>/{record,join,tt_runs}.py`; `<fam-checkout>/src/` if selected; `relay/package*.json` | owners' tests including conformance; distinct identities for concurrent sessions; stamped notes join |
-| Sessions, archive, `obs` | `hq`, `obs` | `tools/hq_cli/`, `tools/hq.toml`, `tools/session_archive/`, `agents/skills/session-logs/SKILL.md`, `agents/bin/session-episodes`, `<obs-checkout>/<name>_adapter.py`, `stores.py` and the registries discovery finds | `just test`, `hq sessions`, obs tests, live `obs index` |
+| CLI vocabulary, relay, ancestry, provenance | `ops`, `relay`, `tasks`, `obs`, `familiar`, `hq` | `<ops-checkout>/cli.toml`, `bin/tt`, `bin/tt-report`, `keys.toml`; `<relay-checkout>/src/`, `bin/relay.js`; `<tasks-checkout>/src/relay/`, `src/provenance.rs`, `src/claims.rs`, fixture copy; `<obs-checkout>/src/obs/{observer/envelopes,work/join,timing/tt_runs}.py`; `<fam-checkout>/src/` if selected; `relay/package*.json` | owners' tests including conformance; distinct identities for concurrent sessions; stamped notes join |
+| Sessions, archive, `obs` | `hq`, `obs` | `tools/hq_cli/`, `tools/hq.toml`, `tools/session_archive/`, `agents/skills/session-logs/SKILL.md`, `agents/bin/session-episodes`, `<obs-checkout>/src/obs/harness/<name>.py`, `harness/stores.py` and the registries discovery finds | `just test`, `hq sessions`, obs tests, live `obs index` |
