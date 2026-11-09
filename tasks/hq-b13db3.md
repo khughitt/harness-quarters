@@ -7,8 +7,9 @@ size: m
 complexity: high
 process: planned
 created: 2026-10-22T20:35:06Z
-updated: 2026-10-22T20:36:54Z
+updated: 2026-11-09T12:31:40Z
 depends: [ops-e4d678, tasks-d8823c, lore-a071ae, flows-47f205]
+related: [ops-cbd6eb, ops-161e17, ops-b13db3]
 tags: []
 source: ops-e4d678
 agent: codex
@@ -37,3 +38,5 @@ Done: retained sanitized evidence and independent per-route verdicts, credential
 ## Notes
 
 - 2026-10-22T20:36:53Z (main): attached: walkthrough-design-e21ea75.md (33256 bytes): Accepted design frozen at ops e21ea75; sha256 df835af8428626da6284972352edeffa749429e1c209fc183e62a3801f30c70a
+- 2026-11-09T12:31:40Z (main): New independent occurrence for the existing parked-walkthrough validation: ops-cbd6eb was filed during a design conversation in claude-code:c1229d6d-3fd4-4cd5-8cb4-06c2437bfa3e on 2026-11-09. Transcript lines 564-571 show a runtime-seams playback ending with a question, the claim-guard Stop refusal for ops-161e17, then a park and feedback filing (toolu_017GX3tJkPK5V9sEcM7qWaMo, 12:18:00.863Z to 12:18:04.114Z). The report says five park/start cycles; this scope pass verified one Stop episode, not that aggregate. This is new recurrence evidence, not a changed request or authorization for a claim exemption, extra runs, or activation. Existing ops-b13db3 and accepted ops-e4d678 cover the workflow; preserve the design-conversation context when judging delivered guidance. Found by a scope pass on ops-cbd6eb.
+  provenance: {"harness_session":"codex:01a1c048-ef27-7162-800c-380fb266f7f1","harness_session_source":"CODEX_THREAD_ID"}
