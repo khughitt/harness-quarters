@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-ecee7e-hostkit-fixture
 created: 2026-11-09T17:08:30Z
-updated: 2026-11-09T18:55:52Z
+updated: 2026-11-09T18:58:57Z
 started: 2026-11-09T18:40:50Z
 depends: []
 tags: [testing]
@@ -45,3 +45,5 @@ Verification: just test-one tools/test_rename_cutover.py shows no failure naming
   provenance: {"harness_session":"claude-code:007a9370-10d2-4c63-86e7-81dd708478cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-09T18:53:36Z (fix/hq-ecee7e-hostkit-fixture): scope narrowed: with the fixture config, 38 of 83 failures pass; the other 45 all fail on rename-cutover's guard refusing state/tasks/rename-commit/<new>.toml, a receipt tasks 98c2383 added. That is a tool defect beyond this fixture fix, filed as hq-0f7499. Run: 45 failed, 135 passed, 0 mentions of work-link.
 - 2026-11-09T18:55:52Z (fix/hq-ecee7e-hostkit-fixture): review: impl round 1 — verdict: accept; findings: minor 1; reviewer: claude-code/claude-opus-5-5
+- 2026-11-09T18:58:57Z (fix/hq-ecee7e-hostkit-fixture): gate: verified tree:3213eb8db1a420b7f0e9880f23a256c0eab2f1ad — checks: just test-one tools/test_rename_cutover.py gave 45 failed 135 passed with zero failures naming work-link and every failure naming the rename-commit receipt owned by hq-0f7499 (baseline before the fix 83 failed 97 passed all on work-link config as the targeted break), just check-hygiene passed, broad suite skipped by tt policy; review: minor addressed sync_root now escaped with json.dumps; reviewer: claude-code/claude-opus-5-5
+  provenance: {"harness_session":"claude-code:007a9370-10d2-4c63-86e7-81dd708478cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
