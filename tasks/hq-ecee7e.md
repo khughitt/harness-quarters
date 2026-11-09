@@ -1,17 +1,20 @@
 ---
 id: hq-ecee7e
 title: "rename-cutover tests fail locally against hostkit's work-link, which needs storage.anchor_name and sync.ignore_xattr config"
-status: doing
+status: done
 priority: 2
 size: s
 complexity: mid
 process: direct
-owner: main
+owner: fix/hq-ecee7e-hostkit-fixture
 created: 2026-11-09T17:08:30Z
-updated: 2026-11-09T18:42:51Z
+updated: 2026-11-09T18:59:27Z
 started: 2026-11-09T18:40:50Z
+completed: 2026-11-09T18:59:26Z
+closed: 2026-11-09T18:59:26Z
 depends: []
 tags: [testing]
+model: claude-opus-5-5
 agent: claude-code/claude-opus-5-5
 origin: mixed
 ---
@@ -20,13 +23,13 @@ On 2026-11-09 a deliberate full suite (TT_FORCE=1 just test) on hq main plus a C
 
 ## Scope (2026-11-09)
 
-Outcome: tools/test_rename_cutover.py passes locally against hostkit's work-link and still passes in CI against the pinned dotfiles copy.
+Outcome: no tools/test_rename_cutover.py test fails on work-link config locally against hostkit's work-link, and CI against the pinned dotfiles copy is unaffected. (Narrowed 2026-11-09: 45 tests still fail on a separate rename-commit receipt drift, filed as hq-0f7499.)
 
 Approach: the Sandbox fixture already isolates XDG_CONFIG_HOME and hardcodes the anchor `.dropbox-work`, which was the dotfiles copy's fixed name. Hostkit's work-link reads storage.anchor_name and sync.ignore_xattr from XDG_CONFIG_HOME/hostkit/config.toml. The fixture writes that test-owned file with sync_root = the sandbox sync dir, anchor_name = ".dropbox-work", ignore_xattr = "com.dropbox.ignored" (the dotfiles copy's hardcoded values), so both implementations behave alike. rename-cutover itself does not pass config: at a real cutover it runs work-link under the host's own hostkit config, which is the right source.
 
 Not in scope: switching CI to hostkit's work-link. Hostkit has no git remote, so the workflow cannot fetch a pinned copy; that waits on publishing hostkit, which is the user's decision.
 
-Verification: just test-one tools/test_rename_cutover.py passes (was 83 failed); the config write is seen to matter by removing it and seeing the failures return.
+Verification: just test-one tools/test_rename_cutover.py shows no failure naming work-link (was 83, all work-link); the remaining failures all name the rename-commit receipt (hq-0f7499). The baseline run without the config write is the targeted break.
 
 ## Notes
 
@@ -38,4 +41,18 @@ Verification: just test-one tools/test_rename_cutover.py passes (was 83 failed);
 - 2026-11-09T18:41:19Z (main): arm: flow-trial-1 — unit tack-ecee7e — flow on
 - 2026-11-09T18:42:36Z (main): process direct: fixture-only fix, approach settled by reading tools/rename-cutover, the Sandbox fixture and hostkit bin/hostkit_config.py; CI switch out of scope because hostkit has no git remote
 - 2026-11-09T18:42:38Z (main): gate: scoped — adopted
+  provenance: {"harness_session":"claude-code:007a9370-10d2-4c63-86e7-81dd708478cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-09T18:42:59Z (fix/hq-ecee7e-hostkit-fixture): resumed
+  provenance: {"harness_session":"claude-code:007a9370-10d2-4c63-86e7-81dd708478cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-09T18:43:08Z (fix/hq-ecee7e-hostkit-fixture): gate: implementing .worktrees/hq-ecee7e
+  provenance: {"harness_session":"claude-code:007a9370-10d2-4c63-86e7-81dd708478cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-09T18:53:36Z (fix/hq-ecee7e-hostkit-fixture): scope narrowed: with the fixture config, 38 of 83 failures pass; the other 45 all fail on rename-cutover's guard refusing state/tasks/rename-commit/<new>.toml, a receipt tasks 98c2383 added. That is a tool defect beyond this fixture fix, filed as hq-0f7499. Run: 45 failed, 135 passed, 0 mentions of work-link.
+- 2026-11-09T18:55:52Z (fix/hq-ecee7e-hostkit-fixture): review: impl round 1 — verdict: accept; findings: minor 1; reviewer: claude-code/claude-opus-5-5
+- 2026-11-09T18:58:57Z (fix/hq-ecee7e-hostkit-fixture): gate: verified tree:3213eb8db1a420b7f0e9880f23a256c0eab2f1ad — checks: just test-one tools/test_rename_cutover.py gave 45 failed 135 passed with zero failures naming work-link and every failure naming the rename-commit receipt owned by hq-0f7499 (baseline before the fix 83 failed 97 passed all on work-link config as the targeted break), just check-hygiene passed, broad suite skipped by tt policy; review: minor addressed sync_root now escaped with json.dumps; reviewer: claude-code/claude-opus-5-5
+  provenance: {"harness_session":"claude-code:007a9370-10d2-4c63-86e7-81dd708478cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-09T18:59:09Z (fix/hq-ecee7e-hostkit-fixture): retro: the first fix only uncovered a second, unrelated drift (the tasks rename-commit receipt) that the work-link failure had hidden. Grouping failures by message after the first fix showed the split right away and kept this task bounded. A test sandbox that calls host tools should supply each tool's config, so a change to a host tool's config contract shows up as a fixture gap, not a mystery.
+- 2026-11-09T18:59:26Z (fix/hq-ecee7e-hostkit-fixture): retained: worktree .worktrees/hq-ecee7e removed after merge (ignored files are setup-hydrated local/ and caches, regenerable); session scratch (task body drafts, two focused-run logs) discarded as regenerable; no WORK_ROOT task directory; no processes left running; nothing pushed
+- 2026-11-09T18:59:26Z (fix/hq-ecee7e-hostkit-fixture): done
+  provenance: {"harness_session":"claude-code:007a9370-10d2-4c63-86e7-81dd708478cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-09T18:59:26Z (fix/hq-ecee7e-hostkit-fixture): rename-cutover Sandbox writes a test-owned hostkit work-link config; no test fails on work-link config, remaining 45 failures are the rename-commit receipt drift owned by hq-0f7499
   provenance: {"harness_session":"claude-code:007a9370-10d2-4c63-86e7-81dd708478cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
