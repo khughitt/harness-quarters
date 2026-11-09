@@ -446,8 +446,10 @@ def files(root, skip):
 
 
 def validate_inventory(path, meta):
-    """An interrupted `tasks rename` leaves rename/<old>.toml. It belongs to this cutover
-    only when its source, target and root are exactly this rename's."""
+    """An interrupted `tasks rename` leaves its inventory, rename/<old>.toml; a completed
+    one leaves the same record as a receipt, rename-commit/<new>.toml, until `tasks commit
+    --project <new>` commits the rename and removes it. Either belongs to this cutover only
+    when its source, target and root are exactly this rename's."""
     try:
         data = tomllib.loads(path.read_text())
     except tomllib.TOMLDecodeError as error:
@@ -482,10 +484,10 @@ def guard(meta, snap):
     if live != saved:
         raise Stop(f"guard: the registry changed outside {old}/{new}: {', '.join(registry_changes(live, saved))}")
     own = {f"claims/{p}.{ext}" for p in (old, new) for ext in ("toml", "lock")}
-    inventory = state / "rename" / f"{old}.toml"
-    if inventory.exists():
-        validate_inventory(inventory, meta)
-        own.add(f"rename/{old}.toml")
+    for rel in (f"rename/{old}.toml", f"rename-commit/{new}.toml"):
+        if (state / rel).exists():
+            validate_inventory(state / rel, meta)
+            own.add(rel)
     for live_root, saved_root, skip in ((config, snap / "config", {"projects.toml", "projects.lock"}),
                                         (state, snap / "state", own)):
         live_files, saved_files = files(live_root, skip), files(saved_root, skip)

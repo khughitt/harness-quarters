@@ -2058,6 +2058,29 @@ def test_guard_rejects_a_foreign_inventory(box):
     assert result.returncode == 1 and "inventory" in result.stderr
 
 
+def test_rollback_after_a_completed_rename_restores_without_its_receipt(box):
+    """A completed tasks rename leaves rename-commit/tack.toml for tasks commit; the guard
+    reads it as this rename's own, and restoring the saved state removes it."""
+    before = box.fingerprint()
+    box.save()
+    box.cutover("apply", "--snapshot", box.snapshot)
+    receipt = box.tmp / "state" / "tasks" / "rename-commit" / "tack.toml"
+    assert receipt.exists()
+    box.cutover("rollback", "--snapshot", box.snapshot)
+    assert not receipt.exists()
+    assert box.fingerprint() == before
+
+
+def test_guard_rejects_a_receipt_for_another_root(box):
+    box.save()
+    box.cutover("apply", "--snapshot", box.snapshot)
+    receipt = box.tmp / "state" / "tasks" / "rename-commit" / "tack.toml"
+    receipt.write_text(receipt.read_text().replace(f'"{box.checkout}"', f'"{box.checkout}-other"'))
+    result = box.cutover("rollback", "--snapshot", box.snapshot, check=False)
+    assert result.returncode == 1 and "inventory" in result.stderr and "rename-commit" in result.stderr
+    assert receipt.exists() and box.new_root.exists()   # nothing was moved back
+
+
 def test_guard_stops_on_a_nonempty_foreign_claims_file(box):
     box.save()
     box.cutover("apply", "--snapshot", box.snapshot)
