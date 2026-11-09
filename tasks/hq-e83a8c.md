@@ -3,12 +3,12 @@ id: hq-e83a8c
 title: "session-archive inputs: read Codex continuation-segment rollout names (rollout-<ts>-<thread>_<segment>.jsonl)"
 status: doing
 priority: 3
-size: xs
+size: s
 complexity: low
 process: direct
 owner: fix/hq-e83a8c-codex-continuation
 created: 2026-11-09T12:10:34Z
-updated: 2026-11-09T12:19:43Z
+updated: 2026-11-09T12:19:46Z
 started: 2026-11-09T12:17:51Z
 depends: []
 tags: []
