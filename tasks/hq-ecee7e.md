@@ -7,7 +7,7 @@ size: s
 complexity: mid
 owner: main
 created: 2026-11-09T17:08:30Z
-updated: 2026-11-09T18:40:50Z
+updated: 2026-11-09T18:41:17Z
 started: 2026-11-09T18:40:50Z
 depends: []
 tags: [testing]
@@ -23,3 +23,4 @@ On 2026-11-09 a deliberate full suite (TT_FORCE=1 just test) on hq main plus a C
   provenance: {"harness_session":"claude-code:d1bad3e7-58ab-480c-a57c-ab20317aa035","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"mixed"}
 - 2026-11-09T18:40:50Z (main): started
   provenance: {"harness_session":"claude-code:007a9370-10d2-4c63-86e7-81dd708478cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-09T18:41:17Z (main): trial: flow-trial-1 — enrolled — flow on
