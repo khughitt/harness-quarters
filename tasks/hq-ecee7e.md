@@ -1,12 +1,14 @@
 ---
 id: hq-ecee7e
 title: "rename-cutover tests fail locally against hostkit's work-link, which needs storage.anchor_name and sync.ignore_xattr config"
-status: todo
+status: doing
 priority: 2
 size: s
 complexity: mid
+owner: main
 created: 2026-11-09T17:08:30Z
-updated: 2026-11-09T17:08:30Z
+updated: 2026-11-09T18:40:50Z
+started: 2026-11-09T18:40:50Z
 depends: []
 tags: [testing]
 agent: claude-code/claude-opus-5-5
@@ -19,3 +21,5 @@ On 2026-11-09 a deliberate full suite (TT_FORCE=1 just test) on hq main plus a C
 
 - 2026-11-09T17:08:30Z (add): created
   provenance: {"harness_session":"claude-code:d1bad3e7-58ab-480c-a57c-ab20317aa035","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"mixed"}
+- 2026-11-09T18:40:50Z (main): started
+  provenance: {"harness_session":"claude-code:007a9370-10d2-4c63-86e7-81dd708478cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
