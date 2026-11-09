@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: main
 created: 2026-11-09T17:08:30Z
-updated: 2026-11-09T18:42:36Z
+updated: 2026-11-09T18:42:38Z
 started: 2026-11-09T18:40:50Z
 depends: []
 tags: [testing]
@@ -36,3 +36,5 @@ Verification: just test-one tools/test_rename_cutover.py passes (was 83 failed);
 - 2026-11-09T18:41:17Z (main): trial: flow-trial-1 — enrolled — flow on
 - 2026-11-09T18:41:19Z (main): arm: flow-trial-1 — unit tack-ecee7e — flow on
 - 2026-11-09T18:42:36Z (main): process direct: fixture-only fix, approach settled by reading tools/rename-cutover, the Sandbox fixture and hostkit bin/hostkit_config.py; CI switch out of scope because hostkit has no git remote
+- 2026-11-09T18:42:38Z (main): gate: scoped — adopted
+  provenance: {"harness_session":"claude-code:007a9370-10d2-4c63-86e7-81dd708478cd","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
