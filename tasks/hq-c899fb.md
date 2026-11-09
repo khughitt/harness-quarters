@@ -7,8 +7,9 @@ size: s
 complexity: low
 process: direct
 created: 2026-11-02T20:00:54Z
-updated: 2026-11-02T20:17:04Z
+updated: 2026-11-09T21:17:54Z
 depends: []
+related: [hq-74f102]
 tags: [rename-cutover]
 source: hq-5300fd
 agent: claude-code
@@ -21,3 +22,5 @@ The rename procedure lives only in dated plans (docs/plans/2026-10-06-rename-to-
 
 - 2026-11-02T20:00:54Z (add): created
   provenance: {"harness_session":"claude-code:7104a322-b727-4975-8f34-3d210db837b3","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
+- 2026-11-09T21:17:54Z (fix/hq-74f102-rename-receipt): Owns the deferred Minor from hq-74f102 final review: tools/rename-cutover verify_records recovery text (lines 1264-1266 at reviewed 96aeb2a7032e87fa9ede6708d7fe0dcfbf52d311) still says to use the line apply printed, and tools/fixtures/records-hook/README.md lines 8-11 repeats that old manual-commit contract. Remove the obsolete parenthetical, describe committing remaining edits, and update the fixture description: apply now commits the rename before moving and commits detached config relocation itself. The planned reference runbook must use this current step order, not the printed-records-commit step in this task body historical context. Accepted as Minor: verify still refuses dirty state and rollback remains available. Full review will be attached to hq-74f102 as final-1-report.md.
+  provenance: {"harness_session":"codex:01a1c1cb-f948-7571-9531-9ef02916ebc4","harness_session_source":"CODEX_THREAD_ID"}
