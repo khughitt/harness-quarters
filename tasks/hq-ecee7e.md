@@ -8,11 +8,12 @@ complexity: mid
 process: direct
 owner: fix/hq-ecee7e-hostkit-fixture
 created: 2026-11-09T17:08:30Z
-updated: 2026-11-09T18:59:27Z
+updated: 2026-11-09T18:59:48Z
 started: 2026-11-09T18:40:50Z
 completed: 2026-11-09T18:59:26Z
 closed: 2026-11-09T18:59:26Z
 depends: []
+related: [hq-0f7499]
 tags: [testing]
 model: claude-opus-5-5
 agent: claude-code/claude-opus-5-5
