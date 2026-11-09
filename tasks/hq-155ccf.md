@@ -1,15 +1,17 @@
 ---
 id: hq-155ccf
 title: Commit cutover writes and enforce receipt ownership
-status: doing
+status: done
 priority: 3
 size: s
 complexity: mid
 process: direct
 owner: fix/hq-74f102-rename-receipt
 created: 2026-11-09T20:21:08Z
-updated: 2026-11-09T20:58:41Z
+updated: 2026-11-09T20:58:44Z
 started: 2026-11-09T20:44:29Z
+completed: 2026-11-09T20:58:44Z
+closed: 2026-11-09T20:58:44Z
 depends: []
 related: [hq-5e90dd]
 parent: hq-74f102
@@ -42,3 +44,7 @@ Implement Task 1 of the receipt plan in the parent worktree .worktrees/hq-74f102
 - 2026-11-09T20:58:37Z (fix/hq-74f102-rename-receipt): gate: verified tree:9a72dc8280bbf7ba1cca8304246350e203f2149d — checks: just test-one tools/test_rename_cutover.py 218 passed and just check-hygiene passed with broad suite deliberately omitted by policy; review: none; reviewer: codex/gpt-6.1-sol
   provenance: {"harness_session":"codex:01a1c1cb-f948-7571-9531-9ef02916ebc4","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-09T20:58:41Z (fix/hq-74f102-rename-receipt): retro: forcing the existing receipt route before the move fixed both layouts without changing tasks. The three old-fixture failures showed why interrupted states must be constructed directly once successful apply commits them.
+- 2026-11-09T20:58:44Z (fix/hq-74f102-rename-receipt): done
+  provenance: {"harness_session":"codex:01a1c1cb-f948-7571-9531-9ef02916ebc4","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-09T20:58:44Z (fix/hq-74f102-rename-receipt): Receipt-aware apply and guards committed at 091984c51971fa2685138f00f1ba00b04e208349; 218 focused tests and hygiene pass; final independent review remains on parent hq-74f102.
+  provenance: {"harness_session":"codex:01a1c1cb-f948-7571-9531-9ef02916ebc4","harness_session_source":"CODEX_THREAD_ID"}
