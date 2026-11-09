@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-ecee7e-hostkit-fixture
 created: 2026-11-09T17:08:30Z
-updated: 2026-11-09T18:43:08Z
+updated: 2026-11-09T18:53:34Z
 started: 2026-11-09T18:40:50Z
 depends: []
 tags: [testing]
@@ -20,13 +20,13 @@ On 2026-11-09 a deliberate full suite (TT_FORCE=1 just test) on hq main plus a C
 
 ## Scope (2026-11-09)
 
-Outcome: tools/test_rename_cutover.py passes locally against hostkit's work-link and still passes in CI against the pinned dotfiles copy.
+Outcome: no tools/test_rename_cutover.py test fails on work-link config locally against hostkit's work-link, and CI against the pinned dotfiles copy is unaffected. (Narrowed 2026-11-09: 45 tests still fail on a separate rename-commit receipt drift, filed as hq-0f7499.)
 
 Approach: the Sandbox fixture already isolates XDG_CONFIG_HOME and hardcodes the anchor `.dropbox-work`, which was the dotfiles copy's fixed name. Hostkit's work-link reads storage.anchor_name and sync.ignore_xattr from XDG_CONFIG_HOME/hostkit/config.toml. The fixture writes that test-owned file with sync_root = the sandbox sync dir, anchor_name = ".dropbox-work", ignore_xattr = "com.dropbox.ignored" (the dotfiles copy's hardcoded values), so both implementations behave alike. rename-cutover itself does not pass config: at a real cutover it runs work-link under the host's own hostkit config, which is the right source.
 
 Not in scope: switching CI to hostkit's work-link. Hostkit has no git remote, so the workflow cannot fetch a pinned copy; that waits on publishing hostkit, which is the user's decision.
 
-Verification: just test-one tools/test_rename_cutover.py passes (was 83 failed); the config write is seen to matter by removing it and seeing the failures return.
+Verification: just test-one tools/test_rename_cutover.py shows no failure naming work-link (was 83, all work-link); the remaining failures all name the rename-commit receipt (hq-0f7499). The baseline run without the config write is the targeted break.
 
 ## Notes
 
