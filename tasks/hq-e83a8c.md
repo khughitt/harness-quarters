@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: fix/hq-e83a8c-codex-continuation
 created: 2026-11-09T12:10:34Z
-updated: 2026-11-09T12:18:31Z
+updated: 2026-11-09T12:19:43Z
 started: 2026-11-09T12:17:51Z
 depends: []
 tags: []
@@ -33,3 +33,4 @@ Done: ROLLOUT_RE accepts the optional _<UUID> suffix and takes the thread from t
 - 2026-11-09T12:18:20Z (main): arm: flow-trial-1 — unit tack-e83a8c — flow off
 - 2026-11-09T12:18:31Z (fix/hq-e83a8c-codex-continuation): resumed
   provenance: {"harness_session":"claude-code:b8d0f935-d801-48f4-b7be-91c26545cfa1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-09T12:19:43Z (fix/hq-e83a8c-codex-continuation): scope: codex_units skips continuation names today, so segments were never captured; prune deletes per thread with codex delete, so a segmented thread must fail closed in prune until codex delete's effect on segments is probed (follow-up to file). Size xs -> s; still direct: loader accepts the suffix, capture archives segments, prune keeps segmented threads. Prune timer inactive on titan (only capture enabled).
