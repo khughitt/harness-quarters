@@ -1,13 +1,15 @@
 ---
 id: hq-e83a8c
 title: "session-archive inputs: read Codex continuation-segment rollout names (rollout-<ts>-<thread>_<segment>.jsonl)"
-status: todo
+status: doing
 priority: 3
 size: xs
 complexity: low
 process: direct
+owner: main
 created: 2026-11-09T12:10:34Z
-updated: 2026-11-09T12:10:34Z
+updated: 2026-11-09T12:17:51Z
+started: 2026-11-09T12:17:51Z
 depends: []
 tags: []
 source: obs-11932e
@@ -25,3 +27,5 @@ Done: ROLLOUT_RE accepts the optional _<UUID> suffix and takes the thread from t
 
 - 2026-11-09T12:10:34Z (add): created
   provenance: {"harness_session":"claude-code:b8d0f935-d801-48f4-b7be-91c26545cfa1","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
+- 2026-11-09T12:17:51Z (main): started
+  provenance: {"harness_session":"claude-code:b8d0f935-d801-48f4-b7be-91c26545cfa1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
