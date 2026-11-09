@@ -2,12 +2,12 @@
 id: hq-155ccf
 title: Commit cutover writes and enforce receipt ownership
 status: todo
-priority: 2
+priority: 3
 size: s
 complexity: mid
 process: direct
 created: 2026-11-09T20:21:08Z
-updated: 2026-11-09T20:23:18Z
+updated: 2026-11-09T20:24:39Z
 depends: []
 parent: hq-74f102
 tags: []
