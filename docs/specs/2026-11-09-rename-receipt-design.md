@@ -1,6 +1,12 @@
 # Consume the rename receipt before moving the checkout
 
-Task: hq-74f102. Status: proposed, revision 1; awaiting human review.
+Task: hq-74f102. Status: proposed, revision 2; awaiting human review.
+
+Revision 2 addresses spec review round 1: require a real in-tree hook acceptance
+case before guide edits, surface successful commit warnings, and have `apply`
+commit the detached config relocation itself. The full review is saved in
+`docs/notes/2026-11-09-rename-receipt-spec-round-1-report.md`. These are the
+author's proposed dispositions; revision 1 remains frozen in its original commit.
 
 ## Intent and evidence
 
@@ -54,15 +60,26 @@ the invoking checkout now disables automatic broad tests.
   The tasks command owns receipt validation, path selection, repository locking
   and consumption; hq does not duplicate them or unlink a receipt itself.
 - Only then move the checkout/storage and repoint with the current `init --force`
-  commands. For a detached checkout, print a scoped command from the new checkout:
+  commands. For a detached checkout, run this scoped commit from the new checkout:
   `tasks commit --project <new> tasks/.config.toml -m "chore(tasks): relocate <new> checkout"`.
-  Include an explicit `-C <new-root>` in the emitted command, with shell quoting.
-  This second commit records only the changed checkout path before retargeting.
+  Pass the new root as the runner's explicit working directory. This second
+  commit records only the changed checkout path before retargeting. `apply`
+  commits its own rename and relocation writes; the runbook commits its own edits.
   In-tree callers still commit their subsequent code/config edits as their runbook
-  requires. Neither path prints the old raw rename commit command.
-- A receipt commit failure stops before the move, preserves the receipt and
-  reports the command's failure. Git may already have committed before a later
-  receipt-removal error; do not assume a failed command means no commit exists.
+  requires. Neither path prints a manual rename or relocation commit command.
+- For both commit calls, parse the successful command's JSON report and print
+  every warning verbatim to stderr with the command identified, preserving any
+  recovery command it contains. Nonempty warnings do not themselves turn success
+  into failure or cause hq to execute their instructions. Require a JSON object
+  with a `warnings` list of strings; malformed output stops at that boundary.
+  This follows the explicit validation pattern in `committed_check`, without
+  introducing warning classes or changing retarget's policy.
+- A receipt commit failure stops before the move and reports the command's
+  failure, retaining any receipt still present. Git may already have committed
+  before a later receipt-removal or report-validation error; do not assume a
+  failed apply means no commit exists. A detached relocation commit failure
+  stops after the move/repoint, before apply reports success; the rename is
+  already committed and its receipt consumed, and the config may be uncommitted.
   Recovery uses the saved snapshot's existing rollback, then a fresh apply;
   no automatic retry or new apply-resume mechanism is added. Failures after the
   commit or move remain within the existing rollback window.
@@ -95,6 +112,28 @@ after relocation and after the scoped config commit. Exercise interrupted rename
 rollback directly rather than assuming successful apply still leaves a receipt.
 Verify must reject an injected receipt. Test pre-existing receipts at save/apply,
 unchanged saved inventories, malformed field types and changed foreign inventories.
+
+The in-tree success case must also use a sandbox copy of hq's real committed
+hook inputs, with `just setup` and `core.hooksPath=.githooks`, and an isolated
+registry, HOME and Git configuration. Run the normal pre-commit hook, including
+`ops-check`, `ops-docs check` and both staged checks; neither `--ci` nor a no-op
+substitute proves this case. After `tasks rename`, before runbook edits to
+`identity.toml`, README or AGENTS, the receipt commit must succeed with those
+files unchanged. Expected reason: guide identity is checked against the still
+unchanged identity manifest, and retired ids resolve through the rename alias.
+Record actual hook output and the unchanged guide/identity content at that point.
+If this fails, return the demonstrated conflict for a design amendment before
+implementing an alternate commit order or bypass; there is no demonstrated pass
+yet. The fixture must supply its own required registry context rather than read
+the user's stores.
+
+For each commit boundary, test a successful JSON response with warnings and
+assert that every warning and its recovery instruction reaches stderr while
+apply succeeds. Include separate-repository predecessor and staged-recovery
+warning examples; these test output transport, not permission to run the
+suggested commands. Test malformed reports fail at their boundary, and a refusing
+detached relocation hook stops after the move and can roll back. Whole detached
+cutovers now finish apply with both commits complete and no manual commit step.
 
 Execution Setup runs the focused baseline through
 `just test-one tools/test_rename_cutover.py`; implementation preserves focused
