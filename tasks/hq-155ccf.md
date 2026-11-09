@@ -7,7 +7,7 @@ size: s
 complexity: mid
 process: direct
 created: 2026-11-09T20:21:08Z
-updated: 2026-11-09T20:21:08Z
+updated: 2026-11-09T20:23:18Z
 depends: []
 parent: hq-74f102
 tags: []
@@ -25,3 +25,5 @@ Implement Task 1 of the receipt plan in the parent worktree .worktrees/hq-74f102
 
 - 2026-11-09T20:21:08Z (add): created
   provenance: {"harness_session":"codex:01a1c1cb-f948-7571-9531-9ef02916ebc4","harness_session_source":"CODEX_THREAD_ID","origin":"agent"}
+- 2026-11-09T20:23:18Z (fix/hq-74f102-rename-receipt): gate: scoped — step of hq-74f102 plan
+  provenance: {"harness_session":"codex:01a1c1cb-f948-7571-9531-9ef02916ebc4","harness_session_source":"CODEX_THREAD_ID"}
