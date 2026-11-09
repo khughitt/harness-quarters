@@ -8,9 +8,10 @@ complexity: mid
 process: direct
 owner: fix/hq-74f102-rename-receipt
 created: 2026-11-09T20:21:08Z
-updated: 2026-11-09T20:44:56Z
+updated: 2026-11-09T20:58:33Z
 started: 2026-11-09T20:44:29Z
 depends: []
+related: [hq-5e90dd]
 parent: hq-74f102
 tags: []
 source: hq-74f102
@@ -34,3 +35,7 @@ Implement Task 1 of the receipt plan in the parent worktree .worktrees/hq-74f102
 - 2026-11-09T20:44:41Z (fix/hq-74f102-rename-receipt): gate: implementing .worktrees/hq-74f102
   provenance: {"harness_session":"codex:01a1c1cb-f948-7571-9531-9ef02916ebc4","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-09T20:44:56Z (fix/hq-74f102-rename-receipt): arm: flow-trial-1 — unit tack-74f102 — flow on
+- 2026-11-09T20:58:33Z (fix/hq-74f102-rename-receipt): Implementation commit 091984c51971fa2685138f00f1ba00b04e208349; focused tests: just test-one tools/test_rename_cutover.py, 218 passed in 181.37s, exit 0; evidence parent workspace task-1-tests-6fap40.log. Earlier RED and targeted-break logs and corrections are in the parent ledger. Mandatory just check-hygiene passed; broad suite deliberately omitted under invoking .tt.toml automatic_broad=false; no remote evidence. Completion scope covers both automatic commits, warnings/JSON, receipt guards, inventory types and rollback/adoption fixture migration. Real-hook compatibility remains hq-5e90dd.
+  provenance: {"harness_session":"codex:01a1c1cb-f948-7571-9531-9ef02916ebc4","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-09T20:58:33Z (fix/hq-74f102-rename-receipt): Inline completion self-check by codex/gpt-6.1-sol (fresh relay model output): no independent per-task seat under the user's inline review-scaling rule; the parent's fresh whole-branch review will cover this code before integration. This rule overrides flow's generic per-child fresh-context review. No task-specific retained items or processes; worktree and mutable external workspace are owned by open parent hq-74f102, not transferred at child close. No pushes or host pointers changed; implementation branch remains unmerged in the parent's worktree.
+  provenance: {"harness_session":"codex:01a1c1cb-f948-7571-9531-9ef02916ebc4","harness_session_source":"CODEX_THREAD_ID"}
