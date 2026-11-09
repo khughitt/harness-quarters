@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-74f102-rename-receipt
 created: 2026-11-09T20:21:29Z
-updated: 2026-11-09T21:10:33Z
+updated: 2026-11-09T21:10:35Z
 started: 2026-11-09T20:59:28Z
 depends: [hq-155ccf]
 related: [tasks-7180ec]
@@ -45,4 +45,6 @@ Run Task 2 of the receipt plan using the committed Task 1 candidate and task-own
 - 2026-11-09T21:10:33Z (fix/hq-74f102-rename-receipt): Preparation failures are preserved in the parent's workspace and report: first baseline lacked lore source context; second baseline passed but rename required retained named refs that clone kept as remote refs. Exact matching source commits established both fixture causes; final case faithfully restored context without hook bypass or a code workaround. No behavior suite rerun for this operational verification; mandatory normal attachment/merge hooks passed, broad suite deliberately omitted under policy, no hosted evidence. Feedback tasks-7180ec records the exact-ref refusal's useful diagnostic.
   provenance: {"harness_session":"codex:01a1c1cb-f948-7571-9531-9ef02916ebc4","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-09T21:10:33Z (fix/hq-74f102-rename-receipt): Inline operator self-check; parent final independent whole-branch review remains required. No child-owned retained worktree, scratch or external evidence and no processes; parent hq-74f102 owns the shared mutable execution workspace and worktree across final review. No pushes, live rename or host pointers. Branch remains unmerged at parent's .worktrees/hq-74f102.
+  provenance: {"harness_session":"codex:01a1c1cb-f948-7571-9531-9ef02916ebc4","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-09T21:10:35Z (fix/hq-74f102-rename-receipt): gate: verified tree:5541e47c201a311baa2d9c0225c726923d953aa3 — checks: real-hook rehearsal and saved evidence verification passed with both normal hook commits successful; review: none; reviewer: codex/gpt-6.1-sol
   provenance: {"harness_session":"codex:01a1c1cb-f948-7571-9531-9ef02916ebc4","harness_session_source":"CODEX_THREAD_ID"}
