@@ -767,8 +767,8 @@ the same change that widens its parser.
 
   `agy` is the precedent: tasks-b42efc's design
   (`docs/specs/2026-11-08-agy-session-identity-design.md` in the tasks records) shipped
-  the reader half, gated the writer on every host's install and obs's `join.py`, then
-  shipped the writer.
+  the reader half, gated the writer on every host's install and obs's
+  `src/obs/work/join.py`, then shipped the writer.
 - `TASKS_SESSION` and `TASKS_SESSION_PID` are claim-ownership overrides, never
   provenance. When a harness exports no native session ID (`pi` without an
   extension), `--stamp` omits `provenance`; report session attribution as absent rather
@@ -884,12 +884,14 @@ transcript does not name its own working directory).
    value is `unknown`.
 4. **`<obs-checkout>`**: implement `src/obs/harness/<name>.py` (session metadata, turns,
    usage, tool and shell calls, skill reads, hook runs, turn-end reasons, truncation
-   markers; a leading underscore when no module outside `harness/` imports it, as for
-   `_claude.py`) and register it in `src/obs/harness/stores.py` (`ADAPTERS`,
-   `SKILL_COVERAGE`, `store_roots()` with an `OBS_<NAME>_...` override so tests never
-   read live homes, `paths()`, `peek_cwd()`) and `src/obs/collect/pipeline.py`
-   (`initial_state()`). Discovery (section 1) finds the remaining registries; among
-   them are `src/obs/index/db.py`, `src/obs/cli.py` (`--harness` choices) and
+   markers; a leading underscore when no caller outside `harness/` imports it, whether
+   another subsystem, a script or a launcher, as for `_claude.py`) and register it in
+   `src/obs/harness/stores.py` (`ADAPTERS`, `SKILL_COVERAGE`, `store_roots()` with an
+   `OBS_<NAME>_...` override so tests never read live homes, `paths()`, `peek_cwd()`)
+   and `src/obs/collect/pipeline.py` (`initial_state()`). Discovery (section 1) finds the
+   remaining registries and branches; among them are `src/obs/index/db.py`
+   (`normalize_usage()` raises on an unknown harness; its per-harness re-read migrations
+   are history, not a registry), `src/obs/cli.py` (`--harness` choices) and
    `src/obs/commands/index.py` (the default harness list, kept equal to
    `harness.stores.ADAPTERS`), the `src/obs/session_logs/` pipeline
    (or an explicit exclusion in `session_logs/_place.py` `roots()`),
