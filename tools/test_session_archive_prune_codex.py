@@ -13,7 +13,7 @@ from session_archive.capture import capture_run, hash_file, mirror_path
 from session_archive.inputs import codex_units
 from session_archive.prune import Context, Hooks, delete_codex_unit, evaluate
 from session_archive.quarantine import QUARANTINE
-from session_archive.testing import TID, codex_continuation, codex_rollout, lenient_open_inodes, obs_for
+from session_archive.testing import SEGMENT, TID, codex_continuation, codex_rollout, lenient_open_inodes, obs_for
 
 
 @pytest.fixture
@@ -329,6 +329,16 @@ def test_segment_written_after_discovery_keeps_the_thread(world, tmp_path):
     continuation = codex_continuation(src.root)
     assert delete_codex_unit(unit, ctx) == "kept:segmented-thread"
     assert rollout.exists() and continuation.exists() and not link(src, rollout).exists()
+    assert not (tmp_path / "codex.log").exists()
+
+
+def test_archived_segment_written_after_discovery_keeps_the_thread(world, tmp_path):
+    src, unit, rollout, ctx = world
+    segment = src.home / "archived_sessions" / f"rollout-2026-01-03T00-00-00-{TID}_{SEGMENT}.jsonl"
+    segment.parent.mkdir(exist_ok=True)
+    segment.write_bytes(b'{"type":"session_meta"}\n')
+    assert delete_codex_unit(unit, ctx) == "kept:segmented-thread"
+    assert rollout.exists() and segment.exists() and not link(src, rollout).exists()
     assert not (tmp_path / "codex.log").exists()
 
 

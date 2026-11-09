@@ -18,6 +18,7 @@ from session_archive.testing import (SEGMENT, SID, TID, age, claude_session, cod
                                      write_config)
 
 OTHER = "22222222-2222-4333-8444-555555555555"
+UNRELATED = "33333333-2222-4333-8444-555555555555"
 
 
 @pytest.fixture
@@ -138,6 +139,31 @@ def test_segmented_codex_thread_is_kept_before_any_lock(table, archive, manifest
     log = tmp_path / "codex.log"
     calls = [json.loads(line)["argv"] for line in log.read_text().splitlines()] if log.exists() else []
     assert calls == ([["delete", "--force", SID]] if apply else [])
+
+
+def archived_rollout(table, tid, segment=None):
+    """A rollout `codex archive` moved into archived_sessions, which `codex delete` also reaches."""
+    suffix = f"_{segment}" if segment else ""
+    return write(src(table, "codex-archived").root / f"rollout-2026-01-03T00-00-00-{tid}{suffix}.jsonl",
+                 b'{"type":"session_meta"}\n', 40)
+
+
+@pytest.mark.parametrize("live_part", ["base", "segment"])
+def test_thread_split_between_live_and_archived_stores_is_kept(table, archive, manifest, stub_codex, tmp_path,
+                                                              live_part):
+    codex = src(table, "codex")
+    if live_part == "base":
+        live, archived_part = codex_rollout(codex.root), archived_rollout(table, TID, SEGMENT)
+    else:
+        live, archived_part = codex_continuation(codex.root), archived_rollout(table, TID)
+    single, unrelated = codex_rollout(codex.root, tid=SID), archived_rollout(table, UNRELATED)
+    capture_run(archive, manifest, table)
+    report, ok = run_prune(ctx_for(archive, manifest, [live, single], str(stub_codex)), table, True)
+    assert ok and report["codex"]["totals"] == {"kept:segmented-thread": 1, "pruned": 1}
+    assert live.exists() and archived_part.exists() and unrelated.exists() and not single.exists()
+    assert not (codex.home / "thread-writer-locks" / f"{TID}.lock").exists()
+    calls = [json.loads(line)["argv"] for line in (tmp_path / "codex.log").read_text().splitlines()]
+    assert calls == [["delete", "--force", SID]]
 
 
 def test_deferred_sources_are_not_pruned(table, archive, manifest):

@@ -257,7 +257,7 @@ def delete_codex_unit(unit: Unit, ctx: Context) -> str:
             if not os.path.lexists(rollout):
                 return "kept:vanished"
             # A segment written since discovery would go with the thread.
-            if codex_thread_segmented(unit.source.root, unit.thread_id):
+            if codex_thread_segmented(unit.source, unit.thread_id):
                 return "kept:segmented-thread"
             reason = evaluate(unit, ctx, ctx.held())
             if reason:
