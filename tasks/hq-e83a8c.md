@@ -6,9 +6,9 @@ priority: 3
 size: xs
 complexity: low
 process: direct
-owner: main
+owner: fix/hq-e83a8c-codex-continuation
 created: 2026-11-09T12:10:34Z
-updated: 2026-11-09T12:18:20Z
+updated: 2026-11-09T12:18:31Z
 started: 2026-11-09T12:17:51Z
 depends: []
 tags: []
@@ -31,3 +31,5 @@ Done: ROLLOUT_RE accepts the optional _<UUID> suffix and takes the thread from t
   provenance: {"harness_session":"claude-code:b8d0f935-d801-48f4-b7be-91c26545cfa1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-09T12:18:17Z (main): trial: flow-trial-1 — enrolled — flow off
 - 2026-11-09T12:18:20Z (main): arm: flow-trial-1 — unit tack-e83a8c — flow off
+- 2026-11-09T12:18:31Z (fix/hq-e83a8c-codex-continuation): resumed
+  provenance: {"harness_session":"claude-code:b8d0f935-d801-48f4-b7be-91c26545cfa1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
