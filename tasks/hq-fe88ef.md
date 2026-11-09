@@ -7,9 +7,9 @@ size: s
 complexity: mid
 process: direct
 created: 2026-10-06T13:23:04Z
-updated: 2026-11-09T15:41:03Z
+updated: 2026-11-09T15:43:59Z
 depends: []
-related: [ops-161e17]
+related: [ops-161e17, hq-a83688]
 parent: hq-72fd4b
 tags: []
 source: tack-8b7a28
