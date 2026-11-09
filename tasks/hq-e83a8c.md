@@ -1,16 +1,19 @@
 ---
 id: hq-e83a8c
 title: "session-archive inputs: read Codex continuation-segment rollout names (rollout-<ts>-<thread>_<segment>.jsonl)"
-status: doing
+status: done
 priority: 3
 size: s
 complexity: low
 process: direct
 owner: fix/hq-e83a8c-codex-continuation
 created: 2026-11-09T12:10:34Z
-updated: 2026-11-09T12:35:12Z
+updated: 2026-11-09T12:35:34Z
 started: 2026-11-09T12:17:51Z
+completed: 2026-11-09T12:35:34Z
+closed: 2026-11-09T12:35:34Z
 depends: []
+related: [hq-c7490a]
 tags: []
 source: obs-11932e
 agent: claude-code/claude-opus-5-5
@@ -37,3 +40,7 @@ Done: ROLLOUT_RE accepts the optional _<UUID> suffix and takes the thread from t
 - 2026-11-09T12:29:25Z (fix/hq-e83a8c-codex-continuation): review: impl round 1 — verdict: revise; findings: important 1, minor 3; reviewer: claude-code/claude-opus-5-5
 - 2026-11-09T12:35:09Z (fix/hq-e83a8c-codex-continuation): review: impl round 2 — verdict: accept; findings: minor 1; reviewer: claude-code/claude-opus-5-5
 - 2026-11-09T12:35:12Z (fix/hq-e83a8c-codex-continuation): minor accepted without change: the missing-archived_sessions skip branch is untested, but check_sources already refuses a missing codex-archived root on a real host and the reviewer probed the branch. Verification: just test-one over test_session_archive inputs, prune_codex, prune_run, readiness, capture_run 245 passed, just check-hygiene rc 0, policy-off (no broad suite). Premise correction: capture already archived continuation segments (capture_run walks every file); only prune was affected. No continuation was left out of an archive run.
+- 2026-11-09T12:35:34Z (fix/hq-e83a8c-codex-continuation): done
+  provenance: {"harness_session":"claude-code:b8d0f935-d801-48f4-b7be-91c26545cfa1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-09T12:35:34Z (fix/hq-e83a8c-codex-continuation): ROLLOUT_RE accepts the continuation-segment suffix (thread = first UUID): the loader accepts ready continuations, codex_units yields segments, prune keeps segmented threads across sessions and archived_sessions; segmented deletion is hq-c7490a
+  provenance: {"harness_session":"claude-code:b8d0f935-d801-48f4-b7be-91c26545cfa1","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
