@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-74f102-rename-receipt
 created: 2026-11-09T20:21:29Z
-updated: 2026-11-09T21:00:56Z
+updated: 2026-11-09T21:08:55Z
 started: 2026-11-09T20:59:28Z
 depends: [hq-155ccf]
 parent: hq-74f102
@@ -38,3 +38,4 @@ Run Task 2 of the receipt plan using the committed Task 1 candidate and task-own
 - 2026-11-09T21:00:03Z (fix/hq-74f102-rename-receipt): arm: flow-trial-1 — unit tack-74f102 — flow on
 - 2026-11-09T21:00:56Z (fix/hq-74f102-rename-receipt): gate: implementing .worktrees/hq-74f102
   provenance: {"harness_session":"codex:01a1c1cb-f948-7571-9531-9ef02916ebc4","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-09T21:08:55Z (fix/hq-74f102-rename-receipt): attached: real-hook-rehearsal.md (2736 bytes): Normal hook passes before and after hqprobe rename on the merged candidate; guides unchanged and receipt consumed.
