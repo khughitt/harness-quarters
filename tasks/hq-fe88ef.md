@@ -7,8 +7,9 @@ size: s
 complexity: mid
 process: direct
 created: 2026-10-06T13:23:04Z
-updated: 2026-10-08T10:19:52Z
+updated: 2026-11-09T15:41:03Z
 depends: []
+related: [ops-161e17]
 parent: hq-72fd4b
 tags: []
 source: tack-8b7a28
@@ -26,3 +27,4 @@ Where: links.toml [required]; claude/settings.json; codex/hooks*.json; local/cla
 ## Notes
 
 - 2026-10-08T10:19:50Z (main): scope: scoped; todo under hq-72fd4b, P3 s mid direct; six hook links (lore claude-profile, five ops hooks) declared in links.toml [required], ops's just install rejected, familiar left to fam (npm familiar already on PATH); brief: docs/notes/2026-10-08-declared-surface-drift-brief.md
+- 2026-11-09T15:41:03Z (main): Subsumed by r5 piece 2.6 (filed in hq under ops-161e17; ops records docs/specs/2026-11-09-boundary-revision-5-design.md §5.5): hq generates relay-only harness settings for Claude Code, Codex and agy, so no hook command names a checkout path. Close this when 2.6 lands.
