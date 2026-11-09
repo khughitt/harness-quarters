@@ -7,9 +7,9 @@ size: s
 complexity: mid
 process: direct
 created: 2026-10-19T21:48:11Z
-updated: 2026-11-09T15:40:58Z
+updated: 2026-11-09T15:43:55Z
 depends: []
-related: [ops-161e17]
+related: [ops-161e17, hq-a83688]
 tags: [hooks]
 source: ops-1d3a70
 agent: claude-code/claude-opus-5-5
