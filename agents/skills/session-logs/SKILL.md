@@ -91,7 +91,7 @@ beginning `# AGENTS.md`, `<environment_context>`, `<INSTRUCTIONS>`,
 human: a turn beginning `<pasted_content id="…">` — the person pasted
 something and may have typed after the closing `</pasted_content id="…">`; the
 wrapper tags are the harness's, the rest is theirs. The same list lives in obs's
-`claude_adapter.py` / `codex_adapter.py` and in `session-episodes`; change all
+`src/obs/harness/_claude.py` / `src/obs/harness/codex.py` and in `session-episodes`; change all
 three together.
 
 In agy, the human is a `USER_INPUT` step with `source: USER_EXPLICIT`, and only the
