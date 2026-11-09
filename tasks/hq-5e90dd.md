@@ -2,12 +2,12 @@
 id: hq-5e90dd
 title: Record real-hook acceptance before guide edits
 status: todo
-priority: 2
+priority: 3
 size: s
 complexity: mid
 process: direct
 created: 2026-11-09T20:21:29Z
-updated: 2026-11-09T20:23:23Z
+updated: 2026-11-09T20:24:44Z
 depends: [hq-155ccf]
 parent: hq-74f102
 tags: []
