@@ -8,7 +8,7 @@ complexity: mid
 process: direct
 owner: fix/hq-74f102-rename-receipt
 created: 2026-11-09T20:21:29Z
-updated: 2026-11-09T21:10:35Z
+updated: 2026-11-09T21:10:38Z
 started: 2026-11-09T20:59:28Z
 depends: [hq-155ccf]
 related: [tasks-7180ec]
@@ -48,3 +48,4 @@ Run Task 2 of the receipt plan using the committed Task 1 candidate and task-own
   provenance: {"harness_session":"codex:01a1c1cb-f948-7571-9531-9ef02916ebc4","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-09T21:10:35Z (fix/hq-74f102-rename-receipt): gate: verified tree:5541e47c201a311baa2d9c0225c726923d953aa3 — checks: real-hook rehearsal and saved evidence verification passed with both normal hook commits successful; review: none; reviewer: codex/gpt-6.1-sol
   provenance: {"harness_session":"codex:01a1c1cb-f948-7571-9531-9ef02916ebc4","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-09T21:10:38Z (fix/hq-74f102-rename-receipt): retro: the unrenamed hook baseline separated missing registry context from rename behavior. Faithfully copying retained local refs resolved clone-only validation; the precise refusal saved investigation and is recorded as positive feedback tasks-7180ec.
