@@ -107,6 +107,16 @@ def codex_rollout(root: Path, age_days: float = 40, tid: str = TID,
     return write(root / "2026" / "01" / "01" / f"rollout-2026-01-01T00-00-00-{tid}.jsonl", data, age_days)
 
 
+SEGMENT = "019e0000-0000-7000-8000-0000000000aa"
+
+
+def codex_continuation(root: Path, age_days: float = 40, tid: str = TID, segment: str = SEGMENT,
+                       data: bytes = b'{"type":"session_meta","history_mode":"paginated"}\n') -> Path:
+    """A Codex 0.165+ continuation segment of thread `tid`, written on a later day."""
+    return write(root / "2026" / "01" / "02" / f"rollout-2026-01-02T00-00-00-{tid}_{segment}.jsonl",
+                 data, age_days)
+
+
 def uninspectable_comms() -> tuple[str, ...]:
     """comm names of this user's processes whose descriptors this host cannot read (on
     the primary host: systemd and (sd-pam)); tests allow them so they can watch processes they start."""

@@ -13,7 +13,7 @@ from typing import Callable
 
 from .capture import archived_file, capture_file, fsync_dir, mirror_path, open_nofollow, stat_of, walk_files
 from .decide import INACTIVE_NS, FileFacts, ObsFile, Stat, unit_reason
-from .inputs import InspectionFailed, Unit
+from .inputs import InspectionFailed, Unit, codex_thread_segmented
 from .manifest import MIRROR, Manifest
 from .quarantine import QUARANTINE, _rename_at, inodes, leftovers, quarantine_dir, release, remove_empty_dirs
 
@@ -101,8 +101,11 @@ def _facts(source, relpath: str, ctx: Context, held) -> FileFacts:
 
 
 def evaluate(unit: Unit, ctx: Context, held) -> str | None:
-    """The first condition the unit fails, or None. An active unit is rejected on its stat
-    alone, before any hashing."""
+    """The first condition the unit fails, or None. A segmented Codex thread is kept outright:
+    `codex delete` acts on the whole thread, and the deletion protocol holds one rollout. An
+    active unit is rejected on its stat alone, before any hashing."""
+    if unit.segmented:
+        return "segmented-thread"
     for relpath in unit.files:
         if ctx.now_ns - stat_of(unit.source.root / relpath).mtime_ns <= INACTIVE_NS:
             return "active"
@@ -253,6 +256,9 @@ def delete_codex_unit(unit: Unit, ctx: Context) -> str:
                 return "kept:busy"
             if not os.path.lexists(rollout):
                 return "kept:vanished"
+            # A segment written since discovery would go with the thread.
+            if codex_thread_segmented(unit.source, unit.thread_id):
+                return "kept:segmented-thread"
             reason = evaluate(unit, ctx, ctx.held())
             if reason:
                 return f"kept:{reason}"

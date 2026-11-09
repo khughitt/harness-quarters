@@ -3,6 +3,7 @@ import json
 import os
 import re
 import subprocess
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -12,7 +13,9 @@ from .decide import ObsFile
 
 UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 SESSION_RE = re.compile(rf"^{UUID}$")
-ROLLOUT_RE = re.compile(rf"^rollout-.*-({UUID})\.jsonl$")
+# Group 1 is the thread. Codex 0.165+ continues a thread in segment files,
+# rollout-<ts>-<thread>_<segment>.jsonl; group 2 holds the segment suffix.
+ROLLOUT_RE = re.compile(rf"^rollout-.*-({UUID})(_{UUID})?\.jsonl$")
 
 
 class ObsUnavailable(Exception):
@@ -186,6 +189,7 @@ class Unit:
     paths: tuple[Path, ...]    # entries the deletion protocol moves or links
     files: tuple[str, ...]     # regular files relative to source.root
     thread_id: str | None = None
+    segmented: bool = False    # Codex: a continuation segment, or its thread has several rollout files
 
 
 def claude_units(source: Source) -> list[Unit]:
@@ -223,11 +227,48 @@ def claude_units(source: Source) -> list[Unit]:
     return units
 
 
+# Every store `codex delete <thread>` reaches under a Codex home.
+CODEX_STORES = ("sessions", "archived_sessions")
+
+
+def _rollouts(root: Path) -> list[tuple[Path, re.Match]]:
+    return [(path, match) for path in walk_files(root) if (match := ROLLOUT_RE.fullmatch(path.name))]
+
+
+def _home_rollouts(source: Source) -> list[tuple[Path, re.Match]]:
+    """Rollouts in every Codex store of the source's home. The source root must be one of
+    them and must exist; another store may be absent."""
+    stores = [source.home / name for name in CODEX_STORES]
+    if source.root not in stores:
+        raise ValueError(f"{source.root} is not a Codex store of {source.home}")
+    return [found for store in stores if store == source.root or os.path.lexists(store)
+            for found in _rollouts(store)]
+
+
+def _segmented(matches: list[re.Match]) -> bool:
+    """A thread with several rollout files, or any continuation segment (its base may lie
+    outside the stores)."""
+    return len(matches) > 1 or any(match[2] for match in matches)
+
+
 def codex_units(source: Source) -> list[Unit]:
+    """One unit per rollout file under the source root, base and continuation segment alike.
+    A thread's files are counted across every store, since `codex delete` acts on them all."""
+    found = _home_rollouts(source)
+    threads = Counter(match[1] for _, match in found)
     units = []
-    for path in walk_files(source.root):
-        match = ROLLOUT_RE.fullmatch(path.name)
-        if match:
-            relpath = path.relative_to(source.root).as_posix()
-            units.append(Unit(source, relpath, (path,), (relpath,), match.group(1)))
+    for path, match in found:
+        if not path.is_relative_to(source.root):
+            continue
+        relpath = path.relative_to(source.root).as_posix()
+        units.append(Unit(source, relpath, (path,), (relpath,), match[1],
+                          segmented=bool(match[2]) or threads[match[1]] > 1))
     return units
+
+
+def codex_thread_segmented(source: Source, thread_id: str) -> bool:
+    """A fresh look at whether the thread is segmented across the source home's stores.
+    It walks every store, once per unit that reaches deletion (units x files). A glob for
+    the thread would be cheaper, but Path.glob skips a directory it cannot read, and a
+    missed segment would let `codex delete` take it unchecked; walk_files raises instead."""
+    return _segmented([match for _, match in _home_rollouts(source) if match[1] == thread_id])

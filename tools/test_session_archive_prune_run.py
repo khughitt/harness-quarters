@@ -13,10 +13,12 @@ from session_archive.capture import capture_run, hash_file, mirror_path, promote
 from session_archive.manifest import Manifest
 from session_archive.prune import Context, LeftoverQuarantine, prune_run
 from session_archive.quarantine import QUARANTINE
-from session_archive.testing import (SID, age, claude_session, codex_rollout, lenient_open_inodes, obs_for, obs_payload,
-                                     run_tool, uninspectable_comms, write, write_config)
+from session_archive.testing import (SEGMENT, SID, TID, age, claude_session, codex_continuation, codex_rollout,
+                                     lenient_open_inodes, obs_for, obs_payload, run_tool, uninspectable_comms, write,
+                                     write_config)
 
 OTHER = "22222222-2222-4333-8444-555555555555"
+UNRELATED = "33333333-2222-4333-8444-555555555555"
 
 
 @pytest.fixture
@@ -116,6 +118,52 @@ def test_unprobed_codex_is_kept_and_fails_the_run(table, archive, manifest, stub
     report, ok = run_prune(ctx_for(archive, manifest, [rollout], str(stub_codex)), table, True, codex_probed=False)
     assert not ok and report["codex"]["totals"] == {"kept:codex-unprobed": 1}
     assert rollout.exists()
+
+
+@pytest.mark.parametrize("apply", [False, True])
+def test_segmented_codex_thread_is_kept_before_any_lock(table, archive, manifest, stub_codex, tmp_path, apply):
+    codex = src(table, "codex")
+    base, continuation = codex_rollout(codex.root), codex_continuation(codex.root)
+    lone = codex_continuation(codex.root, tid=OTHER, segment=SEGMENT)
+    single = codex_rollout(codex.root, tid=SID)
+    capture_run(archive, manifest, table)
+    ctx = ctx_for(archive, manifest, [base, continuation, lone, single], str(stub_codex))
+    report, ok = run_prune(ctx, table, apply)
+    kept = [base, continuation, lone]
+    assert ok and report["codex"]["totals"] == {"kept:segmented-thread": 3, "pruned" if apply else "eligible": 1}
+    outcomes = {entry["unit"]: entry["outcome"] for entry in report["codex"]["units"]}
+    assert all(outcomes[path.relative_to(codex.root).as_posix()] == "kept:segmented-thread" for path in kept)
+    assert all(path.exists() for path in kept) and single.exists() != apply
+    locks = codex.home / "thread-writer-locks"
+    assert not (locks / f"{TID}.lock").exists() and not (locks / f"{OTHER}.lock").exists()
+    log = tmp_path / "codex.log"
+    calls = [json.loads(line)["argv"] for line in log.read_text().splitlines()] if log.exists() else []
+    assert calls == ([["delete", "--force", SID]] if apply else [])
+
+
+def archived_rollout(table, tid, segment=None):
+    """A rollout `codex archive` moved into archived_sessions, which `codex delete` also reaches."""
+    suffix = f"_{segment}" if segment else ""
+    return write(src(table, "codex-archived").root / f"rollout-2026-01-03T00-00-00-{tid}{suffix}.jsonl",
+                 b'{"type":"session_meta"}\n', 40)
+
+
+@pytest.mark.parametrize("live_part", ["base", "segment"])
+def test_thread_split_between_live_and_archived_stores_is_kept(table, archive, manifest, stub_codex, tmp_path,
+                                                              live_part):
+    codex = src(table, "codex")
+    if live_part == "base":
+        live, archived_part = codex_rollout(codex.root), archived_rollout(table, TID, SEGMENT)
+    else:
+        live, archived_part = codex_continuation(codex.root), archived_rollout(table, TID)
+    single, unrelated = codex_rollout(codex.root, tid=SID), archived_rollout(table, UNRELATED)
+    capture_run(archive, manifest, table)
+    report, ok = run_prune(ctx_for(archive, manifest, [live, single], str(stub_codex)), table, True)
+    assert ok and report["codex"]["totals"] == {"kept:segmented-thread": 1, "pruned": 1}
+    assert live.exists() and archived_part.exists() and unrelated.exists() and not single.exists()
+    assert not (codex.home / "thread-writer-locks" / f"{TID}.lock").exists()
+    calls = [json.loads(line)["argv"] for line in (tmp_path / "codex.log").read_text().splitlines()]
+    assert calls == [["delete", "--force", SID]]
 
 
 def test_deferred_sources_are_not_pruned(table, archive, manifest):
