@@ -1,13 +1,15 @@
 ---
 id: hq-5e90dd
 title: Record real-hook acceptance before guide edits
-status: todo
+status: doing
 priority: 3
 size: s
 complexity: mid
 process: direct
+owner: fix/hq-74f102-rename-receipt
 created: 2026-11-09T20:21:29Z
-updated: 2026-11-09T20:24:44Z
+updated: 2026-11-09T20:59:28Z
+started: 2026-11-09T20:59:28Z
 depends: [hq-155ccf]
 parent: hq-74f102
 tags: []
@@ -30,4 +32,6 @@ Run Task 2 of the receipt plan using the committed Task 1 candidate and task-own
 - 2026-11-09T20:21:29Z (add): created
   provenance: {"harness_session":"codex:01a1c1cb-f948-7571-9531-9ef02916ebc4","harness_session_source":"CODEX_THREAD_ID","origin":"agent"}
 - 2026-11-09T20:23:23Z (fix/hq-74f102-rename-receipt): gate: scoped — step of hq-74f102 plan
+  provenance: {"harness_session":"codex:01a1c1cb-f948-7571-9531-9ef02916ebc4","harness_session_source":"CODEX_THREAD_ID"}
+- 2026-11-09T20:59:28Z (fix/hq-74f102-rename-receipt): started
   provenance: {"harness_session":"codex:01a1c1cb-f948-7571-9531-9ef02916ebc4","harness_session_source":"CODEX_THREAD_ID"}
