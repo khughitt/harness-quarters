@@ -9,7 +9,7 @@ import harness_stores
 from session_archive import capture, config
 from session_archive.capture import capture_run, mirror_path
 from session_archive.manifest import Manifest
-from session_archive.testing import run_tool, write, write_config
+from session_archive.testing import codex_continuation, codex_rollout, run_tool, write, write_config
 
 
 def table(home):
@@ -26,6 +26,17 @@ def test_counts_and_mirror(home, archive, manifest):
     assert mirror_path(archive, "codex", "2026/01/01/r.jsonl").read_bytes() == b"r\n"
     again, _ = capture_run(archive, manifest, table(home))
     assert again["claude"]["unchanged"] == 1
+
+
+def test_codex_continuation_segments_are_archived_beside_their_base(home, archive, manifest):
+    root = home / ".codex/sessions"
+    files = [codex_rollout(root, data=b"base\n"), codex_continuation(root, data=b"segment\n")]
+    report, ok = capture_run(archive, manifest, table(home))
+    assert ok and report["codex"]["copied"] == 2
+    for path in files:
+        relpath = path.relative_to(root).as_posix()
+        assert mirror_path(archive, "codex", relpath).read_bytes() == path.read_bytes()
+        assert manifest.mirror("codex", relpath).sha256 is not None
 
 
 def test_removed_source_stays_archived(home, archive, manifest):

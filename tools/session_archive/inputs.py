@@ -3,6 +3,7 @@ import json
 import os
 import re
 import subprocess
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -12,7 +13,9 @@ from .decide import ObsFile
 
 UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 SESSION_RE = re.compile(rf"^{UUID}$")
-ROLLOUT_RE = re.compile(rf"^rollout-.*-({UUID})\.jsonl$")
+# Group 1 is the thread. Codex 0.165+ continues a thread in segment files,
+# rollout-<ts>-<thread>_<segment>.jsonl; group 2 holds the segment suffix.
+ROLLOUT_RE = re.compile(rf"^rollout-.*-({UUID})(_{UUID})?\.jsonl$")
 
 
 class ObsUnavailable(Exception):
@@ -186,6 +189,7 @@ class Unit:
     paths: tuple[Path, ...]    # entries the deletion protocol moves or links
     files: tuple[str, ...]     # regular files relative to source.root
     thread_id: str | None = None
+    segmented: bool = False    # Codex: the thread has more than one rollout file
 
 
 def claude_units(source: Source) -> list[Unit]:
@@ -223,11 +227,28 @@ def claude_units(source: Source) -> list[Unit]:
     return units
 
 
+def _rollouts(root: Path) -> list[tuple[Path, re.Match]]:
+    return [(path, match) for path in walk_files(root) if (match := ROLLOUT_RE.fullmatch(path.name))]
+
+
+def _segmented(matches: list[re.Match]) -> bool:
+    """A thread with several rollout files, or any continuation segment (its base may lie
+    outside the root)."""
+    return len(matches) > 1 or any(match[2] for match in matches)
+
+
 def codex_units(source: Source) -> list[Unit]:
+    """One unit per rollout file, base and continuation segment alike."""
+    found = _rollouts(source.root)
+    threads = Counter(match[1] for _, match in found)
     units = []
-    for path in walk_files(source.root):
-        match = ROLLOUT_RE.fullmatch(path.name)
-        if match:
-            relpath = path.relative_to(source.root).as_posix()
-            units.append(Unit(source, relpath, (path,), (relpath,), match.group(1)))
+    for path, match in found:
+        relpath = path.relative_to(source.root).as_posix()
+        units.append(Unit(source, relpath, (path,), (relpath,), match[1],
+                          segmented=bool(match[2]) or threads[match[1]] > 1))
     return units
+
+
+def codex_thread_segmented(root: Path, thread_id: str) -> bool:
+    """A fresh look at whether the thread has more than one rollout file under root."""
+    return _segmented([match for _, match in _rollouts(root) if match[1] == thread_id])

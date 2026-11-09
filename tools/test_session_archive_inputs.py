@@ -10,9 +10,10 @@ import pytest
 
 import harness_stores
 from session_archive import config
-from session_archive.inputs import (InspectionFailed, ObsUnavailable, claude_units, codex_units,
+from session_archive.inputs import (ROLLOUT_RE, InspectionFailed, ObsUnavailable, claude_units, codex_units,
                                     load_obs_state, open_inodes)
-from session_archive.testing import SID, TID, claude_session, codex_rollout, lenient_open_inodes, write
+from session_archive.testing import (SEGMENT, SID, TID, claude_session, codex_continuation, codex_rollout,
+                                     lenient_open_inodes, write)
 
 
 def source(home, name):
@@ -150,6 +151,36 @@ def test_codex_units_carry_thread_ids(home):
     (unit,) = codex_units(src)
     assert unit.thread_id == TID and unit.paths == (rollout,)
     assert unit.files == (rollout.relative_to(src.root).as_posix(),)
+    assert not unit.segmented
+
+
+def test_rollout_name_takes_the_thread_from_the_first_uuid():
+    assert ROLLOUT_RE.fullmatch(f"rollout-2026-01-01T00-00-00-{TID}.jsonl")[1] == TID
+    assert ROLLOUT_RE.fullmatch(f"rollout-2026-01-02T00-00-00-{TID}_{SEGMENT}.jsonl")[1] == TID
+    for name in (f"rollout-2026-01-02T00-00-00-{TID}_segment.jsonl", f"rollout-2026-01-02T00-00-00-{TID}_.jsonl",
+                 f"rollout-2026-01-02T00-00-00-{TID}_{SEGMENT}_{SEGMENT}.jsonl"):
+        assert ROLLOUT_RE.fullmatch(name) is None, name
+
+
+def test_codex_units_yield_each_segment_of_a_thread(home):
+    src = source(home, "codex")
+    base, continuation = codex_rollout(src.root), codex_continuation(src.root)
+    single = codex_rollout(src.root, tid=SID)
+    units = {unit.key: unit for unit in codex_units(src)}
+    keys = {path: path.relative_to(src.root).as_posix() for path in (base, continuation, single)}
+    assert set(units) == set(keys.values())
+    for path in (base, continuation):
+        unit = units[keys[path]]
+        assert unit.thread_id == TID and unit.paths == (path,) and unit.files == (keys[path],)
+        assert unit.segmented
+    assert units[keys[single]].thread_id == SID and not units[keys[single]].segmented
+
+
+def test_lone_continuation_is_segmented(home):
+    src = source(home, "codex")
+    continuation = codex_continuation(src.root)
+    (unit,) = codex_units(src)
+    assert unit.thread_id == TID and unit.paths == (continuation,) and unit.segmented
 
 
 def obs_payload():
@@ -313,6 +344,24 @@ def test_obs_rejects_codex_identity_contradictions(field, value):
     payload = codex_payload()
     payload["files"][0]["identity"][field] = value
     with pytest.raises(ObsUnavailable):
+        load(payload)
+
+
+def test_obs_accepts_ready_continuation_claimed_by_its_thread():
+    payload = codex_payload()
+    path = f"/source/rollout-2026-01-02-{TID}_{SEGMENT}.jsonl"
+    payload["files"][0]["path"] = path
+    entry = load(payload)[path]
+    assert entry.ready and entry.thread_id == entry.filename_id == TID
+
+
+@pytest.mark.parametrize("claimed", [SID, SEGMENT])
+def test_obs_rejects_ready_continuation_of_another_thread(claimed):
+    payload = codex_payload()
+    payload["files"][0].update(path=f"/source/rollout-2026-01-02-{TID}_{SEGMENT}.jsonl",
+                               identity={"thread_id": claimed, "filename_id": claimed,
+                                         "ancestors": [], "conflicts": []})
+    with pytest.raises(ObsUnavailable, match="ready contradicts"):
         load(payload)
 
 
