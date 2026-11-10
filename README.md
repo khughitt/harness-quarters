@@ -376,9 +376,11 @@ MIT licensed; see `LICENSE`.
 - `tools/hq`, `tools/hq_cli/` and `tools/hq.toml`: the `hq` command, linked as
   `~/.local/bin/hq`; `hq sessions` lists and resumes agent sessions (see "Finding a
   past session" below).
-- `docs/`: hq's specs, plans, notes (briefs, contracts and analyses), runbooks, and the
-  2026-10-16 commit map in `docs/rewrites/` for old SHAs cited in records. Frozen
-  documents moved to lore and flows stay as references for closed tasks.
+- `docs/`: hq's reference documents, runbooks, the specs, plans and notes this tree still
+  cites (revised in place), and the 2026-10-16 commit map in `docs/rewrites/` for old SHAs
+  cited in records. Frozen documents moved to lore and flows stay as references for closed
+  tasks. New specs, plans, briefs and handoffs go to the records directory (`tasks where`
+  names it).
 - `tools/ops-docs` and `tools/ops-check`: vendored from ops; change them there.
 - `.ops-check.toml`: the paths the layout check lets carry host values. The six harness
   settings and hooks files hold absolute paths their homes read literally (or, for
