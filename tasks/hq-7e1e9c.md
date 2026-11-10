@@ -8,7 +8,7 @@ complexity: low
 process: planned
 owner: main
 created: 2026-10-27T14:17:56Z
-updated: 2026-11-10T02:29:40Z
+updated: 2026-11-10T02:29:43Z
 started: 2026-11-10T02:28:09Z
 depends: []
 related: [ops-630a87]
@@ -42,4 +42,6 @@ Done: the paths are gone, just test passes, and the pre-commit checks pass. grep
   provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-10T02:28:36Z (main): arm: flow-trial-1 — unit tack-7e81ed — flow on
 - 2026-11-10T02:29:37Z (main): scope grew (evidence 2026-11-09 at main 09dbead8): since filing, the cutover test modules became partitions 3 and 4 of tools/test-suite (relay-parallel under xdist, relay-signal serial), named in tools/test_test_execution.py fixtures, docs/test-execution.md partitions list, AGENTS.md Gates (relay signal test stays serial, xdist reads the grant), .github/workflows/ci.yml PYTEST_XDIST_AUTO_NUM_WORKERS 2 with its partition comment, and docs/specs/2026-11-03-test-execution-policy-design.md (four partitions, hosted zsh requirement for the cutover modules). Deleting the tool now means redesigning the partitions (two partitions or keep xdist for hooks-tools, whether ci-test still needs the explicit worker count, hosted coverage contract), not removing two justfile segments. Other findings: no ~/.local/state/hq/relay-cutover on titan or europa; .githooks/harness-state-clean:37 comment and tools/test_turn_pause_wiring.py:18 comment also cite it. Process changed direct to planned, size s to m
+  provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-10T02:29:43Z (main): parked (waiting on agent): agent drafts a design amendment to the test-execution policy for removing the cutover partitions (partition set, xdist and ci-test worker requirement, hosted coverage), then the user reviews it before deletion
   provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
