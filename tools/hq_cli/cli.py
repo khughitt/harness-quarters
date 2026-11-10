@@ -4,6 +4,8 @@ import os
 import re
 import select
 import shutil
+import socket
+import stat
 import subprocess
 import sys
 import time
@@ -226,10 +228,27 @@ def pick(lines: list[str], footer: str, painted: bool) -> int:
 
 def broken(stream) -> bool:
     """Whether the stream's reader has gone: poll reports POLLERR on a pipe without a reader
-    and POLLHUP on a socket whose peer closed (a pipe's write end never reports POLLHUP)."""
+    and POLLHUP on a socket whose peer closed (a pipe's write end never reports POLLHUP).
+    A stream socket whose peer only shut down reading shows poll nothing, so it is probed."""
     poller = select.poll()
     poller.register(stream.fileno(), 0)
-    return any(event & (select.POLLERR | select.POLLHUP) for _, event in poller.poll(0))
+    if any(event & (select.POLLERR | select.POLLHUP) for _, event in poller.poll(0)):
+        return True
+    return stat.S_ISSOCK(os.fstat(stream.fileno()).st_mode) and reader_shut(stream.fileno())
+
+
+def reader_shut(fd: int) -> bool:
+    """Whether a stream socket's peer shut down reading: a zero-length send carries no data
+    and fails with EPIPE only then. Other socket types are not probed, since a zero-length
+    datagram is a message."""
+    with socket.socket(fileno=os.dup(fd)) as sock:
+        if sock.type != socket.SOCK_STREAM:
+            return False
+        try:
+            sock.send(b"", socket.MSG_DONTWAIT | socket.MSG_NOSIGNAL)
+        except BrokenPipeError:
+            return True
+    return False
 
 
 def silence_broken() -> bool:

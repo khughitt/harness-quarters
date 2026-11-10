@@ -831,6 +831,55 @@ def test_fzf_pick_into_a_closed_socket_refuses_before_launch(env):
     assert not marker.exists()
 
 
+def test_listing_into_a_socket_whose_reader_shut_down_reading_exits_quietly(env):
+    """poll shows nothing for a peer's SHUT_RD, yet the write fails with EPIPE."""
+    claude_session(env.home / ".claude", SID, env.project("alpha"))
+    ours, theirs = socket.socketpair()
+    ours.shutdown(socket.SHUT_RD)
+    try:
+        result = subprocess.run([sys.executable, str(TOOL), "sessions"], stdout=theirs.fileno(),
+                                stderr=subprocess.PIPE, text=True,
+                                env={"HOME": str(env.home), "PATH": str(env.bin)})
+    finally:
+        theirs.close()
+        ours.close()
+    assert result.returncode == 0 and result.stderr == ""
+
+
+def test_fzf_pick_into_a_socket_whose_reader_shut_down_reading_refuses_before_launch(env):
+    claude_session(env.home / ".claude", SID, env.project("alpha"))
+    env.script("fzf", FZF_STUB.format(python=sys.executable))
+    marker = env.root / "launched"
+    env.script("claude", f"#!{sys.executable}\nopen({str(marker)!r}, 'w').close()\n")
+    ours, theirs = socket.socketpair()
+    ours.shutdown(socket.SHUT_RD)
+    try:
+        result = subprocess.run([sys.executable, str(TOOL), "sessions", "-i"], stdout=theirs.fileno(),
+                                stderr=subprocess.PIPE, text=True,
+                                env={"HOME": str(env.home), "PATH": str(env.bin), "FZF_PICK": "1"})
+    finally:
+        theirs.close()
+        ours.close()
+    assert result.returncode == 1
+    assert "nothing launched" in result.stderr
+    assert not marker.exists()
+
+
+def test_a_live_socket_is_not_broken():
+    """The zero-length probe sends nothing to a reader that is still there."""
+    from hq_cli import cli
+    ours, theirs = socket.socketpair()
+    try:
+        with theirs.makefile("w") as stream:
+            assert not cli.broken(stream)
+        ours.setblocking(False)
+        with pytest.raises(BlockingIOError):
+            ours.recv(1)
+    finally:
+        theirs.close()
+        ours.close()
+
+
 def test_error_with_stderr_closed_at_startup_still_exits_1(env):
     claude_session(env.home / ".claude", SID, env.project("alpha"))
     result = subprocess.run([sys.executable, str(TOOL), "sessions", "-i"], stdout=subprocess.PIPE,
