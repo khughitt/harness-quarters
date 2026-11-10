@@ -37,10 +37,12 @@ def seed(home, harness, root, cwd="/work/a", workers=(), calls=140, **fields):
             setattr(st, key, value)
 
 
-def hq(home, *args, thread=None, cwd=None):
+def hq(home, *args, thread=None, cwd=None, claude_session=None):
     env = {"PATH": os.environ["PATH"], "HOME": str(home / "home"), "XDG_STATE_HOME": str(home / "state")}
     if thread:
         env["CODEX_THREAD_ID"] = thread
+    if claude_session:
+        env["CLAUDE_CODE_SESSION_ID"] = claude_session
     return subprocess.run([sys.executable, str(TOOL), "pause", *args], env=env, cwd=cwd or str(home),
                           capture_output=True, text=True)
 
@@ -71,6 +73,57 @@ def test_status_cwd_picks_newest(home):
     os.utime(store(home)._path("claude-code-old.json"), (1, 1))
     seed(home, "claude-code", "new", cwd=str(home), paused="calls")
     assert "paused:calls" in hq(home, "status").stdout
+
+
+def test_status_claude_session_env_beats_cwd(home):
+    seed(home, "claude-code", "s1", cwd="/elsewhere")
+    seed(home, "claude-code", "other", cwd=str(home), calls=0)
+    result = hq(home, "status", claude_session="s1")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == LINE
+
+
+def make_repo_with_worktree(home):
+    """A git repository at home/main with a linked worktree outside it, off the host's git config."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    env.update(HOME=str(home / "home"), GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_NOSYSTEM="1",
+               GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
+    main, linked = home / "main", home / "storage" / "wt"
+    main.mkdir()
+
+    def git(*args, cwd=main):
+        subprocess.run(["git", *args], cwd=cwd, env=env, check=True, capture_output=True)
+
+    git("init", "-q", "-b", "main")
+    top = subprocess.run(["git", "rev-parse", "--show-toplevel", "--absolute-git-dir"], cwd=main, env=env,
+                         check=True, capture_output=True, text=True).stdout.split()
+    assert top == [str(main.resolve()), str((main / ".git").resolve())]
+    git("commit", "-q", "--allow-empty", "-m", "init")
+    git("worktree", "add", "-q", "-b", "wt", str(linked))
+    return main.resolve(), linked.resolve()
+
+
+def test_status_from_linked_worktree_finds_main_checkout_state(home):
+    main, linked = make_repo_with_worktree(home)
+    seed(home, "claude-code", "s1", cwd=str(main))
+    result = hq(home, "status", cwd=str(linked))
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == LINE
+
+
+def test_status_worktree_cwd_prefers_exact_match(home):
+    main, linked = make_repo_with_worktree(home)
+    seed(home, "claude-code", "main", cwd=str(main), calls=0)
+    seed(home, "claude-code", "wt", cwd=str(linked))
+    os.utime(store(home)._path("claude-code-wt.json"), (1, 1))
+    assert hq(home, "status", cwd=str(linked)).stdout.strip() == LINE
+
+
+def test_status_no_state_from_worktree_names_both_paths(home):
+    main, linked = make_repo_with_worktree(home)
+    result = hq(home, "status", cwd=str(linked))
+    assert result.returncode == 1 and result.stdout == ""
+    assert str(linked) in result.stderr and str(main) in result.stderr
 
 
 def test_status_session_flag(home):

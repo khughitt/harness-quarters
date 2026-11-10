@@ -7,6 +7,7 @@ modules it needs are the hook's own cheap ones.
 from datetime import datetime, timezone
 import json
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -56,7 +57,8 @@ def add_parser(commands) -> None:
     status = sub.add_parser("status", help="this tree's counts, limits, pause and notification state",
                             description=GUIDANCE)
     status.add_argument("--session", help="root or worker session id (default: $CODEX_THREAD_ID, "
-                                          "else the newest state for the current directory)")
+                                          "else $CLAUDE_CODE_SESSION_ID, else the newest state for the "
+                                          "current directory or, from a linked worktree, its main checkout)")
     status.add_argument("--json", action="store_true")
     show = sub.add_parser("limits", help="the default turn limits", description=GUIDANCE)
     show.add_argument("--json", action="store_true")
@@ -68,9 +70,26 @@ def add_parser(commands) -> None:
     _add_history_filters(lst)
 
 
+def main_checkout(env, cwd: str) -> str | None:
+    """The main worktree of the git repository holding cwd, when cwd is in a linked worktree of it."""
+    clean = {k: v for k, v in env.items() if not k.startswith("GIT_")}
+    out = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=cwd, env=clean,
+                         capture_output=True, text=True, check=False)
+    if out.returncode != 0:
+        return None
+    common = Path(out.stdout.strip())
+    if common.name != ".git":
+        return None
+    main = str(common.parent.resolve())
+    return None if main == cwd else main
+
+
 def find(store: Store, session: str | None, env, cwd: str):
-    """(state, what was looked for). A session id may be a root or a worker of a root."""
-    session = session or env.get("CODEX_THREAD_ID") or None
+    """(state, what was looked for). A session id may be a root or a worker of a root.
+
+    Without --session the harness's own session id ($CODEX_THREAD_ID, $CLAUDE_CODE_SESSION_ID) wins;
+    then the newest state for cwd, then for the main checkout when cwd is a linked worktree of it."""
+    session = session or env.get("CODEX_THREAD_ID") or env.get("CLAUDE_CODE_SESSION_ID") or None
     if session is not None:
         for harness in HARNESSES:
             root = store.root_for_agent(harness, session) or session
@@ -81,7 +100,13 @@ def find(store: Store, session: str | None, env, cwd: str):
     found = store.latest_for_cwd(cwd)
     if found is not None:
         return store.read(*found), ""
-    return None, f"a state for cwd {cwd!r}"
+    main = main_checkout(env, cwd)
+    if main is None:
+        return None, f"a state for cwd {cwd!r}"
+    found = store.latest_for_cwd(main)
+    if found is not None:
+        return store.read(*found), ""
+    return None, f"a state for cwd {cwd!r} or its main checkout {main!r}"
 
 
 def notify_text(state) -> str:
