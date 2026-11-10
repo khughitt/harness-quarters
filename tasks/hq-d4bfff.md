@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-10-10T12:51:00Z
-updated: 2026-11-10T02:28:01Z
+updated: 2026-11-10T09:20:42Z
 started: 2026-11-10T02:27:01Z
 depends: []
 tags: []
@@ -28,4 +28,6 @@ hq-915ef2 found OpenCode v2.0.26 reads ~/.agents/skills and ~/.claude/skills its
 - 2026-11-10T02:27:58Z (main): finding 2026-11-09 on europa: OpenCode is not installed (no opencode on PATH in plain or login zsh, pacman has neither opencode nor opencode-bin, no ~/.opencode or ~/.local/share/opencode; only ~/.config/opencode exists). ~/.agents/skills there holds flow, curate, tasks and session-logs as declared links that resolve (session-logs SKILL.md present). titan runs opencode 2.2.6 (pacman opencode 2.2.6-1). Installing a package on europa is a host change outside the repository, so whether europa should have OpenCode is the user's decision
   provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-10T02:28:01Z (main): parked (waiting on user, decision): user decides: install OpenCode on europa (pacman -S opencode, matching titan 2.2.6), after which an agent runs opencode run --standalone there and checks the four skills; or drop this task because europa does not run OpenCode
+  provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-10T09:20:42Z (main): gate: scoped — adopted
   provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
