@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-11-09T15:46:04Z
-updated: 2026-11-10T02:16:41Z
+updated: 2026-11-10T02:16:44Z
 started: 2026-11-10T02:16:14Z
 depends: [tasks-14ae03]
 related: [ops-99d2b2]
@@ -35,3 +35,4 @@ Constraints (r5 plan, Global Constraints): passes the trial gate as the user nar
 - 2026-11-10T02:16:14Z (main): started
   provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-10T02:16:41Z (main): trial: flow-trial-1 — enrolled — flow on
+- 2026-11-10T02:16:44Z (main): arm: flow-trial-1 — unit tack-63cab5 — flow on
