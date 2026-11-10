@@ -2,6 +2,7 @@
 import os
 import sys
 import tomllib
+from collections.abc import Mapping
 from pathlib import Path
 
 import harness_stores
@@ -50,6 +51,15 @@ def environment(session: Session, base: dict[str, str]) -> dict[str, str]:
     return env
 
 
+def managed_argv(command: list[str], env: Mapping[str, str]) -> list[str]:
+    setting = env.get("HOSTKIT_AGENT_SESSIONS", "")
+    if setting in ("", "0"):
+        return command
+    if setting == "1":
+        return ["host-budget", "session", "--", *command]
+    raise LaunchError("HOSTKIT_AGENT_SESSIONS must be 0 or 1")
+
+
 def launch(session: Session, flags_by_home: dict[str, list[str]], config: Path) -> None:
     """Replace this process with the harness; rechecks cwd and transcript just before."""
     if session.home.name not in flags_by_home:
@@ -62,6 +72,7 @@ def launch(session: Session, flags_by_home: dict[str, list[str]], config: Path) 
         raise LaunchError(f"transcript gone: {session.transcript}")
     command = argv(session, flags_by_home[session.home.name])
     env = environment(session, dict(os.environ))
+    command = managed_argv(command, env)
     sys.stdout.flush()
     sys.stderr.flush()
     try:
