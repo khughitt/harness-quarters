@@ -2,14 +2,15 @@
 id: hq-a6b2d8
 title: Rerun flow-defects-after-close once its cohort has scored tasks
 status: todo
-priority: "3"
+priority: 3
 size: xs
 complexity: low
 process: direct
 defer: 2026-10-31
 created: 2026-10-02T12:10:55Z
-updated: 2026-10-02T12:10:56Z
+updated: 2026-11-10T02:25:25Z
 depends: []
+related: [flows-f8ea06]
 tags: [flow]
 source: tack-026612
 agent: claude-code/claude-opus-5-5
@@ -20,3 +21,4 @@ The first run (2026-10-02) of agents/evals/cases/flow-defects-after-close.md had
 ## Notes
 
 - 2026-10-02T12:10:55Z (flow-eval-run): concerns: tack-026612 extension — the first live run's cohort was empty by the 30-day rule; the first scoring run is due after 2026-10-30
+- 2026-11-10T02:25:25Z (main): the case file left hq at eaae8e37 (flows-f8ea06); it now lives in flows evals/cases/flow-defects-after-close.md with bin/flow-outcome-verdict there, so the rerun and the appended verdict are flows work; moving
