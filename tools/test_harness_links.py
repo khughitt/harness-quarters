@@ -877,7 +877,7 @@ def test_real_manifest_adopts_agy_replaced_settings_on_anchored_host_and_clears_
 
 
 def first_run_host(tmp_path, settings):
-    """A set-up clone and a host agy ran on before its home was linked (europa's shape)."""
+    """A set-up clone and a host agy ran on before its home was linked."""
     import json
 
     home = tmp_path / "home"
