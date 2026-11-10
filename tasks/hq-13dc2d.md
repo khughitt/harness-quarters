@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-11-06T01:13:01Z
-updated: 2026-11-10T09:21:37Z
+updated: 2026-11-10T09:21:39Z
 started: 2026-11-10T02:29:59Z
 depends: []
 tags: []
@@ -37,4 +37,6 @@ Why: lore-591a09 builds skills/distillation-review/SKILL.md; it needs the same d
 - 2026-11-10T09:18:52Z (main): resumed
   provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-10T09:21:37Z (main): applied on titan 2026-11-10 with the user's approval: just link --apply rc 0, just link-check reports no drift, ~/.agents/skills/distillation-review and ~/.claude/skills/distillation-review resolve to lore skills/distillation-review (SKILL.md present). europa: hq checkout synced at d88a4e3b and lore SKILL.md present there, but just link refuses the whole apply because ~/.local/bin/agy is a real file (a 234 MB agy ELF binary dated 2026-10-31) where links.toml declares the harnesses/agy/bin/agy launcher, which execs ~/.local/share/agy/agy. The same europa apply would also create four session-archive unit links (replicate and verify-replica .service and .timer; linking only, nothing enabled). Nothing applied on europa
+  provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-10T09:21:39Z (main): parked (waiting on user, approval): on the user's approval, an agent on europa runs mkdir -p ~/.local/share/agy and mv ~/.local/bin/agy ~/.local/share/agy/agy, then just link --apply from main (creates the two distillation-review links, the agy launcher link and four session-archive unit links, enabling nothing), then just link-check
   provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
