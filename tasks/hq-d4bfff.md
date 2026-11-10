@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-10-10T12:51:00Z
-updated: 2026-11-10T02:27:28Z
+updated: 2026-11-10T02:27:30Z
 started: 2026-11-10T02:27:01Z
 depends: []
 tags: []
@@ -24,3 +24,4 @@ hq-915ef2 found OpenCode v2.0.26 reads ~/.agents/skills and ~/.claude/skills its
 - 2026-11-10T02:27:01Z (main): started
   provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-10T02:27:28Z (main): trial: flow-trial-1 — enrolled — flow on
+- 2026-11-10T02:27:30Z (main): arm: flow-trial-1 — unit tack-d4bfff — flow on
