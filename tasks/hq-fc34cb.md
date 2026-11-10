@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-11-08T16:53:53Z
-updated: 2026-11-10T02:18:15Z
+updated: 2026-11-10T02:18:41Z
 started: 2026-11-10T02:18:15Z
 depends: []
 tags: []
@@ -25,3 +25,4 @@ Deferred minor from hq-d9d059's round-2 review (tools/hq_cli/cli.py broken()/mai
   provenance: {"harness_session":"claude-code:51fffea7-6ed5-4a54-b2d7-3a0f02c1306a","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
 - 2026-11-10T02:18:15Z (main): started
   provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-10T02:18:41Z (main): trial: flow-trial-1 — enrolled — flow on
