@@ -8,10 +8,10 @@ complexity: low
 process: direct
 owner: chore/hq-d4bfff-europa-opencode
 created: 2026-10-10T12:51:00Z
-updated: 2026-11-10T09:23:19Z
+updated: 2026-11-10T09:23:21Z
 started: 2026-11-10T02:27:01Z
 depends: []
-related: [hq-13dc2d]
+related: [hq-13dc2d, flows-5a84e2, flows-85e3ae]
 tags: []
 source: hq-915ef2
 agent: claude-code/claude-opus-5-5
@@ -42,3 +42,4 @@ hq-915ef2 found OpenCode v2.0.26 reads ~/.agents/skills and ~/.claude/skills its
 - 2026-11-10T09:23:16Z (chore/hq-d4bfff-europa-opencode): reviewer accepted after its own fresh europa session: names and description openings match SKILL.md on disk, and a made-up skill name was denied. Minor 1: europa link drift (distillation-review, session-archive units, agy refuse) is outside this claim and owned by hq-13dc2d. Minor 2: both ~/.agents/skills and ~/.claude/skills hold the four skills, so the session does not say which supplied them; either surface satisfies the task
 - 2026-11-10T09:23:19Z (chore/hq-d4bfff-europa-opencode): gate: verified tree:bb309534ee283252f7ceb261e5d238c14e93fbcb — checks: ssh europa opencode --version v2.2.6 and ls -l of the four skill links and fresh opencode run --standalone listing flow curate tasks session-logs, repeated independently by the reviewer; review: minor deferred hq-13dc2d europa link drift outside this claim, minor addressed both skill surfaces hold the four skills and either satisfies the task; reviewer: claude-code
   provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-10T09:23:21Z (chore/hq-d4bfff-europa-opencode): retro: the check itself took four commands once OpenCode was installed; the empty worktree and fresh review mostly satisfied the direct path's tree gates, the friction flows-5a84e2 and flows-85e3ae already track. Asking a free model to list skills, with a made-up-name control, was cheap evidence of discovery
