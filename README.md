@@ -708,7 +708,10 @@ Root calls count tool-call attempts by the controller; worker calls never spend
 that allowance. Spawns count the whole tree, and compactions count only the root.
 Use `hq pause status --json` as the authoritative hook snapshot for counted metrics;
 keep manually counted, unhooked metrics separate. JSON compactions are `null` when
-the hook cannot count them. `hq pause history` and `hq pause list` expose read-only
+the hook cannot count them. Without `--session`, `hq pause status` finds the session from
+`CODEX_THREAD_ID` or `CLAUDE_CODE_SESSION_ID`, else the newest state recorded for the
+current directory or, from a linked git worktree, for its main checkout; finding none
+exits 1 naming the paths it tried. `hq pause history` and `hq pause list` expose read-only
 transition events and per-turn summaries across local root records (`--session`,
 `--harness`, `--since`, `--until`, `-n`, `--json`; see the
 [diagnostics guide](docs/turn-pause-history.md)).
