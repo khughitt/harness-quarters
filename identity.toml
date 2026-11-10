@@ -8,3 +8,6 @@ The instruction corpus and profiles live in lore; the flow system lives in flows
 """
 authority = ["docs/specs/2026-10-06-residue-design.md"]
 subsystems = []
+
+[code]
+standard = 1
