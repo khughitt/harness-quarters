@@ -3,12 +3,12 @@ id: hq-7e1e9c
 title: "Delete the relay cutover tool, its tests, runbook and allowances"
 status: doing
 priority: 3
-size: s
+size: m
 complexity: low
-process: direct
+process: planned
 owner: main
 created: 2026-10-27T14:17:56Z
-updated: 2026-11-10T02:29:37Z
+updated: 2026-11-10T02:29:40Z
 started: 2026-11-10T02:28:09Z
 depends: []
 related: [ops-630a87]
