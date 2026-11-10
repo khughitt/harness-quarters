@@ -206,3 +206,12 @@ logic behind one adapter per harness"):
   `session-episodes`, and `session-logs` (alongside `obs-175b10` for `obs` indexing).
 - `hq-ce3ab4`: support Crush sessions in `hq sessions`, `session-archive`,
   `session-episodes`, and `session-logs` (alongside `obs-175b10`).
+
+## Managed CPU scopes
+
+On a host with `HOSTKIT_AGENT_SESSIONS=1`, `hq sessions -i` and the agy
+and pi executable launchers enter the host's validated slice through
+`host-budget session`. Resumes keep the selected harness home and working
+directory. The session wrapper preserves runner defaults and the command's
+exit status. A failed scope launch stops the command. An unset or zero
+setting uses the native launch path.

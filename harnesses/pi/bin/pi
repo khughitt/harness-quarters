@@ -42,4 +42,8 @@ export PI_SKIP_VERSION_CHECK=1
 for var in PYTEST_XDIST_AUTO_NUM_WORKERS CARGO_BUILD_JOBS RUST_TEST_THREADS NEXTEST_TEST_THREADS GOMAXPROCS; do
     export "$var=${!var:-4}"
 done
-exec "$dir/node_modules/.bin/pi" "$@"
+case "${HOSTKIT_AGENT_SESSIONS-}" in
+    ""|0) exec "$dir/node_modules/.bin/pi" "$@" ;;
+    1) exec host-budget session -- "$dir/node_modules/.bin/pi" "$@" ;;
+    *) echo "pi: HOSTKIT_AGENT_SESSIONS must be 0 or 1" >&2; exit 2 ;;
+esac
