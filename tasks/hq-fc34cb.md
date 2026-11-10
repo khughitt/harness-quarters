@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: fix/hq-fc34cb-shut-rd-socket
 created: 2026-11-08T16:53:53Z
-updated: 2026-11-10T02:26:22Z
+updated: 2026-11-10T02:26:38Z
 started: 2026-11-10T02:18:15Z
 completed: 2026-11-10T02:26:22Z
 closed: 2026-11-10T02:26:22Z
@@ -44,3 +44,4 @@ Deferred minor from hq-d9d059's round-2 review (tools/hq_cli/cli.py broken()/mai
   provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-10T02:26:22Z (fix/hq-fc34cb-shut-rd-socket): broken() detects a stream socket whose peer shut down reading by a zero-length send; listing exits quietly and -i refuses before launch; minors deferred to hq-73665f
   provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-10T02:26:38Z (main): cleanup: merged to main 09dbead8; worktree removed (ignored: regenerable caches only); branch deleted; nothing pushed; no processes left
