@@ -49,8 +49,8 @@ still holds what the filter strips (fix with `git add --renormalize <path>`), an
 when the repository's filter config is not what `just setup` writes (`clean`,
 `required = true`, `smudge = cat`; read from the shared config in a linked worktree too). A record commit
 that the hygiene checks refuse means a finding somewhere in the working tree, not in the
-task record (for an attach commit, its own attached file under tasks/files can be the
-finding). A new attachment that carries host values follows the attachment fallback in
+task record (for an attach commit, its own attached file in the records directory can be
+the finding). A new attachment that carries host values follows the attachment fallback in
 lore `skills/references/retained-item-records.md`: keep the raw bytes under WORK_ROOT
 and attach a portable derivative. Never widen `.ops-check.toml` for an attachment.
 `just docs` regenerates the identity and family regions.
@@ -95,9 +95,9 @@ The generated global Projects block is checked by lore.
 - `tools/session-archive` and `systemd/user/`: transcript capture and pruning.
 - `tools/hq` (`tools/hq_cli/`, flags in `tools/hq.toml`): `hq sessions` lists and resumes
   sessions across harness homes from their own metadata (README.md).
-- `docs/`: specs, plans, notes, runbooks, a commit map in rewrites/, and frozen documents
-  moved to lore and flows, kept for closed tasks. `tools/ops-docs` and `tools/ops-check`
-  are vendored from ops.
+- `docs/`: references, runbooks, a commit map in rewrites/, and the specs, plans and notes
+  this tree cites, revised in place; new specs, plans, briefs and handoffs go to the records
+  directory (`tasks where`). `tools/ops-docs` and `tools/ops-check` are vendored from ops.
 
 ## Rules
 
