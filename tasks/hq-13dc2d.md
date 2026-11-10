@@ -6,9 +6,9 @@ priority: 2
 size: xs
 complexity: low
 process: direct
-owner: main
+owner: feat/hq-13dc2d-distillation-review
 created: 2026-11-06T01:13:01Z
-updated: 2026-11-10T02:30:28Z
+updated: 2026-11-10T02:30:48Z
 started: 2026-11-10T02:29:59Z
 depends: []
 tags: []
@@ -28,3 +28,5 @@ Why: lore-591a09 builds skills/distillation-review/SKILL.md; it needs the same d
   provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-10T02:30:26Z (main): trial: flow-trial-1 — enrolled — flow off
 - 2026-11-10T02:30:28Z (main): arm: flow-trial-1 — unit tack-13dc2d — flow off
+- 2026-11-10T02:30:48Z (feat/hq-13dc2d-distillation-review): resumed
+  provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
