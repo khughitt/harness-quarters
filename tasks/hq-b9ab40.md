@@ -6,7 +6,7 @@ priority: 3
 defer: 2026-12-09
 wake_on: [obs-c1b5ac]
 created: 2026-09-18T18:56:12Z
-updated: 2026-11-10T01:31:13Z
+updated: 2026-11-10T01:31:26Z
 depends: [tasks-5b73bf]
 related: [tasks-5b73bf]
 tags: [quick-add, flow, question]
@@ -31,3 +31,5 @@ Source: mindful:thought:7b1b0c108103464388357acb293ad0ed
 - 2026-10-31T11:07:18Z (main): scope: shelved; renewed the missing checkpoint to 2026-11-30, retaining the full two-part condition. tasks-5b73bf is still todo; the current curate-kinds deliverable remains outstanding. The 127 retros since 2026-09-24 (no scan warnings) do not establish kind-specific gate friction. obs-00809f is done but E1 remains unvalidated, tracked by obs-c1b5ac; closure alone does not supply the required kind evidence. Related direction: flows-912ac5 types existing gates rather than establishing per-kind lifecycles. Evidence: tasks 7589a04, flows 55b28e4, obs 2e31cd0. origin: filing unavailable (no stamped creation occurrence); canonical mindful thought:7b1b0c108103464388357acb293ad0ed confirms the human's lifecycle question, separately from the task's evidence conditions; origin field unchanged.
   provenance: {"harness_session":"codex:01a1919f-7e52-7202-94dd-12751aee4777","harness_session_source":"CODEX_THREAD_ID"}
 - 2026-11-10T01:31:13Z (main): shelved: tasks-5b73bf's kinds section has landed (supported shapes: Defect, Decision, Open idea; goal and plan step omitted for lack of evidence), so the remaining condition is: a retro listing or a validated obs outcome-measure report (E1 revision obs-c1b5ac) shows one kind's flow tasks skipping or faking a gate or repeating the same friction
+- 2026-11-10T01:31:26Z (main): scope: shelved; woken by tasks-5b73bf done (2026-11-09, merged at tasks 0025a349): the curate skill's kinds section lists Defect, Decision and Open idea from 20 recorded curate verdicts, and omits goal and plan step (no pass drew one) and feedback as its own kind (folded into Defect). That meets the condition's first half. The second half stays unmet: 137 retros since 2026-10-31 (no scan warnings) show no kind-specific gate skipping, faking or repeated friction, and obs-c1b5ac (E1 revision, todo) still keeps the outcome measures unvalidated. Renewed to 2026-12-09; wake target tasks-5b73bf acknowledged and replaced by obs-c1b5ac; execution dependency on tasks-5b73bf kept. Note for the eventual answer: the flow-run tasks are mostly plan steps, a kind the curate evidence has not yet drawn. origin: unchanged from the 2026-10-31 audit (no stamped creation occurrence; mindful thought confirms the human's question); origin field unchanged
+  provenance: {"harness_session":"claude-code:ec805703-7844-4701-8baa-4c05d849b360","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
