@@ -8,9 +8,10 @@ complexity: low
 process: direct
 owner: chore/hq-d4bfff-europa-opencode
 created: 2026-10-10T12:51:00Z
-updated: 2026-11-10T09:20:47Z
+updated: 2026-11-10T09:20:59Z
 started: 2026-11-10T02:27:01Z
 depends: []
+related: [hq-13dc2d]
 tags: []
 source: hq-915ef2
 agent: claude-code/claude-opus-5-5
@@ -34,4 +35,6 @@ hq-915ef2 found OpenCode v2.0.26 reads ~/.agents/skills and ~/.claude/skills its
 - 2026-11-10T09:20:45Z (chore/hq-d4bfff-europa-opencode): resumed
   provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-10T09:20:47Z (chore/hq-d4bfff-europa-opencode): gate: implementing .worktrees/hq-d4bfff
+  provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-10T09:20:59Z (chore/hq-d4bfff-europa-opencode): check 2026-11-10 on europa after the user installed OpenCode: /usr/bin/opencode reports v2.2.6 (matches titan). ~/.agents/skills there links flow, curate, tasks and session-logs into their owner checkouts. A fresh opencode run --standalone --archived -m opencode/big-pickle session (free model, no metered charge) in /tmp, asked to list its skills without tools, listed 43 including curate, flow, session-logs and tasks, plus lore and superpowers skills. No link change needed, matching hq-915ef2's titan finding. Separate: just link on europa is refused by a real binary at ~/.local/bin/agy, recorded on hq-13dc2d
   provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
