@@ -8,10 +8,10 @@ complexity: low
 process: direct
 owner: main
 created: 2026-11-09T15:46:04Z
-updated: 2026-11-10T02:16:44Z
+updated: 2026-11-10T02:17:49Z
 started: 2026-11-10T02:16:14Z
 depends: [tasks-14ae03]
-related: [ops-99d2b2]
+related: [ops-99d2b2, tasks-d09fc4]
 tags: []
 source: ops-161e17
 agent: claude-code/claude-opus-5-5
@@ -36,3 +36,5 @@ Constraints (r5 plan, Global Constraints): passes the trial gate as the user nar
   provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
 - 2026-11-10T02:16:41Z (main): trial: flow-trial-1 — enrolled — flow on
 - 2026-11-10T02:16:44Z (main): arm: flow-trial-1 — unit tack-63cab5 — flow on
+- 2026-11-10T02:17:49Z (main): finding: color.py already takes the hex from tasks resolve (projects.place reads row color since b0b56253); the remaining derivation is color.stand_in (xterm-256 nearest in OKLab, pinned to ops project-colors), which r5 spec 5.1 rule 5 assigns to tasks alone. tasks resolve JSON exposes only color #rrggbb (checked 2026-11-09), so removing stand_in now would either change 256-colour output (breaking acceptance: hq colours unchanged) or keep a copy. Blocked on tasks-d09fc4 exposing the stand-in index in resolve/projects JSON; then hq reads it, deletes stand_in, LEGIBLE_256 use for projects, and the two pinned stand-in tests
+  provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
