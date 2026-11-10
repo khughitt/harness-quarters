@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: feat/hq-13dc2d-distillation-review
 created: 2026-11-06T01:13:01Z
-updated: 2026-11-10T02:30:48Z
+updated: 2026-11-10T02:32:11Z
 started: 2026-11-10T02:29:59Z
 depends: []
 tags: []
@@ -29,4 +29,6 @@ Why: lore-591a09 builds skills/distillation-review/SKILL.md; it needs the same d
 - 2026-11-10T02:30:26Z (main): trial: flow-trial-1 — enrolled — flow off
 - 2026-11-10T02:30:28Z (main): arm: flow-trial-1 — unit tack-13dc2d — flow off
 - 2026-11-10T02:30:48Z (feat/hq-13dc2d-distillation-review): resumed
+  provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-10T02:32:11Z (main): declared both links (merged fe65e2f9): ~/.agents/skills/distillation-review and claude skills/distillation-review to lore:skills/distillation-review; lore ff06d8b is on origin/main. Checks: just test-one tools/test_harness_links.py 63 passed, check-hygiene rc 0. just link preview from main shows exactly two creates and nothing else. Worktree removed (ignored: caches only), branch deleted, nothing pushed. Activation awaits the user's go-ahead
   provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
