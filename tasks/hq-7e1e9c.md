@@ -8,7 +8,7 @@ complexity: low
 process: direct
 owner: main
 created: 2026-10-27T14:17:56Z
-updated: 2026-11-10T02:28:09Z
+updated: 2026-11-10T02:28:36Z
 started: 2026-11-10T02:28:09Z
 depends: []
 related: [ops-630a87]
@@ -40,3 +40,4 @@ Done: the paths are gone, just test passes, and the pre-commit checks pass. grep
 - 2026-11-08T16:16:07Z (main): Trial gate re-scoped 2026-11-08 at the user's request (flows records docs/notes/2026-11-08-flow-trial-1-gate-scope.md, superseding ops-630a87 change 5's wait-for-readout for flow-trial-1): this step neither reaches the two arms differently nor touches the verdict's inputs (trial-arm census, obs outcomes report), so it no longer waits for readout. Land it on its own merits.
 - 2026-11-10T02:28:09Z (main): started
   provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
+- 2026-11-10T02:28:36Z (main): arm: flow-trial-1 — unit tack-7e81ed — flow on
