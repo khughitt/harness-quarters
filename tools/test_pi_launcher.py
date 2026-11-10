@@ -18,8 +18,9 @@ printf 'skip=%s\\n' "${PI_SKIP_VERSION_CHECK-unset}"
 
 
 def run(root, *args):
-    env = {**os.environ, "PI_INSTALL_ROOT": str(root)}
-    env.pop("PI_SKIP_VERSION_CHECK", None)
+    home = root / "home"
+    home.mkdir(exist_ok=True)
+    env = {"HOME": str(home), "PATH": os.environ["PATH"], "PI_INSTALL_ROOT": str(root)}
     return subprocess.run([str(LAUNCHER), *args], env=env, capture_output=True, text=True)
 
 

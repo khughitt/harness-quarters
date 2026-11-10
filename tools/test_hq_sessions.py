@@ -984,6 +984,41 @@ def test_launch_claude_work_sets_claude_config_dir(env):
     assert out["cwd"] == str(project)
 
 
+@pytest.mark.parametrize("work", [False, True])
+@pytest.mark.parametrize("setting", ["", "0", "1"])
+def test_launch_scope_keeps_the_selected_claude_home(env, work, setting):
+    project = env.project("alpha")
+    selected = env.home / (".claude-work" if work else ".claude")
+    claude_session(selected, SID, project)
+    marker = env.root / "scoped"
+    env.script("host-budget", f"""#!{sys.executable}
+import os, pathlib, sys
+assert sys.argv[1:4] == ["session", "--", "claude"]
+pathlib.Path({str(marker)!r}).touch()
+os.execvp(sys.argv[3], sys.argv[3:])
+""")
+    result = env.run("sessions", "-i", input="1\n", HOSTKIT_AGENT_SESSIONS=setting)
+    out = launched(result)
+    assert out["argv"] == ["--dangerously-skip-permissions", "--resume", SID]
+    assert out["cwd"] == str(project)
+    assert out["CLAUDE_CONFIG_DIR"] == (str(selected) if work else None)
+    assert marker.exists() == (setting == "1")
+
+
+def test_launch_scope_refusal_never_falls_through(env):
+    claude_session(env.home / ".claude-work", SID, env.project("alpha"))
+    result = env.run("sessions", "-i", input="1\n", HOSTKIT_AGENT_SESSIONS="1")
+    assert result.returncode != 0
+    assert "host-budget" in result.stderr
+    env.script("host-budget", f"#!{sys.executable}\nraise SystemExit(7)\n")
+    result = env.run("sessions", "-i", input="1\n", HOSTKIT_AGENT_SESSIONS="1")
+    assert result.returncode == 7
+    assert '"tool": "claude"' not in result.stdout
+    result = env.run("sessions", "-i", input="1\n", HOSTKIT_AGENT_SESSIONS="typo")
+    assert result.returncode != 0
+    assert "HOSTKIT_AGENT_SESSIONS" in result.stderr
+
+
 def test_launch_claude_work_keeps_the_callers_codex_home(env):
     claude_session(env.home / ".claude-work", SID, env.project("alpha"))
     out = launched(env.run("sessions", "-i", input="1\n", CODEX_HOME="/y"))
