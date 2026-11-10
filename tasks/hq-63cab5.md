@@ -1,13 +1,15 @@
 ---
 id: hq-63cab5
 title: color.py reads the tasks resolver for project colour
-status: todo
+status: doing
 priority: 1
 size: xs
 complexity: low
 process: direct
+owner: main
 created: 2026-11-09T15:46:04Z
-updated: 2026-11-09T15:47:29Z
+updated: 2026-11-10T02:16:14Z
+started: 2026-11-10T02:16:14Z
 depends: [tasks-14ae03]
 related: [ops-99d2b2]
 tags: []
@@ -30,3 +32,5 @@ Constraints (r5 plan, Global Constraints): passes the trial gate as the user nar
 
 - 2026-11-09T15:46:04Z (add): created
   provenance: {"harness_session":"claude-code:8b04cd6d-bc88-4b52-98d6-cf73afc07a6e","harness_session_source":"CLAUDE_CODE_SESSION_ID","origin":"agent"}
+- 2026-11-10T02:16:14Z (main): started
+  provenance: {"harness_session":"claude-code:ec2a27a0-32cf-4bec-9baf-700f147c7283","harness_session_source":"CLAUDE_CODE_SESSION_ID"}
