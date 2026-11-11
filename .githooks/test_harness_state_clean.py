@@ -229,7 +229,7 @@ def test_unconfigured_toml_and_nested_slash_paths_are_refused(path, text):
 
 RUNPY = ("import json, runpy, sys\n"
          "ns = runpy.run_path(sys.argv[1])\n"
-         "print(json.dumps({'keys': ns.get('CLAUDE_JSON_KEYS'), 'bound': 'CLAUDE_JSON_KEYS' in ns,\n"
+         "print(json.dumps({'bound': 'CLAUDE_JSON_KEYS' in ns,\n"
          "                  'names': [n for n in ('clean_json', 'clean_toml', 'TOML_HEADER', 'TOML_KEY') if n in ns]}))\n")
 
 
@@ -240,45 +240,12 @@ def namespace(script, home):
     return json.loads(result.stdout)
 
 
-def _toml_value(value):
-    if isinstance(value, dict):
-        return "{ " + ", ".join(f"{k} = {_toml_value(v)}" for k, v in value.items()) + " }"
-    if isinstance(value, list):
-        return "[" + ", ".join(_toml_value(item) for item in value) + "]"
-    return json.dumps(value)
-
-
-def _dump_manifest(parsed):
-    lines = [f"schema = {parsed['schema']}\n"]
-    for name, table in parsed["harnesses"].items():
-        if "live_state" not in table:
-            lines.append(f"[harnesses.{name}]")
-            continue
-        lines.append(f"[harnesses.{name}.live_state]")
-        for key, value in table["live_state"].items():
-            lines.append(f"{key} = {_toml_value(value)}")
-    return "\n".join(lines) + "\n"
-
-
-def test_runpy_exposes_cleaners_and_binds_claude_json_keys_without_silent_fallback(tmp_path):
-    import tomllib
+def test_runpy_exposes_cleaners(tmp_path):
     home = tmp_path / "home"
     home.mkdir()
     found = namespace(FILTER, home)
-    assert found["keys"] == ["model", "modelSettings", "effortLevel"]
-    assert found["names"] == ["clean_json", "clean_toml", "TOML_HEADER", "TOML_KEY"]
-
-    scratch = tmp_path / "scratch"
-    (scratch / ".githooks").mkdir(parents=True)
-    for name in ("harness-state-clean", "harness_state.py"):
-        shutil.copy2(FILTER.parent / name, scratch / ".githooks" / name)
-    parsed = tomllib.loads((FILTER.parent.parent / "harnesses.toml").read_text())
-    assert tomllib.loads(_dump_manifest(parsed)) == parsed
-    assert "live_state" in parsed["harnesses"]["claude-code"]
-    parsed["harnesses"]["claude-code"].pop("live_state")
-    (scratch / "harnesses.toml").write_text(_dump_manifest(parsed))
-    found = namespace(scratch / ".githooks" / "harness-state-clean", home)
     assert found["bound"] is False
+    assert found["names"] == ["clean_json", "clean_toml", "TOML_HEADER", "TOML_KEY"]
 
 
 @pytest.mark.parametrize("text", ['{"model": "x",}\n', "// jsonc\n{}\n", "", "[1, 2]\n", "null\n"])

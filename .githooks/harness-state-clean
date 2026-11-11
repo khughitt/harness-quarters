@@ -34,12 +34,6 @@ except (ImportError, SyntaxError) as error:
 # the path glob .gitattributes routes to it.
 MANIFEST = harness_state.load_manifest_or_exit("harness-state-clean")
 
-# tools/relay_cutover_bootstrap/inputs.py reads this name through runpy until hq-7e1e9c
-# retires it. Bound only when the manifest gives claude-code a JSON config: no fallback.
-_CLAUDE = MANIFEST.by_harness.get("claude-code")
-if _CLAUDE is not None and _CLAUDE.format == "json":
-    CLAUDE_JSON_KEYS = _CLAUDE.json_clean_keys
-
 
 def main(argv):
     if len(argv) != 2:
