@@ -1,0 +1,716 @@
+# Session evidence sample catalogue. All fixtures are synthetic conformance inputs.
+# Consumer oracle: obs fe61869f0041eff423ed495d10845ef3cf3d5638; hq 3163fab9d3bea604617003b46ca63d0f8a076b57.
+# Origin evidence/labels are hand-derived; consumer results were run once from frozen code.
+# TOML has no null: omitted native_kind and marker lead/joined mean null only.
+# All other evidence keys are required. Absence in a sample means unobserved, never unsupported.
+# CWAIT is captures/turn-evidence-claude.jsonl; XE covers Codex turn ends and phases.
+
+[[sample]]
+path = "captures/escaped-malformed.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "captures/escaped.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "captures/sdk-stream.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "captures/turn-evidence-claude.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "degraded/.claude/projects/-w-delta/c0000000-0000-4000-8000-00000000000d.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "degraded/.claude-work/projects/-w-delta/c0000000-0000-4000-8000-00000000000e.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "degraded/.codex/sessions/2026/10/11/rollout-2026-10-11T10-00-00-01900000-0000-7000-8000-0000000000d1.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "home/.claude/projects/-w-alpha/c0000000-0000-4000-8000-00000000000a/subagents/agent-a0000000000000b01.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "home/.claude/projects/-w-alpha/c0000000-0000-4000-8000-00000000000a.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "home/.claude-work/projects/-w-beta/c0000000-0000-4000-8000-00000000000b.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "home/.claude-work/projects/-w-beta/c0000000-0000-4000-8000-00000000000c.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "home/.codex/archived_sessions/rollout-2026-09-20T09-00-00-01900000-0000-7000-8000-0000000000a2.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-00-01900000-0000-7000-8000-0000000000a1.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-11-01900000-0000-7000-8000-0000000000c1.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-32-01900000-0000-7000-8000-0000000000c2.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "home/.codex-work/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01900000-0000-7000-8000-0000000000b1.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000021.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000022.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000023.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000024.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T10-00-00-01900000-0000-7000-8000-0000000000e1.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T10-05-00-01900000-0000-7000-8000-0000000000f1.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T11-00-00-01900000-0000-7000-8000-0000000000f2.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "origin/claude-code-leading-whitespace.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "system_reminder", lead = "inside", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["user_channel_unattributed", "heuristic"]
+reader_role = "human"
+reader_basis = "prefix_rule"
+claude_index_human = false
+episodes = "other"
+
+[[sample]]
+path = "origin/claude-code-paste-after-whitespace.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "pasted_content", lead = "inside", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["user_channel_unattributed", "heuristic"]
+reader_role = "human"
+reader_basis = "prefix_rule"
+claude_index_human = true
+episodes = "human"
+
+[[sample]]
+path = "origin/claude-code-unrecognized-tag.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [], unrecognized_tag = { lead = true, joined = true } }
+label = ["injected", "heuristic"]
+reader_role = "injected"
+reader_basis = "prefix_rule"
+claude_index_human = false
+episodes = "other"
+
+[[sample]]
+path = "origin/claude-code-interrupt-inside.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "interrupt", lead = "inside", joined = "inside" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["user_channel_unattributed", "heuristic"]
+reader_role = "human"
+reader_basis = "prefix_rule"
+claude_index_human = true
+episodes = "human"
+
+[[sample]]
+path = "origin/claude-code-plain-typed.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [], unrecognized_tag = { lead = false, joined = false } }
+label = ["user_channel_unattributed", "heuristic"]
+reader_role = "human"
+reader_basis = "prefix_rule"
+claude_index_human = true
+episodes = "human"
+
+[[sample]]
+path = "origin/claude-code-slash-typed.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [], unrecognized_tag = { lead = false, joined = false } }
+label = ["user_channel_unattributed", "heuristic"]
+reader_role = "human"
+reader_basis = "prefix_rule"
+claude_index_human = true
+episodes = "human"
+
+[[sample]]
+path = "origin/claude-code-plain-then-wrapper.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "system_reminder", joined = "inside" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["user_channel_unattributed", "heuristic"]
+reader_role = "human"
+reader_basis = "prefix_rule"
+claude_index_human = true
+episodes = "human"
+
+[[sample]]
+path = "origin/claude-code-wrapper-then-plain.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "system_reminder", lead = "start", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["injected", "heuristic"]
+reader_role = "injected"
+reader_basis = "prefix_rule"
+claude_index_human = false
+episodes = "other"
+
+[[sample]]
+path = "origin/claude-code-empty-first-block.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "system_reminder", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["user_channel_unattributed", "heuristic"]
+reader_role = "human"
+reader_basis = "prefix_rule"
+claude_index_human = false
+episodes = "other"
+
+[[sample]]
+path = "origin/claude-code-paste.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "pasted_content", lead = "start", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["user_channel_unattributed", "heuristic"]
+reader_role = "human"
+reader_basis = "prefix_rule"
+claude_index_human = true
+episodes = "human"
+
+[[sample]]
+path = "origin/claude-code-task-notification.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "task_notification", lead = "start", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["injected", "heuristic"]
+reader_role = "injected"
+reader_basis = "prefix_rule"
+claude_index_human = false
+episodes = "other"
+
+[[sample]]
+path = "origin/claude-code-interrupt-start.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "interrupt", lead = "start", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["injected", "convention"]
+reader_role = "injected"
+reader_basis = "structure"
+claude_index_human = true
+episodes = "other"
+
+[[sample]]
+path = "origin/claude-code-child-prompt.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [], unrecognized_tag = { lead = false, joined = false } }
+label = ["dispatch", "convention"]
+reader_role = "dispatch"
+reader_basis = "structure"
+claude_index_human = true
+episodes = "other"
+
+[[sample]]
+path = "origin/codex-leading-whitespace.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "system_reminder", lead = "inside", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["user_channel_unattributed", "heuristic"]
+reader_role = "human"
+reader_basis = "prefix_rule"
+codex_index = "neither"
+episodes = "other"
+
+[[sample]]
+path = "origin/codex-paste-after-whitespace.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "pasted_content", lead = "inside", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["user_channel_unattributed", "heuristic"]
+reader_role = "human"
+reader_basis = "prefix_rule"
+codex_index = "human"
+episodes = "human"
+
+[[sample]]
+path = "origin/codex-unrecognized-tag.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [], unrecognized_tag = { lead = true, joined = true } }
+label = ["injected", "heuristic"]
+reader_role = "injected"
+reader_basis = "prefix_rule"
+codex_index = "neither"
+episodes = "other"
+
+[[sample]]
+path = "origin/codex-interrupt-inside.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "interrupt", lead = "inside", joined = "inside" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["user_channel_unattributed", "heuristic"]
+reader_role = "human"
+reader_basis = "prefix_rule"
+codex_index = "human"
+episodes = "human"
+
+[[sample]]
+path = "origin/codex-plain-typed.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [], unrecognized_tag = { lead = false, joined = false } }
+label = ["user_channel_unattributed", "heuristic"]
+reader_role = "human"
+reader_basis = "prefix_rule"
+codex_index = "human"
+episodes = "human"
+
+[[sample]]
+path = "origin/codex-slash-typed.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [], unrecognized_tag = { lead = false, joined = false } }
+label = ["user_channel_unattributed", "heuristic"]
+reader_role = "human"
+reader_basis = "prefix_rule"
+codex_index = "human"
+episodes = "human"
+
+[[sample]]
+path = "origin/codex-plain-then-wrapper.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "system_reminder", joined = "inside" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["user_channel_unattributed", "heuristic"]
+reader_role = "human"
+reader_basis = "prefix_rule"
+codex_index = "human"
+episodes = "human"
+
+[[sample]]
+path = "origin/codex-wrapper-then-plain.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "system_reminder", lead = "start", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["injected", "heuristic"]
+reader_role = "injected"
+reader_basis = "prefix_rule"
+codex_index = "neither"
+episodes = "other"
+
+[[sample]]
+path = "origin/codex-empty-first-block.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "system_reminder", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["user_channel_unattributed", "heuristic"]
+reader_role = "human"
+reader_basis = "prefix_rule"
+codex_index = "neither"
+episodes = "other"
+
+[[sample]]
+path = "origin/codex-paste.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "pasted_content", lead = "start", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["user_channel_unattributed", "heuristic"]
+reader_role = "human"
+reader_basis = "prefix_rule"
+codex_index = "human"
+episodes = "human"
+
+[[sample]]
+path = "origin/codex-task-notification.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "task_notification", lead = "start", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["injected", "heuristic"]
+reader_role = "injected"
+reader_basis = "prefix_rule"
+codex_index = "neither"
+episodes = "other"
+
+[[sample]]
+path = "origin/codex-interrupt-start.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "interrupt", lead = "start", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["user_channel_unattributed", "heuristic"]
+reader_role = "human"
+reader_basis = "prefix_rule"
+codex_index = "human"
+episodes = "human"
+
+[[sample]]
+path = "origin/codex-child-prompt.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [], unrecognized_tag = { lead = false, joined = false } }
+label = ["dispatch", "heuristic"]
+reader_role = "dispatch"
+reader_basis = "prefix_rule"
+codex_index = "human"
+episodes = "human"
+
+[[sample]]
+path = "origin/claude-code-native-nonhuman.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [], unrecognized_tag = { lead = false, joined = false }, native_kind = "task-notification" }
+label = ["injected", "native"]
+reader_role = "injected"
+reader_basis = "origin"
+claude_index_human = true
+episodes = "human"
+
+[[sample]]
+path = "origin/claude-code-native-human.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [], unrecognized_tag = { lead = false, joined = false }, native_kind = "human" }
+label = ["human", "native"]
+reader_role = "human"
+reader_basis = "origin"
+claude_index_human = true
+episodes = "human"
+
+[[sample]]
+path = "origin/claude-code-meta-plain.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = ["meta"], markers = [], unrecognized_tag = { lead = false, joined = false } }
+label = ["injected", "native"]
+reader_role = "injected"
+reader_basis = "structure"
+claude_index_human = false
+episodes = "other"
+
+[[sample]]
+path = "origin/claude-code-summary-plain.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = ["compaction_summary"], markers = [], unrecognized_tag = { lead = false, joined = false } }
+label = ["injected", "native"]
+reader_role = "injected"
+reader_basis = "structure"
+claude_index_human = false
+episodes = "other"
+
+[[sample]]
+path = "origin/claude-code-local-input.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "command_name", lead = "start", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["human", "convention"]
+reader_role = "human"
+reader_basis = "local_command"
+claude_index_human = false
+episodes = "other"
+
+[[sample]]
+path = "origin/claude-code-local-output.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "bash_stdout", lead = "start", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["injected", "convention"]
+reader_role = "injected"
+reader_basis = "local_command"
+claude_index_human = false
+episodes = "other"
+
+[[sample]]
+path = "origin/claude-code-conflict-human.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "system_reminder", lead = "start", joined = "start" }], unrecognized_tag = { lead = false, joined = false }, native_kind = "human" }
+label = ["unknown", "heuristic"]
+reader_role = "human"
+reader_basis = "origin"
+claude_index_human = false
+episodes = "other"
+
+[[sample]]
+path = "origin/claude-code-conflict-nonhuman.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "command_name", lead = "start", joined = "start" }], unrecognized_tag = { lead = false, joined = false }, native_kind = "task-notification" }
+label = ["unknown", "heuristic"]
+reader_role = "injected"
+reader_basis = "origin"
+claude_index_human = false
+episodes = "other"
+
+[[sample]]
+path = "origin/claude-code-conflict-human-joined.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "system_reminder", lead = "inside", joined = "start" }], unrecognized_tag = { lead = false, joined = false }, native_kind = "human" }
+label = ["unknown", "heuristic"]
+reader_role = "human"
+reader_basis = "origin"
+claude_index_human = false
+episodes = "other"
+
+[[sample]]
+path = "origin/claude-code-conflict-nonhuman-paste.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "pasted_content", lead = "start", joined = "start" }], unrecognized_tag = { lead = false, joined = false }, native_kind = "task-notification" }
+label = ["unknown", "heuristic"]
+reader_role = "injected"
+reader_basis = "origin"
+claude_index_human = true
+episodes = "human"
+
+[[sample]]
+path = "origin/codex-agents_md.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "agents_md", lead = "start", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["injected", "heuristic"]
+reader_role = "injected"
+reader_basis = "prefix_rule"
+codex_index = "injected"
+episodes = "other"
+
+[[sample]]
+path = "origin/codex-environment_context.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "environment_context", lead = "start", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["injected", "heuristic"]
+reader_role = "injected"
+reader_basis = "prefix_rule"
+codex_index = "injected"
+episodes = "other"
+
+[[sample]]
+path = "origin/codex-instructions.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "instructions", lead = "start", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["injected", "heuristic"]
+reader_role = "injected"
+reader_basis = "prefix_rule"
+codex_index = "injected"
+episodes = "other"
+
+[[sample]]
+path = "origin/codex-skills_instructions.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "skills_instructions", lead = "start", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["injected", "heuristic"]
+reader_role = "injected"
+reader_basis = "prefix_rule"
+codex_index = "injected"
+episodes = "other"
+
+[[sample]]
+path = "origin/codex-turn_aborted.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "turn_aborted", lead = "start", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["injected", "heuristic"]
+reader_role = "injected"
+reader_basis = "prefix_rule"
+codex_index = "injected"
+episodes = "other"
+
+[[sample]]
+path = "origin/codex-permissions.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "permissions", lead = "start", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["injected", "heuristic"]
+reader_role = "injected"
+reader_basis = "prefix_rule"
+codex_index = "injected"
+episodes = "other"
+
+[[sample]]
+path = "origin/codex-user_shell.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "user_shell", lead = "start", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["injected", "heuristic"]
+reader_role = "injected"
+reader_basis = "prefix_rule"
+codex_index = "injected"
+episodes = "other"
+
+[[sample]]
+path = "origin/codex-collaboration_mode.jsonl"
+harness = "codex"
+version = "unknown"
+provenance = "synthetic"
+[sample.expected]
+evidence = { flags = [], markers = [{ name = "collaboration_mode", lead = "start", joined = "start" }], unrecognized_tag = { lead = false, joined = false } }
+label = ["injected", "heuristic"]
+reader_role = "injected"
+reader_basis = "prefix_rule"
+codex_index = "injected"
+episodes = "other"

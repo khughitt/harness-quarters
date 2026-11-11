@@ -178,8 +178,8 @@ class FixtureTest(unittest.TestCase):
             self.assertEqual((got[ref_of(short)]["role"], got[ref_of(short)]["role_basis"]),
                              ("injected", "prefix_rule"), short)
         self.assertEqual((got[ref_of("XP:6#0")]["role"], got[ref_of("XP:6#0")]["role_basis"]),
-                         ("human", "prefix_rule"))
-        self.assertEqual([r["ref"] for r in read.records if r["role"] == "human"], [ref_of("XP:6#0")])
+                         ("user_channel_unattributed", "prefix_rule"))
+        self.assertEqual([r["ref"] for r in read.records if r["role"] == "user_channel_unattributed"], [ref_of("XP:6#0")])
         self.assertFalse(read.header["child"])
         self.assertIsNone(read.header["parent"])
         self.assertEqual(read.header["agent_path"], "/root")
@@ -245,7 +245,7 @@ class FixtureTest(unittest.TestCase):
         done = by_ref(read)[ref_of("XA:7")]
         self.assertNotIn("_last_agent_message", done)
         self.assertEqual(read.records[0]["store"], "archived")
-        self.assertEqual(by_ref(read)[ref_of("XA:5#0")]["role"], "human")
+        self.assertEqual(by_ref(read)[ref_of("XA:5#0")]["role"], "user_channel_unattributed")
 
     def test_xg_depth_two_identity_and_controller(self):
         read = read_codex("XG")
@@ -332,7 +332,7 @@ class InlineTest(InlineRollouts):
         self.assertEqual(command["execution"], {"command": ["bash", "-lc", "ls"], "exit_code": 0,
                                                 "cwd": "/w/x", "status": "completed"})
         self.assertEqual((got[10]["role"], got[10].get("copy")), ("metadata", None))
-        self.assertEqual(got[3]["role"], "human")
+        self.assertEqual(got[3]["role"], "user_channel_unattributed")
 
     def test_compaction_history_is_copied(self):
         read = self.read_inline([
@@ -357,7 +357,7 @@ class InlineTest(InlineRollouts):
             self.assertEqual(r["kind"], "compacted")
             self.assertEqual(r["_flags"], frozenset())
         self.assertEqual([(r["role"], r["text"]) for r in copies],
-                         [("human", "earlier ask"), ("assistant", "earlier answer")])
+                         [("user_channel_unattributed", "earlier ask"), ("assistant", "earlier answer")])
 
     def test_fork_history_ends_at_first_unknown_turn(self):
         asked = []
@@ -595,7 +595,7 @@ class SdkTest(unittest.TestCase):
         path.write_bytes(data)
         read = rec.sdk_read(Place("claude-code", "file", None, "explicit", str(path), path), len(data))
         human, brief, odd, stream = read.records
-        self.assertEqual(human["role"], "human")
+        self.assertEqual(human["role"], "user_channel_unattributed")
         self.assertEqual((brief["role"], brief["role_basis"]), ("dispatch", "structure"))
         self.assertEqual(brief["dispatch"], {"kind": "sdk_dispatch", "call": "toolu_d"})
         self.assertEqual((odd["role"], odd["kind"]), ("unknown", None))

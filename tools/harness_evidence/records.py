@@ -11,6 +11,7 @@ import re
 from typing import Callable, Collection
 
 from harness_evidence.lines import Line, Place, decode, lines, ref, sha256
+from harness_evidence.labels import label, origin
 
 CLASSIFIER = "session-logs-classifier/1"
 
@@ -171,6 +172,7 @@ def _object(place: Place, identity: dict, line: Line, block: int | None, at, rol
     if role == "assistant":
         phase = out.get("phase")
         out["answer_phase"] = None if phase is None else "final" if phase == "final_answer" else "other"
+    label(out)
     return out
 
 
@@ -396,11 +398,14 @@ class _ClaudeFile:
             self.models.add(resolved, "resolved", ref(self.place, line.number), line.number)
         role, basis = self.prompt_role(role, basis)
         kind = "api-request-blob" if copy else "user"
+        evidence = origin(content, "claude-code", _dict(record, "origin").get("kind"),
+                          [name for key, name in (("isMeta", "meta"), ("isCompactSummary", "compaction_summary"))
+                           if record.get(key)])
         if blocks is None:
-            self.emit(line, record, kind, role, basis, flags, copy=copy, text=_text_of(content))
+            self.emit(line, record, kind, role, basis, flags, copy=copy, text=_text_of(content), origin=evidence)
             return
         if not blocks:
-            self.emit(line, record, kind, role, basis, flags, copy=copy, text="")
+            self.emit(line, record, kind, role, basis, flags, copy=copy, text="", origin=evidence)
             return
         for index, block in enumerate(blocks):
             block = block if isinstance(block, dict) else {}
@@ -409,7 +414,7 @@ class _ClaudeFile:
             self.emit(line, record, kind, "tool_output" if is_result else role,
                       "structure" if is_result else basis, flags, block=index,
                       block_type=_str(block.get("type")), copy=copy, call=_call(block),
-                      model=model if is_result else None, text=text, encrypted=encrypted or None)
+                      model=model if is_result else None, text=text, encrypted=encrypted or None, origin=evidence)
 
     def prompt_role(self, role: str, basis: str) -> tuple[str, str]:
         """In a subagent file every prompt is the dispatch brief, never a human's: the file's
@@ -453,15 +458,16 @@ class _ClaudeFile:
         kind = f"attachment/{sub}" if sub else "attachment"
         origin_kind = _str(_dict(body, "origin").get("kind"))
         text = body.get("prompt") if isinstance(body.get("prompt"), str) else _compact(body)
+        evidence = origin(text, "claude-code", origin_kind)
         queued = sub == "queued_command"
         if queued:
             flags.add("queued")
         if origin_kind is None:
-            self.emit(line, record, kind, "injected", "structure", flags, text=text)
+            self.emit(line, record, kind, "injected", "structure", flags, text=text, origin=evidence)
             return
         role, basis = self.prompt_role("human" if origin_kind == "human" else "injected", "origin")
         self.emit(line, record, kind, role, basis, flags, origin_kind=origin_kind,
-                  queued=True if queued and origin_kind == "human" else None, text=text)
+                  queued=True if queued and origin_kind == "human" else None, text=text, origin=evidence)
 
     def request_blob(self, line: Line, record: dict) -> None:
         """For an `api-request-blob` row, each block takes its request message's role and is
@@ -488,7 +494,8 @@ class _ClaudeFile:
                 flags.add(local)
                 role, basis = self.prompt_role("human" if local == "local_input" else "injected",
                                                "local_command")
-                self.emit(line, record, kind, role, basis, flags, text=record["content"])
+                self.emit(line, record, kind, role, basis, flags, text=record["content"],
+                          origin=origin(record["content"], "claude-code"))
                 return
         if sub == "turn_duration":
             flags.add("turn_duration")
@@ -836,6 +843,8 @@ class _CodexFile:
         flags = {"prompt"} if role in ("human", "injected", "dispatch") else set()
         fields = {"phase": _str(payload.get("phase")), "message_id": _str(payload.get("id"))}
         content = payload.get("content")
+        if payload.get("role") == "user":
+            fields["origin"] = origin(content, "codex")
         if common["copy"] is not None or not isinstance(content, list):
             self.emit(line, record, kind, role, basis, **common, flags=flags,
                       block_type=_str(payload.get("type")) if common["copy"] else None,
@@ -987,9 +996,13 @@ def sdk_read(place: Place, size: int) -> FileRead:
 
         def emit(role, basis, kind, block=None, flags=(), **fields):
             records.append(_object(place, identity, line, block, record.get("timestamp"), role,
-                                   basis, kind, {"dispatch": dispatch, **fields}, flags))
+                                   basis, kind, {"dispatch": dispatch, **fields,
+                                   **({"origin": evidence} if record.get("type") == "user" else {})}, flags))
         message = _dict(record, "message")
         content = message.get("content")
+        evidence = origin(content, "claude-code", _dict(record, "origin").get("kind"),
+                          [name for key, name in (("isMeta", "meta"), ("isCompactSummary", "compaction_summary"))
+                           if record.get(key)])
         blocks = [b if isinstance(b, dict) else {} for b in content] if isinstance(content, list) else None
         if kind == "assistant":
             value = _str(message.get("model"))

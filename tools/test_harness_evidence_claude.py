@@ -224,8 +224,8 @@ class InlineTest(InlineFiles):
             user("summary", isCompactSummary=True),
         ])
         got = [(r["role"], r["role_basis"]) for r in read.records]
-        self.assertEqual(got, [("human", "prefix_rule"), ("injected", "prefix_rule"),
-                               ("human", "prefix_rule"), ("injected", "structure"),
+        self.assertEqual(got, [("user_channel_unattributed", "prefix_rule"), ("injected", "prefix_rule"),
+                               ("user_channel_unattributed", "prefix_rule"), ("injected", "structure"),
                                ("injected", "structure"), ("injected", "structure")])
         self.assertIn("interrupt_marker", read.records[3]["_flags"])
         self.assertEqual(read.records[3]["block"], 0)
@@ -347,7 +347,7 @@ class FollowUpTest(InlineFiles):
         self.assertEqual((first["role"], first["kind"]), ("unknown", None))
         self.assertEqual((second["role"], second["kind"]), ("unknown", None))
         self.assertEqual(read.records[2]["text"], "")
-        self.assertEqual(read.records[2]["role"], "human")
+        self.assertEqual(read.records[2]["role"], "user_channel_unattributed")
         self.assertNotIn("block_type", read.records[3])
         self.assertEqual([r["text"] for r in read.records[5:7]], ["", ""])
         self.assertIsNone(read.records[7]["call"]["tool"])  # a tool name is a string or nothing
