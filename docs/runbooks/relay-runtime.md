@@ -1,5 +1,9 @@
 # Pinned relay runtime
 
+Type: guide; document types 1. Install, upgrade and recover the pinned standalone
+runtime and hook images. See [home links](../home-links.md) for launcher ownership
+and [capabilities](../harness-capabilities.md) for native/adapter/policy boundaries.
+
 `relay/package.json` selects v0.3.0; `relay/package-lock.json` fixes its commit to
 `ed0cb9573a3b147f68923b7ad6f5b152419c147d`. The declared home launcher resolves to
 `relay/bin/relay`, which reads that pin and runs the versioned installation under
@@ -56,7 +60,7 @@ Root retirement assumes one active Codex root per process. TUIs launched with
 `--no-daemon`, as the shell aliases for both Codex homes are, satisfy it. A Codex
 launched without that flag starts a shared app-server daemon that outlives it, and
 sessions hosted there could share its handle and retire each other's rows
-(relay-511e14). Look for a running `codex app-server` before a rollout and after it
+(shared-daemon retirement limitation). Look for a running `codex app-server` before a rollout and after it
 check that no registry row carries a daemon's pid.
 
 To move Codex's hooks to the pinned release, install it into the stable root first,
@@ -103,7 +107,6 @@ asks again, and the same review writes the old hashes back in both homes. Commit
 personal home's restored `[hooks.state]` hashes in `harnesses/codex/config.toml` too.
 Restore no trust from a copy: the work file holds other live settings.
 
-The completed v0.1.1 hook rollout is recorded on hq-7e81ed (and commit 30f31917).
 Real phone-gate acceptance and home-link changes have their own rollout
 gates. Equivalent hosts and profiles using the same
 installer and launcher are covered by one end-to-end check; a distinct service or
