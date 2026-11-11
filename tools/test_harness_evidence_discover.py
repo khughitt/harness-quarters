@@ -168,7 +168,7 @@ def test_discover_objects_include_provenance_place_and_stat(tmp_path):
     assert [o["object"] for o in objs] == ["root"] * 6 + ["file"] * 9 + ["discover_end"]
     for obj in objs:
         assert obj["schema"] == "harness-evidence/1"
-        assert obj["decoder"]["version"] == "2"
+        assert obj["decoder"]["version"] == "3"
         assert obj["decoder"]["revision"]
         assert obj["decoder"] == objs[0]["decoder"]
     for obj in objs[6:-1]:
@@ -252,3 +252,44 @@ def test_file_stat_failure_emits_null_metadata_and_terminal_count(tmp_path, monk
     assert [file[key] for key in ("device", "inode", "size", "mtime_ns")] == [None] * 4
     assert file["filename_identity"]["thread"] == THREAD
     assert (objs[-1]["roots"], objs[-1]["files"]) == (1, 1)
+
+
+@pytest.mark.parametrize("operation", ["stat", "lstat"])
+@pytest.mark.parametrize("failure, state", [(PermissionError(13, "denied"), "unreadable"),
+                                            (FileNotFoundError(2, "gone"), "vanished"),
+                                            (OSError(5, "I/O failure"), "unreadable")])
+def test_initial_metadata_failure_keeps_enumerated_candidate(tmp_path, monkeypatch, capsys,
+                                                           operation, failure, state):
+    from harness_evidence import __main__ as cli
+    root = tmp_path / ".codex/sessions"
+    root.mkdir(parents=True)
+    path = root / f"rollout-time-{THREAD}.jsonl"
+    path.write_text("{}\n")
+    alias = root / "alias.jsonl"
+    alias.symlink_to(path)
+    target = os if operation == "lstat" else Path
+    original = getattr(target, operation)
+    calls = []
+
+    def failed_metadata(held, *args, **kwargs):
+        if Path(held) == path and kwargs.get("follow_symlinks") is not False:
+            calls.append(held)
+            raise failure
+        return original(held, *args, **kwargs)
+
+    monkeypatch.setattr(target, operation, failed_metadata)
+    assert cli.main(["discover", "--root", f"codex={root}"]) == 0
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    objs = [json.loads(line) for line in captured.out.splitlines()]
+    assert [o["object"] for o in objs] == ["root", "file", "discover_end"]
+    assert calls
+    file = objs[1]
+    assert file["path"] == str(path) and file["state"] == state and file["error"]
+    assert [file[k] for k in ("device", "inode", "size", "mtime_ns")] == [None] * 4
+    assert file["filename_identity"]["thread"] == THREAD
+    assert (objs[0]["files"], objs[0]["bytes"], objs[-1]["files"]) == (1, 0, 1)
+    if state == "unreadable":
+        assert (objs[0]["state"], objs[0]["listing"], objs[0]["errors"]) == ("unreadable", "partial", 1)
+    listing = api().list_files(api().roots(None, [("codex", root)]), 10**20)
+    assert listing.files == [path] and listing.aliases == [alias] and listing.skipped_by_mtime == 0

@@ -32,6 +32,8 @@ def _discover(args: argparse.Namespace, envelope: dict) -> None:
                   "place": location, "filename_identity": discover.filename_identity(place.harness, path),
                   "state": "listed"}
         try:
+            if path in listing.file_errors:
+                raise listing.file_errors[path]
             info = path.stat()
         except OSError as error:
             output.update(state="vanished" if isinstance(error, FileNotFoundError) else "unreadable",

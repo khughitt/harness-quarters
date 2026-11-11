@@ -36,7 +36,7 @@ def origin(content, harness: str, native_kind=None, flags=()) -> dict:
         blocks = [b for b in content if isinstance(b, dict)] if isinstance(content, list) else []
         if harness == 'codex':
             lead = next((b['text'] for b in blocks if isinstance(b.get('text'), str)), '')
-            texts = [b['text'] for b in blocks if b.get('type') in {'input_text', 'output_text'}
+            texts = [b['text'] for b in blocks if b.get('type') in ('input_text', 'output_text')
                      and isinstance(b.get('text'), str)]
         else:
             lead = next((b.get('text') for b in blocks if b.get('type') == 'text'), '')

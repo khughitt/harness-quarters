@@ -445,11 +445,14 @@ the shared personal/work homes, including Codex's archived stores, and ignore ob
 environment overrides. Discovery reads no transcript text. Codex filename identity is
 marked `convention`, separate from identity recorded inside a transcript. Symlinked
 transcripts are excluded. Missing or unreadable roots are reported; a file that
-vanishes or becomes unreadable after listing retains a file object with null stat
-metadata and its observed state/error.
+vanishes or has unavailable metadata after its name is enumerated retains a file
+object with null stat metadata and its observed state/error. Initial lstat/stat
+failures remain explicit even if a later lookup could succeed; known symlink
+aliases stay excluded. The listing helper retains candidates with unknown mtime
+when applying a cutoff; the command applies no cutoff.
 
 `tools/harness-evidence version --json` reports the evidence schema,
-decoder version `2`, and the decoder revision. A pinned copy reads a `REVISION`
+decoder version `3`, and the decoder revision. A pinned copy reads a `REVISION`
 file inside the package; a checkout reports its HEAD with `+dirty` when
 the package has changes. Without either source the command exits 2.
 

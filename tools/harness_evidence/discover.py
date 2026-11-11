@@ -60,6 +60,7 @@ class Listing:
     files: list[Path]
     aliases: list[Path]
     skipped_by_mtime: int
+    file_errors: dict[Path, OSError]
 
 
 def _matches(root: Root, depth: int, dirnames: list[str]) -> bool:
@@ -94,8 +95,11 @@ def list_files(roots: list[Root], since_ms: int | None) -> Listing:
     aliases, never files. Claude roots follow directory links as the index's glob does (the
     depth limit rules out loops); Codex roots do not. With `since_ms`, a file whose mtime is
     older is skipped and counted. An unreadable root records how many listing errors
-    it met, the first few, and whether its listing was `partial` or `failed`."""
+    it met, the first few, and whether its listing was `partial` or `failed`.
+    Enumerated names with unavailable metadata remain selected even with `since_ms`;
+    their mtime is unknown and file_errors retains the failed observation."""
     entries, files, aliases, skipped = [], [], [], 0
+    file_errors = {}
     for root in roots:
         entry = {"harness": root.harness, "home": root.home, "profile": root.profile,
                  "store": root.store, "state": "searched", "files": 0, "bytes": 0}
@@ -117,18 +121,25 @@ def list_files(roots: list[Root], since_ms: int | None) -> Listing:
                 if name.endswith(".jsonl"):
                     path = Path(dirpath) / name
                     try:  # a directory readable but not searchable lists names it cannot stat
-                        (links if path.is_symlink() else found).append(path)
+                        (links if stat.S_ISLNK(path.lstat().st_mode) else found).append(path)
                     except OSError as error:
-                        errors.append(error)
+                        found.append(path)
+                        file_errors[path] = error
+                        if not isinstance(error, FileNotFoundError):
+                            errors.append(error)
         for path in sorted(found):
-            try:
-                info = path.stat()
-            except FileNotFoundError:
-                files.append(path)  # gone already: open_listed reports it as vanished
+            if path in file_errors:
+                files.append(path)
                 entry["files"] += 1
                 continue
+            try:
+                info = path.stat()
             except OSError as error:
-                errors.append(error)
+                file_errors[path] = error
+                files.append(path)
+                entry["files"] += 1
+                if not isinstance(error, FileNotFoundError):
+                    errors.append(error)
                 continue
             if since_ms is not None and info.st_mtime_ns // 1_000_000 < since_ms:
                 skipped += 1
@@ -142,7 +153,7 @@ def list_files(roots: list[Root], since_ms: int | None) -> Listing:
                          first_errors=[str(error) for error in errors[:ERROR_SAMPLE]],
                          listing="failed" if top else "partial")
         aliases.extend(sorted(links))
-    return Listing(entries, files, aliases, skipped)
+    return Listing(entries, files, aliases, skipped, file_errors)
 
 
 def place_of(path: Path, roots: list[Root], store: str | None = None) -> Place:

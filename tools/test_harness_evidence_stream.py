@@ -351,6 +351,32 @@ def test_nonfinite_source_numbers_are_unparsed_and_batch_continues(tmp_path, tok
 
 
 @pytest.mark.parametrize("kind", [[], {}, 1, None])
+@pytest.mark.parametrize("cross_file", [False, True])
+def test_nested_codex_block_type_is_source_contained(tmp_path, kind, cross_file):
+    source = tmp_path / "nested-shape.jsonl"
+    raw = json.dumps({"type": "response_item", "payload": {"type": "message", "role": "user",
+                      "content": [{"type": kind, "text": "<unrecognized>sample"}]}}) + "\n"
+    source.write_text('{"type":"session_meta","payload":{"id":"shape"}}\n' + raw)
+    healthy = tmp_path / "healthy.jsonl"
+    healthy.write_text('{"type":"session_meta","payload":{"id":"healthy"}}\n')
+    output = invoke(tmp_path, request([entry(source), entry(healthy)],
+                                     cross_file=cross_file, text=True, raw=True))
+    record = next(o for o in output if o.get("file") == 0 and o.get("line") == 2 and o["object"] == "record")
+    assert record.get("block_type") is None and record["role"] == "unknown"
+    assert record["origin"]["native_kind"] is None
+    assert record["origin"]["unrecognized_tag"] == {"lead": True, "joined": False}
+    assert record["raw"] == raw and strict_json(record["raw"])["payload"]["content"][0]["type"] == kind
+    assert record["sha256"] == hashlib.sha256(raw.encode()).hexdigest()
+    assert record["line"] == 2 and record["ref"] == f"file:{source}#L2#0"
+    for i in (0, 1):
+        framed = [o for o in output if o.get("file") == i]
+        assert framed[0]["object"] == "file_start" and framed[-1]["object"] == "file_end"
+        assert end(output, i)["status"] == "ok"
+        assert end(output, i)["count"] == len(framed) - 2
+    assert output[-1]["object"] == "request_end" and output[-1]["files"] == 2
+
+
+@pytest.mark.parametrize("kind", [[], {}, 1, None])
 @pytest.mark.parametrize("harness", ["claude", "codex", "sdk"])
 @pytest.mark.parametrize("cross_file", [False, True])
 def test_non_string_native_kind_before_signature_is_source_contained(tmp_path, kind, harness, cross_file):
