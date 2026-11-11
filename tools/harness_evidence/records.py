@@ -553,8 +553,8 @@ def claude_read(place: Place, size: int) -> FileRead:
     unparsed lines, and the file's header."""
     parsed, unparsed, count = _decoded(place, size)
     timed = [r for _l, r in parsed if r.get("timestamp")]
-    subagent = place.path.parent.name == "subagents" or (
-        bool(timed) and all(r.get("isSidechain") is True for r in timed))
+    native_sidechain = bool(timed) and all(r.get("isSidechain") is True for r in timed)
+    subagent = place.path.parent.name == "subagents" or native_sidechain
     identity = _identity(place, parsed, subagent)
     reader = _ClaudeFile(place, identity, subagent, _fork_message(parsed))
     for line, record in parsed:
@@ -574,6 +574,7 @@ def claude_read(place: Place, size: int) -> FileRead:
         "last_at": last_at,
         "lines": count,
         "subagent": subagent,
+        "subagent_basis": "native" if native_sidechain else "convention" if subagent else "heuristic",
         "forked": _forked(parsed),
         "uuids": {r["uuid"]: line.number for line, r in parsed if isinstance(r.get("uuid"), str)},
         "continued_in": continued,
@@ -959,6 +960,8 @@ def codex_read(place: Place, size: int,
         "depth": thread["depth"],
         "inherited_id": inherited_id,
         "child": thread["child"],
+        "child_basis": "native" if thread["parent"] is not None or isinstance(first.get("thread_source"), str)
+                       else "heuristic",
         "forked": inherited_line is not None,
         "cwd": _str(first.get("cwd")),
         "entrypoint": _str(first.get("originator")),

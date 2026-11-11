@@ -145,15 +145,16 @@ def _read(source, roots, inherited):
                  version if fmt == "claude" else read.header.get("cli_version"))
 
 
-def _public(value, text):
-    """Private reader facts and transcript text never leak through nested structures."""
-    if isinstance(value, dict):
-        omitted = set() if text else {"text", "turn_end_message", "command", "abort_reason", "prompt_source"}
-        return {k: v if text else _public(v, False) for k, v in value.items()
-                if not k.startswith("_") and k not in omitted}
-    if isinstance(value, list):
-        return [_public(v, text) for v in value]
-    return value
+def _public(value: dict, text: bool) -> dict:
+    """Project reader fields explicitly; native metadata keys are data, not field names."""
+    out = {k: v for k, v in value.items() if not k.startswith("_")}
+    if not text:
+        for key in ("text", "turn_end_message", "prompt_source"):
+            out.pop(key, None)
+        for key in ("call", "execution"):
+            if key in out:
+                out[key] = {k: v for k, v in out[key].items() if k != "command"}
+    return out
 
 
 def _objects(file, text, raw, copy_scope, *, lexical_keys=False):

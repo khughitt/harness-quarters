@@ -3,13 +3,12 @@ import json
 from pathlib import Path
 import select
 import subprocess
-import sys
 import tomllib
 
 import pytest
 
-from harness_evidence_testing import FIXTURES, PATHS, CAPTURES, path_of
-from harness_evidence import discover, records
+from harness_evidence_testing import FIXTURES, path_of
+from harness_evidence import records
 from harness_evidence.lines import Place, detect_format
 
 TOOLS = Path(__file__).resolve().parent
@@ -240,3 +239,67 @@ def test_live_duplicate_copy_original_uses_root_priority_then_logical_relpath(tm
     reordered = invoke(tmp_path, request([entry(b, state=state), entry(a), entry(c)], roots=roots,
                                          cross_file=True))
     assert reordered[0]["replaces"] == {"from_line": state["next_line"]}
+
+
+@pytest.mark.parametrize("sidechain,path_child,expected", [
+    (False, True, "convention"), (True, False, "native"), (False, False, "heuristic"),
+    (True, True, "native"),
+])
+def test_claude_header_subagent_basis_from_raw_evidence(tmp_path, sidechain, path_child, expected):
+    path = tmp_path / ("subagents/agent-child.jsonl" if path_child else "session.jsonl")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"type":"user", "sessionId":"s", "timestamp":"2026-01-01",
+                               "isSidechain":sidechain, "message":{"content":"hello"}}) + "\n")
+    place = Place("claude-code", "file", None, "explicit", str(path), path)
+    direct = records.claude_read(place, path.stat().st_size).header
+    assert direct["subagent_basis"] == expected
+    assert direct["subagent"] == (sidechain or path_child)
+    output = invoke(tmp_path, request([entry(path)]))
+    assert next(o["header"] for o in output if o["object"] == "session")["subagent_basis"] == expected
+
+
+@pytest.mark.parametrize("metadata,child,basis", [
+    ({"parent_thread_id":"parent"}, True, "native"),
+    ({"source":{"subagent":{"thread_spawn":{"parent_thread_id":"parent"}}}}, True, "native"),
+    ({"thread_source":"user"}, False, "native"),
+    ({}, False, "heuristic"),
+])
+def test_codex_header_child_basis_from_raw_evidence(tmp_path, metadata, child, basis):
+    path = tmp_path / "rollout.jsonl"
+    path.write_text(json.dumps({"type":"session_meta", "payload":{"id":"thread", **metadata}}) + "\n")
+    place = Place("codex", "file", None, "explicit", str(path), path)
+    direct = records.codex_read(place, path.stat().st_size, lambda _: None).header
+    assert direct["child_basis"] == basis and direct["child"] == child
+    output = invoke(tmp_path, request([entry(path)]))
+    header = next(o["header"] for o in output if o["object"] == "session")
+    assert header["child_basis"] == basis and header["child"] == child
+
+
+def test_codex_missing_metadata_keeps_heuristic_negative_only_in_typed_reader(tmp_path):
+    path = tmp_path / "events.jsonl"
+    path.write_text('{"type":"event_msg","payload":{"type":"task_started","turn_id":"t"}}\n')
+    place = Place("codex", "file", None, "explicit", str(path), path)
+    header = records.codex_read(place, path.stat().st_size, lambda _: None).header
+    assert header["child"] is False and header["child_basis"] == "heuristic"
+    output = invoke(tmp_path, request([entry(path)]))
+    header = next(o["header"] for o in output if o["object"] == "session")
+    assert "child" not in header and "child_basis" not in header
+
+
+def test_abort_reason_is_metadata_when_text_is_disabled(tmp_path):
+    path = tmp_path / "abort.jsonl"
+    path.write_text('{"type":"session_meta","payload":{"id":"thread"}}\n'
+                    '{"type":"event_msg","payload":{"type":"turn_aborted","reason":"interrupt"}}\n')
+    output = invoke(tmp_path, request([entry(path)]))
+    abort = next(o for o in output if o.get("kind") == "event_msg/turn_aborted")
+    assert abort["abort_reason"] == "interrupt" and "text" not in abort
+
+
+def test_text_opt_out_preserves_native_metadata_dictionary_keys(tmp_path):
+    path = tmp_path / "uuid-keys.jsonl"
+    ids = ["_native", "text", "command"]
+    path.write_text("".join(json.dumps({"type":"user", "sessionId":"s", "uuid":uuid,
+                                       "message":{"content":"hello"}}) + "\n" for uuid in ids))
+    output = invoke(tmp_path, request([entry(path)]))
+    header = next(o["header"] for o in output if o["object"] == "session")
+    assert header["uuids"] == {uuid:i for i,uuid in enumerate(ids,1)}

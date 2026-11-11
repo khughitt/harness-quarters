@@ -461,6 +461,11 @@ or refs. `roots` replaces default discovery roots, `context` supplies fork evide
 without emitting it, and `cross_file` marks copies across requested files. `text`
 and `raw` default to false; transcript text, nested commands and turn-end messages
 require `text`, while original physical lines require `raw` independently.
+Native `abort_reason` remains metadata when text is disabled. Session headers keep
+their existing child flags and add `subagent_basis` for Claude Code (native timed
+sidechain flags, conventional subagent path, or a heuristic negative) and
+`child_basis` for Codex (native parent/thread-source evidence or a heuristic
+negative). SDK and unknown headers gain no child flags.
 
 Each file emits keyed `file_start`, records or unparsed lines, `session`, and
 `file_end` with status, emitted count and checkpoint `state`. Source failures stay
