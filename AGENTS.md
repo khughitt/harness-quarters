@@ -27,10 +27,10 @@ Run fresh `just test-one <pytest arguments>` checks for changed behavior and man
 `just check-hygiene` before committing. A policy skip is not a test pass.
 The focused route preserves arguments and runner status through the host budget.
 `TT_FORCE=1 just test` or `just test-full` deliberately runs the complete suite.
-The relay signal test stays serial; xdist reads the grant's worker count. `just ci-test`
-shares the suite but requires explicit positive PYTEST_XDIST_AUTO_NUM_WORKERS and never
-sets TT_FORCE. The workflow sets it at job scope, uses two workers and retains
-setup and suite artifacts. Accepted hosted coverage has exactly the three local
+Both partitions run serially. Local `just test` runs through `host-budget`, and the suite
+validates a positive integer `PYTEST_XDIST_AUTO_NUM_WORKERS`. `just ci-test` shares the suite
+and never sets `TT_FORCE`. The workflow sets both at job scope (`PYTEST_XDIST_AUTO_NUM_WORKERS="2"`)
+and retains setup and suite artifacts. Accepted hosted coverage has exactly the three local
 integration omissions listed in docs/test-execution.md; none excludes a module.
 Both pre-push routes run mandatory `just check-hygiene` followed by `just test`; no outer
 composite is timed. The hook declares origin branches covered for the workflow and warns

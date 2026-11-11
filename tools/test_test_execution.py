@@ -11,7 +11,7 @@ from xml.etree import ElementTree as ET
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-REPORTS = ("agents", "hooks-tools", "relay-parallel", "relay-signal")
+REPORTS = ("agents", "hooks-tools")
 
 
 def executable(path, text):
@@ -175,8 +175,7 @@ def suite_module():
 
 def write_evidence(directory):
     directory.mkdir(exist_ok=True)
-    ids = ["agents/bin/test_a.py::test_a", ".githooks/test_b.py::test_b",
-           "tools/test_relay_cutover_bootstrap.py::test_c", "tools/test_relay_cutover_transport.py::test_signal"]
+    ids = ["agents/bin/test_a.py::test_a", ".githooks/test_b.py::test_b"]
     (directory / "inventory.json").write_text(json.dumps({
         "nodeids": ids, "collection_problems": [], "modules": [n.split("::")[0] for n in ids]}))
     for name, nodeid in zip(REPORTS, ids):
@@ -188,7 +187,7 @@ def write_evidence(directory):
     return ids
 
 
-def test_four_partitions_cover_inventory(tmp_path):
+def test_two_partitions_cover_inventory(tmp_path):
     ids = write_evidence(tmp_path)
     result = suite_module()["verify_evidence"](tmp_path)
     assert result["collected"] == result["reported"] == len(ids)
@@ -197,7 +196,7 @@ def test_four_partitions_cover_inventory(tmp_path):
     assert result["problems"] == []
     tt = runpy.run_path(str(ROOT / "tools/tt"))
     warnings = []
-    assert len(tt["read_junit_dir"](tmp_path, ROOT, warnings.append)) == 4
+    assert len(tt["read_junit_dir"](tmp_path, ROOT, warnings.append)) == 2
     assert warnings == []
 
 
@@ -228,16 +227,16 @@ def test_phase_errors_are_one_identity(tmp_path):
     case = tree.find(".//testcase")
     tree.find("testsuite").append(ET.fromstring(ET.tostring(case)))
     tree.write(path)
-    assert suite_module()["verify_evidence"](tmp_path)["reported"] == 4
+    assert suite_module()["verify_evidence"](tmp_path)["reported"] == 2
 
 
 @pytest.mark.parametrize("damage", ["missing", "overlap", "empty", "malformed", "encoding"])
 def test_incomplete_evidence_is_rejected(tmp_path, damage):
     write_evidence(tmp_path)
     if damage == "missing":
-        (tmp_path / "pytest-relay-signal.xml").unlink()
+        (tmp_path / "pytest-hooks-tools.xml").unlink()
     elif damage == "overlap":
-        shutil.copyfile(tmp_path / "pytest-agents.xml", tmp_path / "pytest-relay-signal.xml")
+        shutil.copyfile(tmp_path / "pytest-agents.xml", tmp_path / "pytest-hooks-tools.xml")
     elif damage == "empty":
         (tmp_path / "inventory.json").write_text('{"nodeids": [], "collection_problems": [], "modules": []}')
     elif damage == "encoding":
@@ -253,9 +252,6 @@ def miniature_suite(world, failure=False):
         "import pytest\n@pytest.mark.parametrize('x', [1], ids=[\"quotes ' $ * and space\"])\ndef test_agent(x): assert x == 1\n")
     (world.root / ".githooks/test_hook.py").write_text(
         "import pytest\n@pytest.mark.skip(reason='intentional fixture skip')\ndef test_hook(): pass\n")
-    (world.root / "tools/test_relay_cutover_bootstrap.py").write_text("def test_parallel(): pass\n")
-    (world.root / "tools/test_relay_cutover_transport.py").write_text(
-        "def test_other(): pass\ndef test_signal_while_recording_start_cancels(): pass\n")
     if failure:
         (world.root / "agents/bin/test_agent.py").write_text(
             "import pytest\n@pytest.fixture\ndef broken():\n    yield\n    assert False, 'teardown failure'\n"
@@ -280,7 +276,7 @@ def test_reports_survive_wrapper_exit_on_failure(world, tmp_path, failure):
         assert len({p.get("value") for c in cases for p in c.findall("properties/property") if p.get("name") == "nodeid"}) == 1
     else:
         coverage = json.loads((evidence / "coverage.json").read_text())
-        assert coverage["collected"] == coverage["reported"] == 5
+        assert coverage["collected"] == coverage["reported"] == 2
         assert coverage["skips"] == [{"nodeid": ".githooks/test_hook.py::test_hook", "reason": "intentional fixture skip"}]
         assert world.rows()[-1]["slowest"]
         for name in REPORTS:
@@ -308,13 +304,13 @@ def test_fixed_suite_ignores_ambient_selection(world, tmp_path):
     result = world.run("ci-test", env={
         "PYTEST_XDIST_AUTO_NUM_WORKERS": "2", "REAL_PYTEST": "1",
         "HQ_TEST_EVIDENCE_DIR": str(evidence),
-        "PYTEST_ADDOPTS": "--deselect=tools/test_relay_cutover_transport.py::test_other",
+        "PYTEST_ADDOPTS": "--deselect=.githooks/test_hook.py::test_hook",
     })
     assert result.returncode == 0, result.stdout + result.stderr
     inventory = json.loads((evidence / "inventory.json").read_text())
-    assert "tools/test_relay_cutover_transport.py::test_other" in inventory["nodeids"]
+    assert ".githooks/test_hook.py::test_hook" in inventory["nodeids"]
     coverage = json.loads((evidence / "coverage.json").read_text())
-    assert coverage["collected"] == coverage["reported"] == 5
+    assert coverage["collected"] == coverage["reported"] == 2
 
 
 @pytest.mark.parametrize("mode,outcome", [("skip", "skipped"), ("error", "error")])

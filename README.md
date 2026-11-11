@@ -325,9 +325,6 @@ MIT licensed; see `LICENSE`.
   facts (see "Re-probing pi" below).
 - [Pinned relay runtime](docs/runbooks/relay-runtime.md): installing and upgrading the
   standalone launcher, isolated rehearsals, and durable inbox recovery limits.
-- [Relay operator cutover](docs/runbooks/relay-cutover.md): the record of the completed
-  2026-10-22 window. The cutover tool is retired pending deletion (hq-7e81ed).
-  Relay upgrades follow the [pinned relay runtime runbook](docs/runbooks/relay-runtime.md).
 - [Harness capability and integration matrix](docs/harness-capabilities.md): overview of
   integration layers, relay hook-dispatch separation, selected probed behaviour, and
   session-store coverage across `claude-code`, `codex`, `agy`, `pi`, `pi-durable`,
@@ -387,9 +384,7 @@ MIT licensed; see `LICENSE`.
   `harnesses/agy/settings.json`, stripped `trustedWorkspaces` paths written in place;
   `harnesses/pi/settings.json` stays checked because `/settings` writes no path keys,
   pi's project trust lives in ~/.pi/agent/trust.json, and any path-valued setting
-  written there is not stripped by the clean filter). The relay
-  cutover tool, its tests, runbook and window plan use fixed fleet names and deployment
-  paths; hq-7e81ed removes those entries if it retires the tool. The capture-notice,
+  written there is not stripped by the clean filter). The capture-notice,
   claim-guard and relay wiring tests assert the exact deployed hook strings and are
   allowed by file too. Shared document examples use checkout-role placeholders such
   as `<project-checkout>`, rather than home-relative aliases of registered paths.
@@ -409,10 +404,12 @@ Use `just test-one <pytest arguments>` for fresh focused checks under the local 
 worker budget, with literal argument forwarding, and always run `just check-hygiene`.
 `TT_FORCE=1 just test` or `just test-full` deliberately runs the complete suite;
 a normal broad skip is not a test pass.
-The shared driver retains the existing four partitions, checks individual test
-identities against full collection and preserves caller-owned reports on failure.
-The pinned hosted workflow forces the full suite on all branch pushes, with portable
-hygiene, two workers and retained reports. Accepted hosted coverage has three named
+The shared driver runs the two serial partitions (`agents` and `hooks-tools`), checks
+individual test identities against full collection and preserves caller-owned reports
+on failure. The local `just test` recipe enforces the `host-budget` route, while the
+pinned hosted workflow forces the full suite on all branch pushes with portable
+hygiene, an explicit positive `PYTEST_XDIST_AUTO_NUM_WORKERS` setting and retained
+reports. Accepted hosted coverage has three named
 local integration omissions and excludes no module.
 See [test execution](docs/test-execution.md) for commands,
 omissions and evidence.

@@ -71,17 +71,8 @@ resolved ops records path `<ops-records>/docs/runbooks/relay-guard-evidence-code
 below. Probe evidence is private ops records, not a file under the ops code checkout.
 On each executing host, `tasks where <ops-code-checkout> --json` must resolve the
 ops project and its absolute `project.records` directory outside that checkout.
-The bootstrap inventory, target identity checks and installer use
-records-relative docs/runbooks/relay-guard-evidence-<harness>.json. Each bootstrap
-host operation caches its own resolution in the operation context so its inventory
-hash checks or target identity checks and installer share that path; standalone
-`tools/relay-cutover preflight` subprocesses (including those the real inventory
-invokes per harness) resolve independently with the same reply/path validator.
-The reviewed manifest’s logical `ops:docs/runbooks/...` member keys stay unchanged;
-they identify the evidence, not its physical storage root.
-Missing/invalid resolution or evidence refuses readiness; no code-root fallback
-exists. A digest mismatch still requires refreshed, reviewed evidence. This
-storage cutover changes no live harness or bootstrap-window authorization.
+Missing or invalid resolution or evidence refuses readiness; no code-root fallback
+exists.
 
 COPY is an absolute path ending in `/hooks.json` (any other name fails as `relay
 operation failed`). Without `--apply` nothing is written; confirm the planned
@@ -112,8 +103,8 @@ asks again, and the same review writes the old hashes back in both homes. Commit
 personal home's restored `[hooks.state]` hashes in `harnesses/codex/config.toml` too.
 Restore no trust from a copy: the work file holds other live settings.
 
-The historical [operator cutover](relay-cutover.md) describes the v0.1.1 hook
-rollout. Real phone-gate acceptance and home-link changes have their own rollout
+The completed v0.1.1 hook rollout is recorded on hq-7e81ed (and commit 30f31917).
+Real phone-gate acceptance and home-link changes have their own rollout
 gates. Equivalent hosts and profiles using the same
 installer and launcher are covered by one end-to-end check; a distinct service or
 configuration path needs its own check.

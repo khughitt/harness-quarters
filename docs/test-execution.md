@@ -22,14 +22,14 @@ skip without force is an error, including through nested wrappers.
 
 All test processes use the system Python, pytest 9.2.0 and pytest-xdist 3.8.0.
 The suite first validates capability facts, then collects all tests under agents/bin,
-.githooks and tools, and executes these partitions:
+.githooks and tools, and executes these two partitions serially:
 
 1. agents/bin.
-2. .githooks and tools, excluding the two relay-cutover modules.
-3. Both relay-cutover modules under xdist, excluding the process-signal test.
-4. The process-signal test serially.
+2. .githooks and tools.
 
-Local xdist uses the worker grant. The suite driver takes no selectors; focused
+Both partitions run serially; the local `just test` recipe enforces the `host-budget`
+route, while `tools/test-suite` validates a positive integer
+`PYTEST_XDIST_AUTO_NUM_WORKERS`. The suite driver takes no selectors; focused
 selection belongs to test-one. The fixed suite ignores PYTEST_ADDOPTS so ambient
 selectors and worker flags cannot alter its inventory or partitions.
 Full local pre-commit hygiene remains mandatory.
@@ -65,9 +65,8 @@ Without it, local evidence lives in TT_JUNIT_DIR and tt removes it after reading
 timings. The shared driver copies completed caller-owned JUnit reports into that
 temporary directory before exit, so local timing collection still works.
 
-The output contains inventory.json, coverage.json and four JUnit reports:
-pytest-agents.xml, pytest-hooks-tools.xml, pytest-relay-parallel.xml and
-pytest-relay-signal.xml. Inventory records collection errors and module skips;
+The output contains inventory.json, coverage.json and two JUnit reports:
+pytest-agents.xml and pytest-hooks-tools.xml. Inventory records collection errors and module skips;
 coverage reports unique collected/reported/executed identities, per-test skips,
 excluded modules, skipped module count and problems. Collection omissions,
 missing reports, cross-partition overlap, replaced identities and empty execution
@@ -79,7 +78,8 @@ suite and never replace an existing runner failure. A cancelled or interrupted
 attempt is unverified. Retain caller-owned evidence for inspection; do not upload
 from TT_JUNIT_DIR after the wrapper returns.
 
-The workflow uses ubuntu-24.04, two pytest workers and a finite 60-minute
+The workflow uses ubuntu-24.04, sets PYTEST_XDIST_AUTO_NUM_WORKERS="2" (satisfying the
+suite driver's positive-integer check while both partitions run serially) and a finite 60-minute
 job limit. It pins uv 0.13.7, just 1.59.0, Node 26.13.0, Rust 1.99.1 and public
 tasks commit fa58ab31acd757f59798537b6957e540fdccb9fb. System Python, zsh and
 libatomic1 come from the runner; actual versions are recorded. Setup explicitly
@@ -96,7 +96,7 @@ All branch pushes and manual dispatch are covered, with no duplicate PR trigger.
 
 The always-run artifact upload retains HQ_TEST_ARTIFACT_DIR for seven days. Its
 setup-report.txt records setup; the initially empty suite/ child is
-HQ_TEST_EVIDENCE_DIR and holds the inventory, coverage and four reports. A failed
+HQ_TEST_EVIDENCE_DIR and holds the inventory, coverage and two reports. A failed
 setup or partial run retains available evidence and remains unverified.
 
 The accepted hosted omissions are these exact local integration checks:
@@ -112,5 +112,5 @@ checkouts; the added local integration check also copies the real registered
 targets and compares their shapes. No module is excluded. All three pass locally;
 their registry-dependent behavior remains outside hosted coverage. The local
 preparation pilot exercises
-four miniature partitions and failure retention, not Ubuntu or hosted coverage.
+two miniature partitions and failure retention, not Ubuntu or hosted coverage.
 The separate mods and live capability probes are outside just test.
