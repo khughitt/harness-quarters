@@ -154,6 +154,23 @@ def _object(place: Place, identity: dict, line: Line, block: int | None, at, rol
     out["_flags"] = frozenset(flags)
     if private:
         out.update(private)
+    # Publish evidence without changing the native facts used by existing readers.
+    names = {"isMeta": "meta", "isCompactSummary": "compaction_summary"}
+    out["flags"] = sorted({names.get(flag, flag) for flag in out["_flags"]})
+    out["turn_id"] = out.get("_turn_id")
+    out["turn_end_message"] = out.get("_last_agent_message")
+    out["abort_reason"] = out.get("_abort_reason")
+    out["readable_text"] = role == "assistant" and out.get("block_type") in {None, "text", "output_text"}
+    if role == "tool_call":
+        tools = {"AskUserQuestion", "EnterPlanMode", "ExitPlanMode"} if place.harness == "claude-code" \
+            else {"request_user_input"} if place.harness == "codex" else set()
+        out["waits_for_user"] = (out.get("call") or {}).get("tool") in tools
+    if role in {"assistant", "tool_call"}:
+        stop = out.get("stop_reason")
+        out["stop_class"] = None if stop is None else "closing" if stop in {"end_turn", "stop_sequence"} else "other"
+    if role == "assistant":
+        phase = out.get("phase")
+        out["answer_phase"] = None if phase is None else "final" if phase == "final_answer" else "other"
     return out
 
 
