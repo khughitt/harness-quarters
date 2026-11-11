@@ -58,7 +58,7 @@ def origin(content, harness: str, native_kind=None, flags=()) -> dict:
 
 
 def label(record: dict) -> None:
-    """Add the rule/basis and apply only the two planned evidence-label changes."""
+    """Add the rule/basis and resolve only the evidence that supports a label."""
     role, rule = record['role'], record['role_basis']
     basis = _BASES[rule]
     if rule == 'structure' and (role == 'dispatch' or 'interrupt_marker' in record['_flags']):
@@ -66,6 +66,8 @@ def label(record: dict) -> None:
     if role == 'human' and rule == 'prefix_rule':
         role = 'user_channel_unattributed'
     evidence = record.get('origin')
+    if rule == 'prefix_rule' and evidence is not None and any(evidence['unrecognized_tag'].values()):
+        role = 'unknown'
     if evidence is not None and role in {'human', 'injected', 'dispatch', 'user_channel_unattributed'}:
         native = evidence['native_kind']
         starts = [m for m in evidence['markers'] if 'start' in (m['lead'], m['joined'])]

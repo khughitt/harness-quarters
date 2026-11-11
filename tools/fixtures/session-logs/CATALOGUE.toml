@@ -5,16 +5,19 @@
 # All other evidence keys are required. Absence in a sample means unobserved, never unsupported.
 # CWAIT is captures/turn-evidence-claude.jsonl; XE covers Codex turn ends and phases.
 
+# Known synthetic format versions come from native fields, independently of provenance.
+# Unspecified versions stay unknown; no synthetic sample establishes observed emission.
+
 [[sample]]
 path = "captures/escaped-malformed.jsonl"
 harness = "claude-code"
-version = "unknown"
+version = "2.1.304"
 provenance = "synthetic"
 
 [[sample]]
 path = "captures/escaped.jsonl"
 harness = "claude-code"
-version = "unknown"
+version = "2.1.304"
 provenance = "synthetic"
 
 [[sample]]
@@ -32,115 +35,115 @@ provenance = "synthetic"
 [[sample]]
 path = "degraded/.claude/projects/-w-delta/c0000000-0000-4000-8000-00000000000d.jsonl"
 harness = "claude-code"
-version = "unknown"
+version = "2.1.300"
 provenance = "synthetic"
 
 [[sample]]
 path = "degraded/.claude-work/projects/-w-delta/c0000000-0000-4000-8000-00000000000e.jsonl"
 harness = "claude-code"
-version = "unknown"
+version = "2.1.300"
 provenance = "synthetic"
 
 [[sample]]
 path = "degraded/.codex/sessions/2026/10/11/rollout-2026-10-11T10-00-00-01900000-0000-7000-8000-0000000000d1.jsonl"
 harness = "codex"
-version = "unknown"
+version = "0.163.0"
 provenance = "synthetic"
 
 [[sample]]
 path = "home/.claude/projects/-w-alpha/c0000000-0000-4000-8000-00000000000a/subagents/agent-a0000000000000b01.jsonl"
 harness = "claude-code"
-version = "unknown"
+version = "2.1.300"
 provenance = "synthetic"
 
 [[sample]]
 path = "home/.claude/projects/-w-alpha/c0000000-0000-4000-8000-00000000000a.jsonl"
 harness = "claude-code"
-version = "unknown"
+version = "2.1.300"
 provenance = "synthetic"
 
 [[sample]]
 path = "home/.claude-work/projects/-w-beta/c0000000-0000-4000-8000-00000000000b.jsonl"
 harness = "claude-code"
-version = "unknown"
+version = "2.1.300"
 provenance = "synthetic"
 
 [[sample]]
 path = "home/.claude-work/projects/-w-beta/c0000000-0000-4000-8000-00000000000c.jsonl"
 harness = "claude-code"
-version = "unknown"
+version = "2.1.300"
 provenance = "synthetic"
 
 [[sample]]
 path = "home/.codex/archived_sessions/rollout-2026-09-20T09-00-00-01900000-0000-7000-8000-0000000000a2.jsonl"
 harness = "codex"
-version = "unknown"
+version = "0.163.0"
 provenance = "synthetic"
 
 [[sample]]
 path = "home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-00-01900000-0000-7000-8000-0000000000a1.jsonl"
 harness = "codex"
-version = "unknown"
+version = "0.163.0"
 provenance = "synthetic"
 
 [[sample]]
 path = "home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-11-01900000-0000-7000-8000-0000000000c1.jsonl"
 harness = "codex"
-version = "unknown"
+version = "0.163.0"
 provenance = "synthetic"
 
 [[sample]]
 path = "home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-32-01900000-0000-7000-8000-0000000000c2.jsonl"
 harness = "codex"
-version = "unknown"
+version = "0.163.0"
 provenance = "synthetic"
 
 [[sample]]
 path = "home/.codex-work/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01900000-0000-7000-8000-0000000000b1.jsonl"
 harness = "codex"
-version = "unknown"
+version = "0.163.0"
 provenance = "synthetic"
 
 [[sample]]
 path = "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000021.jsonl"
 harness = "claude-code"
-version = "unknown"
+version = "2.1.304"
 provenance = "synthetic"
 
 [[sample]]
 path = "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000022.jsonl"
 harness = "claude-code"
-version = "unknown"
+version = "2.1.304"
 provenance = "synthetic"
 
 [[sample]]
 path = "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000023.jsonl"
 harness = "claude-code"
-version = "unknown"
+version = "2.1.304"
 provenance = "synthetic"
 
 [[sample]]
 path = "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000024.jsonl"
 harness = "claude-code"
-version = "unknown"
+version = "2.1.304"
 provenance = "synthetic"
 
 [[sample]]
 path = "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T10-00-00-01900000-0000-7000-8000-0000000000e1.jsonl"
 harness = "codex"
-version = "unknown"
+version = "0.164.0"
 provenance = "synthetic"
 
 [[sample]]
 path = "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T10-05-00-01900000-0000-7000-8000-0000000000f1.jsonl"
 harness = "codex"
-version = "unknown"
+version = "0.164.0"
 provenance = "synthetic"
 
 [[sample]]
 path = "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T11-00-00-01900000-0000-7000-8000-0000000000f2.jsonl"
 harness = "codex"
-version = "unknown"
+version = "0.164.0"
 provenance = "synthetic"
 
 [[sample]]
@@ -176,7 +179,7 @@ version = "unknown"
 provenance = "synthetic"
 [sample.expected]
 evidence = { flags = [], markers = [], unrecognized_tag = { lead = true, joined = true } }
-label = ["injected", "heuristic"]
+label = ["unknown", "heuristic"]
 reader_role = "injected"
 reader_basis = "prefix_rule"
 claude_index_human = false
@@ -345,7 +348,7 @@ version = "unknown"
 provenance = "synthetic"
 [sample.expected]
 evidence = { flags = [], markers = [], unrecognized_tag = { lead = true, joined = true } }
-label = ["injected", "heuristic"]
+label = ["unknown", "heuristic"]
 reader_role = "injected"
 reader_basis = "prefix_rule"
 codex_index = "neither"

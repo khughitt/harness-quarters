@@ -72,7 +72,7 @@ def test_every_rule_has_a_basis_and_no_fallback_claims_human():
             if record['role'] == 'human':
                 assert record['basis'] in {'native', 'convention'}
             if record['rule'] == 'prefix_rule' and record['role'] != 'dispatch':
-                assert record['role'] in {'injected', 'user_channel_unattributed'}
+                assert record['role'] in {'injected', 'user_channel_unattributed', 'unknown'}
 
 
 def test_catalogue_covers_all_samples_without_claiming_live_provenance():
@@ -139,3 +139,49 @@ def test_native_and_agent_path_basis(short, line, want):
     sample = next(s for s in CATALOGUE if s['path'] == PATHS[short])
     record = next(r for r in read_sample(sample).records if r['line'] == line)
     assert record['basis'] == want
+
+
+@pytest.mark.parametrize('short,version', [('CA', '2.1.300'), ('XP', '0.163.0'),
+                                          ('CM', '2.1.304'), ('XE', '0.164.0')])
+def test_catalogue_preserves_known_synthetic_versions(short, version):
+    sample = next(s for s in CATALOGUE if s['path'] == PATHS[short])
+    assert (sample['version'], sample['provenance']) == (version, 'synthetic')
+
+
+@pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+@pytest.mark.parametrize('shape,want', [('leading', 'unknown'), ('whitespace', 'unknown'),
+                                       ('empty-first', 'unknown'), ('inside', 'user_channel_unattributed')])
+def test_unrecognized_wrappers_remain_unknown_only_when_leading(tmp_path, harness, shape, want):
+    text = '<future-wrapper>context</future-wrapper>'
+    block = 'text' if harness == 'claude-code' else 'input_text'
+    content = {'leading': text, 'whitespace': '  ' + text,
+               'empty-first': [{'type': block, 'text': ''}, {'type': block, 'text': text}],
+               'inside': 'Quoted later: ' + text}[shape]
+    if harness == 'claude-code':
+        row = {'type': 'user', 'sessionId': 's', 'message': {'content': content}}
+    else:
+        row = {'type': 'response_item', 'payload': {'type': 'message', 'role': 'user',
+                'content': [{'type': block, 'text': content}] if isinstance(content, str) else content}}
+    path = tmp_path / 'unknown-wrapper.jsonl'
+    path.write_text(json.dumps(row) + '\n')
+    place = lines.Place(harness, 'file', None, 'explicit', str(path), path)
+    read = records.claude_read(place, path.stat().st_size) if harness == 'claude-code' else records.codex_read(place, path.stat().st_size, lambda _id: None)
+    assert read.records
+    assert all((r['role'], r['rule'], r['basis'], r['role_basis']) ==
+               (want, 'prefix_rule', 'heuristic', 'prefix_rule') for r in read.records)
+
+
+@pytest.mark.parametrize('native,meta,want,rule', [('human', False, 'human', 'origin'),
+                                                 ('task-notification', False, 'injected', 'origin'),
+                                                 (None, True, 'injected', 'structure')])
+def test_unrecognized_wrapper_does_not_override_native_evidence(tmp_path, native, meta, want, rule):
+    row = {'type': 'user', 'sessionId': 's', 'message': {'content': '<future-wrapper>context</future-wrapper>'}}
+    if native is not None:
+        row['origin'] = {'kind': native}
+    if meta:
+        row['isMeta'] = True
+    path = tmp_path / 'native-wrapper.jsonl'
+    path.write_text(json.dumps(row) + '\n')
+    place = lines.Place('claude-code', 'file', None, 'explicit', str(path), path)
+    record = records.claude_read(place, path.stat().st_size).records[0]
+    assert (record['role'], record['rule'], record['basis']) == (want, rule, 'native')
