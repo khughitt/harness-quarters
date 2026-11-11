@@ -377,18 +377,23 @@ def test_warning_allows_work_at_the_limit_and_excludes_worker_calls(tmp_path, no
     assert d.state().paused == 'calls'
 
 
-def test_501st_root_call_is_denied_with_the_root_text_after_one_warning(tmp_path, notices):
+def test_2001st_root_call_is_denied_with_the_root_text_after_one_warning(tmp_path, notices):
     d = Driver(tmp_path, 'claude-code')
     d.prompt('a long job')
-    for i in range(1, 501):
-        out = d.bash('ls')
-        assert not denied(out), i
-        expected = WARNING_TEXT.format(limit='root calls', n=75, used=375, value=500) if i == 375 else None
-        assert context(out) == expected, i
-    out = d.bash('ls')
+    with d.store.locked('claude-code', CLAUDE_ROOT) as record:
+        record.state.turn.calls = 1498
+    assert d.bash('ls', dt=240) is None  # 1499: below 75%
+    out = d.bash('ls', dt=60)  # 1500: 75% warning
+    assert not denied(out)
+    assert context(out) == WARNING_TEXT.format(limit='root calls', n=75, used=1500, value=2000)
+    assert d.bash('ls', dt=60) is None  # 1501: warning is not repeated
+    with d.store.locked('claude-code', CLAUDE_ROOT) as record:
+        record.state.turn.calls = 1999
+    assert d.bash('ls', dt=60) is None  # 2000: exact limit is allowed
+    out = d.bash('ls', dt=60)  # 2001: refused
     assert denied(out)
     assert reason(out) == (
-        ROOT_TEXT.format(limit='calls', a='0h08m', A='16h00m', c=501, C=500, s=0, S=60, k=0, K=2)
+        ROOT_TEXT.format(limit='calls', a='0h08m', A='16h00m', c=2001, C=2000, s=0, S=60, k=0, K=2)
         + f'\n{OWNER_LINE}'
     )
     assert 'stop the work you already started: interrupt your subagents and the sessions you launched' in reason(out)
@@ -585,7 +590,7 @@ def test_continue_ends_the_pause_resets_counters_and_sets_no_budget(tmp_path, no
     assert st.budget_note is None and st.notified is False
 
 
-@pytest.mark.parametrize('hours, calls, spawns, compactions', [(12, 375, 45, 2), (48, 1500, 180, 6)])
+@pytest.mark.parametrize('hours, calls, spawns, compactions', [(8, 1000, 30, 1), (12, 1500, 45, 2), (48, 6000, 180, 6)])
 def test_budget_directive_scales_from_default(tmp_path, hours, calls, spawns, compactions):
     d = Driver(tmp_path, 'claude-code')
     out = d.prompt(f'budget: {hours}h\nRun the whole migration.')
@@ -630,11 +635,11 @@ def test_changed_limits_file_pauses_with_limits_changed_and_notifies(tmp_path, n
     out = d.bash('ls')
     assert denied(out)
     assert reason(out) == (
-        LIMITS_CHANGED_TEXT.format(a='0h00m', A='16h00m', c=2, C=500, s=0, S=60, k=0, K=2)
+        LIMITS_CHANGED_TEXT.format(a='0h00m', A='16h00m', c=2, C=2000, s=0, S=60, k=0, K=2)
         + f'\n{OWNER_LINE}'
     )
     assert reason(out).startswith('turn paused: the turn limits file changed mid-turn (active 0h00m of 16h00m, '
-                                  'root calls 2/500, tree spawns 0/60, root compactions 0/2 (advisory)). Start nothing new and stop')
+                                  'root calls 2/2000, tree spawns 0/60, root compactions 0/2 (advisory)). Start nothing new and stop')
     assert d.state().paused == 'limits-changed'
     assert len(notices) == 1
     assert denied(d.bash('touch y'))
@@ -1001,7 +1006,7 @@ def test_history_initial_turn_and_reset(tmp_path, harness, implicit):
     assert record.events[1]['snapshot']['calls']['used'] == int(implicit)
 
 
-@pytest.mark.parametrize('harness,metric,value', [('codex', 'active', 43200), ('codex', 'calls', 375),
+@pytest.mark.parametrize('harness,metric,value', [('codex', 'active', 43200), ('codex', 'calls', 1500),
                                                 ('codex', 'spawns', 45), ('claude-code', 'compactions', 2)])
 def test_history_first_warning_only(tmp_path, harness, metric, value):
     d = Driver(tmp_path, harness)
@@ -1015,7 +1020,7 @@ def test_history_first_warning_only(tmp_path, harness, metric, value):
     assert len(warnings) == 1 and warnings[0]['reason'] == metric
 
 
-@pytest.mark.parametrize('harness,metric,value', [('codex', 'active', 57601), ('codex', 'calls', 500),
+@pytest.mark.parametrize('harness,metric,value', [('codex', 'active', 57601), ('codex', 'calls', 2000),
     ('codex', 'spawns', 61), ('codex', 'limits-changed', 0)])
 def test_history_pause_transition_is_atomic_and_not_repeated(tmp_path, harness, metric, value):
     d = Driver(tmp_path, harness)
@@ -1108,7 +1113,7 @@ def test_history_directory_fsync_failure_keeps_committed_pause_unknown(tmp_path,
     d = Driver(tmp_path, 'codex')
     d.prompt('work')
     with d.store.locked(d.harness, d.root) as record:
-        record.state.turn.calls = 500
+        record.state.turn.calls = 2000
     real = os.fsync
     def fail_directory(fd):
         if stat.S_ISDIR(os.fstat(fd).st_mode):
