@@ -64,6 +64,18 @@ def test_committed_artifact_equals_a_fresh_build(tmp_path):
     assert build_in(root, env) == ARTIFACT.read_bytes()
 
 
+def test_recorded_identity_capability_uses_only_qualifying_native_field(tmp_path):
+    from harness_evidence.capabilities import build
+    (tmp_path / "one.jsonl").write_text('{"type":"user","sessionId":"recorded"}\n')
+    catalogue = tmp_path / "CATALOGUE.toml"
+    catalogue.write_text('[[sample]]\npath="one.jsonl"\nharness="claude-code"\nversion="test"\nprovenance="synthetic"\n')
+    evidence = build(catalogue)["harnesses"]["claude-code"]
+    assert evidence["fields"]["header.recorded_identity.session"]["provenance"] == ["sessionId"]
+    assert "header.recorded_identity.session" in evidence["versions"]["test"]["fields_seen"]["synthetic"]
+    (tmp_path / "one.jsonl").write_text('{"type":"user","sessionId":"side","isSidechain":true}\n')
+    assert "header.recorded_identity.session" not in build(catalogue)["harnesses"]["claude-code"]["versions"]["test"]["fields_seen"]["synthetic"]
+
+
 def test_build_is_independent_of_revision_dirty_state_and_host_path(tmp_path):
     root, env = fixture_repo(tmp_path / "one")
     first = build_in(root, env)

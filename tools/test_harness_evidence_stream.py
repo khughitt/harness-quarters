@@ -60,6 +60,139 @@ def end(output, file=0):
     return next(o for o in output if o["object"] == "file_end" and o["file"] == file)
 
 
+@pytest.mark.parametrize("harness,prefix,first,want,rule", [
+    ("claude", [{"type":"user","sessionId":"side","isSidechain":True},
+                {"type":"user","sessionId":7}], {"type":"user","sessionId":"different"}, "different", "session_id"),
+    ("claude", [], {"type":"user","sessionId":""}, "", "session_id"),
+    ("codex", [], {"type":"session_meta","payload":{"id":"first"}}, "first", "session_meta"),
+    ("codex", [], {"type":"session_meta","payload":{"id":7}}, None, "session_meta"),
+    ("codex", [], {"type":"session_meta","payload":[]}, None, "session_meta"),
+    ("codex", [], {"type":"session_meta","payload":{"id":""}}, None, "session_meta"),
+])
+@pytest.mark.parametrize("number", [3, 50, 51])
+def test_recorded_identity_preserves_first_native_observation_and_position(tmp_path,harness,prefix,first,want,rule,number):
+    source = tmp_path / "c0000000-0000-4000-8000-00000000000a.jsonl"
+    before = b"".join((json.dumps(row)+"\n").encode() for row in prefix)
+    before += b"bad json\n" * (number-len(prefix)-1)
+    raw = (json.dumps(first)+"\n").encode()
+    later = {"type":"session_meta","payload":{"id":"later"}} if harness=="codex" \
+        else {"type":"user","sessionId":"later"}
+    source.write_bytes(before+raw+(json.dumps(later)+"\n").encode())
+    output = invoke(tmp_path, request([entry(source)], raw=True))
+    header = next(o["header"] for o in output if o["object"]=="session")
+    assert header["recorded_identity"] == {"session":want,"line":number,"ref":f"file:{source}#L{number}",
+        "sha256":hashlib.sha256(raw).hexdigest(),"basis":"native","rule":rule}
+    if harness=="claude":
+        assert header["session"] == source.stem
+        assert header["identity_basis"] == "file_name_unconfirmed"
+    # The historical <=50-line projection belongs to the consumer, not the decoder.
+    assert (header["recorded_identity"]["line"] <= 50) == (number <= 50)
+
+
+@pytest.mark.parametrize("raw", [b'{"type":"session_meta","payload":{"id":"cut"}}',
+                                  b'{"type":"user","sessionId":"cut"}'])
+def test_recorded_identity_uses_captured_final_physical_line(tmp_path,raw):
+    source = tmp_path / "partial.jsonl"
+    source.write_bytes(raw)
+    output = invoke(tmp_path, request([entry(source)]))
+    header = next(o["header"] for o in output if o["object"]=="session")
+    assert header["recorded_identity"]["session"] == "cut"
+    assert header["recorded_identity"]["sha256"] == hashlib.sha256(raw).hexdigest()
+
+
+@pytest.mark.parametrize("content", [b'unknown\n', b'{"type":"user","sessionId":7}\n',
+                                       b'{"type":"user","sessionId":"side","isSidechain":true}\n',
+                                       b'{"type":"system","session_id":"sdk","subtype":"init"}\n'])
+def test_no_qualifying_native_identity_is_explicit_null(tmp_path,content):
+    source = tmp_path / "none.jsonl"
+    source.write_bytes(content)
+    output = invoke(tmp_path, request([entry(source)]))
+    assert next(o["header"] for o in output if o["object"]=="session")["recorded_identity"] is None
+
+
+@pytest.mark.parametrize("cross_file", [False,True])
+@pytest.mark.parametrize("metadata", [{"model":"sonnet"}, {}, {"model":7}, {"model":""}, [], None])
+def test_child_sidecar_requested_model_after_copy_settlement(tmp_path,cross_file,metadata):
+    root = tmp_path / ".claude/projects"
+    directory = root / "project/session/subagents"
+    directory.mkdir(parents=True)
+    source = directory / "agent-child.jsonl"
+    source.write_text('{"type":"assistant","sessionId":"parent","agentId":"child","message":{"model":"runtime","content":"hello"}}\n')
+    sidecar = source.with_suffix(".meta.json")
+    if metadata is not None:
+        sidecar.write_text(json.dumps(metadata))
+    output = invoke(tmp_path,request([entry(source)],cross_file=cross_file,
+        roots=[{"harness":"claude-code","path":str(root)}]))
+    models = next(o["header"]["models"] for o in output if o["object"]=="session")
+    expected = [{"value":"runtime","basis":"runtime","ref":"claude:projects/project/session/subagents/agent-child.jsonl#L1"}]
+    if metadata == {"model":"sonnet"}:
+        expected.append({"value":"sonnet","basis":"requested","ref":"claude:projects/project/session/subagents/agent-child.meta.json"})
+    assert models == expected
+    # Explicit-store captures cannot consult adjacent metadata.
+    explicit = invoke(tmp_path,request([entry(source)]))
+    assert [m["basis"] for o in explicit if o["object"]=="session" for m in o["header"]["models"]] == ["runtime"]
+
+
+@pytest.mark.parametrize("harness", ["claude-code", "codex"])
+@pytest.mark.parametrize("content", [b'{}\n', b'{"type":"system","session_id":"sdk","subtype":"init"}\n'])
+def test_store_uses_established_harness_while_explicit_uses_signature(tmp_path,harness,content):
+    root = tmp_path / "store"
+    source = root / "session/subagents/agent-x.jsonl"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(content)
+    output = invoke(tmp_path,request([entry(source)],roots=[{"harness":harness,"path":str(root)}]))
+    assert end(output)["status"] == "ok"
+    assert output[0]["harness"] == harness
+    header = next(o["header"] for o in output if o["object"]=="session")
+    if harness == "claude-code":
+        assert header["session"] == "agent-x" and header["subagent"]
+    else:
+        assert header["session"] is None and "subagent" not in header
+    assert next(o for o in output if o["object"]=="record")["role"] in {"unknown","metadata"}
+    record = next(o for o in output if o["object"]=="record")
+    assert record["sha256"] == hashlib.sha256(content).hexdigest()
+    assert record["line"] == 1 and record["ref"].endswith("#L1")
+    explicit = invoke(tmp_path,request([entry(source)]))
+    if content == b'{}\n':
+        assert end(explicit)["status"] == "unknown_format"
+    else:
+        assert end(explicit)["status"] == "ok"
+        assert next(o["header"] for o in explicit if o["object"]=="session")["session"] == "sdk"
+
+
+def test_malformed_child_sidecar_is_optional_and_duplicate_requested_model_keeps_transcript_ref(tmp_path):
+    root = tmp_path / "projects"
+    source = root / "project/session/subagents/agent-x.jsonl"
+    source.parent.mkdir(parents=True)
+    source.write_text('{"type":"user","sessionId":"session","requestedModel":"sonnet"}\n')
+    req = request([entry(source)],roots=[{"harness":"claude-code","path":str(root)}])
+    for metadata in ('invalid json', '{"model":"sonnet"}'):
+        source.with_suffix(".meta.json").write_text(metadata)
+        output = invoke(tmp_path,req)
+        models = next(o["header"]["models"] for o in output if o["object"]=="session")
+        assert models == [{"value":"sonnet","basis":"requested",
+                           "ref":f"{tmp_path.name}:projects/project/session/subagents/agent-x.jsonl#L1"}]
+
+
+def test_sidecar_requested_model_survives_duplicate_transcript_settlement(tmp_path):
+    roots, sources = [], []
+    for home in (".claude", ".claude-work"):
+        root = tmp_path / home / "projects"
+        source = root / "p/parent/subagents/agent-child.jsonl"
+        source.parent.mkdir(parents=True)
+        source.write_text('{"type":"assistant","sessionId":"parent","agentId":"child","message":{"model":"runtime","content":"hello"}}\n')
+        source.with_suffix(".meta.json").write_text('{"model":"sonnet"}')
+        roots.append({"harness":"claude-code","path":str(root)})
+        sources.append(entry(source))
+    output = invoke(tmp_path,request(sources,roots=roots,cross_file=True))
+    assert any(o.get("copy")=="duplicate_file" for o in output)
+    copied = next(o["file"] for o in output if o.get("copy")=="duplicate_file")
+    header = next(o["header"] for o in output if o["object"]=="session" and o["file"]==copied)
+    home = ("claude", "claude-work")[copied]
+    assert header["models"] == [{"value":"sonnet","basis":"requested",
+        "ref":f"{home}:projects/p/parent/subagents/agent-child.meta.json"}]
+
+
 def test_each_file_is_framed_and_counted(tmp_path):
     output = invoke(tmp_path, request([entry(FIXTURES / path_of(n)) for n in ("CA", "XA")]))
     for i in (0, 1):
@@ -183,6 +316,55 @@ def test_logical_path_controls_identity_refs_and_links(tmp_path):
     assert session["header"]["parent"] == "parent"
     assert session["links"][0]["target"] == "parent"
     assert next(o["ref"] for o in output if o["object"] == "record").startswith("claude:projects/")
+
+
+@pytest.mark.parametrize("cross_file", [False, True])
+@pytest.mark.parametrize("fact", ["models", "link"])
+@pytest.mark.parametrize("physical_meta,logical_meta", [
+    ({"model":"sonnet","toolUseId":"physical-call"}, None),
+    ({"model":"sonnet","toolUseId":"physical-call"}, {"model":"opus","toolUseId":"stale-call"}),
+    (None, {"model":"opus","toolUseId":"stale-call"}),
+    (None, None),
+])
+def test_replayed_child_metadata_follows_physical_source_with_logical_refs(tmp_path,cross_file,fact,physical_meta,logical_meta):
+    root = tmp_path / ".claude/projects"
+    logical = root / "project/parent/subagents/agent-child.jsonl"
+    physical = tmp_path / "archive/parent/subagents/transcript-copy.jsonl"
+    physical.parent.mkdir(parents=True)
+    raw = b'{"type":"assistant","sessionId":"parent","agentId":"child","message":{"model":"runtime","content":"hello"}}\n'
+    physical.write_bytes(raw)
+    for source, metadata in ((logical,logical_meta),(physical,physical_meta)):
+        if metadata is not None:
+            source.parent.mkdir(parents=True,exist_ok=True)
+            (source.parent / "agent-child.meta.json").write_text(json.dumps(metadata))
+    assert not logical.exists()
+    output = invoke(tmp_path,request([entry(physical,path=str(logical),read_path=str(physical))],
+        roots=[{"harness":"claude-code","path":str(root)}],cross_file=cross_file,raw=True))
+    assert output[-1]["object"] == "request_end" and end(output)["status"] == "ok"
+    session = next(o for o in output if o["object"]=="session")
+    header = session["header"]
+    assert header["session"] == "agent-child" and header["parent"] == "parent"
+    prefix = "claude:projects/project/parent/subagents/agent-child"
+    expected = [{"value":"runtime","basis":"runtime","ref":prefix+".jsonl#L1"}]
+    if physical_meta:
+        expected.append({"value":"sonnet","basis":"requested","ref":prefix+".meta.json"})
+    if fact == "models":
+        assert header["models"] == expected
+    child = next(link for link in session["links"] if link["kind"]=="child_to_parent")
+    expected_link = {"kind":"child_to_parent","target":"parent","basis":"convention",
+                     "rule":"path","ref":prefix+".jsonl"}
+    if physical_meta:
+        expected_link["call"] = {"id":"physical-call","ref":None}
+    if fact == "link":
+        assert child == expected_link
+    record = next(o for o in output if o["object"]=="record")
+    assert record["ref"] == prefix+".jsonl#L1"
+    assert record["raw"].encode() == raw and record["sha256"] == hashlib.sha256(raw).hexdigest()
+    # An explicit capture with read_path still cannot consult either sidecar.
+    explicit = invoke(tmp_path,request([entry(physical,path=str(logical),read_path=str(physical))]))
+    session = next(o for o in explicit if o["object"]=="session")
+    assert [m["basis"] for m in session["header"]["models"]] == ["runtime"]
+    assert all("call" not in link for link in session["links"])
 
 
 def test_cross_file_copies_and_context_fork_resolution(tmp_path):
@@ -430,6 +612,8 @@ def test_rewritten_source_has_one_consistent_byte_observation(tmp_path, monkeypa
             assert record["sha256"]==hashlib.sha256(record["raw"].encode()).hexdigest()
             assert record["end"]-record["offset"]==len(record["raw"].encode())
             assert strict_json(record["raw"])["payload"]["id"]==record["session"]==header["session"]
+            assert header["recorded_identity"]["session"] == header["session"]
+            assert header["recorded_identity"]["sha256"] == record["sha256"]
     else:
         assert end(output,0)["status"]=="unreadable" and not emitted
     assert end(output,1)["status"]=="ok" and output[-1]["object"]=="request_end"

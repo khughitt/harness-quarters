@@ -71,7 +71,7 @@
    "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T11-00-00-01900000-0000-7000-8000-0000000000f2.jsonl": "30b550b6f035815a4123c8a8fd18fbbf7059ec89c04b0749ecda738e24b2fde3"
   }
  },
- "decoder_version": "3",
+ "decoder_version": "5",
  "evidence_rule": "synthetic samples establish decoder conformance; observed samples or probes establish emission; absent from a sample means unobserved",
  "harnesses": {
   "claude-code": {
@@ -208,6 +208,12 @@
       "message.model",
       "requestedModel",
       "toolUseResult.resolvedModel"
+     ]
+    },
+    "header.recorded_identity.session": {
+     "coverage_keys": [],
+     "provenance": [
+      "sessionId"
      ]
     },
     "header.session": {
@@ -443,6 +449,7 @@
        "header.first_at",
        "header.last_at",
        "header.models[].value",
+       "header.recorded_identity.session",
        "header.session",
        "header.subagent",
        "header.subagent_basis",
@@ -493,6 +500,7 @@
        "header.last_at",
        "header.markers",
        "header.models[].value",
+       "header.recorded_identity.session",
        "header.session",
        "header.subagent",
        "header.subagent_basis",
@@ -546,6 +554,7 @@
        "header.last_at",
        "header.markers",
        "header.models[].value",
+       "header.recorded_identity.session",
        "header.session",
        "header.subagent",
        "header.subagent_basis",
@@ -780,6 +789,12 @@
       "payload.source.subagent.thread_spawn.parent_thread_id"
      ]
     },
+    "header.recorded_identity.session": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.id"
+     ]
+    },
     "header.session": {
      "coverage_keys": [],
      "provenance": [
@@ -968,6 +983,7 @@
        "header.models[].value",
        "header.own_turn_ids",
        "header.parent",
+       "header.recorded_identity.session",
        "header.session",
        "header.turn_ids",
        "kind",
@@ -1025,6 +1041,7 @@
        "header.models[].value",
        "header.own_turn_ids",
        "header.parent",
+       "header.recorded_identity.session",
        "header.session",
        "header.turn_ids",
        "kind",
@@ -1067,6 +1084,7 @@
        "header.last_at",
        "header.own_turn_ids",
        "header.parent",
+       "header.recorded_identity.session",
        "header.session",
        "header.turn_ids",
        "kind",

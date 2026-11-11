@@ -194,6 +194,25 @@ class InlinePair(unittest.TestCase):
 
 
 class ResumeTest(InlinePair):
+    def test_disjoint_files_do_not_rebuild_uuid_sets_per_pair(self):
+        """Relocated obs test_followups.ResumeWork assertion, unchanged bounds."""
+        visits = []
+
+        class UUIDs(dict):
+            def __iter__(self):
+                visits.append(len(self))
+                return super().__iter__()
+
+        reads = []
+        for n in range(40):
+            read = self.write(f"s{n}", [row(
+                "user", f"u{n}", "2026-10-12T09:00:00Z", f"s{n}")])
+            read.header["uuids"] = UUIDs(read.header["uuids"])
+            reads.append(read)
+        copies.mark_resume_copies(reads)
+        self.assertTrue(all("copy" not in r for read in reads for r in read.records))
+        self.assertLessEqual(len(visits), 80)
+
     def test_resume_copy_by_timing(self):
         cw = read_file(fixture_place("CW"))
         cw2 = read_file(fixture_place("CW2"))

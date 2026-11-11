@@ -168,7 +168,7 @@ def test_discover_objects_include_provenance_place_and_stat(tmp_path):
     assert [o["object"] for o in objs] == ["root"] * 6 + ["file"] * 9 + ["discover_end"]
     for obj in objs:
         assert obj["schema"] == "harness-evidence/1"
-        assert obj["decoder"]["version"] == "3"
+        assert obj["decoder"]["version"] == "5"
         assert obj["decoder"]["revision"]
         assert obj["decoder"] == objs[0]["decoder"]
     for obj in objs[6:-1]:
@@ -214,6 +214,29 @@ def test_non_directory_and_absent_roots_remain_explicit(tmp_path):
     assert objs[0]["first_errors"]
     assert objs[1]["state"] == "absent"
     assert (objs[-1]["roots"], objs[-1]["files"]) == (2, 0)
+    assert objs[0]["aliases"] == objs[1]["aliases"] == []
+
+
+def test_discover_exposes_known_and_dangling_aliases_without_counting_files(tmp_path):
+    root = tmp_path / ".codex/sessions"
+    root.mkdir(parents=True)
+    source = root / "source.jsonl"
+    source.write_bytes(b"not transcript content\n")
+    alias = root / f"rollout-time-{THREAD}_{SEGMENT}.jsonl"
+    alias.symlink_to(source)
+    dangling = root / "dangling.jsonl"
+    dangling.symlink_to(root / "missing.jsonl")
+    objs = run_json(["discover", "--root", f"codex={root}"], tmp_path)
+    assert objs[0]["files"] == objs[-1]["files"] == 1
+    assert objs[0]["bytes"] == source.stat().st_size
+    assert [o["path"] for o in objs if o["object"] == "file"] == [str(source)]
+    assert objs[0]["aliases"] == [
+        {"path": str(dangling), "place": {"harness": "codex", "home": "codex",
+         "profile": "personal", "store": "live", "relpath": "sessions/dangling.jsonl"},
+         "filename_identity": None},
+        {"path": str(alias), "place": {"harness": "codex", "home": "codex",
+         "profile": "personal", "store": "live", "relpath": f"sessions/{alias.name}"},
+         "filename_identity": {"thread": THREAD, "segment": SEGMENT, "basis": "convention"}}]
 
 
 @pytest.mark.parametrize("value", ["codex", "codex=", "=sessions", "other=sessions"])
