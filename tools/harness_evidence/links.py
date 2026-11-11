@@ -9,14 +9,14 @@ from harness_evidence.records import FileRead
 
 
 def _meta_path(read: FileRead) -> tuple[Path, str] | None:
-    """A Claude child's `.meta.json` beside its transcript: the path and its home-relative
-    relpath."""
+    """A Claude child's metadata beside its actual source, with its logical ref path."""
     if read.place.harness != "claude-code" or not read.header.get("subagent") \
             or read.place.store == "explicit":
         return None
     stem = PurePosixPath(read.place.relpath).stem
     relpath = str(PurePosixPath(read.place.relpath).with_name(f"{stem}.meta.json"))
-    return read.place.path.with_name(f"{stem}.meta.json"), relpath
+    source = read.place.read_path if read.place.read_path is not None else read.place.path
+    return source.with_name(f"{stem}.meta.json"), relpath
 
 
 def _meta(read: FileRead) -> tuple[dict, str] | None:

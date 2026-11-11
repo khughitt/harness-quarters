@@ -454,7 +454,7 @@ aliases stay excluded from file objects. The listing helper retains candidates w
 when applying a cutoff; the command applies no cutoff.
 
 `tools/harness-evidence version --json` reports the evidence schema,
-decoder version `4`, and the decoder revision. A pinned copy reads a `REVISION`
+decoder version `5`, and the decoder revision. A pinned copy reads a `REVISION`
 file inside the package; a checkout reports its HEAD with `+dirty` when
 the package has changes. Without either source the command exits 2.
 
@@ -484,7 +484,9 @@ and non-string ids. A valid final JSON line can supply this observation without 
 newline. Consumers apply their own peek window to its line position.
 Child `.meta.json` requested models join `header.models` after transcript copy
 settlement, with the sidecar ref; sidecars are separately observed metadata and
-explicit-store captures never consult them.
+explicit-store captures never consult them. With `read_path`, child metadata comes
+from beside that physical source, using the logical transcript stem and ref; it
+never falls back to a stale sidecar at the logical path.
 Each bounded transcript prefix is captured once in transient memory; format,
 records, header, raw lines, hashes and offsets all use those same bytes. The
 buffer is released after extraction; its peak cost is up to one current file's

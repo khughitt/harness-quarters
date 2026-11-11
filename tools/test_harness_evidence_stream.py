@@ -318,6 +318,55 @@ def test_logical_path_controls_identity_refs_and_links(tmp_path):
     assert next(o["ref"] for o in output if o["object"] == "record").startswith("claude:projects/")
 
 
+@pytest.mark.parametrize("cross_file", [False, True])
+@pytest.mark.parametrize("fact", ["models", "link"])
+@pytest.mark.parametrize("physical_meta,logical_meta", [
+    ({"model":"sonnet","toolUseId":"physical-call"}, None),
+    ({"model":"sonnet","toolUseId":"physical-call"}, {"model":"opus","toolUseId":"stale-call"}),
+    (None, {"model":"opus","toolUseId":"stale-call"}),
+    (None, None),
+])
+def test_replayed_child_metadata_follows_physical_source_with_logical_refs(tmp_path,cross_file,fact,physical_meta,logical_meta):
+    root = tmp_path / ".claude/projects"
+    logical = root / "project/parent/subagents/agent-child.jsonl"
+    physical = tmp_path / "archive/parent/subagents/transcript-copy.jsonl"
+    physical.parent.mkdir(parents=True)
+    raw = b'{"type":"assistant","sessionId":"parent","agentId":"child","message":{"model":"runtime","content":"hello"}}\n'
+    physical.write_bytes(raw)
+    for source, metadata in ((logical,logical_meta),(physical,physical_meta)):
+        if metadata is not None:
+            source.parent.mkdir(parents=True,exist_ok=True)
+            (source.parent / "agent-child.meta.json").write_text(json.dumps(metadata))
+    assert not logical.exists()
+    output = invoke(tmp_path,request([entry(physical,path=str(logical),read_path=str(physical))],
+        roots=[{"harness":"claude-code","path":str(root)}],cross_file=cross_file,raw=True))
+    assert output[-1]["object"] == "request_end" and end(output)["status"] == "ok"
+    session = next(o for o in output if o["object"]=="session")
+    header = session["header"]
+    assert header["session"] == "agent-child" and header["parent"] == "parent"
+    prefix = "claude:projects/project/parent/subagents/agent-child"
+    expected = [{"value":"runtime","basis":"runtime","ref":prefix+".jsonl#L1"}]
+    if physical_meta:
+        expected.append({"value":"sonnet","basis":"requested","ref":prefix+".meta.json"})
+    if fact == "models":
+        assert header["models"] == expected
+    child = next(link for link in session["links"] if link["kind"]=="child_to_parent")
+    expected_link = {"kind":"child_to_parent","target":"parent","basis":"convention",
+                     "rule":"path","ref":prefix+".jsonl"}
+    if physical_meta:
+        expected_link["call"] = {"id":"physical-call","ref":None}
+    if fact == "link":
+        assert child == expected_link
+    record = next(o for o in output if o["object"]=="record")
+    assert record["ref"] == prefix+".jsonl#L1"
+    assert record["raw"].encode() == raw and record["sha256"] == hashlib.sha256(raw).hexdigest()
+    # An explicit capture with read_path still cannot consult either sidecar.
+    explicit = invoke(tmp_path,request([entry(physical,path=str(logical),read_path=str(physical))]))
+    session = next(o for o in explicit if o["object"]=="session")
+    assert [m["basis"] for m in session["header"]["models"]] == ["runtime"]
+    assert all("call" not in link for link in session["links"])
+
+
 def test_cross_file_copies_and_context_fork_resolution(tmp_path):
     parent = tmp_path / ".codex" / "sessions" / "parent.jsonl"
     parent.parent.mkdir(parents=True)
