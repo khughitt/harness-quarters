@@ -65,3 +65,36 @@ unit do not prove a host has configured and enabled replication. Turn-pause
 history covers local retained hook transitions, not every agent-initiated stop.
 See [capabilities](harness-capabilities.md), [archive](session-archive.md) and
 [turn accounting](turn-pause.md) for their boundaries.
+
+## Pinned runtimes and local extensions
+
+just pi-install installs the lock-pinned CLI and durable SDK below the executing
+home's .local/share/pi/VERSION. PI_INSTALL_ROOT selects an alternate destination.
+The launcher checks that install's lock against harnesses/pi/package-lock.json;
+a missing install or lock mismatch refuses launch. It rejects pi self-updates;
+model-catalog, extension and package updates have separate targets. Change the pin
+and requalify its probes as described in [capabilities](harness-capabilities.md).
+No install is performed merely by validating a clone.
+
+Create the real .pi/agent home and apply declared links before first use. If pi
+already wrote a real settings.json, preserve it and merge needed configuration
+into the tracked settings before restoring declared links. Authentication, trust,
+model-store and sessions stay in the home. Other configuration needs an explicit
+links.toml declaration once it has content. The picker extension preserves model
+and thinking selections; installation identifiers are deliberately not restored.
+When restricting pi tools, include required MCP names explicitly, for example
+`--tools 'read,grep,mcp__SERVER__*'`; a list of built-in names does not establish
+that a direct MCP tool is reachable. Recheck the pinned runtime after upgrades.
+
+Claude Code function-hook mods live under harnesses/claude/mods/. The home mods
+link and colon-separated CLAUDE_CODE_PLUGIN_DIRS entries select the loaded folders.
+A missing home link starts Claude without the mods. The cli-pane mod offers
+`/tas ID` for tasks show and `/m ID` for mindful show. `/m` without an ID opens a
+thought search picker; the mobile surface instead requires an explicit ID.
+Search waits 200 ms after typing, serializes requests and returns at most ten hits.
+
+Each command focuses its pane; Escape closes it and another invocation replaces
+its content. Errors and output truncation are visible. Output stays out of model
+context, but the slash-command invocation itself remains in the transcript.
+Generated plugin types and tsconfig.json are ignored. Use just mods for plugin
+validation/tests and `tsc -p harnesses/claude/mods/NAME` for a mod's type check.

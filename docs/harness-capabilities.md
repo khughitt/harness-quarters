@@ -35,6 +35,23 @@ Guard subscribers require a real refusal channel; observers do not create one.
 Current CLI scope wrapping through host-budget depends on the declared host option;
 a failed scope launch stops rather than silently running unmanaged.
 
+## Installed hook wiring
+
+Codex personal/work hooks each register ops's claim guard on root Stop and worker
+SubagentStop. A worker's agent_id selects its own claim; root metadata grants no
+foreign closure authority. After a definition change, inspect and trust the exact
+definition through native /hooks in each home. Trust restoration follows the
+[runtime upgrade procedure](runbooks/relay-runtime.md).
+
+Agy's local hook runs profile/capture-notice at SessionStart and heals detached
+settings before startup and run_command. PreToolUse healing emits empty stdout,
+keeping native permission prompts intact. Relay translates run_command to Bash
+for ops's guard and dispatches its familiar subscriber. Its agy handler timeout
+is 60 seconds with --outer-ms 60000. Stop also refreshes picks and performs the
+local one-shot claim check, allowing a stop while fullyIdle is false under the
+probed controller-wake behavior. This fallback remains until the shared guard
+supports that route; an installed observer is not a substitute refusal channel.
+
 ## Fact schema and lookup
 
 Use only the supported reader, not a hand-written TOML reader:

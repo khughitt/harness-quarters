@@ -80,3 +80,16 @@ then apply declared links before launching a harness that writes first-run files
 After a manifest change, convergence is checked on each host that applies it.
 Settings, hooks and session tools target hq; instructions/profiles/general skills
 and task/flow skills target their registered owners directly.
+
+## Current home groups
+
+Claude Code and Codex have personal and private work homes. Agy's settings home
+is .gemini/antigravity-cli and its hook/skill home is .gemini/config; both are one
+session-store integration, not personal/work session adapters. Its skills.json
+uses a relative path to .agents/skills because agy does not expand home syntax
+in that file. Pi reads .agents/skills natively. The OpenCode group activates only
+when its declared .config/opencode.local home exists.
+
+External Ponytail defaults live in external/ponytail/config.json with defaultMode
+off: skills are available without automatic session/worker footer injection.
+Installed plugin caches stay harness-managed rather than becoming hq inputs.
