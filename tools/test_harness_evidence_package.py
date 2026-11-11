@@ -129,6 +129,28 @@ def test_checkout_revision_is_head_and_marks_dirty(tmp_path):
     assert version_json(root, env)["decoder"]["revision"] == head + "+dirty"
 
 
+@pytest.mark.parametrize("context", ["git-dir", "work-tree", "index", "combined"])
+def test_checkout_revision_ignores_inherited_git_context(tmp_path, context):
+    root, env = fixture_repo(tmp_path / "containing")
+    foreign, foreign_env = fixture_repo(tmp_path / "foreign")
+    (foreign / "tools" / "harness_evidence" / "foreign-only").write_text("other checkout\n")
+    git(foreign, foreign_env, "add", "tools")
+    git(foreign, foreign_env, "commit", "-qm", "foreign checkout")
+    head = git(root, env, "rev-parse", "HEAD")
+    assert git(foreign, foreign_env, "rev-parse", "HEAD") != head
+
+    hostile_env = clean_env(tmp_path)
+    if context in ("git-dir", "combined"):
+        hostile_env["GIT_DIR"] = str(foreign / ".git")
+    if context in ("work-tree", "combined"):
+        hostile_env["GIT_WORK_TREE"] = str(foreign)
+    if context in ("index", "combined"):
+        hostile_env["GIT_INDEX_FILE"] = str(foreign / ".git" / "index")
+    assert version_json(root, hostile_env)["decoder"]["revision"] == head
+    (root / "tools" / "harness_evidence" / "extra.py").write_text("")
+    assert version_json(root, hostile_env)["decoder"]["revision"] == head + "+dirty"
+
+
 def test_pinned_copy_reads_revision_file(tmp_path):
     root = extracted_copy(tmp_path, revision="a" * 40)
     assert not any((p / ".git").exists() for p in (root, *root.parents))
