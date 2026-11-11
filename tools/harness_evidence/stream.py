@@ -156,14 +156,15 @@ def _public(value, text):
     return value
 
 
-def _objects(file, text, raw, copy_scope):
+def _objects(file, text, raw, copy_scope, *, lexical_keys=False):
     grouped = {}
     for record in file.read.records:
         grouped.setdefault(record["line"], []).append(record)
     unparsed = {r["_line"]: r for r in file.read.unparsed}
     for number in sorted(grouped.keys() | unparsed.keys()):
         position = file.positions[number]
-        for record in sorted(grouped.get(number, []), key=lambda r: r.get("block", -1)):
+        for record in sorted(grouped.get(number, []),
+                             key=lambda r: str(r.get("block", "")) if lexical_keys else r.get("block", -1)):
             value = _public(record, text)
             key = f"L{number}" + (f"#{record['block']}" if "block" in record else "")
             value.update(object="record", key=key, offset=position["offset"], end=position["end"])
@@ -188,7 +189,7 @@ def _emit_file(file, index, envelope, request):
     scope = sorted({f["path"] for f in request["files"]}) if request.get("cross_file") else [file.source["path"]]
     old = file.source.get("state")
     digest, prior = hashlib.sha256(), hashlib.sha256()
-    for value in _objects(file, text, raw, scope):
+    for value in _objects(file, text, raw, scope, lexical_keys=True):
         if value.get("provisional"):
             continue
         encoded = (serialized(value, canonical=True) + "\n").encode("ascii")
@@ -240,7 +241,12 @@ def objects(request, envelope):
     base = {**envelope, "request": request["id"]}
     if request.get("cross_file"):
         files = [_read(source, roots, inherited) for source in sources]
-        reads = [f.read for f in files if f.status == "ok"]
+
+        def priority(read):
+            root = discover._root_of(read.place.path, roots)
+            return (roots.index(root) if root is not None else 0, read.place.relpath)
+
+        reads = sorted([f.read for f in files if f.status == "ok"], key=priority)
         copies.mark_resume_copies(reads)
         copies.mark_duplicate_files(reads)
         for i, file in enumerate(files):

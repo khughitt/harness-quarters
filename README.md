@@ -469,10 +469,14 @@ line. Pass the last state to resume: `replaces: {"from_line": N}` replaces line
 objects at or after N, while `replaces: "all"` restarts after an earlier payload
 changed. Always replace the file and session aggregates by key. Incomplete tails
 are provisional and replayed. Stage 1 rereads the whole bounded prefix each time.
-The checkpoint hashes committed line objects in line/block order: sorted-key,
+Copy marking uses root-list priority followed by logical relative path, independent
+of request file order. Outside-root explicit files have priority zero.
+The checkpoint hashes committed line objects in line/string-key order: sorted-key,
 compact ASCII JSON plus a newline per object, excluding schema, decoder and
 request/file transport indices. Text/raw option changes can therefore restart
 replay, while request ids and decoder revision changes alone do not.
+Records themselves retain native numeric block order, including when a line has
+ten or more blocks.
 
 - **Rows.** Harness, home (`personal` or `work`), short id (the first eight characters;
   for Codex the last eight, since a UUIDv7 id starts with its timestamp), age, place (marked

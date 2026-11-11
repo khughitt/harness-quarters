@@ -131,3 +131,16 @@ def test_modified_or_shrunk_committed_source_restarts(tmp_path):
     path.write_bytes(b"")
     output = invoke(tmp_path, request([entry(path, state=end(first)["state"])]))
     assert output[0]["replaces"] == "all"
+
+
+def test_digest_lexical_keys_preserve_numeric_emission_order(tmp_path):
+    path = tmp_path / "blocks.jsonl"
+    path.write_text(json.dumps({"type": "assistant", "sessionId": "s", "message": {
+        "content": [{"type": "text", "text": str(i)} for i in range(12)]}}) + "\n")
+    output = invoke(tmp_path, request([entry(path)]))
+    records = [payload(o) for o in output if o["object"] == "record"]
+    assert [o["block"] for o in records] == list(range(12))
+    canonical = sorted(records, key=lambda o: (o["line"], o["key"]))
+    digest = hashlib.sha256(b"".join((json.dumps(o, ensure_ascii=True, separators=(",", ":"),
+        sort_keys=True) + "\n").encode("ascii") for o in canonical)).hexdigest()
+    assert end(output)["state"]["digest"] == digest

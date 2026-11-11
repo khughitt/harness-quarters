@@ -219,3 +219,24 @@ def test_byte_bound_larger_than_machine_integer_reads_available_prefix(tmp_path)
     whole = invoke(tmp_path, request([entry(path)]))
     output = invoke(tmp_path, request([entry(path, size=10**100)]))
     assert output == whole
+
+
+def test_live_duplicate_copy_original_uses_root_priority_then_logical_relpath(tmp_path):
+    first_root = tmp_path / ".codex-work" / "sessions"
+    second_root = tmp_path / ".codex" / "sessions"
+    first_root.mkdir(parents=True)
+    second_root.mkdir(parents=True)
+    source = '{"type":"session_meta","payload":{"id":"same"}}\n'
+    a = first_root / "a.jsonl"
+    b = first_root / "b.jsonl"
+    c = second_root / "0.jsonl"
+    for path in (a, b, c):
+        path.write_text(source)
+    roots = [{"harness": "codex", "path": str(p)} for p in (first_root, second_root)]
+    initial = invoke(tmp_path, request([entry(c), entry(b), entry(a)], roots=roots, cross_file=True))
+    originals = [o for o in initial if o["object"] == "record" and "copy" not in o]
+    assert len(originals) == 1 and originals[0]["file"] == 2
+    state = end(initial, 1)["state"]
+    reordered = invoke(tmp_path, request([entry(b, state=state), entry(a), entry(c)], roots=roots,
+                                         cross_file=True))
+    assert reordered[0]["replaces"] == {"from_line": state["next_line"]}
