@@ -112,7 +112,8 @@ def test_protected_read_accepts_only_filesystem_readers(command):
 
 
 @pytest.mark.parametrize('command', [
-    'tasks attach x /srv/config', 'tasks note x /srv/config', 'hq pause status', 'kill 123',
+    'tasks attach x /srv/config', 'tasks note x /srv/config',
+    'tasks feedback --project hq --category friction /srv/config', 'hq pause status', 'kill 123',
     'touch /srv/config', 'cat /srv/config > /srv/out', 'cat /srv/config; touch /srv/out',
     'sed -n 1p /srv/config', 'tail -f /srv/config', 'env cat /srv/config',
     'cat $(echo /srv/config)', 'readlink /srv/config', 'readlink -f',
@@ -159,6 +160,8 @@ SHELL_PASSES = [
     ('tasks park lore-1 "next"', 'bookkeeping'),
     ('tasks note x "y"', 'bookkeeping'),
     ('tasks park lore-1 "next" --waiting-on user --reason decision', 'bookkeeping'),
+    ('tasks feedback --project hq --category friction --origin user -b "detail" "wrong block"', 'bookkeeping'),
+    ('tasks feedback "unclear pause block" --project hq --category friction --origin agent', 'bookkeeping'),
     ('hq pause status', 'bookkeeping'),
     ('hq pause limits', 'bookkeeping'),
     ('hq pause history', 'read'),
@@ -195,6 +198,8 @@ def test_shell_passes(cmd, klass):
     ('tasks -C .worktrees/task park hq-123456 next', 'bookkeeping'),
     ('tasks -C /srv/project/.worktrees/task note hq-123456 paused', 'bookkeeping'),
     ('tasks -C "project worktree" note hq-123456 paused', 'bookkeeping'),
+    ('tasks -C .worktrees/task feedback --project hq --category friction --origin user -b "detail" "msg"', 'bookkeeping'),
+    ('tasks -C "project worktree" feedback --project hq --category gap "missing allowlist entry"', 'bookkeeping'),
     ('tasks -C . show hq-123456 --no-fetch', 'read'),
     ('tasks -C . claims', 'read'),
     ('tasks -C . list', 'read'),
@@ -216,6 +221,35 @@ def test_shell_passes(cmd, klass):
 ])
 def test_tasks_directory_selector(cmd, klass):
     assert shell(cmd, NOBODY).klass == klass
+
+
+@pytest.mark.parametrize('cmd', [
+    'tasks feedback --project hq --category friction "summary"',
+    'tasks -C .worktrees/task feedback --project hq --category friction --origin user -b "one line" "summary"',
+    'tasks -C "project worktree" feedback "summary" --project hq --category idea --origin agent --new',
+])
+def test_tasks_feedback_classified_as_bookkeeping(cmd):
+    v = shell(cmd, NOBODY)
+    assert v == Verdict('bookkeeping', 'tasks feedback')
+
+
+@pytest.mark.parametrize('cmd', [
+    'tasks add "regular task"',
+    'tasks -C .worktrees/task add "regular task"',
+    'tasks edit hq-123456 --status todo',
+    "tasks feedback --project hq --category friction -b 'line 1\nline 2' 'summary'",
+    'tasks feedback --project hq --category friction -b "line 1\nline 2" "summary"',
+    'tasks feedback --project hq --category friction "' + 'a' * allowlist.MAX_TEXT + '"',
+    'tasks feedback --project hq --category friction "msg" && git status',
+    'env tasks feedback --project hq --category friction "msg"',
+    'tasks feedback --project hq --category friction "$(id)"',
+    'tasks feedback --project hq --category friction "msg" > /srv/out',
+    'tasks -C ~/work feedback --project hq --category friction "msg"',
+    'tasks -C "" feedback --project hq --category friction "msg"',
+    'tasks -C --project feedback hq --category friction "msg"',
+])
+def test_tasks_feedback_preserves_parser_and_mutation_refusals(cmd):
+    assert shell(cmd, NOBODY).klass == 'refuse'
 
 
 # ---- shell validator: refusals -------------------------------------------------------

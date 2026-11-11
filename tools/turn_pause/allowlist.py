@@ -37,7 +37,7 @@ class Owned(Frozen):
 # Shell programs. `hq pause` passes as `hq pause status|limits` (bookkeeping) or
 # `hq pause history|list` (read); `tasks show` only with --no-fetch, since it otherwise
 # runs a document provider.
-BOOKKEEPING = {('tasks', 'park'), ('tasks', 'note'), ('hq', 'pause')}
+BOOKKEEPING = {('tasks', 'park'), ('tasks', 'note'), ('tasks', 'feedback'), ('hq', 'pause')}
 HQ_PAUSE = {'status', 'limits'}
 HQ_PAUSE_READS = {'history', 'list'}
 RECORD_READS = {('tasks', 'show'), ('tasks', 'claims'), ('tasks', 'list'), ('tasks', 'attach')}

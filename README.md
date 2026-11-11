@@ -743,12 +743,16 @@ authorize mutation.
 
 Use `tasks -C .worktrees/<name> park <id> "next step" --waiting-on user --reason decision`
 when the authoritative task record is in a worktree. `tasks -C .worktrees/<name> note <id> "status"`
-also stays allowed after the pause's read grace is exhausted. Quote a directory that
-contains spaces. The directory selector preserves each closing subcommand's existing
-restrictions: records reads, `hq pause history`, `hq pause list`, and attachments use
-grace (`hq pause status` and `hq pause limits` remain bookkeeping), and `tasks show`
-needs `--no-fetch`.
-The pause still refuses `cd`, `env` wrappers and compound shell commands.
+and `tasks feedback` (including `tasks -C .worktrees/<name> feedback --project <owner> --category <kind> "summary"`)
+are bookkeeping too, so they stay allowed before and after the pause's read grace is
+exhausted without spending grace or lifting the pause. Quote a directory that
+contains spaces. The directory selector and bookkeeping subcommands preserve the closing
+parser's existing restrictions: commands stay single-line (no literal newlines inside or
+outside quotes) within the 4,096-character limit, protected paths stay refused, records
+reads, `hq pause history`, `hq pause list`, and attachments use grace (`hq pause status`
+and `hq pause limits` remain bookkeeping), and `tasks show` needs `--no-fetch`.
+The pause still refuses other task mutations (`tasks add`, `tasks start`, `tasks done`),
+`cd`, `env` wrappers, substitutions, redirects, and compound shell commands.
 
 ### Re-probing the turn-pause hook facts
 
