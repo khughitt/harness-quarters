@@ -332,7 +332,7 @@ def test_kill_refusals(child, template):
 
 def test_kill_many_targets_within_budget(child):
     """Each distinct pid is walked once, and a kill names at most MAX_KILL_TARGETS
-    distinct pids, so a 4 KB kill stays within the per-call budget."""
+    distinct pids, so a MAX_TEXT kill stays within the per-call budget."""
     pid, grandchild = child
     me = owned(harness_pid=os.getppid())  # two levels above the child: a longer walk
     cmd = 'kill'
