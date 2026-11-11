@@ -40,8 +40,11 @@ ROOT_TEXT = (
     'then pause an active goal only if the user explicitly requested its pause. If an active '
     'goal lacks that authorization, leave its status unchanged, name it in the pause report '
     'and include a request for the user to authorize its pause; do not claim it is paused. '
-    'Then write the pause report the turn-pause '
-    'rule describes, park your task --waiting-on user --reason decision, and end your turn. If '
+    'Then record the durable pause report the turn-pause rule describes with single-line '
+    'tasks note calls (file writes are refused while paused; split across notes past 16,384 '
+    'characters), park your task --waiting-on user --reason decision, and end your turn '
+    'with the continuation decision and any exact budget: line in your closing message '
+    '(question tools are refused while paused). If '
     'another agent launched this session, park any claim --waiting-on agent for that agent and '
     'return a short status (done, left, running) instead of a pause report. Only bookkeeping, '
     'plain reads and stopping your own work are allowed now; hq pause status shows the counts.')
@@ -377,18 +380,23 @@ def test_warning_allows_work_at_the_limit_and_excludes_worker_calls(tmp_path, no
     assert d.state().paused == 'calls'
 
 
-def test_501st_root_call_is_denied_with_the_root_text_after_one_warning(tmp_path, notices):
+def test_2001st_root_call_is_denied_with_the_root_text_after_one_warning(tmp_path, notices):
     d = Driver(tmp_path, 'claude-code')
     d.prompt('a long job')
-    for i in range(1, 501):
-        out = d.bash('ls')
-        assert not denied(out), i
-        expected = WARNING_TEXT.format(limit='root calls', n=75, used=375, value=500) if i == 375 else None
-        assert context(out) == expected, i
-    out = d.bash('ls')
+    with d.store.locked('claude-code', CLAUDE_ROOT) as record:
+        record.state.turn.calls = 1498
+    assert d.bash('ls', dt=240) is None  # 1499: below 75%
+    out = d.bash('ls', dt=60)  # 1500: 75% warning
+    assert not denied(out)
+    assert context(out) == WARNING_TEXT.format(limit='root calls', n=75, used=1500, value=2000)
+    assert d.bash('ls', dt=60) is None  # 1501: warning is not repeated
+    with d.store.locked('claude-code', CLAUDE_ROOT) as record:
+        record.state.turn.calls = 1999
+    assert d.bash('ls', dt=60) is None  # 2000: exact limit is allowed
+    out = d.bash('ls', dt=60)  # 2001: refused
     assert denied(out)
     assert reason(out) == (
-        ROOT_TEXT.format(limit='calls', a='0h08m', A='16h00m', c=501, C=500, s=0, S=60, k=0, K=2)
+        ROOT_TEXT.format(limit='calls', a='0h08m', A='16h00m', c=2001, C=2000, s=0, S=60, k=0, K=2)
         + f'\n{OWNER_LINE}'
     )
     assert 'stop the work you already started: interrupt your subagents and the sessions you launched' in reason(out)
@@ -495,6 +503,74 @@ def test_paused_scoped_tasks_write_note_and_release_claim(tmp_path, notices, har
 
 
 @pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+def test_paused_long_tasks_note_persists_durable_handoff_after_grace_exhausted(tmp_path, notices, harness):
+    tasks_cli = shutil.which('tasks')
+    assert tasks_cli is not None, 'the tasks CLI is required for the closing-path test'
+    d = Driver(tmp_path, harness)
+    project = tmp_path / 'project worktree'
+    project.mkdir()
+    outside = tmp_path / 'outside'
+    outside.mkdir()
+    env = {'PATH': f'{Path(tasks_cli).parent}:/usr/bin:/bin', 'HOME': d.env['HOME'],
+           'USER': 'fixture', 'XDG_CONFIG_HOME': str(tmp_path / 'config'),
+           'XDG_STATE_HOME': d.env['XDG_STATE_HOME'], 'XDG_DATA_HOME': str(tmp_path / 'data'),
+           'XDG_RUNTIME_DIR': d.env['XDG_RUNTIME_DIR'], 'TASKS_SESSION': 'pause-long-note-test',
+           'TASKS_OWNER': 'fixture', 'GIT_CONFIG_GLOBAL': '/dev/null',
+           'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CEILING_DIRECTORIES': str(tmp_path)}
+
+    def run(*args):
+        result = subprocess.run(['tasks', '-C', str(project), *args], cwd=outside, env=env,
+                                text=True, capture_output=True, timeout=15)
+        assert result.returncode == 0, result.stdout + result.stderr
+        return json.loads(result.stdout)
+
+    run('init', '--prefix', 'pause')
+    added = run('add', 'long pause handoff fixture', '--process', 'direct')
+    tid = added.get('id') or added['task']['id']
+    run('start', tid)
+    d.pause_on_calls()
+    for _ in range(25):
+        assert not denied(d.bash('ls'))
+    assert denied(d.bash('ls'))
+    report = 'pause report: status, evidence, remaining work and custody — ' + ('detail ' * 919) + 'end'
+    assert len(report) > 6000 and '\n' not in report
+    note_args = ('note', tid, report, '--stamp')
+    command = shlex.join(['tasks', '-C', str(project), *note_args])
+    assert 4096 < len(command) <= 16384
+    assert d.bash(command) is None
+    run(*note_args)
+    over_cmd = "tasks note " + tid + " '" + ('z' * 16384) + "'"
+    over_out = d.bash(over_cmd)
+    assert denied(over_out)
+    assert 'split a longer pause report across multiple single-line tasks note calls' in reason(over_out)
+    shown = run('show', tid)
+    assert any(n['text'] == report for n in shown['task']['notes'])
+    assert d.state().grace_used['root'] == 25
+
+
+@pytest.mark.parametrize('harness, tool, tool_input, expected', [
+    ('claude-code', 'Write', {'file_path': 'report.md', 'content': 'pause'}, 'tasks note'),
+    ('claude-code', 'Edit', {'file_path': 'report.md', 'old_string': 'a', 'new_string': 'b'}, 'tasks note'),
+    ('claude-code', 'NotebookEdit', {'notebook_path': 'report.ipynb'}, 'tasks note'),
+    ('codex', 'apply_patch', {'command': '*** Begin Patch\n*** Add File: r.md\n+x\n*** End Patch'}, 'tasks note'),
+    ('claude-code', 'AskUserQuestion', {'questions': [{'question': 'Continue?'}]}, 'closing message'),
+    ('codex', 'request_user_input', {'questions': [{'question': 'Continue?'}]}, 'closing message'),
+    ('codex', 'request_user_input_async', {'questions': [{'question': 'Continue?'}]}, 'closing message'),
+])
+def test_paused_write_and_question_denials_name_sanctioned_substitutes(
+    tmp_path, notices, harness, tool, tool_input, expected
+):
+    d = Driver(tmp_path, harness)
+    d.pause_on_calls()
+    out, _ = d.pre(tool, tool_input)
+    assert denied(out)
+    text = reason(out)
+    assert text.startswith('turn paused: calls over its limit')
+    assert 'This call:' in text and expected in text
+    assert text.endswith(OWNER_LINE)
+
+
+@pytest.mark.parametrize('harness', ['claude-code', 'codex'])
 @pytest.mark.parametrize('agent', [None, 'worker-1'])
 @pytest.mark.parametrize('reads', [0, 25])
 def test_paused_tasks_feedback_is_bookkeeping_for_root_and_child_at_any_grace(tmp_path, notices, harness, agent, reads):
@@ -585,7 +661,7 @@ def test_continue_ends_the_pause_resets_counters_and_sets_no_budget(tmp_path, no
     assert st.budget_note is None and st.notified is False
 
 
-@pytest.mark.parametrize('hours, calls, spawns, compactions', [(12, 375, 45, 2), (48, 1500, 180, 6)])
+@pytest.mark.parametrize('hours, calls, spawns, compactions', [(8, 1000, 30, 1), (12, 1500, 45, 2), (48, 6000, 180, 6)])
 def test_budget_directive_scales_from_default(tmp_path, hours, calls, spawns, compactions):
     d = Driver(tmp_path, 'claude-code')
     out = d.prompt(f'budget: {hours}h\nRun the whole migration.')
@@ -630,11 +706,11 @@ def test_changed_limits_file_pauses_with_limits_changed_and_notifies(tmp_path, n
     out = d.bash('ls')
     assert denied(out)
     assert reason(out) == (
-        LIMITS_CHANGED_TEXT.format(a='0h00m', A='16h00m', c=2, C=500, s=0, S=60, k=0, K=2)
+        LIMITS_CHANGED_TEXT.format(a='0h00m', A='16h00m', c=2, C=2000, s=0, S=60, k=0, K=2)
         + f'\n{OWNER_LINE}'
     )
     assert reason(out).startswith('turn paused: the turn limits file changed mid-turn (active 0h00m of 16h00m, '
-                                  'root calls 2/500, tree spawns 0/60, root compactions 0/2 (advisory)). Start nothing new and stop')
+                                  'root calls 2/2000, tree spawns 0/60, root compactions 0/2 (advisory)). Start nothing new and stop')
     assert d.state().paused == 'limits-changed'
     assert len(notices) == 1
     assert denied(d.bash('touch y'))
@@ -1001,7 +1077,7 @@ def test_history_initial_turn_and_reset(tmp_path, harness, implicit):
     assert record.events[1]['snapshot']['calls']['used'] == int(implicit)
 
 
-@pytest.mark.parametrize('harness,metric,value', [('codex', 'active', 43200), ('codex', 'calls', 375),
+@pytest.mark.parametrize('harness,metric,value', [('codex', 'active', 43200), ('codex', 'calls', 1500),
                                                 ('codex', 'spawns', 45), ('claude-code', 'compactions', 2)])
 def test_history_first_warning_only(tmp_path, harness, metric, value):
     d = Driver(tmp_path, harness)
@@ -1015,7 +1091,7 @@ def test_history_first_warning_only(tmp_path, harness, metric, value):
     assert len(warnings) == 1 and warnings[0]['reason'] == metric
 
 
-@pytest.mark.parametrize('harness,metric,value', [('codex', 'active', 57601), ('codex', 'calls', 500),
+@pytest.mark.parametrize('harness,metric,value', [('codex', 'active', 57601), ('codex', 'calls', 2000),
     ('codex', 'spawns', 61), ('codex', 'limits-changed', 0)])
 def test_history_pause_transition_is_atomic_and_not_repeated(tmp_path, harness, metric, value):
     d = Driver(tmp_path, harness)
@@ -1108,7 +1184,7 @@ def test_history_directory_fsync_failure_keeps_committed_pause_unknown(tmp_path,
     d = Driver(tmp_path, 'codex')
     d.prompt('work')
     with d.store.locked(d.harness, d.root) as record:
-        record.state.turn.calls = 500
+        record.state.turn.calls = 2000
     real = os.fsync
     def fail_directory(fd):
         if stat.S_ISDIR(os.fstat(fd).st_mode):

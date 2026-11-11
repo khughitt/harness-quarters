@@ -54,8 +54,11 @@ ROOT_TEXT = (
     'then pause an active goal only if the user explicitly requested its pause. If an active '
     'goal lacks that authorization, leave its status unchanged, name it in the pause report '
     'and include a request for the user to authorize its pause; do not claim it is paused. '
-    'Then write the pause report the turn-pause '
-    'rule describes, park your task --waiting-on user --reason decision, and end your turn. If '
+    'Then record the durable pause report the turn-pause rule describes with single-line '
+    'tasks note calls (file writes are refused while paused; split across notes past 16,384 '
+    'characters), park your task --waiting-on user --reason decision, and end your turn '
+    'with the continuation decision and any exact budget: line in your closing message '
+    '(question tools are refused while paused). If '
     'another agent launched this session, park any claim --waiting-on agent for that agent and '
     'return a short status (done, left, running) instead of a pause report. Only bookkeeping, '
     'plain reads and stopping your own work are allowed now; hq pause status shows the counts.')

@@ -8,7 +8,16 @@ from turn_pause.limits import Limits
 from turn_pause.prompt import Budget
 
 
-def test_defaults_file(): assert limits.load()[0] == Limits(57600, 500, 60, 2)
+def test_defaults_file(): assert limits.load()[0] == Limits(57600, 2000, 60, 2)
+
+
+def test_default_call_budgets_scale_and_named_calls_override():
+    defaults = limits.load()[0]
+    assert limits.with_budget(defaults, Budget(14400, None, None, None)).calls == 500
+    assert limits.with_budget(defaults, Budget(28800, None, None, None)).calls == 1000
+    assert limits.with_budget(defaults, Budget(43200, None, None, None)).calls == 1500
+    assert limits.with_budget(defaults, Budget(172800, None, None, None)).calls == 6000
+    assert limits.with_budget(defaults, Budget(43200, 900, None, None)).calls == 900
 
 
 def test_default_spawn_budgets_scale_and_named_agents_override():
@@ -22,7 +31,7 @@ def test_load_returns_file_sha256():
 
 def test_defaults_file_names_spec_and_approval():
     text = limits.DEFAULTS_PATH.read_text()
-    assert '2026-11-01-turn-pause-design' in text and '2026-11-01' in text
+    assert '2026-11-01-turn-pause-design' in text and '2026-11-01' in text and 'hq-649891' in text
 
 def test_budget_scales_unnamed(): assert limits.with_budget(Limits(14400, 500, 30, 2), Budget(43200, None, None, None)) == Limits(43200, 1500, 90, 6)
 

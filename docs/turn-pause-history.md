@@ -26,12 +26,14 @@ unknown. Ended records expire lazily after30days or beyond512 roots; maintenance
 affects at most32 records per pass and reports remaining cleanup debt. Repeated
 maintenance does not refresh an already-ended record.
 
-The prepared default allows 60 tree spawns, with a warning at 45. Reaching 60
-remains allowed; the next hooked decision after 61 spawns pauses the tree.
-Explicit agent budgets override proportional scaling. Existing 16-hour,
-500-root-call and two-root-compaction safeguards remain unchanged. Larger valid
-plans can still cross 60; the measurement and its limits are retained on
-hq-704fe5. Activation of a prepared default is a separate user-approved step.
+The prepared default allows 2,000 root calls (warning at 1,500) and 60 tree
+spawns (warning at 45). Reaching an exact enforced limit remains allowed; the
+2,001st root call or the next hooked decision after 61 spawns pauses the tree.
+Explicit count budgets override proportional scaling. Existing 16-hour and
+two-root-compaction safeguards remain unchanged. Larger valid plans can still
+cross these defaults; the spawn and root-call measurements and their limits are
+retained on hq-704fe5 and hq-649891. Activation of a prepared default is a
+separate user-approved step.
 
 ## Read-only history and turn summaries
 
@@ -103,6 +105,10 @@ Split an action and its verification into separate calls. For example, a merge
 followed by a read in one shell command is refused even when the read is safe.
 While paused, reads spend the existing25-read grace. Bookkeeping and owned
 cancellation retain their existing permissions; a read never clears a pause.
+Single-line `tasks note` calls up to 16,384 characters carry the durable pause
+report (split longer reports across multiple notes; file writes remain refused),
+and the closing assistant message carries the continuation decision and any exact
+`budget:` line (question tools remain refused).
 
 ## Checking host pointers before worktree removal
 
