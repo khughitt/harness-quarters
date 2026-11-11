@@ -3,19 +3,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from harness_evidence.homes import Home
 from hq_cli import color
 
 
 class SourceError(Exception):
     """A source exists but cannot be read as expected; listing stops rather than empties."""
-
-
-@dataclass(frozen=True)
-class Home:
-    name: str       # the launch-config key
-    harness: str    # the adapter alias: "claude", "codex" or "agy"
-    kind: str       # "personal" or "work"
-    path: Path
 
 
 @dataclass(frozen=True)

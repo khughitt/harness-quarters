@@ -435,6 +435,76 @@ that alone names a conversation's workspace and title, with the transcript under
 `tools/harness_stores/`, registered in `tools/harness_stores/__init__.py`; the display
 order and the `--harness` choices follow the registry.
 
+The adapters share `Home` and home discovery from `tools/harness_evidence/homes.py`.
+That standalone package also names transcript stores without importing hq or its
+configuration. `tools/harness-evidence discover [--home PATH] [--root HARNESS=PATH]...`
+lists Claude Code and Codex transcript paths and filesystem metadata as
+JSONL under schema version 1 (`root`, `file`, then `discover_end`). Explicit roots replace
+all default roots; supported harness names are `claude-code` and `codex`. Defaults use
+the shared personal/work homes, including Codex's archived stores, and ignore obs's
+environment overrides. Discovery reads no transcript text. Codex filename identity is
+marked `convention`, separate from identity recorded inside a transcript. Symlinked
+transcripts are excluded. Missing or unreadable roots are reported; a file that
+vanishes or has unavailable metadata after its name is enumerated retains a file
+object with null stat metadata and its observed state/error. Initial lstat/stat
+failures remain explicit even if a later lookup could succeed; known symlink
+aliases stay excluded. The listing helper retains candidates with unknown mtime
+when applying a cutoff; the command applies no cutoff.
+
+`tools/harness-evidence version --json` reports the evidence schema,
+decoder version `3`, and the decoder revision. A pinned copy reads a `REVISION`
+file inside the package; a checkout reports its HEAD with `+dirty` when
+the package has changes. Without either source the command exits 2.
+
+`tools/harness-evidence decode` reads one JSON request per stdin line and flushes
+framed harness-evidence/1 objects through `request_end` before reading the next.
+Requests require an integer `id` and `files`, each with logical `path` and byte
+bound `size`; optional `read_path` reads captured bytes without changing identity
+or refs. `roots` replaces default discovery roots, `context` supplies fork evidence
+without emitting it, and `cross_file` marks copies across requested files. `text`
+and `raw` default to false; transcript text, nested commands and turn-end messages
+require `text`, while original physical lines require `raw` independently.
+Raw strings preserve invalid UTF-8 bytes with surrogate escapes; recover exact
+bytes with `raw.encode("utf-8", errors="surrogateescape")`. Typed text keeps its
+existing replacement of invalid UTF-8.
+Native `abort_reason` remains metadata when text is disabled. Session headers keep
+their existing child flags and add `subagent_basis` for Claude Code (native timed
+sidechain flags, conventional subagent path, or a heuristic negative) and
+`child_basis` for Codex (native parent/thread-source evidence or a heuristic
+negative). SDK and unknown headers gain no child flags.
+Each bounded transcript prefix is captured once in transient memory; format,
+records, header, raw lines, hashes and offsets all use those same bytes. The
+buffer is released after extraction; its peak cost is up to one current file's
+requested prefix in addition to reader data. Cross-file mode retains the reads
+needed for its requested group, rather than retaining those byte buffers.
+Non-JSON numeric constants and numbers that overflow a finite float become
+complete malformed `unparsed` evidence. Output JSON rejects non-finite numbers;
+malformed native kinds remain unknown source records within the detected format.
+Neither case aborts a later healthy file.
+
+Copy labels carry their own `copy_basis` and `copy_rule`, independently of role
+provenance. Explicit request/history constructs and native continuation links
+are native; inherited-turn ranges, event mirrors and identity/line matches are
+conventional; unresolved ranges, timing and ties are heuristic. Session links
+use native or conventional `basis` and retain their former recognition basis
+as `rule` for the later reader projection.
+
+Each file emits keyed `file_start`, records or unparsed lines, `session`, and
+`file_end` with status, emitted count and checkpoint `state`. Source failures stay
+framed; malformed requests, unknown fields and invalid states exit 2 with a stderr
+line. Pass the last state to resume: `replaces: {"from_line": N}` replaces line
+objects at or after N, while `replaces: "all"` restarts after an earlier payload
+changed. Always replace the file and session aggregates by key. Incomplete tails
+are provisional and replayed. Stage 1 rereads the whole bounded prefix each time.
+Copy marking uses root-list priority followed by logical relative path, independent
+of request file order. Outside-root explicit files have priority zero.
+The checkpoint hashes committed line objects in line/string-key order: sorted-key,
+compact ASCII JSON plus a newline per object, excluding schema, decoder and
+request/file transport indices. Text/raw option changes can therefore restart
+replay, while request ids and decoder revision changes alone do not.
+Records themselves retain native numeric block order, including when a line has
+ten or more blocks.
+
 - **Rows.** Harness, home (`personal` or `work`), short id (the first eight characters;
   for Codex the last eight, since a UUIDv7 id starts with its timestamp), age, place (marked
   `cwd missing` when the directory is gone, which is common for removed worktrees), and

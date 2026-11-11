@@ -165,6 +165,26 @@ conversations, and turn resumption after process death:
 
 ## 4. Session discovery, archive, and transcript-reader coverage
 
+`tools/harness-evidence capabilities` shows the standalone decoder's catalogued
+evidence as a table; `capabilities --json` returns the same content with the running
+decoder's version and revision. Both read only the package's committed
+`tools/harness_evidence/capabilities.json`, so a pinned package needs no fixtures.
+Rebuild it explicitly with `tools/harness-evidence capabilities --build` in an hq
+checkout after changing decoder behavior, declarations, or catalogued samples.
+The artifact hashes `tools/fixtures/session-logs/CATALOGUE.toml` and every listed
+sample. Builds read no metadata sidecars or uncatalogued sibling transcripts.
+
+The `fields` map names decoded paths (`header.*` and `links[].*` for session
+evidence); each `provenance` list names native JSON paths, where `[]` visits array
+items. `fields_seen` requires a decoded value and native source evidence, excluding
+nulls, empty evidence containers, and defaults with no source. Explicit false and
+zero values can be evidence. Record kinds and role-label bases are listed separately.
+Synthetic samples establish decoder conformance; observed samples or probes establish
+emission. The current catalogue is entirely synthetic, and its known modeled format
+versions do not establish observed emission. An unspecified or unlisted version is
+untested; an absent field is unobserved. `coverage_keys` and `exceptions` remain empty
+until coverage declarations and exceptions are added in later stages.
+
 `tools/harness_stores/__init__.py` registers three session-store adapters today:
 `claude` (`claude-code`), `codex` (`codex`), and `agy` (`agy`). `hq sessions`,
 `tools/session-archive`, and `agents/bin/session-episodes` all read this registry

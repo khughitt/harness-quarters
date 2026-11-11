@@ -2,18 +2,16 @@
 Contract: docs/notes/2026-10-15-session-discovery-contract.md."""
 import os
 import sqlite3
+from functools import partial
 from pathlib import Path
 
+from harness_evidence.homes import homes as evidence_homes
 from hq_cli import color
 
 from .model import Adapter, Home, Session, SourceError
 
 
-def homes(user_home: Path) -> tuple[Home, ...]:
-    return (
-        Home("codex", "codex", "personal", user_home / ".codex"),
-        Home("codex-work", "codex", "work", user_home / ".codex-work"),
-    )
+homes = partial(evidence_homes, harness="codex")
 
 
 CODEX_COLUMNS = ("id", "rollout_path", "source", "thread_source", "archived", "preview", "cwd",

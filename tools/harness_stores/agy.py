@@ -4,10 +4,12 @@ import json
 import re
 import sqlite3
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import unquote, urlparse
 
+from harness_evidence.homes import homes as evidence_homes
 from hq_cli import color
 
 from .model import Adapter, Home, Session, SourceError
@@ -21,8 +23,7 @@ DRIFT = "agy's summary schema changed"
 LOCK_TIMEOUT_S = 1.0   # a writer holding the database fails the listing rather than hanging it
 
 
-def homes(user_home: Path) -> tuple[Home, ...]:
-    return (Home("agy", "agy", "personal", user_home / ".gemini" / "antigravity-cli"),)
+homes = partial(evidence_homes, harness="agy")
 
 
 def parse_time(path: Path, cid: str, value) -> int:

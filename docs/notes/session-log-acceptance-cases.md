@@ -57,6 +57,7 @@ Every identifier, path, task id, model name and text in them is synthetic.
 | TD | `captures/tasks-show-zz-000021.json` | `tasks show zz-000021 --json` capture | task zz-000021 with one stamped note naming CT1 |
 | ESC | `captures/escaped.jsonl` | Claude, explicit file | one prompt whose text `needle` is written `\u006eeedle` in the bytes |
 | ESM | `captures/escaped-malformed.jsonl` | Claude, explicit file | a valid `hello` prompt, then an unclosed record holding the same escape |
+| CWAIT | `captures/turn-evidence-claude.jsonl` | Claude, explicit file | synthetic conformance: all three wait tools and a non-wait tool; closing, other and absent stop reasons; readable text and thinking blocks |
 
 `home/` has five of the six roots, the shape of the surveyed host. There is no
 `.codex-work/archived_sessions`. `degraded/` has only `.claude/projects`,
