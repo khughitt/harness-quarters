@@ -15,7 +15,7 @@ class ProtocolError(Exception):
 
 
 def serialized(value, *, canonical=False):
-    return json.dumps(value, ensure_ascii=True, separators=(",", ":"), sort_keys=canonical)
+    return json.dumps(value, ensure_ascii=True, separators=(",", ":"), sort_keys=canonical, allow_nan=False)
 
 
 def _fields(value, allowed, required=()):
@@ -105,18 +105,21 @@ def _read(source, roots, inherited):
 
     try:
         size = min(source["size"], physical.stat().st_size)
+        with physical.open("rb") as handle:
+            data = handle.read(size)
+        size = len(data)
         try:
-            fmt = detect_format(physical, size)
+            fmt = detect_format(data, size)
         except UnknownFormat:
             status = "unknown_format"
         if fmt is not None:
             place = replace(place, harness="codex" if fmt == "codex" else "claude-code")
             reader = {"claude": records.claude_read, "sdk": records.sdk_read, "codex": records.codex_read}[fmt]
-            read = reader(place, size, lookup) if fmt == "codex" else reader(place, size)
+            read = reader(place, size, lookup, data=data) if fmt == "codex" else reader(place, size, data=data)
         else:
             read = records.FileRead(place, [], [])
         offset = 0
-        for line in lines(physical, size):
+        for line in lines(data, size):
             if fmt == "claude" and version is None and line.complete:
                 native = decode(line)
                 candidate = native.get("version") if native else None
@@ -124,7 +127,7 @@ def _read(source, roots, inherited):
                     version = candidate
             end = offset + len(line.raw)
             positions[line.number] = {"offset": offset, "end": end, "sha256": sha256(line),
-                                      "raw": line.raw.decode("utf-8", errors="replace") if source.get("_raw") else None}
+                                      "raw": line.raw.decode("utf-8", errors="surrogateescape") if source.get("_raw") else None}
             if line.complete:
                 next_line, next_offset = line.number + 1, end
             else:
@@ -134,7 +137,7 @@ def _read(source, roots, inherited):
             # Unknown syntax stays unknown; only malformed/truncated physical lines are unparsed.
             read.unparsed = [{"_line": line.number,
                               "reason": "malformed" if line.complete else "truncated"}
-                             for line in lines(physical, size)
+                             for line in lines(data, size)
                              if not line.complete or decode(line) is None]
     except (OSError, UnicodeError) as error:
         status = "vanished" if isinstance(error, FileNotFoundError) else "unreadable"
@@ -219,8 +222,12 @@ def _emit_file(file, index, envelope, request):
             count += 1
             yield {**base, **value}
     count += 1
+    linked = native_links(file.read) if file.status == "ok" else []
+    for link in linked:
+        if "copy" in link:
+            link["copy_scope"] = scope
     yield {**base, "object": "session", "key": "session", "header": _public(file.read.header, text),
-           "links": native_links(file.read) if file.status == "ok" else [], "unresolved_forks": file.unresolved}
+           "links": linked, "unresolved_forks": file.unresolved}
     yield {**base, "object": "file_end", "key": "end", "status": file.status,
            "offset": file.state["next_offset"], "state": file.state, "count": count}
 
@@ -238,6 +245,7 @@ def objects(request, envelope):
             continue
         if context.place.harness == "codex" and context.status == "ok" and context.read.header.get("session"):
             inherited.setdefault(context.read.header["session"], set()).update(context.read.header["turn_ids"])
+        del context
     sources = [{**f, "_raw": request.get("raw", False)} for f in request["files"]]
     base = {**envelope, "request": request["id"]}
     if request.get("cross_file"):

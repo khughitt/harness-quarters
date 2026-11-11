@@ -449,7 +449,7 @@ vanishes or becomes unreadable after listing retains a file object with null sta
 metadata and its observed state/error.
 
 `tools/harness-evidence version --json` reports the evidence schema,
-decoder version `1`, and the decoder revision. A pinned copy reads a `REVISION`
+decoder version `2`, and the decoder revision. A pinned copy reads a `REVISION`
 file inside the package; a checkout reports its HEAD with `+dirty` when
 the package has changes. Without either source the command exits 2.
 
@@ -461,11 +461,30 @@ or refs. `roots` replaces default discovery roots, `context` supplies fork evide
 without emitting it, and `cross_file` marks copies across requested files. `text`
 and `raw` default to false; transcript text, nested commands and turn-end messages
 require `text`, while original physical lines require `raw` independently.
+Raw strings preserve invalid UTF-8 bytes with surrogate escapes; recover exact
+bytes with `raw.encode("utf-8", errors="surrogateescape")`. Typed text keeps its
+existing replacement of invalid UTF-8.
 Native `abort_reason` remains metadata when text is disabled. Session headers keep
 their existing child flags and add `subagent_basis` for Claude Code (native timed
 sidechain flags, conventional subagent path, or a heuristic negative) and
 `child_basis` for Codex (native parent/thread-source evidence or a heuristic
 negative). SDK and unknown headers gain no child flags.
+Each bounded transcript prefix is captured once in transient memory; format,
+records, header, raw lines, hashes and offsets all use those same bytes. The
+buffer is released after extraction; its peak cost is up to one current file's
+requested prefix in addition to reader data. Cross-file mode retains the reads
+needed for its requested group, rather than retaining those byte buffers.
+Non-JSON numeric constants and numbers that overflow a finite float become
+complete malformed `unparsed` evidence. Output JSON rejects non-finite numbers;
+malformed native kinds remain unknown source records within the detected format.
+Neither case aborts a later healthy file.
+
+Copy labels carry their own `copy_basis` and `copy_rule`, independently of role
+provenance. Explicit request/history constructs and native continuation links
+are native; inherited-turn ranges, event mirrors and identity/line matches are
+conventional; unresolved ranges, timing and ties are heuristic. Session links
+use native or conventional `basis` and retain their former recognition basis
+as `rule` for the later reader projection.
 
 Each file emits keyed `file_start`, records or unparsed lines, `session`, and
 `file_end` with status, emitted count and checkpoint `state`. Source failures stay

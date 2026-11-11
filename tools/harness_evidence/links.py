@@ -40,15 +40,18 @@ def _str(value) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
-def _link(kind: str, target: str, basis: str, at: str | None, call: dict | None = None,
+def _link(kind: str, target: str, rule: str, at: str | None, call: dict | None = None,
           *sources: dict) -> dict:
     """One link; `call` only when the link goes through a dispatching call, and
     `copy: ambiguous` when a record it comes from lies in an ambiguous range (R27)."""
-    out = {"kind": kind, "target": target, "basis": basis, "ref": at}
+    out = {"kind": kind, "target": target,
+           "basis": {"native_metadata": "native", "path": "convention"}[rule], "rule": rule, "ref": at}
     if call is not None:
         out["call"] = call
-    if any(source.get("copy") == "ambiguous" for source in sources):
+    ambiguous = next((source for source in sources if source.get("copy") == "ambiguous"), None)
+    if ambiguous is not None:
         out["copy"] = "ambiguous"
+        out.update(copy_basis=ambiguous["copy_basis"], copy_rule=ambiguous["copy_rule"])
     return out
 
 

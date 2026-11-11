@@ -107,6 +107,7 @@ class CodexLinkTest(InlineRollouts):
         self.assertNotIn("copy", parent)
         self.assertEqual((binding["kind"], binding["target"], binding["copy"]),
                          ("dispatch_binding", "K", "ambiguous"))
+        self.assertEqual((binding["copy_basis"], binding["copy_rule"]), ("heuristic", "unresolved_fork"))
         self.assertEqual(binding["call"], {"id": "s1", "ref": ref(read.place, 4)})
 
     def test_fork_history_records_no_links_and_own_turns_do(self):
@@ -247,7 +248,7 @@ class ResumeTest(InlinePair):
             else:
                 self.assertNotIn("copy", r)
         links = native.native_links(a)
-        self.assertIn({"kind": "continued_in", "target": B_ID, "basis": "native_metadata",
+        self.assertIn({"kind": "continued_in", "target": B_ID, "basis": "native", "rule": "native_metadata",
                        "ref": ref(a.place, 4)}, links)
         self.assertEqual(native.native_links(b), [])
 
@@ -360,8 +361,9 @@ class ResumeTest(InlinePair):
         for read in (a, b):
             self.assertEqual(native.native_links(read), [{
                 "kind": "parent_to_child", "target": "agent-a0000000000000c01",
-                "basis": "native_metadata", "ref": ref(read.place, 4),
-                "call": {"id": "toolu_s", "ref": None}, "copy": "ambiguous"}])
+                "basis": "native", "rule": "native_metadata", "ref": ref(read.place, 4),
+                "call": {"id": "toolu_s", "ref": None}, "copy": "ambiguous",
+                "copy_basis": "heuristic", "copy_rule": "timing_ambiguity"}])
         # A decided resume: the copy's launch line records no link; the original's does.
         a = self.write(A_ID, shared(A_ID) + [launch(A_ID)])
         b = self.write(B_ID, shared(B_ID) + [launch(B_ID)] + [
@@ -470,7 +472,7 @@ class LinkTest(CopyHomeTest):
         read = rec.sdk_read(place, place.path.stat().st_size)
         links = native.native_links(read)
         self.assertEqual({link["kind"] for link in links}, {"sdk_dispatch"})
-        self.assertEqual({link["basis"] for link in links}, {"native_metadata"})
+        self.assertEqual({link["basis"] for link in links}, {"native"})
         calls = {r["dispatch"]["call"] for r in read.records if "dispatch" in r}
         self.assertEqual({link["target"] for link in links}, calls)
         self.assertEqual(len(links), len(calls))
@@ -481,8 +483,8 @@ class LinkTest(CopyHomeTest):
         child = read_file(self.place("AG"))
         self.assertEqual({(link["kind"], link["target"], link["basis"])
                           for link in native.native_links(parent)},
-                         {("parent_to_child", AG, "native_metadata"),
-                          ("parent_to_child", AG, "path")})
+                         {("parent_to_child", AG, "native"),
+                          ("parent_to_child", AG, "convention")})
         self.assertEqual(native.native_links(child)[0]["call"],
                          {"id": "toolu_fx_agent", "ref": None})
         self.place("AG").path.with_suffix(".meta.json").unlink()

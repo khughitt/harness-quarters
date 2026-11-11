@@ -93,16 +93,16 @@ def _later(read: FileRead, shared_lines: set[int], other: FileRead, timed: dict)
     return mine[unshared[0]] > max(theirs.values())
 
 
-def _direction(a: FileRead, b: FileRead, shared: set[str], timed: dict) -> tuple[FileRead, FileRead] | None:
+def _direction(a: FileRead, b: FileRead, shared: set[str], timed: dict) -> tuple[FileRead, FileRead, str] | None:
     """(copy, original) by the native link, then timing; None for a tie (`ambiguous`)."""
     a_names_b, b_names_a = _named(a, b), _named(b, a)
     if a_names_b != b_names_a:
-        return (b, a) if a_names_b else (a, b)
+        return (b, a, "continued_in") if a_names_b else (a, b, "continued_in")
     a_later = _later(a, {a.header["uuids"][u] for u in shared}, b, timed)
     b_later = _later(b, {b.header["uuids"][u] for u in shared}, a, timed)
     if a_later == b_later:  # neither or both meet the timing test: a tie
         return None
-    return (a, b) if a_later else (b, a)
+    return (a, b, "timestamp_order") if a_later else (b, a, "timestamp_order")
 
 
 def mark_resume_copies(reads: list[FileRead]) -> None:
@@ -140,7 +140,7 @@ def mark_resume_copies(reads: list[FileRead]) -> None:
     touched: set[int] = set()  # id(read) of every file with a line marked
     lines_of = {id(read): _by_line(read) for read in reads}
     marked: list[dict] = []
-    for copy, original, shared in decided:
+    for copy, original, rule, shared in decided:
         refs = {r["ref"] for r in original.records}
         for uuid in shared:
             line, source = copy.header["uuids"][uuid], original.header["uuids"][uuid]
@@ -148,6 +148,7 @@ def mark_resume_copies(reads: list[FileRead]) -> None:
                 if record.get("copy") not in (None, "ambiguous"):
                     continue
                 record["copy"] = "resume_history"
+                record.update(copy_basis="native" if rule == "continued_in" else "heuristic", copy_rule=rule)
                 record["original"] = _original_ref(original, refs, source, record.get("block"))
                 marked.append(record)
                 copied[id(copy)].add(line)
@@ -159,6 +160,7 @@ def mark_resume_copies(reads: list[FileRead]) -> None:
                 for record in lines_of[id(read)][line]:
                     if "copy" not in record:
                         record["copy"] = "ambiguous"
+                        record.update(copy_basis="heuristic", copy_rule="timing_ambiguity")
                         touched.add(id(read))
     # A resume of a resume: point at the first holder, never at another copy.
     every = {r["ref"]: r for read in reads for r in read.records}
@@ -228,6 +230,7 @@ def mark_duplicate_files(reads: list[FileRead]) -> None:
                 line = record["line"]
                 if source.get(line) == signature[line]:
                     record["copy"] = "duplicate_file"
+                    record.update(copy_basis="convention", copy_rule="identity_line_match")
                     record["original"] = _original_ref(original, refs, line, record.get("block"))
                     copied.add(line)
             if copied:

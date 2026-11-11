@@ -2,7 +2,9 @@
 reader. The lowest layer: it reads bytes and never writes."""
 from dataclasses import dataclass
 import hashlib
+from io import BytesIO
 import json
+import math
 from pathlib import Path
 import re
 from typing import Iterator
@@ -44,12 +46,12 @@ def ref(place: Place, line: int | None = None, block: int | None = None) -> str:
     return out
 
 
-def lines(path: Path, size: int) -> Iterator[Line]:
+def lines(path: Path | bytes, size: int) -> Iterator[Line]:
     """Every physical line in the first `size` bytes, blank ones included, read one line
     at a time. Only a last line without a newline (or cut by the bound) is incomplete."""
     remaining = size
     number = 0
-    with path.open("rb") as handle:
+    with (BytesIO(path) if isinstance(path, bytes) else path.open("rb")) as handle:
         while remaining > 0:
             raw = handle.readline(remaining)
             if not raw:
@@ -63,10 +65,22 @@ def sha256(line: Line) -> str:
     return line.digest if line.digest is not None else hashlib.sha256(line.raw).hexdigest()
 
 
+def _finite_float(token: str) -> float:
+    value = float(token)
+    if not math.isfinite(value):
+        raise ValueError("source number cannot be represented as a finite float")
+    return value
+
+
+def _reject_constant(token: str):
+    raise ValueError(f"non-JSON numeric constant: {token}")
+
+
 def decode(line: Line) -> dict | None:
     """The line as a JSON object, or None. Invalid UTF-8 is replaced, not rejected."""
     try:
-        value = json.loads(line.raw.decode("utf-8", errors="replace"))
+        value = json.loads(line.raw.decode("utf-8", errors="replace"),
+                           parse_constant=_reject_constant, parse_float=_finite_float)
     except (ValueError, RecursionError):
         return None
     return value if isinstance(value, dict) else None
@@ -103,20 +117,22 @@ _SDK_TYPES = frozenset({"system", "user", "assistant", "result"})
 
 
 def _signature(record: dict) -> str | None:
-    if record.get("type") == "session_meta":
+    kind = record.get("type")
+    if kind == "session_meta":
         return "codex"
-    if "sessionId" in record or record.get("type") in _CLAUDE_KINDS:
+    if "sessionId" in record or (isinstance(kind, str) and kind in _CLAUDE_KINDS):
         return "claude"
-    if "session_id" in record and record.get("type") in _SDK_TYPES:
+    if "session_id" in record and isinstance(kind, str) and kind in _SDK_TYPES:
         return "sdk"
     return None
 
 
-def detect_format(path: Path, size: int) -> str:
+def detect_format(path: Path | bytes, size: int) -> str:
     """The first record that matches a signature decides; other lines are skipped."""
     for line in lines(path, size):
         record = decode(line)
         found = _signature(record) if record is not None else None
         if found:
             return found
-    raise UnknownFormat(f"no record in {path} matches a known format")
+    where = "bounded bytes" if isinstance(path, bytes) else path
+    raise UnknownFormat(f"no record in {where} matches a known format")

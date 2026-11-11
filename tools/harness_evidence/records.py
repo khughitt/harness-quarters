@@ -107,10 +107,11 @@ def _unparsed(place: Place, line: Line) -> dict:
             "_raw": line.raw.decode("utf-8", errors="replace"), "_line": line.number}
 
 
-def _decoded(place: Place, size: int) -> tuple[list[tuple[Line, dict]], list[dict], int]:
+def _decoded(place: Place, size: int, data: bytes | None = None) -> tuple[list[tuple[Line, dict]], list[dict], int]:
     """Every line decoded once, retaining its hash in place of its raw bytes."""
     parsed, unparsed, count = [], [], 0
-    for line in lines(place.read_path if place.read_path is not None else place.path, size):
+    source = data if data is not None else place.read_path if place.read_path is not None else place.path
+    for line in lines(source, size):
         count = line.number
         record = decode(line) if line.complete else None
         if record is None:
@@ -155,6 +156,18 @@ def _object(place: Place, identity: dict, line: Line, block: int | None, at, rol
     out["_flags"] = frozenset(flags)
     if private:
         out.update(private)
+    copied = out.get("copy")
+    if copied is not None:
+        basis, rule = {
+            "request_blob": ("native", "api_request_blob"),
+            "fork_history": ("convention", "inherited_turn_ids"),
+            "compaction_history": ("native", "replacement_history"),
+            "event_mirror": ("convention", "event_mirror"),
+            "ambiguous": ("heuristic", "unresolved_fork"),
+        }[copied]
+        if copied == "fork_history" and place.harness == "claude-code":
+            basis, rule = "native", "fork_context_ref"
+        out.update(copy_basis=basis, copy_rule=rule)
     # Publish evidence without changing the native facts used by existing readers.
     names = {"isMeta": "meta", "isCompactSummary": "compaction_summary"}
     out["flags"] = sorted({names.get(flag, flag) for flag in out["_flags"]})
@@ -168,7 +181,7 @@ def _object(place: Place, identity: dict, line: Line, block: int | None, at, rol
         out["waits_for_user"] = (out.get("call") or {}).get("tool") in tools
     if role in {"assistant", "tool_call"}:
         stop = out.get("stop_reason")
-        out["stop_class"] = None if stop is None else "closing" if stop in {"end_turn", "stop_sequence"} else "other"
+        out["stop_class"] = None if stop is None else "closing" if stop in ("end_turn", "stop_sequence") else "other"
     if role == "assistant":
         phase = out.get("phase")
         out["answer_phase"] = None if phase is None else "final" if phase == "final_answer" else "other"
@@ -548,10 +561,10 @@ def _fork_message(parsed: list[tuple[Line, dict]]) -> tuple[int, str | None] | N
     return None
 
 
-def claude_read(place: Place, size: int) -> FileRead:
+def claude_read(place: Place, size: int, *, data: bytes | None = None) -> FileRead:
     """A Claude Code transcript's first `size` bytes as records (without `turn`), the
     unparsed lines, and the file's header."""
-    parsed, unparsed, count = _decoded(place, size)
+    parsed, unparsed, count = _decoded(place, size, data)
     timed = [r for _l, r in parsed if r.get("timestamp")]
     native_sidechain = bool(timed) and all(r.get("isSidechain") is True for r in timed)
     subagent = place.path.parent.name == "subagents" or native_sidechain
@@ -926,13 +939,13 @@ def _mirror_originals(records: list[dict]) -> None:
 
 
 def codex_read(place: Place, size: int,
-               inherited_turn_ids: Callable[[str], Collection[str] | None]) -> FileRead:
+               inherited_turn_ids: Callable[[str], Collection[str] | None], *, data: bytes | None = None) -> FileRead:
     """A Codex rollout's first `size` bytes as records (without `turn`), the
     unparsed lines, and the file's header. Identity is the first `session_meta`'s
     `payload.id`. A second `session_meta` makes the rollout a fork of the thread it
     names: `inherited_turn_ids(id)` gives that thread's full `turn_ids` (copies included),
     or None when its rollout is unreadable."""
-    parsed, unparsed, count = _decoded(place, size)
+    parsed, unparsed, count = _decoded(place, size, data)
     metas = [(line, r) for line, r in parsed if r.get("type") == "session_meta"]
     first = _dict(metas[0][1], "payload") if metas else {}
     session = _str(first.get("id"))
@@ -981,12 +994,12 @@ def codex_read(place: Place, size: int,
 # Claude SDK stream-json capture
 # ---------------------------------------------------------------------------------------
 
-def sdk_read(place: Place, size: int) -> FileRead:
+def sdk_read(place: Place, size: int, *, data: bytes | None = None) -> FileRead:
     """A Claude SDK `stream-json` capture as records. Identity is the events' shared
     `session_id`, which links nothing (SL9). An event's `parent_tool_use_id` names the
     dispatching call: `dispatch: {kind: sdk_dispatch, call}`; a prompt inside a dispatch is
     the child's brief, `dispatch`."""
-    parsed, unparsed, count = _decoded(place, size)
+    parsed, unparsed, count = _decoded(place, size, data)
     session = next((r["session_id"] for _l, r in parsed if isinstance(r.get("session_id"), str)), None)
     identity = {"session": session, "agent": None,
                 "identity_basis": "session_id" if session else None, "parent": None}

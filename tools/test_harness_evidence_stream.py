@@ -1,5 +1,7 @@
 """Protocol framing, privacy, source failures and moved-reader conformance."""
 import json
+import hashlib
+import io
 from pathlib import Path
 import select
 import subprocess
@@ -38,7 +40,20 @@ def run_raw(tmp_path, text):
 def invoke(tmp_path, req):
     proc = run_raw(tmp_path, json.dumps(req) + "\n")
     assert proc.returncode == 0, proc.stderr
-    return [json.loads(line) for line in proc.stdout.splitlines()]
+    return [strict_json(line) for line in proc.stdout.splitlines()]
+
+
+def strict_json(value):
+    def reject(token):
+        raise ValueError("non-JSON numeric token: " + token)
+    return json.loads(value, parse_constant=reject)
+
+
+@pytest.mark.parametrize("number", [float("nan"),float("inf"),float("-inf")])
+def test_wire_serializer_refuses_nonfinite_values_even_if_a_producer_regresses(number):
+    from harness_evidence.stream import serialized
+    with pytest.raises(ValueError):
+        serialized({"nested":[number]})
 
 
 def end(output, file=0):
@@ -190,6 +205,7 @@ def test_cross_file_copies_and_context_fork_resolution(tmp_path):
     assert all(o["unresolved_forks"] == [] for o in output if o["object"] == "session")
     copied = [o for o in output if o.get("copy") == "duplicate_file"]
     assert copied and all(set(o["copy_scope"]) == {str(child), str(archived)} for o in copied)
+    assert all((o["copy_basis"],o["copy_rule"])==("convention","identity_line_match") for o in copied)
     assert not any(o.get("path") == str(parent) for o in output)
     assert any(o.get("copy") == "fork_history" for o in output)
     state = end(output, 1)["state"]
@@ -303,3 +319,223 @@ def test_text_opt_out_preserves_native_metadata_dictionary_keys(tmp_path):
     output = invoke(tmp_path, request([entry(path)]))
     header = next(o["header"] for o in output if o["object"] == "session")
     assert header["uuids"] == {uuid:i for i,uuid in enumerate(ids,1)}
+
+
+@pytest.mark.parametrize("token", ["NaN", "Infinity", "-Infinity", "1e999", "-1e999"])
+@pytest.mark.parametrize("location", ["exit", "nested_execution", "call_id", "prompt_source"])
+@pytest.mark.parametrize("cross_file", [False, True])
+def test_nonfinite_source_numbers_are_unparsed_and_batch_continues(tmp_path, token, location, cross_file):
+    if location in {"exit", "nested_execution"}:
+        first = {"type":"session_meta", "payload":{"id":"s"}}
+        item = {"type":"CommandExecution", "exit_code":"NUMBER" if location=="exit" else 0}
+        if location=="nested_execution":
+            item["cwd"] = {"nested":["NUMBER"]}
+        bad = {"type":"event_msg", "payload":{"type":"item_completed", "item":item}}
+    else:
+        first = {"type":"user", "sessionId":"s", "message":{"content":"hello"}}
+        bad = {"type":"assistant", "sessionId":"s", "message":{"content":[{
+            "type":"tool_use", "id":{"nested":["NUMBER"]}, "name":"Bash", "input":{}}]}} \
+            if location=="call_id" else {"type":"user", "sessionId":"s",
+                "promptSource":{"nested":["NUMBER"]}, "message":{"content":"hello"}}
+    raw = (json.dumps(bad).replace('"NUMBER"', token) + "\n").encode()
+    source = tmp_path / "bad-number.jsonl"
+    source.write_bytes((json.dumps(first) + "\n").encode() + raw)
+    healthy = tmp_path / "healthy.jsonl"
+    healthy.write_text('{"type":"session_meta","payload":{"id":"healthy"}}\n')
+    output = invoke(tmp_path, request([entry(source),entry(healthy)], cross_file=cross_file, text=True, raw=True))
+    bad_line = next(o for o in output if o.get("file")==0 and o.get("line")==2)
+    assert bad_line["object"]=="unparsed" and bad_line["reason"]=="malformed"
+    assert bad_line["raw"].encode()==raw and bad_line["sha256"]==hashlib.sha256(raw).hexdigest()
+    assert end(output,0)["status"]==end(output,1)["status"]=="ok"
+    assert output[-1]["object"]=="request_end"
+
+
+@pytest.mark.parametrize("kind", [[], {}, 1, None])
+@pytest.mark.parametrize("harness", ["claude", "codex", "sdk"])
+@pytest.mark.parametrize("cross_file", [False, True])
+def test_non_string_native_kind_before_signature_is_source_contained(tmp_path, kind, harness, cross_file):
+    signature = {"claude":{"type":"user","sessionId":"s","message":{"content":"hello"}},
+                 "codex":{"type":"session_meta","payload":{"id":"s"}},
+                 "sdk":{"type":"system","session_id":"s","subtype":"init"}}[harness]
+    source = tmp_path / "shape.jsonl"
+    source.write_text(json.dumps({"type":kind}) + "\n" + json.dumps(signature) + "\n")
+    healthy = tmp_path / "healthy.jsonl"
+    healthy.write_text('{"type":"session_meta","payload":{"id":"healthy"}}\n')
+    output = invoke(tmp_path, request([entry(source),entry(healthy)],cross_file=cross_file,text=True,raw=True))
+    unknown = next(o for o in output if o.get("file")==0 and o.get("line")==1)
+    assert unknown["object"]=="record" and unknown["role"]=="unknown" and unknown["kind"] is None
+    assert strict_json(unknown["raw"])["type"]==kind
+    assert end(output,0)["status"]==end(output,1)["status"]=="ok"
+    assert output[-1]["files"]==2
+
+
+@pytest.mark.parametrize("rewrite", [
+    b'{"type":"session_meta","payload":{"id":"new"}}\n',
+    b'{"type":"session_meta","payload":{"id":"a"}}\n',
+    b'{"type":"session_meta","payload":{"id":"a-much-longer-new-session"}}\n',
+])
+@pytest.mark.parametrize("cross_file", [False, True])
+def test_rewritten_source_has_one_consistent_byte_observation(tmp_path, monkeypatch, rewrite, cross_file):
+    from harness_evidence import stream
+    source = tmp_path / "mutable.jsonl"
+    first = b'{"type":"session_meta","payload":{"id":"old"}}\n'
+    source.write_bytes(first)
+    healthy = tmp_path / "healthy.jsonl"
+    healthy.write_text('{"type":"session_meta","payload":{"id":"healthy"}}\n')
+    original_open = Path.open
+    opens = []
+    def changing_open(path, *args, **kwargs):
+        if path==source:
+            opens.append(path)
+            return io.BytesIO(first if len(opens)<=2 else rewrite)
+        return original_open(path,*args,**kwargs)
+    monkeypatch.setattr(Path,"open",changing_open)
+    stdout, stderr = io.StringIO(), io.StringIO()
+    req=request([entry(source),entry(healthy)],cross_file=cross_file,text=True,raw=True)
+    rc=stream.run(io.StringIO(json.dumps(req)+"\n"),stdout,stderr,
+                  {"schema":"harness-evidence/1","decoder":{"version":"test","revision":"test"}})
+    assert rc==0 and not stderr.getvalue()
+    output=[strict_json(line) for line in stdout.getvalue().splitlines()]
+    emitted=[o for o in output if o.get("file")==0 and o["object"]=="record"]
+    if end(output,0)["status"]=="ok":
+        assert emitted
+        header=next(o["header"] for o in output if o.get("file")==0 and o["object"]=="session")
+        for record in emitted:
+            assert record["sha256"]==hashlib.sha256(record["raw"].encode()).hexdigest()
+            assert record["end"]-record["offset"]==len(record["raw"].encode())
+            assert strict_json(record["raw"])["payload"]["id"]==record["session"]==header["session"]
+    else:
+        assert end(output,0)["status"]=="unreadable" and not emitted
+    assert end(output,1)["status"]=="ok" and output[-1]["object"]=="request_end"
+
+
+@pytest.mark.parametrize("name,copy,basis,rule", [
+    ("CA","request_blob","native","api_request_blob"),
+    ("XE","event_mirror","convention","event_mirror"),
+])
+def test_intrinsic_copy_provenance_is_separate_from_role(tmp_path,name,copy,basis,rule):
+    output=invoke(tmp_path,request([entry(FIXTURES/path_of(name))]))
+    copied=[o for o in output if o.get("copy")==copy]
+    assert copied
+    assert all((o["copy_basis"],o["copy_rule"])==(basis,rule) for o in copied)
+
+
+@pytest.mark.parametrize("harness,copy,basis,rule", [
+    ("claude","fork_history","native","fork_context_ref"),
+    ("codex","compaction_history","native","replacement_history"),
+])
+def test_explicit_native_history_constructs_keep_their_copy_provenance(tmp_path,harness,copy,basis,rule):
+    source=tmp_path/"history.jsonl"
+    rows=[{"type":"fork-context-ref","sessionId":"s"},
+          {"type":"assistant","sessionId":"s","message":{"id":"m","content":[{"type":"text","text":"old"}]}}] \
+        if harness=="claude" else [{"type":"session_meta","payload":{"id":"s"}},
+          {"type":"compacted","payload":{"replacement_history":[{"type":"message","role":"user",
+              "content":[{"type":"input_text","text":"old"}]}]}}]
+    source.write_text("".join(json.dumps(row)+"\n" for row in rows))
+    output=invoke(tmp_path,request([entry(source)]))
+    copied=[o for o in output if o.get("copy")==copy]
+    assert copied and all((o["copy_basis"],o["copy_rule"])==(basis,rule) for o in copied)
+
+
+@pytest.mark.parametrize("reason", [[], {}])
+def test_non_string_native_stop_reason_is_data_and_does_not_abort(tmp_path,reason):
+    source=tmp_path/"reason.jsonl"
+    source.write_text(json.dumps({"type":"assistant","sessionId":"s","message":{
+        "stop_reason":reason,"content":[{"type":"text","text":"hello"}]}})+"\n")
+    output=invoke(tmp_path,request([entry(source)]))
+    record=next(o for o in output if o["object"]=="record")
+    assert record["stop_reason"]==reason and record["stop_class"]=="other"
+    assert end(output)["status"]=="ok"
+
+
+@pytest.mark.parametrize("raw", [
+    b'{"type":"user","sessionId":"s","message":{"content":"bad\xff"}}\n',
+    b'\xffnot-json\n',
+    '{"type":"user","sessionId":"s","message":{"content":"caf\u00e9"}}\n'.encode(),
+    b'{"type":"user","sessionId":"s","message":{"content":"\\ud800"}}\n',
+])
+def test_raw_bytes_are_lossless_with_replacement_only_in_typed_text(tmp_path,raw):
+    header=b'{"type":"user","sessionId":"s","message":{"content":"header"}}\n'
+    source=tmp_path/"raw.jsonl"
+    source.write_bytes(header+raw)
+    output=invoke(tmp_path,request([entry(source)],text=True,raw=True))
+    observed=next(o for o in output if o.get("line")==2)
+    assert observed["raw"].encode("utf-8",errors="surrogateescape")==raw
+    assert observed["sha256"]==hashlib.sha256(raw).hexdigest()
+    assert (observed["offset"],observed["end"])==(len(header),len(header)+len(raw))
+    if observed["object"]=="record":
+        assert observed["text"]==strict_json(raw.decode("utf-8",errors="replace"))["message"]["content"]
+    else:
+        assert observed["reason"]=="malformed"
+
+
+@pytest.mark.parametrize("context,basis,rule,copy", [
+    (False,"heuristic","unresolved_fork","ambiguous"),
+    (True,"convention","inherited_turn_ids","fork_history"),
+])
+def test_codex_fork_copy_provenance(tmp_path,context,basis,rule,copy):
+    parent=tmp_path/"parent.jsonl"
+    parent.write_text('{"type":"session_meta","payload":{"id":"parent"}}\n'
+                      '{"type":"event_msg","payload":{"type":"task_started","turn_id":"t"}}\n')
+    child=tmp_path/"child.jsonl"
+    child.write_text('{"type":"session_meta","payload":{"id":"child"}}\n'
+                     '{"type":"session_meta","payload":{"id":"parent"}}\n'
+                     '{"type":"event_msg","payload":{"type":"task_started","turn_id":"t"}}\n')
+    output=invoke(tmp_path,request([entry(child)],context=[str(parent)] if context else []))
+    copied=[o for o in output if o.get("copy")==copy]
+    assert copied and all((o["copy_basis"],o["copy_rule"])==(basis,rule) for o in copied)
+
+
+@pytest.mark.parametrize("mode,basis,rule", [
+    ("native","native","continued_in"),
+    ("reverse_native","native","continued_in"),
+    ("timing","heuristic","timestamp_order"),
+    ("ambiguous","heuristic","timing_ambiguity"),
+    ("both_native","heuristic","timestamp_order"),
+    ("ambiguous_native","heuristic","timing_ambiguity"),
+])
+def test_cross_file_resume_copy_records_actual_recognition_path(tmp_path,mode,basis,rule):
+    root=tmp_path/".claude"/"projects"
+    directory=root/"project"
+    directory.mkdir(parents=True)
+    ids=["c0000000-0000-4000-8000-0000000000a1","c0000000-0000-4000-8000-0000000000b1"]
+    paths=[directory/(ident+".jsonl") for ident in ids]
+    def user(ident,uuid,hour):
+        return {"type":"user","sessionId":ident,"uuid":uuid,"timestamp":f"2026-01-01T{hour}:00:00Z",
+                "message":{"content":"hello"}}
+    a=[user(ids[0],"shared","09")]
+    if mode in {"native","both_native","ambiguous_native"}:
+        a.append({"type":"continued-in","sessionId":ids[0],"continuedInSessionId":ids[1]})
+    a.append(user(ids[0],"a","10" if mode in {"ambiguous","ambiguous_native"} else "11"))
+    b=[user(ids[1],"shared","09")]
+    if mode in {"reverse_native","both_native","ambiguous_native"}:
+        b.append({"type":"continued-in","sessionId":ids[1],"continuedInSessionId":ids[0]})
+    b.append(user(ids[1],"b","10"))
+    for path,rows in zip(paths,(a,b)):
+        path.write_text("".join(json.dumps(row)+"\n" for row in rows))
+    output=invoke(tmp_path,request([entry(p) for p in paths],cross_file=True,
+        roots=[{"harness":"claude-code","path":str(root)}]))
+    copied=[o for o in output if "copy" in o]
+    assert copied and all((o["copy_basis"],o["copy_rule"])==(basis,rule) for o in copied)
+
+
+def test_link_provenance_is_normalized_and_keeps_recognition_rule(tmp_path):
+    roots=[{"harness":"claude-code","path":str(FIXTURES/"home/.claude/projects")},
+           {"harness":"codex","path":str(FIXTURES/"home/.codex/sessions")}]
+    output=invoke(tmp_path,request([entry(FIXTURES/path_of(n)) for n in ("CA","AG","XC")],roots=roots))
+    links=[link for o in output if o["object"]=="session" for link in o["links"]]
+    assert {link["rule"] for link in links}=={"native_metadata","path"}
+    assert all(link["basis"]=={"native_metadata":"native","path":"convention"}[link["rule"]] for link in links)
+
+
+@pytest.mark.parametrize("cross_file", [False,True])
+def test_ambiguous_link_copy_provenance_keeps_request_scope(tmp_path,cross_file):
+    source=tmp_path/"fork.jsonl"
+    source.write_text('{"type":"session_meta","payload":{"id":"child"}}\n'
+        '{"type":"session_meta","payload":{"id":"parent"}}\n'
+        '{"type":"response_item","payload":{"type":"function_call","name":"spawn_agent","call_id":"c","arguments":"{}"}}\n'
+        '{"type":"event_msg","payload":{"type":"item_completed","item":{"type":"SubAgentActivity","id":"c","agent_thread_id":"sub"}}}\n')
+    output=invoke(tmp_path,request([entry(source)],cross_file=cross_file))
+    copied=[link for obj in output if obj["object"]=="session" for link in obj["links"] if "copy" in link]
+    assert copied and all((link["copy_basis"],link["copy_rule"],link["copy_scope"])==
+        ("heuristic","unresolved_fork",[str(source)]) for link in copied)
