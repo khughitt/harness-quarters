@@ -488,6 +488,87 @@ def test_paused_scoped_tasks_write_note_and_release_claim(tmp_path, notices, har
     assert d.state().grace_used['root'] == 25
 
 
+@pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+@pytest.mark.parametrize('agent', [None, 'worker-1'])
+@pytest.mark.parametrize('reads', [0, 25])
+def test_paused_tasks_feedback_is_bookkeeping_for_root_and_child_at_any_grace(tmp_path, notices, harness, agent, reads):
+    d = Driver(tmp_path, harness)
+    d.pause_on_calls()
+    session = agent or 'root'
+    for _ in range(reads):
+        assert not denied(d.bash('ls', agent=agent))
+    for cmd in (
+        'tasks feedback --project hq --category friction --origin user -b "single line detail" "wrong block"',
+        'tasks -C .worktrees/task feedback --project hq --category friction --origin agent -b "detail" "wrong block"',
+        'tasks -C "project worktree" feedback "wrong block" --project hq --category gap',
+    ):
+        assert d.bash(cmd, agent=agent) is None
+    assert d.state().grace_used.get(session, 0) == reads
+    assert d.state().paused == 'calls'
+    assert denied(d.bash('ls', agent=agent)) == (reads == 25)
+    assert denied(d.bash('tasks add "new work"', agent=agent))
+    assert denied(d.bash('tasks -C .worktrees/task add "new work"', agent=agent))
+    assert denied(d.bash('tasks feedback --project hq --category friction "msg" && ls', agent=agent))
+    assert denied(d.bash(f'tasks feedback --project hq --category friction {shlex.quote(str(d.limits))}', agent=agent))
+    assert denied(d.bash(f'tasks -C {shlex.quote(str(d.limits))} feedback --project hq --category friction "msg"',
+                         agent=agent))
+    assert d.state().paused == 'calls'
+
+
+@pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+def test_paused_tasks_feedback_creates_isolated_record_after_grace_exhausted(tmp_path, notices, harness):
+    tasks_cli = shutil.which('tasks')
+    assert tasks_cli is not None, 'the tasks CLI is required for the closing-path test'
+    d = Driver(tmp_path, harness)
+    caller = tmp_path / 'caller worktree'
+    owner = tmp_path / 'owner'
+    outside = tmp_path / 'outside'
+    for directory in (caller, owner, outside):
+        directory.mkdir()
+    env = {'PATH': f'{Path(tasks_cli).parent}:/usr/bin:/bin', 'HOME': d.env['HOME'],
+           'USER': 'fixture', 'XDG_CONFIG_HOME': str(tmp_path / 'config'),
+           'XDG_STATE_HOME': d.env['XDG_STATE_HOME'], 'XDG_DATA_HOME': str(tmp_path / 'data'),
+           'XDG_RUNTIME_DIR': d.env['XDG_RUNTIME_DIR'], 'TASKS_SESSION': 'pause-feedback-test',
+           'TASKS_OWNER': 'fixture', 'GIT_CONFIG_GLOBAL': '/dev/null',
+           'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CEILING_DIRECTORIES': str(tmp_path)}
+
+    def run(cwd_target, *args):
+        result = subprocess.run(['tasks', '-C', str(cwd_target), *args], cwd=outside, env=env,
+                                text=True, capture_output=True, timeout=15)
+        assert result.returncode == 0, result.stdout + result.stderr
+        return json.loads(result.stdout)
+
+    run(caller, 'init', '--prefix', 'src')
+    run(owner, 'init', '--prefix', 'own')
+    with (owner / 'tasks' / '.config.toml').open('a') as f:
+        f.write('\n[feedback]\nscope = "Isolated pause feedback fixture."\n')
+    d.pause_on_calls()
+    for _ in range(25):
+        assert not denied(d.bash('ls'))
+    assert denied(d.bash('ls'))
+    feedback_args = [
+        'feedback', '--project', 'own', '--category', 'friction', '--origin', 'user',
+        '-b', 'paused session filed feedback after grace exhausted',
+        'closing allowlist blocked required tooling feedback',
+    ]
+    command = shlex.join(['tasks', '-C', str(caller), *feedback_args])
+    assert d.bash(command) is None
+    created = run(caller, *feedback_args)
+    fid = created['id']
+    assert created['action'] == 'created'
+    records = list((owner / 'tasks').glob('*.md'))
+    assert [p.name for p in records] == [f'{fid}.md']
+    assert (tmp_path / 'config' / 'tasks' / 'projects.toml').is_file()
+    shown = run(owner, 'show', fid)
+    task = shown['task']
+    assert task['status'] == 'idea'
+    assert task['origin'] == 'user'
+    assert {'feedback', 'friction', 'from:src'} <= set(task['tags'])
+    assert 'paused session filed feedback after grace exhausted' in task['body']
+    assert d.state().grace_used['root'] == 25
+    assert d.state().paused == 'calls'
+
+
 def test_continue_ends_the_pause_resets_counters_and_sets_no_budget(tmp_path, notices):
     d = Driver(tmp_path, 'claude-code')
     d.pause_on_calls()
