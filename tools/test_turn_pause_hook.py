@@ -40,8 +40,11 @@ ROOT_TEXT = (
     'then pause an active goal only if the user explicitly requested its pause. If an active '
     'goal lacks that authorization, leave its status unchanged, name it in the pause report '
     'and include a request for the user to authorize its pause; do not claim it is paused. '
-    'Then write the pause report the turn-pause '
-    'rule describes, park your task --waiting-on user --reason decision, and end your turn. If '
+    'Then record the durable pause report the turn-pause rule describes with single-line '
+    'tasks note calls (file writes are refused while paused; split across notes past 16,384 '
+    'characters), park your task --waiting-on user --reason decision, and end your turn '
+    'with the continuation decision and any exact budget: line in your closing message '
+    '(question tools are refused while paused). If '
     'another agent launched this session, park any claim --waiting-on agent for that agent and '
     'return a short status (done, left, running) instead of a pause report. Only bookkeeping, '
     'plain reads and stopping your own work are allowed now; hq pause status shows the counts.')
@@ -497,6 +500,74 @@ def test_paused_scoped_tasks_write_note_and_release_claim(tmp_path, notices, har
     assert any(n['text'] == 'paused from another directory' for n in shown['task']['notes'])
     assert not shown.get('claim', {}).get('live', False)
     assert d.state().grace_used['root'] == 25
+
+
+@pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+def test_paused_long_tasks_note_persists_durable_handoff_after_grace_exhausted(tmp_path, notices, harness):
+    tasks_cli = shutil.which('tasks')
+    assert tasks_cli is not None, 'the tasks CLI is required for the closing-path test'
+    d = Driver(tmp_path, harness)
+    project = tmp_path / 'project worktree'
+    project.mkdir()
+    outside = tmp_path / 'outside'
+    outside.mkdir()
+    env = {'PATH': f'{Path(tasks_cli).parent}:/usr/bin:/bin', 'HOME': d.env['HOME'],
+           'USER': 'fixture', 'XDG_CONFIG_HOME': str(tmp_path / 'config'),
+           'XDG_STATE_HOME': d.env['XDG_STATE_HOME'], 'XDG_DATA_HOME': str(tmp_path / 'data'),
+           'XDG_RUNTIME_DIR': d.env['XDG_RUNTIME_DIR'], 'TASKS_SESSION': 'pause-long-note-test',
+           'TASKS_OWNER': 'fixture', 'GIT_CONFIG_GLOBAL': '/dev/null',
+           'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CEILING_DIRECTORIES': str(tmp_path)}
+
+    def run(*args):
+        result = subprocess.run(['tasks', '-C', str(project), *args], cwd=outside, env=env,
+                                text=True, capture_output=True, timeout=15)
+        assert result.returncode == 0, result.stdout + result.stderr
+        return json.loads(result.stdout)
+
+    run('init', '--prefix', 'pause')
+    added = run('add', 'long pause handoff fixture', '--process', 'direct')
+    tid = added.get('id') or added['task']['id']
+    run('start', tid)
+    d.pause_on_calls()
+    for _ in range(25):
+        assert not denied(d.bash('ls'))
+    assert denied(d.bash('ls'))
+    report = 'pause report: status, evidence, remaining work and custody — ' + ('detail ' * 919) + 'end'
+    assert len(report) > 6000 and '\n' not in report
+    note_args = ('note', tid, report, '--stamp')
+    command = shlex.join(['tasks', '-C', str(project), *note_args])
+    assert 4096 < len(command) <= 16384
+    assert d.bash(command) is None
+    run(*note_args)
+    over_cmd = "tasks note " + tid + " '" + ('z' * 16384) + "'"
+    over_out = d.bash(over_cmd)
+    assert denied(over_out)
+    assert 'split a longer pause report across multiple single-line tasks note calls' in reason(over_out)
+    shown = run('show', tid)
+    assert any(n['text'] == report for n in shown['task']['notes'])
+    assert d.state().grace_used['root'] == 25
+
+
+@pytest.mark.parametrize('harness, tool, tool_input, expected', [
+    ('claude-code', 'Write', {'file_path': 'report.md', 'content': 'pause'}, 'tasks note'),
+    ('claude-code', 'Edit', {'file_path': 'report.md', 'old_string': 'a', 'new_string': 'b'}, 'tasks note'),
+    ('claude-code', 'NotebookEdit', {'notebook_path': 'report.ipynb'}, 'tasks note'),
+    ('codex', 'apply_patch', {'command': '*** Begin Patch\n*** Add File: r.md\n+x\n*** End Patch'}, 'tasks note'),
+    ('claude-code', 'AskUserQuestion', {'questions': [{'question': 'Continue?'}]}, 'closing message'),
+    ('codex', 'request_user_input', {'questions': [{'question': 'Continue?'}]}, 'closing message'),
+    ('codex', 'request_user_input_async', {'questions': [{'question': 'Continue?'}]}, 'closing message'),
+])
+def test_paused_write_and_question_denials_name_sanctioned_substitutes(
+    tmp_path, notices, harness, tool, tool_input, expected
+):
+    d = Driver(tmp_path, harness)
+    d.pause_on_calls()
+    out, _ = d.pre(tool, tool_input)
+    assert denied(out)
+    text = reason(out)
+    assert text.startswith('turn paused: calls over its limit')
+    assert 'This call:' in text and expected in text
+    assert text.endswith(OWNER_LINE)
 
 
 @pytest.mark.parametrize('harness', ['claude-code', 'codex'])
