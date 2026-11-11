@@ -35,12 +35,12 @@ manager if the unit changed. Check its journal and configured state path, and
 verify that the running service and CLI use the same release. A host without a
 configured service needs no unit created or enabled for a CLI upgrade.
 
-Preserve `inbox/seq`, entries, rejected files and presence. Verify a saved answer
+Preserve inbox/seq, entries, rejected files and presence. Verify a saved answer
 survives the upgrade. Through the selected launcher and an isolated service, post
 `relay inbox ask --file PATH`, answer with `relay inbox answer ID ITEM=VALUE
 --surface terminal`, then run `relay inbox take ID` twice. The answer must survive
 a service restart and repeated take must leave the consumed entry unchanged.
-The installed package's `docs/runbooks/inbox-service.md` describes the envelope
+The installed package's docs/runbooks/inbox-service.md describes the envelope
 and recovery contract.
 
 Older services can quarantine entries containing take or refusal histories.
@@ -99,7 +99,7 @@ Codex then asks to re-trust each changed hook. Review it in each home from a
 (`CODEX_HOME` unset), `cow` for the work home. Codex writes its own trust and nobody
 edits trust hashes. The personal home's new `[hooks.state]` hashes land in tracked
 `harnesses/codex/config.toml`; commit that change after the review. The work home's
-land in untracked `local/codex/config.work.toml`. A rollback stops Codex the same way
+land in untracked local/codex/config.work.toml. A rollback stops Codex the same way
 and reverts the pin-and-images commit (or runs `git revert -m 1 <merge>`, noting that a
 whole-merge revert also reverts any runbook and task-record changes in the merge),
 which returns both the images and the CLI pin to their previous versions; Codex then
