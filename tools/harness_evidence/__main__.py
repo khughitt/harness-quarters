@@ -47,11 +47,27 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     version = commands.add_parser("version", help="identify the decoder")
     version.add_argument("--json", action="store_true", required=True)
+    capabilities_parser = commands.add_parser("capabilities", help="show catalogued decoder evidence")
+    mode = capabilities_parser.add_mutually_exclusive_group()
+    mode.add_argument("--json", action="store_true")
+    mode.add_argument("--build", action="store_true", help="rebuild the committed artifact in an hq checkout")
     discover_parser = commands.add_parser("discover", help="list transcript paths and metadata")
     discover_parser.add_argument("--home", type=Path)
     discover_parser.add_argument("--root", type=_root, action="append")
     commands.add_parser("decode", help="decode framed JSON requests from stdin")
     args = parser.parse_args(argv)
+    if args.command == "capabilities":
+        from . import capabilities
+        try:
+            if args.build:
+                capabilities.build_artifact()
+            else:
+                value = capabilities.view({"version": DECODER_VERSION, "revision": revision()})
+                print(json.dumps(value, sort_keys=True) if args.json else capabilities.table(value))
+        except (OSError, ValueError, KeyError, RevisionUnknown) as error:
+            print(f"capabilities: {error}", file=sys.stderr)
+            return 2
+        return 0
     try:
         output = {"schema": SCHEMA, "decoder": {"version": DECODER_VERSION, "revision": revision()}}
     except RevisionUnknown as error:
