@@ -437,7 +437,18 @@ order and the `--harness` choices follow the registry.
 
 The adapters share `Home` and home discovery from `tools/harness_evidence/homes.py`.
 That standalone package also names transcript stores without importing hq or its
-configuration. `tools/harness-evidence version --json` reports the evidence schema,
+configuration. `tools/harness-evidence discover [--home PATH] [--root HARNESS=PATH]...`
+lists Claude Code and Codex transcript paths and filesystem metadata as
+JSONL under schema version 1 (`root`, `file`, then `discover_end`). Explicit roots replace
+all default roots; supported harness names are `claude-code` and `codex`. Defaults use
+the shared personal/work homes, including Codex's archived stores, and ignore obs's
+environment overrides. Discovery reads no transcript text. Codex filename identity is
+marked `convention`, separate from identity recorded inside a transcript. Symlinked
+transcripts are excluded. Missing or unreadable roots are reported; a file that
+vanishes or becomes unreadable after listing retains a file object with null stat
+metadata and its observed state/error.
+
+`tools/harness-evidence version --json` reports the evidence schema,
 decoder version `1`, and the decoder revision. A pinned copy reads a `REVISION`
 file inside the package; a checkout reports its HEAD with `+dirty` when
 the package has changes. Without either source the command exits 2.
