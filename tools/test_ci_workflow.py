@@ -216,10 +216,10 @@ def test_preparation_pilot(world, tmp_path, failure):
     if failure:
         assert coverage["problems"] and not (evidence / "pytest-hooks-tools.xml").exists()
     else:
-        assert coverage["collected"] == coverage["reported"] == 6
-        assert coverage["executed"] == 5 and coverage["problems"] == []
+        assert coverage["collected"] == coverage["reported"] == 3
+        assert coverage["executed"] == 2 and coverage["problems"] == []
         assert world.rows()[-1]["slowest"]
-        assert len(list(evidence.glob("pytest-*.xml"))) == 4
+        assert len(list(evidence.glob("pytest-*.xml"))) == 2
     assert all(row["kind"] != "budget" for row in world.markers())
     print(json.dumps({"tasks": version, "expected_failure": failure, "collected": coverage["collected"],
                       "reported": coverage["reported"], "artifact": str(artifact)}))

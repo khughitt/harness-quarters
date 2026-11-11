@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run hq's four partitions and reconcile durable evidence against full collection."""
+"""Run hq's two partitions and reconcile durable evidence against full collection."""
 import json
 import os
 from pathlib import Path
@@ -8,14 +8,9 @@ import subprocess
 import sys
 from xml.etree import ElementTree as ET
 
-SIGNAL = "test_signal_while_recording_start_cancels"
 PARTITIONS = (
     ("agents", ("agents/bin",)),
-    ("hooks-tools", (".githooks", "tools", "--ignore=tools/test_relay_cutover_bootstrap.py",
-                     "--ignore=tools/test_relay_cutover_transport.py")),
-    ("relay-parallel", ("tools/test_relay_cutover_bootstrap.py", "tools/test_relay_cutover_transport.py",
-                        "-n", "auto", "-k", f"not {SIGNAL}")),
-    ("relay-signal", ("tools/test_relay_cutover_transport.py", "-k", SIGNAL)),
+    ("hooks-tools", (".githooks", "tools")),
 )
 PYTEST = ("uv", "run", "-q", "--python", "/usr/bin/python3", "--with", "pytest==9.2.0",
           "--with", "pytest-xdist==3.8.0", "pytest", "-p", "no:httpbin", "-p", "pytest_evidence", "-q", "-rs")

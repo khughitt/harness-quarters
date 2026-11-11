@@ -15,8 +15,8 @@ EVENTS = {
 }
 ABSENT_CODEX = ('PostToolUseFailure', 'PreCompact', 'PostCompact')
 ALL_TOOLS = ('PreToolUse', 'PostToolUse', 'PostToolUseFailure')
-# Codex clamps a SessionEnd hook's timeout to 3 s (the relay-cutover plan's Codex
-# SessionEnd row); every other turn-pause entry declares 5 s.
+# Codex clamps a SessionEnd hook's timeout to 3 s; every other turn-pause entry
+# declares 5 s.
 TIMEOUTS = {('codex', 'SessionEnd'): 3}
 DEFAULT_TIMEOUT = 5
 CASES = [('harnesses/claude/settings.json', 'claude-code'), ('harnesses/codex/hooks.json', 'codex'),

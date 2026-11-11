@@ -11,16 +11,6 @@ layout_allowed = [
   "harnesses/codex/work/hooks.json",
   "harnesses/agy/hooks.json",
   "harnesses/agy/settings.json",
-  # The relay cutover tool, its tests, runbook and window plan carry the fixed fleet
-  # names and deployment paths. Remove these with the tool if hq-7e81ed retires it.
-  "tools/relay-cutover",
-  "tools/relay_cutover_bootstrap/",
-  "tools/relay-cutover-host",
-  "tools/test_relay_cutover_bootstrap.py",
-  "tools/test_relay_cutover_transport.py",
-  "tools/test_relay_cutover.py",
-  "docs/runbooks/relay-cutover.md",
-  "docs/plans/2026-10-19-relay-cutover.md",
   # Exact deployed hook strings are the contract these wiring tests protect.
   "tools/test_capture_notice_wiring.py",
   "tools/test_claim_guard_wiring.py",
