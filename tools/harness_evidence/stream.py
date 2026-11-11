@@ -7,7 +7,7 @@ import re
 
 from . import copies, discover, records
 from .lines import Place, UnknownFormat, decode, detect_format, lines, ref, sha256
-from .links import native_links
+from .links import native_links, requested_model
 
 
 class ProtocolError(Exception):
@@ -108,10 +108,13 @@ def _read(source, roots, inherited):
         with physical.open("rb") as handle:
             data = handle.read(size)
         size = len(data)
-        try:
-            fmt = detect_format(data, size)
-        except UnknownFormat:
-            status = "unknown_format"
+        if place.store != "explicit":
+            fmt = "codex" if place.harness == "codex" else "claude"
+        else:
+            try:
+                fmt = detect_format(data, size)
+            except UnknownFormat:
+                status = "unknown_format"
         if fmt is not None:
             place = replace(place, harness="codex" if fmt == "codex" else "claude-code")
             reader = {"claude": records.claude_read, "sdk": records.sdk_read, "codex": records.codex_read}[fmt]
@@ -226,7 +229,12 @@ def _emit_file(file, index, envelope, request):
     for link in linked:
         if "copy" in link:
             link["copy_scope"] = scope
-    yield {**base, "object": "session", "key": "session", "header": _public(file.read.header, text),
+    header = {"recorded_identity": None, **_public(file.read.header, text)}
+    model = requested_model(file.read) if file.status == "ok" else None
+    if model and (model["value"], model["basis"]) not in {
+            (m["value"], m["basis"]) for m in header.get("models", [])}:
+        header["models"] = [*header.get("models", []), model]
+    yield {**base, "object": "session", "key": "session", "header": header,
            "links": linked, "unresolved_forks": file.unresolved}
     yield {**base, "object": "file_end", "key": "end", "status": file.status,
            "offset": file.state["next_offset"], "state": file.state, "count": count}

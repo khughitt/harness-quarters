@@ -107,18 +107,36 @@ def _unparsed(place: Place, line: Line) -> dict:
             "_raw": line.raw.decode("utf-8", errors="replace"), "_line": line.number}
 
 
-def _decoded(place: Place, size: int, data: bytes | None = None) -> tuple[list[tuple[Line, dict]], list[dict], int]:
+def recorded_identity(place: Place, line: Line, record: dict) -> dict | None:
+    """One native identity observation; callers keep the first, without a peek window."""
+    if place.harness == "codex":
+        if record.get("type") != "session_meta":
+            return None
+        value = _str(_dict(record, "payload").get("id")) or None
+        rule = "session_meta"
+    else:
+        value = record.get("sessionId")
+        if not isinstance(value, str) or record.get("isSidechain"):
+            return None
+        rule = "session_id"
+    return {"session": value, "line": line.number, "ref": ref(place, line.number),
+            "sha256": sha256(line), "basis": "native", "rule": rule}
+
+
+def _decoded(place: Place, size: int, data: bytes | None = None) -> tuple[list[tuple[Line, dict]], list[dict], int, dict | None]:
     """Every line decoded once, retaining its hash in place of its raw bytes."""
-    parsed, unparsed, count = [], [], 0
+    parsed, unparsed, count, identity = [], [], 0, None
     source = data if data is not None else place.read_path if place.read_path is not None else place.path
     for line in lines(source, size):
         count = line.number
-        record = decode(line) if line.complete else None
-        if record is None:
+        record = decode(line)
+        if identity is None and record is not None:
+            identity = recorded_identity(place, line, record)
+        if record is None or not line.complete:
             unparsed.append(_unparsed(place, line))
         else:
             parsed.append((Line(line.number, b"", line.complete, sha256(line)), record))
-    return parsed, unparsed, count
+    return parsed, unparsed, count, identity
 
 
 def _text_of(content) -> str:
@@ -564,7 +582,7 @@ def _fork_message(parsed: list[tuple[Line, dict]]) -> tuple[int, str | None] | N
 def claude_read(place: Place, size: int, *, data: bytes | None = None) -> FileRead:
     """A Claude Code transcript's first `size` bytes as records (without `turn`), the
     unparsed lines, and the file's header."""
-    parsed, unparsed, count = _decoded(place, size, data)
+    parsed, unparsed, count, observed = _decoded(place, size, data)
     timed = [r for _l, r in parsed if r.get("timestamp")]
     native_sidechain = bool(timed) and all(r.get("isSidechain") is True for r in timed)
     subagent = place.path.parent.name == "subagents" or native_sidechain
@@ -581,6 +599,7 @@ def claude_read(place: Place, size: int, *, data: bytes | None = None) -> FileRe
                       if r.get("type") == "continued-in"), None)
     header = {
         **identity,
+        "recorded_identity": observed,
         "cwd": first_with("cwd"),
         "entrypoint": first_with("entrypoint"),
         "first_at": first_at,
@@ -945,7 +964,7 @@ def codex_read(place: Place, size: int,
     `payload.id`. A second `session_meta` makes the rollout a fork of the thread it
     names: `inherited_turn_ids(id)` gives that thread's full `turn_ids` (copies included),
     or None when its rollout is unreadable."""
-    parsed, unparsed, count = _decoded(place, size, data)
+    parsed, unparsed, count, observed = _decoded(place, size, data)
     metas = [(line, r) for line, r in parsed if r.get("type") == "session_meta"]
     first = _dict(metas[0][1], "payload") if metas else {}
     session = _str(first.get("id"))
@@ -968,6 +987,7 @@ def codex_read(place: Place, size: int,
     first_at, last_at = _span(parsed)
     header = {
         **identity,
+        "recorded_identity": observed,
         "parent": thread["parent"],
         "agent_path": thread["agent_path"],
         "depth": thread["depth"],
@@ -999,7 +1019,7 @@ def sdk_read(place: Place, size: int, *, data: bytes | None = None) -> FileRead:
     `session_id`, which links nothing (SL9). An event's `parent_tool_use_id` names the
     dispatching call: `dispatch: {kind: sdk_dispatch, call}`; a prompt inside a dispatch is
     the child's brief, `dispatch`."""
-    parsed, unparsed, count = _decoded(place, size, data)
+    parsed, unparsed, count, observed = _decoded(place, size, data)
     session = next((r["session_id"] for _l, r in parsed if isinstance(r.get("session_id"), str)), None)
     identity = {"session": session, "agent": None,
                 "identity_basis": "session_id" if session else None, "parent": None}
@@ -1053,6 +1073,7 @@ def sdk_read(place: Place, size: int, *, data: bytes | None = None) -> FileRead:
             emit("unknown", "kind", kind, text=_compact(record))
     pair_calls(records)
     first_at, last_at = _span(parsed)
-    header = {**identity, "first_at": first_at, "last_at": last_at, "lines": count,
+    header = {**identity, "recorded_identity": observed,
+              "first_at": first_at, "last_at": last_at, "lines": count,
               "models": models.listed, "_model_refs": models.refs}
     return FileRead(place, records, unparsed, header)

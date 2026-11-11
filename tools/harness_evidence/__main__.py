@@ -21,7 +21,18 @@ def _discover(args: argparse.Namespace, envelope: dict) -> None:
     roots = discover.roots(args.home, args.root)
     listing = discover.list_files(roots, None)
     for root, entry in zip(roots, listing.roots):
-        print(json.dumps({**envelope, "object": "root", "path": str(root.path), **entry}))
+        aliases = []
+        for path in listing.aliases:
+            if discover._root_of(path, roots) != root:
+                continue
+            place = discover.place_of(path, roots)
+            location = asdict(place)
+            del location["path"]
+            del location["read_path"]
+            aliases.append({"path": str(path), "place": location,
+                            "filename_identity": discover.filename_identity(place.harness, path)})
+        print(json.dumps({**envelope, "object": "root", "path": str(root.path), **entry,
+                          "aliases": aliases}))
     for path in listing.files:
         place = discover.place_of(path, roots)
         location = asdict(place)

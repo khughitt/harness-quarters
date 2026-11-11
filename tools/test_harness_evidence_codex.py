@@ -1,4 +1,6 @@
 import json
+import gc
+import tracemalloc
 import tempfile
 import unittest
 from pathlib import Path
@@ -642,6 +644,32 @@ class StepSixFollowUpTest(InlineRollouts):
 
     def test_entrypoint_is_the_originator(self):
         self.assertEqual(read_codex("XC").header["entrypoint"], "codex-tui")
+
+
+class NativeMemory(unittest.TestCase):
+    def test_native_raw_bytes_are_not_retained_with_classified_records(self):
+        """Relocated obs test_followups.NativeMemory, same bytes and numerical bound."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "large.jsonl"
+            with path.open("w") as out:
+                out.write(json.dumps({"timestamp": "2026-10-12T10:00:00.000Z", "type": "session_meta",
+                    "payload": {"id": "01900000-0000-7000-8000-0000000000e9", "cwd": "/w/x",
+                                "source": "cli", "thread_source": "user"}}) + "\n")
+                for n in range(300):
+                    out.write(json.dumps({"type": "response_item", "payload": {
+                        "type": "function_call_output", "call_id": str(n), "output": "x" * 10000}})
+                              + "\n")
+            place = Place("codex", "file", None, "explicit", str(path), path)
+            gc.collect()
+            tracemalloc.start()
+            try:
+                read = rec.codex_read(place, path.stat().st_size, lambda _id: None)
+                _current, peak = tracemalloc.get_traced_memory()
+            finally:
+                tracemalloc.stop()
+            self.assertEqual(len(read.records), 301)
+            self.assertEqual(read.records[-1]["text"], "x" * 10000)
+            self.assertLess(peak, path.stat().st_size * 1.7)
 
 
 if __name__ == "__main__":

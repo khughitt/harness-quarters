@@ -40,6 +40,13 @@ def _str(value) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
+def requested_model(read: FileRead) -> dict | None:
+    """Separately observed child metadata, added only after transcript copy settlement."""
+    meta = _meta(read)
+    value = _str(meta[0].get("model")) if meta else None
+    return {"value": value, "basis": "requested", "ref": meta[1]} if value else None
+
+
 def _link(kind: str, target: str, rule: str, at: str | None, call: dict | None = None,
           *sources: dict) -> dict:
     """One link; `call` only when the link goes through a dispatching call, and

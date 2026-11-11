@@ -444,15 +444,17 @@ all default roots; supported harness names are `claude-code` and `codex`. Defaul
 the shared personal/work homes, including Codex's archived stores, and ignore obs's
 environment overrides. Discovery reads no transcript text. Codex filename identity is
 marked `convention`, separate from identity recorded inside a transcript. Symlinked
-transcripts are excluded. Missing or unreadable roots are reported; a file that
+transcripts appear in each root's `aliases` list with normalized place and filename
+identity; they are never opened or counted as files/bytes. Missing or unreadable
+roots are reported; a file that
 vanishes or has unavailable metadata after its name is enumerated retains a file
 object with null stat metadata and its observed state/error. Initial lstat/stat
 failures remain explicit even if a later lookup could succeed; known symlink
-aliases stay excluded. The listing helper retains candidates with unknown mtime
+aliases stay excluded from file objects. The listing helper retains candidates with unknown mtime
 when applying a cutoff; the command applies no cutoff.
 
 `tools/harness-evidence version --json` reports the evidence schema,
-decoder version `3`, and the decoder revision. A pinned copy reads a `REVISION`
+decoder version `4`, and the decoder revision. A pinned copy reads a `REVISION`
 file inside the package; a checkout reports its HEAD with `+dirty` when
 the package has changes. Without either source the command exits 2.
 
@@ -471,7 +473,18 @@ Native `abort_reason` remains metadata when text is disabled. Session headers ke
 their existing child flags and add `subagent_basis` for Claude Code (native timed
 sidechain flags, conventional subagent path, or a heuristic negative) and
 `child_basis` for Codex (native parent/thread-source evidence or a heuristic
-negative). SDK and unknown headers gain no child flags.
+negative). SDK and unknown headers gain no child flags. Store-placed files use the
+established root's native reader, including files without a signature; rootless
+explicit files retain signature detection, including SDK captures.
+Headers also publish `recorded_identity`: the first qualifying native identity
+observation with session, physical line, ref, hash, native basis and recognition
+rule, or null. This does not replace the existing session identity. Codex's first
+session metadata stops the search even with an invalid id; Claude skips sidechain
+and non-string ids. A valid final JSON line can supply this observation without a
+newline. Consumers apply their own peek window to its line position.
+Child `.meta.json` requested models join `header.models` after transcript copy
+settlement, with the sidecar ref; sidecars are separately observed metadata and
+explicit-store captures never consult them.
 Each bounded transcript prefix is captured once in transient memory; format,
 records, header, raw lines, hashes and offsets all use those same bytes. The
 buffer is released after extraction; its peak cost is up to one current file's

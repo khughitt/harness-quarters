@@ -118,7 +118,7 @@ def test_checkout_revision_is_head_and_marks_dirty(tmp_path):
     root, env = fixture_repo(tmp_path)
     head = git(root, env, "rev-parse", "HEAD")
     output = version_json(root, env)
-    assert output == {"schema": "harness-evidence/1", "decoder": {"version": "3", "revision": head}}
+    assert output == {"schema": "harness-evidence/1", "decoder": {"version": "4", "revision": head}}
     (root / "unrelated").write_text("outside package\n")
     assert version_json(root, env)["decoder"]["revision"] == head
     extra = root / "tools" / "harness_evidence" / "extra.py"
