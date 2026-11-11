@@ -110,7 +110,7 @@ def _unparsed(place: Place, line: Line) -> dict:
 def _decoded(place: Place, size: int) -> tuple[list[tuple[Line, dict]], list[dict], int]:
     """Every line decoded once, retaining its hash in place of its raw bytes."""
     parsed, unparsed, count = [], [], 0
-    for line in lines(place.path, size):
+    for line in lines(place.read_path if place.read_path is not None else place.path, size):
         count = line.number
         record = decode(line) if line.complete else None
         if record is None:

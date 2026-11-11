@@ -20,6 +20,7 @@ class Place:
     store: str
     relpath: str
     path: Path
+    read_path: Path | None = None
 
 
 @dataclass(frozen=True)

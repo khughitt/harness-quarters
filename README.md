@@ -453,6 +453,27 @@ decoder version `1`, and the decoder revision. A pinned copy reads a `REVISION`
 file inside the package; a checkout reports its HEAD with `+dirty` when
 the package has changes. Without either source the command exits 2.
 
+`tools/harness-evidence decode` reads one JSON request per stdin line and flushes
+framed harness-evidence/1 objects through `request_end` before reading the next.
+Requests require an integer `id` and `files`, each with logical `path` and byte
+bound `size`; optional `read_path` reads captured bytes without changing identity
+or refs. `roots` replaces default discovery roots, `context` supplies fork evidence
+without emitting it, and `cross_file` marks copies across requested files. `text`
+and `raw` default to false; transcript text, nested commands and turn-end messages
+require `text`, while original physical lines require `raw` independently.
+
+Each file emits keyed `file_start`, records or unparsed lines, `session`, and
+`file_end` with status, emitted count and checkpoint `state`. Source failures stay
+framed; malformed requests, unknown fields and invalid states exit 2 with a stderr
+line. Pass the last state to resume: `replaces: {"from_line": N}` replaces line
+objects at or after N, while `replaces: "all"` restarts after an earlier payload
+changed. Always replace the file and session aggregates by key. Incomplete tails
+are provisional and replayed. Stage 1 rereads the whole bounded prefix each time.
+The checkpoint hashes committed line objects in line/block order: sorted-key,
+compact ASCII JSON plus a newline per object, excluding schema, decoder and
+request/file transport indices. Text/raw option changes can therefore restart
+replay, while request ids and decoder revision changes alone do not.
+
 - **Rows.** Harness, home (`personal` or `work`), short id (the first eight characters;
   for Codex the last eight, since a UUIDv7 id starts with its timestamp), age, place (marked
   `cwd missing` when the directory is gone, which is common for removed worktrees), and

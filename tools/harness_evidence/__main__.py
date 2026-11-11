@@ -26,6 +26,7 @@ def _discover(args: argparse.Namespace, envelope: dict) -> None:
         place = discover.place_of(path, roots)
         location = asdict(place)
         del location["path"]
+        del location["read_path"]
         output = {**envelope, "object": "file", "path": str(path), "harness": place.harness,
                   "device": None, "inode": None, "size": None, "mtime_ns": None,
                   "place": location, "filename_identity": discover.filename_identity(place.harness, path),
@@ -49,12 +50,16 @@ def main(argv: list[str] | None = None) -> int:
     discover_parser = commands.add_parser("discover", help="list transcript paths and metadata")
     discover_parser.add_argument("--home", type=Path)
     discover_parser.add_argument("--root", type=_root, action="append")
+    commands.add_parser("decode", help="decode framed JSON requests from stdin")
     args = parser.parse_args(argv)
     try:
         output = {"schema": SCHEMA, "decoder": {"version": DECODER_VERSION, "revision": revision()}}
     except RevisionUnknown as error:
         print(str(error), file=sys.stderr)
         return 2
+    if args.command == "decode":
+        from .stream import run
+        return run(sys.stdin, sys.stdout, sys.stderr, output)
     if args.command == "discover":
         _discover(args, output)
     else:
