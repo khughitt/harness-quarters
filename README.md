@@ -694,7 +694,7 @@ line passes no `protocolVersion`; if it does, that option's value is the revisio
 
 ### Turn-pause limits
 
-`hq pause limits` shows the current defaults: 16 active hours, 500 root tool calls,
+`hq pause limits` shows the current defaults: 16 active hours, 2,000 root tool calls,
 60 tree spawns and 2 root compactions (advisory) per turn. It and `hq pause status` write active time
 with its units (`16h00m`, `0h16m`); `--json` gives seconds. The next hooked call after an
 enforced limit (`active`, `calls` or `spawns`) is exceeded pauses the turn; `compactions`
@@ -715,15 +715,16 @@ transition events and per-turn summaries across local root records (`--session`,
 
 The 75% warning asks for a concise status update and preparation while authorized
 work continues. It is not a pause, a request for a new budget, or a new approval
-gate. The spawn warning occurs at 45 of 60. Stop on an actual crossed enforced limit or
+gate. The root-call warning occurs at 1,500 of 2,000 and the spawn warning at 45 of 60. Stop on an actual crossed enforced limit or
 another genuine human gate. Reaching an
 exact enforced limit is allowed, and root compactions are advisory only. Do not add reviewers' calls to the root count.
 The [cutoff calibration](docs/notes/2026-11-02-active-cutoff-report.md) records the
-historical comparison and its limits; duration alone cannot prove a runaway.
+historical active-time comparison and its limits, and hq-649891 retains the root-call
+cutoff calibration; duration or call count alone cannot prove a runaway.
 
 A first-line budget directive scales unnamed counts relative to the default:
-`budget: 12h` gives 375 calls, 45 spawns and 2 compactions, while `budget: 48h` gives
-1,500 calls, 180 spawns and 6 compactions. Named counts override scaling.
+`budget: 12h` gives 1,500 calls, 45 spawns and 2 compactions, while `budget: 48h` gives
+6,000 calls, 180 spawns and 6 compactions (`budget: 8h` gives 1,000 calls, 30 spawns and 1 compaction). Named counts override scaling.
 Changing the live limits file pauses existing turns with `limits-changed`; a new
 genuine user prompt starts a turn with the updated limits.
 
