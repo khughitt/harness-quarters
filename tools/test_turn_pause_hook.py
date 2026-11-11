@@ -53,6 +53,10 @@ CHILD_TEXT = (
 LIMITS_CHANGED_TEXT = (
     'turn paused: the turn limits file changed mid-turn (active {a} of {A}, root calls {c}/{C}, tree spawns {s}/{S}, '
     'root compactions {k}/{K} (advisory)). ' + ROOT_TEXT[ROOT_TEXT.index('Start nothing new'):])
+OWNER_LINE = (
+    '(owner: hq; a wrong or unclear block is feedback: '
+    'tasks feedback --project hq — see Feedback in your instructions)'
+)
 WARNING_TEXT = ('turn-pause: warning only: {limit} at {n}% ({used} of {value}). '
                 'Continue authorized work; this is not a pause or a new approval gate. '
                 'Give a concise status update and prepare to stop only if a limit is exceeded '
@@ -383,8 +387,10 @@ def test_501st_root_call_is_denied_with_the_root_text_after_one_warning(tmp_path
         assert context(out) == expected, i
     out = d.bash('ls')
     assert denied(out)
-    assert reason(out) == ROOT_TEXT.format(limit='calls', a='0h08m', A='16h00m', c=501, C=500,
-                                           s=0, S=60, k=0, K=2)
+    assert reason(out) == (
+        ROOT_TEXT.format(limit='calls', a='0h08m', A='16h00m', c=501, C=500, s=0, S=60, k=0, K=2)
+        + f'\n{OWNER_LINE}'
+    )
     assert 'stop the work you already started: interrupt your subagents and the sessions you launched' in reason(out)
     assert 'If another agent launched this session, park any claim --waiting-on agent' in reason(out)
     assert d.state().paused == 'calls' and len(notices) == 1
@@ -542,7 +548,10 @@ def test_changed_limits_file_pauses_with_limits_changed_and_notifies(tmp_path, n
     write_limits(d.limits, calls=5000)
     out = d.bash('ls')
     assert denied(out)
-    assert reason(out) == LIMITS_CHANGED_TEXT.format(a='0h00m', A='16h00m', c=2, C=500, s=0, S=60, k=0, K=2)
+    assert reason(out) == (
+        LIMITS_CHANGED_TEXT.format(a='0h00m', A='16h00m', c=2, C=500, s=0, S=60, k=0, K=2)
+        + f'\n{OWNER_LINE}'
+    )
     assert reason(out).startswith('turn paused: the turn limits file changed mid-turn (active 0h00m of 16h00m, '
                                   'root calls 2/500, tree spawns 0/60, root compactions 0/2 (advisory)). Start nothing new and stop')
     assert d.state().paused == 'limits-changed'
@@ -1530,3 +1539,111 @@ def test_relocated_wiring_is_protected(tmp_path, path, shell):
         out, _ = d.pre('Write', {'file_path': target, 'content': '{}'})
     assert denied(out)
     assert 'protected' in reason(out)
+
+
+def _assert_hq_owner(text: str, expected_substring: str):
+    assert expected_substring in text
+    assert text.endswith(f'\n{OWNER_LINE}')
+    body = text[:-len(OWNER_LINE) - 1]
+    assert expected_substring in body
+    assert 'owner: hq' not in body
+
+
+@pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+@pytest.mark.parametrize('case', [
+    'root-limit',
+    'child-limit',
+    'limits-changed',
+    'paused-disallowed',
+    'exhausted-grace',
+    'protected-path',
+    'node-budget',
+    'ended-root',
+    'malformed-event',
+    'state-error',
+])
+def test_every_decide_denial_retains_its_cause_and_attributes_owner_to_hq(tmp_path, notices, harness, case):
+    from turn_pause import protect
+    d = Driver(tmp_path, harness)
+    if case == 'root-limit':
+        out = d.pause_on_calls(limit=1)
+        _assert_hq_owner(reason(out), 'turn paused: calls over its limit')
+        assert 'Start nothing new and stop the work you already started' in reason(out)
+    elif case == 'child-limit':
+        write_limits(d.limits, active_seconds=1)
+        d.prompt('work')
+        out = d.bash('touch x', agent='a620dc1cd95e3a1c5', dt=2)
+        _assert_hq_owner(reason(out), "turn paused by your controller's limit")
+        assert 'Do not write a pause report.' in reason(out)
+    elif case == 'limits-changed':
+        d.prompt('work')
+        assert d.bash('ls') is None
+        write_limits(d.limits, calls=5000)
+        out = d.bash('ls')
+        _assert_hq_owner(reason(out), 'turn paused: the turn limits file changed mid-turn')
+        assert 'Start nothing new and stop the work you already started' in reason(out)
+    elif case == 'paused-disallowed':
+        d.pause_on_calls()
+        out = d.bash('touch z')
+        _assert_hq_owner(reason(out), 'This call:')
+    elif case == 'exhausted-grace':
+        d.pause_on_calls()
+        for _ in range(25):
+            assert not denied(d.bash('ls'))
+        out = d.bash('ls')
+        _assert_hq_owner(reason(out), 'the 25 allowlisted reads of grace are used up')
+    elif case == 'protected-path':
+        d.prompt('work')
+        out = d.bash('touch ' + shlex.quote(str(d.limits)))
+        _assert_hq_owner(reason(out), 'this call names a protected path')
+    elif case == 'node-budget':
+        d.prompt('work')
+        out, _ = d.pre('Bash', {'command': 'ls', 'extra': [0] * (protect.MAX_NODES + 1)})
+        _assert_hq_owner(reason(out), 'JSON nodes')
+    elif case == 'ended-root':
+        d.prompt('work')
+        end = claude_bare('SessionEnd') if harness == 'claude-code' else codex_bare('SessionEnd')
+        d('SessionEnd', end)
+        out = d.bash('ls')
+        _assert_hq_owner(reason(out), 'root session ended; a genuine root prompt is required to resume.')
+    elif case == 'malformed-event':
+        out = hook.decide(harness, 'PreToolUse', {'session_id': 123}, T0, d.store, d.limits, d.env)
+        _assert_hq_owner(reason(out), 'turn-pause could not judge this call, so it is refused:')
+    elif case == 'state-error':
+        d.prompt('work')
+        root = CLAUDE_ROOT if harness == 'claude-code' else CODEX_ROOT
+        (state_dir(d.env) / f'{harness}-{root}.json').write_text('{not json')
+        out = d.bash('ls')
+        _assert_hq_owner(reason(out), 'turn-pause could not judge this call, so it is refused:')
+
+
+@pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+@pytest.mark.parametrize('case', ['bad-json', 'oversized', 'many-nodes', 'import-error'])
+def test_entry_fail_closed_denials_retain_cause_and_attribute_owner_to_hq(tmp_path, harness, case):
+    if case == 'bad-json':
+        r = run_entry(tmp_path, 'PreToolUse', b'{not json', harness=harness)
+        expected = 'turn-pause could not judge this call, so it is refused: JSONDecodeError:'
+    elif case == 'oversized':
+        payload = (claude_pre('Write', {'file_path': '/srv/x', 'content': 'a' * (hook.MAX_PAYLOAD_BYTES + 1)}, 'c1')
+                   if harness == 'claude-code'
+                   else codex_pre('Bash', {'command': 'a' * (hook.MAX_PAYLOAD_BYTES + 1)}, 'c1'))
+        r = run_entry(tmp_path, 'PreToolUse', payload, harness=harness)
+        expected = f'over the {hook.MAX_PAYLOAD_BYTES} byte cap'
+    elif case == 'many-nodes':
+        r = run_entry(tmp_path, 'PreToolUse', _many_nodes(b'0'), harness=harness)
+        expected = 'JSON nodes'
+    elif case == 'import-error':
+        broken = tmp_path / 'broken-entry'
+        broken.mkdir()
+        entry_copy = broken / 'turn-pause'
+        shutil.copy2(ENTRY, entry_copy)
+        (broken / 'turn_pause').mkdir()
+        (broken / 'turn_pause' / 'hook.py').write_text('raise RuntimeError("boom")\n')
+        r = subprocess.run([str(entry_copy), '--harness', harness, 'PreToolUse'],
+                           input=b'{}', env=make_env(tmp_path), capture_output=True, timeout=20)
+        expected = 'turn-pause cannot load, so this call is refused: RuntimeError'
+    assert r.returncode == 0
+    out = json.loads(r.stdout)
+    assert denied(out)
+    _assert_hq_owner(reason(out), expected)
+    assert getattr(hook, 'OWNER_LINE', None) == OWNER_LINE

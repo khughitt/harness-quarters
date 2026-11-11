@@ -92,11 +92,15 @@ GRACE_TEXT = (f'the {GRACE} allowlisted reads of grace are used up; only bookkee
               'own work remain')
 HARNESS_NAMES = ('claude', 'codex')
 LIMITS_CHANGED = 'limits-changed'
+OWNER_LINE = (
+    '(owner: hq; a wrong or unclear block is feedback: '
+    'tasks feedback --project hq — see Feedback in your instructions)'
+)
 
 
 def _deny(reason: str) -> dict:
     return {'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'permissionDecision': 'deny',
-                                   'permissionDecisionReason': reason}}
+                                   'permissionDecisionReason': f'{reason}\n{OWNER_LINE}'}}
 
 
 def _context(event: str, text: str) -> dict:
