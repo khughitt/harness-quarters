@@ -807,11 +807,14 @@ Read `docs/notes/2026-10-15-session-discovery-contract.md` first: `hq sessions` 
 index, reads each harness's native metadata directly, and raises `SourceError` when a
 present home's metadata is missing, unreadable or at an unexpected schema version.
 
-One module per harness carries all of it: `tools/harness_stores/<name>.py` exports an
+One module per harness carries its adapter: `tools/harness_stores/<name>.py` exports an
 `ADAPTER` (`tools/harness_stores/model.py`, `Adapter`). `hq sessions`, `session-archive`
 and `session-episodes` each read the registry, so a new harness is not threaded through
 their code. Use `claude.py`, `codex.py` and `agy.py` as models (agy is the one whose
 transcript does not name its own working directory).
+`tools/harness_evidence/homes.py` owns the shared `Home` type, harness slugs, home
+discovery and transcript-store paths. The adapter binds that discovery function to
+its harness alias; `harness_stores.Home` remains the same public type.
 
 ### The adapter (`hq`)
 

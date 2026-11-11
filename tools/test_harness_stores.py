@@ -10,6 +10,7 @@ sys.path.insert(0, str(TOOLS))
 
 import harness_stores  # noqa: E402
 import pytest  # noqa: E402
+from harness_evidence.homes import Home  # noqa: E402
 from hq_cli import cli, color, launch  # noqa: E402
 
 
@@ -80,7 +81,7 @@ def test_launch_refuses_a_session_without_cwd(tmp_path):
 
 
 def test_environment_refuses_a_work_home_without_a_home_variable(tmp_path):
-    home = harness_stores.Home("agy-work", "agy", "work", tmp_path)
+    home = Home("agy-work", "agy", "work", tmp_path)
     session = harness_stores.Session(home, "cid", "/x", 0, "", tmp_path)
     with pytest.raises(launch.LaunchError, match="agy"):
         launch.environment(session, {})

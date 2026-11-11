@@ -435,6 +435,13 @@ that alone names a conversation's workspace and title, with the transcript under
 `tools/harness_stores/`, registered in `tools/harness_stores/__init__.py`; the display
 order and the `--harness` choices follow the registry.
 
+The adapters share `Home` and home discovery from `tools/harness_evidence/homes.py`.
+That standalone package also names transcript stores without importing hq or its
+configuration. `tools/harness-evidence version --json` reports the evidence schema,
+decoder version `1`, and the decoder revision. A pinned copy reads a `REVISION`
+file inside the package; a checkout reports its HEAD with `+dirty` when
+the package has changes. Without either source the command exits 2.
+
 - **Rows.** Harness, home (`personal` or `work`), short id (the first eight characters;
   for Codex the last eight, since a UUIDv7 id starts with its timestamp), age, place (marked
   `cwd missing` when the directory is gone, which is common for removed worktrees), and
