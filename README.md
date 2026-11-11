@@ -746,9 +746,15 @@ when the authoritative task record is in a worktree. `tasks -C .worktrees/<name>
 and `tasks feedback` (including `tasks -C .worktrees/<name> feedback --project <owner> --category <kind> "summary"`)
 are bookkeeping too, so they stay allowed before and after the pause's read grace is
 exhausted without spending grace or lifting the pause. Quote a directory that
-contains spaces. The directory selector and bookkeeping subcommands preserve the closing
+contains spaces. Record the durable pause report via single-line `tasks note` calls rather
+than workspace file writes (`Edit`, `Write`, `NotebookEdit`, `apply_patch`), which stay
+refused while paused, and put the continuation decision and any exact `budget:` first line
+in the closing assistant message rather than structured question tools (`AskUserQuestion`,
+`request_user_input`, `request_user_input_async`), which also stay refused while paused.
+The directory selector and bookkeeping subcommands preserve the closing
 parser's existing restrictions: commands stay single-line (no literal newlines inside or
-outside quotes) within the 4,096-character limit, protected paths stay refused, records
+outside quotes) within the 16,384-character limit (split a longer pause report across
+multiple single-line `tasks note` calls), protected paths stay refused, records
 reads, `hq pause history`, `hq pause list`, and attachments use grace (`hq pause status`
 and `hq pause limits` remain bookkeeping), and `tasks show` needs `--no-fetch`.
 The pause still refuses other task mutations (`tasks add`, `tasks start`, `tasks done`),

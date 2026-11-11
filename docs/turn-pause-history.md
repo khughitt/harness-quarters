@@ -103,6 +103,10 @@ Split an action and its verification into separate calls. For example, a merge
 followed by a read in one shell command is refused even when the read is safe.
 While paused, reads spend the existing25-read grace. Bookkeeping and owned
 cancellation retain their existing permissions; a read never clears a pause.
+Single-line `tasks note` calls up to 16,384 characters carry the durable pause
+report (split longer reports across multiple notes; file writes remain refused),
+and the closing assistant message carries the continuation decision and any exact
+`budget:` line (question tools remain refused).
 
 ## Checking host pointers before worktree removal
 
