@@ -242,7 +242,7 @@ def test_discover_objects_include_provenance_place_and_stat(tmp_path):
     assert [o["object"] for o in objs] == ["root"] * 6 + ["file"] * 9 + ["discover_end"]
     for obj in objs:
         assert obj["schema"] == "harness-evidence/1"
-        assert obj["decoder"]["version"] == "6"
+        assert obj["decoder"]["version"] == "8"
         assert obj["decoder"]["revision"]
         assert obj["decoder"] == objs[0]["decoder"]
     for obj in objs[6:-1]:
@@ -260,7 +260,8 @@ def test_discover_objects_include_provenance_place_and_stat(tmp_path):
         if obj["harness"] == "codex":
             assert obj["filename_identity"]["thread"] in obj["filename_lookup"]["session_ids"]
         else:
-            assert obj["filename_lookup"] is None
+            assert obj["filename_lookup"]["rule"] == "claude_name_lookup"
+            assert obj["path_facts"]["ref"].startswith(obj["place"]["home"] + ":")
     assert objs[-1]["files"] == 9
 
 
@@ -308,6 +309,7 @@ def test_discover_exposes_known_and_dangling_aliases_without_counting_files(tmp_
     assert objs[0]["files"] == objs[-1]["files"] == 1
     assert objs[0]["bytes"] == source.stat().st_size
     assert [o["path"] for o in objs if o["object"] == "file"] == [str(source)]
+    assert all(alias.pop("path_facts") is None for alias in objs[0]["aliases"])
     lookup = objs[0]["aliases"][1].pop("filename_lookup")
     assert lookup["basis"] == "convention" and lookup["rule"] == "rollout_name_lookup"
     assert THREAD in lookup["session_ids"] and f"{THREAD}_{SEGMENT}" in lookup["session_ids"]

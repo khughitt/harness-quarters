@@ -1,12 +1,12 @@
 """Read-only native transcript discovery and filename-claimed identity."""
 from dataclasses import dataclass
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import stat
 
 from . import homes
-from .lines import Place
+from .lines import Place, ref
 
 NAMING_RULE = ("home: the root's parent directory name without its leading dot; store: "
                "archived for an archived_sessions root, else live; profile: work when the "
@@ -176,8 +176,34 @@ def filename_identity(harness: str, path: Path) -> dict | None:
     return {"thread": match.group(1), "segment": match.group(2), "basis": "convention"}
 
 
-def filename_lookup(harness: str, path: Path) -> dict | None:
-    """Possible lookup IDs under the rollout convention, not recorded identities."""
+def path_facts(place: Place) -> dict | None:
+    """Claude naming claims from the logical path, independently of source bytes."""
+    if place.harness != "claude-code":
+        return None
+    session = PurePosixPath(place.relpath).stem
+    subagent = place.path.parent.name == "subagents"
+    return {"session": session, "agent": session[len("agent-"):] if session.startswith("agent-") else None,
+            "parent": place.path.parent.parent.name if subagent else None, "subagent": subagent,
+            "resume_group": None if subagent else str(PurePosixPath(place.relpath).parent),
+            "basis": "convention", "rule": "claude_path_layout", "ref": ref(place)}
+
+
+def filename_lookup(harness: str, path: Path, *, root: Root | None = None) -> dict | None:
+    """Exact possible native name-lookup IDs, separate from recorded identities."""
+    if harness == "claude-code":
+        if root is None or not path.name.endswith(".jsonl"):
+            return None
+        parts = path.relative_to(root.path).parts
+        stem = path.name[:-len(".jsonl")]
+        candidates = set()
+        if len(parts) == 2:
+            candidates.add(stem)
+        elif len(parts) == 4 and parts[2] == "subagents" and stem.startswith("agent-"):
+            candidates.update((parts[1], stem))
+            agent = stem[len("agent-"):]
+            if not agent.startswith("agent-"):
+                candidates.add(agent)
+        return {"session_ids": sorted(candidates - {""}), "basis": "convention", "rule": "claude_name_lookup"}
     if harness != "codex" or path.suffix != ".jsonl" or not path.name.startswith("rollout-"):
         return None
     body = path.stem[len("rollout-"):]

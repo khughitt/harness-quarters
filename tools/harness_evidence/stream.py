@@ -218,6 +218,7 @@ def _emit_file(file, index, envelope, request):
     yield {**base, "object": "file_start", "key": "file", "path": file.source["path"],
            "harness": file.place.harness, "harness_version": file.harness_version,
            "place": location, "filename_identity": discover.filename_identity(file.place.harness, file.place.path),
+           "path_facts": discover.path_facts(file.place),
            "replaces": replacement}
     count = 0
     for value in _objects(file, text, raw, scope):

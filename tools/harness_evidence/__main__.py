@@ -31,7 +31,8 @@ def _discover(args: argparse.Namespace, envelope: dict) -> None:
             del location["read_path"]
             aliases.append({"path": str(path), "place": location,
                             "filename_identity": discover.filename_identity(place.harness, path),
-                            "filename_lookup": discover.filename_lookup(place.harness, path)})
+                            "filename_lookup": discover.filename_lookup(place.harness, path, root=root),
+                            "path_facts": discover.path_facts(place)})
         print(json.dumps({**envelope, "object": "root", "path": str(root.path), **entry,
                           "aliases": aliases}))
     for path in listing.files:
@@ -42,7 +43,8 @@ def _discover(args: argparse.Namespace, envelope: dict) -> None:
         output = {**envelope, "object": "file", "path": str(path), "harness": place.harness,
                   "device": None, "inode": None, "size": None, "mtime_ns": None,
                   "place": location, "filename_identity": discover.filename_identity(place.harness, path),
-                  "filename_lookup": discover.filename_lookup(place.harness, path),
+                  "filename_lookup": discover.filename_lookup(place.harness, path, root=discover._root_of(path, roots)),
+                  "path_facts": discover.path_facts(place),
                   "state": "listed"}
         try:
             if path in listing.file_errors:
