@@ -463,6 +463,8 @@ matching exactly `*/<id>.jsonl`, `*/<id>/subagents/agent-*.jsonl` and
 itself start `agent-`; query alias normalization removes exactly one prefix. Nested bare IDs, non-agent child names, wrong depths
 and wrong suffixes are excluded. Empty lists assert no membership; unplaced or
 explicit Claude names have null lookup. Aliases use their own logical names.
+Lookup depth is relative to the actual declared root, including current-directory
+and filesystem-root forms; public paths and refs keep their declared spelling.
 These hints assert neither canonical filename identity nor recorded session identity.
 Consumers retain query grammar/alias policy and confirm identity from evidence.
 
@@ -481,7 +483,7 @@ header agent evidence is separate. Query-ID aliases and publication of arbitrary
 index/identity claims remain consumer policy, rather than native path decoding.
 
 `tools/harness-evidence version --json` reports the evidence schema,
-decoder version `7`, and the decoder revision. A pinned copy reads a `REVISION`
+decoder version `8`, and the decoder revision. A pinned copy reads a `REVISION`
 file inside the package; a checkout reports its HEAD with `+dirty` when
 the package has changes. Without either source the command exits 2.
 

@@ -242,7 +242,7 @@ def test_discover_objects_include_provenance_place_and_stat(tmp_path):
     assert [o["object"] for o in objs] == ["root"] * 6 + ["file"] * 9 + ["discover_end"]
     for obj in objs:
         assert obj["schema"] == "harness-evidence/1"
-        assert obj["decoder"]["version"] == "7"
+        assert obj["decoder"]["version"] == "8"
         assert obj["decoder"]["revision"]
         assert obj["decoder"] == objs[0]["decoder"]
     for obj in objs[6:-1]:

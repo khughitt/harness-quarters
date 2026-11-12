@@ -188,12 +188,12 @@ def path_facts(place: Place) -> dict | None:
             "basis": "convention", "rule": "claude_path_layout", "ref": ref(place)}
 
 
-def filename_lookup(harness: str, path: Path, *, place: Place | None = None) -> dict | None:
+def filename_lookup(harness: str, path: Path, *, root: Root | None = None) -> dict | None:
     """Exact possible native name-lookup IDs, separate from recorded identities."""
     if harness == "claude-code":
-        if place is None or place.store == "explicit" or not path.name.endswith(".jsonl"):
+        if root is None or not path.name.endswith(".jsonl"):
             return None
-        parts = PurePosixPath(place.relpath).parts[1:]
+        parts = path.relative_to(root.path).parts
         stem = path.name[:-len(".jsonl")]
         candidates = set()
         if len(parts) == 2:

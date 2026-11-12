@@ -15,6 +15,10 @@ def placed(tmp_path, relative, *, store='live'):
                  tmp_path / '.claude/projects' / relative)
 
 
+def store_root(tmp_path):
+    return discover.roots(explicit=[('claude-code', tmp_path / '.claude/projects')])[0]
+
+
 @pytest.mark.parametrize('relative,ids', [
     ('p/P.jsonl', ['P']),
     ('p/agent-A.jsonl', ['agent-A']),
@@ -35,7 +39,7 @@ def placed(tmp_path, relative, *, store='live'):
 ])
 def test_claude_lookup_has_exact_old_membership(tmp_path, relative, ids):
     place = placed(tmp_path, relative)
-    observed = discover.filename_lookup('claude-code', place.path, place=place)
+    observed = discover.filename_lookup('claude-code', place.path, root=store_root(tmp_path))
     assert observed == (None if ids is None else
                         {'session_ids': ids, 'basis': 'convention', 'rule': 'claude_name_lookup'})
 
@@ -59,8 +63,44 @@ def test_claude_lookup_matches_old_globs_with_query_aliases_and_literal_metachar
         expected = {path for pattern in (f'*/{sid}.jsonl', f'*/{sid}/subagents/agent-*.jsonl',
                                         f'*/*/subagents/agent-{aid}.jsonl') for path in root.glob(pattern)}
         actual = {path for path in paths if query in discover.filename_lookup(
-            'claude-code', path, place=placed(tmp_path, path.relative_to(root).as_posix()))['session_ids']}
+            'claude-code', path, root=store_root(tmp_path))['session_ids']}
         assert actual == expected, query
+
+
+def test_current_directory_explicit_root_preserves_old_lookup_and_public_paths(tmp_path, monkeypatch):
+    import glob
+    from test_harness_evidence_discover import run_json
+    for name in ('p/P.jsonl', 'p/P/subagents/agent-A.jsonl', 'p/P/subagents/notes.jsonl'):
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b'not transcript content\n')
+    (tmp_path / 'p/Alias.jsonl').symlink_to('P.jsonl')
+    output = run_json(['discover', '--root', 'claude-code=.'], tmp_path)
+    assert output[0]['path'] == '.'
+    entries = [row for row in output if row['object'] == 'file'] + output[0]['aliases']
+    main = next(row for row in entries if row['path'] == 'p/P.jsonl')
+    assert main['filename_lookup']['session_ids'] == ['P']
+    monkeypatch.chdir(tmp_path)
+    for query in ('P', 'A', 'agent-A', 'Alias', 'notes'):
+        agent = query[6:] if query.startswith('agent-') else query
+        sid, aid = glob.escape(query), glob.escape(agent)
+        expected = {path for pattern in (f'*/{sid}.jsonl', f'*/{sid}/subagents/agent-*.jsonl',
+                                        f'*/*/subagents/agent-{aid}.jsonl') for path in Path('.').glob(pattern)}
+        assert {Path(row['path']) for row in entries if query in row['filename_lookup']['session_ids']} == expected
+    for row in entries:
+        assert not Path(row['path']).is_absolute()
+        assert row['place']['relpath'] == row['path']
+        assert row['path_facts']['ref'] == ':' + row['path']
+
+
+def test_filesystem_root_lookup_is_root_relative_without_source_reads():
+    root = discover.roots(explicit=[('claude-code', Path('/'))])[0]
+    for name, ids in (('p/P.jsonl', ['P']), ('p/P/subagents/agent-A.jsonl', ['A', 'P', 'agent-A'])):
+        path = Path('/') / name
+        place = discover.place_of(path, [root])
+        assert place.relpath == name
+        assert discover.filename_lookup('claude-code', path, root=root)['session_ids'] == ids
+        assert discover.path_facts(place)['ref'] == ':' + name
 
 
 @pytest.mark.parametrize('relative,session,agent,parent,subagent,resume', [
@@ -84,7 +124,7 @@ def test_path_facts_are_logical_claims_at_any_indexed_depth(tmp_path, relative, 
 
 def test_explicit_and_other_harness_paths_do_not_claim_store_lookup(tmp_path):
     place = placed(tmp_path, 'p/P.jsonl', store='explicit')
-    assert discover.filename_lookup('claude-code', place.path, place=place) is None
+    assert discover.path_facts(place)['ref'] == 'file:projects/p/P.jsonl'
     assert discover.filename_lookup('claude-code', place.path) is None
     assert callable(getattr(discover, 'path_facts', None)), 'normalized path facts exporter is absent'
     for harness in ('codex', 'unknown'):
