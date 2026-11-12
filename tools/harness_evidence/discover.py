@@ -174,3 +174,16 @@ def filename_identity(harness: str, path: Path) -> dict | None:
     if match is None:
         return None
     return {"thread": match.group(1), "segment": match.group(2), "basis": "convention"}
+
+
+def filename_lookup(harness: str, path: Path) -> dict | None:
+    """Possible lookup IDs under the rollout convention, not recorded identities."""
+    if harness != "codex" or path.suffix != ".jsonl" or not path.name.startswith("rollout-"):
+        return None
+    body = path.stem[len("rollout-"):]
+    candidates = {body[i + 1:] for i, char in enumerate(body) if char == "-" and body[i + 1:]}
+    match = ROLLOUT_ID.search(path.stem)
+    # The old rollout-*-<id>* glob needs a separator after the rollout- prefix.
+    if match is not None and match.start() >= len("rollout-"):
+        candidates.add(match.group(1))
+    return {"session_ids": sorted(candidates), "basis": "convention", "rule": "rollout_name_lookup"}

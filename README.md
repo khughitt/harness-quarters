@@ -453,8 +453,17 @@ failures remain explicit even if a later lookup could succeed; known symlink
 aliases stay excluded from file objects. The listing helper retains candidates with unknown mtime
 when applying a cutoff; the command applies no cutoff.
 
+Every discovery file and alias also carries `filename_lookup`: null outside Codex
+`rollout-*.jsonl` names, otherwise an object with sorted unique nonempty `session_ids`,
+`basis: "convention"` and `rule: "rollout_name_lookup"`. These candidates preserve
+the rollout suffix lookup convention, including non-UUID suffixes and canonical
+threads in continuation names. The old `rollout-*-<id>*.jsonl` prefix condition still
+applies: "rollout-T.jsonl" has no candidate T, while "rollout--T.jsonl" does.
+Candidates permit a name lookup; they assert neither canonical filename identity nor
+recorded session identity. Consumers still confirm identity from transcript evidence.
+
 `tools/harness-evidence version --json` reports the evidence schema,
-decoder version `5`, and the decoder revision. A pinned copy reads a `REVISION`
+decoder version `6`, and the decoder revision. A pinned copy reads a `REVISION`
 file inside the package; a checkout reports its HEAD with `+dirty` when
 the package has changes. Without either source the command exits 2.
 
