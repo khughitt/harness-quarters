@@ -12,7 +12,7 @@ from turn_pause.counters import TurnState
 from turn_pause.state import Store, state_path
 
 TOOL = Path(__file__).resolve().parent / "hq"
-LINE = "active 1h12m/16h00m root calls 140/500 tree spawns 3/60 root compactions 0/2 (advisory) paused:no budget:none notify:ok"
+LINE = "active 1h12m/16h00m root calls 140/2000 tree spawns 3/60 root compactions 0/2 (advisory) paused:no budget:none notify:ok"
 
 
 @pytest.fixture
@@ -58,7 +58,7 @@ def test_status_for_worker_prints_its_roots_counts(home):
     seed(home, "codex", "r1", workers=["w9"])
     result = hq(home, "status", thread="w9", cwd=str(home))
     assert result.returncode == 0, result.stderr
-    assert "calls 140/500" in result.stdout
+    assert "calls 140/2000" in result.stdout
 
 
 def test_status_by_cwd_claude(home):
@@ -151,7 +151,7 @@ def test_status_json(home):
     data = json.loads(hq(home, "status", "--session", "s1", "--json").stdout)
     assert data["harness"] == "claude-code" and data["root"] == "s1"
     assert data["active"] == {"used": 4320.0, "limit": 57600}
-    assert data["calls"] == {"used": 140, "limit": 500}
+    assert data["calls"] == {"used": 140, "limit": 2000}
     assert data["compactions"] == {"used": 0, "limit": 2}
     assert data["paused"] is None and data["notify"] == "ok"
 
@@ -186,9 +186,9 @@ def test_status_state_without_turn_is_an_error(home):
 def test_limits_text_and_json(home):
     text = hq(home, "limits")
     assert text.returncode == 0, text.stderr
-    assert text.stdout.strip() == "active 16h00m root calls 500 tree spawns 60 root compactions 2 (advisory)"
+    assert text.stdout.strip() == "active 16h00m root calls 2000 tree spawns 60 root compactions 2 (advisory)"
     data = json.loads(hq(home, "limits", "--json").stdout)
-    assert data == {"active_seconds": 57600, "calls": 500, "spawns": 60, "compactions": 2}
+    assert data == {"active_seconds": 57600, "calls": 2000, "spawns": 60, "compactions": 2}
 
 
 def snapshot_tree(root: Path) -> dict[str, tuple[bytes, int, int]]:

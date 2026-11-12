@@ -2,18 +2,16 @@
 `<home>/projects/*/<id>.jsonl`. Contract: docs/notes/2026-10-15-session-discovery-contract.md."""
 import json
 import os
+from functools import partial
 from pathlib import Path
 
+from harness_evidence.homes import homes as evidence_homes
 from hq_cli import color
 
 from .model import Adapter, Home, Session, SourceError
 
 
-def homes(user_home: Path) -> tuple[Home, ...]:
-    return (
-        Home("claude", "claude", "personal", user_home / ".claude"),
-        Home("claude-work", "claude", "work", user_home / ".claude-work"),
-    )
+homes = partial(evidence_homes, harness="claude")
 
 
 def claude_recency_ms(transcript: Path, fallback_ms: int) -> int:

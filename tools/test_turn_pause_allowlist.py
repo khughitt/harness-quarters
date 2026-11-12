@@ -112,7 +112,8 @@ def test_protected_read_accepts_only_filesystem_readers(command):
 
 
 @pytest.mark.parametrize('command', [
-    'tasks attach x /srv/config', 'tasks note x /srv/config', 'hq pause status', 'kill 123',
+    'tasks attach x /srv/config', 'tasks note x /srv/config',
+    'tasks feedback --project hq --category friction /srv/config', 'hq pause status', 'kill 123',
     'touch /srv/config', 'cat /srv/config > /srv/out', 'cat /srv/config; touch /srv/out',
     'sed -n 1p /srv/config', 'tail -f /srv/config', 'env cat /srv/config',
     'cat $(echo /srv/config)', 'readlink /srv/config', 'readlink -f',
@@ -159,6 +160,8 @@ SHELL_PASSES = [
     ('tasks park lore-1 "next"', 'bookkeeping'),
     ('tasks note x "y"', 'bookkeeping'),
     ('tasks park lore-1 "next" --waiting-on user --reason decision', 'bookkeeping'),
+    ('tasks feedback --project hq --category friction --origin user -b "detail" "wrong block"', 'bookkeeping'),
+    ('tasks feedback "unclear pause block" --project hq --category friction --origin agent', 'bookkeeping'),
     ('hq pause status', 'bookkeeping'),
     ('hq pause limits', 'bookkeeping'),
     ('hq pause history', 'read'),
@@ -195,6 +198,8 @@ def test_shell_passes(cmd, klass):
     ('tasks -C .worktrees/task park hq-123456 next', 'bookkeeping'),
     ('tasks -C /srv/project/.worktrees/task note hq-123456 paused', 'bookkeeping'),
     ('tasks -C "project worktree" note hq-123456 paused', 'bookkeeping'),
+    ('tasks -C .worktrees/task feedback --project hq --category friction --origin user -b "detail" "msg"', 'bookkeeping'),
+    ('tasks -C "project worktree" feedback --project hq --category gap "missing allowlist entry"', 'bookkeeping'),
     ('tasks -C . show hq-123456 --no-fetch', 'read'),
     ('tasks -C . claims', 'read'),
     ('tasks -C . list', 'read'),
@@ -216,6 +221,35 @@ def test_shell_passes(cmd, klass):
 ])
 def test_tasks_directory_selector(cmd, klass):
     assert shell(cmd, NOBODY).klass == klass
+
+
+@pytest.mark.parametrize('cmd', [
+    'tasks feedback --project hq --category friction "summary"',
+    'tasks -C .worktrees/task feedback --project hq --category friction --origin user -b "one line" "summary"',
+    'tasks -C "project worktree" feedback "summary" --project hq --category idea --origin agent --new',
+])
+def test_tasks_feedback_classified_as_bookkeeping(cmd):
+    v = shell(cmd, NOBODY)
+    assert v == Verdict('bookkeeping', 'tasks feedback')
+
+
+@pytest.mark.parametrize('cmd', [
+    'tasks add "regular task"',
+    'tasks -C .worktrees/task add "regular task"',
+    'tasks edit hq-123456 --status todo',
+    "tasks feedback --project hq --category friction -b 'line 1\nline 2' 'summary'",
+    'tasks feedback --project hq --category friction -b "line 1\nline 2" "summary"',
+    'tasks feedback --project hq --category friction "' + 'a' * allowlist.MAX_TEXT + '"',
+    'tasks feedback --project hq --category friction "msg" && git status',
+    'env tasks feedback --project hq --category friction "msg"',
+    'tasks feedback --project hq --category friction "$(id)"',
+    'tasks feedback --project hq --category friction "msg" > /srv/out',
+    'tasks -C ~/work feedback --project hq --category friction "msg"',
+    'tasks -C "" feedback --project hq --category friction "msg"',
+    'tasks -C --project feedback hq --category friction "msg"',
+])
+def test_tasks_feedback_preserves_parser_and_mutation_refusals(cmd):
+    assert shell(cmd, NOBODY).klass == 'refuse'
 
 
 # ---- shell validator: refusals -------------------------------------------------------
@@ -298,7 +332,7 @@ def test_kill_refusals(child, template):
 
 def test_kill_many_targets_within_budget(child):
     """Each distinct pid is walked once, and a kill names at most MAX_KILL_TARGETS
-    distinct pids, so a 4 KB kill stays within the per-call budget."""
+    distinct pids, so a MAX_TEXT kill stays within the per-call budget."""
     pid, grandchild = child
     me = owned(harness_pid=os.getppid())  # two levels above the child: a longer walk
     cmd = 'kill'
@@ -531,12 +565,49 @@ def test_non_dict_tool_input_refused(harness, tool, tool_input):
     assert v.klass == 'refuse' and 'object' in v.reason
 
 
+@pytest.mark.parametrize('harness, tool, tool_input', [
+    ('claude-code', 'Edit', {'file_path': 'a', 'old_string': 'x', 'new_string': 'y'}),
+    ('claude-code', 'Write', {'file_path': 'a', 'content': 'x'}),
+    ('claude-code', 'NotebookEdit', {'notebook_path': 'a'}),
+    ('codex', 'apply_patch', {'command': '*** Begin Patch\n*** Add File: a\n+x\n*** End Patch'}),
+    ('claude-code', 'ToolSearch', {'query': 'select:Write', 'max_results': 5}),
+])
+def test_paused_write_tools_direct_durable_report_to_tasks_note(harness, tool, tool_input):
+    v = classify(harness, tool, tool_input, NOBODY)
+    assert v.klass == 'refuse'
+    assert 'file writes are refused while paused' in v.reason
+    assert 'tasks note' in v.reason
+    assert len(v.reason) < 400
+
+
+@pytest.mark.parametrize('harness, tool, tool_input', [
+    ('claude-code', 'AskUserQuestion', {'questions': [{'question': 'Continue?'}]}),
+    ('codex', 'request_user_input', {'questions': [{'question': 'Continue?'}]}),
+    ('codex', 'request_user_input_async', {'questions': [{'question': 'Continue?'}]}),
+    ('claude-code', 'ToolSearch', {'query': 'select:AskUserQuestion', 'max_results': 5}),
+])
+def test_paused_question_tools_direct_decision_to_closing_message(harness, tool, tool_input):
+    v = classify(harness, tool, tool_input, NOBODY)
+    assert v.klass == 'refuse'
+    assert 'question tools are refused while paused' in v.reason
+    assert 'closing message' in v.reason and 'budget:' in v.reason
+    assert len(v.reason) < 400
+    records = json.loads((FIX / 'hooks' / 'codex-remaining-tools.json').read_text())['records']
+    for name in ('request_user_input', 'request_user_input_async'):
+        recorded = next(r['payload'] for r in records if r['payload']['tool_name'] == name)
+        rv = classify('codex', recorded['tool_name'], recorded['tool_input'], NOBODY)
+        assert rv.klass == 'refuse' and 'closing message' in rv.reason
+
+
 def test_refusal_reasons_truncate_untrusted_text():
     long = 'x' * 5000
+    over = 'x' * (allowlist.MAX_TEXT + 100)
     mine = owned(harness_pid=os.getpid())
     for v in (shell(f'git {long}', NOBODY), shell(f'kill {long}', mine), shell(f'cat -{long}', NOBODY),
               shell(f'{long}=1 cat', NOBODY), classify('claude-code', 'CronDelete', {'id': long}, NOBODY),
-              classify('codex', 'collaborationinterrupt_agent', {'target': long}, NOBODY)):
+              classify('codex', 'collaborationinterrupt_agent', {'target': long}, NOBODY),
+              shell(f'tasks note hq-123456 {over}', NOBODY),
+              classify('claude-code', 'CronDelete', {'id': over}, NOBODY)):
         assert v.klass == 'refuse' and len(v.reason) < 400, len(v.reason)
 
 
@@ -607,9 +678,30 @@ def test_long_command_refused_within_budget(template, size):
 
 
 def test_command_length_bound_is_exact():
+    assert allowlist.MAX_TEXT == 16384
     at = 'cat ' + 'x' * (allowlist.MAX_TEXT - 4)
     assert len(at) == allowlist.MAX_TEXT and shell(at, NOBODY).klass == 'read'
     assert shell(at + 'x', NOBODY).klass == 'refuse'
+    handoff_cmd = "tasks -C .worktrees/task note hq-123456 '" + 'r' * 6500 + "' --stamp"
+    v, took = fastest(lambda: shell(handoff_cmd, NOBODY))
+    assert v == Verdict('bookkeeping', 'tasks note') and took < BUDGET, took
+    prefix = "tasks note hq-123456 '"
+    suffix = "'"
+    exact_note = prefix + 'n' * (allowlist.MAX_TEXT - len(prefix) - len(suffix)) + suffix
+    assert len(exact_note) == allowlist.MAX_TEXT
+    v, took = fastest(lambda: shell(exact_note, NOBODY))
+    assert v == Verdict('bookkeeping', 'tasks note') and took < BUDGET, took
+    over_note = prefix + 'n' * (allowlist.MAX_TEXT + 1 - len(prefix) - len(suffix)) + suffix
+    assert len(over_note) == allowlist.MAX_TEXT + 1
+    v, took = fastest(lambda: shell(over_note, NOBODY))
+    assert v.klass == 'refuse' and '16384' in v.reason and took < BUDGET, (v.reason, took)
+    assert 'split a longer pause report across multiple single-line tasks note calls' in v.reason
+    for bad in (
+        "tasks note hq-123456 '" + 'a' * 5000 + "\nsecond line'",
+        'tasks note hq-123456 "' + 'a' * 5000 + '" && ls',
+        'cat <<EOF\n' + 'a' * 5000 + '\nEOF',
+    ):
+        assert shell(bad, NOBODY).klass == 'refuse'
 
 
 @pytest.mark.parametrize('harness, tool, arg, value', [

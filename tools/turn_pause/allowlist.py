@@ -37,7 +37,7 @@ class Owned(Frozen):
 # Shell programs. `hq pause` passes as `hq pause status|limits` (bookkeeping) or
 # `hq pause history|list` (read); `tasks show` only with --no-fetch, since it otherwise
 # runs a document provider.
-BOOKKEEPING = {('tasks', 'park'), ('tasks', 'note'), ('hq', 'pause')}
+BOOKKEEPING = {('tasks', 'park'), ('tasks', 'note'), ('tasks', 'feedback'), ('hq', 'pause')}
 HQ_PAUSE = {'status', 'limits'}
 HQ_PAUSE_READS = {'history', 'list'}
 RECORD_READS = {('tasks', 'show'), ('tasks', 'claims'), ('tasks', 'list'), ('tasks', 'attach')}
@@ -59,16 +59,23 @@ COUNTED = {'head', 'tail'}
 COUNT_OPTIONS = {'-n', '-c'}
 COUNT = re.compile(r'\+?[0-9]{1,18}')
 SHOWN = 200
-# The longest shell command or control argument judged while paused. Every allowlisted
-# call fits easily; anything longer is refused before it is scanned, because shlex is
-# superlinear (a 1 MB command took seconds) and a hook that outlives the harness's
-# timeout lets the call proceed. The spec's budget is 50 ms per call.
-MAX_TEXT = 4096
+# The longest shell command or control argument judged while paused. Single-line
+# durable pause handoffs fit in one `tasks note` call (~10-13 ms scan + shlex);
+# anything longer is refused before it is scanned, because shlex is superlinear
+# (a 1 MB command took seconds) and a hook that outlives the harness's timeout
+# lets the call proceed. The spec's budget is 50 ms per call.
+MAX_TEXT = 16384
 # Distinct kill targets per command: each costs a /proc ancestry walk. A larger kill
 # splits across calls, which cancellation never runs out of.
 MAX_KILL_TARGETS = 64
 
 CLAUDE_READERS = {'Read', 'Grep', 'Glob'}
+WRITE_TOOLS = frozenset({'Edit', 'Write', 'NotebookEdit', 'apply_patch'})
+QUESTION_TOOLS = frozenset({'AskUserQuestion', 'request_user_input', 'request_user_input_async'})
+WRITE_HINT = 'file writes are refused while paused; record the durable pause report with single-line tasks note calls'
+QUESTION_HINT = (
+    'question tools are refused while paused; put the continuation decision and any exact budget: first line in your closing message'
+)
 
 # Cancellation controls by hook tool name, each with the one argument classify reads
 # (None: harness-scoped, nothing to check). Tests bind these to the recorded fixtures.
@@ -129,7 +136,10 @@ def _scan(cmd: str) -> str | None:
 def _argv(cmd: str) -> list[str] | Verdict:
     """Literal argv after the common shell expansion and program-name checks."""
     if len(cmd) > MAX_TEXT:
-        return _refuse(f'shell command is {len(cmd)} characters; the limit while paused is {MAX_TEXT}')
+        return _refuse(
+            f'shell command is {len(cmd)} characters; the limit while paused is {MAX_TEXT} '
+            '(split a longer pause report across multiple single-line tasks note calls)'
+        )
     bad = _scan(cmd)
     if bad:
         return _refuse(f'shell command refused while paused: {bad}')
@@ -304,6 +314,10 @@ def classify(harness: str, tool: str, tool_input: dict, owned: Owned) -> Verdict
         return Verdict('read', f'{tool} reads files')
     controls = CONTROLS[harness]
     if tool not in controls:
+        if tool in WRITE_TOOLS:
+            return _refuse(f'{_show(tool)} is not on the closing allowlist ({WRITE_HINT})')
+        if tool in QUESTION_TOOLS:
+            return _refuse(f'{_show(tool)} is not on the closing allowlist ({QUESTION_HINT})')
         return _refuse(f'{_show(tool)} is not on the closing allowlist')
     arg = controls[tool]
     value = None if arg is None else tool_input.get(arg)
@@ -337,5 +351,10 @@ def _tool_search(query) -> Verdict:
         return _refuse('ToolSearch passes only as select: naming cancellation tools')
     names = [n.strip() for n in query[len('select:'):].split(',')]
     if not all(n in SELECTABLE for n in names):
-        return _refuse(f'ToolSearch may load only {sorted(SELECTABLE)} while paused')
+        base = f'ToolSearch may load only {sorted(SELECTABLE)} while paused'
+        if any(n in WRITE_TOOLS for n in names):
+            return _refuse(f'{base} ({WRITE_HINT})')
+        if any(n in QUESTION_TOOLS for n in names):
+            return _refuse(f'{base} ({QUESTION_HINT})')
+        return _refuse(base)
     return Verdict('cancellation', f'ToolSearch loads {",".join(names)}')

@@ -31,6 +31,13 @@ uncovered.
 The records live under `tools/fixtures/session-logs/`, in each harness's native format.
 Every identifier, path, task id, model name and text in them is synthetic.
 
+The table inventories the historical SL1–SL11 replay fixtures, including their
+non-JSONL inputs. [CATALOGUE.toml](../../tools/fixtures/session-logs/CATALOGUE.toml)
+is the canonical inventory of all JSONL samples, including the later `origin/` cases.
+The corpus checks keep this table's historical coverage exact and account for every
+file through the table, catalogue sample paths and `CATALOGUE.toml` itself. The
+catalogue checks also require exact JSONL coverage, unique paths and synthetic provenance.
+
 | Short | File (under `tools/fixtures/session-logs/`) | Harness, home | Holds |
 |---|---|---|---|
 | CA | `home/.claude/projects/-w-alpha/c0000000-0000-4000-8000-00000000000a.jsonl` | Claude, personal | a denied then successful park, a request-blob copy, an async Agent dispatch with its queued notice, a typed `/tasks` command, an unknown record kind, a read of the report |
@@ -57,6 +64,7 @@ Every identifier, path, task id, model name and text in them is synthetic.
 | TD | `captures/tasks-show-zz-000021.json` | `tasks show zz-000021 --json` capture | task zz-000021 with one stamped note naming CT1 |
 | ESC | `captures/escaped.jsonl` | Claude, explicit file | one prompt whose text `needle` is written `\u006eeedle` in the bytes |
 | ESM | `captures/escaped-malformed.jsonl` | Claude, explicit file | a valid `hello` prompt, then an unclosed record holding the same escape |
+| CWAIT | `captures/turn-evidence-claude.jsonl` | Claude, explicit file | synthetic conformance: all three wait tools and a non-wait tool; closing, other and absent stop reasons; readable text and thinking blocks |
 
 `home/` has five of the six roots, the shape of the surveyed host. There is no
 `.codex-work/archived_sessions`. `degraded/` has only `.claude/projects`,

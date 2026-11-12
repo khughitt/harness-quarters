@@ -19,7 +19,11 @@ except BaseException as error:  # a broken install must neither let a call throu
     if sys.argv[-1:] == ['PreToolUse']:
         print(json.dumps({'hookSpecificOutput': {
             'hookEventName': 'PreToolUse', 'permissionDecision': 'deny',
-            'permissionDecisionReason': f'turn-pause cannot load, so this call is refused: {error!r}'}}))
+            'permissionDecisionReason': (
+                f'turn-pause cannot load, so this call is refused: {error!r}\n'
+                '(owner: hq; a wrong or unclear block is feedback: '
+                'tasks feedback --project hq — see Feedback in your instructions)'
+            )}}))
     else:
         print(f'turn-pause: cannot load: {error!r}', file=sys.stderr)
     sys.exit(0)

@@ -73,6 +73,9 @@ home, model or worker controls; test each actual launch path.
 ## Sessions, custody and readers
 
 Add a tools/harness_stores adapter only when real metadata supports discovery.
+`tools/harness_evidence/homes.py` owns the shared `Home` type, harness slugs, home
+discovery and transcript-store paths. The adapter binds that discovery function to
+its harness alias; `harness_stores.Home` remains the same public type.
 List from native metadata, recheck cwd/transcript before launch and fail on schema
 changes. Search/show evidence needs all relevant homes and explicit files, not
 just visible interactive sessions. Runtime attribution, copied history, parent

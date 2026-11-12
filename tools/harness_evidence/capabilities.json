@@ -1,0 +1,1132 @@
+{
+ "built_from": {
+  "catalogue_sha256": "f441dc264caa7eaf876556389cf4718f312bdd30330dbe717b52b18b658bb3ef",
+  "samples": {
+   "captures/escaped-malformed.jsonl": "d3ab501588cb7af5e03ae856e875b6809bbd5851e03283e43e53a82bd11a8454",
+   "captures/escaped.jsonl": "4ff4490899cc4ac6444b34fc672811990fe9ec53cca6c5c23f4a642d90cbd273",
+   "captures/sdk-stream.jsonl": "a37f7c66c332b6d87cf5a0d8c79146e36a7788f030ad354919ca7a8035d4fc1a",
+   "captures/turn-evidence-claude.jsonl": "7a3db43d7ce7a5765c50bfe5d2a42b64628fffe4b636a9aa890c6c182e2b6906",
+   "degraded/.claude-work/projects/-w-delta/c0000000-0000-4000-8000-00000000000e.jsonl": "6d0a704c161c50176ce6d2859f5b503d048ad143c15677fb184e02f760e66b08",
+   "degraded/.claude/projects/-w-delta/c0000000-0000-4000-8000-00000000000d.jsonl": "0e7f54db86739b67bd2c18ddb52baea83547bf4280262ec8cadb7b9c1f30f63e",
+   "degraded/.codex/sessions/2026/10/11/rollout-2026-10-11T10-00-00-01900000-0000-7000-8000-0000000000d1.jsonl": "64072f76ceeecf952ed00cbf98978a93401a8ea10bbc42618d447d590d690ea6",
+   "home/.claude-work/projects/-w-beta/c0000000-0000-4000-8000-00000000000b.jsonl": "3f5c960b89c61ff190bb88df897cc53d1119a8097c8532420a9cedbf7c87547d",
+   "home/.claude-work/projects/-w-beta/c0000000-0000-4000-8000-00000000000c.jsonl": "63ee1df82d30322057e6634a91d4d2de031ef1fe0967683cfd6869ddd90ca846",
+   "home/.claude/projects/-w-alpha/c0000000-0000-4000-8000-00000000000a.jsonl": "88112f68adafc20f860d60b11fd9797b15a80616f3ff9103d52c5dcc44a8588c",
+   "home/.claude/projects/-w-alpha/c0000000-0000-4000-8000-00000000000a/subagents/agent-a0000000000000b01.jsonl": "3fbdd22a8ff644682fa64b2dd34d2feaef3b211a57bff22c42bee87f82d4e91e",
+   "home/.codex-work/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01900000-0000-7000-8000-0000000000b1.jsonl": "ffa6d14f6358a8bbbb4ee6063ac085decc30a89c6add74a11c190daa4f892908",
+   "home/.codex/archived_sessions/rollout-2026-09-20T09-00-00-01900000-0000-7000-8000-0000000000a2.jsonl": "f1cae9126ff133b0bf9383f56a726a544c8cd900cda87695706b672e39ba43e7",
+   "home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-00-01900000-0000-7000-8000-0000000000a1.jsonl": "7eb0a79debf520bc23b40fdcc3100ead08d7c8173c5d2069a2e2667fe6fa705d",
+   "home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-11-01900000-0000-7000-8000-0000000000c1.jsonl": "6873cd11d9e18c2f0228908de8eabbc1a56cea85e1a735c87249e40cad260e76",
+   "home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-32-01900000-0000-7000-8000-0000000000c2.jsonl": "2fc261d6c84f59cf4b0ba712e79ab1d0170d26f1e05393604414f591505e74c1",
+   "origin/claude-code-child-prompt.jsonl": "f42d405bd48a418fc268c40e111491ad870b7c45bc84b7e175a032bbcd798468",
+   "origin/claude-code-conflict-human-joined.jsonl": "0ca8c370970321dc0cf14c85364f57e8d6fc7e1340d47c4c9e9fc27aac8260e4",
+   "origin/claude-code-conflict-human.jsonl": "3cb12cbc1f8e0fa2acab259052a915247bc90ab56f175299cfccdae77df4174c",
+   "origin/claude-code-conflict-nonhuman-paste.jsonl": "84ffbcf82f3ec77c4b4502aaf4bec837c6fe0a4221b8e6c3c152cccd3189fa85",
+   "origin/claude-code-conflict-nonhuman.jsonl": "6a7d5a84d49bd88fa4876267d62a888b44b897cd72bdf7a7778f4692e050bb8f",
+   "origin/claude-code-empty-first-block.jsonl": "13e45a8b0f29e1b8e963f1f3d5b09321395b2bef3507cc81860c41ec4dbc672a",
+   "origin/claude-code-interrupt-inside.jsonl": "24ea833a0f170eed58c56595d9eacc07b2fdb7ced88ec0ee201f4c6ce4a7cd18",
+   "origin/claude-code-interrupt-start.jsonl": "b5d7155c7f20b1f09f4490372fc39e40efd75138a2c0b4aab6647cee41e436e4",
+   "origin/claude-code-leading-whitespace.jsonl": "24ab71fe1514f220b8c913a52f483f1b9a86379aa9a4150f001ec4339a20461a",
+   "origin/claude-code-local-input.jsonl": "8dcb1c83e38e022ea068e5034457ce66a4f8a1a3075c7b1f2af4bfa93dbb1608",
+   "origin/claude-code-local-output.jsonl": "17ef5025937b32f10ae930152f910d4ac2456523ac3d3bb606a536ce8e05f140",
+   "origin/claude-code-meta-plain.jsonl": "de3a772023cc3fa265834b5e4829615c1b8d1d142267656c7cb729f00410f603",
+   "origin/claude-code-native-human.jsonl": "51742018f3a69d9ef575048286ca9c43b097e711b8cb92c45a2409d0bc27f1d5",
+   "origin/claude-code-native-nonhuman.jsonl": "236786583014c111b7ebd92c190c0bf6b02f40f05c77a96f2d4dfa5b34bb3286",
+   "origin/claude-code-paste-after-whitespace.jsonl": "3ec3c8c971773f4fe44f05f92418e4e6ee45427d8ff11544981f8ab21c84fc36",
+   "origin/claude-code-paste.jsonl": "eac8d1451c9d71e02621466f088b0c65d90d4eaa4884a9f9a81262c21a1f3744",
+   "origin/claude-code-plain-then-wrapper.jsonl": "2a08e4cf645817ca5cbfe089bade655625c838b84d6b2f26c71914b4c2eaaba9",
+   "origin/claude-code-plain-typed.jsonl": "b0f4b351dc8a1243f8f99a683d3ff0c38f2041c0491c6499b6987e5fb3f52fea",
+   "origin/claude-code-slash-typed.jsonl": "3d95188fee0d45280fd5f3c9c57651f2844e8563466f72e4cb68ecc0ef1442d6",
+   "origin/claude-code-summary-plain.jsonl": "c52b3fd631b0f7df7d713ca9e6d0b78de500d37df3707b75c979d97ae4b8bde0",
+   "origin/claude-code-task-notification.jsonl": "627ee902c0133e8a6ec596f692b27fc8f196a8b7a75631fd2b4ae8ca25578db9",
+   "origin/claude-code-unrecognized-tag.jsonl": "d787ae9433fafd2238d147ae272123d0c31d35e6e5339872408232314c01b5b8",
+   "origin/claude-code-wrapper-then-plain.jsonl": "b223ac4e1e21af28e4bedfb081b9ceac57fa64fcb102b401617d5b9a7ec0811f",
+   "origin/codex-agents_md.jsonl": "72aafa94cabe0e8880fbc1c4607ef25bb96259d31199a01958739c53c74ed368",
+   "origin/codex-child-prompt.jsonl": "d6fa35a385e40a8d88acc14f5f48e4ba70f9ed79ace1b6510633e9ae41079679",
+   "origin/codex-collaboration_mode.jsonl": "a11f5ea2e4a99f59e1698975d842863f188bf1968dd5cc585eb7967d8946b2e0",
+   "origin/codex-empty-first-block.jsonl": "c8019ca310fcb2e526894ee3d85c57ddc0a58c97a473cd26b00d56c67ee497a1",
+   "origin/codex-environment_context.jsonl": "04fda6fafb69005b283ac465ebf62f80e2f64c584431644fc7da55a4142f9d73",
+   "origin/codex-instructions.jsonl": "6ac4b5b6339acf436114a6daa02e65a5878ab7286a1ad500023d60f9a271913e",
+   "origin/codex-interrupt-inside.jsonl": "96b4771790327d4562d971bd28be4b3f053a243d6ba1cb5a8c9100b3b1799a8a",
+   "origin/codex-interrupt-start.jsonl": "68864137fa27d9ada847db1d2c2fdee1b92039695d7a042e214dc973b2561722",
+   "origin/codex-leading-whitespace.jsonl": "9853decdf66a7807035278bfc5dee81e5a5ed69ca37fc6979b8aae770a73e725",
+   "origin/codex-paste-after-whitespace.jsonl": "0cc3c8b5842b2383ec2d13dbd9a67ea8f20ba1bdd8003d0e1696df48ba8f61e3",
+   "origin/codex-paste.jsonl": "2ca383ec0866f86edc17b179b73a42bd5ddc095d8a9f42e57826f25e1800da72",
+   "origin/codex-permissions.jsonl": "03634a3ba8217d0267db0c69e47e12141f8c49645e5e0d69cc9b8b9fa38ed480",
+   "origin/codex-plain-then-wrapper.jsonl": "5d670121454572338f176a84210c6375da8c247055f8f00825e01697cc93a06f",
+   "origin/codex-plain-typed.jsonl": "7882184f3ddc704a260ebbb4b45c08dc5f81fb9af6185d8c8bcce835438189f1",
+   "origin/codex-skills_instructions.jsonl": "bf95cff08e091282c4caf776c799d50dd6c4cd2e830e8de0ad22dd777abbcfd1",
+   "origin/codex-slash-typed.jsonl": "8ea0b0e1eac20d9e6ad7cdb533b5dc77ab41546953dd4805e0755caedfe26ade",
+   "origin/codex-task-notification.jsonl": "4952491ed28095a8ceab7ab6cc9cf5788a8d8f89047a0e282e01f266a8e1b36b",
+   "origin/codex-turn_aborted.jsonl": "66ab8b8f326b6335985158a7e79032e7790527e30e6e0c170053c46306b800d8",
+   "origin/codex-unrecognized-tag.jsonl": "673764a743f963f43f97ec002b9208d69df29c3959610261114dbfb66c139f0e",
+   "origin/codex-user_shell.jsonl": "7156dbbe8a3e2480da7df1695365605822d2331e84b0b2284cabf9ed2ed23710",
+   "origin/codex-wrapper-then-plain.jsonl": "f8836a93dcc01cc6d68f4c3202d263c3c05b29e82dfb90a7a110aac9ebb5ab2c",
+   "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000021.jsonl": "0287b2a1f7ec8a59670b2c0d2a6b7500a8550f28711c76ffa49e55b225e27a51",
+   "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000022.jsonl": "0d61b470dd8c0b355ea69220418d1ad6aaa0c687956735f98e15c4164430f811",
+   "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000023.jsonl": "5f5a31bb9ca46f86dc58de1e5b0b9289bf7ec732d0117675bf4491df3d44ef5f",
+   "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000024.jsonl": "3ac6d55e2501d9c418d79342bdc77e46f6c2d3584335b88afe361051d01310db",
+   "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T10-00-00-01900000-0000-7000-8000-0000000000e1.jsonl": "64138ad13d9db62b139c8b28c0e6a63e6b7a8b8fdf033d957ed0e3f53973a363",
+   "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T10-05-00-01900000-0000-7000-8000-0000000000f1.jsonl": "9af397ddf9afd530b2d1486fb491555ee090ebc036c5020f054e5665cb8a3c43",
+   "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T11-00-00-01900000-0000-7000-8000-0000000000f2.jsonl": "30b550b6f035815a4123c8a8fd18fbbf7059ec89c04b0749ecda738e24b2fde3"
+  }
+ },
+ "decoder_version": "8",
+ "evidence_rule": "synthetic samples establish decoder conformance; observed samples or probes establish emission; absent from a sample means unobserved",
+ "harnesses": {
+  "claude-code": {
+   "exceptions": [],
+   "fields": {
+    "agent": {
+     "coverage_keys": [],
+     "provenance": [
+      "agentId"
+     ]
+    },
+    "at": {
+     "coverage_keys": [],
+     "provenance": [
+      "timestamp"
+     ]
+    },
+    "block_type": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content[].type"
+     ]
+    },
+    "call.command": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content[].input.command"
+     ]
+    },
+    "call.id": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content[].id",
+      "message.content[].tool_use_id"
+     ]
+    },
+    "call.is_error": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content[].is_error"
+     ]
+    },
+    "call.tool": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content[].name"
+     ]
+    },
+    "copy": {
+     "coverage_keys": [],
+     "provenance": [
+      "type"
+     ]
+    },
+    "copy_basis": {
+     "coverage_keys": [],
+     "provenance": [
+      "type"
+     ]
+    },
+    "copy_rule": {
+     "coverage_keys": [],
+     "provenance": [
+      "type"
+     ]
+    },
+    "dispatch.call": {
+     "coverage_keys": [],
+     "provenance": [
+      "parent_tool_use_id"
+     ]
+    },
+    "encrypted": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content[].type"
+     ]
+    },
+    "flags": {
+     "coverage_keys": [],
+     "provenance": [
+      "isCompactSummary",
+      "isMeta",
+      "subtype",
+      "type"
+     ]
+    },
+    "header.agent": {
+     "coverage_keys": [],
+     "provenance": [
+      "agentId"
+     ]
+    },
+    "header.cwd": {
+     "coverage_keys": [],
+     "provenance": [
+      "cwd"
+     ]
+    },
+    "header.entrypoint": {
+     "coverage_keys": [],
+     "provenance": [
+      "entrypoint"
+     ]
+    },
+    "header.first_at": {
+     "coverage_keys": [],
+     "provenance": [
+      "timestamp"
+     ]
+    },
+    "header.forked": {
+     "coverage_keys": [],
+     "provenance": [
+      "type"
+     ]
+    },
+    "header.last_at": {
+     "coverage_keys": [],
+     "provenance": [
+      "timestamp"
+     ]
+    },
+    "header.markers": {
+     "coverage_keys": [],
+     "provenance": [
+      "subtype"
+     ]
+    },
+    "header.models[].value": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content[].input.model",
+      "message.model",
+      "requestedModel",
+      "toolUseResult.resolvedModel"
+     ]
+    },
+    "header.recorded_identity.session": {
+     "coverage_keys": [],
+     "provenance": [
+      "sessionId"
+     ]
+    },
+    "header.session": {
+     "coverage_keys": [],
+     "provenance": [
+      "agentId",
+      "sessionId",
+      "session_id"
+     ]
+    },
+    "header.subagent": {
+     "coverage_keys": [],
+     "provenance": [
+      "isSidechain"
+     ]
+    },
+    "header.subagent_basis": {
+     "coverage_keys": [],
+     "provenance": [
+      "isSidechain"
+     ]
+    },
+    "header.uuids": {
+     "coverage_keys": [],
+     "provenance": [
+      "uuid"
+     ]
+    },
+    "kind": {
+     "coverage_keys": [],
+     "provenance": [
+      "attachment.type",
+      "subtype",
+      "type"
+     ]
+    },
+    "links[].target": {
+     "coverage_keys": [],
+     "provenance": [
+      "parent_tool_use_id",
+      "toolUseResult.agentId"
+     ]
+    },
+    "message_id": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.id"
+     ]
+    },
+    "model.value": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.model",
+      "toolUseResult.resolvedModel"
+     ]
+    },
+    "origin.flags": {
+     "coverage_keys": [],
+     "provenance": [
+      "isCompactSummary",
+      "isMeta"
+     ]
+    },
+    "origin.markers": {
+     "coverage_keys": [],
+     "provenance": [
+      "attachment.prompt",
+      "content",
+      "message.content"
+     ]
+    },
+    "origin.native_kind": {
+     "coverage_keys": [],
+     "provenance": [
+      "attachment.origin.kind",
+      "origin.kind"
+     ]
+    },
+    "origin.unrecognized_tag.joined": {
+     "coverage_keys": [],
+     "provenance": [
+      "attachment.prompt",
+      "content",
+      "message.content"
+     ]
+    },
+    "origin.unrecognized_tag.lead": {
+     "coverage_keys": [],
+     "provenance": [
+      "attachment.prompt",
+      "content",
+      "message.content"
+     ]
+    },
+    "origin_kind": {
+     "coverage_keys": [],
+     "provenance": [
+      "attachment.origin.kind",
+      "origin.kind"
+     ]
+    },
+    "prompt_source": {
+     "coverage_keys": [],
+     "provenance": [
+      "promptSource"
+     ]
+    },
+    "queued": {
+     "coverage_keys": [],
+     "provenance": [
+      "attachment.type"
+     ]
+    },
+    "readable_text": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content[].type",
+      "type"
+     ]
+    },
+    "session": {
+     "coverage_keys": [],
+     "provenance": [
+      "agentId",
+      "sessionId",
+      "session_id"
+     ]
+    },
+    "stop_class": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.stop_reason"
+     ]
+    },
+    "stop_reason": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.stop_reason"
+     ]
+    },
+    "synthetic": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.model"
+     ]
+    },
+    "text": {
+     "coverage_keys": [],
+     "provenance": [
+      "attachment.prompt",
+      "content",
+      "message.content",
+      "message.content[].content",
+      "message.content[].input",
+      "message.content[].text",
+      "message.content[].thinking"
+     ]
+    },
+    "waits_for_user": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content[].name"
+     ]
+    }
+   },
+   "labels": {
+    "assistant": [
+     "native"
+    ],
+    "dispatch": [
+     "convention"
+    ],
+    "human": [
+     "convention",
+     "native"
+    ],
+    "injected": [
+     "convention",
+     "heuristic",
+     "native"
+    ],
+    "metadata": [
+     "native"
+    ],
+    "tool_call": [
+     "native"
+    ],
+    "tool_output": [
+     "native"
+    ],
+    "unknown": [
+     "heuristic",
+     "native"
+    ],
+    "user_channel_unattributed": [
+     "heuristic"
+    ]
+   },
+   "record_kinds": [
+    "api-request-blob",
+    "assistant",
+    "attachment/hook_blocking_error",
+    "attachment/queued_command",
+    "future-record-kind",
+    "queue-operation",
+    "result/success",
+    "system/init",
+    "system/local_command",
+    "system/scheduled_task_fire",
+    "system/stop_hook_summary",
+    "system/turn_duration",
+    "user"
+   ],
+   "versions": {
+    "2.1.300": {
+     "fields_seen": {
+      "observed": [],
+      "synthetic": [
+       "agent",
+       "at",
+       "block_type",
+       "call.command",
+       "call.id",
+       "call.is_error",
+       "call.tool",
+       "copy",
+       "copy_basis",
+       "copy_rule",
+       "flags",
+       "header.agent",
+       "header.cwd",
+       "header.entrypoint",
+       "header.first_at",
+       "header.last_at",
+       "header.models[].value",
+       "header.recorded_identity.session",
+       "header.session",
+       "header.subagent",
+       "header.subagent_basis",
+       "header.uuids",
+       "kind",
+       "links[].target",
+       "message_id",
+       "model.value",
+       "origin.flags",
+       "origin.markers",
+       "origin.native_kind",
+       "origin.unrecognized_tag.joined",
+       "origin.unrecognized_tag.lead",
+       "origin_kind",
+       "prompt_source",
+       "readable_text",
+       "session",
+       "stop_class",
+       "stop_reason",
+       "text",
+       "waits_for_user"
+      ]
+     },
+     "observed": [],
+     "synthetic": [
+      "degraded/.claude-work/projects/-w-delta/c0000000-0000-4000-8000-00000000000e.jsonl",
+      "degraded/.claude/projects/-w-delta/c0000000-0000-4000-8000-00000000000d.jsonl",
+      "home/.claude-work/projects/-w-beta/c0000000-0000-4000-8000-00000000000b.jsonl",
+      "home/.claude-work/projects/-w-beta/c0000000-0000-4000-8000-00000000000c.jsonl",
+      "home/.claude/projects/-w-alpha/c0000000-0000-4000-8000-00000000000a.jsonl",
+      "home/.claude/projects/-w-alpha/c0000000-0000-4000-8000-00000000000a/subagents/agent-a0000000000000b01.jsonl"
+     ]
+    },
+    "2.1.304": {
+     "fields_seen": {
+      "observed": [],
+      "synthetic": [
+       "at",
+       "block_type",
+       "call.command",
+       "call.id",
+       "call.is_error",
+       "call.tool",
+       "flags",
+       "header.cwd",
+       "header.entrypoint",
+       "header.first_at",
+       "header.last_at",
+       "header.markers",
+       "header.models[].value",
+       "header.recorded_identity.session",
+       "header.session",
+       "header.subagent",
+       "header.subagent_basis",
+       "header.uuids",
+       "kind",
+       "message_id",
+       "model.value",
+       "origin.flags",
+       "origin.markers",
+       "origin.native_kind",
+       "origin.unrecognized_tag.joined",
+       "origin.unrecognized_tag.lead",
+       "origin_kind",
+       "prompt_source",
+       "queued",
+       "readable_text",
+       "session",
+       "stop_class",
+       "stop_reason",
+       "synthetic",
+       "text",
+       "waits_for_user"
+      ]
+     },
+     "observed": [],
+     "synthetic": [
+      "captures/escaped-malformed.jsonl",
+      "captures/escaped.jsonl",
+      "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000021.jsonl",
+      "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000022.jsonl",
+      "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000023.jsonl",
+      "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000024.jsonl"
+     ]
+    },
+    "unknown": {
+     "fields_seen": {
+      "observed": [],
+      "synthetic": [
+       "agent",
+       "at",
+       "block_type",
+       "call.id",
+       "call.is_error",
+       "call.tool",
+       "dispatch.call",
+       "flags",
+       "header.agent",
+       "header.cwd",
+       "header.entrypoint",
+       "header.first_at",
+       "header.last_at",
+       "header.markers",
+       "header.models[].value",
+       "header.recorded_identity.session",
+       "header.session",
+       "header.subagent",
+       "header.subagent_basis",
+       "header.uuids",
+       "kind",
+       "links[].target",
+       "message_id",
+       "model.value",
+       "origin.flags",
+       "origin.markers",
+       "origin.native_kind",
+       "origin.unrecognized_tag.joined",
+       "origin.unrecognized_tag.lead",
+       "origin_kind",
+       "readable_text",
+       "session",
+       "stop_class",
+       "stop_reason",
+       "text",
+       "waits_for_user"
+      ]
+     },
+     "observed": [],
+     "synthetic": [
+      "captures/sdk-stream.jsonl",
+      "captures/turn-evidence-claude.jsonl",
+      "origin/claude-code-child-prompt.jsonl",
+      "origin/claude-code-conflict-human-joined.jsonl",
+      "origin/claude-code-conflict-human.jsonl",
+      "origin/claude-code-conflict-nonhuman-paste.jsonl",
+      "origin/claude-code-conflict-nonhuman.jsonl",
+      "origin/claude-code-empty-first-block.jsonl",
+      "origin/claude-code-interrupt-inside.jsonl",
+      "origin/claude-code-interrupt-start.jsonl",
+      "origin/claude-code-leading-whitespace.jsonl",
+      "origin/claude-code-local-input.jsonl",
+      "origin/claude-code-local-output.jsonl",
+      "origin/claude-code-meta-plain.jsonl",
+      "origin/claude-code-native-human.jsonl",
+      "origin/claude-code-native-nonhuman.jsonl",
+      "origin/claude-code-paste-after-whitespace.jsonl",
+      "origin/claude-code-paste.jsonl",
+      "origin/claude-code-plain-then-wrapper.jsonl",
+      "origin/claude-code-plain-typed.jsonl",
+      "origin/claude-code-slash-typed.jsonl",
+      "origin/claude-code-summary-plain.jsonl",
+      "origin/claude-code-task-notification.jsonl",
+      "origin/claude-code-unrecognized-tag.jsonl",
+      "origin/claude-code-wrapper-then-plain.jsonl"
+     ]
+    }
+   }
+  },
+  "codex": {
+   "exceptions": [],
+   "fields": {
+    "abort_reason": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.reason"
+     ]
+    },
+    "answer_phase": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.phase"
+     ]
+    },
+    "at": {
+     "coverage_keys": [],
+     "provenance": [
+      "timestamp"
+     ]
+    },
+    "block_type": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.content[].type",
+      "payload.type"
+     ]
+    },
+    "call.command": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.arguments"
+     ]
+    },
+    "call.id": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.call_id",
+      "payload.id"
+     ]
+    },
+    "call.is_error": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.output"
+     ]
+    },
+    "call.tool": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.name",
+      "payload.type"
+     ]
+    },
+    "copy": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.type",
+      "type"
+     ]
+    },
+    "copy_basis": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.type",
+      "type"
+     ]
+    },
+    "copy_rule": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.type",
+      "type"
+     ]
+    },
+    "encrypted": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.content[].type"
+     ]
+    },
+    "flags": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.item.questions",
+      "payload.role",
+      "payload.type",
+      "type"
+     ]
+    },
+    "header.agent_path": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.source.subagent.thread_spawn.agent_path"
+     ]
+    },
+    "header.child": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.parent_thread_id",
+      "payload.source.subagent.thread_spawn.parent_thread_id",
+      "payload.thread_source"
+     ]
+    },
+    "header.child_basis": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.parent_thread_id",
+      "payload.source.subagent.thread_spawn.parent_thread_id",
+      "payload.thread_source"
+     ]
+    },
+    "header.cli_version": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.cli_version"
+     ]
+    },
+    "header.cwd": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.cwd"
+     ]
+    },
+    "header.depth": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.source.subagent.thread_spawn.depth"
+     ]
+    },
+    "header.entrypoint": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.originator"
+     ]
+    },
+    "header.first_at": {
+     "coverage_keys": [],
+     "provenance": [
+      "timestamp"
+     ]
+    },
+    "header.forked": {
+     "coverage_keys": [],
+     "provenance": [
+      "type"
+     ]
+    },
+    "header.inherited_id": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.id"
+     ]
+    },
+    "header.last_at": {
+     "coverage_keys": [],
+     "provenance": [
+      "timestamp"
+     ]
+    },
+    "header.models[].value": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.arguments",
+      "payload.base_instructions.provenance.model",
+      "payload.model"
+     ]
+    },
+    "header.own_turn_ids": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.turn_id"
+     ]
+    },
+    "header.parent": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.parent_thread_id",
+      "payload.source.subagent.thread_spawn.parent_thread_id"
+     ]
+    },
+    "header.recorded_identity.session": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.id"
+     ]
+    },
+    "header.session": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.id"
+     ]
+    },
+    "header.turn_ids": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.turn_id"
+     ]
+    },
+    "kind": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.item.type",
+      "payload.type",
+      "type"
+     ]
+    },
+    "links[].call.id": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.item.id"
+     ]
+    },
+    "links[].target": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.item.agent_thread_id",
+      "payload.parent_thread_id",
+      "payload.source.subagent.thread_spawn.parent_thread_id"
+     ]
+    },
+    "message_id": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.id",
+      "payload.item.id"
+     ]
+    },
+    "model.value": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.base_instructions.provenance.model",
+      "payload.model"
+     ]
+    },
+    "origin.markers": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.content"
+     ]
+    },
+    "origin.unrecognized_tag.joined": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.content"
+     ]
+    },
+    "origin.unrecognized_tag.lead": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.content"
+     ]
+    },
+    "original": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.item.id"
+     ]
+    },
+    "phase": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.item.phase",
+      "payload.phase"
+     ]
+    },
+    "readable_text": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.role",
+      "payload.type"
+     ]
+    },
+    "session": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.id"
+     ]
+    },
+    "text": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.arguments",
+      "payload.content",
+      "payload.input",
+      "payload.item.content",
+      "payload.output",
+      "payload.summary"
+     ]
+    },
+    "turn_end_message": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.last_agent_message"
+     ]
+    },
+    "turn_id": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.turn_id"
+     ]
+    },
+    "waits_for_user": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.name"
+     ]
+    }
+   },
+   "labels": {
+    "assistant": [
+     "native"
+    ],
+    "dispatch": [
+     "convention",
+     "heuristic"
+    ],
+    "injected": [
+     "convention",
+     "heuristic"
+    ],
+    "metadata": [
+     "native"
+    ],
+    "tool_call": [
+     "native"
+    ],
+    "tool_output": [
+     "native"
+    ],
+    "unknown": [
+     "heuristic"
+    ],
+    "user_channel_unattributed": [
+     "heuristic"
+    ]
+   },
+   "record_kinds": [
+    "event_msg/item_completed/AgentMessage",
+    "event_msg/item_completed/SubAgentActivity",
+    "event_msg/task_complete",
+    "event_msg/task_started",
+    "event_msg/turn_aborted",
+    "response_item/agent_message",
+    "response_item/custom_tool_call",
+    "response_item/custom_tool_call_output",
+    "response_item/function_call",
+    "response_item/function_call_output",
+    "response_item/message",
+    "session_meta",
+    "turn_context"
+   ],
+   "versions": {
+    "0.163.0": {
+     "fields_seen": {
+      "observed": [],
+      "synthetic": [
+       "at",
+       "block_type",
+       "call.id",
+       "call.tool",
+       "encrypted",
+       "flags",
+       "header.agent_path",
+       "header.child",
+       "header.child_basis",
+       "header.cli_version",
+       "header.cwd",
+       "header.depth",
+       "header.entrypoint",
+       "header.first_at",
+       "header.last_at",
+       "header.models[].value",
+       "header.own_turn_ids",
+       "header.parent",
+       "header.recorded_identity.session",
+       "header.session",
+       "header.turn_ids",
+       "kind",
+       "links[].call.id",
+       "links[].target",
+       "model.value",
+       "origin.markers",
+       "origin.unrecognized_tag.joined",
+       "origin.unrecognized_tag.lead",
+       "readable_text",
+       "session",
+       "text",
+       "turn_end_message",
+       "turn_id",
+       "waits_for_user"
+      ]
+     },
+     "observed": [],
+     "synthetic": [
+      "degraded/.codex/sessions/2026/10/11/rollout-2026-10-11T10-00-00-01900000-0000-7000-8000-0000000000d1.jsonl",
+      "home/.codex-work/sessions/2026/10/10/rollout-2026-10-10T08-00-00-01900000-0000-7000-8000-0000000000b1.jsonl",
+      "home/.codex/archived_sessions/rollout-2026-09-20T09-00-00-01900000-0000-7000-8000-0000000000a2.jsonl",
+      "home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-00-01900000-0000-7000-8000-0000000000a1.jsonl",
+      "home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-11-01900000-0000-7000-8000-0000000000c1.jsonl",
+      "home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-32-01900000-0000-7000-8000-0000000000c2.jsonl"
+     ]
+    },
+    "0.164.0": {
+     "fields_seen": {
+      "observed": [],
+      "synthetic": [
+       "abort_reason",
+       "answer_phase",
+       "at",
+       "block_type",
+       "call.command",
+       "call.id",
+       "call.tool",
+       "copy",
+       "copy_basis",
+       "copy_rule",
+       "encrypted",
+       "flags",
+       "header.agent_path",
+       "header.child",
+       "header.child_basis",
+       "header.cli_version",
+       "header.cwd",
+       "header.depth",
+       "header.entrypoint",
+       "header.first_at",
+       "header.forked",
+       "header.inherited_id",
+       "header.last_at",
+       "header.models[].value",
+       "header.own_turn_ids",
+       "header.parent",
+       "header.recorded_identity.session",
+       "header.session",
+       "header.turn_ids",
+       "kind",
+       "links[].call.id",
+       "links[].target",
+       "message_id",
+       "model.value",
+       "origin.unrecognized_tag.joined",
+       "origin.unrecognized_tag.lead",
+       "original",
+       "phase",
+       "readable_text",
+       "session",
+       "text",
+       "turn_end_message",
+       "turn_id",
+       "waits_for_user"
+      ]
+     },
+     "observed": [],
+     "synthetic": [
+      "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T10-00-00-01900000-0000-7000-8000-0000000000e1.jsonl",
+      "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T10-05-00-01900000-0000-7000-8000-0000000000f1.jsonl",
+      "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T11-00-00-01900000-0000-7000-8000-0000000000f2.jsonl"
+     ]
+    },
+    "unknown": {
+     "fields_seen": {
+      "observed": [],
+      "synthetic": [
+       "answer_phase",
+       "at",
+       "block_type",
+       "flags",
+       "header.child",
+       "header.child_basis",
+       "header.cwd",
+       "header.entrypoint",
+       "header.first_at",
+       "header.last_at",
+       "header.own_turn_ids",
+       "header.parent",
+       "header.recorded_identity.session",
+       "header.session",
+       "header.turn_ids",
+       "kind",
+       "links[].target",
+       "origin.markers",
+       "origin.unrecognized_tag.joined",
+       "origin.unrecognized_tag.lead",
+       "phase",
+       "readable_text",
+       "session",
+       "text",
+       "turn_end_message",
+       "turn_id"
+      ]
+     },
+     "observed": [],
+     "synthetic": [
+      "origin/codex-agents_md.jsonl",
+      "origin/codex-child-prompt.jsonl",
+      "origin/codex-collaboration_mode.jsonl",
+      "origin/codex-empty-first-block.jsonl",
+      "origin/codex-environment_context.jsonl",
+      "origin/codex-instructions.jsonl",
+      "origin/codex-interrupt-inside.jsonl",
+      "origin/codex-interrupt-start.jsonl",
+      "origin/codex-leading-whitespace.jsonl",
+      "origin/codex-paste-after-whitespace.jsonl",
+      "origin/codex-paste.jsonl",
+      "origin/codex-permissions.jsonl",
+      "origin/codex-plain-then-wrapper.jsonl",
+      "origin/codex-plain-typed.jsonl",
+      "origin/codex-skills_instructions.jsonl",
+      "origin/codex-slash-typed.jsonl",
+      "origin/codex-task-notification.jsonl",
+      "origin/codex-turn_aborted.jsonl",
+      "origin/codex-unrecognized-tag.jsonl",
+      "origin/codex-user_shell.jsonl",
+      "origin/codex-wrapper-then-plain.jsonl"
+     ]
+    }
+   }
+  }
+ },
+ "schema": "harness-evidence/1"
+}

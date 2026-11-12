@@ -435,6 +435,120 @@ that alone names a conversation's workspace and title, with the transcript under
 `tools/harness_stores/`, registered in `tools/harness_stores/__init__.py`; the display
 order and the `--harness` choices follow the registry.
 
+The adapters share `Home` and home discovery from `tools/harness_evidence/homes.py`.
+That standalone package also names transcript stores without importing hq or its
+configuration. `tools/harness-evidence discover [--home PATH] [--root HARNESS=PATH]...`
+lists Claude Code and Codex transcript paths and filesystem metadata as
+JSONL under schema version 1 (`root`, `file`, then `discover_end`). Explicit roots replace
+all default roots; supported harness names are `claude-code` and `codex`. Defaults use
+the shared personal/work homes, including Codex's archived stores, and ignore obs's
+environment overrides. Discovery reads no transcript text. Codex filename identity is
+marked `convention`, separate from identity recorded inside a transcript. Symlinked
+transcripts appear in each root's `aliases` list with normalized place and filename
+identity; they are never opened or counted as files/bytes. Missing or unreadable
+roots are reported; a file that
+vanishes or has unavailable metadata after its name is enumerated retains a file
+object with null stat metadata and its observed state/error. Initial lstat/stat
+failures remain explicit even if a later lookup could succeed; known symlink
+aliases stay excluded from file objects. The listing helper retains candidates with unknown mtime
+when applying a cutoff; the command applies no cutoff.
+
+Every discovery file and alias also carries `filename_lookup`: null when no
+supported placed naming convention applies, otherwise sorted unique `session_ids`,
+`basis: "convention"` and a `rule`. Codex uses `rollout_name_lookup`, retaining exact
+suffix/non-UUID/continuation lookup: "rollout-T.jsonl" has no T candidate while
+"rollout--T.jsonl" does. Claude uses `claude_name_lookup` under a declared root,
+matching exactly `*/<id>.jsonl`, `*/<id>/subagents/agent-*.jsonl` and
+`*/*/subagents/agent-<agent>.jsonl`. The last pattern admits `agent-<agent>` and also bare `<agent>` when it does not
+itself start `agent-`; query alias normalization removes exactly one prefix. Nested bare IDs, non-agent child names, wrong depths
+and wrong suffixes are excluded. Empty lists assert no membership; unplaced or
+explicit Claude names have null lookup. Aliases use their own logical names.
+Lookup depth is relative to the actual declared root, including current-directory
+and filesystem-root forms; public paths and refs keep their declared spelling.
+These hints assert neither canonical filename identity nor recorded session identity.
+Consumers retain query grammar/alias policy and confirm identity from evidence.
+
+Discovery files/aliases and decode `file_start` also carry `path_facts`, null outside
+Claude. Claude's convention object has `session` (logical filename stem), `agent`
+(one filename `agent-` prefix removed, otherwise null; empty string stays distinct),
+`subagent` (immediate parent is `subagents`), `parent` (grandparent name in that case,
+otherwise null), and `resume_group` (POSIX parent of place.relpath when not subagent,
+otherwise null). It includes `basis: "convention"`, `rule: "claude_path_layout"` and
+`ref` (logical file ref, no line/hash). These are naming facts, not recorded identity,
+copy decisions or observed authorship. Any-depth layout facts also describe indexed
+nonstandard paths; lookup membership still obeys the exact patterns above. Facts use
+logical paths even for missing/index-only files or differently named external replay
+copies; physical read_path continues to supply bytes/adjacent metadata. Decoded
+header agent evidence is separate. Query-ID aliases and publication of arbitrary
+index/identity claims remain consumer policy, rather than native path decoding.
+
+`tools/harness-evidence version --json` reports the evidence schema,
+decoder version `8`, and the decoder revision. A pinned copy reads a `REVISION`
+file inside the package; a checkout reports its HEAD with `+dirty` when
+the package has changes. Without either source the command exits 2.
+
+`tools/harness-evidence decode` reads one JSON request per stdin line and flushes
+framed harness-evidence/1 objects through `request_end` before reading the next.
+Requests require an integer `id` and `files`, each with logical `path` and byte
+bound `size`; optional `read_path` reads captured bytes without changing identity
+or refs. `roots` replaces default discovery roots, `context` supplies fork evidence
+without emitting it, and `cross_file` marks copies across requested files. `text`
+and `raw` default to false; transcript text, nested commands and turn-end messages
+require `text`, while original physical lines require `raw` independently.
+Raw strings preserve invalid UTF-8 bytes with surrogate escapes; recover exact
+bytes with `raw.encode("utf-8", errors="surrogateescape")`. Typed text keeps its
+existing replacement of invalid UTF-8.
+Native `abort_reason` remains metadata when text is disabled. Session headers keep
+their existing child flags and add `subagent_basis` for Claude Code (native timed
+sidechain flags, conventional subagent path, or a heuristic negative) and
+`child_basis` for Codex (native parent/thread-source evidence or a heuristic
+negative). SDK and unknown headers gain no child flags. Store-placed files use the
+established root's native reader, including files without a signature; rootless
+explicit files retain signature detection, including SDK captures.
+Headers also publish `recorded_identity`: the first qualifying native identity
+observation with session, physical line, ref, hash, native basis and recognition
+rule, or null. This does not replace the existing session identity. Codex's first
+session metadata stops the search even with an invalid id; Claude skips sidechain
+and non-string ids. A valid final JSON line can supply this observation without a
+newline. Consumers apply their own peek window to its line position.
+Child `.meta.json` requested models join `header.models` after transcript copy
+settlement, with the sidecar ref; sidecars are separately observed metadata and
+explicit-store captures never consult them. With `read_path`, child metadata comes
+from beside that physical source, using the logical transcript stem and ref; it
+never falls back to a stale sidecar at the logical path.
+Each bounded transcript prefix is captured once in transient memory; format,
+records, header, raw lines, hashes and offsets all use those same bytes. The
+buffer is released after extraction; its peak cost is up to one current file's
+requested prefix in addition to reader data. Cross-file mode retains the reads
+needed for its requested group, rather than retaining those byte buffers.
+Non-JSON numeric constants and numbers that overflow a finite float become
+complete malformed `unparsed` evidence. Output JSON rejects non-finite numbers;
+malformed native kinds remain unknown source records within the detected format.
+Neither case aborts a later healthy file.
+
+Copy labels carry their own `copy_basis` and `copy_rule`, independently of role
+provenance. Explicit request/history constructs and native continuation links
+are native; inherited-turn ranges, event mirrors and identity/line matches are
+conventional; unresolved ranges, timing and ties are heuristic. Session links
+use native or conventional `basis` and retain their former recognition basis
+as `rule` for the later reader projection.
+
+Each file emits keyed `file_start`, records or unparsed lines, `session`, and
+`file_end` with status, emitted count and checkpoint `state`. Source failures stay
+framed; malformed requests, unknown fields and invalid states exit 2 with a stderr
+line. Pass the last state to resume: `replaces: {"from_line": N}` replaces line
+objects at or after N, while `replaces: "all"` restarts after an earlier payload
+changed. Always replace the file and session aggregates by key. Incomplete tails
+are provisional and replayed. Stage 1 rereads the whole bounded prefix each time.
+Copy marking uses root-list priority followed by logical relative path, independent
+of request file order. Outside-root explicit files have priority zero.
+The checkpoint hashes committed line objects in line/string-key order: sorted-key,
+compact ASCII JSON plus a newline per object, excluding schema, decoder and
+request/file transport indices. Text/raw option changes can therefore restart
+replay, while request ids and decoder revision changes alone do not.
+Records themselves retain native numeric block order, including when a line has
+ten or more blocks.
+
 - **Rows.** Harness, home (`personal` or `work`), short id (the first eight characters;
   for Codex the last eight, since a UUIDv7 id starts with its timestamp), age, place (marked
   `cwd missing` when the directory is gone, which is common for removed worktrees), and
@@ -694,7 +808,7 @@ line passes no `protocolVersion`; if it does, that option's value is the revisio
 
 ### Turn-pause limits
 
-`hq pause limits` shows the current defaults: 16 active hours, 500 root tool calls,
+`hq pause limits` shows the current defaults: 16 active hours, 2,000 root tool calls,
 60 tree spawns and 2 root compactions (advisory) per turn. It and `hq pause status` write active time
 with its units (`16h00m`, `0h16m`); `--json` gives seconds. The next hooked call after an
 enforced limit (`active`, `calls` or `spawns`) is exceeded pauses the turn; `compactions`
@@ -715,15 +829,16 @@ transition events and per-turn summaries across local root records (`--session`,
 
 The 75% warning asks for a concise status update and preparation while authorized
 work continues. It is not a pause, a request for a new budget, or a new approval
-gate. The spawn warning occurs at 45 of 60. Stop on an actual crossed enforced limit or
+gate. The root-call warning occurs at 1,500 of 2,000 and the spawn warning at 45 of 60. Stop on an actual crossed enforced limit or
 another genuine human gate. Reaching an
 exact enforced limit is allowed, and root compactions are advisory only. Do not add reviewers' calls to the root count.
 The [cutoff calibration](docs/notes/2026-11-02-active-cutoff-report.md) records the
-historical comparison and its limits; duration alone cannot prove a runaway.
+historical active-time comparison and its limits, and hq-649891 retains the root-call
+cutoff calibration; duration or call count alone cannot prove a runaway.
 
 A first-line budget directive scales unnamed counts relative to the default:
-`budget: 12h` gives 375 calls, 45 spawns and 2 compactions, while `budget: 48h` gives
-1,500 calls, 180 spawns and 6 compactions. Named counts override scaling.
+`budget: 12h` gives 1,500 calls, 45 spawns and 2 compactions, while `budget: 48h` gives
+6,000 calls, 180 spawns and 6 compactions (`budget: 8h` gives 1,000 calls, 30 spawns and 1 compaction). Named counts override scaling.
 Changing the live limits file pauses existing turns with `limits-changed`; a new
 genuine user prompt starts a turn with the updated limits.
 
@@ -743,12 +858,22 @@ authorize mutation.
 
 Use `tasks -C .worktrees/<name> park <id> "next step" --waiting-on user --reason decision`
 when the authoritative task record is in a worktree. `tasks -C .worktrees/<name> note <id> "status"`
-also stays allowed after the pause's read grace is exhausted. Quote a directory that
-contains spaces. The directory selector preserves each closing subcommand's existing
-restrictions: records reads, `hq pause history`, `hq pause list`, and attachments use
-grace (`hq pause status` and `hq pause limits` remain bookkeeping), and `tasks show`
-needs `--no-fetch`.
-The pause still refuses `cd`, `env` wrappers and compound shell commands.
+and `tasks feedback` (including `tasks -C .worktrees/<name> feedback --project <owner> --category <kind> "summary"`)
+are bookkeeping too, so they stay allowed before and after the pause's read grace is
+exhausted without spending grace or lifting the pause. Quote a directory that
+contains spaces. Record the durable pause report via single-line `tasks note` calls rather
+than workspace file writes (`Edit`, `Write`, `NotebookEdit`, `apply_patch`), which stay
+refused while paused, and put the continuation decision and any exact `budget:` first line
+in the closing assistant message rather than structured question tools (`AskUserQuestion`,
+`request_user_input`, `request_user_input_async`), which also stay refused while paused.
+The directory selector and bookkeeping subcommands preserve the closing
+parser's existing restrictions: commands stay single-line (no literal newlines inside or
+outside quotes) within the 16,384-character limit (split a longer pause report across
+multiple single-line `tasks note` calls), protected paths stay refused, records
+reads, `hq pause history`, `hq pause list`, and attachments use grace (`hq pause status`
+and `hq pause limits` remain bookkeeping), and `tasks show` needs `--no-fetch`.
+The pause still refuses other task mutations (`tasks add`, `tasks start`, `tasks done`),
+`cd`, `env` wrappers, substitutions, redirects, and compound shell commands.
 
 ### Re-probing the turn-pause hook facts
 
