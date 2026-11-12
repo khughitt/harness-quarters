@@ -116,7 +116,7 @@ def test_artifact_covers_catalogue_hashes_and_keeps_provenance_separate():
         "samples": {s["path"]: hashlib.sha256((FIXTURES / s["path"]).read_bytes()).hexdigest()
                     for s in samples},
     }
-    assert len(samples) == 194
+    assert len(samples) == 195
     for slug, harness in artifact["harnesses"].items():
         assert set(harness) == {"record_kinds", "fields", "labels", "versions", "exceptions"} | ({"index"} if slug == "claude-code" else set())
         assert harness["exceptions"] == []
@@ -284,7 +284,7 @@ def test_extracted_git_package_runs_every_command_without_checkout_or_fixtures(t
         assert result.returncode == 0, result.stderr
         rows = [json.loads(line) for line in result.stdout.splitlines()]
         assert all(row["decoder"]["revision"] == "a" * 40 for row in rows)
-        assert all(row["decoder"]["version"] == "13" for row in rows)
+        assert all(row["decoder"]["version"] == "14" for row in rows)
         if args[0] == "discover":
             assert next(row for row in rows if row["object"] == "file")["filename_lookup"] == {
                 "session_ids": ["T"], "basis": "convention", "rule": "rollout_name_lookup"}

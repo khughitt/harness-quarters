@@ -1,6 +1,6 @@
 {
  "built_from": {
-  "catalogue_sha256": "24e91958f6da019c761406e177b8199ee69ec0039c5c27450c8501a28aa3f0f7",
+  "catalogue_sha256": "0eadb67943c78d9e094a3f8c6e041ba3035e66dff5e9843f76a2e7260064cb9d",
   "samples": {
    "captures/escaped-malformed.jsonl": "d3ab501588cb7af5e03ae856e875b6809bbd5851e03283e43e53a82bd11a8454",
    "captures/escaped.jsonl": "4ff4490899cc4ac6444b34fc672811990fe9ec53cca6c5c23f4a642d90cbd273",
@@ -144,6 +144,7 @@
    "index/ownership.jsonl": "920fdde80da1c44746c33b7da82b523a7db2c744fe454ef69cbf9b0011c23ae2",
    "index/sizes.jsonl": "9a504380c2c0d6dcc0e49374a14c65b84a3062f651f9c5b29d6c8a47b04a6c44",
    "index/task2-first-result.jsonl": "16c781cbf284a17154e13574f91f3f2104190071edbfd5ce00241dbe7ccb84f1",
+   "index/task2-usage-storage.jsonl": "d25475f5ff93f393c29b17b3cfc03096644ed4bb1bd98b97c84967908a299f18",
    "index/write-paths.jsonl": "e54a8b29644d40ea3ede06263f5bef11ba9f82382252dfe4e196fa52bff2373b",
    "origin/claude-code-child-prompt.jsonl": "f42d405bd48a418fc268c40e111491ad870b7c45bc84b7e175a032bbcd798468",
    "origin/claude-code-conflict-human-joined.jsonl": "0ca8c370970321dc0cf14c85364f57e8d6fc7e1340d47c4c9e9fc27aac8260e4",
@@ -198,7 +199,7 @@
    "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T11-00-00-01900000-0000-7000-8000-0000000000f2.jsonl": "30b550b6f035815a4123c8a8fd18fbbf7059ec89c04b0749ecda738e24b2fde3"
   }
  },
- "decoder_version": "13",
+ "decoder_version": "14",
  "evidence_rule": "synthetic samples establish decoder conformance; observed samples or probes establish emission; absent from a sample means unobserved",
  "harnesses": {
   "claude-code": {
@@ -828,6 +829,22 @@
       "message.usage.input_tokens"
      ]
     },
+    "response.usage_present.output": {
+     "coverage_keys": [
+      "applied:usage/input:output_tokens"
+     ],
+     "provenance": [
+      "message.usage.output_tokens"
+     ]
+    },
+    "response.usage_present.thinking": {
+     "coverage_keys": [
+      "applied:usage/input:thinking_tokens"
+     ],
+     "provenance": [
+      "message.usage.output_tokens_details.thinking_tokens"
+     ]
+    },
     "results[].agent": {
      "coverage_keys": [],
      "provenance": [
@@ -1368,6 +1385,8 @@
        "response.usage.output",
        "response.usage.thinking",
        "response.usage.uncached_total",
+       "response.usage_present.output",
+       "response.usage_present.thinking",
        "results[].answers",
        "results[].bytes",
        "results[].call_id",
@@ -1581,6 +1600,8 @@
        "response.usage.output",
        "response.usage.thinking",
        "response.usage.uncached_total",
+       "response.usage_present.output",
+       "response.usage_present.thinking",
        "results[].agent",
        "results[].answers",
        "results[].background_id",
@@ -1725,6 +1746,7 @@
       "index/ownership.jsonl",
       "index/sizes.jsonl",
       "index/task2-first-result.jsonl",
+      "index/task2-usage-storage.jsonl",
       "index/write-paths.jsonl",
       "origin/claude-code-child-prompt.jsonl",
       "origin/claude-code-conflict-human-joined.jsonl",

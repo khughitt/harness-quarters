@@ -211,7 +211,7 @@ def test_index_evidence_has_sources_and_text_is_opt_in(tmp_path):
         assert row["line"] == number and row["end"] == offset + len(line)
         assert row["sha256"] == hashlib.sha256(line).hexdigest()
         assert row["ref"] == f"file:{source}#L{number}"
-        assert row["decoder"]["version"] == "13"
+        assert row["decoder"]["version"] == "14"
         for provenance in row["provenance"].values():
             assert provenance["basis"] in {"native", "convention", "heuristic"}
             assert provenance["rule"] and provenance["ref"] == row["ref"]
@@ -697,3 +697,72 @@ def test_surviving_numeric_overflow_retains_old_flush_outcome(tmp_path, variant)
         assert math.isinf(reconstructed) and reconstructed > 0
     else:
         assert usage["context_total"] == reconstructed == turn["context_tokens"] == 10**400 + 1
+
+
+def test_usage_storage_presence_preserves_old_defaults_and_values(tmp_path):
+    controls = json.loads((FIXTURES / "index/task2-usage-storage-controls.json").read_text())
+    source = FIXTURES / "index" / controls["source"]
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == controls["sha256"]
+    out = decoded(tmp_path, source.name)
+    emitted = events(out)
+    assert len(emitted) == len(controls["events"]) == 25
+    turns = {v["response_id"]: v for v in controls["rows"] if v["table"] == "turns"}
+    for event, expected in zip(emitted, controls["events"]):
+        response = event["response"]
+        assert response["id"] == expected["response"]
+        assert response["usage_present"] == expected["usage_present"], expected["label"]
+        assert all(type(value) is bool for value in response["usage_present"].values())
+        if expected["final_fragment"]:
+            old = turns[response["id"]]
+            for field in ("output", "thinking"):
+                value = response["usage"][field] if response["usage_present"][field] else 0
+                assert value == old[field + "_tokens"], expected["label"]
+                assert type(value) is type(old[field + "_tokens"]), expected["label"]
+    by_id = {v["response"]["id"]: v["response"] for v in emitted}
+    assert by_id["absent"]["usage"]["output"] is None
+    assert by_id["explicit-null"]["usage"]["output"] is None
+    assert by_id["absent"]["usage_present"] == {"output": False, "thinking": False}
+    assert by_id["explicit-null"]["usage_present"] == {"output": True, "thinking": True}
+    assert by_id["empty-string"]["usage"]["output"] == ""
+    assert by_id["empty-containers"]["usage"]["output"] == []
+    assert by_id["empty-containers"]["usage"]["thinking"] == {}
+    measured = next(v for v in out if v["object"] == "coverage")
+    assert measured["records"] == controls["records"]
+    assert measured["fields"] == controls["fields"]
+
+
+def test_usage_presence_is_safe_for_invalid_overwritten_fragments(tmp_path):
+    controls = json.loads((FIXTURES / "index/task2-usage-storage-controls.json").read_text())
+    emitted = events(decoded(tmp_path, controls["source"]))
+    firsts = [(v["response"], expected) for v, expected in zip(emitted, controls["events"])
+              if not expected["final_fragment"]]
+    assert len(firsts) == 4
+    for response, expected in firsts:
+        assert response["usage_present"] == expected["usage_present"]
+        assert response["usage_present"]["thinking"] is False
+    assert firsts[0][0]["native"] == "transient"
+    assert firsts[1][0]["native"] == [1]
+    assert firsts[2][0]["usage"]["output"] == 7
+    assert firsts[3][0]["usage"]["output"] == 7
+
+
+@pytest.mark.parametrize("name", ["fix1-usage-final-nested.jsonl", "fix1-usage-final-nonmapping.jsonl", "fix1-usage-final-list.jsonl"])
+def test_usage_presence_does_not_move_final_invalid_failure_earlier(tmp_path, name):
+    proc = command(tmp_path, FIXTURES / "index" / name)
+    assert proc.returncode != 0 and CONTROLS["cases"][name]["error"] in proc.stderr
+    out = [json.loads(line) for line in proc.stdout.splitlines()]
+    response = events(out)[0]["response"]
+    assert response["usage_present"] == {"output": False, "thinking": False}
+    assert not any(v["object"] in {"file_end", "request_end"} for v in out)
+
+
+def test_usage_presence_has_native_provenance_and_no_new_populations(tmp_path):
+    out = decoded(tmp_path, "task2-usage-storage.jsonl")
+    for field, native in [("output", "output_tokens"), ("thinking", "output_tokens_details.thinking_tokens")]:
+        provenance = events(out)[0]["provenance"]["response.usage_present." + field]
+        assert provenance["native_paths"] == ["message.usage." + native]
+        assert provenance["coverage_keys"] == ["applied:usage/input:" + native.rsplit(".", 1)[-1]]
+        assert provenance["basis"] == "native" and provenance["rule"] == "claude_native"
+    old = json.loads((FIXTURES / "index/task2-usage-storage-controls.json").read_text())
+    measured = next(v for v in out if v["object"] == "coverage")
+    assert measured["records"] == old["records"] and measured["fields"] == old["fields"]

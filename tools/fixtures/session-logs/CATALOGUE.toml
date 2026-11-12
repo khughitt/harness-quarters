@@ -1621,3 +1621,10 @@ harness = "claude-code"
 version = "unknown"
 provenance = "synthetic"
 profile = "index"
+
+[[sample]]
+path = "index/task2-usage-storage.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"

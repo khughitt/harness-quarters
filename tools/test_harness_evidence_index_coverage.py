@@ -34,6 +34,9 @@ def test_every_native_read_is_declared(monkeypatch):
         path = FIXTURES / "index" / name
         place = Place("claude-code", "file", None, "explicit", name, path)
         reads.update(traced_extract(numbered(path.read_bytes()), copy.deepcopy(old["initial_state"]), place=place))
+    path = FIXTURES / "index/task2-usage-storage.jsonl"
+    reads.update(traced_extract(numbered(path.read_bytes()), place=Place(
+        "claude-code", "file", None, "explicit", path.name, path)))
     missing = sorted((kind, path) for kind, path in reads if not covered(path, declared(dec, kind)))
     assert missing == []
     # A container declaration cannot silently authorize future descendants.

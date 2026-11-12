@@ -64,6 +64,8 @@ PROVENANCE = {
     "response.model": ["message.model"],
     "response.effort": ["effort"],
     "response.native": ["message.usage"],
+    "response.usage_present.output": ["message.usage.output_tokens"],
+    "response.usage_present.thinking": ["message.usage.output_tokens_details.thinking_tokens"],
     "response.usage.input_uncached": ["message.usage.input_tokens"],
     "response.usage.cache_read": ["message.usage.cache_read_input_tokens"],
     "response.usage.cache_write": ["message.usage.cache_creation_input_tokens"],
@@ -138,6 +140,8 @@ PROVENANCE = {
 COVERAGE_KEYS = {
     "response.id": ["assistant/input:response"],
     "response.model": ["assistant/input:model"],
+    "response.usage_present.output": ["applied:usage/input:output_tokens"],
+    "response.usage_present.thinking": ["applied:usage/input:thinking_tokens"],
     "response.effort": ["assistant/input:effort"],
     "identity.version": ["assistant/input:version"],
     "message.text": ["applied:text_block/input:text"],
@@ -230,6 +234,14 @@ def _usage(raw):
         "context_total": _usage_total(values),
         "uncached_total": _usage_total(values[:2]),
     }
+
+
+def _usage_present(raw):
+    # Invalid provisional fragments still fail only at their original use site.
+    mapping = raw if isinstance(raw, dict) else {}
+    details = mapping.get("output_tokens_details")
+    return {"output": "output_tokens" in mapping,
+            "thinking": isinstance(details, dict) and "thinking_tokens" in details}
 
 
 def _flush(state):
@@ -763,6 +775,7 @@ def extract(lines, state, *, place: Place, text: bool):
                     "model": message.get("model"),
                     "effort": record.get("effort"),
                     "usage": _usage(request["usage"]),
+                    "usage_present": _usage_present(request["usage"]),
                     "native": request["usage"],
                 }
                 for i, block in enumerate(message.get("content") or []):

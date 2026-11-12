@@ -588,6 +588,13 @@ sizes. Joined user text preserves empty placeholders for missing text keys. Nati
 the exact nonempty native file/notebook path; `paths` separately carries lexical
 normalization against cwd, and `paths_complete` records missing or rejected inputs.
 
+`response.usage_present` contains `output` and `thinking` booleans for native key
+presence, including explicit null. Consumers preserving old storage defaults use 0
+only when the flag is false and copy a present `usage.output` or `usage.thinking`
+unchanged. These two fields preserve opaque native JSON storage values, including
+nonnumeric values; numeric arithmetic inputs remain separately validated. Presence
+flags add no raw/applied coverage population or consumer measurement rule.
+
 Claude usage components are `input_uncached` (input tokens), `cache_write`,
 `cache_read`, `output` and `thinking`; absent components are null. `context_total`
 is input plus cache write plus cache read, and `uncached_total` is input plus cache
