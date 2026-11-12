@@ -2,9 +2,12 @@
 Index facts and candidate selection remain in obs; this module reads paths and metadata only.
 """
 import importlib
+import fnmatch
+import glob
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -143,6 +146,77 @@ def test_filename_identity_rejects_other_names(harness, name):
     assert api().filename_identity(harness, Path(name)) is None
 
 
+def old_lookup(name, session_id):
+    """Literal old glob and stem predicate, independent of the producer helper."""
+    uuid = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+    match = re.search(rf"-({uuid})(?:_({uuid}))?$", Path(name).stem)
+    return fnmatch.fnmatchcase(name, f"rollout-*-{glob.escape(session_id)}*.jsonl") and (
+        Path(name).stem.endswith("-" + session_id)
+        or (match is not None and match.group(1) == session_id))
+
+
+@pytest.mark.parametrize("name, expected", [
+    ("rollout-t-T.jsonl", ["T"]),
+    ("rollout-t-thread-x.jsonl", ["thread-x", "x"]),
+    ("rollout-t-[]*?.jsonl", ["[]*?"]),
+    ("rollout-t--T.jsonl", ["-T", "T"]),
+    ("rollout--T.jsonl", ["T"]),
+    ("rollout-T.jsonl", []),
+    ("rollout-t-.jsonl", []),
+    ("rollout-.jsonl", []),
+])
+def test_filename_lookup_preserves_suffix_candidates(name, expected):
+    fact = api().filename_lookup("codex", Path(name))
+    assert fact == {"session_ids": expected, "basis": "convention", "rule": "rollout_name_lookup"}
+    for query in {*expected, "t-T", "t-thread-x", "thread", "T*", "[]", "missing"}:
+        assert (query in fact["session_ids"]) == old_lookup(name, query), (name, query)
+
+
+@pytest.mark.parametrize("name", [
+    f"rollout-2026-10-01T09-00-00-{THREAD}.jsonl",
+    f"rollout-2026-10-01T09-00-00-{THREAD}_{SEGMENT}.jsonl",
+    f"rollout-{THREAD}.jsonl",
+    f"rollout-{THREAD}_{SEGMENT}.jsonl",
+    f"rollout--{THREAD}_{SEGMENT}.jsonl",
+    "rollout-t-x-x.jsonl",
+])
+def test_filename_lookup_equals_old_predicate_for_every_possible_match(name):
+    fact = api().filename_lookup("codex", Path(name))
+    stem = Path(name).stem
+    # Every old suffix match begins after a hyphen; only the UUID branch adds a
+    # possible non-suffix match. Include excluded prefixes and explicit negatives.
+    queries = {stem[i + 1:] for i, char in enumerate(stem) if char == "-" and stem[i + 1:]}
+    queries.update({THREAD, SEGMENT, "missing", "x", "x-x", "0000000000a2", "*", "?", "[a]"})
+    expected = sorted(query for query in queries if old_lookup(name, query))
+    assert fact == {"session_ids": expected, "basis": "convention", "rule": "rollout_name_lookup"}
+    assert all((query in fact["session_ids"]) == old_lookup(name, query) for query in queries)
+
+
+@pytest.mark.parametrize("harness, name", [
+    ("claude-code", "rollout-t-T.jsonl"), ("codex", "other-t-T.jsonl"),
+    ("codex", "rollout-t-T.txt"), ("codex", "rollout-t-T.jsonl.bak"),
+])
+def test_filename_lookup_is_null_outside_codex_rollout_names(harness, name):
+    assert api().filename_lookup(harness, Path(name)) is None
+
+
+def test_discover_publishes_lookup_on_files_and_aliases_without_claiming_identity(tmp_path):
+    root = tmp_path / ".codex/sessions"
+    root.mkdir(parents=True)
+    source = root / "rollout-t-T.jsonl"
+    source.write_bytes(b"not transcript content\n")
+    alias = root / "rollout-t-thread-x.jsonl"
+    alias.symlink_to(source)
+    objs = run_json(["discover", "--root", f"codex={root}"], tmp_path)
+    assert objs[1]["filename_lookup"] == {
+        "session_ids": ["T"], "basis": "convention", "rule": "rollout_name_lookup"}
+    assert objs[0]["aliases"][0]["filename_lookup"] == {
+        "session_ids": ["thread-x", "x"], "basis": "convention", "rule": "rollout_name_lookup"}
+    assert objs[1]["filename_identity"] is None
+    assert objs[0]["aliases"][0]["filename_identity"] is None
+    assert (objs[-1]["roots"], objs[-1]["files"]) == (1, 1)
+
+
 def test_explicit_roots_replace_homes(tmp_path):
     root = FIXTURES / "home/.codex/sessions"
     objs = run_json(["discover", "--home", str(FIXTURES / "home"), "--root", f"codex={root}"], tmp_path)
@@ -168,7 +242,7 @@ def test_discover_objects_include_provenance_place_and_stat(tmp_path):
     assert [o["object"] for o in objs] == ["root"] * 6 + ["file"] * 9 + ["discover_end"]
     for obj in objs:
         assert obj["schema"] == "harness-evidence/1"
-        assert obj["decoder"]["version"] == "5"
+        assert obj["decoder"]["version"] == "6"
         assert obj["decoder"]["revision"]
         assert obj["decoder"] == objs[0]["decoder"]
     for obj in objs[6:-1]:
@@ -183,6 +257,10 @@ def test_discover_objects_include_provenance_place_and_stat(tmp_path):
             "store": "archived" if rel.startswith("archived_sessions/") else "live", "relpath": rel}
         assert obj["state"] == "listed"
         assert (obj["filename_identity"] is not None) == (obj["harness"] == "codex")
+        if obj["harness"] == "codex":
+            assert obj["filename_identity"]["thread"] in obj["filename_lookup"]["session_ids"]
+        else:
+            assert obj["filename_lookup"] is None
     assert objs[-1]["files"] == 9
 
 
@@ -230,10 +308,13 @@ def test_discover_exposes_known_and_dangling_aliases_without_counting_files(tmp_
     assert objs[0]["files"] == objs[-1]["files"] == 1
     assert objs[0]["bytes"] == source.stat().st_size
     assert [o["path"] for o in objs if o["object"] == "file"] == [str(source)]
+    lookup = objs[0]["aliases"][1].pop("filename_lookup")
+    assert lookup["basis"] == "convention" and lookup["rule"] == "rollout_name_lookup"
+    assert THREAD in lookup["session_ids"] and f"{THREAD}_{SEGMENT}" in lookup["session_ids"]
     assert objs[0]["aliases"] == [
         {"path": str(dangling), "place": {"harness": "codex", "home": "codex",
          "profile": "personal", "store": "live", "relpath": "sessions/dangling.jsonl"},
-         "filename_identity": None},
+         "filename_identity": None, "filename_lookup": None},
         {"path": str(alias), "place": {"harness": "codex", "home": "codex",
          "profile": "personal", "store": "live", "relpath": f"sessions/{alias.name}"},
          "filename_identity": {"thread": THREAD, "segment": SEGMENT, "basis": "convention"}}]
@@ -274,6 +355,7 @@ def test_file_stat_failure_emits_null_metadata_and_terminal_count(tmp_path, monk
     assert file["error"]
     assert [file[key] for key in ("device", "inode", "size", "mtime_ns")] == [None] * 4
     assert file["filename_identity"]["thread"] == THREAD
+    assert THREAD in file["filename_lookup"]["session_ids"]
     assert (objs[-1]["roots"], objs[-1]["files"]) == (1, 1)
 
 
@@ -311,6 +393,7 @@ def test_initial_metadata_failure_keeps_enumerated_candidate(tmp_path, monkeypat
     assert file["path"] == str(path) and file["state"] == state and file["error"]
     assert [file[k] for k in ("device", "inode", "size", "mtime_ns")] == [None] * 4
     assert file["filename_identity"]["thread"] == THREAD
+    assert THREAD in file["filename_lookup"]["session_ids"]
     assert (objs[0]["files"], objs[0]["bytes"], objs[-1]["files"]) == (1, 0, 1)
     if state == "unreadable":
         assert (objs[0]["state"], objs[0]["listing"], objs[0]["errors"]) == ("unreadable", "partial", 1)

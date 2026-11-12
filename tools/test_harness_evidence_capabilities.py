@@ -266,7 +266,7 @@ def test_extracted_git_package_runs_every_command_without_checkout_or_fixtures(t
     (copy / "tools/harness_evidence/REVISION").write_text("a" * 40 + "\n")
     sample_dir = tmp_path / "sources"
     sample_dir.mkdir()
-    sample = sample_dir / "rollout.jsonl"
+    sample = sample_dir / "rollout-t-T.jsonl"
     shutil.copy2(FIXTURES / path_of("XA"), sample)
     # Remove the original checkout to catch accidental fallback reads.
     shutil.rmtree(root)
@@ -277,6 +277,10 @@ def test_extracted_git_package_runs_every_command_without_checkout_or_fixtures(t
         assert result.returncode == 0, result.stderr
         rows = [json.loads(line) for line in result.stdout.splitlines()]
         assert all(row["decoder"]["revision"] == "a" * 40 for row in rows)
+        assert all(row["decoder"]["version"] == "6" for row in rows)
+        if args[0] == "discover":
+            assert next(row for row in rows if row["object"] == "file")["filename_lookup"] == {
+                "session_ids": ["T"], "basis": "convention", "rule": "rollout_name_lookup"}
     request = {"id": 1, "files": [{"path": str(sample), "size": sample.stat().st_size}], "roots": []}
     result = command(copy, env, "decode", stdin=json.dumps(request) + "\n")
     assert result.returncode == 0, result.stderr
