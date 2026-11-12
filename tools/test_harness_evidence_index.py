@@ -211,7 +211,7 @@ def test_index_evidence_has_sources_and_text_is_opt_in(tmp_path):
         assert row["line"] == number and row["end"] == offset + len(line)
         assert row["sha256"] == hashlib.sha256(line).hexdigest()
         assert row["ref"] == f"file:{source}#L{number}"
-        assert row["decoder"]["version"] == "11"
+        assert row["decoder"]["version"] == "12"
         for provenance in row["provenance"].values():
             assert provenance["basis"] in {"native", "convention", "heuristic"}
             assert provenance["rule"] and provenance["ref"] == row["ref"]
@@ -323,7 +323,7 @@ def test_raw_write_paths_are_distinct_from_candidate_paths(tmp_path):
                     "path": "x",
                     "size": 0,
                     "identity": {"device": 1, "inode": 2},
-                    "state": {"next_line": 1, "next_offset": 0, "digest": "0" * 64, "index": {}},
+                    "state": {"next_line": 1, "next_offset": 0, "digest": "0" * 64, "index": []},
                 }
             ]
         },

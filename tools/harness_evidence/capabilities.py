@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 import tomllib
 
-from . import DECODER_VERSION, SCHEMA, index_events
+from . import DECODER_VERSION, SCHEMA, index_events, index_coverage
 
 EVIDENCE_RULE = ("synthetic samples establish decoder conformance; observed samples or probes "
                  "establish emission; absent from a sample means unobserved")
@@ -222,10 +222,10 @@ def build(catalogue: Path) -> dict:
             source = [first_meta] if fmt == "codex" and name in creation else list(native.values())
             seen.update(_seen({"header": read.header}, source, {field: paths}))
     harnesses["claude-code"]["index"] = json.loads(json.dumps({
-        "profile": "index", "mode": "full_file", "resume": False,
-        "watched": index_events.WATCHED, "applied": index_events.APPLIED,
-        "unwatched": index_events.UNWATCHED, "common_reads": index_events.COMMON_READS,
-        "known_kinds": sorted(index_events.KNOWN_KINDS)}))
+        "profile": "index", "mode": "incremental", "resume": True,
+        "watched": index_coverage.WATCHED, "applied": index_coverage.APPLIED,
+        "unwatched": index_coverage.UNWATCHED, "common_reads": index_coverage.COMMON_READS,
+        "known_kinds": sorted(index_coverage.KNOWN_KINDS)}))
     for harness in harnesses.values():
         harness["record_kinds"] = sorted(harness["record_kinds"])
         harness["labels"] = {role: sorted(bases) for role, bases in harness["labels"].items()}

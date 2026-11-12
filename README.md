@@ -550,11 +550,13 @@ Records themselves retain native numeric block order, including when a line has
 ten or more blocks.
 
 The opt-in `extract: "index"` request emits Claude native evidence for the scratch
-index pilot. This decoder revision supports full files only: include each file's
-`identity: {"device": ..., "inode": ...}`, keep `cross_file` and `raw` false, and
-omit `state` and `context`. A saved index state is rejected explicitly; incremental
-resume and the final pilot producer are a later milestone. The held descriptor must
-match the supplied identity and fixed byte span. Logical paths determine refs and
+index pilot. Include each file's `identity: {"device": ..., "inode": ...}`, keep
+`cross_file` and `raw` false, and omit `context`. Pass a saved index `state` whole:
+`next_line`, `next_offset` and `digest` describe the complete raw prefix, while
+`index` is opaque. The held descriptor must match the supplied identity and fixed
+byte span. Resume proves that prefix in bounded reads and decodes complete lines
+from its checkpoint; incompatible decoder revision, identity, logical path, options
+or prefix explicitly returns `replaces:"all"`. Logical paths determine refs and
 child-parent naming; `read_path` determines physical bytes.
 
 This profile emits `file_start`, one `index_event` per complete JSON object (key
@@ -563,7 +565,12 @@ cumulative native `coverage`, `file_end`, then `request_end`. The terminal count
 includes every event, unparsed object and coverage object. A partial tail does not
 advance the checkpoint. Valid JSON with invalid native types retains the original
 index adapter's errors. Accept a file only after both terminals and the count have
-been validated. `file_end.restart` is null in this full-file milestone.
+been validated. On a late invalidation `file_end.restart` carries a reason and an
+opaque from-zero seed; its `state` is null, so no successful checkpoint is exposed.
+Drain both terminals before retrying from zero with that seed. The transport supports
+this signal; Claude currently has no native restart trigger. Source-open failures
+stay framed with vanished/unreadable status and null state; protocol faults fail the
+request visibly. Each file releases its source handle and output before the next.
 
 Events carry recorded and normalized session identity, timestamps, response fragments,
 message origin evidence, ordered text blocks, native tool calls/results, attachment

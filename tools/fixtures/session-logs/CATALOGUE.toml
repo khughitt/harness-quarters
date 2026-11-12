@@ -1614,3 +1614,10 @@ version = "unknown"
 provenance = "synthetic"
 profile = "index"
 index_error = "AttributeError"
+
+[[sample]]
+path = "index/task2-first-result.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"

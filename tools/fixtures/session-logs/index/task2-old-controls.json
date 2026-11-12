@@ -1,0 +1,691 @@
+{
+ "oracle": "obs0a09481c06d1c91a785f9bc59b9dd9193b269dd3",
+ "replay": [
+  {
+   "fields": [
+    {
+     "day": "2026-11-11",
+     "field": "input:id",
+     "present": 1,
+     "record_kind": "applied:tool_use",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:input",
+     "present": 1,
+     "record_kind": "applied:tool_use",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:name",
+     "present": 1,
+     "record_kind": "applied:tool_use",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:cache_creation_input_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:cache_read_input_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:input_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:output_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:thinking_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:response",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.id",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_creation_input_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_read_input_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.input_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.output_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "requestId",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    }
+   ],
+   "records": [
+    {
+     "day": "2026-11-11",
+     "known": 1,
+     "record_kind": "assistant",
+     "records": 1,
+     "session_id": "agent-kid"
+    }
+   ]
+  },
+  {
+   "fields": [
+    {
+     "day": "2026-11-11",
+     "field": "input:id",
+     "present": 1,
+     "record_kind": "applied:tool_use",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:input",
+     "present": 1,
+     "record_kind": "applied:tool_use",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:name",
+     "present": 1,
+     "record_kind": "applied:tool_use",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:cache_creation_input_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:cache_read_input_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:input_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:output_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:thinking_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:response",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.id",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_creation_input_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_read_input_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.input_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.output_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "requestId",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "applied:tool_result",
+     "seen": 1,
+     "session_id": "other"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:tool_use_id",
+     "present": 1,
+     "record_kind": "applied:tool_result",
+     "seen": 1,
+     "session_id": "other"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:duration",
+     "present": 0,
+     "record_kind": "applied:tool_result_meta",
+     "seen": 1,
+     "session_id": "other"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "user",
+     "seen": 1,
+     "session_id": "other"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.content",
+     "present": 1,
+     "record_kind": "user",
+     "seen": 1,
+     "session_id": "other"
+    }
+   ],
+   "records": [
+    {
+     "day": "2026-11-11",
+     "known": 1,
+     "record_kind": "assistant",
+     "records": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-12",
+     "known": 1,
+     "record_kind": "user",
+     "records": 1,
+     "session_id": "other"
+    }
+   ]
+  },
+  {
+   "fields": [
+    {
+     "day": "2026-11-11",
+     "field": "input:id",
+     "present": 1,
+     "record_kind": "applied:tool_use",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:input",
+     "present": 1,
+     "record_kind": "applied:tool_use",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:name",
+     "present": 1,
+     "record_kind": "applied:tool_use",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:cache_creation_input_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:cache_read_input_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:input_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:output_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:thinking_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:response",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.id",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_creation_input_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_read_input_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.input_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.output_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "requestId",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:content",
+     "present": 3,
+     "record_kind": "applied:tool_result",
+     "seen": 3,
+     "session_id": "other"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:tool_use_id",
+     "present": 3,
+     "record_kind": "applied:tool_result",
+     "seen": 3,
+     "session_id": "other"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:duration",
+     "present": 0,
+     "record_kind": "applied:tool_result_meta",
+     "seen": 3,
+     "session_id": "other"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:content",
+     "present": 2,
+     "record_kind": "user",
+     "seen": 2,
+     "session_id": "other"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.content",
+     "present": 2,
+     "record_kind": "user",
+     "seen": 2,
+     "session_id": "other"
+    }
+   ],
+   "records": [
+    {
+     "day": "2026-11-11",
+     "known": 1,
+     "record_kind": "assistant",
+     "records": 1,
+     "session_id": "agent-kid"
+    },
+    {
+     "day": "2026-11-12",
+     "known": 1,
+     "record_kind": "user",
+     "records": 2,
+     "session_id": "other"
+    }
+   ]
+  }
+ ],
+ "sha256": "16c781cbf284a17154e13574f91f3f2104190071edbfd5ce00241dbe7ccb84f1"
+}
