@@ -211,7 +211,7 @@ def test_index_evidence_has_sources_and_text_is_opt_in(tmp_path):
         assert row["line"] == number and row["end"] == offset + len(line)
         assert row["sha256"] == hashlib.sha256(line).hexdigest()
         assert row["ref"] == f"file:{source}#L{number}"
-        assert row["decoder"]["version"] == "14"
+        assert row["decoder"]["version"] == "15"
         for provenance in row["provenance"].values():
             assert provenance["basis"] in {"native", "convention", "heuristic"}
             assert provenance["rule"] and provenance["ref"] == row["ref"]
@@ -766,3 +766,49 @@ def test_usage_presence_has_native_provenance_and_no_new_populations(tmp_path):
     old = json.loads((FIXTURES / "index/task2-usage-storage-controls.json").read_text())
     measured = next(v for v in out if v["object"] == "coverage")
     assert measured["records"] == old["records"] and measured["fields"] == old["fields"]
+
+
+POLICY_CONTROLS = json.loads((FIXTURES / "index/task2-policy-controls.json").read_text())
+
+
+@pytest.mark.parametrize("name", sorted(POLICY_CONTROLS["cases"]))
+def test_native_question_answer_duration_json_matches_old_controls(tmp_path, name):
+    control = POLICY_CONTROLS["cases"][name]
+    source = FIXTURES / "index" / name
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == control["sha256"]
+    assert control["outcome"]["native"] == "success"
+    out = decoded(tmp_path, name)
+    rows = events(out)
+    assert len(rows) == 2
+    native = control["native"]
+    call = rows[0]["calls"][0]
+    if native["pending_question"]:
+        assert call["questions"][0]["question"] == native["question"]
+        assert type(call["questions"][0]["question"]) is type(native["question"])
+        assert call["questions"][0]["options"] == [{"label": "A (Recommended)"}, {"label": "B"}]
+    else:
+        assert call["kind"] == "shell" and call["questions"] == []
+    result = rows[1]["results"][0]
+    for field in ("answers", "native_duration_ms"):
+        assert result[field] == native[field]
+        assert type(result[field]) is type(native[field])
+    completed = [v for v in control["rows"] if v["table"] == "tool_calls" and v["duration_ms"] is not None]
+    assert completed[-1]["duration_ms"] == native["result_elapsed_ms"] == 2000
+    assert control["sessions"]
+    measured = next(v for v in out if v["object"] == "coverage")
+    assert measured["records"] == control["records"]
+    assert measured["fields"] == control["fields"]
+
+
+def test_policy_controls_distinguish_native_success_from_consumer_failure():
+    failures = [v for v in POLICY_CONTROLS["cases"].values() if v["outcome"]["consumer"] == "error"]
+    assert {v["label"] for v in failures} == {"pending-truthy-string", "pending-truthy-integer", "pending-truthy-list", "pending-truthy-boolean"}
+    for control in failures:
+        assert control["error"] == "AttributeError"
+        assert control["error_category"] == "consumer_policy" and control["error_site"] == "_score_answers"
+        assert control["partial_old_state"] and control["outcome"]["native"] == "success"
+        assert control["rows"] and control["sessions"] and control["fields"]
+    for label in ("question-null", "question-integer"):
+        control = POLICY_CONTROLS["cases"]["task2-policy-" + label + ".jsonl"]
+        assert control["outcome"]["consumer"] == "success"
+        assert control["sessions"][0]["rec_accepted"] == 1

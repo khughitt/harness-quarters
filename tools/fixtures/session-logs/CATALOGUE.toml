@@ -1628,3 +1628,262 @@ harness = "claude-code"
 version = "unknown"
 provenance = "synthetic"
 profile = "index"
+
+[[sample]]
+path = "index/task2-policy-duration-absent.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-duration-boolean.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-duration-empty-dict.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-duration-empty-list.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-duration-fractional.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-duration-integer.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-duration-null.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-duration-string.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-duration-zero.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-metadata-absent.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-absent.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-empty-dict.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-empty-list.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-empty-string.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-false.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-integer-value.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-list-value.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-null-value.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-null.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-other-option.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-recommended.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-truthy-boolean.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-truthy-integer.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-truthy-list.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-truthy-string.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-zero.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-question-boolean.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-question-integer.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-question-list.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-question-null.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-question-object.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-question-string.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-unused-answers-boolean.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-unused-answers-dict.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-unused-answers-integer.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-unused-answers-list.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-unused-answers-string.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"

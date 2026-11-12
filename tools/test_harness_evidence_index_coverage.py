@@ -9,7 +9,7 @@ import pytest
 from harness_evidence import index_events
 from harness_evidence.lines import Place
 from harness_evidence_index_tracing import covered, declared, feeds_valid, reasons_valid, traced_extract
-from test_harness_evidence_index import CONTROLS, FIXTURES
+from test_harness_evidence_index import CONTROLS, FIXTURES, POLICY_CONTROLS
 from test_harness_evidence_index_stream import coverage, read, request, source
 
 
@@ -37,6 +37,10 @@ def test_every_native_read_is_declared(monkeypatch):
     path = FIXTURES / "index/task2-usage-storage.jsonl"
     reads.update(traced_extract(numbered(path.read_bytes()), place=Place(
         "claude-code", "file", None, "explicit", path.name, path)))
+    for name in POLICY_CONTROLS["cases"]:
+        path = FIXTURES / "index" / name
+        reads.update(traced_extract(numbered(path.read_bytes()), place=Place(
+            "claude-code", "file", None, "explicit", path.name, path)))
     missing = sorted((kind, path) for kind, path in reads if not covered(path, declared(dec, kind)))
     assert missing == []
     # A container declaration cannot silently authorize future descendants.

@@ -588,6 +588,13 @@ sizes. Joined user text preserves empty placeholders for missing text keys. Nati
 the exact nonempty native file/notebook path; `paths` separately carries lexical
 normalization against cwd, and `paths_complete` records missing or rejected inputs.
 
+Question prompts, result answers and native duration metadata retain their finite
+JSON values. Consumers apply their hashing/matching/scoring rules at the original
+use site; a native decode success can still precede a consumer-policy failure.
+Native duration metadata describes presence and is separate from timestamp deltas.
+The conformance corpus records native and consumer outcomes separately for these
+cases, including old partial row/session/coverage evidence on consumer failure.
+
 `response.usage_present` contains `output` and `thinking` booleans for native key
 presence, including explicit null. Consumers preserving old storage defaults use 0
 only when the flag is false and copy a present `usage.output` or `usage.thinking`
