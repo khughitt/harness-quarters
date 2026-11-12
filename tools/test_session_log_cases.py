@@ -11,6 +11,7 @@ import os
 import re
 import shutil
 import stat
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -607,9 +608,13 @@ def test_fixtures_hold_no_private_paths_or_identifiers():
         assert not PRIVATE.search(SYNTHETIC_UUID.sub("", str(path.relative_to(FIXTURES))))
 
 
-def test_every_fixture_file_is_listed_by_the_cases_document():
+def test_cases_document_and_catalogue_account_for_every_fixture_file():
     doc = (Path(__file__).parents[1] / "docs/notes/session-log-acceptance-cases.md").read_text()
     listed = set(re.findall(r"`((?:home|degraded|captures|turns)/[^`]+)`", doc))
+    catalogue = tomllib.loads((FIXTURES / "CATALOGUE.toml").read_text())["sample"]
+    catalogued = {sample["path"] for sample in catalogue}
     on_disk = {str(p.relative_to(FIXTURES)) for p in every_file(FIXTURES)}
-    assert on_disk == listed
+    historical = {p for p in on_disk if p.split("/", 1)[0] in {"home", "degraded", "captures", "turns"}}
+    assert historical == listed
+    assert on_disk == listed | catalogued | {"CATALOGUE.toml"}
     assert CF in doc
