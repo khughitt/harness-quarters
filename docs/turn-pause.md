@@ -15,7 +15,7 @@ hq pause history [--session ROOT] [--harness claude-code|codex]
 hq pause list [--session ROOT] [--harness claude-code|codex]
 ```
 
-Current defaults are 57,600 active seconds (16 hours), 500 root call attempts,
+Current defaults are 57,600 active seconds (16 hours), 2,000 root call attempts,
 60 tree spawns and two root compactions. Active/calls/spawns are enforced only
 when strictly above their limit; exact equality is allowed. Compactions are
 advisory. Warnings start at 75% and authorize continued work within limits;
@@ -125,6 +125,13 @@ read grace (25), as do permitted literal filesystem inspections. Read-only acces
 never authorizes writes or clears a pause. Allowed readers use concrete paths and
 restricted options; wrappers, redirection, glob expansion and compound actions
 are not equivalent to a validated single read.
+
+Single-line tasks note, tasks park and tasks feedback commands remain bookkeeping
+after read grace is exhausted. Their command text is limited to 16,384 characters;
+split longer pause reports across note calls. Workspace file writes and structured
+question tools remain refused while paused. Put the durable handoff in task notes
+and the continuation decision, including any exact budget first line, in the
+closing assistant message. Other task mutations remain refused.
 
 Before worktree disposal inspect declared launchers, user units and config includes
 for targets into the worktree, including embedded paths. Resolve literal entries;

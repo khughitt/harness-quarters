@@ -16,6 +16,7 @@ private work settings or apply another person's home layout without configuratio
 | Live configuration | harnesses.toml, .gitattributes | Git filter, pick and trust hooks |
 | Capability observations | facts/capabilities.toml | tools/harness-facts and its lookup interface |
 | Session discovery | tools/harness_stores/ | hq sessions, transcript archive and evidence tools |
+| Native transcript evidence | tools/harness_evidence/ | standalone harness-evidence decoder; shared home discovery |
 | Transcript custody | tools/session_archive/ | session-archive commands and optional user timers |
 | Turn accounting | tools/turn_pause/ | lifecycle/tool hooks and hq pause diagnostics |
 | Pinned runtimes | harnesses/pi/, relay/ | home launchers and installed hook images |
