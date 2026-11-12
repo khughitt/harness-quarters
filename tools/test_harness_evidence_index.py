@@ -211,7 +211,7 @@ def test_index_evidence_has_sources_and_text_is_opt_in(tmp_path):
         assert row["line"] == number and row["end"] == offset + len(line)
         assert row["sha256"] == hashlib.sha256(line).hexdigest()
         assert row["ref"] == f"file:{source}#L{number}"
-        assert row["decoder"]["version"] == "12"
+        assert row["decoder"]["version"] == "13"
         for provenance in row["provenance"].values():
             assert provenance["basis"] in {"native", "convention", "heuristic"}
             assert provenance["rule"] and provenance["ref"] == row["ref"]

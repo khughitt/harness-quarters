@@ -93,8 +93,9 @@ def _file(source, number, roots, request, envelope):
         def physical_lines():
             offset = state["next_offset"]
             while offset < source["size"]:
-                raw = handle.readline(source["size"] - offset)
-                if not raw:
+                remaining = source["size"] - offset
+                raw = handle.readline(remaining)
+                if not raw or not raw.endswith(b"\n") and len(raw) < remaining:
                     raise ProtocolError("short read within index fixed span")
                 if raw.endswith(b"\n"):
                     digest.update(raw)

@@ -239,14 +239,37 @@ def test_held_handle_reads_original_source_after_path_replacement(tmp_path):
     assert [v["native_kind"] for v in out if v["object"] == "index_event"] == ["user", "assistant", "user"]
 
 
-def test_short_read_fails_without_file_terminal(tmp_path):
+@pytest.mark.parametrize("truncated", [b"", b"{}\n{"])
+def test_short_read_fails_without_file_terminal(tmp_path, truncated):
     path = tmp_path / "truncated"
-    path.write_bytes((FIXTURES / "index/sizes.jsonl").read_bytes())
+    path.write_bytes(b"{}\n{}\n")
     iterator = stream.objects(stream.validate(request(source(path))), ENVELOPE)
     assert next(iterator)["object"] == "file_start"
-    path.write_bytes(b"")
+    path.write_bytes(truncated)
+    emitted = []
     with pytest.raises(stream.ProtocolError, match="short read"):
-        list(iterator)
+        for value in iterator:
+            emitted.append(value)
+    assert not any(v["object"] in {"file_end", "request_end"} for v in emitted)
+    assert [v["object"] for v in emitted] == (["index_event"] if truncated else [])
+
+
+def test_nonempty_short_read_preserves_previous_file_terminal(tmp_path):
+    first = FIXTURES / "index/sizes.jsonl"
+    path = tmp_path / "truncated-second"
+    path.write_bytes(b"{}\n{}\n")
+    iterator = stream.objects(stream.validate(request(source(first), source(path))), ENVELOPE)
+    emitted = []
+    with pytest.raises(stream.ProtocolError, match="short read"):
+        for value in iterator:
+            emitted.append(value)
+            if value["object"] == "file_start" and value["file"] == 1:
+                path.write_bytes(b"{}\n{")
+    terminals = [v for v in emitted if v["object"] == "file_end"]
+    assert len(terminals) == 1 and terminals[0]["file"] == 0
+    assert terminals[0]["offset"] == first.stat().st_size
+    assert terminals[0]["state"]["next_offset"] == first.stat().st_size
+    assert not any(v["object"] == "request_end" for v in emitted)
 
 
 def test_vanished_source_is_framed_and_has_no_checkpoint(tmp_path):
