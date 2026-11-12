@@ -63,6 +63,3356 @@
    ],
    "sha256": "62ce88dd628896fb4bb258f1f33a3ebd32ec0de3b90b4d8a7778e93de780820c"
   },
+  "fix1-attachment-ignored-message.jsonl": {
+   "fields": [
+    {
+     "day": "2026-11-11",
+     "field": "input:body",
+     "present": 1,
+     "record_kind": "applied:attachment",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "attachment",
+     "present": 1,
+     "record_kind": "attachment",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "attachment.type",
+     "present": 1,
+     "record_kind": "attachment",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:attachment",
+     "present": 1,
+     "record_kind": "attachment",
+     "seen": 1,
+     "session_id": "control"
+    }
+   ],
+   "initial_state": {},
+   "malformed": 0,
+   "original_tests": [
+    "new:fix1-attachment-ignored-message"
+   ],
+   "records": [
+    {
+     "day": "2026-11-11",
+     "known": 1,
+     "record_kind": "attachment",
+     "records": 1,
+     "session_id": "control"
+    }
+   ],
+   "rows": [
+    {
+     "at_ms": 1794441540000,
+     "bytes": 2,
+     "kind": "hook_success",
+     "piece_index": 0,
+     "record_offset": 0,
+     "response_id": null,
+     "session_id": "control",
+     "source": "guard",
+     "table": "injections"
+    }
+   ],
+   "sessions": [
+    {
+     "active_seconds": 0.0,
+     "assistant_msgs": 0,
+     "commits": 0,
+     "compactions": 0,
+     "cwd": "/w/project",
+     "end_ms": 1794441540000,
+     "entrypoint": "cli",
+     "harness_version": "unknown",
+     "human_turns": 0,
+     "interactive": true,
+     "interruptions": 0,
+     "model_first": null,
+     "parent_session": null,
+     "questions": 0,
+     "questions_with_rec": 0,
+     "rec_accepted": 0,
+     "rec_free_text": 0,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "subagent": false,
+     "tasks_cmds": {},
+     "test_runs": 0,
+     "tool_calls": 0,
+     "waits": []
+    }
+   ],
+   "sha256": "a390bbad610892ea7cdf198fb8917aab1f6894f88d45809da263baf018483ed3"
+  },
+  "fix1-compact-invalid-text.jsonl": {
+   "error": "TypeError",
+   "initial_state": {},
+   "message": "sequence item 0: expected str instance, NoneType found",
+   "original_tests": [
+    "new:fix1-compact-invalid-text"
+   ],
+   "sha256": "fca04934ca58ecb52bb2996e51c1f2ec3ecd1faf5b3368f4815407351146c3ab"
+  },
+  "fix1-entrypoint-cli-sdk.jsonl": {
+   "fields": [
+    {
+     "day": "2026-11-11",
+     "field": "input:content",
+     "present": 2,
+     "record_kind": "user",
+     "seen": 2,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.content",
+     "present": 2,
+     "record_kind": "user",
+     "seen": 2,
+     "session_id": "control"
+    }
+   ],
+   "initial_state": {},
+   "malformed": 0,
+   "original_tests": [
+    "new:fix1-entrypoint-cli-sdk"
+   ],
+   "prefix_sessions": [
+    [
+     {
+      "active_seconds": 0.0,
+      "assistant_msgs": 0,
+      "commits": 0,
+      "compactions": 0,
+      "cwd": "/w/project",
+      "end_ms": 1794441540000,
+      "entrypoint": "cli",
+      "harness_version": "unknown",
+      "human_turns": 1,
+      "interactive": true,
+      "interruptions": 0,
+      "model_first": null,
+      "parent_session": null,
+      "questions": 0,
+      "questions_with_rec": 0,
+      "rec_accepted": 0,
+      "rec_free_text": 0,
+      "session_id": "control",
+      "start_ms": 1794441540000,
+      "subagent": false,
+      "tasks_cmds": {},
+      "test_runs": 0,
+      "tool_calls": 0,
+      "waits": []
+     }
+    ],
+    [
+     {
+      "active_seconds": 1.0,
+      "assistant_msgs": 0,
+      "commits": 0,
+      "compactions": 0,
+      "cwd": "/w/project",
+      "end_ms": 1794441541000,
+      "entrypoint": "cli",
+      "harness_version": "unknown",
+      "human_turns": 2,
+      "interactive": true,
+      "interruptions": 0,
+      "model_first": null,
+      "parent_session": null,
+      "questions": 0,
+      "questions_with_rec": 0,
+      "rec_accepted": 0,
+      "rec_free_text": 0,
+      "session_id": "control",
+      "start_ms": 1794441540000,
+      "subagent": false,
+      "tasks_cmds": {},
+      "test_runs": 0,
+      "tool_calls": 0,
+      "waits": []
+     }
+    ]
+   ],
+   "records": [
+    {
+     "day": "2026-11-11",
+     "known": 1,
+     "record_kind": "user",
+     "records": 2,
+     "session_id": "control"
+    }
+   ],
+   "rows": [
+    {
+     "end_ms": 1794441541000,
+     "end_offset": 179,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "start_offset": 0,
+     "table": "activity_intervals"
+    }
+   ],
+   "sessions": [
+    {
+     "active_seconds": 1.0,
+     "assistant_msgs": 0,
+     "commits": 0,
+     "compactions": 0,
+     "cwd": "/w/project",
+     "end_ms": 1794441541000,
+     "entrypoint": "cli",
+     "harness_version": "unknown",
+     "human_turns": 2,
+     "interactive": true,
+     "interruptions": 0,
+     "model_first": null,
+     "parent_session": null,
+     "questions": 0,
+     "questions_with_rec": 0,
+     "rec_accepted": 0,
+     "rec_free_text": 0,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "subagent": false,
+     "tasks_cmds": {},
+     "test_runs": 0,
+     "tool_calls": 0,
+     "waits": []
+    }
+   ],
+   "sha256": "7c2f351e6020fbc83f89474bbdf37f146861c4087c6b6a2d12c2134c9a7f1f9c"
+  },
+  "fix1-entrypoint-empty-sdk.jsonl": {
+   "fields": [
+    {
+     "day": "2026-11-11",
+     "field": "input:content",
+     "present": 2,
+     "record_kind": "user",
+     "seen": 2,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.content",
+     "present": 2,
+     "record_kind": "user",
+     "seen": 2,
+     "session_id": "control"
+    }
+   ],
+   "initial_state": {},
+   "malformed": 0,
+   "original_tests": [
+    "new:fix1-entrypoint-empty-sdk"
+   ],
+   "prefix_sessions": [
+    [
+     {
+      "active_seconds": 0.0,
+      "assistant_msgs": 0,
+      "commits": 0,
+      "compactions": 0,
+      "cwd": "/w/project",
+      "end_ms": 1794441540000,
+      "entrypoint": "",
+      "harness_version": "unknown",
+      "human_turns": 1,
+      "interactive": false,
+      "interruptions": 0,
+      "model_first": null,
+      "parent_session": null,
+      "questions": 0,
+      "questions_with_rec": 0,
+      "rec_accepted": 0,
+      "rec_free_text": 0,
+      "session_id": "control",
+      "start_ms": 1794441540000,
+      "subagent": false,
+      "tasks_cmds": {},
+      "test_runs": 0,
+      "tool_calls": 0,
+      "waits": []
+     }
+    ],
+    [
+     {
+      "active_seconds": 1.0,
+      "assistant_msgs": 0,
+      "commits": 0,
+      "compactions": 0,
+      "cwd": "/w/project",
+      "end_ms": 1794441541000,
+      "entrypoint": "sdk-py",
+      "harness_version": "unknown",
+      "human_turns": 2,
+      "interactive": false,
+      "interruptions": 0,
+      "model_first": null,
+      "parent_session": null,
+      "questions": 0,
+      "questions_with_rec": 0,
+      "rec_accepted": 0,
+      "rec_free_text": 0,
+      "session_id": "control",
+      "start_ms": 1794441540000,
+      "subagent": true,
+      "tasks_cmds": {},
+      "test_runs": 0,
+      "tool_calls": 0,
+      "waits": []
+     }
+    ]
+   ],
+   "records": [
+    {
+     "day": "2026-11-11",
+     "known": 1,
+     "record_kind": "user",
+     "records": 2,
+     "session_id": "control"
+    }
+   ],
+   "rows": [
+    {
+     "end_ms": 1794441541000,
+     "end_offset": 176,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "start_offset": 0,
+     "table": "activity_intervals"
+    }
+   ],
+   "sessions": [
+    {
+     "active_seconds": 1.0,
+     "assistant_msgs": 0,
+     "commits": 0,
+     "compactions": 0,
+     "cwd": "/w/project",
+     "end_ms": 1794441541000,
+     "entrypoint": "sdk-py",
+     "harness_version": "unknown",
+     "human_turns": 2,
+     "interactive": false,
+     "interruptions": 0,
+     "model_first": null,
+     "parent_session": null,
+     "questions": 0,
+     "questions_with_rec": 0,
+     "rec_accepted": 0,
+     "rec_free_text": 0,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "subagent": true,
+     "tasks_cmds": {},
+     "test_runs": 0,
+     "tool_calls": 0,
+     "waits": []
+    }
+   ],
+   "sha256": "851039fcc7d0c0c773acb13d737403341886b308a274d7a5f07e07e691b8cdfc"
+  },
+  "fix1-entrypoint-sdk-cli.jsonl": {
+   "fields": [
+    {
+     "day": "2026-11-11",
+     "field": "input:content",
+     "present": 2,
+     "record_kind": "user",
+     "seen": 2,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.content",
+     "present": 2,
+     "record_kind": "user",
+     "seen": 2,
+     "session_id": "control"
+    }
+   ],
+   "initial_state": {},
+   "malformed": 0,
+   "original_tests": [
+    "new:fix1-entrypoint-sdk-cli"
+   ],
+   "prefix_sessions": [
+    [
+     {
+      "active_seconds": 0.0,
+      "assistant_msgs": 0,
+      "commits": 0,
+      "compactions": 0,
+      "cwd": "/w/project",
+      "end_ms": 1794441540000,
+      "entrypoint": "sdk-py",
+      "harness_version": "unknown",
+      "human_turns": 1,
+      "interactive": false,
+      "interruptions": 0,
+      "model_first": null,
+      "parent_session": null,
+      "questions": 0,
+      "questions_with_rec": 0,
+      "rec_accepted": 0,
+      "rec_free_text": 0,
+      "session_id": "control",
+      "start_ms": 1794441540000,
+      "subagent": true,
+      "tasks_cmds": {},
+      "test_runs": 0,
+      "tool_calls": 0,
+      "waits": []
+     }
+    ],
+    [
+     {
+      "active_seconds": 1.0,
+      "assistant_msgs": 0,
+      "commits": 0,
+      "compactions": 0,
+      "cwd": "/w/project",
+      "end_ms": 1794441541000,
+      "entrypoint": "sdk-py",
+      "harness_version": "unknown",
+      "human_turns": 2,
+      "interactive": false,
+      "interruptions": 0,
+      "model_first": null,
+      "parent_session": null,
+      "questions": 0,
+      "questions_with_rec": 0,
+      "rec_accepted": 0,
+      "rec_free_text": 0,
+      "session_id": "control",
+      "start_ms": 1794441540000,
+      "subagent": true,
+      "tasks_cmds": {},
+      "test_runs": 0,
+      "tool_calls": 0,
+      "waits": []
+     }
+    ]
+   ],
+   "records": [
+    {
+     "day": "2026-11-11",
+     "known": 1,
+     "record_kind": "user",
+     "records": 2,
+     "session_id": "control"
+    }
+   ],
+   "rows": [
+    {
+     "end_ms": 1794441541000,
+     "end_offset": 182,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "start_offset": 0,
+     "table": "activity_intervals"
+    }
+   ],
+   "sessions": [
+    {
+     "active_seconds": 1.0,
+     "assistant_msgs": 0,
+     "commits": 0,
+     "compactions": 0,
+     "cwd": "/w/project",
+     "end_ms": 1794441541000,
+     "entrypoint": "sdk-py",
+     "harness_version": "unknown",
+     "human_turns": 2,
+     "interactive": false,
+     "interruptions": 0,
+     "model_first": null,
+     "parent_session": null,
+     "questions": 0,
+     "questions_with_rec": 0,
+     "rec_accepted": 0,
+     "rec_free_text": 0,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "subagent": true,
+     "tasks_cmds": {},
+     "test_runs": 0,
+     "tool_calls": 0,
+     "waits": []
+    }
+   ],
+   "sha256": "122bdaa6e20ff5d0dc983d55ecd2c82ad10a394fde34bcfeb14191db05df3547"
+  },
+  "fix1-entrypoint-sidechain.jsonl": {
+   "fields": [
+    {
+     "day": "2026-11-11",
+     "field": "input:content",
+     "present": 4,
+     "record_kind": "user",
+     "seen": 4,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.content",
+     "present": 4,
+     "record_kind": "user",
+     "seen": 4,
+     "session_id": "control"
+    }
+   ],
+   "initial_state": {},
+   "malformed": 0,
+   "original_tests": [
+    "new:fix1-entrypoint-sidechain"
+   ],
+   "prefix_sessions": [
+    [
+     {
+      "active_seconds": 0.0,
+      "assistant_msgs": 0,
+      "commits": 0,
+      "compactions": 0,
+      "cwd": "/w/project",
+      "end_ms": 1794441540000,
+      "entrypoint": "cli",
+      "harness_version": "unknown",
+      "human_turns": 1,
+      "interactive": true,
+      "interruptions": 0,
+      "model_first": null,
+      "parent_session": null,
+      "questions": 0,
+      "questions_with_rec": 0,
+      "rec_accepted": 0,
+      "rec_free_text": 0,
+      "session_id": "control",
+      "start_ms": 1794441540000,
+      "subagent": false,
+      "tasks_cmds": {},
+      "test_runs": 0,
+      "tool_calls": 0,
+      "waits": []
+     }
+    ],
+    [
+     {
+      "active_seconds": 1.0,
+      "assistant_msgs": 0,
+      "commits": 0,
+      "compactions": 0,
+      "cwd": "/w/project",
+      "end_ms": 1794441541000,
+      "entrypoint": "cli",
+      "harness_version": "unknown",
+      "human_turns": 2,
+      "interactive": true,
+      "interruptions": 0,
+      "model_first": null,
+      "parent_session": null,
+      "questions": 0,
+      "questions_with_rec": 0,
+      "rec_accepted": 0,
+      "rec_free_text": 0,
+      "session_id": "control",
+      "start_ms": 1794441540000,
+      "subagent": false,
+      "tasks_cmds": {},
+      "test_runs": 0,
+      "tool_calls": 0,
+      "waits": []
+     }
+    ],
+    [
+     {
+      "active_seconds": 2.0,
+      "assistant_msgs": 0,
+      "commits": 0,
+      "compactions": 0,
+      "cwd": "/w/project",
+      "end_ms": 1794441542000,
+      "entrypoint": "cli",
+      "harness_version": "unknown",
+      "human_turns": 3,
+      "interactive": false,
+      "interruptions": 0,
+      "model_first": null,
+      "parent_session": null,
+      "questions": 0,
+      "questions_with_rec": 0,
+      "rec_accepted": 0,
+      "rec_free_text": 0,
+      "session_id": "control",
+      "start_ms": 1794441540000,
+      "subagent": true,
+      "tasks_cmds": {},
+      "test_runs": 0,
+      "tool_calls": 0,
+      "waits": []
+     }
+    ],
+    [
+     {
+      "active_seconds": 3.0,
+      "assistant_msgs": 0,
+      "commits": 0,
+      "compactions": 0,
+      "cwd": "/w/project",
+      "end_ms": 1794441543000,
+      "entrypoint": "cli",
+      "harness_version": "unknown",
+      "human_turns": 4,
+      "interactive": false,
+      "interruptions": 0,
+      "model_first": null,
+      "parent_session": null,
+      "questions": 0,
+      "questions_with_rec": 0,
+      "rec_accepted": 0,
+      "rec_free_text": 0,
+      "session_id": "control",
+      "start_ms": 1794441540000,
+      "subagent": true,
+      "tasks_cmds": {},
+      "test_runs": 0,
+      "tool_calls": 0,
+      "waits": []
+     }
+    ]
+   ],
+   "records": [
+    {
+     "day": "2026-11-11",
+     "known": 1,
+     "record_kind": "user",
+     "records": 4,
+     "session_id": "control"
+    }
+   ],
+   "rows": [
+    {
+     "end_ms": 1794441541000,
+     "end_offset": 175,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "start_offset": 0,
+     "table": "activity_intervals"
+    },
+    {
+     "end_ms": 1794441542000,
+     "end_offset": 354,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "start_offset": 0,
+     "table": "activity_intervals"
+    },
+    {
+     "end_ms": 1794441543000,
+     "end_offset": 554,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "start_offset": 0,
+     "table": "activity_intervals"
+    }
+   ],
+   "sessions": [
+    {
+     "active_seconds": 3.0,
+     "assistant_msgs": 0,
+     "commits": 0,
+     "compactions": 0,
+     "cwd": "/w/project",
+     "end_ms": 1794441543000,
+     "entrypoint": "cli",
+     "harness_version": "unknown",
+     "human_turns": 4,
+     "interactive": false,
+     "interruptions": 0,
+     "model_first": null,
+     "parent_session": null,
+     "questions": 0,
+     "questions_with_rec": 0,
+     "rec_accepted": 0,
+     "rec_free_text": 0,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "subagent": true,
+     "tasks_cmds": {},
+     "test_runs": 0,
+     "tool_calls": 0,
+     "waits": []
+    }
+   ],
+   "sha256": "0fc4e99fdcfcf4854b16c287c33bdf8fef5cd159001e66992dee3eab9bfe2b57"
+  },
+  "fix1-result-ignored-text.jsonl": {
+   "fields": [
+    {
+     "day": "2026-11-11",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "applied:tool_result",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:tool_use_id",
+     "present": 1,
+     "record_kind": "applied:tool_result",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "user",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.content",
+     "present": 1,
+     "record_kind": "user",
+     "seen": 1,
+     "session_id": "control"
+    }
+   ],
+   "initial_state": {},
+   "malformed": 0,
+   "original_tests": [
+    "new:fix1-result-ignored-text"
+   ],
+   "records": [
+    {
+     "day": "2026-11-11",
+     "known": 1,
+     "record_kind": "user",
+     "records": 1,
+     "session_id": "control"
+    }
+   ],
+   "rows": [],
+   "sessions": [
+    {
+     "active_seconds": 0.0,
+     "assistant_msgs": 0,
+     "commits": 0,
+     "compactions": 0,
+     "cwd": "/w/project",
+     "end_ms": 1794441540000,
+     "entrypoint": "cli",
+     "harness_version": "unknown",
+     "human_turns": 0,
+     "interactive": true,
+     "interruptions": 0,
+     "model_first": null,
+     "parent_session": null,
+     "questions": 0,
+     "questions_with_rec": 0,
+     "rec_accepted": 0,
+     "rec_free_text": 0,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "subagent": false,
+     "tasks_cmds": {},
+     "test_runs": 0,
+     "tool_calls": 0,
+     "waits": []
+    }
+   ],
+   "sha256": "13a47df7fd871100de3a9dd5c8c833087e194073f1b76dfbfc5615b7f3062304"
+  },
+  "fix1-stop-equality.jsonl": {
+   "fields": [
+    {
+     "day": "2026-11-11",
+     "field": "input:body",
+     "present": 0,
+     "record_kind": "applied:attachment",
+     "seen": 3,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:command",
+     "present": 2,
+     "record_kind": "applied:hook_run",
+     "seen": 3,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:duration",
+     "present": 0,
+     "record_kind": "applied:hook_run",
+     "seen": 3,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:command",
+     "present": 2,
+     "record_kind": "applied:stop_block",
+     "seen": 3,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:reason",
+     "present": 3,
+     "record_kind": "applied:stop_block",
+     "seen": 3,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:turn",
+     "present": 3,
+     "record_kind": "applied:stop_block",
+     "seen": 3,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:errors",
+     "present": 1,
+     "record_kind": "applied:turn_end",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:hooks",
+     "present": 1,
+     "record_kind": "applied:turn_end",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:id",
+     "present": 1,
+     "record_kind": "applied:turn_end",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:turn",
+     "present": 1,
+     "record_kind": "applied:turn_end",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "attachment",
+     "present": 3,
+     "record_kind": "attachment",
+     "seen": 3,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "attachment.type",
+     "present": 3,
+     "record_kind": "attachment",
+     "seen": 3,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:attachment",
+     "present": 3,
+     "record_kind": "attachment",
+     "seen": 3,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:subtype",
+     "present": 1,
+     "record_kind": "system",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "subtype",
+     "present": 1,
+     "record_kind": "system",
+     "seen": 1,
+     "session_id": "control"
+    }
+   ],
+   "initial_state": {},
+   "malformed": 0,
+   "original_tests": [
+    "new:fix1-stop-equality"
+   ],
+   "records": [
+    {
+     "day": "2026-11-11",
+     "known": 1,
+     "record_kind": "attachment",
+     "records": 3,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "known": 1,
+     "record_kind": "system",
+     "records": 1,
+     "session_id": "control"
+    }
+   ],
+   "rows": [
+    {
+     "end_ms": 1794441541000,
+     "end_offset": 910,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "start_offset": 612,
+     "table": "activity_intervals"
+    },
+    {
+     "at_ms": 1794441541000,
+     "blocked": true,
+     "hooks": 3,
+     "reason_bytes": 12,
+     "session_id": "control",
+     "table": "turn_ends",
+     "turn_end_id": "equal-end"
+    },
+    {
+     "at_ms": 1794441541000,
+     "blocked": true,
+     "command": {
+      "nested": [
+       1,
+       1
+      ]
+     },
+     "duration_ms": null,
+     "reason_bytes": 4,
+     "seq": 0,
+     "session_id": "control",
+     "table": "hook_runs",
+     "turn_end_id": "equal-end"
+    },
+    {
+     "at_ms": 1794441541000,
+     "blocked": true,
+     "command": false,
+     "duration_ms": null,
+     "reason_bytes": 4,
+     "seq": 1,
+     "session_id": "control",
+     "table": "hook_runs",
+     "turn_end_id": "equal-end"
+    },
+    {
+     "at_ms": 1794441541000,
+     "blocked": true,
+     "command": null,
+     "duration_ms": null,
+     "reason_bytes": 4,
+     "seq": 2,
+     "session_id": "control",
+     "table": "hook_runs",
+     "turn_end_id": "equal-end"
+    },
+    {
+     "at_ms": 1794441540000,
+     "bytes": 153,
+     "kind": "hook_blocking_error",
+     "piece_index": 0,
+     "record_offset": 0,
+     "response_id": null,
+     "session_id": "control",
+     "source": {
+      "nested": [
+       true,
+       1.0
+      ]
+     },
+     "table": "injections"
+    },
+    {
+     "at_ms": 1794441540000,
+     "bytes": 131,
+     "kind": "hook_blocking_error",
+     "piece_index": 0,
+     "record_offset": 317,
+     "response_id": null,
+     "session_id": "control",
+     "source": 0,
+     "table": "injections"
+    },
+    {
+     "at_ms": 1794441540000,
+     "bytes": 134,
+     "kind": "hook_blocking_error",
+     "piece_index": 0,
+     "record_offset": 612,
+     "response_id": null,
+     "session_id": "control",
+     "source": null,
+     "table": "injections"
+    }
+   ],
+   "sessions": [
+    {
+     "active_seconds": 1.0,
+     "assistant_msgs": 0,
+     "commits": 0,
+     "compactions": 0,
+     "cwd": "/w/project",
+     "end_ms": 1794441541000,
+     "entrypoint": "cli",
+     "harness_version": "unknown",
+     "human_turns": 0,
+     "interactive": true,
+     "interruptions": 0,
+     "model_first": null,
+     "parent_session": null,
+     "questions": 0,
+     "questions_with_rec": 0,
+     "rec_accepted": 0,
+     "rec_free_text": 0,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "subagent": false,
+     "tasks_cmds": {},
+     "test_runs": 0,
+     "tool_calls": 0,
+     "waits": []
+    }
+   ],
+   "sha256": "a92be65282411ae859e4d5fcdbf8c3ea7807f5f6ba6fc11684b7c659834d9b9a"
+  },
+  "fix1-stop-matching.jsonl": {
+   "fields": [
+    {
+     "day": "2026-11-11",
+     "field": "input:body",
+     "present": 0,
+     "record_kind": "applied:attachment",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:command",
+     "present": 2,
+     "record_kind": "applied:hook_run",
+     "seen": 2,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:duration",
+     "present": 0,
+     "record_kind": "applied:hook_run",
+     "seen": 2,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:command",
+     "present": 1,
+     "record_kind": "applied:stop_block",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:reason",
+     "present": 1,
+     "record_kind": "applied:stop_block",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:turn",
+     "present": 1,
+     "record_kind": "applied:stop_block",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:errors",
+     "present": 1,
+     "record_kind": "applied:turn_end",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:hooks",
+     "present": 1,
+     "record_kind": "applied:turn_end",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:id",
+     "present": 1,
+     "record_kind": "applied:turn_end",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:turn",
+     "present": 1,
+     "record_kind": "applied:turn_end",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "attachment",
+     "present": 1,
+     "record_kind": "attachment",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "attachment.type",
+     "present": 1,
+     "record_kind": "attachment",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:attachment",
+     "present": 1,
+     "record_kind": "attachment",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:subtype",
+     "present": 1,
+     "record_kind": "system",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "subtype",
+     "present": 1,
+     "record_kind": "system",
+     "seen": 1,
+     "session_id": "control"
+    }
+   ],
+   "initial_state": {},
+   "malformed": 0,
+   "original_tests": [
+    "new:fix1-stop-matching"
+   ],
+   "records": [
+    {
+     "day": "2026-11-11",
+     "known": 1,
+     "record_kind": "attachment",
+     "records": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "known": 1,
+     "record_kind": "system",
+     "records": 1,
+     "session_id": "control"
+    }
+   ],
+   "replay": [
+    {
+     "fields": [
+      {
+       "day": "2026-11-11",
+       "field": "input:body",
+       "present": 0,
+       "record_kind": "applied:attachment",
+       "seen": 1,
+       "session_id": "control"
+      },
+      {
+       "day": "2026-11-11",
+       "field": "input:command",
+       "present": 1,
+       "record_kind": "applied:stop_block",
+       "seen": 1,
+       "session_id": "control"
+      },
+      {
+       "day": "2026-11-11",
+       "field": "input:reason",
+       "present": 1,
+       "record_kind": "applied:stop_block",
+       "seen": 1,
+       "session_id": "control"
+      },
+      {
+       "day": "2026-11-11",
+       "field": "input:turn",
+       "present": 1,
+       "record_kind": "applied:stop_block",
+       "seen": 1,
+       "session_id": "control"
+      },
+      {
+       "day": "2026-11-11",
+       "field": "attachment",
+       "present": 1,
+       "record_kind": "attachment",
+       "seen": 1,
+       "session_id": "control"
+      },
+      {
+       "day": "2026-11-11",
+       "field": "attachment.type",
+       "present": 1,
+       "record_kind": "attachment",
+       "seen": 1,
+       "session_id": "control"
+      },
+      {
+       "day": "2026-11-11",
+       "field": "input:attachment",
+       "present": 1,
+       "record_kind": "attachment",
+       "seen": 1,
+       "session_id": "control"
+      }
+     ],
+     "records": [
+      {
+       "day": "2026-11-11",
+       "known": 1,
+       "record_kind": "attachment",
+       "records": 1,
+       "session_id": "control"
+      }
+     ],
+     "rows": [
+      {
+       "at_ms": 1794441540000,
+       "bytes": 180,
+       "kind": "hook_blocking_error",
+       "piece_index": 0,
+       "record_offset": 0,
+       "response_id": null,
+       "session_id": "control",
+       "source": "guard-sensitive-command /private/path --token=fake",
+       "table": "injections"
+      }
+     ],
+     "sessions": [
+      {
+       "active_seconds": 0.0,
+       "assistant_msgs": 0,
+       "commits": 0,
+       "compactions": 0,
+       "cwd": "/w/project",
+       "end_ms": 1794441540000,
+       "entrypoint": "cli",
+       "harness_version": "unknown",
+       "human_turns": 0,
+       "interactive": true,
+       "interruptions": 0,
+       "model_first": null,
+       "parent_session": null,
+       "questions": 0,
+       "questions_with_rec": 0,
+       "rec_accepted": 0,
+       "rec_free_text": 0,
+       "session_id": "control",
+       "start_ms": 1794441540000,
+       "subagent": false,
+       "tasks_cmds": {},
+       "test_runs": 0,
+       "tool_calls": 0,
+       "waits": []
+      }
+     ],
+     "state": {
+      "activity_runs": {
+       "control": {
+        "at_ms": 1794441540000,
+        "offset": 0,
+        "run": null
+       }
+      },
+      "coverage": {
+       "fields": {
+        "control\t2026-11-11\tapplied:attachment\tinput:body": [
+         1,
+         0
+        ],
+        "control\t2026-11-11\tapplied:stop_block\tinput:command": [
+         1,
+         1
+        ],
+        "control\t2026-11-11\tapplied:stop_block\tinput:reason": [
+         1,
+         1
+        ],
+        "control\t2026-11-11\tapplied:stop_block\tinput:turn": [
+         1,
+         1
+        ],
+        "control\t2026-11-11\tattachment\tattachment": [
+         1,
+         1
+        ],
+        "control\t2026-11-11\tattachment\tattachment.type": [
+         1,
+         1
+        ],
+        "control\t2026-11-11\tattachment\tinput:attachment": [
+         1,
+         1
+        ]
+       },
+       "records": {
+        "control\t2026-11-11\tattachment": [
+         1,
+         1
+        ]
+       }
+      },
+      "coverage_day": "2026-11-11",
+      "coverage_session": "control",
+      "pending_injections": [
+       {
+        "at_ms": 1794441540000,
+        "bytes": 180,
+        "emitted": true,
+        "kind": "hook_blocking_error",
+        "piece_index": 0,
+        "record_offset": 0,
+        "session_id": "control",
+        "source": "guard-sensitive-command /private/path --token=fake"
+       }
+      ],
+      "sessions": {
+       "control": {
+        "_after_compaction": false,
+        "_last_assistant_ms": null,
+        "_last_ms": 1794441540000,
+        "_prompt_bytes": 0,
+        "active_seconds": 0.0,
+        "assistant_msgs": 0,
+        "commits": 0,
+        "compactions": 0,
+        "cwd": "/w/project",
+        "end_ms": 1794441540000,
+        "entrypoint": "cli",
+        "harness_version": "unknown",
+        "human_turns": 0,
+        "interruptions": 0,
+        "model_first": null,
+        "parent_session": null,
+        "questions": 0,
+        "questions_with_rec": 0,
+        "rec_accepted": 0,
+        "rec_free_text": 0,
+        "session_id": "control",
+        "start_ms": 1794441540000,
+        "subagent": false,
+        "tasks_cmds": {},
+        "test_runs": 0,
+        "tool_calls": 0,
+        "waits": []
+       }
+      },
+      "stop_blocks": {
+       "turn": [
+        [
+         "guard-sensitive-command /private/path --token=fake",
+         2
+        ]
+       ]
+      },
+      "usage_source": "record"
+     },
+     "through_line": 1
+    },
+    {
+     "fields": [
+      {
+       "day": "2026-11-11",
+       "field": "input:body",
+       "present": 0,
+       "record_kind": "applied:attachment",
+       "seen": 1,
+       "session_id": "control"
+      },
+      {
+       "day": "2026-11-11",
+       "field": "input:command",
+       "present": 2,
+       "record_kind": "applied:hook_run",
+       "seen": 2,
+       "session_id": "control"
+      },
+      {
+       "day": "2026-11-11",
+       "field": "input:duration",
+       "present": 0,
+       "record_kind": "applied:hook_run",
+       "seen": 2,
+       "session_id": "control"
+      },
+      {
+       "day": "2026-11-11",
+       "field": "input:command",
+       "present": 1,
+       "record_kind": "applied:stop_block",
+       "seen": 1,
+       "session_id": "control"
+      },
+      {
+       "day": "2026-11-11",
+       "field": "input:reason",
+       "present": 1,
+       "record_kind": "applied:stop_block",
+       "seen": 1,
+       "session_id": "control"
+      },
+      {
+       "day": "2026-11-11",
+       "field": "input:turn",
+       "present": 1,
+       "record_kind": "applied:stop_block",
+       "seen": 1,
+       "session_id": "control"
+      },
+      {
+       "day": "2026-11-11",
+       "field": "input:errors",
+       "present": 1,
+       "record_kind": "applied:turn_end",
+       "seen": 1,
+       "session_id": "control"
+      },
+      {
+       "day": "2026-11-11",
+       "field": "input:hooks",
+       "present": 1,
+       "record_kind": "applied:turn_end",
+       "seen": 1,
+       "session_id": "control"
+      },
+      {
+       "day": "2026-11-11",
+       "field": "input:id",
+       "present": 1,
+       "record_kind": "applied:turn_end",
+       "seen": 1,
+       "session_id": "control"
+      },
+      {
+       "day": "2026-11-11",
+       "field": "input:turn",
+       "present": 1,
+       "record_kind": "applied:turn_end",
+       "seen": 1,
+       "session_id": "control"
+      },
+      {
+       "day": "2026-11-11",
+       "field": "attachment",
+       "present": 1,
+       "record_kind": "attachment",
+       "seen": 1,
+       "session_id": "control"
+      },
+      {
+       "day": "2026-11-11",
+       "field": "attachment.type",
+       "present": 1,
+       "record_kind": "attachment",
+       "seen": 1,
+       "session_id": "control"
+      },
+      {
+       "day": "2026-11-11",
+       "field": "input:attachment",
+       "present": 1,
+       "record_kind": "attachment",
+       "seen": 1,
+       "session_id": "control"
+      },
+      {
+       "day": "2026-11-11",
+       "field": "input:subtype",
+       "present": 1,
+       "record_kind": "system",
+       "seen": 1,
+       "session_id": "control"
+      },
+      {
+       "day": "2026-11-11",
+       "field": "subtype",
+       "present": 1,
+       "record_kind": "system",
+       "seen": 1,
+       "session_id": "control"
+      }
+     ],
+     "records": [
+      {
+       "day": "2026-11-11",
+       "known": 1,
+       "record_kind": "attachment",
+       "records": 1,
+       "session_id": "control"
+      },
+      {
+       "day": "2026-11-11",
+       "known": 1,
+       "record_kind": "system",
+       "records": 1,
+       "session_id": "control"
+      }
+     ],
+     "rows": [
+      {
+       "end_ms": 1794441541000,
+       "end_offset": 344,
+       "session_id": "control",
+       "start_ms": 1794441540000,
+       "start_offset": 0,
+       "table": "activity_intervals"
+      },
+      {
+       "at_ms": 1794441541000,
+       "blocked": true,
+       "hooks": 2,
+       "reason_bytes": 2,
+       "session_id": "control",
+       "table": "turn_ends",
+       "turn_end_id": "fix1-end"
+      },
+      {
+       "at_ms": 1794441541000,
+       "blocked": false,
+       "command": "other",
+       "duration_ms": null,
+       "reason_bytes": null,
+       "seq": 0,
+       "session_id": "control",
+       "table": "hook_runs",
+       "turn_end_id": "fix1-end"
+      },
+      {
+       "at_ms": 1794441541000,
+       "blocked": true,
+       "command": "guard-sensitive-command /private/path --token=fake",
+       "duration_ms": null,
+       "reason_bytes": 2,
+       "seq": 1,
+       "session_id": "control",
+       "table": "hook_runs",
+       "turn_end_id": "fix1-end"
+      }
+     ],
+     "sessions": [
+      {
+       "active_seconds": 1.0,
+       "assistant_msgs": 0,
+       "commits": 0,
+       "compactions": 0,
+       "cwd": "/w/project",
+       "end_ms": 1794441541000,
+       "entrypoint": "cli",
+       "harness_version": "unknown",
+       "human_turns": 0,
+       "interactive": true,
+       "interruptions": 0,
+       "model_first": null,
+       "parent_session": null,
+       "questions": 0,
+       "questions_with_rec": 0,
+       "rec_accepted": 0,
+       "rec_free_text": 0,
+       "session_id": "control",
+       "start_ms": 1794441540000,
+       "subagent": false,
+       "tasks_cmds": {},
+       "test_runs": 0,
+       "tool_calls": 0,
+       "waits": []
+      }
+     ],
+     "state": {
+      "activity_runs": {
+       "control": {
+        "at_ms": 1794441541000,
+        "offset": 344,
+        "run": {
+         "end_ms": 1794441541000,
+         "end_offset": 344,
+         "session_id": "control",
+         "start_ms": 1794441540000,
+         "start_offset": 0,
+         "table": "activity_intervals"
+        }
+       }
+      },
+      "coverage": {
+       "fields": {
+        "control\t2026-11-11\tapplied:attachment\tinput:body": [
+         1,
+         0
+        ],
+        "control\t2026-11-11\tapplied:hook_run\tinput:command": [
+         2,
+         2
+        ],
+        "control\t2026-11-11\tapplied:hook_run\tinput:duration": [
+         2,
+         0
+        ],
+        "control\t2026-11-11\tapplied:stop_block\tinput:command": [
+         1,
+         1
+        ],
+        "control\t2026-11-11\tapplied:stop_block\tinput:reason": [
+         1,
+         1
+        ],
+        "control\t2026-11-11\tapplied:stop_block\tinput:turn": [
+         1,
+         1
+        ],
+        "control\t2026-11-11\tapplied:turn_end\tinput:errors": [
+         1,
+         1
+        ],
+        "control\t2026-11-11\tapplied:turn_end\tinput:hooks": [
+         1,
+         1
+        ],
+        "control\t2026-11-11\tapplied:turn_end\tinput:id": [
+         1,
+         1
+        ],
+        "control\t2026-11-11\tapplied:turn_end\tinput:turn": [
+         1,
+         1
+        ],
+        "control\t2026-11-11\tattachment\tattachment": [
+         1,
+         1
+        ],
+        "control\t2026-11-11\tattachment\tattachment.type": [
+         1,
+         1
+        ],
+        "control\t2026-11-11\tattachment\tinput:attachment": [
+         1,
+         1
+        ],
+        "control\t2026-11-11\tsystem\tinput:subtype": [
+         1,
+         1
+        ],
+        "control\t2026-11-11\tsystem\tsubtype": [
+         1,
+         1
+        ]
+       },
+       "records": {
+        "control\t2026-11-11\tattachment": [
+         1,
+         1
+        ],
+        "control\t2026-11-11\tsystem": [
+         1,
+         1
+        ]
+       }
+      },
+      "coverage_day": "2026-11-11",
+      "coverage_session": "control",
+      "pending_injections": [
+       {
+        "at_ms": 1794441540000,
+        "bytes": 180,
+        "emitted": true,
+        "kind": "hook_blocking_error",
+        "piece_index": 0,
+        "record_offset": 0,
+        "session_id": "control",
+        "source": "guard-sensitive-command /private/path --token=fake"
+       }
+      ],
+      "sessions": {
+       "control": {
+        "_after_compaction": false,
+        "_last_assistant_ms": null,
+        "_last_ms": 1794441541000,
+        "_prompt_bytes": 0,
+        "active_seconds": 1.0,
+        "assistant_msgs": 0,
+        "commits": 0,
+        "compactions": 0,
+        "cwd": "/w/project",
+        "end_ms": 1794441541000,
+        "entrypoint": "cli",
+        "harness_version": "unknown",
+        "human_turns": 0,
+        "interruptions": 0,
+        "model_first": null,
+        "parent_session": null,
+        "questions": 0,
+        "questions_with_rec": 0,
+        "rec_accepted": 0,
+        "rec_free_text": 0,
+        "session_id": "control",
+        "start_ms": 1794441540000,
+        "subagent": false,
+        "tasks_cmds": {},
+        "test_runs": 0,
+        "tool_calls": 0,
+        "waits": []
+       }
+      },
+      "stop_blocks": {},
+      "usage_source": "record"
+     },
+     "through_line": 2
+    }
+   ],
+   "rows": [
+    {
+     "end_ms": 1794441541000,
+     "end_offset": 344,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "start_offset": 0,
+     "table": "activity_intervals"
+    },
+    {
+     "at_ms": 1794441541000,
+     "blocked": true,
+     "hooks": 2,
+     "reason_bytes": 2,
+     "session_id": "control",
+     "table": "turn_ends",
+     "turn_end_id": "fix1-end"
+    },
+    {
+     "at_ms": 1794441541000,
+     "blocked": false,
+     "command": "other",
+     "duration_ms": null,
+     "reason_bytes": null,
+     "seq": 0,
+     "session_id": "control",
+     "table": "hook_runs",
+     "turn_end_id": "fix1-end"
+    },
+    {
+     "at_ms": 1794441541000,
+     "blocked": true,
+     "command": "guard-sensitive-command /private/path --token=fake",
+     "duration_ms": null,
+     "reason_bytes": 2,
+     "seq": 1,
+     "session_id": "control",
+     "table": "hook_runs",
+     "turn_end_id": "fix1-end"
+    },
+    {
+     "at_ms": 1794441540000,
+     "bytes": 180,
+     "kind": "hook_blocking_error",
+     "piece_index": 0,
+     "record_offset": 0,
+     "response_id": null,
+     "session_id": "control",
+     "source": "guard-sensitive-command /private/path --token=fake",
+     "table": "injections"
+    }
+   ],
+   "sessions": [
+    {
+     "active_seconds": 1.0,
+     "assistant_msgs": 0,
+     "commits": 0,
+     "compactions": 0,
+     "cwd": "/w/project",
+     "end_ms": 1794441541000,
+     "entrypoint": "cli",
+     "harness_version": "unknown",
+     "human_turns": 0,
+     "interactive": true,
+     "interruptions": 0,
+     "model_first": null,
+     "parent_session": null,
+     "questions": 0,
+     "questions_with_rec": 0,
+     "rec_accepted": 0,
+     "rec_free_text": 0,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "subagent": false,
+     "tasks_cmds": {},
+     "test_runs": 0,
+     "tool_calls": 0,
+     "waits": []
+    }
+   ],
+   "sha256": "3137f123c00d5675356512a1c68a026e619ea648ab9de4e8b6c479ca8adcfcba"
+  },
+  "fix1-system-invalid-message.jsonl": {
+   "error": "AttributeError",
+   "initial_state": {},
+   "message": "'str' object has no attribute 'get'",
+   "original_tests": [
+    "new:fix1-system-invalid-message"
+   ],
+   "sha256": "38a3185f465ef8c78b833e5cc63258a64ea0c6f83ca1ff6fe3606979e4b4734c"
+  },
+  "fix1-usage-final-arithmetic.jsonl": {
+   "error": "TypeError",
+   "initial_state": {},
+   "message": "can only concatenate str (not \"int\") to str",
+   "original_tests": [
+    "new:fix1-usage-final-arithmetic"
+   ],
+   "sha256": "24963a7c66ddfcdcd5a0be62d2f2037de986801932b3cd5512fe322f53f5b360"
+  },
+  "fix1-usage-final-list.jsonl": {
+   "error": "AttributeError",
+   "initial_state": {},
+   "message": "'list' object has no attribute 'get'",
+   "original_tests": [
+    "new:fix1-usage-final-list"
+   ],
+   "sha256": "1e6b1389a3dc35a001b045684826aae4f74d2b32aae00b3b47af67397d31cf5f"
+  },
+  "fix1-usage-final-nested.jsonl": {
+   "error": "AttributeError",
+   "initial_state": {},
+   "message": "'str' object has no attribute 'get'",
+   "original_tests": [
+    "new:fix1-usage-final-nested"
+   ],
+   "sha256": "e6d8c47746ea6097c7654cb48f5c2f36c5b171c923a7af46d0c3c26d26a9689b"
+  },
+  "fix1-usage-final-nonmapping.jsonl": {
+   "error": "AttributeError",
+   "initial_state": {},
+   "message": "'str' object has no attribute 'get'",
+   "original_tests": [
+    "new:fix1-usage-final-nonmapping"
+   ],
+   "sha256": "dbf51c0dbee682e3cedd37b625336e07f44e00c111f8c783b6802539d80a7783"
+  },
+  "fix1-usage-overwritten-arithmetic.jsonl": {
+   "fields": [
+    {
+     "day": "2026-11-11",
+     "field": "effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:response",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.id",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_creation_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_read_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.output_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "requestId",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:cache_creation_input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:cache_read_input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:output_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:thinking_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:response",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.id",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.cache_creation_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.cache_read_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.output_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "requestId",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    }
+   ],
+   "initial_state": {},
+   "malformed": 0,
+   "original_tests": [
+    "new:fix1-usage-overwritten-arithmetic"
+   ],
+   "records": [
+    {
+     "day": "2026-11-11",
+     "known": 1,
+     "record_kind": "assistant",
+     "records": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "known": 1,
+     "record_kind": "assistant",
+     "records": 1,
+     "session_id": "control"
+    }
+   ],
+   "rows": [
+    {
+     "end_ms": 1794441601000,
+     "end_offset": 344,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "start_offset": 0,
+     "table": "activity_intervals"
+    },
+    {
+     "after_compaction": false,
+     "at_ms": 1794441601000,
+     "cache_write_tokens": 0,
+     "cached_tokens": 0,
+     "context_tokens": 1,
+     "context_window": null,
+     "effort": null,
+     "model": "synthetic-model",
+     "native": {
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "input_tokens": 1
+     },
+     "output_text_bytes": 0,
+     "output_tokens": 0,
+     "prompt_bytes": 0,
+     "response_id": "fix1",
+     "seq": 1,
+     "session_id": "control",
+     "table": "turns",
+     "thinking_tokens": 0,
+     "uncached_tokens": 1
+    }
+   ],
+   "sessions": [
+    {
+     "active_seconds": 61.0,
+     "assistant_msgs": 2,
+     "commits": 0,
+     "compactions": 0,
+     "cwd": "/w/project",
+     "end_ms": 1794441601000,
+     "entrypoint": "cli",
+     "harness_version": "unknown",
+     "human_turns": 0,
+     "interactive": true,
+     "interruptions": 0,
+     "model_first": "synthetic-model",
+     "parent_session": null,
+     "questions": 0,
+     "questions_with_rec": 0,
+     "rec_accepted": 0,
+     "rec_free_text": 0,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "subagent": false,
+     "tasks_cmds": {},
+     "test_runs": 0,
+     "tool_calls": 0,
+     "waits": []
+    }
+   ],
+   "sha256": "fc2d55f7a518674a0f2aefed83498c23b5d603322d4e69d88a2690314a346853"
+  },
+  "fix1-usage-overwritten-list.jsonl": {
+   "fields": [
+    {
+     "day": "2026-11-11",
+     "field": "effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:response",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.id",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_creation_input_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_read_input_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.input_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.output_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "requestId",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:cache_creation_input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:cache_read_input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:output_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:thinking_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:response",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.id",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.cache_creation_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.cache_read_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.output_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "requestId",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    }
+   ],
+   "initial_state": {},
+   "malformed": 0,
+   "original_tests": [
+    "new:fix1-usage-overwritten-list"
+   ],
+   "records": [
+    {
+     "day": "2026-11-11",
+     "known": 1,
+     "record_kind": "assistant",
+     "records": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "known": 1,
+     "record_kind": "assistant",
+     "records": 1,
+     "session_id": "control"
+    }
+   ],
+   "rows": [
+    {
+     "end_ms": 1794441601000,
+     "end_offset": 254,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "start_offset": 0,
+     "table": "activity_intervals"
+    },
+    {
+     "after_compaction": false,
+     "at_ms": 1794441601000,
+     "cache_write_tokens": 0,
+     "cached_tokens": 0,
+     "context_tokens": 1,
+     "context_window": null,
+     "effort": null,
+     "model": "synthetic-model",
+     "native": {
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "input_tokens": 1
+     },
+     "output_text_bytes": 0,
+     "output_tokens": 0,
+     "prompt_bytes": 0,
+     "response_id": "fix1",
+     "seq": 1,
+     "session_id": "control",
+     "table": "turns",
+     "thinking_tokens": 0,
+     "uncached_tokens": 1
+    }
+   ],
+   "sessions": [
+    {
+     "active_seconds": 61.0,
+     "assistant_msgs": 2,
+     "commits": 0,
+     "compactions": 0,
+     "cwd": "/w/project",
+     "end_ms": 1794441601000,
+     "entrypoint": "cli",
+     "harness_version": "unknown",
+     "human_turns": 0,
+     "interactive": true,
+     "interruptions": 0,
+     "model_first": "synthetic-model",
+     "parent_session": null,
+     "questions": 0,
+     "questions_with_rec": 0,
+     "rec_accepted": 0,
+     "rec_free_text": 0,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "subagent": false,
+     "tasks_cmds": {},
+     "test_runs": 0,
+     "tool_calls": 0,
+     "waits": []
+    }
+   ],
+   "sha256": "e84da8c0955ee7ee99fccdbfec58246ee80858d1a1bad536b1e02fddbe4342af"
+  },
+  "fix1-usage-overwritten-nested.jsonl": {
+   "fields": [
+    {
+     "day": "2026-11-11",
+     "field": "effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:response",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.id",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_creation_input_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_read_input_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.input_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.output_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "requestId",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:cache_creation_input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:cache_read_input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:output_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:thinking_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:response",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.id",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.cache_creation_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.cache_read_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.output_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "requestId",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    }
+   ],
+   "initial_state": {},
+   "malformed": 0,
+   "original_tests": [
+    "new:fix1-usage-overwritten-nested"
+   ],
+   "records": [
+    {
+     "day": "2026-11-11",
+     "known": 1,
+     "record_kind": "assistant",
+     "records": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "known": 1,
+     "record_kind": "assistant",
+     "records": 1,
+     "session_id": "control"
+    }
+   ],
+   "rows": [
+    {
+     "end_ms": 1794441601000,
+     "end_offset": 289,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "start_offset": 0,
+     "table": "activity_intervals"
+    },
+    {
+     "after_compaction": false,
+     "at_ms": 1794441601000,
+     "cache_write_tokens": 0,
+     "cached_tokens": 0,
+     "context_tokens": 1,
+     "context_window": null,
+     "effort": null,
+     "model": "synthetic-model",
+     "native": {
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "input_tokens": 1
+     },
+     "output_text_bytes": 0,
+     "output_tokens": 0,
+     "prompt_bytes": 0,
+     "response_id": "fix1",
+     "seq": 1,
+     "session_id": "control",
+     "table": "turns",
+     "thinking_tokens": 0,
+     "uncached_tokens": 1
+    }
+   ],
+   "sessions": [
+    {
+     "active_seconds": 61.0,
+     "assistant_msgs": 2,
+     "commits": 0,
+     "compactions": 0,
+     "cwd": "/w/project",
+     "end_ms": 1794441601000,
+     "entrypoint": "cli",
+     "harness_version": "unknown",
+     "human_turns": 0,
+     "interactive": true,
+     "interruptions": 0,
+     "model_first": "synthetic-model",
+     "parent_session": null,
+     "questions": 0,
+     "questions_with_rec": 0,
+     "rec_accepted": 0,
+     "rec_free_text": 0,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "subagent": false,
+     "tasks_cmds": {},
+     "test_runs": 0,
+     "tool_calls": 0,
+     "waits": []
+    }
+   ],
+   "sha256": "d2fd7d4575ddccfb8dc7605e4009a7f71e7d5208daac8b5518be40e646d4f730"
+  },
+  "fix1-usage-overwritten-nonmapping.jsonl": {
+   "fields": [
+    {
+     "day": "2026-11-11",
+     "field": "effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:response",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.id",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_creation_input_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_read_input_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.input_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.output_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "requestId",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:cache_creation_input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:cache_read_input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:output_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:thinking_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:response",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.id",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.cache_creation_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.cache_read_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.output_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "requestId",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    }
+   ],
+   "initial_state": {},
+   "malformed": 0,
+   "original_tests": [
+    "new:fix1-usage-overwritten-nonmapping"
+   ],
+   "records": [
+    {
+     "day": "2026-11-11",
+     "known": 1,
+     "record_kind": "assistant",
+     "records": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "known": 1,
+     "record_kind": "assistant",
+     "records": 1,
+     "session_id": "control"
+    }
+   ],
+   "rows": [
+    {
+     "end_ms": 1794441601000,
+     "end_offset": 262,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "start_offset": 0,
+     "table": "activity_intervals"
+    },
+    {
+     "after_compaction": false,
+     "at_ms": 1794441601000,
+     "cache_write_tokens": 0,
+     "cached_tokens": 0,
+     "context_tokens": 1,
+     "context_window": null,
+     "effort": null,
+     "model": "synthetic-model",
+     "native": {
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "input_tokens": 1
+     },
+     "output_text_bytes": 0,
+     "output_tokens": 0,
+     "prompt_bytes": 0,
+     "response_id": "fix1",
+     "seq": 1,
+     "session_id": "control",
+     "table": "turns",
+     "thinking_tokens": 0,
+     "uncached_tokens": 1
+    }
+   ],
+   "sessions": [
+    {
+     "active_seconds": 61.0,
+     "assistant_msgs": 2,
+     "commits": 0,
+     "compactions": 0,
+     "cwd": "/w/project",
+     "end_ms": 1794441601000,
+     "entrypoint": "cli",
+     "harness_version": "unknown",
+     "human_turns": 0,
+     "interactive": true,
+     "interruptions": 0,
+     "model_first": "synthetic-model",
+     "parent_session": null,
+     "questions": 0,
+     "questions_with_rec": 0,
+     "rec_accepted": 0,
+     "rec_free_text": 0,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "subagent": false,
+     "tasks_cmds": {},
+     "test_runs": 0,
+     "tool_calls": 0,
+     "waits": []
+    }
+   ],
+   "sha256": "da546798889bdd30c8733a051c464f93ad7e74a741ad664f10d64d1272d47e9d"
+  },
   "fragments.jsonl": {
    "fields": [
     {

@@ -211,7 +211,7 @@ def test_index_evidence_has_sources_and_text_is_opt_in(tmp_path):
         assert row["line"] == number and row["end"] == offset + len(line)
         assert row["sha256"] == hashlib.sha256(line).hexdigest()
         assert row["ref"] == f"file:{source}#L{number}"
-        assert row["decoder"]["version"] == "9"
+        assert row["decoder"]["version"] == "10"
         for provenance in row["provenance"].values():
             assert provenance["basis"] in {"native", "convention", "heuristic"}
             assert provenance["rule"] and provenance["ref"] == row["ref"]
@@ -249,7 +249,7 @@ def test_reader_request_remains_unchanged(tmp_path):
     }
     out = list(
         objects(
-            req, {"schema": "harness-evidence/1", "decoder": {"version": "9", "revision": "test"}}
+            req, {"schema": "harness-evidence/1", "decoder": {"version": "10", "revision": "test"}}
         )
     )
     read = records.claude_read(
@@ -517,3 +517,132 @@ def test_unrecognized_native_kind_retains_old_unknown_coverage(tmp_path, kind):
     assert next(v for v in out if v["object"] == "coverage")["records"] == [
         {"session_id": "s", "day": "2026-11-11", "record_kind": str(kind), "known": 0, "records": 1}
     ]
+
+
+@pytest.mark.parametrize("name", ["cli-sdk", "sdk-cli", "empty-sdk", "sidechain"])
+def test_first_entrypoint_precedence_and_later_sidechain_match_old(tmp_path, name):
+    name = "fix1-entrypoint-" + name + ".jsonl"
+    old = CONTROLS["cases"][name]
+    rows = events(decoded(tmp_path, name))
+    expected = [sessions[0]["subagent"] for sessions in old["prefix_sessions"]]
+    assert [row["identity"]["subagent"] for row in rows] == expected
+    native = [json.loads(line) for line in (FIXTURES / "index" / name).read_text().splitlines()]
+    assert [r["identity"]["entrypoint"] for r in rows] == [r["entrypoint"] for r in native]
+    assert rows[-1]["identity"]["subagent"] == old["sessions"][0]["subagent"]
+
+
+@pytest.mark.parametrize("variant", ["arithmetic", "nested", "nonmapping", "list"])
+def test_overwritten_invalid_usage_is_opaque_until_old_flush(tmp_path, variant):
+    name = "fix1-usage-overwritten-" + variant + ".jsonl"
+    old = CONTROLS["cases"][name]
+    rows = events(decoded(tmp_path, name))
+    native = json.loads((FIXTURES / "index" / name).read_text().splitlines()[0])["message"]["usage"]
+    assert rows[0]["response"]["native"] == native
+    assert all(
+        v is None or isinstance(v, (int, float)) for v in rows[0]["response"]["usage"].values()
+    )
+    turn = next(row for row in old["rows"] if row["table"] == "turns")
+    assert rows[-1]["response"]["usage"]["context_total"] == turn["context_tokens"] == 1
+    assert rows[-1]["response"]["native"] == turn["native"]
+    invalid = "fix1-usage-final-" + variant + ".jsonl"
+    proc = command(tmp_path, FIXTURES / "index" / invalid)
+    assert proc.returncode != 0 and CONTROLS["cases"][invalid]["error"] in proc.stderr
+
+
+@pytest.mark.parametrize(
+    "name", ["fix1-result-ignored-text.jsonl", "fix1-attachment-ignored-message.jsonl"]
+)
+def test_native_skip_branches_do_not_read_ignored_message_data(tmp_path, name):
+    rows = events(decoded(tmp_path, name))
+    assert rows[0]["message"] is None
+    if name.startswith("fix1-result"):
+        assert rows[0]["results"][0]["call_id"] == "orphan"
+        assert rows[0]["results"][0]["bytes"] == 2
+    else:
+        expected = next(
+            row for row in CONTROLS["cases"][name]["rows"] if row["table"] == "injections"
+        )
+        assert rows[0]["injections"] == [
+            {
+                "piece": 0,
+                "native_kind": "hook_success",
+                "source": "guard",
+                "bytes": expected["bytes"],
+            }
+        ]
+    for invalid in [
+        "errors-text.jsonl",
+        "fix1-compact-invalid-text.jsonl",
+        "fix1-system-invalid-message.jsonl",
+    ]:
+        proc = command(tmp_path, FIXTURES / "index" / invalid)
+        assert proc.returncode != 0 and CONTROLS["cases"][invalid]["error"] in proc.stderr
+
+
+def test_text_disabled_stop_boundary_omits_command_from_whole_response(tmp_path):
+    source = FIXTURES / "index/fix1-stop-matching.jsonl"
+    first = source.read_bytes().splitlines(keepends=True)[0]
+    info = source.stat()
+    proc = command(
+        tmp_path,
+        source,
+        text=False,
+        files=[
+            {
+                "path": str(source),
+                "size": len(first),
+                "identity": {"device": info.st_dev, "inode": info.st_ino},
+            }
+        ],
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "guard-sensitive-command" not in proc.stdout and "/private/path" not in proc.stdout
+    assert "--token=fake" not in proc.stdout
+    out = [json.loads(line) for line in proc.stdout.splitlines()]
+    assert out[-2]["offset"] == len(first)
+    # The same pending-stop case retains its exact event text only when requested.
+    requested = command(
+        tmp_path,
+        source,
+        text=True,
+        files=[
+            {
+                "path": str(source),
+                "size": len(first),
+                "identity": {"device": info.st_dev, "inode": info.st_ino},
+            }
+        ],
+    )
+    assert requested.returncode == 0 and "guard-sensitive-command" in requested.stdout
+
+
+def test_nontext_pending_stop_matching_survives_native_slice_boundary():
+    from harness_evidence.index_events import extract
+    from harness_evidence.lines import Place
+
+    source = FIXTURES / "index/fix1-stop-matching.jsonl"
+    raw = source.read_bytes().splitlines(keepends=True)
+    place = Place("claude-code", "file", None, "explicit", str(source), source)
+    state = {}
+    list(extract([(0, raw[0])], state, place=place, text=False))
+    assert "guard-sensitive-command" not in json.dumps(state)
+    resumed = list(extract([(len(raw[0]), raw[1])], state, place=place, text=False))
+    hooks = events(resumed)[0]["turn_end"]["hooks"]
+    old = CONTROLS["cases"][source.name]["replay"][-1]
+    expected = [r for r in old["rows"] if r["table"] == "hook_runs"]
+    assert hooks == [
+        {k: r[k] for k in ["duration_ms", "blocked", "reason_bytes"]} for r in expected
+    ]
+    assert resumed[-1]["fields"] == old["fields"]
+
+
+def test_nontext_stop_keys_preserve_old_json_command_equality(tmp_path):
+    out = decoded(tmp_path, "fix1-stop-equality.jsonl", text=False)
+    hooks = next(row["turn_end"]["hooks"] for row in events(out) if row["turn_end"])
+    old = [
+        row
+        for row in CONTROLS["cases"]["fix1-stop-equality.jsonl"]["rows"]
+        if row["table"] == "hook_runs"
+    ]
+    assert hooks == [{k: row[k] for k in ["duration_ms", "blocked", "reason_bytes"]} for row in old]
+    assert all(hook["blocked"] for hook in hooks)

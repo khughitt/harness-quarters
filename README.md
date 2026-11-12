@@ -483,7 +483,7 @@ header agent evidence is separate. Query-ID aliases and publication of arbitrary
 index/identity claims remain consumer policy, rather than native path decoding.
 
 `tools/harness-evidence version --json` reports the evidence schema,
-decoder version `9`, and the decoder revision. A pinned copy reads a `REVISION`
+decoder version `10`, and the decoder revision. A pinned copy reads a `REVISION`
 file inside the package; a checkout reports its HEAD with `+dirty` when
 the package has changes. Without either source the command exits 2.
 
@@ -585,7 +585,13 @@ Claude usage components are `input_uncached` (input tokens), `cache_write`,
 `cache_read`, `output` and `thinking`; absent components are null. `context_total`
 is input plus cache write plus cache read, and `uncached_total` is input plus cache
 write, each null when a required component is missing. `response.native` preserves
-the original counters as opaque data. Native coverage preserves the old extraction
+original JSON as opaque data, including invalid intermediate usage values that a
+later fragment replaces. Normalized components that an invalid intermediate fragment
+cannot supply are null; the original final-invalid failure remains at response flush.
+SDK child evidence uses the session's first nonempty entrypoint and retains a later
+native sidechain flag. Pending Stop-hook matching stores nontext equality keys, so
+text-disabled terminal state contains no hook command text. Native coverage preserves
+the old extraction
 populations, including response usage counted at each historical EOF flush. Synthetic
 `tools/fixtures/session-logs/index/` samples and frozen old-oracle controls establish conformance, not observed
 harness emission or full/replay equality. The capability artifact publishes native

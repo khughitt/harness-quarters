@@ -1385,6 +1385,138 @@ provenance = "synthetic"
 profile = "index"
 
 [[sample]]
+path = "index/fix1-entrypoint-cli-sdk.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-entrypoint-sdk-cli.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-entrypoint-empty-sdk.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-entrypoint-sidechain.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-usage-overwritten-arithmetic.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-usage-final-arithmetic.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+index_error = "TypeError"
+
+[[sample]]
+path = "index/fix1-usage-overwritten-nested.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-usage-final-nested.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+index_error = "AttributeError"
+
+[[sample]]
+path = "index/fix1-usage-overwritten-nonmapping.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-usage-final-nonmapping.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+index_error = "AttributeError"
+
+[[sample]]
+path = "index/fix1-usage-overwritten-list.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-usage-final-list.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+index_error = "AttributeError"
+
+[[sample]]
+path = "index/fix1-result-ignored-text.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-attachment-ignored-message.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-system-invalid-message.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+index_error = "AttributeError"
+
+[[sample]]
+path = "index/fix1-compact-invalid-text.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+index_error = "TypeError"
+
+[[sample]]
+path = "index/fix1-stop-matching.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-stop-equality.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
 path = "index/errors-nonobject.jsonl"
 harness = "claude-code"
 version = "unknown"

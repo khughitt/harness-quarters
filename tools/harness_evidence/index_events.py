@@ -442,14 +442,17 @@ def _text_blocks(content):
 
 
 def _usage(raw):
-    details = raw.get("output_tokens_details") or {}
-    values = [raw.get(name) for name in USAGE[:3]]
+    # Fragments may be replaced before the old flush site validates their values.
+    mapping = raw if isinstance(raw, dict) else {}
+    details = mapping.get("output_tokens_details")
+    values = [mapping.get(name) for name in USAGE[:3]]
+    values = [v if isinstance(v, (int, float)) else None for v in values]
     return {
         "input_uncached": values[0],
         "cache_write": values[1],
         "cache_read": values[2],
-        "output": raw.get("output_tokens"),
-        "thinking": details.get("thinking_tokens"),
+        "output": mapping.get("output_tokens"),
+        "thinking": details.get("thinking_tokens") if isinstance(details, dict) else None,
         "context_total": sum(values) if all(v is not None for v in values) else None,
         "uncached_total": sum(values[:2]) if all(v is not None for v in values[:2]) else None,
     }
@@ -581,6 +584,24 @@ def _truncation(content, result):
     }
 
 
+def _command_key(command):
+    """Stable matching evidence without persisting command text; keep JSON equality."""
+
+    def comparable(value):
+        if isinstance(value, bool) or isinstance(value, float) and value.is_integer():
+            return int(value)
+        if isinstance(value, list):
+            return [comparable(item) for item in value]
+        if isinstance(value, dict):
+            return {key: comparable(item) for key, item in value.items()}
+        return value
+
+    encoded = json.dumps(
+        comparable(command), ensure_ascii=True, sort_keys=True, separators=(",", ":")
+    ).encode("ascii")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def _attachment(record, state, session, day):
     attachment = record.get("attachment") or {}
     kind = attachment.get("type", "attachment")
@@ -605,7 +626,7 @@ def _attachment(record, state, session, day):
             },
         )
         state.setdefault("stop_blocks", {}).setdefault(turn, []).append(
-            [command, _size(reason or "")]
+            [_command_key(command), _size(reason or "")]
         )
     if kind == "prompt_snapshot":
         pieces = [
@@ -660,7 +681,8 @@ def _turn_end(record, state, session, day):
             "hook_run",
             {"command": command is not None, "duration": info.get("durationMs") is not None},
         )
-        block = next((b for b in blocks if b[0] == command), None)
+        command_key = _command_key(command)
+        block = next((b for b in blocks if b[0] == command_key), None)
         if block is not None:
             blocks.remove(block)
         hooks.append(
@@ -681,9 +703,14 @@ def _turn_end(record, state, session, day):
 
 
 def _message(record, kind):
+    if kind == "attachment":
+        return None
     content = (record.get("message") or {}).get("content")
     if kind != "assistant" and kind != "user":
         return None
+    if kind == "user" and not record.get("isCompactSummary") and isinstance(content, list):
+        if any(isinstance(block, dict) and block.get("type") == "tool_result" for block in content):
+            return None
     texts = _text_blocks(content)
     joined = "\n".join(texts)
     flags = [
@@ -780,6 +807,37 @@ def _without_text(event):
     event["identity"].pop("cwd")
 
 
+def _identity_subagent(state, session, record, sidechain, place, reference):
+    """The old first-nonempty entrypoint and cumulative native child evidence."""
+    facts = state.setdefault("identity_facts", {}).setdefault(
+        session, {"entrypoint": None, "entrypoint_ref": None, "subagent": None}
+    )
+    if not facts["entrypoint"]:
+        facts["entrypoint"] = record.get("entrypoint")
+        facts["entrypoint_ref"] = reference
+    if facts["subagent"] is None:
+        if record.get("isSidechain"):
+            facts["subagent"] = {"basis": "native", "rule": "is_sidechain", "ref": reference}
+        elif sidechain:
+            facts["subagent"] = {
+                "basis": "convention",
+                "rule": "claude_path_layout",
+                "ref": ref(place),
+            }
+        elif facts["entrypoint"] == "sdk-py":
+            facts["subagent"] = {
+                "basis": "convention",
+                "rule": "claude_sdk_entrypoint",
+                "ref": facts["entrypoint_ref"],
+            }
+    proof = facts["subagent"] or {
+        "basis": "native" if "isSidechain" in record else "heuristic",
+        "rule": "is_sidechain" if "isSidechain" in record else "no_sidechain_evidence",
+        "ref": reference,
+    }
+    return facts["subagent"] is not None, proof
+
+
 def extract(lines, state, *, place: Place, text: bool):
     """Yield physical native events, then cumulative native coverage, without table rows."""
     facts = discover.path_facts(place) or {}
@@ -835,6 +893,11 @@ def extract(lines, state, *, place: Place, text: bool):
             "version": record.get("version"),
         }
         at_ms = _at_ms(record["timestamp"]) if eligible else None
+        subagent_proof = None
+        if eligible:
+            identity["subagent"], subagent_proof = _identity_subagent(
+                state, index_session, record, sidechain, place, reference
+            )
         flush = eligible and kind != "assistant"
         if flush:
             _flush(state)
@@ -1127,11 +1190,8 @@ def extract(lines, state, *, place: Place, text: bool):
         event["provenance"] = _provenance(reference, identity)
         if index_session == session:
             event["provenance"]["identity.index_session"].update(basis="native", rule="session_id")
-        if not sidechain and record.get("entrypoint") != "sdk-py":
-            event["provenance"]["identity.subagent"].update(
-                basis="native" if "isSidechain" in record else "heuristic",
-                rule="is_sidechain" if "isSidechain" in record else "no_sidechain_evidence",
-            )
+        if subagent_proof is not None:
+            event["provenance"]["identity.subagent"].update(subagent_proof)
         if parent and sidechain and agent:
             event["provenance"]["identity.parent"].update(ref=ref(place), rule="claude_path_layout")
         event["provenance"]["notifications"].update(

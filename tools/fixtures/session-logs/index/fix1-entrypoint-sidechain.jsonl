@@ -1,0 +1,4 @@
+{"sessionId": "control", "cwd": "/w/project", "entrypoint": "cli", "version": "unknown", "type": "user", "timestamp": "2026-11-11T23:59:00Z", "message": {"content": "first"}}
+{"sessionId": "control", "cwd": "/w/project", "entrypoint": "sdk-py", "version": "unknown", "type": "user", "timestamp": "2026-11-11T23:59:01Z", "message": {"content": "second"}}
+{"sessionId": "control", "cwd": "/w/project", "entrypoint": "cli", "version": "unknown", "type": "user", "timestamp": "2026-11-11T23:59:02Z", "isSidechain": true, "message": {"content": "sidechain"}}
+{"sessionId": "control", "cwd": "/w/project", "entrypoint": "cli", "version": "unknown", "type": "user", "timestamp": "2026-11-11T23:59:03Z", "message": {"content": "after"}}
