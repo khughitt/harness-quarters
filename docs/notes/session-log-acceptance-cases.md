@@ -31,6 +31,13 @@ uncovered.
 The records live under `tools/fixtures/session-logs/`, in each harness's native format.
 Every identifier, path, task id, model name and text in them is synthetic.
 
+The table inventories the historical SL1–SL11 replay fixtures, including their
+non-JSONL inputs. [CATALOGUE.toml](../../tools/fixtures/session-logs/CATALOGUE.toml)
+is the canonical inventory of all JSONL samples, including the later `origin/` cases.
+The corpus checks keep this table's historical coverage exact and account for every
+file through the table, catalogue sample paths and `CATALOGUE.toml` itself. The
+catalogue checks also require exact JSONL coverage, unique paths and synthetic provenance.
+
 | Short | File (under `tools/fixtures/session-logs/`) | Harness, home | Holds |
 |---|---|---|---|
 | CA | `home/.claude/projects/-w-alpha/c0000000-0000-4000-8000-00000000000a.jsonl` | Claude, personal | a denied then successful park, a request-blob copy, an async Agent dispatch with its queued notice, a typed `/tasks` command, an unknown record kind, a read of the report |
