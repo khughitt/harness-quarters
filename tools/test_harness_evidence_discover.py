@@ -374,7 +374,7 @@ def test_initial_metadata_failure_keeps_enumerated_candidate(tmp_path, monkeypat
     path.write_text("{}\n")
     alias = root / "alias.jsonl"
     alias.symlink_to(path)
-    target = os if operation == "lstat" else Path
+    target = Path
     original = getattr(target, operation)
     calls = []
 
