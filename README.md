@@ -453,17 +453,35 @@ failures remain explicit even if a later lookup could succeed; known symlink
 aliases stay excluded from file objects. The listing helper retains candidates with unknown mtime
 when applying a cutoff; the command applies no cutoff.
 
-Every discovery file and alias also carries `filename_lookup`: null outside Codex
-`rollout-*.jsonl` names, otherwise an object with sorted unique nonempty `session_ids`,
-`basis: "convention"` and `rule: "rollout_name_lookup"`. These candidates preserve
-the rollout suffix lookup convention, including non-UUID suffixes and canonical
-threads in continuation names. The old `rollout-*-<id>*.jsonl` prefix condition still
-applies: "rollout-T.jsonl" has no candidate T, while "rollout--T.jsonl" does.
-Candidates permit a name lookup; they assert neither canonical filename identity nor
-recorded session identity. Consumers still confirm identity from transcript evidence.
+Every discovery file and alias also carries `filename_lookup`: null when no
+supported placed naming convention applies, otherwise sorted unique `session_ids`,
+`basis: "convention"` and a `rule`. Codex uses `rollout_name_lookup`, retaining exact
+suffix/non-UUID/continuation lookup: "rollout-T.jsonl" has no T candidate while
+"rollout--T.jsonl" does. Claude uses `claude_name_lookup` under a declared root,
+matching exactly `*/<id>.jsonl`, `*/<id>/subagents/agent-*.jsonl` and
+`*/*/subagents/agent-<agent>.jsonl`. The last pattern admits `agent-<agent>` and also bare `<agent>` when it does not
+itself start `agent-`; query alias normalization removes exactly one prefix. Nested bare IDs, non-agent child names, wrong depths
+and wrong suffixes are excluded. Empty lists assert no membership; unplaced or
+explicit Claude names have null lookup. Aliases use their own logical names.
+These hints assert neither canonical filename identity nor recorded session identity.
+Consumers retain query grammar/alias policy and confirm identity from evidence.
+
+Discovery files/aliases and decode `file_start` also carry `path_facts`, null outside
+Claude. Claude's convention object has `session` (logical filename stem), `agent`
+(one filename `agent-` prefix removed, otherwise null; empty string stays distinct),
+`subagent` (immediate parent is `subagents`), `parent` (grandparent name in that case,
+otherwise null), and `resume_group` (POSIX parent of place.relpath when not subagent,
+otherwise null). It includes `basis: "convention"`, `rule: "claude_path_layout"` and
+`ref` (logical file ref, no line/hash). These are naming facts, not recorded identity,
+copy decisions or observed authorship. Any-depth layout facts also describe indexed
+nonstandard paths; lookup membership still obeys the exact patterns above. Facts use
+logical paths even for missing/index-only files or differently named external replay
+copies; physical read_path continues to supply bytes/adjacent metadata. Decoded
+header agent evidence is separate. Query-ID aliases and publication of arbitrary
+index/identity claims remain consumer policy, rather than native path decoding.
 
 `tools/harness-evidence version --json` reports the evidence schema,
-decoder version `6`, and the decoder revision. A pinned copy reads a `REVISION`
+decoder version `7`, and the decoder revision. A pinned copy reads a `REVISION`
 file inside the package; a checkout reports its HEAD with `+dirty` when
 the package has changes. Without either source the command exits 2.
 
