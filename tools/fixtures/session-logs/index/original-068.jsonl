@@ -1,0 +1,4 @@
+{"type": "user", "timestamp": "2026-09-18T10:00:00Z", "sessionId": "s1", "cwd": "/checkout", "entrypoint": "cli", "isSidechain": false, "uuid": "user", "message": {"content": "\u00e9"}}
+{"type": "user", "timestamp": "2026-09-18T10:00:00Z", "sessionId": "s1", "cwd": "/checkout", "entrypoint": "cli", "isSidechain": false, "uuid": "user"}
+{"type": "user", "timestamp": "2026-09-18T10:01:00Z", "sessionId": "s1", "cwd": "/checkout", "entrypoint": "cli", "isSidechain": true, "uuid": "user", "agentId": "child"}
+{"type": "user", "timestamp": "2026-09-18T10:05:00Z", "sessionId": "s1", "cwd": "/checkout", "entrypoint": "cli", "isSidechain": false, "uuid": "user"}

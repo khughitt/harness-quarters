@@ -1,0 +1,6 @@
+{"type": "user", "timestamp": "2026-09-18T10:05:00Z", "sessionId": "s1", "cwd": "/checkout", "entrypoint": "cli", "isSidechain": false, "uuid": "user"}
+{"type": "user", "timestamp": "2026-09-18T10:02:00Z", "sessionId": "s1", "cwd": "/checkout", "entrypoint": "cli", "isSidechain": true, "uuid": "user", "agentId": "child"}
+{"type": "user", "timestamp": "2026-09-18T10:05:00Z", "sessionId": "s1", "cwd": "/checkout", "entrypoint": "cli", "isSidechain": false, "uuid": "user"}
+{"type": "user", "timestamp": "2026-09-18T10:03:00Z", "sessionId": "s1", "cwd": "/checkout", "entrypoint": "cli", "isSidechain": false, "uuid": "user"}
+{"type": "user", "timestamp": "2026-09-18T10:06:00Z", "sessionId": "s1", "cwd": "/checkout", "entrypoint": "cli", "isSidechain": false, "uuid": "user"}
+{"type": "user", "timestamp": "2026-09-18T10:16:00Z", "sessionId": "s1", "cwd": "/checkout", "entrypoint": "cli", "isSidechain": false, "uuid": "user"}

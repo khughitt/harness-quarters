@@ -233,7 +233,8 @@ def test_text_and_raw_are_independent_opt_ins(tmp_path):
     assert not any("text" in o for o in output)
 
 
-@pytest.mark.parametrize("sample", tomllib.loads((FIXTURES / "CATALOGUE.toml").read_text())["sample"],
+@pytest.mark.parametrize("sample", [s for s in tomllib.loads((FIXTURES / "CATALOGUE.toml").read_text())["sample"]
+                                    if s.get("profile") != "index"],
                          ids=lambda s: s["path"])
 def test_records_equal_moved_readers(tmp_path, sample):
     path = FIXTURES / sample["path"]

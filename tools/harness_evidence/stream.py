@@ -2,6 +2,7 @@
 from dataclasses import asdict, dataclass, replace
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 
@@ -35,13 +36,25 @@ def _path(value):
 
 def validate(value):
     """Reject the complete request before any response for it is emitted."""
-    _fields(value, {"id", "files", "roots", "context", "cross_file", "text", "raw"}, {"id", "files"})
+    _fields(value, {"id", "files", "roots", "context", "cross_file", "text", "raw", "extract"}, {"id", "files"})
     if type(value["id"]) is not int:
         raise ProtocolError("id must be an integer")
     if not isinstance(value["files"], list):
         raise ProtocolError("files must be an array")
+    index = value.get("extract") == "index"
+    if "extract" in value and not index:
+        raise ProtocolError("unsupported extraction profile")
+    if index and (value.get("cross_file", False) or value.get("raw", False) or value.get("context")):
+        raise ProtocolError("index extraction requires cross_file:false, raw:false and no context")
     for file in value["files"]:
-        _fields(file, {"path", "read_path", "size", "state"}, {"path", "size"})
+        allowed = {"path", "read_path", "size", "state"} | ({"identity"} if index else set())
+        _fields(file, allowed, {"path", "size"} | ({"identity"} if index else set()))
+        if index:
+            _fields(file["identity"], {"device", "inode"}, {"device", "inode"})
+            for number in file["identity"].values():
+                _integer(number, 0)
+            if file.get("state") is not None:
+                raise ProtocolError("index resume is not supported by this full-file milestone")
         _path(file["path"])
         if file.get("read_path") is not None:
             _path(file["read_path"])
@@ -243,6 +256,9 @@ def _emit_file(file, index, envelope, request):
 
 def objects(request, envelope):
     """Yield one request, buffering all reads only when copy marking requires it."""
+    if request.get("extract") == "index":
+        yield from _index_objects(request, envelope)
+        return
     explicit = request.get("roots")
     roots = discover.roots(explicit=None if explicit is None else [(r["harness"], Path(r["path"])) for r in explicit])
     inherited = {}
@@ -286,3 +302,59 @@ def run(stdin, stdout, stderr, envelope):
             stdout.write(serialized(value) + "\n")
             stdout.flush()
     return 0
+
+
+def _index_objects(request, envelope):
+    """Frame full-file index extraction; saved states are explicitly unsupported."""
+    from . import index_events
+
+    roots = discover.roots(explicit=[(r["harness"], Path(r["path"])) for r in request.get("roots") or []])
+    base = {**envelope, "request": request["id"]}
+    for index, source in enumerate(request["files"]):
+        logical, physical = Path(source["path"]), Path(source.get("read_path") or source["path"])
+        try:
+            place = discover.place_of(logical, roots)
+        except ValueError:
+            place = Place("claude-code", "file", None, "explicit", str(logical), logical)
+        if place.harness != "claude-code":
+            raise ProtocolError("index extraction currently supports Claude only")
+        place = replace(place, read_path=physical)
+        with physical.open("rb") as handle:
+            info = os.fstat(handle.fileno())
+            if source["identity"] != {"device": info.st_dev, "inode": info.st_ino}:
+                raise ProtocolError("index source identity changed")
+            if info.st_size < source["size"]:
+                raise ProtocolError("index source is shorter than its fixed span")
+            location = asdict(place)
+            location.pop("path")
+            location.pop("read_path")
+            file_base = {**base, "file": index, "harness": place.harness, "harness_version": None}
+            yield {**file_base, "object": "file_start", "key": "file", "path": str(logical),
+                "place": location, "filename_identity": None, "path_facts": discover.path_facts(place), "replaces": "all"}
+            digest = hashlib.sha256()
+            state = {"next_line": 1, "next_offset": 0}
+
+            def physical_lines():
+                offset = 0
+                while offset < source["size"]:
+                    raw = handle.readline(source["size"] - offset)
+                    if not raw:
+                        raise ProtocolError("short read within index fixed span")
+                    if raw.endswith(b"\n"):
+                        digest.update(raw)
+                    yield offset, raw
+                    offset += len(raw)
+
+            count = 0
+            for value in index_events.extract(physical_lines(), state, place=place, text=request.get("text", False)):
+                for provenance in value.get("provenance", {}).values():
+                    provenance["revision"] = envelope["decoder"]["revision"]
+                count += 1
+                version = value.get("identity", {}).get("version")
+                yield {**file_base, **value, "harness_version": version}
+            checkpoint = {"next_line": state.pop("next_line"), "next_offset": state.pop("next_offset"),
+                          "digest": digest.hexdigest(), "index": {"decoder": envelope["decoder"],
+                          "identity": source["identity"], "native": state}}
+            yield {**file_base, "object": "file_end", "key": "end", "status": "ok", "restart": None,
+                   "offset": checkpoint["next_offset"], "state": checkpoint, "count": count}
+    yield {**base, "object": "request_end", "files": len(request["files"])}

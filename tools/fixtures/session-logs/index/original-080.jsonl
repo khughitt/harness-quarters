@@ -1,0 +1,2 @@
+{"type": "user", "timestamp": "2026-09-04T09:38:28.000Z", "sessionId": "s1", "cwd": "/checkout", "entrypoint": "cli", "version": "2.1.281", "message": {"content": "please do x"}}
+{"type": "user", "timestamp": "2026-09-04T09:38:28.000Z", "sessionId": "s1", "cwd": "/checkout", "entrypoint": "cli", "version": "2.1.281", "message": {"content": [{"type": "image", "source": {"type": "base64", "data": "x"}}, {"type": "text", "body": "more please"}]}}

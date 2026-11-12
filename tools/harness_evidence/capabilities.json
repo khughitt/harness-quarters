@@ -1,6 +1,6 @@
 {
  "built_from": {
-  "catalogue_sha256": "f441dc264caa7eaf876556389cf4718f312bdd30330dbe717b52b18b658bb3ef",
+  "catalogue_sha256": "016cc50210ea7f4fb3534ce76f4050f96db6c4c94b3264d11859e524633ba462",
   "samples": {
    "captures/escaped-malformed.jsonl": "d3ab501588cb7af5e03ae856e875b6809bbd5851e03283e43e53a82bd11a8454",
    "captures/escaped.jsonl": "4ff4490899cc4ac6444b34fc672811990fe9ec53cca6c5c23f4a642d90cbd273",
@@ -18,6 +18,108 @@
    "home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-00-01900000-0000-7000-8000-0000000000a1.jsonl": "7eb0a79debf520bc23b40fdcc3100ead08d7c8173c5d2069a2e2667fe6fa705d",
    "home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-11-01900000-0000-7000-8000-0000000000c1.jsonl": "6873cd11d9e18c2f0228908de8eabbc1a56cea85e1a735c87249e40cad260e76",
    "home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-32-01900000-0000-7000-8000-0000000000c2.jsonl": "2fc261d6c84f59cf4b0ba712e79ab1d0170d26f1e05393604414f591505e74c1",
+   "index/errors-hook-id.jsonl": "53e3ac15a14d8be31d135291e62f82c582b962958d17d0b9e5449801f8fcfc07",
+   "index/errors-input.jsonl": "14a74c958d1474fb97423654eec3b06d33ec7eb83af716d49e368d048cfd22bf",
+   "index/errors-nonobject.jsonl": "10159baf262b43a92d95db59dae1f72c645127301661e0a3ce4e38b295a97c58",
+   "index/errors-response.jsonl": "14bf80b36af4a8adc5a2b376f2655fa07c3f2988d0154c3a68777a788646f5b2",
+   "index/errors-text.jsonl": "282e12c25d114fa5fe99731f07b547b11035be9cd10b847093a00192f9ae79fe",
+   "index/errors-timestamp.jsonl": "94f36b396be47eade9651075df8e225d30d90d8d8e976208f0c258be2c750ae1",
+   "index/errors-usage-null.jsonl": "62ce88dd628896fb4bb258f1f33a3ebd32ec0de3b90b4d8a7778e93de780820c",
+   "index/fragments.jsonl": "79a30d27d3919910cb16b847b881d002052e99f08923cf45e80f6139d2206d2a",
+   "index/identities.jsonl": "4ad50103dfe7489ea368a757d271234aabfd1e08a463d15ebc1cbb87fcf5b20c",
+   "index/invalid-optional-origin.jsonl": "61436015392c489b92c67c58de403c0983a640152c87574323fd007791dc6d71",
+   "index/native-tools.jsonl": "857ace2291dc67e728b6ab193e07071071fb934fc02cb6e393006755edf6f63d",
+   "index/null-overwritten.jsonl": "9040acb6afda39618842a0005edc8d06704c693922b2cba04428021fa91ac0f5",
+   "index/optional-inputs.jsonl": "c5972582895d0463d06db24219a43e6508151a90eb40383367d445e9e6413536",
+   "index/original-000.jsonl": "547bac95b16de1c95d7b00487a51bf787b14de91ba08f73c0543d56fd52c823c",
+   "index/original-001.jsonl": "6a77548483f4fae048106cbc8548c000cb4b82dbc14f2d663a74662e8fe48034",
+   "index/original-002.jsonl": "96d30a514ddc97ac1553a61145ee51b97c97950f1de638a7ddd6a4df9302e065",
+   "index/original-003.jsonl": "f013114aced315ae64c03b2d4a6cdc7154269e78dff9772e98b466e3cbf2516c",
+   "index/original-004.jsonl": "873f9daeda8e1fd77d26b488e3c7644f3123d2778cd2ed2d2e3a9aefd938bc44",
+   "index/original-005.jsonl": "1efabf9de9673e3b22a0d8ada098731eca8c097bfb2d0357909f40ca4fa8880b",
+   "index/original-006.jsonl": "5efbe7a8fc86b3022e8ad987d3d78391618056530e39a9e65df4f4c05b685ff6",
+   "index/original-007.jsonl": "7feaa4501949975b555c34f79a77d90dd5f0c25085fcd17885a0342dd5ebc1eb",
+   "index/original-008.jsonl": "37e4616c2c3df0b747b826f59be6aa1a3a35cdbcbf69d5ffa168bb11da595939",
+   "index/original-009.jsonl": "403099be73e332750616897eea145e61068f693ea4e30086f2b6c308d8367a60",
+   "index/original-010.jsonl": "b2c2d3fabce0a09a619540f8b6bacc0bceae04822fe69439d252e2f3b905df48",
+   "index/original-011.jsonl": "bed5cc233bbfae619c22621cb74d57bca69b56aa830997d6607bff7ca8607947",
+   "index/original-012.jsonl": "6e750194967f4364498dcb9ed87ead02e38e2d87591bf48ec692453cadd733b9",
+   "index/original-013.jsonl": "642d90b3d5a1675131c6c5cd43c9b4fd40430517be7908b614c880525c59986d",
+   "index/original-014.jsonl": "dcadbdf89ac13320cdb3f058a8d3dd92c9440ed028ba7b00b9a2c7b92544c06b",
+   "index/original-015.jsonl": "ae2e22502352dc83b52be3fd3451a753b372eb9ba6bbf5532b9a69f8c781a1c4",
+   "index/original-016.jsonl": "a2b13453ea9826d441da94885595ef838c32d7e44b81c5d22f3bf2543592444b",
+   "index/original-017.jsonl": "1a49b1c241a31d24249f26dc3a8503a78afb0260de7b380c489ecba9ae4b3db5",
+   "index/original-018.jsonl": "8b35752693265e26822e3fb0c50d4bd59b01f14628f5c4fad56b6deceeac3048",
+   "index/original-019.jsonl": "2ab174678468f1157b68fd8d974f7cb86ebaa08e883d456f637046f13a754d5d",
+   "index/original-020.jsonl": "85e021e007b610a52a529d02611f8238485f639f4b10fbabf39e370e97308cb5",
+   "index/original-021.jsonl": "b570346081796ef9de182f70f965d9a08b9d3eb5eaf7e00b26450139c9047270",
+   "index/original-022.jsonl": "f60b4f493218a171bf956c7efefcdd201be1184d409e672c5a985c33fce0df31",
+   "index/original-023.jsonl": "d300a82bf2f46fbf5ad22017863be4fe71fbd6ececa98b861191ae09ede2b968",
+   "index/original-024.jsonl": "3f1c82a38b0aff983559f4984f9fbff4f2ac221a502b833878e44ac24e64571e",
+   "index/original-025.jsonl": "c3f22a7d3d0a243c691b1182c6003ec61dc0b0b9cfa83bdbf0a911afe166d2b3",
+   "index/original-026.jsonl": "88b8f0c385463583bc4a0117e8d88518d0d0d6ebe32974b9aeb8660122230789",
+   "index/original-027.jsonl": "a5642d2e9013af6ee9b6f720ca0a7af4ff6cfb765961c4d6c66b1065a87def29",
+   "index/original-028.jsonl": "3b85010b9c0231a441d77c1fb9bf8d0fe77ad7e36af2476ed4a8370be80cb4df",
+   "index/original-029.jsonl": "932a5cefd22a5b495b288cf2b097679368ebaa3449c3c67fba7e3eebb41d3a49",
+   "index/original-030.jsonl": "f41c76fbf70d74ba54c4338aaca316f1badd71d2e08d9103c3571b0f20343de7",
+   "index/original-031.jsonl": "eae12f85fc6a91a400437b2238994c66c2132ce011d409e84284fd62f37d6f4f",
+   "index/original-032.jsonl": "02ea7e1a038edc5984699aac547f9690606b6bcdbf742407cf1a5bc98c19a6f4",
+   "index/original-033.jsonl": "a0eda78b17f8cbc2354341132d621bd147796d9cafc677dea7331a84a8b99943",
+   "index/original-034.jsonl": "92acd95a7dc92830e096d82233cc639a02fb5884be2a5aa54036429e90b90ba1",
+   "index/original-035.jsonl": "e4a7d86d20d8a45e9349b4478f7dea2f2147263e405d7b6f6d980e98752a3e10",
+   "index/original-036.jsonl": "5f4ae8a6c8dd317f4113de7d14cac903aa55e8ef1ca46829861b6652f86e061e",
+   "index/original-037.jsonl": "8bbc218545968b1f343c4224fea65d1641174472f17481fc0feff613d1e221bf",
+   "index/original-038.jsonl": "353b9c650b6af26c252943c0706866551aaa991ed83be7398c7c9462bd7b4c39",
+   "index/original-039.jsonl": "77a9aadf8587c07867c3ed06bf8fdcfeb68cec93cc4edfcb4cc92a5f1712a78f",
+   "index/original-040.jsonl": "485040156d679ae7e1b604f712071586d1c3f295acdc76a07b8043b3e13fb10b",
+   "index/original-041.jsonl": "903fab4e0a70a591ca658dde1ff952b22b2ff2763dc6f52299326b2b3e8e8c84",
+   "index/original-042.jsonl": "7e120ca97349da76c31ee9b03d62849855d58d16b84b00c95c3f740a86ac3f99",
+   "index/original-043.jsonl": "d207b137706b6d217f86723dbc9579e9d6017eae93dee745b22cf0eb071dac1d",
+   "index/original-044.jsonl": "3dde0e93358c97a5e34e6af48d6b32e66ddd01bc70b2af620d95cc3466a8602a",
+   "index/original-045.jsonl": "7b244aa67c7a5c4103e0ccb4fa104a6e11cf4b6e84c30912528df3fc60f8efd9",
+   "index/original-046.jsonl": "0221a4679406ace9dc387e21126554cedf59e8645906dc428d630031306454ca",
+   "index/original-047.jsonl": "e37952cf4d82e4507e2f6f3f4eb91b3f18a7091ff24a2cf21f38bed5fa5da9a1",
+   "index/original-048.jsonl": "f36638556806beabe496229377a5a89330a07f56606661f4f38577f397297cd2",
+   "index/original-049.jsonl": "c626fdc5ed2cb6dd14b45569beca93b11df4730485837ee4a5b97a5e10eec06c",
+   "index/original-050.jsonl": "086472e97b77ab1a36b5e74cb1b3baced384187efdacd885270b307fe50fc002",
+   "index/original-051.jsonl": "e38a274edfe3fbe853b4de8ec94cedffeac460fb1c5807c892189bfab15b2e4d",
+   "index/original-052.jsonl": "f41ce2fa06b9cb35f9c3aa7ddcb08577324496957e7b59b0d5d78cd82b5eff49",
+   "index/original-053.jsonl": "c3a63679d80b559d04de3f2f89db09c0c2acde64d1f1754ac6c3dcb19bbd439f",
+   "index/original-054.jsonl": "bfc5468fa949a99a9d6ab169487622ba5fc63c9be1f28c0e341c10e694188df0",
+   "index/original-055.jsonl": "f826742bb03d06ac2ecf469e7e249d492db44df7d77d581666a7c5afa9b08ccc",
+   "index/original-056.jsonl": "171c7e6a4466056757651318513a7c63d9c5a360b58c1ccad7786c4de20691db",
+   "index/original-057.jsonl": "8184ace5ebc4b1caa6337a3eb9c9da17bede68c32f25bd1def41f47582db967b",
+   "index/original-058.jsonl": "8962179bccffb2ab2702854c5a7df926a03b897fa3161feef4339e894285a801",
+   "index/original-059.jsonl": "e55118e3886a8d05a1966b22b6472135987ca4f48b9318c2183a17d8a6865573",
+   "index/original-060.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+   "index/original-061.jsonl": "c601f4f068daf7f9b9ae4d395d7ed3bda6fdd98fff2ea18603b37c74acc161e8",
+   "index/original-062.jsonl": "48397ea0f797b41de51223044030c7e742ca58f379bf3631aef96d9cfaed0098",
+   "index/original-063.jsonl": "2ad275e987102932e186119377c375fa805b3bb9ff72941c4b8348feffebf2dc",
+   "index/original-064.jsonl": "1480b5bcdb0206cc9b0f9d934ada4487728b819b845365f026cd9859245fc83d",
+   "index/original-065.jsonl": "52ea40ae5c0ab5eee47b92755d4629b079eb6d82cd74051de72c8f73c8890d18",
+   "index/original-066.jsonl": "731211ebf81b26c9509d2bb50a22f6d1393687669cbdec8f8c3dec0e1b888430",
+   "index/original-067.jsonl": "2eed42c60e4ee063e6e53d43ec10d85001af99834052ccd20e8feec2b66b1add",
+   "index/original-068.jsonl": "a336cc88c4c977e80b2553ef04d7203a0a45b32860df80ab0e5aba14902ef423",
+   "index/original-069.jsonl": "7834f7fbab9c81b9b03508d0eb0d3ac47c891fda2646dcf0698aaf8da12a4620",
+   "index/original-070.jsonl": "8fec3903d83db4f2d1bbb9779a2597c01e9af9d7d19c72f812e2bd8f99a40193",
+   "index/original-071.jsonl": "f4e01aa2472545394b7846d9f4d2d35cc0de15efa7f5f2b2a03e331b7993bc21",
+   "index/original-072.jsonl": "9e51f00092ac922dc04d159ade09a79bde9135ef3bf6db82c3c0a6f43fda4036",
+   "index/original-073.jsonl": "c8bff579a522424ddd0c272ecc5d51320e4d4f3b005766b01cce2b84472684c3",
+   "index/original-074.jsonl": "a77a667454a2a54eb0d2f1d764753e96d5a490a594943cca66be5618814e9ead",
+   "index/original-075.jsonl": "6b8111d0583e6596987cffb1b6c70675be67851935810a7e1ab782f5d54a0cfd",
+   "index/original-076.jsonl": "1e4968166f426a376f4841575d7992a15550ae0260e587eacaef8ffdf46d30a6",
+   "index/original-077.jsonl": "95b2f7141257543fa229cac86b13f8cf81a3992e42232c6ee9909fa46712c675",
+   "index/original-078.jsonl": "8d33460143609f44a804b8b63f9815ebdf4de112baa57b7d3c6f525c3b7862e0",
+   "index/original-079.jsonl": "f0e11c0d559c76563431f583fcb16355a30df0e8dc0d8165bf633cb3aa00ba97",
+   "index/original-080.jsonl": "e39f8cf640ae02669657174d7de75f579cbdee96c249af593f5ae73b37d1397a",
+   "index/original-081.jsonl": "1ae099bd57f2175584392cfdc3c9bf0c1665e7c926af75bf07b04f141da4de46",
+   "index/original-082.jsonl": "fa5bcaee47c0846018a8fd7f53f8836daf63d93a4fd0b2a4f04b702df7694d17",
+   "index/original-parent-000.jsonl": "96d30a514ddc97ac1553a61145ee51b97c97950f1de638a7ddd6a4df9302e065",
+   "index/original-parent-001.jsonl": "f013114aced315ae64c03b2d4a6cdc7154269e78dff9772e98b466e3cbf2516c",
+   "index/original-parent-002.jsonl": "873f9daeda8e1fd77d26b488e3c7644f3123d2778cd2ed2d2e3a9aefd938bc44",
+   "index/ownership.jsonl": "920fdde80da1c44746c33b7da82b523a7db2c744fe454ef69cbf9b0011c23ae2",
+   "index/sizes.jsonl": "9a504380c2c0d6dcc0e49374a14c65b84a3062f651f9c5b29d6c8a47b04a6c44",
+   "index/write-paths.jsonl": "e54a8b29644d40ea3ede06263f5bef11ba9f82382252dfe4e196fa52bff2373b",
    "origin/claude-code-child-prompt.jsonl": "f42d405bd48a418fc268c40e111491ad870b7c45bc84b7e175a032bbcd798468",
    "origin/claude-code-conflict-human-joined.jsonl": "0ca8c370970321dc0cf14c85364f57e8d6fc7e1340d47c4c9e9fc27aac8260e4",
    "origin/claude-code-conflict-human.jsonl": "3cb12cbc1f8e0fa2acab259052a915247bc90ab56f175299cfccdae77df4174c",
@@ -71,7 +173,7 @@
    "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T11-00-00-01900000-0000-7000-8000-0000000000f2.jsonl": "30b550b6f035815a4123c8a8fd18fbbf7059ec89c04b0749ecda738e24b2fde3"
   }
  },
- "decoder_version": "8",
+ "decoder_version": "9",
  "evidence_rule": "synthetic samples establish decoder conformance; observed samples or probes establish emission; absent from a sample means unobserved",
  "harnesses": {
   "claude-code": {
@@ -84,6 +186,12 @@
      ]
     },
     "at": {
+     "coverage_keys": [],
+     "provenance": [
+      "timestamp"
+     ]
+    },
+    "at_ms": {
      "coverage_keys": [],
      "provenance": [
       "timestamp"
@@ -120,6 +228,112 @@
       "message.content[].name"
      ]
     },
+    "calls[].background": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content[].input.run_in_background"
+     ]
+    },
+    "calls[].block": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content"
+     ]
+    },
+    "calls[].command": {
+     "coverage_keys": [
+      "applied:bash/input:command"
+     ],
+     "provenance": [
+      "message.content[].input.command"
+     ]
+    },
+    "calls[].id": {
+     "coverage_keys": [
+      "applied:tool_use/input:id"
+     ],
+     "provenance": [
+      "message.content[].id"
+     ]
+    },
+    "calls[].input_bytes": {
+     "coverage_keys": [
+      "applied:tool_use/input:input"
+     ],
+     "provenance": [
+      "message.content[].input"
+     ]
+    },
+    "calls[].kind": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content[].name"
+     ]
+    },
+    "calls[].native_name": {
+     "coverage_keys": [
+      "applied:tool_use/input:name"
+     ],
+     "provenance": [
+      "message.content[].name"
+     ]
+    },
+    "calls[].paths": {
+     "coverage_keys": [],
+     "provenance": [
+      "cwd",
+      "message.content[].input.file_path",
+      "message.content[].input.notebook_path",
+      "message.content[].input.path"
+     ]
+    },
+    "calls[].paths_complete": {
+     "coverage_keys": [],
+     "provenance": [
+      "cwd",
+      "message.content[].input.file_path",
+      "message.content[].input.notebook_path",
+      "message.content[].input.path"
+     ]
+    },
+    "calls[].prompt": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content[].input.prompt"
+     ]
+    },
+    "calls[].questions": {
+     "coverage_keys": [
+      "applied:ask/input:questions",
+      "applied:question/input:question",
+      "applied:question/input:options",
+      "applied:question/input:labels"
+     ],
+     "provenance": [
+      "message.content[].input.questions"
+     ]
+    },
+    "calls[].raw_path": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content[].input.file_path",
+      "message.content[].input.notebook_path"
+     ]
+    },
+    "calls[].skill": {
+     "coverage_keys": [
+      "applied:skill/input:skill"
+     ],
+     "provenance": [
+      "message.content[].input.skill"
+     ]
+    },
+    "compaction": {
+     "coverage_keys": [],
+     "provenance": [
+      "isCompactSummary"
+     ]
+    },
     "copy": {
      "coverage_keys": [],
      "provenance": [
@@ -144,6 +358,13 @@
       "parent_tool_use_id"
      ]
     },
+    "eligible": {
+     "coverage_keys": [],
+     "provenance": [
+      "sessionId",
+      "timestamp"
+     ]
+    },
     "encrypted": {
      "coverage_keys": [],
      "provenance": [
@@ -156,6 +377,20 @@
       "isCompactSummary",
       "isMeta",
       "subtype",
+      "type"
+     ]
+    },
+    "flush_response": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.id",
+      "requestId",
+      "type"
+     ]
+    },
+    "fork_boundary": {
+     "coverage_keys": [],
+     "provenance": [
       "type"
      ]
     },
@@ -242,6 +477,82 @@
       "uuid"
      ]
     },
+    "identity.agent": {
+     "coverage_keys": [],
+     "provenance": [
+      "agentId"
+     ]
+    },
+    "identity.cwd": {
+     "coverage_keys": [],
+     "provenance": [
+      "cwd"
+     ]
+    },
+    "identity.entrypoint": {
+     "coverage_keys": [],
+     "provenance": [
+      "entrypoint"
+     ]
+    },
+    "identity.index_session": {
+     "coverage_keys": [],
+     "provenance": [
+      "agentId",
+      "isSidechain",
+      "sessionId"
+     ]
+    },
+    "identity.parent": {
+     "coverage_keys": [],
+     "provenance": [
+      "agentId",
+      "isSidechain",
+      "sessionId"
+     ]
+    },
+    "identity.session": {
+     "coverage_keys": [],
+     "provenance": [
+      "sessionId"
+     ]
+    },
+    "identity.subagent": {
+     "coverage_keys": [],
+     "provenance": [
+      "agentId",
+      "entrypoint",
+      "isSidechain"
+     ]
+    },
+    "identity.version": {
+     "coverage_keys": [
+      "assistant/input:version"
+     ],
+     "provenance": [
+      "version"
+     ]
+    },
+    "injections": {
+     "coverage_keys": [
+      "applied:attachment/input:body"
+     ],
+     "provenance": [
+      "attachment",
+      "attachment.content",
+      "attachment.files",
+      "attachment.systemPrompt",
+      "attachment.type",
+      "message.content"
+     ]
+    },
+    "interruption": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content",
+      "subtype"
+     ]
+    },
     "kind": {
      "coverage_keys": [],
      "provenance": [
@@ -257,6 +568,59 @@
       "toolUseResult.agentId"
      ]
     },
+    "message.assistant_output_bytes": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content[].input",
+      "message.content[].text"
+     ]
+    },
+    "message.blocks": {
+     "coverage_keys": [
+      "applied:text_block/input:text"
+     ],
+     "provenance": [
+      "message.content[].text"
+     ]
+    },
+    "message.channel": {
+     "coverage_keys": [],
+     "provenance": [
+      "type"
+     ]
+    },
+    "message.joined_bytes": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content",
+      "message.content[].text"
+     ]
+    },
+    "message.joined_nonempty": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content",
+      "message.content[].text"
+     ]
+    },
+    "message.origin": {
+     "coverage_keys": [],
+     "provenance": [
+      "isCompactSummary",
+      "isMeta",
+      "message.content",
+      "origin.kind"
+     ]
+    },
+    "message.text": {
+     "coverage_keys": [
+      "applied:text_block/input:text"
+     ],
+     "provenance": [
+      "message.content",
+      "message.content[].text"
+     ]
+    },
     "message_id": {
      "coverage_keys": [],
      "provenance": [
@@ -268,6 +632,18 @@
      "provenance": [
       "message.model",
       "toolUseResult.resolvedModel"
+     ]
+    },
+    "native_kind": {
+     "coverage_keys": [],
+     "provenance": [
+      "type"
+     ]
+    },
+    "notifications": {
+     "coverage_keys": [],
+     "provenance": [
+      ""
      ]
     },
     "origin.flags": {
@@ -334,6 +710,170 @@
       "type"
      ]
     },
+    "response.effort": {
+     "coverage_keys": [
+      "assistant/input:effort"
+     ],
+     "provenance": [
+      "effort"
+     ]
+    },
+    "response.id": {
+     "coverage_keys": [
+      "assistant/input:response"
+     ],
+     "provenance": [
+      "message.id",
+      "requestId"
+     ]
+    },
+    "response.model": {
+     "coverage_keys": [
+      "assistant/input:model"
+     ],
+     "provenance": [
+      "message.model"
+     ]
+    },
+    "response.native": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.usage"
+     ]
+    },
+    "response.usage.cache_read": {
+     "coverage_keys": [
+      "applied:usage/input:cache_read_input_tokens"
+     ],
+     "provenance": [
+      "message.usage.cache_read_input_tokens"
+     ]
+    },
+    "response.usage.cache_write": {
+     "coverage_keys": [
+      "applied:usage/input:cache_creation_input_tokens"
+     ],
+     "provenance": [
+      "message.usage.cache_creation_input_tokens"
+     ]
+    },
+    "response.usage.context_total": {
+     "coverage_keys": [
+      "applied:usage/input:input_tokens",
+      "applied:usage/input:cache_creation_input_tokens",
+      "applied:usage/input:cache_read_input_tokens"
+     ],
+     "provenance": [
+      "message.usage.cache_creation_input_tokens",
+      "message.usage.cache_read_input_tokens",
+      "message.usage.input_tokens"
+     ]
+    },
+    "response.usage.input_uncached": {
+     "coverage_keys": [
+      "applied:usage/input:input_tokens"
+     ],
+     "provenance": [
+      "message.usage.input_tokens"
+     ]
+    },
+    "response.usage.output": {
+     "coverage_keys": [
+      "applied:usage/input:output_tokens"
+     ],
+     "provenance": [
+      "message.usage.output_tokens"
+     ]
+    },
+    "response.usage.thinking": {
+     "coverage_keys": [
+      "applied:usage/input:thinking_tokens"
+     ],
+     "provenance": [
+      "message.usage.output_tokens_details.thinking_tokens"
+     ]
+    },
+    "response.usage.uncached_total": {
+     "coverage_keys": [
+      "applied:usage/input:input_tokens",
+      "applied:usage/input:cache_creation_input_tokens"
+     ],
+     "provenance": [
+      "message.usage.cache_creation_input_tokens",
+      "message.usage.input_tokens"
+     ]
+    },
+    "results[].agent": {
+     "coverage_keys": [],
+     "provenance": [
+      "toolUseResult.agentId"
+     ]
+    },
+    "results[].answers": {
+     "coverage_keys": [
+      "applied:answers/input:answers"
+     ],
+     "provenance": [
+      "toolUseResult.answers"
+     ]
+    },
+    "results[].background_id": {
+     "coverage_keys": [],
+     "provenance": [
+      "toolUseResult.backgroundTaskId"
+     ]
+    },
+    "results[].bytes": {
+     "coverage_keys": [
+      "applied:tool_result/input:content"
+     ],
+     "provenance": [
+      "message.content[].content"
+     ]
+    },
+    "results[].call_id": {
+     "coverage_keys": [
+      "applied:tool_result/input:tool_use_id"
+     ],
+     "provenance": [
+      "message.content[].tool_use_id"
+     ]
+    },
+    "results[].child_session": {
+     "coverage_keys": [],
+     "provenance": [
+      "toolUseResult.agentId"
+     ]
+    },
+    "results[].error": {
+     "coverage_keys": [],
+     "provenance": [
+      "message.content[].is_error"
+     ]
+    },
+    "results[].interrupted": {
+     "coverage_keys": [],
+     "provenance": [
+      "toolUseResult.interrupted"
+     ]
+    },
+    "results[].native_duration_ms": {
+     "coverage_keys": [
+      "applied:tool_result_meta/input:duration"
+     ],
+     "provenance": [
+      "toolUseResult.durationMs"
+     ]
+    },
+    "results[].truncation": {
+     "coverage_keys": [
+      "applied:truncation/input:persisted_size"
+     ],
+     "provenance": [
+      "message.content[].content",
+      "toolUseResult.persistedOutputSize"
+     ]
+    },
     "session": {
      "coverage_keys": [],
      "provenance": [
@@ -372,11 +912,282 @@
       "message.content[].thinking"
      ]
     },
+    "turn_end": {
+     "coverage_keys": [
+      "applied:turn_end/input:id",
+      "applied:turn_end/input:turn",
+      "applied:turn_end/input:hooks",
+      "applied:turn_end/input:errors",
+      "applied:hook_run/input:command",
+      "applied:hook_run/input:duration",
+      "applied:stop_block/input:turn",
+      "applied:stop_block/input:command",
+      "applied:stop_block/input:reason"
+     ],
+     "provenance": [
+      "hookErrors",
+      "hookInfos",
+      "toolUseID",
+      "uuid"
+     ]
+    },
     "waits_for_user": {
      "coverage_keys": [],
      "provenance": [
       "message.content[].name"
      ]
+    }
+   },
+   "index": {
+    "applied": {
+     "answers": [
+      "answers"
+     ],
+     "ask": [
+      "questions"
+     ],
+     "attachment": [
+      "body"
+     ],
+     "bash": [
+      "command"
+     ],
+     "hook_run": [
+      "command",
+      "duration"
+     ],
+     "question": [
+      "question",
+      "options",
+      "labels"
+     ],
+     "skill": [
+      "skill"
+     ],
+     "stop_block": [
+      "turn",
+      "command",
+      "reason"
+     ],
+     "text_block": [
+      "text"
+     ],
+     "tool_result": [
+      "tool_use_id",
+      "content"
+     ],
+     "tool_result_meta": [
+      "duration"
+     ],
+     "tool_use": [
+      "id",
+      "name",
+      "input"
+     ],
+     "truncation": [
+      "persisted_size"
+     ],
+     "turn_end": [
+      "id",
+      "turn",
+      "hooks",
+      "errors"
+     ],
+     "usage": [
+      "input_tokens",
+      "cache_creation_input_tokens",
+      "cache_read_input_tokens",
+      "output_tokens",
+      "thinking_tokens"
+     ]
+    },
+    "common_reads": [
+     "type",
+     "timestamp",
+     "sessionId",
+     "isSidechain",
+     "agentId",
+     "cwd",
+     "entrypoint",
+     "version",
+     "message"
+    ],
+    "known_kinds": [
+     "agent-color",
+     "agent-name",
+     "ai-title",
+     "assistant",
+     "atis-latch",
+     "attachment",
+     "bridge-session",
+     "continued-in",
+     "cost-state",
+     "custom-title",
+     "file-history-delta",
+     "file-history-snapshot",
+     "fork-context-ref",
+     "last-prompt",
+     "mode",
+     "permission-mode",
+     "pr-link",
+     "queue-operation",
+     "relocated",
+     "summary",
+     "system",
+     "user",
+     "worktree-state"
+    ],
+    "mode": "full_file",
+    "profile": "index",
+    "resume": false,
+    "unwatched": {
+     "assistant": {
+      "message.content[].id": "applied:tool_use",
+      "message.content[].input": "applied:tool_use",
+      "message.content[].input.command": "applied:bash",
+      "message.content[].input.file_path": "dimension",
+      "message.content[].input.notebook_path": "dimension",
+      "message.content[].input.prompt": "dimension",
+      "message.content[].input.questions": "applied:ask",
+      "message.content[].input.questions[].options": "applied:question",
+      "message.content[].input.questions[].options[].label": "applied:question",
+      "message.content[].input.questions[].question": "applied:question",
+      "message.content[].input.run_in_background": "flag",
+      "message.content[].input.skill": "applied:skill",
+      "message.content[].name": "applied:tool_use",
+      "message.content[].text": "applied:text_block",
+      "message.content[].type": "applied:text_block",
+      "message.usage.output_tokens_details.thinking_tokens": "applied:usage"
+     },
+     "attachment": {
+      "attachment.blockingError": "applied:stop_block",
+      "attachment.blockingError.blockingError": "applied:stop_block",
+      "attachment.blockingError.command": [
+       "dimension",
+       "applied:stop_block"
+      ],
+      "attachment.command": "dimension",
+      "attachment.content": "applied:attachment",
+      "attachment.files": "applied:attachment",
+      "attachment.files[].content": "applied:attachment",
+      "attachment.files[].path": "dimension",
+      "attachment.hookEvent": "dimension",
+      "attachment.systemPrompt": "applied:attachment",
+      "attachment.toolUseID": "applied:stop_block"
+     },
+     "system": {
+      "hookErrors": "applied:turn_end",
+      "hookInfos": "applied:turn_end",
+      "hookInfos[].command": "applied:hook_run",
+      "hookInfos[].durationMs": "applied:hook_run",
+      "toolUseID": "applied:turn_end",
+      "uuid": "applied:turn_end"
+     },
+     "user": {
+      "isCompactSummary": "flag",
+      "isMeta": "flag",
+      "message.content[].content": "applied:tool_result",
+      "message.content[].is_error": "flag",
+      "message.content[].text": "applied:text_block",
+      "message.content[].tool_use_id": "applied:tool_result",
+      "message.content[].type": "applied:text_block",
+      "toolUseResult": "applied:tool_result_meta",
+      "toolUseResult.agentId": "dimension",
+      "toolUseResult.answers": "applied:answers",
+      "toolUseResult.backgroundTaskId": "flag",
+      "toolUseResult.durationMs": "applied:tool_result_meta",
+      "toolUseResult.interrupted": "flag",
+      "toolUseResult.persistedOutputSize": "applied:truncation"
+     }
+    },
+    "watched": {
+     "assistant": {
+      "feeds": {
+       "message.content": [
+        "applied:text_block/input:text",
+        "applied:tool_use/input:name"
+       ],
+       "message.usage.cache_creation_input_tokens": [
+        "applied:usage/input:cache_creation_input_tokens"
+       ],
+       "message.usage.cache_read_input_tokens": [
+        "applied:usage/input:cache_read_input_tokens"
+       ],
+       "message.usage.input_tokens": [
+        "applied:usage/input:input_tokens"
+       ],
+       "message.usage.output_tokens": [
+        "applied:usage/input:output_tokens"
+       ]
+      },
+      "inputs": {
+       "content": [
+        "message.content"
+       ],
+       "effort": [
+        "effort"
+       ],
+       "model": [
+        "message.model"
+       ],
+       "response": [
+        "requestId",
+        "message.id"
+       ],
+       "version": [
+        "version"
+       ]
+      },
+      "sources": [
+       "requestId",
+       "message.id",
+       "message.model",
+       "message.content",
+       "effort",
+       "version",
+       "message.usage.input_tokens",
+       "message.usage.cache_creation_input_tokens",
+       "message.usage.cache_read_input_tokens",
+       "message.usage.output_tokens"
+      ]
+     },
+     "attachment": {
+      "inputs": {
+       "attachment": [
+        "attachment"
+       ]
+      },
+      "sources": [
+       "attachment",
+       "attachment.type"
+      ]
+     },
+     "system": {
+      "inputs": {
+       "subtype": [
+        "subtype"
+       ]
+      },
+      "sources": [
+       "subtype"
+      ]
+     },
+     "user": {
+      "feeds": {
+       "message.content": [
+        "applied:tool_result/input:content",
+        "applied:text_block/input:text"
+       ]
+      },
+      "inputs": {
+       "content": [
+        "message.content"
+       ]
+      },
+      "sources": [
+       "message.content"
+      ]
+     }
     }
    },
    "labels": {
@@ -413,14 +1224,43 @@
     ]
    },
    "record_kinds": [
+    "ai-title",
+    "api-request",
     "api-request-blob",
+    "api-request-shape",
     "assistant",
+    "attachment/hook_additional_context",
     "attachment/hook_blocking_error",
+    "attachment/hook_non_blocking_error",
+    "attachment/hook_success",
+    "attachment/instructions",
+    "attachment/kind0",
+    "attachment/kind1",
+    "attachment/kind10",
+    "attachment/kind11",
+    "attachment/kind12",
+    "attachment/kind13",
+    "attachment/kind14",
+    "attachment/kind2",
+    "attachment/kind3",
+    "attachment/kind4",
+    "attachment/kind5",
+    "attachment/kind6",
+    "attachment/kind7",
+    "attachment/kind8",
+    "attachment/kind9",
+    "attachment/prompt_snapshot",
     "attachment/queued_command",
+    "attachment/skill_listing",
+    "brand-new-kind",
+    "file-history-delta",
+    "fork-context-ref",
     "future-record-kind",
     "queue-operation",
     "result/success",
+    "system/anything",
     "system/init",
+    "system/interrupted",
     "system/local_command",
     "system/scheduled_task_fire",
     "system/stop_hook_summary",
@@ -428,6 +1268,94 @@
     "user"
    ],
    "versions": {
+    "2.1.281": {
+     "fields_seen": {
+      "observed": [],
+      "synthetic": [
+       "at",
+       "at_ms",
+       "block_type",
+       "call.command",
+       "call.id",
+       "call.tool",
+       "calls[].block",
+       "calls[].command",
+       "calls[].id",
+       "calls[].input_bytes",
+       "calls[].kind",
+       "calls[].native_name",
+       "calls[].paths",
+       "calls[].paths_complete",
+       "calls[].questions",
+       "calls[].raw_path",
+       "calls[].skill",
+       "compaction",
+       "eligible",
+       "flags",
+       "flush_response",
+       "fork_boundary",
+       "header.cwd",
+       "header.entrypoint",
+       "header.first_at",
+       "header.last_at",
+       "header.models[].value",
+       "header.recorded_identity.session",
+       "header.session",
+       "header.uuids",
+       "identity.cwd",
+       "identity.entrypoint",
+       "identity.index_session",
+       "identity.session",
+       "identity.subagent",
+       "identity.version",
+       "injections",
+       "interruption",
+       "kind",
+       "message.assistant_output_bytes",
+       "message.blocks",
+       "message.channel",
+       "message.joined_bytes",
+       "message.joined_nonempty",
+       "message.origin",
+       "message.text",
+       "message_id",
+       "model.value",
+       "native_kind",
+       "origin.flags",
+       "origin.markers",
+       "origin.unrecognized_tag.joined",
+       "origin.unrecognized_tag.lead",
+       "readable_text",
+       "response.effort",
+       "response.id",
+       "response.model",
+       "response.native",
+       "response.usage.cache_read",
+       "response.usage.cache_write",
+       "response.usage.context_total",
+       "response.usage.input_uncached",
+       "response.usage.output",
+       "response.usage.thinking",
+       "response.usage.uncached_total",
+       "results[].answers",
+       "results[].bytes",
+       "results[].call_id",
+       "results[].native_duration_ms",
+       "results[].truncation",
+       "session",
+       "text",
+       "turn_end",
+       "waits_for_user"
+      ]
+     },
+     "observed": [],
+     "synthetic": [
+      "index/original-079.jsonl",
+      "index/original-080.jsonl",
+      "index/original-081.jsonl",
+      "index/original-082.jsonl"
+     ]
+    },
     "2.1.300": {
      "fields_seen": {
       "observed": [],
@@ -541,16 +1469,39 @@
       "synthetic": [
        "agent",
        "at",
+       "at_ms",
        "block_type",
+       "call.command",
        "call.id",
        "call.is_error",
        "call.tool",
+       "calls[].background",
+       "calls[].block",
+       "calls[].command",
+       "calls[].id",
+       "calls[].input_bytes",
+       "calls[].kind",
+       "calls[].native_name",
+       "calls[].paths",
+       "calls[].paths_complete",
+       "calls[].prompt",
+       "calls[].questions",
+       "calls[].raw_path",
+       "calls[].skill",
+       "compaction",
+       "copy",
+       "copy_basis",
+       "copy_rule",
        "dispatch.call",
+       "eligible",
        "flags",
+       "flush_response",
+       "fork_boundary",
        "header.agent",
        "header.cwd",
        "header.entrypoint",
        "header.first_at",
+       "header.forked",
        "header.last_at",
        "header.markers",
        "header.models[].value",
@@ -559,10 +1510,28 @@
        "header.subagent",
        "header.subagent_basis",
        "header.uuids",
+       "identity.agent",
+       "identity.cwd",
+       "identity.entrypoint",
+       "identity.index_session",
+       "identity.parent",
+       "identity.session",
+       "identity.subagent",
+       "identity.version",
+       "injections",
        "kind",
        "links[].target",
+       "message.assistant_output_bytes",
+       "message.blocks",
+       "message.channel",
+       "message.joined_bytes",
+       "message.joined_nonempty",
+       "message.origin",
+       "message.text",
        "message_id",
        "model.value",
+       "native_kind",
+       "notifications",
        "origin.flags",
        "origin.markers",
        "origin.native_kind",
@@ -570,10 +1539,32 @@
        "origin.unrecognized_tag.lead",
        "origin_kind",
        "readable_text",
+       "response.effort",
+       "response.id",
+       "response.model",
+       "response.native",
+       "response.usage.cache_read",
+       "response.usage.cache_write",
+       "response.usage.context_total",
+       "response.usage.input_uncached",
+       "response.usage.output",
+       "response.usage.thinking",
+       "response.usage.uncached_total",
+       "results[].agent",
+       "results[].answers",
+       "results[].background_id",
+       "results[].bytes",
+       "results[].call_id",
+       "results[].child_session",
+       "results[].error",
+       "results[].interrupted",
+       "results[].native_duration_ms",
+       "results[].truncation",
        "session",
        "stop_class",
        "stop_reason",
        "text",
+       "turn_end",
        "waits_for_user"
       ]
      },
@@ -581,6 +1572,104 @@
      "synthetic": [
       "captures/sdk-stream.jsonl",
       "captures/turn-evidence-claude.jsonl",
+      "index/errors-hook-id.jsonl",
+      "index/errors-input.jsonl",
+      "index/errors-nonobject.jsonl",
+      "index/errors-response.jsonl",
+      "index/errors-text.jsonl",
+      "index/errors-timestamp.jsonl",
+      "index/errors-usage-null.jsonl",
+      "index/fragments.jsonl",
+      "index/identities.jsonl",
+      "index/invalid-optional-origin.jsonl",
+      "index/native-tools.jsonl",
+      "index/null-overwritten.jsonl",
+      "index/optional-inputs.jsonl",
+      "index/original-000.jsonl",
+      "index/original-001.jsonl",
+      "index/original-002.jsonl",
+      "index/original-003.jsonl",
+      "index/original-004.jsonl",
+      "index/original-005.jsonl",
+      "index/original-006.jsonl",
+      "index/original-007.jsonl",
+      "index/original-008.jsonl",
+      "index/original-009.jsonl",
+      "index/original-010.jsonl",
+      "index/original-011.jsonl",
+      "index/original-012.jsonl",
+      "index/original-013.jsonl",
+      "index/original-014.jsonl",
+      "index/original-015.jsonl",
+      "index/original-016.jsonl",
+      "index/original-017.jsonl",
+      "index/original-018.jsonl",
+      "index/original-019.jsonl",
+      "index/original-020.jsonl",
+      "index/original-021.jsonl",
+      "index/original-022.jsonl",
+      "index/original-023.jsonl",
+      "index/original-024.jsonl",
+      "index/original-025.jsonl",
+      "index/original-026.jsonl",
+      "index/original-027.jsonl",
+      "index/original-028.jsonl",
+      "index/original-029.jsonl",
+      "index/original-030.jsonl",
+      "index/original-031.jsonl",
+      "index/original-032.jsonl",
+      "index/original-033.jsonl",
+      "index/original-034.jsonl",
+      "index/original-035.jsonl",
+      "index/original-036.jsonl",
+      "index/original-037.jsonl",
+      "index/original-038.jsonl",
+      "index/original-039.jsonl",
+      "index/original-040.jsonl",
+      "index/original-041.jsonl",
+      "index/original-042.jsonl",
+      "index/original-043.jsonl",
+      "index/original-044.jsonl",
+      "index/original-045.jsonl",
+      "index/original-046.jsonl",
+      "index/original-047.jsonl",
+      "index/original-048.jsonl",
+      "index/original-049.jsonl",
+      "index/original-050.jsonl",
+      "index/original-051.jsonl",
+      "index/original-052.jsonl",
+      "index/original-053.jsonl",
+      "index/original-054.jsonl",
+      "index/original-055.jsonl",
+      "index/original-056.jsonl",
+      "index/original-057.jsonl",
+      "index/original-058.jsonl",
+      "index/original-059.jsonl",
+      "index/original-060.jsonl",
+      "index/original-061.jsonl",
+      "index/original-062.jsonl",
+      "index/original-063.jsonl",
+      "index/original-064.jsonl",
+      "index/original-065.jsonl",
+      "index/original-066.jsonl",
+      "index/original-067.jsonl",
+      "index/original-068.jsonl",
+      "index/original-069.jsonl",
+      "index/original-070.jsonl",
+      "index/original-071.jsonl",
+      "index/original-072.jsonl",
+      "index/original-073.jsonl",
+      "index/original-074.jsonl",
+      "index/original-075.jsonl",
+      "index/original-076.jsonl",
+      "index/original-077.jsonl",
+      "index/original-078.jsonl",
+      "index/original-parent-000.jsonl",
+      "index/original-parent-001.jsonl",
+      "index/original-parent-002.jsonl",
+      "index/ownership.jsonl",
+      "index/sizes.jsonl",
+      "index/write-paths.jsonl",
       "origin/claude-code-child-prompt.jsonl",
       "origin/claude-code-conflict-human-joined.jsonl",
       "origin/claude-code-conflict-human.jsonl",

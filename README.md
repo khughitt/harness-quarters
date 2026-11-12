@@ -483,7 +483,7 @@ header agent evidence is separate. Query-ID aliases and publication of arbitrary
 index/identity claims remain consumer policy, rather than native path decoding.
 
 `tools/harness-evidence version --json` reports the evidence schema,
-decoder version `8`, and the decoder revision. A pinned copy reads a `REVISION`
+decoder version `9`, and the decoder revision. A pinned copy reads a `REVISION`
 file inside the package; a checkout reports its HEAD with `+dirty` when
 the package has changes. Without either source the command exits 2.
 
@@ -548,6 +548,48 @@ request/file transport indices. Text/raw option changes can therefore restart
 replay, while request ids and decoder revision changes alone do not.
 Records themselves retain native numeric block order, including when a line has
 ten or more blocks.
+
+The opt-in `extract: "index"` request emits Claude native evidence for the scratch
+index pilot. This decoder revision supports full files only: include each file's
+`identity: {"device": ..., "inode": ...}`, keep `cross_file` and `raw` false, and
+omit `state` and `context`. A saved index state is rejected explicitly; incremental
+resume and the final pilot producer are a later milestone. The held descriptor must
+match the supplied identity and fixed byte span. Logical paths determine refs and
+child-parent naming; `read_path` determines physical bytes.
+
+This profile emits `file_start`, one `index_event` per complete JSON object (key
+`E<byte offset>`), `unparsed` evidence for malformed lines or a partial tail, a final
+cumulative native `coverage`, `file_end`, then `request_end`. The terminal count
+includes every event, unparsed object and coverage object. A partial tail does not
+advance the checkpoint. Valid JSON with invalid native types retains the original
+index adapter's errors. Accept a file only after both terminals and the count have
+been validated. `file_end.restart` is null in this full-file milestone.
+
+Events carry recorded and normalized session identity, timestamps, response fragments,
+message origin evidence, ordered text blocks, native tool calls/results, attachment
+pieces, notifications, fork evidence and stop-hook summaries. Field provenance names
+native paths, coverage keys, basis, rule, revision and source ref. `text:true` requests
+message, command, path, question, answer and dispatch text; with it disabled those
+values are omitted. No human-turn, active-time, task/review or recommendation verdict
+is produced. Default reader requests retain their existing object/state shapes.
+
+Native byte sizes use UTF-8 strings or `json.dumps(value, ensure_ascii=False)` with
+its default spaced separators for other values, independently of compact wire JSON.
+Assistant output bytes sum text-block bytes without joining newlines plus tool-input
+sizes. Joined user text preserves empty placeholders for missing text keys. Native
+`durationMs` stays separate from timestamp differences. File-edit `raw_path` preserves
+the exact nonempty native file/notebook path; `paths` separately carries lexical
+normalization against cwd, and `paths_complete` records missing or rejected inputs.
+
+Claude usage components are `input_uncached` (input tokens), `cache_write`,
+`cache_read`, `output` and `thinking`; absent components are null. `context_total`
+is input plus cache write plus cache read, and `uncached_total` is input plus cache
+write, each null when a required component is missing. `response.native` preserves
+the original counters as opaque data. Native coverage preserves the old extraction
+populations, including response usage counted at each historical EOF flush. Synthetic
+`tools/fixtures/session-logs/index/` samples and frozen old-oracle controls establish conformance, not observed
+harness emission or full/replay equality. The capability artifact publishes native
+field provenance and coverage declarations separately from reader declarations.
 
 - **Rows.** Harness, home (`personal` or `work`), short id (the first eight characters;
   for Codex the last eight, since a UUIDv7 id starts with its timestamp), age, place (marked
