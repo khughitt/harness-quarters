@@ -211,7 +211,7 @@ def test_index_evidence_has_sources_and_text_is_opt_in(tmp_path):
         assert row["line"] == number and row["end"] == offset + len(line)
         assert row["sha256"] == hashlib.sha256(line).hexdigest()
         assert row["ref"] == f"file:{source}#L{number}"
-        assert row["decoder"]["version"] == "10"
+        assert row["decoder"]["version"] == "11"
         for provenance in row["provenance"].values():
             assert provenance["basis"] in {"native", "convention", "heuristic"}
             assert provenance["rule"] and provenance["ref"] == row["ref"]
@@ -249,7 +249,7 @@ def test_reader_request_remains_unchanged(tmp_path):
     }
     out = list(
         objects(
-            req, {"schema": "harness-evidence/1", "decoder": {"version": "10", "revision": "test"}}
+            req, {"schema": "harness-evidence/1", "decoder": {"version": "11", "revision": "test"}}
         )
     )
     read = records.claude_read(
@@ -646,3 +646,54 @@ def test_nontext_stop_keys_preserve_old_json_command_equality(tmp_path):
     ]
     assert hooks == [{k: row[k] for k in ["duration_ms", "blocked", "reason_bytes"]} for row in old]
     assert all(hook["blocked"] for hook in hooks)
+
+
+@pytest.mark.parametrize("variant", ["finite-overflow", "mixed-overflow", "large-integer"])
+def test_overwritten_numeric_overflow_keeps_raw_components_until_old_flush(tmp_path, variant):
+    name = "fix2-usage-overwritten-" + variant + ".jsonl"
+    out = decoded(tmp_path, name)
+    rows = events(out)
+    native = json.loads((FIXTURES / "index" / name).read_text().splitlines()[0])["message"]["usage"]
+    first = rows[0]["response"]
+    assert first["native"] == native
+    for decoded_name, native_name in [
+        ("input_uncached", "input_tokens"),
+        ("cache_write", "cache_creation_input_tokens"),
+        ("cache_read", "cache_read_input_tokens"),
+    ]:
+        assert first["usage"][decoded_name] == native[native_name]
+    if variant != "large-integer":
+        assert first["usage"]["context_total"] is None
+        assert first["usage"]["uncached_total"] is None
+    else:
+        assert first["usage"]["context_total"] == 10**400 + 1
+    old = next(row for row in CONTROLS["cases"][name]["rows"] if row["table"] == "turns")
+    assert rows[-1]["response"]["usage"]["context_total"] == old["context_tokens"] == 1
+    assert rows[-1]["response"]["native"] == old["native"]
+
+
+@pytest.mark.parametrize("variant", ["finite-overflow", "mixed-overflow", "large-integer"])
+def test_surviving_numeric_overflow_retains_old_flush_outcome(tmp_path, variant):
+    import math
+
+    name = "fix2-usage-surviving-" + variant + ".jsonl"
+    old = CONTROLS["cases"][name]
+    if "error" in old:
+        proc = command(tmp_path, FIXTURES / "index" / name)
+        assert (
+            proc.returncode != 0 and old["error"] == "OverflowError" and old["error"] in proc.stderr
+        )
+        assert "in _flush" in proc.stderr
+        return
+    row = events(decoded(tmp_path, name))[0]["response"]
+    turn = next(item for item in old["rows"] if item["table"] == "turns")
+    assert row["native"] == turn["native"]
+    usage = row["usage"]
+    reconstructed = usage["input_uncached"] + usage["cache_write"] + usage["cache_read"]
+    if variant == "finite-overflow":
+        assert turn["context_tokens"] == turn["uncached_tokens"] == {"$old_float": "inf"}
+        assert usage["context_total"] is None and usage["uncached_total"] is None
+        # Null aggregate means wire-unavailable; components still reproduce old arithmetic.
+        assert math.isinf(reconstructed) and reconstructed > 0
+    else:
+        assert usage["context_total"] == reconstructed == turn["context_tokens"] == 10**400 + 1

@@ -1517,6 +1517,49 @@ provenance = "synthetic"
 profile = "index"
 
 [[sample]]
+path = "index/fix2-usage-overwritten-finite-overflow.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix2-usage-surviving-finite-overflow.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix2-usage-overwritten-mixed-overflow.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix2-usage-surviving-mixed-overflow.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+index_error = "OverflowError"
+
+[[sample]]
+path = "index/fix2-usage-overwritten-large-integer.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix2-usage-surviving-large-integer.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
 path = "index/errors-nonobject.jsonl"
 harness = "claude-code"
 version = "unknown"

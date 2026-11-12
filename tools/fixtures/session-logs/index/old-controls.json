@@ -3413,6 +3413,1589 @@
    ],
    "sha256": "da546798889bdd30c8733a051c464f93ad7e74a741ad664f10d64d1272d47e9d"
   },
+  "fix2-usage-overwritten-finite-overflow.jsonl": {
+   "fields": [
+    {
+     "day": "2026-11-11",
+     "field": "effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:response",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.id",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_creation_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_read_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.output_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "requestId",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:cache_creation_input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:cache_read_input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:output_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:thinking_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:response",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.id",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.cache_creation_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.cache_read_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.output_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "requestId",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    }
+   ],
+   "initial_state": {},
+   "malformed": 0,
+   "original_tests": [
+    "new:fix2-usage-overwritten-finite-overflow"
+   ],
+   "records": [
+    {
+     "day": "2026-11-11",
+     "known": 1,
+     "record_kind": "assistant",
+     "records": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "known": 1,
+     "record_kind": "assistant",
+     "records": 1,
+     "session_id": "control"
+    }
+   ],
+   "rows": [
+    {
+     "end_ms": 1794441601000,
+     "end_offset": 344,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "start_offset": 0,
+     "table": "activity_intervals"
+    },
+    {
+     "after_compaction": false,
+     "at_ms": 1794441601000,
+     "cache_write_tokens": 0,
+     "cached_tokens": 0,
+     "context_tokens": 1,
+     "context_window": null,
+     "effort": null,
+     "model": "synthetic-model",
+     "native": {
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "input_tokens": 1
+     },
+     "output_text_bytes": 0,
+     "output_tokens": 0,
+     "prompt_bytes": 0,
+     "response_id": "fix2",
+     "seq": 1,
+     "session_id": "control",
+     "table": "turns",
+     "thinking_tokens": 0,
+     "uncached_tokens": 1
+    }
+   ],
+   "sessions": [
+    {
+     "active_seconds": 61.0,
+     "assistant_msgs": 2,
+     "commits": 0,
+     "compactions": 0,
+     "cwd": "/w/project",
+     "end_ms": 1794441601000,
+     "entrypoint": "cli",
+     "harness_version": "unknown",
+     "human_turns": 0,
+     "interactive": true,
+     "interruptions": 0,
+     "model_first": "synthetic-model",
+     "parent_session": null,
+     "questions": 0,
+     "questions_with_rec": 0,
+     "rec_accepted": 0,
+     "rec_free_text": 0,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "subagent": false,
+     "tasks_cmds": {},
+     "test_runs": 0,
+     "tool_calls": 0,
+     "waits": []
+    }
+   ],
+   "sha256": "351f9e66ce7aed1af84f229323c22bff45332f7615578d1fd44429dd8c5049fa"
+  },
+  "fix2-usage-overwritten-large-integer.jsonl": {
+   "fields": [
+    {
+     "day": "2026-11-11",
+     "field": "effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:response",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.id",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_creation_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_read_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.output_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "requestId",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:cache_creation_input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:cache_read_input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:output_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:thinking_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:response",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.id",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.cache_creation_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.cache_read_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.output_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "requestId",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    }
+   ],
+   "initial_state": {},
+   "malformed": 0,
+   "original_tests": [
+    "new:fix2-usage-overwritten-large-integer"
+   ],
+   "records": [
+    {
+     "day": "2026-11-11",
+     "known": 1,
+     "record_kind": "assistant",
+     "records": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "known": 1,
+     "record_kind": "assistant",
+     "records": 1,
+     "session_id": "control"
+    }
+   ],
+   "rows": [
+    {
+     "end_ms": 1794441601000,
+     "end_offset": 734,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "start_offset": 0,
+     "table": "activity_intervals"
+    },
+    {
+     "after_compaction": false,
+     "at_ms": 1794441601000,
+     "cache_write_tokens": 0,
+     "cached_tokens": 0,
+     "context_tokens": 1,
+     "context_window": null,
+     "effort": null,
+     "model": "synthetic-model",
+     "native": {
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "input_tokens": 1
+     },
+     "output_text_bytes": 0,
+     "output_tokens": 0,
+     "prompt_bytes": 0,
+     "response_id": "fix2",
+     "seq": 1,
+     "session_id": "control",
+     "table": "turns",
+     "thinking_tokens": 0,
+     "uncached_tokens": 1
+    }
+   ],
+   "sessions": [
+    {
+     "active_seconds": 61.0,
+     "assistant_msgs": 2,
+     "commits": 0,
+     "compactions": 0,
+     "cwd": "/w/project",
+     "end_ms": 1794441601000,
+     "entrypoint": "cli",
+     "harness_version": "unknown",
+     "human_turns": 0,
+     "interactive": true,
+     "interruptions": 0,
+     "model_first": "synthetic-model",
+     "parent_session": null,
+     "questions": 0,
+     "questions_with_rec": 0,
+     "rec_accepted": 0,
+     "rec_free_text": 0,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "subagent": false,
+     "tasks_cmds": {},
+     "test_runs": 0,
+     "tool_calls": 0,
+     "waits": []
+    }
+   ],
+   "sha256": "60be50a28a2cffafe393fe8fa121957babd139f1dd12a7fc77bd6d0983b9330b"
+  },
+  "fix2-usage-overwritten-mixed-overflow.jsonl": {
+   "fields": [
+    {
+     "day": "2026-11-11",
+     "field": "effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:response",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.id",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_creation_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_read_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.output_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "requestId",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:cache_creation_input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:cache_read_input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:output_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:thinking_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:response",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "input:version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.id",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.cache_creation_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.cache_read_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "message.usage.output_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "requestId",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "field": "version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    }
+   ],
+   "initial_state": {},
+   "malformed": 0,
+   "original_tests": [
+    "new:fix2-usage-overwritten-mixed-overflow"
+   ],
+   "records": [
+    {
+     "day": "2026-11-11",
+     "known": 1,
+     "record_kind": "assistant",
+     "records": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-12",
+     "known": 1,
+     "record_kind": "assistant",
+     "records": 1,
+     "session_id": "control"
+    }
+   ],
+   "rows": [
+    {
+     "end_ms": 1794441601000,
+     "end_offset": 736,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "start_offset": 0,
+     "table": "activity_intervals"
+    },
+    {
+     "after_compaction": false,
+     "at_ms": 1794441601000,
+     "cache_write_tokens": 0,
+     "cached_tokens": 0,
+     "context_tokens": 1,
+     "context_window": null,
+     "effort": null,
+     "model": "synthetic-model",
+     "native": {
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "input_tokens": 1
+     },
+     "output_text_bytes": 0,
+     "output_tokens": 0,
+     "prompt_bytes": 0,
+     "response_id": "fix2",
+     "seq": 1,
+     "session_id": "control",
+     "table": "turns",
+     "thinking_tokens": 0,
+     "uncached_tokens": 1
+    }
+   ],
+   "sessions": [
+    {
+     "active_seconds": 61.0,
+     "assistant_msgs": 2,
+     "commits": 0,
+     "compactions": 0,
+     "cwd": "/w/project",
+     "end_ms": 1794441601000,
+     "entrypoint": "cli",
+     "harness_version": "unknown",
+     "human_turns": 0,
+     "interactive": true,
+     "interruptions": 0,
+     "model_first": "synthetic-model",
+     "parent_session": null,
+     "questions": 0,
+     "questions_with_rec": 0,
+     "rec_accepted": 0,
+     "rec_free_text": 0,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "subagent": false,
+     "tasks_cmds": {},
+     "test_runs": 0,
+     "tool_calls": 0,
+     "waits": []
+    }
+   ],
+   "sha256": "e2f58603b8b26cce3992581781781f65fcfb9986d3031ba9d20ba1e8837b2f47"
+  },
+  "fix2-usage-surviving-finite-overflow.jsonl": {
+   "fields": [
+    {
+     "day": "2026-11-11",
+     "field": "input:cache_creation_input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:cache_read_input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:output_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:thinking_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:response",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.id",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_creation_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_read_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.output_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "requestId",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    }
+   ],
+   "initial_state": {},
+   "malformed": 0,
+   "original_tests": [
+    "new:fix2-usage-surviving-finite-overflow"
+   ],
+   "records": [
+    {
+     "day": "2026-11-11",
+     "known": 1,
+     "record_kind": "assistant",
+     "records": 1,
+     "session_id": "control"
+    }
+   ],
+   "rows": [
+    {
+     "after_compaction": false,
+     "at_ms": 1794441540000,
+     "cache_write_tokens": 1e+308,
+     "cached_tokens": 0,
+     "context_tokens": {
+      "$old_float": "inf"
+     },
+     "context_window": null,
+     "effort": null,
+     "model": "synthetic-model",
+     "native": {
+      "cache_creation_input_tokens": 1e+308,
+      "cache_read_input_tokens": 0,
+      "input_tokens": 1e+308
+     },
+     "output_text_bytes": 0,
+     "output_tokens": 0,
+     "prompt_bytes": 0,
+     "response_id": "fix2",
+     "seq": 1,
+     "session_id": "control",
+     "table": "turns",
+     "thinking_tokens": 0,
+     "uncached_tokens": {
+      "$old_float": "inf"
+     }
+    }
+   ],
+   "sessions": [
+    {
+     "active_seconds": 0.0,
+     "assistant_msgs": 1,
+     "commits": 0,
+     "compactions": 0,
+     "cwd": "/w/project",
+     "end_ms": 1794441540000,
+     "entrypoint": "cli",
+     "harness_version": "unknown",
+     "human_turns": 0,
+     "interactive": true,
+     "interruptions": 0,
+     "model_first": "synthetic-model",
+     "parent_session": null,
+     "questions": 0,
+     "questions_with_rec": 0,
+     "rec_accepted": 0,
+     "rec_free_text": 0,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "subagent": false,
+     "tasks_cmds": {},
+     "test_runs": 0,
+     "tool_calls": 0,
+     "waits": []
+    }
+   ],
+   "sha256": "cf6c52ca6ab2c3d71ae4d2e73238045f485aecc9442f72beb0fac5d3713ba788"
+  },
+  "fix2-usage-surviving-large-integer.jsonl": {
+   "fields": [
+    {
+     "day": "2026-11-11",
+     "field": "input:cache_creation_input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:cache_read_input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:input_tokens",
+     "present": 1,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:output_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:thinking_tokens",
+     "present": 0,
+     "record_kind": "applied:usage",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:effort",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:response",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "input:version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.content",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.id",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.model",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_creation_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.cache_read_input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.input_tokens",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "message.usage.output_tokens",
+     "present": 0,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "requestId",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    },
+    {
+     "day": "2026-11-11",
+     "field": "version",
+     "present": 1,
+     "record_kind": "assistant",
+     "seen": 1,
+     "session_id": "control"
+    }
+   ],
+   "initial_state": {},
+   "malformed": 0,
+   "original_tests": [
+    "new:fix2-usage-surviving-large-integer"
+   ],
+   "records": [
+    {
+     "day": "2026-11-11",
+     "known": 1,
+     "record_kind": "assistant",
+     "records": 1,
+     "session_id": "control"
+    }
+   ],
+   "rows": [
+    {
+     "after_compaction": false,
+     "at_ms": 1794441540000,
+     "cache_write_tokens": 1,
+     "cached_tokens": 0,
+     "context_tokens": 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001,
+     "context_window": null,
+     "effort": null,
+     "model": "synthetic-model",
+     "native": {
+      "cache_creation_input_tokens": 1,
+      "cache_read_input_tokens": 0,
+      "input_tokens": 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+     },
+     "output_text_bytes": 0,
+     "output_tokens": 0,
+     "prompt_bytes": 0,
+     "response_id": "fix2",
+     "seq": 1,
+     "session_id": "control",
+     "table": "turns",
+     "thinking_tokens": 0,
+     "uncached_tokens": 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001
+    }
+   ],
+   "sessions": [
+    {
+     "active_seconds": 0.0,
+     "assistant_msgs": 1,
+     "commits": 0,
+     "compactions": 0,
+     "cwd": "/w/project",
+     "end_ms": 1794441540000,
+     "entrypoint": "cli",
+     "harness_version": "unknown",
+     "human_turns": 0,
+     "interactive": true,
+     "interruptions": 0,
+     "model_first": "synthetic-model",
+     "parent_session": null,
+     "questions": 0,
+     "questions_with_rec": 0,
+     "rec_accepted": 0,
+     "rec_free_text": 0,
+     "session_id": "control",
+     "start_ms": 1794441540000,
+     "subagent": false,
+     "tasks_cmds": {},
+     "test_runs": 0,
+     "tool_calls": 0,
+     "waits": []
+    }
+   ],
+   "sha256": "1329ad754b1a4f499b33a64fec1b7f5ddaa7141e5b8a60dbc587c12e678f60e3"
+  },
+  "fix2-usage-surviving-mixed-overflow.jsonl": {
+   "error": "OverflowError",
+   "initial_state": {},
+   "message": "int too large to convert to float",
+   "original_tests": [
+    "new:fix2-usage-surviving-mixed-overflow"
+   ],
+   "sha256": "f55984cf88cf54d12982fbf3df50301c84b1face29359cdeaf4d78e4b01e7c95"
+  },
   "fragments.jsonl": {
    "fields": [
     {

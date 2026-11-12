@@ -1,6 +1,6 @@
 {
  "built_from": {
-  "catalogue_sha256": "2afa3d08abc136c283b87ca09b37d3b09795f70eff0ca6c5246eabff251580f7",
+  "catalogue_sha256": "a4abe1f324091bd92251f569b4f8696e3640a559c304d8491c1f8261b89865b9",
   "samples": {
    "captures/escaped-malformed.jsonl": "d3ab501588cb7af5e03ae856e875b6809bbd5851e03283e43e53a82bd11a8454",
    "captures/escaped.jsonl": "4ff4490899cc4ac6444b34fc672811990fe9ec53cca6c5c23f4a642d90cbd273",
@@ -43,6 +43,12 @@
    "index/fix1-usage-overwritten-list.jsonl": "e84da8c0955ee7ee99fccdbfec58246ee80858d1a1bad536b1e02fddbe4342af",
    "index/fix1-usage-overwritten-nested.jsonl": "d2fd7d4575ddccfb8dc7605e4009a7f71e7d5208daac8b5518be40e646d4f730",
    "index/fix1-usage-overwritten-nonmapping.jsonl": "da546798889bdd30c8733a051c464f93ad7e74a741ad664f10d64d1272d47e9d",
+   "index/fix2-usage-overwritten-finite-overflow.jsonl": "351f9e66ce7aed1af84f229323c22bff45332f7615578d1fd44429dd8c5049fa",
+   "index/fix2-usage-overwritten-large-integer.jsonl": "60be50a28a2cffafe393fe8fa121957babd139f1dd12a7fc77bd6d0983b9330b",
+   "index/fix2-usage-overwritten-mixed-overflow.jsonl": "e2f58603b8b26cce3992581781781f65fcfb9986d3031ba9d20ba1e8837b2f47",
+   "index/fix2-usage-surviving-finite-overflow.jsonl": "cf6c52ca6ab2c3d71ae4d2e73238045f485aecc9442f72beb0fac5d3713ba788",
+   "index/fix2-usage-surviving-large-integer.jsonl": "1329ad754b1a4f499b33a64fec1b7f5ddaa7141e5b8a60dbc587c12e678f60e3",
+   "index/fix2-usage-surviving-mixed-overflow.jsonl": "f55984cf88cf54d12982fbf3df50301c84b1face29359cdeaf4d78e4b01e7c95",
    "index/fragments.jsonl": "79a30d27d3919910cb16b847b881d002052e99f08923cf45e80f6139d2206d2a",
    "index/identities.jsonl": "4ad50103dfe7489ea368a757d271234aabfd1e08a463d15ebc1cbb87fcf5b20c",
    "index/invalid-optional-origin.jsonl": "61436015392c489b92c67c58de403c0983a640152c87574323fd007791dc6d71",
@@ -191,7 +197,7 @@
    "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T11-00-00-01900000-0000-7000-8000-0000000000f2.jsonl": "30b550b6f035815a4123c8a8fd18fbbf7059ec89c04b0749ecda738e24b2fde3"
   }
  },
- "decoder_version": "10",
+ "decoder_version": "11",
  "evidence_rule": "synthetic samples establish decoder conformance; observed samples or probes establish emission; absent from a sample means unobserved",
  "harnesses": {
   "claude-code": {
@@ -1615,6 +1621,12 @@
       "index/fix1-usage-overwritten-list.jsonl",
       "index/fix1-usage-overwritten-nested.jsonl",
       "index/fix1-usage-overwritten-nonmapping.jsonl",
+      "index/fix2-usage-overwritten-finite-overflow.jsonl",
+      "index/fix2-usage-overwritten-large-integer.jsonl",
+      "index/fix2-usage-overwritten-mixed-overflow.jsonl",
+      "index/fix2-usage-surviving-finite-overflow.jsonl",
+      "index/fix2-usage-surviving-large-integer.jsonl",
+      "index/fix2-usage-surviving-mixed-overflow.jsonl",
       "index/fragments.jsonl",
       "index/identities.jsonl",
       "index/invalid-optional-origin.jsonl",

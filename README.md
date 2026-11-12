@@ -483,7 +483,7 @@ header agent evidence is separate. Query-ID aliases and publication of arbitrary
 index/identity claims remain consumer policy, rather than native path decoding.
 
 `tools/harness-evidence version --json` reports the evidence schema,
-decoder version `10`, and the decoder revision. A pinned copy reads a `REVISION`
+decoder version `11`, and the decoder revision. A pinned copy reads a `REVISION`
 file inside the package; a checkout reports its HEAD with `+dirty` when
 the package has changes. Without either source the command exits 2.
 
@@ -584,7 +584,11 @@ normalization against cwd, and `paths_complete` records missing or rejected inpu
 Claude usage components are `input_uncached` (input tokens), `cache_write`,
 `cache_read`, `output` and `thinking`; absent components are null. `context_total`
 is input plus cache write plus cache read, and `uncached_total` is input plus cache
-write, each null when a required component is missing. `response.native` preserves
+write, each null when a required component is missing or the derived result cannot
+be represented as a finite wire number. A null aggregate does not erase its exact
+components: consumers preserving old index arithmetic compute totals from normalized
+components with their existing absent-to-zero rule, including an infinite surviving
+total where the old parser produced one. `response.native` preserves
 original JSON as opaque data, including invalid intermediate usage values that a
 later fragment replaces. Normalized components that an invalid intermediate fragment
 cannot supply are null; the original final-invalid failure remains at response flush.

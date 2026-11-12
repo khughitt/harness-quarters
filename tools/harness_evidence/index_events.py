@@ -7,6 +7,7 @@ extraction sites, including historical EOF response-flush contributions.
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 import posixpath
 import re
 
@@ -441,6 +442,17 @@ def _text_blocks(content):
     return []
 
 
+def _usage_total(values):
+    """An unavailable wire total does not erase the original finite components."""
+    if any(value is None for value in values):
+        return None
+    try:
+        total = sum(values)
+    except OverflowError:
+        return None
+    return None if isinstance(total, float) and not math.isfinite(total) else total
+
+
 def _usage(raw):
     # Fragments may be replaced before the old flush site validates their values.
     mapping = raw if isinstance(raw, dict) else {}
@@ -453,8 +465,8 @@ def _usage(raw):
         "cache_read": values[2],
         "output": mapping.get("output_tokens"),
         "thinking": details.get("thinking_tokens") if isinstance(details, dict) else None,
-        "context_total": sum(values) if all(v is not None for v in values) else None,
-        "uncached_total": sum(values[:2]) if all(v is not None for v in values[:2]) else None,
+        "context_total": _usage_total(values),
+        "uncached_total": _usage_total(values[:2]),
     }
 
 
