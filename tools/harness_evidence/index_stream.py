@@ -7,46 +7,9 @@ import os
 from pathlib import Path
 
 from . import discover, index_events
+from .index_events import _factor_provenance, _check_proof_change, _own_proof_changes
 from .lines import Place
 from ._protocol import ProtocolError, validate
-
-
-def _factor_provenance(event: dict, defaults: dict) -> dict:
-    """Audit complete native proofs before encoding exact sparse replacements."""
-    proofs = event.get("provenance")
-    if not isinstance(proofs, dict) or proofs.keys() != defaults.keys():
-        raise ProtocolError("index provenance fields differ from declarations")
-    required = {"native_paths", "coverage_keys", "basis", "rule", "ref", "revision"}
-    sparse = {}
-    for field, proof in proofs.items():
-        if (not isinstance(proof, dict) or not required <= proof.keys()
-                or proof.keys() - required - {"source"}):
-            raise ProtocolError("index provenance attributes are missing or unknown")
-        for name in ("native_paths", "coverage_keys"):
-            value = proof[name]
-            if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
-                raise ProtocolError("index provenance arrays must contain strings")
-        if (not isinstance(proof["basis"], str)
-                or proof["basis"] not in {"native", "convention", "heuristic"}
-                or not isinstance(proof["rule"], str) or not proof["rule"]
-                or not isinstance(proof["ref"], str) or not proof["ref"]
-                or not isinstance(proof["revision"], str)
-                or proof["revision"] != event["decoder"]["revision"]):
-            raise ProtocolError("index provenance basis, rule, ref or revision is invalid")
-        default = defaults[field]
-        if ("source" in proof and not isinstance(proof["source"], str)
-                or "source" in default and "source" not in proof):
-            raise ProtocolError("index provenance source is invalid or cannot be deleted")
-        changes = {}
-        for name, value in proof.items():
-            if name == "revision":
-                continue
-            inherited = event["ref"] if name == "ref" else default.get(name)
-            if name not in default and name != "ref" or value != inherited:
-                changes[name] = list(value) if isinstance(value, list) else value
-        if changes:
-            sparse[field] = changes
-    return sparse
 
 
 def _plain_declaration(proof):
@@ -81,7 +44,6 @@ def _provenance_encoder(defaults: dict) -> Callable[[dict], dict]:
                   for field, proof in defaults.items()}
     _factor_provenance({"provenance": prototypes, "ref": "checked",
                         "decoder": {"revision": "checked"}}, defaults)
-    allowed = attributes | {"source", "ref"}
 
     def encode(event: dict) -> dict:
         if type(event) is not dict:
@@ -94,13 +56,13 @@ def _provenance_encoder(defaults: dict) -> Callable[[dict], dict]:
         for field, change in changes.items():
             if type(field) is not str or field not in defaults:
                 raise ProtocolError("index provenance change field is unknown")
-            if (type(change) is not dict or not all(type(name) is str for name in change)
-                    or change.keys() - allowed):
-                raise ProtocolError("index provenance change attributes are invalid or unknown")
-            proof = {**defaults[field], "ref": reference, "revision": decoder["revision"], **change}
-            audited = _factor_provenance({**event, "provenance": {field: proof}},
-                                         {field: defaults[field]})
-            sparse.update(audited)
+            _check_proof_change(change)
+            owned = _own_proof_changes(change)
+            proof = {**defaults[field], "ref": reference, "revision": decoder["revision"], **owned}
+            _factor_provenance({**event, "provenance": {field: proof}}, {field: defaults[field]})
+            # Validate the literal updates without recomputing native operator decisions.
+            if owned:
+                sparse[field] = owned
         return sparse
     return encode
 

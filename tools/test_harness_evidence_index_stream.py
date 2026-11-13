@@ -615,9 +615,18 @@ def complete_default_event(defaults):
 
 def native_changes_for_full_event(event):
     event = copy.deepcopy(event)
-    for proof in event["provenance"].values():
+    defaults = index_events.provenance_defaults()
+    for field, proof in list(event["provenance"].items()):
         if type(proof.get("revision")) is str and proof["revision"] == event["decoder"]["revision"]:
             proof.pop("revision")
+        if type(proof) is dict:
+            for name, value in list(proof.items()):
+                plain = type(value) is str or (type(value) is list and all(type(v) is str for v in value))
+                inherited = event["ref"] if name == "ref" else defaults[field].get(name)
+                if plain and (name in defaults[field] or name == "ref") and value == inherited:
+                    proof.pop(name)
+            if not proof:
+                event["provenance"].pop(field)
     return event
 
 
@@ -805,7 +814,7 @@ def test_frozen_oracle_detects_dropped_identity_parent_and_ref_overrides(monkeyp
 
 
 def test_native_provenance_constructs_declarations_once_and_only_changed_fields_per_event(monkeypatch):
-    preparations, audits, native, traversals = [], [], [], []
+    preparations, audits, native_audits, native, traversals = [], [], [], [], []
     class CountDeclarations(dict):
         def items(self):
             traversals.append(1)
@@ -826,6 +835,10 @@ def test_native_provenance_constructs_declarations_once_and_only_changed_fields_
             yield value
     monkeypatch.setattr(index_events, "provenance_defaults", declarations)
     monkeypatch.setattr(index_stream, "_factor_provenance", audit)
+    def native_audit(event, defaults):
+        native_audits.append(set(event["provenance"]))
+        return original_audit(event, defaults)
+    monkeypatch.setattr(index_events, "_factor_provenance", native_audit)
     monkeypatch.setattr(index_events, "extract", extract)
     out = read(request(source(FIXTURES / "index/ownership.jsonl")))
     assert len(native) == 6 and len(preparations) == 1 and len(traversals) == 1
@@ -833,6 +846,8 @@ def test_native_provenance_constructs_declarations_once_and_only_changed_fields_
     assert audits[0] == set(index_events.PROVENANCE)
     assert all(len(fields) == 1 for fields in audits[1:])
     assert len(audits) == 1 + sum(map(len, native))
+    assert len(native_audits) == sum(map(len, native))
+    assert all(len(fields) == 1 for fields in native_audits)
     assert all("provenance" not in v["state"]["index"]["native"]
                for v in out if v["object"] == "file_end")
 
@@ -1094,3 +1109,192 @@ def test_frozen_error_contract_rejects_new_exception_classes_and_native_messages
             if fault == "subclass":
                 raise UnexpectedError("interpreter wording")
             raise ValueError("Claude explicit native error changed")
+
+
+@pytest.mark.parametrize("attribute", ["native_paths", "coverage_keys"])
+@pytest.mark.parametrize("behavior", ["invalid-iteration", "different-iteration", "suppress-change", "force-change"])
+def test_pending_array_behavior_reaches_original_audit_before_copy(monkeypatch, attribute, behavior):
+    defaults = index_events.provenance_defaults()
+    inherited = defaults["identity.subagent"][attribute]
+    class InvalidIteration(list):
+        def __iter__(self):
+            return iter([0])
+    class DifferentIteration(list):
+        def __iter__(self):
+            return iter(["audited.path"])
+    class SuppressChange(DifferentIteration):
+        def __ne__(self, other):
+            return False
+    class ForceChange(list):
+        def __ne__(self, other):
+            return True
+    kind = {"invalid-iteration": InvalidIteration, "different-iteration": DifferentIteration,
+            "suppress-change": SuppressChange, "force-change": ForceChange}[behavior]
+    supplied_array = kind(inherited if behavior == "force-change" else ["stored.path"])
+    actual = index_events._identity_subagent
+    pending = []
+    def supplied(*args, **kw):
+        label, proof = actual(*args, **kw)
+        pending.append(supplied_array)
+        return label, {**proof, attribute: supplied_array}
+    monkeypatch.setattr(index_events, "_identity_subagent", supplied)
+    path = FIXTURES / "index/ownership.jsonl"
+    if behavior == "invalid-iteration":
+        with pytest.raises(stream.ProtocolError, match="arrays must contain strings"):
+            read(request(source(path)))
+        return
+    out = read(request(source(path)))
+    native = [v for v in out if v["object"] == "index_event" and v["eligible"]]
+    assert native
+    for event in native:
+        delta = event["provenance"]["identity.subagent"]
+        if behavior == "suppress-change":
+            assert attribute not in delta
+        else:
+            assert delta[attribute] == (inherited if behavior == "force-change" else ["audited.path"])
+            delta[attribute].append("caller mutation")
+    assert all(list.copy(value) == (inherited if behavior == "force-change" else ["stored.path"])
+               for value in pending)
+
+
+@pytest.mark.parametrize("attribute", ["native_paths", "coverage_keys"])
+@pytest.mark.parametrize("state_location", ["dictionary", "slots"])
+def test_native_array_projection_uses_operator_state_without_copy_hooks(monkeypatch, attribute, state_location):
+    class Metaclass(type):
+        def __eq__(cls, other):
+            raise AssertionError("metaclass equality")
+        def __hash__(cls):
+            raise AssertionError("metaclass hash")
+    class Stateful(list, metaclass=Metaclass):
+        def __iter__(self):
+            return iter(self.semantic)
+        def __ne__(self, other):
+            return self.changed
+        def __copy__(self):
+            raise AssertionError("copy hook")
+        def __deepcopy__(self, memo):
+            raise AssertionError("deepcopy hook")
+        def __reduce_ex__(self, protocol):
+            raise AssertionError("reduce hook")
+        def __getstate__(self):
+            raise AssertionError("state hook")
+    class Slotted(Stateful):
+        __slots__ = ("semantic", "changed")
+    array = (Slotted if state_location == "slots" else Stateful)(["stored.path"])
+    array.semantic, array.changed = ["audited.path"], True
+    actual = index_events._identity_subagent
+    def supplied(*args, **kw):
+        label, proof = actual(*args, **kw)
+        return label, {**proof, attribute: array}
+    monkeypatch.setattr(index_events, "_identity_subagent", supplied)
+    from harness_evidence.lines import Place
+    path = FIXTURES / "index/ownership.jsonl"
+    raw = path.read_bytes().splitlines(keepends=True)[0]
+    place = Place("claude-code", "file", None, "explicit", "file", path)
+    event = next(index_events.extract([(0, raw)], {}, place=place, text=True))
+    snapshot = event["provenance"]["identity.subagent"][attribute]
+    assert snapshot is not array and snapshot == ["audited.path"]
+    list.append(snapshot, "caller mutation")
+    assert list.copy(array) == ["stored.path"]
+    event["decoder"] = ENVELOPE["decoder"]
+    encoded = index_stream._provenance_encoder(index_events.provenance_defaults())(event)
+    assert encoded["identity.subagent"][attribute] == ["audited.path", "caller mutation"]
+    again = next(index_events.extract([(0, raw)], {}, place=place, text=True))
+    assert again["provenance"]["identity.subagent"][attribute] == ["audited.path"]
+
+
+@pytest.mark.parametrize("attribute", ["native_paths", "coverage_keys"])
+def test_native_array_identity_sensitive_comparison_precedes_materialization(monkeypatch, attribute):
+    class IdentitySensitive(list):
+        def __ne__(self, other):
+            return self is supplied_array
+        def __iter__(self):
+            return iter(["audited.path"])
+    supplied_array = IdentitySensitive(["stored.path"])
+    actual = index_events._identity_subagent
+    def supplied(*args, **kw):
+        label, proof = actual(*args, **kw)
+        return label, {**proof, attribute: supplied_array}
+    monkeypatch.setattr(index_events, "_identity_subagent", supplied)
+    out = read(request(source(FIXTURES / "index/ownership.jsonl")))
+    eligible = [v for v in out if v["object"] == "index_event" and v["eligible"]]
+    assert eligible
+    assert all(v["provenance"]["identity.subagent"][attribute] == ["audited.path"] for v in eligible)
+    assert list.copy(supplied_array) == ["stored.path"]
+
+
+def test_framing_preserves_explicit_precomputed_updates_without_second_prune():
+    defaults = index_events.provenance_defaults()
+    event = {"ref": "file#L1", "decoder": {"revision": "a" * 40},
+             "provenance": {"identity.subagent": copy.deepcopy(defaults["identity.subagent"])}}
+    encode = index_stream._provenance_encoder(defaults)
+    actual = encode(event)
+    assert actual == event["provenance"]
+    actual["identity.subagent"]["native_paths"].append("caller")
+    assert event["provenance"]["identity.subagent"]["native_paths"] == defaults["identity.subagent"]["native_paths"]
+
+
+@pytest.mark.parametrize("attribute", ["basis", "rule"])
+def test_native_scalar_comparison_decision_survives_framing(monkeypatch, attribute):
+    class IdentitySensitive(str):
+        def __ne__(self, other):
+            return self is supplied_value
+    inherited = index_events.provenance_defaults()["identity.subagent"][attribute]
+    supplied_value = IdentitySensitive(inherited)
+    actual = index_events._identity_subagent
+    def supplied(*args, **kw):
+        label, proof = actual(*args, **kw)
+        return label, {**proof, attribute: supplied_value}
+    monkeypatch.setattr(index_events, "_identity_subagent", supplied)
+    out = read(request(source(FIXTURES / "index/ownership.jsonl")))
+    eligible = [v for v in out if v["object"] == "index_event" and v["eligible"]]
+    assert eligible
+    assert all(attribute in v["provenance"]["identity.subagent"]
+               and v["provenance"]["identity.subagent"][attribute] == inherited for v in eligible)
+
+
+def test_framing_validates_owned_values_without_replaying_update_comparison():
+    class ComputedArray(list):
+        def __iter__(self):
+            return iter(["computed.path"])
+        def __ne__(self, other):
+            raise AssertionError("update presence is already computed")
+    event = {"ref": "file#L1", "decoder": {"revision": "a" * 40},
+             "provenance": {"identity.subagent": {"native_paths": ComputedArray(["stored.path"])}}}
+    encoded = index_stream._provenance_encoder(index_events.provenance_defaults())(event)
+    assert encoded == {"identity.subagent": {"native_paths": ["computed.path"]}}
+
+
+def test_framing_checks_literal_basis_after_owning_supplied_string():
+    class InvalidBasis(str):
+        def __hash__(self):
+            return hash("native")
+        def __eq__(self, other):
+            return True
+    event = {"ref": "file#L1", "decoder": {"revision": "a" * 40},
+             "provenance": {"identity.subagent": {"basis": InvalidBasis("unsupported")}}}
+    with pytest.raises(stream.ProtocolError, match="provenance"):
+        index_stream._provenance_encoder(index_events.provenance_defaults())(event)
+
+
+def test_native_class_spoofed_scalar_fails_literal_framing(monkeypatch):
+    class NativeString(str):
+        @property
+        def __class__(self):
+            return list
+    value = NativeString("kept_rule")
+    defaults = index_events.provenance_defaults()
+    proof = {**defaults["identity.subagent"], "ref": "file#L1", "revision": "a" * 40,
+             "rule": value}
+    event = {"ref": "file#L1", "decoder": {"revision": "a" * 40},
+             "provenance": {"identity.subagent": proof}}
+    # The original auditor materializes this injected object as an invalid scalar array.
+    audited = index_stream._factor_provenance(event, {"identity.subagent": defaults["identity.subagent"]})
+    assert audited["identity.subagent"]["rule"] == list("kept_rule")
+    actual = index_events._identity_subagent
+    def supplied(*args, **kw):
+        label, pending = actual(*args, **kw)
+        return label, {**pending, "rule": value}
+    monkeypatch.setattr(index_events, "_identity_subagent", supplied)
+    with pytest.raises(stream.ProtocolError, match="basis, rule, ref or revision"):
+        read(request(source(FIXTURES / "index/ownership.jsonl")))

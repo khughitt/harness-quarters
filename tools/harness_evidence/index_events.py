@@ -12,6 +12,7 @@ import posixpath
 import re
 
 from . import discover, labels
+from ._protocol import ProtocolError
 from .lines import Place, ref, _finite_float, _reject_constant
 
 from .index_coverage import (KNOWN_KINDS, WATCHED, USAGE, ATTACHMENT_BODY, STOP_EVENTS,
@@ -545,22 +546,81 @@ def _message(record, kind):
     }
 
 
+_CONVENTION_PROOFS = frozenset({
+    "message.origin", "flush_response", "identity.index_session", "identity.parent",
+    "identity.subagent", "calls[].kind", "calls[].paths", "calls[].paths_complete",
+    "results[].child_session", "results[].truncation", "notifications",
+})
+_PROOF_CHANGES = frozenset({"native_paths", "coverage_keys", "basis", "rule", "source", "ref"})
+
+
+def _provenance_declaration(field):
+    proof = {"native_paths": list(PROVENANCE[field]),
+             "coverage_keys": list(COVERAGE_KEYS.get(field, [])),
+             "basis": "native", "rule": "claude_native"}
+    if field in _CONVENTION_PROOFS:
+        proof.update(basis="convention", rule="claude_" + field.replace(".", "_").replace("[]", ""))
+    if field == "notifications":
+        proof.update(rule="claude_notification_xml", source="physical_line")
+    return proof
+
+
 def provenance_defaults() -> dict[str, dict]:
     """Owned complete declarations; dynamic refs/revisions come from each event."""
-    proofs = {
-        field: {"native_paths": list(paths), "coverage_keys": list(COVERAGE_KEYS.get(field, [])),
-                "basis": "native", "rule": "claude_native"}
-        for field, paths in PROVENANCE.items()
-    }
-    for field in [
-        "message.origin", "flush_response", "identity.index_session", "identity.parent",
-        "identity.subagent", "calls[].kind", "calls[].paths", "calls[].paths_complete",
-        "results[].child_session", "results[].truncation", "notifications",
-    ]:
-        proofs[field].update(
-            basis="convention", rule="claude_" + field.replace(".", "_").replace("[]", ""))
-    proofs["notifications"].update(rule="claude_notification_xml", source="physical_line")
-    return proofs
+    return {field: _provenance_declaration(field) for field, _ in PROVENANCE.items()}
+
+
+def _factor_provenance(event: dict, defaults: dict) -> dict:
+    """Audit complete native proofs before encoding exact sparse replacements."""
+    proofs = event.get("provenance")
+    if not isinstance(proofs, dict) or proofs.keys() != defaults.keys():
+        raise ProtocolError("index provenance fields differ from declarations")
+    required = {"native_paths", "coverage_keys", "basis", "rule", "ref", "revision"}
+    sparse = {}
+    for field, proof in proofs.items():
+        if (not isinstance(proof, dict) or not required <= proof.keys()
+                or proof.keys() - required - {"source"}):
+            raise ProtocolError("index provenance attributes are missing or unknown")
+        for name in ("native_paths", "coverage_keys"):
+            value = proof[name]
+            if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+                raise ProtocolError("index provenance arrays must contain strings")
+        if (not isinstance(proof["basis"], str)
+                or proof["basis"] not in {"native", "convention", "heuristic"}
+                or not isinstance(proof["rule"], str) or not proof["rule"]
+                or not isinstance(proof["ref"], str) or not proof["ref"]
+                or not isinstance(proof["revision"], str)
+                or proof["revision"] != event["decoder"]["revision"]):
+            raise ProtocolError("index provenance basis, rule, ref or revision is invalid")
+        default = defaults[field]
+        if ("source" in proof and not isinstance(proof["source"], str)
+                or "source" in default and "source" not in proof):
+            raise ProtocolError("index provenance source is invalid or cannot be deleted")
+        changes = {}
+        for name, value in proof.items():
+            if name == "revision":
+                continue
+            inherited = event["ref"] if name == "ref" else default.get(name)
+            if name not in default and name != "ref" or value != inherited:
+                changes[name] = list(value) if isinstance(value, list) else value
+        if changes:
+            sparse[field] = changes
+    return sparse
+
+
+def _check_proof_change(change):
+    if (type(change) is not dict or not all(type(name) is str for name in change)
+            or change.keys() - _PROOF_CHANGES):
+        raise ProtocolError("index provenance change attributes are invalid or unknown")
+
+
+def _own_proof_changes(change):
+    """Own string/array update values without invoking custom scalar or copy hooks."""
+    try:
+        return {name: [str.__str__(item) for item in value] if isinstance(value, list)
+                else str.__str__(value) for name, value in change.items()}
+    except TypeError:
+        raise ProtocolError("index provenance changes must contain strings or string arrays") from None
 
 
 def _without_text(event):
@@ -614,6 +674,8 @@ def _identity_subagent(state, session, record, sidechain, place, reference):
 
 def extract(lines, state, *, place: Place, text: bool):
     """Yield native events with proof changes, then cumulative native coverage."""
+    proof_defaults = {field: _provenance_declaration(field) for field in
+                      ("identity.index_session", "identity.parent", "identity.subagent")}
     facts = discover.path_facts(place) or {}
     parent = state.setdefault(
         "parent_session", facts.get("parent") if facts.get("subagent") else None
@@ -969,14 +1031,20 @@ def extract(lines, state, *, place: Place, text: bool):
         if index_session == session:
             changes["identity.index_session"] = {"basis": "native", "rule": "session_id"}
         if subagent_proof is not None:
-            # Copy every attribute and supported mutable array; never transform unaudited scalars.
-            changes["identity.subagent"] = (
-                {name: list.copy(value) if isinstance(value, list) else value
-                 for name, value in subagent_proof.items()}
-                if type(subagent_proof) is dict else subagent_proof)
+            changes["identity.subagent"] = subagent_proof
         if parent and sidechain and agent:
             changes.setdefault("identity.parent", {}).update(ref=ref(place), rule="claude_path_layout")
-        event["provenance"] = changes
+        # Audit original values/operators before materializing their computed updates.
+        projected = {}
+        for field, change in changes.items():
+            _check_proof_change(change)
+            declaration = proof_defaults[field]
+            proof = {**declaration, "ref": reference, "revision": "native", **change}
+            audited = _factor_provenance({"ref": reference, "decoder": {"revision": "native"},
+                                          "provenance": {field: proof}}, {field: declaration})
+            if field in audited:
+                projected[field] = _own_proof_changes(audited[field])
+        event["provenance"] = projected
         if not text:
             _without_text(event)
         yield event
