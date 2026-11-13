@@ -1,5 +1,6 @@
 """Bounded held-source index framing, prefix-proved resume and terminal restarts."""
 from dataclasses import asdict, replace
+from collections.abc import Callable
 import copy
 import hashlib
 import os
@@ -48,8 +49,8 @@ def _factor_provenance(event: dict, defaults: dict) -> dict:
     return sparse
 
 
-def _plain_proof(proof):
-    """Only built-in JSON nodes may participate in equality without user operators."""
+def _plain_declaration(proof):
+    """Declarations contain only built-in strings and string arrays."""
     if type(proof) is not dict:
         return False
     for key, value in proof.items():
@@ -65,40 +66,43 @@ def _plain_proof(proof):
     return True
 
 
-def _provenance_factor(defaults):
-    """Check an owned file-local declaration snapshot before using whole-proof equality."""
-    defaults = copy.deepcopy(defaults)
+def _provenance_encoder(defaults: dict) -> Callable[[dict], dict]:
+    """Validate owned declarations once, then audit every supplied resolved change."""
     attributes = {"native_paths", "coverage_keys", "basis", "rule"}
     if (type(defaults) is not dict or not all(type(field) is str for field in defaults)
             or defaults.keys() != index_events.PROVENANCE.keys()):
         raise ProtocolError("index provenance declaration fields are missing or unknown")
     for proof in defaults.values():
-        if (not _plain_proof(proof) or not attributes <= proof.keys()
+        if (not _plain_declaration(proof) or not attributes <= proof.keys()
                 or proof.keys() - attributes - {"source"}):
             raise ProtocolError("index provenance declaration attributes are missing or unknown")
-    expected = {field: {**proof, "ref": "checked", "revision": "checked"}
-                for field, proof in defaults.items()}
-    _factor_provenance({"provenance": expected, "ref": "checked",
+    defaults = copy.deepcopy(defaults)
+    prototypes = {field: {**proof, "ref": "checked", "revision": "checked"}
+                  for field, proof in defaults.items()}
+    _factor_provenance({"provenance": prototypes, "ref": "checked",
                         "decoder": {"revision": "checked"}}, defaults)
+    allowed = attributes | {"source", "ref"}
 
-    def factor(event):
+    def encode(event: dict) -> dict:
         if type(event) is not dict:
-            return _factor_provenance(event, defaults)
-        proofs, reference, decoder = event.get("provenance"), event.get("ref"), event.get("decoder")
-        if (type(proofs) is not dict or not all(type(field) is str for field in proofs)
-                or proofs.keys() != defaults.keys() or type(reference) is not str or not reference
-                or type(decoder) is not dict or type(decoder.get("revision")) is not str):
-            return _factor_provenance(event, defaults)
+            raise ProtocolError("index provenance event must be an object")
+        changes, reference, decoder = event.get("provenance"), event.get("ref"), event.get("decoder")
+        if (type(changes) is not dict or not isinstance(reference, str) or not reference
+                or type(decoder) is not dict or not isinstance(decoder.get("revision"), str)):
+            raise ProtocolError("index provenance changes or envelope is invalid")
         sparse = {}
-        for field, proof in proofs.items():
-            complete = expected[field]
-            complete.update(ref=reference, revision=decoder["revision"])
-            if _plain_proof(proof) and dict.__eq__(complete, proof):
-                continue
-            sparse.update(_factor_provenance({**event, "provenance": {field: proof}},
-                                             {field: defaults[field]}))
+        for field, change in changes.items():
+            if type(field) is not str or field not in defaults:
+                raise ProtocolError("index provenance change field is unknown")
+            if (type(change) is not dict or not all(type(name) is str for name in change)
+                    or change.keys() - allowed):
+                raise ProtocolError("index provenance change attributes are invalid or unknown")
+            proof = {**defaults[field], "ref": reference, "revision": decoder["revision"], **change}
+            audited = _factor_provenance({**event, "provenance": {field: proof}},
+                                         {field: defaults[field]})
+            sparse.update(audited)
         return sparse
-    return factor
+    return encode
 
 
 def _prefix(handle, limit):
@@ -150,7 +154,7 @@ def _file(source, number, roots, request, envelope):
     location.pop("path")
     location.pop("read_path")
     defaults = index_events.provenance_defaults()
-    factor_provenance = _provenance_factor(defaults)
+    encode_provenance = _provenance_encoder(defaults)
     start = {**base, "provenance_format": "defaults/1",
              "provenance_defaults": copy.deepcopy(defaults),
              "object": "file_start", "key": "file", "path": str(logical),
@@ -202,12 +206,7 @@ def _file(source, number, roots, request, envelope):
             for value in index_events.extract(physical_lines(), state, place=place, text=request.get("text", False)):
                 event = {**base, **value, "harness_version": value.get("identity", {}).get("version")}
                 if event["object"] == "index_event":
-                    proofs = event.get("provenance")
-                    if isinstance(proofs, dict):
-                        for proof in proofs.values():
-                            if isinstance(proof, dict):
-                                proof.setdefault("revision", envelope["decoder"]["revision"])
-                    event["provenance"] = factor_provenance(event)
+                    event["provenance"] = encode_provenance(event)
                 count += 1
                 yield event
         except index_events.Restart as signal:

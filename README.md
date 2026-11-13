@@ -582,10 +582,13 @@ optional `source:"physical_line"`. Each event's `provenance` contains only chang
 attributes; an empty mapping inherits the whole table. Ref and revision inherit
 from the event envelope. Overrides replace whole arrays or scalar values and may
 refer to earlier records or file paths. Unknown fields/attributes, revision overrides
-and deletion of defaulted attributes fail visibly before encoding. Native extraction
-and its read audit retain complete proofs; declarations reset on each file and resume
-request, outside opaque state and terminal counts. Both command and import routes
-use this framing. `text:true` requests
+and invalid or deletion-like supplied values fail visibly before encoding. Complete
+declarations are checked once per file; native extraction supplies record-specific
+changes, each resolved field is audited, and every event's ref/revision binding is
+checked even with empty changes. Omitted fields inherit checked declarations; an
+independent frozen full-proof oracle checks for accidentally omitted dynamic changes.
+Declarations reset on each file and resume request, outside opaque state and terminal
+counts. Both command and import routes use this framing. `text:true` requests
 message, command, path, question, answer and dispatch text; with it disabled those
 values are omitted. No human-turn, active-time, task/review or recommendation verdict
 is produced. Default reader requests retain their existing object/state shapes.

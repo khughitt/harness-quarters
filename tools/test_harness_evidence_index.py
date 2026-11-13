@@ -5,6 +5,7 @@ changes and a reader request accidentally entering the opt-in index path.
 """
 
 import copy
+from contextlib import contextmanager
 import hashlib
 import json
 from pathlib import Path
@@ -823,3 +824,71 @@ def test_policy_controls_distinguish_native_success_from_consumer_failure():
         control = POLICY_CONTROLS["cases"]["task2-policy-" + label + ".jsonl"]
         assert control["outcome"]["consumer"] == "success"
         assert control["sessions"][0]["rec_accepted"] == 1
+
+
+PROVENANCE_ORACLE = json.loads((TOOLS / "fixtures/harness-evidence/index-provenance-oracle.json").read_text())
+
+
+def oracle_hash(value):
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"),
+                                     ensure_ascii=True, allow_nan=False).encode()).hexdigest()
+
+
+def oracle_rows(rows, defaults):
+    result = []
+    for value in rows:
+        ordinary = copy.deepcopy(value)
+        if ordinary["object"] == "index_event":
+            proof = expand_proofs(ordinary, defaults)
+            ordinary.pop("provenance")
+        else:
+            proof = None
+        for key in ("schema", "decoder", "request", "file", "harness", "harness_version"):
+            ordinary.pop(key, None)
+        result.append({"ordinary": oracle_hash(ordinary),
+                       "provenance": oracle_hash(proof) if proof is not None else None})
+    return result
+
+
+@contextmanager
+def oracle_error(error):
+    # Native messages are the contract; interpreter wording varies across Python3.11+.
+    import builtins
+    kind = getattr(builtins, error["type"])
+    with pytest.raises(kind) as observed:
+        yield
+    assert type(observed.value) is kind
+    if error["message"].startswith("Claude "):
+        assert str(observed.value) == error["message"]
+
+
+def oracle_native_case(case):
+    from harness_evidence import discover, index_events
+    path = FIXTURES / case["fixture"]
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == PROVENANCE_ORACLE["fixtures"][case["fixture"]]
+    defaults = index_events.provenance_defaults()
+    assert defaults == PROVENANCE_ORACLE["declarations"]
+    place = discover.place_of(Path(case["logical"]), discover.roots(
+        explicit=[("claude-code", Path("/oracle/.claude/projects"))]))
+    state = {}
+    for old in case["passes"]:
+        if case["schedule"] == "prefix":
+            state = {}
+        working = copy.deepcopy(state)
+        offset, lines = 0, []
+        for raw in path.read_bytes()[:old["size"]].splitlines(keepends=True):
+            if offset >= working.get("next_offset", 0):
+                lines.append((offset, raw))
+            offset += len(raw)
+        rows = []
+        def consume():
+            for value in index_events.extract(lines, working, place=place, text=case["text"]):
+                rows.append({**value, "decoder": {"revision": PROVENANCE_ORACLE["proof_revision"]}})
+        if old["error"]:
+            with oracle_error(old["error"]):
+                consume()
+        else:
+            consume()
+            state = working
+        assert oracle_rows(rows, defaults) == old["rows"], (case["fixture"], case["layout"], old["through_line"])
+        assert oracle_hash(working) == old["native_state"]

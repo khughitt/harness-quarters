@@ -545,45 +545,20 @@ def _message(record, kind):
     }
 
 
-def _provenance(reference, identity):
-    out = {
-        field: {
-            "native_paths": paths,
-            "coverage_keys": COVERAGE_KEYS.get(field, []),
-            "basis": "native",
-            "rule": "claude_native",
-            "ref": reference,
-        }
+def provenance_defaults() -> dict[str, dict]:
+    """Owned complete declarations; dynamic refs/revisions come from each event."""
+    proofs = {
+        field: {"native_paths": list(paths), "coverage_keys": list(COVERAGE_KEYS.get(field, [])),
+                "basis": "native", "rule": "claude_native"}
         for field, paths in PROVENANCE.items()
     }
     for field in [
-        "message.origin",
-        "flush_response",
-        "identity.index_session",
-        "identity.parent",
-        "identity.subagent",
-        "calls[].kind",
-        "calls[].paths",
-        "calls[].paths_complete",
-        "results[].child_session",
-        "results[].truncation",
-        "notifications",
+        "message.origin", "flush_response", "identity.index_session", "identity.parent",
+        "identity.subagent", "calls[].kind", "calls[].paths", "calls[].paths_complete",
+        "results[].child_session", "results[].truncation", "notifications",
     ]:
-        out[field].update(
-            basis="convention", rule="claude_" + field.replace(".", "_").replace("[]", "")
-        )
-    if identity["parent"] is not None:
-        out["identity.parent"]["rule"] = "claude_child_parent"
-    return out
-
-
-def provenance_defaults() -> dict[str, dict]:
-    """Owned index-wire defaults; refs and revisions come from each event."""
-    proofs = _provenance(None, {"parent": None})
-    for proof in proofs.values():
-        del proof["ref"]
-        proof["native_paths"] = list(proof["native_paths"])
-        proof["coverage_keys"] = list(proof["coverage_keys"])
+        proofs[field].update(
+            basis="convention", rule="claude_" + field.replace(".", "_").replace("[]", ""))
     proofs["notifications"].update(rule="claude_notification_xml", source="physical_line")
     return proofs
 
@@ -638,7 +613,7 @@ def _identity_subagent(state, session, record, sidechain, place, reference):
 
 
 def extract(lines, state, *, place: Place, text: bool):
-    """Yield physical native events, then cumulative native coverage, without table rows."""
+    """Yield native events with proof changes, then cumulative native coverage."""
     facts = discover.path_facts(place) or {}
     parent = state.setdefault(
         "parent_session", facts.get("parent") if facts.get("subagent") else None
@@ -988,16 +963,20 @@ def extract(lines, state, *, place: Place, text: bool):
                     }
                 elif record.get("subtype") == "stop_hook_summary":
                     event["turn_end"] = _turn_end(record, state, index_session, day)
-        event["provenance"] = _provenance(reference, identity)
+        changes = {}
+        if identity["parent"] is not None:
+            changes["identity.parent"] = {"rule": "claude_child_parent"}
         if index_session == session:
-            event["provenance"]["identity.index_session"].update(basis="native", rule="session_id")
+            changes["identity.index_session"] = {"basis": "native", "rule": "session_id"}
         if subagent_proof is not None:
-            event["provenance"]["identity.subagent"].update(subagent_proof)
+            # Copy every attribute and supported mutable array; never transform unaudited scalars.
+            changes["identity.subagent"] = (
+                {name: list.copy(value) if isinstance(value, list) else value
+                 for name, value in subagent_proof.items()}
+                if type(subagent_proof) is dict else subagent_proof)
         if parent and sidechain and agent:
-            event["provenance"]["identity.parent"].update(ref=ref(place), rule="claude_path_layout")
-        event["provenance"]["notifications"].update(
-            rule="claude_notification_xml", source="physical_line"
-        )
+            changes.setdefault("identity.parent", {}).update(ref=ref(place), rule="claude_path_layout")
+        event["provenance"] = changes
         if not text:
             _without_text(event)
         yield event
