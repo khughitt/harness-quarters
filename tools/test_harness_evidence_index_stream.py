@@ -319,7 +319,7 @@ def test_index_provenance_defaults_round_trip_full_proofs(monkeypatch, name):
             yield value
     monkeypatch.setattr(index_events, "extract", audited)
     state = None
-    for size in [sum(map(len, raw[:i])) for i in range(1, len(raw) + 1)]:
+    for size in [0] + [sum(map(len, raw[:i])) for i in range(1, len(raw) + 1)]:
         originals.clear()
         iterator = stream.objects(request(source(path, size=size, state=state)), ENVELOPE)
         header = next(iterator)
