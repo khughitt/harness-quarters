@@ -577,6 +577,17 @@ def _provenance(reference, identity):
     return out
 
 
+def provenance_defaults() -> dict[str, dict]:
+    """Owned index-wire defaults; refs and revisions come from each event."""
+    proofs = _provenance(None, {"parent": None})
+    for proof in proofs.values():
+        del proof["ref"]
+        proof["native_paths"] = list(proof["native_paths"])
+        proof["coverage_keys"] = list(proof["coverage_keys"])
+    proofs["notifications"].update(rule="claude_notification_xml", source="physical_line")
+    return proofs
+
+
 def _without_text(event):
     if event["message"]:
         event["message"].pop("text")

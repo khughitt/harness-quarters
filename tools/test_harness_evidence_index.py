@@ -4,6 +4,7 @@ These checks catch native extraction loss, byte-size changes, coverage populatio
 changes and a reader request accidentally entering the opt-in index path.
 """
 
+import copy
 import hashlib
 import json
 from pathlib import Path
@@ -89,8 +90,18 @@ def decoded(tmp_path, name, **kw):
     return out
 
 
+def expand_proofs(event, defaults):
+    """Independent wire-contract expansion, compared to complete native proofs."""
+    return {field: {**copy.deepcopy(proof), "ref": event["ref"],
+                    "revision": event["decoder"]["revision"],
+                    **copy.deepcopy(event["provenance"].get(field, {}))}
+            for field, proof in defaults.items()}
+
+
 def events(out):
-    return [v for v in out if v["object"] == "index_event"]
+    defaults = out[0]["provenance_defaults"]
+    return [{**v, "provenance": expand_proofs(v, defaults)}
+            for v in out if v["object"] == "index_event"]
 
 
 def test_index_events_preserve_fragments_and_missing_usage(tmp_path):
@@ -211,7 +222,7 @@ def test_index_evidence_has_sources_and_text_is_opt_in(tmp_path):
         assert row["line"] == number and row["end"] == offset + len(line)
         assert row["sha256"] == hashlib.sha256(line).hexdigest()
         assert row["ref"] == f"file:{source}#L{number}"
-        assert row["decoder"]["version"] == "15"
+        assert row["decoder"]["version"] == "16"
         for provenance in row["provenance"].values():
             assert provenance["basis"] in {"native", "convention", "heuristic"}
             assert provenance["rule"] and provenance["ref"] == row["ref"]
@@ -627,7 +638,7 @@ def test_nontext_pending_stop_matching_survives_native_slice_boundary():
     list(extract([(0, raw[0])], state, place=place, text=False))
     assert "guard-sensitive-command" not in json.dumps(state)
     resumed = list(extract([(len(raw[0]), raw[1])], state, place=place, text=False))
-    hooks = events(resumed)[0]["turn_end"]["hooks"]
+    hooks = next(v for v in resumed if v["object"] == "index_event")["turn_end"]["hooks"]
     old = CONTROLS["cases"][source.name]["replay"][-1]
     expected = [r for r in old["rows"] if r["table"] == "hook_runs"]
     assert hooks == [

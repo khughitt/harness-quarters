@@ -8,8 +8,8 @@ import subprocess
 import pytest
 
 from harness_evidence import DECODER_VERSION
-from harness_evidence import index_events, stream
-from test_harness_evidence_index import CONTROLS, FIXTURES, TOOLS, environment
+from harness_evidence import index_events, index_stream, stream
+from test_harness_evidence_index import CONTROLS, FIXTURES, TOOLS, environment, expand_proofs
 
 ENVELOPE = {"schema": "harness-evidence/1", "decoder": {"version": DECODER_VERSION, "revision": "a" * 40}}
 
@@ -140,7 +140,7 @@ def test_restart_seed_clears_old_rows(monkeypatch):
             offset, raw = next(iterator)
             state["next_offset"] = offset + len(raw)
             state["next_line"] = 2
-            yield {"object": "index_event", "key": "E0"}
+            yield {**proof_event(actual), "key": "E0"}
             raise index_events.Restart("test invalidation", {"restart_mode": True})
         yield from actual(lines, state, **kw)
     monkeypatch.setattr(index_events, "extract", late)
@@ -161,11 +161,12 @@ def test_mid_file_restart_is_terminal_and_stream_stays_bounded(monkeypatch, tmp_
     path = tmp_path / "many-lines"
     path.write_bytes(b'{}\n' * 10000)
     consumed = []
+    actual = index_events.extract
     def late(lines, state, **kw):
         for offset, raw in lines:
             consumed.append(offset)
             state.update(next_offset=offset + len(raw), next_line=len(consumed) + 1)
-            yield {"object": "index_event", "key": f"E{offset}"}
+            yield {**proof_event(actual), "key": f"E{offset}"}
             if len(consumed) == 2:
                 raise index_events.Restart("test", {"restart_mode": True})
     monkeypatch.setattr(index_events, "extract", late)
@@ -298,3 +299,198 @@ def test_bad_identity_in_batch_exits_nonzero_after_first_terminal(tmp_path):
 def test_unencodable_source_path_is_framed_unreadable():
     out = read(request({"path": "\ud800", "size": 0, "identity": {"device": 0, "inode": 0}}))
     assert out[-2]["status"] == "unreadable" and out[-2]["state"] is None
+
+
+@pytest.mark.parametrize("name", sorted(p.name for p in (FIXTURES / "index").glob("*.jsonl")))
+def test_index_provenance_defaults_round_trip_full_proofs(monkeypatch, name):
+    # Dropping any native proof attribute, including optional ones, breaks equality.
+    path = FIXTURES / "index" / name
+    raw = path.read_bytes().splitlines(keepends=True)
+    actual = index_events.extract
+    originals = []
+    def audited(*args, **kw):
+        for value in actual(*args, **kw):
+            if value["object"] == "index_event":
+                proof = copy.deepcopy(value["provenance"])
+                assert set(proof) == set(index_events.PROVENANCE)
+                for field in proof.values():
+                    field["revision"] = ENVELOPE["decoder"]["revision"]
+                originals.append(proof)
+            yield value
+    monkeypatch.setattr(index_events, "extract", audited)
+    state = None
+    for size in [sum(map(len, raw[:i])) for i in range(1, len(raw) + 1)]:
+        originals.clear()
+        iterator = stream.objects(request(source(path, size=size, state=state)), ENVELOPE)
+        header = next(iterator)
+        assert header.get("provenance_format") == "defaults/1"
+        assert set(header["provenance_defaults"]) == set(index_events.PROVENANCE)
+        emitted = []
+        try:
+            for value in iterator:
+                emitted.append(value)
+        except (TypeError, ValueError, AttributeError, OverflowError):
+            # Existing invalid native fixtures retain their original failure boundary.
+            assert not any(v["object"] == "file_end" for v in emitted)
+        assert [expand_proofs(v, header["provenance_defaults"]) for v in emitted
+                if v["object"] == "index_event"] == originals
+        if emitted and emitted[-1]["object"] == "request_end":
+            state = emitted[-2]["state"]
+
+
+def proof_event(extract=None):
+    path = FIXTURES / "index/ownership.jsonl"
+    raw = path.read_bytes().splitlines(keepends=True)
+    from harness_evidence.lines import Place
+    place = Place("claude-code", "file", None, "explicit", str(path), path)
+    offset = 0
+    lines = []
+    for line in raw:
+        lines.append((offset, line))
+        offset += len(line)
+    event = next((extract or index_events.extract)(lines, {}, place=place, text=True))
+    event["decoder"] = copy.deepcopy(ENVELOPE["decoder"])
+    for proof in event["provenance"].values():
+        proof["revision"] = event["decoder"]["revision"]
+    return event
+
+
+def test_index_provenance_overrides_preserve_prior_and_path_refs():
+    event = proof_event()
+    defaults = index_events.provenance_defaults()
+    event["provenance"]["identity.subagent"].update(
+        ref="archive:prior#L1", basis="heuristic", rule="prior_evidence",
+        native_paths=["prior.field"], coverage_keys=["prior/input:field"])
+    event["provenance"]["identity.parent"]["ref"] = "archive:path"
+    original = copy.deepcopy(event)
+    sparse = index_stream._factor_provenance(event, defaults)
+    assert sparse["identity.subagent"]["ref"] == "archive:prior#L1"
+    assert sparse["identity.parent"]["ref"] == "archive:path"
+    assert "ref" not in sparse.get("native_kind", {})
+    assert expand_proofs({**event, "provenance": sparse}, defaults) == original["provenance"]
+    assert event == original
+
+
+@pytest.mark.parametrize("change", [
+    "missing", "unknown-field", "unknown-attribute", "revision", "missing-revision",
+    "missing-source", "null-source", "int-source", "bool-source", "list-source",
+    "null-ref", "int-ref", "empty-ref", "basis", "rule", "empty-rule",
+    "native_paths", "coverage_keys", "nested-patch", "missing-paths",
+])
+def test_index_factorization_rejects_missing_or_unrepresentable_proof(change):
+    event = proof_event()
+    field = event["provenance"]["native_kind"]
+    if change == "missing":
+        del event["provenance"]["native_kind"]
+    elif change == "unknown-field":
+        event["provenance"]["future"] = copy.deepcopy(field)
+    elif change == "unknown-attribute":
+        field["future"] = "must not disappear"
+    elif change == "revision":
+        field["revision"] = "b" * 40
+    elif change == "missing-revision":
+        del field["revision"]
+    elif change == "missing-source":
+        del event["provenance"]["notifications"]["source"]
+    elif change.endswith("-source"):
+        event["provenance"]["notifications"]["source"] = {
+            "null-source": None, "int-source": 0, "bool-source": False, "list-source": []}[change]
+    elif change.endswith("-ref"):
+        field["ref"] = {"null-ref": None, "int-ref": 0, "empty-ref": ""}[change]
+    elif change == "missing-paths":
+        del field["native_paths"]
+    else:
+        key = {"nested-patch": "native_paths", "empty-rule": "rule"}.get(change, change)
+        field[key] = {"basis": "unknown", "rule": False, "empty-rule": "",
+                      "native_paths": [1], "coverage_keys": "not-list",
+                      "nested-patch": {"append": "x"}}[change]
+    with pytest.raises(stream.ProtocolError, match="provenance"):
+        index_stream._factor_provenance(event, index_events.provenance_defaults())
+
+
+def test_notification_proof_source_presence_survives_encoding():
+    event = proof_event()
+    defaults = index_events.provenance_defaults()
+    assert defaults["notifications"]["source"] == "physical_line"
+    assert all("source" not in proof for field, proof in defaults.items() if field != "notifications")
+    event["provenance"]["native_kind"]["source"] = ""
+    event["provenance"]["notifications"]["source"] = "different"
+    sparse = index_stream._factor_provenance(event, defaults)
+    assert sparse["native_kind"]["source"] == ""
+    assert sparse["notifications"]["source"] == "different"
+    assert expand_proofs({**event, "provenance": sparse}, defaults) == event["provenance"]
+    event["provenance"]["native_kind"]["source"] = 1
+    with pytest.raises(stream.ProtocolError, match="provenance"):
+        index_stream._factor_provenance(event, defaults)
+
+
+def test_index_defaults_repeat_per_file_and_resume():
+    path = FIXTURES / "index/sizes.jsonl"
+    iterator = stream.objects(request(source(path), source(path)), ENVELOPE)
+    header = next(iterator)
+    pristine = copy.deepcopy(header)
+    assert header.get("provenance_format") == "defaults/1"
+    header["provenance_defaults"]["native_kind"]["native_paths"].append("caller")
+    header["provenance_defaults"]["notifications"].pop("source")
+    header["provenance_defaults"] = {}
+    rest = list(iterator)
+    second = next(v for v in rest if v["object"] == "file_start")
+    assert second["provenance_defaults"] == pristine["provenance_defaults"]
+    first_event = next(v for v in rest if v["object"] == "index_event")
+    assert "native_kind" not in first_event["provenance"]
+    assert "notifications" not in first_event["provenance"]
+    end = next(v for v in rest if v["object"] == "file_end")
+    assert end["count"] == 4  # Three native events plus coverage, declaration is a header field.
+    assert "provenance" not in json.dumps(end["state"])
+    resumed = read(request(source(path, state=end["state"])))
+    assert resumed[0]["provenance_defaults"] == pristine["provenance_defaults"]
+    assert resumed[-2]["count"] == 1
+    fresh = index_events.provenance_defaults()
+    fresh["native_kind"]["native_paths"].clear()
+    assert index_events.provenance_defaults()["native_kind"]["native_paths"] == ["type"]
+
+
+@pytest.mark.parametrize("change", ["unknown-attribute", "revision", "missing-source", "missing-table"])
+def test_index_proof_audit_preserves_completed_file(monkeypatch, change):
+    actual = index_events.extract
+    invocation = 0
+    def corrupted(*args, **kw):
+        nonlocal invocation
+        invocation += 1
+        for value in actual(*args, **kw):
+            if invocation == 2 and value["object"] == "index_event" and value["line"] == 2:
+                if change == "unknown-attribute":
+                    value["provenance"]["native_kind"]["future"] = "do not discard"
+                elif change == "revision":
+                    value["provenance"]["native_kind"]["revision"] = "b" * 40
+                elif change == "missing-source":
+                    del value["provenance"]["notifications"]["source"]
+                else:
+                    value.pop("provenance")
+            yield value
+    monkeypatch.setattr(index_events, "extract", corrupted)
+    path = FIXTURES / "index/sizes.jsonl"
+    completed, partial = [], []
+    with pytest.raises(stream.ProtocolError, match="provenance"):
+        for value in stream.objects(request(source(path), source(path)), ENVELOPE):
+            partial.append(value)
+            if value["object"] == "file_end":
+                completed.append(value["file"])
+    assert completed == [0]
+    assert [v["line"] for v in partial if v.get("file") == 1 and v["object"] == "index_event"] == [1]
+    assert not any(v["object"] == "request_end" for v in partial)
+
+
+def test_index_command_and_import_share_exact_proof_framing(tmp_path):
+    path = FIXTURES / "index/native-tools.jsonl"
+    req = request(source(path))
+    result = subprocess.run([str(TOOLS / "harness-evidence"), "decode"],
+                            input=json.dumps(req) + "\n", text=True, capture_output=True,
+                            env=environment(tmp_path), timeout=60)
+    assert result.returncode == 0, result.stderr
+    wire = [json.loads(line) for line in result.stdout.splitlines()]
+    envelope = {key: wire[0][key] for key in ("schema", "decoder")}
+    assert wire == read(req, envelope)
+    assert wire[0]["provenance_format"] == "defaults/1"
+    assert all(len(v["provenance"]) < len(wire[0]["provenance_defaults"])
+               for v in wire if v["object"] == "index_event")

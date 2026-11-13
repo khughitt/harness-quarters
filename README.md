@@ -575,7 +575,17 @@ request visibly. Each file releases its source handle and output before the next
 Events carry recorded and normalized session identity, timestamps, response fragments,
 message origin evidence, ordered text blocks, native tool calls/results, attachment
 pieces, notifications, fork evidence and stop-hook summaries. Field provenance names
-native paths, coverage keys, basis, rule, revision and source ref. `text:true` requests
+native paths, coverage keys, basis, rule, revision and source ref. Index version 16
+uses `provenance_format:"defaults/1"`: every `file_start` carries owned
+`provenance_defaults` for all normalized fields, including notification proofs'
+optional `source:"physical_line"`. Each event's `provenance` contains only changed
+attributes; an empty mapping inherits the whole table. Ref and revision inherit
+from the event envelope. Overrides replace whole arrays or scalar values and may
+refer to earlier records or file paths. Unknown fields/attributes, revision overrides
+and deletion of defaulted attributes fail visibly before encoding. Native extraction
+and its read audit retain complete proofs; declarations reset on each file and resume
+request, outside opaque state and terminal counts. Both command and import routes
+use this framing. `text:true` requests
 message, command, path, question, answer and dispatch text; with it disabled those
 values are omitted. No human-turn, active-time, task/review or recommendation verdict
 is produced. Default reader requests retain their existing object/state shapes.

@@ -10,6 +10,44 @@ from .lines import Place
 from ._protocol import ProtocolError, validate
 
 
+def _factor_provenance(event: dict, defaults: dict) -> dict:
+    """Audit complete native proofs before encoding exact sparse replacements."""
+    proofs = event.get("provenance")
+    if not isinstance(proofs, dict) or proofs.keys() != defaults.keys():
+        raise ProtocolError("index provenance fields differ from declarations")
+    required = {"native_paths", "coverage_keys", "basis", "rule", "ref", "revision"}
+    sparse = {}
+    for field, proof in proofs.items():
+        if (not isinstance(proof, dict) or not required <= proof.keys()
+                or proof.keys() - required - {"source"}):
+            raise ProtocolError("index provenance attributes are missing or unknown")
+        for name in ("native_paths", "coverage_keys"):
+            value = proof[name]
+            if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+                raise ProtocolError("index provenance arrays must contain strings")
+        if (not isinstance(proof["basis"], str)
+                or proof["basis"] not in {"native", "convention", "heuristic"}
+                or not isinstance(proof["rule"], str) or not proof["rule"]
+                or not isinstance(proof["ref"], str) or not proof["ref"]
+                or not isinstance(proof["revision"], str)
+                or proof["revision"] != event["decoder"]["revision"]):
+            raise ProtocolError("index provenance basis, rule, ref or revision is invalid")
+        default = defaults[field]
+        if ("source" in proof and not isinstance(proof["source"], str)
+                or "source" in default and "source" not in proof):
+            raise ProtocolError("index provenance source is invalid or cannot be deleted")
+        changes = {}
+        for name, value in proof.items():
+            if name == "revision":
+                continue
+            inherited = event["ref"] if name == "ref" else default.get(name)
+            if name not in default and name != "ref" or value != inherited:
+                changes[name] = list(value) if isinstance(value, list) else value
+        if changes:
+            sparse[field] = changes
+    return sparse
+
+
 def _prefix(handle, limit):
     digest, count, offset, last = hashlib.sha256(), 0, 0, b""
     while offset < limit:
@@ -58,7 +96,10 @@ def _file(source, number, roots, request, envelope):
     location = asdict(place)
     location.pop("path")
     location.pop("read_path")
-    start = {**base, "object": "file_start", "key": "file", "path": str(logical),
+    defaults = index_events.provenance_defaults()
+    start = {**base, "provenance_format": "defaults/1",
+             "provenance_defaults": copy.deepcopy(defaults),
+             "object": "file_start", "key": "file", "path": str(logical),
              "place": location, "filename_identity": None,
              "path_facts": discover.path_facts(place), "replaces": "all"}
     try:
@@ -105,10 +146,16 @@ def _file(source, number, roots, request, envelope):
         count, restart = 0, None
         try:
             for value in index_events.extract(physical_lines(), state, place=place, text=request.get("text", False)):
-                for provenance in value.get("provenance", {}).values():
-                    provenance["revision"] = envelope["decoder"]["revision"]
+                event = {**base, **value, "harness_version": value.get("identity", {}).get("version")}
+                if event["object"] == "index_event":
+                    proofs = event.get("provenance")
+                    if isinstance(proofs, dict):
+                        for proof in proofs.values():
+                            if isinstance(proof, dict):
+                                proof.setdefault("revision", envelope["decoder"]["revision"])
+                    event["provenance"] = _factor_provenance(event, defaults)
                 count += 1
-                yield {**base, **value, "harness_version": value.get("identity", {}).get("version")}
+                yield event
         except index_events.Restart as signal:
             if not isinstance(signal.reason, str) or not signal.reason or not isinstance(signal.seed, dict):
                 raise ProtocolError("invalid native restart signal") from signal
