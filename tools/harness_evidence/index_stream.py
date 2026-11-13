@@ -48,6 +48,46 @@ def _factor_provenance(event: dict, defaults: dict) -> dict:
     return sparse
 
 
+def _provenance_factor(defaults):
+    """Check an owned file-local declaration snapshot before using whole-proof equality."""
+    defaults = copy.deepcopy(defaults)
+    attributes = {"native_paths", "coverage_keys", "basis", "rule"}
+    if not isinstance(defaults, dict) or defaults.keys() != index_events.PROVENANCE.keys():
+        raise ProtocolError("index provenance declaration fields are missing or unknown")
+    for proof in defaults.values():
+        if (not isinstance(proof, dict) or not attributes <= proof.keys()
+                or proof.keys() - attributes - {"source"}):
+            raise ProtocolError("index provenance declaration attributes are missing or unknown")
+        for value in proof.values():
+            if type(value) is list:
+                valid = all(type(item) is str for item in value)
+            else:
+                valid = type(value) is str
+            if not valid:
+                raise ProtocolError("index provenance declarations require plain JSON strings and arrays")
+    expected = {field: {**proof, "ref": "checked", "revision": "checked"}
+                for field, proof in defaults.items()}
+    _factor_provenance({"provenance": expected, "ref": "checked",
+                        "decoder": {"revision": "checked"}}, defaults)
+
+    def factor(event):
+        proofs, reference, decoder = event.get("provenance"), event.get("ref"), event.get("decoder")
+        if (not isinstance(proofs, dict) or proofs.keys() != defaults.keys()
+                or type(reference) is not str or not reference
+                or not isinstance(decoder, dict) or type(decoder.get("revision")) is not str):
+            return _factor_provenance(event, defaults)
+        sparse = {}
+        for field, proof in proofs.items():
+            complete = expected[field]
+            complete.update(ref=reference, revision=decoder["revision"])
+            if isinstance(proof, dict) and dict.__eq__(complete, proof):
+                continue
+            sparse.update(_factor_provenance({**event, "provenance": {field: proof}},
+                                             {field: defaults[field]}))
+        return sparse
+    return factor
+
+
 def _prefix(handle, limit):
     digest, count, offset, last = hashlib.sha256(), 0, 0, b""
     while offset < limit:
@@ -97,6 +137,7 @@ def _file(source, number, roots, request, envelope):
     location.pop("path")
     location.pop("read_path")
     defaults = index_events.provenance_defaults()
+    factor_provenance = _provenance_factor(defaults)
     start = {**base, "provenance_format": "defaults/1",
              "provenance_defaults": copy.deepcopy(defaults),
              "object": "file_start", "key": "file", "path": str(logical),
@@ -153,7 +194,7 @@ def _file(source, number, roots, request, envelope):
                         for proof in proofs.values():
                             if isinstance(proof, dict):
                                 proof.setdefault("revision", envelope["decoder"]["revision"])
-                    event["provenance"] = _factor_provenance(event, defaults)
+                    event["provenance"] = factor_provenance(event)
                 count += 1
                 yield event
         except index_events.Restart as signal:

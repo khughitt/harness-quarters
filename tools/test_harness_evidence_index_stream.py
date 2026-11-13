@@ -494,3 +494,149 @@ def test_index_command_and_import_share_exact_proof_framing(tmp_path):
     assert wire[0]["provenance_format"] == "defaults/1"
     assert all(len(v["provenance"]) < len(wire[0]["provenance_defaults"])
                for v in wire if v["object"] == "index_event")
+
+
+@pytest.mark.parametrize("changed", [False, True])
+def test_equal_native_proof_avoids_python_attribute_walk(monkeypatch, changed):
+    # Full dict equality must replace the attribute walk only for complete equal proofs.
+    reads = []
+    class ObservedProof(dict):
+        def keys(self):
+            reads.append("keys")
+            return super().keys()
+        def items(self):
+            reads.append("items")
+            return super().items()
+        def __getitem__(self, key):
+            reads.append(key)
+            return super().__getitem__(key)
+    actual = index_events.extract
+    def observed(*args, **kw):
+        for value in actual(*args, **kw):
+            if value["object"] == "index_event":
+                proof = ObservedProof(value["provenance"]["native_kind"])
+                if changed:
+                    proof["rule"] = "changed_rule"
+                value["provenance"]["native_kind"] = proof
+            yield value
+    monkeypatch.setattr(index_events, "extract", observed)
+    out = read(request(source(FIXTURES / "index/sizes.jsonl")))
+    native = [v for v in out if v["object"] == "index_event"]
+    assert len(native) == 3
+    if changed:
+        assert reads  # Different proofs still enter the complete attribute auditor.
+        assert all(v["provenance"]["native_kind"] == {"rule": "changed_rule"} for v in native)
+    else:
+        assert reads == []
+        assert all("native_kind" not in v["provenance"] for v in native)
+
+
+@pytest.mark.parametrize("attribute,bad", [
+    ("native_paths", [False]), ("native_paths", [0]), ("native_paths", ("type",)),
+    ("coverage_keys", [False]), ("coverage_keys", [0]), ("coverage_keys", ()),
+    ("basis", False), ("basis", 0), ("basis", "unknown"),
+    ("rule", False), ("rule", 0), ("rule", ""),
+    ("source", False), ("source", 0), ("source", None),
+    ("ref", "must-not-be-defaulted"), ("revision", "must-not-be-defaulted"),
+    ("future", "do-not-hide"),
+])
+def test_invalid_proof_defaults_fail_before_header(monkeypatch, attribute, bad):
+    # A malformed declaration must never become a reference that validates a matching bad proof.
+    defaults = index_events.provenance_defaults()
+    defaults["native_kind"][attribute] = bad
+    monkeypatch.setattr(index_events, "provenance_defaults", lambda: defaults)
+    iterator = stream.objects(request(source(FIXTURES / "index/sizes.jsonl")), ENVELOPE)
+    with pytest.raises(stream.ProtocolError, match="provenance"):
+        next(iterator)
+
+
+@pytest.mark.parametrize("attribute,bad", [
+    ("native_paths", [False]), ("native_paths", [0]), ("native_paths", ("type",)),
+    ("coverage_keys", [False]), ("coverage_keys", [0]), ("coverage_keys", ()),
+    ("basis", False), ("basis", 0), ("basis", "unknown"),
+    ("rule", False), ("rule", 0), ("rule", ""),
+    ("source", False), ("source", 0), ("source", None),
+    ("ref", False), ("ref", 0), ("ref", ""),
+    ("revision", False), ("revision", 0), ("revision", ""),
+    ("future", "do-not-hide"),
+])
+def test_equality_path_preserves_bad_proof_rejection(monkeypatch, attribute, bad):
+    actual = index_events.extract
+    def corrupted(*args, **kw):
+        for value in actual(*args, **kw):
+            if value["object"] == "index_event":
+                value["provenance"]["native_kind"][attribute] = bad
+            yield value
+    monkeypatch.setattr(index_events, "extract", corrupted)
+    with pytest.raises(stream.ProtocolError, match="provenance"):
+        read(request(source(FIXTURES / "index/sizes.jsonl")))
+
+
+@pytest.mark.parametrize("attribute,bad", [("ref", False), ("ref", 0), ("ref", ""),
+                                           ("revision", False), ("revision", 0)])
+def test_equality_path_rejects_invalid_matching_envelope_values(monkeypatch, attribute, bad):
+    actual = index_events.extract
+    envelope = copy.deepcopy(ENVELOPE)
+    if attribute == "revision":
+        envelope["decoder"]["revision"] = bad
+    def corrupted(*args, **kw):
+        for value in actual(*args, **kw):
+            if value["object"] == "index_event" and attribute == "ref":
+                value["ref"] = bad
+                for proof in value["provenance"].values():
+                    proof["ref"] = bad
+            yield value
+    monkeypatch.setattr(index_events, "extract", corrupted)
+    with pytest.raises(stream.ProtocolError, match="provenance"):
+        read(request(source(FIXTURES / "index/sizes.jsonl")), envelope)
+
+
+def test_direct_proof_auditor_retains_full_type_validation():
+    event = proof_event()
+    defaults = index_events.provenance_defaults()
+    # bool/int equality must not make a bad array pass when both arguments are malformed.
+    defaults["native_kind"]["native_paths"] = [0]
+    event["provenance"]["native_kind"]["native_paths"] = [False]
+    with pytest.raises(stream.ProtocolError, match="provenance"):
+        index_stream._factor_provenance(event, defaults)
+
+
+@pytest.mark.parametrize("attribute", ["ref", "revision"])
+def test_equality_path_does_not_trust_overridden_envelope_equality(monkeypatch, attribute):
+    class UnusualString(str):
+        def __eq__(self, other):
+            return True
+    actual = index_events.extract
+    def corrupted(*args, **kw):
+        for value in actual(*args, **kw):
+            if value["object"] == "index_event":
+                if attribute == "ref":
+                    value["ref"] = UnusualString(value["ref"])
+                else:
+                    value["decoder"] = {**ENVELOPE["decoder"],
+                                        "revision": UnusualString(ENVELOPE["decoder"]["revision"])}
+                value["provenance"]["native_kind"][attribute] = 0
+            yield value
+    monkeypatch.setattr(index_events, "extract", corrupted)
+    with pytest.raises(stream.ProtocolError, match="provenance"):
+        read(request(source(FIXTURES / "index/sizes.jsonl")))
+
+
+@pytest.mark.parametrize("attribute", ["rule", "source", "native_paths", "coverage_keys"])
+def test_equality_path_cannot_inherit_overridden_declaration_equality(monkeypatch, attribute):
+    class UnusualString(str):
+        def __eq__(self, other):
+            return True
+    defaults = index_events.provenance_defaults()
+    array = attribute in {"native_paths", "coverage_keys"}
+    defaults["native_kind"][attribute] = [UnusualString("type")] if array else UnusualString("value")
+    monkeypatch.setattr(index_events, "provenance_defaults", lambda: defaults)
+    actual = index_events.extract
+    def corrupted(*args, **kw):
+        for value in actual(*args, **kw):
+            if value["object"] == "index_event":
+                value["provenance"]["native_kind"][attribute] = [0] if array else 0
+            yield value
+    monkeypatch.setattr(index_events, "extract", corrupted)
+    with pytest.raises(stream.ProtocolError, match="provenance"):
+        read(request(source(FIXTURES / "index/sizes.jsonl")))
