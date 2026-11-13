@@ -497,37 +497,29 @@ def test_index_command_and_import_share_exact_proof_framing(tmp_path):
 
 
 @pytest.mark.parametrize("changed", [False, True])
-def test_equal_native_proof_avoids_python_attribute_walk(monkeypatch, changed):
-    # Full dict equality must replace the attribute walk only for complete equal proofs.
-    reads = []
-    class ObservedProof(dict):
-        def keys(self):
-            reads.append("keys")
-            return super().keys()
-        def items(self):
-            reads.append("items")
-            return super().items()
-        def __getitem__(self, key):
-            reads.append(key)
-            return super().__getitem__(key)
+def test_equal_builtin_native_proof_avoids_repeated_full_attribute_audit(monkeypatch, changed):
+    # Count full auditor visits; the native exact-type traversal is required for safe equality.
+    audited_fields = []
+    original_audit = index_stream._factor_provenance
+    def observed_audit(event, defaults):
+        audited_fields.extend(event["provenance"])
+        return original_audit(event, defaults)
+    monkeypatch.setattr(index_stream, "_factor_provenance", observed_audit)
     actual = index_events.extract
     def observed(*args, **kw):
         for value in actual(*args, **kw):
-            if value["object"] == "index_event":
-                proof = ObservedProof(value["provenance"]["native_kind"])
-                if changed:
-                    proof["rule"] = "changed_rule"
-                value["provenance"]["native_kind"] = proof
+            if value["object"] == "index_event" and changed:
+                value["provenance"]["native_kind"]["rule"] = "changed_rule"
             yield value
     monkeypatch.setattr(index_events, "extract", observed)
     out = read(request(source(FIXTURES / "index/sizes.jsonl")))
     native = [v for v in out if v["object"] == "index_event"]
     assert len(native) == 3
+    # One complete declaration audit per file, plus all three changed proofs when applicable.
+    assert audited_fields.count("native_kind") == (4 if changed else 1)
     if changed:
-        assert reads  # Different proofs still enter the complete attribute auditor.
         assert all(v["provenance"]["native_kind"] == {"rule": "changed_rule"} for v in native)
     else:
-        assert reads == []
         assert all("native_kind" not in v["provenance"] for v in native)
 
 
@@ -640,3 +632,81 @@ def test_equality_path_cannot_inherit_overridden_declaration_equality(monkeypatc
     monkeypatch.setattr(index_events, "extract", corrupted)
     with pytest.raises(stream.ProtocolError, match="provenance"):
         read(request(source(FIXTURES / "index/sizes.jsonl")))
+
+
+def complete_default_event(defaults):
+    return {"ref": "file#L1", "decoder": {"revision": "a" * 40},
+            "provenance": {field: {**copy.deepcopy(proof), "ref": "file#L1", "revision": "a" * 40}
+                           for field, proof in defaults.items()}}
+
+
+def native_equal_override(kind):
+    class EqualInt(int):
+        def __eq__(self, other):
+            return True
+        __hash__ = int.__hash__
+    class EqualStr(str):
+        def __eq__(self, other):
+            return True
+        __hash__ = str.__hash__
+    class EqualList(list):
+        def __eq__(self, other):
+            return True
+    return {"integer": lambda: EqualInt(0), "empty-string": lambda: EqualStr(""),
+            "bad-list": lambda: EqualList([0]), "changed-string": lambda: EqualStr("changed_rule")}[kind]()
+
+
+@pytest.mark.parametrize("field,attribute,kind", [
+    ("native_kind", "basis", "integer"), ("native_kind", "basis", "empty-string"),
+    ("native_kind", "rule", "integer"), ("native_kind", "rule", "empty-string"),
+    ("native_kind", "ref", "integer"), ("native_kind", "ref", "empty-string"),
+    ("native_kind", "revision", "integer"), ("native_kind", "revision", "empty-string"),
+    ("notifications", "source", "integer"),
+    ("native_kind", "native_paths", "bad-list"),
+    ("native_kind", "coverage_keys", "bad-list"),
+])
+def test_native_equality_override_cannot_hide_invalid_proof(field, attribute, kind):
+    defaults = index_events.provenance_defaults()
+    event = complete_default_event(defaults)
+    event["provenance"][field][attribute] = native_equal_override(kind)
+    with pytest.raises(stream.ProtocolError, match="provenance"):
+        index_stream._factor_provenance(event, defaults)
+    with pytest.raises(stream.ProtocolError, match="provenance"):
+        index_stream._provenance_factor(defaults)(event)
+
+
+@pytest.mark.parametrize("field,attribute", [("native_kind", "native_paths"),
+                                            ("response.id", "coverage_keys")])
+def test_native_list_item_equality_override_cannot_hide_invalid_type(field, attribute):
+    defaults = index_events.provenance_defaults()
+    event = complete_default_event(defaults)
+    event["provenance"][field][attribute][0] = native_equal_override("integer")
+    with pytest.raises(stream.ProtocolError, match="provenance"):
+        index_stream._factor_provenance(event, defaults)
+    with pytest.raises(stream.ProtocolError, match="provenance"):
+        index_stream._provenance_factor(defaults)(event)
+
+
+@pytest.mark.parametrize("field,attribute", [("native_kind", "rule"), ("notifications", "source")])
+def test_native_valid_string_override_preserves_full_auditor_delta(field, attribute):
+    defaults = index_events.provenance_defaults()
+    event = complete_default_event(defaults)
+    event["provenance"][field][attribute] = native_equal_override("changed-string")
+    expected = {field: {attribute: "changed_rule"}}
+    full = index_stream._factor_provenance(event, defaults)
+    assert json.loads(json.dumps(full)) == expected
+    fast = index_stream._provenance_factor(defaults)(event)
+    assert json.loads(json.dumps(fast)) == expected
+
+
+def test_native_proof_dictionary_override_uses_original_auditor():
+    class AlteredAccess(dict):
+        def __getitem__(self, key):
+            return 0 if key == "rule" else super().__getitem__(key)
+    defaults = index_events.provenance_defaults()
+    event = complete_default_event(defaults)
+    event["provenance"]["native_kind"] = AlteredAccess(event["provenance"]["native_kind"])
+    with pytest.raises(stream.ProtocolError, match="provenance"):
+        index_stream._factor_provenance(event, defaults)
+    with pytest.raises(stream.ProtocolError, match="provenance"):
+        index_stream._provenance_factor(defaults)(event)
