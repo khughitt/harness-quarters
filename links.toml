@@ -41,6 +41,7 @@
 "~/.agents/bin/flow-state" = "flows:bin/flow-state"
 "~/.agents/bin/harness-facts" = "tools/harness-facts"
 "~/.agents/bin/retros" = "flows:bin/retros"
+"~/.agents/bin/review-effort" = "flows:bin/review-effort"
 "~/.agents/bin/session-episodes" = "agents/bin/session-episodes"
 "~/.agents/bin/skill-sizes.py" = "lore:bin/skill-sizes.py"
 "~/.agents/bin/test_flow_outcome_verdict.py" = "flows:bin/test_flow_outcome_verdict.py"
