@@ -603,7 +603,7 @@ SYNTHETIC_UUID = re.compile(r"\b(c0000000-0000-4000-8000|01900000-0000-7000-8000
 
 def test_fixtures_hold_no_private_paths_or_identifiers():
     for path in every_file(FIXTURES):
-        text = SYNTHETIC_UUID.sub("", path.read_text()).replace("/home/u/CLAUDE.md", "")
+        text = SYNTHETIC_UUID.sub("", path.read_text()).replace('"/home/u/CLAUDE.md"', '""')
         assert not PRIVATE.search(text), (path, PRIVATE.search(text))
         assert not PRIVATE.search(SYNTHETIC_UUID.sub("", str(path.relative_to(FIXTURES))))
 
