@@ -1,0 +1,1 @@
+{"sessionId": "control", "cwd": "/w/project", "entrypoint": "cli", "version": "unknown", "type": "attachment", "timestamp": "2026-11-11T23:59:00Z", "message": "unused", "attachment": {"type": "hook_success", "command": "guard", "content": "ok"}}

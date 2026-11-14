@@ -483,7 +483,7 @@ header agent evidence is separate. Query-ID aliases and publication of arbitrary
 index/identity claims remain consumer policy, rather than native path decoding.
 
 `tools/harness-evidence version --json` reports the evidence schema,
-decoder version `8`, and the decoder revision. A pinned copy reads a `REVISION`
+decoder version `11`, and the decoder revision. A pinned copy reads a `REVISION`
 file inside the package; a checkout reports its HEAD with `+dirty` when
 the package has changes. Without either source the command exits 2.
 
@@ -548,6 +548,92 @@ request/file transport indices. Text/raw option changes can therefore restart
 replay, while request ids and decoder revision changes alone do not.
 Records themselves retain native numeric block order, including when a line has
 ten or more blocks.
+
+The opt-in `extract: "index"` request emits Claude native evidence for the scratch
+index pilot. Include each file's `identity: {"device": ..., "inode": ...}`, keep
+`cross_file` and `raw` false, and omit `context`. Pass a saved index `state` whole:
+`next_line`, `next_offset` and `digest` describe the complete raw prefix, while
+`index` is opaque. The held descriptor must match the supplied identity and fixed
+byte span. Resume proves that prefix in bounded reads and decodes complete lines
+from its checkpoint; incompatible decoder revision, identity, logical path, options
+or prefix explicitly returns `replaces:"all"`. Logical paths determine refs and
+child-parent naming; `read_path` determines physical bytes.
+
+This profile emits `file_start`, one `index_event` per complete JSON object (key
+`E<byte offset>`), `unparsed` evidence for malformed lines or a partial tail, a final
+cumulative native `coverage`, `file_end`, then `request_end`. The terminal count
+includes every event, unparsed object and coverage object. A partial tail does not
+advance the checkpoint. Valid JSON with invalid native types retains the original
+index adapter's errors. Accept a file only after both terminals and the count have
+been validated. On a late invalidation `file_end.restart` carries a reason and an
+opaque from-zero seed; its `state` is null, so no successful checkpoint is exposed.
+Drain both terminals before retrying from zero with that seed. The transport supports
+this signal; Claude currently has no native restart trigger. Source-open failures
+stay framed with vanished/unreadable status and null state; protocol faults fail the
+request visibly. Each file releases its source handle and output before the next.
+
+Events carry recorded and normalized session identity, timestamps, response fragments,
+message origin evidence, ordered text blocks, native tool calls/results, attachment
+pieces, notifications, fork evidence and stop-hook summaries. Field provenance names
+native paths, coverage keys, basis, rule, revision and source ref. Index version 16
+uses `provenance_format:"defaults/1"`: every `file_start` carries owned
+`provenance_defaults` for all normalized fields, including notification proofs'
+optional `source:"physical_line"`. Each event's `provenance` contains only changed
+attributes; an empty mapping inherits the whole table. Ref and revision inherit
+from the event envelope. Overrides replace whole arrays or scalar values and may
+refer to earlier records or file paths. Unknown fields/attributes, revision overrides
+and invalid or deletion-like supplied values fail visibly before encoding. Complete
+declarations are checked once per file; native extraction supplies record-specific
+changes, each resolved field is audited, and every event's ref/revision binding is
+checked even with empty changes. Omitted fields inherit checked declarations; an
+independent frozen full-proof oracle checks for accidentally omitted dynamic changes.
+Declarations reset on each file and resume request, outside opaque state and terminal
+counts. Both command and import routes use this framing. `text:true` requests
+message, command, path, question, answer and dispatch text; with it disabled those
+values are omitted. No human-turn, active-time, task/review or recommendation verdict
+is produced. Default reader requests retain their existing object/state shapes.
+
+Native byte sizes use UTF-8 strings or `json.dumps(value, ensure_ascii=False)` with
+its default spaced separators for other values, independently of compact wire JSON.
+Assistant output bytes sum text-block bytes without joining newlines plus tool-input
+sizes. Joined user text preserves empty placeholders for missing text keys. Native
+`durationMs` stays separate from timestamp differences. File-edit `raw_path` preserves
+the exact nonempty native file/notebook path; `paths` separately carries lexical
+normalization against cwd, and `paths_complete` records missing or rejected inputs.
+
+Question prompts, result answers and native duration metadata retain their finite
+JSON values. Consumers apply their hashing/matching/scoring rules at the original
+use site; a native decode success can still precede a consumer-policy failure.
+Native duration metadata describes presence and is separate from timestamp deltas.
+The conformance corpus records native and consumer outcomes separately for these
+cases, including old partial row/session/coverage evidence on consumer failure.
+
+`response.usage_present` contains `output` and `thinking` booleans for native key
+presence, including explicit null. Consumers preserving old storage defaults use 0
+only when the flag is false and copy a present `usage.output` or `usage.thinking`
+unchanged. These two fields preserve opaque native JSON storage values, including
+nonnumeric values; numeric arithmetic inputs remain separately validated. Presence
+flags add no raw/applied coverage population or consumer measurement rule.
+
+Claude usage components are `input_uncached` (input tokens), `cache_write`,
+`cache_read`, `output` and `thinking`; absent components are null. `context_total`
+is input plus cache write plus cache read, and `uncached_total` is input plus cache
+write, each null when a required component is missing or the derived result cannot
+be represented as a finite wire number. A null aggregate does not erase its exact
+components: consumers preserving old index arithmetic compute totals from normalized
+components with their existing absent-to-zero rule, including an infinite surviving
+total where the old parser produced one. `response.native` preserves
+original JSON as opaque data, including invalid intermediate usage values that a
+later fragment replaces. Normalized components that an invalid intermediate fragment
+cannot supply are null; the original final-invalid failure remains at response flush.
+SDK child evidence uses the session's first nonempty entrypoint and retains a later
+native sidechain flag. Pending Stop-hook matching stores nontext equality keys, so
+text-disabled terminal state contains no hook command text. Native coverage preserves
+the old extraction
+populations, including response usage counted at each historical EOF flush. Synthetic
+`tools/fixtures/session-logs/index/` samples and frozen old-oracle controls establish conformance, not observed
+harness emission or full/replay equality. The capability artifact publishes native
+field provenance and coverage declarations separately from reader declarations.
 
 - **Rows.** Harness, home (`personal` or `work`), short id (the first eight characters;
   for Codex the last eight, since a UUIDv7 id starts with its timestamp), age, place (marked

@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 import tomllib
 
-from . import DECODER_VERSION, SCHEMA
+from . import DECODER_VERSION, SCHEMA, index_events, index_coverage
 
 EVIDENCE_RULE = ("synthetic samples establish decoder conformance; observed samples or probes "
                  "establish emission; absent from a sample means unobserved")
@@ -122,6 +122,9 @@ DECLARED: dict[str, dict[str, list[str]]] = {
 }
 
 
+DECLARED["claude-code"].update(index_events.PROVENANCE)
+
+
 def _values(value, path):
     if not path:
         return [] if value is None else [value]
@@ -159,7 +162,7 @@ def build(catalogue: Path) -> dict:
     raw_catalogue = catalogue.read_bytes()
     samples = tomllib.loads(raw_catalogue.decode("utf-8"))["sample"]
     harnesses = {slug: {"record_kinds": set(), "fields": {
-        field: {"provenance": sorted(paths), "coverage_keys": []} for field, paths in fields.items()
+        field: {"provenance": sorted(paths), "coverage_keys": index_events.COVERAGE_KEYS.get(field, []) if slug == "claude-code" else []} for field, paths in fields.items()
     }, "labels": {}, "versions": {}, "exceptions": []} for slug, fields in DECLARED.items()}
     hashes = {}
     for sample in samples:
@@ -191,6 +194,14 @@ def build(catalogue: Path) -> dict:
         native = {line.number: row for line in lines(data, len(data))
                   if line.complete and (row := decode(line)) is not None}
         fields = DECLARED[slug]
+        if sample.get("profile") == "index" and not sample.get("index_error"):
+            offsets, offset = [], 0
+            for raw in data.splitlines(keepends=True):
+                offsets.append((offset, raw))
+                offset += len(raw)
+            for event in index_events.extract(offsets, {}, place=place, text=True):
+                if event["object"] == "index_event":
+                    evidence["fields_seen"][provenance].update(_seen(event, [native[event["line"]]], fields))
         seen = evidence["fields_seen"][provenance]
         for record in read.records:
             if record["kind"] is not None:
@@ -210,6 +221,11 @@ def build(catalogue: Path) -> dict:
                 continue
             source = [first_meta] if fmt == "codex" and name in creation else list(native.values())
             seen.update(_seen({"header": read.header}, source, {field: paths}))
+    harnesses["claude-code"]["index"] = json.loads(json.dumps({
+        "profile": "index", "mode": "incremental", "resume": True,
+        "watched": index_coverage.WATCHED, "applied": index_coverage.APPLIED,
+        "unwatched": index_coverage.UNWATCHED, "common_reads": index_coverage.COMMON_READS,
+        "known_kinds": sorted(index_coverage.KNOWN_KINDS)}))
     for harness in harnesses.values():
         harness["record_kinds"] = sorted(harness["record_kinds"])
         harness["labels"] = {role: sorted(bases) for role, bases in harness["labels"].items()}

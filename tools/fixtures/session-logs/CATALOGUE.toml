@@ -717,3 +717,1173 @@ reader_role = "injected"
 reader_basis = "prefix_rule"
 codex_index = "injected"
 episodes = "other"
+
+[[sample]]
+path = "index/original-000.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-001.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-002.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-003.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-004.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-005.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-006.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-007.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-008.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-009.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-010.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-011.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-012.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-013.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-014.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-015.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-016.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-017.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-018.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-019.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-020.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-021.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-022.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-023.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-024.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-025.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-026.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-027.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-028.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-029.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-030.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-031.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-032.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-033.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+index_error = "ValueError"
+
+[[sample]]
+path = "index/original-034.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-035.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-036.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-037.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-038.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-039.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-040.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-041.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-042.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-043.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-044.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-045.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-046.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-047.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-048.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-049.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-050.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-051.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-052.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-053.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-054.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-055.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-056.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-057.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-058.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-059.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-060.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-061.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-062.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-063.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-064.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-065.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-066.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-067.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-068.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-069.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-070.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-071.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-072.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-073.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-074.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-075.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-076.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-077.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-078.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-079.jsonl"
+harness = "claude-code"
+version = "2.1.281"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-080.jsonl"
+harness = "claude-code"
+version = "2.1.281"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-081.jsonl"
+harness = "claude-code"
+version = "2.1.281"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-082.jsonl"
+harness = "claude-code"
+version = "2.1.281"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-parent-000.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-parent-001.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/original-parent-002.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fragments.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/native-tools.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/ownership.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/sizes.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/identities.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/write-paths.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/null-overwritten.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/optional-inputs.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/invalid-optional-origin.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-entrypoint-cli-sdk.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-entrypoint-sdk-cli.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-entrypoint-empty-sdk.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-entrypoint-sidechain.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-usage-overwritten-arithmetic.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-usage-final-arithmetic.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+index_error = "TypeError"
+
+[[sample]]
+path = "index/fix1-usage-overwritten-nested.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-usage-final-nested.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+index_error = "AttributeError"
+
+[[sample]]
+path = "index/fix1-usage-overwritten-nonmapping.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-usage-final-nonmapping.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+index_error = "AttributeError"
+
+[[sample]]
+path = "index/fix1-usage-overwritten-list.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-usage-final-list.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+index_error = "AttributeError"
+
+[[sample]]
+path = "index/fix1-result-ignored-text.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-attachment-ignored-message.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-system-invalid-message.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+index_error = "AttributeError"
+
+[[sample]]
+path = "index/fix1-compact-invalid-text.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+index_error = "TypeError"
+
+[[sample]]
+path = "index/fix1-stop-matching.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix1-stop-equality.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix2-usage-overwritten-finite-overflow.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix2-usage-surviving-finite-overflow.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix2-usage-overwritten-mixed-overflow.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix2-usage-surviving-mixed-overflow.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+index_error = "OverflowError"
+
+[[sample]]
+path = "index/fix2-usage-overwritten-large-integer.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/fix2-usage-surviving-large-integer.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/errors-nonobject.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+index_error = "TypeError"
+
+[[sample]]
+path = "index/errors-timestamp.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+index_error = "ValueError"
+
+[[sample]]
+path = "index/errors-response.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+index_error = "ValueError"
+
+[[sample]]
+path = "index/errors-text.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+index_error = "TypeError"
+
+[[sample]]
+path = "index/errors-usage-null.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+index_error = "TypeError"
+
+[[sample]]
+path = "index/errors-hook-id.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+index_error = "ValueError"
+
+[[sample]]
+path = "index/errors-input.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+index_error = "AttributeError"
+
+[[sample]]
+path = "index/task2-first-result.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-usage-storage.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-duration-absent.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-duration-boolean.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-duration-empty-dict.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-duration-empty-list.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-duration-fractional.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-duration-integer.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-duration-null.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-duration-string.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-duration-zero.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-metadata-absent.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-absent.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-empty-dict.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-empty-list.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-empty-string.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-false.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-integer-value.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-list-value.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-null-value.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-null.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-other-option.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-recommended.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-truthy-boolean.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-truthy-integer.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-truthy-list.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-truthy-string.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-pending-zero.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-question-boolean.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-question-integer.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-question-list.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-question-null.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-question-object.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-question-string.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-unused-answers-boolean.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-unused-answers-dict.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-unused-answers-integer.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-unused-answers-list.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "index/task2-policy-unused-answers-string.jsonl"
+harness = "claude-code"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
