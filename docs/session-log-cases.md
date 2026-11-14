@@ -1,30 +1,9 @@
-# Session-log acceptance cases
+# Session-log fixture cases
 
-hq-6e5d88, 2026-10-20. A small, replayable case set derived from the
-[session-log survey](2026-10-20-session-log-survey.md) (hq-de3e4c) and its
-[episode ledger](data/2026-10-20-session-log-survey.jsonl). It judges the
-search/show reader proposed in the
-[store-reach brief](2026-10-20-session-store-reach-brief.md) §4 alternative 4, and later
-evidence-labelled tracing. These are cases and fixtures only: they add no reader, parser,
-eval runner or eval record schema. Shared eval records stay with obs-abfcf9, and the
-harness-version store samples stay with obs-f5710b. Ten cases cover all seven surveyed
-question types. Passing them says nothing about population prevalence or automated trace
-precision. SL11, added by hq-bb90ca for the session evidence reader's design (its §14.3),
-covers turn-final messages and task evidence. hq-b95324 required it; no surveyed episode
-did.
-
-The set is small because each case answers one surveyed question and carries several
-distinctions. Three cases share the reconstruct type because they need three different
-links:
-
-| Case | Link evidence |
-|---|---|
-| SL2 | the outputs of one session |
-| SL8 | a parent→child session link |
-| SL9 | an SDK dispatch, which names a call rather than a session |
-
-Removing any case leaves a required distinction (listed under **Required distinctions**)
-uncovered.
+Type: guide; document types 1. Replay synthetic SL1–SL11 cases to verify transcript
+readers and evidence interpretation. [Sessions](sessions.md) describes current
+commands; these cases preserve distinctions beyond what the session picker exposes.
+The detailed case tables are intentionally longer than the general guide limit.
 
 ## Fixtures and replay
 
@@ -32,7 +11,7 @@ The records live under `tools/fixtures/session-logs/`, in each harness's native 
 Every identifier, path, task id, model name and text in them is synthetic.
 
 The table inventories the historical SL1–SL11 replay fixtures, including their
-non-JSONL inputs. [CATALOGUE.toml](../../tools/fixtures/session-logs/CATALOGUE.toml)
+non-JSONL inputs. [CATALOGUE.toml](../tools/fixtures/session-logs/CATALOGUE.toml)
 is the canonical inventory of all JSONL samples, including the later `origin/` cases.
 The corpus checks keep this table's historical coverage exact and account for every
 file through the table, catalogue sample paths and `CATALOGUE.toml` itself. The
@@ -66,7 +45,7 @@ catalogue checks also require exact JSONL coverage, unique paths and synthetic p
 | ESM | `captures/escaped-malformed.jsonl` | Claude, explicit file | a valid `hello` prompt, then an unclosed record holding the same escape |
 | CWAIT | `captures/turn-evidence-claude.jsonl` | Claude, explicit file | synthetic conformance: all three wait tools and a non-wait tool; closing, other and absent stop reasons; readable text and thinking blocks |
 
-`home/` has five of the six roots, the shape of the surveyed host. There is no
+`home/` has five of the six Claude/Codex store roots. There is no
 `.codex-work/archived_sessions`. `degraded/` has only `.claude/projects`,
 `.claude-work/projects` and `.codex/sessions`. The SDK capture is not a store. A reader
 receives it as an explicit file. The repository's `.gitignore` re-includes the fixture
@@ -74,9 +53,8 @@ homes' dot-directories, which a global ignore of `.claude` or `.codex` would oth
 hide from git.
 
 `turns/` is a third home, with `.claude/projects` and `.codex/sessions` only. Its records
-follow Claude Code 2.1.304 and Codex CLI 0.164.0 as written on this host on 2026-10-23:
-each record kind copies the keys of a live record of that kind, keys only, with synthetic
-values. That covers the `system` `local_command`, `stop_hook_summary`, `turn_duration` and
+use the record shapes of Claude Code 2.1.304 and Codex CLI 0.164.0, with synthetic
+values. These versioned fixtures do not claim to describe every later native schema. That covers the `system` `local_command`, `stop_hook_summary`, `turn_duration` and
 `scheduled_task_fire` records and the `queued_command` and `hook_blocking_error`
 attachments. Every `turn_duration` follows a `stop_hook_summary` with empty `hookErrors`,
 as in live files, except `CM:59`: live files write none between a `<synthetic>` message
@@ -86,27 +64,11 @@ with the task's id and times then set to the fixture's. Its field paths are ther
 CLI's own, `harness_session_source` included, which the CLI writes as
 `CLAUDE_CODE_SESSION_ID`. The two escape files are explicit files, not a home.
 
-The records follow the formats observed on this host on 2026-10-20 (Claude Code 2.1.x,
-Codex CLI 0.163):
-
-- Claude Code writes one record per API content block. Records of one message share
-  `message.id` and count `apiBlockIndex` from 0, and each tool result is its own record.
-  In these fixtures, multi-block content appears only in `api-request-blob` copies and
-  in Codex content and output arrays.
-- Prompt records carry `origin.kind`. A typed prompt also carries `promptSource`
-  `typed`; a slash-command record carries none.
-- A Codex root's `session_meta` has `session_id` equal to its `id`. An unforked child
-  (`fork_turns` `none`) has a single `session_meta` whose `session_id` is the root's:
-  that equals XC's controller at depth 1, but differs from XG's controller at depth 2.
-  A forked child also has a second, inherited `session_meta` whose `payload.id` is the
-  parent's (E069). XK is the only fixture that forks. As in live forked children, its first
-  `session_meta` carries `forked_from_id` and `parent_thread_id` equal to the inherited id.
-- Codex `spawn_agent` arguments and their paired JSON outputs use compact JSON strings,
-  as live records do. Failing Bash results keep their native prefixes: `CA:7` begins
-  `PreToolUse:Bash hook error:` and `CW:6` begins `Exit code 1`.
-- Native Claude records can carry both `sessionId` and a different `session_id`. `CA:3`
-  and `CA:6` reproduce that shape. The second field alone identifies neither this native
-  transcript nor an SDK stream; this case makes no claim about how it was allocated.
+The fixtures use split Claude API-block records, duplicate request blobs and
+Codex native spawn call/result pairs. Some records deliberately carry both
+sessionId and session_id; neither an incidental field nor a copied parent record
+establishes the current session identity. Native error-result prefixes remain
+part of the fixture contract. All identifiers, paths and text are synthetic.
 
 The project's other tests build their homes under `tmp_path`. These fixtures are static
 files instead, so that a reader in any language can replay them and anyone can inspect
@@ -123,7 +85,7 @@ unreadable file. In shell:
 
 `materialize()` in `tools/test_session_log_cases.py` does the same in Python. That module
 also proves every expected fact and negative below from the fixture bytes alone, with
-plain JSON reads; `just test` runs it. Replay as a non-root user. Root reads a mode-0
+plain JSON reads; run `just test-one tools/test_session_log_cases.py`. Replay as a non-root user. Root reads a mode-0
 file, so under root CU becomes a parsed match and SL10's expectation no longer holds. The
 self-check then skips only its permission assertion. A reader's acceptance test replays
 the fixtures, runs each case's question in its own syntax, and compares the answer with
@@ -131,8 +93,7 @@ the expectations here.
 
 ## Notation
 
-`CA:4#0` means line 4 of CA, content block 0. Lines count from 1 and blocks from 0, as in
-the survey ledger. Roles, evidence kinds and link directions use the survey's terms:
+`CA:4#0` means line 4 of CA, content block 0. Lines count from 1 and blocks from 0, in the fixture files. Roles, evidence kinds and link directions use the following terms:
 
 - **Roles:** `human`, `assistant`, `tool_call`, `tool_output`, `injected`, `metadata`,
   plus `dispatch` for a brief delivered to a child. In Claude records, the human role
@@ -149,27 +110,9 @@ Each case states the question in the abstract, independent of CLI spelling.
 
 ## Cases
 
-| Case | Question type | Surveyed episodes | Fixture | Basis |
-|---|---|---|---|---|
-| SL1 | Record formats and parser fidelity | E008 | CA | observed; the request-blob copy and the unknown record kind are synthetic |
-| SL2 | Reconstruct or verify what happened | E002 | CA | observed shape; synthetic content |
-| SL3 | Runtime identity and model attribution | E092, E160 | XP, XC, XG, CA, AG | observed at depth 1; depth-2 control uses live metadata shapes |
-| SL4 | Store coverage, retention and availability | E036, E044 | home | observed; the Codex-work session is synthetic |
-| SL5 | Recover earlier content | E152, E052, E126 | XA, CW, CW2 | observed; the archived placement and the repeated AGENTS.md phrase are synthetic |
-| SL6 | Measure patterns across sessions | E175, E126 | CW, CW2 | observed |
-| SL7 | Trace report/task origins | E046 | XC, XP, CA | observed; the parent's plain brief is synthetic |
-| SL8 | Reconstruct (parent→child), incidental parent fields | E072, E085, E142 | CA, AG, XC | observed; the human-origin command record is synthetic |
-| SL9 | Reconstruct (SDK dispatch) | E107 | SDK | observed |
-| SL10 | Coverage of empty matches; unrecoverable content | E104, E142, E001, E036 | degraded | observed failures; unreadable file synthetic |
-| SL11 | Turn-final messages and task evidence | none (hq-b95324) | turns, TD, ESC, ESM | live record shapes; synthetic content and turn sequences |
-
-"Observed" means a surveyed episode needed the distinction, against records of this
-shape. "Synthetic" means the fixture covers a shape that no cited episode exercised.
-The survey sampled no Codex-work investigation (Method and limits), and its obstacle
-tallies record no unreadable file. The parent's plain `spawn_agent` brief was seen in this
-host's Codex store while these cases were being derived: a 1,932-character brief, plain
-in the parent's arguments and encrypted in the child's `agent_message`. No surveyed
-episode used that route.
+These eleven cases define expected reader behavior over the synthetic fixtures.
+They are acceptance contracts, not claims of population prevalence or an
+implemented general search interface.
 
 ### SL1 — calls, results and content blocks
 
@@ -256,7 +199,7 @@ For the Claude child AG, which model ran it?
 - XC has one `session_meta`, as an unforked child does.
 
 **Fork control.** SL11's existing XK fixture carries a second `session_meta` with the
-parent's id, plus copied parent history (E069). A reader that takes the last or every
+parent's id, plus copied parent history . A reader that takes the last or every
 `session_meta` gives it its parent's identity. Its missing-parent and copy-boundary
 limits remain stated in SL11; no duplicate fork fixture is needed here.
 
@@ -274,7 +217,7 @@ limits remain stated in SL11; no duplicate fork fixture is needed here.
   error.
 
 **Hard negative.** A reader limited to the default homes, or to sessions with an
-interactive preview, misses XW, XA or the subagent AG. That is the brief's §2 gap.
+interactive preview, misses XW, XA or the subagent AG.
 
 ### SL5 — recovering a human turn
 
@@ -369,8 +312,7 @@ before it was queued.
 - `turn_attribution.parent_turn_id` at `XC:2` is a turn pointer, not a session link.
 - XP's `session_meta` has no `parent_thread_id`: it is a root.
 
-A parent pointer printed in a tool output is likewise text, not a recorded link (E142's
-ruling).
+A parent pointer printed in a tool output is likewise text, not a recorded link .
 
 ### SL9 — SDK dispatch links
 
@@ -418,8 +360,7 @@ as parsed matches of a role.
   Question A.
 - The only evidence is the `textual_mention` at `CD:3` (assistant), whose command text
   was clipped.
-- The answer must not present `rm -rf build/cache` as the recovered command. This is
-  E104's outcome.
+- The answer must not present `rm -rf build/cache` as the recovered command.
 
 ### SL11 — turn-final messages and task evidence
 
@@ -478,21 +419,20 @@ begins (`no_end_marker`).
 | XK `tk-copied` | not `completed`: it has no final | last assistant `XK:6#0`, never final | `XK:3`–`XK:7` are `copy: ambiguous` |
 
 XK's inherited thread `01900000-0000-7000-8000-0000000000f9` has no rollout in any fixture
-home. Under spec §8.3 every record after its second `session_meta` (`XK:2`) is therefore
+home. Under the absent-parent copy rule every record after its second `session_meta` (`XK:2`) is therefore
 `ambiguous`, and a turn built from that range carries `copy: ambiguous` and no `final`.
-The case asserts only that the turn is not `completed`. Read literally, §9.3 would give
-`no_final`, since `XK:7` is a `task_complete`. But §8.3 does not say whether a copied
+The case asserts only that the turn is not `completed`. A close-marker-only rule would give
+`no_final`, since `XK:7` is a `task_complete`. The conservative rule does not decide whether a copied
 `task_complete` in an ambiguous range counts as the fork turn's closing event, so the
 case leaves that open.
 
 `XK:1` carries `subagent_history_start_ordinal` 7, one past the last record's ordinal (6).
 Live forks from Codex 0.150 on all carry this key. The review of this fixture found that,
 in the forks it checked whose parent was present, the key named the record just before
-the fork's first own `task_started`. That makes it a native copy boundary, which spec
-§8.3 does not use. The value here says the whole file is copied history. A reader that
-follows the spec and one that honours the key agree that `XK:6` is never XK's final.
+the fork's first own `task_started`. That makes it a native copy boundary, which the conservative absent-parent copy rule does not use. The value here says the whole file is copied history. A reader that
+follows the conservative rule and one that honours the key agree that `XK:6` is never XK's final.
 They differ on the copy label: a reader that honours the key would label `XK:3`–`XK:7`
-`fork_history` instead of `copy: ambiguous`. This case follows spec §8.3. Whether the
+`fork_history` instead of `copy: ambiguous`. This case follows that conservative copy rule. Whether the
 reader honours the key is open with the obs implementation task. Older forks mostly lack
 the key: none from 0.110 to 0.139 and about 40% from 0.140 to 0.149 carry it.
 
@@ -558,15 +498,19 @@ obs's index only the stamp is found, and coverage says so.
 | Task evidence: stamp, single-segment attempt, chain error and mention | SL11 |
 | Escaped text in parsed and malformed lines | SL11 |
 
-## Checking the cases against their sources
+## Frozen index controls
 
-On 2026-10-20 every cited episode's trigger, call, result and outcome reference matched
-its source line's SHA-256 on the surveyed host. The episodes are E001, E002, E008, E036,
-E044, E046, E052, E069, E072, E085, E092, E104, E107, E126, E142, E152, E160 and E175.
-To recheck, resolve each ledger `source` glob beneath that host's home and compare the
-line hashes. A changed or missing line is reported as unavailable, as the survey's
-"Rechecking the evidence" says.
+The catalogue declares native transcript samples. These separate frozen oracle
+inputs preserve the prior consumer’s outcomes and do not assert native emission:
 
-The fixtures copy no transcript text. They reproduce each episode's record shapes and its
-distinction: the field, its position, and what it does or does not prove. Their content
-is synthetic.
+- `index/old-controls.json`
+- `index/task2-old-controls.json`
+- `index/task2-policy-controls.json`
+- `index/task2-usage-storage-controls.json`
+
+The corpus check accounts for the historical table, catalogue, these four controls
+and the catalogue file itself, with exact set equality. The controls include one
+explicit synthetic instruction-source name under a fictitious home; the privacy
+check admits that exact literal alongside the documented synthetic UUID namespaces.
+Every other private-path or identifier pattern remains rejected. Fixture bytes
+are frozen; control inputs are not additional transcript samples.

@@ -5,7 +5,7 @@ that a paused turn can spend its grace, stop its own work, park and resume.
     turn-pause-lifecycle --harness claude-code|codex [--out DIR] [--model NAME]
     turn-pause-lifecycle observe EVENT        (the recording hook the driver wires)
 
-Spec: docs/specs/2026-11-01-turn-pause-design.md ("Warning, pause, notification",
+Spec: docs/turn-pause.md ("Warning, pause, notification",
 "Closing allowlist", "Resuming and granting more"); plan Task 9. It is a live
 operation: each run spends model quota (cheap models, minimal prompts).
 

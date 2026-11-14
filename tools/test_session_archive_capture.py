@@ -1,4 +1,4 @@
-"""Capturing one file: mirror, extension check, versions/, busy and repair (spec §3.3)."""
+"""Capturing one file: mirror, extension check, versions/, busy and repair (docs/session-archive.md)."""
 import os
 from pathlib import Path
 

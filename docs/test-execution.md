@@ -1,5 +1,9 @@
 # Test execution
 
+Type: guide; document types 1. Run focused checks, mandatory hygiene and deliberate
+full-suite verification. See [architecture](architecture.md) for setup and
+[capabilities](harness-capabilities.md) for the separate live probe boundary.
+
 The invoking checkout's `.tt.toml` sets `automatic_broad = false` with
 `broad_targets = ["test", "ci-test"]`. Run fresh focused checks for changed behavior
 and mandatory hygiene; broad suites run deliberately or in the hosted workflow.
@@ -89,7 +93,7 @@ public work-link from dotfiles commit 2a686c0c4915ba0daae9f6455cfe45233780fc33,
 checking SHA-256 6400d9a8431d3af3777d5038716d4322d283ebd127c574c06d7516dd1a784ff4.
 The runner explicitly installs and reports attr, required by work-link's worktree
 storage route, together with curl for the verified download.
-These setup corrections passed hosted verification. The disposable runner installs
+The disposable runner installs
 tools at the exact /usr/bin paths its fixtures use. It runs setup,
 portable hygiene and the same complete suite, with TT_FORCE=1 at job scope.
 All branch pushes and manual dispatch are covered, with no duplicate PR trigger.
@@ -105,8 +109,6 @@ The accepted hosted omissions are these exact local integration checks:
 - tools/test_agy_hooks.py::test_relay_v030_agy_dispatch_with_rendered_subscribers_and_ops_relay_guard
 - tools/test_harness_links.py::test_registered_owner_targets_match_portable_fixture_shapes
 
-The third was accepted alongside the original two after inspecting successful
-run41741765690 at855c814bc4805c7d682c81f847bcb79c7cc953c2.
 Portable owner fixtures exercise the existing link behavior tests without private
 checkouts; the added local integration check also copies the real registered
 targets and compares their shapes. No module is excluded. All three pass locally;

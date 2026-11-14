@@ -9,7 +9,7 @@ quiesce-timers restore --state FILE            start the timers recorded active,
                                                then check each matches its record
 
 Stopping a timer does not stop a run its service already began. `wait` lets that run finish
-and never kills it (docs/specs/2026-10-06-rename-to-hq-design.md §3.2 step 1). Only
+and never kills it (docs/sessions.md step 1). Only
 `systemctl --user` is called, found on PATH, so a test supplies its own.
 """
 import argparse

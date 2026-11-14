@@ -1,4 +1,4 @@
-# Design: docs/specs/2026-09-30-session-archive-design.md, in the repository that holds this unit.
+# Contract: docs/session-archive.md, in the repository that holds this unit.
 [Unit]
 Description=Capture agent session transcripts into the session archive
 

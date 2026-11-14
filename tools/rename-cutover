@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """A project rename's cutover: save originals, apply, retarget, link, verify, roll back.
 
-Written for docs/specs/2026-09-27-rename-to-tack-design.md and made general by
-docs/specs/2026-10-06-rename-to-hq-design.md §3.1. Every path comes from the command line
+Current contract: docs/rename-cutover.md. Every path comes from the command line
 or the snapshot's meta.json, and every tasks call inherits HOME, XDG_CONFIG_HOME and
 XDG_STATE_HOME, so a sandbox rehearsal runs exactly this code. `tasks rename` is
 irreversible; rollback restores the saved originals and stops, leaving the state for a
@@ -15,12 +14,12 @@ records repository outside every snapshot repository, where the cutover owns `<o
 `<new>/` (the checkout's) and `<p>/` (each detached repository's). Rollback resets the
 checkout and the in-tree repositories, never a detached repository's code checkout, and
 in a records repository restores only the owned paths, leaving every other project's
-records there alone (docs/specs/2026-11-02-detached-rename-cutover-design.md). `apply`
+records there alone (docs/rename-cutover.md). `apply`
 renames, commits through the tasks receipt, moves and commits a detached config's new
 checkout path. `retarget` fixes dependencies on retired ids in one of them or, with `--forward`,
 in every project outside them, `link` applies the home links, and `verify` checks the
 result; the runbook commits its own later edits. Receipt consumption before the move
-follows docs/specs/2026-11-09-rename-receipt-design.md: a refused receipt commit stops
+follows docs/rename-cutover.md: a refused receipt commit stops
 before moving, while a refused config commit stops after moving; either can roll back.
 
 The other host, once its sync has delivered the moved checkout (and the committed records

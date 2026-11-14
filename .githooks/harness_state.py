@@ -4,8 +4,8 @@ codex-trust and live-picks both rewrite harnesses/codex/config.toml, so they tak
 local/harness-state.lock, around every read-modify-write of a live file or a saved copy.
 Separate locks would let a trust restore and a pick restore read the same starting file
 and each overwrite the other's insert. Each tool works on the checkout it lives in and
-names itself in its failures. Design:
-docs/specs/2026-10-10-live-model-preservation-design.md §3.3.
+names itself in its failures. Contract:
+docs/live-state.md.
 """
 import argparse
 import contextlib
@@ -109,7 +109,7 @@ class Checkout:
             yield
 
 
-# --- Manifest: harnesses.toml (design: docs/specs/2026-11-01-harness-manifest-design.md §5) ---
+# --- Manifest: harnesses.toml (contract: docs/live-state.md) ---
 
 
 class ManifestError(ValueError):

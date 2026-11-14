@@ -1,4 +1,4 @@
-"""Claude deletion protocol and its deletion-window cases (spec §3.4.2)."""
+"""Claude deletion protocol and its deletion-window cases (docs/session-archive.md)."""
 import os
 import subprocess
 import sys

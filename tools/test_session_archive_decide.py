@@ -1,4 +1,4 @@
-"""Pure decisions: capture action and the extension check (spec §3.3)."""
+"""Pure decisions: capture action and the extension check (docs/session-archive.md)."""
 from session_archive.decide import Stat, capture_action, extends
 from session_archive.manifest import MIRROR, Version
 

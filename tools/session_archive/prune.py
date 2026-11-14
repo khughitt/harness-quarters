@@ -1,4 +1,4 @@
-"""Prune (spec §3.4): evaluate units against the manifest and obs, then delete eligible ones
+"""Prune (docs/session-archive.md): evaluate units against the manifest and obs, then delete eligible ones
 only through the quarantine protocols."""
 import errno
 import fcntl
@@ -23,7 +23,7 @@ class ArchiveUnreadable(Exception):
 
 
 class LeftoverQuarantine(Exception):
-    """A quarantine holds files from an earlier run; a person looks first (spec §3.4.4)."""
+    """A quarantine holds files from an earlier run; a person looks first (docs/session-archive.md.4)."""
 
 
 def _noop(unit):
@@ -153,7 +153,7 @@ def _restore(moved, qdir: Path, stop: Path, outcome: str) -> str:
 
 
 def delete_claude_unit(unit: Unit, ctx: Context) -> str:
-    """Spec §3.4.2: quarantine, settle, re-verify, recreation check, remove."""
+    """docs/session-archive.md: quarantine, settle, re-verify, recreation check, remove."""
     stop = unit.source.home / QUARANTINE
     qdir = quarantine_dir(unit.source.home, ctx.run_id) / unit.key
     qdir.mkdir(parents=True)
@@ -235,7 +235,7 @@ def _same_inode(a: Path, b: Path) -> bool:
 
 
 def delete_codex_unit(unit: Unit, ctx: Context) -> str:
-    """Spec §3.4.3: lock and link, delete, freeze check, re-verify, release. The freeze check
+    """docs/session-archive.md: lock and link, delete, freeze check, re-verify, release. The freeze check
     runs whenever the rollout's inode is no longer at its live path, whatever the exit status."""
     rollout, relpath, home = unit.paths[0], unit.files[0], unit.source.home
     stop = home / QUARANTINE

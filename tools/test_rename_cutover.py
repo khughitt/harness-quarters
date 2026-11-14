@@ -2149,7 +2149,7 @@ def test_detached_rollback_retry_converges_after_an_index_lock(dbox):
     assert dbox.fingerprint() == before
 
 
-# --- the second host (§4.7) -------------------------------------------------------
+# --- the second host docs/rename-cutover.md -------------------------------------------------------
 
 
 def test_detached_second_host_adopts_the_rename(dbox):

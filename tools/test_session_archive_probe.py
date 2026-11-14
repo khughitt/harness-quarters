@@ -1,4 +1,4 @@
-"""probe-codex checks the Codex behaviour the protocol relies on (spec §3.4.3, §5)."""
+"""probe-codex checks the Codex behaviour the protocol relies on (docs/session-archive.md)."""
 import json
 import os
 import subprocess

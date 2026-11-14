@@ -1,5 +1,5 @@
 """The archive manifest: one row per archived file version, plus the run and Codex probe
-logs (spec §3.3, §3.5)."""
+logs (docs/session-archive.md)."""
 import json
 import sqlite3
 from dataclasses import dataclass
@@ -99,7 +99,7 @@ class Manifest:
                                  (source,)).fetchone() is not None
 
     def diverged(self) -> list[Version]:
-        """Files whose newest version is not the mirrored one (spec §3.3)."""
+        """Files whose newest version is not the mirrored one (docs/session-archive.md)."""
         cursor = self.conn.execute(f"""
             SELECT {COLUMNS} FROM (
               SELECT *, ROW_NUMBER() OVER (PARTITION BY source, relpath {NEWEST}) AS n FROM versions)

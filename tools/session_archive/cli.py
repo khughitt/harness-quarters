@@ -1,4 +1,4 @@
-"""session-archive command line (spec docs/specs/2026-09-30-session-archive-design.md)."""
+"""session-archive command line (contract docs/session-archive.md)."""
 import argparse
 import json
 import sqlite3

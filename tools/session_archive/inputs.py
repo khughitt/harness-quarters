@@ -1,4 +1,4 @@
-"""Prune inputs: obs's index state, open inodes, and session units (spec §3.2, §3.4)."""
+"""Prune inputs: obs's index state, open inodes, and session units (docs/session-archive.md)."""
 import json
 import os
 import re

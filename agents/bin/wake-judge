@@ -13,8 +13,7 @@ is text with no tool call, and is exactly WAITING), the notification names a chi
 in that turn by a launching tool call (its id, or an id its own result returned), the nonce
 appears nowhere before it, and a controller message after it reports the nonce.
 
-Known forms grow only from a real transcript and a test built from it (ai
-docs/plans/2026-09-24-turn-boundary-gate.md Task 10). No Codex completion form is known
+Known forms grow only from a real transcript and a test built from it (docs/sessions.md, Wake probes and isolated homes). No Codex completion form is known
 yet, so a Codex run cannot pass until one is added that way.
 """
 import json

@@ -1,5 +1,5 @@
 """Codex: the `threads` table of `<home>/state_5.sqlite`.
-Contract: docs/notes/2026-10-15-session-discovery-contract.md."""
+Contract: docs/sessions.md."""
 import os
 import sqlite3
 from functools import partial

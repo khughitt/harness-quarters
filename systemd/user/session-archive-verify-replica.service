@@ -1,4 +1,4 @@
-# Design: docs/specs/2026-11-07-session-archive-replica-design.md, in the repository that holds this unit.
+# Contract: docs/session-archive.md, in the repository that holds this unit.
 [Unit]
 Description=Verify the current session archive replica generation in scratch
 

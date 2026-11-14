@@ -1,6 +1,6 @@
 """The closing allowlist: which calls a paused session may still make.
 
-Spec: docs/specs/2026-11-01-turn-pause-design.md, "Closing allowlist" through
+Spec: docs/turn-pause.md, "Closing allowlist" through
 "Limitation: unhooked Codex controls". Once a session tree is paused the hook refuses
 every call this module does not classify as bookkeeping, cancellation or (during
 grace) read. It is the security boundary of the pause: a shell command that passes

@@ -23,8 +23,8 @@ and exits 0: git ends a checkout with the hook's status, and a switch that worke
 exit 1. The next turn end retries. restore also takes group and other access off the live
 file: a checkout writes it with the umask's mode, and Codex's config is private.
 Every operation holds local/harness-state.lock, the host lock live-picks also takes. The tool works on the checkout
-it lives in and refuses a linked worktree, whose harnesses/codex/config.toml is not live. Design:
-docs/specs/2026-09-29-codex-trust-restore-design.md.
+it lives in and refuses a linked worktree, whose harnesses/codex/config.toml is not live. Contract:
+docs/live-state.md.
 """
 import contextlib
 import os

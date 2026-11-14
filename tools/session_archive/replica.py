@@ -1,5 +1,5 @@
 """Session archive replica: disk resolution, replica gate, daily replicate, and monthly verify-replica
-(spec docs/specs/2026-11-07-session-archive-replica-design.md)."""
+(contract docs/session-archive.md)."""
 import hashlib
 import json
 import os

@@ -6,8 +6,12 @@ person running agents across these hosts. It keeps model picks and trust out of 
 records what each harness has been shown to do, pins pi and relay, and archives sessions.
 The instruction corpus and profiles live in lore; the flow system lives in flows.
 """
-authority = ["docs/specs/2026-10-06-residue-design.md"]
+authority = ["docs/architecture.md"]
 subsystems = []
 
 [code]
 standard = 1
+
+[documents]
+standard = 1
+references = ["docs/runbooks/relay-runtime.md", "docs/runbooks/adding-a-harness.md"]

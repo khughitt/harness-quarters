@@ -1,5 +1,5 @@
 """Claude Code: `<home>/history.jsonl`, one line per typed prompt, and the transcript at
-`<home>/projects/*/<id>.jsonl`. Contract: docs/notes/2026-10-15-session-discovery-contract.md."""
+`<home>/projects/*/<id>.jsonl`. Contract: docs/sessions.md."""
 import json
 import os
 from functools import partial

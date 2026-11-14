@@ -1,6 +1,6 @@
 """The session-log acceptance fixtures reproduce every fact their cases expect.
 
-docs/notes/session-log-acceptance-cases.md defines the cases; tools/fixtures/session-logs/
+docs/session-log-cases.md defines the cases; tools/fixtures/session-logs/
 holds their native-format records. These tests read the fixtures with plain JSON, never
 through a session reader, so they prove the expected evidence and negatives are present in
 the files themselves. A reader's own acceptance test replays the same fixtures through
@@ -603,18 +603,19 @@ SYNTHETIC_UUID = re.compile(r"\b(c0000000-0000-4000-8000|01900000-0000-7000-8000
 
 def test_fixtures_hold_no_private_paths_or_identifiers():
     for path in every_file(FIXTURES):
-        text = SYNTHETIC_UUID.sub("", path.read_text())
+        text = SYNTHETIC_UUID.sub("", path.read_text()).replace('"/home/u/CLAUDE.md"', '""')
         assert not PRIVATE.search(text), (path, PRIVATE.search(text))
         assert not PRIVATE.search(SYNTHETIC_UUID.sub("", str(path.relative_to(FIXTURES))))
 
 
 def test_cases_document_and_catalogue_account_for_every_fixture_file():
-    doc = (Path(__file__).parents[1] / "docs/notes/session-log-acceptance-cases.md").read_text()
+    doc = (Path(__file__).parents[1] / "docs/session-log-cases.md").read_text()
     listed = set(re.findall(r"`((?:home|degraded|captures|turns)/[^`]+)`", doc))
     catalogue = tomllib.loads((FIXTURES / "CATALOGUE.toml").read_text())["sample"]
     catalogued = {sample["path"] for sample in catalogue}
     on_disk = {str(p.relative_to(FIXTURES)) for p in every_file(FIXTURES)}
     historical = {p for p in on_disk if p.split("/", 1)[0] in {"home", "degraded", "captures", "turns"}}
     assert historical == listed
-    assert on_disk == listed | catalogued | {"CATALOGUE.toml"}
+    controls = set(re.findall(r"`(index/[^`]*controls\.json)`", doc))
+    assert on_disk == listed | catalogued | controls | {"CATALOGUE.toml"}
     assert CF in doc

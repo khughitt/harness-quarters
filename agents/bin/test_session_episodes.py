@@ -933,7 +933,7 @@ def test_session_from_an_unregistered_cwd_still_yields_an_episode(tmp_path):
             x_custom_out("c1", '{"id":"ai-000001","warnings":[]}\n', 6), x_assistant("ok", 60), x_event("task_complete", 60)]
     s = se.read_codex(codex_file(tmp_path, recs))
     eps, _, _ = se.build_episodes(inputs(tmp_path, [s], project(tmp_path)))
-    assert len(eps) == 1  # ownership is the task's prefix, not the shell's cwd (spec §4.1, revised at plan review)
+    assert len(eps) == 1  # ownership is the task's prefix, not the shell's cwd (docs/sessions.md, revised at plan review)
 
 
 def test_transcript_transition_straddling_the_cutoff_makes_window_incomplete(tmp_path):
@@ -1549,7 +1549,7 @@ def test_before_since_skip_changes_no_output(tmp_path):
     assert without_skip[2]["anchors_seen"] == 2 and with_skip[2]["anchors_seen"] == 1
 
 
-# --- ids under a retired prefix (docs/specs/2026-10-06-rename-to-hq-design.md §3.5) -----
+# --- ids under a retired prefix (docs/sessions.md) -----
 
 ALIAS = {"tack-000001": "hq-000001"}
 

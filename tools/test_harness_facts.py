@@ -439,7 +439,7 @@ def test_the_shipped_file_is_valid_and_holds_the_three_facts():
         assert entry["value"] is True
         assert entry["version"] == "0.163.0"
         assert entry["date"] == "2026-10-16"
-        assert "docs/notes/2026-10-15-agent-attention-brief.md" in entry["evidence"]
+        assert entry["evidence"] == "hq-1ec500; records@261a2e0bd94ebd1871ccaa9b15d5014ba8484375:hq/docs/notes/2026-10-15-agent-attention-brief.md"
     for fact, expected in (
         ("hook-payload-model", True),
         ("hook-child-thread-id", True),
@@ -458,7 +458,7 @@ def test_the_shipped_file_is_valid_and_holds_the_three_facts():
 
 
 def test_every_shipped_note_names_the_probe_mode():
-    """Entries key on the harness alone, so each note says how the probe ran (spec §4.5)."""
+    """Entries key on the harness alone, so each note says how the probe ran (docs/harness-capabilities.md, Re-probing a fact)."""
     modes = {
         "agy": "interactive terminal session",
         "claude-code": "interactive session",

@@ -6,7 +6,7 @@
 Prints at most one JSON object and exits 0. A PreToolUse it cannot judge is refused; no
 other event is ever blocked. --limits is for tests and isolated runs only: the live
 wiring never passes it. Python runs with -S (no site): the hook needs only the
-standard library, and site costs several milliseconds a call. Spec: docs/specs/2026-11-01-turn-pause-design.md.
+standard library, and site costs several milliseconds a call. Spec: docs/turn-pause.md.
 """
 import os
 import sys

@@ -31,7 +31,7 @@ def test_load_returns_file_sha256():
 
 def test_defaults_file_names_spec_and_approval():
     text = limits.DEFAULTS_PATH.read_text()
-    assert '2026-11-01-turn-pause-design' in text and '2026-11-01' in text and 'hq-649891' in text
+    assert 'docs/turn-pause.md' in text and 'Live activation requires separate user approval.' in text
 
 def test_budget_scales_unnamed(): assert limits.with_budget(Limits(14400, 500, 30, 2), Budget(43200, None, None, None)) == Limits(43200, 1500, 90, 6)
 

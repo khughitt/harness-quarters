@@ -1,4 +1,4 @@
-"""The daily run over every source, and the capture command (spec §3.3)."""
+"""The daily run over every source, and the capture command (docs/session-archive.md)."""
 import json
 import os
 import shutil

@@ -1,4 +1,4 @@
-"""One case per prune condition (spec §3.4), over constructed records only."""
+"""One case per prune condition (docs/session-archive.md), over constructed records only."""
 from dataclasses import replace
 
 import pytest
