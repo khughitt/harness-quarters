@@ -8,6 +8,7 @@ import subprocess
 import tarfile
 import tomllib
 
+from harness_evidence import DECODER_VERSION
 from harness_evidence_testing import FIXTURES, path_of
 
 TOOLS = Path(__file__).resolve().parent
@@ -309,7 +310,7 @@ def test_extracted_git_package_runs_every_command_without_checkout_or_fixtures(t
         assert result.returncode == 0, result.stderr
         rows = [json.loads(line) for line in result.stdout.splitlines()]
         assert all(row["decoder"]["revision"] == "a" * 40 for row in rows)
-        assert all(row["decoder"]["version"] == "17" for row in rows)
+        assert all(row["decoder"]["version"] == DECODER_VERSION for row in rows)
         if args[0] == "discover":
             assert next(row for row in rows if row["object"] == "file")["filename_lookup"] == {
                 "session_ids": ["T"], "basis": "convention", "rule": "rollout_name_lookup"}

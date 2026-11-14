@@ -16,6 +16,7 @@ import unittest
 
 import pytest
 
+from harness_evidence import DECODER_VERSION
 from harness_evidence_testing import FIXTURES, PATHS, materialize
 
 TOOLS = Path(__file__).resolve().parent
@@ -242,7 +243,7 @@ def test_discover_objects_include_provenance_place_and_stat(tmp_path):
     assert [o["object"] for o in objs] == ["root"] * 6 + ["file"] * 9 + ["discover_end"]
     for obj in objs:
         assert obj["schema"] == "harness-evidence/1"
-        assert obj["decoder"]["version"] == "8"
+        assert obj["decoder"]["version"] == DECODER_VERSION
         assert obj["decoder"]["revision"]
         assert obj["decoder"] == objs[0]["decoder"]
     for obj in objs[6:-1]:
@@ -401,3 +402,47 @@ def test_initial_metadata_failure_keeps_enumerated_candidate(tmp_path, monkeypat
         assert (objs[0]["state"], objs[0]["listing"], objs[0]["errors"]) == ("unreadable", "partial", 1)
     listing = api().list_files(api().roots(None, [("codex", root)]), 10**20)
     assert listing.files == [path] and listing.aliases == [alias] and listing.skipped_by_mtime == 0
+
+
+def old_paths(harness, roots):
+    """Unchanged selector body from OBS 99f1b12a:src/obs/harness/stores.py."""
+    patterns = (["*/*.jsonl", "*/*/subagents/*.jsonl"]
+                if harness == "claude-code" else ["**/*.jsonl"])
+    return sorted({path for root in roots for pattern in patterns for path in root.glob(pattern)
+                   if not path.is_symlink()})
+
+
+@pytest.mark.parametrize("store", ["live", "archive"])
+@pytest.mark.parametrize("relative", ["project/session.jsonl", "project/parent/subagents/agent-child.jsonl"])
+def test_matching_directory_preserves_old_population_and_open_error(tmp_path, store, relative):
+    root = tmp_path / store / ".claude/projects"
+    target = root / relative
+    target.parent.mkdir(parents=True)
+    target.write_bytes((FIXTURES / "index/sizes.jsonl").read_bytes())
+    good = root / "project/good.jsonl"
+    good.write_bytes(target.read_bytes())
+    roots = api().roots(explicit=[("claude-code", root)])
+    assert api().list_files(roots, None).files == old_paths("claude-code", [root])
+    target.unlink()
+    target.mkdir()
+    alias = target.with_name("alias-dir.jsonl")
+    alias.symlink_to(target, target_is_directory=True)
+    file_alias = root / "project/alias-file.jsonl"
+    file_alias.symlink_to(good)
+    for directory in (root / "wrong-depth.jsonl", root / "project/session/wrong.jsonl",
+                      root / "project/parent/subagents/deep/wrong.jsonl"):
+        directory.mkdir(parents=True, exist_ok=True)
+    expected = sorted([target, good])
+    assert old_paths("claude-code", [root]) == expected
+    with pytest.raises(IsADirectoryError):
+        target.open()
+    listing = api().list_files(roots, None)
+    assert listing.files == expected
+    assert listing.aliases == sorted([alias, file_alias])
+    assert listing.file_errors == {}  # Enumeration succeeds; reading this selected path fails.
+    assert listing.roots[0]["files"] == 2 and listing.roots[0]["state"] == "searched"
+    rows = run_json(["discover", "--root", f"claude-code={root}"], tmp_path)
+    assert [row["path"] for row in rows if row["object"] == "file"] == list(map(str, expected))
+    selected = next(row for row in rows if row.get("path") == str(target))
+    assert selected["state"] == "listed" and selected["inode"] == target.stat().st_ino
+    assert rows[-1]["files"] == 2

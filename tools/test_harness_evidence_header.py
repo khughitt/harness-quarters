@@ -199,3 +199,41 @@ def test_header_unrelated_nonfinite_native_values_do_not_change_selected_cwd(tmp
         status, rows, err = run(source(path), roots=[{"harness": "claude-code", "path": str(tmp_path)}])
         assert status == 0 and not err and rows[0]["status"] == "invalid_source"
         assert rows[0]["error"] is not None
+
+
+@pytest.mark.parametrize("archive", [False, True])
+@pytest.mark.parametrize("relative", ["project/session.jsonl", "project/parent/subagents/agent-child.jsonl"])
+def test_discovered_directory_fails_header_and_both_decode_profiles(tmp_path, archive, relative):
+    from harness_evidence import discover
+    from test_harness_evidence_discover import old_paths
+    physical_root = tmp_path / ("archive" if archive else "live") / ".claude/projects"
+    logical_root = tmp_path / "live/.claude/projects"
+    physical = physical_root / relative
+    physical.parent.mkdir(parents=True)
+    physical.write_bytes((FIXTURES / "index/sizes.jsonl").read_bytes())
+    physical.unlink()
+    physical.mkdir()
+    found = discover.list_files(discover.roots(explicit=[("claude-code", physical_root)]), None).files
+    assert found == old_paths("claude-code", [physical_root]) == [physical]
+    descriptor = source(found[0], logical=logical_root / relative)
+    roots = [{"harness": "claude-code", "path": str(logical_root)}]
+    status, rows, err = run(descriptor, roots=roots)
+    assert status == 0 and not err
+    assert rows[0]["path"] == str(logical_root / relative)
+    assert rows[0]["status"] == "unreadable" and rows[0]["error"]["type"] == "IsADirectoryError"
+    assert rows[-1]["object"] == "request_end" and rows[-1]["files"] == 1
+    for profile in (None, "index"):
+        request = {"id": 9, "roots": roots, "files": [dict(descriptor)]}
+        if profile is None:
+            del request["files"][0]["identity"]
+        else:
+            request["extract"] = profile
+        out, err = io.StringIO(), io.StringIO()
+        assert stream.run(io.StringIO(json.dumps(request) + "\n"), out, err, ENVELOPE) == 0
+        values = [json.loads(line) for line in out.getvalue().splitlines()]
+        assert not err.getvalue()
+        end = next(v for v in values if v["object"] == "file_end")
+        assert end["status"] == "unreadable" and end["offset"] == 0
+        assert values[-1]["object"] == "request_end" and values[-1]["files"] == 1
+        if profile == "index":
+            assert end["state"] is None and end["restart"] is None

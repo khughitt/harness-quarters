@@ -14,6 +14,8 @@ import tomllib
 
 import pytest
 
+from harness_evidence import DECODER_VERSION
+
 TOOLS = Path(__file__).resolve().parent
 FIXTURES = TOOLS / "fixtures/session-logs"
 CONTROLS = json.loads((FIXTURES / "index/old-controls.json").read_text())
@@ -223,7 +225,7 @@ def test_index_evidence_has_sources_and_text_is_opt_in(tmp_path):
         assert row["line"] == number and row["end"] == offset + len(line)
         assert row["sha256"] == hashlib.sha256(line).hexdigest()
         assert row["ref"] == f"file:{source}#L{number}"
-        assert row["decoder"]["version"] == "17"
+        assert row["decoder"]["version"] == DECODER_VERSION
         for provenance in row["provenance"].values():
             assert provenance["basis"] in {"native", "convention", "heuristic"}
             assert provenance["rule"] and provenance["ref"] == row["ref"]
