@@ -1,4 +1,4 @@
-"""CLI tests for session-archive replicate and verify-replica (docs/session-archive.md, §3.5, docs/session-archive.md)."""
+"""CLI tests for session-archive replicate and verify-replica; docs/session-archive.md."""
 import fcntl
 import json
 import os
