@@ -34,6 +34,15 @@ syntax and unknown counters; do not edit state/limits or start another controlle
 to avoid a crossed limit. Actual policy decisions belong to the governing global
 instructions, not to inference from a warning message.
 
+To set a turn budget, put this on its own first line of your human prompt:
+
+```text
+budget: 12h, 2000 calls, 80 agents, 4 compactions
+```
+
+This is a prompt line, not a shell command. Budget text later in the prompt or
+inside quoted, fenced or pasted material sets no budget.
+
 Status first resolves an explicit/native session ID (workers map to their root),
 then newest cwd state, then main-checkout state for a linked worktree. Missing state
 fails with what was searched. History/list instead query all local roots without

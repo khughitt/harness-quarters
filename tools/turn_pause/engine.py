@@ -1,8 +1,8 @@
 """The one path that applies hook events to a turn's counters, and the turn boundary.
 
 The hook feeds it with the real decision; the replay (Task 8) with a recording one. No
-other code calls counters.attempt, started or apply. Spec:
-docs/turn-pause.md, "The unit" and "Counters".
+other code calls counters.attempt, started or apply. See
+docs/turn-pause.md, "Limits and turn boundaries".
 """
 from __future__ import annotations
 

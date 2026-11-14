@@ -1,7 +1,7 @@
 """The closing allowlist: which calls a paused session may still make.
 
-Spec: docs/turn-pause.md, "Closing allowlist" through
-"Limitation: unhooked Codex controls". Once a session tree is paused the hook refuses
+See docs/turn-pause.md, "Diagnosis and protected reads".
+Once a session tree is paused the hook refuses
 every call this module does not classify as bookkeeping, cancellation or (during
 grace) read. It is the security boundary of the pause: a shell command that passes
 `shell` must run no program other than its argv[0] and write no file, under sh, bash,

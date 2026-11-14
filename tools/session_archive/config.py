@@ -1,4 +1,7 @@
-"""Host gate, the fixed source table, and the archive lock (docs/session-archive.md–3.2)."""
+"""Host gate, the fixed source table, and the archive lock.
+
+See docs/session-archive.md, "Participants and configuration" and "Capture exchange".
+"""
 import fcntl
 import os
 import time
