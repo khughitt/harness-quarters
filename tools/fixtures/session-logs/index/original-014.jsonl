@@ -1,0 +1,1 @@
+{"type": "user", "timestamp": "2026-09-18T10:00:09.000Z", "sessionId": "s1", "cwd": "/checkout", "entrypoint": "cli", "isSidechain": false, "uuid": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_q", "content": "ok"}]}, "toolUseResult": {"answers": {"Which approach?": "Views"}}}

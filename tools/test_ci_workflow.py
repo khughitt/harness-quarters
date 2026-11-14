@@ -12,7 +12,7 @@ import pytest
 from test_test_execution import miniature_suite, world
 
 ROOT = Path(__file__).resolve().parents[1]
-TASKS_PIN = "fa58ab31acd757f59798537b6957e540fdccb9fb"
+TASKS_PIN = "85d88d497130050527a140c1c99e047225b161f4"
 HISTORICAL_PIN = "6b434eb206c4464c062137e3600dcd303a543f68"
 DOTFILES_PIN = "2a686c0c4915ba0daae9f6455cfe45233780fc33"
 WORK_LINK_SHA256 = "6400d9a8431d3af3777d5038716d4322d283ebd127c574c06d7516dd1a784ff4"
@@ -59,6 +59,7 @@ def test_pinned_actions_tools_and_public_tasks_source():
     for version in ("0.13.7", "1.59.0", "26.13.0", "1.99.1"):
         assert version in text
     assert "repository: khughitt/tasks" in text and f"ref: {TASKS_PIN}" in text
+    assert f'test "$(git -C .ci-tools/tasks-src rev-parse HEAD)" = {TASKS_PIN}' in text
     assert "--locked --release" in text
     assert ".ci-tools/" in text
     assert "package-manager-cache: false" in text

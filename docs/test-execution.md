@@ -85,7 +85,7 @@ from TT_JUNIT_DIR after the wrapper returns.
 The workflow uses ubuntu-24.04, sets PYTEST_XDIST_AUTO_NUM_WORKERS="2" (satisfying the
 suite driver's positive-integer check while both partitions run serially) and a finite 60-minute
 job limit. It pins uv 0.13.7, just 1.59.0, Node 26.13.0, Rust 1.99.1 and public
-tasks commit fa58ab31acd757f59798537b6957e540fdccb9fb. System Python, zsh and
+tasks commit 85d88d497130050527a140c1c99e047225b161f4. System Python, zsh and
 libatomic1 come from the runner; actual versions are recorded. Setup explicitly
 fetches historical commit 6b434eb206c4464c062137e3600dcd303a543f68, which the
 rollback tests need but advertised branch history does not contain. It installs

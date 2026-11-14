@@ -1,0 +1,1 @@
+{"sessionId": "control", "cwd": "/w/project", "entrypoint": "cli", "version": "unknown", "type": "assistant", "timestamp": "2026-11-11T23:59:00Z", "requestId": "bad", "message": {"id": "m-bad", "model": "synthetic-model", "usage": {}, "content": [{"type": "tool_use", "id": "bad", "name": "Bash", "input": "not an object"}]}}

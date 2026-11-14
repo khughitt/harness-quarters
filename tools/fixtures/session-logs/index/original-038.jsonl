@@ -1,0 +1,1 @@
+{"type": "queue-operation", "operation": "enqueue", "timestamp": "2026-09-18T11:09:06.000Z", "sessionId": "s1", "content": "<task-notification>\n<task-id>b1</task-id>\n<tool-use-id>toolu_bg</tool-use-id>\n<output-file>/tmp/b1.output</output-file>\n<status>failed</status>\n<summary>Background command \"smoke\" failed (exit code 1)</summary>\n</task-notification>"}

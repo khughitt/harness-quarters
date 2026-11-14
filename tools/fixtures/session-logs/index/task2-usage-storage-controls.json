@@ -1,0 +1,917 @@
+{
+ "events": [
+  {
+   "final_fragment": true,
+   "label": "absent",
+   "response": "absent",
+   "usage_present": {
+    "output": false,
+    "thinking": false
+   }
+  },
+  {
+   "final_fragment": true,
+   "label": "explicit-null",
+   "response": "explicit-null",
+   "usage_present": {
+    "output": true,
+    "thinking": true
+   }
+  },
+  {
+   "final_fragment": true,
+   "label": "null-output",
+   "response": "null-output",
+   "usage_present": {
+    "output": true,
+    "thinking": false
+   }
+  },
+  {
+   "final_fragment": true,
+   "label": "null-thinking",
+   "response": "null-thinking",
+   "usage_present": {
+    "output": false,
+    "thinking": true
+   }
+  },
+  {
+   "final_fragment": true,
+   "label": "zero",
+   "response": "zero",
+   "usage_present": {
+    "output": true,
+    "thinking": true
+   }
+  },
+  {
+   "final_fragment": true,
+   "label": "boolean",
+   "response": "boolean",
+   "usage_present": {
+    "output": true,
+    "thinking": true
+   }
+  },
+  {
+   "final_fragment": true,
+   "label": "numeric",
+   "response": "numeric",
+   "usage_present": {
+    "output": true,
+    "thinking": true
+   }
+  },
+  {
+   "final_fragment": true,
+   "label": "string",
+   "response": "string",
+   "usage_present": {
+    "output": true,
+    "thinking": true
+   }
+  },
+  {
+   "final_fragment": true,
+   "label": "empty-string",
+   "response": "empty-string",
+   "usage_present": {
+    "output": true,
+    "thinking": true
+   }
+  },
+  {
+   "final_fragment": true,
+   "label": "containers",
+   "response": "containers",
+   "usage_present": {
+    "output": true,
+    "thinking": true
+   }
+  },
+  {
+   "final_fragment": true,
+   "label": "empty-containers",
+   "response": "empty-containers",
+   "usage_present": {
+    "output": true,
+    "thinking": true
+   }
+  },
+  {
+   "final_fragment": true,
+   "label": "details-empty",
+   "response": "details-empty",
+   "usage_present": {
+    "output": false,
+    "thinking": false
+   }
+  },
+  {
+   "final_fragment": true,
+   "label": "details-null",
+   "response": "details-null",
+   "usage_present": {
+    "output": false,
+    "thinking": false
+   }
+  },
+  {
+   "final_fragment": true,
+   "label": "details-empty-string",
+   "response": "details-empty-string",
+   "usage_present": {
+    "output": false,
+    "thinking": false
+   }
+  },
+  {
+   "final_fragment": true,
+   "label": "details-false",
+   "response": "details-false",
+   "usage_present": {
+    "output": false,
+    "thinking": false
+   }
+  },
+  {
+   "final_fragment": true,
+   "label": "details-zero",
+   "response": "details-zero",
+   "usage_present": {
+    "output": false,
+    "thinking": false
+   }
+  },
+  {
+   "final_fragment": true,
+   "label": "details-empty-list",
+   "response": "details-empty-list",
+   "usage_present": {
+    "output": false,
+    "thinking": false
+   }
+  },
+  {
+   "final_fragment": false,
+   "label": "overwritten-usage-string-first",
+   "response": "overwritten-usage-string",
+   "usage_present": {
+    "output": false,
+    "thinking": false
+   }
+  },
+  {
+   "final_fragment": true,
+   "label": "overwritten-usage-string-last",
+   "response": "overwritten-usage-string",
+   "usage_present": {
+    "output": true,
+    "thinking": true
+   }
+  },
+  {
+   "final_fragment": false,
+   "label": "overwritten-usage-list-first",
+   "response": "overwritten-usage-list",
+   "usage_present": {
+    "output": false,
+    "thinking": false
+   }
+  },
+  {
+   "final_fragment": true,
+   "label": "overwritten-usage-list-last",
+   "response": "overwritten-usage-list",
+   "usage_present": {
+    "output": true,
+    "thinking": true
+   }
+  },
+  {
+   "final_fragment": false,
+   "label": "overwritten-details-string-first",
+   "response": "overwritten-details-string",
+   "usage_present": {
+    "output": true,
+    "thinking": false
+   }
+  },
+  {
+   "final_fragment": true,
+   "label": "overwritten-details-string-last",
+   "response": "overwritten-details-string",
+   "usage_present": {
+    "output": true,
+    "thinking": true
+   }
+  },
+  {
+   "final_fragment": false,
+   "label": "overwritten-details-list-first",
+   "response": "overwritten-details-list",
+   "usage_present": {
+    "output": true,
+    "thinking": false
+   }
+  },
+  {
+   "final_fragment": true,
+   "label": "overwritten-details-list-last",
+   "response": "overwritten-details-list",
+   "usage_present": {
+    "output": true,
+    "thinking": true
+   }
+  }
+ ],
+ "fields": [
+  {
+   "day": "2026-11-12",
+   "field": "input:cache_creation_input_tokens",
+   "present": 0,
+   "record_kind": "applied:usage",
+   "seen": 21,
+   "session_id": "storage-control"
+  },
+  {
+   "day": "2026-11-12",
+   "field": "input:cache_read_input_tokens",
+   "present": 0,
+   "record_kind": "applied:usage",
+   "seen": 21,
+   "session_id": "storage-control"
+  },
+  {
+   "day": "2026-11-12",
+   "field": "input:input_tokens",
+   "present": 0,
+   "record_kind": "applied:usage",
+   "seen": 21,
+   "session_id": "storage-control"
+  },
+  {
+   "day": "2026-11-12",
+   "field": "input:output_tokens",
+   "present": 11,
+   "record_kind": "applied:usage",
+   "seen": 21,
+   "session_id": "storage-control"
+  },
+  {
+   "day": "2026-11-12",
+   "field": "input:thinking_tokens",
+   "present": 11,
+   "record_kind": "applied:usage",
+   "seen": 21,
+   "session_id": "storage-control"
+  },
+  {
+   "day": "2026-11-12",
+   "field": "effort",
+   "present": 0,
+   "record_kind": "assistant",
+   "seen": 25,
+   "session_id": "storage-control"
+  },
+  {
+   "day": "2026-11-12",
+   "field": "input:content",
+   "present": 25,
+   "record_kind": "assistant",
+   "seen": 25,
+   "session_id": "storage-control"
+  },
+  {
+   "day": "2026-11-12",
+   "field": "input:effort",
+   "present": 0,
+   "record_kind": "assistant",
+   "seen": 25,
+   "session_id": "storage-control"
+  },
+  {
+   "day": "2026-11-12",
+   "field": "input:model",
+   "present": 25,
+   "record_kind": "assistant",
+   "seen": 25,
+   "session_id": "storage-control"
+  },
+  {
+   "day": "2026-11-12",
+   "field": "input:response",
+   "present": 25,
+   "record_kind": "assistant",
+   "seen": 25,
+   "session_id": "storage-control"
+  },
+  {
+   "day": "2026-11-12",
+   "field": "input:version",
+   "present": 25,
+   "record_kind": "assistant",
+   "seen": 25,
+   "session_id": "storage-control"
+  },
+  {
+   "day": "2026-11-12",
+   "field": "message.content",
+   "present": 25,
+   "record_kind": "assistant",
+   "seen": 25,
+   "session_id": "storage-control"
+  },
+  {
+   "day": "2026-11-12",
+   "field": "message.id",
+   "present": 25,
+   "record_kind": "assistant",
+   "seen": 25,
+   "session_id": "storage-control"
+  },
+  {
+   "day": "2026-11-12",
+   "field": "message.model",
+   "present": 25,
+   "record_kind": "assistant",
+   "seen": 25,
+   "session_id": "storage-control"
+  },
+  {
+   "day": "2026-11-12",
+   "field": "message.usage.cache_creation_input_tokens",
+   "present": 0,
+   "record_kind": "assistant",
+   "seen": 25,
+   "session_id": "storage-control"
+  },
+  {
+   "day": "2026-11-12",
+   "field": "message.usage.cache_read_input_tokens",
+   "present": 0,
+   "record_kind": "assistant",
+   "seen": 25,
+   "session_id": "storage-control"
+  },
+  {
+   "day": "2026-11-12",
+   "field": "message.usage.input_tokens",
+   "present": 0,
+   "record_kind": "assistant",
+   "seen": 25,
+   "session_id": "storage-control"
+  },
+  {
+   "day": "2026-11-12",
+   "field": "message.usage.output_tokens",
+   "present": 13,
+   "record_kind": "assistant",
+   "seen": 25,
+   "session_id": "storage-control"
+  },
+  {
+   "day": "2026-11-12",
+   "field": "requestId",
+   "present": 25,
+   "record_kind": "assistant",
+   "seen": 25,
+   "session_id": "storage-control"
+  },
+  {
+   "day": "2026-11-12",
+   "field": "version",
+   "present": 25,
+   "record_kind": "assistant",
+   "seen": 25,
+   "session_id": "storage-control"
+  }
+ ],
+ "oracle": "obs0a09481c06d1c91a785f9bc59b9dd9193b269dd3",
+ "parser_succeeded": true,
+ "records": [
+  {
+   "day": "2026-11-12",
+   "known": 1,
+   "record_kind": "assistant",
+   "records": 25,
+   "session_id": "storage-control"
+  }
+ ],
+ "rows": [
+  {
+   "after_compaction": false,
+   "at_ms": 1794441600000,
+   "cache_write_tokens": 0,
+   "cached_tokens": 0,
+   "context_tokens": 0,
+   "context_window": null,
+   "effort": null,
+   "model": "synthetic-model",
+   "native": {},
+   "output_text_bytes": 0,
+   "output_tokens": 0,
+   "prompt_bytes": 0,
+   "response_id": "absent",
+   "seq": 1,
+   "session_id": "storage-control",
+   "table": "turns",
+   "thinking_tokens": 0,
+   "uncached_tokens": 0
+  },
+  {
+   "after_compaction": false,
+   "at_ms": 1794441600000,
+   "cache_write_tokens": 0,
+   "cached_tokens": 0,
+   "context_tokens": 0,
+   "context_window": null,
+   "effort": null,
+   "model": "synthetic-model",
+   "native": {
+    "output_tokens": null,
+    "output_tokens_details": {
+     "thinking_tokens": null
+    }
+   },
+   "output_text_bytes": 0,
+   "output_tokens": null,
+   "prompt_bytes": 0,
+   "response_id": "explicit-null",
+   "seq": 2,
+   "session_id": "storage-control",
+   "table": "turns",
+   "thinking_tokens": null,
+   "uncached_tokens": 0
+  },
+  {
+   "after_compaction": false,
+   "at_ms": 1794441600000,
+   "cache_write_tokens": 0,
+   "cached_tokens": 0,
+   "context_tokens": 0,
+   "context_window": null,
+   "effort": null,
+   "model": "synthetic-model",
+   "native": {
+    "output_tokens": null
+   },
+   "output_text_bytes": 0,
+   "output_tokens": null,
+   "prompt_bytes": 0,
+   "response_id": "null-output",
+   "seq": 3,
+   "session_id": "storage-control",
+   "table": "turns",
+   "thinking_tokens": 0,
+   "uncached_tokens": 0
+  },
+  {
+   "after_compaction": false,
+   "at_ms": 1794441600000,
+   "cache_write_tokens": 0,
+   "cached_tokens": 0,
+   "context_tokens": 0,
+   "context_window": null,
+   "effort": null,
+   "model": "synthetic-model",
+   "native": {
+    "output_tokens_details": {
+     "thinking_tokens": null
+    }
+   },
+   "output_text_bytes": 0,
+   "output_tokens": 0,
+   "prompt_bytes": 0,
+   "response_id": "null-thinking",
+   "seq": 4,
+   "session_id": "storage-control",
+   "table": "turns",
+   "thinking_tokens": null,
+   "uncached_tokens": 0
+  },
+  {
+   "after_compaction": false,
+   "at_ms": 1794441600000,
+   "cache_write_tokens": 0,
+   "cached_tokens": 0,
+   "context_tokens": 0,
+   "context_window": null,
+   "effort": null,
+   "model": "synthetic-model",
+   "native": {
+    "output_tokens": 0,
+    "output_tokens_details": {
+     "thinking_tokens": 0
+    }
+   },
+   "output_text_bytes": 0,
+   "output_tokens": 0,
+   "prompt_bytes": 0,
+   "response_id": "zero",
+   "seq": 5,
+   "session_id": "storage-control",
+   "table": "turns",
+   "thinking_tokens": 0,
+   "uncached_tokens": 0
+  },
+  {
+   "after_compaction": false,
+   "at_ms": 1794441600000,
+   "cache_write_tokens": 0,
+   "cached_tokens": 0,
+   "context_tokens": 0,
+   "context_window": null,
+   "effort": null,
+   "model": "synthetic-model",
+   "native": {
+    "output_tokens": false,
+    "output_tokens_details": {
+     "thinking_tokens": true
+    }
+   },
+   "output_text_bytes": 0,
+   "output_tokens": false,
+   "prompt_bytes": 0,
+   "response_id": "boolean",
+   "seq": 6,
+   "session_id": "storage-control",
+   "table": "turns",
+   "thinking_tokens": true,
+   "uncached_tokens": 0
+  },
+  {
+   "after_compaction": false,
+   "at_ms": 1794441600000,
+   "cache_write_tokens": 0,
+   "cached_tokens": 0,
+   "context_tokens": 0,
+   "context_window": null,
+   "effort": null,
+   "model": "synthetic-model",
+   "native": {
+    "output_tokens": -2,
+    "output_tokens_details": {
+     "thinking_tokens": 1.5
+    }
+   },
+   "output_text_bytes": 0,
+   "output_tokens": -2,
+   "prompt_bytes": 0,
+   "response_id": "numeric",
+   "seq": 7,
+   "session_id": "storage-control",
+   "table": "turns",
+   "thinking_tokens": 1.5,
+   "uncached_tokens": 0
+  },
+  {
+   "after_compaction": false,
+   "at_ms": 1794441600000,
+   "cache_write_tokens": 0,
+   "cached_tokens": 0,
+   "context_tokens": 0,
+   "context_window": null,
+   "effort": null,
+   "model": "synthetic-model",
+   "native": {
+    "output_tokens": "not numeric",
+    "output_tokens_details": {
+     "thinking_tokens": "still storage"
+    }
+   },
+   "output_text_bytes": 0,
+   "output_tokens": "not numeric",
+   "prompt_bytes": 0,
+   "response_id": "string",
+   "seq": 8,
+   "session_id": "storage-control",
+   "table": "turns",
+   "thinking_tokens": "still storage",
+   "uncached_tokens": 0
+  },
+  {
+   "after_compaction": false,
+   "at_ms": 1794441600000,
+   "cache_write_tokens": 0,
+   "cached_tokens": 0,
+   "context_tokens": 0,
+   "context_window": null,
+   "effort": null,
+   "model": "synthetic-model",
+   "native": {
+    "output_tokens": "",
+    "output_tokens_details": {
+     "thinking_tokens": ""
+    }
+   },
+   "output_text_bytes": 0,
+   "output_tokens": "",
+   "prompt_bytes": 0,
+   "response_id": "empty-string",
+   "seq": 9,
+   "session_id": "storage-control",
+   "table": "turns",
+   "thinking_tokens": "",
+   "uncached_tokens": 0
+  },
+  {
+   "after_compaction": false,
+   "at_ms": 1794441600000,
+   "cache_write_tokens": 0,
+   "cached_tokens": 0,
+   "context_tokens": 0,
+   "context_window": null,
+   "effort": null,
+   "model": "synthetic-model",
+   "native": {
+    "output_tokens": {
+     "nested": [
+      1
+     ]
+    },
+    "output_tokens_details": {
+     "thinking_tokens": [
+      "text"
+     ]
+    }
+   },
+   "output_text_bytes": 0,
+   "output_tokens": {
+    "nested": [
+     1
+    ]
+   },
+   "prompt_bytes": 0,
+   "response_id": "containers",
+   "seq": 10,
+   "session_id": "storage-control",
+   "table": "turns",
+   "thinking_tokens": [
+    "text"
+   ],
+   "uncached_tokens": 0
+  },
+  {
+   "after_compaction": false,
+   "at_ms": 1794441600000,
+   "cache_write_tokens": 0,
+   "cached_tokens": 0,
+   "context_tokens": 0,
+   "context_window": null,
+   "effort": null,
+   "model": "synthetic-model",
+   "native": {
+    "output_tokens": [],
+    "output_tokens_details": {
+     "thinking_tokens": {}
+    }
+   },
+   "output_text_bytes": 0,
+   "output_tokens": [],
+   "prompt_bytes": 0,
+   "response_id": "empty-containers",
+   "seq": 11,
+   "session_id": "storage-control",
+   "table": "turns",
+   "thinking_tokens": {},
+   "uncached_tokens": 0
+  },
+  {
+   "after_compaction": false,
+   "at_ms": 1794441600000,
+   "cache_write_tokens": 0,
+   "cached_tokens": 0,
+   "context_tokens": 0,
+   "context_window": null,
+   "effort": null,
+   "model": "synthetic-model",
+   "native": {
+    "output_tokens_details": {}
+   },
+   "output_text_bytes": 0,
+   "output_tokens": 0,
+   "prompt_bytes": 0,
+   "response_id": "details-empty",
+   "seq": 12,
+   "session_id": "storage-control",
+   "table": "turns",
+   "thinking_tokens": 0,
+   "uncached_tokens": 0
+  },
+  {
+   "after_compaction": false,
+   "at_ms": 1794441600000,
+   "cache_write_tokens": 0,
+   "cached_tokens": 0,
+   "context_tokens": 0,
+   "context_window": null,
+   "effort": null,
+   "model": "synthetic-model",
+   "native": {
+    "output_tokens_details": null
+   },
+   "output_text_bytes": 0,
+   "output_tokens": 0,
+   "prompt_bytes": 0,
+   "response_id": "details-null",
+   "seq": 13,
+   "session_id": "storage-control",
+   "table": "turns",
+   "thinking_tokens": 0,
+   "uncached_tokens": 0
+  },
+  {
+   "after_compaction": false,
+   "at_ms": 1794441600000,
+   "cache_write_tokens": 0,
+   "cached_tokens": 0,
+   "context_tokens": 0,
+   "context_window": null,
+   "effort": null,
+   "model": "synthetic-model",
+   "native": {
+    "output_tokens_details": ""
+   },
+   "output_text_bytes": 0,
+   "output_tokens": 0,
+   "prompt_bytes": 0,
+   "response_id": "details-empty-string",
+   "seq": 14,
+   "session_id": "storage-control",
+   "table": "turns",
+   "thinking_tokens": 0,
+   "uncached_tokens": 0
+  },
+  {
+   "after_compaction": false,
+   "at_ms": 1794441600000,
+   "cache_write_tokens": 0,
+   "cached_tokens": 0,
+   "context_tokens": 0,
+   "context_window": null,
+   "effort": null,
+   "model": "synthetic-model",
+   "native": {
+    "output_tokens_details": false
+   },
+   "output_text_bytes": 0,
+   "output_tokens": 0,
+   "prompt_bytes": 0,
+   "response_id": "details-false",
+   "seq": 15,
+   "session_id": "storage-control",
+   "table": "turns",
+   "thinking_tokens": 0,
+   "uncached_tokens": 0
+  },
+  {
+   "after_compaction": false,
+   "at_ms": 1794441600000,
+   "cache_write_tokens": 0,
+   "cached_tokens": 0,
+   "context_tokens": 0,
+   "context_window": null,
+   "effort": null,
+   "model": "synthetic-model",
+   "native": {
+    "output_tokens_details": 0
+   },
+   "output_text_bytes": 0,
+   "output_tokens": 0,
+   "prompt_bytes": 0,
+   "response_id": "details-zero",
+   "seq": 16,
+   "session_id": "storage-control",
+   "table": "turns",
+   "thinking_tokens": 0,
+   "uncached_tokens": 0
+  },
+  {
+   "after_compaction": false,
+   "at_ms": 1794441600000,
+   "cache_write_tokens": 0,
+   "cached_tokens": 0,
+   "context_tokens": 0,
+   "context_window": null,
+   "effort": null,
+   "model": "synthetic-model",
+   "native": {
+    "output_tokens_details": []
+   },
+   "output_text_bytes": 0,
+   "output_tokens": 0,
+   "prompt_bytes": 0,
+   "response_id": "details-empty-list",
+   "seq": 17,
+   "session_id": "storage-control",
+   "table": "turns",
+   "thinking_tokens": 0,
+   "uncached_tokens": 0
+  },
+  {
+   "after_compaction": false,
+   "at_ms": 1794441600000,
+   "cache_write_tokens": 0,
+   "cached_tokens": 0,
+   "context_tokens": 0,
+   "context_window": null,
+   "effort": null,
+   "model": "synthetic-model",
+   "native": {
+    "output_tokens": 9,
+    "output_tokens_details": {
+     "thinking_tokens": 10
+    }
+   },
+   "output_text_bytes": 0,
+   "output_tokens": 9,
+   "prompt_bytes": 0,
+   "response_id": "overwritten-usage-string",
+   "seq": 18,
+   "session_id": "storage-control",
+   "table": "turns",
+   "thinking_tokens": 10,
+   "uncached_tokens": 0
+  },
+  {
+   "after_compaction": false,
+   "at_ms": 1794441600000,
+   "cache_write_tokens": 0,
+   "cached_tokens": 0,
+   "context_tokens": 0,
+   "context_window": null,
+   "effort": null,
+   "model": "synthetic-model",
+   "native": {
+    "output_tokens": 9,
+    "output_tokens_details": {
+     "thinking_tokens": 10
+    }
+   },
+   "output_text_bytes": 0,
+   "output_tokens": 9,
+   "prompt_bytes": 0,
+   "response_id": "overwritten-usage-list",
+   "seq": 19,
+   "session_id": "storage-control",
+   "table": "turns",
+   "thinking_tokens": 10,
+   "uncached_tokens": 0
+  },
+  {
+   "after_compaction": false,
+   "at_ms": 1794441600000,
+   "cache_write_tokens": 0,
+   "cached_tokens": 0,
+   "context_tokens": 0,
+   "context_window": null,
+   "effort": null,
+   "model": "synthetic-model",
+   "native": {
+    "output_tokens": 9,
+    "output_tokens_details": {
+     "thinking_tokens": 10
+    }
+   },
+   "output_text_bytes": 0,
+   "output_tokens": 9,
+   "prompt_bytes": 0,
+   "response_id": "overwritten-details-string",
+   "seq": 20,
+   "session_id": "storage-control",
+   "table": "turns",
+   "thinking_tokens": 10,
+   "uncached_tokens": 0
+  },
+  {
+   "after_compaction": false,
+   "at_ms": 1794441600000,
+   "cache_write_tokens": 0,
+   "cached_tokens": 0,
+   "context_tokens": 0,
+   "context_window": null,
+   "effort": null,
+   "model": "synthetic-model",
+   "native": {
+    "output_tokens": 9,
+    "output_tokens_details": {
+     "thinking_tokens": 10
+    }
+   },
+   "output_text_bytes": 0,
+   "output_tokens": 9,
+   "prompt_bytes": 0,
+   "response_id": "overwritten-details-list",
+   "seq": 21,
+   "session_id": "storage-control",
+   "table": "turns",
+   "thinking_tokens": 10,
+   "uncached_tokens": 0
+  }
+ ],
+ "sha256": "d25475f5ff93f393c29b17b3cfc03096644ed4bb1bd98b97c84967908a299f18",
+ "source": "task2-usage-storage.jsonl",
+ "sqlite_verdict": "not exercised; consumer Task3 owns actual binding and rollback"
+}

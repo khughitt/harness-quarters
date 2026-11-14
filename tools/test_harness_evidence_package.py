@@ -11,7 +11,7 @@ TOOLS = Path(__file__).resolve().parent
 sys.path.insert(0, str(TOOLS))
 
 import harness_stores  # noqa: E402
-from harness_evidence import homes  # noqa: E402
+from harness_evidence import DECODER_VERSION, homes  # noqa: E402
 
 
 def clean_env(tmp_path):
@@ -118,7 +118,7 @@ def test_checkout_revision_is_head_and_marks_dirty(tmp_path):
     root, env = fixture_repo(tmp_path)
     head = git(root, env, "rev-parse", "HEAD")
     output = version_json(root, env)
-    assert output == {"schema": "harness-evidence/1", "decoder": {"version": "8", "revision": head}}
+    assert output == {"schema": "harness-evidence/1", "decoder": {"version": DECODER_VERSION, "revision": head}}
     (root / "unrelated").write_text("outside package\n")
     assert version_json(root, env)["decoder"]["revision"] == head
     extra = root / "tools" / "harness_evidence" / "extra.py"

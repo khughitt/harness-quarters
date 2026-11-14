@@ -222,6 +222,12 @@ def task_id(output):
     return added.get("id") or added["task"]["id"]
 
 
+def configure_color(records):
+    """Give sandbox project configs a color so unrelated color_missing warnings stay absent."""
+    config = Path(records) / "tasks" / ".config.toml"
+    config.write_text('color = "#2f9fb1"\n' + config.read_text())
+
+
 def start_under_a_dead_session(box, tid, cwd):
     """Claim `tid` for a session whose pid has ended. tasks records the PID view that lets
     it judge a pid only when the exported pid exists at the claim and the claim is written
@@ -304,6 +310,7 @@ class Sandbox:
         assert Path(self.run("git", "rev-parse", "--show-toplevel", cwd=path).stdout.strip()).resolve() == path.resolve()
         assert Path(self.run("git", "rev-parse", "--absolute-git-dir", cwd=path).stdout.strip()).resolve().is_relative_to(path.resolve())
         self.run("tasks", "init", "--prefix", prefix, cwd=path)
+        configure_color(path)
 
     def code_repo(self, path, prefix):
         """A detached project: a code checkout with no tasks/, paired with records under
@@ -314,6 +321,7 @@ class Sandbox:
         assert Path(self.run("git", "rev-parse", "--show-toplevel", cwd=path).stdout.strip()).resolve() == path.resolve()
         assert Path(self.run("git", "rev-parse", "--absolute-git-dir", cwd=path).stdout.strip()).resolve().is_relative_to(path.resolve())
         self.run("tasks", "init", "--prefix", prefix, "--records", self.records, cwd=path)
+        configure_color(self.records / prefix)
         self.commit(self.records, f"{prefix} records")
 
     def records_repo(self):
@@ -680,6 +688,7 @@ def extra_detached(box, name, records_root):
     (code / "README").write_text("x\n")
     box.commit(code, "init")
     box.run("tasks", "init", "--prefix", name, "--records", records_root, cwd=code)
+    configure_color(Path(records_root) / name)
     box.repos.append(code)
     return code
 
@@ -750,6 +759,7 @@ def linked(box):
     overlay = box.sync / "overlay"
     overlay.mkdir()
     box.run("tasks", "init", "--prefix", "lnk", "--checkout", code, cwd=overlay)
+    configure_color(overlay)
     (overlay / "tools").mkdir()
     for name in ("harness-links", "rename-cutover"):
         shutil.copy2(TOOLS / name, overlay / "tools" / name)

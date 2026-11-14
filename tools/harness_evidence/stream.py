@@ -3,73 +3,17 @@ from dataclasses import asdict, dataclass, replace
 import hashlib
 import json
 from pathlib import Path
-import re
 
 from . import copies, discover, records
 from .lines import Place, UnknownFormat, decode, detect_format, lines, ref, sha256
 from .links import native_links, requested_model
 
 
-class ProtocolError(Exception):
-    """The request, rather than a source file, violates the wire contract."""
+from ._protocol import ProtocolError, validate
 
 
 def serialized(value, *, canonical=False):
     return json.dumps(value, ensure_ascii=True, separators=(",", ":"), sort_keys=canonical, allow_nan=False)
-
-
-def _fields(value, allowed, required=()):
-    if not isinstance(value, dict) or value.keys() - set(allowed) or set(required) - value.keys():
-        raise ProtocolError("invalid object fields")
-
-
-def _integer(value, minimum):
-    if type(value) is not int or value < minimum:
-        raise ProtocolError("expected an integer in range")
-
-
-def _path(value):
-    if not isinstance(value, str) or not value or "\x00" in value:
-        raise ProtocolError("expected a nonempty path string")
-
-
-def validate(value):
-    """Reject the complete request before any response for it is emitted."""
-    _fields(value, {"id", "files", "roots", "context", "cross_file", "text", "raw"}, {"id", "files"})
-    if type(value["id"]) is not int:
-        raise ProtocolError("id must be an integer")
-    if not isinstance(value["files"], list):
-        raise ProtocolError("files must be an array")
-    for file in value["files"]:
-        _fields(file, {"path", "read_path", "size", "state"}, {"path", "size"})
-        _path(file["path"])
-        if file.get("read_path") is not None:
-            _path(file["read_path"])
-        _integer(file["size"], 0)
-        state = file.get("state")
-        if state is not None:
-            _fields(state, {"next_line", "next_offset", "digest"}, {"next_line", "next_offset", "digest"})
-            _integer(state["next_line"], 1)
-            _integer(state["next_offset"], 0)
-            if not isinstance(state["digest"], str) or re.fullmatch("[0-9a-f]{64}", state["digest"]) is None:
-                raise ProtocolError("invalid checkpoint digest")
-    roots = value.get("roots")
-    if roots is not None:
-        if not isinstance(roots, list):
-            raise ProtocolError("roots must be an array or null")
-        for root in roots:
-            _fields(root, {"harness", "path"}, {"harness", "path"})
-            if root["harness"] not in ("claude-code", "codex"):
-                raise ProtocolError("unsupported root harness")
-            _path(root["path"])
-    if not isinstance(value.get("context", []), list):
-        raise ProtocolError("context must be an array")
-    for path in value.get("context", []):
-        _path(path)
-    for key in ("cross_file", "text", "raw"):
-        if type(value.get(key, False)) is not bool:
-            raise ProtocolError(f"{key} must be boolean")
-    return value
 
 
 @dataclass
@@ -243,6 +187,10 @@ def _emit_file(file, index, envelope, request):
 
 def objects(request, envelope):
     """Yield one request, buffering all reads only when copy marking requires it."""
+    if request.get("extract") == "index":
+        from .index_stream import objects as index_objects
+        yield from index_objects(request, envelope)
+        return
     explicit = request.get("roots")
     roots = discover.roots(explicit=None if explicit is None else [(r["harness"], Path(r["path"])) for r in explicit])
     inherited = {}

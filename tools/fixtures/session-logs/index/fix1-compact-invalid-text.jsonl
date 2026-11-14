@@ -1,0 +1,1 @@
+{"sessionId": "control", "cwd": "/w/project", "entrypoint": "cli", "version": "unknown", "type": "user", "timestamp": "2026-11-11T23:59:00Z", "isCompactSummary": true, "message": {"content": [{"type": "tool_result", "tool_use_id": "orphan", "content": "ok"}, {"type": "text", "text": null}]}}

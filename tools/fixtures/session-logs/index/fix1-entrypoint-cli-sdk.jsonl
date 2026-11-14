@@ -1,0 +1,2 @@
+{"sessionId": "control", "cwd": "/w/project", "entrypoint": "cli", "version": "unknown", "type": "user", "timestamp": "2026-11-11T23:59:00Z", "message": {"content": "synthetic"}}
+{"sessionId": "control", "cwd": "/w/project", "entrypoint": "sdk-py", "version": "unknown", "type": "user", "timestamp": "2026-11-11T23:59:01Z", "message": {"content": "synthetic"}}

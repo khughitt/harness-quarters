@@ -1,0 +1,1 @@
+{"sessionId": "control", "cwd": "/w/project", "entrypoint": "cli", "version": "unknown", "type": "assistant", "timestamp": "2026-11-11T23:59:00Z", "requestId": "fix1", "message": {"id": "m-fix1", "model": "synthetic-model", "usage": "transient", "content": []}}
