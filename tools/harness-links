@@ -16,8 +16,8 @@ it does not hold, or a running agy, before it creates any link. Required links g
 every host (their parent directory is created); a harness group applies only where its
 home is a real directory. Run from the main checkout: links must never resolve into a
 worktree. A target is checked only when its entry applies (a required link, or a group
-whose home is a real directory); a missing one is an error, never created. Design:
-docs/specs/2026-09-27-rename-to-tack-design.md, docs/specs/2026-09-28-local-layer-design.md.
+whose home is a real directory); a missing one is an error, never created. Contract:
+docs/home-links.md.
 
 Targets are checkout-relative or <project>:<relative-path>, resolved through
 `tasks projects --paths`. [directories] maps directory paths to their former link

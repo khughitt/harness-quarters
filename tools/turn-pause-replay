@@ -7,7 +7,7 @@
 Replays the Claude Code and Codex session trees on this host (read-only) through the
 turn-pause hook's own counters. START and END are ISO times (2026-10-02T00:00:00Z):
 turns whose genuine prompt falls in [START, END) are counted. --all reads every record.
-Spec: docs/specs/2026-11-01-turn-pause-design.md, "Limits" and "Verification".
+Spec: docs/turn-pause.md, "Limits" and "Verification".
 """
 import os
 import sys

@@ -142,7 +142,8 @@ def preparation_script():
 @pytest.mark.parametrize("failure", [False, True])
 def test_preparation_pilot(world, tmp_path, failure):
     for relative in ("README.md", "AGENTS.md", "identity.toml", ".gitignore", "docs/test-execution.md",
-                     "docs/specs/2026-10-06-residue-design.md", "tools/ops-docs", "tools/family.toml",
+                     "docs/architecture.md", "docs/runbooks/relay-runtime.md",
+                     "docs/runbooks/adding-a-harness.md", "tools/ops-docs", "tools/family.toml",
                      "tools/code-organization.md", "tools/harness-facts",
                      ".githooks/pre-commit", ".githooks/harness_state.py", ".githooks/harness-state-clean"):
         destination = world.root / relative

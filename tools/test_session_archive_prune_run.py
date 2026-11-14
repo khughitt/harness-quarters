@@ -1,4 +1,4 @@
-"""The prune run: two phases, dry run, gates, leftovers, repair and divergence (spec §3.4)."""
+"""The prune run: two phases, dry run, gates, leftovers, repair and divergence (docs/session-archive.md)."""
 import json
 from dataclasses import replace
 import os

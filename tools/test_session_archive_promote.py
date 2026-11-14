@@ -1,4 +1,4 @@
-"""promote makes a diverged file's latest version the mirror, deleting nothing (spec §3.3)."""
+"""promote makes a diverged file's latest version the mirror, deleting nothing (docs/session-archive.md)."""
 import json
 
 import pytest

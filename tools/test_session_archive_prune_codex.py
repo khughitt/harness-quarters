@@ -1,4 +1,4 @@
-"""Codex deletion protocol and its deletion-window cases (spec §3.4.3)."""
+"""Codex deletion protocol and its deletion-window cases (docs/session-archive.md)."""
 import fcntl
 import json
 import os

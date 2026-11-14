@@ -1,4 +1,4 @@
-"""Claude successor links into an older unit under prune (spec §3.2-3.4).
+"""Claude successor links into an older unit under prune (docs/session-archive.md-3.4).
 
 Claude Code hands a running background agent to its successor session as a symlink,
 <new>/subagents/agent-<id>.jsonl -> <old>/subagents/agent-<id>.jsonl (relative or

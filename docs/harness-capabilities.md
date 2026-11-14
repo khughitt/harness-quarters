@@ -71,8 +71,8 @@ zero values can be evidence. Record kinds and role-label bases are listed separa
 Synthetic samples establish decoder conformance; observed samples or probes establish
 emission. The current catalogue is entirely synthetic, and its known modeled format
 versions do not establish observed emission. An unspecified or unlisted version is
-untested; an absent field is unobserved. `coverage_keys` and `exceptions` remain empty
-until coverage declarations and exceptions are added in later stages.
+untested; an absent field is unobserved. Native index field provenance and coverage declarations are published separately
+from reader declarations; their presence does not establish observed harness emission.
 
 ## Fact schema and lookup
 

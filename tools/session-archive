@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """session-archive: daily capture and verified prune of agent session stores.
 
-Design: docs/specs/2026-09-30-session-archive-design.md."""
+Contract: docs/session-archive.md."""
 import sys
 from pathlib import Path
 

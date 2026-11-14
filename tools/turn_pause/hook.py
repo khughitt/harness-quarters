@@ -6,7 +6,7 @@ protected path, then, while paused, the closing allowlist with its grace. A PreT
 the hook cannot judge is refused with the error; no other event is ever blocked or
 answered with a decision (a blocked Stop makes the agent continue). Slow work (the
 notification) runs after the state is written, and its result is recorded in a second
-short locked update. Spec: docs/specs/2026-11-01-turn-pause-design.md.
+short locked update. Spec: docs/turn-pause.md.
 
 Every call pays for its imports (they were most of its latency), so this module and
 those it imports keep to json, os, sys, time, fcntl and _sha2: no dataclasses, typing,

@@ -1,4 +1,4 @@
-"""status: one JSON object on archive health; unhealthy exits 1 (spec §3.5)."""
+"""status: one JSON object on archive health; unhealthy exits 1 (docs/session-archive.md)."""
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path

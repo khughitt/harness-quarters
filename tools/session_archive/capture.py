@@ -1,4 +1,4 @@
-"""Capturing files into the archive (spec §3.3): the mirror, versions/, and the manifest."""
+"""Capturing files into the archive (docs/session-archive.md): the mirror, versions/, and the manifest."""
 import hashlib
 import os
 import tempfile

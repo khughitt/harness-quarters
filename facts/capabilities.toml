@@ -1,6 +1,6 @@
 # Capability facts: what each harness has been shown to do, and where that is recorded.
 # Read only through tools/harness-facts (a command, or a module). Edit in a worktree.
-# Re-probing: README.md, "Re-probing a fact". Design: docs/specs/2026-10-06-residue-design.md §4.
+# Re-probing: docs/harness-capabilities.md, "Re-probing a fact". Design: records@261a2e0bd94ebd1871ccaa9b15d5014ba8484375:hq/docs/specs/2026-10-06-residue-design.md §4.
 schema = 1
 
 [facts.controller-wake]
@@ -344,7 +344,7 @@ note = "pi's MCP runtime builds its client with no protocol version, so initiali
 
 # pi: `pi` is the CLI and its RPC mode, `pi-durable` the SDK's durable Harness; the CLI does
 # not use pi-durable. Each harness's entries come from its own probe under pi/probes;
-# the epoch rule: README.md, "Re-probing pi".
+# the epoch rule: docs/harness-capabilities.md, "Re-probing pi".
 
 [facts.headless-controls]
 type = "set"
@@ -843,7 +843,7 @@ value = true
 version = "2.1.316"
 date = 2026-11-01
 evidence = "hq-57d68e"
-note = "The first record's entrypoint (cli, sdk-cli, sdk-py) separates interactive from headless runs, per docs/notes/2026-10-15-session-discovery-contract.md. A live sample on this host shows entrypoint cli."
+note = "The first record's entrypoint (cli, sdk-cli, sdk-py) separates interactive from headless runs, per records@261a2e0bd94ebd1871ccaa9b15d5014ba8484375:hq/docs/notes/2026-10-15-session-discovery-contract.md. A live sample on this host shows entrypoint cli."
 
 [facts.session-metadata-marks-headless.harness.codex]
 status = "probed"
@@ -851,7 +851,7 @@ value = true
 version = "0.166.0"
 date = 2026-11-01
 evidence = "hq-57d68e"
-note = "The session_meta source (cli, exec and others) separates interactive from headless runs, per docs/notes/2026-10-15-session-discovery-contract.md. A live sample on this host shows source cli."
+note = "The session_meta source (cli, exec and others) separates interactive from headless runs, per records@261a2e0bd94ebd1871ccaa9b15d5014ba8484375:hq/docs/notes/2026-10-15-session-discovery-contract.md. A live sample on this host shows source cli."
 
 
 [facts.transcript-self-describing]
@@ -911,7 +911,7 @@ status = "probed"
 value = true
 version = "0.163.0"
 date = 2026-10-16
-evidence = "hq-1ec500; docs/notes/2026-10-15-agent-attention-brief.md"
+evidence = "hq-1ec500; records@261a2e0bd94ebd1871ccaa9b15d5014ba8484375:hq/docs/notes/2026-10-15-agent-attention-brief.md"
 note = "In three fresh interactive TUI sessions recorded under script in a private detached tmux server on Codex 0.163.0 (TUI client 0.163.0, shared background server 0.162.1) with `notifications = [\"approval-requested\", \"plan-mode-prompt\", \"async-question\"]` and `KITTY_WINDOW_ID` set, ordinary turn completions (`agent-turn-complete`) stayed silent while unfocused (`CSI O`), whereas `request_user_input_async` emitted `async-question` (`Question: ...`) and both `request_user_input` in Plan mode and the plan implementation prompt emitted `plan-mode-prompt` (`Plan mode prompt: ...`). Exec/edit approvals (unreachable under `approval_policy = \"never\"`) and server-initiated MCP elicitation (`approval-requested`) were not exercised in the live TUI and remain unknown there."
 
 
@@ -924,7 +924,7 @@ status = "probed"
 value = true
 version = "0.163.0"
 date = 2026-10-16
-evidence = "hq-1ec500; docs/notes/2026-10-15-agent-attention-brief.md"
+evidence = "hq-1ec500; records@261a2e0bd94ebd1871ccaa9b15d5014ba8484375:hq/docs/notes/2026-10-15-agent-attention-brief.md"
 note = "In interactive TUI sessions recorded under script in a private detached tmux server on Codex 0.163.0 (with `focus-events` off so only injected sequences changed the focus flag), the terminal started focused and each unfocused check first injected `CSI O`. After injecting `CSI I` (focus gained) in session 2, `request_user_input_async` registered on screen and moved the session to blocked while emitting no OSC 9 notification, whereas the same tool emitted OSC 9 when unfocused (`CSI O`) in sessions 1 and 3."
 
 
@@ -937,7 +937,7 @@ status = "probed"
 value = true
 version = "0.163.0"
 date = 2026-10-16
-evidence = "hq-1ec500; docs/notes/2026-10-15-agent-attention-brief.md"
+evidence = "hq-1ec500; records@261a2e0bd94ebd1871ccaa9b15d5014ba8484375:hq/docs/notes/2026-10-15-agent-attention-brief.md"
 note = "In interactive TUI sessions recorded under script in a private detached tmux server on Codex 0.163.0 with `KITTY_WINDOW_ID` set: sessions 1 and 2 unset `TMUX` but left `TMUX_PANE` set, and the TUI still detected tmux and wrapped each OSC 9 notification in a tmux DCS passthrough; session 3 unset both `TMUX` and `TMUX_PANE` and emitted the bare OSC 9 sequence that Kitty receives outside tmux."
 
 

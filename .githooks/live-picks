@@ -60,10 +60,8 @@ lock, local/harness-state.lock, which every operation holds and codex-trust also
 A hook reports a failure, a broken harnesses.toml included, on stderr and exits 0, and
 skips a linked worktree silently and, from post-checkout, a rebase in progress; the next
 turn end retries. Every other operation refuses a linked worktree, whose configs are not
-live, and a broken harnesses.toml. Design:
-docs/specs/2026-10-10-live-model-preservation-design.md, extended by
-docs/specs/2026-10-15-pi-live-picks-design.md and
-docs/specs/2026-11-01-harness-manifest-design.md §5.3.
+live, and a broken harnesses.toml. Contract:
+docs/live-state.md.
 """
 import json
 import os

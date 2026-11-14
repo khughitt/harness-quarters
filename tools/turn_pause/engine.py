@@ -2,7 +2,7 @@
 
 The hook feeds it with the real decision; the replay (Task 8) with a recording one. No
 other code calls counters.attempt, started or apply. Spec:
-docs/specs/2026-11-01-turn-pause-design.md, "The unit" and "Counters".
+docs/turn-pause.md, "The unit" and "Counters".
 """
 from __future__ import annotations
 

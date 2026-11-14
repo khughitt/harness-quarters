@@ -25,7 +25,7 @@ ALLOWED = ("%h/.local/bin", "/usr/local/bin", "/usr/bin", "/bin")
 def paths_off_the_allowlist(text):
     """Every path a unit names outside comments that is not under an allowed directory.
     A unit that names a checkout, by any spelling, stops working when the checkout moves
-    (docs/specs/2026-10-06-rename-to-hq-design.md §3.1)."""
+    (docs/rename-cutover.md docs/session-archive.md)."""
     off = []
     for line in text.splitlines():
         if line.startswith("#"):

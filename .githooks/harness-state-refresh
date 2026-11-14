@@ -31,10 +31,8 @@ every failing step's message. After capture, a broken harnesses.toml fails the r
 before it syncs, restores or stages anything, and so does a filter config other than the
 one `just setup` writes (`filter.harness-state.clean`, `required = true` and the identity
 `smudge = cat`), with a
-message naming `just setup`. Design:
-docs/specs/2026-10-10-live-model-preservation-design.md §3.3, extended by
-docs/specs/2026-10-15-pi-live-picks-design.md §3.3 and
-docs/specs/2026-11-01-harness-manifest-design.md §5.3.
+message naming `just setup`. Contract:
+docs/live-state.md.
 """
 import subprocess
 import sys

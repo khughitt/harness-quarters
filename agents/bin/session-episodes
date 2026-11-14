@@ -7,7 +7,7 @@ session-episodes show     <id>        --episodes PATH
 session-episodes confirm  <id> yes|no --episodes PATH [--anchors PATH]
 session-episodes label    <id> yes|no --episodes PATH [--labels PATH]
 
-The contract is docs/specs/2026-09-19-session-logs-design.md in the ai checkout.
+The contract is docs/sessions.md in the ai checkout.
 Read-only over the stores and every tasks/ directory; standard library only. Store roots
 come from hq's tools/harness_stores, found from this file's real path; `extract` reads
 Claude Code and Codex unless `--harness` names the set (agy only on request until the
@@ -507,7 +507,7 @@ def commands_of_custom_input(source: str) -> tuple[tuple[str, ...], bool]:
 # bodies lifted out, quoted strings blanked, a regex over what is left, plus the executable
 # text (shell heredocs, -c strings, "$(…)") kept as nested candidates. For *confirming* a
 # transition from its own output the tool reads strictly: the command must be one literal
-# `tasks` invocation and nothing else (§4.2). Everything between those two is review.
+# `tasks` invocation and nothing else docs/sessions.md. Everything between those two is review.
 
 @dataclass(frozen=True)
 class Invocation:
@@ -648,7 +648,7 @@ def ids_in_result(result_text: str) -> list[str]:
 
 def attribute(commands: tuple[str, ...], result_text: str, task_id: str, subcommand: str = "start",
               canonical: str | None = None) -> str:
-    """Does this call's output prove that its `tasks <subcommand> <task_id>` ran? (§4.2)
+    """Does this call's output prove that its `tasks <subcommand> <task_id>` ran? docs/sessions.md
     confirmed | outside-grammar | no-id-line | error-output. `canonical` is the id tasks
     prints for an id written under a retired prefix; an id line naming either confirms."""
     if has_error_line(result_text):
@@ -1007,7 +1007,7 @@ def _new_summary(inputs: Inputs) -> dict:
 
 def _collect_anchors(inputs: Inputs, summary: dict) -> tuple[dict[tuple, _Anchor], dict[tuple, dict]]:
     """Every tasks-start candidate keyed by (harness, call_id, task_id), and per-session
-    confirmed transitions keyed the same way for §4.4. An id written under a retired prefix
+    confirmed transitions keyed the same way for docs/sessions.md. An id written under a retired prefix
     joins its canonical id's anchors and transitions; each anchor keeps the id as written."""
     canon = inputs.canonical.get
     anchors: dict[tuple, _Anchor] = {}
@@ -1053,7 +1053,7 @@ def _collect_anchors(inputs: Inputs, summary: dict) -> tuple[dict[tuple, _Anchor
 
 def _confirm(anchor: _Anchor, record: TaskRecord | None, inputs: Inputs, summary: dict,
              holder: tuple[Session, int]) -> tuple[str | None, str | None, str | None]:
-    """(anchor_source, reason, stamped_session): how this start is corroborated (§4.2).
+    """(anchor_source, reason, stamped_session): how this start is corroborated docs/sessions.md.
     Order: the call's own output; this session's lifecycle note; a reviewed confirmation.
     Any error line blocks the automatic routes, and the started: stamp alone is only a hint."""
     session, index = holder
@@ -1107,7 +1107,7 @@ class Transition:
 def _transitions_of(kind: str, task_id: str, record: TaskRecord | None, transitions: dict,
                     started_at: int) -> list[Transition]:
     """Every park (kind='park') or close (kind='close') candidate at or after started_at, from
-    notes, confirmed transcript calls, and — for closes — completion stamps (§4.4)."""
+    notes, confirmed transcript calls, and — for closes — completion stamps docs/sessions.md."""
     found: list[Transition] = []
     prefix = task_id.rsplit("-", 1)[0]
     notes = [n for n in (record.notes if record else []) if note_kind(n.text) == kind and n.at_ms >= started_at]

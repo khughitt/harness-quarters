@@ -1,4 +1,4 @@
-"""status: fresh capture, healthy prune, empty quarantines (spec §3.5, §3.4.4)."""
+"""status: fresh capture, healthy prune, empty quarantines (docs/session-archive.md)."""
 import fcntl
 import json
 import os

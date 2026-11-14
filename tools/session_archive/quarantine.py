@@ -1,4 +1,4 @@
-"""The quarantine rules of spec §3.4.1: restore never replaces, and an entry is released
+"""The quarantine rules of docs/session-archive.md: restore never replaces, and an entry is released
 only when its bytes are preserved."""
 import ctypes
 import errno
@@ -33,7 +33,7 @@ def quarantine_dir(home: Path, run_id: str) -> Path:
 
 
 def leftovers(homes) -> list[Path]:
-    """Quarantine roots holding any nondirectory entry stop the next prune (§3.4.4)."""
+    """Quarantine roots holding any nondirectory entry stop the next prune docs/session-archive.md."""
     found = []
     for home in sorted(set(homes)):
         root = home / QUARANTINE

@@ -8,7 +8,7 @@ transcript index links to them (read with mode=ro; the stores are never written)
 transcript record becomes the events the hook would have received for it, and each tree
 runs through engine.prompt_kind, engine.start_turn and engine.feed with a decide that
 allows every call and records the first call made after a limit was crossed: the pause
-point. Spec: docs/specs/2026-11-01-turn-pause-design.md, "Measured range", "Counters",
+point. Spec: docs/turn-pause.md, "Measured range", "Counters",
 "Limits" (the replay) and "Verification".
 
 What the hook sees, and so what the converter emits:

@@ -497,3 +497,20 @@ obs's index only the stamp is found, and coverage says so.
 | Fork history whose inherited thread is absent | SL11 |
 | Task evidence: stamp, single-segment attempt, chain error and mention | SL11 |
 | Escaped text in parsed and malformed lines | SL11 |
+
+## Frozen index controls
+
+The catalogue declares native transcript samples. These separate frozen oracle
+inputs preserve the prior consumer’s outcomes and do not assert native emission:
+
+- `index/old-controls.json`
+- `index/task2-old-controls.json`
+- `index/task2-policy-controls.json`
+- `index/task2-usage-storage-controls.json`
+
+The corpus check accounts for the historical table, catalogue, these four controls
+and the catalogue file itself, with exact set equality. The controls include one
+explicit synthetic instruction-source name under a fictitious home; the privacy
+check admits that exact literal alongside the documented synthetic UUID namespaces.
+Every other private-path or identifier pattern remains rejected. Fixture bytes
+are frozen; control inputs are not additional transcript samples.

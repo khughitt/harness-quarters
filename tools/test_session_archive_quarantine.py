@@ -1,4 +1,4 @@
-"""No-replace restore and the release rule (spec §3.4.1)."""
+"""No-replace restore and the release rule (docs/session-archive.md)."""
 import os
 import errno
 

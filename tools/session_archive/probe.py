@@ -1,4 +1,4 @@
-"""Check Codex's deletion protocol in a throwaway CODEX_HOME (spec §3.4.3, §5).
+"""Check Codex's deletion protocol in a throwaway CODEX_HOME (docs/session-archive.md).
 
 prune --apply deletes Codex units only on a version that passed these checks.
 """

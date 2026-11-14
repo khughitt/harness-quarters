@@ -12,7 +12,7 @@ default: what it permits is the consumer's decision.
 This tool is the only supported reader. As a command: `check`, `list`, `get`. As a module,
 for a hook that cannot afford a subprocess: load this file with a source loader and call
 `lookup(fact, harness)`. Both validate the whole file first and refuse the same things.
-It opens the fact file for reading only. Design: docs/specs/2026-10-06-residue-design.md §4.
+It opens the fact file for reading only. Contract: docs/harness-capabilities.md.
 """
 import argparse
 import datetime

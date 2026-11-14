@@ -1,4 +1,4 @@
-"""Host gate, the fixed source table, and the archive lock (spec §3.1–3.2)."""
+"""Host gate, the fixed source table, and the archive lock (docs/session-archive.md–3.2)."""
 import fcntl
 import os
 import time
@@ -32,7 +32,7 @@ def ALL(relpath: str) -> bool:
 @dataclass(frozen=True)
 class PruneHooks:
     """What prune needs from a harness: unit discovery, the deletion protocol and the facts
-    obs is compared against (spec §3.4)."""
+    obs is compared against (docs/session-archive.md)."""
     harness: str     # the obs harness label
     units: Callable[["Source"], list["Unit"]]
     delete_unit: Callable[["Unit", "Context"], str]
@@ -48,7 +48,7 @@ class Source:
     harness: str     # the adapter's canonical slug
     home: Path       # the harness home: parent of the quarantine
     root: Path       # the live root the archive mirrors
-    prune: PruneHooks | None    # None: prune does not cover it (spec §3.2)
+    prune: PruneHooks | None    # None: prune does not cover it (docs/session-archive.md)
     required: bool = True
     append_only: bool = True
     descend: Callable[[str], bool] = ALL
