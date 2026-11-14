@@ -23,7 +23,10 @@ class ArchiveUnreadable(Exception):
 
 
 class LeftoverQuarantine(Exception):
-    """A quarantine holds files from an earlier run; a person looks first (docs/session-archive.md.4)."""
+    """A quarantine holds files from an earlier run; a person looks first.
+
+    See docs/session-archive.md, "Pruning exchange".
+    """
 
 
 def _noop(unit):
