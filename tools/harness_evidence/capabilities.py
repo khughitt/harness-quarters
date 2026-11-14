@@ -5,6 +5,7 @@ Native paths are dotted JSON keys, with [] visiting array items. Transport field
 and values derived only from filenames/defaults are not native field evidence.
 """
 import hashlib
+from io import BytesIO
 import json
 from pathlib import Path
 import tomllib
@@ -52,7 +53,10 @@ DECLARED: dict[str, dict[str, list[str]]] = {
         "header.session": ["sessionId", "session_id", "agentId"],
         "header.recorded_identity.session": ["sessionId"],
         "header.agent": ["agentId"],
-        "header.cwd": ["cwd"],
+        # Header selection also preserves the historical session_meta branch; this
+        # declares an implemented policy source, not observed Claude emission.
+        "header.cwd": ["cwd", "payload.cwd"],
+        "header.start_ms": ["timestamp"],
         "header.entrypoint": ["entrypoint"],
         "header.first_at": ["timestamp"],
         "header.last_at": ["timestamp"],
@@ -124,6 +128,43 @@ DECLARED: dict[str, dict[str, list[str]]] = {
 
 DECLARED["claude-code"].update(index_events.PROVENANCE)
 
+# Descendant metadata extends capability resolution, never the hot event proof table.
+DECLARED["claude-code"].update({
+    "calls[].questions[].options[].label": ["message.content[].input.questions[].options[].label"],
+    "turn_end.id": ["uuid"],
+    "turn_end.turn": ["toolUseID"],
+    "turn_end.hooks": ["hookInfos"],
+    "turn_end.blocked": ["hookErrors"],
+    "turn_end.errors_bytes": ["hookErrors"],
+    "turn_end.hooks[].duration_ms": ["hookInfos[].durationMs"],
+    "turn_end.hooks[].blocked": ["attachment.type", "attachment.hookEvent", "attachment.toolUseID",
+                                  "attachment.blockingError.command", "toolUseID", "hookInfos[].command"],
+})
+
+COVERAGE_KEYS = {
+    **index_events.COVERAGE_KEYS,
+    "message.joined_nonempty": ["assistant/input:content", "user/input:content"],
+    "message.joined_bytes": ["assistant/input:content", "user/input:content"],
+    "calls[].questions[].options[].label": ["applied:question/input:labels"],
+    "turn_end.id": ["applied:turn_end/input:id"],
+    "turn_end.turn": ["applied:turn_end/input:turn"],
+    "turn_end.hooks": ["applied:turn_end/input:hooks"],
+    "turn_end.blocked": ["applied:turn_end/input:errors"],
+    "turn_end.errors_bytes": ["applied:turn_end/input:errors"],
+    "turn_end.hooks[].duration_ms": ["applied:hook_run/input:duration"],
+    "turn_end.hooks[].blocked": ["applied:stop_block/input:command"],
+}
+COVERAGE_SCOPES = {field: [
+    {"when": {"message.channel": "user"}, "coverage_keys": ["user/input:content"]},
+    {"when": {"message.channel": "assistant"}, "coverage_keys": ["assistant/input:content"]},
+] for field in ("message.joined_nonempty", "message.joined_bytes")}
+TOOL_KINDS = {
+    **{name: "file_read" for name in index_events.PATH_FIELDS},
+    **{name: "file_edit" for name in index_events.WRITERS},
+    **{name: "dispatch" for name in index_events.DISPATCH},
+    "Bash": "shell", "AskUserQuestion": "question", "Skill": "skill",
+}
+
 
 def _values(value, path):
     if not path:
@@ -162,7 +203,8 @@ def build(catalogue: Path) -> dict:
     raw_catalogue = catalogue.read_bytes()
     samples = tomllib.loads(raw_catalogue.decode("utf-8"))["sample"]
     harnesses = {slug: {"record_kinds": set(), "fields": {
-        field: {"provenance": sorted(paths), "coverage_keys": index_events.COVERAGE_KEYS.get(field, []) if slug == "claude-code" else []} for field, paths in fields.items()
+        field: {"provenance": sorted(paths), "coverage_keys": COVERAGE_KEYS.get(field, []) if slug == "claude-code" else [],
+                **({"coverage_scopes": COVERAGE_SCOPES[field]} if slug == "claude-code" and field in COVERAGE_SCOPES else {})} for field, paths in fields.items()
     }, "labels": {}, "versions": {}, "exceptions": []} for slug, fields in DECLARED.items()}
     hashes = {}
     for sample in samples:
@@ -194,6 +236,18 @@ def build(catalogue: Path) -> dict:
         native = {line.number: row for line in lines(data, len(data))
                   if line.complete and (row := decode(line)) is not None}
         fields = DECLARED[slug]
+        if slug == "claude-code":
+            from .header import _lines, _scan
+            selected = {"header": {"session": None, "cwd": None, "start_ms": None},
+                        "provenance": {}, "harness_version": None}
+            try:
+                _scan(_lines(BytesIO(data), len(data)), place, {"decoder": {"revision": "sample"}}, selected)
+            except (ValueError, AttributeError, RecursionError):
+                pass  # Invalid native records are source failures, never emission evidence.
+            else:
+                for name, proof in selected["provenance"].items():
+                    evidence["fields_seen"][provenance].update(_seen(
+                        selected, [native.get(proof["line"], {})], {"header." + name: proof["native_paths"]}))
         if sample.get("profile") == "index" and not sample.get("index_error"):
             offsets, offset = [], 0
             for raw in data.splitlines(keepends=True):
@@ -225,7 +279,11 @@ def build(catalogue: Path) -> dict:
         "profile": "index", "mode": "incremental", "resume": True,
         "watched": index_coverage.WATCHED, "applied": index_coverage.APPLIED,
         "unwatched": index_coverage.UNWATCHED, "common_reads": index_coverage.COMMON_READS,
-        "known_kinds": sorted(index_coverage.KNOWN_KINDS)}))
+        "known_kinds": sorted(index_coverage.KNOWN_KINDS),
+        "tool_kinds": TOOL_KINDS,
+        "features": {"native_skill_events": True, "question_option_labels": True}}))
+    harnesses["claude-code"]["header"] = {"implemented": True, "line_limit": 50}
+    harnesses["codex"]["header"] = {"implemented": False}
     for harness in harnesses.values():
         harness["record_kinds"] = sorted(harness["record_kinds"])
         harness["labels"] = {role: sorted(bases) for role, bases in harness["labels"].items()}

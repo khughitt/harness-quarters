@@ -91,7 +91,7 @@ header agent evidence is separate. Query-ID aliases and publication of arbitrary
 index/identity claims remain consumer policy, rather than native path decoding.
 
 `tools/harness-evidence version --json` reports the evidence schema,
-decoder version `16`, and the decoder revision. A pinned copy reads a `REVISION`
+decoder version `17`, and the decoder revision. A pinned copy reads a `REVISION`
 file inside the package; a checkout reports its HEAD with `+dirty` when
 the package has changes. Without either source the command exits 2.
 
@@ -156,6 +156,35 @@ request/file transport indices. Text/raw option changes can therefore restart
 replay, while request ids and decoder revision changes alone do not.
 Records themselves retain native numeric block order, including when a line has
 ten or more blocks.
+
+## Cheap Claude headers
+
+`tools/harness-evidence header` accepts one JSON request per stdin line with
+`id`, `files` and explicit `roots`. Files use the same logical `path`, optional
+`read_path`, fixed `size` and `identity:{device,inode}` as index decoding. Claude
+roots must contain every logical path; Codex headers are explicitly unsupported.
+No default roots or guessed harness are used. The capability view explicitly
+marks Claude headers implemented (50 lines) and Codex headers unimplemented;
+this declares implementation, not evidence that a harness version emits a field.
+
+Each file emits one `header` object with its request id, file index, logical path,
+status, `header:{session,cwd,start_ms}`, provenance and null or structured error.
+The batch ends with `request_end` carrying the exact file count. Protocol, source
+identity and fixed-span violations fail the command visibly. Open failures and
+invalid native types carry non-ok source statuses and error details, never a
+successful empty header. Consumers validate the complete ordered batch before
+using any selection result.
+
+Selection preserves the old first-50-physical-line policy, including LF, CRLF and
+CR newlines, replacement of invalid UTF-8 and skipping malformed JSON lines.
+The first truthy top-level CWD stops the scan immediately; `session_meta` also
+stops at its payload CWD even when false or absent. Valid unterminated final JSON
+lines are eligible. Finite native CWD values retain their JSON types. Session id
+and UTC start time are optional evidence from records already visited; neither
+justifies scanning beyond the selection. Provenance binds each value to its
+source ref, physical bytes' hash, line, offset and decoder revision. This path
+holds only one physical line plus bounded read-ahead and never invokes the full
+reader. It has no resumable checkpoint or index extraction side effects.
 
 ## Native index extraction
 
@@ -242,8 +271,14 @@ text-disabled terminal state contains no hook command text. Native coverage pres
 the old extraction
 populations, including response usage counted at each historical EOF flush. Synthetic
 `tools/fixtures/session-logs/index/` samples and frozen old-oracle controls establish conformance, not observed
-harness emission or full/replay equality. The capability artifact publishes native
-field provenance and coverage declarations separately from reader declarations.
+harness emission or full/replay equality. Capability field declarations also expose
+real nested question-option and stop-hook values. `coverage_keys` is the union; optional `coverage_scopes` name exact subsets
+using conditions on decoded scalar paths such as `message.channel`. These metadata
+additions do not expand `defaults/1` proofs or change per-file raw/applied coverage.
+`index.tool_kinds` maps known native names to normalized kinds, and `index.features`
+declares native skill events and question option labels. These describe decoder
+behavior, without claims about untested harness versions or consumer metrics.
+The capability artifact publishes native field provenance and coverage declarations separately from reader declarations.
 
 ## Read evidence, not mentions
 

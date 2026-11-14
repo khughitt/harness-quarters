@@ -118,3 +118,43 @@ def test_native_size_origin_duration_identity_state_contract_survives_slicing(na
         assert "guard-sensitive-command" not in json.dumps(state)
         assert not any(token in json.dumps(state) for token in ['Inspect synthetic task', 'echo α'])
     assert replay == full
+
+
+def test_scoped_provenance_refers_to_real_decoded_fields():
+    from harness_evidence.capabilities import build
+    fields = build(FIXTURES / "CATALOGUE.toml")["harnesses"]["claude-code"]["fields"]
+    # Two contexts of the same real values, rather than consumer-specific aliases.
+    for field in ("message.joined_nonempty", "message.joined_bytes"):
+        assert fields[field]["coverage_keys"] == ["assistant/input:content", "user/input:content"]
+        assert fields[field]["coverage_scopes"] == [
+            {"when": {"message.channel": "user"}, "coverage_keys": ["user/input:content"]},
+            {"when": {"message.channel": "assistant"}, "coverage_keys": ["assistant/input:content"]}]
+    out = read(request(source(FIXTURES / "index/sizes.jsonl")))
+    messages = [v["message"] for v in out if v.get("message")]
+    assert {m["channel"] for m in messages} == {"user", "assistant"}
+    assert all(isinstance(m["joined_bytes"], int) and isinstance(m["joined_nonempty"], bool) for m in messages)
+
+
+def test_nested_metric_inputs_are_independently_declared():
+    from harness_evidence.capabilities import build, _values
+    view = build(FIXTURES / "CATALOGUE.toml")["harnesses"]["claude-code"]
+    expected = {
+        "calls[].questions[].options[].label": ["applied:question/input:labels"],
+        "turn_end.id": ["applied:turn_end/input:id"],
+        "turn_end.turn": ["applied:turn_end/input:turn"],
+        "turn_end.hooks": ["applied:turn_end/input:hooks"],
+        "turn_end.blocked": ["applied:turn_end/input:errors"],
+        "turn_end.errors_bytes": ["applied:turn_end/input:errors"],
+        "turn_end.hooks[].duration_ms": ["applied:hook_run/input:duration"],
+        "turn_end.hooks[].blocked": ["applied:stop_block/input:command"],
+    }
+    events = []
+    for name in ("native-tools.jsonl", "fix1-stop-matching.jsonl"):
+        events.extend(read(request(source(FIXTURES / "index" / name))))
+    for field, keys in expected.items():
+        assert view["fields"][field]["coverage_keys"] == keys
+        assert any(_values(event, field) for event in events), field
+        assert field not in index_events.PROVENANCE
+    assert view["index"]["tool_kinds"]["Bash"] == "shell"
+    assert view["index"]["tool_kinds"]["AskUserQuestion"] == "question"
+    assert view["index"]["features"] == {"native_skill_events": True, "question_option_labels": True}

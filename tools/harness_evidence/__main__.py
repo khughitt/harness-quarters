@@ -72,6 +72,7 @@ def main(argv: list[str] | None = None) -> int:
     discover_parser.add_argument("--home", type=Path)
     discover_parser.add_argument("--root", type=_root, action="append")
     commands.add_parser("decode", help="decode framed JSON requests from stdin")
+    commands.add_parser("header", help="select bounded Claude headers from stdin")
     args = parser.parse_args(argv)
     if args.command == "capabilities":
         from . import capabilities
@@ -90,6 +91,9 @@ def main(argv: list[str] | None = None) -> int:
     except RevisionUnknown as error:
         print(str(error), file=sys.stderr)
         return 2
+    if args.command == "header":
+        from .header import run
+        return run(sys.stdin, sys.stdout, sys.stderr, output)
     if args.command == "decode":
         from .stream import run
         return run(sys.stdin, sys.stdout, sys.stderr, output)
