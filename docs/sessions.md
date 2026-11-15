@@ -83,7 +83,8 @@ These hints assert neither canonical filename identity nor recorded session iden
 Consumers retain query grammar/alias policy and confirm identity from evidence.
 
 Discovery files/aliases and decode `file_start` also carry `path_facts`, null outside
-Claude and agy. Claude's convention object has `session` (logical filename stem), `agent`
+Claude and agy; agy alias rows carry null `path_facts`, and alias rows carry no
+`side_inputs` or `copy`. Claude's convention object has `session` (logical filename stem), `agent`
 (one filename `agent-` prefix removed, otherwise null; empty string stays distinct),
 `subagent` (immediate parent is `subagents`), `parent` (grandparent name in that case,
 otherwise null), and `resume_group` (POSIX parent of place.relpath when not subagent,
@@ -97,12 +98,15 @@ header agent evidence is separate. Query-ID aliases and publication of arbitrary
 index/identity claims remain consumer policy, rather than native path decoding.
 
 agy's root is `~/.gemini/antigravity-cli/brain` (harness and home `agy` in refs); an
-agy root not named `brain` is refused, and index and header refuse any agy file not
-shaped `brain/<id>/.system_generated/logs/<file>`.
+agy root not named `brain` is refused before any output, with one line and exit 2 from
+`discover --root` and from `decode` (a protocol error), as other invalid roots are. Index
+and header refuse any agy file not shaped `brain/<id>/.system_generated/logs/<file>`,
+including one whose relpath has a `.` or `..` segment.
 Discovery lists each `brain/<id>/.system_generated/logs/transcript_full.jsonl` as the
 conversation's session file and each `transcript.jsonl` beside it with
-`copy: {label: "truncated_mirror", basis: "convention", full: <transcript_full path>}`;
-other files rows carry `copy: null`. The byte segments under `logs/chunks/` are not
+`copy: {label: "truncated_mirror", basis: "convention", full: <transcript_full path>}`,
+with `full` null when that file does not exist (the mirror is never decoded, so such a
+conversation has no index source); other files rows carry `copy: null`. The byte segments under `logs/chunks/` are not
 listed. agy `filename_identity` is `{conversation, basis: "convention"}` from the brain
 directory. agy `path_facts` come from one read-only read of
 `conversation_summaries.db` per file: `parent`, `subagent`, `cwd` (first local
@@ -111,14 +115,19 @@ directory. agy `path_facts` come from one read-only read of
 `rule: "agy_conversation_summaries"` and `ref`. There is no transcript heuristic for an
 unresolved row. The database opens as a read-only SQLite URI, with `immutable=1` only
 for a WAL-mode file that has no `-wal` file, so a read creates no file in agy's home.
+One race remains: if agy removes its `-wal` between that check and the open, the
+`mode=ro` read can create `-wal` and `-shm` beside the database; the decoder does not
+retry.
 Discovery rows and index `file_start` carry `side_inputs`: null for Claude and Codex,
 and for agy `{agy_conversation_summaries: <sha256>}`, the sha256 of the canonical
 JSON of the resolved facts `{parent, subagent, cwd, agent_name}` or of
 `{"status": <reason>}`. A consumer that skips unchanged transcripts must add
 `side_inputs` to its unchanged-file check and decode again from no state when it
 differs; the decoder also refuses to resume a checkpoint made under another
-fingerprint. Reader decode (no `extract`) has no agy support and fails with the
-protocol error "agy supports only extract:index".
+fingerprint. Reader decode (no `extract`) has no agy support: a file under an agy root
+fails with the protocol error "agy supports only extract:index", an explicit agy file
+reads as `unknown_format` (as before agy was detected), and an agy `context` entry is
+skipped.
 
 `tools/harness-evidence version --json` reports the evidence schema,
 decoder version `19`, and the decoder revision. A pinned copy reads a `REVISION`
@@ -329,23 +338,39 @@ summary row are null with an event provenance rule `unresolved:<reason>`: unknow
 not absent.
 
 - `PLANNER_RESPONSE` and `CHECKPOINT` steps are complete responses (`flush_response`
-  true, id `<conversation>:<step_index>`). Usage: `input_uncached` is `input_tokens`,
+  true, id `<conversation>:<step_index>`). `response.model` is the planner's `model`,
+  null when the step has none and for a checkpoint. Usage: `input_uncached` is `input_tokens`,
   `cache_read` is `cache_read_tokens`, `output` is `output_tokens`; `cache_write` and
-  `thinking` are null; `context_total` is input plus cache read and `uncached_total`
+  `thinking` are null, and so is `usage_present.thinking` (agy records no thinking count),
+  while `usage_present.output` says whether `output_tokens` was recorded; `context_total` is input plus cache read and `uncached_total`
   is input. `response.native` holds the three counters as recorded and
   `thinking_text_bytes`, the byte size of the planner's thinking text, which stays out
   of `message.text`. A checkpoint is a `compaction` with a `compact_summary` injection.
 - Calls are `<conversation>:<step_index>:<k>`. Results pair positionally with the
-  oldest open call of the latest planner step; a surplus `GENERIC` gets no result.
+  oldest open call of the latest planner step; a surplus `GENERIC` gets no result. An
+  ineligible planner step (no `created_at` or `step_index`) leaves its calls unknown:
+  no later result pairs with older calls, and the `applied:result` coverage input
+  `calls_known` is false for the results that follow until the next eligible planner
+  step, which tells them apart from true surplus results (`input:call` false alone).
+  A dispatch call's `paths_complete` is true only when its prompt is present, as
+  Claude's.
   `results[].error` means the tool failed to run (status `ERROR`); `exit_code` is the
   command's own status from a `run_command` result's `Command exited with code N.` line
-  before `Command output:`, so a `DONE` result can carry a nonzero code. `truncation` is
-  `{kind: "tool_preview"}` when a `run_command` result reports the tool's output preview,
-  otherwise null. A `RUNNING` result carries `background_id`; `calls[].background` is
+  before `Command output:`, so a `DONE` result can carry a nonzero code; only a `DONE`
+  result is read for it, since a `RUNNING` one reports its code in its wake-up and an
+  `ERROR` one did not run. `truncation` is
+  `{kind: "tool_preview", original_tokens: null, original_bytes: null}` when a
+  `run_command` result reports the tool's output preview before `Command output:`,
+  otherwise null. `answers` on an `ask_question` result is `{"A<n>": text}`, each text
+  running from its `A<n>:` line to the next one, so an answer may span lines. A `RUNNING` result carries `background_id`; `calls[].background` is
   null (`absent:known_after_call`), and the call's end arrives as a `notifications[]`
-  entry on the `SYSTEM` wake-up from that id (`finished` or `canceled`).
+  entry on the `SYSTEM` wake-up from that id (`finished` or `canceled`). The first
+  `sender=` and end marker are the wake-up's own; a result that quotes another message
+  does not end that message's task. An ineligible wake-up reports nothing but still
+  closes its id.
 - `USER_INPUT` text is the `<USER_REQUEST>` body; the other wrappers are injections,
-  and a slash-command `<SKILL>` block is a `skill` call. `SYSTEM_SDK` messages are hook
+  and a slash-command `<SKILL>` block is a `skill` call (native name `SKILL`, kind
+  `skill` in `TOOL_KINDS`). `SYSTEM_SDK` messages are hook
   injections; other system messages are injections. `ERROR_MESSAGE` "stream was
   interrupted" sets `interruption`. Unknown step types are events counted
   `known: false`.

@@ -67,7 +67,9 @@ def _uri(database: Path) -> str:
     file has nothing outside its main file, and a plain mode=ro open would create -wal and
     -shm in agy's home: `immutable=1` reads it without them. With -wal present (agy is
     writing), mode=ro reads the uncheckpointed rows through the sidecars agy created. A
-    rollback-journal file keeps mode=ro, whose locking and hot-journal check create nothing."""
+    rollback-journal file keeps mode=ro, whose locking and hot-journal check create nothing.
+    One race remains: agy removing -wal between this check and the open lets the mode=ro
+    read create -wal and -shm. No retry narrows it: any re-check races the same way."""
     wal = database.with_name(database.name + "-wal")
     try:
         immutable = _is_wal(database) and not wal.exists()
