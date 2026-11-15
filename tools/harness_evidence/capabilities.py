@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 import tomllib
 
-from . import DECODER_VERSION, SCHEMA, index_events, index_coverage, index_codex, index_codex_coverage
+from . import homes, DECODER_VERSION, SCHEMA, index_events, index_coverage, index_codex, index_codex_coverage
 
 EVIDENCE_RULE = ("synthetic samples establish decoder conformance; observed samples or probes "
                  "establish emission; absent from a sample means unobserved")
@@ -110,7 +110,9 @@ DECLARED: dict[str, dict[str, list[str]]] = {
         "header.child_basis": ["payload.parent_thread_id", "payload.source.subagent.thread_spawn.parent_thread_id",
                                "payload.thread_source"],
         "header.forked": ["type"],
-        "header.cwd": ["payload.cwd"],
+        "header.cwd": ["cwd", "payload.cwd"],
+        "header.start_ms": ["timestamp"],
+        "filename_identity.index_thread": [],
         "header.entrypoint": ["payload.originator"],
         "header.cli_version": ["payload.cli_version"],
         "header.first_at": ["timestamp"],
@@ -330,8 +332,14 @@ def build(catalogue: Path, *, index_catalogue: Path | None = None) -> dict:
                        **dict.fromkeys(index_codex.DISPATCH, "dispatch")},
         "features": {"native_skill_events": False, "question_option_labels": False,
                      "stateful_execution": True}}))
+    harnesses["codex"]["fields"]["filename_identity.index_thread"].update(
+        basis="convention", rule="index_rollout_name")
     harnesses["claude-code"]["header"] = {"implemented": True, "line_limit": 50}
-    harnesses["codex"]["header"] = {"implemented": False}
+    harnesses["codex"]["header"] = {"implemented": True, "line_limit": 50}
+    for alias in ("claude", "codex"):
+        harnesses[homes.SLUG[alias]]["discovery"] = {"default_roots": [
+            path.as_posix() for home in homes.homes(Path("."), alias)
+            for _store, path in homes.stores(home)]}
     for harness in harnesses.values():
         harness["record_kinds"] = sorted(harness["record_kinds"])
         harness["labels"] = {role: sorted(bases) for role, bases in harness["labels"].items()}

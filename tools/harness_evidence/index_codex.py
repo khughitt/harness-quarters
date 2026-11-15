@@ -121,6 +121,20 @@ for _field in ("call_id", "bytes", "error", "interrupted", "native_duration_ms",
     PROVENANCE["results[]." + _field] = ["payload.call_id", "payload.output"]
     COVERAGE_KEYS["results[]." + _field] = ["applied:tool_output/input:call_id", "applied:tool_output/input:output"]
     CONVENTIONS |= {"results[]." + _field}
+# Coverage dependencies retain the original extraction sites, independently of
+# association evidence (a result's call id is not an input to its byte count).
+COVERAGE_KEYS.update({
+    "calls[].skills": ["applied:tool_call/input:value"],
+    "results[].call_id": ["applied:tool_output/input:call_id"],
+    "results[].error": ["applied:tool_output/input:output"],
+    "execution.call_updates[].error": ["applied:command_item/input:exit_code"],
+    **{f"results[].{name}": ["applied:tool_output/input:output"] for name in
+       ("bytes", "interrupted", "truncation")},
+})
+PROVENANCE["execution.call_updates[].error"] = ["payload.item.exit_code", "payload.exit_code",
+                                                "payload.success", "payload.result", "payload.output"]
+CONVENTIONS |= {"execution.call_updates[].error"}
+
 METADATA_PROVENANCE = {
     "metadata.identity.thread_id": ["payload.id"],
     "metadata.identity.ancestors": ["payload.forked_from_id", "payload.parent_thread_id",

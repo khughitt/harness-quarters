@@ -246,6 +246,12 @@
  "evidence_rule": "synthetic samples establish decoder conformance; observed samples or probes establish emission; absent from a sample means unobserved",
  "harnesses": {
   "claude-code": {
+   "discovery": {
+    "default_roots": [
+     ".claude/projects",
+     ".claude-work/projects"
+    ]
+   },
    "exceptions": [],
    "fields": {
     "agent": {
@@ -2036,6 +2042,14 @@
    }
   },
   "codex": {
+   "discovery": {
+    "default_roots": [
+     ".codex/sessions",
+     ".codex/archived_sessions",
+     ".codex-work/sessions",
+     ".codex-work/archived_sessions"
+    ]
+   },
    "exceptions": [],
    "fields": {
     "abort_reason": {
@@ -2215,7 +2229,6 @@
     },
     "calls[].skills": {
      "coverage_keys": [
-      "applied:tool_call/input:name",
       "applied:tool_call/input:value"
      ],
      "provenance": [
@@ -2326,6 +2339,18 @@
       "payload.success",
       "payload.timestamp",
       "timestamp"
+     ]
+    },
+    "execution.call_updates[].error": {
+     "coverage_keys": [
+      "applied:command_item/input:exit_code"
+     ],
+     "provenance": [
+      "payload.exit_code",
+      "payload.item.exit_code",
+      "payload.output",
+      "payload.result",
+      "payload.success"
      ]
     },
     "execution.commands": {
@@ -2458,6 +2483,12 @@
       "timestamp"
      ]
     },
+    "filename_identity.index_thread": {
+     "basis": "convention",
+     "coverage_keys": [],
+     "provenance": [],
+     "rule": "index_rollout_name"
+    },
     "flags": {
      "coverage_keys": [],
      "provenance": [
@@ -2510,6 +2541,7 @@
     "header.cwd": {
      "coverage_keys": [],
      "provenance": [
+      "cwd",
       "payload.cwd"
      ]
     },
@@ -2580,6 +2612,12 @@
      "coverage_keys": [],
      "provenance": [
       "payload.id"
+     ]
+    },
+    "header.start_ms": {
+     "coverage_keys": [],
+     "provenance": [
+      "timestamp"
      ]
     },
     "header.turn_ids": {
@@ -3250,7 +3288,6 @@
     },
     "results[].bytes": {
      "coverage_keys": [
-      "applied:tool_output/input:call_id",
       "applied:tool_output/input:output"
      ],
      "provenance": [
@@ -3260,8 +3297,7 @@
     },
     "results[].call_id": {
      "coverage_keys": [
-      "applied:tool_output/input:call_id",
-      "applied:tool_output/input:output"
+      "applied:tool_output/input:call_id"
      ],
      "provenance": [
       "payload.call_id",
@@ -3280,7 +3316,6 @@
     },
     "results[].error": {
      "coverage_keys": [
-      "applied:tool_output/input:call_id",
       "applied:tool_output/input:output"
      ],
      "provenance": [
@@ -3290,7 +3325,6 @@
     },
     "results[].interrupted": {
      "coverage_keys": [
-      "applied:tool_output/input:call_id",
       "applied:tool_output/input:output"
      ],
      "provenance": [
@@ -3310,7 +3344,6 @@
     },
     "results[].truncation": {
      "coverage_keys": [
-      "applied:tool_output/input:call_id",
       "applied:tool_output/input:output"
      ],
      "provenance": [
@@ -3361,7 +3394,8 @@
     }
    },
    "header": {
-    "implemented": false
+    "implemented": true,
+    "line_limit": 50
    },
    "index": {
     "applied": {
@@ -3945,6 +3979,7 @@
        "eligible",
        "execution",
        "execution.call_updates",
+       "execution.call_updates[].error",
        "execution.commands",
        "execution.diagnostics",
        "execution.operations",

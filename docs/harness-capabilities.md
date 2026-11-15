@@ -76,6 +76,15 @@ versions do not establish observed emission. An unspecified or unlisted version 
 untested; an absent field is unobserved. Native index field provenance and coverage declarations are published separately
 from reader declarations; their presence does not establish observed harness emission.
 
+Both harnesses publish `header` support with a fifty-physical-line limit. Header
+CWD selection stops at the first truthy top-level CWD or session metadata record,
+including an empty metadata CWD. Optional identity from that scan does not replace
+the ordinary reader's independent identity window. `discovery.default_roots` lists
+home-relative store locations, allowing consumers to apply their overrides before
+enumeration. Codex filename identity includes the ordinary thread/segment claim and
+`index_thread`, the stricter lowercase rollout claim used by index readiness;
+these convention facts remain available even when source bytes are missing.
+
 ## Fact schema and lookup
 
 Use only the supported reader, not a hand-written TOML reader:

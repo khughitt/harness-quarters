@@ -2671,7 +2671,7 @@
       "hq_native": "Native records, identity, usage selection, context, messages, tool/execution/byte facts used by this case.",
       "obs_policy": "OBS aggregates these facts into sessions, turns, activity, candidate, lifecycle or wait/run rows; row layout stays OBS-owned.",
       "owner_plan_task": 2,
-      "status": "native-covered; consumer assertions remain task 3",
+      "status": "covered by original corpus through producer and normalized consumer at OBS 1778932321b54e9a89c1e6136d4f8ba22c76efce",
       "assertions": [
         "self.assertEqual(json.loads(by_label[\"L139\"][\"paths\"]),\n                         [\"/w/ops/bin/capture\", \"/w/ops/identity-mirror.toml\"])",
         "self.assertEqual(by_label[\"L154\"][\"parsed\"], 0)",
@@ -2685,8 +2685,13 @@
       "task_2_controls": [
         "tools/test_harness_evidence_index_codex_runs.py::DispatchCandidates::test_message_only_nonempty_string_for_each_native_dispatch"
       ],
-      "hq_native_status": "covered; native assertions only",
-      "consumer_owner_plan_task": 3
+      "hq_native_status": "covered through Task 3 original relay corpus replay; dispatch-message control alone is not relay coverage",
+      "consumer_owner_plan_task": 3,
+      "task_3_controls": [
+        "tests/harness/test_codex_mapping.py::CodexMapping::test_original_codex_rows_equal_normalized_mapping"
+      ],
+      "task_3_revision": "1778932321b54e9a89c1e6136d4f8ba22c76efce",
+      "assertion_ownership": "Original full call identity/offset/sequence/time, L139 paths, L154 unparsed and shared rows asserted in OBS; HQ provides native parsed facts."
     },
     {
       "identity": "tests/harness/test_codex.py::CallCandidates::test_rows_match_the_shared_relay_rows",
@@ -2696,7 +2701,7 @@
       "hq_native": "Native records, identity, usage selection, context, messages, tool/execution/byte facts used by this case.",
       "obs_policy": "OBS aggregates these facts into sessions, turns, activity, candidate, lifecycle or wait/run rows; row layout stays OBS-owned.",
       "owner_plan_task": 2,
-      "status": "native-covered; consumer assertions remain task 3",
+      "status": "covered by original corpus through producer and normalized consumer at OBS 1778932321b54e9a89c1e6136d4f8ba22c76efce",
       "assertions": [
         "self.assertEqual([{k: v for k, v in row.items() if k != \"table\"} for row in decoded], expected)"
       ],
@@ -2706,8 +2711,13 @@
       "task_2_controls": [
         "tools/test_harness_evidence_index_codex_runs.py::DispatchCandidates::test_message_only_nonempty_string_for_each_native_dispatch"
       ],
-      "hq_native_status": "covered; native assertions only",
-      "consumer_owner_plan_task": 3
+      "hq_native_status": "covered through Task 3 original relay corpus replay; dispatch-message control alone is not relay coverage",
+      "consumer_owner_plan_task": 3,
+      "task_3_controls": [
+        "tests/harness/test_codex_mapping.py::CodexMapping::test_original_codex_rows_equal_normalized_mapping"
+      ],
+      "task_3_revision": "1778932321b54e9a89c1e6136d4f8ba22c76efce",
+      "assertion_ownership": "Original full call identity/offset/sequence/time, L139 paths, L154 unparsed and shared rows asserted in OBS; HQ provides native parsed facts."
     },
     {
       "identity": "tests/harness/test_adapter_coverage.py::CodexCoverageTests::test_every_read_is_declared_exactly_with_a_valid_reason",

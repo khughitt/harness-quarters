@@ -1,4 +1,4 @@
-"""Held-source Claude headers with the historical fifty-line selection policy."""
+"""Held-source headers with the historical fifty-line selection policy."""
 from datetime import datetime
 import hashlib
 import json
@@ -59,10 +59,13 @@ def _scan(physical_lines, place, envelope, result):
         if not isinstance(record, dict):
             raise ValueError("header source record must be an object")
         # Optional evidence only comes from records already visited for CWD.
-        session = record.get("sessionId")
+        session = record.get("sessionId") if place.harness == "claude-code" else (
+            (record.get("payload") or {}).get("id") if record.get("type") == "session_meta"
+            and isinstance(record.get("payload") or {}, dict) else None)
+        session_paths = ["sessionId"] if place.harness == "claude-code" else ["payload.id"]
         if result["header"]["session"] is None and isinstance(session, str) and session:
             result["header"]["session"] = session
-            result["provenance"]["session"] = _proof(place, line, offset, raw, envelope, ["sessionId"])
+            result["provenance"]["session"] = _proof(place, line, offset, raw, envelope, session_paths)
         timestamp = record.get("timestamp")
         if result["header"]["start_ms"] is None and isinstance(timestamp, str):
             try:
@@ -75,7 +78,9 @@ def _scan(physical_lines, place, envelope, result):
                 if start is not None:
                     result["header"]["start_ms"] = start
                     result["provenance"]["start_ms"] = _proof(place, line, offset, raw, envelope, ["timestamp"])
-        version = record.get("version")
+        version = record.get("version") if place.harness == "claude-code" else (
+            (record.get("payload") or {}).get("cli_version") if record.get("type") == "session_meta"
+            and isinstance(record.get("payload") or {}, dict) else None)
         if result["harness_version"] is None and isinstance(version, str) and version:
             result["harness_version"] = version
         if record.get("cwd"):
@@ -140,8 +145,6 @@ def run(stdin, stdout, stderr, envelope):
                     place = discover.place_of(Path(source["path"]), roots)
                 except ValueError as error:
                     raise ProtocolError(str(error)) from error
-                if place.harness != "claude-code":
-                    raise ProtocolError("header currently supports Claude only")
                 places.append(place)
             for number, (source, place) in enumerate(zip(request["files"], places)):
                 stdout.write(serialized(_file(source, number, place, request, envelope)) + "\n")

@@ -128,10 +128,9 @@ def test_artifact_covers_catalogue_hashes_and_keeps_provenance_separate():
     }
     assert len(samples) == 232
     for slug, harness in artifact["harnesses"].items():
-        assert set(harness) == {"record_kinds", "fields", "labels", "versions", "exceptions", "header"} | {"index"}
+        assert set(harness) == {"record_kinds", "fields", "labels", "versions", "exceptions", "header", "discovery"} | {"index"}
         assert harness["exceptions"] == []
-        assert harness["header"] == ({"implemented": True, "line_limit": 50} if slug == "claude-code"
-                                      else {"implemented": False})
+        assert harness["header"] == {"implemented": True, "line_limit": 50}
         if slug == "codex":
             assert harness["fields"]["response.usage.input_uncached"]["coverage_keys"] == [
                 "applied:usage/input:input_tokens", "applied:usage/input:cached_input_tokens"]
@@ -183,17 +182,21 @@ def test_every_declared_native_path_occurs_in_its_harness_samples():
             if sample["harness"] == slug:
                 native += [json.loads(line) for line in (index_root / sample["path"]).read_bytes().splitlines()]
         for field, paths in fields.items():
+            if (slug, field) == ("codex", "filename_identity.index_thread"):
+                assert paths == []  # A filename convention, never native record evidence.
+                continue
             assert paths, (slug, field)
             for path in paths:
-                if (slug, field, path) == ("claude-code", "header.cwd", "payload.cwd"):
+                if (slug, field, path) in (("claude-code", "header.cwd", "payload.cwd"),
+                                           ("codex", "header.cwd", "cwd")):
                     # An old selector-policy branch, not a Claude emission claim.
                     # Its unchanged Codex sample bytes exercise a Claude-placed header.
                     from harness_evidence import header
-                    sample = FIXTURES / path_of("XA")
+                    sample = FIXTURES / (path_of("XA") if slug == "claude-code" else "index/sizes.jsonl")
                     info = sample.stat()
                     request = {"id": 1, "files": [{"path": str(sample), "size": info.st_size,
                                "identity": {"device": info.st_dev, "inode": info.st_ino}}],
-                               "roots": [{"harness": "claude-code", "path": str(FIXTURES)}]}
+                               "roots": [{"harness": slug, "path": str(FIXTURES)}]}
                     out, err = io.StringIO(), io.StringIO()
                     assert header.run(io.StringIO(json.dumps(request) + "\n"), out, err,
                                       {"schema": "harness-evidence/1", "decoder": {"revision": "test"}}) == 0
@@ -374,3 +377,19 @@ def test_codex_question_and_execution_poll_kind_declarations():
     kinds = json.loads(ARTIFACT.read_text())['harnesses']['codex']['index']['tool_kinds']
     assert {name:kinds.get(name) for name in ('request_user_input','exec','wait','write_stdin','wait_agent')} == {
         'request_user_input':'question','exec':'script','wait':'poll','write_stdin':'poll','wait_agent':'other'}
+
+
+def test_codex_selection_and_metric_dependencies_are_declared():
+    view = json.loads(ARTIFACT.read_text())['harnesses']
+    assert view['codex']['header'] == {'implemented':True, 'line_limit':50}
+    assert view['codex']['discovery']['default_roots'] == [
+        '.codex/sessions', '.codex/archived_sessions', '.codex-work/sessions', '.codex-work/archived_sessions']
+    fields = view['codex']['fields']
+    expected = {'results[].bytes':['applied:tool_output/input:output'],
+                'results[].call_id':['applied:tool_output/input:call_id'],
+                'results[].error':['applied:tool_output/input:output'],
+                'execution.call_updates[].error':['applied:command_item/input:exit_code'],
+                'calls[].skills':['applied:tool_call/input:value']}
+    for field, keys in expected.items():
+        assert fields[field]['coverage_keys'] == keys
+    assert fields['filename_identity.index_thread']['provenance'] == []

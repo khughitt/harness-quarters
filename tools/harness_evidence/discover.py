@@ -16,6 +16,8 @@ _UUID = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F
 # continuation segment (`rollout-<ts>-<thread>_<segment>`, segment in group 2), whose
 # session_meta records the thread.
 ROLLOUT_ID = re.compile(rf"-({_UUID})(?:_({_UUID}))?$")
+_INDEX_UUID = _UUID.replace("a-fA-F", "a-f")
+INDEX_ROLLOUT = re.compile(rf"^rollout-.*-({_INDEX_UUID})(?:_{_INDEX_UUID})?\.jsonl$")
 ERROR_SAMPLE = 3
 
 
@@ -174,7 +176,9 @@ def filename_identity(harness: str, path: Path) -> dict | None:
     match = ROLLOUT_ID.search(path.stem)
     if match is None:
         return None
-    return {"thread": match.group(1), "segment": match.group(2), "basis": "convention"}
+    indexed = INDEX_ROLLOUT.fullmatch(path.name)
+    return {"thread": match.group(1), "segment": match.group(2), "basis": "convention",
+            "index_thread": indexed.group(1) if indexed else None}
 
 
 def path_facts(place: Place) -> dict | None:
