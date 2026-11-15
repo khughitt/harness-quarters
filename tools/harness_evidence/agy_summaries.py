@@ -20,7 +20,7 @@ NAME = "agy_conversation_summaries"
 LOCK_TIMEOUT_S = 1.0  # a writer holding the database reads as unreadable rather than hanging
 DECLARATION = {
     "path": DATABASE, "relative_to": "home", "table": TABLE, "key": KEY, "columns": list(COLUMNS),
-    "open": "read-only SQLite URI (mode=ro, with immutable=1 when no -wal file exists)",
+    "open": "read-only SQLite URI (mode=ro; immutable=1 only for a WAL-mode file with no -wal file)",
     "fingerprint": ("sha256 of the canonical JSON of the resolved facts {parent, subagent, cwd, "
                     "agent_name}, or of {\"status\": \"no_summary_row\"} or "
                     "{\"status\": \"summaries_unreadable\"}"),
@@ -45,20 +45,35 @@ def _cwd(workspace_uris) -> str | None:
         raise _Unreadable("workspace_uris is not a JSON array of strings")
     if not uris:
         return None
-    parsed = urlparse(uris[0])
+    try:
+        parsed = urlparse(uris[0])
+    except ValueError:
+        raise _Unreadable("the first workspace is not a URI") from None
     cwd = unquote(parsed.path)
     if parsed.scheme != "file" or parsed.netloc not in ("", "localhost") or not cwd.startswith("/"):
         raise _Unreadable("the first workspace is not a local file URI")
     return cwd
 
 
+def _is_wal(database: Path) -> bool:
+    """The file header's read and write format versions (bytes 18 and 19) are 2 in WAL mode."""
+    with database.open("rb") as handle:
+        header = handle.read(20)
+    return len(header) == 20 and header[18] == 2 and header[19] == 2
+
+
 def _uri(database: Path) -> str:
-    """A read-only URI that creates no file beside the database. A WAL database with no -wal
+    """A read-only URI that creates no file beside the database. A WAL-mode file with no -wal
     file has nothing outside its main file, and a plain mode=ro open would create -wal and
     -shm in agy's home: `immutable=1` reads it without them. With -wal present (agy is
-    writing), mode=ro reads the uncheckpointed rows through the sidecars agy created."""
+    writing), mode=ro reads the uncheckpointed rows through the sidecars agy created. A
+    rollback-journal file keeps mode=ro, whose locking and hot-journal check create nothing."""
     wal = database.with_name(database.name + "-wal")
-    return database.as_uri() + ("?mode=ro" if wal.exists() else "?mode=ro&immutable=1")
+    try:
+        immutable = _is_wal(database) and not wal.exists()
+    except OSError:
+        immutable = False  # The open below reports the file as unreadable.
+    return database.as_uri() + ("?mode=ro&immutable=1" if immutable else "?mode=ro")
 
 
 def resolve(database: Path, conversation: str) -> dict:

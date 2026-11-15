@@ -262,7 +262,7 @@
      ],
      "fingerprint": "sha256 of the canonical JSON of the resolved facts {parent, subagent, cwd, agent_name}, or of {\"status\": \"no_summary_row\"} or {\"status\": \"summaries_unreadable\"}",
      "key": "conversation_id",
-     "open": "read-only SQLite URI (mode=ro, with immutable=1 when no -wal file exists)",
+     "open": "read-only SQLite URI (mode=ro; immutable=1 only for a WAL-mode file with no -wal file)",
      "path": "conversation_summaries.db",
      "relative_to": "home",
      "table": "conversation_summaries"

@@ -189,7 +189,7 @@ def test_an_empty_workspace_value_is_a_resolved_row_without_cwd(tmp_path, mutabl
     assert row["side_inputs"] == {"agy_conversation_summaries": canonical_sha256(facts)}
 
 
-@pytest.mark.parametrize("value", ['["file://otherhost/w/alpha"]', '["https://example.org/w"]',
+@pytest.mark.parametrize("value", ['["file://otherhost/w/alpha"]', '["https://example.org/w"]', '["file://[x/y"]',
                                    '["file:relative/path"]', '{"not": "a list"}', "not json"])
 def test_a_workspace_value_agy_does_not_write_reads_as_unreadable(tmp_path, mutable_store, value):
     set_workspace(mutable_store, B, value)
@@ -247,6 +247,26 @@ def test_a_wal_database_with_a_live_writer_shows_uncheckpointed_rows(tmp_path, m
         assert listing(store) == before and database.read_bytes() == main
     finally:
         writer.close()
+
+
+def test_a_rollback_journal_database_never_shows_an_uncommitted_row(tmp_path, mutable_store):
+    # Only a WAL file may be read immutable; a rollback-mode file keeps SQLite's locking.
+    store = mutable_store
+    database = store / "conversation_summaries.db"
+    writer = sqlite3.connect(database, isolation_level=None)
+    try:
+        writer.execute("BEGIN EXCLUSIVE")
+        writer.execute("UPDATE conversation_summaries SET agent_name = 'uncommitted' WHERE conversation_id = ?", (B,))
+        before = listing(store)
+        row = files(discover(tmp_path, store))[f"{B}/transcript_full.jsonl"]
+        assert row["path_facts"]["agent_name"] != "uncommitted"
+        assert row["path_facts"]["reason"] == "summaries_unreadable"  # locked, not guessed
+        assert listing(store) == before
+    finally:
+        writer.execute("ROLLBACK")
+        writer.close()
+    row = files(discover(tmp_path, store))[f"{B}/transcript_full.jsonl"]
+    assert row["path_facts"]["agent_name"] == "task-2" and row["path_facts"]["reason"] is None
 
 
 def header(tmp_path, store, *paths):
