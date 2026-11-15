@@ -167,3 +167,9 @@ and a pin change do not authorize that spend. MCP protocol revisions require
 checking the pinned client construction too; the probe server's acceptance alone
 does not establish the requested revision. Changes to the external analyst
 runtime/tool epoch need their owning project's requalification independently.
+
+For a stateful execution profile, `index.execution_origin_tools` names native call
+identities that originate execution envelopes. It is derived from the same grammar
+constants used by the run parser. Poll/resume tools and generic shell-like tools are
+not origins merely because of their kind; `tool_kinds` keeps that separate fact.
+Consumers choose their measurement population from these declarations.

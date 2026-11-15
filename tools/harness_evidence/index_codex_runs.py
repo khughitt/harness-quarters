@@ -14,6 +14,10 @@ import re
 
 from . import _index_codex_outcomes as outcomes
 
+# Native calls that originate execution envelopes; wait/stdin only resume them.
+SCRIPT_TOOL = "exec"
+DIRECT_TOOLS = ("exec_command", "shell_command")
+
 OPERATION = re.compile(r"tools\.(exec_command|shell_command|write_stdin)\(")
 STRINGS = re.compile(r'"(?:[^"\\\n]|\\.)*"|\'(?:[^\'\\\n]|\\.)*\'|`(?:[^`\\]|\\.)*`', re.S)
 CONTROL = re.compile(r"\?|&&|\|\||=>|\bPromise\.|\b(?:if|else|for|while|do|switch|try|catch|"
@@ -298,12 +302,12 @@ def _function_session(value):
 def on_call(state, session_id, call_id, name, value, at_ms):
     """Remember what a call's output will need; nothing is emitted yet."""
     calls = state.setdefault("run_calls", {})
-    if name == "exec":
+    if name == SCRIPT_TOOL:
         text = str(value)
         ops = operations(text)
         calls[call_id] = {"kind": "exec", "session_id": session_id, "at_ms": at_ms, "ops": None if ops is None else [{"op": op["op"], "session": op["session_id"]} for op in ops],
                           "sessionish": "write_stdin" in text or "session_id" in text}
-    elif name in ("exec_command", "shell_command"):
+    elif name in DIRECT_TOOLS:
         calls[call_id] = {"kind": "command", "session_id": session_id, "at_ms": at_ms,
                           "operation_seq": None}
     elif name == "wait":

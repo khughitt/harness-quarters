@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 import tomllib
 
-from . import homes, DECODER_VERSION, SCHEMA, index_events, index_coverage, index_codex, index_codex_coverage
+from . import homes, DECODER_VERSION, SCHEMA, index_events, index_coverage, index_codex, index_codex_coverage, index_codex_runs
 
 EVIDENCE_RULE = ("synthetic samples establish decoder conformance; observed samples or probes "
                  "establish emission; absent from a sample means unobserved")
@@ -330,6 +330,7 @@ def build(catalogue: Path, *, index_catalogue: Path | None = None) -> dict:
                        "write_stdin": "poll", "wait": "poll", "wait_agent": "other",
                        "request_user_input": "question",
                        **dict.fromkeys(index_codex.DISPATCH, "dispatch")},
+        "execution_origin_tools": [index_codex_runs.SCRIPT_TOOL, *index_codex_runs.DIRECT_TOOLS],
         "features": {"native_skill_events": False, "question_option_labels": False,
                      "stateful_execution": True}}))
     harnesses["codex"]["fields"]["filename_identity.index_thread"].update(

@@ -393,3 +393,18 @@ def test_codex_selection_and_metric_dependencies_are_declared():
     for field, keys in expected.items():
         assert fields[field]['coverage_keys'] == keys
     assert fields['filename_identity.index_thread']['provenance'] == []
+
+
+def test_execution_origins_follow_native_envelope_grammar():
+    from harness_evidence import index_codex_runs
+    declared = json.loads(ARTIFACT.read_text())['harnesses']['codex']['index']
+    assert declared['execution_origin_tools'] == ['exec', 'exec_command', 'shell_command']
+    assert declared['tool_kinds']['exec'] == 'script'
+    assert declared['tool_kinds']['shell'] == 'shell'
+    # This declaration describes origins, not polling/resumption or every shell tool.
+    for name in ('exec', 'exec_command', 'shell_command', 'shell', 'wait', 'write_stdin'):
+        state = {}
+        value = 'tools.exec_command({"cmd":"true"})' if name == 'exec' else '{}'
+        index_codex_runs.on_call(state, 's', 'call', name, value, 1)
+        origin = state['run_calls'].get('call', {}).get('kind') in ('exec', 'command')
+        assert origin == (name in declared['execution_origin_tools'])

@@ -3458,6 +3458,11 @@
      "payload.type",
      "payload.timestamp"
     ],
+    "execution_origin_tools": [
+     "exec",
+     "exec_command",
+     "shell_command"
+    ],
     "features": {
      "native_skill_events": false,
      "question_option_labels": false,
