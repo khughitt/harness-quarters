@@ -836,12 +836,40 @@ def oracle_hash(value):
                                      ensure_ascii=True, allow_nan=False).encode()).hexdigest()
 
 
+ADDITIVE_CLAUDE_FIELDS = {"context", "execution", "response.phase"}
+
+
+def old_claude_defaults(defaults):
+    # Check each new declaration before projecting onto the immutable old oracle.
+    assert set(defaults) == set(PROVENANCE_ORACLE["declarations"]) | ADDITIVE_CLAUDE_FIELDS
+    for field in ADDITIVE_CLAUDE_FIELDS:
+        assert defaults[field] == {"native_paths": ["type"], "coverage_keys": [],
+                                   "basis": "convention", "rule": "claude_" + field.replace(".", "_")}
+    return {field: proof for field, proof in defaults.items() if field not in ADDITIVE_CLAUDE_FIELDS}
+
+
+def check_claude_additions(event):
+    assert event["context"] is None
+    assert event["execution"] == {"runs": [], "commands": [], "call_updates": [],
+                                  "writes": [], "operations": [], "diagnostics": {}}
+    if event["response"] is not None:
+        assert event["response"]["phase"] == "fragment"
+
+
 def oracle_rows(rows, defaults):
     result = []
     for value in rows:
         ordinary = copy.deepcopy(value)
         if ordinary["object"] == "index_event":
+            check_claude_additions(ordinary)
             proof = expand_proofs(ordinary, defaults)
+            for field in ADDITIVE_CLAUDE_FIELDS:
+                assert proof[field] == {**defaults[field], "ref": ordinary["ref"], "revision": ordinary["decoder"]["revision"]}
+                proof.pop(field)
+            ordinary.pop("context")
+            ordinary.pop("execution")
+            if ordinary["response"] is not None:
+                ordinary["response"].pop("phase")
             ordinary.pop("provenance")
         else:
             proof = None
@@ -869,7 +897,7 @@ def oracle_native_case(case):
     path = FIXTURES / case["fixture"]
     assert hashlib.sha256(path.read_bytes()).hexdigest() == PROVENANCE_ORACLE["fixtures"][case["fixture"]]
     defaults = index_events.provenance_defaults()
-    assert defaults == PROVENANCE_ORACLE["declarations"]
+    assert old_claude_defaults(defaults) == PROVENANCE_ORACLE["declarations"]
     place = discover.place_of(Path(case["logical"]), discover.roots(
         explicit=[("claude-code", Path("/oracle/.claude/projects"))]))
     state = {}

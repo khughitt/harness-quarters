@@ -1,0 +1,300 @@
+"""Codex index facts, independent of the consumer's measurement policy.
+
+Basic record facts preserve OBS 1e0afad1. Stateful execution associations and
+late context replacement are delivered by the next relocation step.
+"""
+import hashlib
+import json
+import posixpath
+import re
+
+from . import labels
+from .index_events import Restart, _at_ms, _size, _join
+from .index_codex_coverage import (COUNTERS, KNOWN_KINDS, WATCHED, record_kind,
+                                   day_of, count_record, applied, coverage_rows)
+from .lines import Place, ref, _finite_float, _reject_constant
+
+USAGE = {"cache_read": "cached_input_tokens", "cache_write": "cache_write_input_tokens",
+         "output": "output_tokens", "thinking": "reasoning_output_tokens", "context_total": "input_tokens"}
+INJECTED = ("# AGENTS.md", "<environment_context>", "<INSTRUCTIONS>",
+            "<skills_instruct", "<turn_aborted>", "<permissions",
+            "<user_shell", "<collaboration_mode")
+SHELL = frozenset({"exec_command", "shell_command", "shell"})
+PATCH_PATH = re.compile(r"\*\*\* (?:(?:Update|Add|Delete) File|Move to): (.+?)(?=\\n|\n|[\"'`]|$)")
+
+PROVENANCE = {
+    "native_kind": ["type", "payload.type"], "eligible": ["payload.id"],
+    "flush_response": ["type"],
+    "execution": ["type"], "notifications": ["type"],
+    "fork_boundary": ["type"], "turn_end": ["type"],
+    "at_ms": ["timestamp", "payload.timestamp"],
+    "identity.session": ["payload.id"], "identity.index_session": ["payload.id"],
+    "identity.agent": ["payload.id", "payload.thread_source"],
+    "identity.parent": ["payload.parent_thread_id", "payload.source.subagent.thread_spawn.parent_thread_id"],
+    "identity.subagent": ["payload.thread_source", "payload.parent_thread_id", "payload.source.subagent.thread_spawn.parent_thread_id"],
+    "identity.cwd": ["payload.cwd"], "identity.entrypoint": ["payload.originator"],
+    "identity.version": ["payload.cli_version"],
+    "context.model": ["payload.model"],
+    "context.effort": ["payload.effort", "payload.collaboration_mode.settings.reasoning_effort"],
+    "context.cwd": ["payload.cwd"], "context.context_window": ["payload.info.model_context_window"],
+    "response.phase": ["type", "payload.type"],
+    "response.id": ["payload.response_id", "payload.info.total_token_usage"],
+    "response.model": ["payload.model"], "response.effort": ["payload.effort", "payload.collaboration_mode.settings.reasoning_effort"],
+    "response.native": ["payload.usage", "payload.info.last_token_usage"],
+    "message.channel": ["payload.role"], "message.origin": ["payload.content"],
+    "message.text": ["payload.content[].text"], "message.blocks": ["payload.content[].text"],
+    "message.joined_bytes": ["payload.content[].text"], "message.joined_nonempty": ["payload.content[].text"],
+    "message.assistant_output_bytes": ["payload.content[].text"],
+    "calls[].block": ["payload.type"], "calls[].id": ["payload.call_id"],
+    "calls[].native_name": ["payload.name"], "calls[].kind": ["payload.name"],
+    "calls[].input_bytes": ["payload.arguments", "payload.input"],
+    "calls[].input_text": ["payload.arguments", "payload.input"],
+    "calls[].command": ["payload.arguments", "payload.input"],
+    "calls[].commands": ["payload.arguments", "payload.input", "payload.cwd"],
+    "calls[].patch_paths": ["payload.arguments", "payload.input"],
+    "calls[].paths": ["payload.arguments", "payload.input", "payload.cwd"],
+    "calls[].paths_complete": ["payload.arguments", "payload.input", "payload.cwd"],
+    "injections": ["payload.base_instructions.text", "payload.content", "payload.replacement_history"],
+    "compaction": ["payload.replacement_history"], "interruption": ["payload.type"],
+}
+COVERAGE_KEYS = {
+    "identity.session": ["session_meta/input:session"],
+    "identity.index_session": ["session_meta/input:session"],
+    "identity.version": ["session_meta/input:version"],
+    "identity.entrypoint": ["session_meta/input:entrypoint"],
+    "identity.cwd": ["session_meta/payload.cwd"],
+    "message.channel": ["response_item:message/payload.role"],
+    "response.native": [f"applied:usage/input:{name}" for name in COUNTERS],
+    "identity.parent": ["applied:spawn/input:parent_thread_id"],
+    "context.model": ["turn_context/input:model"],
+    "context.effort": ["turn_context/input:effort"],
+    "context.context_window": ["event_msg:token_count/input:context_window"],
+    "response.id": ["token_usage_record/input:response", "event_msg:token_count/payload.info.total_token_usage"],
+    "response.model": ["turn_context/input:model"], "response.effort": ["turn_context/input:effort"],
+    "message.text": ["applied:text_block/input:text"], "message.blocks": ["applied:text_block/input:text"],
+    "message.joined_bytes": ["response_item:message/input:content"],
+    "message.joined_nonempty": ["response_item:message/input:content"],
+    "message.assistant_output_bytes": ["applied:text_block/input:text"],
+    "calls[].id": ["applied:tool_call/input:call_id"],
+    "calls[].native_name": ["applied:tool_call/input:name"],
+    "calls[].input_bytes": ["applied:tool_call/input:value"],
+    "calls[].input_text": ["applied:tool_call/input:value"],
+    "calls[].commands": ["applied:tool_call/input:value", "applied:shell_arguments/input:workdir"],
+    "injections": ["applied:base_instructions/input:text", "applied:text_block/input:text", "compacted/input:history"],
+    "compaction": ["compacted/input:history"],
+    "calls[].kind": ["applied:tool_call/input:name"],
+    **{field: ["applied:tool_call/input:value"] for field in
+       ("calls[].command", "calls[].patch_paths", "calls[].paths", "calls[].paths_complete")},
+}
+for _field in (*USAGE, "input_uncached", "uncached_total"):
+    _names = ("input_tokens", "cached_input_tokens") if _field in {"input_uncached", "uncached_total"} else (USAGE[_field],)
+    _paths = [f"payload.{container}.{name}" for container in ("usage", "info.last_token_usage") for name in _names]
+    for _prefix in ("response.usage.", "response.usage_present."):
+        PROVENANCE[_prefix + _field] = _paths
+        COVERAGE_KEYS[_prefix + _field] = [f"applied:usage/input:{name}" for name in _names]
+
+CONVENTIONS = frozenset({"flush_response", "execution", "notifications", "fork_boundary", "turn_end", "response.phase", "response.id", "message.origin", "identity.subagent",
+                          "calls[].kind", "calls[].paths", "calls[].paths_complete", "calls[].commands"})
+
+
+def provenance_defaults():
+    """Sparse default proofs; per-event exceptions carry only changed attributes."""
+    return {field: {"native_paths": list(paths), "coverage_keys": list(COVERAGE_KEYS.get(field, [])),
+                    "basis": "convention" if field in CONVENTIONS else "native",
+                    "rule": "codex_" + field.replace("[]", "").replace(".", "_")}
+            for field, paths in PROVENANCE.items()}
+
+
+def _parent(payload):
+    source = payload.get("source")
+    subagent = source.get("subagent") if isinstance(source, dict) else None
+    spawn = (subagent.get("thread_spawn") or {}) if isinstance(subagent, dict) else {}
+    return spawn.get("parent_thread_id") or payload.get("parent_thread_id")
+
+
+def _usage(raw):
+    inp, cached = raw.get("input_tokens", 0), raw.get("cached_input_tokens", 0)
+    # Missing operands default exactly as the oracle; present null still fails.
+    uncached = inp - cached
+    selected = "input_tokens" in raw or "cached_input_tokens" in raw
+    usage = {field: raw.get(name) for field, name in USAGE.items()}
+    usage.update(input_uncached=uncached if selected else None, uncached_total=uncached if selected else None)
+    present = {field: name in raw for field, name in USAGE.items()}
+    present.update(input_uncached=selected, uncached_total=selected)
+    return usage, present
+
+
+def _message(payload):
+    blocks = [{"block": i, "text": block.get("text", ""), "bytes": _size(block.get("text", ""))}
+              for i, block in enumerate(payload.get("content") or [])
+              if isinstance(block, dict) and block.get("type") in ("input_text", "output_text")]
+    joined = "\n".join(block["text"] for block in blocks)
+    channel = payload.get("role")
+    return {"channel": channel, "origin": labels.origin(payload.get("content"), "codex"),
+            "text": joined, "joined_nonempty": bool(joined.strip()), "joined_bytes": _size(joined),
+            "assistant_output_bytes": sum(b["bytes"] for b in blocks) if channel == "assistant" else 0,
+            "blocks": blocks}
+
+
+def _call(payload, cwd):
+    name = payload.get("name", "")
+    value = payload.get("arguments" if payload.get("type") == "function_call" else "input", "")
+    text, command, commands = str(value), None, []
+    arguments = None
+    if name in SHELL:
+        try:
+            arguments = json.loads(text)
+        except ValueError:
+            pass
+        if isinstance(arguments, dict):
+            command = arguments.get("cmd", arguments.get("command"))
+            command = " ".join(command) if isinstance(command, list) else command
+        elif name == "shell" and not text.lstrip().startswith("{"):
+            command = text
+        directory = cwd
+        if isinstance(arguments, dict) and "workdir" in arguments:
+            workdir = arguments["workdir"]
+            directory = (workdir if posixpath.isabs(workdir) else posixpath.join(cwd, workdir) if cwd else None) \
+                if isinstance(workdir, str) and workdir else None
+        commands = [{"command": command, "cwd": directory}]
+    patch = name == "apply_patch" or name == "exec" and "tools.apply_patch(" in text
+    raw_paths = ([m.group(1).strip() for m in PATCH_PATH.finditer(text)] or [None]) if patch else []
+    candidate_text = value if isinstance(value, str) else json.dumps(value)
+    candidate_paths = ([m.group(1).strip() for m in PATCH_PATH.finditer(candidate_text)] or [None]) if patch else []
+    candidates = [_join(path, cwd) if path is not None else None for path in candidate_paths]
+    call = {"id": payload.get("call_id"), "native_name": name,
+            "kind": "shell" if name in SHELL else "patch" if patch else "poll" if name in {"write_stdin", "wait", "wait_agent"} else "other",
+            "input_bytes": _size(value), "input_text": text, "command": command,
+            "commands": commands, "patch_paths": raw_paths,
+            "paths": sorted(set(p for p in candidates if p is not None)),
+            "paths_complete": all(p is not None for p in candidates), "block": 0}
+    return call, arguments
+
+
+def extract(lines, state, *, place: Place, text: bool):
+    """Yield independent physical facts and cumulative native coverage."""
+    state.setdefault("usage_source", "none")
+    number, partial = state.get("next_line", 1), False
+    for offset, raw in lines:
+        if isinstance(raw, str):
+            raw = raw.encode("utf-8")
+        position = {"key": f"E{offset}", "line": number, "offset": offset, "end": offset + len(raw),
+                    "ref": ref(place, number), "sha256": hashlib.sha256(raw).hexdigest()}
+        if not raw.endswith(b"\n"):
+            partial = True
+            yield {"object": "unparsed", **position, "reason": "truncated", "provisional": True}
+            break
+        state["next_line"], state["next_offset"] = number + 1, offset + len(raw)
+        number += 1
+        try:
+            record = json.loads(raw.decode("utf-8", errors="replace"), parse_float=_finite_float,
+                                parse_constant=_reject_constant)
+        except (ValueError, RecursionError):
+            state["malformed"] = state.get("malformed", 0) + 1
+            yield {"object": "unparsed", **position, "reason": "malformed", "provisional": False}
+            continue
+        payload, kind = record.get("payload") or {}, record.get("type")
+        if kind == "token_usage_record":
+            if state["usage_source"] == "count":
+                raise Restart("token_usage_record after token_count", {"usage_source": "record"})
+            state["usage_source"] = "record"
+        if kind == "session_meta":
+            session = payload.get("id") or state.get("session_id")
+            if session is not None:
+                state["session_id"] = session
+                identities = state.setdefault("sessions", {})
+                identity = identities.setdefault(session, {"session": session, "index_session": session,
+                    "agent": None, "parent": None, "subagent": False, "cwd": None,
+                    "entrypoint": None, "version": None})
+                identity["cwd"] = identity["cwd"] or payload.get("cwd")
+                identity["entrypoint"] = identity["entrypoint"] or payload.get("originator")
+                identity["version"] = identity["version"] or payload.get("cli_version")
+                identity["parent"] = identity["parent"] or _parent(payload)
+                identity["subagent"] = identity["subagent"] or payload.get("thread_source") not in (None, "user") or bool(_parent(payload))
+        session = state.get("session_id")
+        identity = dict(state.get("sessions", {}).get(session) or dict.fromkeys(
+            ("session", "index_session", "agent", "parent", "subagent", "cwd", "entrypoint", "version")))
+        timestamp = record.get("timestamp") or payload.get("timestamp")
+        at_ms = _at_ms(timestamp) if timestamp else None
+        day, native_kind = day_of(at_ms), record_kind(record)
+        count_record(state, session, day, native_kind, native_kind in KNOWN_KINDS, record, WATCHED)
+        event = {"object": "index_event", **position, "native_kind": native_kind,
+                 "identity": identity, "at_ms": at_ms, "eligible": session is not None,
+                 "response": None, "flush_response": False, "message": None, "context": None,
+                 "calls": [], "results": [], "injections": [], "notifications": [],
+                 "compaction": None, "interruption": None, "fork_boundary": None, "turn_end": None,
+                 "execution": {"runs": [], "commands": [], "call_updates": [], "writes": [],
+                               "operations": [], "diagnostics": {}}, "provenance": {}}
+        if session is not None:
+            if kind == "session_meta":
+                base = payload.get("base_instructions")
+                if isinstance(base, dict):
+                    applied(state, session, day, "base_instructions", {"text": base.get("text") is not None})
+                    if base.get("text") is not None:
+                        event["injections"] = [{"piece": 0, "native_kind": "base_instructions", "source": "session_meta", "bytes": _size(base["text"])}]
+                source = payload.get("source")
+                if isinstance(source, dict) and "subagent" in source:
+                    applied(state, session, day, "spawn", {"parent_thread_id": _parent(payload) is not None})
+            elif kind == "turn_context":
+                settings = (payload.get("collaboration_mode") or {}).get("settings") or {}
+                state.update(model=payload.get("model"), effort=payload.get("effort") or settings.get("reasoning_effort"), turn_cwd=payload.get("cwd"))
+                event["context"] = {"model": state["model"], "effort": state["effort"], "cwd": state["turn_cwd"], "context_window": state.get("context_window")}
+            selected = None
+            if kind == "token_usage_record":
+                selected = (payload.get("response_id"), payload.get("usage") or {})
+                event["provenance"]["response.id"] = {"basis": "native"}
+            elif native_kind == "event_msg:token_count":
+                info = payload.get("info")
+                if info is not None:
+                    window = info.get("model_context_window")
+                    if window is not None:
+                        state["context_window"] = window
+                        event["context"] = {"model": state.get("model"), "effort": state.get("effort"), "cwd": state.get("turn_cwd"), "context_window": window}
+                    total = info.get("total_token_usage")
+                    if state["usage_source"] != "record" and total != state.get("last_total"):
+                        state.update(usage_source="count", last_total=total)
+                        selected = (f"tc:{session}:{offset}", info.get("last_token_usage") or {})
+            if selected is not None:
+                response_id, usage = selected
+                normalized, present = _usage(usage)
+                applied(state, session, day, "usage", {name: usage.get(name) is not None for name in COUNTERS})
+                event["response"] = {"id": response_id, "phase": "terminal", "model": state.get("model"), "effort": state.get("effort"),
+                                     "native": usage, "usage": normalized, "usage_present": present}
+            if native_kind == "response_item:message":
+                event["message"] = _message(payload)
+                if payload.get("role") == "user":
+                    joined = event["message"]["text"]
+                    prefix = next((prefix for prefix in INJECTED if joined.strip().startswith(prefix)), None)
+                    if prefix is not None:
+                        event["injections"] = [{"piece": 0, "native_kind": "user_injection:" + prefix,
+                                                "source": prefix, "bytes": _size(joined)}]
+                for block in payload.get("content") or []:
+                    if isinstance(block, dict) and block.get("type") in ("input_text", "output_text"):
+                        applied(state, session, day, "text_block", {"text": block.get("text") is not None})
+            elif native_kind in ("response_item:function_call", "response_item:custom_tool_call"):
+                call, arguments = _call(payload, state.get("turn_cwd"))
+                event["calls"].append(call)
+                field = "arguments" if payload.get("type") == "function_call" else "input"
+                applied(state, session, day, "tool_call", {"call_id": payload.get("call_id") is not None, "name": payload.get("name") is not None, "value": payload.get(field) is not None})
+                if isinstance(arguments, dict):
+                    applied(state, session, day, "shell_arguments", {"workdir": isinstance(arguments.get("workdir"), str)})
+            elif kind == "compacted":
+                event["compaction"] = {"summary": True, "basis": "native", "rule": "codex_compacted"}
+                event["injections"] = [{"piece": 0, "native_kind": "compact_summary", "source": None,
+                                        "bytes": _size(payload.get("replacement_history") or [])}]
+            elif native_kind == "event_msg:turn_aborted":
+                event["interruption"] = {"user_marker": False, "system": True, "basis": "native", "rule": "codex_turn_aborted"}
+        if not text:
+            if event["message"]:
+                event["message"].pop("text")
+                for block in event["message"]["blocks"]:
+                    block.pop("text")
+            for call in event["calls"]:
+                for key in ("input_text", "command", "commands", "patch_paths", "paths"):
+                    call.pop(key)
+            for injection in event["injections"]:
+                injection.pop("source")
+        yield event
+    counts, fields = coverage_rows(state)
+    yield {"object": "coverage", "key": "coverage", "records": counts, "fields": fields,
+           "malformed": state.get("malformed", 0), "partial_tail": partial}

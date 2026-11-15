@@ -61,7 +61,9 @@ decoder's version and revision. Both read only the package's committed
 Rebuild it explicitly with `tools/harness-evidence capabilities --build` in an hq
 checkout after changing decoder behavior, declarations, or catalogued samples.
 The artifact hashes `tools/fixtures/session-logs/CATALOGUE.toml` and every listed
-sample. Builds read no metadata sidecars or uncatalogued sibling transcripts.
+sample, plus the separate index-only catalogue and its samples under
+`tools/fixtures/harness-evidence/`. Index-only controls establish native index
+facts without requiring reader role labels. Builds read no metadata sidecars or uncatalogued sibling transcripts.
 
 The `fields` map names decoded paths (`header.*` and `links[].*` for session
 evidence); each `provenance` list names native JSON paths, where `[]` visits array

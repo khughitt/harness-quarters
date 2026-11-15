@@ -1,6 +1,11 @@
 {
  "built_from": {
   "catalogue_sha256": "4727c9f36d5a3edc66a26688d965fcc8d71dd860eaeb0782cfa8363a2ea20df2",
+  "index_catalogue_sha256": "7180d385ed9d3f18541abf98ce19658f0389db07bdd22a968145cb5002d51770",
+  "index_samples": {
+   "codex-basic.jsonl": "a7238f2c4cc4903f0247967deb9b95360302563cbf315624ae92ac2cb588fe76",
+   "codex-context.jsonl": "dcbe4630c1b00f0afc13d26e20c08d7ee5e37eb562204828d5204872194135d8"
+  },
   "samples": {
    "captures/escaped-malformed.jsonl": "d3ab501588cb7af5e03ae856e875b6809bbd5851e03283e43e53a82bd11a8454",
    "captures/escaped.jsonl": "4ff4490899cc4ac6444b34fc672811990fe9ec53cca6c5c23f4a642d90cbd273",
@@ -236,7 +241,7 @@
    "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T11-00-00-01900000-0000-7000-8000-0000000000f2.jsonl": "30b550b6f035815a4123c8a8fd18fbbf7059ec89c04b0749ecda738e24b2fde3"
   }
  },
- "decoder_version": "18",
+ "decoder_version": "19",
  "evidence_rule": "synthetic samples establish decoder conformance; observed samples or probes establish emission; absent from a sample means unobserved",
  "harnesses": {
   "claude-code": {
@@ -405,6 +410,12 @@
       "isCompactSummary"
      ]
     },
+    "context": {
+     "coverage_keys": [],
+     "provenance": [
+      "type"
+     ]
+    },
     "copy": {
      "coverage_keys": [],
      "provenance": [
@@ -440,6 +451,12 @@
      "coverage_keys": [],
      "provenance": [
       "message.content[].type"
+     ]
+    },
+    "execution": {
+     "coverage_keys": [],
+     "provenance": [
+      "type"
      ]
     },
     "flags": {
@@ -859,6 +876,12 @@
      "coverage_keys": [],
      "provenance": [
       "message.usage"
+     ]
+    },
+    "response.phase": {
+     "coverage_keys": [],
+     "provenance": [
+      "type"
      ]
     },
     "response.usage.cache_read": {
@@ -1557,6 +1580,7 @@
        "response.id",
        "response.model",
        "response.native",
+       "response.phase",
        "response.usage.cache_read",
        "response.usage.cache_write",
        "response.usage.context_total",
@@ -1783,6 +1807,7 @@
        "response.id",
        "response.model",
        "response.native",
+       "response.phase",
        "response.usage.cache_read",
        "response.usage.cache_write",
        "response.usage.context_total",
@@ -2030,6 +2055,13 @@
       "timestamp"
      ]
     },
+    "at_ms": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.timestamp",
+      "timestamp"
+     ]
+    },
     "block_type": {
      "coverage_keys": [],
      "provenance": [
@@ -2063,6 +2095,142 @@
       "payload.type"
      ]
     },
+    "calls[].block": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.type"
+     ]
+    },
+    "calls[].command": {
+     "coverage_keys": [
+      "applied:tool_call/input:value"
+     ],
+     "provenance": [
+      "payload.arguments",
+      "payload.input"
+     ]
+    },
+    "calls[].commands": {
+     "coverage_keys": [
+      "applied:tool_call/input:value",
+      "applied:shell_arguments/input:workdir"
+     ],
+     "provenance": [
+      "payload.arguments",
+      "payload.cwd",
+      "payload.input"
+     ]
+    },
+    "calls[].id": {
+     "coverage_keys": [
+      "applied:tool_call/input:call_id"
+     ],
+     "provenance": [
+      "payload.call_id"
+     ]
+    },
+    "calls[].input_bytes": {
+     "coverage_keys": [
+      "applied:tool_call/input:value"
+     ],
+     "provenance": [
+      "payload.arguments",
+      "payload.input"
+     ]
+    },
+    "calls[].input_text": {
+     "coverage_keys": [
+      "applied:tool_call/input:value"
+     ],
+     "provenance": [
+      "payload.arguments",
+      "payload.input"
+     ]
+    },
+    "calls[].kind": {
+     "coverage_keys": [
+      "applied:tool_call/input:name"
+     ],
+     "provenance": [
+      "payload.name"
+     ]
+    },
+    "calls[].native_name": {
+     "coverage_keys": [
+      "applied:tool_call/input:name"
+     ],
+     "provenance": [
+      "payload.name"
+     ]
+    },
+    "calls[].patch_paths": {
+     "coverage_keys": [
+      "applied:tool_call/input:value"
+     ],
+     "provenance": [
+      "payload.arguments",
+      "payload.input"
+     ]
+    },
+    "calls[].paths": {
+     "coverage_keys": [
+      "applied:tool_call/input:value"
+     ],
+     "provenance": [
+      "payload.arguments",
+      "payload.cwd",
+      "payload.input"
+     ]
+    },
+    "calls[].paths_complete": {
+     "coverage_keys": [
+      "applied:tool_call/input:value"
+     ],
+     "provenance": [
+      "payload.arguments",
+      "payload.cwd",
+      "payload.input"
+     ]
+    },
+    "compaction": {
+     "coverage_keys": [
+      "compacted/input:history"
+     ],
+     "provenance": [
+      "payload.replacement_history"
+     ]
+    },
+    "context.context_window": {
+     "coverage_keys": [
+      "event_msg:token_count/input:context_window"
+     ],
+     "provenance": [
+      "payload.info.model_context_window"
+     ]
+    },
+    "context.cwd": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.cwd"
+     ]
+    },
+    "context.effort": {
+     "coverage_keys": [
+      "turn_context/input:effort"
+     ],
+     "provenance": [
+      "payload.collaboration_mode.settings.reasoning_effort",
+      "payload.effort"
+     ]
+    },
+    "context.model": {
+     "coverage_keys": [
+      "turn_context/input:model"
+     ],
+     "provenance": [
+      "payload.model"
+     ]
+    },
     "copy": {
      "coverage_keys": [],
      "provenance": [
@@ -2084,10 +2252,22 @@
       "type"
      ]
     },
+    "eligible": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.id"
+     ]
+    },
     "encrypted": {
      "coverage_keys": [],
      "provenance": [
       "payload.content[].type"
+     ]
+    },
+    "execution": {
+     "coverage_keys": [],
+     "provenance": [
+      "type"
      ]
     },
     "flags": {
@@ -2096,6 +2276,18 @@
       "payload.item.questions",
       "payload.role",
       "payload.type",
+      "type"
+     ]
+    },
+    "flush_response": {
+     "coverage_keys": [],
+     "provenance": [
+      "type"
+     ]
+    },
+    "fork_boundary": {
+     "coverage_keys": [],
+     "provenance": [
       "type"
      ]
     },
@@ -2208,6 +2400,88 @@
       "payload.turn_id"
      ]
     },
+    "identity.agent": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.id",
+      "payload.thread_source"
+     ]
+    },
+    "identity.cwd": {
+     "coverage_keys": [
+      "session_meta/payload.cwd"
+     ],
+     "provenance": [
+      "payload.cwd"
+     ]
+    },
+    "identity.entrypoint": {
+     "coverage_keys": [
+      "session_meta/input:entrypoint"
+     ],
+     "provenance": [
+      "payload.originator"
+     ]
+    },
+    "identity.index_session": {
+     "coverage_keys": [
+      "session_meta/input:session"
+     ],
+     "provenance": [
+      "payload.id"
+     ]
+    },
+    "identity.parent": {
+     "coverage_keys": [
+      "applied:spawn/input:parent_thread_id"
+     ],
+     "provenance": [
+      "payload.parent_thread_id",
+      "payload.source.subagent.thread_spawn.parent_thread_id"
+     ]
+    },
+    "identity.session": {
+     "coverage_keys": [
+      "session_meta/input:session"
+     ],
+     "provenance": [
+      "payload.id"
+     ]
+    },
+    "identity.subagent": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.parent_thread_id",
+      "payload.source.subagent.thread_spawn.parent_thread_id",
+      "payload.thread_source"
+     ]
+    },
+    "identity.version": {
+     "coverage_keys": [
+      "session_meta/input:version"
+     ],
+     "provenance": [
+      "payload.cli_version"
+     ]
+    },
+    "injections": {
+     "coverage_keys": [
+      "applied:base_instructions/input:text",
+      "applied:text_block/input:text",
+      "compacted/input:history"
+     ],
+     "provenance": [
+      "payload.base_instructions.text",
+      "payload.content",
+      "payload.replacement_history"
+     ]
+    },
+    "interruption": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.type"
+     ]
+    },
     "kind": {
      "coverage_keys": [],
      "provenance": [
@@ -2230,6 +2504,60 @@
       "payload.source.subagent.thread_spawn.parent_thread_id"
      ]
     },
+    "message.assistant_output_bytes": {
+     "coverage_keys": [
+      "applied:text_block/input:text"
+     ],
+     "provenance": [
+      "payload.content[].text"
+     ]
+    },
+    "message.blocks": {
+     "coverage_keys": [
+      "applied:text_block/input:text"
+     ],
+     "provenance": [
+      "payload.content[].text"
+     ]
+    },
+    "message.channel": {
+     "coverage_keys": [
+      "response_item:message/payload.role"
+     ],
+     "provenance": [
+      "payload.role"
+     ]
+    },
+    "message.joined_bytes": {
+     "coverage_keys": [
+      "response_item:message/input:content"
+     ],
+     "provenance": [
+      "payload.content[].text"
+     ]
+    },
+    "message.joined_nonempty": {
+     "coverage_keys": [
+      "response_item:message/input:content"
+     ],
+     "provenance": [
+      "payload.content[].text"
+     ]
+    },
+    "message.origin": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.content"
+     ]
+    },
+    "message.text": {
+     "coverage_keys": [
+      "applied:text_block/input:text"
+     ],
+     "provenance": [
+      "payload.content[].text"
+     ]
+    },
     "message_id": {
      "coverage_keys": [],
      "provenance": [
@@ -2242,6 +2570,19 @@
      "provenance": [
       "payload.base_instructions.provenance.model",
       "payload.model"
+     ]
+    },
+    "native_kind": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.type",
+      "type"
+     ]
+    },
+    "notifications": {
+     "coverage_keys": [],
+     "provenance": [
+      "type"
      ]
     },
     "origin.markers": {
@@ -2282,6 +2623,191 @@
       "payload.type"
      ]
     },
+    "response.effort": {
+     "coverage_keys": [
+      "turn_context/input:effort"
+     ],
+     "provenance": [
+      "payload.collaboration_mode.settings.reasoning_effort",
+      "payload.effort"
+     ]
+    },
+    "response.id": {
+     "coverage_keys": [
+      "token_usage_record/input:response",
+      "event_msg:token_count/payload.info.total_token_usage"
+     ],
+     "provenance": [
+      "payload.info.total_token_usage",
+      "payload.response_id"
+     ]
+    },
+    "response.model": {
+     "coverage_keys": [
+      "turn_context/input:model"
+     ],
+     "provenance": [
+      "payload.model"
+     ]
+    },
+    "response.native": {
+     "coverage_keys": [
+      "applied:usage/input:input_tokens",
+      "applied:usage/input:cached_input_tokens",
+      "applied:usage/input:cache_write_input_tokens",
+      "applied:usage/input:output_tokens",
+      "applied:usage/input:reasoning_output_tokens"
+     ],
+     "provenance": [
+      "payload.info.last_token_usage",
+      "payload.usage"
+     ]
+    },
+    "response.phase": {
+     "coverage_keys": [],
+     "provenance": [
+      "payload.type",
+      "type"
+     ]
+    },
+    "response.usage.cache_read": {
+     "coverage_keys": [
+      "applied:usage/input:cached_input_tokens"
+     ],
+     "provenance": [
+      "payload.info.last_token_usage.cached_input_tokens",
+      "payload.usage.cached_input_tokens"
+     ]
+    },
+    "response.usage.cache_write": {
+     "coverage_keys": [
+      "applied:usage/input:cache_write_input_tokens"
+     ],
+     "provenance": [
+      "payload.info.last_token_usage.cache_write_input_tokens",
+      "payload.usage.cache_write_input_tokens"
+     ]
+    },
+    "response.usage.context_total": {
+     "coverage_keys": [
+      "applied:usage/input:input_tokens"
+     ],
+     "provenance": [
+      "payload.info.last_token_usage.input_tokens",
+      "payload.usage.input_tokens"
+     ]
+    },
+    "response.usage.input_uncached": {
+     "coverage_keys": [
+      "applied:usage/input:input_tokens",
+      "applied:usage/input:cached_input_tokens"
+     ],
+     "provenance": [
+      "payload.info.last_token_usage.cached_input_tokens",
+      "payload.info.last_token_usage.input_tokens",
+      "payload.usage.cached_input_tokens",
+      "payload.usage.input_tokens"
+     ]
+    },
+    "response.usage.output": {
+     "coverage_keys": [
+      "applied:usage/input:output_tokens"
+     ],
+     "provenance": [
+      "payload.info.last_token_usage.output_tokens",
+      "payload.usage.output_tokens"
+     ]
+    },
+    "response.usage.thinking": {
+     "coverage_keys": [
+      "applied:usage/input:reasoning_output_tokens"
+     ],
+     "provenance": [
+      "payload.info.last_token_usage.reasoning_output_tokens",
+      "payload.usage.reasoning_output_tokens"
+     ]
+    },
+    "response.usage.uncached_total": {
+     "coverage_keys": [
+      "applied:usage/input:input_tokens",
+      "applied:usage/input:cached_input_tokens"
+     ],
+     "provenance": [
+      "payload.info.last_token_usage.cached_input_tokens",
+      "payload.info.last_token_usage.input_tokens",
+      "payload.usage.cached_input_tokens",
+      "payload.usage.input_tokens"
+     ]
+    },
+    "response.usage_present.cache_read": {
+     "coverage_keys": [
+      "applied:usage/input:cached_input_tokens"
+     ],
+     "provenance": [
+      "payload.info.last_token_usage.cached_input_tokens",
+      "payload.usage.cached_input_tokens"
+     ]
+    },
+    "response.usage_present.cache_write": {
+     "coverage_keys": [
+      "applied:usage/input:cache_write_input_tokens"
+     ],
+     "provenance": [
+      "payload.info.last_token_usage.cache_write_input_tokens",
+      "payload.usage.cache_write_input_tokens"
+     ]
+    },
+    "response.usage_present.context_total": {
+     "coverage_keys": [
+      "applied:usage/input:input_tokens"
+     ],
+     "provenance": [
+      "payload.info.last_token_usage.input_tokens",
+      "payload.usage.input_tokens"
+     ]
+    },
+    "response.usage_present.input_uncached": {
+     "coverage_keys": [
+      "applied:usage/input:input_tokens",
+      "applied:usage/input:cached_input_tokens"
+     ],
+     "provenance": [
+      "payload.info.last_token_usage.cached_input_tokens",
+      "payload.info.last_token_usage.input_tokens",
+      "payload.usage.cached_input_tokens",
+      "payload.usage.input_tokens"
+     ]
+    },
+    "response.usage_present.output": {
+     "coverage_keys": [
+      "applied:usage/input:output_tokens"
+     ],
+     "provenance": [
+      "payload.info.last_token_usage.output_tokens",
+      "payload.usage.output_tokens"
+     ]
+    },
+    "response.usage_present.thinking": {
+     "coverage_keys": [
+      "applied:usage/input:reasoning_output_tokens"
+     ],
+     "provenance": [
+      "payload.info.last_token_usage.reasoning_output_tokens",
+      "payload.usage.reasoning_output_tokens"
+     ]
+    },
+    "response.usage_present.uncached_total": {
+     "coverage_keys": [
+      "applied:usage/input:input_tokens",
+      "applied:usage/input:cached_input_tokens"
+     ],
+     "provenance": [
+      "payload.info.last_token_usage.cached_input_tokens",
+      "payload.info.last_token_usage.input_tokens",
+      "payload.usage.cached_input_tokens",
+      "payload.usage.input_tokens"
+     ]
+    },
     "session": {
      "coverage_keys": [],
      "provenance": [
@@ -2297,6 +2823,12 @@
       "payload.item.content",
       "payload.output",
       "payload.summary"
+     ]
+    },
+    "turn_end": {
+     "coverage_keys": [],
+     "provenance": [
+      "type"
      ]
     },
     "turn_end_message": {
@@ -2320,6 +2852,371 @@
    },
    "header": {
     "implemented": false
+   },
+   "index": {
+    "applied": {
+     "base_instructions": [
+      "text"
+     ],
+     "command_item": [
+      "id",
+      "exit_code",
+      "process_id",
+      "started_at_ms",
+      "completed_at_ms"
+     ],
+     "exec_end": [
+      "call_id",
+      "exit_code",
+      "duration"
+     ],
+     "mcp_end": [
+      "call_id",
+      "result"
+     ],
+     "patch_end": [
+      "call_id",
+      "success"
+     ],
+     "shell_arguments": [
+      "workdir"
+     ],
+     "spawn": [
+      "parent_thread_id"
+     ],
+     "text_block": [
+      "text"
+     ],
+     "tool_call": [
+      "call_id",
+      "name",
+      "value"
+     ],
+     "tool_item": [
+      "status"
+     ],
+     "tool_output": [
+      "call_id",
+      "output"
+     ],
+     "usage": [
+      "input_tokens",
+      "cached_input_tokens",
+      "cache_write_input_tokens",
+      "output_tokens",
+      "reasoning_output_tokens"
+     ]
+    },
+    "common_reads": [
+     "type",
+     "timestamp",
+     "payload",
+     "payload.type",
+     "payload.timestamp"
+    ],
+    "features": {
+     "native_skill_events": false,
+     "question_option_labels": false,
+     "stateful_execution": false
+    },
+    "known_kinds": [
+     "compacted",
+     "event_msg:agent_message",
+     "event_msg:agent_reasoning",
+     "event_msg:collab_agent_interaction_end",
+     "event_msg:collab_agent_spawn_end",
+     "event_msg:collab_close_end",
+     "event_msg:collab_resume_end",
+     "event_msg:collab_waiting_end",
+     "event_msg:context_compacted",
+     "event_msg:error",
+     "event_msg:exec_command_end",
+     "event_msg:item_completed",
+     "event_msg:mcp_tool_call_end",
+     "event_msg:patch_apply_end",
+     "event_msg:sub_agent_activity",
+     "event_msg:task_complete",
+     "event_msg:task_started",
+     "event_msg:thread_rolled_back",
+     "event_msg:thread_settings_applied",
+     "event_msg:token_count",
+     "event_msg:turn_aborted",
+     "event_msg:user_message",
+     "event_msg:view_image_tool_call",
+     "event_msg:web_search_end",
+     "inter_agent_communication_metadata",
+     "response_item:agent_message",
+     "response_item:custom_tool_call",
+     "response_item:custom_tool_call_output",
+     "response_item:function_call",
+     "response_item:function_call_output",
+     "response_item:message",
+     "response_item:reasoning",
+     "response_item:tool_search_call",
+     "response_item:tool_search_output",
+     "response_item:web_search_call",
+     "session_meta",
+     "token_usage_record",
+     "turn_context",
+     "world_state"
+    ],
+    "mode": "incremental",
+    "pending_plan_task": 2,
+    "profile": "index",
+    "resume": true,
+    "tool_kinds": {
+     "apply_patch": "patch",
+     "exec_command": "shell",
+     "shell": "shell",
+     "shell_command": "shell",
+     "wait": "poll",
+     "wait_agent": "poll",
+     "write_stdin": "poll"
+    },
+    "unwatched": {
+     "event_msg:exec_command_end": {
+      "payload.call_id": "applied:exec_end",
+      "payload.duration": "applied:exec_end",
+      "payload.duration.nanos": "applied:exec_end",
+      "payload.duration.secs": "applied:exec_end",
+      "payload.exit_code": "applied:exec_end"
+     },
+     "event_msg:item_completed": {
+      "payload.completed_at_ms": "applied:command_item",
+      "payload.item": "applied:command_item",
+      "payload.item.changes": "dimension",
+      "payload.item.exit_code": "applied:command_item",
+      "payload.item.id": [
+       "applied:command_item",
+       "dimension"
+      ],
+      "payload.item.process_id": "applied:command_item",
+      "payload.item.status": "applied:tool_item",
+      "payload.item.type": "dimension",
+      "payload.started_at_ms": "applied:command_item"
+     },
+     "event_msg:mcp_tool_call_end": {
+      "payload.call_id": "applied:mcp_end",
+      "payload.result": "applied:mcp_end",
+      "payload.result.Err": "applied:mcp_end",
+      "payload.result.Ok": "applied:mcp_end",
+      "payload.result.Ok.isError": "applied:mcp_end"
+     },
+     "event_msg:patch_apply_end": {
+      "payload.call_id": "applied:patch_end",
+      "payload.success": "applied:patch_end"
+     },
+     "response_item:custom_tool_call_output": {
+      "payload.output[].text": "applied:tool_output"
+     },
+     "response_item:function_call_output": {
+      "payload.output[].text": "applied:tool_output"
+     },
+     "response_item:message": {
+      "payload.content[].text": "applied:text_block",
+      "payload.content[].type": "applied:text_block"
+     },
+     "session_meta": {
+      "payload.base_instructions.text": "applied:base_instructions",
+      "payload.forked_from_id": "dimension",
+      "payload.parent_thread_id": "applied:spawn",
+      "payload.source.subagent.thread_spawn.parent_thread_id": "applied:spawn"
+     },
+     "turn_context": {
+      "payload.cwd": "dimension"
+     }
+    },
+    "watched": {
+     "compacted": {
+      "inputs": {
+       "history": [
+        "payload.replacement_history"
+       ]
+      },
+      "sources": [
+       "payload.replacement_history"
+      ]
+     },
+     "event_msg:token_count": {
+      "feeds": {
+       "payload.info.last_token_usage.cache_write_input_tokens": [
+        "applied:usage/input:cache_write_input_tokens"
+       ],
+       "payload.info.last_token_usage.cached_input_tokens": [
+        "applied:usage/input:cached_input_tokens"
+       ],
+       "payload.info.last_token_usage.input_tokens": [
+        "applied:usage/input:input_tokens"
+       ],
+       "payload.info.last_token_usage.output_tokens": [
+        "applied:usage/input:output_tokens"
+       ],
+       "payload.info.last_token_usage.reasoning_output_tokens": [
+        "applied:usage/input:reasoning_output_tokens"
+       ]
+      },
+      "inputs": {
+       "context_window": [
+        "payload.info.model_context_window"
+       ]
+      },
+      "sources": [
+       "payload.info.total_token_usage",
+       "payload.info.model_context_window",
+       "payload.info.last_token_usage.input_tokens",
+       "payload.info.last_token_usage.cached_input_tokens",
+       "payload.info.last_token_usage.cache_write_input_tokens",
+       "payload.info.last_token_usage.output_tokens",
+       "payload.info.last_token_usage.reasoning_output_tokens"
+      ]
+     },
+     "response_item:custom_tool_call": {
+      "feeds": {
+       "payload.call_id": [
+        "applied:tool_call/input:call_id"
+       ],
+       "payload.input": [
+        "applied:tool_call/input:value"
+       ],
+       "payload.name": [
+        "applied:tool_call/input:name"
+       ]
+      },
+      "inputs": {},
+      "sources": [
+       "payload.call_id",
+       "payload.name",
+       "payload.input"
+      ]
+     },
+     "response_item:custom_tool_call_output": {
+      "feeds": {
+       "payload.output": [
+        "applied:tool_output/input:output"
+       ]
+      },
+      "inputs": {},
+      "sources": [
+       "payload.call_id",
+       "payload.output"
+      ]
+     },
+     "response_item:function_call": {
+      "feeds": {
+       "payload.arguments": [
+        "applied:tool_call/input:value"
+       ],
+       "payload.call_id": [
+        "applied:tool_call/input:call_id"
+       ],
+       "payload.name": [
+        "applied:tool_call/input:name"
+       ]
+      },
+      "inputs": {},
+      "sources": [
+       "payload.call_id",
+       "payload.name",
+       "payload.arguments"
+      ]
+     },
+     "response_item:function_call_output": {
+      "feeds": {
+       "payload.output": [
+        "applied:tool_output/input:output"
+       ]
+      },
+      "inputs": {},
+      "sources": [
+       "payload.call_id",
+       "payload.output"
+      ]
+     },
+     "response_item:message": {
+      "feeds": {
+       "payload.content": [
+        "applied:text_block/input:text"
+       ]
+      },
+      "inputs": {
+       "content": [
+        "payload.content"
+       ]
+      },
+      "sources": [
+       "payload.role",
+       "payload.content"
+      ]
+     },
+     "session_meta": {
+      "inputs": {
+       "entrypoint": [
+        "payload.originator"
+       ],
+       "session": [
+        "payload.id"
+       ],
+       "version": [
+        "payload.cli_version"
+       ]
+      },
+      "sources": [
+       "payload.id",
+       "payload.cwd",
+       "payload.originator",
+       "payload.cli_version",
+       "payload.thread_source"
+      ]
+     },
+     "token_usage_record": {
+      "feeds": {
+       "payload.usage.cache_write_input_tokens": [
+        "applied:usage/input:cache_write_input_tokens"
+       ],
+       "payload.usage.cached_input_tokens": [
+        "applied:usage/input:cached_input_tokens"
+       ],
+       "payload.usage.input_tokens": [
+        "applied:usage/input:input_tokens"
+       ],
+       "payload.usage.output_tokens": [
+        "applied:usage/input:output_tokens"
+       ],
+       "payload.usage.reasoning_output_tokens": [
+        "applied:usage/input:reasoning_output_tokens"
+       ]
+      },
+      "inputs": {
+       "response": [
+        "payload.response_id"
+       ]
+      },
+      "sources": [
+       "payload.response_id",
+       "payload.usage.input_tokens",
+       "payload.usage.cached_input_tokens",
+       "payload.usage.cache_write_input_tokens",
+       "payload.usage.output_tokens",
+       "payload.usage.reasoning_output_tokens"
+      ]
+     },
+     "turn_context": {
+      "inputs": {
+       "effort": [
+        "payload.effort",
+        "payload.collaboration_mode.settings.reasoning_effort"
+       ],
+       "model": [
+        "payload.model"
+       ]
+      },
+      "sources": [
+       "payload.model",
+       "payload.effort",
+       "payload.collaboration_mode.settings.reasoning_effort"
+      ]
+     }
+    }
    },
    "labels": {
     "assistant": [
@@ -2365,6 +3262,33 @@
     "turn_context"
    ],
    "versions": {
+    "0.156.1": {
+     "fields_seen": {
+      "observed": [],
+      "synthetic": [
+       "at_ms",
+       "compaction",
+       "context.cwd",
+       "context.effort",
+       "context.model",
+       "eligible",
+       "flush_response",
+       "identity.cwd",
+       "identity.entrypoint",
+       "identity.index_session",
+       "identity.parent",
+       "identity.session",
+       "identity.subagent",
+       "identity.version",
+       "injections",
+       "native_kind"
+      ]
+     },
+     "observed": [],
+     "synthetic": [
+      "index:codex-context.jsonl"
+     ]
+    },
     "0.163.0": {
      "fields_seen": {
       "observed": [],
@@ -2478,8 +3402,24 @@
       "synthetic": [
        "answer_phase",
        "at",
+       "at_ms",
        "block_type",
+       "calls[].block",
+       "calls[].command",
+       "calls[].commands",
+       "calls[].id",
+       "calls[].input_bytes",
+       "calls[].input_text",
+       "calls[].kind",
+       "calls[].native_name",
+       "calls[].paths_complete",
+       "context.context_window",
+       "context.cwd",
+       "context.effort",
+       "context.model",
+       "eligible",
        "flags",
+       "flush_response",
        "header.child",
        "header.child_basis",
        "header.cwd",
@@ -2491,13 +3431,44 @@
        "header.recorded_identity.session",
        "header.session",
        "header.turn_ids",
+       "identity.cwd",
+       "identity.entrypoint",
+       "identity.index_session",
+       "identity.session",
+       "identity.subagent",
+       "injections",
        "kind",
        "links[].target",
+       "message.assistant_output_bytes",
+       "message.blocks",
+       "message.channel",
+       "message.joined_bytes",
+       "message.joined_nonempty",
+       "message.origin",
+       "message.text",
+       "native_kind",
        "origin.markers",
        "origin.unrecognized_tag.joined",
        "origin.unrecognized_tag.lead",
        "phase",
        "readable_text",
+       "response.id",
+       "response.native",
+       "response.phase",
+       "response.usage.cache_read",
+       "response.usage.cache_write",
+       "response.usage.context_total",
+       "response.usage.input_uncached",
+       "response.usage.output",
+       "response.usage.thinking",
+       "response.usage.uncached_total",
+       "response.usage_present.cache_read",
+       "response.usage_present.cache_write",
+       "response.usage_present.context_total",
+       "response.usage_present.input_uncached",
+       "response.usage_present.output",
+       "response.usage_present.thinking",
+       "response.usage_present.uncached_total",
        "session",
        "text",
        "turn_end_message",
@@ -2506,6 +3477,7 @@
      },
      "observed": [],
      "synthetic": [
+      "index:codex-basic.jsonl",
       "origin/codex-agents_md.jsonl",
       "origin/codex-child-prompt.jsonl",
       "origin/codex-collaboration_mode.jsonl",

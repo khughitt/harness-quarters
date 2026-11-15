@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 import tomllib
 
-from . import DECODER_VERSION, SCHEMA, index_events, index_coverage
+from . import DECODER_VERSION, SCHEMA, index_events, index_coverage, index_codex, index_codex_coverage
 
 EVIDENCE_RULE = ("synthetic samples establish decoder conformance; observed samples or probes "
                  "establish emission; absent from a sample means unobserved")
@@ -127,6 +127,7 @@ DECLARED: dict[str, dict[str, list[str]]] = {
 
 
 DECLARED["claude-code"].update(index_events.PROVENANCE)
+DECLARED["codex"].update(index_codex.PROVENANCE)
 
 # Descendant metadata extends capability resolution, never the hot event proof table.
 DECLARED["claude-code"].update({
@@ -189,12 +190,19 @@ def _seen(decoded, native, fields):
                        for value in values)
         return bool(values)
 
+    def meaningful(value):
+        if isinstance(value, dict):
+            return any(meaningful(child) for child in value.values())
+        if isinstance(value, list):
+            return any(meaningful(child) for child in value)
+        return value is not None
+
     return {field for field, paths in fields.items()
-            if any(value != [] and value != {} for value in _values(decoded, field))
+            if any(meaningful(value) for value in _values(decoded, field))
             and any(source(field, row, path) for row in native for path in paths)}
 
 
-def build(catalogue: Path) -> dict:
+def build(catalogue: Path, *, index_catalogue: Path | None = None) -> dict:
     """Decode each catalogued byte snapshot; no links may read ancillary store files."""
     from . import records
     from .lines import Place, UnknownFormat, decode, detect_format, lines
@@ -203,7 +211,7 @@ def build(catalogue: Path) -> dict:
     raw_catalogue = catalogue.read_bytes()
     samples = tomllib.loads(raw_catalogue.decode("utf-8"))["sample"]
     harnesses = {slug: {"record_kinds": set(), "fields": {
-        field: {"provenance": sorted(paths), "coverage_keys": COVERAGE_KEYS.get(field, []) if slug == "claude-code" else [],
+        field: {"provenance": sorted(paths), "coverage_keys": (COVERAGE_KEYS if slug == "claude-code" else index_codex.COVERAGE_KEYS).get(field, []),
                 **({"coverage_scopes": COVERAGE_SCOPES[field]} if slug == "claude-code" and field in COVERAGE_SCOPES else {})} for field, paths in fields.items()
     }, "labels": {}, "versions": {}, "exceptions": []} for slug, fields in DECLARED.items()}
     hashes = {}
@@ -275,6 +283,35 @@ def build(catalogue: Path) -> dict:
                 continue
             source = [first_meta] if fmt == "codex" and name in creation else list(native.values())
             seen.update(_seen({"header": read.header}, source, {field: paths}))
+    # Index-only native records have no reader-role conformance obligation.
+    index_hashes = {}
+    if index_catalogue is not None:
+        raw_index = index_catalogue.read_bytes()
+        for sample in tomllib.loads(raw_index.decode("utf-8"))["sample"]:
+            name, slug, version, provenance = (sample[key] for key in ("path", "harness", "version", "provenance"))
+            path = index_catalogue.parent / name
+            if Path(name).is_absolute() or not path.resolve().is_relative_to(index_catalogue.parent.resolve()):
+                raise ValueError("sample path must remain within the catalogue directory")
+            if name in index_hashes or provenance not in ("synthetic", "observed") or sample.get("profile") != "index":
+                raise ValueError("invalid index sample declaration")
+            data = path.read_bytes()
+            index_hashes[name] = hashlib.sha256(data).hexdigest()
+            evidence = harnesses[slug]["versions"].setdefault(version, {
+                "synthetic": [], "observed": [], "fields_seen": {"synthetic": set(), "observed": set()}})
+            evidence[provenance].append("index:" + name)
+            native, offsets, offset = {}, [], 0
+            for line, raw in enumerate(data.splitlines(keepends=True), 1):
+                offsets.append((offset, raw))
+                offset += len(raw)
+                try:
+                    native[line] = json.loads(raw)
+                except (ValueError, UnicodeError):
+                    pass
+            place = Place(slug, "file", None, "explicit", name, path)
+            profile = {"claude-code": index_events, "codex": index_codex}[slug]
+            for event in profile.extract(offsets, {}, place=place, text=True):
+                if event["object"] == "index_event":
+                    evidence["fields_seen"][provenance].update(_seen(event, [native[event["line"]]], DECLARED[slug]))
     harnesses["claude-code"]["index"] = json.loads(json.dumps({
         "profile": "index", "mode": "incremental", "resume": True,
         "watched": index_coverage.WATCHED, "applied": index_coverage.APPLIED,
@@ -282,6 +319,16 @@ def build(catalogue: Path) -> dict:
         "known_kinds": sorted(index_coverage.KNOWN_KINDS),
         "tool_kinds": TOOL_KINDS,
         "features": {"native_skill_events": True, "question_option_labels": True}}))
+    harnesses["codex"]["index"] = json.loads(json.dumps({
+        "profile": "index", "mode": "incremental", "resume": True,
+        "watched": index_codex_coverage.WATCHED, "applied": index_codex_coverage.APPLIED,
+        "unwatched": index_codex_coverage.UNWATCHED, "common_reads": index_codex_coverage.COMMON_READS,
+        "known_kinds": sorted(index_codex_coverage.KNOWN_KINDS),
+        "tool_kinds": {**dict.fromkeys(index_codex.SHELL, "shell"), "apply_patch": "patch",
+                       "write_stdin": "poll", "wait": "poll", "wait_agent": "poll"},
+        "features": {"native_skill_events": False, "question_option_labels": False,
+                     "stateful_execution": False},
+        "pending_plan_task": 2}))
     harnesses["claude-code"]["header"] = {"implemented": True, "line_limit": 50}
     harnesses["codex"]["header"] = {"implemented": False}
     for harness in harnesses.values():
@@ -292,7 +339,9 @@ def build(catalogue: Path) -> dict:
                 evidence[provenance].sort()
                 evidence["fields_seen"][provenance] = sorted(evidence["fields_seen"][provenance])
     return {"schema": SCHEMA, "decoder_version": DECODER_VERSION, "built_from": {
-        "catalogue_sha256": hashlib.sha256(raw_catalogue).hexdigest(), "samples": hashes},
+        "catalogue_sha256": hashlib.sha256(raw_catalogue).hexdigest(), "samples": hashes,
+        **({"index_catalogue_sha256": hashlib.sha256(raw_index).hexdigest(),
+            "index_samples": index_hashes} if index_catalogue is not None else {})},
         "evidence_rule": EVIDENCE_RULE, "harnesses": harnesses}
 
 
@@ -302,7 +351,7 @@ def build_artifact() -> None:
     catalogue = root / "tools/fixtures/session-logs/CATALOGUE.toml"
     if not (root / ".git").exists() or not (root / "tools/hq").is_file() or not catalogue.is_file():
         raise ValueError("capabilities --build requires an hq checkout with its catalogue")
-    ARTIFACT.write_text(json.dumps(build(catalogue), sort_keys=True, indent=1) + "\n", encoding="utf-8")
+    ARTIFACT.write_text(json.dumps(build(catalogue, index_catalogue=root / "tools/fixtures/harness-evidence/CATALOGUE.toml"), sort_keys=True, indent=1) + "\n", encoding="utf-8")
 
 
 def view(decoder: dict) -> dict:

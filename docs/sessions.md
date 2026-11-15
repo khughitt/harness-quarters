@@ -97,7 +97,7 @@ header agent evidence is separate. Query-ID aliases and publication of arbitrary
 index/identity claims remain consumer policy, rather than native path decoding.
 
 `tools/harness-evidence version --json` reports the evidence schema,
-decoder version `18`, and the decoder revision. A pinned copy reads a `REVISION`
+decoder version `19`, and the decoder revision. A pinned copy reads a `REVISION`
 file inside the package; a checkout reports its HEAD with `+dirty` when
 the package has changes. Without either source the command exits 2.
 
@@ -194,8 +194,10 @@ reader. It has no resumable checkpoint or index extraction side effects.
 
 ## Native index extraction
 
-The opt-in `extract: "index"` request emits Claude native evidence for the scratch
-index pilot. Include each file's `identity: {"device": ..., "inode": ...}`, keep
+The opt-in `extract: "index"` request selects the native evidence profile from
+the declared harness/place. Claude supports the scratch index pilot; the Codex
+profile currently supplies basic facts and declarations while stateful execution
+relocation remains incomplete. Include each file's `identity: {"device": ..., "inode": ...}`, keep
 `cross_file` and `raw` false, and omit `context`. Pass a saved index `state` whole:
 `next_line`, `next_offset` and `digest` describe the complete raw prefix, while
 `index` is opaque. The held descriptor must match the supplied identity and fixed
@@ -246,6 +248,24 @@ sizes. Joined user text preserves empty placeholders for missing text keys. Nati
 the exact nonempty native file/notebook path; `paths` separately carries lexical
 normalization against cwd, and `paths_complete` records missing or rejected inputs.
 
+Codex version 19 emits terminal usage responses (`response.phase:"terminal"`),
+independent messages, direct call inputs and context updates. Context observations
+can be untimed. Claude response fragments carry `phase:"fragment"`, `context:null`
+and empty `execution` collections and diagnostic counters. Codex terminal
+`usage_present` has all seven normalized usage keys. Missing direct counters remain
+null; input-minus-cached arithmetic defaults absent operands to zero and still
+rejects explicit null operands. A later record-usage source after count usage
+requests a seeded restart. Discarded count usage contributes no applied population.
+Native counters stay unchanged in `response.native`.
+
+Codex patch header paths stay in `patch_paths`; lexical candidate `paths` normalize
+separately. Direct shell calls expose ordered `commands` and directories. Code-mode
+operations, result status/truncation, skill inference, bounded stateful associations,
+late context replacement and terminal metadata are not yet implemented by this step;
+the capability view marks stateful execution incomplete. The index-only catalogue
+and original-case inventory live under `tools/fixtures/harness-evidence/`; they do
+not add reader-role requirements to the ordinary reader catalogue.
+
 Question prompts, result answers and native duration metadata retain their finite
 JSON values. Consumers apply their hashing/matching/scoring rules at the original
 use site; a native decode success can still precede a consumer-policy failure.
@@ -253,7 +273,7 @@ Native duration metadata describes presence and is separate from timestamp delta
 The conformance corpus records native and consumer outcomes separately for these
 cases, including old partial row/session/coverage evidence on consumer failure.
 
-`response.usage_present` contains `output` and `thinking` booleans for native key
+For Claude fragments, `response.usage_present` contains `output` and `thinking` booleans for native key
 presence, including explicit null. Consumers preserving old storage defaults use 0
 only when the flag is false and copy a present `usage.output` or `usage.thinking`
 unchanged. These two fields preserve opaque native JSON storage values, including

@@ -6,7 +6,7 @@ import hashlib
 import os
 from pathlib import Path
 
-from . import discover, index_events
+from . import discover, index_events, index_codex
 from .index_events import _factor_provenance, _check_proof_change, _own_proof_changes
 from .lines import Place
 from ._protocol import ProtocolError, validate
@@ -29,11 +29,11 @@ def _plain_declaration(proof):
     return True
 
 
-def _provenance_encoder(defaults: dict) -> Callable[[dict], dict]:
+def _provenance_encoder(defaults: dict, *, profile=index_events) -> Callable[[dict], dict]:
     """Validate owned declarations once, then audit every supplied resolved change."""
     attributes = {"native_paths", "coverage_keys", "basis", "rule"}
     if (type(defaults) is not dict or not all(type(field) is str for field in defaults)
-            or defaults.keys() != index_events.PROVENANCE.keys()):
+            or defaults.keys() != profile.PROVENANCE.keys()):
         raise ProtocolError("index provenance declaration fields are missing or unknown")
     for proof in defaults.values():
         if (not _plain_declaration(proof) or not attributes <= proof.keys()
@@ -106,8 +106,8 @@ def _file(source, number, roots, request, envelope):
         place = discover.place_of(logical, roots)
     except ValueError:
         place = Place("claude-code", "file", None, "explicit", str(logical), logical)
-    if place.harness != "claude-code":
-        raise ProtocolError("index extraction currently supports Claude only")
+    profiles = {"claude-code": index_events, "codex": index_codex}
+    profile = profiles[place.harness]
     place = replace(place, read_path=physical)
     binding = _binding(source, place, envelope, request.get("text", False))
     base = {**envelope, "request": request["id"], "file": number,
@@ -115,8 +115,8 @@ def _file(source, number, roots, request, envelope):
     location = asdict(place)
     location.pop("path")
     location.pop("read_path")
-    defaults = index_events.provenance_defaults()
-    encode_provenance = _provenance_encoder(defaults)
+    defaults = profile.provenance_defaults()
+    encode_provenance = _provenance_encoder(defaults, profile=profile)
     start = {**base, "provenance_format": "defaults/1",
              "provenance_defaults": copy.deepcopy(defaults),
              "object": "file_start", "key": "file", "path": str(logical),
@@ -165,7 +165,7 @@ def _file(source, number, roots, request, envelope):
 
         count, restart = 0, None
         try:
-            for value in index_events.extract(physical_lines(), state, place=place, text=request.get("text", False)):
+            for value in profile.extract(physical_lines(), state, place=place, text=request.get("text", False)):
                 event = {**base, **value, "harness_version": value.get("identity", {}).get("version")}
                 if event["object"] == "index_event":
                     event["provenance"] = encode_provenance(event)
