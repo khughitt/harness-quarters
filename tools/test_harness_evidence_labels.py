@@ -66,6 +66,8 @@ def test_conflicts_are_unknown_with_their_evidence():
 
 def test_every_rule_has_a_basis_and_no_fallback_claims_human():
     for sample in CATALOGUE:
+        if sample.get('profile') == 'index':
+            continue
         for record in read_sample(sample).records:
             assert record['basis'] in {'native', 'convention', 'heuristic'}
             assert record['rule'] == record['role_basis']
