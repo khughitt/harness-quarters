@@ -1,14 +1,16 @@
 """Codex index facts, independent of the consumer's measurement policy.
 
-Basic record facts preserve OBS 1e0afad1. Stateful execution associations and
-late context replacement are delivered by the next relocation step.
+Native grammar and associations preserve OBS 1e0afad1. Consumer measurement
+policy and accumulated turn replacement remain outside the decoder.
 """
+import copy
 import hashlib
 import json
 import posixpath
 import re
 
-from . import labels
+from . import labels, index_codex_runs as runs, index_codex_tools as tools
+from . import _index_codex_skills as skills, _index_codex_outcomes as outcomes
 from .index_events import Restart, _at_ms, _size, _join
 from .index_codex_coverage import (COUNTERS, KNOWN_KINDS, WATCHED, record_kind,
                                    day_of, count_record, applied, coverage_rows)
@@ -20,6 +22,7 @@ INJECTED = ("# AGENTS.md", "<environment_context>", "<INSTRUCTIONS>",
             "<skills_instruct", "<turn_aborted>", "<permissions",
             "<user_shell", "<collaboration_mode")
 SHELL = frozenset({"exec_command", "shell_command", "shell"})
+DISPATCH = frozenset({"spawn_agent", "send_message", "followup_task"})
 PATCH_PATH = re.compile(r"\*\*\* (?:(?:Update|Add|Delete) File|Move to): (.+?)(?=\\n|\n|[\"'`]|$)")
 
 PROVENANCE = {
@@ -51,6 +54,7 @@ PROVENANCE = {
     "calls[].input_text": ["payload.arguments", "payload.input"],
     "calls[].command": ["payload.arguments", "payload.input"],
     "calls[].commands": ["payload.arguments", "payload.input", "payload.cwd"],
+    "calls[].prompt": ["payload.arguments.message", "payload.input.message"],
     "calls[].patch_paths": ["payload.arguments", "payload.input"],
     "calls[].paths": ["payload.arguments", "payload.input", "payload.cwd"],
     "calls[].paths_complete": ["payload.arguments", "payload.input", "payload.cwd"],
@@ -83,6 +87,7 @@ COVERAGE_KEYS = {
     "injections": ["applied:base_instructions/input:text", "applied:text_block/input:text", "compacted/input:history"],
     "compaction": ["compacted/input:history"],
     "calls[].kind": ["applied:tool_call/input:name"],
+    "calls[].prompt": ["applied:tool_call/input:value"],
     **{field: ["applied:tool_call/input:value"] for field in
        ("calls[].command", "calls[].patch_paths", "calls[].paths", "calls[].paths_complete")},
 }
@@ -97,12 +102,59 @@ CONVENTIONS = frozenset({"flush_response", "execution", "notifications", "fork_b
                           "calls[].kind", "calls[].paths", "calls[].paths_complete", "calls[].commands"})
 
 
+
+EXEC_PATHS = ["timestamp", "payload.timestamp", "payload.call_id", "payload.name", "payload.arguments", "payload.input",
+              "payload.output", "payload.item", "payload.exit_code", "payload.duration",
+              "payload.success", "payload.result", "payload.started_at_ms", "payload.completed_at_ms"]
+EXEC_COVERAGE = ["applied:tool_call/input:call_id", "applied:tool_output/input:output",
+                "applied:exec_end/input:exit_code", "applied:command_item/input:id",
+                "applied:patch_end/input:success", "applied:mcp_end/input:result"]
+for _group in ("runs", "commands", "call_updates", "writes", "operations", "diagnostics"):
+    PROVENANCE["execution." + _group] = EXEC_PATHS
+    COVERAGE_KEYS["execution." + _group] = EXEC_COVERAGE
+for _field in ("operations", "skills"):
+    PROVENANCE["calls[]." + _field] = ["payload.name", "payload.arguments", "payload.input"]
+    COVERAGE_KEYS["calls[]." + _field] = ["applied:tool_call/input:name", "applied:tool_call/input:value"]
+    CONVENTIONS |= {"calls[]." + _field}
+for _field in ("call_id", "bytes", "error", "interrupted", "native_duration_ms", "background_id",
+               "agent", "child_session", "answers", "truncation"):
+    PROVENANCE["results[]." + _field] = ["payload.call_id", "payload.output"]
+    COVERAGE_KEYS["results[]." + _field] = ["applied:tool_output/input:call_id", "applied:tool_output/input:output"]
+    CONVENTIONS |= {"results[]." + _field}
+METADATA_PROVENANCE = {
+    "metadata.identity.thread_id": ["payload.id"],
+    "metadata.identity.ancestors": ["payload.forked_from_id", "payload.parent_thread_id",
+        "payload.source.subagent.thread_spawn.parent_thread_id"],
+    "metadata.identity.conflicts": ["payload.id", "payload.forked_from_id", "payload.parent_thread_id",
+        "payload.source.subagent.thread_spawn.parent_thread_id"],
+    "metadata.usage_source": ["type", "payload.type", "payload.info.total_token_usage"],
+    **{"metadata.run_diagnostics." + name: EXEC_PATHS for name in runs.COUNTERS},
+    **{"metadata.command_diagnostics." + name: EXEC_PATHS for name in outcomes.COUNTERS},
+}
+PROVENANCE.update(METADATA_PROVENANCE)
+for _field in METADATA_PROVENANCE:
+    COVERAGE_KEYS[_field] = EXEC_COVERAGE if "diagnostics" in _field else ["session_meta/input:session"] if "identity" in _field else ["token_usage_record/input:response", "event_msg:token_count/payload.info.total_token_usage"]
+
+
+def metadata(state):
+    """Declared cumulative facts; absence retains the original uninitialized maps."""
+    return copy.deepcopy({key: state.get(key) for key in
+                          ("identity", "usage_source", "run_diagnostics", "command_diagnostics")})
+
+
 def provenance_defaults():
     """Sparse default proofs; per-event exceptions carry only changed attributes."""
-    return {field: {"native_paths": list(paths), "coverage_keys": list(COVERAGE_KEYS.get(field, [])),
+    defaults = {field: {"native_paths": list(paths), "coverage_keys": list(COVERAGE_KEYS.get(field, [])),
                     "basis": "convention" if field in CONVENTIONS else "native",
                     "rule": "codex_" + field.replace("[]", "").replace(".", "_")}
             for field, paths in PROVENANCE.items()}
+    defaults["context.context_window"]["source"] = "context_window_snapshot"
+    for field in ("calls[].skills", "execution.runs", "execution.commands", "execution.call_updates", "execution.writes", "execution.operations"):
+        defaults[field]["basis"] = "heuristic"
+    for field in METADATA_PROVENANCE:
+        defaults[field]["basis"] = "convention"
+        defaults[field]["rule"] = "codex_cumulative_" + field.removeprefix("metadata.").replace(".", "_")
+    return defaults
 
 
 def _parent(payload):
@@ -110,6 +162,26 @@ def _parent(payload):
     subagent = source.get("subagent") if isinstance(source, dict) else None
     spawn = (subagent.get("thread_spawn") or {}) if isinstance(subagent, dict) else {}
     return spawn.get("parent_thread_id") or payload.get("parent_thread_id")
+
+
+def _identity(state, payload):
+    """Record the file's own thread (its first session_meta id), the parents its records
+    declare, and any later id outside that ancestry. A fork or
+    subagent rollout inherits its parent's session_meta as history; that is ancestry, not
+    a conflict."""
+    thread = payload.get("id")
+    if not thread:
+        return
+    identity = state.setdefault("identity", {"thread_id": None, "ancestors": [], "conflicts": []})
+    if identity["thread_id"] is None:
+        identity["thread_id"] = thread
+    elif thread != identity["thread_id"] and thread not in identity["ancestors"]:
+        if thread not in identity["conflicts"]:
+            identity["conflicts"].append(thread)
+        return
+    for parent in (payload.get("forked_from_id"), _parent(payload)):
+        if parent and parent not in identity["ancestors"]:
+            identity["ancestors"].append(parent)
 
 
 def _usage(raw):
@@ -162,17 +234,31 @@ def _call(payload, cwd):
             directory = (workdir if posixpath.isabs(workdir) else posixpath.join(cwd, workdir) if cwd else None) \
                 if isinstance(workdir, str) and workdir else None
         commands = [{"command": command, "cwd": directory}]
+    if name not in SHELL:
+        commands = [{"command": cmd, "cwd": here} for cmd, here in zip(
+            tools.codex_commands(name, value), tools.codex_directories(name, value, cwd), strict=True)]
     patch = name == "apply_patch" or name == "exec" and "tools.apply_patch(" in text
     raw_paths = ([m.group(1).strip() for m in PATCH_PATH.finditer(text)] or [None]) if patch else []
     candidate_text = value if isinstance(value, str) else json.dumps(value)
     candidate_paths = ([m.group(1).strip() for m in PATCH_PATH.finditer(candidate_text)] or [None]) if patch else []
     candidates = [_join(path, cwd) if path is not None else None for path in candidate_paths]
     call = {"id": payload.get("call_id"), "native_name": name,
-            "kind": "shell" if name in SHELL else "patch" if patch else "poll" if name in {"write_stdin", "wait", "wait_agent"} else "other",
+            "kind": "shell" if name in SHELL else "script" if name == "exec" else "patch" if patch else "poll" if name in {"write_stdin", "wait", "wait_agent"} else "dispatch" if name in DISPATCH else "other",
             "input_bytes": _size(value), "input_text": text, "command": command,
-            "commands": commands, "patch_paths": raw_paths,
+            "commands": commands, "operations": runs.operations(text) if name == "exec" else None,
+            "skills": skills.from_call(name, value), "patch_paths": raw_paths,
             "paths": sorted(set(p for p in candidates if p is not None)),
             "paths_complete": all(p is not None for p in candidates), "block": 0}
+    if name in DISPATCH:
+        decoded = value
+        if isinstance(value, str):
+            try:
+                decoded = json.loads(value)
+            except ValueError:
+                decoded = None
+        message = decoded.get("message") if isinstance(decoded, dict) else None
+        call["prompt"] = message if isinstance(message, str) and message else None
+        call["paths_complete"] = call["prompt"] is not None
     return call, arguments, normalization
 
 
@@ -231,6 +317,7 @@ def extract(lines, state, *, place: Place, text: bool):
                  "execution": {"runs": [], "commands": [], "call_updates": [], "writes": [],
                                "operations": [], "diagnostics": {}}, "provenance": {}}
         if kind == "session_meta":
+            _identity(state, payload)
             base = (payload.get("base_instructions") or {}).get("text")
             if base is not None:
                 if session is None:
@@ -258,16 +345,22 @@ def extract(lines, state, *, place: Place, text: bool):
                     if window is not None:
                         state["context_window"] = window
                         event["context"] = {"model": state.get("model"), "effort": state.get("effort"), "cwd": state.get("turn_cwd"), "context_window": window}
+                        event["provenance"]["context.context_window"] = {
+                            "source": "context_window_observation", "rule": "codex_recorded_context_window"}
                     total = info.get("total_token_usage")
                     if state["usage_source"] != "record" and total != state.get("last_total"):
                         state.update(usage_source="count", last_total=total)
                         selected = (f"tc:{session}:{offset}", info.get("last_token_usage") or {})
             if selected is not None:
                 response_id, usage = selected
+                event["context"] = {"model": state.get("model"), "effort": state.get("effort"),
+                    "cwd": state.get("turn_cwd"), "context_window":
+                    window if native_kind == "event_msg:token_count" else state.get("context_window")}
                 normalized, present = _usage(usage)
                 applied(state, session, day, "usage", {name: usage.get(name) is not None for name in COUNTERS})
                 event["response"] = {"id": response_id, "phase": "terminal", "model": state.get("model"), "effort": state.get("effort"),
                                      "native": usage, "usage": normalized, "usage_present": present}
+                tools.on_usage(state, response_id)
             if native_kind == "response_item:message":
                 event["message"] = _message(payload)
                 if payload.get("role") == "user":
@@ -282,6 +375,8 @@ def extract(lines, state, *, place: Place, text: bool):
             elif native_kind in ("response_item:function_call", "response_item:custom_tool_call"):
                 call, arguments, normalization = _call(payload, state.get("turn_cwd"))
                 event["calls"].append(call)
+                field = "arguments" if payload.get("type") == "function_call" else "input"
+                tools.on_call(state, event, call, payload.get(field, ""))
                 if normalization is not None:
                     event["provenance"]["calls[].command"] = {"basis": "convention", "rule": normalization}
                     event["provenance"]["calls[].commands"] = {"rule": normalization}
@@ -289,20 +384,25 @@ def extract(lines, state, *, place: Place, text: bool):
                 applied(state, session, day, "tool_call", {"call_id": payload.get("call_id") is not None, "name": payload.get("name") is not None, "value": payload.get(field) is not None})
                 if isinstance(arguments, dict):
                     applied(state, session, day, "shell_arguments", {"workdir": isinstance(arguments.get("workdir"), str)})
+            elif native_kind in ("response_item:function_call_output", "response_item:custom_tool_call_output"):
+                tools.on_output(state, event, payload, day)
             elif kind == "compacted":
                 event["compaction"] = {"summary": True, "basis": "native", "rule": "codex_compacted"}
                 event["injections"] = [{"piece": 0, "native_kind": "compact_summary", "source": None,
                                         "bytes": _size(payload.get("replacement_history") or [])}]
             elif native_kind == "event_msg:turn_aborted":
                 event["interruption"] = {"user_marker": False, "system": True, "basis": "native", "rule": "codex_turn_aborted"}
+            if kind == "event_msg":
+                tools.on_event(state, event, payload, day)
+        event["execution"]["diagnostics"] = {**state.get("run_diagnostics", {}), **state.get("command_diagnostics", {})}
         if not text:
             if event["message"]:
                 event["message"].pop("text")
                 for block in event["message"]["blocks"]:
                     block.pop("text")
             for call in event["calls"]:
-                for key in ("input_text", "command", "commands", "patch_paths", "paths"):
-                    call.pop(key)
+                for key in ("input_text", "command", "commands", "operations", "patch_paths", "paths", "prompt"):
+                    call.pop(key, None)
             for injection in event["injections"]:
                 injection.pop("source")
         yield event

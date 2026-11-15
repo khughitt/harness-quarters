@@ -204,7 +204,8 @@ def test_counts_deduplicate_without_fabricating_usage_populations():
             if v["record_kind"] == "applied:usage" and v["field"] == "input:output_tokens"] == [(1, 1)]
 
 
-def test_basic_native_reads_are_declared_without_parent_wildcards(monkeypatch):
+@pytest.mark.parametrize("sample", ["codex-basic.jsonl", "codex-context.jsonl", "codex-execution.jsonl"])
+def test_basic_native_reads_are_declared_without_parent_wildcards(monkeypatch, sample):
     """Original support.tracing read audit, over this step's implemented controls."""
     from types import SimpleNamespace
     from harness_evidence import index_codex as cx, index_codex_coverage as cv
@@ -241,7 +242,7 @@ def test_basic_native_reads_are_declared_without_parent_wildcards(monkeypatch):
         return wrap(value, "", cv.record_kind(value)) if isinstance(value, dict) and "payload" in value else value
 
     monkeypatch.setattr(cx, "json", SimpleNamespace(loads=traced, dumps=json.dumps))
-    source = (FIXTURES / "codex-basic.jsonl").read_bytes().splitlines(keepends=True)
+    source = (FIXTURES / sample).read_bytes().splitlines(keepends=True)
     place = Place("codex", "file", None, "explicit", "control", Path("control"))
     list(cx.extract(enumerate(source), {}, place=place, text=True))
     missing = []
@@ -265,10 +266,11 @@ def test_native_injection_sources_and_compaction_sizes_are_independent_of_policy
     assert values[2]["injections"] == [{"piece": 0, "native_kind": "compact_summary", "source": None, "bytes": 10}]
 
 
-def test_pinned_command_and_import_codex_facts_agree(tmp_path):
+@pytest.mark.parametrize("sample", ["codex-basic.jsonl", "codex-execution.jsonl"])
+def test_pinned_command_and_import_codex_facts_agree(tmp_path, sample):
     from test_harness_evidence_package import extracted_copy
     root = extracted_copy(tmp_path, revision="f" * 40)
-    source = FIXTURES / "codex-basic.jsonl"
+    source = FIXTURES / sample
     req = request(source)
     proc = subprocess.run([str(root / "tools/harness-evidence"), "decode"],
                           input=json.dumps(req) + "\n", text=True, capture_output=True,

@@ -135,7 +135,7 @@ def test_artifact_covers_catalogue_hashes_and_keeps_provenance_separate():
         if slug == "codex":
             assert harness["fields"]["response.usage.input_uncached"]["coverage_keys"] == [
                 "applied:usage/input:input_tokens", "applied:usage/input:cached_input_tokens"]
-            assert harness["index"]["features"]["stateful_execution"] is False
+            assert harness["index"]["features"]["stateful_execution"] is True
         else:
             assert harness["fields"]["calls[].raw_path"]["provenance"] == [
                 "message.content[].input.file_path", "message.content[].input.notebook_path"]
@@ -358,11 +358,13 @@ def test_missing_artifact_fails_instead_of_building_from_fixtures(tmp_path):
     assert result.stdout == ""
 
 
-def test_empty_execution_scaffold_does_not_claim_versioned_extraction():
+def test_execution_support_is_distinct_from_synthetic_versioned_evidence():
     from harness_evidence.capabilities import build
     evidence = build(FIXTURES / "CATALOGUE.toml",
                      index_catalogue=TOOLS / "fixtures/harness-evidence/CATALOGUE.toml")
-    for harness in evidence["harnesses"].values():
-        for version in harness["versions"].values():
-            assert "execution" not in version["fields_seen"]["synthetic"]
-    assert evidence["harnesses"]["codex"]["index"]["features"]["stateful_execution"] is False
+    for version in evidence["harnesses"]["claude-code"]["versions"].values():
+        assert "execution" not in version["fields_seen"]["synthetic"]
+    codex = evidence["harnesses"]["codex"]
+    assert codex["index"]["features"]["stateful_execution"] is True
+    assert "execution.runs" in codex["versions"]["unknown"]["fields_seen"]["synthetic"]
+    assert all(not v["fields_seen"]["observed"] for v in codex["versions"].values())

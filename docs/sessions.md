@@ -195,9 +195,8 @@ reader. It has no resumable checkpoint or index extraction side effects.
 ## Native index extraction
 
 The opt-in `extract: "index"` request selects the native evidence profile from
-the declared harness/place. Claude supports the scratch index pilot; the Codex
-profile currently supplies basic facts and declarations while stateful execution
-relocation remains incomplete. Include each file's `identity: {"device": ..., "inode": ...}`, keep
+the declared harness/place. Claude supports the scratch index pilot; Codex supplies terminal usage and
+stateful native execution facts. Include each file's `identity: {"device": ..., "inode": ...}`, keep
 `cross_file` and `raw` false, and omit `context`. Pass a saved index `state` whole:
 `next_line`, `next_offset` and `digest` describe the complete raw prefix, while
 `index` is opaque. The held descriptor must match the supplied identity and fixed
@@ -263,10 +262,41 @@ separately. Direct shell calls expose ordered `commands` and directories. Comman
 are strings or null; string lists join with spaces, and other malformed values fail.
 The original adapter's accepted empty command object normalizes to empty text with
 the named convention `codex_empty_command_object`, retaining the original input and
-byte size. Code-mode
-operations, result status/truncation, skill inference, bounded stateful associations,
-late context replacement and terminal metadata are not yet implemented by this step;
-the capability view marks stateful execution incomplete. The index-only catalogue
+byte size. Code-mode calls have kind `script`, including scripts containing patch
+operations; direct patch calls have kind `patch`. Ordered `operations` distinguish
+launches and polls, with null for scripts that cannot be paired and an empty list
+for plain scripts without operations. Commands, input text and operation commands
+require `text:true`. Skill names carry heuristic provenance. Native collaboration
+calls use kind `dispatch` and `prompt` from a nonempty native `message` string;
+a native `prompt` key alone supplies no candidate message.
+
+`execution` publishes run intervals, command outcomes, call updates, write outcomes,
+operation statuses and cumulative diagnostics. Stable native ids and operation indices
+allow later facts to replace provisional facts without replaying physical events.
+Poll results retain their own status; an awaited command's failure updates its
+originating run. Pending checkpoints keep association summaries and the original
+256-entry recent bounds where applicable, never command, input or output text.
+Pending identity maps and past launches retain the source algorithm's uncapped
+semantics so late evidence can still join. Shell roles, task ids, review judgments
+and lifecycle interpretation remain consumer policy.
+
+Every terminal response includes the current context snapshot: remembered context
+window for record usage, that token-count record's local window (possibly null) for
+count usage. The default context-window proof has `source:context_window_snapshot`
+and rule `codex_context_context_window`; a non-null token-count observation overrides
+these with `context_window_observation` and `codex_recorded_context_window`.
+Consumers use the checked sparse source to apply their recent-turn replacement once.
+An inherited turn-context snapshot, null count info or a missing/null window does not
+trigger replacement.
+
+Codex `file_end.metadata` has `identity`, `usage_source`, `run_diagnostics` and
+`command_diagnostics`. Identity includes thread id, ancestors and conflicts. Maps
+remain null until initialized; usage source is `none`, `count` or `record`. Restart
+and unavailable sources publish null metadata. These are cumulative facts scoped
+by the held file and decoder revision, with leaf native paths and named cumulative
+rules in profile provenance defaults. They are committed only after validated file
+and request terminals; a late decode fault never publishes partial terminal state.
+Claude publishes null metadata. The index-only catalogue
 and original-case inventory live under `tools/fixtures/harness-evidence/`; they do
 not add reader-role requirements to the ordinary reader catalogue.
 

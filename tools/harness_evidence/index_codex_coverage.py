@@ -1,7 +1,7 @@
 """Codex native declarations relocated from OBS 1e0afad1.
 
-The full extraction-site schema is preserved for Task 2's stateful relocation;
-only sites actually visited by the current extractor contribute populations.
+Only sites actually visited by the extractor contribute populations.
+Unwatched native candidate dimensions do not change the historical populations.
 """
 from .index_coverage import day_of, count_record, applied, coverage_rows
 
@@ -127,6 +127,8 @@ UNWATCHED = {
                                  "payload.item.changes": "dimension",
                                  "payload.started_at_ms": "applied:command_item",
                                  "payload.completed_at_ms": "applied:command_item"},
+    "response_item:function_call": {"payload.arguments.message": "dimension"},
+    "response_item:custom_tool_call": {"payload.input.message": "dimension"},
     "response_item:function_call_output": {"payload.output[].text": "applied:tool_output"},
     "response_item:custom_tool_call_output": {"payload.output[].text": "applied:tool_output"},
 }

@@ -324,11 +324,11 @@ def build(catalogue: Path, *, index_catalogue: Path | None = None) -> dict:
         "watched": index_codex_coverage.WATCHED, "applied": index_codex_coverage.APPLIED,
         "unwatched": index_codex_coverage.UNWATCHED, "common_reads": index_codex_coverage.COMMON_READS,
         "known_kinds": sorted(index_codex_coverage.KNOWN_KINDS),
-        "tool_kinds": {**dict.fromkeys(index_codex.SHELL, "shell"), "apply_patch": "patch",
-                       "write_stdin": "poll", "wait": "poll", "wait_agent": "poll"},
+        "tool_kinds": {**dict.fromkeys(index_codex.SHELL, "shell"), "apply_patch": "patch", "exec": "script",
+                       "write_stdin": "poll", "wait": "poll", "wait_agent": "poll",
+                       **dict.fromkeys(index_codex.DISPATCH, "dispatch")},
         "features": {"native_skill_events": False, "question_option_labels": False,
-                     "stateful_execution": False},
-        "pending_plan_task": 2}))
+                     "stateful_execution": True}}))
     harnesses["claude-code"]["header"] = {"implemented": True, "line_limit": 50}
     harnesses["codex"]["header"] = {"implemented": False}
     for harness in harnesses.values():

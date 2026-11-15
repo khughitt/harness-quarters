@@ -6,7 +6,7 @@ from pathlib import Path
 SCHEMA = "harness-evidence/1"
 DECODER_VERSION = "19"
 
-__all__ = ["SCHEMA", "DECODER_VERSION", "RevisionUnknown", "revision", "index_events", "index_stream", "index_coverage", "index_codex", "index_codex_coverage", "header"]
+__all__ = ["SCHEMA", "DECODER_VERSION", "RevisionUnknown", "revision", "index_events", "index_stream", "index_coverage", "index_codex", "index_codex_coverage", "index_codex_runs", "index_codex_tools", "header"]
 
 
 class RevisionUnknown(Exception):

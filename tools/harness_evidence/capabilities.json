@@ -1,10 +1,11 @@
 {
  "built_from": {
   "catalogue_sha256": "4727c9f36d5a3edc66a26688d965fcc8d71dd860eaeb0782cfa8363a2ea20df2",
-  "index_catalogue_sha256": "7180d385ed9d3f18541abf98ce19658f0389db07bdd22a968145cb5002d51770",
+  "index_catalogue_sha256": "a178debc3bf9d2d186bd832b15b46a9cc238fdeafc4f9314ec6c5462cdd18ea2",
   "index_samples": {
    "codex-basic.jsonl": "a7238f2c4cc4903f0247967deb9b95360302563cbf315624ae92ac2cb588fe76",
-   "codex-context.jsonl": "dcbe4630c1b00f0afc13d26e20c08d7ee5e37eb562204828d5204872194135d8"
+   "codex-context.jsonl": "dcbe4630c1b00f0afc13d26e20c08d7ee5e37eb562204828d5204872194135d8",
+   "codex-execution.jsonl": "210585b77ecc3ed7da3b06146a0db214d98d11aa3922cd54dc1f6bb15ec50191"
   },
   "samples": {
    "captures/escaped-malformed.jsonl": "d3ab501588cb7af5e03ae856e875b6809bbd5851e03283e43e53a82bd11a8454",
@@ -2163,6 +2164,17 @@
       "payload.name"
      ]
     },
+    "calls[].operations": {
+     "coverage_keys": [
+      "applied:tool_call/input:name",
+      "applied:tool_call/input:value"
+     ],
+     "provenance": [
+      "payload.arguments",
+      "payload.input",
+      "payload.name"
+     ]
+    },
     "calls[].patch_paths": {
      "coverage_keys": [
       "applied:tool_call/input:value"
@@ -2190,6 +2202,26 @@
       "payload.arguments",
       "payload.cwd",
       "payload.input"
+     ]
+    },
+    "calls[].prompt": {
+     "coverage_keys": [
+      "applied:tool_call/input:value"
+     ],
+     "provenance": [
+      "payload.arguments.message",
+      "payload.input.message"
+     ]
+    },
+    "calls[].skills": {
+     "coverage_keys": [
+      "applied:tool_call/input:name",
+      "applied:tool_call/input:value"
+     ],
+     "provenance": [
+      "payload.arguments",
+      "payload.input",
+      "payload.name"
      ]
     },
     "compaction": {
@@ -2268,6 +2300,162 @@
      "coverage_keys": [],
      "provenance": [
       "type"
+     ]
+    },
+    "execution.call_updates": {
+     "coverage_keys": [
+      "applied:tool_call/input:call_id",
+      "applied:tool_output/input:output",
+      "applied:exec_end/input:exit_code",
+      "applied:command_item/input:id",
+      "applied:patch_end/input:success",
+      "applied:mcp_end/input:result"
+     ],
+     "provenance": [
+      "payload.arguments",
+      "payload.call_id",
+      "payload.completed_at_ms",
+      "payload.duration",
+      "payload.exit_code",
+      "payload.input",
+      "payload.item",
+      "payload.name",
+      "payload.output",
+      "payload.result",
+      "payload.started_at_ms",
+      "payload.success",
+      "payload.timestamp",
+      "timestamp"
+     ]
+    },
+    "execution.commands": {
+     "coverage_keys": [
+      "applied:tool_call/input:call_id",
+      "applied:tool_output/input:output",
+      "applied:exec_end/input:exit_code",
+      "applied:command_item/input:id",
+      "applied:patch_end/input:success",
+      "applied:mcp_end/input:result"
+     ],
+     "provenance": [
+      "payload.arguments",
+      "payload.call_id",
+      "payload.completed_at_ms",
+      "payload.duration",
+      "payload.exit_code",
+      "payload.input",
+      "payload.item",
+      "payload.name",
+      "payload.output",
+      "payload.result",
+      "payload.started_at_ms",
+      "payload.success",
+      "payload.timestamp",
+      "timestamp"
+     ]
+    },
+    "execution.diagnostics": {
+     "coverage_keys": [
+      "applied:tool_call/input:call_id",
+      "applied:tool_output/input:output",
+      "applied:exec_end/input:exit_code",
+      "applied:command_item/input:id",
+      "applied:patch_end/input:success",
+      "applied:mcp_end/input:result"
+     ],
+     "provenance": [
+      "payload.arguments",
+      "payload.call_id",
+      "payload.completed_at_ms",
+      "payload.duration",
+      "payload.exit_code",
+      "payload.input",
+      "payload.item",
+      "payload.name",
+      "payload.output",
+      "payload.result",
+      "payload.started_at_ms",
+      "payload.success",
+      "payload.timestamp",
+      "timestamp"
+     ]
+    },
+    "execution.operations": {
+     "coverage_keys": [
+      "applied:tool_call/input:call_id",
+      "applied:tool_output/input:output",
+      "applied:exec_end/input:exit_code",
+      "applied:command_item/input:id",
+      "applied:patch_end/input:success",
+      "applied:mcp_end/input:result"
+     ],
+     "provenance": [
+      "payload.arguments",
+      "payload.call_id",
+      "payload.completed_at_ms",
+      "payload.duration",
+      "payload.exit_code",
+      "payload.input",
+      "payload.item",
+      "payload.name",
+      "payload.output",
+      "payload.result",
+      "payload.started_at_ms",
+      "payload.success",
+      "payload.timestamp",
+      "timestamp"
+     ]
+    },
+    "execution.runs": {
+     "coverage_keys": [
+      "applied:tool_call/input:call_id",
+      "applied:tool_output/input:output",
+      "applied:exec_end/input:exit_code",
+      "applied:command_item/input:id",
+      "applied:patch_end/input:success",
+      "applied:mcp_end/input:result"
+     ],
+     "provenance": [
+      "payload.arguments",
+      "payload.call_id",
+      "payload.completed_at_ms",
+      "payload.duration",
+      "payload.exit_code",
+      "payload.input",
+      "payload.item",
+      "payload.name",
+      "payload.output",
+      "payload.result",
+      "payload.started_at_ms",
+      "payload.success",
+      "payload.timestamp",
+      "timestamp"
+     ]
+    },
+    "execution.writes": {
+     "coverage_keys": [
+      "applied:tool_call/input:call_id",
+      "applied:tool_output/input:output",
+      "applied:exec_end/input:exit_code",
+      "applied:command_item/input:id",
+      "applied:patch_end/input:success",
+      "applied:mcp_end/input:result"
+     ],
+     "provenance": [
+      "payload.arguments",
+      "payload.call_id",
+      "payload.completed_at_ms",
+      "payload.duration",
+      "payload.exit_code",
+      "payload.input",
+      "payload.item",
+      "payload.name",
+      "payload.output",
+      "payload.result",
+      "payload.started_at_ms",
+      "payload.success",
+      "payload.timestamp",
+      "timestamp"
      ]
     },
     "flags": {
@@ -2565,6 +2753,228 @@
       "payload.item.id"
      ]
     },
+    "metadata.command_diagnostics.commands_ambiguous": {
+     "coverage_keys": [
+      "applied:tool_call/input:call_id",
+      "applied:tool_output/input:output",
+      "applied:exec_end/input:exit_code",
+      "applied:command_item/input:id",
+      "applied:patch_end/input:success",
+      "applied:mcp_end/input:result"
+     ],
+     "provenance": [
+      "payload.arguments",
+      "payload.call_id",
+      "payload.completed_at_ms",
+      "payload.duration",
+      "payload.exit_code",
+      "payload.input",
+      "payload.item",
+      "payload.name",
+      "payload.output",
+      "payload.result",
+      "payload.started_at_ms",
+      "payload.success",
+      "payload.timestamp",
+      "timestamp"
+     ]
+    },
+    "metadata.command_diagnostics.commands_unattributed": {
+     "coverage_keys": [
+      "applied:tool_call/input:call_id",
+      "applied:tool_output/input:output",
+      "applied:exec_end/input:exit_code",
+      "applied:command_item/input:id",
+      "applied:patch_end/input:success",
+      "applied:mcp_end/input:result"
+     ],
+     "provenance": [
+      "payload.arguments",
+      "payload.call_id",
+      "payload.completed_at_ms",
+      "payload.duration",
+      "payload.exit_code",
+      "payload.input",
+      "payload.item",
+      "payload.name",
+      "payload.output",
+      "payload.result",
+      "payload.started_at_ms",
+      "payload.success",
+      "payload.timestamp",
+      "timestamp"
+     ]
+    },
+    "metadata.command_diagnostics.late_event_unmatched": {
+     "coverage_keys": [
+      "applied:tool_call/input:call_id",
+      "applied:tool_output/input:output",
+      "applied:exec_end/input:exit_code",
+      "applied:command_item/input:id",
+      "applied:patch_end/input:success",
+      "applied:mcp_end/input:result"
+     ],
+     "provenance": [
+      "payload.arguments",
+      "payload.call_id",
+      "payload.completed_at_ms",
+      "payload.duration",
+      "payload.exit_code",
+      "payload.input",
+      "payload.item",
+      "payload.name",
+      "payload.output",
+      "payload.result",
+      "payload.started_at_ms",
+      "payload.success",
+      "payload.timestamp",
+      "timestamp"
+     ]
+    },
+    "metadata.identity.ancestors": {
+     "coverage_keys": [
+      "session_meta/input:session"
+     ],
+     "provenance": [
+      "payload.forked_from_id",
+      "payload.parent_thread_id",
+      "payload.source.subagent.thread_spawn.parent_thread_id"
+     ]
+    },
+    "metadata.identity.conflicts": {
+     "coverage_keys": [
+      "session_meta/input:session"
+     ],
+     "provenance": [
+      "payload.forked_from_id",
+      "payload.id",
+      "payload.parent_thread_id",
+      "payload.source.subagent.thread_spawn.parent_thread_id"
+     ]
+    },
+    "metadata.identity.thread_id": {
+     "coverage_keys": [
+      "session_meta/input:session"
+     ],
+     "provenance": [
+      "payload.id"
+     ]
+    },
+    "metadata.run_diagnostics.session_reused": {
+     "coverage_keys": [
+      "applied:tool_call/input:call_id",
+      "applied:tool_output/input:output",
+      "applied:exec_end/input:exit_code",
+      "applied:command_item/input:id",
+      "applied:patch_end/input:success",
+      "applied:mcp_end/input:result"
+     ],
+     "provenance": [
+      "payload.arguments",
+      "payload.call_id",
+      "payload.completed_at_ms",
+      "payload.duration",
+      "payload.exit_code",
+      "payload.input",
+      "payload.item",
+      "payload.name",
+      "payload.output",
+      "payload.result",
+      "payload.started_at_ms",
+      "payload.success",
+      "payload.timestamp",
+      "timestamp"
+     ]
+    },
+    "metadata.run_diagnostics.unattributed_scripts": {
+     "coverage_keys": [
+      "applied:tool_call/input:call_id",
+      "applied:tool_output/input:output",
+      "applied:exec_end/input:exit_code",
+      "applied:command_item/input:id",
+      "applied:patch_end/input:success",
+      "applied:mcp_end/input:result"
+     ],
+     "provenance": [
+      "payload.arguments",
+      "payload.call_id",
+      "payload.completed_at_ms",
+      "payload.duration",
+      "payload.exit_code",
+      "payload.input",
+      "payload.item",
+      "payload.name",
+      "payload.output",
+      "payload.result",
+      "payload.started_at_ms",
+      "payload.success",
+      "payload.timestamp",
+      "timestamp"
+     ]
+    },
+    "metadata.run_diagnostics.unmatched_poll": {
+     "coverage_keys": [
+      "applied:tool_call/input:call_id",
+      "applied:tool_output/input:output",
+      "applied:exec_end/input:exit_code",
+      "applied:command_item/input:id",
+      "applied:patch_end/input:success",
+      "applied:mcp_end/input:result"
+     ],
+     "provenance": [
+      "payload.arguments",
+      "payload.call_id",
+      "payload.completed_at_ms",
+      "payload.duration",
+      "payload.exit_code",
+      "payload.input",
+      "payload.item",
+      "payload.name",
+      "payload.output",
+      "payload.result",
+      "payload.started_at_ms",
+      "payload.success",
+      "payload.timestamp",
+      "timestamp"
+     ]
+    },
+    "metadata.run_diagnostics.unmatched_wait": {
+     "coverage_keys": [
+      "applied:tool_call/input:call_id",
+      "applied:tool_output/input:output",
+      "applied:exec_end/input:exit_code",
+      "applied:command_item/input:id",
+      "applied:patch_end/input:success",
+      "applied:mcp_end/input:result"
+     ],
+     "provenance": [
+      "payload.arguments",
+      "payload.call_id",
+      "payload.completed_at_ms",
+      "payload.duration",
+      "payload.exit_code",
+      "payload.input",
+      "payload.item",
+      "payload.name",
+      "payload.output",
+      "payload.result",
+      "payload.started_at_ms",
+      "payload.success",
+      "payload.timestamp",
+      "timestamp"
+     ]
+    },
+    "metadata.usage_source": {
+     "coverage_keys": [
+      "token_usage_record/input:response",
+      "event_msg:token_count/payload.info.total_token_usage"
+     ],
+     "provenance": [
+      "payload.info.total_token_usage",
+      "payload.type",
+      "type"
+     ]
+    },
     "model.value": {
      "coverage_keys": [],
      "provenance": [
@@ -2808,6 +3218,106 @@
       "payload.usage.input_tokens"
      ]
     },
+    "results[].agent": {
+     "coverage_keys": [
+      "applied:tool_output/input:call_id",
+      "applied:tool_output/input:output"
+     ],
+     "provenance": [
+      "payload.call_id",
+      "payload.output"
+     ]
+    },
+    "results[].answers": {
+     "coverage_keys": [
+      "applied:tool_output/input:call_id",
+      "applied:tool_output/input:output"
+     ],
+     "provenance": [
+      "payload.call_id",
+      "payload.output"
+     ]
+    },
+    "results[].background_id": {
+     "coverage_keys": [
+      "applied:tool_output/input:call_id",
+      "applied:tool_output/input:output"
+     ],
+     "provenance": [
+      "payload.call_id",
+      "payload.output"
+     ]
+    },
+    "results[].bytes": {
+     "coverage_keys": [
+      "applied:tool_output/input:call_id",
+      "applied:tool_output/input:output"
+     ],
+     "provenance": [
+      "payload.call_id",
+      "payload.output"
+     ]
+    },
+    "results[].call_id": {
+     "coverage_keys": [
+      "applied:tool_output/input:call_id",
+      "applied:tool_output/input:output"
+     ],
+     "provenance": [
+      "payload.call_id",
+      "payload.output"
+     ]
+    },
+    "results[].child_session": {
+     "coverage_keys": [
+      "applied:tool_output/input:call_id",
+      "applied:tool_output/input:output"
+     ],
+     "provenance": [
+      "payload.call_id",
+      "payload.output"
+     ]
+    },
+    "results[].error": {
+     "coverage_keys": [
+      "applied:tool_output/input:call_id",
+      "applied:tool_output/input:output"
+     ],
+     "provenance": [
+      "payload.call_id",
+      "payload.output"
+     ]
+    },
+    "results[].interrupted": {
+     "coverage_keys": [
+      "applied:tool_output/input:call_id",
+      "applied:tool_output/input:output"
+     ],
+     "provenance": [
+      "payload.call_id",
+      "payload.output"
+     ]
+    },
+    "results[].native_duration_ms": {
+     "coverage_keys": [
+      "applied:tool_output/input:call_id",
+      "applied:tool_output/input:output"
+     ],
+     "provenance": [
+      "payload.call_id",
+      "payload.output"
+     ]
+    },
+    "results[].truncation": {
+     "coverage_keys": [
+      "applied:tool_output/input:call_id",
+      "applied:tool_output/input:output"
+     ],
+     "provenance": [
+      "payload.call_id",
+      "payload.output"
+     ]
+    },
     "session": {
      "coverage_keys": [],
      "provenance": [
@@ -2917,7 +3427,7 @@
     "features": {
      "native_skill_events": false,
      "question_option_labels": false,
-     "stateful_execution": false
+     "stateful_execution": true
     },
     "known_kinds": [
      "compacted",
@@ -2961,14 +3471,17 @@
      "world_state"
     ],
     "mode": "incremental",
-    "pending_plan_task": 2,
     "profile": "index",
     "resume": true,
     "tool_kinds": {
      "apply_patch": "patch",
+     "exec": "script",
      "exec_command": "shell",
+     "followup_task": "dispatch",
+     "send_message": "dispatch",
      "shell": "shell",
      "shell_command": "shell",
+     "spawn_agent": "dispatch",
      "wait": "poll",
      "wait_agent": "poll",
      "write_stdin": "poll"
@@ -3006,8 +3519,14 @@
       "payload.call_id": "applied:patch_end",
       "payload.success": "applied:patch_end"
      },
+     "response_item:custom_tool_call": {
+      "payload.input.message": "dimension"
+     },
      "response_item:custom_tool_call_output": {
       "payload.output[].text": "applied:tool_output"
+     },
+     "response_item:function_call": {
+      "payload.arguments.message": "dimension"
      },
      "response_item:function_call_output": {
       "payload.output[].text": "applied:tool_output"
@@ -3412,12 +3931,24 @@
        "calls[].input_text",
        "calls[].kind",
        "calls[].native_name",
+       "calls[].operations",
+       "calls[].patch_paths",
+       "calls[].paths",
        "calls[].paths_complete",
+       "calls[].prompt",
+       "calls[].skills",
        "context.context_window",
        "context.cwd",
        "context.effort",
        "context.model",
        "eligible",
+       "execution",
+       "execution.call_updates",
+       "execution.commands",
+       "execution.diagnostics",
+       "execution.operations",
+       "execution.runs",
+       "execution.writes",
        "flags",
        "flush_response",
        "header.child",
@@ -3434,9 +3965,11 @@
        "identity.cwd",
        "identity.entrypoint",
        "identity.index_session",
+       "identity.parent",
        "identity.session",
        "identity.subagent",
        "injections",
+       "interruption",
        "kind",
        "links[].target",
        "message.assistant_output_bytes",
@@ -3469,6 +4002,11 @@
        "response.usage_present.output",
        "response.usage_present.thinking",
        "response.usage_present.uncached_total",
+       "results[].bytes",
+       "results[].call_id",
+       "results[].error",
+       "results[].interrupted",
+       "results[].truncation",
        "session",
        "text",
        "turn_end_message",
@@ -3478,6 +4016,7 @@
      "observed": [],
      "synthetic": [
       "index:codex-basic.jsonl",
+      "index:codex-execution.jsonl",
       "origin/codex-agents_md.jsonl",
       "origin/codex-child-prompt.jsonl",
       "origin/codex-collaboration_mode.jsonl",
