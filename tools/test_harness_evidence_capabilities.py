@@ -8,6 +8,7 @@ import subprocess
 import tarfile
 import tomllib
 
+from harness_evidence import DECODER_VERSION
 from harness_evidence_testing import FIXTURES, path_of
 
 TOOLS = Path(__file__).resolve().parent
@@ -72,6 +73,10 @@ def test_recorded_identity_capability_uses_only_qualifying_native_field(tmp_path
     evidence = build(catalogue)["harnesses"]["claude-code"]
     assert evidence["fields"]["header.recorded_identity.session"]["provenance"] == ["sessionId"]
     assert "header.recorded_identity.session" in evidence["versions"]["test"]["fields_seen"]["synthetic"]
+    (tmp_path / "one.jsonl").write_text('{"type":"user","sessionId":"recorded","cwd":"/selected",'
+                                      '"timestamp":"2026-11-11T23:59:00Z"}\n')
+    seen = build(catalogue)["harnesses"]["claude-code"]["versions"]["test"]["fields_seen"]["synthetic"]
+    assert "header.start_ms" in seen
     (tmp_path / "one.jsonl").write_text('{"type":"user","sessionId":"side","isSidechain":true}\n')
     assert "header.recorded_identity.session" not in build(catalogue)["harnesses"]["claude-code"]["versions"]["test"]["fields_seen"]["synthetic"]
 
@@ -118,8 +123,10 @@ def test_artifact_covers_catalogue_hashes_and_keeps_provenance_separate():
     }
     assert len(samples) == 232
     for slug, harness in artifact["harnesses"].items():
-        assert set(harness) == {"record_kinds", "fields", "labels", "versions", "exceptions"} | ({"index"} if slug == "claude-code" else set())
+        assert set(harness) == {"record_kinds", "fields", "labels", "versions", "exceptions", "header"} | ({"index"} if slug == "claude-code" else set())
         assert harness["exceptions"] == []
+        assert harness["header"] == ({"implemented": True, "line_limit": 50} if slug == "claude-code"
+                                      else {"implemented": False})
         if slug == "codex":
             assert all(f["coverage_keys"] == [] for f in harness["fields"].values())
         else:
@@ -166,6 +173,25 @@ def test_every_declared_native_path_occurs_in_its_harness_samples():
         for field, paths in fields.items():
             assert paths, (slug, field)
             for path in paths:
+                if (slug, field, path) == ("claude-code", "header.cwd", "payload.cwd"):
+                    # An old selector-policy branch, not a Claude emission claim.
+                    # Its unchanged Codex sample bytes exercise a Claude-placed header.
+                    from harness_evidence import header
+                    sample = FIXTURES / path_of("XA")
+                    info = sample.stat()
+                    request = {"id": 1, "files": [{"path": str(sample), "size": info.st_size,
+                               "identity": {"device": info.st_dev, "inode": info.st_ino}}],
+                               "roots": [{"harness": "claude-code", "path": str(FIXTURES)}]}
+                    out, err = io.StringIO(), io.StringIO()
+                    assert header.run(io.StringIO(json.dumps(request) + "\n"), out, err,
+                                      {"schema": "harness-evidence/1", "decoder": {"revision": "test"}}) == 0
+                    row = json.loads(out.getvalue().splitlines()[0])
+                    from test_harness_evidence_header import old_peek_cwd
+                    assert row["header"]["cwd"] == old_peek_cwd(sample)
+                    first = json.loads(sample.read_bytes().splitlines()[0])
+                    assert native_values(first, path) == [row["header"]["cwd"]]
+                    assert row["provenance"]["cwd"]["native_paths"] == [path]
+                    continue
                 assert any(native_values(row, path) for row in native), (slug, field, path)
 
 
@@ -284,7 +310,7 @@ def test_extracted_git_package_runs_every_command_without_checkout_or_fixtures(t
         assert result.returncode == 0, result.stderr
         rows = [json.loads(line) for line in result.stdout.splitlines()]
         assert all(row["decoder"]["revision"] == "a" * 40 for row in rows)
-        assert all(row["decoder"]["version"] == "16" for row in rows)
+        assert all(row["decoder"]["version"] == DECODER_VERSION for row in rows)
         if args[0] == "discover":
             assert next(row for row in rows if row["object"] == "file")["filename_lookup"] == {
                 "session_ids": ["T"], "basis": "convention", "rule": "rollout_name_lookup"}
@@ -294,6 +320,18 @@ def test_extracted_git_package_runs_every_command_without_checkout_or_fixtures(t
     rows = [json.loads(line) for line in result.stdout.splitlines()]
     assert rows[-1]["object"] == "request_end"
     assert next(row for row in rows if row["object"] == "file_end")["status"] == "ok"
+    claude = sample_dir / "claude.jsonl"
+    claude.write_bytes((FIXTURES / "index/sizes.jsonl").read_bytes())
+    info = claude.stat()
+    request = {"id": 2, "files": [{"path": str(claude), "size": info.st_size,
+               "identity": {"device": info.st_dev, "inode": info.st_ino}}],
+               "roots": [{"harness": "claude-code", "path": str(sample_dir)}]}
+    result = command(copy, env, "header", stdin=json.dumps(request) + "\n")
+    assert result.returncode == 0, result.stderr
+    rows = [json.loads(line) for line in result.stdout.splitlines()]
+    assert rows[0]["header"]["cwd"] == "/w/project"
+    assert rows[0]["decoder"]["revision"] == "a" * 40
+    assert rows[-1]["object"] == "request_end" and rows[-1]["files"] == 1
     result = command(copy, env, "capabilities", "--build")
     assert result.returncode == 2 and "hq checkout" in result.stderr
 

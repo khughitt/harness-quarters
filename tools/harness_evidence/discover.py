@@ -115,9 +115,10 @@ def list_files(roots: list[Root], since_ms: int | None) -> Listing:
         for dirpath, dirnames, filenames in os.walk(root.path, onerror=errors.append,
                                                     followlinks=root.harness == "claude-code"):
             depth = len(Path(dirpath).relative_to(root.path).parts)
+            names = filenames + dirnames  # Keep matching paths before traversal pruning.
             if not _matches(root, depth, dirnames):
                 continue
-            for name in filenames:
+            for name in names:
                 if name.endswith(".jsonl"):
                     path = Path(dirpath) / name
                     try:  # a directory readable but not searchable lists names it cannot stat

@@ -236,7 +236,7 @@
    "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T11-00-00-01900000-0000-7000-8000-0000000000f2.jsonl": "30b550b6f035815a4123c8a8fd18fbbf7059ec89c04b0749ecda738e24b2fde3"
   }
  },
- "decoder_version": "16",
+ "decoder_version": "18",
  "evidence_rule": "synthetic samples establish decoder conformance; observed samples or probes establish emission; absent from a sample means unobserved",
  "harnesses": {
   "claude-code": {
@@ -376,6 +376,14 @@
       "message.content[].input.questions"
      ]
     },
+    "calls[].questions[].options[].label": {
+     "coverage_keys": [
+      "applied:question/input:labels"
+     ],
+     "provenance": [
+      "message.content[].input.questions[].options[].label"
+     ]
+    },
     "calls[].raw_path": {
      "coverage_keys": [],
      "provenance": [
@@ -466,7 +474,8 @@
     "header.cwd": {
      "coverage_keys": [],
      "provenance": [
-      "cwd"
+      "cwd",
+      "payload.cwd"
      ]
     },
     "header.entrypoint": {
@@ -520,6 +529,12 @@
       "agentId",
       "sessionId",
       "session_id"
+     ]
+    },
+    "header.start_ms": {
+     "coverage_keys": [],
+     "provenance": [
+      "timestamp"
      ]
     },
     "header.subagent": {
@@ -653,14 +668,56 @@
      ]
     },
     "message.joined_bytes": {
-     "coverage_keys": [],
+     "coverage_keys": [
+      "assistant/input:content",
+      "user/input:content"
+     ],
+     "coverage_scopes": [
+      {
+       "coverage_keys": [
+        "user/input:content"
+       ],
+       "when": {
+        "message.channel": "user"
+       }
+      },
+      {
+       "coverage_keys": [
+        "assistant/input:content"
+       ],
+       "when": {
+        "message.channel": "assistant"
+       }
+      }
+     ],
      "provenance": [
       "message.content",
       "message.content[].text"
      ]
     },
     "message.joined_nonempty": {
-     "coverage_keys": [],
+     "coverage_keys": [
+      "assistant/input:content",
+      "user/input:content"
+     ],
+     "coverage_scopes": [
+      {
+       "coverage_keys": [
+        "user/input:content"
+       ],
+       "when": {
+        "message.channel": "user"
+       }
+      },
+      {
+       "coverage_keys": [
+        "assistant/input:content"
+       ],
+       "when": {
+        "message.channel": "assistant"
+       }
+      }
+     ],
      "provenance": [
       "message.content",
       "message.content[].text"
@@ -1010,12 +1067,77 @@
       "uuid"
      ]
     },
+    "turn_end.blocked": {
+     "coverage_keys": [
+      "applied:turn_end/input:errors"
+     ],
+     "provenance": [
+      "hookErrors"
+     ]
+    },
+    "turn_end.errors_bytes": {
+     "coverage_keys": [
+      "applied:turn_end/input:errors"
+     ],
+     "provenance": [
+      "hookErrors"
+     ]
+    },
+    "turn_end.hooks": {
+     "coverage_keys": [
+      "applied:turn_end/input:hooks"
+     ],
+     "provenance": [
+      "hookInfos"
+     ]
+    },
+    "turn_end.hooks[].blocked": {
+     "coverage_keys": [
+      "applied:stop_block/input:command"
+     ],
+     "provenance": [
+      "attachment.blockingError.command",
+      "attachment.hookEvent",
+      "attachment.toolUseID",
+      "attachment.type",
+      "hookInfos[].command",
+      "toolUseID"
+     ]
+    },
+    "turn_end.hooks[].duration_ms": {
+     "coverage_keys": [
+      "applied:hook_run/input:duration"
+     ],
+     "provenance": [
+      "hookInfos[].durationMs"
+     ]
+    },
+    "turn_end.id": {
+     "coverage_keys": [
+      "applied:turn_end/input:id"
+     ],
+     "provenance": [
+      "uuid"
+     ]
+    },
+    "turn_end.turn": {
+     "coverage_keys": [
+      "applied:turn_end/input:turn"
+     ],
+     "provenance": [
+      "toolUseID"
+     ]
+    },
     "waits_for_user": {
      "coverage_keys": [],
      "provenance": [
       "message.content[].name"
      ]
     }
+   },
+   "header": {
+    "implemented": true,
+    "line_limit": 50
    },
    "index": {
     "applied": {
@@ -1091,6 +1213,10 @@
      "version",
      "message"
     ],
+    "features": {
+     "native_skill_events": true,
+     "question_option_labels": true
+    },
     "known_kinds": [
      "agent-color",
      "agent-name",
@@ -1119,6 +1245,20 @@
     "mode": "incremental",
     "profile": "index",
     "resume": true,
+    "tool_kinds": {
+     "Agent": "dispatch",
+     "AskUserQuestion": "question",
+     "Bash": "shell",
+     "Edit": "file_edit",
+     "Glob": "file_read",
+     "Grep": "file_read",
+     "MultiEdit": "file_edit",
+     "NotebookEdit": "file_edit",
+     "Read": "file_read",
+     "Skill": "skill",
+     "Task": "dispatch",
+     "Write": "file_edit"
+    },
     "unwatched": {
      "assistant": {
       "isCompactSummary": "flag",
@@ -1372,6 +1512,7 @@
        "calls[].paths",
        "calls[].paths_complete",
        "calls[].questions",
+       "calls[].questions[].options[].label",
        "calls[].raw_path",
        "calls[].skill",
        "compaction",
@@ -1386,6 +1527,7 @@
        "header.models[].value",
        "header.recorded_identity.session",
        "header.session",
+       "header.start_ms",
        "header.uuids",
        "identity.cwd",
        "identity.entrypoint",
@@ -1432,6 +1574,13 @@
        "session",
        "text",
        "turn_end",
+       "turn_end.blocked",
+       "turn_end.errors_bytes",
+       "turn_end.hooks",
+       "turn_end.hooks[].blocked",
+       "turn_end.hooks[].duration_ms",
+       "turn_end.id",
+       "turn_end.turn",
        "waits_for_user"
       ]
      },
@@ -1466,6 +1615,7 @@
        "header.models[].value",
        "header.recorded_identity.session",
        "header.session",
+       "header.start_ms",
        "header.subagent",
        "header.subagent_basis",
        "header.uuids",
@@ -1517,6 +1667,7 @@
        "header.models[].value",
        "header.recorded_identity.session",
        "header.session",
+       "header.start_ms",
        "header.subagent",
        "header.subagent_basis",
        "header.uuids",
@@ -1573,6 +1724,7 @@
        "calls[].paths_complete",
        "calls[].prompt",
        "calls[].questions",
+       "calls[].questions[].options[].label",
        "calls[].raw_path",
        "calls[].skill",
        "compaction",
@@ -1594,6 +1746,7 @@
        "header.models[].value",
        "header.recorded_identity.session",
        "header.session",
+       "header.start_ms",
        "header.subagent",
        "header.subagent_basis",
        "header.uuids",
@@ -1654,6 +1807,13 @@
        "stop_reason",
        "text",
        "turn_end",
+       "turn_end.blocked",
+       "turn_end.errors_bytes",
+       "turn_end.hooks",
+       "turn_end.hooks[].blocked",
+       "turn_end.hooks[].duration_ms",
+       "turn_end.id",
+       "turn_end.turn",
        "waits_for_user"
       ]
      },
@@ -2157,6 +2317,9 @@
       "payload.name"
      ]
     }
+   },
+   "header": {
+    "implemented": false
    },
    "labels": {
     "assistant": [
