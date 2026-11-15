@@ -184,6 +184,23 @@ def test_normalized_stream_holds_no_checkout_or_home_path():
             assert checkout not in value and home not in value, (sample["path"], value)
 
 
+def test_registry_refuses_a_harness_without_an_adapter():
+    import pytest
+    from harness_evidence import index_adapters
+    from harness_evidence._protocol import ProtocolError
+    assert sorted(index_adapters.ADAPTERS) == ["claude-code"]
+    home = CATALOGUE.parent / "home"
+    codex = home / ".codex/sessions/2026/10/08"
+    path = next(codex.glob("rollout-*.jsonl"))
+    info = path.stat()
+    request = {"id": 1, "extract": "index", "cross_file": False, "text": False, "raw": False,
+               "roots": [{"harness": "codex", "path": str(home / ".codex/sessions")}],
+               "files": [{"path": str(path), "size": info.st_size,
+                          "identity": {"device": info.st_dev, "inode": info.st_ino}}]}
+    envelope = {"schema": SCHEMA, "decoder": {"version": DECODER_VERSION, "revision": "r"}}
+    with pytest.raises(ProtocolError, match="^no index adapter for codex$"):
+        list(index_stream.objects(request, envelope))
+
 if __name__ == "__main__":
     if sys.argv[1:] != ["--write"]:
         sys.exit("usage: test_harness_evidence_index_adapters.py --write")

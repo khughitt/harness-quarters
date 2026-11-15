@@ -2,6 +2,7 @@
 (kind of the record the object came from, dotted path). List items add `[]`."""
 
 import json
+import sys
 import types
 
 
@@ -39,12 +40,15 @@ def _trace(value, path, kind, log):
     return value
 
 
-def traced_extract(lines, state=None, *, place, text=True):
-    """Trace actual extractor descendants, including labels and coverage reads."""
-    from harness_evidence import index_events
+def traced_extract(adapter, lines, state=None, *, place, text=True):
+    """Trace actual extractor descendants, including labels and coverage reads.
+
+    `adapter` is a registered index adapter; the JSON loader of the module that defines
+    its `extract` is traced."""
+    module = sys.modules[adapter.extract.__module__]
     log = set()
     current = {"next_record": True, "kind": None}
-    original = index_events.json
+    original = module.json
 
     def loads(value, **options):
         record = json.loads(value, **options)
@@ -62,12 +66,12 @@ def traced_extract(lines, state=None, *, place, text=True):
             current["next_record"] = True
             yield line
 
-    index_events.json = types.SimpleNamespace(loads=loads, dumps=json.dumps,
+    module.json = types.SimpleNamespace(loads=loads, dumps=json.dumps,
                                               JSONDecodeError=json.JSONDecodeError)
     try:
-        list(index_events.extract(traced_lines(), {} if state is None else state, place=place, text=text))
+        list(adapter.extract(traced_lines(), {} if state is None else state, place=place, text=text))
     finally:
-        index_events.json = original
+        module.json = original
     return log
 
 

@@ -123,7 +123,7 @@ def test_header_wrong_identity_and_missing_terminal_fail(tmp_path):
     status, rows, err = run(wrong, roots=roots)
     assert status == 2 and "identity" in err and not rows
     status, rows, err = run(source(path), roots=[{"harness": "codex", "path": str(tmp_path)}])
-    assert status == 2 and "Claude" in err and not rows
+    assert status == 2 and "no index adapter for codex" in err and not rows
     from harness_evidence import header
     for request in [{"id": 1, "files": [source(path)]},
                     {"id": 1, "files": [source(path), source(path)], "roots": roots},
