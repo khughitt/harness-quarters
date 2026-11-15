@@ -38,7 +38,12 @@ def _home(place) -> Path:
 
 
 def refusal(place) -> str | None:
-    if place.path.name == AGY_MIRROR:
+    """agy reads only brain/<id>/.system_generated/logs/transcript_full.jsonl."""
+    parts = PurePosixPath(place.relpath).parts
+    if (len(parts) != 5 or parts[0] != "brain" or parts[2:4] != (".system_generated", "logs")
+            or parts[4] not in (AGY_FULL, AGY_MIRROR)):
+        return f"agy index reads brain/<id>/.system_generated/logs/{AGY_FULL}"
+    if parts[4] == AGY_MIRROR:
         return f"agy index reads {AGY_FULL}"
     return None
 

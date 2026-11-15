@@ -41,6 +41,9 @@ def roots(user_home: Path | None = None,
     for harness, path in explicit:
         if harness not in ("claude-code", "codex", "agy"):
             raise ValueError(f"unsupported discovery harness: {harness}")
+        if harness == "agy" and path.name != "brain":
+            # Conversation ids and the summaries database are found from brain/<id>/...
+            raise ValueError(f"agy root must be a brain directory: {path}")
         name = path.parent.name
         # agy's home directory is antigravity-cli; its refs name the harness instead.
         home = "agy" if harness == "agy" else name[1:] if name.startswith(".") else name

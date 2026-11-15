@@ -93,7 +93,9 @@ copies; physical read_path continues to supply bytes/adjacent metadata. Decoded
 header agent evidence is separate. Query-ID aliases and publication of arbitrary
 index/identity claims remain consumer policy, rather than native path decoding.
 
-agy's root is `~/.gemini/antigravity-cli/brain` (harness and home `agy` in refs).
+agy's root is `~/.gemini/antigravity-cli/brain` (harness and home `agy` in refs); an
+agy root not named `brain` is refused, and index and header refuse any agy file not
+shaped `brain/<id>/.system_generated/logs/<file>`.
 Discovery lists each `brain/<id>/.system_generated/logs/transcript_full.jsonl` as the
 conversation's session file and each `transcript.jsonl` beside it with
 `copy: {label: "truncated_mirror", basis: "convention", full: <transcript_full path>}`;

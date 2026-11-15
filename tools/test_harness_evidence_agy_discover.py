@@ -325,6 +325,32 @@ def test_reader_decode_refuses_agy_sources(tmp_path, store):
     assert [json.loads(line)["object"] for line in empty.stdout.splitlines()] == ["request_end"]
 
 
+def test_an_agy_root_must_be_the_brain_directory(tmp_path, store):
+    proc = run(tmp_path, ["discover", "--root", f"agy={store}"])
+    assert proc.returncode != 0 and proc.stdout == ""
+    assert "agy root must be a brain directory" in proc.stderr
+    request = {"id": 1, "extract": "index", "cross_file": False, "text": False, "raw": False,
+               "roots": [{"harness": "agy", "path": str(store)}], "files": [held(transcript(store, A))]}
+    proc = run(tmp_path, ["decode"], json.dumps(request) + "\n")
+    assert proc.returncode != 0 and proc.stdout == ""
+    assert "agy root must be a brain directory" in proc.stderr.splitlines()[-1]
+    proc = run(tmp_path, ["header"], json.dumps({"id": 1, "roots": request["roots"],
+                                                 "files": request["files"]}) + "\n")
+    assert proc.returncode == 2 and proc.stdout == ""
+    assert "agy root must be a brain directory" in proc.stderr
+
+
+def test_a_file_outside_the_transcript_layout_is_refused(tmp_path, store):
+    stray = store / "brain" / A / "transcript_full.jsonl"
+    shutil.copy(transcript(store, A), stray)
+    proc = header(tmp_path, store, stray)
+    assert proc.returncode == 2 and proc.stdout == ""
+    assert proc.stderr.strip() == ("protocol error: agy index reads "
+                                   "brain/<id>/.system_generated/logs/transcript_full.jsonl")
+    assert_refused(decode_index(tmp_path, store, stray),
+                   "agy index reads brain/<id>/.system_generated/logs/transcript_full.jsonl")
+
+
 def test_default_roots_include_the_agy_home(tmp_path, store):
     proc = run(tmp_path, ["discover", "--home", str(store.parent.parent)])
     assert proc.returncode == 0, proc.stderr
