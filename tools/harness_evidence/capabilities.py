@@ -128,6 +128,8 @@ DECLARED: dict[str, dict[str, list[str]]] = {
 
 
 DECLARED["claude-code"].update(ADAPTERS["claude-code"].PROVENANCE)
+# agy has no reader decode; its fields arrive with its index extractor's declarations.
+DECLARED["agy"] = {}
 
 # Descendant metadata extends capability resolution, never the hot event proof table.
 DECLARED["claude-code"].update({
@@ -221,8 +223,10 @@ def build(catalogue: Path) -> dict:
             fmt = detect_format(data, len(data))
         except UnknownFormat:
             continue
-        if ("codex" if fmt == "codex" else "claude-code") != slug:
+        if {"codex": "codex", "agy": "agy"}.get(fmt, "claude-code") != slug:
             raise ValueError("sample harness disagrees with decoded format")
+        if fmt == "agy":
+            continue  # agy has no reader decode (spec rev 2 §3); no reader fields are claimed.
         # Explicit place prevents metadata sidecars and sibling transcript discovery.
         place = Place(slug, "file", None, "explicit", name, path)
         reader = {"claude": records.claude_read, "sdk": records.sdk_read, "codex": records.codex_read}[fmt]
@@ -276,6 +280,11 @@ def build(catalogue: Path) -> dict:
         if adapter is None:
             harness["header"] = {"implemented": False}
             continue
+        harness["header"] = {"implemented": True, "line_limit": 50}
+        if adapter.SIDE_INPUTS:
+            harness["side_inputs"] = json.loads(json.dumps(adapter.SIDE_INPUTS))
+        if not hasattr(adapter, "extract"):
+            continue
         harness["index"] = json.loads(json.dumps({
             "profile": "index", "mode": "incremental", "resume": True,
             "watched": adapter.WATCHED, "applied": adapter.APPLIED,
@@ -283,7 +292,6 @@ def build(catalogue: Path) -> dict:
             "known_kinds": sorted(adapter.KNOWN_KINDS),
             "tool_kinds": adapter.TOOL_KINDS,
             "features": adapter.FEATURES}))
-        harness["header"] = {"implemented": True, "line_limit": 50}
     for harness in harnesses.values():
         harness["record_kinds"] = sorted(harness["record_kinds"])
         harness["labels"] = {role: sorted(bases) for role, bases in harness["labels"].items()}

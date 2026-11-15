@@ -34,15 +34,16 @@ def roots(user_home: Path | None = None,
     if explicit is None:
         user_home = Path.home() if user_home is None else user_home
         explicit = [(homes.SLUG[home.harness], path)
-                    for harness in ("claude", "codex")
+                    for harness in ("claude", "codex", "agy")
                     for home in homes.homes(user_home, harness)
                     for _store, path in homes.stores(home)]
     found = []
     for harness, path in explicit:
-        if harness not in ("claude-code", "codex"):
+        if harness not in ("claude-code", "codex", "agy"):
             raise ValueError(f"unsupported discovery harness: {harness}")
         name = path.parent.name
-        home = name[1:] if name.startswith(".") else name
+        # agy's home directory is antigravity-cli; its refs name the harness instead.
+        home = "agy" if harness == "agy" else name[1:] if name.startswith(".") else name
         found.append(Root(harness, home, "work" if home.endswith("-work") else "personal",
                           "archived" if path.name == "archived_sessions" else "live", path))
     return found
@@ -63,10 +64,19 @@ class Listing:
     file_errors: dict[Path, OSError]
 
 
+# agy keeps each conversation's transcripts in brain/<id>/.system_generated/logs. Its
+# chunks/ subdirectories hold byte segments of the same files and are not listed.
+AGY_FULL, AGY_MIRROR = "transcript_full.jsonl", "transcript.jsonl"
+_AGY_DIRS = {1: ".system_generated", 2: "logs"}
+
+
 def _matches(root: Root, depth: int, dirnames: list[str]) -> bool:
     """Whether files at this depth match the index's patterns (`stores.paths`), pruning
     Claude directories no pattern reaches: `*/*.jsonl`, `*/*/subagents/*.jsonl`; Codex
-    `**/*.jsonl`."""
+    `**/*.jsonl`; agy `*/.system_generated/logs/transcript{_full,}.jsonl`."""
+    if root.harness == "agy":
+        dirnames[:] = [name for name in dirnames if depth == 0 or _AGY_DIRS.get(depth) == name]
+        return depth == 3
     if root.harness != "claude-code":
         return True
     if depth == 2:
@@ -119,7 +129,7 @@ def list_files(roots: list[Root], since_ms: int | None) -> Listing:
             if not _matches(root, depth, dirnames):
                 continue
             for name in names:
-                if name.endswith(".jsonl"):
+                if name.endswith(".jsonl") and (root.harness != "agy" or name in (AGY_FULL, AGY_MIRROR)):
                     path = Path(dirpath) / name
                     try:  # a directory readable but not searchable lists names it cannot stat
                         (links if stat.S_ISLNK(path.lstat().st_mode) else found).append(path)
@@ -168,13 +178,25 @@ def place_of(path: Path, roots: list[Root], store: str | None = None) -> Place:
 
 
 def filename_identity(harness: str, path: Path) -> dict | None:
-    """Identity claimed by a Codex rollout name, independent of recorded identity."""
+    """Identity claimed by a Codex rollout name or an agy brain directory, independent of
+    recorded identity."""
+    if harness == "agy":
+        if path.name not in (AGY_FULL, AGY_MIRROR) or path.parent.parent.name != ".system_generated":
+            return None
+        return {"conversation": path.parent.parent.parent.name, "basis": "convention"}
     if harness != "codex" or path.suffix != ".jsonl" or not path.name.startswith("rollout-"):
         return None
     match = ROLLOUT_ID.search(path.stem)
     if match is None:
         return None
     return {"thread": match.group(1), "segment": match.group(2), "basis": "convention"}
+
+
+def copy_label(harness: str, path: Path) -> dict | None:
+    """agy's transcript.jsonl is an export-truncated mirror of transcript_full.jsonl."""
+    if harness != "agy" or path.name != AGY_MIRROR:
+        return None
+    return {"label": "truncated_mirror", "basis": "convention", "full": str(path.with_name(AGY_FULL))}
 
 
 def path_facts(place: Place) -> dict | None:

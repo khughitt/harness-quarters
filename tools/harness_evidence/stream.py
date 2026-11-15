@@ -53,12 +53,14 @@ def _read(source, roots, inherited):
             data = handle.read(size)
         size = len(data)
         if place.store != "explicit":
-            fmt = "codex" if place.harness == "codex" else "claude"
+            fmt = {"codex": "codex", "agy": "agy"}.get(place.harness, "claude")
         else:
             try:
                 fmt = detect_format(data, size)
             except UnknownFormat:
                 status = "unknown_format"
+        if fmt == "agy":
+            raise ProtocolError("agy supports only extract:index")
         if fmt is not None:
             place = replace(place, harness="codex" if fmt == "codex" else "claude-code")
             reader = {"claude": records.claude_read, "sdk": records.sdk_read, "codex": records.codex_read}[fmt]

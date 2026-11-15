@@ -58,15 +58,15 @@ class PlaceTest(unittest.TestCase):
         self.assertEqual([(r.home, r.store, r.profile) for r in self.roots], [
             ("claude", "live", "personal"), ("claude-work", "live", "work"),
             ("codex", "live", "personal"), ("codex", "archived", "personal"),
-            ("codex-work", "live", "work"), ("codex-work", "archived", "work")])
-        self.assertEqual([r.harness for r in self.roots], ["claude-code"] * 2 + ["codex"] * 4)
+            ("codex-work", "live", "work"), ("codex-work", "archived", "work"), ("agy", "live", "personal")])
+        self.assertEqual([r.harness for r in self.roots], ["claude-code"] * 2 + ["codex"] * 4 + ["agy"])
         elsewhere = self.tmp / "elsewhere" / "-w-linked"
         elsewhere.mkdir(parents=True)
         linked = self.home / ".claude/projects/-w-linked/c0000000-0000-4000-8000-0000000000aa.jsonl"
         shutil.copy2(self.path("CA"), elsewhere / linked.name)
         linked.parent.symlink_to(elsewhere)
         listing = self.sp.list_files(self.roots, None)
-        self.assertEqual([r["state"] for r in listing.roots], ["searched"] * 5 + ["absent"])
+        self.assertEqual([r["state"] for r in listing.roots], ["searched"] * 5 + ["absent"] * 2)
         self.assertEqual(listing.roots[-1]["files"], 0)
         expected = [self.path(key) for key in ("CA", "AG", "CW", "CW2", "XP", "XC", "XG", "XA", "XW")]
         self.assertEqual(sorted(listing.files), sorted(expected + [linked]))
@@ -107,7 +107,7 @@ class PlaceTest(unittest.TestCase):
         parent.chmod(0)
         self.addCleanup(parent.chmod, 0o755)
         entries = self.sp.list_files(self.roots, None).roots
-        self.assertEqual([e["state"] for e in entries[4:]], ["unreadable", "unreadable"])
+        self.assertEqual([e["state"] for e in entries[4:]], ["unreadable", "unreadable", "absent"])
         self.assertEqual(entries[4]["listing"], "failed")
 
     def test_symlink_is_alias(self):
@@ -234,19 +234,20 @@ def test_discover_reads_no_obs_environment(tmp_path):
                OBS_CLAUDE_PROJECTS=str(FIXTURES / "home/.claude/projects"))
     objs = run_json(["discover"], tmp_path, env)
     assert objs[-1]["files"] == 0
-    assert objs[-1]["roots"] == 6
+    assert objs[-1]["roots"] == 7
     assert all(o["state"] == "absent" for o in objs[:-1])
 
 
 def test_discover_objects_include_provenance_place_and_stat(tmp_path):
     objs = run_json(["discover", "--home", str(FIXTURES / "home")], tmp_path)
-    assert [o["object"] for o in objs] == ["root"] * 6 + ["file"] * 9 + ["discover_end"]
+    assert [o["object"] for o in objs] == ["root"] * 7 + ["file"] * 9 + ["discover_end"]
+    assert objs[6]["harness"] == "agy" and objs[6]["state"] == "absent"
     for obj in objs:
         assert obj["schema"] == "harness-evidence/1"
         assert obj["decoder"]["version"] == DECODER_VERSION
         assert obj["decoder"]["revision"]
         assert obj["decoder"] == objs[0]["decoder"]
-    for obj in objs[6:-1]:
+    for obj in objs[7:-1]:
         path = Path(obj["path"])
         info = path.stat()
         assert (obj["device"], obj["inode"], obj["size"], obj["mtime_ns"]) == (

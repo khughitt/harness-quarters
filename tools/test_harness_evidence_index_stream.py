@@ -724,8 +724,10 @@ def normalize_oracle_wire(values):
 @pytest.mark.parametrize("route", ["import", "command"])
 def test_direct_provenance_changes_expand_to_frozen_full_oracle(tmp_path, route):
     assert pre_oracle_defaults(index_events.provenance_defaults()) == PROVENANCE_ORACLE["declarations"]
+    # The agy store fixtures postdate the frozen oracle; every other fixture is in it.
     assert set(PROVENANCE_ORACLE["fixtures"]) == {
-        str(p.relative_to(FIXTURES)) for p in FIXTURES.rglob("*.jsonl")}
+        str(p.relative_to(FIXTURES)) for p in FIXTURES.rglob("*.jsonl")
+        if p.relative_to(FIXTURES).parts[0] != "agy"}
     for name, digest in PROVENANCE_ORACLE["fixtures"].items():
         assert hashlib.sha256((FIXTURES / name).read_bytes()).hexdigest() == digest
     from harness_evidence import revision

@@ -1,7 +1,11 @@
 {
  "built_from": {
-  "catalogue_sha256": "4727c9f36d5a3edc66a26688d965fcc8d71dd860eaeb0782cfa8363a2ea20df2",
+  "catalogue_sha256": "57a9ad34b1ff8723b65dfa2bc9108a027ac6bbd3466500176be6331bff2e134b",
   "samples": {
+   "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000a1/.system_generated/logs/transcript.jsonl": "1d93449220efab4bda578acfb4d4f89096b9e0b3502629842888b63ad6e470c5",
+   "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000a1/.system_generated/logs/transcript_full.jsonl": "17a91d7e1e1c515806a3622802b2ddcbff1df8de2a961fc024f5017de034ec97",
+   "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000b1/.system_generated/logs/transcript_full.jsonl": "be91abc0508e41bdde5a14bbd1722cb8c72ab6e2cdc813f22b09c5a553b5ecaa",
+   "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000c1/.system_generated/logs/transcript_full.jsonl": "5cfb49736647bdd0a980f8bd0f2ec5ee1cbeaad1440eb19bb7a485b4e6c3fccb",
    "captures/escaped-malformed.jsonl": "d3ab501588cb7af5e03ae856e875b6809bbd5851e03283e43e53a82bd11a8454",
    "captures/escaped.jsonl": "4ff4490899cc4ac6444b34fc672811990fe9ec53cca6c5c23f4a642d90cbd273",
    "captures/sdk-stream.jsonl": "a37f7c66c332b6d87cf5a0d8c79146e36a7788f030ad354919ca7a8035d4fc1a",
@@ -239,6 +243,47 @@
  "decoder_version": "19",
  "evidence_rule": "synthetic samples establish decoder conformance; observed samples or probes establish emission; absent from a sample means unobserved",
  "harnesses": {
+  "agy": {
+   "exceptions": [],
+   "fields": {},
+   "header": {
+    "implemented": true,
+    "line_limit": 50
+   },
+   "labels": {},
+   "record_kinds": [],
+   "side_inputs": {
+    "agy_conversation_summaries": {
+     "columns": [
+      "conversation_id",
+      "parent_conversation_id",
+      "workspace_uris",
+      "agent_name"
+     ],
+     "fingerprint": "sha256 of the canonical JSON of the resolved facts {parent, subagent, cwd, agent_name}, or of {\"status\": \"no_summary_row\"} or {\"status\": \"summaries_unreadable\"}",
+     "key": "conversation_id",
+     "open": "read-only SQLite URI (mode=ro)",
+     "path": "conversation_summaries.db",
+     "relative_to": "home",
+     "table": "conversation_summaries"
+    }
+   },
+   "versions": {
+    "unknown": {
+     "fields_seen": {
+      "observed": [],
+      "synthetic": []
+     },
+     "observed": [],
+     "synthetic": [
+      "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000a1/.system_generated/logs/transcript.jsonl",
+      "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000a1/.system_generated/logs/transcript_full.jsonl",
+      "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000b1/.system_generated/logs/transcript_full.jsonl",
+      "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000c1/.system_generated/logs/transcript_full.jsonl"
+     ]
+    }
+   }
+  },
   "claude-code": {
    "exceptions": [],
    "fields": {

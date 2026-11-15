@@ -60,7 +60,7 @@ def validate(value):
             raise ProtocolError("roots must be an array or null")
         for root in roots:
             _fields(root, {"harness", "path"}, {"harness", "path"})
-            if root["harness"] not in ("claude-code", "codex"):
+            if root["harness"] not in ("claude-code", "codex", "agy"):
                 raise ProtocolError("unsupported root harness")
             _path(root["path"])
     if not isinstance(value.get("context", []), list):

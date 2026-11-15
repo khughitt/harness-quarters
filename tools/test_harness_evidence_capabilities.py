@@ -121,14 +121,18 @@ def test_artifact_covers_catalogue_hashes_and_keeps_provenance_separate():
         "samples": {s["path"]: hashlib.sha256((FIXTURES / s["path"]).read_bytes()).hexdigest()
                     for s in samples},
     }
-    assert len(samples) == 232
+    assert len(samples) == 236
+    assert sorted(artifact["harnesses"]) == ["agy", "claude-code", "codex"]
     for slug, harness in artifact["harnesses"].items():
-        assert set(harness) == {"record_kinds", "fields", "labels", "versions", "exceptions", "header"} | ({"index"} if slug == "claude-code" else set())
+        assert set(harness) == {"record_kinds", "fields", "labels", "versions", "exceptions", "header"} | (
+            {"index"} if slug == "claude-code" else {"side_inputs"} if slug == "agy" else set())
         assert harness["exceptions"] == []
-        assert harness["header"] == ({"implemented": True, "line_limit": 50} if slug == "claude-code"
+        assert harness["header"] == ({"implemented": True, "line_limit": 50} if slug in ("claude-code", "agy")
                                       else {"implemented": False})
         if slug == "codex":
             assert all(f["coverage_keys"] == [] for f in harness["fields"].values())
+        elif slug == "agy":  # Index declarations arrive with agy's extractor.
+            assert harness["fields"] == {} and harness["record_kinds"] == [] and harness["labels"] == {}
         else:
             assert harness["fields"]["calls[].raw_path"]["provenance"] == [
                 "message.content[].input.file_path", "message.content[].input.notebook_path"]

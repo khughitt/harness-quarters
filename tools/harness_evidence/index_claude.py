@@ -7,7 +7,7 @@ from .index_events import (COVERAGE_KEYS, DISPATCH, PATH_FIELDS, PROVENANCE, WRI
 
 __all__ = ["extract", "Restart", "provenance_defaults", "WATCHED", "APPLIED", "UNWATCHED",
            "COMMON_READS", "KNOWN_KINDS", "PROVENANCE", "COVERAGE_KEYS", "TOOL_KINDS",
-           "FEATURES", "header", "path_facts"]
+           "FEATURES", "SIDE_INPUTS", "header", "path_facts", "side_inputs", "refusal"]
 
 TOOL_KINDS = {
     **{name: "file_read" for name in PATH_FIELDS},
@@ -17,6 +17,8 @@ TOOL_KINDS = {
 }
 # Capability features the Claude extractor declares in its index block.
 FEATURES = {"native_skill_events": True, "question_option_labels": True}
+# Claude's path facts read no store file beyond the transcript's own path (spec rev 2 §4.2).
+SIDE_INPUTS = {}
 
 
 def header(place, handle, *, size, envelope, result):
@@ -26,3 +28,11 @@ def header(place, handle, *, size, envelope, result):
 
 def path_facts(place):
     return discover.path_facts(place)
+
+
+def side_inputs(_facts):
+    return None
+
+
+def refusal(_place):
+    return None

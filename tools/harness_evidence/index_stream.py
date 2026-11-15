@@ -80,9 +80,9 @@ def _prefix(handle, limit):
     return digest, count, not limit or last == b"\n"
 
 
-def _binding(source, place, envelope, text, adapter):
+def _binding(source, place, envelope, text, facts):
     return {"decoder": envelope["decoder"], "identity": source["identity"],
-            "path": str(place.path), "path_facts": adapter.path_facts(place), "text": text}
+            "path": str(place.path), "path_facts": facts, "text": text}
 
 
 def _checkpoint(state, digest, binding, *, seed=False):
@@ -106,9 +106,10 @@ def _file(source, number, roots, request, envelope):
         place = discover.place_of(logical, roots)
     except ValueError:
         place = Place("claude-code", "file", None, "explicit", str(logical), logical)
-    adapter = index_adapters.adapter(place.harness)
+    adapter = index_adapters.for_source(place, extract=True)
     place = replace(place, read_path=physical)
-    binding = _binding(source, place, envelope, request.get("text", False), adapter)
+    facts = adapter.path_facts(place)  # One snapshot serves the binding and file_start.
+    binding = _binding(source, place, envelope, request.get("text", False), facts)
     base = {**envelope, "request": request["id"], "file": number,
             "harness": place.harness, "harness_version": None}
     location = asdict(place)
@@ -120,7 +121,7 @@ def _file(source, number, roots, request, envelope):
              "provenance_defaults": copy.deepcopy(defaults),
              "object": "file_start", "key": "file", "path": str(logical),
              "place": location, "filename_identity": None,
-             "path_facts": adapter.path_facts(place), "side_inputs": None, "replaces": "all"}
+             "path_facts": facts, "side_inputs": None, "replaces": "all"}
     try:
         handle = physical.open("rb")
     except (OSError, UnicodeError) as error:

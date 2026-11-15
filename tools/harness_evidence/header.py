@@ -141,7 +141,7 @@ def run(stdin, stdout, stderr, envelope):
                     place = discover.place_of(Path(source["path"]), roots)
                 except ValueError as error:
                     raise ProtocolError(str(error)) from error
-                places.append((place, index_adapters.adapter(place.harness)))
+                places.append((place, index_adapters.for_source(place, extract=False)))
             for number, (source, (place, adapter)) in enumerate(zip(request["files"], places)):
                 stdout.write(serialized(_file(source, number, place, adapter, request, envelope)) + "\n")
                 stdout.flush()
