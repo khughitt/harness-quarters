@@ -140,7 +140,7 @@ def _call(payload, cwd):
     name = payload.get("name", "")
     value = payload.get("arguments" if payload.get("type") == "function_call" else "input", "")
     text, command, commands = str(value), None, []
-    arguments = None
+    arguments, normalization = None, None
     if name in SHELL:
         try:
             arguments = json.loads(text)
@@ -149,6 +149,11 @@ def _call(payload, cwd):
         if isinstance(arguments, dict):
             command = arguments.get("cmd", arguments.get("command"))
             command = " ".join(command) if isinstance(command, list) else command
+            if type(command) is dict and not command:
+                # The original adapter treats an empty object exactly like empty text.
+                command, normalization = "", "codex_empty_command_object"
+            elif command is not None and not isinstance(command, str):
+                raise TypeError("Codex direct command must be a string or null")
         elif name == "shell" and not text.lstrip().startswith("{"):
             command = text
         directory = cwd
@@ -168,7 +173,7 @@ def _call(payload, cwd):
             "commands": commands, "patch_paths": raw_paths,
             "paths": sorted(set(p for p in candidates if p is not None)),
             "paths_complete": all(p is not None for p in candidates), "block": 0}
-    return call, arguments
+    return call, arguments, normalization
 
 
 def extract(lines, state, *, place: Place, text: bool):
@@ -225,17 +230,20 @@ def extract(lines, state, *, place: Place, text: bool):
                  "compaction": None, "interruption": None, "fork_boundary": None, "turn_end": None,
                  "execution": {"runs": [], "commands": [], "call_updates": [], "writes": [],
                                "operations": [], "diagnostics": {}}, "provenance": {}}
+        if kind == "session_meta":
+            base = (payload.get("base_instructions") or {}).get("text")
+            if base is not None:
+                if session is None:
+                    raise TypeError("session_meta instructions require a session")
+                event["injections"] = [{"piece": 0, "native_kind": "base_instructions", "source": "session_meta", "bytes": _size(base)}]
+            base_object = payload.get("base_instructions")
+            if isinstance(base_object, dict):
+                applied(state, session, day, "base_instructions", {"text": base_object.get("text") is not None})
+            source = payload.get("source")
+            if isinstance(source, dict) and "subagent" in source:
+                applied(state, session, day, "spawn", {"parent_thread_id": _parent(payload) is not None})
         if session is not None:
-            if kind == "session_meta":
-                base = payload.get("base_instructions")
-                if isinstance(base, dict):
-                    applied(state, session, day, "base_instructions", {"text": base.get("text") is not None})
-                    if base.get("text") is not None:
-                        event["injections"] = [{"piece": 0, "native_kind": "base_instructions", "source": "session_meta", "bytes": _size(base["text"])}]
-                source = payload.get("source")
-                if isinstance(source, dict) and "subagent" in source:
-                    applied(state, session, day, "spawn", {"parent_thread_id": _parent(payload) is not None})
-            elif kind == "turn_context":
+            if kind == "turn_context":
                 settings = (payload.get("collaboration_mode") or {}).get("settings") or {}
                 state.update(model=payload.get("model"), effort=payload.get("effort") or settings.get("reasoning_effort"), turn_cwd=payload.get("cwd"))
                 event["context"] = {"model": state["model"], "effort": state["effort"], "cwd": state["turn_cwd"], "context_window": state.get("context_window")}
@@ -272,8 +280,11 @@ def extract(lines, state, *, place: Place, text: bool):
                     if isinstance(block, dict) and block.get("type") in ("input_text", "output_text"):
                         applied(state, session, day, "text_block", {"text": block.get("text") is not None})
             elif native_kind in ("response_item:function_call", "response_item:custom_tool_call"):
-                call, arguments = _call(payload, state.get("turn_cwd"))
+                call, arguments, normalization = _call(payload, state.get("turn_cwd"))
                 event["calls"].append(call)
+                if normalization is not None:
+                    event["provenance"]["calls[].command"] = {"basis": "convention", "rule": normalization}
+                    event["provenance"]["calls[].commands"] = {"rule": normalization}
                 field = "arguments" if payload.get("type") == "function_call" else "input"
                 applied(state, session, day, "tool_call", {"call_id": payload.get("call_id") is not None, "name": payload.get("name") is not None, "value": payload.get(field) is not None})
                 if isinstance(arguments, dict):

@@ -259,7 +259,11 @@ requests a seeded restart. Discarded count usage contributes no applied populati
 Native counters stay unchanged in `response.native`.
 
 Codex patch header paths stay in `patch_paths`; lexical candidate `paths` normalize
-separately. Direct shell calls expose ordered `commands` and directories. Code-mode
+separately. Direct shell calls expose ordered `commands` and directories. Commands
+are strings or null; string lists join with spaces, and other malformed values fail.
+The original adapter's accepted empty command object normalizes to empty text with
+the named convention `codex_empty_command_object`, retaining the original input and
+byte size. Code-mode
 operations, result status/truncation, skill inference, bounded stateful associations,
 late context replacement and terminal metadata are not yet implemented by this step;
 the capability view marks stateful execution incomplete. The index-only catalogue

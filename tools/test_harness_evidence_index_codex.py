@@ -312,3 +312,72 @@ def test_direct_usage_values_keep_storage_presence_and_raw_json(key, field):
         assert response["usage"][field] == value
         assert response["usage_present"][field] is True
         assert response["native"] == {key: value}
+
+
+def test_sessionless_metadata_keeps_empty_session_applied_populations():
+    values, state = native([record("session_meta", {"base_instructions": {}, "source": {"subagent": {}}})])
+    event, coverage = values
+    assert event["eligible"] is False
+    assert event["identity"]["session"] is None
+    assert event["injections"] == []
+    assert "session_id" not in state
+    assert coverage["records"] == [{"session_id": "", "day": "2026-09-04",
+                                     "record_kind": "session_meta", "known": 1, "records": 1}]
+    populations = {(row["record_kind"], row["field"]): row for row in coverage["fields"]}
+    for site, field in [("applied:base_instructions", "input:text"),
+                        ("applied:spawn", "input:parent_thread_id")]:
+        assert populations[(site, field)] == {"session_id": "", "day": "2026-09-04",
+                                              "record_kind": site, "field": field, "seen": 1, "present": 0}
+    assert populations[("session_meta", "payload.id")]["seen"] == 1
+    assert populations[("session_meta", "payload.id")]["present"] == 0
+
+
+@pytest.mark.parametrize("base,exception", [({"text": "native"}, TypeError), ("malformed", AttributeError)])
+def test_sessionless_metadata_keeps_original_instruction_rejections(base, exception):
+    with pytest.raises(exception):
+        native([record("session_meta", {"base_instructions": base})])
+
+
+@pytest.mark.parametrize("name", ["exec_command", "shell_command", "shell"])
+@pytest.mark.parametrize("command", [42, 1.5, True, False, {"bad": 1}, ["echo", 42], [None]])
+def test_malformed_direct_commands_are_rejected_before_wire_emission(name, command):
+    with pytest.raises((TypeError, KeyError)):
+        native([META, record("response_item", {"type": "function_call", "call_id": "c",
+                 "name": name, "arguments": json.dumps({"cmd": command})})])
+
+
+@pytest.mark.parametrize("name", ["exec_command", "shell_command", "shell"])
+@pytest.mark.parametrize("arguments,want", [({}, None), ({"cmd": None}, None),
+    ({"cmd": ""}, ""), ({"cmd": []}, ""), ({"cmd": {}}, ""), ({"command": {}}, ""), ({"cmd": ["echo", "ok"]}, "echo ok"),
+    ({"command": "echo fallback"}, "echo fallback"),
+    ({"cmd": None, "command": "not selected"}, None)])
+def test_direct_command_wire_shape_keeps_absence_null_and_joined_lists(name, arguments, want):
+    values, _ = native([META, record("response_item", {"type": "function_call", "call_id": "c",
+                       "name": name, "arguments": json.dumps(arguments)})])
+    call = values[1]["calls"][0]
+    assert call["command"] == want
+    assert call["commands"] == [{"command": want, "cwd": None}]
+    assert call["command"] is None or isinstance(call["command"], str)
+
+
+@pytest.mark.parametrize("name", ["exec_command", "shell_command", "shell"])
+def test_accepted_empty_command_object_has_named_inferred_provenance(name):
+    values, _ = native([META, record("response_item", {"type": "function_call", "call_id": "c",
+                       "name": name, "arguments": '{"cmd": {}}'})])
+    event = values[1]
+    call = event["calls"][0]
+    assert call["command"] == ""
+    assert call["commands"] == [{"command": "", "cwd": None}]
+    assert call["input_text"] == '{"cmd": {}}'
+    assert call["input_bytes"] == 11
+    assert event["provenance"] == {
+        "calls[].command": {"basis": "convention", "rule": "codex_empty_command_object"},
+        "calls[].commands": {"rule": "codex_empty_command_object"},
+    }
+    from harness_evidence import index_codex
+    defaults = index_codex.provenance_defaults()
+    event["decoder"] = {"revision": "test"}
+    assert index_stream._provenance_encoder(defaults, profile=index_codex)(event) == event["provenance"]
+    proofs = {field: {**proof, "ref": event["ref"], "revision": "test", **event["provenance"].get(field, {})}
+              for field, proof in defaults.items()}
+    assert index_events._factor_provenance({**event, "provenance": proofs}, defaults) == event["provenance"]
