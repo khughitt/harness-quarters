@@ -125,7 +125,9 @@ JSON of the resolved facts `{parent, subagent, cwd, agent_name}` or of
 `side_inputs` to its unchanged-file check and decode again from no state when it
 differs; the decoder also refuses to resume a checkpoint made under another
 fingerprint. Reader decode (no `extract`) has no agy support: a file under an agy root
-fails with the protocol error "agy supports only extract:index", an explicit agy file
+fails with the protocol error "agy supports only extract:index" when the decoder reaches
+it, after the objects of earlier files in the request (a traceback and exit 1, as other
+in-stream protocol errors), an explicit agy file
 reads as `unknown_format` (as before agy was detected), and an agy `context` entry is
 skipped.
 
@@ -341,8 +343,10 @@ not absent.
   true, id `<conversation>:<step_index>`). `response.model` is the planner's `model`,
   null when the step has none and for a checkpoint. Usage: `input_uncached` is `input_tokens`,
   `cache_read` is `cache_read_tokens`, `output` is `output_tokens`; `cache_write` and
-  `thinking` are null, and so is `usage_present.thinking` (agy records no thinking count),
-  while `usage_present.output` says whether `output_tokens` was recorded; `context_total` is input plus cache read and `uncached_total`
+  `thinking` are null. The presence flags stay booleans: `usage_present.output` says
+  whether `output_tokens` was recorded, and `usage_present.thinking` is always false,
+  declared by convention (`agy_no_thinking_record`) since agy records no thinking
+  count; `context_total` is input plus cache read and `uncached_total`
   is input. `response.native` holds the three counters as recorded and
   `thinking_text_bytes`, the byte size of the planner's thinking text, which stays out
   of `message.text`. A checkpoint is a `compaction` with a `compact_summary` injection.
@@ -362,7 +366,8 @@ not absent.
   `{kind: "tool_preview", original_tokens: null, original_bytes: null}` when a
   `run_command` result reports the tool's output preview before `Command output:`,
   otherwise null. `answers` on an `ask_question` result is `{"A<n>": text}`, each text
-  running from its `A<n>:` line to the next one, so an answer may span lines. A `RUNNING` result carries `background_id`; `calls[].background` is
+  running from its `A<n>:` line to the next one, so an answer may span lines; it is null
+  when the result has no `A<n>:` line. A `RUNNING` result carries `background_id`; `calls[].background` is
   null (`absent:known_after_call`), and the call's end arrives as a `notifications[]`
   entry on the `SYSTEM` wake-up from that id (`finished` or `canceled`). The first
   `sender=` and end marker are the wake-up's own; a result that quotes another message

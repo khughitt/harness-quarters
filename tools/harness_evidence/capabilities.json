@@ -599,7 +599,8 @@
     },
     "results[].call_id": {
      "coverage_keys": [
-      "applied:result/input:call"
+      "applied:result/input:call",
+      "applied:result/input:calls_known"
      ],
      "provenance": [
       "step_index"
@@ -664,7 +665,6 @@
      "response.effort": "not_recorded",
      "response.usage.cache_write": "not_recorded",
      "response.usage.thinking": "not_recorded",
-     "response.usage_present.thinking": "not_recorded",
      "results[].agent": "not_recorded",
      "results[].interrupted": "not_recorded",
      "turn_end": "no_turn_end_records"

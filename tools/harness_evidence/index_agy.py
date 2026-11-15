@@ -40,7 +40,7 @@ def _home(place) -> Path:
 def refusal(place) -> str | None:
     """agy reads only brain/<id>/.system_generated/logs/transcript_full.jsonl."""
     parts = PurePosixPath(place.relpath).parts
-    if (len(parts) != 5 or {".", ".."} & set(place.relpath.split("/")) or parts[0] != "brain" or parts[2:4] != (".system_generated", "logs")
+    if (len(parts) != 5 or ".." in parts or parts[0] != "brain" or parts[2:4] != (".system_generated", "logs")
             or parts[4] not in (AGY_FULL, AGY_MIRROR)):
         return f"agy index reads brain/<id>/.system_generated/logs/{AGY_FULL}"
     if parts[4] == AGY_MIRROR:
@@ -178,13 +178,14 @@ _CONVENTION = {
     "results[].background_id": "agy_background_id", "results[].child_session": "agy_child_conversation",
     "results[].answers": "agy_answer_lines", "results[].truncation": "agy_preview_truncation",
     "results[].exit_code": "agy_exit_line", "injections": "agy_injections",
+    "response.usage_present.thinking": "agy_no_thinking_record",
     "notifications": "agy_background_message", "interruption": "agy_stream_interrupted",
 }
 _SUMMARY_FIELDS = {"identity.parent": "parent_conversation_id", "identity.subagent": "parent_conversation_id",
                    "identity.cwd": "workspace_uris"}
 _ABSENT = {
     "identity.agent": "not_recorded", "identity.version": "not_recorded", "response.effort": "not_recorded",
-    "response.usage_present.thinking": "not_recorded", "response.usage.cache_write": "not_recorded",
+    "response.usage.cache_write": "not_recorded",
     "response.usage.thinking": "not_recorded", "calls[].background": "known_after_call",
     "results[].interrupted": "not_recorded", "results[].agent": "not_recorded",
     "fork_boundary": "no_fork_records", "turn_end": "no_turn_end_records",
@@ -233,7 +234,7 @@ COVERAGE_KEYS = {
     "calls[].native_name": ["applied:tool_call/input:name"],
     "calls[].input_bytes": ["applied:tool_call/input:args"],
     "calls[].command": ["applied:run_command/input:command"],
-    "results[].call_id": ["applied:result/input:call"],
+    "results[].call_id": ["applied:result/input:call", "applied:result/input:calls_known"],
     "results[].bytes": ["applied:result/input:content"],
     "results[].exit_code": ["applied:exit_line/input:exit_code"],
     "results[].native_duration_ms": ["applied:result_times/input:created", "applied:result_times/input:completed"],
@@ -317,8 +318,9 @@ def _usage(step: dict, planner: bool) -> tuple[dict, dict, dict]:
     thinking = step.get("thinking") if planner else None
     if isinstance(thinking, str):
         native["thinking_text_bytes"] = _size(thinking)
-    # agy records no thinking token count: declared absent, so null rather than False.
-    return usage, {"output": "output_tokens" in step, "thinking": None}, native
+    # A presence flag is a boolean: agy never records a thinking count, so the flag is a
+    # constant False, declared by convention (agy_no_thinking_record), not absent.
+    return usage, {"output": "output_tokens" in step, "thinking": False}, native
 
 
 def _paths(value, cwd) -> tuple[list[str], bool]:

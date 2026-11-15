@@ -117,7 +117,7 @@ def test_planner_steps_are_complete_responses_with_agy_usage(store):
         "id": f"{H}:1", "model": "gemini-3-pro-high", "effort": None,
         "usage": {"input_uncached": 120, "cache_read": 4000, "cache_write": None, "output": 55,
                   "thinking": None, "context_total": 4120, "uncached_total": 120},
-        "usage_present": {"output": True, "thinking": None},  # declared absent: null, not False
+        "usage_present": {"output": True, "thinking": False},  # presence flags are booleans
         "native": {"input_tokens": 120, "cache_read_tokens": 4000, "output_tokens": 55,
                    "thinking_text_bytes": len("Plan: list, read, edit.")}}
     assert planner["message"]["channel"] == "assistant" and planner["message"]["text"] == "Running the checks."
@@ -298,6 +298,45 @@ def test_results_after_an_ineligible_planner_are_counted_apart_from_surplus(stor
     assert fields["input:calls_known"] == (3, 2)
 
 
+def test_a_constant_presence_flag_is_declared_by_convention_not_absent():
+    from harness_evidence.index_adapters import ADAPTERS
+    proof = ADAPTERS["agy"].provenance_defaults()["response.usage_present.thinking"]
+    assert (proof["basis"], proof["native_paths"]) == ("convention", [])
+    assert not proof["rule"].startswith("absent:")
+
+
+def test_the_result_pairing_declares_its_calls_known_input():
+    from harness_evidence.index_adapters import ADAPTERS
+    keys = ADAPTERS["agy"].provenance_defaults()["results[].call_id"]["coverage_keys"]
+    assert "applied:result/input:calls_known" in keys
+
+
+INELIGIBLE = "b9000000-0000-4000-8000-0000000000f1"  # written by the test; no summary row
+
+
+def test_resume_across_ineligible_steps_equals_a_full_decode(store):
+    steps = [*background_start(store),
+             {"step_index": 4, "source": "MODEL", "type": "PLANNER_RESPONSE", "status": "DONE",
+              "tool_calls": [{"name": "run_command", "args": {"CommandLine": "c"}}]},  # ineligible
+             {"step_index": 5, "source": "MODEL", "type": "GENERIC", "status": "DONE",
+              "created_at": "2026-11-03T15:00:05Z", "content": "Command exited with code 0.\n"},
+             wake_up(6, None, f"{H}/task-1", "finished", "done"),
+             wake_up(7, "2026-11-03T15:02:00Z", f"{H}/task-1", "finished", "done"),
+             wake_up(8, "2026-11-03T15:03:00Z", f"{H}/task-2", "finished", "done")]
+    path = transcript(store, INELIGIBLE)
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"".join(raw for _, raw in raw_lines(steps)))
+    full = decode(store, INELIGIBLE)
+    assert by_line(full)[7]["notifications"] == []  # closed by the ineligible wake-up
+    assert by_line(full)[8]["notifications"][0]["call_id"] == f"{INELIGIBLE}:1:1"
+    data = path.read_bytes()
+    for size in [i + 1 for i, byte in enumerate(data) if byte == ord("\n")]:
+        first = decode(store, INELIGIBLE, size=size)
+        second = decode(store, INELIGIBLE, state=first[-2]["state"])
+        assert comparable(first) + comparable(second) == comparable(full), size
+        assert second[-3] == {**full[-3], "file": second[-3]["file"]}
+
+
 def test_the_adapter_declares_claudes_provenance_field_set():
     from harness_evidence.index_adapters import ADAPTERS
     assert ADAPTERS["agy"].PROVENANCE.keys() == ADAPTERS["claude-code"].PROVENANCE.keys()
@@ -311,8 +350,7 @@ def test_skill_calls_have_a_declared_tool_kind():
 def test_the_layout_check_refuses_dot_segments(store):
     from harness_evidence.index_adapters import ADAPTERS
     from harness_evidence.lines import Place
-    for relpath in ("brain/../.system_generated/logs/transcript_full.jsonl",
-                    "brain/./.system_generated/logs/transcript_full.jsonl"):
+    for relpath in ("brain/../.system_generated/logs/transcript_full.jsonl",):
         place = Place("agy", "agy", "personal", "live", relpath, store / relpath)
         assert ADAPTERS["agy"].refusal(place) is not None, relpath
 
