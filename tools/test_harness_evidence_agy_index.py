@@ -18,17 +18,30 @@ G = "b9000000-0000-4000-8000-000000000002"  # background, system kinds, checkpoi
 P = "b9000000-0000-4000-8000-000000000003"  # subagent of G: invoke_subagent, ask_question wait
 K = "b9000000-0000-4000-8000-000000000004"  # no summary row; malformed line and partial tail
 Q = "b9000000-0000-4000-8000-000000000005"  # the child P's invoke_subagent created
+# The discovery store's transcripts are catalogued as index samples too.
+DISCOVERY = TOOLS / "fixtures/session-logs/agy/.gemini/antigravity-cli"
+A1, B1, C1 = (f"a9000000-0000-4000-8000-0000000000{x}1" for x in "abc")
+SAMPLES = [("index", c) for c in (H, G, P, K)] + [("discovery", c) for c in (A1, B1, C1)]
 ENVELOPE = {"schema": SCHEMA, "decoder": {"version": DECODER_VERSION, "revision": "r" * 40}}
 
 
-@pytest.fixture
-def store(tmp_path):
-    root = tmp_path / "home/.gemini/antigravity-cli"
-    shutil.copytree(STORE, root)
+def build(tmp_path, source, home):
+    root = tmp_path / home / ".gemini/antigravity-cli"
+    shutil.copytree(source, root)
     with sqlite3.connect(root / "conversation_summaries.db") as connection:
         connection.executescript((root / "conversation_summaries.sql").read_text())
     connection.close()
     return root
+
+
+@pytest.fixture
+def store(tmp_path):
+    return build(tmp_path, STORE, "home")
+
+
+@pytest.fixture
+def stores(tmp_path):
+    return {"index": build(tmp_path, STORE, "home"), "discovery": build(tmp_path, DISCOVERY, "discovery")}
 
 
 def transcript(root, conversation):
@@ -104,7 +117,7 @@ def test_planner_steps_are_complete_responses_with_agy_usage(store):
         "id": f"{H}:1", "model": "gemini-3-pro-high", "effort": None,
         "usage": {"input_uncached": 120, "cache_read": 4000, "cache_write": None, "output": 55,
                   "thinking": None, "context_total": 4120, "uncached_total": 120},
-        "usage_present": {"output": True, "thinking": False},
+        "usage_present": {"output": True, "thinking": False},  # presence flags are booleans
         "native": {"input_tokens": 120, "cache_read_tokens": 4000, "output_tokens": 55,
                    "thinking_text_bytes": len("Plan: list, read, edit.")}}
     assert planner["message"]["channel"] == "assistant" and planner["message"]["text"] == "Running the checks."
@@ -184,13 +197,170 @@ def test_subagent_identity_child_session_and_answers(store):
     out = decode(store, P)
     lines = by_line(out)
     assert all(e["identity"]["parent"] == G and e["identity"]["subagent"] is True for e in events(out))
-    assert lines[1]["message"]["channel"] == "user" and lines[1]["message"]["origin"]["native_kind"] == "SYSTEM"
-    dispatch, question = lines[2]["calls"]
+    # A live subagent opens with the hook injection, then its parent's message: no user input.
+    assert [(i["native_kind"], i["source"]) for i in lines[1]["injections"]] == [
+        ("agy_hook_injection", "SessionStart hook")]
+    assert lines[2]["message"]["channel"] == "system" and lines[2]["notifications"] == []
+    assert [i["native_kind"] for i in lines[2]["injections"]] == ["agy_system_message"]
+    assert all(e["message"] is None or e["message"]["channel"] != "user" for e in events(out))
+    dispatch, question = lines[3]["calls"]
     assert (dispatch["kind"], dispatch["prompt"], question["kind"]) == ("dispatch", "Read the log", "question")
+    assert dispatch["paths_complete"] is True  # as Claude's: complete when the prompt is present
     assert question["questions"] == [{"question": "Which suite?", "options": ["unit", "full"]}]
-    assert result(out, 3)["child_session"] == Q
-    assert result(out, 4)["answers"] == {"A1": "unit"}
-    assert lines[5]["calls"][0]["kind"] == "question" and lines[5]["results"] == []
+    assert result(out, 4)["child_session"] == Q
+    assert result(out, 5)["answers"] == {"A1": "unit"}
+    assert lines[6]["calls"][0]["kind"] == "question" and lines[6]["results"] == []
+
+
+def test_an_answer_runs_to_the_next_answer_line(store):
+    planner = {"step_index": 1, "source": "MODEL", "type": "PLANNER_RESPONSE", "status": "DONE",
+               "created_at": "2026-11-03T15:00:02Z", "tool_calls": [{"name": "ask_question", "args": {
+                   "questions": [{"question": "Scope?"}, {"question": "When?"}]}}]}
+    answer = {"step_index": 2, "source": "MODEL", "type": "GENERIC", "status": "DONE",
+              "created_at": "2026-11-03T15:01:00Z",
+              "content": ("Created At: 2026-11-03T10:00:02-05:00\nCompleted At: 2026-11-03T10:01:00-05:00\n"
+                          "A1: both parts:\n\n- the reader\n- the index\nA2: today\n")}
+    [_, paired] = extracted(store, [planner, answer])
+    assert paired["results"][0]["answers"] == {"A1": "both parts:\n\n- the reader\n- the index", "A2": "today"}
+
+
+def test_a_dispatch_without_a_prompt_has_incomplete_paths(store):
+    planner = {"step_index": 1, "source": "MODEL", "type": "PLANNER_RESPONSE", "status": "DONE",
+               "created_at": "2026-11-03T15:00:02Z", "tool_calls": [{"name": "invoke_subagent", "args": {}}]}
+    [event] = extracted(store, [planner])
+    assert (event["calls"][0]["prompt"], event["calls"][0]["paths_complete"]) == (None, False)
+
+
+def test_a_command_result_reads_its_exit_line_and_preview_only_before_its_output(store):
+    planner = {"step_index": 1, "source": "MODEL", "type": "PLANNER_RESPONSE", "status": "DONE",
+               "created_at": "2026-11-03T15:00:02Z", "tool_calls": [{"name": "run_command", "args": {
+                   "CommandLine": "cat log"}}]}
+    quoted = {"step_index": 2, "source": "MODEL", "type": "GENERIC", "status": "DONE",
+              "created_at": "2026-11-03T15:00:04Z",
+              "content": ("Command exited with code 0.\n\nCommand output:\nCommand exited with code 3.\n"
+                          "The tool's output was truncated due to being too long\n")}
+    [_, paired] = extracted(store, [planner, quoted])
+    assert (paired["results"][0]["exit_code"], paired["results"][0]["truncation"]) == (0, None)
+
+
+def wake_up(index, at, sender, ended, text):
+    content = (f"<SYSTEM_MESSAGE>\n[Message] timestamp={at} sender={sender} priority=MESSAGE_PRIORITY_HIGH"
+               f" content=Task id \"{sender}\" {ended} with result:\n{text}\n</SYSTEM_MESSAGE>")
+    step = {"step_index": index, "source": "SYSTEM", "type": "SYSTEM_MESSAGE", "status": "DONE", "content": content}
+    return step if at is None else {**step, "created_at": at}
+
+
+def background_start(store):
+    planner = {"step_index": 1, "source": "MODEL", "type": "PLANNER_RESPONSE", "status": "DONE",
+               "created_at": "2026-11-03T15:00:02Z", "tool_calls": [
+                   {"name": "run_command", "args": {"CommandLine": "a"}},
+                   {"name": "run_command", "args": {"CommandLine": "b"}}]}
+    running = [{"step_index": i, "source": "MODEL", "type": "GENERIC", "status": "RUNNING",
+                "created_at": "2026-11-03T15:00:03Z",
+                "content": f"Started a background task with task id: {H}/task-{i - 1}"} for i in (2, 3)]
+    return [planner, *running]
+
+
+def test_a_wake_up_quoting_another_message_reports_only_its_own_sender(store):
+    quoting = wake_up(4, "2026-11-03T15:01:00Z", f"{H}/task-1", "finished",
+                      f"[Message] sender={H}/task-2 content=Task id \"{H}/task-2\" was canceled with result:\nx")
+    own = wake_up(5, "2026-11-03T15:02:00Z", f"{H}/task-2", "was canceled", "stopped")
+    out = extracted(store, [*background_start(store), quoting, own])
+    assert out[3]["notifications"] == [{"call_id": f"{H}:1:0", "status": "finished", "exit_code": None}]
+    assert out[4]["notifications"] == [{"call_id": f"{H}:1:1", "status": "canceled", "exit_code": None}]
+
+
+def test_an_ineligible_wake_up_still_closes_its_background_id(store):
+    ineligible = wake_up(4, None, f"{H}/task-1", "finished", "done")
+    repeated = wake_up(5, "2026-11-03T15:02:00Z", f"{H}/task-1", "finished", "done")
+    out = extracted(store, [*background_start(store), ineligible, repeated])
+    assert out[3]["eligible"] is False and out[4]["notifications"] == []
+
+
+def test_results_after_an_ineligible_planner_are_counted_apart_from_surplus(store):
+    planner = {"step_index": 1, "source": "MODEL", "type": "PLANNER_RESPONSE", "status": "DONE",
+               "created_at": "2026-11-03T15:00:02Z", "tool_calls": [{"name": "run_command", "args": {"CommandLine": "a"}}]}
+    generic = {"step_index": 2, "source": "MODEL", "type": "GENERIC", "status": "DONE",
+               "created_at": "2026-11-03T15:00:03Z", "content": "Command exited with code 0.\n"}
+    surplus = {**generic, "step_index": 3}
+    unknown = {**planner, "step_index": 4}
+    del unknown["created_at"]
+    after = {**generic, "step_index": 5}
+    from harness_evidence import discover
+    from harness_evidence.index_adapters import ADAPTERS
+    place = discover.place_of(transcript(store, H), discover.roots(explicit=[("agy", store / "brain")]))
+    state = {}
+    ADAPTERS["agy"].bind(state, ADAPTERS["agy"].path_facts(place))
+    out = list(ADAPTERS["agy"].extract(raw_lines([planner, generic, surplus, unknown, after]), state,
+                                       place=place, text=True))
+    fields = {f["field"]: (f["seen"], f["present"]) for f in out[-1]["fields"] if f["record_kind"] == "applied:result"}
+    assert fields["input:call"] == (3, 1)  # one paired, one surplus, one after the unknown calls
+    assert fields["input:calls_known"] == (3, 2)
+
+
+def test_a_constant_presence_flag_is_declared_by_convention_not_absent():
+    from harness_evidence.index_adapters import ADAPTERS
+    proof = ADAPTERS["agy"].provenance_defaults()["response.usage_present.thinking"]
+    assert (proof["basis"], proof["native_paths"]) == ("convention", [])
+    assert not proof["rule"].startswith("absent:")
+
+
+def test_the_result_pairing_declares_its_calls_known_input():
+    from harness_evidence.index_adapters import ADAPTERS
+    keys = ADAPTERS["agy"].provenance_defaults()["results[].call_id"]["coverage_keys"]
+    assert "applied:result/input:calls_known" in keys
+
+
+INELIGIBLE = "b9000000-0000-4000-8000-0000000000f1"  # written by the test; no summary row
+
+
+def test_resume_across_ineligible_steps_equals_a_full_decode(store):
+    steps = [*background_start(store),
+             {"step_index": 4, "source": "MODEL", "type": "PLANNER_RESPONSE", "status": "DONE",
+              "tool_calls": [{"name": "run_command", "args": {"CommandLine": "c"}}]},  # ineligible
+             {"step_index": 5, "source": "MODEL", "type": "GENERIC", "status": "DONE",
+              "created_at": "2026-11-03T15:00:05Z", "content": "Command exited with code 0.\n"},
+             wake_up(6, None, f"{H}/task-1", "finished", "done"),
+             wake_up(7, "2026-11-03T15:02:00Z", f"{H}/task-1", "finished", "done"),
+             wake_up(8, "2026-11-03T15:03:00Z", f"{H}/task-2", "finished", "done")]
+    path = transcript(store, INELIGIBLE)
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"".join(raw for _, raw in raw_lines(steps)))
+    full = decode(store, INELIGIBLE)
+    assert by_line(full)[7]["notifications"] == []  # closed by the ineligible wake-up
+    assert by_line(full)[8]["notifications"][0]["call_id"] == f"{INELIGIBLE}:1:1"
+    data = path.read_bytes()
+    for size in [i + 1 for i, byte in enumerate(data) if byte == ord("\n")]:
+        first = decode(store, INELIGIBLE, size=size)
+        second = decode(store, INELIGIBLE, state=first[-2]["state"])
+        assert comparable(first) + comparable(second) == comparable(full), size
+        assert second[-3] == {**full[-3], "file": second[-3]["file"]}
+
+
+def test_the_adapter_declares_claudes_provenance_field_set():
+    from harness_evidence.index_adapters import ADAPTERS
+    assert ADAPTERS["agy"].PROVENANCE.keys() == ADAPTERS["claude-code"].PROVENANCE.keys()
+
+
+def test_skill_calls_have_a_declared_tool_kind():
+    from harness_evidence.index_adapters import ADAPTERS
+    assert ADAPTERS["agy"].TOOL_KINDS["SKILL"] == "skill"
+
+
+def test_the_layout_check_refuses_dot_segments(store):
+    from harness_evidence.index_adapters import ADAPTERS
+    from harness_evidence.lines import Place
+    for relpath in ("brain/../.system_generated/logs/transcript_full.jsonl",):
+        place = Place("agy", "agy", "personal", "live", relpath, store / relpath)
+        assert ADAPTERS["agy"].refusal(place) is not None, relpath
+
+
+def test_every_unwatched_declaration_is_read(stores):
+    from harness_evidence.index_adapters import ADAPTERS
+    adapter, reads = ADAPTERS["agy"], sample_reads(stores)
+    unread = sorted((kind, path) for kind, paths in adapter.UNWATCHED.items() for path in paths
+                    if (kind, path) not in reads)
+    assert unread == []
 
 
 def test_missing_row_malformed_line_and_partial_tail(store):
@@ -231,8 +401,9 @@ def comparable(out):
             for o in out if o["object"] in ("index_event", "unparsed")]
 
 
-@pytest.mark.parametrize("conversation", [H, G, P, K])
-def test_resume_from_every_line_boundary_equals_a_full_decode(store, conversation):
+@pytest.mark.parametrize("name, conversation", SAMPLES)
+def test_resume_from_every_line_boundary_equals_a_full_decode(stores, name, conversation):
+    store = stores[name]
     full = decode(store, conversation)
     data = transcript(store, conversation).read_bytes()
     boundaries = [i + 1 for i, byte in enumerate(data) if byte == ord("\n")]
@@ -312,19 +483,27 @@ def numbered(data):
         offset += len(raw)
 
 
-def test_every_native_read_is_declared(store):
+def sample_reads(stores):
+    """Every native read the extractor makes over the catalogued agy samples."""
     from harness_evidence import discover
     from harness_evidence.index_adapters import ADAPTERS
-    from harness_evidence_index_tracing import covered, declared, feeds_valid, reasons_valid, traced_extract
-    adapter = ADAPTERS["agy"]
-    assert feeds_valid(adapter) == [] and reasons_valid(adapter) == []
-    roots = discover.roots(explicit=[("agy", store / "brain")])
-    reads = set()
-    for conversation in (H, G, P, K):
-        place = discover.place_of(transcript(store, conversation), roots)
+    from harness_evidence_index_tracing import traced_extract
+    adapter, reads = ADAPTERS["agy"], set()
+    for name, conversation in SAMPLES:
+        store = stores[name]
+        place = discover.place_of(transcript(store, conversation), discover.roots(explicit=[("agy", store / "brain")]))
         state = {}
         adapter.bind(state, adapter.path_facts(place))
         reads |= traced_extract(adapter, numbered(transcript(store, conversation).read_bytes()), state, place=place)
+    return reads
+
+
+def test_every_native_read_is_declared(stores):
+    from harness_evidence.index_adapters import ADAPTERS
+    from harness_evidence_index_tracing import covered, declared, feeds_valid, reasons_valid
+    adapter = ADAPTERS["agy"]
+    assert feeds_valid(adapter) == [] and reasons_valid(adapter) == []
+    reads = sample_reads(stores)
     missing = sorted((kind, path) for kind, path in reads if not covered(path, declared(adapter, kind)))
     assert reads and missing == []
 
@@ -360,6 +539,21 @@ def extracted(store, steps):
     adapter.bind(state, adapter.path_facts(place))
     return [e for e in adapter.extract(raw_lines(steps), state, place=place, text=True)
             if e["object"] == "index_event"]
+
+
+def test_each_catalogued_sample_decodes_to_its_expected_events(stores):
+    import tomllib
+    catalogue = tomllib.loads((TOOLS / "fixtures/session-logs/CATALOGUE.toml").read_text())["sample"]
+    agy = [s for s in catalogue if s["harness"] == "agy" and s.get("profile") == "index"]
+    assert sorted(s["path"].split("/")[4] for s in agy) == sorted(c for _, c in SAMPLES)
+    for sample in agy:
+        name = "index" if sample["path"].startswith("agy-index/") else "discovery"
+        out = decode(stores[name], sample["path"].split("/")[4])
+        found = events(out)
+        assert [e["native_kind"] for e in found] == sample["index_events"], sample["path"]
+        assert [o["reason"] for o in out if o["object"] == "unparsed"] == sample["unparsed"], sample["path"]
+        for key in ("calls", "results", "notifications"):
+            assert sum(len(e[key]) for e in found) == sample[key], (sample["path"], key)
 
 
 def test_an_ineligible_step_keeps_its_place_in_the_pairing(store):

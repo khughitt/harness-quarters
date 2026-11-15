@@ -52,19 +52,23 @@ class Normalizer:
 
     def __call__(self, value):
         if isinstance(value, dict):
-            if value.keys() == {"version", "revision"}:
-                self.matched["decoder"] += 1
-                return {"version": "<version>", "revision": "<revision>"}
-            if value.keys() == {"device", "inode"}:
-                self.matched["identity"] += 1
-                return {"device": "<device>", "inode": "<inode>"}
-            return {key: self(item) for key, item in value.items()}
+            return {key: self._member(key, item) for key, item in value.items()}
         if isinstance(value, list):
             return [self(item) for item in value]
         if isinstance(value, str) and self.prefix in value:
             self.matched["catalogue_path"] += 1
             return value.replace(self.prefix, "")
         return value
+
+    def _member(self, key, item):
+        """The envelope's and the checkpoint's `decoder`, and a file `identity`, by key."""
+        if key == "decoder" and isinstance(item, dict) and item.keys() == {"version", "revision"}:
+            self.matched["decoder"] += 1
+            return {"version": "<version>", "revision": "<revision>"}
+        if key == "identity" and isinstance(item, dict) and item.keys() == {"device", "inode"}:
+            self.matched["identity"] += 1
+            return {"device": "<device>", "inode": "<inode>"}
+        return self(item)
 
 
 def project(obj: dict) -> tuple[dict, list]:
@@ -79,8 +83,8 @@ def project(obj: dict) -> tuple[dict, list]:
         for result in obj.get("results") or []:
             for key in ADDED_RESULT_FIELDS:
                 removed.append(result.pop(key))
-        for field in ADDED_PROVENANCE:
-            obj["provenance"].pop(field, None)
+        for field in ADDED_PROVENANCE:  # Claude never overrides an added field's default.
+            assert field not in obj["provenance"], field
     return obj, removed
 
 
@@ -213,6 +217,7 @@ def test_registry_refuses_a_harness_without_an_adapter():
     with pytest.raises(ProtocolError, match="^no index adapter for codex$"):
         list(index_stream.objects(request, envelope))
 
+
 def test_claude_declares_the_shared_additions_absent():
     from harness_evidence.index_adapters import ADAPTERS
     declaration = ADAPTERS["claude-code"].provenance_defaults()["results[].exit_code"]
@@ -223,6 +228,7 @@ def test_claude_declares_the_shared_additions_absent():
     assert out[0]["object"] == "file_start" and out[0]["side_inputs"] is None
     results = [r for o in out if o["object"] == "index_event" for r in o.get("results") or []]
     assert results and all(r["exit_code"] is None for r in results)
+
 
 if __name__ == "__main__":
     if sys.argv[1:] != ["--write"]:

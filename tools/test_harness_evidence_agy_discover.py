@@ -116,6 +116,12 @@ def test_discover_lists_full_transcripts_and_labels_each_mirror(tmp_path, store)
             assert row["copy"] is None
 
 
+def test_a_mirror_without_its_full_transcript_names_no_full_file(tmp_path, store):
+    transcript(store, A).unlink()
+    row = files(discover(tmp_path, store))[f"{A}/transcript.jsonl"]
+    assert row["copy"] == {"label": "truncated_mirror", "basis": "convention", "full": None}
+
+
 def test_discover_resolves_summary_facts_once_per_row(tmp_path, store):
     rows = files(discover(tmp_path, store))
     a, b, c = (rows[f"{x}/transcript_full.jsonl"] for x in (A, B, C))
@@ -147,13 +153,23 @@ def test_unreadable_summaries_null_every_fact(tmp_path, mutable_store, damage):
         if os.geteuid() == 0:
             pytest.skip("root reads a mode-0 file")
         database.chmod(0)
+    before = listing(store), damaged_state(database)
     rows = files(discover(tmp_path, store))
+    assert (listing(store), damaged_state(database)) == before
     for name, row in rows.items():
         assert row["path_facts"]["reason"] == "summaries_unreadable", name
         assert all(row["path_facts"][k] is None for k in ("parent", "subagent", "cwd", "agent_name"))
         assert row["side_inputs"] == {
             "agy_conversation_summaries": canonical_sha256({"status": "summaries_unreadable"})}
     assert damage == "missing" or not (store / "conversation_summaries.db-journal").exists()
+
+
+def damaged_state(database):
+    """Bytes and mtime where readable; the mtime alone for a mode-0 file; None when missing."""
+    if not database.exists():
+        return None
+    info = database.stat()
+    return (database.read_bytes() if info.st_mode & 0o444 else None), info.st_mtime_ns
 
 
 def test_a_row_added_between_discover_calls_changes_the_fingerprint(tmp_path, mutable_store):
@@ -165,7 +181,9 @@ def test_a_row_added_between_discover_calls_changes_the_fingerprint(tmp_path, mu
                            " VALUES (?, '2026-11-02 10:00:07', '[\"file:///w/gamma\"]', '', '',"
                            " '2026-11-02 10:00:05')", (C,))
     connection.close()
+    before = database_state(store)
     second = files(discover(tmp_path, store))[f"{C}/transcript_full.jsonl"]
+    assert database_state(store) == before
     facts = {"parent": None, "subagent": False, "cwd": "/w/gamma", "agent_name": ""}
     assert first["side_inputs"] != second["side_inputs"]
     assert second["side_inputs"] == {"agy_conversation_summaries": canonical_sha256(facts)}
@@ -222,7 +240,8 @@ def test_a_wal_database_is_read_without_creating_files(tmp_path, mutable_store):
     assert "conversation_summaries.db-wal" not in before
     rows = files(discover(tmp_path, store))
     assert rows[f"{A}/transcript_full.jsonl"]["path_facts"]["reason"] is None
-    header(tmp_path, store, transcript(store, A))
+    proc = header(tmp_path, store, transcript(store, A))
+    assert proc.returncode == 0, proc.stderr
     assert listing(store) == before and database_state(store) == state
 
 
@@ -269,6 +288,33 @@ def test_a_rollback_journal_database_never_shows_an_uncommitted_row(tmp_path, mu
     assert row["path_facts"]["agent_name"] == "task-2" and row["path_facts"]["reason"] is None
 
 
+HOT_WRITER = """
+import os, sqlite3, sys
+connection = sqlite3.connect(sys.argv[1], isolation_level=None)
+connection.execute("PRAGMA cache_size=2")  # Spill dirty pages into the database before commit.
+connection.execute("BEGIN IMMEDIATE")
+connection.execute("UPDATE conversation_summaries SET agent_name = 'uncommitted' WHERE conversation_id = ?",
+                   (sys.argv[2],))
+connection.execute("CREATE TABLE filler (value BLOB)")
+connection.executemany("INSERT INTO filler VALUES (?)", ((os.urandom(4000),) for _ in range(200)))
+os._exit(0)  # A writer that dies here leaves a hot journal and a half-written database.
+"""
+
+
+def test_a_hot_journal_reads_as_unreadable_and_is_left_in_place(tmp_path, mutable_store):
+    store = mutable_store
+    database = store / "conversation_summaries.db"
+    journal = store / "conversation_summaries.db-journal"
+    subprocess.run([sys.executable, "-c", HOT_WRITER, str(database), B], check=True, timeout=60,
+                   env=environment(tmp_path))
+    assert journal.stat().st_size > 0
+    before = listing(store), database.read_bytes(), journal.read_bytes()
+    row = files(discover(tmp_path, store))[f"{B}/transcript_full.jsonl"]
+    assert row["path_facts"]["agent_name"] is None
+    assert row["path_facts"]["reason"] == "summaries_unreadable"  # never the spilled page, never rolled back
+    assert (listing(store), database.read_bytes(), journal.read_bytes()) == before
+
+
 def header(tmp_path, store, *paths):
     request = {"id": 1, "roots": [{"harness": "agy", "path": str(store / "brain")}],
                "files": [held(path) for path in paths]}
@@ -294,6 +340,25 @@ def test_header_reads_session_and_start_from_the_transcript_and_identity_from_th
     assert rows[2]["provenance"]["cwd"]["reason"] == "no_summary_row"
 
 
+def steps_file(store, conversation, lines):
+    path = transcript(store, conversation)
+    path.parent.mkdir(parents=True)
+    path.write_text("".join(json.dumps(line) + "\n" for line in lines))
+    return path
+
+
+def test_header_reads_start_only_within_fifty_lines(tmp_path, mutable_store):
+    plain = {"step_index": 0, "source": "SYSTEM", "type": "SYSTEM_MESSAGE"}
+    timed = {**plain, "created_at": "2026-11-02T10:00:05Z"}
+    inside = steps_file(mutable_store, "a9000000-0000-4000-8000-0000000000d1", [plain] * 49 + [timed])
+    beyond = steps_file(mutable_store, "a9000000-0000-4000-8000-0000000000e1", [plain] * 50 + [timed])
+    proc = header(tmp_path, mutable_store, inside, beyond)
+    assert proc.returncode == 0, proc.stderr
+    rows = [json.loads(line) for line in proc.stdout.splitlines()]
+    assert [r["header"]["start_ms"] for r in rows[:2]] == [1793613605000, None]
+    assert rows[0]["provenance"]["start_ms"]["line"] == 50
+
+
 def test_header_and_index_refuse_the_truncated_mirror(tmp_path, store):
     mirror = transcript(store, A, "transcript.jsonl")
     proc = header(tmp_path, store, mirror)
@@ -315,6 +380,29 @@ def decode_index(tmp_path, store, path):
     return run(tmp_path, ["decode"], json.dumps(request) + "\n")
 
 
+def test_index_decode_runs_from_the_command_line(tmp_path, store):
+    proc = decode_index(tmp_path, store, transcript(store, A))
+    assert proc.returncode == 0, proc.stderr
+    objs = [json.loads(line) for line in proc.stdout.splitlines()]
+    assert [o["object"] for o in objs][0] == "file_start" and objs[-1]["object"] == "request_end"
+    assert objs[0]["side_inputs"] == files(discover(tmp_path, store))[f"{A}/transcript_full.jsonl"]["side_inputs"]
+    assert objs[-2]["status"] == "ok" and any(o["object"] == "index_event" for o in objs)
+
+
+def test_reader_decode_reads_an_explicit_agy_file_as_unknown_and_skips_agy_context(tmp_path, store):
+    loose = tmp_path / "loose.jsonl"
+    shutil.copy(transcript(store, A), loose)
+    claude = TOOLS / "fixtures/session-logs/index/sizes.jsonl"
+    request = {"id": 1, "context": [str(transcript(store, B))],
+               "roots": [{"harness": "agy", "path": str(store / "brain")}],
+               "files": [{"path": str(loose), "size": loose.stat().st_size},
+                         {"path": str(claude), "size": claude.stat().st_size}]}
+    proc = run(tmp_path, ["decode"], json.dumps(request) + "\n")
+    assert proc.returncode == 0, proc.stderr
+    ends = [json.loads(line) for line in proc.stdout.splitlines() if json.loads(line)["object"] == "file_end"]
+    assert [e["status"] for e in ends] == ["unknown_format", "ok"]  # as before agy was detected
+
+
 def test_reader_decode_refuses_agy_sources(tmp_path, store):
     request = {"id": 1, "roots": [{"harness": "agy", "path": str(store / "brain")}],
                "files": [{"path": str(transcript(store, A)), "size": transcript(store, A).stat().st_size}]}
@@ -326,14 +414,15 @@ def test_reader_decode_refuses_agy_sources(tmp_path, store):
 
 
 def test_an_agy_root_must_be_the_brain_directory(tmp_path, store):
+    # Refused where other invalid roots are: one line and exit 2, before any output.
     proc = run(tmp_path, ["discover", "--root", f"agy={store}"])
-    assert proc.returncode != 0 and proc.stdout == ""
-    assert "agy root must be a brain directory" in proc.stderr
+    assert proc.returncode == 2 and proc.stdout == ""
+    assert "agy root must be a brain directory" in proc.stderr and "Traceback" not in proc.stderr
     request = {"id": 1, "extract": "index", "cross_file": False, "text": False, "raw": False,
                "roots": [{"harness": "agy", "path": str(store)}], "files": [held(transcript(store, A))]}
     proc = run(tmp_path, ["decode"], json.dumps(request) + "\n")
-    assert proc.returncode != 0 and proc.stdout == ""
-    assert "agy root must be a brain directory" in proc.stderr.splitlines()[-1]
+    assert proc.returncode == 2 and proc.stdout == ""
+    assert proc.stderr == "protocol error: agy root must be a brain directory\n"
     proc = run(tmp_path, ["header"], json.dumps({"id": 1, "roots": request["roots"],
                                                  "files": request["files"]}) + "\n")
     assert proc.returncode == 2 and proc.stdout == ""

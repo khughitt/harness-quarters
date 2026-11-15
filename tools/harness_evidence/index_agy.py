@@ -40,7 +40,7 @@ def _home(place) -> Path:
 def refusal(place) -> str | None:
     """agy reads only brain/<id>/.system_generated/logs/transcript_full.jsonl."""
     parts = PurePosixPath(place.relpath).parts
-    if (len(parts) != 5 or parts[0] != "brain" or parts[2:4] != (".system_generated", "logs")
+    if (len(parts) != 5 or ".." in parts or parts[0] != "brain" or parts[2:4] != (".system_generated", "logs")
             or parts[4] not in (AGY_FULL, AGY_MIRROR)):
         return f"agy index reads brain/<id>/.system_generated/logs/{AGY_FULL}"
     if parts[4] == AGY_MIRROR:
@@ -132,7 +132,7 @@ _BACKGROUND = re.compile(r"background task with task id: (\S+)")
 _SENDER = re.compile(r"\bsender=(\S+)")
 _ENDED = (("finished with result:", "finished"), ("was canceled with result:", "canceled"))
 _CHILD = re.compile(r'"conversationId":\s*"([^"]+)"')
-_ANSWER = re.compile(r"^(A\d+): ?(.*)$", re.M)
+_ANSWER = re.compile(r"^(A\d+): ?", re.M)
 _HOOK = re.compile(r"injected by an? (\w+) hook")
 
 KNOWN_KINDS = frozenset({"USER_INPUT", "PLANNER_RESPONSE", "GENERIC", "SYSTEM_MESSAGE", "CHECKPOINT",
@@ -152,7 +152,9 @@ APPLIED = {
     "usage": _USAGE,  # each planner or checkpoint step that became a response
     "tool_call": ("name", "args"),  # each planner tool call
     "run_command": ("command",),  # run_command call inputs
-    "result": ("call", "content"),  # each GENERIC step; call: a call was waiting for it
+    # each GENERIC step; call: a call was waiting for it; calls_known: no ineligible planner
+    # step since the last eligible one left the waiting calls unknown
+    "result": ("call", "content", "calls_known"),
     "exit_line": ("exit_code",),  # each paired DONE run_command result
     "result_times": ("created", "completed"),  # each paired result
     "background": ("call",),  # each background wake-up; call: its sender was open
@@ -165,7 +167,6 @@ UNWATCHED = {
                          "tool_calls[].args.CommandLine": "applied:run_command",
                          "tool_calls[].args.Path": "dimension", "tool_calls[].args.Prompt": "dimension",
                          "tool_calls[].args.questions": "dimension"},
-    "GENERIC": {"error": "flag"},
 }
 _CONVENTION = {
     "flush_response": "agy_step_response", "identity.session": "agy_brain_directory",
@@ -177,13 +178,14 @@ _CONVENTION = {
     "results[].background_id": "agy_background_id", "results[].child_session": "agy_child_conversation",
     "results[].answers": "agy_answer_lines", "results[].truncation": "agy_preview_truncation",
     "results[].exit_code": "agy_exit_line", "injections": "agy_injections",
+    "response.usage_present.thinking": "agy_no_thinking_record",
     "notifications": "agy_background_message", "interruption": "agy_stream_interrupted",
 }
 _SUMMARY_FIELDS = {"identity.parent": "parent_conversation_id", "identity.subagent": "parent_conversation_id",
                    "identity.cwd": "workspace_uris"}
 _ABSENT = {
     "identity.agent": "not_recorded", "identity.version": "not_recorded", "response.effort": "not_recorded",
-    "response.usage_present.thinking": "not_recorded", "response.usage.cache_write": "not_recorded",
+    "response.usage.cache_write": "not_recorded",
     "response.usage.thinking": "not_recorded", "calls[].background": "known_after_call",
     "results[].interrupted": "not_recorded", "results[].agent": "not_recorded",
     "fork_boundary": "no_fork_records", "turn_end": "no_turn_end_records",
@@ -232,7 +234,7 @@ COVERAGE_KEYS = {
     "calls[].native_name": ["applied:tool_call/input:name"],
     "calls[].input_bytes": ["applied:tool_call/input:args"],
     "calls[].command": ["applied:run_command/input:command"],
-    "results[].call_id": ["applied:result/input:call"],
+    "results[].call_id": ["applied:result/input:call", "applied:result/input:calls_known"],
     "results[].bytes": ["applied:result/input:content"],
     "results[].exit_code": ["applied:exit_line/input:exit_code"],
     "results[].native_duration_ms": ["applied:result_times/input:created", "applied:result_times/input:completed"],
@@ -242,7 +244,8 @@ COVERAGE_KEYS = {
     "message.text": ["USER_INPUT/input:content", "PLANNER_RESPONSE/input:content"],
 }
 TOOL_KINDS = {"run_command": "shell", "read_file": "file_read", "write_file": "file_edit",
-              "edit_file": "file_edit", "invoke_subagent": "dispatch", "ask_question": "question"}
+              "edit_file": "file_edit", "invoke_subagent": "dispatch", "ask_question": "question",
+              "SKILL": "skill"}  # SKILL: the call a <SKILL> block in a user input becomes
 _WRITERS = frozenset({"write_file", "edit_file"})
 FEATURES = {"native_skill_events": False, "question_option_labels": False}
 
@@ -315,6 +318,8 @@ def _usage(step: dict, planner: bool) -> tuple[dict, dict, dict]:
     thinking = step.get("thinking") if planner else None
     if isinstance(thinking, str):
         native["thinking_text_bytes"] = _size(thinking)
+    # A presence flag is a boolean: agy never records a thinking count, so the flag is a
+    # constant False, declared by convention (agy_no_thinking_record), not absent.
     return usage, {"output": "output_tokens" in step, "thinking": False}, native
 
 
@@ -337,6 +342,8 @@ def _call(conversation, number, index, call, cwd) -> dict:
     raw = args.get("Path") if name in _WRITERS else None
     prompt = args.get("Prompt") if kind == "dispatch" else None
     command = args.get("CommandLine") if kind == "shell" else None
+    if kind == "dispatch":  # As Claude's: a dispatch's paths are complete when its prompt is.
+        complete = isinstance(prompt, str) and bool(prompt)
     questions = args.get("questions") if kind == "question" else None
     return {"id": f"{conversation}:{number}:{index}", "native_name": name if isinstance(name, str) else None,
             "kind": kind, "input_bytes": _size(args), "command": command if isinstance(command, str) else None,
@@ -361,6 +368,8 @@ def _result(state, session, day, call_id, name, step, content) -> dict:
     applied(state, session, day, "result_times", {"created": created is not None, "completed": completed is not None})
     head = content.split(_OUTPUT, 1)[0]
     exit_code = truncation = child = answers = background = None
+    # Only a DONE result can carry the line: a RUNNING one reports its code later in its
+    # wake-up (notifications[].exit_code), and an ERROR one is a tool that did not run.
     if name == "run_command" and status == "DONE":
         match = _EXIT.search(head)
         applied(state, session, day, "exit_line", {"exit_code": match is not None})
@@ -377,9 +386,11 @@ def _result(state, session, day, call_id, name, step, content) -> dict:
         applied(state, session, day, "child", {"conversation": found is not None})
         child = found.group(1) if found else None
     if name == "ask_question":
-        pairs = _ANSWER.findall(content)
-        applied(state, session, day, "answers", {"answers": bool(pairs)})
-        answers = dict(pairs) if pairs else None
+        # Each answer runs from its A<n>: line to the next one; an answer may span lines.
+        marks = list(_ANSWER.finditer(content))
+        applied(state, session, day, "answers", {"answers": bool(marks)})
+        ends = [mark.start() for mark in marks[1:]] + [len(content)]
+        answers = {mark.group(1): content[mark.end():end].rstrip() for mark, end in zip(marks, ends)} or None
     return {"call_id": call_id, "bytes": _size(content), "error": status == "ERROR", "interrupted": None,
             "native_duration_ms": None if created is None or completed is None else completed - created,
             "background_id": background, "agent": None, "child_session": child, "answers": answers,
@@ -458,7 +469,11 @@ def extract(lines, state, *, place, text: bool):
         if not eligible and kind == "GENERIC" and state.get("pending"):
             state["pending"].pop(0)  # It still answers its call; its fields cannot be trusted.
         elif not eligible and kind == "PLANNER_RESPONSE":
-            state["pending"] = []  # Its calls are unknown, so no later result pairs with older ones.
+            state["pending"] = None  # Its calls are unknown, so no later result pairs with older ones.
+        elif not eligible and kind == "SYSTEM_MESSAGE" and source == "SYSTEM":
+            ended = _wake_up(step["content"]) if isinstance(step.get("content"), str) else None
+            if ended is not None:  # Its task still ended; a later message cannot be its wake-up.
+                state.get("background", {}).pop(ended[0], None)
         if eligible and kind in ("USER_INPUT", "PLANNER_RESPONSE", "CHECKPOINT", "GENERIC", "SYSTEM_MESSAGE"):
             content = step.get("content") if isinstance(step.get("content"), str) else ""
         if eligible and kind == "USER_INPUT":
@@ -503,8 +518,10 @@ def extract(lines, state, *, place, text: bool):
                 event["message"] = _message("assistant", content, _origin(content, str(source)),
                                             _size(content) * bool(content) + sum(c["input_bytes"] for c in event["calls"]))
         elif eligible and kind == "GENERIC":
+            known = state.get("pending", []) is not None
             pending = state.get("pending") or []
-            applied(state, conversation, day, "result", {"call": bool(pending), "content": "content" in step})
+            applied(state, conversation, day, "result",
+                    {"call": bool(pending), "content": "content" in step, "calls_known": known})
             if pending:
                 call_id, name = pending.pop(0)
                 event["results"] = [_result(state, conversation, day, call_id, name, step, content)]

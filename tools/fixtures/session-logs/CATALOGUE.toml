@@ -9,12 +9,19 @@
 # Unspecified versions stay unknown; no synthetic sample establishes observed emission.
 
 # agy index samples: synthetic steps; their summaries rows are conversation_summaries.sql beside brain/.
+# Expected events: index_events lists each index_event's native_kind in order, unparsed each
+# unparsed object's reason; calls, results and notifications count those arrays' entries.
 [[sample]]
 path = "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000001/.system_generated/logs/transcript_full.jsonl"
 harness = "agy"
 version = "unknown"
 provenance = "synthetic"
 profile = "index"
+index_events = ["USER_INPUT", "PLANNER_RESPONSE", "GENERIC", "GENERIC", "GENERIC", "PLANNER_RESPONSE", "GENERIC", "PLANNER_RESPONSE", "GENERIC", "USER_INPUT", "PLANNER_RESPONSE"]
+unparsed = []
+calls = 6
+results = 5
+notifications = 0
 
 [[sample]]
 path = "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000002/.system_generated/logs/transcript_full.jsonl"
@@ -22,6 +29,11 @@ harness = "agy"
 version = "unknown"
 provenance = "synthetic"
 profile = "index"
+index_events = ["USER_INPUT", "SYSTEM_MESSAGE", "PLANNER_RESPONSE", "GENERIC", "GENERIC", "PLANNER_RESPONSE", "SYSTEM_MESSAGE", "SYSTEM_MESSAGE", "SYSTEM_MESSAGE", "CHECKPOINT", "GENERIC", "PLANNER_RESPONSE", "GENERIC", "FUTURE_STEP", "ERROR_MESSAGE"]
+unparsed = []
+calls = 4
+results = 3
+notifications = 2
 
 [[sample]]
 path = "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000003/.system_generated/logs/transcript_full.jsonl"
@@ -29,6 +41,11 @@ harness = "agy"
 version = "unknown"
 provenance = "synthetic"
 profile = "index"
+index_events = ["SYSTEM_MESSAGE", "SYSTEM_MESSAGE", "PLANNER_RESPONSE", "GENERIC", "GENERIC", "PLANNER_RESPONSE"]
+unparsed = []
+calls = 3
+results = 2
+notifications = 0
 
 [[sample]]
 path = "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000004/.system_generated/logs/transcript_full.jsonl"
@@ -36,6 +53,11 @@ harness = "agy"
 version = "unknown"
 provenance = "synthetic"
 profile = "index"
+index_events = ["USER_INPUT", "PLANNER_RESPONSE"]
+unparsed = ["malformed", "truncated"]
+calls = 0
+results = 0
+notifications = 0
 
 # agy discovery fixtures: synthetic steps; their summaries rows are conversation_summaries.sql beside brain/.
 [[sample]]
@@ -50,6 +72,11 @@ harness = "agy"
 version = "unknown"
 provenance = "synthetic"
 profile = "index"
+index_events = ["USER_INPUT", "PLANNER_RESPONSE", "GENERIC", "PLANNER_RESPONSE"]
+unparsed = []
+calls = 1
+results = 1
+notifications = 0
 
 [[sample]]
 path = "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000b1/.system_generated/logs/transcript_full.jsonl"
@@ -57,6 +84,11 @@ harness = "agy"
 version = "unknown"
 provenance = "synthetic"
 profile = "index"
+index_events = ["USER_INPUT", "PLANNER_RESPONSE"]
+unparsed = []
+calls = 0
+results = 0
+notifications = 0
 
 [[sample]]
 path = "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000c1/.system_generated/logs/transcript_full.jsonl"
@@ -64,6 +96,11 @@ harness = "agy"
 version = "unknown"
 provenance = "synthetic"
 profile = "index"
+index_events = ["USER_INPUT", "PLANNER_RESPONSE"]
+unparsed = ["malformed"]
+calls = 0
+results = 0
+notifications = 0
 
 [[sample]]
 path = "captures/escaped-malformed.jsonl"

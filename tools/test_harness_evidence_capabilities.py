@@ -207,9 +207,25 @@ def test_every_declared_native_path_occurs_in_its_harness_samples():
                     from harness_evidence import agy_summaries
                     column = path.removeprefix("conversation_summaries.")
                     assert column in agy_summaries.COLUMNS, path
-                    assert all(column in sql.read_text() for sql in FIXTURES.glob("agy*/.gemini/antigravity-cli/*.sql"))
+                    assert any(column_values(sql, column) for sql in FIXTURES.glob("agy*/.gemini/antigravity-cli/*.sql")), path
                     continue
                 assert any(native_values(row, path) for row in native), (slug, field, path)
+
+
+def column_values(sql, column):
+    """The nonempty values a fixture's summaries rows hold in `column`, read from the table
+    the SQL builds (not its text), so a column no row fills is not evidence."""
+    import sqlite3
+    connection = sqlite3.connect(":memory:")
+    try:
+        connection.executescript(sql.read_text())
+        names = [row[1] for row in connection.execute("PRAGMA table_info(conversation_summaries)")]
+        if column not in names:
+            return []
+        return [value for (value,) in connection.execute(f"SELECT {column} FROM conversation_summaries")
+                if value not in (None, "")]
+    finally:
+        connection.close()
 
 
 def test_fields_seen_require_native_evidence_but_keep_false_and_zero(tmp_path):

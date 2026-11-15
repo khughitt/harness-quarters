@@ -59,7 +59,10 @@ def _read(source, roots, inherited):
                 fmt = detect_format(data, size)
             except UnknownFormat:
                 status = "unknown_format"
-        if fmt == "agy":
+        if fmt == "agy" and place.store == "explicit":
+            # An explicit file reads as before agy was detected: not a format the reader decodes.
+            status, fmt = "unknown_format", None
+        elif fmt == "agy":
             raise ProtocolError("agy supports only extract:index")
         if fmt is not None:
             place = replace(place, harness="codex" if fmt == "codex" else "claude-code")
@@ -201,6 +204,8 @@ def objects(request, envelope):
         try:
             context = _read({"path": path, "size": Path(path).stat().st_size}, roots, {})
         except (OSError, UnicodeError):
+            continue
+        except ProtocolError:  # An agy transcript under an agy root carries no Codex lineage.
             continue
         if context.place.harness == "codex" and context.status == "ok" and context.read.header.get("session"):
             inherited.setdefault(context.read.header["session"], set()).update(context.read.header["turn_ids"])

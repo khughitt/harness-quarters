@@ -16,11 +16,11 @@ from test_harness_evidence_index import (CONTROLS, FIXTURES, TOOLS, environment,
 ENVELOPE = {"schema": "harness-evidence/1", "decoder": {"version": DECODER_VERSION, "revision": "a" * 40}}
 
 
-
 def patch_claude(monkeypatch, name, value):
     """Replace a Claude extractor entry point where both the registry and direct callers see it."""
     monkeypatch.setattr(index_events, name, value)
     monkeypatch.setattr(index_claude, name, value)
+
 
 def source(path, *, size=None, state=None, logical=None):
     info = path.stat()
