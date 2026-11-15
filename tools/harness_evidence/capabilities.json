@@ -3478,12 +3478,13 @@
      "exec": "script",
      "exec_command": "shell",
      "followup_task": "dispatch",
+     "request_user_input": "question",
      "send_message": "dispatch",
      "shell": "shell",
      "shell_command": "shell",
      "spawn_agent": "dispatch",
      "wait": "poll",
-     "wait_agent": "poll",
+     "wait_agent": "other",
      "write_stdin": "poll"
     },
     "unwatched": {

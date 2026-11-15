@@ -368,3 +368,9 @@ def test_execution_support_is_distinct_from_synthetic_versioned_evidence():
     assert codex["index"]["features"]["stateful_execution"] is True
     assert "execution.runs" in codex["versions"]["unknown"]["fields_seen"]["synthetic"]
     assert all(not v["fields_seen"]["observed"] for v in codex["versions"].values())
+
+
+def test_codex_question_and_execution_poll_kind_declarations():
+    kinds = json.loads(ARTIFACT.read_text())['harnesses']['codex']['index']['tool_kinds']
+    assert {name:kinds.get(name) for name in ('request_user_input','exec','wait','write_stdin','wait_agent')} == {
+        'request_user_input':'question','exec':'script','wait':'poll','write_stdin':'poll','wait_agent':'other'}

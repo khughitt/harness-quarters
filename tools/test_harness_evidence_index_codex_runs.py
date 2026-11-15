@@ -1945,3 +1945,47 @@ def test_unavailable_metadata_is_null(tmp_path):
                                             'decoder':{'revision':'test','version':'19'}}))
     assert values[-2]['status'] == 'vanished' and values[-2]['metadata'] is None
     assert values[-1]['object'] == 'request_end'
+
+
+def test_question_and_execution_poll_kinds_preserve_native_call_facts():
+    names = ('request_user_input', 'request_user_input_async', 'exec', 'wait', 'write_stdin', 'wait_agent')
+    expected = ('question', 'other', 'script', 'poll', 'poll', 'other')
+    rows = [META, CTX]
+    for name in names:
+        rows += [fn_call(name, name, {}, T0), fn_output(name, 'aborted by user after 1s', T1)]
+    rows.append(count(10, ts=T1))
+    state = {}
+    events = native_events(rows, state)
+    calls = [call for event in events for call in event.get('calls', [])]
+    assert [(c['native_name'], c['kind']) for c in calls] == list(zip(names, expected))
+    assert all(c['input_text'] == '{}' and c['input_bytes'] == 2 for c in calls)
+    assert all(not {'questions', 'answers', 'recommendation'} & c.keys() for c in calls)
+    updates = combined(events)['call_updates']
+    assert set(updates) == {('c1', name) for name in names}
+    assert all(u['error'] is False and u['interrupted'] is True and u['duration_ms'] == 2000
+               for u in updates.values())
+    fields = {(r['record_kind'], r['field']):(r['seen'], r['present']) for r in events[-1]['fields']}
+    assert fields[('applied:tool_call', 'input:name')] == (6, 6)
+    assert fields[('applied:tool_output', 'input:output')] == (6, 6)
+    assert [entry[1] for entry in state['recent_calls']] == ['request_user_input', 'request_user_input_async', 'wait_agent']
+    assert index_codex.provenance_defaults()['calls[].kind']['native_paths'] == ['payload.name']
+
+
+def test_named_call_and_agent_wait_survive_long_gap_of_execution_scripts():
+    rows = [META, CTX, exec_command_call('named', 'true', T0), fn_output('named', exited(0), T1),
+            fn_call('agent-wait', 'wait_agent', {'targets':['child']}, T0),
+            fn_output('agent-wait', '{"timed_out": true, "status": {}}', T1), count(10, ts=T1)]
+    for i in range(257):
+        rows += [exec_script(f'script-{i}', 'text("x");', T1),
+                 exec_output(f'script-{i}', T2, DONE), count(20+i, ts=T2)]
+    state = {}
+    first = native_events(rows, state)
+    assert [entry[1] for entry in state['recent_calls']] == ['named', 'agent-wait']
+    calls = [c for e in first for c in e.get('calls', [])]
+    assert len(calls) == 259
+    assert [c['kind'] for c in calls] == ['shell', 'other'] + ['script']*257
+    resumed = native_events([exec_end('named', 130, 1, T3)], json.loads(json.dumps(state)))
+    update = combined(resumed)['call_updates'][('c1', 'named')]
+    assert update['error'] is True and update['interrupted'] is True
+    assert not any(r.get('call_id') == 'agent-wait' for r in execution(resumed, 'call_updates'))
+    assert resumed[-1]['malformed'] == 0

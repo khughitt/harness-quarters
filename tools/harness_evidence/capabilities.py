@@ -325,7 +325,8 @@ def build(catalogue: Path, *, index_catalogue: Path | None = None) -> dict:
         "unwatched": index_codex_coverage.UNWATCHED, "common_reads": index_codex_coverage.COMMON_READS,
         "known_kinds": sorted(index_codex_coverage.KNOWN_KINDS),
         "tool_kinds": {**dict.fromkeys(index_codex.SHELL, "shell"), "apply_patch": "patch", "exec": "script",
-                       "write_stdin": "poll", "wait": "poll", "wait_agent": "poll",
+                       "write_stdin": "poll", "wait": "poll", "wait_agent": "other",
+                       "request_user_input": "question",
                        **dict.fromkeys(index_codex.DISPATCH, "dispatch")},
         "features": {"native_skill_events": False, "question_option_labels": False,
                      "stateful_execution": True}}))

@@ -263,7 +263,10 @@ are strings or null; string lists join with spaces, and other malformed values f
 The original adapter's accepted empty command object normalizes to empty text with
 the named convention `codex_empty_command_object`, retaining the original input and
 byte size. Code-mode calls have kind `script`, including scripts containing patch
-operations; direct patch calls have kind `patch`. Ordered `operations` distinguish
+operations; direct patch calls have kind `patch`. Native request_user_input has
+kind `question` for the consumer's Codex count-only policy. Only execution wait and
+write_stdin have kind `poll`; wait_agent remains `other`, preserving its eligibility
+for the original recent-call cache. Ordered `operations` distinguish
 launches and polls, with null for scripts that cannot be paired and an empty list
 for plain scripts without operations. Commands, input text and operation commands
 require `text:true`. Skill names carry heuristic provenance. Native collaboration

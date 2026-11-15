@@ -243,7 +243,7 @@ def _call(payload, cwd):
     candidate_paths = ([m.group(1).strip() for m in PATCH_PATH.finditer(candidate_text)] or [None]) if patch else []
     candidates = [_join(path, cwd) if path is not None else None for path in candidate_paths]
     call = {"id": payload.get("call_id"), "native_name": name,
-            "kind": "shell" if name in SHELL else "script" if name == "exec" else "patch" if patch else "poll" if name in {"write_stdin", "wait", "wait_agent"} else "dispatch" if name in DISPATCH else "other",
+            "kind": "shell" if name in SHELL else "script" if name == "exec" else "patch" if patch else "question" if name == "request_user_input" else "poll" if name in {"write_stdin", "wait"} else "dispatch" if name in DISPATCH else "other",
             "input_bytes": _size(value), "input_text": text, "command": command,
             "commands": commands, "operations": runs.operations(text) if name == "exec" else None,
             "skills": skills.from_call(name, value), "patch_paths": raw_paths,
