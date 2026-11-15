@@ -7,7 +7,7 @@ from .index_events import (COVERAGE_KEYS, DISPATCH, PATH_FIELDS, PROVENANCE, WRI
 
 __all__ = ["extract", "Restart", "provenance_defaults", "WATCHED", "APPLIED", "UNWATCHED",
            "COMMON_READS", "KNOWN_KINDS", "PROVENANCE", "COVERAGE_KEYS", "TOOL_KINDS",
-           "FEATURES", "SIDE_INPUTS", "header", "path_facts", "side_inputs", "refusal"]
+           "FEATURES", "SIDE_INPUTS", "bind", "header", "path_facts", "side_inputs", "refusal"]
 
 TOOL_KINDS = {
     **{name: "file_read" for name in PATH_FIELDS},
@@ -32,6 +32,10 @@ def path_facts(place):
 
 def side_inputs(_facts):
     return None
+
+
+def bind(_state, _facts):
+    """Claude's extractor derives its path facts from the place itself."""
 
 
 def refusal(_place):

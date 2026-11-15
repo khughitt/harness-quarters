@@ -40,7 +40,7 @@ def canonical(value) -> str:
 
 def samples():
     catalogue = tomllib.loads(CATALOGUE.read_text(encoding="utf-8"))["sample"]
-    return [s for s in catalogue if s.get("profile") == "index"]
+    return [s for s in catalogue if s.get("profile") == "index" and s["harness"] == "claude-code"]
 
 
 class Normalizer:

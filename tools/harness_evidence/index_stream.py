@@ -80,9 +80,12 @@ def _prefix(handle, limit):
     return digest, count, not limit or last == b"\n"
 
 
-def _binding(source, place, envelope, text, facts):
-    return {"decoder": envelope["decoder"], "identity": source["identity"],
-            "path": str(place.path), "path_facts": facts, "text": text}
+def _binding(source, place, envelope, text, facts, side_inputs):
+    binding = {"decoder": envelope["decoder"], "identity": source["identity"],
+               "path": str(place.path), "path_facts": facts, "text": text}
+    if side_inputs is not None:  # A changed side input never resumes (spec rev 2 §4.2).
+        binding["side_inputs"] = side_inputs
+    return binding
 
 
 def _checkpoint(state, digest, binding, *, seed=False):
@@ -108,8 +111,9 @@ def _file(source, number, roots, request, envelope):
         place = Place("claude-code", "file", None, "explicit", str(logical), logical)
     adapter = index_adapters.for_source(place, extract=True)
     place = replace(place, read_path=physical)
-    facts = adapter.path_facts(place)  # One snapshot serves the binding and file_start.
-    binding = _binding(source, place, envelope, request.get("text", False), facts)
+    facts = adapter.path_facts(place)  # One snapshot serves binding, file_start and events.
+    side_inputs = adapter.side_inputs(facts)
+    binding = _binding(source, place, envelope, request.get("text", False), facts, side_inputs)
     base = {**envelope, "request": request["id"], "file": number,
             "harness": place.harness, "harness_version": None}
     location = asdict(place)
@@ -121,7 +125,7 @@ def _file(source, number, roots, request, envelope):
              "provenance_defaults": copy.deepcopy(defaults),
              "object": "file_start", "key": "file", "path": str(logical),
              "place": location, "filename_identity": None,
-             "path_facts": facts, "side_inputs": None, "replaces": "all"}
+             "path_facts": facts, "side_inputs": side_inputs, "replaces": "all"}
     try:
         handle = physical.open("rb")
     except (OSError, UnicodeError) as error:
@@ -148,6 +152,7 @@ def _file(source, number, roots, request, envelope):
                 digest = prior
                 if old["index"]["mode"] == "resume":
                     start["replaces"] = {"from_line": old["next_line"]}
+        adapter.bind(state, facts)
         handle.seek(state["next_offset"])
         yield start
 

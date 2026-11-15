@@ -315,11 +315,6 @@ def decode_index(tmp_path, store, path):
     return run(tmp_path, ["decode"], json.dumps(request) + "\n")
 
 
-def test_index_has_no_agy_extractor_yet(tmp_path, store):
-    proc = decode_index(tmp_path, store, transcript(store, A))
-    assert_refused(proc, "no index extractor for agy")
-
-
 def test_reader_decode_refuses_agy_sources(tmp_path, store):
     request = {"id": 1, "roots": [{"harness": "agy", "path": str(store / "brain")}],
                "files": [{"path": str(transcript(store, A)), "size": transcript(store, A).stat().st_size}]}
@@ -347,4 +342,4 @@ def test_capabilities_declare_the_side_input_and_the_agy_header():
     assert agy["header"] == {"implemented": True, "line_limit": 50}
     assert agy["side_inputs"]["agy_conversation_summaries"]["columns"] == COLUMNS
     assert agy["side_inputs"]["agy_conversation_summaries"]["path"] == "conversation_summaries.db"
-    assert "index" not in agy
+    assert agy["index"]["mode"] == "incremental" and agy["index"]["resume"] is True
