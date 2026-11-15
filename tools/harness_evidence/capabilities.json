@@ -1,6 +1,6 @@
 {
  "built_from": {
-  "catalogue_sha256": "63e4c0c0e914c7fa96ac5dcb33f34019c07045fafe1b270f00ca79a627fad514",
+  "catalogue_sha256": "6440bd481ab49c3927218b0d3d4fe70f65b63121d6cb1b81e24d121a4c912c21",
   "samples": {
    "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000001/.system_generated/logs/transcript_full.jsonl": "665c7874fd0d6fd14d98b5d65ab52c6aa0257d634231a80d166a2ddea6b0eb54",
    "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000002/.system_generated/logs/transcript_full.jsonl": "b86df9c5a4eee90e7563000b4b9ef9c53cbb85cd3eb7999b2c7aef8d7bb33d15",
