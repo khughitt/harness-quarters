@@ -1,6 +1,7 @@
 {
  "base": "3e346e267d6230ccee3c90f4ebc618c44449c0d5",
  "capabilities": {
+  "harness": "d8a48bb9191d7945bd9d0dea73c4286cd2e4126d0878ebea881391240e59dc32",
   "header": "4901b4efcd23e7556a5e53b13b1b080342e616e2a95b423c0dacb53729af9bca",
   "index": "53b9653c7b5ec0bb03d336c2e8b93ce24e930b4eaacd19ee06773253600e3b0c"
  },

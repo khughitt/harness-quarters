@@ -122,9 +122,17 @@ def observe(normalize: Normalizer):
     return completing, failing, removed
 
 
+# The capabilities fields entry each post-base addition creates for Claude.
+ADDED_CAPABILITY_FIELDS = {"results[].exit_code": {"coverage_keys": [], "provenance": []}}
+
+
 def claude_capability_blocks():
+    """The whole Claude harness block, with the post-base fields entries projected out."""
     claude = json.loads(CAPABILITIES.read_text(encoding="utf-8"))["harnesses"]["claude-code"]
-    return {"index": canonical(claude["index"]), "header": canonical(claude["header"])}
+    for field, entry in ADDED_CAPABILITY_FIELDS.items():
+        assert claude["fields"].pop(field) == entry, field
+    return {"index": canonical(claude["index"]), "header": canonical(claude["header"]),
+            "harness": canonical(claude)}
 
 
 def compute():
