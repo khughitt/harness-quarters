@@ -20,7 +20,7 @@ from .header import _lines, _proof
 from .index_coverage import applied, count_record, coverage_rows, day_of
 from .lines import _finite_float, _reject_constant, ref
 
-__all__ = ["extract", "Restart", "provenance_defaults", "bind", "WATCHED", "APPLIED", "UNWATCHED",
+__all__ = ["extract", "Restart", "provenance_defaults", "bind", "ABSENT", "WATCHED", "APPLIED", "UNWATCHED",
            "COMMON_READS", "KNOWN_KINDS", "PROVENANCE", "COVERAGE_KEYS", "TOOL_KINDS", "FEATURES",
            "SIDE_INPUTS", "header", "path_facts", "side_inputs", "refusal"]
 
@@ -183,6 +183,7 @@ _ABSENT = {
     "results[].interrupted": "not_recorded", "results[].agent": "not_recorded",
     "fork_boundary": "no_fork_records", "turn_end": "no_turn_end_records",
 }
+ABSENT = _ABSENT  # Published in the capabilities index block (spec rev 2 §7).
 _SUMMARY = [f"{agy_summaries.TABLE}.{column}" for column in ("parent_conversation_id",)]
 PROVENANCE = {
     "native_kind": ["type"], "eligible": ["created_at", "step_index"], "flush_response": ["type"],
@@ -403,6 +404,7 @@ def _without_text(event):
         result.pop("answers")
     for injection in event["injections"]:
         injection.pop("source")
+    event["identity"].pop("cwd")  # As Claude's text-off identity.
 
 
 def extract(lines, state, *, place, text: bool):
@@ -413,7 +415,8 @@ def extract(lines, state, *, place, text: bool):
     identity = {"session": conversation, "index_session": conversation, "agent": None,
                 "parent": facts["parent"], "subagent": facts["subagent"], "cwd": facts["cwd"],
                 "entrypoint": "agy", "version": None}
-    unresolved = ({field: {"native_paths": [], "rule": "absent:" + facts["reason"]} for field in _SUMMARY_FIELDS}
+    # Unknown, not a declared absence: agy records these facts and this row is not available.
+    unresolved = ({field: {"native_paths": [], "rule": "unresolved:" + facts["reason"]} for field in _SUMMARY_FIELDS}
                   if facts["reason"] is not None else {})
     number, partial = state.get("next_line", 1), False
     for offset, raw in lines:
@@ -447,6 +450,10 @@ def extract(lines, state, *, place, text: bool):
                  "message": None, "calls": [], "results": [], "injections": [], "notifications": [],
                  "compaction": None, "interruption": None, "fork_boundary": None, "turn_end": None}
         source = step.get("source")
+        if not eligible and kind == "GENERIC" and state.get("pending"):
+            state["pending"].pop(0)  # It still answers its call; its fields cannot be trusted.
+        elif not eligible and kind == "PLANNER_RESPONSE":
+            state["pending"] = []  # Its calls are unknown, so no later result pairs with older ones.
         if eligible and kind in ("USER_INPUT", "PLANNER_RESPONSE", "CHECKPOINT", "GENERIC", "SYSTEM_MESSAGE"):
             content = step.get("content") if isinstance(step.get("content"), str) else ""
         if eligible and kind == "USER_INPUT":

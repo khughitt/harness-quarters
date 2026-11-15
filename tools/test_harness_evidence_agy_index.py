@@ -199,7 +199,8 @@ def test_missing_row_malformed_line_and_partial_tail(store):
     event = events(out)[0]
     assert (event["identity"]["parent"], event["identity"]["subagent"], event["identity"]["cwd"]) == (None, None, None)
     defaults = out[0]["provenance_defaults"]
-    assert event["provenance"]["identity.cwd"] == {"native_paths": [], "rule": "absent:no_summary_row"}
+    # Unknown, not a declared absence: agy records these facts, the row is missing (spec §4.2).
+    assert event["provenance"]["identity.cwd"] == {"native_paths": [], "rule": "unresolved:no_summary_row"}
     assert defaults["identity.cwd"]["rule"] == "agy_conversation_summaries"
     unparsed = [o for o in out if o["object"] == "unparsed"]
     assert [(u["line"], u["reason"], u["provisional"]) for u in unparsed] == [(2, "malformed", False),
@@ -221,6 +222,7 @@ def test_text_off_drops_text_and_keeps_sizes(store):
     assert all("command" not in c and "prompt" not in c for e in out for c in e["calls"])
     assert all("answers" not in r for e in out for r in e["results"])
     assert all("source" not in i for e in out for i in e["injections"])
+    assert all("cwd" not in e["identity"] for e in out)  # as Claude's text-off identity
     assert by_line(decode(store, H, text=False))[1]["message"]["joined_bytes"] == len("Run the checks")
 
 
@@ -325,3 +327,65 @@ def test_every_native_read_is_declared(store):
         reads |= traced_extract(adapter, numbered(transcript(store, conversation).read_bytes()), state, place=place)
     missing = sorted((kind, path) for kind, path in reads if not covered(path, declared(adapter, kind)))
     assert reads and missing == []
+
+
+def test_capabilities_list_agy_absences_apart_from_conventions():
+    from harness_evidence import capabilities
+    from harness_evidence.index_adapters import ADAPTERS
+    agy = json.loads(capabilities.ARTIFACT.read_text())["harnesses"]["agy"]
+    defaults = ADAPTERS["agy"].provenance_defaults()
+    absent = {f: p["rule"].removeprefix("absent:") for f, p in defaults.items() if p["rule"].startswith("absent:")}
+    assert agy["index"]["absent"] == absent and "turn_end" in absent
+    for field, entry in agy["fields"].items():
+        if not entry["provenance"]:
+            assert field in absent or defaults[field]["basis"] == "convention", field
+    assert "identity.session" not in absent
+
+
+def raw_lines(steps):
+    offset, out = 0, []
+    for step in steps:
+        raw = (json.dumps(step) + "\n").encode()
+        out.append((offset, raw))
+        offset += len(raw)
+    return out
+
+
+def extracted(store, steps):
+    from harness_evidence import discover
+    from harness_evidence.index_adapters import ADAPTERS
+    adapter = ADAPTERS["agy"]
+    place = discover.place_of(transcript(store, H), discover.roots(explicit=[("agy", store / "brain")]))
+    state = {}
+    adapter.bind(state, adapter.path_facts(place))
+    return [e for e in adapter.extract(raw_lines(steps), state, place=place, text=True)
+            if e["object"] == "index_event"]
+
+
+def test_an_ineligible_step_keeps_its_place_in_the_pairing(store):
+    planner = {"step_index": 1, "source": "MODEL", "type": "PLANNER_RESPONSE", "status": "DONE",
+               "created_at": "2026-11-03T15:00:02Z", "tool_calls": [
+                   {"name": "run_command", "args": {"CommandLine": "true"}},
+                   {"name": "read_file", "args": {"Path": "/w/a"}}]}
+    broken = {"step_index": 2, "source": "MODEL", "type": "GENERIC", "status": "DONE",
+              "content": "Command exited with code 0."}  # no created_at: ineligible
+    read = {"step_index": 3, "source": "MODEL", "type": "GENERIC", "status": "DONE",
+            "created_at": "2026-11-03T15:00:04Z", "content": "Command exited with code 7.\n"}
+    events_ = extracted(store, [planner, broken, read])
+    assert events_[1]["eligible"] is False and events_[1]["results"] == []
+    [result_] = events_[2]["results"]
+    assert result_["call_id"] == f"{H}:1:1" and result_["exit_code"] is None  # read_file, not run_command
+
+
+def test_an_ineligible_planner_step_closes_the_earlier_calls(store):
+    first = {"step_index": 1, "source": "MODEL", "type": "PLANNER_RESPONSE", "status": "DONE",
+             "created_at": "2026-11-03T15:00:02Z", "tool_calls": [{"name": "run_command", "args": {"CommandLine": "a"}},
+                                                                   {"name": "run_command", "args": {"CommandLine": "b"}}]}
+    generic = {"step_index": 2, "source": "MODEL", "type": "GENERIC", "status": "DONE",
+               "created_at": "2026-11-03T15:00:03Z", "content": "Command exited with code 0.\n"}
+    second = {"step_index": 3, "source": "MODEL", "type": "PLANNER_RESPONSE", "status": "DONE",
+              "tool_calls": [{"name": "read_file", "args": {"Path": "/w/a"}}]}  # no created_at
+    late = {**generic, "step_index": 4, "content": "Command exited with code 9.\n"}
+    events_ = extracted(store, [first, generic, second, late])
+    assert events_[1]["results"][0]["call_id"] == f"{H}:1:0"
+    assert events_[3]["results"] == []  # the ineligible planner's calls are unknown; nothing is paired

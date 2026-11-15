@@ -656,6 +656,19 @@
     "line_limit": 50
    },
    "index": {
+    "absent": {
+     "calls[].background": "known_after_call",
+     "fork_boundary": "no_fork_records",
+     "identity.agent": "not_recorded",
+     "identity.version": "not_recorded",
+     "response.effort": "not_recorded",
+     "response.usage.cache_write": "not_recorded",
+     "response.usage.thinking": "not_recorded",
+     "response.usage_present.thinking": "not_recorded",
+     "results[].agent": "not_recorded",
+     "results[].interrupted": "not_recorded",
+     "turn_end": "no_turn_end_records"
+    },
     "applied": {
      "answers": [
       "answers"

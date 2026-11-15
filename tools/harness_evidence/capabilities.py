@@ -319,6 +319,8 @@ def build(catalogue: Path) -> dict:
             "known_kinds": sorted(adapter.KNOWN_KINDS),
             "tool_kinds": adapter.TOOL_KINDS,
             "features": adapter.FEATURES}))
+        if hasattr(adapter, "ABSENT"):  # Claude's block keeps its v18 keys (spec rev 2 §4.4).
+            harness["index"]["absent"] = dict(sorted(adapter.ABSENT.items()))
     for harness in harnesses.values():
         harness["record_kinds"] = sorted(harness["record_kinds"])
         harness["labels"] = {role: sorted(bases) for role, bases in harness["labels"].items()}
