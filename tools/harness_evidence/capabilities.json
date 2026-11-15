@@ -4,7 +4,7 @@
   "samples": {
    "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000001/.system_generated/logs/transcript_full.jsonl": "665c7874fd0d6fd14d98b5d65ab52c6aa0257d634231a80d166a2ddea6b0eb54",
    "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000002/.system_generated/logs/transcript_full.jsonl": "b86df9c5a4eee90e7563000b4b9ef9c53cbb85cd3eb7999b2c7aef8d7bb33d15",
-   "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000003/.system_generated/logs/transcript_full.jsonl": "e55c8412173811fee9b92f3ee3a481fd468730d12e00dcde3bd8a18180cd701a",
+   "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000003/.system_generated/logs/transcript_full.jsonl": "8da0dce3a0a9ffb2696addb7f79aba2db2f47f8fbfe967c810b25618fa62dae5",
    "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000004/.system_generated/logs/transcript_full.jsonl": "581bb04172f6676987074c4e9545620e12b885f94c5cd70a9c3d0ff592ebb7d6",
    "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000a1/.system_generated/logs/transcript.jsonl": "1d93449220efab4bda578acfb4d4f89096b9e0b3502629842888b63ad6e470c5",
    "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000a1/.system_generated/logs/transcript_full.jsonl": "17a91d7e1e1c515806a3622802b2ddcbff1df8de2a961fc024f5017de034ec97",
@@ -684,7 +684,8 @@
      ],
      "result": [
       "call",
-      "content"
+      "content",
+      "calls_known"
      ],
      "result_times": [
       "created",
@@ -728,6 +729,7 @@
     "profile": "index",
     "resume": true,
     "tool_kinds": {
+     "SKILL": "skill",
      "ask_question": "question",
      "edit_file": "file_edit",
      "invoke_subagent": "dispatch",
@@ -736,9 +738,6 @@
      "write_file": "file_edit"
     },
     "unwatched": {
-     "GENERIC": {
-      "error": "flag"
-     },
      "PLANNER_RESPONSE": {
       "tool_calls[].args": "applied:tool_call",
       "tool_calls[].args.CommandLine": "applied:run_command",

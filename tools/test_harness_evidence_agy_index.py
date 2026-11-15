@@ -104,7 +104,7 @@ def test_planner_steps_are_complete_responses_with_agy_usage(store):
         "id": f"{H}:1", "model": "gemini-3-pro-high", "effort": None,
         "usage": {"input_uncached": 120, "cache_read": 4000, "cache_write": None, "output": 55,
                   "thinking": None, "context_total": 4120, "uncached_total": 120},
-        "usage_present": {"output": True, "thinking": False},
+        "usage_present": {"output": True, "thinking": None},  # declared absent: null, not False
         "native": {"input_tokens": 120, "cache_read_tokens": 4000, "output_tokens": 55,
                    "thinking_text_bytes": len("Plan: list, read, edit.")}}
     assert planner["message"]["channel"] == "assistant" and planner["message"]["text"] == "Running the checks."
@@ -184,13 +184,141 @@ def test_subagent_identity_child_session_and_answers(store):
     out = decode(store, P)
     lines = by_line(out)
     assert all(e["identity"]["parent"] == G and e["identity"]["subagent"] is True for e in events(out))
-    assert lines[1]["message"]["channel"] == "user" and lines[1]["message"]["origin"]["native_kind"] == "SYSTEM"
-    dispatch, question = lines[2]["calls"]
+    # A live subagent opens with the hook injection, then its parent's message: no user input.
+    assert [(i["native_kind"], i["source"]) for i in lines[1]["injections"]] == [
+        ("agy_hook_injection", "SessionStart hook")]
+    assert lines[2]["message"]["channel"] == "system" and lines[2]["notifications"] == []
+    assert [i["native_kind"] for i in lines[2]["injections"]] == ["agy_system_message"]
+    assert all(e["message"] is None or e["message"]["channel"] != "user" for e in events(out))
+    dispatch, question = lines[3]["calls"]
     assert (dispatch["kind"], dispatch["prompt"], question["kind"]) == ("dispatch", "Read the log", "question")
+    assert dispatch["paths_complete"] is True  # as Claude's: complete when the prompt is present
     assert question["questions"] == [{"question": "Which suite?", "options": ["unit", "full"]}]
-    assert result(out, 3)["child_session"] == Q
-    assert result(out, 4)["answers"] == {"A1": "unit"}
-    assert lines[5]["calls"][0]["kind"] == "question" and lines[5]["results"] == []
+    assert result(out, 4)["child_session"] == Q
+    assert result(out, 5)["answers"] == {"A1": "unit"}
+    assert lines[6]["calls"][0]["kind"] == "question" and lines[6]["results"] == []
+
+
+def test_an_answer_runs_to_the_next_answer_line(store):
+    planner = {"step_index": 1, "source": "MODEL", "type": "PLANNER_RESPONSE", "status": "DONE",
+               "created_at": "2026-11-03T15:00:02Z", "tool_calls": [{"name": "ask_question", "args": {
+                   "questions": [{"question": "Scope?"}, {"question": "When?"}]}}]}
+    answer = {"step_index": 2, "source": "MODEL", "type": "GENERIC", "status": "DONE",
+              "created_at": "2026-11-03T15:01:00Z",
+              "content": ("Created At: 2026-11-03T10:00:02-05:00\nCompleted At: 2026-11-03T10:01:00-05:00\n"
+                          "A1: both parts:\n\n- the reader\n- the index\nA2: today\n")}
+    [_, paired] = extracted(store, [planner, answer])
+    assert paired["results"][0]["answers"] == {"A1": "both parts:\n\n- the reader\n- the index", "A2": "today"}
+
+
+def test_a_dispatch_without_a_prompt_has_incomplete_paths(store):
+    planner = {"step_index": 1, "source": "MODEL", "type": "PLANNER_RESPONSE", "status": "DONE",
+               "created_at": "2026-11-03T15:00:02Z", "tool_calls": [{"name": "invoke_subagent", "args": {}}]}
+    [event] = extracted(store, [planner])
+    assert (event["calls"][0]["prompt"], event["calls"][0]["paths_complete"]) == (None, False)
+
+
+def test_a_command_result_reads_its_exit_line_and_preview_only_before_its_output(store):
+    planner = {"step_index": 1, "source": "MODEL", "type": "PLANNER_RESPONSE", "status": "DONE",
+               "created_at": "2026-11-03T15:00:02Z", "tool_calls": [{"name": "run_command", "args": {
+                   "CommandLine": "cat log"}}]}
+    quoted = {"step_index": 2, "source": "MODEL", "type": "GENERIC", "status": "DONE",
+              "created_at": "2026-11-03T15:00:04Z",
+              "content": ("Command exited with code 0.\n\nCommand output:\nCommand exited with code 3.\n"
+                          "The tool's output was truncated due to being too long\n")}
+    [_, paired] = extracted(store, [planner, quoted])
+    assert (paired["results"][0]["exit_code"], paired["results"][0]["truncation"]) == (0, None)
+
+
+def wake_up(index, at, sender, ended, text):
+    content = (f"<SYSTEM_MESSAGE>\n[Message] timestamp={at} sender={sender} priority=MESSAGE_PRIORITY_HIGH"
+               f" content=Task id \"{sender}\" {ended} with result:\n{text}\n</SYSTEM_MESSAGE>")
+    step = {"step_index": index, "source": "SYSTEM", "type": "SYSTEM_MESSAGE", "status": "DONE", "content": content}
+    return step if at is None else {**step, "created_at": at}
+
+
+def background_start(store):
+    planner = {"step_index": 1, "source": "MODEL", "type": "PLANNER_RESPONSE", "status": "DONE",
+               "created_at": "2026-11-03T15:00:02Z", "tool_calls": [
+                   {"name": "run_command", "args": {"CommandLine": "a"}},
+                   {"name": "run_command", "args": {"CommandLine": "b"}}]}
+    running = [{"step_index": i, "source": "MODEL", "type": "GENERIC", "status": "RUNNING",
+                "created_at": "2026-11-03T15:00:03Z",
+                "content": f"Started a background task with task id: {H}/task-{i - 1}"} for i in (2, 3)]
+    return [planner, *running]
+
+
+def test_a_wake_up_quoting_another_message_reports_only_its_own_sender(store):
+    quoting = wake_up(4, "2026-11-03T15:01:00Z", f"{H}/task-1", "finished",
+                      f"[Message] sender={H}/task-2 content=Task id \"{H}/task-2\" was canceled with result:\nx")
+    own = wake_up(5, "2026-11-03T15:02:00Z", f"{H}/task-2", "was canceled", "stopped")
+    out = extracted(store, [*background_start(store), quoting, own])
+    assert out[3]["notifications"] == [{"call_id": f"{H}:1:0", "status": "finished", "exit_code": None}]
+    assert out[4]["notifications"] == [{"call_id": f"{H}:1:1", "status": "canceled", "exit_code": None}]
+
+
+def test_an_ineligible_wake_up_still_closes_its_background_id(store):
+    ineligible = wake_up(4, None, f"{H}/task-1", "finished", "done")
+    repeated = wake_up(5, "2026-11-03T15:02:00Z", f"{H}/task-1", "finished", "done")
+    out = extracted(store, [*background_start(store), ineligible, repeated])
+    assert out[3]["eligible"] is False and out[4]["notifications"] == []
+
+
+def test_results_after_an_ineligible_planner_are_counted_apart_from_surplus(store):
+    planner = {"step_index": 1, "source": "MODEL", "type": "PLANNER_RESPONSE", "status": "DONE",
+               "created_at": "2026-11-03T15:00:02Z", "tool_calls": [{"name": "run_command", "args": {"CommandLine": "a"}}]}
+    generic = {"step_index": 2, "source": "MODEL", "type": "GENERIC", "status": "DONE",
+               "created_at": "2026-11-03T15:00:03Z", "content": "Command exited with code 0.\n"}
+    surplus = {**generic, "step_index": 3}
+    unknown = {**planner, "step_index": 4}
+    del unknown["created_at"]
+    after = {**generic, "step_index": 5}
+    from harness_evidence import discover
+    from harness_evidence.index_adapters import ADAPTERS
+    place = discover.place_of(transcript(store, H), discover.roots(explicit=[("agy", store / "brain")]))
+    state = {}
+    ADAPTERS["agy"].bind(state, ADAPTERS["agy"].path_facts(place))
+    out = list(ADAPTERS["agy"].extract(raw_lines([planner, generic, surplus, unknown, after]), state,
+                                       place=place, text=True))
+    fields = {f["field"]: (f["seen"], f["present"]) for f in out[-1]["fields"] if f["record_kind"] == "applied:result"}
+    assert fields["input:call"] == (3, 1)  # one paired, one surplus, one after the unknown calls
+    assert fields["input:calls_known"] == (3, 2)
+
+
+def test_the_adapter_declares_claudes_provenance_field_set():
+    from harness_evidence.index_adapters import ADAPTERS
+    assert ADAPTERS["agy"].PROVENANCE.keys() == ADAPTERS["claude-code"].PROVENANCE.keys()
+
+
+def test_skill_calls_have_a_declared_tool_kind():
+    from harness_evidence.index_adapters import ADAPTERS
+    assert ADAPTERS["agy"].TOOL_KINDS["SKILL"] == "skill"
+
+
+def test_the_layout_check_refuses_dot_segments(store):
+    from harness_evidence.index_adapters import ADAPTERS
+    from harness_evidence.lines import Place
+    for relpath in ("brain/../.system_generated/logs/transcript_full.jsonl",
+                    "brain/./.system_generated/logs/transcript_full.jsonl"):
+        place = Place("agy", "agy", "personal", "live", relpath, store / relpath)
+        assert ADAPTERS["agy"].refusal(place) is not None, relpath
+
+
+def test_every_unwatched_declaration_is_read(store):
+    from harness_evidence import discover
+    from harness_evidence.index_adapters import ADAPTERS
+    from harness_evidence_index_tracing import traced_extract
+    adapter = ADAPTERS["agy"]
+    roots = discover.roots(explicit=[("agy", store / "brain")])
+    reads = set()
+    for conversation in (H, G, P, K):
+        place = discover.place_of(transcript(store, conversation), roots)
+        state = {}
+        adapter.bind(state, adapter.path_facts(place))
+        reads |= traced_extract(adapter, numbered(transcript(store, conversation).read_bytes()), state, place=place)
+    unread = sorted((kind, path) for kind, paths in adapter.UNWATCHED.items() for path in paths
+                    if (kind, path) not in reads)
+    assert unread == []
 
 
 def test_missing_row_malformed_line_and_partial_tail(store):
