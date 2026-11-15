@@ -120,7 +120,7 @@ def _file(source, number, roots, request, envelope):
              "provenance_defaults": copy.deepcopy(defaults),
              "object": "file_start", "key": "file", "path": str(logical),
              "place": location, "filename_identity": None,
-             "path_facts": adapter.path_facts(place), "replaces": "all"}
+             "path_facts": adapter.path_facts(place), "side_inputs": None, "replaces": "all"}
     try:
         handle = physical.open("rb")
     except (OSError, UnicodeError) as error:

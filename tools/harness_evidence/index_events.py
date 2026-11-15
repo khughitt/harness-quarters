@@ -123,6 +123,8 @@ PROVENANCE = {
     "results[].child_session": ["toolUseResult.agentId"],
     "results[].answers": ["toolUseResult.answers"],
     "results[].truncation": ["message.content[].content", "toolUseResult.persistedOutputSize"],
+    # Shared with harnesses that report a foreground exit status; v18 Claude reads none.
+    "results[].exit_code": [],
     "injections": [
         "attachment",
         "attachment.type",
@@ -551,6 +553,8 @@ _CONVENTION_PROOFS = frozenset({
     "identity.subagent", "calls[].kind", "calls[].paths", "calls[].paths_complete",
     "results[].child_session", "results[].truncation", "notifications",
 })
+# Fields of the shared stream schema this extractor never fills, with the reason.
+_ABSENT = {"results[].exit_code": "not_decoded"}
 _PROOF_CHANGES = frozenset({"native_paths", "coverage_keys", "basis", "rule", "source", "ref"})
 
 
@@ -562,6 +566,8 @@ def _provenance_declaration(field):
         proof.update(basis="convention", rule="claude_" + field.replace(".", "_").replace("[]", ""))
     if field == "notifications":
         proof.update(rule="claude_notification_xml", source="physical_line")
+    if field in _ABSENT:
+        proof.update(rule="absent:" + _ABSENT[field])
     return proof
 
 
@@ -987,6 +993,7 @@ def extract(lines, state, *, place: Place, text: bool):
                                     else None,
                                     "answers": meta.get("answers"),
                                     "truncation": cut,
+                                    "exit_code": None,
                                 }
                             )
                     else:

@@ -257,6 +257,7 @@ def test_discover_objects_include_provenance_place_and_stat(tmp_path):
             "profile": "work" if dot.endswith("-work") else "personal",
             "store": "archived" if rel.startswith("archived_sessions/") else "live", "relpath": rel}
         assert obj["state"] == "listed"
+        assert obj["side_inputs"] is None  # Claude and Codex read no side input
         assert (obj["filename_identity"] is not None) == (obj["harness"] == "codex")
         if obj["harness"] == "codex":
             assert obj["filename_identity"]["thread"] in obj["filename_lookup"]["session_ids"]

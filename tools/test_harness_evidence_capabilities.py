@@ -171,7 +171,9 @@ def test_every_declared_native_path_occurs_in_its_harness_samples():
                 if isinstance(value, dict):
                     native.append(value)
         for field, paths in fields.items():
-            assert paths, (slug, field)
+            if not paths:  # Only a field the index adapter declares absent may have none.
+                from harness_evidence.index_adapters import ADAPTERS
+                assert ADAPTERS[slug].provenance_defaults()[field]["rule"].startswith("absent:"), (slug, field)
             for path in paths:
                 if (slug, field, path) == ("claude-code", "header.cwd", "payload.cwd"):
                     # An old selector-policy branch, not a Claude emission claim.

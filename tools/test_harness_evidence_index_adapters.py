@@ -28,9 +28,9 @@ DIGESTS = TOOLS / "fixtures/harness-evidence/claude-index-digests-3e346e26.json"
 CAPABILITIES = TOOLS / "harness_evidence/capabilities.json"
 RULES = ("decoder", "catalogue_path", "identity")
 # Fields added after the base, projected out before comparison and asserted null for Claude.
-ADDED_RESULT_FIELDS = ()
-ADDED_FILE_START_FIELDS = ()
-ADDED_PROVENANCE = ()
+ADDED_RESULT_FIELDS = ("exit_code",)
+ADDED_FILE_START_FIELDS = ("side_inputs",)
+ADDED_PROVENANCE = ("results[].exit_code",)
 
 
 def canonical(value) -> str:
@@ -102,14 +102,17 @@ def observe(normalize: Normalizer):
         name = sample["path"]
         path = CATALOGUE.parent / name
         for text in (True, False):
-            emitted, error = [], None
+            raw, error = [], None
             try:
                 for obj in frame(path, text):
-                    obj, gone = project(obj)
-                    removed.extend(gone)
-                    emitted.append(normalize(obj))
+                    raw.append(obj)
             except Exception as raised:  # noqa: BLE001 - the catalogue names the expected type
                 error = raised
+            emitted = []
+            for obj in raw:  # Projection runs outside the decode so its faults are not samples'.
+                obj, gone = project(obj)
+                removed.extend(gone)
+                emitted.append(normalize(obj))
             mode = "text" if text else "notext"
             if error is None:
                 completing.setdefault(name, {})[mode] = canonical(emitted)
@@ -174,12 +177,13 @@ def test_normalized_stream_holds_no_checkout_or_home_path():
     checkout, home = str(TOOLS.parent.resolve()), os.path.expanduser("~")
     for sample in samples():
         path = CATALOGUE.parent / sample["path"]
-        emitted = []
+        raw = []
         try:
             for obj in frame(path, True):
-                emitted.append(normalize(project(obj)[0]))
+                raw.append(obj)
         except Exception:  # noqa: BLE001 - expected failures are checked above
             pass
+        emitted = [normalize(project(obj)[0]) for obj in raw]
         for value in _all_strings(emitted):
             assert checkout not in value and home not in value, (sample["path"], value)
 
@@ -200,6 +204,17 @@ def test_registry_refuses_a_harness_without_an_adapter():
     envelope = {"schema": SCHEMA, "decoder": {"version": DECODER_VERSION, "revision": "r"}}
     with pytest.raises(ProtocolError, match="^no index adapter for codex$"):
         list(index_stream.objects(request, envelope))
+
+def test_claude_declares_the_shared_additions_absent():
+    from harness_evidence.index_adapters import ADAPTERS
+    declaration = ADAPTERS["claude-code"].provenance_defaults()["results[].exit_code"]
+    assert declaration == {"native_paths": [], "coverage_keys": [], "basis": "native",
+                           "rule": "absent:not_decoded"}
+    sample = CATALOGUE.parent / "index/sizes.jsonl"
+    out = list(frame(sample, True))
+    assert out[0]["object"] == "file_start" and out[0]["side_inputs"] is None
+    results = [r for o in out if o["object"] == "index_event" for r in o.get("results") or []]
+    assert results and all(r["exit_code"] is None for r in results)
 
 if __name__ == "__main__":
     if sys.argv[1:] != ["--write"]:

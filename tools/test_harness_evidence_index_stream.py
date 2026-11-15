@@ -11,7 +11,7 @@ from harness_evidence import DECODER_VERSION
 from harness_evidence import index_claude, index_events, index_stream, stream
 from test_harness_evidence_index import (CONTROLS, FIXTURES, TOOLS, environment, expand_proofs,
                                         PROVENANCE_ORACLE, oracle_hash, oracle_rows, oracle_error,
-                                        oracle_native_case)
+                                        oracle_native_case, pre_oracle_defaults)
 
 ENVELOPE = {"schema": "harness-evidence/1", "decoder": {"version": DECODER_VERSION, "revision": "a" * 40}}
 
@@ -723,7 +723,7 @@ def normalize_oracle_wire(values):
 
 @pytest.mark.parametrize("route", ["import", "command"])
 def test_direct_provenance_changes_expand_to_frozen_full_oracle(tmp_path, route):
-    assert index_events.provenance_defaults() == PROVENANCE_ORACLE["declarations"]
+    assert pre_oracle_defaults(index_events.provenance_defaults()) == PROVENANCE_ORACLE["declarations"]
     assert set(PROVENANCE_ORACLE["fixtures"]) == {
         str(p.relative_to(FIXTURES)) for p in FIXTURES.rglob("*.jsonl")}
     for name, digest in PROVENANCE_ORACLE["fixtures"].items():
@@ -783,7 +783,8 @@ def test_direct_provenance_changes_expand_to_frozen_full_oracle(tmp_path, route)
                     native.pop("next_line")
                     native.pop("next_offset")
                 assert oracle_hash(native) == old["native_state"], (case, old["through_line"])
-            assert rows[0]["provenance_defaults"] == PROVENANCE_ORACLE["declarations"]
+            assert rows[0]["side_inputs"] is None
+            assert pre_oracle_defaults(rows[0]["provenance_defaults"]) == PROVENANCE_ORACLE["declarations"]
             assert oracle_rows([v for v in rows if v["object"] not in
                                 {"file_start", "file_end", "request_end"}],
                                rows[0]["provenance_defaults"]) == old["rows"]
