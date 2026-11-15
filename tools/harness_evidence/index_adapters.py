@@ -4,7 +4,6 @@ from types import ModuleType
 from . import index_agy, index_claude
 from ._protocol import ProtocolError
 
-# agy's entry has no `extract` until its extractor lands; its header and facts are served.
 ADAPTERS: dict[str, ModuleType] = {"claude-code": index_claude, "agy": index_agy}
 
 

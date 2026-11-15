@@ -12,6 +12,8 @@ def _root(value: str) -> tuple[str, Path]:
     harness, separator, path = value.partition("=")
     if not separator or not path or harness not in ("claude-code", "codex", "agy"):
         raise argparse.ArgumentTypeError("root must be claude-code=PATH, codex=PATH or agy=PATH")
+    if harness == "agy" and Path(path).name != "brain":
+        raise argparse.ArgumentTypeError(f"agy root must be a brain directory: {path}")  # As discover.roots.
     return harness, Path(path)
 
 
@@ -84,7 +86,7 @@ def main(argv: list[str] | None = None) -> int:
     discover_parser.add_argument("--home", type=Path)
     discover_parser.add_argument("--root", type=_root, action="append")
     commands.add_parser("decode", help="decode framed JSON requests from stdin")
-    commands.add_parser("header", help="select bounded Claude headers from stdin")
+    commands.add_parser("header", help="select bounded transcript headers from stdin")
     args = parser.parse_args(argv)
     if args.command == "capabilities":
         from . import capabilities

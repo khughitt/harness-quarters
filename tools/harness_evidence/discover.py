@@ -196,10 +196,12 @@ def filename_identity(harness: str, path: Path) -> dict | None:
 
 
 def copy_label(harness: str, path: Path) -> dict | None:
-    """agy's transcript.jsonl is an export-truncated mirror of transcript_full.jsonl."""
+    """agy's transcript.jsonl is an export-truncated mirror of transcript_full.jsonl; `full`
+    names that file when it exists and is null otherwise (the mirror itself is never decoded)."""
     if harness != "agy" or path.name != AGY_MIRROR:
         return None
-    return {"label": "truncated_mirror", "basis": "convention", "full": str(path.with_name(AGY_FULL))}
+    full = path.with_name(AGY_FULL)
+    return {"label": "truncated_mirror", "basis": "convention", "full": str(full) if full.exists() else None}
 
 
 def path_facts(place: Place) -> dict | None:
