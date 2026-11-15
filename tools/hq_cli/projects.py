@@ -76,7 +76,7 @@ def place(row: dict) -> Place:
     colour = None
     if "color" in row:
         try:
-            colour = color.project_colour(row["color"])
+            colour = color.project_colour(row["color"], row["color_256"])
         except ValueError as error:
             raise ProjectError(f"tasks resolve: {row['prefix']}: color {error}") from None
     worktree = row.get("worktree")

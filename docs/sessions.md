@@ -40,6 +40,9 @@ this list is not a complete transcript search. The footer reports omitted record
 absent homes and unresolved cwd locations. Project names/locations resolve through
 one tasks resolve call; missing or invalid resolver output stops the command.
 Color selection is auto/always/never and respects NO_COLOR in auto mode.
+Project RGB colours and xterm-256 indices come from tasks resolve (`color` and
+`color_256`); hq does not derive terminal stand-ins. A coloured project missing a
+valid terminal index stops the listing with an error.
 
 ## Standalone transcript decoder
 

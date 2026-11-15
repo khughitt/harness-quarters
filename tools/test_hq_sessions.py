@@ -52,6 +52,7 @@ if os.environ.get("TASKS_STUB_LOG"):
         log.write(json.dumps(paths) + "\\n")
 roots = json.loads(os.environ.get("TASKS_STUB_ROOTS", "{{}}"))
 colors = json.loads(os.environ.get("TASKS_STUB_COLORS", "{{}}"))
+indices = json.loads(os.environ.get("TASKS_STUB_COLOR_256", "{{}}"))
 forced = json.loads(os.environ.get("TASKS_STUB_STATUS", "{{}}"))
 results = []
 for path in paths:
@@ -65,6 +66,8 @@ for path in paths:
             row.update(status="resolved", prefix=prefix, root=root, via="root", location=root, relpath=rest)
             if prefix in colors:
                 row["color"] = colors[prefix]
+                if prefix in indices:
+                    row["color_256"] = indices[prefix]
             parts = rest.split("/")
             if parts == [".worktrees"]:
                 row.update(via="storage", location=root + "/.worktrees", relpath="")
@@ -1345,12 +1348,12 @@ def populate_classes(env) -> None:
 
 
 ALPHA_COLOR = "#2f9fb1"
-ALPHA_RGB = (0x2f, 0x9f, 0xb1)
-ALPHA_STAND_IN = 67   # ops bin/project-colors stand_in for #2f9fb1
+ALPHA_STAND_IN = 67   # tasks resolver color_256 for #2f9fb1
 
 
 def project_colors(env, **colors: str) -> None:
     env.extra["TASKS_STUB_COLORS"] = json.dumps(colors)
+    env.extra["TASKS_STUB_COLOR_256"] = json.dumps({prefix: ALPHA_STAND_IN for prefix in colors})
 
 
 def test_color_never_and_auto_into_a_pipe_are_plain(env):
@@ -1502,26 +1505,41 @@ def test_malformed_project_colour_is_an_error(env, value):
     alpha = env.project("alpha")
     claude_session(env.home / ".claude", SID, alpha)
     projects(env, al=alpha)
-    env.extra["TASKS_STUB_COLORS"] = json.dumps({"al": value})
+    project_colors(env, al=value)
     result = env.run("sessions")
     assert result.returncode == 1 and "tasks resolve" in result.stderr and "color" in result.stderr
 
 
-@pytest.mark.parametrize("rgb, index", [(ALPHA_RGB, ALPHA_STAND_IN), ((0xd7, 0x26, 0x33), 160),
-                                        ((0x77, 0x65, 0x58), 242), ((0x2f, 0x63, 0xe1), 27),
-                                        ((0xfd, 0x53, 0x8f), 198), ((0x31, 0x7d, 0x01), 28)])
-def test_project_stand_in_matches_the_source(rgb, index):
-    """Pinned from ops bin/project-colors stand_in: the xterm-256 entry nearest in OKLab
-    among those at 3:1 or better on dark and light."""
-    assert color.stand_in(rgb) == index
+def test_project_colour_uses_resolver_terminal_index(env):
+    alpha = env.project("alpha")
+    claude_session(env.home / ".claude", SID, alpha, display="resolved-index")
+    projects(env, al=alpha)
+    project_colors(env, al=ALPHA_COLOR)
+    env.extra["TASKS_STUB_COLOR_256"] = json.dumps({"al": 160})
+    result = env.run("sessions", "--color", "always")
+    assert result.returncode == 0, result.stderr
+    assert "\x1b[38;5;160mal\x1b[0m" in row_for(result.stdout, "resolved-index")
 
 
-def test_project_stand_in_is_the_nearest_legible_entry():
-    legible = [i for i in range(16, 256) if contrast(xterm256_rgb(i), DARK) >= 3 and contrast(xterm256_rgb(i), LIGHT) >= 3]
-    for rgb in [(0, 0, 0), (255, 255, 255), (255, 0, 0), (0x80, 0x80, 0x80), ALPHA_RGB]:
-        def apart(i):
-            return sum((x - y) ** 2 for x, y in zip(oklab(rgb), oklab(xterm256_rgb(i))))
-        assert color.stand_in(rgb) == min(legible, key=lambda i: (apart(i), i))
+@pytest.mark.parametrize("index", [None, True, -1, 256, 67.5, "67"])
+def test_malformed_project_terminal_index_is_an_error(env, index):
+    alpha = env.project("alpha")
+    claude_session(env.home / ".claude", SID, alpha)
+    projects(env, al=alpha)
+    project_colors(env, al=ALPHA_COLOR)
+    env.extra["TASKS_STUB_COLOR_256"] = json.dumps({"al": index})
+    result = env.run("sessions")
+    assert result.returncode == 1 and "color_256" in result.stderr
+
+
+def test_missing_project_terminal_index_is_an_error(env):
+    alpha = env.project("alpha")
+    claude_session(env.home / ".claude", SID, alpha)
+    projects(env, al=alpha)
+    project_colors(env, al=ALPHA_COLOR)
+    env.extra["TASKS_STUB_COLOR_256"] = "{}"
+    result = env.run("sessions")
+    assert result.returncode == 1 and "color_256" in result.stderr
 
 
 def test_color_age_cell_takes_the_age_colormap(env):
