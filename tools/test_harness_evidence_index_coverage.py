@@ -14,8 +14,8 @@ from test_harness_evidence_index_stream import coverage, read, request, source
 
 
 def declarations():
-    from harness_evidence import index_coverage
-    return index_coverage
+    from harness_evidence.index_adapters import ADAPTERS
+    return ADAPTERS["claude-code"]
 
 
 def numbered(data):
@@ -33,13 +33,13 @@ def test_every_native_read_is_declared(monkeypatch):
             continue
         path = FIXTURES / "index" / name
         place = Place("claude-code", "file", None, "explicit", name, path)
-        reads.update(traced_extract(numbered(path.read_bytes()), copy.deepcopy(old["initial_state"]), place=place))
+        reads.update(traced_extract(dec, numbered(path.read_bytes()), copy.deepcopy(old["initial_state"]), place=place))
     path = FIXTURES / "index/task2-usage-storage.jsonl"
-    reads.update(traced_extract(numbered(path.read_bytes()), place=Place(
+    reads.update(traced_extract(dec, numbered(path.read_bytes()), place=Place(
         "claude-code", "file", None, "explicit", path.name, path)))
     for name in POLICY_CONTROLS["cases"]:
         path = FIXTURES / "index" / name
-        reads.update(traced_extract(numbered(path.read_bytes()), place=Place(
+        reads.update(traced_extract(dec, numbered(path.read_bytes()), place=Place(
             "claude-code", "file", None, "explicit", path.name, path)))
     missing = sorted((kind, path) for kind, path in reads if not covered(path, declared(dec, kind)))
     assert missing == []
@@ -52,7 +52,7 @@ def test_every_native_read_is_declared(monkeypatch):
             record["message"].get("undeclared_descendant")
         return actual_message(record, kind)
     monkeypatch.setattr(index_events, "_message", new_read)
-    reads = traced_extract(numbered(path.read_bytes()), place=place)
+    reads = traced_extract(dec, numbered(path.read_bytes()), place=place)
     missing = sorted((kind, field) for kind, field in reads if not covered(field, declared(dec, kind)))
     assert ("assistant", "message.undeclared_descendant") in missing
     assert not covered("message.usage.hidden", ["message.usage"])

@@ -121,14 +121,20 @@ def test_artifact_covers_catalogue_hashes_and_keeps_provenance_separate():
         "samples": {s["path"]: hashlib.sha256((FIXTURES / s["path"]).read_bytes()).hexdigest()
                     for s in samples},
     }
-    assert len(samples) == 232
+    assert len(samples) == 240
+    assert sorted(artifact["harnesses"]) == ["agy", "claude-code", "codex"]
     for slug, harness in artifact["harnesses"].items():
-        assert set(harness) == {"record_kinds", "fields", "labels", "versions", "exceptions", "header"} | ({"index"} if slug == "claude-code" else set())
+        assert set(harness) == {"record_kinds", "fields", "labels", "versions", "exceptions", "header"} | (
+            {"index"} if slug == "claude-code" else {"index", "side_inputs"} if slug == "agy" else set())
         assert harness["exceptions"] == []
-        assert harness["header"] == ({"implemented": True, "line_limit": 50} if slug == "claude-code"
+        assert harness["header"] == ({"implemented": True, "line_limit": 50} if slug in ("claude-code", "agy")
                                       else {"implemented": False})
         if slug == "codex":
             assert all(f["coverage_keys"] == [] for f in harness["fields"].values())
+        elif slug == "agy":  # Index declarations only: agy has no reader decode.
+            assert harness["record_kinds"] == [] and harness["labels"] == {}
+            assert harness["fields"]["results[].exit_code"]["coverage_keys"] == ["applied:exit_line/input:exit_code"]
+            assert harness["index"]["mode"] == "incremental" and harness["index"]["resume"]
         else:
             assert harness["fields"]["calls[].raw_path"]["provenance"] == [
                 "message.content[].input.file_path", "message.content[].input.notebook_path"]
@@ -171,7 +177,10 @@ def test_every_declared_native_path_occurs_in_its_harness_samples():
                 if isinstance(value, dict):
                     native.append(value)
         for field, paths in fields.items():
-            assert paths, (slug, field)
+            if not paths:  # A declared absence, or a convention from the path, reads no native field.
+                from harness_evidence.index_adapters import ADAPTERS
+                proof = ADAPTERS[slug].provenance_defaults()[field]
+                assert proof["rule"].startswith("absent:") or proof["basis"] == "convention", (slug, field)
             for path in paths:
                 if (slug, field, path) == ("claude-code", "header.cwd", "payload.cwd"):
                     # An old selector-policy branch, not a Claude emission claim.
@@ -191,6 +200,14 @@ def test_every_declared_native_path_occurs_in_its_harness_samples():
                     first = json.loads(sample.read_bytes().splitlines()[0])
                     assert native_values(first, path) == [row["header"]["cwd"]]
                     assert row["provenance"]["cwd"]["native_paths"] == [path]
+                    continue
+                if slug == "agy" and path.startswith("conversation_summaries."):
+                    # A side-input column: it must be one agy_summaries reads and the SQL
+                    # fixtures beside the agy samples write.
+                    from harness_evidence import agy_summaries
+                    column = path.removeprefix("conversation_summaries.")
+                    assert column in agy_summaries.COLUMNS, path
+                    assert all(column in sql.read_text() for sql in FIXTURES.glob("agy*/.gemini/antigravity-cli/*.sql"))
                     continue
                 assert any(native_values(row, path) for row in native), (slug, field, path)
 

@@ -114,6 +114,8 @@ _CLAUDE_KINDS = frozenset({
     "custom-title", "ai-title", "last-prompt", "permission-mode", "pr-link", "agent-name",
 })
 _SDK_TYPES = frozenset({"system", "user", "assistant", "result"})
+# An agy transcript step (brain/<id>/.system_generated/logs/transcript_full.jsonl).
+_AGY_STEP = frozenset({"step_index", "source", "type", "created_at"})
 
 
 def _signature(record: dict) -> str | None:
@@ -124,6 +126,8 @@ def _signature(record: dict) -> str | None:
         return "claude"
     if "session_id" in record and isinstance(kind, str) and kind in _SDK_TYPES:
         return "sdk"
+    if _AGY_STEP <= record.keys():
+        return "agy"
     return None
 
 

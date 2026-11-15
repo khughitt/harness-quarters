@@ -1,7 +1,15 @@
 {
  "built_from": {
-  "catalogue_sha256": "4727c9f36d5a3edc66a26688d965fcc8d71dd860eaeb0782cfa8363a2ea20df2",
+  "catalogue_sha256": "63e4c0c0e914c7fa96ac5dcb33f34019c07045fafe1b270f00ca79a627fad514",
   "samples": {
+   "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000001/.system_generated/logs/transcript_full.jsonl": "665c7874fd0d6fd14d98b5d65ab52c6aa0257d634231a80d166a2ddea6b0eb54",
+   "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000002/.system_generated/logs/transcript_full.jsonl": "b86df9c5a4eee90e7563000b4b9ef9c53cbb85cd3eb7999b2c7aef8d7bb33d15",
+   "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000003/.system_generated/logs/transcript_full.jsonl": "e55c8412173811fee9b92f3ee3a481fd468730d12e00dcde3bd8a18180cd701a",
+   "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000004/.system_generated/logs/transcript_full.jsonl": "581bb04172f6676987074c4e9545620e12b885f94c5cd70a9c3d0ff592ebb7d6",
+   "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000a1/.system_generated/logs/transcript.jsonl": "1d93449220efab4bda578acfb4d4f89096b9e0b3502629842888b63ad6e470c5",
+   "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000a1/.system_generated/logs/transcript_full.jsonl": "17a91d7e1e1c515806a3622802b2ddcbff1df8de2a961fc024f5017de034ec97",
+   "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000b1/.system_generated/logs/transcript_full.jsonl": "be91abc0508e41bdde5a14bbd1722cb8c72ab6e2cdc813f22b09c5a553b5ecaa",
+   "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000c1/.system_generated/logs/transcript_full.jsonl": "5cfb49736647bdd0a980f8bd0f2ec5ee1cbeaad1440eb19bb7a485b4e6c3fccb",
    "captures/escaped-malformed.jsonl": "d3ab501588cb7af5e03ae856e875b6809bbd5851e03283e43e53a82bd11a8454",
    "captures/escaped.jsonl": "4ff4490899cc4ac6444b34fc672811990fe9ec53cca6c5c23f4a642d90cbd273",
    "captures/sdk-stream.jsonl": "a37f7c66c332b6d87cf5a0d8c79146e36a7788f030ad354919ca7a8035d4fc1a",
@@ -236,9 +244,686 @@
    "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T11-00-00-01900000-0000-7000-8000-0000000000f2.jsonl": "30b550b6f035815a4123c8a8fd18fbbf7059ec89c04b0749ecda738e24b2fde3"
   }
  },
- "decoder_version": "18",
+ "decoder_version": "19",
  "evidence_rule": "synthetic samples establish decoder conformance; observed samples or probes establish emission; absent from a sample means unobserved",
  "harnesses": {
+  "agy": {
+   "exceptions": [],
+   "fields": {
+    "at_ms": {
+     "coverage_keys": [],
+     "provenance": [
+      "created_at"
+     ]
+    },
+    "calls[].background": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "calls[].block": {
+     "coverage_keys": [],
+     "provenance": [
+      "tool_calls"
+     ]
+    },
+    "calls[].command": {
+     "coverage_keys": [
+      "applied:run_command/input:command"
+     ],
+     "provenance": [
+      "tool_calls[].args.CommandLine"
+     ]
+    },
+    "calls[].id": {
+     "coverage_keys": [],
+     "provenance": [
+      "step_index"
+     ]
+    },
+    "calls[].input_bytes": {
+     "coverage_keys": [
+      "applied:tool_call/input:args"
+     ],
+     "provenance": [
+      "tool_calls[].args"
+     ]
+    },
+    "calls[].kind": {
+     "coverage_keys": [],
+     "provenance": [
+      "tool_calls[].name"
+     ]
+    },
+    "calls[].native_name": {
+     "coverage_keys": [
+      "applied:tool_call/input:name"
+     ],
+     "provenance": [
+      "tool_calls[].name"
+     ]
+    },
+    "calls[].paths": {
+     "coverage_keys": [],
+     "provenance": [
+      "conversation_summaries.workspace_uris",
+      "tool_calls[].args.Path"
+     ]
+    },
+    "calls[].paths_complete": {
+     "coverage_keys": [],
+     "provenance": [
+      "conversation_summaries.workspace_uris",
+      "tool_calls[].args.Path"
+     ]
+    },
+    "calls[].prompt": {
+     "coverage_keys": [],
+     "provenance": [
+      "tool_calls[].args.Prompt"
+     ]
+    },
+    "calls[].questions": {
+     "coverage_keys": [],
+     "provenance": [
+      "tool_calls[].args.questions"
+     ]
+    },
+    "calls[].raw_path": {
+     "coverage_keys": [],
+     "provenance": [
+      "tool_calls[].args.Path"
+     ]
+    },
+    "calls[].skill": {
+     "coverage_keys": [],
+     "provenance": [
+      "content"
+     ]
+    },
+    "compaction": {
+     "coverage_keys": [],
+     "provenance": [
+      "type"
+     ]
+    },
+    "eligible": {
+     "coverage_keys": [],
+     "provenance": [
+      "created_at",
+      "step_index"
+     ]
+    },
+    "flush_response": {
+     "coverage_keys": [],
+     "provenance": [
+      "type"
+     ]
+    },
+    "fork_boundary": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "identity.agent": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "identity.cwd": {
+     "coverage_keys": [],
+     "provenance": [
+      "conversation_summaries.workspace_uris"
+     ]
+    },
+    "identity.entrypoint": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "identity.index_session": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "identity.parent": {
+     "coverage_keys": [],
+     "provenance": [
+      "conversation_summaries.parent_conversation_id"
+     ]
+    },
+    "identity.session": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "identity.subagent": {
+     "coverage_keys": [],
+     "provenance": [
+      "conversation_summaries.parent_conversation_id"
+     ]
+    },
+    "identity.version": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "injections": {
+     "coverage_keys": [],
+     "provenance": [
+      "content",
+      "source"
+     ]
+    },
+    "interruption": {
+     "coverage_keys": [],
+     "provenance": [
+      "error"
+     ]
+    },
+    "message.assistant_output_bytes": {
+     "coverage_keys": [],
+     "provenance": [
+      "content",
+      "tool_calls[].args"
+     ]
+    },
+    "message.blocks": {
+     "coverage_keys": [],
+     "provenance": [
+      "content",
+      "error"
+     ]
+    },
+    "message.channel": {
+     "coverage_keys": [],
+     "provenance": [
+      "source",
+      "type"
+     ]
+    },
+    "message.joined_bytes": {
+     "coverage_keys": [],
+     "provenance": [
+      "content",
+      "error"
+     ]
+    },
+    "message.joined_nonempty": {
+     "coverage_keys": [],
+     "provenance": [
+      "content",
+      "error"
+     ]
+    },
+    "message.origin": {
+     "coverage_keys": [],
+     "provenance": [
+      "content",
+      "source"
+     ]
+    },
+    "message.text": {
+     "coverage_keys": [
+      "USER_INPUT/input:content",
+      "PLANNER_RESPONSE/input:content"
+     ],
+     "provenance": [
+      "content",
+      "error"
+     ]
+    },
+    "native_kind": {
+     "coverage_keys": [],
+     "provenance": [
+      "type"
+     ]
+    },
+    "notifications": {
+     "coverage_keys": [
+      "applied:background/input:call"
+     ],
+     "provenance": [
+      "content"
+     ]
+    },
+    "response.effort": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "response.id": {
+     "coverage_keys": [],
+     "provenance": [
+      "step_index"
+     ]
+    },
+    "response.model": {
+     "coverage_keys": [
+      "PLANNER_RESPONSE/input:model"
+     ],
+     "provenance": [
+      "model"
+     ]
+    },
+    "response.native": {
+     "coverage_keys": [
+      "applied:usage/input:input_tokens",
+      "applied:usage/input:cache_read_tokens",
+      "applied:usage/input:output_tokens"
+     ],
+     "provenance": [
+      "cache_read_tokens",
+      "input_tokens",
+      "output_tokens",
+      "thinking"
+     ]
+    },
+    "response.usage.cache_read": {
+     "coverage_keys": [
+      "applied:usage/input:cache_read_tokens"
+     ],
+     "provenance": [
+      "cache_read_tokens"
+     ]
+    },
+    "response.usage.cache_write": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "response.usage.context_total": {
+     "coverage_keys": [
+      "applied:usage/input:input_tokens",
+      "applied:usage/input:cache_read_tokens"
+     ],
+     "provenance": [
+      "cache_read_tokens",
+      "input_tokens"
+     ]
+    },
+    "response.usage.input_uncached": {
+     "coverage_keys": [
+      "applied:usage/input:input_tokens"
+     ],
+     "provenance": [
+      "input_tokens"
+     ]
+    },
+    "response.usage.output": {
+     "coverage_keys": [
+      "applied:usage/input:output_tokens"
+     ],
+     "provenance": [
+      "output_tokens"
+     ]
+    },
+    "response.usage.thinking": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "response.usage.uncached_total": {
+     "coverage_keys": [
+      "applied:usage/input:input_tokens"
+     ],
+     "provenance": [
+      "input_tokens"
+     ]
+    },
+    "response.usage_present.output": {
+     "coverage_keys": [],
+     "provenance": [
+      "output_tokens"
+     ]
+    },
+    "response.usage_present.thinking": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "results[].agent": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "results[].answers": {
+     "coverage_keys": [
+      "applied:answers/input:answers"
+     ],
+     "provenance": [
+      "content"
+     ]
+    },
+    "results[].background_id": {
+     "coverage_keys": [],
+     "provenance": [
+      "content"
+     ]
+    },
+    "results[].bytes": {
+     "coverage_keys": [
+      "applied:result/input:content"
+     ],
+     "provenance": [
+      "content"
+     ]
+    },
+    "results[].call_id": {
+     "coverage_keys": [
+      "applied:result/input:call"
+     ],
+     "provenance": [
+      "step_index"
+     ]
+    },
+    "results[].child_session": {
+     "coverage_keys": [
+      "applied:child/input:conversation"
+     ],
+     "provenance": [
+      "content"
+     ]
+    },
+    "results[].error": {
+     "coverage_keys": [],
+     "provenance": [
+      "status"
+     ]
+    },
+    "results[].exit_code": {
+     "coverage_keys": [
+      "applied:exit_line/input:exit_code"
+     ],
+     "provenance": [
+      "content"
+     ]
+    },
+    "results[].interrupted": {
+     "coverage_keys": [],
+     "provenance": []
+    },
+    "results[].native_duration_ms": {
+     "coverage_keys": [
+      "applied:result_times/input:created",
+      "applied:result_times/input:completed"
+     ],
+     "provenance": [
+      "content"
+     ]
+    },
+    "results[].truncation": {
+     "coverage_keys": [],
+     "provenance": [
+      "content"
+     ]
+    },
+    "turn_end": {
+     "coverage_keys": [],
+     "provenance": []
+    }
+   },
+   "header": {
+    "implemented": true,
+    "line_limit": 50
+   },
+   "index": {
+    "absent": {
+     "calls[].background": "known_after_call",
+     "fork_boundary": "no_fork_records",
+     "identity.agent": "not_recorded",
+     "identity.version": "not_recorded",
+     "response.effort": "not_recorded",
+     "response.usage.cache_write": "not_recorded",
+     "response.usage.thinking": "not_recorded",
+     "response.usage_present.thinking": "not_recorded",
+     "results[].agent": "not_recorded",
+     "results[].interrupted": "not_recorded",
+     "turn_end": "no_turn_end_records"
+    },
+    "applied": {
+     "answers": [
+      "answers"
+     ],
+     "background": [
+      "call"
+     ],
+     "child": [
+      "conversation"
+     ],
+     "exit_line": [
+      "exit_code"
+     ],
+     "result": [
+      "call",
+      "content"
+     ],
+     "result_times": [
+      "created",
+      "completed"
+     ],
+     "run_command": [
+      "command"
+     ],
+     "tool_call": [
+      "name",
+      "args"
+     ],
+     "usage": [
+      "input_tokens",
+      "cache_read_tokens",
+      "output_tokens"
+     ],
+     "user_request": [
+      "request"
+     ]
+    },
+    "common_reads": [
+     "type",
+     "step_index",
+     "created_at",
+     "source"
+    ],
+    "features": {
+     "native_skill_events": false,
+     "question_option_labels": false
+    },
+    "known_kinds": [
+     "CHECKPOINT",
+     "ERROR_MESSAGE",
+     "GENERIC",
+     "PLANNER_RESPONSE",
+     "SYSTEM_MESSAGE",
+     "USER_INPUT"
+    ],
+    "mode": "incremental",
+    "profile": "index",
+    "resume": true,
+    "tool_kinds": {
+     "ask_question": "question",
+     "edit_file": "file_edit",
+     "invoke_subagent": "dispatch",
+     "read_file": "file_read",
+     "run_command": "shell",
+     "write_file": "file_edit"
+    },
+    "unwatched": {
+     "GENERIC": {
+      "error": "flag"
+     },
+     "PLANNER_RESPONSE": {
+      "tool_calls[].args": "applied:tool_call",
+      "tool_calls[].args.CommandLine": "applied:run_command",
+      "tool_calls[].args.Path": "dimension",
+      "tool_calls[].args.Prompt": "dimension",
+      "tool_calls[].args.questions": "dimension",
+      "tool_calls[].name": "applied:tool_call"
+     }
+    },
+    "watched": {
+     "CHECKPOINT": {
+      "inputs": {
+       "content": [
+        "content"
+       ],
+       "usage": [
+        "input_tokens",
+        "cache_read_tokens",
+        "output_tokens"
+       ]
+      },
+      "sources": [
+       "content",
+       "input_tokens",
+       "cache_read_tokens",
+       "output_tokens"
+      ]
+     },
+     "ERROR_MESSAGE": {
+      "inputs": {
+       "error": [
+        "error"
+       ]
+      },
+      "sources": [
+       "error"
+      ]
+     },
+     "GENERIC": {
+      "inputs": {
+       "content": [
+        "content"
+       ],
+       "status": [
+        "status"
+       ]
+      },
+      "sources": [
+       "status",
+       "content"
+      ]
+     },
+     "PLANNER_RESPONSE": {
+      "inputs": {
+       "calls": [
+        "tool_calls"
+       ],
+       "content": [
+        "content"
+       ],
+       "model": [
+        "model"
+       ],
+       "usage": [
+        "input_tokens",
+        "cache_read_tokens",
+        "output_tokens"
+       ]
+      },
+      "sources": [
+       "content",
+       "tool_calls",
+       "model",
+       "thinking",
+       "input_tokens",
+       "cache_read_tokens",
+       "output_tokens"
+      ]
+     },
+     "SYSTEM_MESSAGE": {
+      "inputs": {
+       "content": [
+        "content"
+       ]
+      },
+      "sources": [
+       "content"
+      ]
+     },
+     "USER_INPUT": {
+      "inputs": {
+       "content": [
+        "content"
+       ]
+      },
+      "sources": [
+       "content"
+      ]
+     }
+    }
+   },
+   "labels": {},
+   "record_kinds": [],
+   "side_inputs": {
+    "agy_conversation_summaries": {
+     "columns": [
+      "conversation_id",
+      "parent_conversation_id",
+      "workspace_uris",
+      "agent_name"
+     ],
+     "fingerprint": "sha256 of the canonical JSON of the resolved facts {parent, subagent, cwd, agent_name}, or of {\"status\": \"no_summary_row\"} or {\"status\": \"summaries_unreadable\"}",
+     "key": "conversation_id",
+     "open": "read-only SQLite URI (mode=ro; immutable=1 only for a WAL-mode file with no -wal file)",
+     "path": "conversation_summaries.db",
+     "relative_to": "home",
+     "table": "conversation_summaries"
+    }
+   },
+   "versions": {
+    "unknown": {
+     "fields_seen": {
+      "observed": [],
+      "synthetic": [
+       "at_ms",
+       "calls[].block",
+       "calls[].command",
+       "calls[].id",
+       "calls[].input_bytes",
+       "calls[].kind",
+       "calls[].native_name",
+       "calls[].paths",
+       "calls[].paths_complete",
+       "calls[].prompt",
+       "calls[].questions",
+       "calls[].raw_path",
+       "calls[].skill",
+       "compaction",
+       "eligible",
+       "flush_response",
+       "injections",
+       "interruption",
+       "message.assistant_output_bytes",
+       "message.blocks",
+       "message.channel",
+       "message.joined_bytes",
+       "message.joined_nonempty",
+       "message.origin",
+       "message.text",
+       "native_kind",
+       "notifications",
+       "response.id",
+       "response.model",
+       "response.native",
+       "response.usage.cache_read",
+       "response.usage.context_total",
+       "response.usage.input_uncached",
+       "response.usage.output",
+       "response.usage.uncached_total",
+       "response.usage_present.output",
+       "results[].answers",
+       "results[].background_id",
+       "results[].bytes",
+       "results[].call_id",
+       "results[].child_session",
+       "results[].error",
+       "results[].exit_code",
+       "results[].native_duration_ms",
+       "results[].truncation"
+      ]
+     },
+     "observed": [],
+     "synthetic": [
+      "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000001/.system_generated/logs/transcript_full.jsonl",
+      "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000002/.system_generated/logs/transcript_full.jsonl",
+      "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000003/.system_generated/logs/transcript_full.jsonl",
+      "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000004/.system_generated/logs/transcript_full.jsonl",
+      "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000a1/.system_generated/logs/transcript.jsonl",
+      "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000a1/.system_generated/logs/transcript_full.jsonl",
+      "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000b1/.system_generated/logs/transcript_full.jsonl",
+      "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000c1/.system_generated/logs/transcript_full.jsonl"
+     ]
+    }
+   }
+  },
   "claude-code": {
    "exceptions": [],
    "fields": {
@@ -986,6 +1671,10 @@
      "provenance": [
       "message.content[].is_error"
      ]
+    },
+    "results[].exit_code": {
+     "coverage_keys": [],
+     "provenance": []
     },
     "results[].interrupted": {
      "coverage_keys": [],

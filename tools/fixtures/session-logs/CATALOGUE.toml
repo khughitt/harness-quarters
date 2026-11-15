@@ -8,6 +8,63 @@
 # Known synthetic format versions come from native fields, independently of provenance.
 # Unspecified versions stay unknown; no synthetic sample establishes observed emission.
 
+# agy index samples: synthetic steps; their summaries rows are conversation_summaries.sql beside brain/.
+[[sample]]
+path = "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000001/.system_generated/logs/transcript_full.jsonl"
+harness = "agy"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000002/.system_generated/logs/transcript_full.jsonl"
+harness = "agy"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000003/.system_generated/logs/transcript_full.jsonl"
+harness = "agy"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000004/.system_generated/logs/transcript_full.jsonl"
+harness = "agy"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+# agy discovery fixtures: synthetic steps; their summaries rows are conversation_summaries.sql beside brain/.
+[[sample]]
+path = "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000a1/.system_generated/logs/transcript.jsonl"
+harness = "agy"
+version = "unknown"
+provenance = "synthetic"
+
+[[sample]]
+path = "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000a1/.system_generated/logs/transcript_full.jsonl"
+harness = "agy"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000b1/.system_generated/logs/transcript_full.jsonl"
+harness = "agy"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
+[[sample]]
+path = "agy/.gemini/antigravity-cli/brain/a9000000-0000-4000-8000-0000000000c1/.system_generated/logs/transcript_full.jsonl"
+harness = "agy"
+version = "unknown"
+provenance = "synthetic"
+profile = "index"
+
 [[sample]]
 path = "captures/escaped-malformed.jsonl"
 harness = "claude-code"

@@ -83,7 +83,7 @@ These hints assert neither canonical filename identity nor recorded session iden
 Consumers retain query grammar/alias policy and confirm identity from evidence.
 
 Discovery files/aliases and decode `file_start` also carry `path_facts`, null outside
-Claude. Claude's convention object has `session` (logical filename stem), `agent`
+Claude and agy. Claude's convention object has `session` (logical filename stem), `agent`
 (one filename `agent-` prefix removed, otherwise null; empty string stays distinct),
 `subagent` (immediate parent is `subagents`), `parent` (grandparent name in that case,
 otherwise null), and `resume_group` (POSIX parent of place.relpath when not subagent,
@@ -96,8 +96,32 @@ copies; physical read_path continues to supply bytes/adjacent metadata. Decoded
 header agent evidence is separate. Query-ID aliases and publication of arbitrary
 index/identity claims remain consumer policy, rather than native path decoding.
 
+agy's root is `~/.gemini/antigravity-cli/brain` (harness and home `agy` in refs); an
+agy root not named `brain` is refused, and index and header refuse any agy file not
+shaped `brain/<id>/.system_generated/logs/<file>`.
+Discovery lists each `brain/<id>/.system_generated/logs/transcript_full.jsonl` as the
+conversation's session file and each `transcript.jsonl` beside it with
+`copy: {label: "truncated_mirror", basis: "convention", full: <transcript_full path>}`;
+other files rows carry `copy: null`. The byte segments under `logs/chunks/` are not
+listed. agy `filename_identity` is `{conversation, basis: "convention"}` from the brain
+directory. agy `path_facts` come from one read-only read of
+`conversation_summaries.db` per file: `parent`, `subagent`, `cwd` (first local
+`file://` workspace URI; null for `''` or `[]`) and `agent_name`, with `reason` null,
+`no_summary_row` or `summaries_unreadable`, `basis: "native"`,
+`rule: "agy_conversation_summaries"` and `ref`. There is no transcript heuristic for an
+unresolved row. The database opens as a read-only SQLite URI, with `immutable=1` only
+for a WAL-mode file that has no `-wal` file, so a read creates no file in agy's home.
+Discovery rows and index `file_start` carry `side_inputs`: null for Claude and Codex,
+and for agy `{agy_conversation_summaries: <sha256>}`, the sha256 of the canonical
+JSON of the resolved facts `{parent, subagent, cwd, agent_name}` or of
+`{"status": <reason>}`. A consumer that skips unchanged transcripts must add
+`side_inputs` to its unchanged-file check and decode again from no state when it
+differs; the decoder also refuses to resume a checkpoint made under another
+fingerprint. Reader decode (no `extract`) has no agy support and fails with the
+protocol error "agy supports only extract:index".
+
 `tools/harness-evidence version --json` reports the evidence schema,
-decoder version `18`, and the decoder revision. A pinned copy reads a `REVISION`
+decoder version `19`, and the decoder revision. A pinned copy reads a `REVISION`
 file inside the package; a checkout reports its HEAD with `+dirty` when
 the package has changes. Without either source the command exits 2.
 
@@ -163,15 +187,22 @@ replay, while request ids and decoder revision changes alone do not.
 Records themselves retain native numeric block order, including when a line has
 ten or more blocks.
 
-## Cheap Claude headers
+## Cheap Claude and agy headers
 
 `tools/harness-evidence header` accepts one JSON request per stdin line with
 `id`, `files` and explicit `roots`. Files use the same logical `path`, optional
 `read_path`, fixed `size` and `identity:{device,inode}` as index decoding. Claude
-roots must contain every logical path; Codex headers are explicitly unsupported.
-No default roots or guessed harness are used. The capability view explicitly
-marks Claude headers implemented (50 lines) and Codex headers unimplemented;
-this declares implementation, not evidence that a harness version emits a field.
+or agy roots must contain every logical path; Codex headers are explicitly
+unsupported ("no index adapter for codex"). No default roots or guessed harness are
+used. The capability view marks Claude and agy headers implemented (50 lines) and
+Codex headers unimplemented; this declares implementation, not evidence that a
+harness version emits a field.
+
+An agy header is `{session, start_ms, cwd, parent, subagent}`: `session` is the
+conversation id from the brain directory (basis convention), `start_ms` the first
+timezone-aware `created_at` within 50 lines, and `cwd`, `parent` and `subagent` the
+file's summaries snapshot, with the snapshot's `reason` on their provenance. A
+`transcript.jsonl` mirror is refused with "agy index reads transcript_full.jsonl".
 
 Each file emits one `header` object with its request id, file index, logical path,
 status, `header:{session,cwd,start_ms}`, provenance and null or structured error.
@@ -194,8 +225,9 @@ reader. It has no resumable checkpoint or index extraction side effects.
 
 ## Native index extraction
 
-The opt-in `extract: "index"` request emits Claude native evidence for the scratch
-index pilot. Include each file's `identity: {"device": ..., "inode": ...}`, keep
+The opt-in `extract: "index"` request emits Claude and agy native evidence. Each
+harness has an index adapter, looked up by the file's harness (`no index adapter for
+<harness>` otherwise); Codex has none yet. Include each file's `identity: {"device": ..., "inode": ...}`, keep
 `cross_file` and `raw` false, and omit `context`. Pass a saved index `state` whole:
 `next_line`, `next_offset` and `digest` describe the complete raw prefix, while
 `index` is opaque. The held descriptor must match the supplied identity and fixed
@@ -285,6 +317,41 @@ additions do not expand `defaults/1` proofs or change per-file raw/applied cover
 declares native skill events and question option labels. These describe decoder
 behavior, without claims about untested harness versions or consumer metrics.
 The capability artifact publishes native field provenance and coverage declarations separately from reader declarations.
+
+### agy index events
+
+agy emits one `index_event` per transcript step, with the same object kinds, framing
+and `provenance_defaults` field set as Claude. Fields agy does not record are null and
+declare `native_paths: []` with rule `absent:<reason>` (`not_recorded`,
+`no_turn_end_records`, `no_fork_records`, `known_after_call`); the capability view
+lists them under `harnesses.agy.index.absent`. Identity facts from an unresolved
+summary row are null with an event provenance rule `unresolved:<reason>`: unknown,
+not absent.
+
+- `PLANNER_RESPONSE` and `CHECKPOINT` steps are complete responses (`flush_response`
+  true, id `<conversation>:<step_index>`). Usage: `input_uncached` is `input_tokens`,
+  `cache_read` is `cache_read_tokens`, `output` is `output_tokens`; `cache_write` and
+  `thinking` are null; `context_total` is input plus cache read and `uncached_total`
+  is input. `response.native` holds the three counters as recorded and
+  `thinking_text_bytes`, the byte size of the planner's thinking text, which stays out
+  of `message.text`. A checkpoint is a `compaction` with a `compact_summary` injection.
+- Calls are `<conversation>:<step_index>:<k>`. Results pair positionally with the
+  oldest open call of the latest planner step; a surplus `GENERIC` gets no result.
+  `results[].error` means the tool failed to run (status `ERROR`); `exit_code` is the
+  command's own status from a `run_command` result's `Command exited with code N.` line
+  before `Command output:`, so a `DONE` result can carry a nonzero code. `truncation` is
+  `{kind: "tool_preview"}` when a `run_command` result reports the tool's output preview,
+  otherwise null. A `RUNNING` result carries `background_id`; `calls[].background` is
+  null (`absent:known_after_call`), and the call's end arrives as a `notifications[]`
+  entry on the `SYSTEM` wake-up from that id (`finished` or `canceled`).
+- `USER_INPUT` text is the `<USER_REQUEST>` body; the other wrappers are injections,
+  and a slash-command `<SKILL>` block is a `skill` call. `SYSTEM_SDK` messages are hook
+  injections; other system messages are injections. `ERROR_MESSAGE` "stream was
+  interrupted" sets `interruption`. Unknown step types are events counted
+  `known: false`.
+- `results[].exit_code` is a shared field: Claude emits null (`absent:not_decoded`).
+- Text-off requests drop the same text fields as Claude's, `identity.cwd` included;
+  agy's `path_facts` in `file_start` and the checkpoint binding still name the cwd.
 
 ## Read evidence, not mentions
 

@@ -1,0 +1,391 @@
+"""agy index conformance (spec rev 2 §4.3-§4.5, §5) over the synthetic samples in
+fixtures/session-logs/agy-index. Each test decodes a private copy of the store whose
+conversation_summaries.db is built from the committed SQL text."""
+import hashlib
+import json
+from pathlib import Path
+import shutil
+import sqlite3
+
+import pytest
+
+from harness_evidence import DECODER_VERSION, SCHEMA, index_stream
+
+TOOLS = Path(__file__).resolve().parent
+STORE = TOOLS / "fixtures/session-logs/agy-index/.gemini/antigravity-cli"
+H = "b9000000-0000-4000-8000-000000000001"  # human session: calls, exit codes, truncation, skill
+G = "b9000000-0000-4000-8000-000000000002"  # background, system kinds, checkpoint, surplus, unknown
+P = "b9000000-0000-4000-8000-000000000003"  # subagent of G: invoke_subagent, ask_question wait
+K = "b9000000-0000-4000-8000-000000000004"  # no summary row; malformed line and partial tail
+Q = "b9000000-0000-4000-8000-000000000005"  # the child P's invoke_subagent created
+ENVELOPE = {"schema": SCHEMA, "decoder": {"version": DECODER_VERSION, "revision": "r" * 40}}
+
+
+@pytest.fixture
+def store(tmp_path):
+    root = tmp_path / "home/.gemini/antigravity-cli"
+    shutil.copytree(STORE, root)
+    with sqlite3.connect(root / "conversation_summaries.db") as connection:
+        connection.executescript((root / "conversation_summaries.sql").read_text())
+    connection.close()
+    return root
+
+
+def transcript(root, conversation):
+    return root / "brain" / conversation / ".system_generated/logs/transcript_full.jsonl"
+
+
+def request(root, conversation, *, size=None, state=None, text=True):
+    path = transcript(root, conversation)
+    info = path.stat()
+    source = {"path": str(path), "size": info.st_size if size is None else size,
+              "identity": {"device": info.st_dev, "inode": info.st_ino}}
+    if state is not None:
+        source["state"] = state
+    return {"id": 1, "extract": "index", "cross_file": False, "text": text, "raw": False,
+            "roots": [{"harness": "agy", "path": str(root / "brain")}], "files": [source]}
+
+
+def decode(root, conversation, **kw):
+    return list(index_stream.objects(request(root, conversation, **kw), ENVELOPE))
+
+
+def events(out):
+    return [o for o in out if o["object"] == "index_event"]
+
+
+def by_line(out):
+    return {e["line"]: e for e in events(out)}
+
+
+def test_every_step_is_one_event_with_shared_position_and_identity(store):
+    out = decode(store, H)
+    assert [o["object"] for o in out] == (["file_start"] + ["index_event"] * 11
+                                         + ["coverage", "file_end", "request_end"])
+    start, end = out[0], out[-2]
+    assert start["harness"] == "agy" and start["filename_identity"] is None
+    facts = {"parent": None, "subagent": False, "cwd": "/w/alpha", "agent_name": ""}
+    assert {k: start["path_facts"][k] for k in facts} == facts
+    assert start["side_inputs"] == {"agy_conversation_summaries": hashlib.sha256(json.dumps(
+        facts, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()).hexdigest()}
+    assert end["status"] == "ok" and end["restart"] is None and end["count"] == 12
+    assert end["state"]["index"]["side_inputs"] == start["side_inputs"]
+    offset = 0
+    for event, raw in zip(events(out), transcript(store, H).read_bytes().splitlines(keepends=True)):
+        assert event["key"] == f"E{offset}" and event["end"] == offset + len(raw)
+        assert event["sha256"] == hashlib.sha256(raw).hexdigest()
+        assert event["ref"] == f"agy:brain/{H}/.system_generated/logs/transcript_full.jsonl#L{event['line']}"
+        assert event["identity"] == {"session": H, "index_session": H, "agent": None, "parent": None,
+                                     "subagent": False, "cwd": "/w/alpha", "entrypoint": "agy", "version": None}
+        assert event["eligible"] and event["at_ms"] is not None
+        assert event["turn_end"] is None and event["fork_boundary"] is None
+        offset += len(raw)
+
+
+def test_user_input_keeps_the_request_body_and_reports_wrappers_as_injections(store):
+    first, skill = by_line(decode(store, H))[1], by_line(decode(store, H))[10]
+    assert first["native_kind"] == "USER_INPUT" and first["message"]["channel"] == "user"
+    assert first["message"]["text"] == "Run the checks"
+    assert first["message"]["origin"]["native_kind"] == "USER_EXPLICIT"
+    assert [m["name"] for m in first["message"]["origin"]["markers"]] == [
+        "USER_REQUEST", "ADDITIONAL_METADATA", "USER_SETTINGS_CHANGE"]
+    assert [i["native_kind"] for i in first["injections"]] == [
+        "agy_wrapper:ADDITIONAL_METADATA", "agy_wrapper:USER_SETTINGS_CHANGE"]
+    assert all(i["bytes"] > 0 for i in first["injections"])
+    assert skill["message"]["text"] == "/review the diff"
+    assert [(c["kind"], c["skill"], c["native_name"]) for c in skill["calls"]] == [("skill", "review", "SKILL")]
+    assert [i["native_kind"] for i in skill["injections"]] == ["agy_wrapper:SKILL"]
+
+
+def test_planner_steps_are_complete_responses_with_agy_usage(store):
+    planner = by_line(decode(store, H))[2]
+    assert planner["flush_response"] is True
+    assert planner["response"] == {
+        "id": f"{H}:1", "model": "gemini-3-pro-high", "effort": None,
+        "usage": {"input_uncached": 120, "cache_read": 4000, "cache_write": None, "output": 55,
+                  "thinking": None, "context_total": 4120, "uncached_total": 120},
+        "usage_present": {"output": True, "thinking": False},
+        "native": {"input_tokens": 120, "cache_read_tokens": 4000, "output_tokens": 55,
+                   "thinking_text_bytes": len("Plan: list, read, edit.")}}
+    assert planner["message"]["channel"] == "assistant" and planner["message"]["text"] == "Running the checks."
+    assert "Plan" not in planner["message"]["text"]
+    calls = planner["calls"]
+    assert [(c["id"], c["native_name"], c["kind"], c["block"]) for c in calls] == [
+        (f"{H}:1:0", "run_command", "shell", 0), (f"{H}:1:1", "read_file", "file_read", 1),
+        (f"{H}:1:2", "edit_file", "file_edit", 2)]
+    assert calls[0]["command"] == "just check" and calls[0]["background"] is None
+    assert calls[1]["paths"] == ["/w/alpha/notes/todo.md"] and calls[1]["paths_complete"] is True
+    assert calls[2]["paths"] == ["/w/alpha/README.md"] and calls[2]["raw_path"] == "/w/alpha/README.md"
+    assert planner["message"]["assistant_output_bytes"] == len("Running the checks.") + sum(
+        c["input_bytes"] for c in calls)
+    assert by_line(decode(store, G))[3]["response"]["model"] is None  # model absent
+
+
+def result(out, line):
+    [only] = by_line(out)[line]["results"]
+    return only
+
+
+def test_results_pair_positionally_and_keep_exit_status_apart_from_error(store):
+    out = decode(store, H)
+    ok, read, failed = result(out, 3), result(out, 4), result(out, 5)
+    assert (ok["call_id"], ok["error"], ok["exit_code"], ok["native_duration_ms"]) == (f"{H}:1:0", False, 0, 3000)
+    assert ok["truncation"] is None
+    # A read_file result quoting an exit line or the truncation sentence is neither.
+    assert (read["call_id"], read["exit_code"], read["truncation"]) == (f"{H}:1:1", None, None)
+    assert (failed["call_id"], failed["error"], failed["exit_code"]) == (f"{H}:1:2", True, None)
+    nonzero = result(out, 7)
+    assert (nonzero["call_id"], nonzero["error"], nonzero["exit_code"]) == (f"{H}:5:0", False, 2)
+    assert nonzero["truncation"] == {"kind": "tool_preview", "original_tokens": None, "original_bytes": None}
+    plain = result(out, 9)
+    assert (plain["exit_code"], plain["truncation"]) == (None, None)  # "truncated" only in output
+    for value in (ok, read, failed, nonzero, plain):
+        assert value["interrupted"] is None and value["agent"] is None and value["background_id"] is None
+
+
+def test_background_calls_report_through_notifications(store):
+    out = by_line(decode(store, G))
+    first, second = result(decode(store, G), 4), result(decode(store, G), 5)
+    assert (first["call_id"], first["background_id"], first["native_duration_ms"]) == (f"{G}:2:0", f"{G}/task-1", None)
+    assert (second["call_id"], second["background_id"]) == (f"{G}:2:1", f"{G}/task-2")
+    assert all(c["background"] is None for c in out[3]["calls"])
+    assert out[7]["notifications"] == [{"call_id": f"{G}:2:0", "status": "finished", "exit_code": 1}]
+    assert out[8]["notifications"] == [{"call_id": f"{G}:2:1", "status": "canceled", "exit_code": None}]
+    assert out[7]["injections"] == [] and out[9]["notifications"] == []
+    assert [i["native_kind"] for i in out[9]["injections"]] == ["agy_system_message"]
+    hook = out[2]
+    assert hook["message"]["channel"] == "system"
+    assert [(i["native_kind"], i["source"]) for i in hook["injections"]] == [("agy_hook_injection", "SessionStart hook")]
+
+
+def test_checkpoint_surplus_unknown_and_interruption(store):
+    out = decode(store, G)
+    lines = by_line(out)
+    checkpoint = lines[10]
+    assert checkpoint["compaction"] == {"summary": True, "basis": "native", "rule": "agy_checkpoint"}
+    assert checkpoint["response"]["id"] == f"{G}:9" and checkpoint["flush_response"] is True
+    assert checkpoint["response"]["usage"]["input_uncached"] == 5000
+    assert lines[11]["results"] == []  # surplus GENERIC: no call waiting
+    assert [r["call_id"] for r in lines[13]["results"]] == [f"{G}:11:0"]  # second call unpaired
+    unknown = lines[14]
+    assert unknown["native_kind"] == "FUTURE_STEP" and unknown["message"] is None
+    error = lines[15]
+    assert error["message"]["text"] == "API error: The stream was interrupted"
+    assert error["interruption"] == {"user_marker": False, "system": True, "basis": "convention",
+                                     "rule": "agy_stream_interrupted"}
+    coverage = next(o for o in out if o["object"] == "coverage")
+    kinds = {(r["record_kind"], r["known"]) for r in coverage["records"]}
+    assert ("FUTURE_STEP", 0) in kinds and ("GENERIC", 1) in kinds
+    surplus = [f for f in coverage["fields"] if f["record_kind"] == "applied:result" and f["field"] == "input:call"]
+    assert surplus and surplus[0]["seen"] - surplus[0]["present"] == 1
+
+
+def test_subagent_identity_child_session_and_answers(store):
+    out = decode(store, P)
+    lines = by_line(out)
+    assert all(e["identity"]["parent"] == G and e["identity"]["subagent"] is True for e in events(out))
+    assert lines[1]["message"]["channel"] == "user" and lines[1]["message"]["origin"]["native_kind"] == "SYSTEM"
+    dispatch, question = lines[2]["calls"]
+    assert (dispatch["kind"], dispatch["prompt"], question["kind"]) == ("dispatch", "Read the log", "question")
+    assert question["questions"] == [{"question": "Which suite?", "options": ["unit", "full"]}]
+    assert result(out, 3)["child_session"] == Q
+    assert result(out, 4)["answers"] == {"A1": "unit"}
+    assert lines[5]["calls"][0]["kind"] == "question" and lines[5]["results"] == []
+
+
+def test_missing_row_malformed_line_and_partial_tail(store):
+    out = decode(store, K)
+    assert out[0]["path_facts"]["reason"] == "no_summary_row"
+    event = events(out)[0]
+    assert (event["identity"]["parent"], event["identity"]["subagent"], event["identity"]["cwd"]) == (None, None, None)
+    defaults = out[0]["provenance_defaults"]
+    # Unknown, not a declared absence: agy records these facts, the row is missing (spec §4.2).
+    assert event["provenance"]["identity.cwd"] == {"native_paths": [], "rule": "unresolved:no_summary_row"}
+    assert defaults["identity.cwd"]["rule"] == "agy_conversation_summaries"
+    unparsed = [o for o in out if o["object"] == "unparsed"]
+    assert [(u["line"], u["reason"], u["provisional"]) for u in unparsed] == [(2, "malformed", False),
+                                                                             (4, "truncated", True)]
+    coverage = next(o for o in out if o["object"] == "coverage")
+    assert coverage["malformed"] == 1 and coverage["partial_tail"] is True
+
+
+def test_missing_database_nulls_identity_without_a_heuristic(store):
+    (store / "conversation_summaries.db").unlink()
+    out = decode(store, H)
+    assert out[0]["path_facts"]["reason"] == "summaries_unreadable"
+    assert all(e["identity"]["subagent"] is None for e in events(out))
+
+
+def test_text_off_drops_text_and_keeps_sizes(store):
+    out = events(decode(store, H, text=False))
+    assert all("text" not in (e["message"] or {}) for e in out)
+    assert all("command" not in c and "prompt" not in c for e in out for c in e["calls"])
+    assert all("answers" not in r for e in out for r in e["results"])
+    assert all("source" not in i for e in out for i in e["injections"])
+    assert all("cwd" not in e["identity"] for e in out)  # as Claude's text-off identity
+    assert by_line(decode(store, H, text=False))[1]["message"]["joined_bytes"] == len("Run the checks")
+
+
+def comparable(out):
+    return [{k: v for k, v in o.items() if k not in ("file", "request")}
+            for o in out if o["object"] in ("index_event", "unparsed")]
+
+
+@pytest.mark.parametrize("conversation", [H, G, P, K])
+def test_resume_from_every_line_boundary_equals_a_full_decode(store, conversation):
+    full = decode(store, conversation)
+    data = transcript(store, conversation).read_bytes()
+    boundaries = [i + 1 for i, byte in enumerate(data) if byte == ord("\n")]
+    for size in boundaries:
+        first = decode(store, conversation, size=size)
+        state = first[-2]["state"]
+        second = decode(store, conversation, state=state)
+        assert second[0]["replaces"] == {"from_line": state["next_line"]}
+        assert comparable(first) + comparable(second) == comparable(full), (conversation, size)
+        assert second[-3] == {**full[-3], "file": second[-3]["file"]}  # coverage over the whole file
+
+
+def test_a_running_result_after_a_resume_needs_no_revision_of_the_call(store):
+    data = transcript(store, G).read_bytes()
+    through_planner = sum(len(line) for line in data.splitlines(keepends=True)[:3])
+    first = decode(store, G, size=through_planner)
+    call = by_line(first)[3]["calls"][0]
+    second = decode(store, G, state=first[-2]["state"])
+    running = by_line(second)[4]["results"][0]
+    assert call["background"] is None and running["call_id"] == call["id"]
+    assert running["background_id"] == f"{G}/task-1"
+    assert by_line(second)[7]["notifications"][0]["call_id"] == call["id"]
+
+
+def test_a_summary_row_added_between_decodes_restarts_from_line_one(store):
+    first = decode(store, K)
+    state = first[-2]["state"]
+    with sqlite3.connect(store / "conversation_summaries.db") as connection:
+        connection.execute("INSERT INTO conversation_summaries (conversation_id, last_modified_time, workspace_uris,"
+                           " agent_name, parent_conversation_id, last_user_input_time)"
+                           " VALUES (?, '2026-11-03 18:00:02', '[\"file:///w/kappa\"]', '', '', '2026-11-03 18:00:00')", (K,))
+    connection.close()
+    second = decode(store, K, state=state)
+    assert second[0]["replaces"] == "all"
+    assert second[0]["side_inputs"] != first[0]["side_inputs"]
+    assert events(second)[0]["line"] == 1
+    assert all(e["identity"]["cwd"] == "/w/kappa" and e["identity"]["subagent"] is False for e in events(second))
+
+
+def test_one_decode_reads_the_database_once(store, monkeypatch):
+    from harness_evidence import agy_summaries
+    calls = []
+    actual = agy_summaries.resolve
+
+    def counted(database, conversation):
+        calls.append(conversation)
+        resolved = actual(database, conversation)
+        # A second read in the same decode would see a different row.
+        with sqlite3.connect(database) as connection:
+            connection.execute("UPDATE conversation_summaries SET workspace_uris = '[\"file:///w/changed\"]'")
+        connection.close()
+        return resolved
+    monkeypatch.setattr(agy_summaries, "resolve", counted)
+    out = decode(store, H)
+    assert calls == [H]
+    assert out[0]["path_facts"]["cwd"] == "/w/alpha"
+    assert all(e["identity"]["cwd"] == "/w/alpha" for e in events(out))
+
+
+def test_every_event_proof_names_declared_fields_only(store):
+    out = decode(store, G)
+    defaults = out[0]["provenance_defaults"]
+    from harness_evidence.index_adapters import ADAPTERS
+    claude = ADAPTERS["claude-code"].provenance_defaults()
+    assert defaults.keys() == claude.keys()  # one shared stream schema
+    for field, proof in defaults.items():
+        if not proof["native_paths"]:
+            assert proof["rule"].startswith("absent:") or proof["basis"] == "convention", field
+    for event in events(out):
+        assert event["provenance"].keys() <= defaults.keys()
+
+
+def numbered(data):
+    offset = 0
+    for raw in data.splitlines(keepends=True):
+        yield offset, raw
+        offset += len(raw)
+
+
+def test_every_native_read_is_declared(store):
+    from harness_evidence import discover
+    from harness_evidence.index_adapters import ADAPTERS
+    from harness_evidence_index_tracing import covered, declared, feeds_valid, reasons_valid, traced_extract
+    adapter = ADAPTERS["agy"]
+    assert feeds_valid(adapter) == [] and reasons_valid(adapter) == []
+    roots = discover.roots(explicit=[("agy", store / "brain")])
+    reads = set()
+    for conversation in (H, G, P, K):
+        place = discover.place_of(transcript(store, conversation), roots)
+        state = {}
+        adapter.bind(state, adapter.path_facts(place))
+        reads |= traced_extract(adapter, numbered(transcript(store, conversation).read_bytes()), state, place=place)
+    missing = sorted((kind, path) for kind, path in reads if not covered(path, declared(adapter, kind)))
+    assert reads and missing == []
+
+
+def test_capabilities_list_agy_absences_apart_from_conventions():
+    from harness_evidence import capabilities
+    from harness_evidence.index_adapters import ADAPTERS
+    agy = json.loads(capabilities.ARTIFACT.read_text())["harnesses"]["agy"]
+    defaults = ADAPTERS["agy"].provenance_defaults()
+    absent = {f: p["rule"].removeprefix("absent:") for f, p in defaults.items() if p["rule"].startswith("absent:")}
+    assert agy["index"]["absent"] == absent and "turn_end" in absent
+    for field, entry in agy["fields"].items():
+        if not entry["provenance"]:
+            assert field in absent or defaults[field]["basis"] == "convention", field
+    assert "identity.session" not in absent
+
+
+def raw_lines(steps):
+    offset, out = 0, []
+    for step in steps:
+        raw = (json.dumps(step) + "\n").encode()
+        out.append((offset, raw))
+        offset += len(raw)
+    return out
+
+
+def extracted(store, steps):
+    from harness_evidence import discover
+    from harness_evidence.index_adapters import ADAPTERS
+    adapter = ADAPTERS["agy"]
+    place = discover.place_of(transcript(store, H), discover.roots(explicit=[("agy", store / "brain")]))
+    state = {}
+    adapter.bind(state, adapter.path_facts(place))
+    return [e for e in adapter.extract(raw_lines(steps), state, place=place, text=True)
+            if e["object"] == "index_event"]
+
+
+def test_an_ineligible_step_keeps_its_place_in_the_pairing(store):
+    planner = {"step_index": 1, "source": "MODEL", "type": "PLANNER_RESPONSE", "status": "DONE",
+               "created_at": "2026-11-03T15:00:02Z", "tool_calls": [
+                   {"name": "run_command", "args": {"CommandLine": "true"}},
+                   {"name": "read_file", "args": {"Path": "/w/a"}}]}
+    broken = {"step_index": 2, "source": "MODEL", "type": "GENERIC", "status": "DONE",
+              "content": "Command exited with code 0."}  # no created_at: ineligible
+    read = {"step_index": 3, "source": "MODEL", "type": "GENERIC", "status": "DONE",
+            "created_at": "2026-11-03T15:00:04Z", "content": "Command exited with code 7.\n"}
+    events_ = extracted(store, [planner, broken, read])
+    assert events_[1]["eligible"] is False and events_[1]["results"] == []
+    [result_] = events_[2]["results"]
+    assert result_["call_id"] == f"{H}:1:1" and result_["exit_code"] is None  # read_file, not run_command
+
+
+def test_an_ineligible_planner_step_closes_the_earlier_calls(store):
+    first = {"step_index": 1, "source": "MODEL", "type": "PLANNER_RESPONSE", "status": "DONE",
+             "created_at": "2026-11-03T15:00:02Z", "tool_calls": [{"name": "run_command", "args": {"CommandLine": "a"}},
+                                                                   {"name": "run_command", "args": {"CommandLine": "b"}}]}
+    generic = {"step_index": 2, "source": "MODEL", "type": "GENERIC", "status": "DONE",
+               "created_at": "2026-11-03T15:00:03Z", "content": "Command exited with code 0.\n"}
+    second = {"step_index": 3, "source": "MODEL", "type": "PLANNER_RESPONSE", "status": "DONE",
+              "tool_calls": [{"name": "read_file", "args": {"Path": "/w/a"}}]}  # no created_at
+    late = {**generic, "step_index": 4, "content": "Command exited with code 9.\n"}
+    events_ = extracted(store, [first, generic, second, late])
+    assert events_[1]["results"][0]["call_id"] == f"{H}:1:0"
+    assert events_[3]["results"] == []  # the ineligible planner's calls are unknown; nothing is paired
