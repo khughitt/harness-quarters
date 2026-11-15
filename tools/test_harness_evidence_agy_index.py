@@ -18,17 +18,30 @@ G = "b9000000-0000-4000-8000-000000000002"  # background, system kinds, checkpoi
 P = "b9000000-0000-4000-8000-000000000003"  # subagent of G: invoke_subagent, ask_question wait
 K = "b9000000-0000-4000-8000-000000000004"  # no summary row; malformed line and partial tail
 Q = "b9000000-0000-4000-8000-000000000005"  # the child P's invoke_subagent created
+# The discovery store's transcripts are catalogued as index samples too.
+DISCOVERY = TOOLS / "fixtures/session-logs/agy/.gemini/antigravity-cli"
+A1, B1, C1 = (f"a9000000-0000-4000-8000-0000000000{x}1" for x in "abc")
+SAMPLES = [("index", c) for c in (H, G, P, K)] + [("discovery", c) for c in (A1, B1, C1)]
 ENVELOPE = {"schema": SCHEMA, "decoder": {"version": DECODER_VERSION, "revision": "r" * 40}}
 
 
-@pytest.fixture
-def store(tmp_path):
-    root = tmp_path / "home/.gemini/antigravity-cli"
-    shutil.copytree(STORE, root)
+def build(tmp_path, source, home):
+    root = tmp_path / home / ".gemini/antigravity-cli"
+    shutil.copytree(source, root)
     with sqlite3.connect(root / "conversation_summaries.db") as connection:
         connection.executescript((root / "conversation_summaries.sql").read_text())
     connection.close()
     return root
+
+
+@pytest.fixture
+def store(tmp_path):
+    return build(tmp_path, STORE, "home")
+
+
+@pytest.fixture
+def stores(tmp_path):
+    return {"index": build(tmp_path, STORE, "home"), "discovery": build(tmp_path, DISCOVERY, "discovery")}
 
 
 def transcript(root, conversation):
@@ -304,18 +317,9 @@ def test_the_layout_check_refuses_dot_segments(store):
         assert ADAPTERS["agy"].refusal(place) is not None, relpath
 
 
-def test_every_unwatched_declaration_is_read(store):
-    from harness_evidence import discover
+def test_every_unwatched_declaration_is_read(stores):
     from harness_evidence.index_adapters import ADAPTERS
-    from harness_evidence_index_tracing import traced_extract
-    adapter = ADAPTERS["agy"]
-    roots = discover.roots(explicit=[("agy", store / "brain")])
-    reads = set()
-    for conversation in (H, G, P, K):
-        place = discover.place_of(transcript(store, conversation), roots)
-        state = {}
-        adapter.bind(state, adapter.path_facts(place))
-        reads |= traced_extract(adapter, numbered(transcript(store, conversation).read_bytes()), state, place=place)
+    adapter, reads = ADAPTERS["agy"], sample_reads(stores)
     unread = sorted((kind, path) for kind, paths in adapter.UNWATCHED.items() for path in paths
                     if (kind, path) not in reads)
     assert unread == []
@@ -359,8 +363,9 @@ def comparable(out):
             for o in out if o["object"] in ("index_event", "unparsed")]
 
 
-@pytest.mark.parametrize("conversation", [H, G, P, K])
-def test_resume_from_every_line_boundary_equals_a_full_decode(store, conversation):
+@pytest.mark.parametrize("name, conversation", SAMPLES)
+def test_resume_from_every_line_boundary_equals_a_full_decode(stores, name, conversation):
+    store = stores[name]
     full = decode(store, conversation)
     data = transcript(store, conversation).read_bytes()
     boundaries = [i + 1 for i, byte in enumerate(data) if byte == ord("\n")]
@@ -440,19 +445,27 @@ def numbered(data):
         offset += len(raw)
 
 
-def test_every_native_read_is_declared(store):
+def sample_reads(stores):
+    """Every native read the extractor makes over the catalogued agy samples."""
     from harness_evidence import discover
     from harness_evidence.index_adapters import ADAPTERS
-    from harness_evidence_index_tracing import covered, declared, feeds_valid, reasons_valid, traced_extract
-    adapter = ADAPTERS["agy"]
-    assert feeds_valid(adapter) == [] and reasons_valid(adapter) == []
-    roots = discover.roots(explicit=[("agy", store / "brain")])
-    reads = set()
-    for conversation in (H, G, P, K):
-        place = discover.place_of(transcript(store, conversation), roots)
+    from harness_evidence_index_tracing import traced_extract
+    adapter, reads = ADAPTERS["agy"], set()
+    for name, conversation in SAMPLES:
+        store = stores[name]
+        place = discover.place_of(transcript(store, conversation), discover.roots(explicit=[("agy", store / "brain")]))
         state = {}
         adapter.bind(state, adapter.path_facts(place))
         reads |= traced_extract(adapter, numbered(transcript(store, conversation).read_bytes()), state, place=place)
+    return reads
+
+
+def test_every_native_read_is_declared(stores):
+    from harness_evidence.index_adapters import ADAPTERS
+    from harness_evidence_index_tracing import covered, declared, feeds_valid, reasons_valid
+    adapter = ADAPTERS["agy"]
+    assert feeds_valid(adapter) == [] and reasons_valid(adapter) == []
+    reads = sample_reads(stores)
     missing = sorted((kind, path) for kind, path in reads if not covered(path, declared(adapter, kind)))
     assert reads and missing == []
 
@@ -488,6 +501,21 @@ def extracted(store, steps):
     adapter.bind(state, adapter.path_facts(place))
     return [e for e in adapter.extract(raw_lines(steps), state, place=place, text=True)
             if e["object"] == "index_event"]
+
+
+def test_each_catalogued_sample_decodes_to_its_expected_events(stores):
+    import tomllib
+    catalogue = tomllib.loads((TOOLS / "fixtures/session-logs/CATALOGUE.toml").read_text())["sample"]
+    agy = [s for s in catalogue if s["harness"] == "agy" and s.get("profile") == "index"]
+    assert sorted(s["path"].split("/")[4] for s in agy) == sorted(c for _, c in SAMPLES)
+    for sample in agy:
+        name = "index" if sample["path"].startswith("agy-index/") else "discovery"
+        out = decode(stores[name], sample["path"].split("/")[4])
+        found = events(out)
+        assert [e["native_kind"] for e in found] == sample["index_events"], sample["path"]
+        assert [o["reason"] for o in out if o["object"] == "unparsed"] == sample["unparsed"], sample["path"]
+        for key in ("calls", "results", "notifications"):
+            assert sum(len(e[key]) for e in found) == sample[key], (sample["path"], key)
 
 
 def test_an_ineligible_step_keeps_its_place_in_the_pairing(store):
