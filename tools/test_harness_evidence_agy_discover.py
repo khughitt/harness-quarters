@@ -60,9 +60,9 @@ def environment(tmp_path):
             "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1"}
 
 
-def run(tmp_path, args, stdin=None):
+def run(tmp_path, args, stdin=None, cwd=None):
     return subprocess.run([sys.executable, str(TOOLS / "harness-evidence"), *args], input=stdin,
-                          capture_output=True, text=True, timeout=60, env=environment(tmp_path))
+                          capture_output=True, text=True, timeout=60, env=environment(tmp_path), cwd=cwd)
 
 
 def discover(tmp_path, root):
@@ -171,6 +171,82 @@ def test_a_row_added_between_discover_calls_changes_the_fingerprint(tmp_path, mu
     assert second["side_inputs"] == {"agy_conversation_summaries": canonical_sha256(facts)}
     assert (second["device"], second["inode"], second["size"], second["mtime_ns"]) == (
         first["device"], first["inode"], first["size"], first["mtime_ns"])
+
+
+def set_workspace(store, conversation, value):
+    with sqlite3.connect(store / "conversation_summaries.db") as connection:
+        connection.execute("UPDATE conversation_summaries SET workspace_uris = ? WHERE conversation_id = ?",
+                           (value, conversation))
+    connection.close()
+
+
+def test_an_empty_workspace_value_is_a_resolved_row_without_cwd(tmp_path, mutable_store):
+    # agy writes '' for a session started with no workspace (as harness_stores/agy.py reads it).
+    set_workspace(mutable_store, B, "")
+    row = files(discover(tmp_path, mutable_store))[f"{B}/transcript_full.jsonl"]
+    facts = {"parent": A, "subagent": True, "cwd": None, "agent_name": "task-2"}
+    assert {k: row["path_facts"][k] for k in facts} == facts and row["path_facts"]["reason"] is None
+    assert row["side_inputs"] == {"agy_conversation_summaries": canonical_sha256(facts)}
+
+
+@pytest.mark.parametrize("value", ['["file://otherhost/w/alpha"]', '["https://example.org/w"]',
+                                   '["file:relative/path"]', '{"not": "a list"}', "not json"])
+def test_a_workspace_value_agy_does_not_write_reads_as_unreadable(tmp_path, mutable_store, value):
+    set_workspace(mutable_store, B, value)
+    rows = files(discover(tmp_path, mutable_store))
+    assert rows[f"{B}/transcript_full.jsonl"]["path_facts"]["reason"] == "summaries_unreadable"
+    assert rows[f"{A}/transcript_full.jsonl"]["path_facts"]["reason"] is None
+
+
+def test_a_relative_root_resolves_the_same_facts(tmp_path, store):
+    absolute = files(discover(tmp_path, store))
+    proc = run(tmp_path, ["discover", "--root", "agy=.gemini/antigravity-cli/brain"], cwd=store.parent.parent)
+    assert proc.returncode == 0, proc.stderr
+    relative = files([json.loads(line) for line in proc.stdout.splitlines()])
+    assert sorted(relative) == sorted(absolute)
+    for name, row in relative.items():
+        assert row["path_facts"]["reason"] == absolute[name]["path_facts"]["reason"], name
+        assert row["side_inputs"] == absolute[name]["side_inputs"], name
+
+
+def listing(root):
+    return sorted(p.name for p in root.iterdir())
+
+
+def test_a_wal_database_is_read_without_creating_files(tmp_path, mutable_store):
+    store = mutable_store  # Switching the journal mode rewrites the header; the check starts after.
+    with sqlite3.connect(store / "conversation_summaries.db") as connection:
+        assert connection.execute("PRAGMA journal_mode=wal").fetchone() == ("wal",)
+    connection.close()
+    before, state = listing(store), database_state(store)
+    assert "conversation_summaries.db-wal" not in before
+    rows = files(discover(tmp_path, store))
+    assert rows[f"{A}/transcript_full.jsonl"]["path_facts"]["reason"] is None
+    header(tmp_path, store, transcript(store, A))
+    assert listing(store) == before and database_state(store) == state
+
+
+def test_a_wal_database_with_a_live_writer_shows_uncheckpointed_rows(tmp_path, mutable_store):
+    store = mutable_store
+    database = store / "conversation_summaries.db"
+    with sqlite3.connect(database) as connection:
+        connection.execute("PRAGMA journal_mode=wal")
+    connection.close()
+    writer = sqlite3.connect(database)
+    try:
+        writer.execute("PRAGMA wal_autocheckpoint=0")
+        writer.execute("INSERT INTO conversation_summaries (conversation_id, last_modified_time,"
+                       " workspace_uris, agent_name, parent_conversation_id, last_user_input_time)"
+                       " VALUES (?, '2026-11-02 10:00:07', '[\"file:///w/gamma\"]', '', '',"
+                       " '2026-11-02 10:00:05')", (C,))
+        writer.commit()
+        before, main = listing(store), database.read_bytes()
+        assert "conversation_summaries.db-wal" in before
+        row = files(discover(tmp_path, store))[f"{C}/transcript_full.jsonl"]
+        assert row["path_facts"]["cwd"] == "/w/gamma" and row["path_facts"]["reason"] is None
+        assert listing(store) == before and database.read_bytes() == main
+    finally:
+        writer.close()
 
 
 def header(tmp_path, store, *paths):
