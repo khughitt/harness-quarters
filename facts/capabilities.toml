@@ -63,7 +63,7 @@ note = "Both kinds were run, in the terminal interface, and neither woke."
 
 [facts.idle-wait-kinds]
 type = "set"
-description = "The kinds of child (shell: a background command; subagent) on which a controller waited 30 minutes making no model calls of its own until the child finished. The controller's context is then resent once per wake, not once per poll; a subagent child may still spend calls of its own."
+description = "The kinds of child (shell: a background command; subagent) on which a controller waited 30 minutes making no model calls of its own until the child finished. The controller's context is then resent only when it wakes (one or two calls per wake), not once per poll; a subagent child may still spend calls of its own."
 
 [facts.idle-wait-kinds.harness.agy]
 status = "probed"
