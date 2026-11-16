@@ -598,7 +598,22 @@ def test_sl11_escaped_needle_is_absent_from_the_bytes():
 
 # --- the corpus itself ---------------------------------------------------------------------------
 
-SYNTHETIC_UUID = re.compile(r"\b(c0000000-0000-4000-8000|01900000-0000-7000-8000)-[0-9a-f]{12}\b")
+SYNTHETIC_UUID = re.compile(
+    r"\b(c0000000-0000-4000-8000|01900000-0000-7000-8000"
+    r"|a9000000-0000-4000-8000|b9000000-0000-4000-8000)-[0-9a-f]{12}\b"
+)
+
+
+def test_synthetic_uuid_exception_admits_only_declared_namespaces():
+    for admitted in ("c0000000-0000-4000-8000-00000000000a",
+                     "01900000-0000-7000-8000-0000000000a1",
+                     "a9000000-0000-4000-8000-0000000000a1",
+                     "b9000000-0000-4000-8000-000000000001"):
+        assert not PRIVATE.search(SYNTHETIC_UUID.sub("", admitted)), admitted
+    for rejected in ("d9000000-0000-4000-8000-000000000001",
+                     "a9000000-0001-4000-8000-0000000000a1",
+                     "01a1d9bb-abe7-7b83-a30f-97054ab928b1"):
+        assert PRIVATE.search(SYNTHETIC_UUID.sub("", rejected)), rejected
 
 
 def test_fixtures_hold_no_private_paths_or_identifiers():
@@ -617,5 +632,7 @@ def test_cases_document_and_catalogue_account_for_every_fixture_file():
     historical = {p for p in on_disk if p.split("/", 1)[0] in {"home", "degraded", "captures", "turns"}}
     assert historical == listed
     controls = set(re.findall(r"`(index/[^`]*controls\.json)`", doc))
-    assert on_disk == listed | catalogued | controls | {"CATALOGUE.toml"}
+    side_inputs = set(re.findall(r"`(agy(?:-index)?/[^`]+\.sql)`", doc))
+    assert len(side_inputs) == 2
+    assert on_disk == listed | catalogued | controls | side_inputs | {"CATALOGUE.toml"}
     assert CF in doc
