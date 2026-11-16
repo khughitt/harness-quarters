@@ -12,7 +12,7 @@ import re
 from . import labels, index_codex_runs as runs, index_codex_tools as tools
 from . import _index_codex_skills as skills, _index_codex_outcomes as outcomes
 from .index_events import Restart, _at_ms, _size, _join
-from .index_codex_coverage import (COUNTERS, KNOWN_KINDS, WATCHED, record_kind,
+from .index_codex_coverage import (COUNTERS, KNOWN_KINDS, WATCHED, APPLIED, UNWATCHED, COMMON_READS, record_kind,
                                    day_of, count_record, applied, coverage_rows)
 from .lines import Place, ref, _finite_float, _reject_constant
 
@@ -23,6 +23,38 @@ INJECTED = ("# AGENTS.md", "<environment_context>", "<INSTRUCTIONS>",
             "<user_shell", "<collaboration_mode")
 SHELL = frozenset({"exec_command", "shell_command", "shell"})
 DISPATCH = frozenset({"spawn_agent", "send_message", "followup_task"})
+TOOL_KINDS = {**dict.fromkeys(SHELL, "shell"), "apply_patch": "patch", "exec": "script",
+              "write_stdin": "poll", "wait": "poll", "wait_agent": "other",
+              "request_user_input": "question", **dict.fromkeys(DISPATCH, "dispatch")}
+EXECUTION_ORIGIN_TOOLS = [runs.SCRIPT_TOOL, *runs.DIRECT_TOOLS]
+FEATURES = {"native_skill_events": False, "question_option_labels": False,
+            "stateful_execution": True}
+SIDE_INPUTS = {}
+
+
+def header(place, handle, *, size, envelope, result):
+    """Keep the historical fifty-line Codex project-selection window."""
+    from .header import _lines, _scan
+    _scan(_lines(handle, size), place, envelope, result)
+
+
+def path_facts(place):
+    from . import discover
+    return discover.path_facts(place)
+
+
+def side_inputs(_facts):
+    return None
+
+
+def bind(_state, _facts):
+    """Codex derives identity from the selected transcript, without side inputs."""
+
+
+def refusal(_place):
+    return None
+
+
 PATCH_PATH = re.compile(r"\*\*\* (?:(?:Update|Add|Delete) File|Move to): (.+?)(?=\\n|\n|[\"'`]|$)")
 
 PROVENANCE = {

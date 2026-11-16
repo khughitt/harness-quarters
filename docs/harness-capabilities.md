@@ -75,6 +75,12 @@ emission. The current catalogue is entirely synthetic, and its known modeled for
 versions do not establish observed emission. An unspecified or unlisted version is
 untested; an absent field is unobserved. Native index field provenance and coverage declarations are published separately
 from reader declarations; their presence does not establish observed harness emission.
+The agy block has no reader fields (agy has no reader decode): its `fields` are its
+index declarations, its `index.absent` names each field agy declares absent with the
+reason, and `side_inputs.agy_conversation_summaries` declares the summaries database
+the agy path facts read (path relative to the agy home, table, key, columns, open mode
+and fingerprint rule). A consumer that caches decoded agy files must treat that
+fingerprint as part of each file's identity.
 
 Both harnesses publish `header` support with a fifty-physical-line limit. Header
 CWD selection stops at the first truthy top-level CWD or session metadata record,

@@ -6,7 +6,7 @@ import hashlib
 import os
 from pathlib import Path
 
-from . import discover, index_events, index_codex
+from . import discover, index_adapters
 from .index_events import _factor_provenance, _check_proof_change, _own_proof_changes
 from .lines import Place
 from ._protocol import ProtocolError, validate
@@ -29,11 +29,11 @@ def _plain_declaration(proof):
     return True
 
 
-def _provenance_encoder(defaults: dict, *, profile=index_events) -> Callable[[dict], dict]:
+def _provenance_encoder(defaults: dict, declared: dict) -> Callable[[dict], dict]:
     """Validate owned declarations once, then audit every supplied resolved change."""
     attributes = {"native_paths", "coverage_keys", "basis", "rule"}
     if (type(defaults) is not dict or not all(type(field) is str for field in defaults)
-            or defaults.keys() != profile.PROVENANCE.keys()):
+            or defaults.keys() != declared.keys()):
         raise ProtocolError("index provenance declaration fields are missing or unknown")
     for proof in defaults.values():
         if (not _plain_declaration(proof) or not attributes <= proof.keys()
@@ -80,9 +80,12 @@ def _prefix(handle, limit):
     return digest, count, not limit or last == b"\n"
 
 
-def _binding(source, place, envelope, text):
-    return {"decoder": envelope["decoder"], "identity": source["identity"],
-            "path": str(place.path), "path_facts": discover.path_facts(place), "text": text}
+def _binding(source, place, envelope, text, facts, side_inputs):
+    binding = {"decoder": envelope["decoder"], "identity": source["identity"],
+               "path": str(place.path), "path_facts": facts, "text": text}
+    if side_inputs is not None:  # A changed side input never resumes (spec rev 2 §4.2).
+        binding["side_inputs"] = side_inputs
+    return binding
 
 
 def _checkpoint(state, digest, binding, *, seed=False):
@@ -106,22 +109,23 @@ def _file(source, number, roots, request, envelope):
         place = discover.place_of(logical, roots)
     except ValueError:
         place = Place("claude-code", "file", None, "explicit", str(logical), logical)
-    profiles = {"claude-code": index_events, "codex": index_codex}
-    profile = profiles[place.harness]
+    adapter = index_adapters.for_source(place, extract=True)
     place = replace(place, read_path=physical)
-    binding = _binding(source, place, envelope, request.get("text", False))
+    facts = adapter.path_facts(place)  # One snapshot serves binding, file_start and events.
+    side_inputs = adapter.side_inputs(facts)
+    binding = _binding(source, place, envelope, request.get("text", False), facts, side_inputs)
     base = {**envelope, "request": request["id"], "file": number,
             "harness": place.harness, "harness_version": None}
     location = asdict(place)
     location.pop("path")
     location.pop("read_path")
-    defaults = profile.provenance_defaults()
-    encode_provenance = _provenance_encoder(defaults, profile=profile)
+    defaults = adapter.provenance_defaults()
+    encode_provenance = _provenance_encoder(defaults, adapter.PROVENANCE)
     start = {**base, "provenance_format": "defaults/1",
              "provenance_defaults": copy.deepcopy(defaults),
              "object": "file_start", "key": "file", "path": str(logical),
              "place": location, "filename_identity": None,
-             "path_facts": discover.path_facts(place), "replaces": "all"}
+             "path_facts": facts, "side_inputs": side_inputs, "replaces": "all"}
     try:
         handle = physical.open("rb")
     except (OSError, UnicodeError) as error:
@@ -148,6 +152,7 @@ def _file(source, number, roots, request, envelope):
                 digest = prior
                 if old["index"]["mode"] == "resume":
                     start["replaces"] = {"from_line": old["next_line"]}
+        adapter.bind(state, facts)
         handle.seek(state["next_offset"])
         yield start
 
@@ -165,13 +170,13 @@ def _file(source, number, roots, request, envelope):
 
         count, restart = 0, None
         try:
-            for value in profile.extract(physical_lines(), state, place=place, text=request.get("text", False)):
+            for value in adapter.extract(physical_lines(), state, place=place, text=request.get("text", False)):
                 event = {**base, **value, "harness_version": value.get("identity", {}).get("version")}
                 if event["object"] == "index_event":
                     event["provenance"] = encode_provenance(event)
                 count += 1
                 yield event
-        except index_events.Restart as signal:
+        except adapter.Restart as signal:
             if not isinstance(signal.reason, str) or not signal.reason or not isinstance(signal.seed, dict):
                 raise ProtocolError("invalid native restart signal") from signal
             seed = copy.deepcopy(signal.seed)
@@ -179,7 +184,7 @@ def _file(source, number, roots, request, envelope):
             restart = {"reason": signal.reason,
                        "seed": _checkpoint(seed, hashlib.sha256(b"").hexdigest(), binding, seed=True)}
         offset = state["next_offset"]
-        metadata = profile.metadata(state) if not restart and place.harness == "codex" else None
+        metadata = adapter.metadata(state) if not restart and hasattr(adapter, "metadata") else None
         checkpoint = None if restart else _checkpoint(state, digest.hexdigest(), binding)
         yield {**base, "object": "file_end", "key": "end", "status": "ok", "restart": restart,
                "offset": offset, "state": checkpoint, "count": count, "metadata": metadata}

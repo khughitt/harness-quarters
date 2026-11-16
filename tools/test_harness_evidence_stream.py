@@ -234,7 +234,7 @@ def test_text_and_raw_are_independent_opt_ins(tmp_path):
 
 
 @pytest.mark.parametrize("sample", [s for s in tomllib.loads((FIXTURES / "CATALOGUE.toml").read_text())["sample"]
-                                    if s.get("profile") != "index"],
+                                    if s.get("profile") != "index" and s["harness"] != "agy"],  # agy: index only
                          ids=lambda s: s["path"])
 def test_records_equal_moved_readers(tmp_path, sample):
     path = FIXTURES / sample["path"]
@@ -262,7 +262,7 @@ def test_source_failures_do_not_abort_other_files(tmp_path):
 
 @pytest.mark.parametrize("mutation", [
     {"extra": True}, {"id": True}, {"text": 1}, {"files": [{"path": 3}]},
-    {"files": [{"path": "x", "size": -1}]}, {"roots": [{"harness": "agy", "path": "x"}]},
+    {"files": [{"path": "x", "size": -1}]}, {"roots": [{"harness": "opencode", "path": "x"}]},  # agy is accepted (index only)
     {"files": [{"path": "x", "size": 1, "state": {}}]},
     {"files": [{"path": "x", "size": 1, "extra": 2}]},
     {"context": [2]}, {"cross_file": None},

@@ -856,10 +856,31 @@ def check_claude_additions(event):
         assert event["response"]["phase"] == "fragment"
 
 
+# Shared stream additions made after the frozen oracle (spec rev 2 §4.4). Claude emits
+# `results[].exit_code` as null and declares it absent, so the oracle compares without it.
+POST_ORACLE_DECLARATIONS = {"results[].exit_code": {
+    "native_paths": [], "coverage_keys": [], "basis": "native", "rule": "absent:not_decoded"}}
+
+
+def pre_oracle_defaults(defaults):
+    assert {field: defaults[field] for field in POST_ORACLE_DECLARATIONS} == POST_ORACLE_DECLARATIONS
+    return {field: proof for field, proof in defaults.items() if field not in POST_ORACLE_DECLARATIONS}
+
+
+def pre_oracle_row(value):
+    value = copy.deepcopy(value)
+    if value["object"] == "index_event":
+        for result in value["results"]:
+            assert result.pop("exit_code") is None
+        assert not POST_ORACLE_DECLARATIONS.keys() & value["provenance"].keys()
+    return value
+
+
 def oracle_rows(rows, defaults):
+    defaults = pre_oracle_defaults(defaults)
     result = []
     for value in rows:
-        ordinary = copy.deepcopy(value)
+        ordinary = pre_oracle_row(value)
         if ordinary["object"] == "index_event":
             check_claude_additions(ordinary)
             proof = expand_proofs(ordinary, defaults)
@@ -897,7 +918,7 @@ def oracle_native_case(case):
     path = FIXTURES / case["fixture"]
     assert hashlib.sha256(path.read_bytes()).hexdigest() == PROVENANCE_ORACLE["fixtures"][case["fixture"]]
     defaults = index_events.provenance_defaults()
-    assert old_claude_defaults(defaults) == PROVENANCE_ORACLE["declarations"]
+    assert old_claude_defaults(pre_oracle_defaults(defaults)) == PROVENANCE_ORACLE["declarations"]
     place = discover.place_of(Path(case["logical"]), discover.roots(
         explicit=[("claude-code", Path("/oracle/.claude/projects"))]))
     state = {}

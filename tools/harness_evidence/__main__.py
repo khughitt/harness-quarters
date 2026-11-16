@@ -10,9 +10,22 @@ from . import DECODER_VERSION, SCHEMA, RevisionUnknown, revision
 
 def _root(value: str) -> tuple[str, Path]:
     harness, separator, path = value.partition("=")
-    if not separator or not path or harness not in ("claude-code", "codex"):
-        raise argparse.ArgumentTypeError("root must be claude-code=PATH or codex=PATH")
+    if not separator or not path or harness not in ("claude-code", "codex", "agy"):
+        raise argparse.ArgumentTypeError("root must be claude-code=PATH, codex=PATH or agy=PATH")
+    if harness == "agy" and Path(path).name != "brain":
+        raise argparse.ArgumentTypeError(f"agy root must be a brain directory: {path}")  # As discover.roots.
     return harness, Path(path)
+
+
+def _file_facts(place) -> tuple[dict | None, dict | None]:
+    """Path facts and the side-input fingerprint from one snapshot of them."""
+    from . import discover
+    from .index_adapters import ADAPTERS
+    adapter = ADAPTERS.get(place.harness)
+    if adapter is None:
+        return discover.path_facts(place), None
+    facts = adapter.path_facts(place)
+    return facts, adapter.side_inputs(facts)
 
 
 def _discover(args: argparse.Namespace, envelope: dict) -> None:
@@ -40,12 +53,13 @@ def _discover(args: argparse.Namespace, envelope: dict) -> None:
         location = asdict(place)
         del location["path"]
         del location["read_path"]
+        facts, side_inputs = _file_facts(place)
         output = {**envelope, "object": "file", "path": str(path), "harness": place.harness,
                   "device": None, "inode": None, "size": None, "mtime_ns": None,
                   "place": location, "filename_identity": discover.filename_identity(place.harness, path),
                   "filename_lookup": discover.filename_lookup(place.harness, path, root=discover._root_of(path, roots)),
-                  "path_facts": discover.path_facts(place),
-                  "state": "listed"}
+                  "path_facts": facts, "side_inputs": side_inputs,
+                  "copy": discover.copy_label(place.harness, path), "state": "listed"}
         try:
             if path in listing.file_errors:
                 raise listing.file_errors[path]
@@ -72,7 +86,7 @@ def main(argv: list[str] | None = None) -> int:
     discover_parser.add_argument("--home", type=Path)
     discover_parser.add_argument("--root", type=_root, action="append")
     commands.add_parser("decode", help="decode framed JSON requests from stdin")
-    commands.add_parser("header", help="select bounded Claude headers from stdin")
+    commands.add_parser("header", help="select bounded transcript headers from stdin")
     args = parser.parse_args(argv)
     if args.command == "capabilities":
         from . import capabilities

@@ -159,7 +159,7 @@ def test_all_codex_fields_have_coverage_and_provenance(tmp_path):
                     continue
                 assert any(field == declared or field.startswith(declared + ".") or field.startswith(declared + "[]")
                            for declared in defaults), field
-    encode = index_stream._provenance_encoder(defaults, profile=index_codex)
+    encode = index_stream._provenance_encoder(defaults, index_codex.PROVENANCE)
     for value in out:
         if value["object"] != "index_event":
             continue
@@ -174,7 +174,7 @@ def test_all_codex_fields_have_coverage_and_provenance(tmp_path):
     assert index_codex_coverage.WATCHED["turn_context"]["inputs"]["effort"] == (
         "payload.effort", "payload.collaboration_mode.settings.reasoning_effort")
     with pytest.raises(Exception, match="fields"):
-        index_stream._provenance_encoder({"unknown": next(iter(defaults.values()))}, profile=index_codex)
+        index_stream._provenance_encoder({"unknown": next(iter(defaults.values()))}, index_codex.PROVENANCE)
     coverage = next(v for v in out if v["object"] == "coverage")
     known = {v["record_kind"]: v["known"] for v in coverage["records"]}
     assert known["event_msg:task_started"] == 1 and known["event_msg:brand_new_event"] == 0
@@ -379,7 +379,7 @@ def test_accepted_empty_command_object_has_named_inferred_provenance(name):
     from harness_evidence import index_codex
     defaults = index_codex.provenance_defaults()
     event["decoder"] = {"revision": "test"}
-    assert index_stream._provenance_encoder(defaults, profile=index_codex)(event) == event["provenance"]
+    assert index_stream._provenance_encoder(defaults, index_codex.PROVENANCE)(event) == event["provenance"]
     proofs = {field: {**proof, "ref": event["ref"], "revision": "test", **event["provenance"].get(field, {})}
               for field, proof in defaults.items()}
     assert index_events._factor_provenance({**event, "provenance": proofs}, defaults) == event["provenance"]

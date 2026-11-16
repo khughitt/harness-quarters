@@ -96,7 +96,7 @@ def _scan(physical_lines, place, envelope, result):
             break
 
 
-def _file(source, number, place, request, envelope):
+def _file(source, number, place, adapter, request, envelope):
     physical = Path(source.get("read_path") or source["path"])
     result = {**envelope, "request": request["id"], "object": "header", "file": number,
               "path": source["path"], "harness": place.harness, "harness_version": None,
@@ -109,7 +109,7 @@ def _file(source, number, place, request, envelope):
                 raise ProtocolError("header source identity changed")
             if info.st_size < source["size"]:
                 raise ProtocolError("header source is shorter than its fixed span")
-            _scan(_lines(handle, source["size"]), place, envelope, result)
+            adapter.header(place, handle, size=source["size"], envelope=envelope, result=result)
     except (OSError, UnicodeError, ValueError, AttributeError, RecursionError) as error:
         result.update(status="vanished" if isinstance(error, FileNotFoundError) else
                       "unreadable" if isinstance(error, OSError) else "invalid_source",
@@ -134,6 +134,7 @@ def _request(request):
 
 def run(stdin, stdout, stderr, envelope):
     """One complete ordered batch per JSON line; protocol faults end the command."""
+    from . import index_adapters  # The Claude adapter imports this module's selection.
     for line in stdin:
         try:
             request = _request(json.loads(line, parse_constant=_reject_constant, parse_float=_finite_float))
@@ -145,9 +146,9 @@ def run(stdin, stdout, stderr, envelope):
                     place = discover.place_of(Path(source["path"]), roots)
                 except ValueError as error:
                     raise ProtocolError(str(error)) from error
-                places.append(place)
-            for number, (source, place) in enumerate(zip(request["files"], places)):
-                stdout.write(serialized(_file(source, number, place, request, envelope)) + "\n")
+                places.append((place, index_adapters.for_source(place, extract=False)))
+            for number, (source, (place, adapter)) in enumerate(zip(request["files"], places)):
+                stdout.write(serialized(_file(source, number, place, adapter, request, envelope)) + "\n")
                 stdout.flush()
             stdout.write(serialized({**envelope, "request": request["id"], "object": "request_end",
                                      "files": len(request["files"])}) + "\n")

@@ -10,7 +10,8 @@ import json
 from pathlib import Path
 import tomllib
 
-from . import homes, DECODER_VERSION, SCHEMA, index_events, index_coverage, index_codex, index_codex_coverage, index_codex_runs
+from . import homes, DECODER_VERSION, SCHEMA, index_events, index_codex
+from .index_adapters import ADAPTERS
 
 EVIDENCE_RULE = ("synthetic samples establish decoder conformance; observed samples or probes "
                  "establish emission; absent from a sample means unobserved")
@@ -130,6 +131,7 @@ DECLARED: dict[str, dict[str, list[str]]] = {
 
 DECLARED["claude-code"].update(index_events.PROVENANCE)
 DECLARED["codex"].update(index_codex.PROVENANCE)
+DECLARED["agy"] = dict(ADAPTERS["agy"].PROVENANCE)
 
 # Descendant metadata extends capability resolution, never the hot event proof table.
 DECLARED["claude-code"].update({
@@ -145,7 +147,7 @@ DECLARED["claude-code"].update({
 })
 
 COVERAGE_KEYS = {
-    **index_events.COVERAGE_KEYS,
+    **ADAPTERS["claude-code"].COVERAGE_KEYS,
     "message.joined_nonempty": ["assistant/input:content", "user/input:content"],
     "message.joined_bytes": ["assistant/input:content", "user/input:content"],
     "calls[].questions[].options[].label": ["applied:question/input:labels"],
@@ -161,12 +163,6 @@ COVERAGE_SCOPES = {field: [
     {"when": {"message.channel": "user"}, "coverage_keys": ["user/input:content"]},
     {"when": {"message.channel": "assistant"}, "coverage_keys": ["assistant/input:content"]},
 ] for field in ("message.joined_nonempty", "message.joined_bytes")}
-TOOL_KINDS = {
-    **{name: "file_read" for name in index_events.PATH_FIELDS},
-    **{name: "file_edit" for name in index_events.WRITERS},
-    **{name: "dispatch" for name in index_events.DISPATCH},
-    "Bash": "shell", "AskUserQuestion": "question", "Skill": "skill",
-}
 
 
 def _values(value, path):
@@ -204,6 +200,29 @@ def _seen(decoded, native, fields):
             and any(source(field, row, path) for row in native for path in paths)}
 
 
+# A catalogue build reads no file beside a sample, so agy's summaries are not consulted.
+_UNREAD_SUMMARIES = {"parent": None, "subagent": None, "cwd": None, "agent_name": None,
+                     "reason": "summaries_unreadable", "basis": "native", "rule": "agy_conversation_summaries"}
+
+
+def _agy_index_evidence(name, path, data, seen):
+    from .lines import Place, decode, lines
+    adapter = ADAPTERS["agy"]
+    relpath = name[name.index("brain/"):]
+    place = Place("agy", "agy", "personal", "live", relpath, path)
+    native = {line.number: row for line in lines(data, len(data))
+              if line.complete and (row := decode(line)) is not None}
+    state = {}
+    adapter.bind(state, {**_UNREAD_SUMMARIES, "ref": name})
+    offsets, offset = [], 0
+    for raw in data.splitlines(keepends=True):
+        offsets.append((offset, raw))
+        offset += len(raw)
+    for event in adapter.extract(offsets, state, place=place, text=True):
+        if event["object"] == "index_event":
+            seen.update(_seen(event, [native[event["line"]]], DECLARED["agy"]))
+
+
 def build(catalogue: Path, *, index_catalogue: Path | None = None) -> dict:
     """Decode each catalogued byte snapshot; no links may read ancillary store files."""
     from . import records
@@ -213,7 +232,7 @@ def build(catalogue: Path, *, index_catalogue: Path | None = None) -> dict:
     raw_catalogue = catalogue.read_bytes()
     samples = tomllib.loads(raw_catalogue.decode("utf-8"))["sample"]
     harnesses = {slug: {"record_kinds": set(), "fields": {
-        field: {"provenance": sorted(paths), "coverage_keys": (COVERAGE_KEYS if slug == "claude-code" else index_codex.COVERAGE_KEYS).get(field, []),
+        field: {"provenance": sorted(paths), "coverage_keys": (COVERAGE_KEYS if slug == "claude-code" else ADAPTERS[slug].COVERAGE_KEYS).get(field, []),
                 **({"coverage_scopes": COVERAGE_SCOPES[field]} if slug == "claude-code" and field in COVERAGE_SCOPES else {})} for field, paths in fields.items()
     }, "labels": {}, "versions": {}, "exceptions": []} for slug, fields in DECLARED.items()}
     hashes = {}
@@ -236,8 +255,13 @@ def build(catalogue: Path, *, index_catalogue: Path | None = None) -> dict:
             fmt = detect_format(data, len(data))
         except UnknownFormat:
             continue
-        if ("codex" if fmt == "codex" else "claude-code") != slug:
+        if {"codex": "codex", "agy": "agy"}.get(fmt, "claude-code") != slug:
             raise ValueError("sample harness disagrees with decoded format")
+        if fmt == "agy":
+            # agy has no reader decode (spec rev 2 §3): its evidence is the index extractor's.
+            if sample.get("profile") == "index" and not sample.get("index_error"):
+                _agy_index_evidence(name, path, data, evidence["fields_seen"][provenance])
+            continue
         # Explicit place prevents metadata sidecars and sibling transcript discovery.
         place = Place(slug, "file", None, "explicit", name, path)
         reader = {"claude": records.claude_read, "sdk": records.sdk_read, "codex": records.codex_read}[fmt]
@@ -246,24 +270,25 @@ def build(catalogue: Path, *, index_catalogue: Path | None = None) -> dict:
         native = {line.number: row for line in lines(data, len(data))
                   if line.complete and (row := decode(line)) is not None}
         fields = DECLARED[slug]
-        if slug == "claude-code":
-            from .header import _lines, _scan
+        adapter = ADAPTERS.get(slug)
+        if adapter is not None:
             selected = {"header": {"session": None, "cwd": None, "start_ms": None},
                         "provenance": {}, "harness_version": None}
             try:
-                _scan(_lines(BytesIO(data), len(data)), place, {"decoder": {"revision": "sample"}}, selected)
+                adapter.header(place, BytesIO(data), size=len(data),
+                               envelope={"decoder": {"revision": "sample"}}, result=selected)
             except (ValueError, AttributeError, RecursionError):
                 pass  # Invalid native records are source failures, never emission evidence.
             else:
                 for name, proof in selected["provenance"].items():
                     evidence["fields_seen"][provenance].update(_seen(
                         selected, [native.get(proof["line"], {})], {"header." + name: proof["native_paths"]}))
-        if sample.get("profile") == "index" and not sample.get("index_error"):
+        if adapter is not None and sample.get("profile") == "index" and not sample.get("index_error"):
             offsets, offset = [], 0
             for raw in data.splitlines(keepends=True):
                 offsets.append((offset, raw))
                 offset += len(raw)
-            for event in index_events.extract(offsets, {}, place=place, text=True):
+            for event in adapter.extract(offsets, {}, place=place, text=True):
                 if event["object"] == "index_event":
                     evidence["fields_seen"][provenance].update(_seen(event, [native[event["line"]]], fields))
         seen = evidence["fields_seen"][provenance]
@@ -314,33 +339,33 @@ def build(catalogue: Path, *, index_catalogue: Path | None = None) -> dict:
             for event in profile.extract(offsets, {}, place=place, text=True):
                 if event["object"] == "index_event":
                     evidence["fields_seen"][provenance].update(_seen(event, [native[event["line"]]], DECLARED[slug]))
-    harnesses["claude-code"]["index"] = json.loads(json.dumps({
-        "profile": "index", "mode": "incremental", "resume": True,
-        "watched": index_coverage.WATCHED, "applied": index_coverage.APPLIED,
-        "unwatched": index_coverage.UNWATCHED, "common_reads": index_coverage.COMMON_READS,
-        "known_kinds": sorted(index_coverage.KNOWN_KINDS),
-        "tool_kinds": TOOL_KINDS,
-        "features": {"native_skill_events": True, "question_option_labels": True}}))
-    harnesses["codex"]["index"] = json.loads(json.dumps({
-        "profile": "index", "mode": "incremental", "resume": True,
-        "watched": index_codex_coverage.WATCHED, "applied": index_codex_coverage.APPLIED,
-        "unwatched": index_codex_coverage.UNWATCHED, "common_reads": index_codex_coverage.COMMON_READS,
-        "known_kinds": sorted(index_codex_coverage.KNOWN_KINDS),
-        "tool_kinds": {**dict.fromkeys(index_codex.SHELL, "shell"), "apply_patch": "patch", "exec": "script",
-                       "write_stdin": "poll", "wait": "poll", "wait_agent": "other",
-                       "request_user_input": "question",
-                       **dict.fromkeys(index_codex.DISPATCH, "dispatch")},
-        "execution_origin_tools": [index_codex_runs.SCRIPT_TOOL, *index_codex_runs.DIRECT_TOOLS],
-        "features": {"native_skill_events": False, "question_option_labels": False,
-                     "stateful_execution": True}}))
     harnesses["codex"]["fields"]["filename_identity.index_thread"].update(
         basis="convention", rule="index_rollout_name")
-    harnesses["claude-code"]["header"] = {"implemented": True, "line_limit": 50}
-    harnesses["codex"]["header"] = {"implemented": True, "line_limit": 50}
     for alias in ("claude", "codex"):
         harnesses[homes.SLUG[alias]]["discovery"] = {"default_roots": [
             path.as_posix() for home in homes.homes(Path("."), alias)
             for _store, path in homes.stores(home)]}
+    for slug, harness in harnesses.items():
+        adapter = ADAPTERS.get(slug)
+        if adapter is None:
+            harness["header"] = {"implemented": False}
+            continue
+        harness["header"] = {"implemented": True, "line_limit": 50}
+        if adapter.SIDE_INPUTS:
+            harness["side_inputs"] = json.loads(json.dumps(adapter.SIDE_INPUTS))
+        if not hasattr(adapter, "extract"):
+            continue
+        harness["index"] = json.loads(json.dumps({
+            "profile": "index", "mode": "incremental", "resume": True,
+            "watched": adapter.WATCHED, "applied": adapter.APPLIED,
+            "unwatched": adapter.UNWATCHED, "common_reads": adapter.COMMON_READS,
+            "known_kinds": sorted(adapter.KNOWN_KINDS),
+            "tool_kinds": adapter.TOOL_KINDS,
+            "features": adapter.FEATURES}))
+        if hasattr(adapter, "EXECUTION_ORIGIN_TOOLS"):
+            harness["index"]["execution_origin_tools"] = list(adapter.EXECUTION_ORIGIN_TOOLS)
+        if hasattr(adapter, "ABSENT"):  # Claude's block keeps its v18 keys (spec rev 2 §4.4).
+            harness["index"]["absent"] = dict(sorted(adapter.ABSENT.items()))
     for harness in harnesses.values():
         harness["record_kinds"] = sorted(harness["record_kinds"])
         harness["labels"] = {role: sorted(bases) for role, bases in harness["labels"].items()}

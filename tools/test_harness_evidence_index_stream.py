@@ -8,12 +8,18 @@ import subprocess
 import pytest
 
 from harness_evidence import DECODER_VERSION
-from harness_evidence import index_events, index_stream, stream
+from harness_evidence import index_claude, index_events, index_stream, stream
 from test_harness_evidence_index import (CONTROLS, FIXTURES, TOOLS, environment, expand_proofs,
                                         PROVENANCE_ORACLE, oracle_hash, oracle_rows, oracle_error,
-                                        oracle_native_case, old_claude_defaults)
+                                        oracle_native_case, old_claude_defaults, pre_oracle_defaults)
 
 ENVELOPE = {"schema": "harness-evidence/1", "decoder": {"version": DECODER_VERSION, "revision": "a" * 40}}
+
+
+def patch_claude(monkeypatch, name, value):
+    """Replace a Claude extractor entry point where both the registry and direct callers see it."""
+    monkeypatch.setattr(index_events, name, value)
+    monkeypatch.setattr(index_claude, name, value)
 
 
 def source(path, *, size=None, state=None, logical=None):
@@ -145,7 +151,7 @@ def test_restart_seed_clears_old_rows(monkeypatch):
             yield {**proof_event(actual, complete=False), "key": "E0"}
             raise index_events.Restart("test invalidation", {"restart_mode": True})
         yield from actual(lines, state, **kw)
-    monkeypatch.setattr(index_events, "extract", late)
+    patch_claude(monkeypatch, "extract", late)
     path = FIXTURES / "index/sizes.jsonl"
     out = list(index_stream.objects(request(source(path)), ENVELOPE))
     assert "restart" not in out[0] and out[-2]["state"] is None
@@ -171,7 +177,7 @@ def test_mid_file_restart_is_terminal_and_stream_stays_bounded(monkeypatch, tmp_
             yield {**proof_event(actual, complete=False), "key": f"E{offset}"}
             if len(consumed) == 2:
                 raise index_events.Restart("test", {"restart_mode": True})
-    monkeypatch.setattr(index_events, "extract", late)
+    patch_claude(monkeypatch, "extract", late)
     iterator = index_stream.objects(request(source(path)), ENVELOPE)
     assert next(iterator)["object"] == "file_start" and consumed == []
     assert next(iterator)["key"] == "E0" and consumed == [0]
@@ -441,7 +447,7 @@ def test_index_proof_audit_preserves_completed_file(monkeypatch, change):
                 else:
                     value.pop("provenance")
             yield value
-    monkeypatch.setattr(index_events, "extract", corrupted)
+    patch_claude(monkeypatch, "extract", corrupted)
     path = FIXTURES / "index/sizes.jsonl"
     completed, partial = [], []
     with pytest.raises(stream.ProtocolError, match="provenance"):
@@ -484,7 +490,7 @@ def test_unchanged_native_fields_avoid_repeated_attribute_audit(monkeypatch, cha
             if value["object"] == "index_event" and changed:
                 value["provenance"].setdefault("native_kind", {})["rule"] = "changed_rule"
             yield value
-    monkeypatch.setattr(index_events, "extract", observed)
+    patch_claude(monkeypatch, "extract", observed)
     out = read(request(source(FIXTURES / "index/sizes.jsonl")))
     native = [v for v in out if v["object"] == "index_event"]
     assert len(native) == 3
@@ -509,7 +515,7 @@ def test_invalid_proof_defaults_fail_before_header(monkeypatch, attribute, bad):
     # A malformed declaration must never become a reference that validates a matching bad proof.
     defaults = index_events.provenance_defaults()
     defaults["native_kind"][attribute] = bad
-    monkeypatch.setattr(index_events, "provenance_defaults", lambda: defaults)
+    patch_claude(monkeypatch, "provenance_defaults", lambda: defaults)
     iterator = stream.objects(request(source(FIXTURES / "index/sizes.jsonl")), ENVELOPE)
     with pytest.raises(stream.ProtocolError, match="provenance"):
         next(iterator)
@@ -532,7 +538,7 @@ def test_supplied_delta_preserves_bad_proof_rejection(monkeypatch, attribute, ba
             if value["object"] == "index_event":
                 value["provenance"].setdefault("native_kind", {})[attribute] = bad
             yield value
-    monkeypatch.setattr(index_events, "extract", corrupted)
+    patch_claude(monkeypatch, "extract", corrupted)
     with pytest.raises(stream.ProtocolError, match="provenance"):
         read(request(source(FIXTURES / "index/sizes.jsonl")))
 
@@ -551,7 +557,7 @@ def test_direct_changes_reject_invalid_envelope_values(monkeypatch, attribute, b
                 for proof in value["provenance"].values():
                     proof["ref"] = bad
             yield value
-    monkeypatch.setattr(index_events, "extract", corrupted)
+    patch_claude(monkeypatch, "extract", corrupted)
     with pytest.raises(stream.ProtocolError, match="provenance"):
         read(request(source(FIXTURES / "index/sizes.jsonl")), envelope)
 
@@ -582,7 +588,7 @@ def test_changed_values_cannot_hide_behind_envelope_equality(monkeypatch, attrib
                                         "revision": UnusualString(ENVELOPE["decoder"]["revision"])}
                 value["provenance"].setdefault("native_kind", {})[attribute] = 0
             yield value
-    monkeypatch.setattr(index_events, "extract", corrupted)
+    patch_claude(monkeypatch, "extract", corrupted)
     with pytest.raises(stream.ProtocolError, match="provenance"):
         read(request(source(FIXTURES / "index/sizes.jsonl")))
 
@@ -595,14 +601,14 @@ def test_declarations_reject_overridden_native_values(monkeypatch, attribute):
     defaults = index_events.provenance_defaults()
     array = attribute in {"native_paths", "coverage_keys"}
     defaults["native_kind"][attribute] = [UnusualString("type")] if array else UnusualString("value")
-    monkeypatch.setattr(index_events, "provenance_defaults", lambda: defaults)
+    patch_claude(monkeypatch, "provenance_defaults", lambda: defaults)
     actual = index_events.extract
     def corrupted(*args, **kw):
         for value in actual(*args, **kw):
             if value["object"] == "index_event":
                 value["provenance"].setdefault("native_kind", {})[attribute] = [0] if array else 0
             yield value
-    monkeypatch.setattr(index_events, "extract", corrupted)
+    patch_claude(monkeypatch, "extract", corrupted)
     with pytest.raises(stream.ProtocolError, match="provenance"):
         read(request(source(FIXTURES / "index/sizes.jsonl")))
 
@@ -662,7 +668,7 @@ def test_native_equality_override_cannot_hide_invalid_proof(field, attribute, ki
     with pytest.raises(stream.ProtocolError, match="provenance"):
         index_stream._factor_provenance(event, defaults)
     with pytest.raises(stream.ProtocolError, match="provenance"):
-        index_stream._provenance_encoder(defaults)(native_changes_for_full_event(event))
+        index_stream._provenance_encoder(defaults, index_events.PROVENANCE)(native_changes_for_full_event(event))
 
 
 @pytest.mark.parametrize("field,attribute", [("native_kind", "native_paths"),
@@ -674,7 +680,7 @@ def test_native_list_item_equality_override_cannot_hide_invalid_type(field, attr
     with pytest.raises(stream.ProtocolError, match="provenance"):
         index_stream._factor_provenance(event, defaults)
     with pytest.raises(stream.ProtocolError, match="provenance"):
-        index_stream._provenance_encoder(defaults)(native_changes_for_full_event(event))
+        index_stream._provenance_encoder(defaults, index_events.PROVENANCE)(native_changes_for_full_event(event))
 
 
 @pytest.mark.parametrize("field,attribute", [("native_kind", "rule"), ("notifications", "source")])
@@ -685,7 +691,7 @@ def test_native_valid_string_override_preserves_full_auditor_delta(field, attrib
     expected = {field: {attribute: "changed_rule"}}
     full = index_stream._factor_provenance(event, defaults)
     assert json.loads(json.dumps(full)) == expected
-    fast = index_stream._provenance_encoder(defaults)(native_changes_for_full_event(event))
+    fast = index_stream._provenance_encoder(defaults, index_events.PROVENANCE)(native_changes_for_full_event(event))
     assert json.loads(json.dumps(fast)) == expected
 
 
@@ -699,7 +705,7 @@ def test_native_proof_dictionary_override_uses_original_auditor():
     with pytest.raises(stream.ProtocolError, match="provenance"):
         index_stream._factor_provenance(event, defaults)
     with pytest.raises(stream.ProtocolError, match="provenance"):
-        index_stream._provenance_encoder(defaults)(native_changes_for_full_event(event))
+        index_stream._provenance_encoder(defaults, index_events.PROVENANCE)(native_changes_for_full_event(event))
 
 
 def normalize_oracle_wire(values):
@@ -717,9 +723,10 @@ def normalize_oracle_wire(values):
 
 @pytest.mark.parametrize("route", ["import", "command"])
 def test_direct_provenance_changes_expand_to_frozen_full_oracle(tmp_path, route):
-    assert old_claude_defaults(index_events.provenance_defaults()) == PROVENANCE_ORACLE["declarations"]
+    assert old_claude_defaults(pre_oracle_defaults(index_events.provenance_defaults())) == PROVENANCE_ORACLE["declarations"]
     assert set(PROVENANCE_ORACLE["fixtures"]) == {
-        str(p.relative_to(FIXTURES)) for p in FIXTURES.rglob("*.jsonl")}
+        str(p.relative_to(FIXTURES)) for p in FIXTURES.rglob("*.jsonl")
+        if p.relative_to(FIXTURES).parts[0] not in ("agy", "agy-index")}
     for name, digest in PROVENANCE_ORACLE["fixtures"].items():
         assert hashlib.sha256((FIXTURES / name).read_bytes()).hexdigest() == digest
     from harness_evidence import revision
@@ -777,7 +784,8 @@ def test_direct_provenance_changes_expand_to_frozen_full_oracle(tmp_path, route)
                     native.pop("next_line")
                     native.pop("next_offset")
                 assert oracle_hash(native) == old["native_state"], (case, old["through_line"])
-            assert old_claude_defaults(rows[0]["provenance_defaults"]) == PROVENANCE_ORACLE["declarations"]
+            assert rows[0]["side_inputs"] is None
+            assert old_claude_defaults(pre_oracle_defaults(rows[0]["provenance_defaults"])) == PROVENANCE_ORACLE["declarations"]
             assert oracle_rows([v for v in rows if v["object"] not in
                                 {"file_start", "file_end", "request_end"}],
                                rows[0]["provenance_defaults"]) == old["rows"]
@@ -806,7 +814,7 @@ def test_frozen_oracle_detects_dropped_identity_parent_and_ref_overrides(monkeyp
                 value["provenance"].pop("identity.parent", None)
                 value["provenance"].pop("identity.subagent", None)
             yield value
-    monkeypatch.setattr(index_events, "extract", dropped)
+    patch_claude(monkeypatch, "extract", dropped)
     case = next(c for c in PROVENANCE_ORACLE["cases"] if c["fixture"] == "index/ownership.jsonl"
                 and c["layout"] == "subagent" and c["text"] and c["schedule"] == "prefix")
     with pytest.raises(AssertionError):
@@ -833,13 +841,13 @@ def test_native_provenance_constructs_declarations_once_and_only_changed_fields_
             if value["object"] == "index_event":
                 native.append(copy.deepcopy(value["provenance"]))
             yield value
-    monkeypatch.setattr(index_events, "provenance_defaults", declarations)
+    patch_claude(monkeypatch, "provenance_defaults", declarations)
     monkeypatch.setattr(index_stream, "_factor_provenance", audit)
     def native_audit(event, defaults):
         native_audits.append(set(event["provenance"]))
         return original_audit(event, defaults)
     monkeypatch.setattr(index_events, "_factor_provenance", native_audit)
-    monkeypatch.setattr(index_events, "extract", extract)
+    patch_claude(monkeypatch, "extract", extract)
     out = read(request(source(FIXTURES / "index/ownership.jsonl")))
     assert len(native) == 6 and len(preparations) == 1 and len(traversals) == 1
     assert all(len(changes) < 6 for changes in native)
@@ -855,7 +863,7 @@ def test_native_provenance_constructs_declarations_once_and_only_changed_fields_
 @pytest.mark.parametrize("change", ["missing-ref", "empty-ref", "null-ref", "int-ref", "revision",
                                    "missing-changes", "null-changes", "list-changes"])
 def test_empty_changes_still_validate_provenance_envelope(change):
-    encode = index_stream._provenance_encoder(index_events.provenance_defaults())
+    encode = index_stream._provenance_encoder(index_events.provenance_defaults(), index_events.PROVENANCE)
     event = {"ref": "file#L1", "decoder": {"revision": "a" * 40}, "provenance": {}}
     assert encode(event) == {}
     if change == "missing-ref":
@@ -876,7 +884,7 @@ def test_empty_changes_still_validate_provenance_envelope(change):
     ("native_paths", [0]), ("coverage_keys", [False]), ("basis", "unknown"),
     ("rule", ""), ("source", None), ("source", False), ("ref", "")])
 def test_declaration_and_delta_faults_fail_before_projection(attribute, bad):
-    encode = index_stream._provenance_encoder(index_events.provenance_defaults())
+    encode = index_stream._provenance_encoder(index_events.provenance_defaults(), index_events.PROVENANCE)
     event = {"ref": "file#L1", "decoder": {"revision": "a" * 40},
              "provenance": {"notifications": {attribute: bad}}}
     with pytest.raises(stream.ProtocolError, match="provenance"):
@@ -925,7 +933,7 @@ def test_declaration_completeness_is_checked_before_file_header(monkeypatch, fau
         defaults["native_kind"].pop("native_paths")
     else:
         defaults["native_kind"]["unknown"] = "must not disappear"
-    monkeypatch.setattr(index_events, "provenance_defaults", lambda: defaults)
+    patch_claude(monkeypatch, "provenance_defaults", lambda: defaults)
     with pytest.raises(stream.ProtocolError, match="provenance"):
         next(stream.objects(request(source(FIXTURES / "index/sizes.jsonl")), ENVELOPE))
 
@@ -945,7 +953,7 @@ def test_direct_changes_late_fault_preserves_completed_files_and_checkpoint(monk
                 if invocation == 3 and value["object"] == "index_event" and value["line"] == 2:
                     value["provenance"].setdefault("native_kind", {})["future"] = "bad"
                 yield value
-        monkeypatch.setattr(index_events, "extract", broken)
+        patch_claude(monkeypatch, "extract", broken)
         rows = []
         with pytest.raises(stream.ProtocolError, match="provenance"):
             rows.extend(stream.objects(req, ENVELOPE))
@@ -983,7 +991,7 @@ sys.exit(main(['decode']))
 
 
 def test_changed_arrays_and_earlier_refs_are_owned_without_checkpoint_encoding():
-    encode = index_stream._provenance_encoder(index_events.provenance_defaults())
+    encode = index_stream._provenance_encoder(index_events.provenance_defaults(), index_events.PROVENANCE)
     event = {"ref": "file#L2", "decoder": {"revision": "a" * 40},
              "provenance": {"identity.subagent": {"native_paths": ["earlier.path"], "ref": "file#L1"},
                             "identity.parent": {"ref": "archive:file"}}}
@@ -1019,7 +1027,7 @@ def test_direct_delta_metaclass_operators_do_not_bypass_validation(location):
     else:
         change = NativeDict(change)
     event = {"ref": "file#L1", "decoder": {"revision": "a" * 40}, "provenance": {"native_kind": change}}
-    encode = index_stream._provenance_encoder(index_events.provenance_defaults())
+    encode = index_stream._provenance_encoder(index_events.provenance_defaults(), index_events.PROVENANCE)
     if location in {"key", "dictionary"}:
         with pytest.raises(stream.ProtocolError, match="provenance"):
             encode(event)
@@ -1053,7 +1061,7 @@ def test_declarations_reject_metaclass_values_before_copying(location):
     else:
         proof["native_paths"] = NativeList(["type"])
     with pytest.raises(stream.ProtocolError, match="provenance"):
-        index_stream._provenance_encoder(defaults)
+        index_stream._provenance_encoder(defaults, index_events.PROVENANCE)
 
 
 @pytest.mark.parametrize("fault", ["scalar", "array-item", "dictionary"])
@@ -1197,7 +1205,7 @@ def test_native_array_projection_uses_operator_state_without_copy_hooks(monkeypa
     list.append(snapshot, "caller mutation")
     assert list.copy(array) == ["stored.path"]
     event["decoder"] = ENVELOPE["decoder"]
-    encoded = index_stream._provenance_encoder(index_events.provenance_defaults())(event)
+    encoded = index_stream._provenance_encoder(index_events.provenance_defaults(), index_events.PROVENANCE)(event)
     assert encoded["identity.subagent"][attribute] == ["audited.path", "caller mutation"]
     again = next(index_events.extract([(0, raw)], {}, place=place, text=True))
     assert again["provenance"]["identity.subagent"][attribute] == ["audited.path"]
@@ -1227,7 +1235,7 @@ def test_framing_preserves_explicit_precomputed_updates_without_second_prune():
     defaults = index_events.provenance_defaults()
     event = {"ref": "file#L1", "decoder": {"revision": "a" * 40},
              "provenance": {"identity.subagent": copy.deepcopy(defaults["identity.subagent"])}}
-    encode = index_stream._provenance_encoder(defaults)
+    encode = index_stream._provenance_encoder(defaults, index_events.PROVENANCE)
     actual = encode(event)
     assert actual == event["provenance"]
     actual["identity.subagent"]["native_paths"].append("caller")
@@ -1261,7 +1269,7 @@ def test_framing_validates_owned_values_without_replaying_update_comparison():
             raise AssertionError("update presence is already computed")
     event = {"ref": "file#L1", "decoder": {"revision": "a" * 40},
              "provenance": {"identity.subagent": {"native_paths": ComputedArray(["stored.path"])}}}
-    encoded = index_stream._provenance_encoder(index_events.provenance_defaults())(event)
+    encoded = index_stream._provenance_encoder(index_events.provenance_defaults(), index_events.PROVENANCE)(event)
     assert encoded == {"identity.subagent": {"native_paths": ["computed.path"]}}
 
 
@@ -1274,7 +1282,7 @@ def test_framing_checks_literal_basis_after_owning_supplied_string():
     event = {"ref": "file#L1", "decoder": {"revision": "a" * 40},
              "provenance": {"identity.subagent": {"basis": InvalidBasis("unsupported")}}}
     with pytest.raises(stream.ProtocolError, match="provenance"):
-        index_stream._provenance_encoder(index_events.provenance_defaults())(event)
+        index_stream._provenance_encoder(index_events.provenance_defaults(), index_events.PROVENANCE)(event)
 
 
 def test_native_class_spoofed_scalar_fails_literal_framing(monkeypatch):

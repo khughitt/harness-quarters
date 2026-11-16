@@ -126,15 +126,20 @@ def test_artifact_covers_catalogue_hashes_and_keeps_provenance_separate():
         "samples": {s["path"]: hashlib.sha256((FIXTURES / s["path"]).read_bytes()).hexdigest()
                     for s in samples},
     }
-    assert len(samples) == 232
+    assert len(samples) == 240
+    assert sorted(artifact["harnesses"]) == ["agy", "claude-code", "codex"]
     for slug, harness in artifact["harnesses"].items():
-        assert set(harness) == {"record_kinds", "fields", "labels", "versions", "exceptions", "header", "discovery"} | {"index"}
+        assert set(harness) == {"record_kinds", "fields", "labels", "versions", "exceptions", "header", "index"} | ({"side_inputs"} if slug == "agy" else {"discovery"})
         assert harness["exceptions"] == []
         assert harness["header"] == {"implemented": True, "line_limit": 50}
         if slug == "codex":
             assert harness["fields"]["response.usage.input_uncached"]["coverage_keys"] == [
                 "applied:usage/input:input_tokens", "applied:usage/input:cached_input_tokens"]
             assert harness["index"]["features"]["stateful_execution"] is True
+        elif slug == "agy":  # Index declarations only: agy has no reader decode.
+            assert harness["record_kinds"] == [] and harness["labels"] == {}
+            assert harness["fields"]["results[].exit_code"]["coverage_keys"] == ["applied:exit_line/input:exit_code"]
+            assert harness["index"]["mode"] == "incremental" and harness["index"]["resume"]
         else:
             assert harness["fields"]["calls[].raw_path"]["provenance"] == [
                 "message.content[].input.file_path", "message.content[].input.notebook_path"]
@@ -185,7 +190,10 @@ def test_every_declared_native_path_occurs_in_its_harness_samples():
             if (slug, field) == ("codex", "filename_identity.index_thread"):
                 assert paths == []  # A filename convention, never native record evidence.
                 continue
-            assert paths, (slug, field)
+            if not paths:  # A declared absence, or a convention from the path, reads no native field.
+                from harness_evidence.index_adapters import ADAPTERS
+                proof = ADAPTERS[slug].provenance_defaults()[field]
+                assert proof["rule"].startswith("absent:") or proof["basis"] == "convention", (slug, field)
             for path in paths:
                 if (slug, field, path) in (("claude-code", "header.cwd", "payload.cwd"),
                                            ("codex", "header.cwd", "cwd")):
@@ -207,7 +215,31 @@ def test_every_declared_native_path_occurs_in_its_harness_samples():
                     assert native_values(first, path) == [row["header"]["cwd"]]
                     assert row["provenance"]["cwd"]["native_paths"] == [path]
                     continue
+                if slug == "agy" and path.startswith("conversation_summaries."):
+                    # A side-input column: it must be one agy_summaries reads and the SQL
+                    # fixtures beside the agy samples write.
+                    from harness_evidence import agy_summaries
+                    column = path.removeprefix("conversation_summaries.")
+                    assert column in agy_summaries.COLUMNS, path
+                    assert any(column_values(sql, column) for sql in FIXTURES.glob("agy*/.gemini/antigravity-cli/*.sql")), path
+                    continue
                 assert any(native_values(row, path) for row in native), (slug, field, path)
+
+
+def column_values(sql, column):
+    """The nonempty values a fixture's summaries rows hold in `column`, read from the table
+    the SQL builds (not its text), so a column no row fills is not evidence."""
+    import sqlite3
+    connection = sqlite3.connect(":memory:")
+    try:
+        connection.executescript(sql.read_text())
+        names = [row[1] for row in connection.execute("PRAGMA table_info(conversation_summaries)")]
+        if column not in names:
+            return []
+        return [value for (value,) in connection.execute(f"SELECT {column} FROM conversation_summaries")
+                if value not in (None, "")]
+    finally:
+        connection.close()
 
 
 def test_fields_seen_require_native_evidence_but_keep_false_and_zero(tmp_path):

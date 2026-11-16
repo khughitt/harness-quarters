@@ -1,4 +1,5 @@
 """Shared request validation for reader and incremental index transports."""
+from pathlib import PurePath
 import re
 
 
@@ -60,9 +61,11 @@ def validate(value):
             raise ProtocolError("roots must be an array or null")
         for root in roots:
             _fields(root, {"harness", "path"}, {"harness", "path"})
-            if root["harness"] not in ("claude-code", "codex"):
+            if root["harness"] not in ("claude-code", "codex", "agy"):
                 raise ProtocolError("unsupported root harness")
             _path(root["path"])
+            if root["harness"] == "agy" and PurePath(root["path"]).name != "brain":
+                raise ProtocolError("agy root must be a brain directory")  # As discover.roots.
     if not isinstance(value.get("context", []), list):
         raise ProtocolError("context must be an array")
     for path in value.get("context", []):

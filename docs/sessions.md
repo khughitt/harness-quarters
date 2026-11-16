@@ -49,9 +49,9 @@ valid terminal index stops the listing with an error.
 The adapters share `Home` and home discovery from `tools/harness_evidence/homes.py`.
 That standalone package also names transcript stores without importing hq or its
 configuration. `tools/harness-evidence discover [--home PATH] [--root HARNESS=PATH]...`
-lists Claude Code and Codex transcript paths and filesystem metadata as
+lists Claude Code, Codex and agy transcript paths and filesystem metadata as
 JSONL under schema version 1 (`root`, `file`, then `discover_end`). Explicit roots replace
-all default roots; supported harness names are `claude-code` and `codex`. Defaults use
+all default roots; supported harness names are `claude-code`, `codex` and `agy`. Defaults use
 the shared personal/work homes, including Codex's archived stores, and ignore obs's
 environment overrides. Discovery reads no transcript text. Matching `.jsonl` paths remain selected even
 when a non-symlink directory occupies a transcript position, including subagents
@@ -83,7 +83,8 @@ These hints assert neither canonical filename identity nor recorded session iden
 Consumers retain query grammar/alias policy and confirm identity from evidence.
 
 Discovery files/aliases and decode `file_start` also carry `path_facts`, null outside
-Claude. Claude's convention object has `session` (logical filename stem), `agent`
+Claude and agy; agy alias rows carry null `path_facts`, and alias rows carry no
+`side_inputs` or `copy`. Claude's convention object has `session` (logical filename stem), `agent`
 (one filename `agent-` prefix removed, otherwise null; empty string stays distinct),
 `subagent` (immediate parent is `subagents`), `parent` (grandparent name in that case,
 otherwise null), and `resume_group` (POSIX parent of place.relpath when not subagent,
@@ -96,8 +97,42 @@ copies; physical read_path continues to supply bytes/adjacent metadata. Decoded
 header agent evidence is separate. Query-ID aliases and publication of arbitrary
 index/identity claims remain consumer policy, rather than native path decoding.
 
+agy's root is `~/.gemini/antigravity-cli/brain` (harness and home `agy` in refs); an
+agy root not named `brain` is refused before any output, with one line and exit 2 from
+`discover --root` and from `decode` (a protocol error), as other invalid roots are. Index
+and header refuse any agy file not shaped `brain/<id>/.system_generated/logs/<file>`,
+including one whose relpath has a `.` or `..` segment.
+Discovery lists each `brain/<id>/.system_generated/logs/transcript_full.jsonl` as the
+conversation's session file and each `transcript.jsonl` beside it with
+`copy: {label: "truncated_mirror", basis: "convention", full: <transcript_full path>}`,
+with `full` null when that file does not exist (the mirror is never decoded, so such a
+conversation has no index source); other files rows carry `copy: null`. The byte segments under `logs/chunks/` are not
+listed. agy `filename_identity` is `{conversation, basis: "convention"}` from the brain
+directory. agy `path_facts` come from one read-only read of
+`conversation_summaries.db` per file: `parent`, `subagent`, `cwd` (first local
+`file://` workspace URI; null for `''` or `[]`) and `agent_name`, with `reason` null,
+`no_summary_row` or `summaries_unreadable`, `basis: "native"`,
+`rule: "agy_conversation_summaries"` and `ref`. There is no transcript heuristic for an
+unresolved row. The database opens as a read-only SQLite URI, with `immutable=1` only
+for a WAL-mode file that has no `-wal` file, so a read creates no file in agy's home.
+One race remains: if agy removes its `-wal` between that check and the open, the
+`mode=ro` read can create `-wal` and `-shm` beside the database; the decoder does not
+retry.
+Discovery rows and index `file_start` carry `side_inputs`: null for Claude and Codex,
+and for agy `{agy_conversation_summaries: <sha256>}`, the sha256 of the canonical
+JSON of the resolved facts `{parent, subagent, cwd, agent_name}` or of
+`{"status": <reason>}`. A consumer that skips unchanged transcripts must add
+`side_inputs` to its unchanged-file check and decode again from no state when it
+differs; the decoder also refuses to resume a checkpoint made under another
+fingerprint. Reader decode (no `extract`) has no agy support: a file under an agy root
+fails with the protocol error "agy supports only extract:index" when the decoder reaches
+it, after the objects of earlier files in the request (a traceback and exit 1, as other
+in-stream protocol errors), an explicit agy file
+reads as `unknown_format` (as before agy was detected), and an agy `context` entry is
+skipped.
+
 `tools/harness-evidence version --json` reports the evidence schema,
-decoder version `19`, and the decoder revision. A pinned copy reads a `REVISION`
+decoder version `20`, and the decoder revision. A pinned copy reads a `REVISION`
 file inside the package; a checkout reports its HEAD with `+dirty` when
 the package has changes. Without either source the command exits 2.
 
@@ -163,15 +198,21 @@ replay, while request ids and decoder revision changes alone do not.
 Records themselves retain native numeric block order, including when a line has
 ten or more blocks.
 
-## Cheap Claude headers
+## Cheap transcript headers
 
 `tools/harness-evidence header` accepts one JSON request per stdin line with
 `id`, `files` and explicit `roots`. Files use the same logical `path`, optional
-`read_path`, fixed `size` and `identity:{device,inode}` as index decoding. Claude
-roots must contain every logical path; Codex headers are explicitly unsupported.
-No default roots or guessed harness are used. The capability view explicitly
-marks Claude headers implemented (50 lines) and Codex headers unimplemented;
-this declares implementation, not evidence that a harness version emits a field.
+`read_path`, fixed `size` and `identity:{device,inode}` as index decoding. Explicit
+Claude, Codex or agy roots must contain every logical path. No default roots or
+guessed harness are used. The capability view marks all three headers implemented
+with a 50-line limit; this declares implementation, not evidence that a harness
+version emits a field.
+
+An agy header is `{session, start_ms, cwd, parent, subagent}`: `session` is the
+conversation id from the brain directory (basis convention), `start_ms` the first
+timezone-aware `created_at` within 50 lines, and `cwd`, `parent` and `subagent` the
+file's summaries snapshot, with the snapshot's `reason` on their provenance. A
+`transcript.jsonl` mirror is refused with "agy index reads transcript_full.jsonl".
 
 Each file emits one `header` object with its request id, file index, logical path,
 status, `header:{session,cwd,start_ms}`, provenance and null or structured error.
@@ -181,7 +222,7 @@ invalid native types carry non-ok source statuses and error details, never a
 successful empty header. Consumers validate the complete ordered batch before
 using any selection result.
 
-Selection preserves the old first-50-physical-line policy, including LF, CRLF and
+Claude and Codex selection preserves the old first-50-physical-line policy, including LF, CRLF and
 CR newlines, replacement of invalid UTF-8 and skipping malformed JSON lines.
 The first truthy top-level CWD stops the scan immediately; `session_meta` also
 stops at its payload CWD even when false or absent. Valid unterminated final JSON
@@ -194,9 +235,9 @@ reader. It has no resumable checkpoint or index extraction side effects.
 
 ## Native index extraction
 
-The opt-in `extract: "index"` request selects the native evidence profile from
-the declared harness/place. Claude supports the scratch index pilot; Codex supplies terminal usage and
-stateful native execution facts. Include each file's `identity: {"device": ..., "inode": ...}`, keep
+The opt-in `extract: "index"` request selects Claude, Codex or agy native evidence
+through the adapter registered for the declared harness/place. Codex supplies terminal
+usage and stateful native execution facts. Include each file's `identity: {"device": ..., "inode": ...}`, keep
 `cross_file` and `raw` false, and omit `context`. Pass a saved index `state` whole:
 `next_line`, `next_offset` and `digest` describe the complete raw prefix, while
 `index` is opaque. The held descriptor must match the supplied identity and fixed
@@ -342,6 +383,65 @@ additions do not expand `defaults/1` proofs or change per-file raw/applied cover
 declares native skill events and question option labels. These describe decoder
 behavior, without claims about untested harness versions or consumer metrics.
 The capability artifact publishes native field provenance and coverage declarations separately from reader declarations.
+
+### agy index events
+
+The agy index profile shares Claude's complete provenance field set. Its shared
+context is null and its execution collections are empty, declared unrecorded;
+ordinary step responses carry the convention phase `fragment`. These constants
+add no native extraction, execution associations or coverage counts.
+
+agy emits one `index_event` per transcript step, with the same object kinds, framing
+and `provenance_defaults` field set as Claude. Fields agy does not record are null and
+declare `native_paths: []` with rule `absent:<reason>` (`not_recorded`,
+`no_turn_end_records`, `no_fork_records`, `known_after_call`); the capability view
+lists them under `harnesses.agy.index.absent`. Identity facts from an unresolved
+summary row are null with an event provenance rule `unresolved:<reason>`: unknown,
+not absent.
+
+- `PLANNER_RESPONSE` and `CHECKPOINT` steps are complete responses (`flush_response`
+  true, id `<conversation>:<step_index>`). `response.model` is the planner's `model`,
+  null when the step has none and for a checkpoint. Usage: `input_uncached` is `input_tokens`,
+  `cache_read` is `cache_read_tokens`, `output` is `output_tokens`; `cache_write` and
+  `thinking` are null. The presence flags stay booleans: `usage_present.output` says
+  whether `output_tokens` was recorded, and `usage_present.thinking` is always false,
+  declared by convention (`agy_no_thinking_record`) since agy records no thinking
+  count; `context_total` is input plus cache read and `uncached_total`
+  is input. `response.native` holds the three counters as recorded and
+  `thinking_text_bytes`, the byte size of the planner's thinking text, which stays out
+  of `message.text`. A checkpoint is a `compaction` with a `compact_summary` injection.
+- Calls are `<conversation>:<step_index>:<k>`. Results pair positionally with the
+  oldest open call of the latest planner step; a surplus `GENERIC` gets no result. An
+  ineligible planner step (no `created_at` or `step_index`) leaves its calls unknown:
+  no later result pairs with older calls, and the `applied:result` coverage input
+  `calls_known` is false for the results that follow until the next eligible planner
+  step, which tells them apart from true surplus results (`input:call` false alone).
+  A dispatch call's `paths_complete` is true only when its prompt is present, as
+  Claude's.
+  `results[].error` means the tool failed to run (status `ERROR`); `exit_code` is the
+  command's own status from a `run_command` result's `Command exited with code N.` line
+  before `Command output:`, so a `DONE` result can carry a nonzero code; only a `DONE`
+  result is read for it, since a `RUNNING` one reports its code in its wake-up and an
+  `ERROR` one did not run. `truncation` is
+  `{kind: "tool_preview", original_tokens: null, original_bytes: null}` when a
+  `run_command` result reports the tool's output preview before `Command output:`,
+  otherwise null. `answers` on an `ask_question` result is `{"A<n>": text}`, each text
+  running from its `A<n>:` line to the next one, so an answer may span lines; it is null
+  when the result has no `A<n>:` line. A `RUNNING` result carries `background_id`; `calls[].background` is
+  null (`absent:known_after_call`), and the call's end arrives as a `notifications[]`
+  entry on the `SYSTEM` wake-up from that id (`finished` or `canceled`). The first
+  `sender=` and end marker are the wake-up's own; a result that quotes another message
+  does not end that message's task. An ineligible wake-up reports nothing but still
+  closes its id.
+- `USER_INPUT` text is the `<USER_REQUEST>` body; the other wrappers are injections,
+  and a slash-command `<SKILL>` block is a `skill` call (native name `SKILL`, kind
+  `skill` in `TOOL_KINDS`). `SYSTEM_SDK` messages are hook
+  injections; other system messages are injections. `ERROR_MESSAGE` "stream was
+  interrupted" sets `interruption`. Unknown step types are events counted
+  `known: false`.
+- `results[].exit_code` is a shared field: Claude emits null (`absent:not_decoded`).
+- Text-off requests drop the same text fields as Claude's, `identity.cwd` included;
+  agy's `path_facts` in `file_start` and the checkpoint binding still name the cwd.
 
 ## Read evidence, not mentions
 
