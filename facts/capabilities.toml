@@ -61,6 +61,62 @@ date = 2026-09-24
 evidence = "tack-00ccb6"
 note = "Both kinds were run, in the terminal interface, and neither woke."
 
+[facts.idle-wait-kinds]
+type = "set"
+description = "The kinds of child (shell: a background command; subagent) on which a controller waited 30 minutes making no model calls of its own until the child finished. Each wait then costs one context resend per completion, not one per poll."
+
+[facts.idle-wait-kinds.harness.agy]
+status = "probed"
+value = ["shell", "subagent"]
+version = "1.5.9"
+date = 2026-11-16
+evidence = "hq-46ed26"
+note = "Isolated interactive sessions, 1800 s job. Shell (run_command background, not daemon): no controller call between WAITING and the SYSTEM_MESSAGE wake, which was one call. Subagent (invoke_subagent self): the child backgrounded the command and ended its turn, made no calls for 30 minutes, was woken by its own task, and answered; the controller made no calls until the child's answer woke it. No timeout on either wait was reached or documented."
+
+[facts.idle-wait-kinds.harness.claude-code]
+status = "probed"
+value = ["shell", "subagent"]
+version = "2.1.325"
+date = 2026-11-16
+evidence = "hq-46ed26"
+note = "Isolated interactive sessions, 1800 s job. Shell (Bash run_in_background, timeout 2400000): no controller call for 30 minutes, then two at the wake (read the output file, answer). Subagent (Agent): the child backgrounded the command because a foreground Bash is capped at 600000 ms, ended its turn and made no calls until its own shell woke it; that first child turn end woke the controller once, which replied not finished. Longest single wait: background Bash defaults to 1800000 ms and is capped at 7200000 ms (constants read from the 2.1.325 binary, not run to the cap); Monitor caps at 1800000 ms."
+
+[facts.idle-wait-kinds.harness.codex]
+status = "probed"
+value = ["subagent"]
+version = "0.169.0"
+date = 2026-11-16
+evidence = "hq-46ed26"
+note = "Isolated interactive sessions, 1800 s job. Subagent (route A): one wait_agent (timeout_ms 3600000, its documented maximum) held the controller for 30 minutes with no calls; the answer took two. The child itself polled: 10 calls in 30 minutes, waiting 300000 ms at a time (write_stdin inside an exec cell with the @exec yield_time_ms pragma; no longer yield was tried). Shell: the controller cannot end its turn and be woken (controller-wake, probed on 0.156.1), so it polls; the direct control chose 60000 ms waits and made 37 calls in 30 minutes. A 300000 ms wait is the longest observed, so at least 12 resends an hour."
+
+[facts.wake-call-cached]
+type = "boolean"
+description = "After the controller has waited 30 minutes without model calls, its wake call reads the earlier context from the provider's prompt cache rather than sending it as uncached input."
+
+[facts.wake-call-cached.harness.agy]
+status = "probed"
+value = false
+version = "1.5.9"
+date = 2026-11-16
+evidence = "hq-46ed26"
+note = "Both kinds: the wake call recorded cache_read_tokens 0 and its whole context as input_tokens (10713 shell, 11427 subagent), where the calls before the wait read about 8k from cache. A waiting subagent's own wake was also uncached."
+
+[facts.wake-call-cached.harness.claude-code]
+status = "probed"
+value = true
+version = "2.1.325"
+date = 2026-11-16
+evidence = "hq-46ed26"
+note = "Both kinds, subscription login: the controller's wake call read about 77k tokens from cache and wrote under 600. A subagent's wake from its own 30-minute shell wait was not cached (cache_read 0, cache_write 67214): its requests appear to use the shorter cache lifetime."
+
+[facts.wake-call-cached.harness.codex]
+status = "probed"
+value = true
+version = "0.169.0"
+date = 2026-11-16
+evidence = "hq-46ed26"
+note = "Route A: when wait_agent returned after 30 minutes, the controller's next call read 13952 of 14171 input tokens from cache. The polling child's calls five minutes apart were also cached."
+
 [facts.stop-input-in-flight-statuses]
 type = "set"
 description = "The statuses Claude Code's Stop input gives, in background_tasks, to work that is still to finish."
