@@ -14,7 +14,8 @@ The table inventories the historical SL1–SL11 replay fixtures, including their
 non-JSONL inputs. [CATALOGUE.toml](../tools/fixtures/session-logs/CATALOGUE.toml)
 is the canonical inventory of all JSONL samples, including the later `origin/` cases.
 The corpus checks keep this table's historical coverage exact and account for every
-file through the table, catalogue sample paths and `CATALOGUE.toml` itself. The
+file through the table, catalogue sample paths, the non-JSONL control and side-input
+files listed below, and `CATALOGUE.toml` itself. The
 catalogue checks also require exact JSONL coverage, unique paths and synthetic provenance.
 
 | Short | File (under `tools/fixtures/session-logs/`) | Harness, home | Holds |
@@ -498,9 +499,9 @@ obs's index only the stamp is found, and coverage says so.
 | Task evidence: stamp, single-segment attempt, chain error and mention | SL11 |
 | Escaped text in parsed and malformed lines | SL11 |
 
-## Frozen index controls
+## Frozen index controls and side inputs
 
-The catalogue declares native transcript samples. These separate frozen oracle
+The catalogue declares native JSONL transcript samples. These separate frozen oracle
 inputs preserve the prior consumer’s outcomes and do not assert native emission:
 
 - `index/old-controls.json`
@@ -508,9 +509,17 @@ inputs preserve the prior consumer’s outcomes and do not assert native emissio
 - `index/task2-policy-controls.json`
 - `index/task2-usage-storage-controls.json`
 
-The corpus check accounts for the historical table, catalogue, these four controls
-and the catalogue file itself, with exact set equality. The controls include one
-explicit synthetic instruction-source name under a fictitious home; the privacy
-check admits that exact literal alongside the documented synthetic UUID namespaces.
-Every other private-path or identifier pattern remains rejected. Fixture bytes
-are frozen; control inputs are not additional transcript samples.
+Antigravity (`agy`) discovery and index fixtures pair their transcripts with synthetic
+SQLite seed scripts loaded into a temporary `conversation_summaries.db` beside `brain/`:
+
+- `agy/.gemini/antigravity-cli/conversation_summaries.sql`
+- `agy-index/.gemini/antigravity-cli/conversation_summaries.sql`
+
+The corpus check accounts for the historical table, catalogue, these four controls,
+these two SQL side inputs and the catalogue file itself, with exact set equality. The
+controls include one explicit synthetic instruction-source name under a fictitious
+home; the privacy check admits that exact literal alongside the synthetic UUID
+namespaces (`c0000000-0000-4000-8000-*` for Claude, `01900000-0000-7000-8000-*` for
+Codex, and `a9000000-0000-4000-8000-*` and `b9000000-0000-4000-8000-*` for
+Antigravity). Every other private-path or identifier pattern remains rejected. Fixture
+bytes are frozen; control and side-input files are not additional transcript samples.
