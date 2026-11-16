@@ -117,6 +117,30 @@ date = 2026-11-16
 evidence = "hq-46ed26"
 note = "Route A, one 30-minute run: the controller's first call after wait_agent returned read 13952 of 14264 input tokens from cache. The polling child's calls five minutes apart were also cached. Waits longer than 30 minutes were not run."
 
+[facts.long-shell-wait]
+type = "boolean"
+description = "With the settings the note names, one shell wait call blocked on a background command for more than 5 minutes and returned when the command finished, so a controller that polls its own command spends one model call per wait rather than one per 5-minute poll. The controller's context is still resent once per wait; only the poll count drops."
+
+[facts.long-shell-wait.harness.codex]
+status = "probed"
+value = true
+version = "0.169.0"
+date = 2026-11-16
+evidence = "hq-9f547b"
+note = "Isolated interactive session, one 900 s job, small default context (about 14k tokens). Two settings must both be raised. background_terminal_max_timeout (config.toml, default 300000 ms) bounds write_stdin; in code mode the exec cell also yields on its own (after about 30 s by default), which the first-line pragma `// @exec: {\"yield_time_ms\": N}` raises. With background_terminal_max_timeout = 3600000 and a cell carrying that pragma and an empty write_stdin with yield_time_ms 3600000, the wait was one call that returned after 895.6 s with the output; the answering call after it read 14080 of 14267 input tokens from cache. With the same prompt at the default timeout, write_stdin returned at 300.0 s each time: 3 waits for the 15 minutes. Without the pragma (90 s pilot) the cell yielded at 31 s and the model fell back to wait-tool polls of 1 to 60 s. The ceiling is the configured 3600000 ms; waits beyond 15 minutes, the code_mode.default_exec_yield_time_ms setting, and the built-in awaiter agent role (background_terminal_max_timeout 3600000) were not probed."
+
+[facts.external-wake]
+type = "boolean"
+description = "A message queued from outside the session, by a command rather than the terminal, starts a new turn in an idle interactive controller without human input. A detached watcher can then end the controller's wait when a job finishes, so the controller makes no model calls while it waits."
+
+[facts.external-wake.harness.codex]
+status = "probed"
+value = true
+version = "0.169.0"
+date = 2026-11-16
+evidence = "hq-9f547b"
+note = "Isolated interactive TUI session, one 900 s job, small default context (about 14k tokens). The controller started a detached watcher (setsid nohup sh -c 'sleep 900; ...; codex queue --thread \"$CODEX_THREAD_ID\" --message ... --resume'), replied WAITING and ended its turn. It made no call for 15 minutes; about 3 s after the watcher ran the queue command (which logged 'Queued message ... for thread ...') a new turn began, taking two calls (reading the result file, answering). The first read 13952 of 17873 input tokens from cache. Sandbox: under sandbox_mode workspace-write the watcher was killed when the exec call that started it returned (90 s pilot: no output, no surviving process), though the same queue command fired from outside the sandbox woke that idle session; the 900 s run used danger-full-access. A failed --resume was not observed (openai/codex#61773 reports one can still exit 0). Waits beyond 15 minutes and idle-thread unloading (thread_unload_delay_secs) were not probed."
+
 [facts.stop-input-in-flight-statuses]
 type = "set"
 description = "The statuses Claude Code's Stop input gives, in background_tasks, to work that is still to finish."
