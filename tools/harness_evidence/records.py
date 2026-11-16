@@ -10,8 +10,8 @@ from pathlib import Path
 import re
 from typing import Callable, Collection
 
-from harness_evidence.lines import Line, Place, decode, lines, ref, sha256
-from harness_evidence.labels import label, origin
+from .lines import Line, Place, decode, lines, ref, sha256
+from .labels import label, origin
 
 CLASSIFIER = "session-logs-classifier/1"
 

@@ -258,3 +258,27 @@ if __name__ == "__main__":
         sys.exit(f"a normalization rule matched nothing: {normalize.matched}")
     DIGESTS.write_text(json.dumps(value, sort_keys=True, indent=1) + "\n", encoding="utf-8")
     print(f"{len(value['completing'])} completing, {len(value['failing'])} failing -> {DIGESTS}")
+
+
+def test_registered_adapters_import_inside_an_isolated_package(tmp_path):
+    import subprocess
+    from test_harness_evidence_index import environment
+    code = """import importlib, importlib.util, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+name = '_pinned_test_decoder'
+spec = importlib.util.spec_from_file_location(name, root / '__init__.py',
+                                             submodule_search_locations=[str(root)])
+package = importlib.util.module_from_spec(spec)
+sys.modules[name] = package
+spec.loader.exec_module(package)
+importlib.import_module(name + '.index_stream')
+adapters = importlib.import_module(name + '.index_adapters').ADAPTERS
+assert set(adapters) == {'agy', 'claude-code', 'codex'}
+assert 'harness_evidence' not in sys.modules
+assert all(module.__name__.startswith(name + '.') for module in adapters.values())
+"""
+    result = subprocess.run([sys.executable, '-I', '-c', code, str(TOOLS / 'harness_evidence')],
+                            cwd=tmp_path, env=environment(tmp_path), capture_output=True,
+                            text=True, timeout=30)
+    assert result.returncode == 0, result.stderr

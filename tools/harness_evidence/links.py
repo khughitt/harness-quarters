@@ -4,8 +4,8 @@ Source revision: fe61869f0041eff423ed495d10845ef3cf3d5638.
 import json
 from pathlib import Path, PurePosixPath
 
-from harness_evidence.lines import Place, ref
-from harness_evidence.records import FileRead
+from .lines import Place, ref
+from .records import FileRead
 
 
 def _meta_path(read: FileRead) -> tuple[Path, str] | None:
