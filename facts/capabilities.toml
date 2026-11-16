@@ -63,7 +63,7 @@ note = "Both kinds were run, in the terminal interface, and neither woke."
 
 [facts.idle-wait-kinds]
 type = "set"
-description = "The kinds of child (shell: a background command; subagent) on which a controller waited 30 minutes making no model calls of its own until the child finished. Each wait then costs one context resend per completion, not one per poll."
+description = "The kinds of child (shell: a background command; subagent) on which a controller waited 30 minutes making no model calls of its own until the child finished. The controller's context is then resent once per wake, not once per poll; a subagent child may still spend calls of its own."
 
 [facts.idle-wait-kinds.harness.agy]
 status = "probed"
@@ -71,7 +71,7 @@ value = ["shell", "subagent"]
 version = "1.5.9"
 date = 2026-11-16
 evidence = "hq-46ed26"
-note = "Isolated interactive sessions, 1800 s job. Shell (run_command background, not daemon): no controller call between WAITING and the SYSTEM_MESSAGE wake, which was one call. Subagent (invoke_subagent self): the child backgrounded the command and ended its turn, made no calls for 30 minutes, was woken by its own task, and answered; the controller made no calls until the child's answer woke it. No timeout on either wait was reached or documented."
+note = "Isolated interactive sessions, one 1800 s job per kind, small default context (about 10k tokens). Shell (run_command background, not daemon): no controller call between WAITING and the SYSTEM_MESSAGE wake, which took one call (10713 input tokens, none cached). Subagent (invoke_subagent self): the child backgrounded the command, ended its turn, made no calls for 30 minutes, was woken by its own task and answered; the controller made no calls until the child's answer woke it (one call, 11427 input tokens, none cached). So 0 calls and 0 tokens per hour of waiting. Longest single wait: no limit reached or documented."
 
 [facts.idle-wait-kinds.harness.claude-code]
 status = "probed"
@@ -79,7 +79,7 @@ value = ["shell", "subagent"]
 version = "2.1.325"
 date = 2026-11-16
 evidence = "hq-46ed26"
-note = "Isolated interactive sessions, 1800 s job. Shell (Bash run_in_background, timeout 2400000): no controller call for 30 minutes, then two at the wake (read the output file, answer). Subagent (Agent): the child backgrounded the command because a foreground Bash is capped at 600000 ms, ended its turn and made no calls until its own shell woke it; that first child turn end woke the controller once, which replied not finished. Longest single wait: background Bash defaults to 1800000 ms and is capped at 7200000 ms (constants read from the 2.1.325 binary, not run to the cap); Monitor caps at 1800000 ms."
+note = "Isolated interactive sessions, one 1800 s job per kind, small default context (about 77k tokens). Shell (Bash run_in_background, timeout 2400000): no controller call for 30 minutes, then two at the wake (read the output file, answer): 154434 tokens read from cache, 636 written. Subagent (Agent): the controller's brief told the child a foreground Bash would time out, so the child backgrounded the command, ended its turn and made no calls until its own shell woke it 30 minutes later. That first child turn end woke the controller about 9 s in (one call, replying not finished), and the child's answer woke it again (one call). So 0 calls per hour of waiting, plus one early wake for a subagent that waits on its own shell. Longest single wait: background Bash defaults to 1800000 ms and is capped at 7200000 ms (constants read from the 2.1.325 binary, not run to the cap); Monitor caps at 1800000 ms per its tool documentation (not run)."
 
 [facts.idle-wait-kinds.harness.codex]
 status = "probed"
@@ -87,11 +87,11 @@ value = ["subagent"]
 version = "0.169.0"
 date = 2026-11-16
 evidence = "hq-46ed26"
-note = "Isolated interactive sessions, 1800 s job. Subagent (route A): one wait_agent (timeout_ms 3600000, its documented maximum) held the controller for 30 minutes with no calls; the answer took two. The child itself polled: 10 calls in 30 minutes, waiting 300000 ms at a time (write_stdin inside an exec cell with the @exec yield_time_ms pragma; no longer yield was tried). Shell: the controller cannot end its turn and be woken (controller-wake, probed on 0.156.1), so it polls; the direct control chose 60000 ms waits and made 37 calls in 30 minutes. A 300000 ms wait is the longest observed, so at least 12 resends an hour."
+note = "Isolated interactive sessions, one 1800 s job per kind, small default context (about 14k tokens). Subagent (route A): after issuing one wait_agent (timeout_ms 3600000, its documented maximum) the controller made no call for 30 minutes, then one to answer. The child polled: 10 calls in 30 minutes (about 20 an hour; 139264 tokens read from cache, 17342 not), mostly 300000 ms waits (write_stdin inside an exec cell with the @exec yield_time_ms pragma; one through the wait tool). Shell: the controller cannot end its turn and be woken (controller-wake, probed on 0.156.1), so it polls. The direct control asked for a 300000 ms write_stdin without the pragma, got control back after about 30 s, then polled with 60000 ms waits: 37 calls in 30 minutes (about 74 an hour; 546304 tokens read from cache, 24536 not, so 96% cached). At 300000 ms polls that is 12 an hour; no longer wait was tried and the wait tool documents no maximum."
 
 [facts.wake-call-cached]
 type = "boolean"
-description = "After the controller has waited 30 minutes without model calls, its wake call reads the earlier context from the provider's prompt cache rather than sending it as uncached input."
+description = "After the controller has waited 30 minutes without model calls, its first model call after the wait (a new turn's wake, or the call after a blocking wait returns) reads the earlier context from the provider's prompt cache rather than sending it as uncached input."
 
 [facts.wake-call-cached.harness.agy]
 status = "probed"
@@ -99,7 +99,7 @@ value = false
 version = "1.5.9"
 date = 2026-11-16
 evidence = "hq-46ed26"
-note = "Both kinds: the wake call recorded cache_read_tokens 0 and its whole context as input_tokens (10713 shell, 11427 subagent), where the calls before the wait read about 8k from cache. A waiting subagent's own wake was also uncached."
+note = "One 30-minute run per kind. Both wake calls recorded cache_read_tokens 0 and the whole context as input_tokens (10713 shell, 11427 subagent), where the WAITING call just before each wait read about 8k from cache. A waiting subagent's own wake was also uncached. Waits longer than 30 minutes were not run."
 
 [facts.wake-call-cached.harness.claude-code]
 status = "probed"
@@ -107,7 +107,7 @@ value = true
 version = "2.1.325"
 date = 2026-11-16
 evidence = "hq-46ed26"
-note = "Both kinds, subscription login: the controller's wake call read about 77k tokens from cache and wrote under 600. A subagent's wake from its own 30-minute shell wait was not cached (cache_read 0, cache_write 67214): its requests appear to use the shorter cache lifetime."
+note = "One 30-minute run per kind, subscription login. The controller's wake calls read about 77k tokens from cache and wrote under 600. A subagent's wake from its own 30-minute shell wait was not cached (cache_read 0, cache_write 67214): its requests appear to use a shorter cache lifetime. Waits longer than 30 minutes were not run, so a cached wake after one hour or more is not established."
 
 [facts.wake-call-cached.harness.codex]
 status = "probed"
@@ -115,7 +115,7 @@ value = true
 version = "0.169.0"
 date = 2026-11-16
 evidence = "hq-46ed26"
-note = "Route A: when wait_agent returned after 30 minutes, the controller's next call read 13952 of 14171 input tokens from cache. The polling child's calls five minutes apart were also cached."
+note = "Route A, one 30-minute run: the controller's first call after wait_agent returned read 13952 of 14264 input tokens from cache. The polling child's calls five minutes apart were also cached. Waits longer than 30 minutes were not run."
 
 [facts.stop-input-in-flight-statuses]
 type = "set"
