@@ -1128,3 +1128,19 @@ def test_run_helper_ignores_caller_git_routing_and_config(world, tmp_path, monke
     assert run("-C", str(decoy), "rev-parse", "HEAD").stdout.strip() == decoy_head
     assert run("-C", str(decoy), "status", "--porcelain").stdout == ""
 
+
+
+def test_quick_add_links_to_owner_checkout_without_an_active_runtime(tmp_path):
+    home = tmp_path / "home"
+    (home / ".claude").mkdir(parents=True)
+    clone = fresh_clone(tmp_path, home)
+    manifest = tomllib.loads((clone / "links.toml").read_text())
+    assert manifest["required"]["~/.agents/skills/quick-add"] == "mind6:skills/quick-add"
+    assert manifest["harness"]["claude"]["links"]["skills/quick-add"] == "mind6:skills/quick-add"
+    assert not (home / ".local/share/mindful-runtime/current").exists()
+    result = link(clone, home, "--apply")
+    assert result.returncode == 0, result.stderr
+    target = tmp_path / "mind6/skills/quick-add"
+    assert (home / ".agents/skills/quick-add").resolve() == target.resolve()
+    assert (home / ".claude/skills/quick-add").resolve() == target.resolve()
+    assert not (home / ".local/share/mindful-runtime").exists()
