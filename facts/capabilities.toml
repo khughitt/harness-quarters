@@ -86,8 +86,8 @@ status = "probed"
 value = ["subagent"]
 version = "0.169.0"
 date = 2026-11-16
-evidence = "hq-46ed26"
-note = "Isolated interactive sessions, one 1800 s job per kind, small default context (about 14k tokens). Subagent (route A): after issuing one wait_agent (timeout_ms 3600000, its documented maximum) the controller made no call for 30 minutes, then one to answer. The child polled: 10 calls in 30 minutes (about 20 an hour; 139264 tokens read from cache, 17342 not), mostly 300000 ms waits (write_stdin inside an exec cell with the @exec yield_time_ms pragma; one through the wait tool). Shell: the controller cannot end its turn and be woken (controller-wake, probed on 0.156.1), so it polls. The direct control asked for a 300000 ms write_stdin without the pragma, got control back after about 30 s, then polled with 60000 ms waits: 37 calls in 30 minutes (about 74 an hour; 546304 tokens read from cache, 24536 not, so 96% cached). At 300000 ms polls that is 12 an hour; no longer wait was tried and the wait tool documents no maximum."
+evidence = "hq-46ed26; hq-9f547b"
+note = "Isolated interactive sessions, one 1800 s job per kind, small default context (about 14k tokens). Subagent (route A): after issuing one wait_agent (timeout_ms 3600000, its documented maximum) the controller made no call for 30 minutes, then one to answer. The child polled: 10 calls in 30 minutes (about 20 an hour; 139264 tokens read from cache, 17342 not), mostly 300000 ms waits (write_stdin inside an exec cell with the @exec yield_time_ms pragma; one through the wait tool). Shell: by default the controller cannot end its turn and be woken (controller-wake, probed on 0.156.1), so it polls. The direct control asked for a 300000 ms write_stdin without the pragma, got control back after about 30 s, then polled with 60000 ms waits: 37 calls in 30 minutes (about 74 an hour; 546304 tokens read from cache, 24536 not, so 96% cached). At 300000 ms polls that is 12 an hour. Shell is not listed for default settings, and the non-default routes hq-9f547b found were run for 15 minutes, not the 30 this fact requires: long-shell-wait (raised background_terminal_max_timeout and an @exec pragma: one call per wait) and external-wake (a detached watcher that queues a message, outside the workspace-write sandbox: no calls while waiting)."
 
 [facts.wake-call-cached]
 type = "boolean"
@@ -116,6 +116,30 @@ version = "0.169.0"
 date = 2026-11-16
 evidence = "hq-46ed26"
 note = "Route A, one 30-minute run: the controller's first call after wait_agent returned read 13952 of 14264 input tokens from cache. The polling child's calls five minutes apart were also cached. Waits longer than 30 minutes were not run."
+
+[facts.long-shell-wait]
+type = "boolean"
+description = "With the settings the note names, one shell wait call blocked on a background command for more than 5 minutes and returned when the command finished, so a controller that polls its own command spends one model call per wait rather than one per 5-minute poll. The controller's context is still resent once per wait; only the poll count drops."
+
+[facts.long-shell-wait.harness.codex]
+status = "probed"
+value = true
+version = "0.169.0"
+date = 2026-11-16
+evidence = "hq-9f547b"
+note = "Isolated interactive session, one 900 s job, small default context (about 14k tokens). Two limits must both be lifted: the config setting background_terminal_max_timeout (config.toml, default 300000 ms), which bounds write_stdin, and, in code mode, the exec cell's own yield (about 30 s by default), which the first-line pragma `// @exec: {\"yield_time_ms\": N}` lifts. The pragma is not a setting: the prompt told the model to write it in each waiting cell, and it did so in all 4 such cells. With background_terminal_max_timeout = 3600000 and a cell carrying that pragma and an empty write_stdin with yield_time_ms 3600000, the wait was one call that returned after 895.6 s with the output; the answering call after it read 14080 of 14267 input tokens from cache. With the same prompt at the default timeout, write_stdin returned at 300.0 s, 300.0 s and then 288.3 s with the output: 3 waits for the 15 minutes. Without the pragma (90 s pilot) the cell yielded at 31 s and the model fell back to wait-tool polls of 1 to 60 s. The ceiling is the configured 3600000 ms; waits beyond 15 minutes, a long wait-tool call after the cell yields without the pragma, the code_mode.default_exec_yield_time_ms setting, and the built-in awaiter agent role (background_terminal_max_timeout 3600000) were not probed."
+
+[facts.external-wake]
+type = "boolean"
+description = "A message queued from outside the session, by a command rather than the terminal, starts a new turn in an idle interactive controller without human input. Unlike controller-wake, the wake comes from an external command, not from a child the harness runs. With the settings the note names, a detached watcher can then end the controller's wait when a job finishes, so the controller makes no model calls while it waits."
+
+[facts.external-wake.harness.codex]
+status = "probed"
+value = true
+version = "0.169.0"
+date = 2026-11-16
+evidence = "hq-9f547b"
+note = "Sandbox: a watcher the controller starts under the default sandbox_mode workspace-write did not survive its sleep (90 s pilot: empty log, no output file, no surviving process; presumably the sandbox reaps the exec call's descendants when it returns), though the same queue command fired from outside the sandbox woke that idle session. The 900 s run used danger-full-access. Isolated interactive TUI session, small default context (about 14k tokens). The controller started a detached watcher (setsid nohup sh -c 'sleep 900; ...; codex queue --thread \"$CODEX_THREAD_ID\" --message ... --resume'), replied WAITING and ended its turn. It made no call for 15 minutes. The queued turn started within about 0.1 s of the queue command (task_started with turn_trigger queue) and its first model output came about 3 s later; the turn took two calls (reading the result file, answering). The first read 13952 of 17873 input tokens from cache: the woken turn's first call carried about 3.9k uncached input tokens in each of the three queue runs (about 4.1k for the whole wake), as the new turn resends turn-start context, where the long-shell-wait answering call carried 187. A failed --resume was not observed (openai/codex#61773 reports one can still exit 0). Waits beyond 15 minutes and idle-thread unloading (thread_unload_delay_secs) were not probed."
 
 [facts.stop-input-in-flight-statuses]
 type = "set"
