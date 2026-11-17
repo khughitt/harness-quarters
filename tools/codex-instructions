@@ -159,7 +159,9 @@ def write_config(path: Path, text: str) -> tuple[str | None, str]:
 
 def _drift(path: Path) -> str:
     return (f"{path}: {KEY} differs from lore {RULE} (refreshing changes every Codex session's "
-            "developer instructions: ask the user to approve, then run `just codex-instructions`)")
+            "developer instructions: ask the user to approve, then run `just codex-instructions` "
+            "for the tracked config and merge it to main, or `tools/codex-instructions write-live` "
+            "from main for the work config)")
 
 
 def _check(paths: list[Path], text: str) -> int:

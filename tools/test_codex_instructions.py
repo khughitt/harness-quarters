@@ -189,6 +189,7 @@ def test_check_live_skips_absent_home_and_reports_stale_work_config(lore, tmp_pa
     assert done.returncode == 1
     assert ".codex-work/config.toml" in done.stderr
     assert ".codex/config.toml" not in done.stderr
+    assert "write-live" in done.stderr
     (home / ".codex-work" / "config.toml").unlink()
     (home / ".codex-work").rmdir()
     assert run("--lore", str(lore), "check-live", "--home", str(home), home=tmp_path).returncode == 0

@@ -24,6 +24,7 @@ link *args:
 # Exit non-zero when this host's home links drift from links.toml.
 link-check:
     tools/harness-links --check
+    tools/codex-instructions check-live
 
 # Write lore's long-wait rule (rule:369c0028) into the tracked Codex config. It goes
 # live only by reaching main, and every change needs the user's approval first.

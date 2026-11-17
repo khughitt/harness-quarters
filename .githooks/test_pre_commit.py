@@ -50,6 +50,8 @@ def world(tmp_path):
     docs_stub(repo)
     facts = repo / "tools" / "harness-facts"                   # the staged tree's fact reader passes
     facts.write_text("#!/usr/bin/env python3\nimport sys\nassert sys.argv[1:] == ['check']\n")
+    codex = repo / "tools" / "codex-instructions"              # the staged Codex check passes
+    codex.write_text("#!/usr/bin/env python3\nimport sys\nassert sys.argv[1] == 'check'\n")
     shutil.copyfile(OPS_CHECK, repo / "tools" / "ops-check")
     (repo / "tools" / "ops-check").chmod(0o755)
     # The staged manifest check: the real checker over a manifest with no live-state
@@ -61,7 +63,8 @@ def world(tmp_path):
     sh(repo, env, "git", "config", "filter.harness-state.clean", ".githooks/harness-state-clean %f")
     sh(repo, env, "git", "config", "filter.harness-state.required", "true")
     sh(repo, env, "git", "config", "filter.harness-state.smudge", "cat")
-    sh(repo, env, "git", "add", "AGENTS.md", "tools/harness-facts", "tools/ops-check",
+    sh(repo, env, "git", "add", "AGENTS.md", "tools/harness-facts", "tools/codex-instructions",
+       "tools/ops-check",
        ".githooks/harness_state.py", "harnesses.toml", ".gitattributes")
     sh(repo, env, "git", "commit", "-q", "-m", "init")
     return repo, env, tmp_path
