@@ -79,7 +79,9 @@ pre-commit hook refuses a staged config whose value is not the current rule, and
 `just link-check` reports a stale live config behind `~/.codex` or `~/.codex-work`.
 Each change to a live value alters every Codex session's instructions and needs the
 user's approval at that moment. The tracked value goes live by merging to main. The
-untracked work config is written from main with `tools/codex-instructions write-live`.
+untracked work config is written from main with `tools/codex-instructions write-live`; a
+work config without a top-level `developer_instructions` line first needs
+`developer_instructions = ""` added above its first table, because the writer only replaces it.
 
 ## Diagnosis
 

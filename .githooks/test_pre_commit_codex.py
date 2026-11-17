@@ -111,7 +111,9 @@ def test_missing_lore_is_refused(repo, tmp_path, capsys):
     (repo / CONFIG).write_text(current_config())
     git("add", CONFIG)
     assert staged_codex_check(tmp_path / "absent") == 1
-    assert "cannot read lore's manifest" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "cannot read lore's manifest" in err
+    assert "ask the user to approve" not in err
 
 
 def test_ci_mode_does_not_run_the_codex_check(monkeypatch):

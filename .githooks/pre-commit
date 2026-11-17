@@ -185,6 +185,10 @@ def codex_check(tree, lore=None):
     lore_args = ["--lore", lore] if lore is not None else []
     done = subprocess.run([sys.executable, str(tool), *lore_args, "check", str(tree / CODEX_CONFIG)],
                           cwd=tree, text=True, capture_output=True)
+    if done.returncode not in (0, 1):
+        sys.stderr.write(done.stderr.replace(f"{tree}/", ""))
+        return fail(f"{CODEX_TOOL} could not check the staged {CODEX_CONFIG} (exit "
+                    f"{done.returncode}); fix the cause above, which no refresh can settle")
     if done.returncode:
         sys.stderr.write(done.stderr.replace(f"{tree}/", ""))
         return fail(f"the staged {CODEX_CONFIG} does not carry lore's current long-wait rule; "

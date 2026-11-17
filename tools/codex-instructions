@@ -99,7 +99,9 @@ def render(lore: Path) -> str:
 
 
 def value_line(text: str) -> str:
-    return f"{KEY} = {json.dumps(text)}\n"
+    # ensure_ascii=False keeps characters beyond the BMP literal: JSON would escape them as
+    # surrogate pairs, which TOML rejects. Control characters still become \n or \uXXXX.
+    return f"{KEY} = {json.dumps(text, ensure_ascii=False)}\n"
 
 
 def read_value(config_text: str) -> str | None:
@@ -118,7 +120,10 @@ def _key_line(lines: list[str]) -> int:
         key = harness_state.TOML_KEY.match(line)
         if key and key.group(1).strip('"') == KEY:
             found.append(index)
-    if len(found) != 1:
+    if not found:
+        raise ConfigError(f"no top-level {KEY} line to replace; add a top-level "
+                          f'`{KEY} = ""` line before the first table, then rerun')
+    if len(found) > 1:
         raise ConfigError(f"expected one top-level {KEY} line, found {len(found)}")
     return found[0]
 
@@ -171,6 +176,8 @@ def _check(paths: list[Path], text: str) -> int:
             value = read_value(path.read_text(encoding="utf-8"))
         except OSError as error:
             raise ConfigError(f"cannot read {path}: {error.strerror or error}") from None
+        except UnicodeDecodeError as error:
+            raise ConfigError(f"{path} is not valid UTF-8: {error}") from None
         except tomllib.TOMLDecodeError as error:
             raise ConfigError(f"{path} is not valid TOML: {error}") from None
         if value != text:
@@ -225,6 +232,9 @@ def main(argv=None) -> int:
             return 0
         return _write(configs, text)
     except (SourceError, ConfigError) as error:
+        print(f"codex-instructions: {error}", file=sys.stderr)
+        return 2
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
         print(f"codex-instructions: {error}", file=sys.stderr)
         return 2
 

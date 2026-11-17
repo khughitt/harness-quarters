@@ -225,3 +225,26 @@ def test_registry_failure_is_an_error(tmp_path):
     done = run("check", str(config), home=tmp_path, path=f"{bin_dir}:/usr/bin:/bin")
     assert done.returncode == 2
     assert "tasks projects --paths" in done.stderr
+
+
+def test_missing_key_refusal_names_the_one_time_step(lore, tmp_path):
+    config = write_config(tmp_path / "config.toml", 'model = "m"\n[tui]\nx = 1\n')
+    with pytest.raises(tool.ConfigError, match='add a top-level `developer_instructions = ""` line'):
+        tool.write_config(config, tool.render(lore))
+
+
+def test_astral_character_round_trips(tmp_path):
+    lore = make_lore(tmp_path / "lore", "- Wait \U0001d465 seconds.\n  then report.\n")
+    config = write_config(tmp_path / "config.toml")
+    tool.write_config(config, tool.render(lore))
+    assert tomllib.loads(config.read_text())["developer_instructions"] == "Wait \U0001d465 seconds.\nthen report.\n"
+
+
+@pytest.mark.parametrize("command", ["write", "check"])
+def test_unreadable_config_is_an_error_not_drift(lore, tmp_path, command):
+    bad = tmp_path / "bad.toml"
+    bad.write_bytes(b"\xff\xfe not utf-8\n")
+    for path in (bad, tmp_path / "absent.toml"):
+        done = run("--lore", str(lore), command, str(path), home=tmp_path)
+        assert done.returncode == 2, done.stderr
+        assert done.stderr.startswith("codex-instructions: ") and "Traceback" not in done.stderr
