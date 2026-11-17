@@ -41,13 +41,46 @@ budget: 12h, 2000 calls, 80 agents, 4 compactions
 ```
 
 This is a prompt line, not a shell command. Budget text later in the prompt or
-inside quoted, fenced or pasted material sets no budget.
+inside quoted, fenced or pasted material sets no budget, and `budget:` lines
+neither scale nor lift spend pauses.
 
 Status first resolves an explicit/native session ID (workers map to their root),
-then newest cwd state, then main-checkout state for a linked worktree. Missing state
+then newest cwd state, then main-checkout state for a linked worktree, and
+includes a `spend` diagnostic read directly from the signal file, root record
+and host outage latch rather than the hook's active-state cache. Missing state
 fails with what was searched. History/list instead query all local roots without
 that cwd/session fallback. History is transition evidence, not proof of human
 receipt or full coverage of agent-initiated stops.
+
+## Spend signals
+
+On `PreToolUse` and `UserPromptSubmit`, the hook stats `spend-signals.json`
+under `XDG_STATE_HOME/obs` (or the home `.local/state/obs` fallback) and parses
+schema 1 only when `(st_mtime_ns, st_size, st_ino)` changes; when a fresh
+resolved entry for `<harness>:<root>` (including in a `partial` run) is due or
+pending and no counter limit pauses first, `PreToolUse` pauses the turn with
+reason `spend`, formatting root refusals (`turn paused: spend...`) from the
+turn's snapshot to stop started work, record value/threshold/episode with
+single-line `tasks note` calls, park `--waiting-on user --reason decision`,
+report the signal and end the turn, while children get the child pause text
+naming `spend` (a child-only pause leaves `delivered_value` null). Only a
+genuine root human prompt lifts and acknowledges a delivered pause at
+`max(seen_value, delivered_value)`; an episode that opened or went undelivered
+while idle is instead injected on the next genuine root prompt as
+`additionalContext` (`turn-pause: spend signal...`, setting
+`delivered_value = acked_value = value` and recording `warning`/`spend` on the
+new turn) so the controller reports and investigates in that turn before
+resuming original work, and an acknowledged episode pauses again only at
+`value >= 2 * acked_value` while a new episode id replaces the record. Missing,
+stale or malformed signals fail open for tool calls and appear in
+`hq pause status` as `absent` (never seen fresh on the host), `vanished`
+(missing after a fresh sighting), `unreadable`, `stale` or `fresh`; `vanished`,
+`unreadable` and `stale` send one desktop alert per outage via the host latch
+(retrying failed alerts at most hourly until a fresh signal clears it). Stopping
+the producer (`systemctl --user stop obs-spend.timer`) is the immediate off
+switch — the file turns stale within `stale_after_ms`, alerting once and pausing
+nothing — whereas reverting code is unsupported once `spend` fields or history
+reasons have been written, so defects are fixed forward.
 
 ## Public history query envelope
 
@@ -80,7 +113,11 @@ at, kind, reason, snapshot, notification and source. Version is 1; source is hoo
 turn and sequence are positive integers; time is finite nonnegative epoch seconds.
 Identity strings are nonempty and bounded. Accepted transitions are turn_start,
 warning, enforced_pause, notification, turn_reset, turn_resume and session_end;
-each permits only its declared reasons, not arbitrary event text.
+each permits only its declared reasons, not arbitrary event text. `enforced_pause`
+(and snapshot `paused` when non-null) permits `active`, `calls`, `spawns`,
+`compactions`, `limits-changed` and `spend`; `warning` permits `active`, `calls`,
+`spawns`, `compactions` and `spend`, where `spend` is used only for prompt
+injections of an idle episode on the receiving turn.
 
 A snapshot is null or has active/calls/spawns/compactions `{used,limit}` pairs,
 limits_sha, paused, counted and scopes. Counted metrics have finite nonnegative
@@ -103,16 +140,32 @@ built only from observed transitions; it fabricates no turn for an unobserved ro
 State lives below XDG_STATE_HOME/hq/pause, or the home .local/state fallback,
 with private directory/file permissions and locked atomic writes. Version 1 roots
 hold version, harness, root, generation, created_at, turn_serial, event_serial,
-state, ended_at, events, dropped_count, dropped_through and prompt_guards.
-Generation distinguishes root-store lifetimes; serials order turns/events;
-dropped metadata records truncation instead of pretending full retention.
+state, ended_at, events, dropped_count, dropped_through, prompt_guards and
+optional `spend` (`{episode, seen_value, delivered_value, acked_value}`). `spend`
+is serialized immediately before `prompt_guards` and omitted when null, keeping
+version 1 compatible with pre-spend records and preserving the
+`prompt_guards`-immediately-before-`events` splice marker that `_LazyEvents` uses
+to avoid parsing historical events on hot calls. Generation distinguishes
+root-store lifetimes; serials order turns/events; dropped metadata records
+truncation instead of pretending full retention. Beside the root records, the
+dot-prefixed `.spend-host.json` (locked via `.spend-host.lock`) holds host-level
+`seen_fresh` and the active `outage` latch (`{state, alerted_at, outcome, error}`
+or null); root listing, pruning and `history`/`list` skip dot-prefixed entries.
 
 Active state contains harness/root, current turn, paused reason, grace usage,
-worker IDs/names, scheduled cron/wakeup state, harness pid/cwd, notification status
-and budget note. A turn records started/last time, limits/digest, active/call/spawn/
-compaction usage, in-flight calls/tools, spawn keys and warned metrics. These
-private implementation records are validated by tools/turn_pause/state.py; public
-history omits cwd and private schedule material.
+worker IDs/names, scheduled cron/wakeup state, harness pid/cwd, notification
+status, budget note, and optional `spend_cache` (cached signal plus
+`(st_mtime_ns, st_size, st_ino)` identity) and `spend_snapshot` (the paused
+turn's spend entry snapshot, cleared when the next turn starts), both omitted
+when null. A turn records started/last time, limits/digest, active/call/spawn/
+compaction usage, in-flight calls/tools, spawn keys and warned metrics. Alongside
+the pause state directory, turn limits, capabilities snapshot and hook wiring,
+the four `obs` spend files under `XDG_STATE_HOME/obs` (or the home
+`.local/state/obs` fallback) — `spend-signals.json`, `spend-baseline.json`,
+`spend-state.json` and `spend.lock` — are protected paths. These private
+implementation records are validated by tools/turn_pause/state.py; public
+history omits cwd, private schedule material, `spend`, `spend_cache`,
+`spend_snapshot` and `.spend-host.json`.
 
 prompt_guards has cron digests and wake rows `[digest,not_before,not_after]`.
 Digests are SHA-256 fingerprints of stripped prompt text, not anonymization.
