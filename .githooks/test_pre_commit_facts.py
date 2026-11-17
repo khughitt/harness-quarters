@@ -28,10 +28,24 @@ def load_hook():
 
 
 CLEAN_FILTER = ".githooks/harness-state-clean %f"
+
+
+def _load_tool_tests():
+    path = CHECKOUT / "tools" / "test_codex_instructions.py"
+    loader = importlib.machinery.SourceFileLoader("test_codex_instructions", str(path))
+    module = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+    loader.exec_module(module)
+    return module
+
+
+# The default-mode hook checks the staged Codex config against lore's rule; the fixture gives
+# it a fixture lore through a fake `tasks` registry and a config carrying that rule.
+TOOL_TESTS = _load_tool_tests()
 # Clean tracked configs: what the filter stages from them is their own bytes.
 TRACKED = {
     "harnesses/claude/settings.json": json.dumps({"theme": "dark-ansi"}, indent=2) + "\n",
-    "harnesses/codex/config.toml": "[features]\nhooks = true\n",
+    "harnesses/codex/config.toml": (TOOL_TESTS.tool.value_line(TOOL_TESTS.RENDERED)
+                                    + "[features]\nhooks = true\n"),
     "harnesses/pi/settings.json": json.dumps({"theme": "system"}, indent=2) + "\n",
     "harnesses/agy/settings.json": json.dumps({"allowNonWorkspaceAccess": True}, indent=2) + "\n",
 }
@@ -49,7 +63,14 @@ def repo(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir()
     (tmp_path / "gitconfig").touch()
-    env = {"PATH": os.environ["PATH"], "HOME": str(home), "XDG_CONFIG_HOME": str(tmp_path / "config"),
+    lore = TOOL_TESTS.make_lore(tmp_path / "lore", TOOL_TESTS.RULE_TEXT)
+    registry = tmp_path / "registry-bin"
+    registry.mkdir()
+    (registry / "tasks").write_text("#!/bin/sh\nprintf '%s\\n' "
+                                    + repr(json.dumps({"projects": [{"prefix": "lore", "root": str(lore)}]}))
+                                    + "\n")
+    (registry / "tasks").chmod(0o755)
+    env = {"PATH": f"{registry}:{os.environ['PATH']}", "HOME": str(home), "XDG_CONFIG_HOME": str(tmp_path / "config"),
            "GIT_CONFIG_GLOBAL": str(tmp_path / "gitconfig"), "GIT_CONFIG_NOSYSTEM": "1",
            "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid",
            "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid",
@@ -76,7 +97,8 @@ def repo(tmp_path, monkeypatch):
     facts = tomllib.loads((CHECKOUT / "facts" / "capabilities.toml").read_text())["facts"]
     probes = {fact["probe"] for fact in facts.values() if "probe" in fact}
     for name in ("tools/harness-facts", "facts/capabilities.toml", "harnesses.toml", ".gitattributes",
-                 ".githooks/harness_state.py", ".githooks/harness-state-clean", *sorted(probes)):
+                 ".githooks/harness_state.py", ".githooks/harness-state-clean",
+                 "tools/codex-instructions", *sorted(probes)):
         (root / name).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(CHECKOUT / name, root / name)
     for name, text in TRACKED.items():
@@ -174,12 +196,13 @@ def test_ci_mode_refuses_deleted_or_renamed_reader(repo, monkeypatch, capsys, re
     assert reader + " is not staged" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("mode,expected", [([], ["local", "hygiene", "docs", "staged"]),
+@pytest.mark.parametrize("mode,expected", [([], ["local", "hygiene", "docs", "local_staged"]),
                                           (["--ci"], ["local", "docs", "staged"])])
 def test_mode_order_and_short_circuit(monkeypatch, mode, expected):
     hook, seen = load_hook(), []
     for label, name in (("local", "local_layer"), ("hygiene", "hygiene_check"),
-                        ("docs", "docs_check"), ("staged", "staged_checks")):
+                        ("docs", "docs_check"), ("staged", "staged_checks"),
+                        ("local_staged", "local_staged_checks")):
         monkeypatch.setattr(hook, name, lambda label=label: seen.append(label) or 0)
     assert hook.main(mode) == 0
     assert seen == expected
@@ -252,7 +275,8 @@ def test_facts_check_and_real_commits_follow_the_committed_index(repo, tmp_path,
     # git commit <path> builds a temporary index from HEAD + <path> while .git/index holds bad facts.
     stage(repo, bad)
     (repo / "facts" / "capabilities.toml").write_text(good)
-    (repo / "harnesses" / "codex" / "config.toml").write_text("[features]\nhooks = false\n")
+    (repo / "harnesses" / "codex" / "config.toml").write_text(
+        TOOL_TESTS.tool.value_line(TOOL_TESTS.RENDERED) + "[features]\nhooks = false\n")
     partial = subprocess.run(["git", "commit", "harnesses/codex/config.toml", "-m", "partial commit"],
                              text=True, capture_output=True)
     assert partial.returncode == 0, partial.stderr
@@ -503,7 +527,8 @@ def test_clean_no_ff_merges_are_checked_by_pre_merge_commit(repo):
 
     # Branch 3 makes a valid change that passes pre-commit.
     git("checkout", "-q", "-b", "valid-change")
-    (repo / "harnesses" / "codex" / "config.toml").write_text("[features]\nhooks = false\n")
+    (repo / "harnesses" / "codex" / "config.toml").write_text(
+        TOOL_TESTS.tool.value_line(TOOL_TESTS.RENDERED) + "[features]\nhooks = false\n")
     git("add", "harnesses/codex/config.toml")
     git("commit", "-q", "-m", "valid change")
     git("checkout", "-q", base_branch)

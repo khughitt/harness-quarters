@@ -583,3 +583,26 @@ def test_an_ineligible_planner_step_closes_the_earlier_calls(store):
     events_ = extracted(store, [first, generic, second, late])
     assert events_[1]["results"][0]["call_id"] == f"{H}:1:0"
     assert events_[3]["results"] == []  # the ineligible planner's calls are unknown; nothing is paired
+
+
+def test_user_channel_origin_classification_is_published_and_unknown_kinds_stay_unclassified(store):
+    from harness_evidence import capabilities, index_agy
+    declaration = json.loads(capabilities.ARTIFACT.read_text())["harnesses"]["agy"]["index"]["origin_kinds"]
+    assert declaration == {"USER_EXPLICIT": {"class": "user_typed", "basis": "native"}}
+    assert declaration == index_agy.ORIGIN_KINDS
+    # The adapter passes arbitrary native source strings through. Every other value is
+    # deliberately unclassified, including values introduced by a future writer.
+    path = transcript(store, H)
+    base = json.loads(path.read_text().splitlines()[0])
+    for source in ("USER_EXPLICIT", "SYSTEM", "USER_DERIVED", "future-origin", None):
+        value = dict(base, source=source)
+        path.write_text(json.dumps(value) + "\n")
+        [only] = events(decode(store, H))
+        kind = only["message"]["origin"]["native_kind"]
+        assert kind == str(source)
+        classified = declaration.get(kind)
+        if source == "USER_EXPLICIT":
+            assert classified == {"class": "user_typed", "basis": "native"}
+        else:
+            assert classified is None  # Deliberate unclassified default, never user_typed.
+    assert "origin_kinds" not in json.loads(capabilities.ARTIFACT.read_text())["harnesses"]["claude-code"]["index"]

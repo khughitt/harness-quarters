@@ -1,0 +1,243 @@
+#!/usr/bin/env python3
+"""Carry lore's long-wait rule in Codex's developer_instructions, generated, never hand-copied.
+
+Source: lore rule:369c00284c7e47028337d6e8c06e41e7 (the Processes bullet "Never end a turn
+waiting…"), sliced from lore's assembled instructions/AGENTS.md at the offset its
+instructions/AGENTS.manifest.json records. The artifact and the rule must both match their
+manifest hashes; any mismatch, or a missing rule, is an error with no fallback. lore's
+checkout comes from the tasks registry (`tasks projects --paths --json`) unless --lore names one.
+
+Text form: the rule's bytes with the leading `- ` and the two-space continuation indent
+removed, the form lore-756d5f's probe injected. TOML form: one line,
+`developer_instructions = "<JSON-escaped text>"`, because the clean filter and live-picks
+read the config line by line. A write replaces only that top-level line and re-parses the
+file to confirm the value and every other key.
+
+Commands: render; write CONFIG...; check CONFIG...; check-live [--home DIR], which checks the
+configs behind <home>/.codex and <home>/.codex-work where each home exists; write-live
+[--home DIR], which writes the work home's config from the main checkout only (the tracked
+personal config goes live only by merging). Exit 0 means current, 1 drift, 2 an error.
+
+Every change to a live value changes every Codex session's instructions: it needs the
+user's approval at that moment (docs/home-links.md).
+"""
+import argparse
+import difflib
+import hashlib
+import json
+import subprocess
+import sys
+import tomllib
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / ".githooks"))
+import harness_state  # noqa: E402
+
+RULE = "rule:369c00284c7e47028337d6e8c06e41e7"
+MANIFEST = Path("instructions") / "AGENTS.manifest.json"
+KEY = "developer_instructions"
+HOMES = (".codex", ".codex-work")
+WORK_HOME = ".codex-work"
+
+
+class SourceError(Exception):
+    """lore's artifact cannot give the rule: unreadable, mismatched or malformed."""
+
+
+class ConfigError(Exception):
+    """The config has no single top-level one-line developer_instructions to replace."""
+
+
+def lore_root_from_registry() -> Path:
+    try:
+        done = subprocess.run(["tasks", "projects", "--paths", "--json"], text=True,
+                              capture_output=True)
+    except OSError as error:
+        raise SourceError(f"cannot run `tasks projects --paths`: {error}") from None
+    if done.returncode:
+        raise SourceError(f"`tasks projects --paths` failed: {done.stderr.strip()}")
+    try:
+        projects = {p["prefix"]: p["root"] for p in json.loads(done.stdout)["projects"]}
+    except (ValueError, KeyError, TypeError) as error:
+        raise SourceError(f"cannot read `tasks projects --paths` output: {error}") from None
+    if "lore" not in projects:
+        raise SourceError("lore is not registered in the tasks registry")
+    return Path(projects["lore"]).expanduser()
+
+
+def _sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def render(lore: Path) -> str:
+    try:
+        manifest = json.loads((lore / MANIFEST).read_text(encoding="utf-8"))
+        artifact = (lore / manifest["artifact"]["path"]).read_bytes()
+        artifact_sha = manifest["artifact"]["sha256"]
+        rules = [rule for fragment in manifest["fragments"] for rule in fragment["rules"]
+                 if rule["id"] == RULE]
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise SourceError(f"cannot read lore's manifest under {lore}: {error}") from None
+    if _sha(artifact) != artifact_sha:
+        raise SourceError("lore's AGENTS.md does not match its manifest; lore must reassemble "
+                          "its instructions first")
+    if len(rules) != 1:
+        raise SourceError(f"lore's manifest holds {len(rules)} entries for {RULE}, expected one")
+    rule = rules[0]
+    data = artifact[rule["offset"]:rule["offset"] + rule["length"]]
+    if _sha(data) != rule["sha256"]:
+        raise SourceError(f"{RULE}'s bytes in lore's AGENTS.md do not match the manifest hash")
+    lines = data.decode("utf-8").split("\n")
+    if not lines[0].startswith("- "):
+        raise SourceError(f"{RULE} does not start with a `- ` bullet marker")
+    out = [lines[0][2:]]
+    for number, line in enumerate(lines[1:], 2):
+        if line and not line.startswith("  "):
+            raise SourceError(f"{RULE} line {number} lacks the two-space continuation indent")
+        out.append(line[2:])
+    return "\n".join(out)
+
+
+def value_line(text: str) -> str:
+    # ensure_ascii=False keeps characters beyond the BMP literal: JSON would escape them as
+    # surrogate pairs, which TOML rejects. Control characters still become \n or \uXXXX.
+    return f"{KEY} = {json.dumps(text, ensure_ascii=False)}\n"
+
+
+def read_value(config_text: str) -> str | None:
+    value = tomllib.loads(config_text).get(KEY)
+    if value is not None and not isinstance(value, str):
+        raise ConfigError(f"{KEY} is not a string")
+    return value
+
+
+def _key_line(lines: list[str]) -> int:
+    """The index of the single top-level developer_instructions line."""
+    found = []
+    for index, line in enumerate(lines):
+        if harness_state.TOML_HEADER.match(line):
+            break
+        key = harness_state.TOML_KEY.match(line)
+        if key and key.group(1).strip('"') == KEY:
+            found.append(index)
+    if not found:
+        raise ConfigError(f"no top-level {KEY} line to replace; add a top-level "
+                          f'`{KEY} = ""` line before the first table, then rerun')
+    if len(found) > 1:
+        raise ConfigError(f"expected one top-level {KEY} line, found {len(found)}")
+    return found[0]
+
+
+def replace_value(config_text: str, text: str) -> str:
+    try:
+        before = tomllib.loads(config_text)
+    except tomllib.TOMLDecodeError as error:
+        raise ConfigError(f"not valid TOML: {error}") from None
+    lines = config_text.splitlines(keepends=True)
+    index = _key_line(lines)
+    try:
+        tomllib.loads(lines[index])
+    except tomllib.TOMLDecodeError:
+        raise ConfigError(f"{KEY} must be one line to be replaced; rewrite it as "
+                          f'`{KEY} = ""` first') from None
+    lines[index] = value_line(text)
+    result = "".join(lines)
+    after = tomllib.loads(result)
+    if after.get(KEY) != text:
+        raise ConfigError(f"the written {KEY} does not read back as the rendered rule")
+    before.pop(KEY, None)
+    after.pop(KEY)
+    if after != before:
+        raise ConfigError(f"replacing {KEY} changed other keys")
+    return result
+
+
+def write_config(path: Path, text: str) -> tuple[str | None, str]:
+    target = path.resolve()
+    with harness_state.Checkout("codex-instructions").locked():
+        current = target.read_text(encoding="utf-8")
+        result = replace_value(current, text)
+        old = read_value(current)
+        harness_state.write(target, result)
+    return old, text
+
+
+def _drift(path: Path) -> str:
+    return (f"{path}: {KEY} differs from lore {RULE} (refreshing changes every Codex session's "
+            "developer instructions: ask the user to approve, then run `just codex-instructions` "
+            "for the tracked config and merge it to main, or `tools/codex-instructions write-live` "
+            "from main for the work config)")
+
+
+def _check(paths: list[Path], text: str) -> int:
+    status = 0
+    for path in paths:
+        try:
+            value = read_value(path.read_text(encoding="utf-8"))
+        except OSError as error:
+            raise ConfigError(f"cannot read {path}: {error.strerror or error}") from None
+        except UnicodeDecodeError as error:
+            raise ConfigError(f"{path} is not valid UTF-8: {error}") from None
+        except tomllib.TOMLDecodeError as error:
+            raise ConfigError(f"{path} is not valid TOML: {error}") from None
+        if value != text:
+            print(f"codex-instructions: {_drift(path)}", file=sys.stderr)
+            status = 1
+    return status
+
+
+def _write(paths: list[Path], text: str) -> int:
+    for path in paths:
+        old, new = write_config(path, text)
+        if old == new:
+            print(f"{path}: unchanged")
+            continue
+        sys.stdout.writelines(difflib.unified_diff(
+            (old or "").splitlines(keepends=True), new.splitlines(keepends=True),
+            f"{path} ({KEY}, before)", f"{path} ({KEY}, after)"))
+    return 0
+
+
+def _live_configs(home: Path, names=HOMES) -> list[Path]:
+    return [home / name / "config.toml" for name in names if (home / name).is_dir()]
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(prog="codex-instructions", description=__doc__.split("\n")[0])
+    parser.add_argument("--lore", type=Path, help="lore checkout (default: the tasks registry's)")
+    commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("render")
+    for name in ("write", "check"):
+        commands.add_parser(name).add_argument("configs", nargs="+", type=Path)
+    for name in ("check-live", "write-live"):
+        commands.add_parser(name).add_argument("--home", type=Path, default=Path.home())
+    args = parser.parse_args(argv)
+    try:
+        if args.command == "write-live" and harness_state.Checkout("codex-instructions").linked_worktree():
+            sys.exit("codex-instructions: write-live runs from the main checkout only, "
+                     "where the work home's link resolves")
+        text = render(args.lore if args.lore is not None else lore_root_from_registry())
+        if args.command == "render":
+            sys.stdout.write(text)
+            return 0
+        if args.command == "write":
+            return _write(args.configs, text)
+        if args.command == "check":
+            return _check(args.configs, text)
+        if args.command == "check-live":
+            return _check(_live_configs(args.home), text)
+        configs = _live_configs(args.home, (WORK_HOME,))
+        if not configs:
+            print("no work home")
+            return 0
+        return _write(configs, text)
+    except (SourceError, ConfigError) as error:
+        print(f"codex-instructions: {error}", file=sys.stderr)
+        return 2
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
+        print(f"codex-instructions: {error}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

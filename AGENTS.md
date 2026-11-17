@@ -38,26 +38,27 @@ on uncovered pushes when local policy skips tests; the declaration is not remote
 `just ci-hygiene` runs the portable subset without registry-dependent ops-check.
 See [test execution](docs/test-execution.md) for report retention and coverage checks.
 The pre-commit hook (and `.githooks/pre-merge-commit`, which delegates to it on clean
-non-fast-forward merges) refuses staged paths under
-`local/`, then runs `tools/ops-check` over the working tree (the hygiene checks ops
-projects share: guide references, conflicted copies, agent scratch, machine layout and
-adopted copies), then checks the guide identity regions with `tools/ops-docs check`, and
-last exports the staged tree once for the staged `tools/harness-facts check` and the
-staged `.githooks/harness_state.py check --staged-tree`. The latter validates
-`harnesses.toml` and `.gitattributes` as staged, refuses a staged harness config blob that
-still holds what the filter strips (fix with `git add --renormalize <path>`), and refuses
-when the repository's filter config is not what `just setup` writes (`clean`,
-`required = true`, `smudge = cat`; read from the shared config in a linked worktree too). A record commit
-that the hygiene checks refuse means a finding somewhere in the working tree, not in the
-task record (for an attach commit, its own attached file in the records directory can be
-the finding). A new attachment that carries host values follows the attachment fallback in
-lore `skills/references/retained-item-records.md`: keep the raw bytes under WORK_ROOT
-and attach a portable derivative. Never widen `.ops-check.toml` for an attachment.
-`just docs` regenerates the identity and family regions.
+non-fast-forward merges) refuses staged paths under `local/`, then runs `tools/ops-check`
+over the working tree (the hygiene checks ops projects share: guide references, conflicted
+copies, agent scratch, machine layout and adopted copies), then checks the guide identity
+regions with `tools/ops-docs check`, and last exports the staged tree once for the staged
+`tools/harness-facts check` and the staged
+`.githooks/harness_state.py check --staged-tree`. The latter validates `harnesses.toml`
+and `.gitattributes` as staged, refuses a staged harness config blob that still holds what
+the filter strips (fix with `git add --renormalize <path>`), and refuses when the
+repository's filter config is not what `just setup` writes (`clean`, `required = true`,
+`smudge = cat`; read from the shared config in a linked worktree too). The default mode
+also runs the staged Codex developer-instructions check (docs/home-links.md). A record
+commit that the hygiene checks refuse means a finding somewhere in the working tree, not
+in the task record (for an attach commit, its own attached file in the records directory
+can be the finding). A new attachment that carries host values follows the attachment
+fallback in lore `skills/references/retained-item-records.md`: keep the raw bytes under
+WORK_ROOT and attach a portable derivative. Never widen `.ops-check.toml` for an
+attachment. `just docs` regenerates the identity and family regions.
 
 The hook's explicit `--ci` mode retains staged-local-state refusal, docs validation
-and both staged checks over one export, omitting only ops-check. Full local checks
-remain mandatory in the default hook, `check-hygiene` and both pre-push routes.
+and both staged checks over one export, omitting ops-check and the Codex check. Full local
+checks remain mandatory in the default hook, `check-hygiene` and both pre-push routes.
 
 From main, `just link` previews home changes and `just link-check` checks convergence.
 `just mods` validates and tests the Claude Code mods when the Claude CLI is available.

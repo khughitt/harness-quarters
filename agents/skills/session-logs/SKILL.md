@@ -5,11 +5,68 @@ description: Use when you need to read a coding agent's local session store — 
 
 # session-logs
 
-Where each harness keeps its sessions, what the records look like, and how to
-turn them into evidence without pasting transcripts anywhere. The tool is
-`~/.agents/bin/session-episodes` (`agents/bin/session-episodes` when standing
-in `hq`); nothing puts it on PATH. Its contract is
-`docs/sessions.md` in the `hq` checkout.
+Use obs's `bin/session-logs` reader first to find sessions and read what happened.
+The store layouts and record shapes below explain the evidence when a targeted
+raw read is needed. Keep transcript text local.
+
+## Find and read sessions
+
+Resolve the reader's checkout with `tasks resolve obs --json`. Require one
+`resolved` result and set `OBS_ROOT` to its `root`; stop on a resolution error or
+a missing `bin/session-logs`. Invoke `"$OBS_ROOT/bin/session-logs"` by explicit
+path: it need not be on PATH. Its current contract is `docs/operations.md`,
+“Session investigation and diagnosis”, in that obs checkout.
+
+Start with task-based search, or go straight to a known session's skeleton:
+
+```sh
+"$OBS_ROOT/bin/session-logs" search --task demo-000001 --pretty
+"$OBS_ROOT/bin/session-logs" show SESSION_ID --skeleton --pretty
+```
+
+The skeleton gives each turn's span, call count and token totals, then one line
+per human or dispatch input, assistant text and tool call. Calls show wall time
+and exit status; reasoning and injected context are omitted. Add `--injected`
+to see injected context. Token totals use indexed responses timed inside the
+turn; they are partial while the index lags and unavailable without it. Codex
+call exits depend on the index. Unknown, missing and partial values are not
+evidence of success; the reader never indexes or modifies a store.
+
+Follow a returned session or record ref to the relevant evidence:
+
+```sh
+"$OBS_ROOT/bin/session-logs" show SESSION_ID --turn --pretty
+"$OBS_ROOT/bin/session-logs" show SESSION_ID --lines 120-180
+"$OBS_ROOT/bin/session-logs" show 'HOME:PATH#L120#0' --text-bytes 8000
+```
+
+Use actual refs from the output, quoting refs containing `#`. Pretty output is
+an overview with clipped text; omit `--pretty` for JSON evidence and increase
+`--text-bytes` when its text is truncated. `--raw` exposes the source record.
+`--expect-sha256 HASH` on a record ref detects a hash mismatch but still emits
+the current records and exits 0: check coverage for `outcome: unknown` with
+`outcome_basis: line_changed` before treating evidence as unchanged.
+A record ref opens its enclosing turn; for just one physical line, use the
+session or file target with `--lines 120-120`.
+
+Unscoped store searches default to the last 30 days; use `--all-time` for older
+work. Searches scoped by `--task`, `--session` or `--file` have no default
+time cutoff; explicit `--since` and `--until` still apply. Use
+`--role human|tool_call|tool_output` to narrow a search, `--cwd PATH` for a
+worktree, or a commit hash as the search pattern. `--task` selects sessions
+with task activity; `--mentions` also includes mere mentions. Search covers
+Claude Code and Codex stores, including configured archived homes; the other
+harness layouts below do not imply reader support. Inspect the coverage
+footer or JSON coverage object for missing/unreadable files and a hit limit.
+`--limit` counts turns in the default session and skeleton views, and records
+with `--turn`, `--lines` or a record ref; narrow the request or use `--no-limit`
+when the limit hides evidence.
+No match with incomplete coverage does not establish absence.
+
+For an already prepared episode dataset, use `session-episodes show` as
+described below. `~/.agents/bin/session-episodes` (`agents/bin/session-episodes`
+in hq) prepares episodes, rather than serving as the general session reader;
+its contract is `docs/sessions.md` in hq.
 
 ## Stores
 
@@ -103,27 +160,14 @@ subagent's.
 
 ## Finding the session behind a thing
 
-- **A task id.** Since 2026-09-17 lifecycle notes carry
+- **A task id.** First use `session-logs search --task ID` as above. Since
+  2026-09-17 lifecycle notes carry
   `provenance: {"harness_session": "claude-code:<uuid>" | "codex:<uuid>" | "agy:<conversation-id>", …}`;
   `tasks show <id>` prints them; an agy id names the `brain/<conversation-id>`
-  directory. Before that, search *tool-call inputs* for
-  `tasks start <id>` — never the raw text, which also matches the tasks
-  skill's own instructions and Codex's AGENTS.md injection (a text grep hits
-  ~1,400 Codex files; tool calls are the real ones):
-
-      python3 - <<'EOF'
-      import json, glob, os
-      for f in glob.glob(os.path.expanduser("~/.claude/projects/*/*.jsonl")):
-          for n, line in enumerate(open(f, errors="replace"), 1):
-              if '"tool_use"' not in line or "tasks start ai-6c8245" not in line: continue
-              r = json.loads(line)
-              for b in (r.get("message") or {}).get("content") or []:
-                  if isinstance(b, dict) and b.get("type") == "tool_use" and "tasks start ai-6c8245" in str((b.get("input") or {}).get("command", "")):
-                      print(f"{f}#L{n}", r.get("sessionId"))
-      EOF
-
-  For Codex, filter `response_item` lines whose payload type is
-  `function_call`/`custom_tool_call` and search their `arguments`/`input`.
+  directory. With no stamp, search tool-call inputs, for example
+  `session-logs search 'tasks start demo-000001' --role tool_call --all-time`.
+  Raw text searches also match injected instructions; inspect the returned
+  call and result before treating a mention as task activity.
   For agy, read the `PLANNER_RESPONSE` steps and search
   `tool_calls[].args.CommandLine` of the `run_command` calls; the conversation id
   is the directory under `~/.gemini/antigravity-cli/brain/`.
@@ -137,18 +181,13 @@ subagent's.
 ## Reading a turn
 
 A turn is one human record through the assistant's last record before the
-next human record. Print one Claude turn's texts by line range:
+next human record. Use the reader's skeleton first, then `show --turn` or
+`show --lines` to inspect the relevant request, action, result and correction.
+The commands and evidence limits are in “Find and read sessions” above.
 
-    sed -n '120,180p' ~/.claude/projects/<slug>/<uuid>.jsonl | python3 -c '
-    import json,sys
-    for l in sys.stdin:
-        r=json.loads(l); c=(r.get("message") or {}).get("content")
-        t=c if isinstance(c,str) else " ".join(b.get("text","") for b in c if isinstance(b,dict) and b.get("type")=="text") if isinstance(c,list) else ""
-        if t.strip(): print(r["type"], r["timestamp"], t[:200])'
-
-`session-episodes show <id> --episodes <file>` prints a known episode's anchor,
-result, last assistant text and next human turn with their refs; prefer it
-over hand-reading when an id exists.
+For a prepared episode, `~/.agents/bin/session-episodes show <id> --episodes
+<file>` prints its anchor, result, last assistant text and next human turn
+with their refs.
 
 ## Preparing pre-flow episodes
 

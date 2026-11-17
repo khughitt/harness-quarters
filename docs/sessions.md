@@ -331,6 +331,13 @@ The capability artifact publishes native field provenance and coverage declarati
 
 ### agy index events
 
+The index capability `harnesses.agy.index.origin_kinds` classifies native user-channel
+origins: `USER_EXPLICIT` maps to `{class: "user_typed", basis: "native"}`. All other
+origin strings, including new values from a future writer, are deliberately unclassified.
+Consumers must not infer human authorship from the user channel alone. Claude omits
+`origin_kinds` and retains its existing marker policy. This declaration does not change
+index events or their original source values.
+
 agy emits one `index_event` per transcript step, with the same object kinds, framing
 and `provenance_defaults` field set as Claude. Fields agy does not record are null and
 declare `native_paths: []` with rule `absent:<reason>` (`not_recorded`,
