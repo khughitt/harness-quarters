@@ -1553,7 +1553,8 @@ def test_entry_oversized_post_tool_use_still_closes_its_call(tmp_path):
     assert _entry_state(tmp_path).turn.in_flight == {}
 
 
-HEAVY = ('dataclasses', 'typing', 'tempfile', 'pathlib', 'hashlib', 'shlex', 'string', 'turn_pause.allowlist')
+HEAVY = ('dataclasses', 'typing', 'tempfile', 'pathlib', 'hashlib', 'shlex', 'string', 'json', 're',
+         'turn_pause.allowlist')
 
 
 def test_entry_hot_path_imports_none_of_the_heavy_modules(tmp_path):
