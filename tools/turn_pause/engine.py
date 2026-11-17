@@ -10,6 +10,15 @@ from . import counters
 from .counters import TurnState
 from .record import Frozen
 
+__all__ = (
+    'WAKE_BEFORE',
+    'WAKE_AFTER',
+    'Decision',
+    'feed',
+    'start_turn',
+    'prompt_kind',
+)
+
 # A ScheduleWakeup prompt is pending from a minute before its fire time to ten after.
 WAKE_BEFORE = 60
 WAKE_AFTER = 600
@@ -53,6 +62,7 @@ def start_turn(rs: RootState, t: float, limits: Limits, limits_sha: str, budget_
     rs.notified = False
     rs.notify_error = None
     rs.budget_note = budget_note
+    rs.spend_snapshot = None
 
 
 def prompt_kind(rs: RootState, harness: str, text: str, now: float, agent: str | None) -> str:

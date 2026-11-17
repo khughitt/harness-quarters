@@ -1805,3 +1805,765 @@ def test_entry_fail_closed_denials_retain_cause_and_attribute_owner_to_hq(tmp_pa
     assert denied(out)
     _assert_hq_owner(reason(out), expected)
     assert getattr(hook, 'OWNER_LINE', None) == OWNER_LINE
+
+
+# --- spend episodes and host latch ----------------------------------------------------
+
+def _spend_entry(
+    harness: str,
+    root_session: str,
+    *,
+    episode: str | None = None,
+    value: int | float = 500_000_000,
+    threshold: int | float = 350_000_000.0,
+    ratio: int | float = 1.43,
+    window_hours: int = 72,
+    now_s: float = T0,
+    measured_at: int | None = None,
+    complete: bool = True,
+    root_resolved: bool = True,
+    credits_drawn_24h: int | float | None = 0.0,
+    root: str | None = None,
+    **overrides,
+) -> dict:
+    ts_ms = int(now_s * 1000) if measured_at is None else measured_at
+    entry = {
+        'root': f'{harness}:{root_session}' if root is None else root,
+        'harness': harness,
+        'root_session': root_session,
+        'root_resolved': root_resolved,
+        'episode': f'{harness}:{root_session}@1793539000000' if episode is None else episode,
+        'metric': 'tokens',
+        'window_hours': window_hours,
+        'info_window_hours': 24,
+        'value': value,
+        'threshold': threshold,
+        'ratio': ratio,
+        'value_info': 100_000_000,
+        'first_crossed_at': ts_ms - 1000,
+        'measured_at': ts_ms,
+        'observed_at': ts_ms,
+        'complete': complete,
+        'children': 1,
+        'last_context_tokens': 50_000,
+        'responses_last_hour': 12,
+        'codex_home': '.codex' if harness == 'codex' else None,
+        'credits_drawn_24h': credits_drawn_24h,
+    }
+    entry.update(overrides)
+    return entry
+
+
+def _write_spend_signal(
+    env: dict[str, str],
+    trees: list[dict],
+    *,
+    now_s: float = T0,
+    generated_at: int | None = None,
+    stale_after_ms: int = 600_000,
+    status: str = 'ok',
+    schema: object = 1,
+) -> Path:
+    gen_ms = int(now_s * 1000) if generated_at is None else generated_at
+    obs_dir = Path(env['XDG_STATE_HOME']) / 'obs'
+    obs_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        'schema': schema,
+        'generated_at': gen_ms,
+        'status': status,
+        'stale_after_ms': stale_after_ms,
+        'baseline': {
+            'id': 'baseline-1',
+            'computed_at': gen_ms,
+            'harnesses': {
+                'claude-code': {'state': 'ok', 'threshold': 250_000_000.0, 'trees': 40},
+                'codex': {'state': 'ok', 'threshold': 350_000_000.0, 'trees': 40},
+            },
+        },
+        'credits': {},
+        'coverage': {
+            'files_seen': 10,
+            'files_unfinished': 0,
+            'files_starved': [],
+            'files_malformed': [],
+            'files_unparsed': [],
+            'trees_unfinished': [],
+        },
+        'trees': trees,
+    }
+    dest = obs_dir / 'spend-signals.json'
+    tmp = obs_dir / f'.spend-signals.json.{os.urandom(6).hex()}.tmp'
+    tmp.write_text(json.dumps(payload), encoding='utf-8')
+    os.replace(tmp, dest)
+    return dest
+
+
+@pytest.fixture
+def desktop_alerts(monkeypatch):
+    sent = []
+    monkeypatch.setattr(
+        hook.notify,
+        'desktop',
+        lambda title, body, *, env: sent.append((title, body, dict(env))) or None,
+    )
+    return sent
+
+
+class TestSpendHook:
+    def test_spend_measurement_and_texts_contract(self):
+        from turn_pause.spend import Entry
+
+        base = dict(
+            episode='ep-1',
+            value=750_000_000,
+            threshold=350_000_000.0,
+            ratio=2.1428,
+            window_hours=72,
+            measured_at=int(T0 * 1000),
+            complete=True,
+        )
+        e_none = Entry(**base, credits_drawn_24h=None)
+        e_zero = Entry(**base, credits_drawn_24h=0.0)
+        e_pos = Entry(**base, credits_drawn_24h=12.5)
+        assert hook.SPEND == 'spend'
+        assert hook.spend_measurement(e_none, 'claude-code') == (
+            'obs measured 750.0M tokens in 72 h against a threshold of 350.0M '
+            '(ratio 2.14; episode ep-1)'
+        )
+        assert hook.spend_measurement(e_zero, 'codex') == (
+            'obs measured 750.0M tokens in 72 h against a threshold of 350.0M '
+            '(ratio 2.14; episode ep-1)'
+        )
+        assert hook.spend_measurement(e_pos, 'codex') == (
+            'obs measured 750.0M tokens in 72 h against a threshold of 350.0M '
+            '(ratio 2.14; episode ep-1; credits drawn in 24 h: 12.5)'
+        )
+        root_text = hook.SPEND_ROOT_TEXT.format(measurement=hook.spend_measurement(e_pos, 'codex'))
+        assert root_text.startswith(
+            "turn paused: spend. This agent tree's token spend is far outside its harness's "
+            'normal range: obs measured 750.0M tokens in 72 h against a threshold of 350.0M '
+            '(ratio 2.14; episode ep-1; credits drawn in 24 h: 12.5). Start nothing new and stop'
+        )
+        assert '..' not in root_text
+        assert 'do not claim it is paused. Then record the signal (value, threshold, episode)' in root_text
+        assert root_text.endswith(
+            'Only bookkeeping, plain reads and stopping your own work are allowed now; '
+            'hq pause status shows the signal.'
+        )
+        inject_text = hook.SPEND_INJECT_TEXT.format(measurement=hook.spend_measurement(e_zero, 'codex'))
+        assert inject_text == (
+            "turn-pause: spend signal. This agent tree's token spend went far outside its "
+            "harness's normal range while it was idle: obs measured 750.0M tokens in 72 h "
+            'against a threshold of 350.0M (ratio 2.14; episode ep-1). Report the signal to the '
+            "user first, then investigate its cause in this turn (obs's growth report on the "
+            "tree, the polling pattern behind it) and record it on the task, before any of the "
+            "original task's work resumes. Do not park or end the turn for this. The original "
+            'work resumes only with a fix or a mitigation that removes the cause, or on the '
+            "user's explicit instruction."
+        )
+
+    @pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+    @pytest.mark.parametrize('credits,status', [(0.0, 'ok'), (None, 'partial'), (12.5, 'ok')])
+    def test_spend_pauses_root_call(self, tmp_path, notices, desktop_alerts, harness, credits, status):
+        d = Driver(tmp_path, harness)
+        d.prompt('work')
+        _write_spend_signal(
+            d.env,
+            [_spend_entry(harness, d.root, episode='ep-root', value=500_000_000,
+                          threshold=350_000_000.0, ratio=1.43, credits_drawn_24h=credits,
+                          now_s=d.t)],
+            now_s=d.t,
+            status=status,
+        )
+        out = d.bash('ls')
+        assert denied(out)
+        text = reason(out)
+        assert text.startswith('turn paused: spend.')
+        expected_credits = '; credits drawn in 24 h: 12.5' if credits == 12.5 else ''
+        expected_meas = (
+            'obs measured 500.0M tokens in 72 h against a threshold of 350.0M '
+            f'(ratio 1.43; episode ep-root{expected_credits})'
+        )
+        assert expected_meas in text
+        if credits in (None, 0.0):
+            assert 'credits drawn' not in text
+        _assert_hq_owner(text, 'hq pause status shows the signal.')
+        assert '..' not in text
+
+        record = d.store.read_record(harness, d.root)
+        pauses = [e for e in record.events if e['kind'] == 'enforced_pause']
+        assert len(pauses) == 1 and pauses[0]['reason'] == 'spend'
+        assert pauses[0]['snapshot']['paused'] == 'spend'
+        assert record.spend is not None
+        assert record.spend.delivered_value == 500_000_000
+        assert record.spend.acked_value is None
+
+        assert len(notices) == 1
+        title, body, _ = notices[0]
+        assert title == 'turn paused (spend)'
+        assert body == (
+            f'{harness} session {d.root} in {d.state().cwd}: {expected_meas}. '
+            'Reply in the session to resume.'
+        )
+        assert desktop_alerts == []
+
+    @pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+    def test_spend_child_call_pauses_without_delivery(self, tmp_path, notices, desktop_alerts, harness):
+        d = Driver(tmp_path, harness)
+        d.prompt('work')
+        _write_spend_signal(
+            d.env,
+            [_spend_entry(harness, d.root, episode='ep-child', value=500_000_000, now_s=d.t)],
+            now_s=d.t,
+        )
+        out = d.bash('touch x', agent='worker-1')
+        assert denied(out)
+        assert reason(out) == CHILD_TEXT.format(limit='spend') + f'\n{OWNER_LINE}'
+        assert d.state().paused == 'spend'
+        record = d.store.read_record(harness, d.root)
+        assert record.spend is not None
+        assert record.spend.episode == 'ep-child'
+        assert record.spend.seen_value == 500_000_000
+        assert record.spend.delivered_value is None
+        assert record.spend.acked_value is None
+        assert len(notices) == 1 and notices[0][0] == 'turn paused (spend)'
+
+    @pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+    def test_child_only_pause_injects_at_prompt(self, tmp_path, notices, desktop_alerts, harness):
+        d = Driver(tmp_path, harness)
+        d.prompt('work')
+        _write_spend_signal(
+            d.env,
+            [_spend_entry(harness, d.root, episode='ep-child', value=500_000_000, now_s=d.t)],
+            now_s=d.t,
+        )
+        assert denied(d.bash('touch x', agent='worker-1'))
+        assert d.store.read_record(harness, d.root).spend.delivered_value is None
+
+        out = d.prompt('what happened?')
+        ctx = context(out)
+        assert ctx is not None
+        assert ctx.startswith("turn-pause: spend signal. This agent tree's token spend went far outside")
+        assert 'obs measured 500.0M tokens in 72 h against a threshold of 350.0M (ratio 1.43; episode ep-child)' in ctx
+        record = d.store.read_record(harness, d.root)
+        assert record.spend.delivered_value == 500_000_000
+        assert record.spend.acked_value == 500_000_000
+        assert record.state.paused is None
+        assert record.state.spend_snapshot is None
+        warnings = [e for e in record.events if e['kind'] == 'warning']
+        assert len(warnings) == 1 and warnings[0]['reason'] == 'spend' and warnings[0]['turn'] == 2
+
+    @pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+    def test_later_root_refusal_delivers_from_snapshot(self, tmp_path, notices, desktop_alerts, harness):
+        d = Driver(tmp_path, harness)
+        d.prompt('work')
+        _write_spend_signal(
+            d.env,
+            [_spend_entry(harness, d.root, episode='ep-snap', value=500_000_000, now_s=d.t)],
+            now_s=d.t,
+        )
+        assert denied(d.bash('touch x', agent='worker-1'))
+        assert d.store.read_record(harness, d.root).spend.delivered_value is None
+
+        # Episode closes in obs before the root's next call.
+        _write_spend_signal(d.env, [], now_s=d.t + 1)
+        # Allowlisted bookkeeping does not deliver.
+        assert d.bash('tasks note hq-123456 paused') is None
+        assert d.store.read_record(harness, d.root).spend.delivered_value is None
+
+        out = d.bash('touch y')
+        assert denied(out)
+        text = reason(out)
+        assert text.startswith('turn paused: spend.')
+        assert '500.0M tokens in 72 h' in text
+        assert 'episode ep-snap' in text
+        assert 'This call:' in text
+        record = d.store.read_record(harness, d.root)
+        assert record.spend.delivered_value == 500_000_000
+        assert record.spend.acked_value is None
+        assert len(notices) == 1
+
+    @pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+    @pytest.mark.parametrize(
+        'case',
+        ['absent', 'unreadable', 'wrong_schema', 'bool_value', 'stale_file', 'stale_entry', 'root_resolved_false'],
+    )
+    def test_no_spend_pause_when(self, tmp_path, notices, desktop_alerts, harness, case):
+        from turn_pause import spend
+
+        d = Driver(tmp_path, harness)
+        d.prompt('work')
+        now_ms = int(d.t * 1000)
+        if case == 'unreadable':
+            obs_dir = Path(d.env['XDG_STATE_HOME']) / 'obs'
+            obs_dir.mkdir(parents=True, exist_ok=True)
+            (obs_dir / 'spend-signals.json').write_text('{not valid json')
+        elif case == 'wrong_schema':
+            _write_spend_signal(d.env, [_spend_entry(harness, d.root, now_s=d.t)], now_s=d.t, schema=2)
+        elif case == 'bool_value':
+            _write_spend_signal(
+                d.env,
+                [_spend_entry(harness, d.root, value=True, now_s=d.t)],
+                now_s=d.t,
+            )
+        elif case == 'stale_file':
+            _write_spend_signal(
+                d.env,
+                [_spend_entry(harness, d.root, measured_at=now_ms - 600_001)],
+                generated_at=now_ms - 600_001,
+                stale_after_ms=600_000,
+            )
+        elif case == 'stale_entry':
+            _write_spend_signal(
+                d.env,
+                [_spend_entry(harness, d.root, measured_at=now_ms - 600_001)],
+                generated_at=now_ms,
+                stale_after_ms=600_000,
+            )
+        elif case == 'root_resolved_false':
+            _write_spend_signal(
+                d.env,
+                [_spend_entry(harness, d.root, root_resolved=False, now_s=d.t)],
+                now_s=d.t,
+            )
+
+        assert d.bash('ls') is None
+        st = d.state()
+        assert st.paused is None
+        assert st.spend_cache is not None
+        expected_state = {
+            'absent': 'absent',
+            'unreadable': 'unreadable',
+            'wrong_schema': 'unreadable',
+            'bool_value': 'unreadable',
+            'stale_file': 'stale',
+            'stale_entry': 'fresh',
+            'root_resolved_false': 'fresh',
+        }[case]
+        assert spend.state_of(st.spend_cache, int(d.t * 1000), False) == expected_state
+        assert d.store.read_record(harness, d.root).spend is None
+        assert notices == []
+
+    @pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+    def test_counter_pause_not_switched(self, tmp_path, notices, desktop_alerts, harness):
+        d = Driver(tmp_path, harness)
+        write_limits(d.limits, calls=1)
+        d.prompt('work')
+        assert not denied(d.bash('ls'))
+        _write_spend_signal(
+            d.env,
+            [_spend_entry(harness, d.root, episode='ep-counter', value=500_000_000, now_s=d.t)],
+            now_s=d.t,
+        )
+        out = d.bash('ls')
+        assert denied(out)
+        assert d.state().paused == 'calls'
+        assert 'calls over its limit' in reason(out)
+        assert denied(d.bash('touch x'))
+        assert d.state().paused == 'calls'
+        assert d.store.read_record(harness, d.root).spend.delivered_value is None
+
+        prompt_out = d.prompt('continue')
+        assert 'turn-pause: spend signal.' in (context(prompt_out) or '')
+        assert 'episode ep-counter' in context(prompt_out)
+        rec = d.store.read_record(harness, d.root)
+        assert rec.spend.delivered_value == 500_000_000
+        assert rec.spend.acked_value == 500_000_000
+
+    @pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+    def test_ack_at_prompt_then_quiet(self, tmp_path, notices, desktop_alerts, harness):
+        d = Driver(tmp_path, harness)
+        d.prompt('work')
+        _write_spend_signal(
+            d.env,
+            [_spend_entry(harness, d.root, episode='ep-ack', value=500_000_000, now_s=d.t)],
+            now_s=d.t,
+        )
+        assert denied(d.bash('ls'))
+        assert d.store.read_record(harness, d.root).spend.acked_value is None
+
+        assert d.prompt('investigate') is None
+        rec = d.store.read_record(harness, d.root)
+        assert rec.spend.acked_value == 500_000_000
+
+        _write_spend_signal(
+            d.env,
+            [_spend_entry(harness, d.root, episode='ep-ack', value=999_000_000, now_s=d.t)],
+            now_s=d.t,
+        )
+        assert d.bash('ls') is None
+        assert d.state().paused is None
+
+        _write_spend_signal(
+            d.env,
+            [_spend_entry(harness, d.root, episode='ep-ack', value=1_000_000_000, now_s=d.t)],
+            now_s=d.t,
+        )
+        out = d.bash('ls')
+        assert denied(out)
+        assert d.state().paused == 'spend'
+        assert '1000.0M tokens' in reason(out)
+
+    @pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+    def test_root_repause_acked_not_injected(self, tmp_path, notices, desktop_alerts, harness):
+        d = Driver(tmp_path, harness)
+        d.prompt('work')
+        _write_spend_signal(
+            d.env,
+            [_spend_entry(harness, d.root, episode='ep-re', value=500_000_000, now_s=d.t)],
+            now_s=d.t,
+        )
+        assert denied(d.bash('ls'))
+        assert d.prompt('ack first') is None
+
+        _write_spend_signal(
+            d.env,
+            [_spend_entry(harness, d.root, episode='ep-re', value=1_000_000_000, now_s=d.t)],
+            now_s=d.t,
+        )
+        assert denied(d.bash('ls'))
+        rec = d.store.read_record(harness, d.root)
+        assert rec.spend.delivered_value == 1_000_000_000
+        assert rec.spend.acked_value is None
+
+        assert d.prompt('ack second') is None
+        rec = d.store.read_record(harness, d.root)
+        assert rec.spend.acked_value == 1_000_000_000
+
+    @pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+    def test_child_repause_injected(self, tmp_path, notices, desktop_alerts, harness):
+        d = Driver(tmp_path, harness)
+        d.prompt('work')
+        _write_spend_signal(
+            d.env,
+            [_spend_entry(harness, d.root, episode='ep-cre', value=500_000_000, now_s=d.t)],
+            now_s=d.t,
+        )
+        assert denied(d.bash('ls'))
+        assert d.prompt('ack first') is None
+
+        _write_spend_signal(
+            d.env,
+            [_spend_entry(harness, d.root, episode='ep-cre', value=1_000_000_000, now_s=d.t)],
+            now_s=d.t,
+        )
+        assert denied(d.bash('touch x', agent='worker-1'))
+        rec = d.store.read_record(harness, d.root)
+        assert rec.spend.delivered_value == 500_000_000
+        assert rec.spend.acked_value == 500_000_000
+
+        out = d.prompt('next turn')
+        assert 'turn-pause: spend signal.' in (context(out) or '')
+        assert '1000.0M tokens' in context(out)
+        rec = d.store.read_record(harness, d.root)
+        assert rec.spend.delivered_value == 1_000_000_000
+        assert rec.spend.acked_value == 1_000_000_000
+
+    @pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+    def test_replacement_episode_injected(self, tmp_path, notices, desktop_alerts, harness):
+        d = Driver(tmp_path, harness)
+        d.prompt('work')
+        _write_spend_signal(
+            d.env,
+            [_spend_entry(harness, d.root, episode='ep-1', value=500_000_000, now_s=d.t)],
+            now_s=d.t,
+        )
+        assert denied(d.bash('ls'))
+        assert d.store.read_record(harness, d.root).spend.acked_value is None
+
+        _write_spend_signal(
+            d.env,
+            [_spend_entry(harness, d.root, episode='ep-2', value=600_000_000, now_s=d.t)],
+            now_s=d.t,
+        )
+        out = d.prompt('continue')
+        assert 'turn-pause: spend signal.' in (context(out) or '')
+        assert '600.0M tokens' in context(out)
+        assert 'episode ep-2' in context(out)
+        rec = d.store.read_record(harness, d.root)
+        assert rec.spend.episode == 'ep-2'
+        assert rec.spend.delivered_value == 600_000_000
+        assert rec.spend.acked_value == 600_000_000
+
+    @pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+    def test_injection_on_first_prompt(self, tmp_path, notices, desktop_alerts, harness):
+        d = Driver(tmp_path, harness)
+        assert d.store.read_record(harness, d.root) is None
+        _write_spend_signal(
+            d.env,
+            [_spend_entry(harness, d.root, episode='ep-first', value=500_000_000, now_s=d.t)],
+            now_s=d.t,
+        )
+        out = d.prompt('start the task')
+        ctx = context(out)
+        assert ctx is not None
+        assert ctx.startswith('turn-pause: spend signal.')
+        assert 'episode ep-first' in ctx
+        rec = d.store.read_record(harness, d.root)
+        assert rec.turn_serial == 1
+        assert [(e['kind'], e['reason'], e['turn']) for e in rec.events] == [
+            ('turn_start', 'genuine_user', 1),
+            ('warning', 'spend', 1),
+        ]
+        assert rec.spend.delivered_value == 500_000_000
+        assert rec.spend.acked_value == 500_000_000
+        assert d.bash('ls') is None
+
+    @pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+    def test_injection_joins_budget_note(self, tmp_path, notices, desktop_alerts, harness):
+        from turn_pause.limits import duration, with_budget
+
+        d = Driver(tmp_path, harness)
+        _write_spend_signal(
+            d.env,
+            [_spend_entry(harness, d.root, episode='ep-budget', value=500_000_000, now_s=d.t)],
+            now_s=d.t,
+        )
+        out = d.prompt('budget: 2h\nRun the migration.')
+        scaled = with_budget(load(d.limits)[0], parse_budget('budget: 2h'))
+        expected_budget = BUDGET_TEXT.format(
+            a=duration(scaled.active_seconds),
+            c=scaled.calls,
+            s=scaled.spawns,
+            k=scaled.compactions,
+        )
+        ctx = context(out)
+        assert ctx is not None
+        parts = ctx.split('\n')
+        assert len(parts) == 2
+        assert parts[0] == expected_budget
+        assert parts[1].startswith('turn-pause: spend signal.')
+        assert 'episode ep-budget' in parts[1]
+        assert d.state().budget_note == expected_budget
+
+    def test_non_genuine_prompts_leave_record(self, tmp_path, notices, desktop_alerts):
+        from turn_pause.record import jencode_compact
+        from turn_pause.spend import spend_record_to_dict
+
+        d = Driver(tmp_path, 'claude-code')
+        d.prompt('work')
+        d('Stop', claude_stop([{'id': 'cron-1', 'prompt': 'scheduled poll'}]))
+        _write_spend_signal(
+            d.env,
+            [_spend_entry('claude-code', d.root, episode='ep-1', value=500_000_000, now_s=d.t)],
+            now_s=d.t,
+        )
+        assert denied(d.bash('ls'))
+
+        rec_before = d.store.read_record('claude-code', d.root)
+        assert rec_before.spend is not None and rec_before.spend.episode == 'ep-1'
+        assert rec_before.spend.delivered_value == 500_000_000
+        assert rec_before.spend.acked_value is None
+        expected_fragment = f'"spend":{jencode_compact(spend_record_to_dict(rec_before.spend))}'.encode()
+        record_file = state_dir(d.env) / f'claude-code-{d.root}.json'
+        assert expected_fragment in record_file.read_bytes()
+
+        _write_spend_signal(
+            d.env,
+            [_spend_entry('claude-code', d.root, episode='ep-2', value=600_000_000, now_s=d.t)],
+            now_s=d.t,
+        )
+
+        worker_prompt = dict(claude_prompt('worker check'), agent_id='a620dc1cd95e3a1c5', agent_type='general-purpose')
+        assert d('UserPromptSubmit', worker_prompt) is None
+        assert d.store.read_record('claude-code', d.root).spend == rec_before.spend
+        assert expected_fragment in record_file.read_bytes()
+
+        assert d.prompt('<task-notification>\n<task-id>a1</task-id>\n</task-notification>') is None
+        assert d.store.read_record('claude-code', d.root).spend == rec_before.spend
+        assert expected_fragment in record_file.read_bytes()
+
+        wake_out = d.prompt('scheduled poll')
+        assert context(wake_out) == WAKE_TEXT
+        assert d.store.read_record('claude-code', d.root).spend == rec_before.spend
+        assert expected_fragment in record_file.read_bytes()
+
+    @pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+    def test_protected_denial_while_spend_paused_does_not_deliver(self, tmp_path, notices, desktop_alerts, harness):
+        d = Driver(tmp_path, harness)
+        d.prompt('work')
+        sig_path = _write_spend_signal(
+            d.env,
+            [_spend_entry(harness, d.root, episode='ep-prot', value=500_000_000, now_s=d.t)],
+            now_s=d.t,
+        )
+        assert denied(d.bash('touch x', agent='worker-1'))
+        assert d.state().paused == 'spend'
+        assert d.store.read_record(harness, d.root).spend.delivered_value is None
+
+        out, _ = d.pre('Edit', {'file_path': str(sig_path), 'old_string': '500000000', 'new_string': '0'})
+        assert denied(out)
+        assert 'protected path' in reason(out)
+        assert d.store.read_record(harness, d.root).spend.delivered_value is None
+
+    @pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+    def test_snapshot_updates_from_newer_same_episode_entry(self, tmp_path, notices, desktop_alerts, harness):
+        d = Driver(tmp_path, harness)
+        d.prompt('work')
+        _write_spend_signal(
+            d.env,
+            [_spend_entry(harness, d.root, episode='ep-up', value=700_000_000, now_s=d.t)],
+            now_s=d.t,
+        )
+        out1 = d.bash('ls')
+        assert denied(out1)
+        assert '700.0M tokens' in reason(out1)
+
+        _write_spend_signal(
+            d.env,
+            [_spend_entry(harness, d.root, episode='ep-up', value=750_000_000, now_s=d.t + 1)],
+            now_s=d.t + 1,
+        )
+        out2 = d.bash('touch z')
+        assert denied(out2)
+        assert '750.0M tokens' in reason(out2)
+        assert d.store.read_record(harness, d.root).spend.delivered_value == 750_000_000
+
+    @pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+    def test_ack_survives_session_end(self, tmp_path, notices, desktop_alerts, harness):
+        d = Driver(tmp_path, harness)
+        d.prompt('work')
+        _write_spend_signal(
+            d.env,
+            [_spend_entry(harness, d.root, episode='ep-end', value=500_000_000, now_s=d.t)],
+            now_s=d.t,
+            stale_after_ms=600_000,
+        )
+        assert denied(d.bash('ls'))
+        assert d.store.read_record(harness, d.root).spend.acked_value is None
+
+        end_payload = claude_bare('SessionEnd') if harness == 'claude-code' else codex_bare('SessionEnd')
+        assert d('SessionEnd', end_payload) is None
+        assert d.state() is None
+
+        # Advance 700 s so the signal file is stale when the session resumes.
+        out = d.prompt('resume after break', dt=700)
+        assert out is None
+        rec = d.store.read_record(harness, d.root)
+        assert rec.spend is not None
+        assert rec.spend.delivered_value == 500_000_000
+        assert rec.spend.acked_value == 500_000_000
+        assert len(desktop_alerts) == 1
+
+    @pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+    def test_concurrent_root_and_worker_one_pause(self, tmp_path, notices, desktop_alerts, harness):
+        d = Driver(tmp_path, harness)
+        d.prompt('work')
+        _write_spend_signal(
+            d.env,
+            [_spend_entry(harness, d.root, episode='ep-conc', value=500_000_000, now_s=d.t)],
+            now_s=d.t,
+        )
+        maker = claude_pre if harness == 'claude-code' else codex_pre
+        root_payload = dict(maker('Bash', {'command': 'touch a'}, 'c-root'), session_id=d.root)
+        worker_payload = dict(maker('Bash', {'command': 'touch b'}, 'c-worker', agent='worker-1'), session_id=d.root)
+
+        barrier = threading.Barrier(2)
+        results = {}
+        errors = []
+
+        def invoke(key, payload, ts):
+            try:
+                barrier.wait(5)
+                results[key] = hook.decide(harness, 'PreToolUse', payload, ts, d.store, d.limits, d.env)
+            except BaseException as exc:
+                errors.append(exc)
+
+        t_root = threading.Thread(target=invoke, args=('root', root_payload, d.t + 1))
+        t_worker = threading.Thread(target=invoke, args=('worker', worker_payload, d.t + 1))
+        t_root.start()
+        t_worker.start()
+        t_root.join(5)
+        t_worker.join(5)
+        assert not t_root.is_alive() and not t_worker.is_alive() and not errors
+        assert denied(results['root']) and denied(results['worker'])
+
+        rec = d.store.read_record(harness, d.root)
+        pauses = [e for e in rec.events if e['kind'] == 'enforced_pause']
+        assert len(pauses) == 1 and pauses[0]['reason'] == 'spend'
+        assert len(notices) == 1
+        assert rec.spend.delivered_value == 500_000_000
+
+    @pytest.mark.parametrize('harness', ['claude-code', 'codex'])
+    def test_spend_files_protected(self, tmp_path, notices, desktop_alerts, harness):
+        from turn_pause.spend import PROTECTED_NAMES
+
+        d = Driver(tmp_path, harness)
+        d.prompt('work')
+        sig_path = _write_spend_signal(d.env, [], now_s=d.t)
+        obs_dir = sig_path.parent
+
+        for name in PROTECTED_NAMES:
+            target = obs_dir / name
+            out, _ = d.pre('Edit', {'file_path': str(target), 'old_string': 'a', 'new_string': 'b'})
+            assert denied(out), name
+            assert 'protected path' in reason(out)
+
+        assert not denied(d.bash('cat ' + shlex.quote(str(sig_path))))
+        doc_edit, _ = d.pre(
+            'Edit',
+            {
+                'file_path': '/srv/docs/obs.md',
+                'old_string': 'old',
+                'new_string': f'See ~/.local/state/obs/index.sqlite and {obs_dir}/index.sqlite',
+            },
+        )
+        assert not denied(doc_edit)
+
+    def test_staleness_alert_once_across_roots(self, tmp_path, notices, desktop_alerts):
+        env = make_env(tmp_path)
+        store = Store(state_dir(env))
+        limits = tmp_path / 'limits.toml'
+        limits.write_bytes(DEFAULTS_PATH.read_bytes())
+
+        now_ms = int(T0 * 1000)
+        _write_spend_signal(env, [], generated_at=now_ms - 700_000, stale_after_ms=600_000)
+
+        # Root 1 (claude-code) and Root 2 (codex) share the same host state directory.
+        assert hook.decide('claude-code', 'UserPromptSubmit', claude_prompt('work'), T0, store, limits, env) is None
+        assert hook.decide('claude-code', 'PreToolUse', claude_pre('Bash', {'command': 'ls'}, 'c1'), T0 + 1, store, limits, env) is None
+        assert hook.decide('codex', 'UserPromptSubmit', codex_prompt('work'), T0 + 2, store, limits, env) is None
+        assert hook.decide('codex', 'PreToolUse', codex_pre('Bash', {'command': 'ls'}, 'c2'), T0 + 3, store, limits, env) is None
+
+        # Even if the file is rewritten with another stale payload, the latch stays silent.
+        _write_spend_signal(env, [], generated_at=now_ms - 650_000, stale_after_ms=600_000)
+        assert hook.decide('claude-code', 'PreToolUse', claude_pre('Bash', {'command': 'ls'}, 'c3'), T0 + 4, store, limits, env) is None
+        assert hook.decide('codex', 'PreToolUse', codex_pre('Bash', {'command': 'ls'}, 'c4'), T0 + 5, store, limits, env) is None
+
+        assert len(desktop_alerts) == 1
+        title, body, _ = desktop_alerts[0]
+        assert title == 'turn-pause: spend protection off'
+        assert 'is stale' in body
+        assert notices == []
+
+    def test_staleness_alert_records_error_and_guards_unresolvable_obs_dir(self, tmp_path, monkeypatch, notices):
+        from turn_pause import spend
+
+        calls = []
+        monkeypatch.setattr(
+            hook.notify,
+            'desktop',
+            lambda title, body, *, env: calls.append((title, body)) or 'notify-send: missing binary',
+        )
+        bad_env = {
+            'PATH': '/usr/bin:/bin',
+            'HOME': str(tmp_path / 'home'),
+            'XDG_STATE_HOME': 'relative/state',
+            'XDG_RUNTIME_DIR': str(tmp_path / 'run'),
+        }
+        (tmp_path / 'home').mkdir()
+        (tmp_path / 'run').mkdir()
+        store = Store(tmp_path / 'pause')
+        limits = tmp_path / 'limits.toml'
+        limits.write_bytes(DEFAULTS_PATH.read_bytes())
+
+        assert hook.decide('claude-code', 'UserPromptSubmit', claude_prompt('work'), T0, store, limits, bad_env) is None
+        assert hook.decide('claude-code', 'PreToolUse', claude_pre('Bash', {'command': 'ls'}, 'c1'), T0 + 1, store, limits, bad_env) is None
+        assert len(calls) == 1
+        assert calls[0][0] == 'turn-pause: spend protection off'
+        assert calls[0][1].startswith('spend-signals.json is unreadable')
+        latch = spend.read_latch(store.dir)
+        assert latch.outage is not None
+        assert latch.outage['outcome'] == 'error'
+        assert latch.outage['error'] == 'notify-send: missing binary'
+

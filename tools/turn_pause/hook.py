@@ -9,9 +9,9 @@ notification) runs after the state is written, and its result is recorded in a s
 short locked update. Spec: docs/turn-pause.md.
 
 Every call pays for its imports (they were most of its latency), so this module and
-those it imports keep to json, os, sys, time, fcntl and _sha2: no dataclasses, typing,
-tempfile, pathlib or hashlib, and the allowlist (with shlex) loads only on the paused
-path. tools/test_turn_pause_hook.py checks the import set.
+those it imports keep to _json, os, sys, time, stat, fcntl and _sha2: no json, re,
+dataclasses, typing, tempfile, pathlib or hashlib, and the allowlist (with shlex) loads
+only on the paused path. tools/test_turn_pause_hook.py checks the import set.
 """
 from __future__ import annotations
 
@@ -19,13 +19,52 @@ import os
 import sys
 import time
 
-from . import adapters, counters, engine, notify
+from . import adapters, counters, engine, notify, spend
 from .engine import Decision
 from .events import Event
 from .limits import DEFAULTS_FILE, duration, file_sha256, load, with_budget
 from .protect import MAX_NODES, TooManyNodes, too_many_nodes, touches_protected
 from .record import jdumps, jloads
+from .spend import Entry
 from .state import RootState, Store, Wakeup, state_path
+
+__all__ = (
+    'CHECKOUT',
+    'WIRING',
+    'HOME_LINKS',
+    'GRACE',
+    'MAX_PAYLOAD_BYTES',
+    'OUTPUT_EVENTS',
+    'GOAL_CLAUSE',
+    'ROOT_TEXT',
+    'CHILD_TEXT',
+    'LIMITS_CHANGED_HEAD',
+    'SPEND',
+    'SPEND_ROOT_TEXT',
+    'SPEND_INJECT_TEXT',
+    'WARNING_TEXT',
+    'COMPACTION_WARNING_TEXT',
+    'BUDGET_TEXT',
+    'MALFORMED_TEXT',
+    'WAKE_TEXT',
+    'PROTECTED_TEXT',
+    'NODES_TEXT',
+    'GRACE_TEXT',
+    'HARNESS_NAMES',
+    'LIMITS_CHANGED',
+    'OWNER_LINE',
+    'USAGE',
+    'spend_measurement',
+    'refusal',
+    'warning',
+    'protected_paths',
+    'find_harness_pid',
+    'is_ancestor',
+    'current_harness_pid',
+    'Judge',
+    'decide',
+    'main',
+)
 
 CHECKOUT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # The hook wiring in this checkout, and the harness home files that link to it
@@ -47,14 +86,17 @@ GRACE = 25
 MAX_PAYLOAD_BYTES = 32 * 1024 * 1024
 OUTPUT_EVENTS = ('PreToolUse', 'UserPromptSubmit')
 
+GOAL_CLAUSE = (
+    ', then pause an active goal only if the user explicitly requested its pause. If an active '
+    'goal lacks that authorization, leave its status unchanged, name it in the pause report '
+    'and include a request for the user to authorize its pause; do not claim it is paused'
+)
 ROOT_TEXT = (
     'turn paused: {limit} over its limit (active {a} of {A}, root calls {c}/{C}, tree spawns {s}/{S}, '
     'root compactions {k}/{K} (advisory)). Start nothing new and stop the work you already started: interrupt '
-    'your subagents and the sessions you launched, stop your background calls and processes, '
-    'then pause an active goal only if the user explicitly requested its pause. If an active '
-    'goal lacks that authorization, leave its status unchanged, name it in the pause report '
-    'and include a request for the user to authorize its pause; do not claim it is paused. '
-    'Then record the durable pause report the turn-pause rule describes with single-line '
+    'your subagents and the sessions you launched, stop your background calls and processes'
+    + GOAL_CLAUSE
+    + '. Then record the durable pause report the turn-pause rule describes with single-line '
     'tasks note calls (file writes are refused while paused; split across notes past 16,384 '
     'characters), park your task --waiting-on user --reason decision, and end your turn '
     'with the continuation decision and any exact budget: line in your closing message '
@@ -62,6 +104,27 @@ ROOT_TEXT = (
     'another agent launched this session, park any claim --waiting-on agent for that agent and '
     'return a short status (done, left, running) instead of a pause report. Only bookkeeping, '
     'plain reads and stopping your own work are allowed now; hq pause status shows the counts.')
+SPEND = 'spend'
+SPEND_ROOT_TEXT = (
+    "turn paused: spend. This agent tree's token spend is far outside its harness's normal "
+    'range: {measurement}. Start nothing new and stop the work you already started: interrupt '
+    'your subagents and the sessions you launched, stop your background calls and processes'
+    + GOAL_CLAUSE
+    + '. Then record the signal (value, threshold, episode) with single-line tasks note calls, '
+    'park your task --waiting-on user --reason decision with the signal in the park note, '
+    'report the signal to the user, and end your turn. Investigation starts in the next turn. '
+    'If another agent launched this session, park any claim --waiting-on agent for that agent '
+    'and return a short status (done, left, running) instead. Only bookkeeping, plain reads and '
+    'stopping your own work are allowed now; hq pause status shows the signal.'
+)
+SPEND_INJECT_TEXT = (
+    "turn-pause: spend signal. This agent tree's token spend went far outside its harness's "
+    'normal range while it was idle: {measurement}. Report the signal to the user first, then '
+    "investigate its cause in this turn (obs's growth report on the tree, the polling pattern "
+    "behind it) and record it on the task, before any of the original task's work resumes. Do "
+    'not park or end the turn for this. The original work resumes only with a fix or a '
+    "mitigation that removes the cause, or on the user's explicit instruction."
+)
 CHILD_TEXT = (
     "turn paused by your controller's limit ({limit}). Start nothing new and stop the work you "
     'already started (your background calls and processes), park any claim --waiting-on agent '
@@ -123,9 +186,26 @@ def _counts(rs: RootState) -> dict:
                 S=lim.spawns, k=t.compactions, K=lim.compactions)
 
 
+def spend_measurement(entry: Entry, harness: str) -> str:
+    credits = (
+        f'; credits drawn in 24 h: {entry.credits_drawn_24h:g}'
+        if entry.credits_drawn_24h is not None and entry.credits_drawn_24h > 0
+        else ''
+    )
+    return (
+        f'obs measured {entry.value / 1_000_000:.1f}M tokens in {entry.window_hours} h '
+        f'against a threshold of {entry.threshold / 1_000_000:.1f}M '
+        f'(ratio {entry.ratio:.2f}; episode {entry.episode}{credits})'
+    )
+
+
 def refusal(rs: RootState, agent: str | None) -> str:
     if agent is not None:
         return CHILD_TEXT.format(limit=rs.paused)
+    if rs.paused == SPEND:
+        if rs.spend_snapshot is None:
+            raise ValueError(f'{rs.harness} {rs.root} is spend-paused without spend_snapshot')
+        return SPEND_ROOT_TEXT.format(measurement=spend_measurement(rs.spend_snapshot, rs.harness))
     if rs.paused == LIMITS_CHANGED:
         return LIMITS_CHANGED_HEAD.format(**_counts(rs)) + ROOT_TEXT[ROOT_TEXT.index('Start nothing new'):]
     return ROOT_TEXT.format(limit=rs.paused, **_counts(rs))
@@ -147,7 +227,15 @@ def protected_paths(store_dir, limits_path, env: Mapping[str, str]) -> list[str]
     paths += [os.path.join(CHECKOUT, w) for w in WIRING]
     if env.get('HOME'):
         paths += [os.path.join(env['HOME'], h) for h in HOME_LINKS]
+    paths += spend.protected_paths(env)
     return paths
+
+
+def _spend_path(env: Mapping[str, str]) -> str:
+    try:
+        return os.path.join(spend.obs_state_dir(env), spend.SIGNAL_NAME)
+    except ValueError:
+        return spend.SIGNAL_NAME
 
 
 def _status(pid: int, proc) -> dict | None:
@@ -217,17 +305,30 @@ def current_harness_pid(recorded: int | None, start: int, proc='/proc') -> int |
 class Judge:
     """The real decision for one PreToolUse's tool_start."""
 
-    def __init__(self, harness: str, payload: dict, limits_sha: str, protected: list[str]):
+    def __init__(self, harness: str, payload: dict, limits_sha: str, protected: list[str],
+                 record=None, entry: Entry | None = None):
         self.harness, self.payload, self.limits_sha, self.protected = harness, payload, limits_sha, protected
+        self.record = record
+        self.entry = entry
 
     def __call__(self, rs: RootState, ev: Event) -> Decision:
         tool_input = self.payload.get('tool_input')
         turn = _turn(rs)
+        if (rs.paused == SPEND and self.entry is not None
+                and rs.spend_snapshot is not None
+                and self.entry.episode == rs.spend_snapshot.episode):
+            rs.spend_snapshot = self.entry
         if rs.paused is None:
             limit = LIMITS_CHANGED if self.limits_sha != turn.limits_sha else counters.crossed(turn)
             if limit is not None:
                 rs.paused = limit
                 return Decision(False, _deny(refusal(rs, ev.agent)), limit)
+            if self.record is not None and spend.is_due(self.record.spend, self.entry):
+                rs.paused = SPEND
+                rs.spend_snapshot = self.entry
+                if ev.agent is None:
+                    self.record.spend = spend.deliver(self.record.spend, self.entry.value)
+                return Decision(False, _deny(refusal(rs, ev.agent)), SPEND)
         try:
             if touches_protected(tool_input, self.protected):
                 from .allowlist import protected_read  # parse only a protected-path match
@@ -259,6 +360,11 @@ class Judge:
             why = GRACE_TEXT
         else:
             why = verdict.reason
+        if rs.paused == SPEND and ev.agent is None and self.record is not None:
+            if rs.spend_snapshot is None:
+                raise ValueError(f'{rs.harness} {rs.root} is spend-paused without spend_snapshot')
+            if self.record.spend is None or self.record.spend.episode == rs.spend_snapshot.episode:
+                self.record.spend = spend.deliver(self.record.spend, rs.spend_snapshot.value)
         return Decision(False, _deny(f'{refusal(rs, ev.agent)} This call: {why}.'), None)
 
 
@@ -267,7 +373,7 @@ def _never(rs: RootState, ev: Event) -> Decision:
 
 
 def _prompt(rs: RootState, harness: str, payload: dict, now: float, limits_path, agent: str | None,
-            oversized: bool, record, counted: bool) -> dict | None:
+            oversized: bool, record, counted: bool, entry: Entry | None = None) -> dict | None:
     from . import history
     from .prompt import Budget, Malformed, empty_guards, is_genuine, parse_budget
     text = payload.get('prompt')
@@ -275,6 +381,9 @@ def _prompt(rs: RootState, harness: str, payload: dict, now: float, limits_path,
         raise ValueError('UserPromptSubmit payload has no prompt string')
     kind = engine.prompt_kind(rs, harness, text, now, agent)
     if kind == 'turn':
+        record.spend = spend.reconcile(record.spend, entry)
+        pending = spend.is_pending(record.spend)
+        due = (not pending) and spend.is_due(record.spend, entry)
         before = history.snapshot(rs, compactions_counted=counted)
         if before is None and record.ended_at is not None:
             before = next((e['snapshot'] for e in reversed(record.events)
@@ -289,10 +398,17 @@ def _prompt(rs: RootState, harness: str, payload: dict, now: float, limits_path,
         elif isinstance(budget, Malformed):
             note = MALFORMED_TEXT.format(reason=budget.reason)
         engine.start_turn(rs, now, limits, sha, note)
-        history.start_turn(record, now, origin='genuine_user', before=before,
-                           after=history.snapshot(rs, compactions_counted=counted))
+        after_snap = history.snapshot(rs, compactions_counted=counted)
+        history.start_turn(record, now, origin='genuine_user', before=before, after=after_snap)
         record.ended_at = None
         record.prompt_guards = empty_guards()
+        if pending:
+            record.spend = spend.acknowledge(record.spend)
+        elif due:
+            record.spend = spend.inject(record.spend, entry.value)
+            history.append_event(record, 'warning', now, reason=SPEND, snapshot=after_snap)
+            spend_note = SPEND_INJECT_TEXT.format(measurement=spend_measurement(entry, harness))
+            note = spend_note if note is None else f'{note}\n{spend_note}'
         return None if note is None else _context('UserPromptSubmit', note)
     if rs.turn is None:
         engine.start_turn(rs, now, *load(limits_path))
@@ -385,6 +501,14 @@ def _last_wakeup(rs: RootState, text) -> Wakeup | None:
 
 
 def _notice(rs: RootState, harness: str, root: str, limit: str) -> tuple[str, str]:
+    if limit == SPEND:
+        if rs.spend_snapshot is None:
+            raise ValueError(f'{harness} {root} is spend-paused without spend_snapshot')
+        body = (
+            f'{harness} session {root} in {rs.cwd or "an unknown directory"}: '
+            f'{spend_measurement(rs.spend_snapshot, harness)}. Reply in the session to resume.'
+        )
+        return f'turn paused ({limit})', body
     c = _counts(rs)
     body = (f'{harness} session {root} in {rs.cwd or "an unknown directory"}: active {c["a"]} of {c["A"]}, root calls {c["c"]}/{c["C"]}, '
             f'tree spawns {c["s"]}/{c["S"]}, root compactions {c["k"]}/{c["K"]} (advisory). Reply in the session to resume.')
@@ -418,6 +542,8 @@ def _decide(harness, event, payload, now, store, limits_path, env, oversized):
     limits_sha = file_sha256(limits_path) if event == 'PreToolUse' else None
     protected = protected_paths(store.dir, limits_path, env) if event == 'PreToolUse' else None
     pause = None
+    sig = before_sig = None
+    now_ms = int(now * 1000)
     with store.locked(harness, root) as record:
         rs = record.state
         if rs is None:
@@ -435,6 +561,8 @@ def _decide(harness, event, payload, now, store, limits_path, env, oversized):
                 return _deny('turn-pause: root session ended; a genuine root prompt is required to resume.')
             else:
                 return None
+        if isinstance(payload.get('cwd'), str):
+            rs.cwd = payload['cwd']
         if rs.harness_pid is None and (rs.turn is None or event == 'UserPromptSubmit'):
             rs.harness_pid = find_harness_pid(os.getppid())
         if rs.turn is None and event != 'UserPromptSubmit':
@@ -442,13 +570,20 @@ def _decide(harness, event, payload, now, store, limits_path, env, oversized):
             engine.start_turn(rs, now, *load(limits_path))
             history.start_turn(record, now, origin='implicit', before=None,
                                after=history.snapshot(rs, compactions_counted=counted))
+        entry = None
+        if event in ('PreToolUse', 'UserPromptSubmit'):
+            before_sig = rs.spend_cache
+            sig = spend.read(env, harness, root, before_sig)
+            rs.spend_cache = sig
+            entry = spend.fresh_entry(sig, now_ms)
         output = None
         allowed = False
         if event == 'UserPromptSubmit':
-            output = _prompt(rs, harness, payload, now, limits_path, agent, oversized, record, counted)
+            output = _prompt(rs, harness, payload, now, limits_path, agent, oversized, record, counted, entry)
         elif event == 'PreToolUse':
+            record.spend = spend.reconcile(record.spend, entry)
             warned = set(rs.turn.warned)
-            decision = engine.feed(rs, events, Judge(harness, payload, limits_sha, protected))
+            decision = engine.feed(rs, events, Judge(harness, payload, limits_sha, protected, record, entry))
             output, allowed = decision.output, decision.allow
             new_warned = rs.turn.warned - warned if rs.turn.warned != warned else None
             if new_warned or (decision.paused is not None and not rs.notified):
@@ -483,6 +618,13 @@ def _decide(harness, event, payload, now, store, limits_path, env, oversized):
                                      notification=notice, turn=turn)
                 if record.state is not None and record.turn_serial == turn:
                     record.state.notify_error = error
+    if sig is not None and (spend.state_of(sig, now_ms, False) != 'fresh' or sig is not before_sig):
+        alert = spend.observe(store.dir, sig, _spend_path(env), now)
+        if alert is not None:
+            _, alerted_at, title, body = alert
+            err = notify.desktop(title, body, env=env)
+            if err:
+                spend.record_alert(store.dir, alerted_at, err)
     if problems:
         raise ValueError(f'{event}: state written, records skipped: ' + '; '.join(problems))
     return output
