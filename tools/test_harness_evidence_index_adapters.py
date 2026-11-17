@@ -31,6 +31,26 @@ RULES = ("decoder", "catalogue_path", "identity")
 ADDED_RESULT_FIELDS = ("exit_code",)
 ADDED_FILE_START_FIELDS = ("side_inputs",)
 ADDED_PROVENANCE = ("results[].exit_code",)
+# Compaction keys added after the base; null on every base sample (none holds a boundary).
+ADDED_COMPACTION_KEYS = ("id", "trigger", "reason")
+# Declarations widened after the base: field -> (current, base).
+CHANGED_PROVENANCE = {"compaction": (
+    ["isCompactSummary", "subtype", "uuid", "parentUuid", "isMeta", "compactMetadata.trigger",
+     "content"],
+    ["isCompactSummary"])}
+# Samples catalogued after the base, with the capability evidence they alone add.
+ADDED_SAMPLES = ("index/compaction-reasons.jsonl",)
+ADDED_SAMPLE_VERSIONS = ("2.1.325",)
+ADDED_RECORD_KINDS = ("system/compact_boundary", "system/informational")
+# Index reads declared after the base for compaction pairing: kind -> path -> (current, base),
+# base None when the read is new.
+CHANGED_UNWATCHED = {
+    "user": {"uuid": ("dimension", None), "parentUuid": ("dimension", None)},
+    "attachment": {"uuid": ("dimension", None), "parentUuid": ("dimension", None)},
+    "system": {"uuid": (["applied:turn_end", "dimension"], "applied:turn_end"),
+               "parentUuid": ("dimension", None), "compactMetadata.trigger": ("dimension", None),
+               "content": ("dimension", None)},
+}
 
 
 def canonical(value) -> str:
@@ -79,12 +99,18 @@ def project(obj: dict) -> tuple[dict, list]:
             removed.append(obj.pop(key))
         for field in ADDED_PROVENANCE:
             obj["provenance_defaults"].pop(field)
+        for field, (current, base) in CHANGED_PROVENANCE.items():
+            assert obj["provenance_defaults"][field]["native_paths"] == current, field
+            obj["provenance_defaults"][field]["native_paths"] = base
     if obj["object"] == "index_event":
         for result in obj.get("results") or []:
             for key in ADDED_RESULT_FIELDS:
                 removed.append(result.pop(key))
         for field in ADDED_PROVENANCE:  # Claude never overrides an added field's default.
             assert field not in obj["provenance"], field
+        if obj["compaction"] is not None:
+            for key in ADDED_COMPACTION_KEYS:
+                removed.append(obj["compaction"].pop(key))
     return obj, removed
 
 
@@ -115,7 +141,8 @@ def observe(normalize: Normalizer):
             emitted = []
             for obj in raw:  # Projection runs outside the decode so its faults are not samples'.
                 obj, gone = project(obj)
-                removed.extend(gone)
+                if name not in ADDED_SAMPLES:  # An added sample's values are its own tests'.
+                    removed.extend(gone)
                 emitted.append(normalize(obj))
             mode = "text" if text else "notext"
             if error is None:
@@ -135,6 +162,19 @@ def claude_capability_blocks():
     claude = json.loads(CAPABILITIES.read_text(encoding="utf-8"))["harnesses"]["claude-code"]
     for field, entry in ADDED_CAPABILITY_FIELDS.items():
         assert claude["fields"].pop(field) == entry, field
+    for field, (current, base) in CHANGED_PROVENANCE.items():
+        assert claude["fields"][field]["provenance"] == sorted(current), field
+        claude["fields"][field]["provenance"] = sorted(base)
+    for version in ADDED_SAMPLE_VERSIONS:
+        assert claude["versions"].pop(version)["synthetic"] == list(ADDED_SAMPLES), version
+    for kind in ADDED_RECORD_KINDS:
+        claude["record_kinds"].remove(kind)
+    for kind, paths in CHANGED_UNWATCHED.items():
+        unwatched = claude["index"]["unwatched"][kind]
+        for path, (current, base) in paths.items():
+            assert unwatched.pop(path) == current, (kind, path)
+            if base is not None:
+                unwatched[path] = base
     return {"index": canonical(claude["index"]), "header": canonical(claude["header"]),
             "harness": canonical(claude)}
 
@@ -178,7 +218,9 @@ def test_claude_index_stream_matches_base_digests():
     observed, normalize, removed = compute()
     assert observed["normalization"] == golden["normalization"]
     assert all(normalize.matched[rule] for rule in RULES), normalize.matched
-    assert observed["completing"] == golden["completing"]
+    # An added sample has no base digest; its own tests cover its stream.
+    assert {k: v for k, v in observed["completing"].items() if k not in ADDED_SAMPLES} \
+        == golden["completing"]
     assert observed["failing"] == golden["failing"]
     assert observed["capabilities"] == golden["capabilities"]
     assert all(value is None for value in removed)
