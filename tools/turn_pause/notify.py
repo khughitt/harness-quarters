@@ -5,12 +5,23 @@ hook open. The relay notice is one `notify` request on relay serve's private soc
 (relay docs/api.md, "Local socket protocol"; the notice shape under "Messages and
 entries"), bounded by a 300 ms timeout. relay serve not running (no socket, or nobody
 listening on it) is not a failure: the spec sends the notice when serve is reachable.
-The heavy imports are local to send(), which runs only when a pause fires.
+The heavy imports are local to desktop() and send(), which run only when an alert or pause fires.
 """
 from __future__ import annotations
 
 import os
 import time
+
+__all__ = (
+    'TIMEOUT',
+    'NOTICE_TTL_MS',
+    'TITLE_MAX',
+    'TEXT_MAX',
+    'relay_socket',
+    'notice',
+    'desktop',
+    'send',
+)
 
 TIMEOUT = 0.3
 NOTICE_TTL_MS = 24 * 3600 * 1000
@@ -36,7 +47,8 @@ def notice(title: str, body: str, *, agent: str | None, cwd: str | None, now_ms:
     }
 
 
-def _desktop(title: str, body: str, env: Mapping[str, str]) -> str | None:
+def desktop(title: str, body: str, *, env: Mapping[str, str]) -> str | None:
+    """Start detached notify-send without touching relay. Error string on OSError, else None."""
     import subprocess
     try:
         subprocess.Popen(['notify-send', '--app-name=turn-pause', '--urgency=critical', title, body],
@@ -101,5 +113,5 @@ def _relay(title: str, body: str, env: Mapping[str, str], agent: str | None, cwd
 def send(title: str, body: str, *, env: Mapping[str, str], agent: str | None = None,
          cwd: str | None = None) -> str | None:
     """Start notify-send, then write one relay notice; both are tried. The first error, or None."""
-    errors = [e for e in (_desktop(title, body, env), _relay(title, body, env, agent, cwd)) if e]
+    errors = [e for e in (desktop(title, body, env=env), _relay(title, body, env, agent, cwd)) if e]
     return errors[0] if errors else None

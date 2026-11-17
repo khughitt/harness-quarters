@@ -1,23 +1,29 @@
-"""Reader for obs's published spend-signals.json (schema 1) and episode rules.
+"""Reader for obs's published spend-signals.json (schema 1), episode rules, and host latch.
 
-Imported on the hook's hot path: keeps imports strictly to os and .record, stats the
-signal file once per call, and parses via record.jloads_strict only when the file's
-(st_mtime_ns, st_size, st_ino) identity changes.
+Imported on the hook's hot path: keeps top-level imports strictly to fcntl, os, and .record
+(loading state.write_atomic lazily only when writing .spend-host.json), stats the signal file
+once per call, and parses via record.jloads_strict only when (st_mtime_ns, st_size, st_ino)
+changes.
 """
 from __future__ import annotations
 
+import fcntl
 import os
 
-from .record import Record, jloads_strict
+from .record import Record, jencode_compact, jloads_strict
 
 __all__ = (
     'SIGNAL_NAME',
     'PROTECTED_NAMES',
+    'HOST_FILE',
+    'HOST_LOCK',
+    'RETRY_SECONDS',
     'obs_state_dir',
     'protected_paths',
     'Entry',
     'Signal',
     'SpendRecord',
+    'HostLatch',
     'read',
     'state_of',
     'fresh_entry',
@@ -27,12 +33,17 @@ __all__ = (
     'deliver',
     'acknowledge',
     'inject',
+    'read_latch',
+    'observe',
+    'record_alert',
     'entry_to_dict',
     'entry_from_dict',
     'signal_to_dict',
     'signal_from_dict',
     'spend_record_to_dict',
     'spend_record_from_dict',
+    'host_latch_to_dict',
+    'host_latch_from_dict',
 )
 
 SIGNAL_NAME = 'spend-signals.json'
@@ -42,12 +53,22 @@ PROTECTED_NAMES = (
     'spend-state.json',
     'spend.lock',
 )
+HOST_FILE = '.spend-host.json'
+HOST_LOCK = '.spend-host.lock'
+RETRY_SECONDS = 3600
 
 _S_IFMT = 0o170000
 _S_IFREG = 0o100000
 _INF = float('inf')
 _VALID_STATUSES = ('ok', 'partial')
 _VALID_BASELINES = ('ok', 'insufficient', 'stale', 'missing')
+_OUTAGE_STATES = ('stale', 'unreadable', 'vanished')
+_OUTAGE_OUTCOMES = ('attempted', 'error')
+_ALERT_TITLE = 'turn-pause: spend protection off'
+_OFF_UNTIL = (
+    'spend protection is off until the producer runs again '
+    '(systemctl --user status obs-spend.timer, journalctl --user -u obs-spend)'
+)
 
 
 class Entry(Record):
@@ -97,9 +118,22 @@ class SpendRecord(Record):
     }
 
 
+class HostLatch(Record):
+    __slots__ = _fields = (
+        'seen_fresh',
+        'outage',
+    )
+    _defaults = {
+        'seen_fresh': False,
+        'outage': None,
+    }
+
+
 _ENTRY_FIELDS = set(Entry._fields)
 _SIGNAL_FIELDS = set(Signal._fields)
 _SPEND_RECORD_FIELDS = set(SpendRecord._fields)
+_HOST_LATCH_FIELDS = set(HostLatch._fields)
+_OUTAGE_FIELDS = {'state', 'alerted_at', 'outcome', 'error'}
 
 
 def obs_state_dir(env: Mapping[str, str] = os.environ) -> str:
@@ -533,3 +567,223 @@ def inject(sr: SpendRecord, value: int | float) -> SpendRecord:
         delivered_value=checked,
         acked_value=checked,
     )
+
+
+def host_latch_to_dict(latch: HostLatch) -> dict:
+    if type(latch) is not HostLatch:
+        raise TypeError(f'latch must be HostLatch, not {type(latch).__name__}')
+    outage = None if latch.outage is None else {
+        'state': latch.outage['state'],
+        'alerted_at': latch.outage['alerted_at'],
+        'outcome': latch.outage['outcome'],
+        'error': latch.outage['error'],
+    }
+    return {
+        'seen_fresh': latch.seen_fresh,
+        'outage': outage,
+    }
+
+
+def host_latch_from_dict(d: dict) -> HostLatch:
+    if not isinstance(d, dict):
+        raise TypeError(f'host latch must be dict, not {type(d).__name__}')
+    if set(d) != _HOST_LATCH_FIELDS:
+        raise ValueError('host latch fields differ')
+    seen_fresh = d['seen_fresh']
+    if type(seen_fresh) is not bool:
+        raise TypeError(f'host latch seen_fresh must be bool, not {type(seen_fresh).__name__}')
+    raw_outage = d['outage']
+    if raw_outage is None:
+        return HostLatch(seen_fresh=seen_fresh, outage=None)
+    if not isinstance(raw_outage, dict):
+        raise TypeError(f'host latch outage must be dict or None, not {type(raw_outage).__name__}')
+    if set(raw_outage) != _OUTAGE_FIELDS:
+        raise ValueError('host latch outage fields differ')
+    st = raw_outage['state']
+    if type(st) is not str or st not in _OUTAGE_STATES:
+        raise ValueError(f'invalid host latch outage.state: {st!r}')
+    alerted_at = float(_nonneg_num(raw_outage['alerted_at'], 'outage.alerted_at'))
+    outcome = raw_outage['outcome']
+    if type(outcome) is not str or outcome not in _OUTAGE_OUTCOMES:
+        raise ValueError(f'invalid host latch outage.outcome: {outcome!r}')
+    err = raw_outage['error']
+    if outcome == 'attempted':
+        if err is not None:
+            raise ValueError(f'attempted outage must have error=None, got {err!r}')
+    elif type(err) is not str:
+        raise TypeError(f'error outage must have str error, not {type(err).__name__}')
+    return HostLatch(
+        seen_fresh=seen_fresh,
+        outage={
+            'state': st,
+            'alerted_at': alerted_at,
+            'outcome': outcome,
+            'error': err,
+        },
+    )
+
+
+def read_latch(store_dir: str | os.PathLike[str]) -> HostLatch:
+    """Read .spend-host.json without locking; missing file returns HostLatch(False, None)."""
+    directory = os.fspath(store_dir) or '.'
+    path = os.path.join(directory, HOST_FILE)
+    flags = (
+        os.O_RDONLY
+        | getattr(os, 'O_CLOEXEC', 0)
+        | getattr(os, 'O_NOFOLLOW', 0)
+        | getattr(os, 'O_NONBLOCK', 0)
+    )
+    try:
+        fd = os.open(path, flags)
+    except FileNotFoundError:
+        return HostLatch(False, None)
+    try:
+        fst = os.fstat(fd)
+        if (fst.st_mode & _S_IFMT) != _S_IFREG:
+            raise ValueError(f'not a regular host latch file: {path}')
+        chunks = []
+        while True:
+            chunk = os.read(fd, 65536)
+            if not chunk:
+                break
+            chunks.append(chunk)
+    finally:
+        os.close(fd)
+    raw = chunks[0] if len(chunks) == 1 else b''.join(chunks)
+    text = raw.decode('utf-8')
+    return host_latch_from_dict(jloads_strict(text))
+
+
+def _write_latch(directory: str, latch: HostLatch) -> None:
+    from .state import write_atomic
+
+    payload = jencode_compact(host_latch_to_dict(latch)).encode('utf-8')
+    write_atomic(os.path.join(directory, HOST_FILE), payload, sync_dir=True)
+
+
+def _open_host_lock(directory: str) -> int:
+    lock_path = os.path.join(directory, HOST_LOCK)
+    flags = os.O_CREAT | os.O_RDWR | getattr(os, 'O_CLOEXEC', 0)
+    while True:
+        try:
+            fd = os.open(lock_path, flags, 0o600)
+        except FileNotFoundError:
+            os.makedirs(directory, mode=0o700, exist_ok=True)
+            fd = os.open(lock_path, flags, 0o600)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            try:
+                current = os.stat(lock_path).st_ino
+            except FileNotFoundError:
+                current = None
+            if current != os.fstat(fd).st_ino:
+                os.close(fd)
+                continue
+            return fd
+        except BaseException:
+            os.close(fd)
+            raise
+
+
+def _alert_due(outage: dict | None, now: float) -> bool:
+    if outage is None:
+        return True
+    return outage['outcome'] == 'error' and (now - outage['alerted_at']) >= RETRY_SECONDS
+
+
+def _format_age(seconds: int) -> str:
+    if seconds < 60:
+        return f'{seconds}s'
+    if seconds < 3600:
+        minutes, secs = divmod(seconds, 60)
+        return f'{minutes}m{secs:02d}s'
+    hours, rem = divmod(seconds, 3600)
+    return f'{hours}h{rem // 60:02d}m'
+
+
+def _format_alert(st: str, sig: Signal, signal_path: str, now_ms: int) -> tuple[str, str]:
+    if sig.generated_at is not None:
+        age_part = f'age {_format_age(max(0, (now_ms - sig.generated_at) // 1000))}'
+    else:
+        age_part = 'age unknown'
+    if st == 'stale':
+        detail = age_part
+    elif st == 'unreadable':
+        err = sig.error or 'unreadable signal'
+        detail = f'{age_part}; {err}'
+    else:
+        detail = f'{age_part}; missing after prior fresh signal'
+    body = f'{signal_path} is {st} ({detail}): {_OFF_UNTIL}.'
+    return _ALERT_TITLE, body
+
+
+def observe(
+    store_dir: str | os.PathLike[str],
+    sig: Signal,
+    signal_path: str | os.PathLike[str],
+    now: float,
+) -> tuple[str, float, str, str] | None:
+    """Observe sig against the host latch; lock and write only when latch state changes."""
+    if type(sig) is not Signal:
+        raise TypeError(f'sig must be Signal, not {type(sig).__name__}')
+    directory = os.fspath(store_dir) or '.'
+    sig_path = os.fspath(signal_path)
+    now_f = float(_nonneg_num(now, 'now'))
+    now_ms = int(now_f * 1000)
+
+    latch = read_latch(directory)
+    st = state_of(sig, now_ms, latch.seen_fresh)
+    if st == 'absent':
+        return None
+    if st == 'fresh':
+        if latch.seen_fresh and latch.outage is None:
+            return None
+    elif not _alert_due(latch.outage, now_f):
+        return None
+
+    fd = _open_host_lock(directory)
+    try:
+        latch = read_latch(directory)
+        st = state_of(sig, now_ms, latch.seen_fresh)
+        if st == 'fresh':
+            if not latch.seen_fresh or latch.outage is not None:
+                _write_latch(directory, HostLatch(seen_fresh=True, outage=None))
+            return None
+        if st in _OUTAGE_STATES and _alert_due(latch.outage, now_f):
+            outage = {
+                'state': st,
+                'alerted_at': now_f,
+                'outcome': 'attempted',
+                'error': None,
+            }
+            _write_latch(directory, HostLatch(seen_fresh=latch.seen_fresh, outage=outage))
+            title, body = _format_alert(st, sig, sig_path, now_ms)
+            return (st, now_f, title, body)
+        return None
+    finally:
+        os.close(fd)
+
+
+def record_alert(
+    store_dir: str | os.PathLike[str],
+    alerted_at: float,
+    error: str,
+) -> None:
+    """Record a desktop alert failure if the active outage still matches alerted_at."""
+    directory = os.fspath(store_dir) or '.'
+    checked_at = float(_nonneg_num(alerted_at, 'alerted_at'))
+    if type(error) is not str:
+        raise TypeError(f'error must be str, not {type(error).__name__}')
+    fd = _open_host_lock(directory)
+    try:
+        latch = read_latch(directory)
+        if latch.outage is not None and latch.outage['alerted_at'] == checked_at:
+            outage = {
+                'state': latch.outage['state'],
+                'alerted_at': latch.outage['alerted_at'],
+                'outcome': 'error',
+                'error': error,
+            }
+            _write_latch(directory, HostLatch(seen_fresh=latch.seen_fresh, outage=outage))
+    finally:
+        os.close(fd)

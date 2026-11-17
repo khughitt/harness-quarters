@@ -1,14 +1,18 @@
-"""Tests for tools/turn_pause/spend.py: reading obs spend-signals.json (schema 1)."""
+"""Tests for tools/turn_pause/spend.py: signal reader, episode rules, and host latch."""
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import subprocess
+import threading
+import time
 from pathlib import Path
 
 import pytest
 
-from turn_pause import spend
+from turn_pause import notify, spend
+from turn_pause.state import Store
 from turn_pause.spend import (
     PROTECTED_NAMES,
     SIGNAL_NAME,
@@ -25,6 +29,11 @@ from turn_pause.spend import (
 
 TOOLS = Path(__file__).parent
 NOW_MS = 1_700_001_000_000
+NOW_S = 1_700_001_000.0
+OFF_UNTIL = (
+    'spend protection is off until the producer runs again '
+    '(systemctl --user status obs-spend.timer, journalctl --user -u obs-spend)'
+)
 HEAVY = ('dataclasses', 'typing', 'tempfile', 'pathlib', 'hashlib', 'shlex', 'string', 'json', 're',
          'turn_pause.allowlist')
 
@@ -381,7 +390,11 @@ def test_signal_dict_round_trip(tmp_path: Path):
 
 
 def test_spend_hot_path_imports_no_heavy_modules(tmp_path: Path):
-    write_signal(tmp_path, [make_tree_entry('codex', 'R')])
+    sig_path = write_signal(tmp_path, [make_tree_entry('codex', 'R')])
+    pause_dir = tmp_path / 'pause'
+    env = make_env(tmp_path)
+    warm_sig = read(env, 'codex', 'R', None)
+    assert spend.observe(str(pause_dir), warm_sig, str(sig_path), NOW_S) is None
     sub_env = {
         'PYTHONPATH': str(TOOLS),
         'XDG_STATE_HOME': str(tmp_path),
@@ -392,7 +405,8 @@ def test_spend_hot_path_imports_no_heavy_modules(tmp_path: Path):
     code = (
         'import os; from turn_pause import spend; '
         'sig = spend.read(os.environ, "codex", "R", None); '
-        'assert sig.entry is not None and sig.entry.value == 500_000_000'
+        'assert sig.entry is not None and sig.entry.value == 500_000_000; '
+        f'assert spend.observe({str(pause_dir)!r}, sig, {str(sig_path)!r}, {NOW_S!r}) is None'
     )
     r = subprocess.run(
         ['/usr/bin/python3', '-S', '-X', 'importtime', '-c', code],
@@ -407,6 +421,7 @@ def test_spend_hot_path_imports_no_heavy_modules(tmp_path: Path):
         if line.startswith('import time:')
     }
     assert 'turn_pause.spend' in imported
+    assert 'turn_pause.state' not in imported
     assert sorted(imported & set(HEAVY)) == []
     assert spend.__name__ == 'turn_pause.spend'
 
@@ -693,4 +708,476 @@ def test_spend_record_and_entry_dict_round_trip():
         spend.entry_from_dict([])  # type: ignore[arg-type]
     with pytest.raises((TypeError, ValueError)):
         spend.entry_from_dict({**entry_dict, 'extra': 1})
+
+
+# --- host outage latch & desktop alert ------------------------------------------------
+
+
+def test_one_alert_per_outage(tmp_path: Path):
+    env = make_env(tmp_path)
+    pause_dir = tmp_path / 'pause'
+    sig_path = write_signal(tmp_path, [], generated_at=NOW_MS)
+    fresh_sig = read(env, 'codex', 'R1', None)
+    assert spend.observe(pause_dir, fresh_sig, str(sig_path), NOW_S) is None
+    assert spend.read_latch(pause_dir) == spend.HostLatch(seen_fresh=True, outage=None)
+
+    # First non-fresh observation (stale by 11m01s) fires the single alert for the outage.
+    write_signal(tmp_path, [], generated_at=NOW_MS - 661_000)
+    stale_sig = read(env, 'codex', 'R1', None)
+    alert = spend.observe(pause_dir, stale_sig, str(sig_path), NOW_S)
+    assert alert is not None
+    st, alerted_at, title, body = alert
+    assert st == 'stale'
+    assert alerted_at == NOW_S
+    assert title == 'turn-pause: spend protection off'
+    assert str(sig_path) in body
+    assert 'stale' in body
+    assert '11m01s' in body
+    assert OFF_UNTIL in body
+    expected_outage = {
+        'state': 'stale',
+        'alerted_at': NOW_S,
+        'outcome': 'attempted',
+        'error': None,
+    }
+    assert spend.read_latch(pause_dir) == spend.HostLatch(seen_fresh=True, outage=expected_outage)
+
+    # Subsequent unreadable files with new identities every call and another root stay silent.
+    write_signal(tmp_path, [], schema=2)
+    bad1 = read(env, 'codex', 'R1', None)
+    assert bad1.identity is not None and bad1.identity != stale_sig.identity
+    assert spend.observe(pause_dir, bad1, str(sig_path), NOW_S + 120) is None
+
+    tmp_bad = sig_path.parent / '.bad2.tmp'
+    tmp_bad.write_text('{broken json', encoding='utf-8')
+    os.replace(tmp_bad, sig_path)
+    bad2 = read(env, 'claude-code', 'R2', None)
+    assert bad2.identity is not None and bad2.identity != bad1.identity
+    assert spend.observe(pause_dir, bad2, str(sig_path), NOW_S + 240) is None
+
+    # Removing the file transitions the signal state to vanished, still silent within the outage.
+    sig_path.unlink()
+    vanished = read(env, 'codex', 'R1', None)
+    assert vanished.identity is None
+    assert state_of(vanished, int((NOW_S + 360) * 1000), True) == 'vanished'
+    assert spend.observe(pause_dir, vanished, str(sig_path), NOW_S + 360) is None
+    assert spend.read_latch(pause_dir) == spend.HostLatch(seen_fresh=True, outage=expected_outage)
+
+
+def test_vanished_detected_from_latch(tmp_path: Path):
+    env = make_env(tmp_path)
+    pause_dir = tmp_path / 'pause'
+    sig_path = write_signal(tmp_path, [], generated_at=NOW_MS)
+    fresh_sig = read(env, 'codex', 'R', None)
+    assert spend.observe(pause_dir, fresh_sig, str(sig_path), NOW_S) is None
+    assert spend.read_latch(pause_dir) == spend.HostLatch(seen_fresh=True, outage=None)
+
+    alert = spend.observe(pause_dir, Signal(), str(sig_path), NOW_S + 30)
+    assert alert is not None
+    st, alerted_at, title, body = alert
+    assert st == 'vanished'
+    assert alerted_at == NOW_S + 30
+    assert title == 'turn-pause: spend protection off'
+    assert str(sig_path) in body
+    assert 'vanished' in body
+    assert 'age unknown' in body
+    assert OFF_UNTIL in body
+    assert spend.read_latch(pause_dir) == spend.HostLatch(
+        seen_fresh=True,
+        outage={'state': 'vanished', 'alerted_at': NOW_S + 30, 'outcome': 'attempted', 'error': None},
+    )
+
+
+def test_record_alert_does_not_resurrect(tmp_path: Path):
+    env = make_env(tmp_path)
+    pause_dir = tmp_path / 'pause'
+    sig_path = write_signal(tmp_path, [], generated_at=NOW_MS - 700_000)
+    stale_sig = read(env, 'codex', 'R', None)
+    alert = spend.observe(pause_dir, stale_sig, str(sig_path), NOW_S)
+    assert alert is not None and alert[1] == NOW_S
+
+    # A concurrent fresh observation clears the outage before desktop alert failure is recorded.
+    write_signal(tmp_path, [], generated_at=NOW_MS + 10_000)
+    fresh_sig = read(env, 'codex', 'R', None)
+    assert spend.observe(pause_dir, fresh_sig, str(sig_path), NOW_S + 10) is None
+    assert spend.read_latch(pause_dir) == spend.HostLatch(seen_fresh=True, outage=None)
+
+    spend.record_alert(pause_dir, NOW_S, 'err')
+    assert spend.read_latch(pause_dir) == spend.HostLatch(seen_fresh=True, outage=None)
+
+    # A stale record_alert for an earlier outage timestamp also leaves a newer outage untouched.
+    write_signal(tmp_path, [], generated_at=NOW_MS - 700_000)
+    stale2 = read(env, 'codex', 'R', None)
+    alert2 = spend.observe(pause_dir, stale2, str(sig_path), NOW_S + 20)
+    assert alert2 is not None and alert2[1] == NOW_S + 20
+    spend.record_alert(pause_dir, NOW_S, 'old err')
+    assert spend.read_latch(pause_dir) == spend.HostLatch(
+        seen_fresh=True,
+        outage={'state': 'stale', 'alerted_at': NOW_S + 20, 'outcome': 'attempted', 'error': None},
+    )
+
+
+@pytest.mark.parametrize('latch_mode', ['attempted_latch', 'error_latch'])
+def test_outage_reads_take_no_lock_or_write(tmp_path: Path, latch_mode: str):
+    env = make_env(tmp_path)
+    pause_dir = tmp_path / 'pause'
+    sig_path = write_signal(tmp_path, [], generated_at=NOW_MS)
+    assert spend.observe(pause_dir, read(env, 'codex', 'R', None), str(sig_path), NOW_S - 60) is None
+
+    write_signal(tmp_path, [], generated_at=NOW_MS - 700_000)
+    stale_sig = read(env, 'codex', 'R', None)
+    alert = spend.observe(pause_dir, stale_sig, str(sig_path), NOW_S)
+    assert alert is not None
+    if latch_mode == 'error_latch':
+        spend.record_alert(pause_dir, NOW_S, 'notify-send: failed')
+        assert spend.read_latch(pause_dir).seen_fresh is True
+
+    host_file = pause_dir / spend.HOST_FILE
+    lock_file = pause_dir / spend.HOST_LOCK
+    os.utime(host_file, (1_000_000, 1_000_000))
+    before = (host_file.stat().st_mtime_ns, host_file.stat().st_ino)
+
+    write_signal(tmp_path, [], schema=2)
+    unreadable_sig = read(env, 'codex', 'R', None)
+
+    lock_fd = os.open(lock_file, os.O_RDWR)
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        probe_fd = os.open(lock_file, os.O_RDWR)
+        try:
+            with pytest.raises(BlockingIOError):
+                fcntl.flock(probe_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        finally:
+            os.close(probe_fd)
+
+        results: list[object] = []
+        errors: list[BaseException] = []
+
+        def run_fast_path():
+            try:
+                results.append(spend.observe(pause_dir, stale_sig, str(sig_path), NOW_S + 3599))
+                results.append(spend.observe(pause_dir, unreadable_sig, str(sig_path), NOW_S + 3599))
+                results.append(spend.observe(pause_dir, Signal(), str(sig_path), NOW_S + 3599))
+            except BaseException as exc:  # pragma: no cover
+                errors.append(exc)
+
+        worker = threading.Thread(target=run_fast_path)
+        worker.start()
+        worker.join(timeout=1.5)
+        assert not worker.is_alive(), 'observe blocked on HOST_LOCK during ongoing outage'
+        assert errors == []
+        assert results == [None, None, None]
+    finally:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        os.close(lock_fd)
+
+    after = (host_file.stat().st_mtime_ns, host_file.stat().st_ino)
+    assert after == before
+
+
+def test_fresh_clears_latch(tmp_path: Path):
+    env = make_env(tmp_path)
+    pause_dir = tmp_path / 'pause'
+    sig_path = write_signal(tmp_path, [], generated_at=NOW_MS - (2 * 3600 + 5 * 60) * 1000)
+    stale1 = read(env, 'codex', 'R', None)
+    alert1 = spend.observe(pause_dir, stale1, str(sig_path), NOW_S)
+    assert alert1 is not None and alert1[0] == 'stale'
+    assert '2h05m' in alert1[3]
+
+    write_signal(tmp_path, [], generated_at=NOW_MS + 60_000)
+    fresh = read(env, 'codex', 'R', None)
+    assert spend.observe(pause_dir, fresh, str(sig_path), NOW_S + 60) is None
+    assert spend.read_latch(pause_dir) == spend.HostLatch(seen_fresh=True, outage=None)
+
+    write_signal(tmp_path, [], schema=2)
+    unreadable = read(env, 'codex', 'R', None)
+    alert2 = spend.observe(pause_dir, unreadable, str(sig_path), NOW_S + 120)
+    assert alert2 is not None
+    st2, alerted_at2, title2, body2 = alert2
+    assert st2 == 'unreadable'
+    assert alerted_at2 == NOW_S + 120
+    assert title2 == 'turn-pause: spend protection off'
+    assert str(sig_path) in body2
+    assert 'unreadable' in body2
+    assert 'age unknown' in body2
+    assert 'schema' in body2
+    assert OFF_UNTIL in body2
+
+
+def test_absent_never_alerts(tmp_path: Path):
+    pause_dir = tmp_path / 'pause'
+    sig_path = tmp_path / 'obs' / SIGNAL_NAME
+    for dt in (0, 60, 3600, 86400):
+        assert spend.observe(pause_dir, Signal(), str(sig_path), NOW_S + dt) is None
+    assert not (pause_dir / spend.HOST_FILE).exists()
+    assert spend.read_latch(pause_dir) == spend.HostLatch(seen_fresh=False, outage=None)
+
+
+def test_absent_before_fresh_is_silent(tmp_path: Path):
+    env = make_env(tmp_path)
+    pause_dir = tmp_path / 'pause'
+    sig_path = tmp_path / 'obs' / SIGNAL_NAME
+
+    # No file and no prior fresh sighting: state is absent, no alert.
+    missing = read(env, 'codex', 'R', None)
+    assert spend.observe(pause_dir, missing, str(sig_path), NOW_S) is None
+    assert spend.read_latch(pause_dir) == spend.HostLatch(seen_fresh=False, outage=None)
+
+    # Even after an unreadable file (seen_fresh stays False), removing it yields absent, not vanished.
+    write_signal(tmp_path, [], schema=2)
+    bad = read(env, 'codex', 'R', None)
+    alert = spend.observe(pause_dir, bad, str(sig_path), NOW_S + 10)
+    assert alert is not None and alert[0] == 'unreadable'
+    assert spend.read_latch(pause_dir).seen_fresh is False
+
+    sig_path.unlink()
+    missing_again = read(env, 'codex', 'R', None)
+    assert state_of(missing_again, int((NOW_S + 20) * 1000), spend.read_latch(pause_dir).seen_fresh) == 'absent'
+    assert spend.observe(pause_dir, missing_again, str(sig_path), NOW_S + 20) is None
+
+
+def test_failed_alert_retried_after_hour(tmp_path: Path):
+    env = make_env(tmp_path)
+    pause_dir = tmp_path / 'pause'
+    assert spend.RETRY_SECONDS == 3600
+    sig_path = write_signal(tmp_path, [], generated_at=NOW_MS - 700_000)
+    stale_sig = read(env, 'codex', 'R', None)
+
+    first = spend.observe(pause_dir, stale_sig, str(sig_path), NOW_S)
+    assert first is not None and first[1] == NOW_S
+    spend.record_alert(pause_dir, NOW_S, 'notify-send: missing binary')
+    assert spend.read_latch(pause_dir) == spend.HostLatch(
+        seen_fresh=False,
+        outage={
+            'state': 'stale',
+            'alerted_at': NOW_S,
+            'outcome': 'error',
+            'error': 'notify-send: missing binary',
+        },
+    )
+
+    assert spend.observe(pause_dir, stale_sig, str(sig_path), NOW_S + 3599) is None
+    assert spend.read_latch(pause_dir).outage == {
+        'state': 'stale',
+        'alerted_at': NOW_S,
+        'outcome': 'error',
+        'error': 'notify-send: missing binary',
+    }
+
+    retried = spend.observe(pause_dir, stale_sig, str(sig_path), NOW_S + 3600)
+    assert retried is not None
+    assert retried[0] == 'stale'
+    assert retried[1] == NOW_S + 3600
+    assert spend.read_latch(pause_dir) == spend.HostLatch(
+        seen_fresh=False,
+        outage={
+            'state': 'stale',
+            'alerted_at': NOW_S + 3600,
+            'outcome': 'attempted',
+            'error': None,
+        },
+    )
+    # Once attempted succeeds (no record_alert), it does not re-fire another hour later.
+    assert spend.observe(pause_dir, stale_sig, str(sig_path), NOW_S + 7200) is None
+
+
+def test_fresh_no_write_when_clear(tmp_path: Path):
+    env = make_env(tmp_path)
+    pause_dir = tmp_path / 'pause'
+    sig_path = write_signal(tmp_path, [], generated_at=NOW_MS)
+    fresh_sig = read(env, 'codex', 'R', None)
+    assert spend.observe(pause_dir, fresh_sig, str(sig_path), NOW_S) is None
+
+    host_file = pause_dir / spend.HOST_FILE
+    lock_file = pause_dir / spend.HOST_LOCK
+    os.utime(host_file, (1_000_000, 1_000_000))
+    before = (host_file.stat().st_mtime_ns, host_file.stat().st_ino)
+
+    lock_fd = os.open(lock_file, os.O_RDWR)
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        assert spend.observe(pause_dir, fresh_sig, str(sig_path), NOW_S + 60) is None
+    finally:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        os.close(lock_fd)
+
+    after = (host_file.stat().st_mtime_ns, host_file.stat().st_ino)
+    assert after == before
+
+
+def test_store_ignores_host_file(tmp_path: Path):
+    env = make_env(tmp_path)
+    pause_dir = tmp_path / 'pause'
+    sig_path = write_signal(tmp_path, [], generated_at=NOW_MS - 700_000)
+    stale_sig = read(env, 'codex', 'R', None)
+    assert spend.observe(pause_dir, stale_sig, str(sig_path), NOW_S) is not None
+    assert spend.HOST_FILE.startswith('.') and spend.HOST_LOCK.startswith('.')
+    assert (pause_dir / spend.HOST_FILE).is_file()
+    assert (pause_dir / spend.HOST_LOCK).is_file()
+
+    store = Store(pause_dir)
+    assert store._files() == []
+    with store.locked('codex', 'r1'):
+        pass
+    assert store._files() == [str(pause_dir / 'codex-r1.json')]
+    assert store.retention(NOW_S)['ended_roots'] == 0
+    assert store.prune(NOW_S + 30 * 86400, compactions_counted={})['deleted'] == 0
+    assert (pause_dir / spend.HOST_FILE).is_file()
+    assert spend.read_latch(pause_dir).outage is not None
+
+
+def test_host_latch_strict_validation(tmp_path: Path):
+    assert spend.read_latch(tmp_path / 'nonexistent') == spend.HostLatch(False, None)
+    assert spend.HostLatch() == spend.HostLatch(False, None)
+
+    host_file = tmp_path / spend.HOST_FILE
+    bad_payloads = [
+        '{not json',
+        '[]',
+        '{}',
+        json.dumps({'seen_fresh': False}),
+        json.dumps({'seen_fresh': False, 'outage': None, 'extra': 1}),
+        json.dumps({'seen_fresh': 1, 'outage': None}),
+        json.dumps({'seen_fresh': 'false', 'outage': None}),
+        json.dumps({'seen_fresh': None, 'outage': None}),
+        json.dumps({'seen_fresh': True, 'outage': []}),
+        json.dumps({'seen_fresh': True, 'outage': {'state': 'stale'}}),
+        json.dumps({
+            'seen_fresh': True,
+            'outage': {'state': 'stale', 'alerted_at': 1.0, 'outcome': 'attempted', 'error': None, 'x': 1},
+        }),
+        json.dumps({
+            'seen_fresh': True,
+            'outage': {'state': 'fresh', 'alerted_at': 1.0, 'outcome': 'attempted', 'error': None},
+        }),
+        json.dumps({
+            'seen_fresh': True,
+            'outage': {'state': 'absent', 'alerted_at': 1.0, 'outcome': 'attempted', 'error': None},
+        }),
+        json.dumps({
+            'seen_fresh': True,
+            'outage': {'state': 'stale', 'alerted_at': True, 'outcome': 'attempted', 'error': None},
+        }),
+        json.dumps({
+            'seen_fresh': True,
+            'outage': {'state': 'stale', 'alerted_at': -1.0, 'outcome': 'attempted', 'error': None},
+        }),
+        json.dumps({
+            'seen_fresh': True,
+            'outage': {'state': 'stale', 'alerted_at': '1.0', 'outcome': 'attempted', 'error': None},
+        }),
+        json.dumps({
+            'seen_fresh': True,
+            'outage': {'state': 'stale', 'alerted_at': 1.0, 'outcome': 'pending', 'error': None},
+        }),
+        json.dumps({
+            'seen_fresh': True,
+            'outage': {'state': 'stale', 'alerted_at': 1.0, 'outcome': 'attempted', 'error': 'oops'},
+        }),
+        json.dumps({
+            'seen_fresh': True,
+            'outage': {'state': 'stale', 'alerted_at': 1.0, 'outcome': 'error', 'error': None},
+        }),
+        json.dumps({
+            'seen_fresh': True,
+            'outage': {'state': 'stale', 'alerted_at': 1.0, 'outcome': 'error', 'error': 123},
+        }),
+    ]
+    for raw in bad_payloads:
+        host_file.write_text(raw, encoding='utf-8')
+        with pytest.raises((TypeError, ValueError)):
+            spend.read_latch(tmp_path)
+
+    host_file.unlink()
+    host_file.mkdir()
+    try:
+        with pytest.raises((OSError, ValueError)):
+            spend.read_latch(tmp_path)
+    finally:
+        host_file.rmdir()
+
+
+def test_notify_desktop_alert(tmp_path: Path):
+    bin_dir = tmp_path / 'bin'
+    bin_dir.mkdir()
+    log_file = bin_dir / 'notify-send.log'
+    stub = bin_dir / 'notify-send'
+    stub.write_text(
+        '#!/bin/sh\nprintf "%s\\n" "$@" >> "$(dirname "$0")/notify-send.log"\n',
+        encoding='utf-8',
+    )
+    stub.chmod(0o755)
+    # Point XDG_STATE_HOME at a regular file so any relay socket attempt would fail if called.
+    blocker = tmp_path / 'not_a_dir'
+    blocker.write_text('x', encoding='utf-8')
+    env = {'PATH': f'{bin_dir}:/usr/bin:/bin', 'HOME': str(tmp_path), 'XDG_STATE_HOME': str(blocker)}
+
+    with pytest.raises(TypeError):
+        notify.desktop('t', 'b', env)  # type: ignore[misc]
+
+    assert notify.desktop('turn-pause: spend protection off', 'stale signal body', env=env) is None
+    for _ in range(150):
+        if log_file.exists() and log_file.read_text(encoding='utf-8'):
+            break
+        time.sleep(0.02)
+    logged = log_file.read_text(encoding='utf-8').splitlines()
+    assert logged == [
+        '--app-name=turn-pause',
+        '--urgency=critical',
+        'turn-pause: spend protection off',
+        'stale signal body',
+    ]
+
+    empty_bin = tmp_path / 'empty_bin'
+    empty_bin.mkdir()
+    missing_env = {'PATH': str(empty_bin), 'HOME': str(tmp_path), 'XDG_STATE_HOME': str(tmp_path)}
+    err = notify.desktop('turn-pause: spend protection off', 'stale signal body', env=missing_env)
+    assert err is not None and err.startswith('notify-send:')
+
+
+def test_double_checked_host_latch_prevents_concurrent_duplicate_alert(tmp_path: Path):
+    from turn_pause.state import write_atomic
+
+    env = make_env(tmp_path)
+    pause_dir = tmp_path / 'pause'
+    pause_dir.mkdir(mode=0o700)
+    sig_path = write_signal(tmp_path, [], generated_at=NOW_MS - 700_000)
+    stale_sig = read(env, 'codex', 'R', None)
+
+    lock_file = pause_dir / spend.HOST_LOCK
+    lock_fd = os.open(lock_file, os.O_CREAT | os.O_RDWR, 0o600)
+    out: list[object] = []
+    errors: list[BaseException] = []
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+
+        def contender():
+            try:
+                out.append(spend.observe(pause_dir, stale_sig, str(sig_path), NOW_S + 5))
+            except BaseException as exc:  # pragma: no cover
+                errors.append(exc)
+
+        worker = threading.Thread(target=contender)
+        worker.start()
+        time.sleep(0.05)
+        assert worker.is_alive(), 'contender should wait on HOST_LOCK after lock-free read'
+
+        winner = spend.HostLatch(
+            seen_fresh=True,
+            outage={'state': 'stale', 'alerted_at': NOW_S, 'outcome': 'attempted', 'error': None},
+        )
+        write_atomic(
+            str(pause_dir / spend.HOST_FILE),
+            json.dumps(spend.host_latch_to_dict(winner)).encode('utf-8'),
+        )
+    finally:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        os.close(lock_fd)
+
+    worker.join(timeout=2.0)
+    assert not worker.is_alive()
+    assert errors == []
+    assert out == [None]
+    assert spend.read_latch(pause_dir) == winner
+
 
