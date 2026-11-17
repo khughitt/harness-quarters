@@ -1,6 +1,6 @@
 {
  "built_from": {
-  "catalogue_sha256": "6440bd481ab49c3927218b0d3d4fe70f65b63121d6cb1b81e24d121a4c912c21",
+  "catalogue_sha256": "d497e0863943f9d2fdd919bb3e243671f5d5ea9632e376b8fee9a2fe6903477c",
   "samples": {
    "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000001/.system_generated/logs/transcript_full.jsonl": "665c7874fd0d6fd14d98b5d65ab52c6aa0257d634231a80d166a2ddea6b0eb54",
    "agy-index/.gemini/antigravity-cli/brain/b9000000-0000-4000-8000-000000000002/.system_generated/logs/transcript_full.jsonl": "b86df9c5a4eee90e7563000b4b9ef9c53cbb85cd3eb7999b2c7aef8d7bb33d15",
@@ -26,6 +26,7 @@
    "home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-00-01900000-0000-7000-8000-0000000000a1.jsonl": "7eb0a79debf520bc23b40fdcc3100ead08d7c8173c5d2069a2e2667fe6fa705d",
    "home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-11-01900000-0000-7000-8000-0000000000c1.jsonl": "6873cd11d9e18c2f0228908de8eabbc1a56cea85e1a735c87249e40cad260e76",
    "home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-32-01900000-0000-7000-8000-0000000000c2.jsonl": "2fc261d6c84f59cf4b0ba712e79ab1d0170d26f1e05393604414f591505e74c1",
+   "index/compaction-reasons.jsonl": "b5779a0a8e093b81c694ffb07c50de742f44f4dcfdd9e31da51e82809ecddc35",
    "index/errors-hook-id.jsonl": "53e3ac15a14d8be31d135291e62f82c582b962958d17d0b9e5449801f8fcfc07",
    "index/errors-input.jsonl": "14a74c958d1474fb97423654eec3b06d33ec7eb83af716d49e368d048cfd22bf",
    "index/errors-nonobject.jsonl": "10159baf262b43a92d95db59dae1f72c645127301661e0a3ce4e38b295a97c58",
@@ -244,7 +245,7 @@
    "turns/.codex/sessions/2026/10/12/rollout-2026-10-12T11-00-00-01900000-0000-7000-8000-0000000000f2.jsonl": "30b550b6f035815a4123c8a8fd18fbbf7059ec89c04b0749ecda738e24b2fde3"
   }
  },
- "decoder_version": "20",
+ "decoder_version": "21",
  "evidence_rule": "synthetic samples establish decoder conformance; observed samples or probes establish emission; absent from a sample means unobserved",
  "harnesses": {
   "agy": {
@@ -1092,7 +1093,13 @@
     "compaction": {
      "coverage_keys": [],
      "provenance": [
-      "isCompactSummary"
+      "compactMetadata.trigger",
+      "content",
+      "isCompactSummary",
+      "isMeta",
+      "parentUuid",
+      "subtype",
+      "uuid"
      ]
     },
     "copy": {
@@ -1990,15 +1997,23 @@
       "attachment.files[].path": "dimension",
       "attachment.hookEvent": "dimension",
       "attachment.systemPrompt": "applied:attachment",
-      "attachment.toolUseID": "applied:stop_block"
+      "attachment.toolUseID": "applied:stop_block",
+      "parentUuid": "dimension",
+      "uuid": "dimension"
      },
      "system": {
+      "compactMetadata.trigger": "dimension",
+      "content": "dimension",
       "hookErrors": "applied:turn_end",
       "hookInfos": "applied:turn_end",
       "hookInfos[].command": "applied:hook_run",
       "hookInfos[].durationMs": "applied:hook_run",
+      "parentUuid": "dimension",
       "toolUseID": "applied:turn_end",
-      "uuid": "applied:turn_end"
+      "uuid": [
+       "applied:turn_end",
+       "dimension"
+      ]
      },
      "user": {
       "isCompactSummary": "flag",
@@ -2010,13 +2025,15 @@
       "message.content[].tool_use_id": "applied:tool_result",
       "message.content[].type": "applied:text_block",
       "origin.kind": "dimension",
+      "parentUuid": "dimension",
       "toolUseResult": "applied:tool_result_meta",
       "toolUseResult.agentId": "dimension",
       "toolUseResult.answers": "applied:answers",
       "toolUseResult.backgroundTaskId": "flag",
       "toolUseResult.durationMs": "applied:tool_result_meta",
       "toolUseResult.interrupted": "flag",
-      "toolUseResult.persistedOutputSize": "applied:truncation"
+      "toolUseResult.persistedOutputSize": "applied:truncation",
+      "uuid": "dimension"
      }
     },
     "watched": {
@@ -2178,6 +2195,8 @@
     "queue-operation",
     "result/success",
     "system/anything",
+    "system/compact_boundary",
+    "system/informational",
     "system/init",
     "system/interrupted",
     "system/local_command",
@@ -2393,6 +2412,52 @@
       "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000022.jsonl",
       "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000023.jsonl",
       "turns/.claude/projects/-w-gamma/c0000000-0000-4000-8000-000000000024.jsonl"
+     ]
+    },
+    "2.1.325": {
+     "fields_seen": {
+      "observed": [],
+      "synthetic": [
+       "at",
+       "at_ms",
+       "compaction",
+       "eligible",
+       "flags",
+       "flush_response",
+       "header.cwd",
+       "header.entrypoint",
+       "header.first_at",
+       "header.last_at",
+       "header.recorded_identity.session",
+       "header.session",
+       "header.start_ms",
+       "header.uuids",
+       "identity.cwd",
+       "identity.entrypoint",
+       "identity.index_session",
+       "identity.session",
+       "identity.subagent",
+       "identity.version",
+       "injections",
+       "kind",
+       "message.channel",
+       "message.joined_bytes",
+       "message.joined_nonempty",
+       "message.origin",
+       "message.text",
+       "native_kind",
+       "origin.flags",
+       "origin.markers",
+       "origin.unrecognized_tag.joined",
+       "origin.unrecognized_tag.lead",
+       "readable_text",
+       "session",
+       "text"
+      ]
+     },
+     "observed": [],
+     "synthetic": [
+      "index/compaction-reasons.jsonl"
      ]
     },
     "unknown": {
