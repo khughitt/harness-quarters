@@ -133,6 +133,8 @@ UNWATCHED = {
     },
     "user": {
         "isCompactSummary": "flag",
+        "uuid": "dimension",
+        "parentUuid": "dimension",
         "isMeta": "flag",
         "origin.kind": "dimension",
         "message.content[].content[].text": "dimension",
@@ -150,6 +152,8 @@ UNWATCHED = {
         "toolUseResult.answers": "applied:answers",
     },
     "attachment": {
+        "uuid": "dimension",
+        "parentUuid": "dimension",
         "attachment.content": "applied:attachment",
         "attachment.systemPrompt": "applied:attachment",
         "attachment.files": "applied:attachment",
@@ -163,7 +167,10 @@ UNWATCHED = {
         "attachment.blockingError.blockingError": "applied:stop_block",
     },
     "system": {
-        "uuid": "applied:turn_end",
+        "uuid": ("applied:turn_end", "dimension"),
+        "parentUuid": "dimension",
+        "compactMetadata.trigger": "dimension",
+        "content": "dimension",
         "toolUseID": "applied:turn_end",
         "hookInfos": "applied:turn_end",
         "hookInfos[].command": "applied:hook_run",
