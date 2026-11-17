@@ -335,8 +335,8 @@ A Claude compaction appears on up to three events that share `compaction.id`, th
 
 - The boundary (`rule:"compact_boundary"`) has `summary:false` and `trigger`, the
   native `compactMetadata.trigger` (`auto` or `manual`), null when absent. A
-  `compactMetadata` that is not an object, or a trigger that is not a string, fails
-  the file with a `TypeError`.
+  `compactMetadata` that is not an object, or a trigger that is not a string, stops
+  the decode request with a `TypeError`, like the decoder's other invalid native types.
 - The summary (`rule:"compact_summary"`, the `isCompactSummary` user record) has
   `summary:true`. Count compactions from these events only. Its `id` is the boundary's
   when it reaches the open boundary chain by `parentUuid`, directly or through
