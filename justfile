@@ -25,6 +25,11 @@ link *args:
 link-check:
     tools/harness-links --check
 
+# Write lore's long-wait rule (rule:369c0028) into the tracked Codex config. It goes
+# live only by reaching main, and every change needs the user's approval first.
+codex-instructions:
+    tools/codex-instructions write harnesses/codex/config.toml
+
 # Policy decides before the local worker budget is requested.
 test:
     {{tt}} test -- host-budget run -- just _test-suite
