@@ -1181,3 +1181,233 @@ def test_double_checked_host_latch_prevents_concurrent_duplicate_alert(tmp_path:
     assert spend.read_latch(pause_dir) == winner
 
 
+# --- latency measurement gate (tools/measure_turn_pause.py) ---------------------------
+
+
+def _install_in_process_hook(monkeypatch, mtp, on_pre_tool_use=None):
+    import io
+    from turn_pause import hook
+
+    monkeypatch.setattr(hook.notify, 'desktop', lambda title, body, *, env: None)
+
+    def fast_call(harness, event, payload, limits, env, entry=mtp.ENTRY):
+        if event == 'PreToolUse' and on_pre_tool_use is not None:
+            on_pre_tool_use(env)
+        out = io.StringIO()
+        err = io.StringIO()
+        code = hook.main(
+            ['--harness', harness, '--limits', str(limits), event],
+            stdin=io.BytesIO(json.dumps(payload).encode('utf-8')),
+            stdout=out,
+            stderr=err,
+            env=env,
+        )
+        assert code == 0 and not err.getvalue(), err.getvalue()
+        assert not out.getvalue().strip(), out.getvalue()
+        return 0.1
+
+    monkeypatch.setattr(mtp, 'call', fast_call)
+
+
+@pytest.mark.parametrize(
+    ('extra_args', 'expected_spend'),
+    [
+        (['--spend', 'fresh'], 'fresh'),
+        (['--spend', 'stale'], 'stale'),
+        ([], 'none'),
+    ],
+)
+def test_measure_pilot_cli_spend_modes(tmp_path: Path, extra_args: list[str], expected_spend: str):
+    out_file = tmp_path / f'pilot-{expected_spend}.json'
+    sub_env = {
+        'PYTHONPATH': str(TOOLS),
+        'HOME': str(tmp_path),
+        'PATH': '/usr/bin:/bin',
+        'OPS_WORKERS': '4',
+        'LC_ALL': 'C.UTF-8',
+    }
+    r = subprocess.run(
+        ['/usr/bin/python3', str(TOOLS / 'measure_turn_pause.py'), '--pilot', *extra_args, '--output', str(out_file)],
+        env=sub_env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert r.stderr == '', r.stderr
+    assert out_file.is_file()
+    raw_text = out_file.read_text(encoding='utf-8')
+    hostname = os.uname().nodename
+    assert str(tmp_path) not in raw_text
+    assert str(TOOLS) not in raw_text
+    assert '/home/' not in raw_text and '/mnt/' not in raw_text and '/tmp/' not in raw_text
+    if len(hostname) >= 3:
+        assert hostname not in raw_text
+
+    data = json.loads(raw_text)
+    assert set(data) == {
+        'version',
+        'pilot',
+        'workers',
+        'target_p99_ms',
+        'seed_events',
+        'spend',
+        'cases',
+        'status',
+    }
+    assert data['version'] == 1
+    assert data['pilot'] is True
+    assert data['workers'] == 4
+    assert data['spend'] == expected_spend
+    assert data['status'] in ('passed', 'failed')
+    assert r.returncode == (0 if data['status'] == 'passed' else 1)
+    assert [(c['harness'], c['case'], c['samples']) for c in data['cases']] == [
+        ('claude-code', 'serial', 1),
+        ('claude-code', 'concurrent', 4),
+        ('codex', 'serial', 1),
+        ('codex', 'concurrent', 4),
+    ]
+    for case in data['cases']:
+        expected_roots = 2 if case['case'] == 'concurrent' else 1
+        assert len(case['counts']) == expected_roots
+        for row in case['counts']:
+            assert row['calls'] == 1
+            assert row['events'] == 128
+            assert row['state_bytes'] > 0
+
+    refused_file = tmp_path / f'refused-{expected_spend}.json'
+    refused_env = {**sub_env, 'OPS_WORKERS': '2'}
+    refused = subprocess.run(
+        [
+            '/usr/bin/python3',
+            str(TOOLS / 'measure_turn_pause.py'),
+            '--pilot',
+            *extra_args,
+            '--output',
+            str(refused_file),
+        ],
+        env=refused_env,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    assert refused.returncode == 77
+    refused_data = json.loads(refused_file.read_text(encoding='utf-8'))
+    assert refused_data['status'] == 'refused'
+    assert refused_data['spend'] == expected_spend
+
+
+def test_measure_spend_state_and_latch_invariants(tmp_path: Path, monkeypatch):
+    import measure_turn_pause as mtp
+    from turn_pause.state import state_dir
+
+    _install_in_process_hook(monkeypatch, mtp)
+
+    with pytest.raises(ValueError):
+        mtp.measure('codex', False, 1, tmp_path, spend='bogus')
+
+    fresh_base = tmp_path / 'fresh'
+    fresh_base.mkdir()
+    fresh_res = mtp.measure('codex', True, 2, fresh_base, spend='fresh')
+    fresh_case_dir = fresh_base / 'codex-concurrent'
+    fresh_env = {'XDG_STATE_HOME': str(fresh_case_dir / 'state'), 'HOME': str(fresh_case_dir / 'home')}
+    other_root = '00000000-0000-0000-0000-000000000000'
+    other_sig = read(fresh_env, 'codex', other_root, None)
+    assert other_sig.error is None
+    assert other_sig.status == 'ok'
+    assert other_sig.stale_after_ms == 600_000
+    assert other_sig.baseline == 'ok'
+    assert other_sig.entry is not None
+    assert other_sig.entry.episode == f'codex:{other_root}@1'
+    assert other_sig.entry.value == 700_000_000
+    assert other_sig.entry.threshold == 500_000_000.0
+    assert other_sig.entry.ratio == 1.4
+    assert other_sig.entry.window_hours == 72
+    assert other_sig.entry.complete is True
+    assert other_sig.entry.credits_drawn_24h is None
+    assert read(fresh_env, 'codex', mtp.NATIVE_ROOTS['codex'][0], None).entry is None
+    assert spend.read_latch(state_dir(fresh_env)) == spend.HostLatch(seen_fresh=True, outage=None)
+
+    stale_base = tmp_path / 'stale'
+    stale_base.mkdir()
+    before_ms = int(time.time() * 1000)
+    stale_res = mtp.measure('codex', False, 2, stale_base, spend='stale')
+    after_ms = int(time.time() * 1000)
+    stale_case_dir = stale_base / 'codex-serial'
+    stale_env = {'XDG_STATE_HOME': str(stale_case_dir / 'state'), 'HOME': str(stale_case_dir / 'home')}
+    stale_sig = read(stale_env, 'codex', other_root, None)
+    assert stale_sig.error is None
+    assert stale_sig.generated_at is not None
+    assert before_ms - 20 * 60 * 1000 <= stale_sig.generated_at <= after_ms - 20 * 60 * 1000
+    assert state_of(stale_sig, after_ms, False) == 'stale'
+    stale_latch = spend.read_latch(state_dir(stale_env))
+    assert stale_latch.outage is not None and stale_latch.outage['state'] == 'stale'
+
+    none_base = tmp_path / 'none'
+    none_base.mkdir()
+    none_res = mtp.measure('codex', False, 2, none_base, spend='none')
+    none_case_dir = none_base / 'codex-serial'
+    assert not (none_case_dir / 'state' / 'obs').exists()
+    assert not (none_case_dir / 'state' / 'hq' / 'pause' / spend.HOST_FILE).exists()
+    assert stale_res['counts'][0]['state_bytes'] > none_res['counts'][0]['state_bytes']
+    assert fresh_res['counts'][0]['state_bytes'] > none_res['counts'][0]['state_bytes']
+
+    # Corrupted signal during client loop fails the post-run spend_cache assertion.
+    def corrupt_signal(env):
+        (Path(env['XDG_STATE_HOME']) / 'obs' / SIGNAL_NAME).write_text('{bad', encoding='utf-8')
+
+    _install_in_process_hook(monkeypatch, mtp, on_pre_tool_use=corrupt_signal)
+    corrupt_base = tmp_path / 'corrupt'
+    corrupt_base.mkdir()
+    with pytest.raises(AssertionError):
+        mtp.measure('codex', False, 1, corrupt_base, spend='fresh')
+
+
+def test_measure_fresh_rewrites_signal_every_120_calls(tmp_path: Path, monkeypatch):
+    import measure_turn_pause as mtp
+    from turn_pause.state import state_dir
+
+    observed: list[tuple[tuple[int, int, int], int]] = []
+    obs_lock = threading.Lock()
+
+    def record_signal(env):
+        sig_path = Path(env['XDG_STATE_HOME']) / 'obs' / SIGNAL_NAME
+        st = sig_path.stat()
+        ident = (st.st_mtime_ns, st.st_size, st.st_ino)
+        gen = json.loads(sig_path.read_text(encoding='utf-8'))['generated_at']
+        with obs_lock:
+            observed.append((ident, gen))
+
+    _install_in_process_hook(monkeypatch, mtp, on_pre_tool_use=record_signal)
+
+    serial_base = tmp_path / 'serial'
+    serial_base.mkdir()
+    mtp.measure('claude-code', False, 125, serial_base, spend='fresh')
+    assert len(observed) == 125
+    id_0, gen_0 = observed[0]
+    assert set(observed[:119]) == {(id_0, gen_0)}
+    id_1, gen_1 = observed[119]
+    assert id_1[2] != id_0[2]
+    assert id_1 != id_0
+    assert gen_1 > gen_0
+    assert set(observed[119:]) == {(id_1, gen_1)}
+
+    serial_env = {
+        'XDG_STATE_HOME': str(serial_base / 'claude-code-serial' / 'state'),
+        'HOME': str(serial_base / 'claude-code-serial' / 'home'),
+    }
+    root = mtp.NATIVE_ROOTS['claude-code'][0]
+    rec = Store(state_dir(serial_env)).read_record('claude-code', root)
+    assert rec is not None and rec.state is not None and rec.state.spend_cache is not None
+    assert rec.state.spend_cache.identity == id_1
+    assert rec.state.spend_cache.generated_at == gen_1
+
+    observed.clear()
+    conc_base = tmp_path / 'conc'
+    conc_base.mkdir()
+    mtp.measure('codex', True, 65, conc_base, spend='fresh')
+    assert len(observed) == 260
+    distinct_gens = sorted({gen for _, gen in observed})
+    distinct_ids = {ident for ident, _ in observed}
+    assert len(distinct_gens) == 3
+    assert len(distinct_ids) == 3
+
