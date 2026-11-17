@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from turn_pause import adapters, history as hist_mod, limits  # noqa: E402
+from turn_pause import adapters, history as hist_mod, limits, spend  # noqa: E402
 from turn_pause.state import (  # noqa: E402
     ENDED_SECONDS,
     IDLE_SECONDS,
@@ -123,11 +123,23 @@ def counted(state) -> dict:
 
 def status(args, env) -> str:
     directory = str(state_dir(env))
-    state, looked = find(Store(directory), args.session, env, os.getcwd())
+    store = Store(directory)
+    state, looked = find(store, args.session, env, os.getcwd())
     if state is None:
         raise PauseError(f"no pause state in {directory} for {looked}")
     if state.turn is None:
         raise PauseError(f"{state.harness} session {state.root} has pause state but no turn started")
+    now = time.time()
+    now_ms = int(now * 1000)
+    record = store.read_record(state.harness, state.root)
+    sr = None if record is None else record.spend
+    sig = spend.read(env, state.harness, state.root, None)
+    latch = spend.read_latch(directory)
+    sig_state = spend.state_of(sig, now_ms, latch.seen_fresh)
+    f_entry = spend.fresh_entry(sig, now_ms)
+    eff_sr = spend.reconcile(sr, f_entry)
+    pending = spend.is_pending(eff_sr)
+    due = spend.is_due(eff_sr, f_entry)
     turn, lim = state.turn, state.turn.limits
     kept = counted(state)
     if args.json:
@@ -136,13 +148,49 @@ def status(args, env) -> str:
         for name in COUNTS:
             used = getattr(turn, name) if kept.get(name, True) else None
             data[name] = {"used": used, "limit": getattr(lim, name)}
-        data.update(paused=state.paused, budget=state.budget_note, notify=notify_text(state))
+        data.update(
+            paused=state.paused,
+            budget=state.budget_note,
+            notify=notify_text(state),
+            spend={
+                "signal": sig_state,
+                "error": sig.error,
+                "age_s": None if sig.generated_at is None else (now_ms - sig.generated_at) / 1000.0,
+                "producer": sig.status,
+                "baseline": sig.baseline,
+                "episode": None if f_entry is None else {
+                    "episode": f_entry.episode,
+                    "value": f_entry.value,
+                    "threshold": f_entry.threshold,
+                    "ratio": f_entry.ratio,
+                    "window_hours": f_entry.window_hours,
+                    "measured_at": f_entry.measured_at,
+                    "measured_age_s": (now_ms - f_entry.measured_at) / 1000.0,
+                    "complete": f_entry.complete,
+                    "credits_drawn_24h": f_entry.credits_drawn_24h,
+                },
+                "record": None if sr is None else spend.spend_record_to_dict(sr),
+                "pending": pending,
+                "due": due,
+                "latch": None if latch.outage is None else dict(latch.outage),
+            },
+        )
         return json.dumps(data)
     compactions = (f"{turn.compactions}/{lim.compactions} (advisory)" if kept["compactions"]
                    else f"-/{lim.compactions} (advisory, unhooked)")
+    spend_txt = f"spend:{sig_state}"
+    if f_entry is not None:
+        spend_txt += f" episode {f_entry.ratio:.2f}x"
+    if eff_sr is not None:
+        if pending:
+            spend_txt += " pending"
+        elif due:
+            spend_txt += " due"
+        elif eff_sr.acked_value is not None:
+            spend_txt += " acked"
     return (f"active {limits.duration(turn.active)}/{limits.duration(lim.active_seconds)} root calls {turn.calls}/{lim.calls} "
             f"tree spawns {turn.spawns}/{lim.spawns} root compactions {compactions} "
-            f"paused:{state.paused or 'no'} budget:{state.budget_note or 'none'} notify:{notify_text(state)}")
+            f"paused:{state.paused or 'no'} budget:{state.budget_note or 'none'} notify:{notify_text(state)} {spend_txt}")
 
 
 def show_limits(args) -> str:
@@ -462,7 +510,7 @@ def run(args) -> int:
             text = listing(args, os.environ)
         else:
             raise PauseError(f"unknown pause subcommand {args.pause_command!r}")
-    except (PauseError, StateError, OSError, ValueError, KeyError) as error:
+    except (PauseError, StateError, OSError, ValueError, KeyError, TypeError, RecursionError) as error:
         print(f"hq: {error}", file=sys.stderr)
         return 1
     print(text)
