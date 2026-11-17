@@ -42,12 +42,16 @@ Follow a returned session or record ref to the relevant evidence:
 
 Use actual refs from the output, quoting refs containing `#`. Pretty output is
 an overview with clipped text; omit `--pretty` for JSON evidence and increase
-`--text-bytes` when its text is truncated. `--raw` exposes the source record;
-`--expect-sha256 HASH` on a record ref refuses changed evidence.
+`--text-bytes` when its text is truncated. `--raw` exposes the source record.
+`--expect-sha256 HASH` on a record ref detects a hash mismatch but still emits
+the current records and exits 0: check coverage for `outcome: unknown` with
+`outcome_basis: line_changed` before treating evidence as unchanged.
 A record ref opens its enclosing turn; for just one physical line, use the
 session or file target with `--lines 120-120`.
 
-Search defaults to the last 30 days; use `--all-time` for older work. Use
+Unscoped store searches default to the last 30 days; use `--all-time` for older
+work. Searches scoped by `--task`, `--session` or `--file` have no default
+time cutoff; explicit `--since` and `--until` still apply. Use
 `--role human|tool_call|tool_output` to narrow a search, `--cwd PATH` for a
 worktree, or a commit hash as the search pattern. `--task` selects sessions
 with task activity; `--mentions` also includes mere mentions. Search covers
