@@ -11,7 +11,7 @@ from harness_evidence import DECODER_VERSION
 from harness_evidence import index_claude, index_events, index_stream, stream
 from test_harness_evidence_index import (CONTROLS, FIXTURES, TOOLS, environment, expand_proofs,
                                         PROVENANCE_ORACLE, oracle_hash, oracle_rows, oracle_error,
-                                        oracle_native_case, pre_oracle_defaults)
+                                        oracle_native_case, pre_oracle_defaults, POST_ORACLE_FIXTURES)
 
 ENVELOPE = {"schema": "harness-evidence/1", "decoder": {"version": DECODER_VERSION, "revision": "a" * 40}}
 
@@ -727,7 +727,7 @@ def test_direct_provenance_changes_expand_to_frozen_full_oracle(tmp_path, route)
     # The agy store fixtures (agy/, agy-index/) postdate the frozen oracle; every other fixture is in it.
     assert set(PROVENANCE_ORACLE["fixtures"]) == {
         str(p.relative_to(FIXTURES)) for p in FIXTURES.rglob("*.jsonl")
-        if p.relative_to(FIXTURES).parts[0] not in ("agy", "agy-index")}
+        if p.relative_to(FIXTURES).parts[0] not in ("agy", "agy-index")} - POST_ORACLE_FIXTURES
     for name, digest in PROVENANCE_ORACLE["fixtures"].items():
         assert hashlib.sha256((FIXTURES / name).read_bytes()).hexdigest() == digest
     from harness_evidence import revision

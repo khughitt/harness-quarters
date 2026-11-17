@@ -842,9 +842,27 @@ POST_ORACLE_DECLARATIONS = {"results[].exit_code": {
     "native_paths": [], "coverage_keys": [], "basis": "native", "rule": "absent:not_decoded"}}
 
 
+# Declarations widened after the oracle: the current value, then the oracle's. Claude's
+# compaction now also reads the boundary and the idle notice that name one compaction.
+POST_ORACLE_CHANGED = {"compaction": (
+    {"native_paths": ["isCompactSummary", "subtype", "uuid", "parentUuid", "isMeta",
+                      "compactMetadata.trigger", "content"],
+     "coverage_keys": [], "basis": "native", "rule": "claude_native"},
+    {"native_paths": ["isCompactSummary"], "coverage_keys": [], "basis": "native",
+     "rule": "claude_native"})}
+# Fixtures added after the oracle; their rows have no frozen counterpart.
+POST_ORACLE_FIXTURES = frozenset({"index/compaction-reasons.jsonl"})
+# Compaction keys added after the oracle; the oracle's fixtures hold no boundary or notice.
+POST_ORACLE_COMPACTION_KEYS = ("id", "trigger", "reason")
+
+
 def pre_oracle_defaults(defaults):
     assert {field: defaults[field] for field in POST_ORACLE_DECLARATIONS} == POST_ORACLE_DECLARATIONS
-    return {field: proof for field, proof in defaults.items() if field not in POST_ORACLE_DECLARATIONS}
+    defaults = {field: proof for field, proof in defaults.items() if field not in POST_ORACLE_DECLARATIONS}
+    for field, (current, oracle) in POST_ORACLE_CHANGED.items():
+        assert defaults[field] == current, field
+        defaults[field] = copy.deepcopy(oracle)
+    return defaults
 
 
 def pre_oracle_row(value):
@@ -852,6 +870,9 @@ def pre_oracle_row(value):
     if value["object"] == "index_event":
         for result in value["results"]:
             assert result.pop("exit_code") is None
+        if value["compaction"] is not None:
+            for key in POST_ORACLE_COMPACTION_KEYS:
+                assert value["compaction"].pop(key) is None, key
         assert not POST_ORACLE_DECLARATIONS.keys() & value["provenance"].keys()
     return value
 
@@ -915,3 +936,109 @@ def oracle_native_case(case):
             state = working
         assert oracle_rows(rows, defaults) == old["rows"], (case["fixture"], case["layout"], old["through_line"])
         assert oracle_hash(working) == old["native_state"]
+
+
+COMPACTION_PATHS = ["isCompactSummary", "subtype", "uuid", "parentUuid", "isMeta",
+                    "compactMetadata.trigger", "content"]
+
+
+def compaction_rows(rows):
+    return [(row["line"], row["compaction"]) for row in rows if row["compaction"]]
+
+
+def compaction(id_, summary=False, trigger=None, reason=None, rule="compact_boundary"):
+    return {"summary": summary, "id": id_, "trigger": trigger, "reason": reason,
+            "basis": "native", "rule": rule}
+
+
+EXPECTED_COMPACTIONS = [
+    (2, compaction("b1", trigger="auto")),
+    (3, compaction("b1", summary=True, rule="compact_summary")),
+    # An injected (isMeta) user record between the attachments and the notice extends the chain.
+    (8, compaction("b1", reason="idle", rule="idle_compaction_notice")),
+    (10, compaction("b2", trigger="manual")),
+    (11, compaction("b2", summary=True, rule="compact_summary")),
+    (14, compaction("b3", trigger="auto")),
+    (15, compaction("b3", summary=True, rule="compact_summary")),
+    # Typed input closed b3's chain, so this notice names no compaction.
+    (17, compaction(None, reason="idle", rule="idle_compaction_notice")),
+    # Claude can write attachments between a boundary and its summary.
+    (19, compaction("b4", trigger="auto")),
+    (21, compaction("b4", summary=True, rule="compact_summary")),
+    (22, compaction("b4", reason="idle", rule="idle_compaction_notice")),
+]
+
+
+def test_claude_compaction_reasons_pair_boundary_summary_and_idle_notice(tmp_path):
+    rows = events(decoded(tmp_path, "compaction-reasons.jsonl"))
+    assert compaction_rows(rows) == EXPECTED_COMPACTIONS
+    # One compaction each: only the summary event is the compaction count.
+    assert sum(1 for _, value in compaction_rows(rows) if value["summary"]) == 4
+    # An unrelated informational notice is not a compaction.
+    assert next(row for row in rows if row["line"] == 18)["compaction"] is None
+    proof = next(row for row in rows if row["line"] == 8)["provenance"]["compaction"]
+    assert proof["native_paths"] == COMPACTION_PATHS and proof["basis"] == "native"
+
+
+@pytest.mark.parametrize("cut", range(1, 22))
+def test_claude_compaction_pairing_survives_every_native_slice_boundary(cut):
+    from harness_evidence.index_events import extract
+    from harness_evidence.lines import Place
+
+    source = FIXTURES / "index/compaction-reasons.jsonl"
+    raw = source.read_bytes().splitlines(keepends=True)
+    offsets = [sum(len(line) for line in raw[:n]) for n in range(len(raw))]
+    place = Place("claude-code", "file", None, "explicit", str(source), source)
+    state = {}
+    first = list(extract(list(zip(offsets[:cut], raw[:cut])), state, place=place, text=False))
+    state = json.loads(json.dumps(state))  # The checkpoint persists state as JSON.
+    second = list(extract(list(zip(offsets[cut:], raw[cut:])), state, place=place, text=False))
+    rows = [v for v in first + second if v["object"] == "index_event"]
+    assert compaction_rows(rows) == EXPECTED_COMPACTIONS
+
+
+def test_claude_compaction_state_is_dropped_once_its_chain_closes():
+    from harness_evidence.index_events import extract
+    from harness_evidence.lines import Place
+
+    source = FIXTURES / "index/compaction-reasons.jsonl"
+    raw = source.read_bytes().splitlines(keepends=True)
+    offsets = [sum(len(line) for line in raw[:n]) for n in range(len(raw))]
+    place = Place("claude-code", "file", None, "explicit", str(source), source)
+    state = {}
+    list(extract(list(zip(offsets, raw)), state, place=place, text=False))
+    assert "compaction_chain" not in state
+
+
+@pytest.mark.parametrize("metadata, message", [
+    ({"trigger": 5}, "trigger is not a string"),
+    ({"trigger": ["auto"]}, "trigger is not a string"),
+    ("auto", "compactMetadata is not an object"),
+])
+def test_claude_compaction_refuses_a_malformed_trigger(metadata, message):
+    from harness_evidence.index_events import extract
+    from harness_evidence.lines import Place
+
+    source = FIXTURES / "index/compaction-reasons.jsonl"
+    record = json.loads(source.read_bytes().splitlines()[1])
+    record["compactMetadata"] = metadata
+    place = Place("claude-code", "file", None, "explicit", str(source), source)
+    with pytest.raises(TypeError, match=f"^Claude compact_boundary {message}$"):
+        list(extract([(0, (json.dumps(record) + "\n").encode())], {}, place=place, text=False))
+
+
+def test_claude_compaction_trigger_is_null_only_when_absent():
+    from harness_evidence.index_events import extract
+    from harness_evidence.lines import Place
+
+    source = FIXTURES / "index/compaction-reasons.jsonl"
+    place = Place("claude-code", "file", None, "explicit", str(source), source)
+    for absent in ({"preTokens": 1}, {"trigger": None}, None):
+        record = json.loads(source.read_bytes().splitlines()[1])
+        if absent is None:
+            record.pop("compactMetadata")
+        else:
+            record["compactMetadata"] = absent
+        rows = [v for v in extract([(0, (json.dumps(record) + "\n").encode())], {}, place=place,
+                                   text=False) if v["object"] == "index_event"]
+        assert rows[0]["compaction"]["trigger"] is None

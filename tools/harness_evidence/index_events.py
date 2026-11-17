@@ -45,6 +45,7 @@ NOTIFIED_ID = re.compile(r"<tool-use-id>([^<]+)</tool-use-id>")
 NOTIFIED_STATUS = re.compile(r"<status>([^<]+)</status>")
 NOTIFIED_EXIT = re.compile(r"\(exit code (-?\d+)\)")
 ELISION = re.compile(r"\n\n\.\.\. \[\d+ characters truncated\] \.\.\.\n\n")
+IDLE_NOTICE = "Compacted while idle, before the prompt cache expired"
 
 # Native sources are declarations, not a consumer's metric catalogue.
 PROVENANCE = {
@@ -134,7 +135,8 @@ PROVENANCE = {
         "message.content",
     ],
     "notifications": [""],
-    "compaction": ["isCompactSummary"],
+    "compaction": ["isCompactSummary", "subtype", "uuid", "parentUuid", "isMeta",
+                   "compactMetadata.trigger", "content"],
     "interruption": ["message.content", "subtype"],
     "fork_boundary": ["type"],
     "turn_end": ["uuid", "toolUseID", "hookInfos", "hookErrors"],
@@ -493,6 +495,52 @@ def _turn_end(record, state, session, day):
     }
 
 
+def _compaction(record, kind, state):
+    """Name a compaction by its boundary uuid across the boundary, summary and idle notice.
+
+    Claude writes the idle notice as a later informational record with no compaction id,
+    reached from the summary by parentUuid through injected context (attachments and
+    isMeta user records). The open chain lives in resumable state and closes at the
+    first other record; a notice outside a chain names no compaction, never a guess.
+    """
+    if kind not in ("system", "user", "attachment"):
+        state.pop("compaction_chain", None)  # Only a summary and injected context extend it.
+        return None
+    uuid = record.get("uuid")
+    chain = state.get("compaction_chain")
+    linked = chain if chain is not None and record.get("parentUuid") in chain["uuids"] else None
+    summary = kind == "user" and bool(record.get("isCompactSummary"))
+    subtype = record.get("subtype") if kind == "system" else None
+    value = {"summary": False, "id": None, "trigger": None, "reason": None, "basis": "native"}
+    if subtype == "compact_boundary":
+        metadata = record.get("compactMetadata")
+        if metadata is not None and not isinstance(metadata, dict):
+            raise TypeError("Claude compact_boundary compactMetadata is not an object")
+        trigger = (metadata or {}).get("trigger")
+        if trigger is not None and not isinstance(trigger, str):
+            raise TypeError("Claude compact_boundary trigger is not a string")
+        if isinstance(uuid, str):
+            state["compaction_chain"] = {"id": uuid, "uuids": [uuid]}
+        else:
+            state.pop("compaction_chain", None)
+        return {**value, "id": uuid if isinstance(uuid, str) else None, "trigger": trigger,
+                "rule": "compact_boundary"}
+    if uuid is None:  # Records without a uuid neither extend nor close a chain.
+        return {**value, "summary": True, "rule": "compact_summary"} if summary else None
+    injected = kind == "attachment" or kind == "user" and bool(record.get("isMeta"))
+    if linked is not None and (injected or summary):
+        linked["uuids"].append(uuid)
+    else:
+        state.pop("compaction_chain", None)
+    owner = linked["id"] if linked is not None else None
+    if summary:
+        return {**value, "summary": True, "id": owner, "rule": "compact_summary"}
+    content = record.get("content") if subtype == "informational" else None
+    if isinstance(content, str) and content.startswith(IDLE_NOTICE):
+        return {**value, "id": owner, "reason": "idle", "rule": "idle_compaction_notice"}
+    return None
+
+
 def _message(record, kind):
     if kind == "attachment":
         return None
@@ -786,6 +834,7 @@ def extract(lines, state, *, place: Place, text: bool):
                     "rule": "fork_context_ref",
                 }
         else:
+            event["compaction"] = _compaction(record, kind, state)
             source_line = raw.decode("utf-8", errors="replace")
             for notification in NOTIFICATION.findall(source_line):
                 id_, status, exit_ = (
@@ -904,11 +953,6 @@ def extract(lines, state, *, place: Place, text: bool):
                 content = (record.get("message") or {}).get("content")
                 msg = event["message"]
                 if record.get("isCompactSummary"):
-                    event["compaction"] = {
-                        "summary": True,
-                        "basis": "native",
-                        "rule": "compact_summary",
-                    }
                     event["injections"] = [
                         {
                             "piece": 0,
