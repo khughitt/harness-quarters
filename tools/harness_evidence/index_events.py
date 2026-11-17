@@ -135,7 +135,7 @@ PROVENANCE = {
         "message.content",
     ],
     "notifications": [""],
-    "compaction": ["isCompactSummary", "subtype", "uuid", "parentUuid",
+    "compaction": ["isCompactSummary", "subtype", "uuid", "parentUuid", "isMeta",
                    "compactMetadata.trigger", "content"],
     "interruption": ["message.content", "subtype"],
     "fork_boundary": ["type"],
@@ -514,7 +514,11 @@ def _compaction(record, kind, state):
     value = {"summary": False, "id": None, "trigger": None, "reason": None, "basis": "native"}
     if subtype == "compact_boundary":
         metadata = record.get("compactMetadata")
-        trigger = metadata.get("trigger") if isinstance(metadata, dict) else None
+        if metadata is not None and not isinstance(metadata, dict):
+            raise TypeError("Claude compact_boundary compactMetadata is not an object")
+        trigger = (metadata or {}).get("trigger")
+        if trigger is not None and not isinstance(trigger, str):
+            raise TypeError("Claude compact_boundary trigger is not a string")
         if isinstance(uuid, str):
             state["compaction_chain"] = {"id": uuid, "uuids": [uuid]}
         else:

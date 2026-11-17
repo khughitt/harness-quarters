@@ -26,7 +26,7 @@
    "home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-00-01900000-0000-7000-8000-0000000000a1.jsonl": "7eb0a79debf520bc23b40fdcc3100ead08d7c8173c5d2069a2e2667fe6fa705d",
    "home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-11-01900000-0000-7000-8000-0000000000c1.jsonl": "6873cd11d9e18c2f0228908de8eabbc1a56cea85e1a735c87249e40cad260e76",
    "home/.codex/sessions/2026/10/08/rollout-2026-10-08T10-00-32-01900000-0000-7000-8000-0000000000c2.jsonl": "2fc261d6c84f59cf4b0ba712e79ab1d0170d26f1e05393604414f591505e74c1",
-   "index/compaction-reasons.jsonl": "e9952deefe664c8634727ada0dafbffcf8bf9e5ac5b7603a8ec2ddcf599ea030",
+   "index/compaction-reasons.jsonl": "b5779a0a8e093b81c694ffb07c50de742f44f4dcfdd9e31da51e82809ecddc35",
    "index/errors-hook-id.jsonl": "53e3ac15a14d8be31d135291e62f82c582b962958d17d0b9e5449801f8fcfc07",
    "index/errors-input.jsonl": "14a74c958d1474fb97423654eec3b06d33ec7eb83af716d49e368d048cfd22bf",
    "index/errors-nonobject.jsonl": "10159baf262b43a92d95db59dae1f72c645127301661e0a3ce4e38b295a97c58",
@@ -1096,6 +1096,7 @@
       "compactMetadata.trigger",
       "content",
       "isCompactSummary",
+      "isMeta",
       "parentUuid",
       "subtype",
       "uuid"

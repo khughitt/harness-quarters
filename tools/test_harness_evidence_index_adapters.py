@@ -35,7 +35,8 @@ ADDED_PROVENANCE = ("results[].exit_code",)
 ADDED_COMPACTION_KEYS = ("id", "trigger", "reason")
 # Declarations widened after the base: field -> (current, base).
 CHANGED_PROVENANCE = {"compaction": (
-    ["isCompactSummary", "subtype", "uuid", "parentUuid", "compactMetadata.trigger", "content"],
+    ["isCompactSummary", "subtype", "uuid", "parentUuid", "isMeta", "compactMetadata.trigger",
+     "content"],
     ["isCompactSummary"])}
 # Samples catalogued after the base, with the capability evidence they alone add.
 ADDED_SAMPLES = ("index/compaction-reasons.jsonl",)

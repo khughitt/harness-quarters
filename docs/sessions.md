@@ -334,15 +334,18 @@ A Claude compaction appears on up to three events that share `compaction.id`, th
 `trigger`, `reason`, `basis:"native"` and `rule`:
 
 - The boundary (`rule:"compact_boundary"`) has `summary:false` and `trigger`, the
-  native `compactMetadata.trigger` (`auto` or `manual`).
+  native `compactMetadata.trigger` (`auto` or `manual`), null when absent. A
+  `compactMetadata` that is not an object, or a trigger that is not a string, fails
+  the file with a `TypeError`.
 - The summary (`rule:"compact_summary"`, the `isCompactSummary` user record) has
-  `summary:true`. Count compactions from these events only; its `id` is null when
-  its parent is not a boundary.
+  `summary:true`. Count compactions from these events only. Its `id` is the boundary's
+  when it reaches the open boundary chain by `parentUuid`, directly or through
+  injected context (Claude can write attachments between the two), and null otherwise.
 - An idle notice (`rule:"idle_compaction_notice"`) has `summary:false` and
   `reason:"idle"`. Claude writes it as a later `system`/`informational` record whose
   content starts "Compacted while idle, before the prompt cache expired". It carries
-  no compaction id, so the decoder follows `parentUuid` from the summary through
-  injected context: attachment records and `isMeta` user records. That chain stays
+  no compaction id, so the decoder follows `parentUuid` from the boundary through the
+  summary and injected context: attachment records and `isMeta` user records. That chain stays
   open in the resumable index state and closes at the first record that does not
   extend it. A notice outside an open chain has a null `id` rather than a guessed one.
 

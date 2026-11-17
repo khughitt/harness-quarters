@@ -845,7 +845,7 @@ POST_ORACLE_DECLARATIONS = {"results[].exit_code": {
 # Declarations widened after the oracle: the current value, then the oracle's. Claude's
 # compaction now also reads the boundary and the idle notice that name one compaction.
 POST_ORACLE_CHANGED = {"compaction": (
-    {"native_paths": ["isCompactSummary", "subtype", "uuid", "parentUuid",
+    {"native_paths": ["isCompactSummary", "subtype", "uuid", "parentUuid", "isMeta",
                       "compactMetadata.trigger", "content"],
      "coverage_keys": [], "basis": "native", "rule": "claude_native"},
     {"native_paths": ["isCompactSummary"], "coverage_keys": [], "basis": "native",
@@ -938,7 +938,7 @@ def oracle_native_case(case):
         assert oracle_hash(working) == old["native_state"]
 
 
-COMPACTION_PATHS = ["isCompactSummary", "subtype", "uuid", "parentUuid",
+COMPACTION_PATHS = ["isCompactSummary", "subtype", "uuid", "parentUuid", "isMeta",
                     "compactMetadata.trigger", "content"]
 
 
@@ -962,6 +962,10 @@ EXPECTED_COMPACTIONS = [
     (15, compaction("b3", summary=True, rule="compact_summary")),
     # Typed input closed b3's chain, so this notice names no compaction.
     (17, compaction(None, reason="idle", rule="idle_compaction_notice")),
+    # Claude can write attachments between a boundary and its summary.
+    (19, compaction("b4", trigger="auto")),
+    (21, compaction("b4", summary=True, rule="compact_summary")),
+    (22, compaction("b4", reason="idle", rule="idle_compaction_notice")),
 ]
 
 
@@ -969,14 +973,14 @@ def test_claude_compaction_reasons_pair_boundary_summary_and_idle_notice(tmp_pat
     rows = events(decoded(tmp_path, "compaction-reasons.jsonl"))
     assert compaction_rows(rows) == EXPECTED_COMPACTIONS
     # One compaction each: only the summary event is the compaction count.
-    assert sum(1 for _, value in compaction_rows(rows) if value["summary"]) == 3
+    assert sum(1 for _, value in compaction_rows(rows) if value["summary"]) == 4
     # An unrelated informational notice is not a compaction.
     assert next(row for row in rows if row["line"] == 18)["compaction"] is None
     proof = next(row for row in rows if row["line"] == 8)["provenance"]["compaction"]
     assert proof["native_paths"] == COMPACTION_PATHS and proof["basis"] == "native"
 
 
-@pytest.mark.parametrize("cut", range(1, 18))
+@pytest.mark.parametrize("cut", range(1, 22))
 def test_claude_compaction_pairing_survives_every_native_slice_boundary(cut):
     from harness_evidence.index_events import extract
     from harness_evidence.lines import Place
@@ -1004,3 +1008,37 @@ def test_claude_compaction_state_is_dropped_once_its_chain_closes():
     state = {}
     list(extract(list(zip(offsets, raw)), state, place=place, text=False))
     assert "compaction_chain" not in state
+
+
+@pytest.mark.parametrize("metadata, message", [
+    ({"trigger": 5}, "trigger is not a string"),
+    ({"trigger": ["auto"]}, "trigger is not a string"),
+    ("auto", "compactMetadata is not an object"),
+])
+def test_claude_compaction_refuses_a_malformed_trigger(metadata, message):
+    from harness_evidence.index_events import extract
+    from harness_evidence.lines import Place
+
+    source = FIXTURES / "index/compaction-reasons.jsonl"
+    record = json.loads(source.read_bytes().splitlines()[1])
+    record["compactMetadata"] = metadata
+    place = Place("claude-code", "file", None, "explicit", str(source), source)
+    with pytest.raises(TypeError, match=f"^Claude compact_boundary {message}$"):
+        list(extract([(0, (json.dumps(record) + "\n").encode())], {}, place=place, text=False))
+
+
+def test_claude_compaction_trigger_is_null_only_when_absent():
+    from harness_evidence.index_events import extract
+    from harness_evidence.lines import Place
+
+    source = FIXTURES / "index/compaction-reasons.jsonl"
+    place = Place("claude-code", "file", None, "explicit", str(source), source)
+    for absent in ({"preTokens": 1}, {"trigger": None}, None):
+        record = json.loads(source.read_bytes().splitlines()[1])
+        if absent is None:
+            record.pop("compactMetadata")
+        else:
+            record["compactMetadata"] = absent
+        rows = [v for v in extract([(0, (json.dumps(record) + "\n").encode())], {}, place=place,
+                                   text=False) if v["object"] == "index_event"]
+        assert rows[0]["compaction"]["trigger"] is None
