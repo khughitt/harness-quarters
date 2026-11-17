@@ -5,6 +5,9 @@ approvals_reviewer = "user"
 
 personality = "pragmatic"
 web_search = "live"
+# Lets one write_stdin wait up to 1 h on a background command (default 300000 ms);
+# the wait rule pairs it with an @exec yield_time_ms pragma. Fact: long-shell-wait.
+background_terminal_max_timeout = 3600000
 
 # codex-specific instructions
 # codex-specific instructions: none; the profile fragments carry the per-project rules.
