@@ -11,8 +11,8 @@ MAX_BYTES = 131072
 SCOPES = {'active': 'tree_active_seconds', 'calls': 'root_attempts',
           'spawns': 'tree_started', 'compactions': 'root'}
 REASONS = {'turn_start': {'genuine_user', 'implicit'},
-           'warning': {'active', 'calls', 'spawns', 'compactions'},
-           'enforced_pause': {'active', 'calls', 'spawns', 'compactions', 'limits-changed'},
+           'warning': {'active', 'calls', 'spawns', 'compactions', 'spend'},
+           'enforced_pause': {'active', 'calls', 'spawns', 'compactions', 'limits-changed', 'spend'},
            'notification': {None}, 'turn_reset': {'genuine_user'},
            'turn_resume': {'genuine_user'}, 'session_end': {'session_end', 'idle'}}
 EVENT_FIELDS = frozenset({'version', 'harness', 'root', 'generation', 'turn', 'sequence', 'host',

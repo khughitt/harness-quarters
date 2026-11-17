@@ -1,4 +1,4 @@
-"""Reader for obs's published spend-signals.json (schema 1).
+"""Reader for obs's published spend-signals.json (schema 1) and episode rules.
 
 Imported on the hook's hot path: keeps imports strictly to os and .record, stats the
 signal file once per call, and parses via record.jloads_strict only when the file's
@@ -17,13 +17,22 @@ __all__ = (
     'protected_paths',
     'Entry',
     'Signal',
+    'SpendRecord',
     'read',
     'state_of',
     'fresh_entry',
+    'reconcile',
+    'is_pending',
+    'is_due',
+    'deliver',
+    'acknowledge',
+    'inject',
     'entry_to_dict',
     'entry_from_dict',
     'signal_to_dict',
     'signal_from_dict',
+    'spend_record_to_dict',
+    'spend_record_from_dict',
 )
 
 SIGNAL_NAME = 'spend-signals.json'
@@ -75,8 +84,22 @@ class Signal(Record):
     }
 
 
+class SpendRecord(Record):
+    __slots__ = _fields = (
+        'episode',
+        'seen_value',
+        'delivered_value',
+        'acked_value',
+    )
+    _defaults = {
+        'delivered_value': None,
+        'acked_value': None,
+    }
+
+
 _ENTRY_FIELDS = set(Entry._fields)
 _SIGNAL_FIELDS = set(Signal._fields)
+_SPEND_RECORD_FIELDS = set(SpendRecord._fields)
 
 
 def obs_state_dir(env: Mapping[str, str] = os.environ) -> str:
@@ -400,4 +423,113 @@ def signal_from_dict(d: dict) -> Signal:
         baseline=baseline,
         entry=entry,
         error=error,
+    )
+
+
+def _nonneg_num(value, name: str) -> int | float:
+    if (type(value) is not int and type(value) is not float) or not (0 <= value < _INF):
+        raise ValueError(f'invalid {name}: {value!r}')
+    return value
+
+
+def spend_record_to_dict(sr: SpendRecord) -> dict:
+    return {
+        'episode': sr.episode,
+        'seen_value': sr.seen_value,
+        'delivered_value': sr.delivered_value,
+        'acked_value': sr.acked_value,
+    }
+
+
+def spend_record_from_dict(d: dict) -> SpendRecord:
+    if not isinstance(d, dict):
+        raise TypeError(f'spend record must be dict, not {type(d).__name__}')
+    if set(d) != _SPEND_RECORD_FIELDS:
+        raise ValueError('spend record fields differ')
+    episode = d['episode']
+    if type(episode) is not str or not episode:
+        raise ValueError(f'invalid spend.episode: {episode!r}')
+    seen_value = _nonneg_num(d['seen_value'], 'spend.seen_value')
+    raw_delivered = d['delivered_value']
+    delivered_value = None if raw_delivered is None else _nonneg_num(raw_delivered, 'spend.delivered_value')
+    raw_acked = d['acked_value']
+    acked_value = None if raw_acked is None else _nonneg_num(raw_acked, 'spend.acked_value')
+    return SpendRecord(
+        episode=episode,
+        seen_value=seen_value,
+        delivered_value=delivered_value,
+        acked_value=acked_value,
+    )
+
+
+def reconcile(sr: SpendRecord | None, entry: Entry | None) -> SpendRecord | None:
+    """Reconcile durable spend state against this root's fresh entry (if any)."""
+    if entry is None:
+        return sr
+    if sr is None or sr.episode != entry.episode:
+        return SpendRecord(
+            episode=entry.episode,
+            seen_value=entry.value,
+            delivered_value=None,
+            acked_value=None,
+        )
+    return SpendRecord(
+        episode=sr.episode,
+        seen_value=max(sr.seen_value, entry.value),
+        delivered_value=sr.delivered_value,
+        acked_value=sr.acked_value,
+    )
+
+
+def is_pending(sr: SpendRecord | None) -> bool:
+    """True when delivered to the root and awaiting a genuine root human prompt."""
+    return sr is not None and sr.delivered_value is not None and sr.acked_value is None
+
+
+def is_due(sr: SpendRecord | None, entry: Entry | None) -> bool:
+    """True when there is a fresh entry that has never been delivered or has doubled since ack."""
+    if entry is None:
+        return False
+    if sr is None or sr.delivered_value is None:
+        return True
+    return sr.acked_value is not None and entry.value >= 2 * sr.acked_value
+
+
+def deliver(sr: SpendRecord, value: int | float) -> SpendRecord:
+    """Record root refusal delivery at value, resetting acked_value to None."""
+    if type(sr) is not SpendRecord:
+        raise TypeError(f'sr must be SpendRecord, not {type(sr).__name__}')
+    checked = _nonneg_num(value, 'spend.delivered_value')
+    return SpendRecord(
+        episode=sr.episode,
+        seen_value=max(sr.seen_value, checked),
+        delivered_value=checked,
+        acked_value=None,
+    )
+
+
+def acknowledge(sr: SpendRecord) -> SpendRecord:
+    """Acknowledge a delivered spend episode at max(seen_value, delivered_value)."""
+    if type(sr) is not SpendRecord:
+        raise TypeError(f'sr must be SpendRecord, not {type(sr).__name__}')
+    if sr.delivered_value is None:
+        raise ValueError('cannot acknowledge an undelivered spend episode')
+    return SpendRecord(
+        episode=sr.episode,
+        seen_value=sr.seen_value,
+        delivered_value=sr.delivered_value,
+        acked_value=max(sr.seen_value, sr.delivered_value),
+    )
+
+
+def inject(sr: SpendRecord, value: int | float) -> SpendRecord:
+    """Record prompt injection at value, setting both delivered_value and acked_value."""
+    if type(sr) is not SpendRecord:
+        raise TypeError(f'sr must be SpendRecord, not {type(sr).__name__}')
+    checked = _nonneg_num(value, 'spend.delivered_value')
+    return SpendRecord(
+        episode=sr.episode,
+        seen_value=max(sr.seen_value, checked),
+        delivered_value=checked,
+        acked_value=checked,
     )

@@ -340,3 +340,43 @@ def test_history_lazy_events_roundtrip_and_corrupt_tail_refusal(tmp_path):
     with pytest.raises(StateError):
         with store.locked('codex', 'r1') as record:
             _ = len(record.events)
+
+
+def test_spend_reasons_valid(tmp_path):
+    store = Store(tmp_path)
+    seeded(store)
+    h = history()
+
+    with store.locked('codex', 'r1') as record:
+        record.state.paused = 'spend'
+        snap_paused = h.snapshot(record.state, compactions_counted=False)
+        h.validate_snapshot(snap_paused)
+        ev_pause = h.append_event(
+            record,
+            'enforced_pause',
+            10.0,
+            reason='spend',
+            snapshot=snap_paused,
+        )
+        assert ev_pause['reason'] == 'spend'
+        assert ev_pause['snapshot']['paused'] == 'spend'
+
+        record.state.paused = None
+        snap_active = h.snapshot(record.state, compactions_counted=False)
+        ev_warn = h.append_event(
+            record,
+            'warning',
+            11.0,
+            reason='spend',
+            snapshot=snap_active,
+        )
+        assert ev_warn['reason'] == 'spend'
+
+    got = store.read_record('codex', 'r1')
+    assert [e['kind'] for e in got.events] == ['enforced_pause', 'warning']
+    assert [e['reason'] for e in got.events] == ['spend', 'spend']
+
+    for disallowed_kind in ('turn_start', 'turn_reset', 'turn_resume', 'session_end', 'notification'):
+        with pytest.raises(ValueError, match='invalid history kind/reason'):
+            h.append_event(got, disallowed_kind, 12.0, reason='spend', snapshot=None)
+

@@ -444,3 +444,229 @@ def test_non_utf8_file_raises_state_error_with_path(tmp_path):
     with pytest.raises(StateError, match=str(path)):
         store.latest_for_cwd('/x')
     assert path.read_bytes() == b'\xff\xfe{'
+
+
+PRE_MERGE_RECORD_JSON = (
+    '{"version":1,"harness":"claude","root":"r1",'
+    '"generation":"0123456789abcdef0123456789abcdef","created_at":1700000000.0,'
+    '"turn_serial":1,"event_serial":1,"state":{"harness":"claude","root":"r1",'
+    '"turn":{"started":1.0,"limits":{"active_seconds":14400,"calls":500,"spawns":30,"compactions":2},'
+    '"limits_sha":"abc","active":0.0,"calls":3,"spawns":1,"compactions":0,"last_t":2.0,'
+    '"in_flight":{"c1":null},"tools":{},"spawn_keys":["k"],"warned":[]},'
+    '"paused":null,"grace_used":{},"workers":["w1"],"worker_names":["n1"],'
+    '"cron_jobs":{"j1":"do it"},"wakeups":[["wake",10.0,70.0]],"harness_pid":42,'
+    '"cwd":"/x","notified":false,"notify_error":null,"budget_note":"b"},'
+    '"ended_at":null,"dropped_count":0,"dropped_through":null,'
+    '"prompt_guards":{"cron":[],"wakeups":[]},'
+    '"events":[{"version":1,"harness":"claude","root":"r1",'
+    '"generation":"0123456789abcdef0123456789abcdef","turn":1,"sequence":1,'
+    '"host":"test-host","at":1.0,"kind":"turn_start","reason":"genuine_user",'
+    '"snapshot":{"limits_sha":"abc","paused":null,'
+    '"counted":{"active":true,"calls":true,"spawns":true,"compactions":true},'
+    '"scopes":{"active":"tree_active_seconds","calls":"root_attempts",'
+    '"spawns":"tree_started","compactions":"root"},'
+    '"active":{"used":0.0,"limit":14400},"calls":{"used":0,"limit":500},'
+    '"spawns":{"used":0,"limit":30},"compactions":{"used":0,"limit":2}},'
+    '"notification":null,"source":"hook"}]}'
+)
+
+
+def test_pre_merge_record_and_state_load(tmp_path):
+    import json
+    from turn_pause.state import parse_record, record_json, state_dict, state_from_dict
+
+    assert '"spend"' not in PRE_MERGE_RECORD_JSON
+    assert '"spend_cache"' not in PRE_MERGE_RECORD_JSON
+    assert '"spend_snapshot"' not in PRE_MERGE_RECORD_JSON
+
+    path = tmp_path / 'claude-r1.json'
+    path.write_text(PRE_MERGE_RECORD_JSON)
+    store = Store(tmp_path)
+
+    loaded_record = store.read_record('claude', 'r1')
+    assert loaded_record is not None
+    assert loaded_record.version == 1
+    assert loaded_record.spend is None
+    assert loaded_record.state is not None
+    assert loaded_record.state.spend_cache is None
+    assert loaded_record.state.spend_snapshot is None
+
+    re_encoded = record_json(loaded_record)
+    assert re_encoded == PRE_MERGE_RECORD_JSON
+    assert parse_record(re_encoded) == loaded_record
+
+    # Explicit null values for optional fields also parse to None.
+    with_nulls = json.loads(PRE_MERGE_RECORD_JSON)
+    with_nulls['spend'] = None
+    with_nulls['state']['spend_cache'] = None
+    with_nulls['state']['spend_snapshot'] = None
+    parsed_nulls = parse_record(json.dumps(with_nulls))
+    assert parsed_nulls == loaded_record
+    assert 'spend_cache' not in state_dict(parsed_nulls.state)
+    assert 'spend_snapshot' not in state_dict(parsed_nulls.state)
+
+    # Unknown extra keys or missing required keys still fail closed.
+    bad_record_extra = json.loads(PRE_MERGE_RECORD_JSON)
+    bad_record_extra['unknown'] = 1
+    with pytest.raises(ValueError, match='root record fields differ'):
+        parse_record(json.dumps(bad_record_extra))
+
+    bad_state_extra = json.loads(PRE_MERGE_RECORD_JSON)['state']
+    bad_state_extra['unknown'] = 1
+    with pytest.raises(ValueError, match='active state fields differ'):
+        state_from_dict(bad_state_extra)
+
+    bad_state_missing = json.loads(PRE_MERGE_RECORD_JSON)['state']
+    del bad_state_missing['budget_note']
+    with pytest.raises(ValueError, match='active state fields differ'):
+        state_from_dict(bad_state_missing)
+
+
+def test_spend_record_round_trip(tmp_path, monkeypatch):
+    import copy
+    import json
+    import pickle
+    from turn_pause import spend
+    from turn_pause.state import state_dict, write_atomic
+
+    entry = spend.Entry(
+        episode='codex:r1@1700000000000',
+        value=550_000_000,
+        threshold=350_000_000.0,
+        ratio=1.57,
+        window_hours=72,
+        measured_at=1_700_001_000_000,
+        complete=True,
+        credits_drawn_24h=12.5,
+    )
+    cache = spend.Signal(
+        identity=(1_700_001_000_000_000_000, 2048, 999),
+        generated_at=1_700_001_000_000,
+        stale_after_ms=600_000,
+        status='ok',
+        baseline='ok',
+        entry=entry,
+        error=None,
+    )
+    sr = spend.SpendRecord(
+        episode='codex:r1@1700000000000',
+        seen_value=550_000_000,
+        delivered_value=500_000_000,
+        acked_value=None,
+    )
+
+    store = Store(tmp_path)
+    with store.locked('codex', 'r1') as record:
+        record.spend = sr
+        record.state.turn = turn()
+        record.state.spend_cache = cache
+        record.state.spend_snapshot = entry
+
+    got_record = store.read_record('codex', 'r1')
+    assert got_record is not None
+    assert got_record.version == 1
+    assert got_record.spend == sr
+    assert got_record.state.spend_cache == cache
+    assert got_record.state.spend_snapshot == entry
+    assert copy.deepcopy(got_record) == got_record
+    assert pickle.loads(pickle.dumps(got_record)) == got_record
+
+    # Partial subset of optional state fields writes only the populated key.
+    only_cache = RootState('codex', 'r1', None, spend_cache=cache)
+    d_only_cache = state_dict(only_cache)
+    assert 'spend_cache' in d_only_cache and 'spend_snapshot' not in d_only_cache
+    only_snap = RootState('codex', 'r1', None, spend_snapshot=entry)
+    d_only_snap = state_dict(only_snap)
+    assert 'spend_snapshot' in d_only_snap and 'spend_cache' not in d_only_snap
+
+    # Durable spend transitions fsync the directory even when serials/ended_at do not change.
+    sync_calls = []
+
+    def spy_write_atomic(path, data, *, sync_dir=True):
+        sync_calls.append(sync_dir)
+        return write_atomic(path, data, sync_dir=sync_dir)
+
+    monkeypatch.setattr('turn_pause.state.write_atomic', spy_write_atomic)
+    with store.locked('codex', 'r1') as record:
+        record.state.cwd = '/portable/work'
+    assert sync_calls[-1] is False
+
+    with store.locked('codex', 'r1') as record:
+        record.spend = spend.acknowledge(record.spend)
+    assert sync_calls[-1] is True
+
+    # SessionEnd clears active state (cache + snapshot) while preserving durable spend.
+    assert store.end('codex', 'r1', 100.0, compactions_counted=False)
+    ended = store.read_record('codex', 'r1')
+    assert ended.state is None
+    assert ended.spend == spend.SpendRecord(
+        episode='codex:r1@1700000000000',
+        seen_value=550_000_000,
+        delivered_value=500_000_000,
+        acked_value=550_000_000,
+    )
+
+    # Malformed spend field in stored JSON raises StateError.
+    path = tmp_path / 'codex-r1.json'
+    bad = json.loads(path.read_text())
+    bad['spend'] = {'episode': 'x', 'seen_value': True, 'delivered_value': None, 'acked_value': None}
+    path.write_text(json.dumps(bad))
+    with pytest.raises(StateError, match=str(path)):
+        store.read_record('codex', 'r1')
+
+
+def test_lazy_splice_kept_with_spend(tmp_path):
+    import copy
+    import pickle
+    from turn_pause import history, spend
+    from turn_pause.state import _LazyEvents, parse_record, record_json
+
+    store = Store(tmp_path)
+    sr = spend.SpendRecord(
+        episode='codex:r1@1700000000000',
+        seen_value=900_000_000,
+        delivered_value=800_000_000,
+        acked_value=800_000_000,
+    )
+    with store.locked('codex', 'r1') as record:
+        record.spend = sr
+        record.state.turn = turn()
+        record.turn_serial = 1
+        for i in range(30):
+            history.append_event(
+                record,
+                'warning',
+                float(10 + i),
+                reason='calls',
+                snapshot=history.snapshot(record.state, compactions_counted=False),
+            )
+        expected_events = list(record.events)
+
+    raw = (tmp_path / 'codex-r1.json').read_text()
+    spend_idx = raw.index(',"spend":{')
+    guards_idx = raw.index(',"prompt_guards":{"cron":')
+    events_idx = raw.index('},"events":[')
+    assert spend_idx < guards_idx < events_idx
+    assert len(raw) - events_idx > 2048
+
+    lazy = parse_record(raw, lazy_events=True)
+    assert type(object.__getattribute__(lazy, 'events')) is _LazyEvents
+    assert lazy.spend == sr
+    assert record_json(lazy) == raw
+    assert type(object.__getattribute__(lazy, 'events')) is _LazyEvents
+    assert copy.deepcopy(lazy).spend == sr
+    assert pickle.loads(pickle.dumps(lazy)).spend == sr
+    assert lazy.events == expected_events
+
+
+def test_spend_omitted_when_none(tmp_path):
+    from turn_pause.state import record_json
+
+    store = Store(tmp_path)
+    with store.locked('codex', 'r1') as record:
+        assert record.spend is None
+        raw = record_json(record)
+    assert '"spend"' not in raw
+    assert ',"prompt_guards":{"cron":' in raw
+    assert raw.index(',"prompt_guards":{"cron":') < raw.index('},"events":[')
+

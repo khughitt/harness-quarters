@@ -409,3 +409,288 @@ def test_spend_hot_path_imports_no_heavy_modules(tmp_path: Path):
     assert 'turn_pause.spend' in imported
     assert sorted(imported & set(HEAVY)) == []
     assert spend.__name__ == 'turn_pause.spend'
+
+
+def make_entry(
+    episode: str = 'ep-1',
+    value: int | float = 500,
+    *,
+    threshold: int | float = 350.0,
+    ratio: int | float = 1.43,
+    window_hours: int = 72,
+    measured_at: int = NOW_MS,
+    complete: bool = True,
+    credits_drawn_24h: int | float | None = 0.0,
+) -> Entry:
+    return Entry(
+        episode=episode,
+        value=value,
+        threshold=threshold,
+        ratio=ratio,
+        window_hours=window_hours,
+        measured_at=measured_at,
+        complete=complete,
+        credits_drawn_24h=credits_drawn_24h,
+    )
+
+
+def test_reconcile_new_episode_replaces():
+    e1 = make_entry('E1', 500)
+    first = spend.reconcile(None, e1)
+    assert first == spend.SpendRecord(
+        episode='E1',
+        seen_value=500,
+        delivered_value=None,
+        acked_value=None,
+    )
+
+    prev = spend.SpendRecord(
+        episode='E1',
+        seen_value=900,
+        delivered_value=800,
+        acked_value=800,
+    )
+    e2 = make_entry('E2', 420)
+    replaced = spend.reconcile(prev, e2)
+    assert replaced == spend.SpendRecord(
+        episode='E2',
+        seen_value=420,
+        delivered_value=None,
+        acked_value=None,
+    )
+
+
+def test_reconcile_raises_seen_value():
+    sr = spend.SpendRecord(
+        episode='E1',
+        seen_value=500,
+        delivered_value=500,
+        acked_value=500,
+    )
+    higher = spend.reconcile(sr, make_entry('E1', 650))
+    assert higher == spend.SpendRecord(
+        episode='E1',
+        seen_value=650,
+        delivered_value=500,
+        acked_value=500,
+    )
+
+    lower = spend.reconcile(higher, make_entry('E1', 400))
+    assert lower == spend.SpendRecord(
+        episode='E1',
+        seen_value=650,
+        delivered_value=500,
+        acked_value=500,
+    )
+
+
+def test_reconcile_without_entry_keeps_record():
+    assert spend.reconcile(None, None) is None
+    sr = spend.SpendRecord(
+        episode='E1',
+        seen_value=700,
+        delivered_value=600,
+        acked_value=None,
+    )
+    kept = spend.reconcile(sr, None)
+    assert kept == sr
+
+
+def test_due_when_never_delivered():
+    entry = make_entry('E1', 500)
+    assert spend.is_due(None, entry) is True
+    assert spend.is_due(None, None) is False
+
+    sr = spend.reconcile(None, entry)
+    assert spend.is_pending(sr) is False
+    assert spend.is_due(sr, entry) is True
+    assert spend.is_due(sr, None) is False
+
+
+def test_due_at_twice_acked():
+    sr = spend.SpendRecord(
+        episode='E1',
+        seen_value=800,
+        delivered_value=800,
+        acked_value=800,
+    )
+    below = make_entry('E1', 1599)
+    sr_below = spend.reconcile(sr, below)
+    assert spend.is_pending(sr_below) is False
+    assert spend.is_due(sr_below, below) is False
+
+    at_twice = make_entry('E1', 1600)
+    sr_twice = spend.reconcile(sr, at_twice)
+    assert spend.is_pending(sr_twice) is False
+    assert spend.is_due(sr_twice, at_twice) is True
+    assert spend.is_due(sr_twice, None) is False
+
+
+def test_pending_after_root_delivery():
+    assert spend.is_pending(None) is False
+    undelivered = spend.SpendRecord(
+        episode='E1',
+        seen_value=500,
+        delivered_value=None,
+        acked_value=None,
+    )
+    assert spend.is_pending(undelivered) is False
+
+    delivered = spend.deliver(undelivered, 500)
+    assert delivered == spend.SpendRecord(
+        episode='E1',
+        seen_value=500,
+        delivered_value=500,
+        acked_value=None,
+    )
+    assert spend.is_pending(delivered) is True
+    assert spend.is_due(delivered, make_entry('E1', 500)) is False
+
+    acked = spend.acknowledge(delivered)
+    assert spend.is_pending(acked) is False
+
+
+def test_deliver_resets_ack():
+    sr = spend.SpendRecord(
+        episode='E1',
+        seen_value=1650,
+        delivered_value=800,
+        acked_value=800,
+    )
+    delivered = spend.deliver(sr, 1650)
+    assert delivered.acked_value is None
+    assert delivered.delivered_value == 1650
+    assert delivered.seen_value == 1650
+    assert spend.is_pending(delivered) is True
+
+    # Delivering a snapshot value lower than seen_value keeps seen_value at max.
+    from_snap = spend.deliver(
+        spend.SpendRecord('E1', seen_value=1800, delivered_value=800, acked_value=800),
+        1650,
+    )
+    assert from_snap.seen_value == 1800
+    assert from_snap.delivered_value == 1650
+    assert from_snap.acked_value is None
+
+
+def test_acknowledge_uses_max():
+    sr_seen_larger = spend.SpendRecord(
+        episode='E1',
+        seen_value=1700,
+        delivered_value=1650,
+        acked_value=None,
+    )
+    acked = spend.acknowledge(sr_seen_larger)
+    assert acked == spend.SpendRecord(
+        episode='E1',
+        seen_value=1700,
+        delivered_value=1650,
+        acked_value=1700,
+    )
+    assert spend.is_pending(acked) is False
+
+    # After resume with no fresh entry, reconcile leaves seen/delivered at 1650 and acks at 1650.
+    sr_resumed = spend.reconcile(
+        spend.SpendRecord(
+            episode='E1',
+            seen_value=1650,
+            delivered_value=1650,
+            acked_value=None,
+        ),
+        None,
+    )
+    acked_resume = spend.acknowledge(sr_resumed)
+    assert acked_resume == spend.SpendRecord(
+        episode='E1',
+        seen_value=1650,
+        delivered_value=1650,
+        acked_value=1650,
+    )
+    assert spend.is_pending(acked_resume) is False
+
+    # Undelivered record cannot be acknowledged.
+    with pytest.raises(ValueError):
+        spend.acknowledge(spend.SpendRecord('E1', seen_value=500))
+
+
+def test_inject_sets_both():
+    sr = spend.SpendRecord(
+        episode='E1',
+        seen_value=500,
+        delivered_value=None,
+        acked_value=None,
+    )
+    injected = spend.inject(sr, 550)
+    assert injected == spend.SpendRecord(
+        episode='E1',
+        seen_value=550,
+        delivered_value=550,
+        acked_value=550,
+    )
+    assert spend.is_pending(injected) is False
+    assert spend.is_due(injected, make_entry('E1', 550)) is False
+
+
+def test_replacement_before_pending():
+    sr_e1 = spend.SpendRecord(
+        episode='E1',
+        seen_value=500,
+        delivered_value=500,
+        acked_value=None,
+    )
+    assert spend.is_pending(sr_e1) is True
+    entry_e2 = make_entry('E2', 450)
+    sr_e2 = spend.reconcile(sr_e1, entry_e2)
+    assert spend.is_pending(sr_e2) is False
+    assert spend.is_due(sr_e2, entry_e2) is True
+    assert sr_e2 == spend.SpendRecord(
+        episode='E2',
+        seen_value=450,
+        delivered_value=None,
+        acked_value=None,
+    )
+
+
+def test_spend_record_and_entry_dict_round_trip():
+    records = [
+        spend.SpendRecord('E1', seen_value=500),
+        spend.SpendRecord('E1', seen_value=500.5, delivered_value=450.0, acked_value=None),
+        spend.SpendRecord('E1', seen_value=0, delivered_value=0, acked_value=0),
+        spend.SpendRecord('E1', seen_value=1700, delivered_value=1650, acked_value=1700),
+    ]
+    for sr in records:
+        as_dict = spend.spend_record_to_dict(sr)
+        assert spend.spend_record_from_dict(as_dict) == sr
+        assert spend.spend_record_from_dict(json.loads(json.dumps(as_dict))) == sr
+
+    bad_records = [
+        None,
+        [],
+        {'episode': 'E1'},
+        {'episode': 'E1', 'seen_value': 1, 'delivered_value': None, 'acked_value': None, 'extra': 1},
+        {'episode': '', 'seen_value': 1, 'delivered_value': None, 'acked_value': None},
+        {'episode': 123, 'seen_value': 1, 'delivered_value': None, 'acked_value': None},
+        {'episode': 'E1', 'seen_value': True, 'delivered_value': None, 'acked_value': None},
+        {'episode': 'E1', 'seen_value': -1, 'delivered_value': None, 'acked_value': None},
+        {'episode': 'E1', 'seen_value': float('nan'), 'delivered_value': None, 'acked_value': None},
+        {'episode': 'E1', 'seen_value': float('inf'), 'delivered_value': None, 'acked_value': None},
+        {'episode': 'E1', 'seen_value': '1', 'delivered_value': None, 'acked_value': None},
+        {'episode': 'E1', 'seen_value': 1, 'delivered_value': False, 'acked_value': None},
+        {'episode': 'E1', 'seen_value': 1, 'delivered_value': -0.1, 'acked_value': None},
+        {'episode': 'E1', 'seen_value': 1, 'delivered_value': float('inf'), 'acked_value': None},
+        {'episode': 'E1', 'seen_value': 1, 'delivered_value': 1, 'acked_value': True},
+        {'episode': 'E1', 'seen_value': 1, 'delivered_value': 1, 'acked_value': -5},
+        {'episode': 'E1', 'seen_value': 1, 'delivered_value': 1, 'acked_value': float('nan')},
+    ]
+    for bad in bad_records:
+        with pytest.raises((TypeError, ValueError)):
+            spend.spend_record_from_dict(bad)  # type: ignore[arg-type]
+
+    entry = make_entry('E1', 500, credits_drawn_24h=12.5)
+    entry_dict = spend.entry_to_dict(entry)
+    assert spend.entry_from_dict(entry_dict) == entry
+    with pytest.raises((TypeError, ValueError)):
+        spend.entry_from_dict([])  # type: ignore[arg-type]
+    with pytest.raises((TypeError, ValueError)):
+        spend.entry_from_dict({**entry_dict, 'extra': 1})
+
