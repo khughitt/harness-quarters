@@ -68,6 +68,21 @@ apply. A running agy also refuses first-run adoption. Preserve the file and stop
 the relevant sessions before an authorized retry; never delete settings to make
 link-check green.
 
+## Codex developer instructions
+
+`developer_instructions` in `harnesses/codex/config.toml` holds lore's long-wait rule
+(`rule:369c00284c7e47028337d6e8c06e41e7`). gpt-6-astra controllers follow it there and
+not from `AGENTS.md` alone (lore-756d5f). `tools/codex-instructions` renders the rule
+from lore's assembled `instructions/AGENTS.md`, checking its manifest hashes, and writes
+it as one line. `just codex-instructions` regenerates the tracked value. The default
+pre-commit hook refuses a staged config whose value is not the current rule, and
+`just link-check` reports a stale live config behind `~/.codex` or `~/.codex-work`.
+Each change to a live value alters every Codex session's instructions and needs the
+user's approval at that moment. The tracked value goes live by merging to main. The
+untracked work config is written from main with `tools/codex-instructions write-live`; a
+work config without a top-level `developer_instructions` line first needs
+`developer_instructions = ""` added above its first table, because the writer only replaces it.
+
 ## Diagnosis
 
 A refused entry prevents apply. Read the named path and owner mismatch first.

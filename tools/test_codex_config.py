@@ -13,3 +13,12 @@ def test_background_terminal_wait_reaches_one_hour():
     # stops Codex loading its config.
     value = tomllib.loads(CONFIG.read_text())['background_terminal_max_timeout']
     assert type(value) is int and value == 3600000
+
+
+def test_developer_instructions_carry_the_long_wait_rule():
+    # Generated from lore rule:369c0028 by `just codex-instructions`; the pre-commit
+    # hook checks it against lore. This structural check runs where lore is absent.
+    value = tomllib.loads(CONFIG.read_text())['developer_instructions']
+    assert type(value) is str
+    assert value.startswith('Never end a turn waiting on work the harness does not track.')
+    assert '`timeout_ms: 3600000`' in value
