@@ -141,6 +141,60 @@ date = 2026-11-16
 evidence = "hq-9f547b"
 note = "Sandbox: a watcher the controller starts under the default sandbox_mode workspace-write did not survive its sleep (90 s pilot: empty log, no output file, no surviving process; presumably the sandbox reaps the exec call's descendants when it returns), though the same queue command fired from outside the sandbox woke that idle session. The 900 s run used danger-full-access. Isolated interactive TUI session, small default context (about 14k tokens). The controller started a detached watcher (setsid nohup sh -c 'sleep 900; ...; codex queue --thread \"$CODEX_THREAD_ID\" --message ... --resume'), replied WAITING and ended its turn. It made no call for 15 minutes. The queued turn started within about 0.1 s of the queue command (task_started with turn_trigger queue) and its first model output came about 3 s later; the turn took two calls (reading the result file, answering). The first read 13952 of 17873 input tokens from cache: the woken turn's first call carried about 3.9k uncached input tokens in each of the three queue runs (about 4.1k for the whole wake), as the new turn resends turn-start context, where the long-shell-wait answering call carried 187. A failed --resume was not observed (openai/codex#61773 reports one can still exit 0). Waits beyond 15 minutes and idle-thread unloading (thread_unload_delay_secs) were not probed."
 
+[facts.hook-stop-continue]
+type = "boolean"
+description = "A Stop hook can continue the current turn and pass its reason to the model."
+
+[facts.hook-stop-continue.harness.agy]
+status = "probed"
+value = true
+version = "1.5.13"
+date = 2026-11-19
+evidence = "hq-d1dd06; files:agy-1.5.13-hooks.json"
+note = "In an isolated interactive terminal session with a loopback model endpoint, one continue reply at executionNum 0 put its reason in the next model request. The same turn then fired Stop with executionNum 1."
+
+[facts.hook-stop-execution-num-resets]
+type = "boolean"
+description = "After a Stop continuation, the next human turn in the same conversation starts its Stop execution counter at zero."
+
+[facts.hook-stop-execution-num-resets.harness.agy]
+status = "probed"
+value = true
+version = "1.5.13"
+date = 2026-11-19
+evidence = "hq-d1dd06; files:agy-1.5.13-hooks.json"
+note = "In an isolated interactive terminal session with a loopback model endpoint, turn one emitted 0 then 1. Turn two and its shell-child wake each emitted 0 with the same conversationId."
+
+[facts.hook-stop-termination-samples]
+type = "set"
+description = "Observed Stop fields as case=terminationReason,fullyIdle. An absent sample means no Stop was observed for that case."
+
+[facts.hook-stop-termination-samples.harness.agy]
+status = "probed"
+value = [
+    "normal=NO_TOOL_CALL,true",
+    "continuation=NO_TOOL_CALL,true",
+    "shell-in-flight=NO_TOOL_CALL,false",
+    "shell-wake=NO_TOOL_CALL,true",
+    "escape-before-model-response=absent",
+]
+version = "1.5.13"
+date = 2026-11-19
+evidence = "hq-d1dd06; files:agy-1.5.13-hooks.json"
+note = "In an isolated interactive terminal session with a loopback model endpoint, Escape visibly interrupted a turn with its first model response held. No Stop arrived in 12 seconds, so there were no cancellation field values for that case. Other cancellation stages remain unobserved."
+
+[facts.hook-system-message-injection]
+type = "set"
+description = "Native hook events shown to deliver a hook-supplied system message into the following model invocation."
+
+[facts.hook-system-message-injection.harness.agy]
+status = "probed"
+value = ["SessionStart", "PreInvocation"]
+version = "1.5.13"
+date = 2026-11-19
+evidence = "hq-d1dd06; files:agy-1.5.13-hooks.json"
+note = "In an isolated interactive terminal session with a loopback model endpoint, each injectSteps systemMessage marker reached the first main model request. Both remained present when the next turn requested a shell command. Native request-review with an explicit command ask rule still prompted, and the command started after one-time approval."
+
 [facts.stop-input-in-flight-statuses]
 type = "set"
 description = "The statuses Claude Code's Stop input gives, in background_tasks, to work that is still to finish."
