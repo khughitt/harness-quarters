@@ -296,7 +296,9 @@ and empty `execution` collections and diagnostic counters. Codex terminal
 null; input-minus-cached arithmetic defaults absent operands to zero and still
 rejects explicit null operands. A later record-usage source after count usage
 requests a seeded restart. Discarded count usage contributes no applied population.
-Native counters stay unchanged in `response.native`.
+Native counters stay unchanged in `response.native`. Codex function results carry
+`exit_code: null` (`absent:not_decoded`), as Claude's do; a command's exit stays on its
+execution facts.
 
 Codex patch header paths stay in `patch_paths`; lexical candidate `paths` normalize
 separately. Direct shell calls expose ordered `commands` and directories. Commands

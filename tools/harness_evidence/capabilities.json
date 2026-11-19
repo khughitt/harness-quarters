@@ -255,6 +255,11 @@
  "evidence_rule": "synthetic samples establish decoder conformance; observed samples or probes establish emission; absent from a sample means unobserved",
  "harnesses": {
   "agy": {
+   "discovery": {
+    "default_roots": [
+     ".gemini/antigravity-cli/brain"
+    ]
+   },
    "exceptions": [],
    "fields": {
     "at_ms": {
@@ -4095,6 +4100,10 @@
       "payload.call_id",
       "payload.output"
      ]
+    },
+    "results[].exit_code": {
+     "coverage_keys": [],
+     "provenance": []
     },
     "results[].interrupted": {
      "coverage_keys": [

@@ -163,6 +163,9 @@ COVERAGE_KEYS.update({
     **{f"results[].{name}": ["applied:tool_output/input:output"] for name in
        ("bytes", "interrupted", "truncation")},
 })
+# A function output records no exit code of its own (spec §5.2 null-for-absent); command
+# exits stay on the associated execution facts.
+PROVENANCE["results[].exit_code"] = []
 PROVENANCE["execution.call_updates[].error"] = ["payload.item.exit_code", "payload.exit_code",
                                                 "payload.success", "payload.result", "payload.output"]
 CONVENTIONS |= {"execution.call_updates[].error"}
@@ -195,6 +198,7 @@ def provenance_defaults():
                     "rule": "codex_" + field.replace("[]", "").replace(".", "_")}
             for field, paths in PROVENANCE.items()}
     defaults["context.context_window"]["source"] = "context_window_snapshot"
+    defaults["results[].exit_code"]["rule"] = "absent:not_decoded"
     for field in ("calls[].skills", "execution.runs", "execution.commands", "execution.call_updates", "execution.writes", "execution.operations"):
         defaults[field]["basis"] = "heuristic"
     for field in METADATA_PROVENANCE:

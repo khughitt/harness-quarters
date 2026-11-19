@@ -129,7 +129,8 @@ def test_artifact_covers_catalogue_hashes_and_keeps_provenance_separate():
     assert len(samples) == 241
     assert sorted(artifact["harnesses"]) == ["agy", "claude-code", "codex"]
     for slug, harness in artifact["harnesses"].items():
-        assert set(harness) == {"record_kinds", "fields", "labels", "versions", "exceptions", "header", "index"} | ({"side_inputs"} if slug == "agy" else {"discovery"})
+        assert set(harness) == {"record_kinds", "fields", "labels", "versions", "exceptions", "header", "index",
+                                "discovery"} | ({"side_inputs"} if slug == "agy" else set())
         assert harness["exceptions"] == []
         assert harness["header"] == {"implemented": True, "line_limit": 50}
         if slug == "codex":
@@ -416,6 +417,7 @@ def test_codex_selection_and_metric_dependencies_are_declared():
     assert view['codex']['header'] == {'implemented':True, 'line_limit':50}
     assert view['codex']['discovery']['default_roots'] == [
         '.codex/sessions', '.codex/archived_sessions', '.codex-work/sessions', '.codex-work/archived_sessions']
+    assert view['agy']['discovery']['default_roots'] == ['.gemini/antigravity-cli/brain']
     fields = view['codex']['fields']
     expected = {'results[].bytes':['applied:tool_output/input:output'],
                 'results[].call_id':['applied:tool_output/input:call_id'],

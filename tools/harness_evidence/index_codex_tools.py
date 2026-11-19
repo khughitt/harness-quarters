@@ -338,7 +338,7 @@ def on_output(state, event, payload, day):
         'error': own['error'] if call is not None else None,
         'interrupted': own['interrupted'] if call is not None else None,
         'native_duration_ms': None, 'background_id': None, 'agent': None,
-        'child_session': None, 'answers': None,
+        'child_session': None, 'answers': None, 'exit_code': None,
         'truncation': {'kind': cut, 'original_tokens': tokens, 'original_bytes': size}})
     _add(event['execution'], facts)
 

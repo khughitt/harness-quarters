@@ -341,7 +341,7 @@ def build(catalogue: Path, *, index_catalogue: Path | None = None) -> dict:
                     evidence["fields_seen"][provenance].update(_seen(event, [native[event["line"]]], DECLARED[slug]))
     harnesses["codex"]["fields"]["filename_identity.index_thread"].update(
         basis="convention", rule="index_rollout_name")
-    for alias in ("claude", "codex"):
+    for alias in ("claude", "codex", "agy"):
         harnesses[homes.SLUG[alias]]["discovery"] = {"default_roots": [
             path.as_posix() for home in homes.homes(Path("."), alias)
             for _store, path in homes.stores(home)]}

@@ -86,8 +86,8 @@ Both harnesses publish `header` support with a fifty-physical-line limit. Header
 CWD selection stops at the first truthy top-level CWD or session metadata record,
 including an empty metadata CWD. Optional identity from that scan does not replace
 the ordinary reader's independent identity window. `discovery.default_roots` lists
-home-relative store locations, allowing consumers to apply their overrides before
-enumeration. Codex filename identity includes the ordinary thread/segment claim and
+home-relative store locations for Claude, Codex and agy, allowing consumers to apply
+their overrides before enumeration. Codex filename identity includes the ordinary thread/segment claim and
 `index_thread`, the stricter lowercase rollout claim used by index readiness;
 these convention facts remain available even when source bytes are missing.
 

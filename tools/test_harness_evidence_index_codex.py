@@ -383,3 +383,14 @@ def test_accepted_empty_command_object_has_named_inferred_provenance(name):
     proofs = {field: {**proof, "ref": event["ref"], "revision": "test", **event["provenance"].get(field, {})}
               for field, proof in defaults.items()}
     assert index_events._factor_provenance({**event, "provenance": proofs}, defaults) == event["provenance"]
+
+
+def test_codex_results_carry_a_null_exit_code_declared_absent(tmp_path):
+    # Spec §5.2 null-for-absent: a native function output records no exit code of its own;
+    # command exits stay on the associated execution facts.
+    from harness_evidence import index_codex
+    out = decode(tmp_path)
+    results = [result for value in out if value["object"] == "index_event" for result in value["results"]]
+    assert results and all("exit_code" in result and result["exit_code"] is None for result in results)
+    assert index_codex.provenance_defaults()["results[].exit_code"] == {
+        "native_paths": [], "coverage_keys": [], "basis": "native", "rule": "absent:not_decoded"}

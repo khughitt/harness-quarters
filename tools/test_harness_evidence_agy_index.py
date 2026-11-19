@@ -630,6 +630,9 @@ def test_shared_additions_preserve_original_agy_capability_block():
         assert agy["fields"].pop(field) == {"coverage_keys": [], "provenance": []}
     for field in ("context", "execution"):
         assert agy["index"]["absent"].pop(field) == "not_recorded"
+    from harness_evidence import index_agy
+    assert agy["index"].pop("origin_kinds") == index_agy.ORIGIN_KINDS  # main e8f16150's checked addition
+    assert agy.pop("discovery") == {"default_roots": [".gemini/antigravity-cli/brain"]}
     # Entire immutable main57f5690c agy capability block, without only checked additions.
     digest = hashlib.sha256(json.dumps(agy, sort_keys=True, separators=(",", ":"),
                                        ensure_ascii=True).encode()).hexdigest()
